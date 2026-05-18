@@ -22,8 +22,8 @@ dist/
 
 # Warp lockfiles and testing artifacts
 warp.lock
-test_*.wr
-tmp*.wr
+test_*.vn
+tmp*.vn
 
 .agents/
 .claude/

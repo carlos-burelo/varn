@@ -11,7 +11,7 @@
 ```sh
 git clone https://github.com/tu-usuario/Varn
 cd Varn
-cargo build --bin wr --release
+cargo build --bin vn --release
 ```
 
 El binario queda en `target/release/wr`.
@@ -20,7 +20,7 @@ El binario queda en `target/release/wr`.
 
 **Linux/macOS:**
 ```sh
-cp target/release/wr ~/.local/bin/wr
+cp target/release/vn ~/.local/bin/wr
 # O agregar target/release/ al PATH en ~/.bashrc / ~/.zshrc
 ```
 
@@ -32,8 +32,8 @@ Copy-Item target\release\wr.exe "$env:USERPROFILE\.cargo\bin\wr.exe"
 ## Verificar instalación
 
 ```sh
-wr doctor
-wr tests/main.wr
+vn doctor
+vn tests/main.vn
 # PASSED: 534 / FAILED: 0
 ```
 
@@ -44,12 +44,12 @@ wr tests/main.wr
 cargo build --bin wr
 
 # Ejecutar directamente sin instalar
-cargo run --bin wr -- tests/main.wr
+cargo run --bin vn -- tests/main.vn
 ```
 
 ## Variables de entorno opcionales
 
 ```sh
-RUST_LOG=debug wr run program.wr    # Logging detallado
-RUST_BACKTRACE=1 wr run program.wr  # Backtrace en errores
+RUST_LOG=debug vn run program.vn    # Logging detallado
+RUST_BACKTRACE=1 vn run program.vn  # Backtrace en errores
 ```

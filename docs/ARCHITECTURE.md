@@ -5,7 +5,7 @@ Descripción técnica de la implementación del lenguaje Varn, escrito completam
 ## 1. Pipeline de Compilación y Ejecución
 
 ```text
-Código Fuente (.wr)
+Código Fuente (.vn)
       │
       ▼
 [ varn-lexer ]    → Tokens
@@ -54,7 +54,7 @@ Código Fuente (.wr)
 ### Herramientas
 - **`varn-cli`**: Binario `wr`. Orquesta el pipeline completo. Comandos: `run`, `check`, `build`, `bench`, `disasm`, `inspect`, `repl`, `add`, `install`, etc.
 - **`varn-lsp`**: Language Server Protocol (tower-lsp + tokio). Consulta SemanticDB del checker. Hover, completions, go-to-definition.
-- **`varn-pm`**: Package manager. Resolución semver sobre git tags, caché global `~/.wr/cache/`, SHA256 integrity.
+- **`varn-pm`**: Package manager. Resolución semver sobre git tags, caché global `~/.vn/cache/`, SHA256 integrity.
 - **`varn-debug`**: Profiling, disassembly, inspección.
 
 ---
@@ -133,10 +133,10 @@ Tres espacios de nombres:
 - `std:*` — stdlib lazy-loaded (`std:fs`, `std:time`, `std:crypto`, etc.).
 - Rutas relativas (`"./module"`) — código del usuario.
 
-Resolución centralizada en `varn-modules`. Caché de bytecode en `.wr/cache/` invalidado por hash de contenido.
+Resolución centralizada en `varn-modules`. Caché de bytecode en `.vn/cache/` invalidado por hash de contenido.
 
 ---
 
 ## 8. Formato `.wrc`
 
-`wr build program.wr` produce un `.wrc`: magic `WRC\0` + versión u32 LE + artefacto serializado con postcard. `wr run program.wrc` omite todas las fases de compilación y ejecuta directamente.
+`vn build program.vn` produce un `.wrc`: magic `WRC\0` + versión u32 LE + artefacto serializado con postcard. `vn run program.wrc` omite todas las fases de compilación y ejecuta directamente.

@@ -17,7 +17,7 @@ Reporta de forma privada (ver abajo) si encuentras:
 
 ## Qué NO es un vulnerability
 
-- Crashes en código `.wr` que el usuario escribe (comportamiento esperado: error de runtime).
+- Crashes en código `.vn` que el usuario escribe (comportamiento esperado: error de runtime).
 - Panics en `--debug` o `--trace` modes (herramientas de desarrollo, no superficie de ataque).
 - Comportamiento indefinido en código que ya falla en type-checking.
 

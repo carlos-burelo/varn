@@ -82,6 +82,6 @@ pub fn execute(args: InitArgs) -> Result<(), CliError> {
     println!("  {main_path}");
     println!("  {wr_dir}/.env");
     println!();
-    println!("Ejecutar con:  wr run {main_path}");
+    println!("Ejecutar con:  vn run {main_path}");
     Ok(())
 }

@@ -324,7 +324,7 @@ import { sqrt, PI } from "std:math"
 import { utils } from "./utils"
 import { Model } from "../models/user"
 
-// Paquetes externos (requiere varn.json + wr install)
+// Paquetes externos (requiere varn.json + vn install)
 import { client } from "pkg:mylib"
 ```
 
