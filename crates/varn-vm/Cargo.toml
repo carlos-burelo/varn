@@ -1,0 +1,15 @@
+[package]
+name = "varn-vm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+varn-types    = { path = "../varn-types" }
+varn-core     = { path = "../varn-core" }
+varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
+varn-runtime  = { path = "../varn-runtime" }
+varn-modules  = { path = "../varn-modules" }
+varn-base     = { path = "../varn-base" }
+parking_lot  = "0.12"
+rust_decimal = "1.34"
+rustc-hash   = "2.1"

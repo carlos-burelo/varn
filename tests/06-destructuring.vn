@@ -1,0 +1,37 @@
+
+const obj1 = { a: 1, b: 2, c: 3 }
+const { a, b } = obj1
+assert("obj destr basic", a === 1 && b === 2)
+
+const { a: renamed } = obj1
+assert("obj destr rename", renamed === 1)
+
+const { name = "default", age = 0 } = { name: "Alice" }
+assert("obj destr default name", name === "Alice")
+assert("obj destr default age",  age === 0)
+
+const nested = { point: { x: 10, y: 20 } }
+const { point: { x: nx, y: ny } } = nested
+assert("nested obj destr", nx === 10 && ny === 20)
+
+const [f1, f2, f3] = [10, 20, 30]
+assert("arr destr basic", f1 === 10 && f3 === 30)
+
+const [skip1, _, skip3] = [100, 200, 300]
+assert("arr destr skip", skip1 === 100 && skip3 === 300)
+
+const [head, ...tail] = [1, 2, 3, 4]
+assert("rest head",   head === 1)
+assert("rest tail",   tail.length === 3)
+assert("rest value",  tail[0] === 2)
+
+const data = { coords: [5, 6] }
+const { coords: [cx, cy] } = data
+assert("nested arr-in-obj", cx === 5 && cy === 6)
+
+const base = { x: 1, y: 2 }
+const ext  = { ...base, z: 3 }
+assert("obj spread x", ext.x === 1)
+assert("obj spread z", ext.z === 3)
+
+print("[PASSED] 6. Destructuring ")

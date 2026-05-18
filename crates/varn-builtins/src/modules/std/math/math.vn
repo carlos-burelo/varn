@@ -1,0 +1,34 @@
+// std:math — Mathematical constants and functions
+
+export namespace Math {
+    export declare const E: float;
+    export declare const LN10: float;
+    export declare const LN2: float;
+    export declare const LOG10E: float;
+    export declare const LOG2E: float;
+    export declare const PI: float;
+    export declare const SQRT1_2: float;
+    export declare const SQRT2: float;
+
+    export declare function abs(x: float): float;
+    export declare function acos(x: float): float;
+    export declare function asin(x: float): float;
+    export declare function atan(x: float): float;
+    export declare function atan2(y: float, x: float): float;
+    export declare function ceil(x: float): float;
+    export declare function cos(x: float): float;
+    export declare function exp(x: float): float;
+    export declare function floor(x: float): float;
+    export declare function log(x: float): float;
+    export declare function max(...args: float[]): float;
+    export declare function min(...args: float[]): float;
+    export declare function pow(x: float, y: float): float;
+    export declare function random(): float;
+    export declare function round(x: float): float;
+    export declare function sin(x: float): float;
+    export declare function sqrt(x: float): float;
+    export declare function tan(x: float): float;
+    export declare function sign(x: float): float;
+    export declare function trunc(x: float): float;
+}
+

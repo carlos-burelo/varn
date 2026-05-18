@@ -1,0 +1,10 @@
+// std:sys — pure IDL facade over runtime system host operations.
+
+export namespace sys {
+    export declare function platform(): str;
+    export declare function cwd(): str;
+    export declare function args(): str[];
+    export declare function exit(code?: int): void;
+    export declare function env(key: str): str;
+    export declare function setEnv(key: str, val: str): void;
+}

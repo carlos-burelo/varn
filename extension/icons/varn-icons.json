@@ -1,0 +1,13 @@
+{
+  "iconDefinitions": {
+    "_vn": {
+      "iconPath": "./vn.svg"
+    }
+  },
+  "fileExtensions": {
+    "vn": "_vn"
+  },
+  "languageIds": {
+    "vn": "_vn"
+  }
+}

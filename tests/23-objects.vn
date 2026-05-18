@@ -1,0 +1,59 @@
+
+class Builder {
+    private parts: str[]
+    constructor() { this.parts = [] }
+    add(s: str): Builder {
+        this.parts.push(s)
+        return this
+    }
+    build(): str { return this.parts.join(" ") }
+}
+
+const result = new Builder().add("hello").add("from").add("builder").build()
+assert("builder pattern", result === "hello from builder")
+
+class Node<T> {
+    value: T
+    next: Node<T> | null
+    constructor(v: T) {
+        this.value = v
+        this.next = null
+    }
+}
+
+class LinkedList<T> {
+    private head: Node<T> | null
+    private _size: int
+    
+    constructor() {
+        this.head = null
+        this._size = 0
+    }
+    prepend(v: T): void {
+        const node = new Node<T>(v)
+        node.next = this.head
+        this.head = node
+        this._size = this._size + 1
+    }
+    get size(): int { return this._size }
+    toArray(): T[] {
+        const arr: T[] = []
+        let cur = this.head
+        while (cur !== null) {
+            arr.push(cur.value)
+            cur = cur.next
+        }
+        return arr
+    }
+}
+
+const list = new LinkedList<int>();
+list.prepend(3);
+list.prepend(2);
+list.prepend(1);
+assert("linked list size",  list.size === 3)
+const la = list.toArray()
+assert("linked list [0]",   la[0] === 1)
+assert("linked list [2]",   la[2] === 3)
+
+print("[PASSED] 23. Complex objects ")

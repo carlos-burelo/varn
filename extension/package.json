@@ -1,0 +1,413 @@
+{
+  "name": "varn-language",
+  "displayName": "Varn Language Support",
+  "description": "Syntax highlighting, diagnostics, hover, go-to-definition, completions, rename, run and debug for the Varn language.",
+  "version": "0.2.0",
+  "publisher": "Varn",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/varn-lang/varn"
+  },
+  "icon": "icon.png",
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Debuggers",
+    "Themes"
+  ],
+  "activationEvents": [
+    "onLanguage:Varn",
+    "onCommand:Varn.restartServer",
+    "onCommand:Varn.stopServer",
+    "onCommand:Varn.showServerLog",
+    "onCommand:Varn.runFile",
+    "onCommand:Varn.runFileInTerminal",
+    "onCommand:Varn.showAst",
+    "onCommand:Varn.showTokens",
+    "onCommand:Varn.disasmFile",
+    "onCommand:Varn.benchFile",
+    "onCommand:Varn.doctor",
+    "onCommand:Varn.installRuntime",
+    "onCommand:Varn.runWithPhases",
+    "onCommand:Varn.toggleBuildMode"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "Varn",
+        "aliases": [
+          "Varn",
+          "Varn"
+        ],
+        "extensions": [
+          ".vn"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "Varn",
+        "scopeName": "source.vn",
+        "path": "./syntaxes/varn.tmLanguage.json"
+      }
+    ],
+    "iconThemes": [
+      {
+        "id": "varn-icons",
+        "label": "Varn Icons",
+        "path": "./icons/varn-icons.json"
+      }
+    ],
+    "breakpoints": [
+      {
+        "language": "Varn"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "Varn",
+        "label": "Varn",
+        "languages": [
+          "Varn"
+        ],
+        "initialConfigurations": [
+          {
+            "type": "Varn",
+            "request": "launch",
+            "name": "Run Varn File",
+            "program": "${file}",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "verbose": false,
+            "debugPhases": []
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Varn: Run file",
+            "description": "Run the current Varn file",
+            "body": {
+              "type": "Varn",
+              "request": "launch",
+              "name": "Run Varn File",
+              "program": "^\"\\${file}\"",
+              "args": [],
+              "cwd": "^\"\\${workspaceFolder}\"",
+              "verbose": false,
+              "debugPhases": []
+            }
+          },
+          {
+            "label": "Varn: Run with AST dump",
+            "description": "Run and print the AST",
+            "body": {
+              "type": "Varn",
+              "request": "launch",
+              "name": "Varn – AST dump",
+              "program": "^\"\\${file}\"",
+              "cwd": "^\"\\${workspaceFolder}\"",
+              "verbose": true,
+              "debugPhases": [
+                "ast"
+              ]
+            }
+          }
+        ],
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "program"
+            ],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Absolute path to the .Varn file to run.",
+                "default": "${file}"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Extra arguments passed after -- to the Varn program.",
+                "default": []
+              },
+              "cwd": {
+                "type": "string",
+                "description": "Working directory for the Varn process.",
+                "default": "${workspaceFolder}"
+              },
+              "verbose": {
+                "type": "boolean",
+                "description": "Print stage-level progress messages (--verbose).",
+                "default": false
+              },
+              "noRun": {
+                "type": "boolean",
+                "description": "Compile but skip execution (--noRun).",
+                "default": false
+              },
+              "debugPhases": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "tokens",
+                    "ast",
+                    "bytecode",
+                    "symbols",
+                    "binds",
+                    "modules",
+                    "types",
+                    "errors",
+                    "trace",
+                    "calls",
+                    "consts",
+                    "scope",
+                    "graph"
+                  ]
+                },
+                "description": "Debug phases to enable (--debug=phase1,phase2,...).",
+                "default": []
+              }
+            }
+          }
+        }
+      }
+    ],
+    "commands": [
+      {
+        "command": "Varn.restartServer",
+        "title": "Restart Language Server",
+        "category": "Varn"
+      },
+      {
+        "command": "Varn.stopServer",
+        "title": "Stop Language Server",
+        "category": "Varn"
+      },
+      {
+        "command": "Varn.showServerLog",
+        "title": "Show Language Server Log",
+        "category": "Varn"
+      },
+      {
+        "command": "Varn.runFile",
+        "title": "Run File",
+        "category": "Varn",
+        "icon": "$(play)"
+      },
+      {
+        "command": "Varn.runFileInTerminal",
+        "title": "Run File in Terminal",
+        "category": "Varn",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "Varn.showAst",
+        "title": "Show AST",
+        "category": "Varn",
+        "icon": "$(symbol-structure)"
+      },
+      {
+        "command": "Varn.showTokens",
+        "title": "Show Tokens",
+        "category": "Varn"
+      },
+      {
+        "command": "Varn.disasmFile",
+        "title": "Show Bytecode Disassembly",
+        "category": "Varn",
+        "icon": "$(symbol-keyword)"
+      },
+      {
+        "command": "Varn.benchFile",
+        "title": "Benchmark File",
+        "category": "Varn",
+        "icon": "$(dashboard)"
+      },
+      {
+        "command": "Varn.doctor",
+        "title": "Doctor (Check Runtime)",
+        "category": "Varn",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "Varn.installRuntime",
+        "title": "Install Runtime",
+        "category": "Varn",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "Varn.runWithPhases",
+        "title": "Run with Debug Phases...",
+        "category": "Varn",
+        "icon": "$(debug-console)"
+      },
+      {
+        "command": "Varn.toggleBuildMode",
+        "title": "Toggle Build Mode (Debug/Release)",
+        "category": "Varn"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "Varn.runFile",
+        "key": "ctrl+f5",
+        "when": "resourceLangId == Varn && !inDebugMode"
+      },
+      {
+        "command": "workbench.action.debug.start",
+        "key": "f5",
+        "when": "resourceLangId == Varn && !inDebugMode && !debuggersAvailable"
+      }
+    ],
+    "menus": {
+      "editor/title/run": [
+        {
+          "command": "Varn.runFile",
+          "when": "resourceLangId == Varn",
+          "group": "navigation@1"
+        },
+        {
+          "command": "Varn.runFileInTerminal",
+          "when": "resourceLangId == Varn",
+          "group": "navigation@2"
+        },
+        {
+          "command": "Varn.runWithPhases",
+          "when": "resourceLangId == Varn",
+          "group": "navigation@3"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "Varn.runFile",
+          "when": "resourceLangId == Varn",
+          "group": "Varn@1"
+        },
+        {
+          "command": "Varn.runFileInTerminal",
+          "when": "resourceLangId == Varn",
+          "group": "Varn@2"
+        },
+        {
+          "command": "Varn.showAst",
+          "when": "resourceLangId == Varn",
+          "group": "Varn@3"
+        },
+        {
+          "command": "Varn.disasmFile",
+          "when": "resourceLangId == Varn",
+          "group": "Varn@4"
+        },
+        {
+          "command": "Varn.doctor",
+          "when": "resourceLangId == Varn",
+          "group": "Varn@5"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "Varn.runFile",
+          "when": "resourceExtname == .vn",
+          "group": "Varn@1"
+        },
+        {
+          "command": "Varn.runFileInTerminal",
+          "when": "resourceExtname == .vn",
+          "group": "Varn@2"
+        },
+        {
+          "command": "Varn.benchFile",
+          "when": "resourceExtname == .vn",
+          "group": "Varn@3"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "Varn.installRuntime",
+          "when": "true"
+        },
+        {
+          "command": "Varn.doctor",
+          "when": "true"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Varn",
+      "properties": {
+        "Varn.server.path": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the varn-lsp binary. Leave empty to auto-detect from varn_HOME/bin, workspace target/{release,debug}, or PATH."
+        },
+        "Varn.cli.path": {
+          "type": "string",
+          "default": "",
+          "description": "Absolute path to the Varn binary. Leave empty to auto-detect from varn_HOME/bin, workspace target/{release,debug}, or PATH."
+        },
+        "Varn.inlayHints.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable inlay hints for types and parameter names."
+        },
+        "Varn.run.verbose": {
+          "type": "boolean",
+          "default": false,
+          "description": "Pass --verbose to Varn when running files."
+        },
+        "Varn.run.debugPhases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "tokens",
+              "ast",
+              "bytecode",
+              "symbols",
+              "binds",
+              "modules",
+              "types",
+              "errors",
+              "trace",
+              "calls",
+              "consts",
+              "scope",
+              "graph"
+            ]
+          },
+          "default": [],
+          "description": "Default debug phases to enable when running files."
+        },
+        "Varn.codeLens.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Varn CodeLens actions (Run, Bench, Disasm, AST) at the top of .Varn files."
+        },
+        "Varn.buildMode": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "release"
+          ],
+          "default": "debug",
+          "description": "Preferred build mode for Varn binaries when auto-detecting from the workspace target directory."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.82.0"
+  }
+}

@@ -1,0 +1,12 @@
+[package]
+name = "varn-lexer"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "varn_lexer"
+crate-type = ["rlib"]
+
+[dependencies]
+varn-core = { path = "../varn-core" }
+varn-base = { path = "../varn-base" }

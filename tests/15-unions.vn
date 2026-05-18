@@ -1,0 +1,47 @@
+
+type StringOrInt = str | int
+type MaybeStr = str | null
+
+function processValue(v: StringOrInt): str {
+    if (v instanceof str) {
+        return "string: " + v
+    } else {
+        return "number: " + v
+    }
+}
+assert("union str branch",  processValue("hello") === "string: hello")
+assert("union int branch",  processValue(42) === "number: 42")
+
+function orNull(v: MaybeStr): int {
+    if (v === null) return 0
+    return v.length
+}
+assert("union null branch",  orNull(null) === 0)
+assert("union str branch 2", orNull("hi") === 2)
+
+class Square2 {
+    side: float
+    constructor(s: float) { this.side = s }
+    area(): float { return this.side * this.side }
+}
+class Circle2 {
+    radius: float
+    constructor(r: float) { this.radius = r }
+    area(): float { return 3.14 * this.radius * this.radius }
+}
+
+type Shape2 = Square2 | Circle2
+
+function totalArea(shapes: Shape2[]): float {
+    let total = 0.0
+    for (const s of shapes) {
+        total = total + s.area()
+    }
+    return total
+}
+
+const shapes: Shape2[] = [new Square2(2.0), new Circle2(1.0), new Square2(3.0)]
+const ta = totalArea(shapes)
+assert("union class area", ta > 16.0 && ta < 20.0)
+
+print("[PASSED] 15. Union types ")

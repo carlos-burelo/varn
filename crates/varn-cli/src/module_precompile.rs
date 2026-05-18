@@ -1,0 +1,263 @@
+use crate::pipeline::hash::fnv1a64;
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::path::Path;
+
+use varn_compiler::FunctionProto;
+use varn_core::ast::Program;
+use varn_types::PackageNode;
+
+const UNKNOWN_INTEGRITY_HASH: &str = "0000000000000000";
+
+pub struct ModuleGraphBuild {
+    pub entry_path: String,
+    pub modules: HashMap<String, FunctionProto>,
+    pub source_hashes: HashMap<String, u64>,
+    pub package_nodes: Vec<varn_types::PackageNode>,
+}
+
+pub fn build_module_graph(
+    entry_program: &Program,
+    entry_source: &str,
+    entry_path: &str,
+    entry_proto: &FunctionProto,
+) -> Result<ModuleGraphBuild, String> {
+    let canonical_entry = canonical_or_original(Path::new(entry_path));
+
+    let mut graph: HashMap<String, Vec<String>> = HashMap::new();
+    let mut source_hashes: HashMap<String, u64> = HashMap::new();
+    source_hashes.insert(canonical_entry.clone(), fnv1a64(entry_source.as_bytes()));
+
+    let mut node_sources: HashMap<String, (String, Program)> = HashMap::new();
+    let mut package_nodes: HashMap<String, PackageNode> = HashMap::new();
+
+    let entry_dir = Path::new(&canonical_entry)
+        .parent()
+        .unwrap_or_else(|| Path::new("."));
+
+    let mut entry_deps = Vec::new();
+    for spec in crate::import_collector::collect_imports(entry_program) {
+        if let Some(dep_path) = resolve_import_specifier(&spec, entry_dir, &mut package_nodes)
+            .map_err(|e| format!("{e}\n  imported from: {entry_path}"))?
+        {
+            entry_deps.push(dep_path);
+        }
+    }
+    graph.insert(canonical_entry.clone(), entry_deps.clone());
+
+    let mut queue: VecDeque<String> = entry_deps.into_iter().collect();
+    let mut enqueued: HashSet<String> = HashSet::new();
+    enqueued.insert(canonical_entry.clone());
+
+    while let Some(module_path) = queue.pop_front() {
+        if enqueued.contains(&module_path) {
+            continue;
+        }
+        enqueued.insert(module_path.clone());
+
+        let source = read_module_source(&module_path)
+            .map_err(|e| format!("cannot read module '{module_path}': {e}"))?;
+        source_hashes.insert(module_path.clone(), fnv1a64(source.as_bytes()));
+
+        let (tokens, _) = varn_lexer::scan(&source, &module_path);
+        let mut program = varn_parser::parse(tokens, &module_path)
+            .map_err(|errs| format!("parse error in '{}': {}", module_path, errs[0].message))?;
+        varn_core::assign_ast_ids(&mut program);
+
+        let module_dir = Path::new(&module_path)
+            .parent()
+            .unwrap_or_else(|| Path::new("."));
+
+        let mut deps = Vec::new();
+        for child_spec in crate::import_collector::collect_imports(&program) {
+            if let Some(child_path) =
+                resolve_import_specifier(&child_spec, module_dir, &mut package_nodes)
+                    .map_err(|e| format!("{e}\n  imported from: {module_path}"))?
+            {
+                deps.push(child_path.clone());
+                if !enqueued.contains(&child_path) {
+                    queue.push_back(child_path);
+                }
+            }
+        }
+
+        graph.insert(module_path.clone(), deps);
+        node_sources.insert(module_path, (source, program));
+    }
+
+    let mut in_degree: HashMap<&str, usize> = HashMap::new();
+    for (node, deps) in &graph {
+        in_degree.entry(node.as_str()).or_insert(0);
+        for dep in deps {
+            if graph.contains_key(dep.as_str()) {
+                *in_degree.entry(dep.as_str()).or_insert(0) += 1;
+            }
+        }
+    }
+
+    let mut topo_queue: VecDeque<&str> = in_degree
+        .iter()
+        .filter(|(_, &deg)| deg == 0)
+        .map(|(&n, _)| n)
+        .collect();
+
+    let mut sorted: Vec<String> = Vec::with_capacity(graph.len());
+
+    while let Some(node) = topo_queue.pop_front() {
+        sorted.push(node.to_owned());
+        if let Some(deps) = graph.get(node) {
+            for dep in deps {
+                if let Some(deg) = in_degree.get_mut(dep.as_str()) {
+                    *deg = deg.saturating_sub(1);
+                    if *deg == 0 {
+                        topo_queue.push_back(dep.as_str());
+                    }
+                }
+            }
+        }
+    }
+
+    if sorted.len() != graph.len() {
+        let cycle_nodes: Vec<&str> = graph
+            .keys()
+            .filter(|k| !sorted.contains(*k))
+            .map(|s| s.as_str())
+            .collect();
+        return Err(format!(
+            "circular dependency detected involving: {}",
+            cycle_nodes.join(", ")
+        ));
+    }
+
+    let mut modules: HashMap<String, FunctionProto> = HashMap::new();
+    modules.insert(canonical_entry.clone(), entry_proto.clone());
+
+    for module_path in sorted.into_iter().rev() {
+        if module_path == canonical_entry {
+            continue;
+        }
+        let Some((_, program)) = node_sources.get(&module_path) else {
+            continue;
+        };
+
+        let check = varn_checker::Checker::check(program);
+        let module_proto = varn_compiler::compile(
+            program,
+            &check.type_annotations,
+            &check.extension_calls,
+            &check.extension_members,
+            &check.extension_set_members,
+        )
+        .map_err(|e| format!("compile error in '{module_path}': {e}"))?;
+
+        modules.insert(module_path, module_proto);
+    }
+
+    Ok(ModuleGraphBuild {
+        entry_path: canonical_entry,
+        modules,
+        source_hashes,
+        package_nodes: package_nodes.into_values().collect(),
+    })
+}
+
+fn read_module_source(module_path: &str) -> Result<String, String> {
+    if let Some(specifier) = module_path.strip_prefix(varn_modules::EMBEDDED_MODULE_PREFIX) {
+        let loader = varn_builtins::ModuleLoader::from_env();
+        return loader
+            .embedded_source(specifier)
+            .map(|s| s.to_owned())
+            .ok_or_else(|| format!("embedded source not found for '{specifier}'"));
+    }
+    if module_path.starts_with("std:") || module_path.starts_with("builtin:") {
+        let loader = varn_builtins::ModuleLoader::from_env();
+        return loader
+            .embedded_source(module_path)
+            .map(|s| s.to_owned())
+            .or_else(|| {
+                loader
+                    .vn_source_path(module_path)
+                    .and_then(|p| std::fs::read_to_string(p).ok())
+            })
+            .ok_or_else(|| format!("stdlib source not found: {module_path}"));
+    }
+    std::fs::read_to_string(module_path).map_err(|e| e.to_string())
+}
+
+pub fn resolve_import_specifier(
+    specifier: &str,
+    module_dir: &Path,
+    package_nodes: &mut HashMap<String, PackageNode>,
+) -> Result<Option<String>, String> {
+    use varn_core::ImportSpecifier;
+
+    match ImportSpecifier::parse(specifier) {
+        ImportSpecifier::Stdlib(_) => {
+            let loader = varn_builtins::ModuleLoader::from_env();
+            if loader.embedded_source(specifier).is_some() {
+                return Ok(Some(specifier.to_owned()));
+            }
+            if loader.vn_source_path(specifier).is_some() {
+                return Ok(Some(specifier.to_owned()));
+            }
+            Ok(None)
+        }
+        ImportSpecifier::Relative(rel) => {
+            let joined = module_dir.join(&rel);
+            let candidates = if joined.extension().is_some() {
+                vec![joined]
+            } else {
+                vec![
+                    joined.with_extension(varn_modules::VARN_FILE_EXTENSION),
+                    joined,
+                ]
+            };
+            for candidate in candidates {
+                if candidate.exists() {
+                    if let Ok(canonical) = std::fs::canonicalize(&candidate) {
+                        return Ok(Some(normalize_path_string(
+                            canonical.to_string_lossy().into_owned(),
+                        )));
+                    }
+                    return Ok(Some(normalize_path_string(
+                        candidate.to_string_lossy().into_owned(),
+                    )));
+                }
+            }
+            Ok(None)
+        }
+        ImportSpecifier::Package(_) => {
+            let resolved = varn_modules::resolve_pkg_specifier_detailed(module_dir, specifier)?;
+            let integrity = std::fs::read(&resolved.resolved_path)
+                .map(|bytes| format!("{:016x}", fnv1a64(&bytes)))
+                .unwrap_or_else(|_| UNKNOWN_INTEGRITY_HASH.to_owned());
+            package_nodes
+                .entry(specifier.to_owned())
+                .or_insert(PackageNode {
+                    specifier: resolved.specifier.clone(),
+                    package: resolved.package.clone(),
+                    version: resolved.version.clone(),
+                    subpath: resolved.subpath.clone(),
+                    resolved_path: resolved.resolved_path.clone(),
+                    integrity,
+                });
+            Ok(Some(resolved.resolved_path))
+        }
+    }
+}
+
+fn canonical_or_original(path: &Path) -> String {
+    if let Ok(canonical) = std::fs::canonicalize(path) {
+        return normalize_path_string(canonical.to_string_lossy().into_owned());
+    }
+    normalize_path_string(path.to_string_lossy().into_owned())
+}
+
+fn normalize_path_string(path: String) -> String {
+    #[cfg(windows)]
+    {
+        if let Some(rest) = path.strip_prefix("\\\\?\\") {
+            return rest.to_owned();
+        }
+    }
+    path
+}

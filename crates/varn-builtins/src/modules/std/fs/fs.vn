@@ -1,0 +1,24 @@
+// std:fs — pure IDL facade over runtime host operations.
+
+export class Stats {
+    size: int;
+    isDir: bool;
+    isFile: bool;
+    mtime: int;
+}
+
+export namespace fs {
+    export declare function read(path: str): str;
+    export declare function write(path: str, content: str): void;
+    export declare function appendText(path: str, content: str): void;
+    export declare function exists(path: str): bool;
+    export declare function stat(path: str): Stats;
+    export declare function mkdir(path: str): void;
+    export declare function mkdirAll(path: str): void;
+    export declare function readDir(path: str): str[];
+    export declare function remove(path: str): void;
+    export declare function removeAll(path: str): void;
+    export declare function rename(from: str, to: str): void;
+    export declare function copy(from: str, to: str): void;
+    export declare function tempDir(): str;
+}

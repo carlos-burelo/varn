@@ -1,0 +1,87 @@
+
+// nullable scalar
+const a: str | null = null
+const b: str | null = "hello"
+const c: bool | null = true
+
+// array of T
+const d: int[] = [1, 2, 3]
+const e: str[] = ["a", "b"]
+
+// array of nullable T  →  (T | null)[]
+const f: (int | null)[] = [1, null, 3]
+const g: (str | null)[] = [null, "x", null]
+
+// nullable array of T  →  T[] | null
+const h: int[] | null = null
+const i: str[] | null = ["a", "b"]
+
+// nullable array of nullable T
+const j: (int | null)[] | null = null
+const k: (int | null)[] | null = [1, null, 3]
+
+// 2d array
+const l: int[][] = [[1, 2], [3, 4]]
+
+// 2d array of nullable T
+const m: (int | null)[][] = [[1, null], [null, 4]]
+
+// nullable 2d array
+const n: int[][] | null = null
+const o: int[][] | null = [[1, 2]]
+
+// nullable 2d array of nullable T
+const p: (int | null)[][] | null = null
+const q: (int | null)[][] | null = [[null, 1]]
+
+// Generic with nullable arg
+const r: Array<int | null> = [1, null, 2]
+
+// nullable generic
+const s: Array<int> | null = null
+const t: Array<int> | null = [1, 2]
+
+// nullable generic of nullable
+const u: Array<str | null> | null = null
+const v: Array<str | null> | null = [null, "x"]
+
+// in function signatures
+function identity(x: int | null): int | null {
+    return x
+}
+
+function first(arr: (int | null)[] | null): int | null {
+    if (arr === null) return null
+    if (arr.length === 0) return null
+    return arr[0]
+}
+
+function wrap(x: int): int[] | null {
+    if (x < 0) return null
+    return [x]
+}
+
+function matrix(flag: bool): (int | null)[][] | null {
+    if (!flag) return null
+    return [[1, null], [null, 2]]
+}
+
+assert("null scalar",         a === null)
+assert("str nullable",        b === "hello")
+assert("bool nullable",       c === true)
+assert("int array",           d.length === 3)
+assert("nullable elem 0",     f[0] === 1)
+assert("nullable elem 1",     f[1] === null)
+assert("nullable arr null",   h === null)
+assert("nullable arr value",  i !== null)
+assert("2d array",            l[0][0] === 1)
+assert("identity null",       identity(null) === null)
+assert("identity 42",         identity(42) === 42)
+assert("first empty",         first([]) === null)
+assert("first non-empty",     first([1, null, 3]) === 1)
+assert("wrap neg",            wrap(-1) === null)
+assert("wrap pos length",     wrap(5) !== null)
+assert("matrix false",        matrix(false) === null)
+assert("matrix true",         matrix(true) !== null)
+
+print("[PASSED] 30. Nullable Types")

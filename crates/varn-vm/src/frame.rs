@@ -1,0 +1,169 @@
+use crate::value::VmValue;
+use std::cell::RefCell;
+use std::rc::Rc;
+use varn_base::VmValuePayload;
+use varn_types::chunk::PolyICSlot;
+pub use varn_types::VmValueRef;
+use varn_types::{FunctionProto, Value};
+
+#[derive(Debug, Clone)]
+pub struct VmUpvalue {
+    pub inner: Rc<RefCell<VmUpvalueInner>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct VmUpvalueInner {
+    pub value: VmValue,
+    pub stack_slot: Option<usize>,
+}
+
+impl VmUpvalue {
+    pub fn open(stack_slot: usize) -> Self {
+        Self {
+            inner: Rc::new(RefCell::new(VmUpvalueInner {
+                value: VmValue::null(),
+                stack_slot: Some(stack_slot),
+            })),
+        }
+    }
+
+    pub fn closed(value: VmValue) -> Self {
+        Self {
+            inner: Rc::new(RefCell::new(VmUpvalueInner {
+                value,
+                stack_slot: None,
+            })),
+        }
+    }
+
+    pub fn read(&self, stack: &[VmValue]) -> VmValue {
+        let g = self.inner.borrow_mut();
+        match g.stack_slot {
+            Some(slot) => stack[slot],
+            None => g.value,
+        }
+    }
+
+    pub fn write(&self, val: VmValue, stack: &mut Vec<VmValue>) {
+        let mut g = self.inner.borrow_mut();
+        match g.stack_slot {
+            Some(slot) => stack[slot] = val,
+            None => g.value = val,
+        }
+    }
+
+    pub fn close(&self, stack: &[VmValue]) {
+        let mut g = self.inner.borrow_mut();
+        if let Some(slot) = g.stack_slot.take() {
+            g.value = stack[slot];
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct VmClosure {
+    pub proto: Rc<FunctionProto>,
+    pub upvalues: Vec<VmUpvalue>,
+    pub constants: Rc<Vec<VmValue>>,
+    pub ic_cache: Rc<RefCell<Vec<PolyICSlot>>>,
+    pub feedback: Rc<RefCell<varn_types::chunk::FeedbackVector>>,
+}
+
+impl VmClosure {
+    pub fn new(proto: Rc<FunctionProto>, constants: Vec<VmValue>) -> Self {
+        let cache_count = proto.cache_count;
+        let ic_cache = Self::make_ic_slots(cache_count);
+        let feedback = Rc::new(RefCell::new(varn_types::chunk::FeedbackVector::new(
+            cache_count,
+        )));
+        Self {
+            proto,
+            upvalues: Vec::new(),
+            constants: Rc::new(constants),
+            ic_cache: Rc::new(RefCell::new(ic_cache)),
+            feedback,
+        }
+    }
+
+    pub fn with_upvalues(
+        proto: Rc<FunctionProto>,
+        upvalues: Vec<VmUpvalue>,
+        constants: Vec<VmValue>,
+        ic_cache: Rc<RefCell<Vec<PolyICSlot>>>,
+        feedback: Rc<RefCell<varn_types::chunk::FeedbackVector>>,
+    ) -> Self {
+        Self {
+            proto,
+            upvalues,
+            constants: Rc::new(constants),
+            ic_cache,
+            feedback,
+        }
+    }
+
+    fn make_ic_slots(count: usize) -> Vec<PolyICSlot> {
+        let mut v = Vec::with_capacity(count);
+        for _ in 0..count {
+            v.push(PolyICSlot::new());
+        }
+        v
+    }
+
+    #[inline(always)]
+    pub fn ic_cache_len(&self) -> usize {
+        self.ic_cache.borrow().len()
+    }
+}
+
+pub struct CallFrame {
+    pub closure: Rc<VmClosure>,
+    pub ip: usize,
+    pub base: usize,
+    pub current_class: Option<Rc<varn_types::ClassObj>>,
+    pub return_reg: Option<u16>,
+}
+
+impl CallFrame {
+    pub fn new(closure: Rc<VmClosure>, base: usize) -> Self {
+        Self {
+            closure,
+            ip: 0,
+            base,
+            current_class: None,
+            return_reg: None,
+        }
+    }
+
+    #[inline(always)]
+    pub fn proto(&self) -> &FunctionProto {
+        &self.closure.proto
+    }
+
+    #[inline(always)]
+    pub fn code(&self) -> &[u16] {
+        &self.closure.proto.chunk.code
+    }
+
+    #[inline(always)]
+    pub fn read_u16(&self) -> u16 {
+        self.code()[self.ip]
+    }
+}
+
+pub struct TryHandler {
+    pub catch_ip: usize,
+    pub frame_depth: usize,
+    pub err_reg: u8,
+}
+
+#[derive(Debug, Clone)]
+pub struct VmClosurePayload(pub Rc<VmClosure>);
+
+impl VmValuePayload for VmClosurePayload {
+    fn clone_payload(&self) -> Box<dyn VmValuePayload> {
+        Box::new(self.clone())
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}

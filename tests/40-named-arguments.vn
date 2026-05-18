@@ -1,0 +1,47 @@
+// 40-named-arguments.Varn
+
+function describe(name: str, age: int, city: str | null = null): str {
+    if (city == null) {
+        city = "Unknown";
+    }
+    return name + " is " + age.toString() + " years old and lives in " + city;
+}
+
+// 1. Basic usage - in order
+assert("Basic in-order", describe(name: "Alice", age: 30, city: "London") == "Alice is 30 years old and lives in London");
+
+// 2. Out of order
+assert("Out of order", describe(age: 25, name: "Bob") == "Bob is 25 years old and lives in Unknown");
+
+// 3. Mixed positional and named
+assert("Mixed positional and named", describe("Charlie", age: 40) == "Charlie is 40 years old and lives in Unknown");
+
+// 4. Using default values with named args
+assert("Default values", describe(name: "Diana", age: 35) == "Diana is 35 years old and lives in Unknown");
+
+// 5. Named arguments in methods
+class Person {
+    name: str
+    constructor(name: str) { this.name = name }
+    greet(greeting: str, formal: bool | null = null): str {
+        if (formal == true) {
+            return greeting + ", " + this.name;
+        }
+        return greeting + " " + this.name;
+    }
+}
+
+const p = new Person("Eve");
+assert("Method named args", p.greet(greeting: "Hello", formal: true) == "Hello, Eve");
+assert("Method default args", p.greet(greeting: "Hi") == "Hi Eve");
+
+// 6. Generic functions with named args
+function identity<T>(value: T, label: str): T {
+
+    return value;
+}
+
+assert("Generic function named args", identity<int>(value: 42, label: "Answer") == 42);
+
+print("[PASSED] 40. Named arguments ")
+print("40 FINISHED")

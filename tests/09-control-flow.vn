@@ -1,0 +1,53 @@
+
+function classify(n: int): str {
+    return n < 0 ? "neg" : n === 0 ? "zero" : "pos"
+}
+assert("nested ternary neg",  classify(-1) === "neg")
+assert("nested ternary zero", classify(0) === "zero")
+assert("nested ternary pos",  classify(1) === "pos")
+
+function firstAbove(arr: int[], threshold: int): int {
+    let i = 0
+    let result = -1
+    while (i < arr.length) {
+        if (arr[i] > threshold) {
+            result = arr[i]
+            break
+        }
+        i = i + 1
+    }
+    return result
+}
+assert("while break", firstAbove([1, 2, 10, 3], 5) === 10)
+
+function sumOdds(max: int): int {
+    let total = 0
+    for (let i = 0; i <= max; i = i + 1) {
+        if (i % 2 === 0) continue
+        total = total + i
+    }
+    return total
+}
+assert("for continue", sumOdds(10) === 25)
+
+let forOfSum = 0
+for (const n of [10, 20, 30]) {
+    forOfSum = forOfSum + n
+}
+assert("for-of sum", forOfSum === 60)
+
+let forOfBreak = 0
+for (const n of [1, 2, 3, 4, 5]) {
+    if (n === 3) break
+    forOfBreak = forOfBreak + n
+}
+assert("for-of break", forOfBreak === 3)
+
+const obj2 = { x: 1, y: 2, z: 3 }
+let keyCount = 0
+for (const k in obj2) {
+    keyCount = keyCount + 1
+}
+assert("for-in key count", keyCount === 3)
+
+print("[PASSED] 9. Control flow ")

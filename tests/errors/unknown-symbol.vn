@@ -1,0 +1,2 @@
+// expect: error[Varn3002]
+print(undeclaredVariable)

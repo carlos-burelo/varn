@@ -1,0 +1,62 @@
+
+// ── Decimal literals and arithmetic ─────────────────────────────
+const d1: decimal = 1.5d
+const d2: decimal = 2.5d
+assert("decimal add",        d1 + d2 === 4.0d)
+assert("decimal sub",        d2 - d1 === 1.0d)
+assert("decimal mul",        d1 * d2 === 3.75d)
+assert("decimal eq",         1.0d === 1.0d)
+assert("decimal neq",        1.0d !== 2.0d)
+assert("decimal lt",         d1 < d2)
+assert("decimal lte",        d1 <= d1)
+assert("decimal gt",         d2 > d1)
+assert("decimal gte",        d2 >= d2)
+
+// toFixed — exact decimal rounding
+const pi_d: decimal = 3.14159d
+assert("decimal toFixed 2",  pi_d.toFixed(2) === "3.14")
+assert("decimal toFixed 0",  pi_d.toFixed(0) === "3")
+assert("decimal toFixed 4",  pi_d.toFixed(4) === "3.1415" || pi_d.toFixed(4) === "3.1416")
+
+// Instance methods
+const neg: decimal = -7.5d
+assert("decimal abs",        neg.abs() === 7.5d)
+assert("decimal negate",     neg.negate() === 7.5d)
+assert("decimal floor",      d2.floor() === 2.0d)
+assert("decimal ceil",       d1.ceil() === 2.0d)
+assert("decimal round",      d1.round() === 2.0d)
+assert("decimal isZero",     (0.0d).isZero())
+assert("decimal isPositive", d1.isPositive())
+assert("decimal isNegative", neg.isNegative())
+assert("decimal trunc",      (2.9d).trunc() === 2.0d)
+
+// Widening from int
+const iv: int = 5
+const dv: decimal = iv
+assert("int to decimal widening", dv.toString() === "5")
+
+// Arithmetic with widened int
+function sumDecimal(a: decimal, b: decimal): decimal { return a + b }
+assert("decimal fn int widening", sumDecimal(3, 2.0d) === 5.0d)
+
+// decimal is decimal narrowing
+function isDecimalType(v: decimal): bool { return v is decimal }
+assert("decimal is decimal", isDecimalType(1.0d))
+
+// ── BigInt ───────────────────────────────────────────────────────
+const bi1: bigint = 100n
+const bi2: bigint = 1n
+assert("bigint eq",          100n === 100n)
+assert("bigint neq",         1n !== 2n)
+assert("bigint lt",          bi2 < bi1)
+assert("bigint gt",          bi1 > bi2)
+
+// int ↔ bigint equality (cross-type comparison)
+assert("int eq bigint", 42n === 42n)
+assert("int neq bigint", 42n !== 43n)
+
+// bigint is bigint
+function isBigInt(v: bigint): bool { return v is bigint }
+assert("bigint is bigint", isBigInt(100n))
+
+print("[PASSED] 35. Decimal & BigInt")

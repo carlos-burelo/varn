@@ -1,0 +1,12 @@
+[package]
+name = "varn-types"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+parking_lot = "0.12.5"
+varn-core = { path = "../varn-core" }
+varn-base = { path = "../varn-base" }
+rust_decimal = { version = "1", features = ["serde"] }
+rustc-hash = "1.1.0"
+serde = { version = "1", features = ["derive", "rc"] }

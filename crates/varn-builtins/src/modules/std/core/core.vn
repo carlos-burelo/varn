@@ -1,0 +1,2 @@
+export declare function describe(op_id: int): dynamic;
+export declare function opId(name: str): int;

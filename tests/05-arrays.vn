@@ -1,0 +1,66 @@
+
+const nums = [3, 1, 4, 1, 5, 9, 2, 6]
+const strs = ["banana", "apple", "cherry"]
+
+assert("length",       nums.length === 8)
+assert("indexOf",      nums.indexOf(5) === 4)
+assert("indexOf none", nums.indexOf(99) === -1)
+assert("includes",     nums.includes(9))
+assert("includes not", !nums.includes(99))
+assert("slice",        nums.slice(2, 5).length === 3)
+assert("slice first",  nums.slice(0, 3)[0] === 3)
+assert("concat",       [1, 2].concat([3, 4]).length === 4)
+assert("join",         [1, 2, 3].join("-") === "1-2-3")
+assert("join default", [1, 2, 3].join() === "1,2,3")
+
+const doubled = nums.map((n) => n * 2)
+assert("map length",   doubled.length === 8)
+assert("map value",    doubled[0] === 6)
+
+const evens = nums.filter((n) => n % 2 === 0)
+assert("filter",       evens.length === 3)
+
+const sum = nums.reduce((acc, n) => acc + n, 0)
+assert("reduce sum",   sum === 31)
+
+const found = nums.find((n) => n > 5)
+assert("find first",   found === 9)
+
+const fi = nums.findIndex((n) => n > 5)
+assert("findIndex",    fi === 5)
+
+assert("some",         nums.some((n) => n > 8))
+assert("some false",   !nums.some((n) => n > 100))
+assert("every",        [2, 4, 6].every((n) => n % 2 === 0))
+assert("every false",  ![2, 4, 5].every((n) => n % 2 === 0))
+
+const sorted = strs.sort()
+assert("sort alpha",   sorted[0] === "apple")
+
+const rev = [1, 2, 3].reverse()
+assert("reverse arr",  rev[0] === 3)
+
+const flat = [[1, 2], [3, 4]].flat()
+assert("flat",         flat.length === 4)
+assert("flat value",   flat[2] === 3)
+
+const fm = [[1, 2], [3]].flatMap((a) => a)
+assert("flatMap",      fm.length === 3)
+
+let counter = 0
+[10, 20, 30].forEach((n) => { counter = counter + n })
+assert("forEach",      counter === 60)
+
+const mut = [1, 2, 3]
+mut.push(4)
+assert("push",         mut.length === 4)
+assert("push value",   mut[3] === 4)
+const popped = mut.pop()
+assert("pop value",    popped === 4)
+assert("pop length",   mut.length === 3)
+
+const spread = [...[1, 2], ...[3, 4]]
+assert("spread array", spread.length === 4)
+assert("spread value", spread[2] === 3)
+
+print("[PASSED] 5. Array methods ")

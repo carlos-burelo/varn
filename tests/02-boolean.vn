@@ -1,0 +1,13 @@
+assert("and short-circuit", (false && (1/0 === 0)) === false)
+assert("or short-circuit",  true  || (1/0 === 0) === true)
+assert("not not",           !!true === true)
+assert("not false",         !false === true)
+assert("not true",          !true === false)
+assert("not eq",            !(1 === 2) === true)
+assert("not neq",           !(1 === 1) === false)
+assert("triple eq str",     "abc" === "abc")
+assert("triple neq str",    "abc" !== "def")
+assert("triple eq null",    null === null)
+assert("triple neq null",   null !== 0)
+
+print("[PASSED] 2. Boolean edge cases")

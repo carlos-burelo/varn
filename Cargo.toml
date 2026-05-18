@@ -1,0 +1,34 @@
+[workspace]
+members = [
+    "crates/varn-core",
+    "crates/varn-lexer",
+    "crates/varn-parser",
+    "crates/varn-checker",
+    "crates/varn-bytecode",
+    "crates/varn-compiler",
+    "crates/varn-types",
+    "crates/varn-op-macros",
+    "crates/varn-modules",
+    "crates/varn-builtins",
+    "crates/varn-runtime",
+    "crates/varn-cli",
+    "crates/varn-lsp",
+    "crates/varn-diagnostics",
+    "crates/varn-vm",
+    "crates/varn-debug",
+    "crates/varn-base",
+    "crates/varn-pm",
+]
+resolver = "2"
+
+[workspace.dependencies]
+rustc-hash = "2.1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+opt-level = 1

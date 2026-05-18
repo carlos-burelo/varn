@@ -1,0 +1,65 @@
+
+// Literals and basic identity
+const a: char = 'a'
+const z: char = 'z'
+const excl: char = '!'
+assert("char identity",       a === 'a')
+assert("char neq",            a !== z)
+assert("char code point",     'A'.charCodeAt() === 65)
+assert("char from code",      char.fromCode(65) === 'A')
+assert("char from code z",    char.fromCode(122) === 'z')
+
+// Classification
+assert("isAlphabetic a",      'a'.isAlphabetic())
+assert("isAlphabetic not 1",  !('1'.isAlphabetic()))
+assert("isAlphanumeric a",    'a'.isAlphanumeric())
+assert("isAlphanumeric 7",    '7'.isAlphanumeric())
+assert("isDigit 5",           '5'.isDigit())
+assert("isDigit not a",       !('a'.isDigit()))
+assert("isWhitespace space",  ' '.isWhitespace())
+assert("isWhitespace not a",  !('a'.isWhitespace()))
+assert("isUppercase A",       'A'.isUppercase())
+assert("isUppercase not a",   !('a'.isUppercase()))
+assert("isLowercase a",       'a'.isLowercase())
+assert("isLowercase not A",   !('A'.isLowercase()))
+assert("isAscii a",           'a'.isAscii())
+assert("isPunctuation dot",   '.'.isPunctuation())
+assert("isPunctuation not a", !('a'.isPunctuation()))
+
+// Case conversion
+assert("toUppercase a",       'a'.toUppercase() === 'A')
+assert("toLowercase A",       'A'.toLowercase() === 'a')
+
+// toString
+assert("char toString",       'x'.toString() === "x")
+
+// is char narrowing
+function describeChar(c: char): str {
+    if (c is char) return "yes"
+    return "no"
+}
+assert("char is char", describeChar('q') === "yes")
+
+// chars in array
+const vowels: char[] = ['a', 'e', 'i', 'o', 'u']
+assert("char array len",     vowels.length === 5)
+assert("char array access",  vowels[0] === 'a')
+assert("char array last",    vowels[4] === 'u')
+
+// char in loop
+let digitCount = 0
+const sample: char[] = ['1', 'a', '2', 'b', '3']
+for (const ch of sample) {
+    if (ch.isDigit()) digitCount = digitCount + 1
+}
+assert("char loop digit count", digitCount === 3)
+
+// round-trip: codePoint -> char -> str
+const codes: int[] = [72, 101, 108, 108, 111]
+let built = ""
+for (const code of codes) {
+    built = built + char.fromCode(code).toString()
+}
+assert("char round-trip Hello", built === "Hello")
+
+print("[PASSED] 34. Char type")

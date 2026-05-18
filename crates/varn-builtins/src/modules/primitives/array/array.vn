@@ -1,0 +1,29 @@
+export declare class Array<T> {
+    readonly length: int;
+    push(item: T): void;
+    pop(): T;
+    shift(): T;
+    unshift(item: T): void;
+    join(separator?: str): str;
+    slice(start?: int, end?: int): T[];
+    at(index: int): T | null;
+    concat(...items: T[][]): T[];
+    fill(value: T, start?: int, end?: int): T[];
+    filter(predicate: (item: T, index: int, array: T[]) => bool): T[];
+    find(predicate: (item: T, index: int, array: T[]) => bool): T | null;
+    findIndex(predicate: (item: T, index: int, array: T[]) => bool): int;
+    flat(depth?: int): T[];
+    flatMap<U>(callback: (item: T, index: int, array: T[]) => U[]): U[];
+    forEach(callback: (item: T, index: int, array: T[]) => void): void;
+    map<U>(callback: (item: T, index: int, array: T[]) => U): U[];
+    reduce<U>(callback: (acc: U, item: T, index: int, array: T[]) => U, initial?: U): U;
+    reverse(): T[];
+    sort(compareFn?: (a: T, b: T) => int): T[];
+    splice(start: int, deleteCount?: int, ...items: T[]): T[];
+    every(predicate: (item: T, index: int, array: T[]) => bool): bool;
+    some(predicate: (item: T, index: int, array: T[]) => bool): bool;
+    includes(search: T): bool;
+    indexOf(search: T): int;
+
+    static isArray(obj: dynamic): bool;
+}

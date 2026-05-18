@@ -1,0 +1,75 @@
+
+function safeDivide(a: int, b: int): int {
+    try {
+        if (b === 0) throw new RangeError("division by zero")
+        return a / b
+    } catch (e) {
+        return -1
+    }
+}
+assert("try no error",      safeDivide(10, 2) === 5)
+assert("try catch returns", safeDivide(10, 0) === -1)
+
+let caughtName = ""
+try {
+    throw new TypeError("bad type")
+} catch (e) {
+    caughtName = e.name
+}
+assert("catch TypeError name", caughtName === "TypeError")
+
+let isRangeError = false
+try {
+    throw new RangeError("too big")
+} catch (e) {
+    isRangeError = e instanceof RangeError
+}
+assert("catch instanceof", isRangeError)
+
+let innerCaught = false
+let outerCaught = false
+try {
+    try {
+        throw new Error("inner")
+    } catch (e) {
+        innerCaught = true
+        throw e
+    }
+} catch (e) {
+    outerCaught = true
+}
+assert("nested try inner caught", innerCaught)
+assert("nested try rethrow",      outerCaught)
+
+class ValidationError extends Error {
+    field: str
+    constructor(field: str, msg: str) {
+        super(msg)
+        this.name = "ValidationError"
+        this.field = field
+    }
+}
+
+let ve: ValidationError | null = null
+try {
+    throw new ValidationError("email", "invalid format")
+} catch (e) {
+    ve = e
+}
+assert("custom error name",    ve?.name === "ValidationError")
+assert("custom error message", ve?.message === "invalid format")
+assert("custom error field",   ve?.field === "email")
+assert("custom instanceof Error", ve instanceof Error)
+
+let finallyRan = false
+function withFinally(): int {
+    try {
+        return 42
+    } finally {
+        finallyRan = true
+    }
+}
+const fres = withFinally()
+assert("finally return value", fres === 42)
+assert("finally ran",          finallyRan)
+print("[PASSED] 11. Error handling ")

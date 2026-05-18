@@ -1,0 +1,86 @@
+mod bench_impl;
+mod bench_output;
+mod cli;
+mod commands;
+mod disasm_impl;
+mod doctor_impl;
+mod error;
+mod fmt;
+mod import_collector;
+mod module_precompile;
+mod opts;
+mod pipeline;
+pub mod stdlib_loader;
+
+use clap::Parser;
+use cli::{Cli, Commands};
+use std::process;
+
+fn main() {
+    let raw: Vec<String> = std::env::args().collect();
+    let effective = implicit_run(raw);
+
+    let cli = Cli::parse_from(effective);
+
+    let result = dispatch(cli.command);
+
+    if let Err(e) = result {
+        eprintln!("{e}");
+        process::exit(e.exit_code);
+    }
+}
+
+fn dispatch(cmd: Commands) -> Result<(), error::CliError> {
+    match cmd {
+        Commands::Run(args) => commands::run::execute(args),
+        Commands::Check(args) => commands::check::execute(args),
+        Commands::Eval(args) => commands::eval::execute(args),
+        Commands::Repl(args) => commands::repl::execute(args),
+        Commands::Bench(args) => commands::bench::execute(args),
+        Commands::Disasm(args) => commands::disasm::execute(args),
+        Commands::Inspect(args) => commands::inspect::execute(args),
+        Commands::Info(args) => commands::info::execute(args),
+        Commands::Doctor => commands::doctor::execute(),
+        Commands::Lsp => commands::lsp::execute(),
+        Commands::Init(args) => commands::init::execute(args),
+        Commands::Completions(args) => commands::completions::execute(args),
+        Commands::Build(args) => commands::build::execute(args),
+        Commands::Add(args) => commands::add::execute(args),
+        Commands::Remove(args) => commands::remove::execute(args),
+        Commands::Install => commands::install::execute(),
+        Commands::Update => commands::update::execute(),
+    }
+}
+
+fn implicit_run(mut args: Vec<String>) -> Vec<String> {
+    const SUBCOMMANDS: &[&str] = &[
+        "run",
+        "check",
+        "eval",
+        "repl",
+        "bench",
+        "disasm",
+        "inspect",
+        "info",
+        "doctor",
+        "lsp",
+        "init",
+        "completions",
+        "build",
+        "add",
+        "remove",
+        "install",
+        "update",
+        "help",
+        "--help",
+        "-h",
+        "--version",
+        "-V",
+    ];
+    if let Some(first) = args.get(1) {
+        if !SUBCOMMANDS.contains(&first.as_str()) && !first.starts_with('-') {
+            args.insert(1, "run".to_owned());
+        }
+    }
+    args
+}

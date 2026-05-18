@@ -1,0 +1,28 @@
+
+function describeNum(n: int): str {
+    return match (n) {
+        0 => "zero",
+        1 => "one",
+        2 | 3 => "two or three",
+        _ => "other"
+    }
+}
+assert("match 0",     describeNum(0) === "zero")
+assert("match 1",     describeNum(1) === "one")
+assert("match 2",     describeNum(2) === "two or three")
+assert("match 3",     describeNum(3) === "two or three")
+assert("match other", describeNum(99) === "other")
+
+function httpStatus(code: int): str {
+    return match (code) {
+        200 => "OK",
+        404 => "Not Found",
+        500 => "Server Error",
+        _ => "dynamic"
+    }
+}
+assert("match 200", httpStatus(200) === "OK")
+assert("match 404", httpStatus(404) === "Not Found")
+assert("match _",   httpStatus(302) === "dynamic")
+
+print("[PASSED] 10. Match expressions ")

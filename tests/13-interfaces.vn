@@ -1,0 +1,44 @@
+
+interface Printable {
+    toString(): str
+}
+interface Serializable {
+    serialize(): str
+}
+
+class Config implements Printable, Serializable {
+    key: str
+    value: int
+    constructor(k: str, v: int) {
+        this.key = k
+        this.value = v
+    }
+    toString(): str { return `${this.key}=${this.value}` }
+    serialize(): str { return `{"${this.key}":${this.value}}` }
+}
+
+const cfg = new Config("timeout", 30)
+assert("interface toString",   cfg.toString() === "timeout=30")
+assert("interface serialize",  cfg.serialize() === `{"timeout":30}`)
+
+function printThing(p: Printable): str {
+    return p.toString()
+}
+assert("structural typing", printThing(cfg) === "timeout=30")
+
+interface Options {
+    verbose?: bool
+    maxRetries?: int
+    tag: str
+}
+function runWith(opts: Options): str {
+    const v = opts.verbose ?? false
+    const r = opts.maxRetries ?? 3
+    return `${opts.tag}:v=${v}:r=${r}`
+}
+
+assert("opts defaults", runWith({ tag: "job1" }) === "job1:v=false:r=3")
+assert("opts partial",  runWith({ tag: "job2", verbose: true }) === "job2:v=true:r=3")
+assert("opts full",     runWith({ tag: "job3", verbose: false, maxRetries: 5 }) === "job3:v=false:r=5")
+
+print("[PASSED] 13. Interfaces ")

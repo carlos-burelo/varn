@@ -1,0 +1,5 @@
+// expect: warning[Varn4004]
+function f(): int {
+    return 1
+    const dead = 2
+}

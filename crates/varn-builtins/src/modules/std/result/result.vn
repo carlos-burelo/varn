@@ -1,0 +1,18 @@
+export type Result<T, E> = | Ok(value: T) | Err(error: E)
+
+export function ok<T, E>(value: T): Result<T, E> {
+    return Ok(value)
+}
+
+export function err<T, E>(error: E): Result<T, E> {
+    return Err(error)
+}
+
+export function tryRun<T>(fn: () => T): Result<T, Error> {
+    try {
+        return ok<T, Error>(fn())
+    } catch (e) {
+        if (e instanceof Error) return err<T, Error>(e)
+        return err<T, Error>(new Error("" + e.toString()))
+    }
+}

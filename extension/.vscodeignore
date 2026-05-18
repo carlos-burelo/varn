@@ -1,0 +1,7 @@
+syntaxes/TypeScript.tmLanguage.json
+pnpm-lock.yaml
+**/*.ts
+!extension.js
+.vscode/
+package-lock.json
+pnpm-lock.yaml

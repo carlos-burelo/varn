@@ -1,0 +1,4 @@
+// expect: error[module-graph]
+import { broken } from "pkg:badconsumer"
+
+broken(1)

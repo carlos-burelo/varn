@@ -1,0 +1,5 @@
+// expect: error[Varn4107]
+abstract class Shape {
+    abstract area(): float
+}
+const s = new Shape()

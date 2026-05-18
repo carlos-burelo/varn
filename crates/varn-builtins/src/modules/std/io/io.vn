@@ -1,0 +1,10 @@
+// std:io — pure IDL facade over runtime host operations.
+
+export namespace io {
+    export declare function write(...args: dynamic[]): void;
+    export declare function writeln(...args: dynamic[]): void;
+    export declare function print(...args: dynamic[]): void;
+    export declare function flush(): void;
+    export declare function readLine(prompt?: str): str;
+    export declare function readAll(): str;
+}

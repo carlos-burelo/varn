@@ -1,0 +1,24 @@
+
+interface Address {
+    city: str
+    zip?: int
+}
+interface Profile {
+    name: str
+    address?: Address
+}
+
+const p1: Profile | null = { name: "Alice", address: { city: "NY" } }
+const p2: Profile | null = { name: "Bob" }
+const p3: Profile | null = null
+
+assert("?. non-null chain",   p1?.address?.city === "NY")
+assert("?. missing nested",   p2?.address?.city === null)
+assert("?. null root",        p3?.name === null)
+assert("?? left non-null",    (42 ?? 0) === 42)
+assert("?? left null",        (null ?? 99) === 99)
+assert("?. + ??",             (p3?.name ?? "anon") === "anon")
+assert("chain ?? fallback",   (p2?.address?.city ?? "dynamic") === "dynamic")
+assert("?? chained",          (null ?? null ?? 7) === 7)
+
+print("[PASSED] 8. Null safety ")

@@ -1,0 +1,110 @@
+use super::compile::CompileOutput;
+use crate::error::CliError;
+use rustc_hash::FxHashMap;
+use std::path::Path;
+use std::rc::Rc;
+use varn_types::ModuleGraphArtifact;
+
+type PipelineResult<T> = Result<T, CliError>;
+
+pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
+    let path = Path::new(file_path);
+    let file_dir = path.parent().unwrap_or_else(|| Path::new("."));
+
+    let project_root = file_dir
+        .ancestors()
+        .find(|dir| dir.join("varn.json").exists())
+        .unwrap_or(file_dir);
+
+    project_root.join(".vn").join("cache").join(format!(
+        "{}.bin",
+        path.file_name().unwrap_or_default().to_string_lossy()
+    ))
+}
+
+pub fn load_cached_graph(
+    cache_path: &Path,
+    version: u32,
+    entry_source: &str,
+) -> Result<Option<ModuleGraphArtifact>, String> {
+    if !cache_path.exists() {
+        return Ok(None);
+    }
+    let bytes = std::fs::read(cache_path).map_err(|e| e.to_string())?;
+    let graph: ModuleGraphArtifact = postcard::from_bytes(&bytes).map_err(|e| e.to_string())?;
+
+    if graph.format_version != version {
+        return Ok(None);
+    }
+
+    if let Some(&cached_hash) = graph.source_hashes.get(&graph.entry_path) {
+        let current_hash = crate::pipeline::hash::fnv1a64(entry_source.as_bytes());
+        if cached_hash != current_hash {
+            return Ok(None);
+        }
+    }
+
+    Ok(Some(graph))
+}
+
+pub fn store_cached_graph(cache_path: &Path, graph: &ModuleGraphArtifact) -> PipelineResult<()> {
+    if let Some(parent) = cache_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| {
+            CliError::fatal(format!(
+                "{}{}error[cache]{}: cannot create cache dir: {}",
+                varn_debug::colors::BOLD,
+                varn_debug::colors::C_ERRORS,
+                varn_debug::colors::R,
+                e
+            ))
+        })?;
+    }
+    let bytes = postcard::to_allocvec(graph).map_err(|e| {
+        CliError::fatal(format!(
+            "{}{}error[cache]{}: serialize failed: {}",
+            varn_debug::colors::BOLD,
+            varn_debug::colors::C_ERRORS,
+            varn_debug::colors::R,
+            e
+        ))
+    })?;
+    std::fs::write(cache_path, bytes).map_err(|e| {
+        CliError::fatal(format!(
+            "{}{}error[cache]{}: write failed: {}",
+            varn_debug::colors::BOLD,
+            varn_debug::colors::C_ERRORS,
+            varn_debug::colors::R,
+            e
+        ))
+    })?;
+    Ok(())
+}
+
+pub fn compile_output_from_graph(graph: ModuleGraphArtifact) -> PipelineResult<CompileOutput> {
+    use varn_modules::EMBEDDED_MODULE_PREFIX;
+
+    let entry_path = graph.entry_path.clone();
+    let entry_proto = graph.entry_proto().cloned().ok_or_else(|| {
+        CliError::fatal(format!(
+            "{}{}error[cache]{}: entry module not found in graph",
+            varn_debug::colors::BOLD,
+            varn_debug::colors::C_ERRORS,
+            varn_debug::colors::R
+        ))
+    })?;
+
+    let mut precompiled: FxHashMap<String, Rc<varn_compiler::FunctionProto>> = FxHashMap::default();
+    for (path, proto) in &graph.modules {
+        if *path == entry_path {
+            continue;
+        }
+        let clean_path = path.strip_prefix(EMBEDDED_MODULE_PREFIX).unwrap_or(path);
+        precompiled.insert(clean_path.to_owned(), Rc::new(proto.clone()));
+    }
+
+    Ok(CompileOutput {
+        entry_proto,
+        precompiled: Rc::new(precompiled),
+        graph_artifact: graph,
+    })
+}

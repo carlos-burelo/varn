@@ -1,0 +1,17 @@
+export declare class Generator<T> {
+    next(value?: dynamic): { value: T; done: bool; };
+    return(value?: T): { value: T; done: bool; };
+}
+
+export declare class AsyncGenerator<T> {
+    next(value?: dynamic): Task<{ value: T; done: bool; }>;
+    return(value?: T): Task<{ value: T; done: bool; }>;
+}
+
+export interface Iterator<T> {
+    next(): { value: T; done: bool; };
+}
+
+export interface AsyncIterator<T> {
+    next(): Task<{ value: T; done: bool; }>;
+}

@@ -1,0 +1,23 @@
+// std:reflect — pure IDL facade over runtime reflection host operations.
+
+export namespace Reflect {
+    export declare function defineMetadata(metadataKey: dynamic, metadataValue: dynamic, target: dynamic): void;
+    export declare function getMetadata(metadataKey: dynamic, target: dynamic): dynamic;
+    export declare function hasMetadata(metadataKey: dynamic, target: dynamic): bool;
+    export declare function getMetadataKeys(target: dynamic): dynamic[];
+}
+
+export declare class MetaKey<T = dynamic> {
+    static create<R>(): MetaKey<R>;
+    set(target: dynamic, value: T): void;
+    get(target: dynamic): T | null;
+    has(target: dynamic): bool;
+    keys(target: dynamic): dynamic[];
+}
+
+export interface MethodContext {
+    name: str;
+    isStatic: bool;
+    isPrivate: bool;
+    kind: str;
+}

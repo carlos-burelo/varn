@@ -1,0 +1,50 @@
+export declare class str {
+    static EMPTY: str;
+    static fromCharCode(...codes: int[]): str;
+    static from(val: dynamic): str;
+    static parse(val: dynamic): str;
+    static join(arr: str[], sep?: str): str;
+
+    readonly length: int;
+    toString(): str;
+    toStr(): str; // ALIAS
+    valueOf(): str;
+    toLowerCase(): str;
+    toUpperCase(): str;
+    trim(): str;
+    trimStart(): str;
+    trimEnd(): str;
+    includes(search: str): bool;
+    contains(search: str): bool; // ALIAS
+    startsWith(search: str): bool;
+    endsWith(search: str): bool;
+    indexOf(search: str): int;
+    lastIndexOf(search: str): int;
+    substring(start: int, end?: int): str;
+    slice(start: int, end?: int): str;
+    at(index: int): str | null;
+    replace(from: str, to: str): str;
+    replaceAll(from: str, to: str): str;
+    split(separator?: str): str[];
+    charCodeAt(pos: int): int;
+    charCode(): int;
+    codePointAt(pos: int): int;
+    lines(): str[];
+    words(): str[];
+    repeat(n: int): str;
+    padStart(target: int, pad?: str): str;
+    padLeft(target: int, pad?: str): str; // ALIAS
+    padEnd(target: int, pad?: str): str;
+    padRight(target: int, pad?: str): str; // ALIAS
+    concat(other: str): str;
+    substr(start: int, length?: int): str;
+    isEmpty(): bool;
+    isBlank(): bool;
+    isDigit(): bool;
+    isLetter(): bool;
+    isWhitespace(): bool;
+    reverse(): str;
+    capitalize(): str;
+    toInt(): int;
+    toFloat(): float;
+}
