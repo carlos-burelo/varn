@@ -1,0 +1,17 @@
+export declare class char {
+    static fromCode(code: int): char;
+
+    toString(): str;
+    toStr(): str;
+    charCodeAt(): int;
+    isAlphabetic(): bool;
+    isAlphanumeric(): bool;
+    isDigit(): bool;
+    isWhitespace(): bool;
+    isUppercase(): bool;
+    isLowercase(): bool;
+    toUppercase(): char | str;
+    toLowercase(): char | str;
+    isAscii(): bool;
+    isPunctuation(): bool;
+}

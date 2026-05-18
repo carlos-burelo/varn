@@ -1,0 +1,61 @@
+// std:types — Utility types implemented via mapped types and keyof
+
+/**
+ * Makes all properties of T optional.
+ */
+export type Partial<T> = { [K in keyof T]?: T[K] }
+
+/**
+ * Makes all properties of T required (removes optionality).
+ */
+export type Required<T> = { [K in keyof T]: T[K] }
+
+/**
+ * Makes all properties of T readonly.
+ */
+export type Readonly<T> = { readonly [K in keyof T]: T[K] }
+
+/**
+ * Removes readonly from all properties of T.
+ */
+export type Mutable<T> = { [K in keyof T]: T[K] }
+
+/**
+ * Constructs an object type with keys K and values of type T.
+ */
+export type Record<K extends str, T> = { [P in K]: T }
+
+/**
+ * Constructs a type by picking a set of properties K from T.
+ */
+export type Pick<T, K extends keyof T> = { [P in K]: T[P] }
+
+/**
+ * Excludes from T all types that are assignable to U (distributive).
+ */
+export type Exclude<T, U> = T extends U ? never : T
+
+/**
+ * Extracts from T all types that are assignable to U (distributive).
+ */
+export type Extract<T, U> = T extends U ? T : never
+
+/**
+ * Removes null from T.
+ */
+export type NonNullable<T> = T extends null ? never : T
+
+/**
+ * Obtains the return type of a function type T.
+ */
+export type ReturnType<T> = T extends (...args: dynamic[]) => infer R ? R : never
+
+/**
+ * Awaited unwraps Task<T> to T.
+ */
+export type Awaited<T> = T extends Task<infer U> ? U : T
+
+/**
+ * Constructs a type by removing keys K from T. Uses Exclude<keyof T, K>.
+ */
+export type Omit<T, K extends keyof T> = { [P in Exclude<keyof T, K>]: T[P] }

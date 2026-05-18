@@ -1,0 +1,18 @@
+
+function double2(n: int): int { return n * 2 }
+function addN(n: int, x: int): int { return n + x }
+function clamp2(lo: int, hi: int, v: int): int {
+    if (v < lo) return lo
+    if (v > hi) return hi
+    return v
+}
+
+assert("pipe simple",      5 |> double2 === 10)
+assert("pipe placeholder", 7 |> addN(_, 3) === 10)
+assert("pipe multi _",     4 |> addN(_, _) === 8)
+assert("pipe clamp lo",    -5 |> clamp2(0, 10, _) === 0)
+assert("pipe clamp hi",    15 |> clamp2(0, 10, _) === 10)
+const piped = (3 |> double2) |> double2
+assert("pipe chained",     piped === 12)
+
+print("[PASSED] 19. Pipeline operator ")

@@ -1,0 +1,11 @@
+
+const scores: Record<str, int> = {
+    "alice": 95,
+    "bob": 87,
+    "charlie": 72
+}
+assert("record get alice",   scores["alice"] === 95)
+assert("record get bob",     scores["bob"] === 87)
+assert("record get charlie", scores["charlie"] === 72)
+
+print("[PASSED] 24. Record type ")

@@ -1,0 +1,22 @@
+
+enum Direction { North, South, East, West }
+enum HttpMethod { GET = 0, POST = 1, PUT = 2, DELETE = 3 }
+
+const dir: Direction = Direction.North
+assert("enum value",       dir === Direction.North)
+assert("enum neq",         Direction.North !== Direction.South)
+assert("enum explicit",    HttpMethod.POST === 1)
+assert("enum rawValue",    Direction.East.rawValue === 2)
+
+function describeDir(d: Direction): str {
+    return match (d) {
+        Direction.North => "going north",
+        Direction.South => "going south",
+        Direction.East  => "going east",
+        Direction.West  => "going west"
+    }
+}
+assert("enum match N", describeDir(Direction.North) === "going north")
+assert("enum match W", describeDir(Direction.West) === "going west")
+
+print("[PASSED] 16. Enums ")

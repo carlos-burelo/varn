@@ -1,0 +1,4 @@
+// expect: error[Varn3002]
+// expect: suggestion: Did you mean `myVariable`?
+const myVariable: int = 42
+print(myVariabl)

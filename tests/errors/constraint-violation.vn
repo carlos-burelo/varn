@@ -1,0 +1,3 @@
+// expect: error[Varn3202]
+function identity<T extends int>(x: T): T { return x }
+identity<str>("hello")

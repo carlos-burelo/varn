@@ -1,0 +1,652 @@
+use std::rc::Rc;
+
+use varn_core::OpCode;
+
+mod rc_str_serde {
+    use serde::{Deserialize, Deserializer, Serializer};
+    use std::rc::Rc;
+    pub fn serialize<S: Serializer>(s: &Rc<str>, ser: S) -> Result<S::Ok, S::Error> {
+        ser.serialize_str(s)
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(de: D) -> Result<Rc<str>, D::Error> {
+        Ok(Rc::from(String::deserialize(de)?))
+    }
+}
+
+mod opt_rc_str_serde {
+    use serde::{Deserialize, Deserializer, Serializer};
+    use std::rc::Rc;
+    pub fn serialize<S: Serializer>(s: &Option<Rc<str>>, ser: S) -> Result<S::Ok, S::Error> {
+        match s {
+            Some(v) => ser.serialize_some(v.as_ref()),
+            None => ser.serialize_none(),
+        }
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(de: D) -> Result<Option<Rc<str>>, D::Error> {
+        Ok(Option::<String>::deserialize(de)?.map(|s| Rc::from(s)))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum Literal {
+    Null,
+    Bool(bool),
+    Int(i64),
+    Float(f64),
+    Str(Rc<str>),
+    BigInt(i128),
+    Decimal(rust_decimal::Decimal),
+    Symbol(crate::value::RuntimeSymbol),
+    Char(char),
+}
+
+impl PartialEq for Literal {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Null, Self::Null) => true,
+            (Self::Bool(a), Self::Bool(b)) => a == b,
+            (Self::Int(a), Self::Int(b)) => a == b,
+            (Self::Float(a), Self::Float(b)) => a.to_bits() == b.to_bits(),
+            (Self::Str(a), Self::Str(b)) => a == b,
+            (Self::BigInt(a), Self::BigInt(b)) => a == b,
+            (Self::Decimal(a), Self::Decimal(b)) => a == b,
+            (Self::Symbol(a), Self::Symbol(b)) => a == b,
+            (Self::Char(a), Self::Char(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Literal {}
+
+impl serde::Serialize for Literal {
+    fn serialize<S: serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+        match self {
+            Literal::Null => ser.serialize_unit_variant("Literal", 0, "Null"),
+            Literal::Bool(b) => ser.serialize_newtype_variant("Literal", 1, "Bool", b),
+            Literal::Int(i) => ser.serialize_newtype_variant("Literal", 2, "Int", i),
+            Literal::Float(f) => ser.serialize_newtype_variant("Literal", 3, "Float", f),
+            Literal::Str(s) => ser.serialize_newtype_variant("Literal", 4, "Str", s.as_ref()),
+            Literal::BigInt(n) => ser.serialize_newtype_variant("Literal", 5, "BigInt", n),
+            Literal::Decimal(d) => {
+                let bits = d.serialize();
+                ser.serialize_newtype_variant("Literal", 6, "Decimal", &bits)
+            }
+            Literal::Symbol(s) => ser.serialize_newtype_variant("Literal", 7, "Symbol", s),
+            Literal::Char(c) => ser.serialize_newtype_variant("Literal", 8, "Char", c),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Literal {
+    fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        use serde::de::{self, EnumAccess, VariantAccess, Visitor};
+        use std::fmt;
+
+        struct LiteralVisitor;
+
+        impl<'de> Visitor<'de> for LiteralVisitor {
+            type Value = Literal;
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("Literal enum")
+            }
+            fn visit_enum<A: EnumAccess<'de>>(self, data: A) -> Result<Self::Value, A::Error> {
+                let (idx, variant): (u32, _) = data.variant()?;
+                match idx {
+                    0 => {
+                        variant.unit_variant()?;
+                        Ok(Literal::Null)
+                    }
+                    1 => Ok(Literal::Bool(variant.newtype_variant()?)),
+                    2 => Ok(Literal::Int(variant.newtype_variant()?)),
+                    3 => Ok(Literal::Float(variant.newtype_variant()?)),
+                    4 => Ok(Literal::Str(Rc::from(variant.newtype_variant::<String>()?))),
+                    5 => Ok(Literal::BigInt(variant.newtype_variant()?)),
+                    6 => {
+                        let bits: [u8; 16] = variant.newtype_variant()?;
+                        Ok(Literal::Decimal(rust_decimal::Decimal::deserialize(bits)))
+                    }
+                    7 => Ok(Literal::Symbol(variant.newtype_variant()?)),
+                    8 => Ok(Literal::Char(variant.newtype_variant()?)),
+                    _ => Err(de::Error::unknown_variant(
+                        &idx.to_string(),
+                        &["0", "1", "2", "3", "4", "5", "6", "7", "8"],
+                    )),
+                }
+            }
+        }
+
+        de.deserialize_enum(
+            "Literal",
+            &[
+                "Null", "Bool", "Int", "Float", "Str", "BigInt", "Decimal", "Symbol", "Char",
+            ],
+            LiteralVisitor,
+        )
+    }
+}
+
+impl std::hash::Hash for Literal {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            Self::Null => {}
+            Self::Bool(b) => b.hash(state),
+            Self::Int(i) => i.hash(state),
+            Self::Float(f) => f.to_bits().hash(state),
+            Self::Str(s) => s.hash(state),
+            Self::BigInt(b) => b.hash(state),
+            Self::Decimal(d) => d.hash(state),
+            Self::Symbol(s) => s.hash(state),
+            Self::Char(c) => c.hash(state),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum PoolEntry {
+    Literal(Literal),
+    Function(std::rc::Rc<FunctionProto>),
+    Shape(Vec<std::rc::Rc<str>>),
+}
+
+impl std::fmt::Debug for PoolEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Literal(lit) => f.debug_tuple("Literal").field(lit).finish(),
+            Self::Function(proto) => f
+                .debug_struct("Function")
+                .field("name", &proto.name)
+                .field("arity", &proto.arity)
+                .finish_non_exhaustive(),
+            Self::Shape(keys) => f.debug_tuple("Shape").field(keys).finish(),
+        }
+    }
+}
+
+impl std::hash::Hash for PoolEntry {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            Self::Literal(lit) => lit.hash(state),
+            Self::Function(f) => {
+                std::rc::Rc::as_ptr(f).hash(state);
+            }
+            Self::Shape(keys) => keys.hash(state),
+        }
+    }
+}
+
+impl PartialEq for PoolEntry {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Literal(l1), Self::Literal(l2)) => l1 == l2,
+            (Self::Shape(k1), Self::Shape(k2)) => k1 == k2,
+            (Self::Function(f1), Self::Function(f2)) => std::rc::Rc::ptr_eq(f1, f2),
+            _ => false,
+        }
+    }
+}
+
+impl Eq for PoolEntry {}
+
+impl serde::Serialize for PoolEntry {
+    fn serialize<S: serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
+        match self {
+            PoolEntry::Literal(l) => ser.serialize_newtype_variant("PoolEntry", 0, "Literal", l),
+            PoolEntry::Function(f) => {
+                ser.serialize_newtype_variant("PoolEntry", 1, "Function", f.as_ref())
+            }
+            PoolEntry::Shape(keys) => {
+                let strs: Vec<&str> = keys.iter().map(|s| s.as_ref()).collect();
+                ser.serialize_newtype_variant("PoolEntry", 2, "Shape", &strs)
+            }
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for PoolEntry {
+    fn deserialize<D: serde::Deserializer<'de>>(de: D) -> Result<Self, D::Error> {
+        use serde::de::{self, EnumAccess, VariantAccess, Visitor};
+        use std::fmt;
+
+        struct PoolEntryVisitor;
+
+        impl<'de> Visitor<'de> for PoolEntryVisitor {
+            type Value = PoolEntry;
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("PoolEntry enum")
+            }
+            fn visit_enum<A: EnumAccess<'de>>(self, data: A) -> Result<Self::Value, A::Error> {
+                let (idx, variant): (u32, _) = data.variant()?;
+                match idx {
+                    0 => Ok(PoolEntry::Literal(variant.newtype_variant()?)),
+                    1 => Ok(PoolEntry::Function(Rc::new(
+                        variant.newtype_variant::<FunctionProto>()?,
+                    ))),
+                    2 => {
+                        let strs = variant.newtype_variant::<Vec<String>>()?;
+                        Ok(PoolEntry::Shape(
+                            strs.into_iter().map(|s| Rc::from(s)).collect(),
+                        ))
+                    }
+                    _ => Err(de::Error::unknown_variant(
+                        &idx.to_string(),
+                        &["0", "1", "2"],
+                    )),
+                }
+            }
+        }
+
+        de.deserialize_enum(
+            "PoolEntry",
+            &["Literal", "Function", "Shape"],
+            PoolEntryVisitor,
+        )
+    }
+}
+
+impl PoolEntry {
+    pub fn as_str(&self) -> Option<&str> {
+        if let PoolEntry::Literal(Literal::Str(s)) = self {
+            Some(s.as_ref())
+        } else {
+            None
+        }
+    }
+}
+
+pub const INVALID_CACHE_SHAPE: u32 = 0;
+
+#[derive(Clone, Copy, Default, Debug, serde::Serialize, serde::Deserialize)]
+#[repr(C)]
+pub struct CacheEntry {
+    pub id: u32,
+    pub slot: u16,
+    pub is_class: u8,
+    pub vtable_ver: u8,
+}
+
+impl CacheEntry {
+    #[inline(always)]
+    pub fn to_u64(self) -> u64 {
+        unsafe { std::mem::transmute(self) }
+    }
+
+    #[inline(always)]
+    pub fn from_u64(val: u64) -> Self {
+        unsafe { std::mem::transmute(val) }
+    }
+
+    #[inline(always)]
+    pub fn matches(&self, other: &CacheEntry) -> bool {
+        self.id == other.id && self.is_class == other.is_class
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct PolyICSlot {
+    pub entries: [CacheEntry; 4],
+    pub next: u8,
+}
+
+impl PolyICSlot {
+    pub fn new() -> Self {
+        Self {
+            entries: [CacheEntry::default(); 4],
+            next: 0,
+        }
+    }
+
+    pub fn find_or_insert(&mut self, entry: CacheEntry) {
+        for e in &mut self.entries {
+            if e.matches(&entry) {
+                *e = entry;
+                return;
+            }
+        }
+        self.entries[self.next as usize] = entry;
+        self.next = (self.next + 1) & 0x3;
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct SiteProfile {
+    pub ids: [u32; 4],
+    pub count: u32,
+    pub megamorphic: bool,
+}
+
+impl SiteProfile {
+    #[inline(always)]
+    pub fn observe(&mut self, id: u32) {
+        if self.megamorphic || id == 0 {
+            return;
+        }
+        self.count = self.count.saturating_add(1);
+        for slot in &mut self.ids {
+            if *slot == id {
+                return;
+            }
+            if *slot == 0 {
+                *slot = id;
+                return;
+            }
+        }
+        self.megamorphic = true;
+    }
+
+    pub fn is_monomorphic(&self) -> bool {
+        !self.megamorphic && self.ids[1] == 0 && self.ids[0] != 0
+    }
+
+    pub fn is_polymorphic(&self) -> bool {
+        !self.megamorphic && self.ids[1] != 0
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct FeedbackVector {
+    pub sites: Vec<SiteProfile>,
+}
+
+impl FeedbackVector {
+    pub fn new(site_count: usize) -> Self {
+        Self {
+            sites: vec![SiteProfile::default(); site_count],
+        }
+    }
+
+    #[inline(always)]
+    pub fn observe(&mut self, site_idx: usize, id: u32) {
+        if let Some(site) = self.sites.get_mut(site_idx) {
+            site.observe(id);
+        }
+    }
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+pub struct LineEntry {
+    pub count: u32,
+    pub line: u32,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Default)]
+pub struct LineMapping {
+    pub entries: Vec<LineEntry>,
+}
+
+impl LineMapping {
+    pub fn add(&mut self, line: u32) {
+        if let Some(last) = self.entries.last_mut() {
+            if last.line == line {
+                last.count += 1;
+                return;
+            }
+        }
+        self.entries.push(LineEntry { count: 1, line });
+    }
+
+    pub fn get_line(&self, instruction_idx: usize) -> u32 {
+        let mut current = 0;
+        for entry in &self.entries {
+            current += entry.count as usize;
+            if instruction_idx < current {
+                return entry.line;
+            }
+        }
+        0
+    }
+
+    pub fn truncate(&mut self, instruction_idx: usize) {
+        let mut current = 0;
+        let mut to_remove_from = None;
+        for (i, entry) in self.entries.iter_mut().enumerate() {
+            let next = current + entry.count as usize;
+            if instruction_idx < next {
+                let keep = instruction_idx - current;
+                if keep == 0 {
+                    to_remove_from = Some(i);
+                } else {
+                    entry.count = keep as u32;
+                    to_remove_from = Some(i + 1);
+                }
+                break;
+            }
+            current = next;
+        }
+        if let Some(idx) = to_remove_from {
+            self.entries.truncate(idx);
+        }
+    }
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+pub struct FunctionProto {
+    #[serde(with = "opt_rc_str_serde")]
+    pub name: Option<Rc<str>>,
+    pub arity: usize,
+
+    pub register_count: u16,
+    pub has_rest: bool,
+    pub is_async: bool,
+    pub is_generator: bool,
+    pub has_this: bool,
+    pub upvalue_count: usize,
+    pub cache_count: usize,
+    pub chunk: Chunk,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct Chunk {
+    pub code: Vec<u16>,
+
+    pub lines: LineMapping,
+
+    pub constants: Vec<PoolEntry>,
+
+    #[serde(skip)]
+    pub constants_map: rustc_hash::FxHashMap<PoolEntry, u16>,
+
+    #[serde(with = "rc_str_serde")]
+    pub source_file: Rc<str>,
+
+    #[serde(skip)]
+    pub module_id: Option<varn_core::ModuleId>,
+}
+
+impl PartialEq for Chunk {
+    fn eq(&self, other: &Self) -> bool {
+        self.code == other.code && self.lines == other.lines && self.constants == other.constants
+    }
+}
+
+impl Eq for Chunk {}
+
+impl std::hash::Hash for Chunk {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.code.hash(state);
+        self.lines.hash(state);
+        self.constants.hash(state);
+    }
+}
+
+impl Default for Chunk {
+    fn default() -> Self {
+        Self {
+            code: Vec::new(),
+            lines: LineMapping::default(),
+            constants: Vec::new(),
+            constants_map: rustc_hash::FxHashMap::default(),
+            source_file: Rc::from(""),
+            module_id: None,
+        }
+    }
+}
+
+impl Chunk {
+    pub fn new() -> Self {
+        Chunk::default()
+    }
+
+    pub fn write(&mut self, word: u16, line: u32) {
+        self.code.push(word);
+        self.lines.add(line);
+    }
+
+    pub fn emit(&mut self, op: OpCode, line: u32) {
+        self.write(op as u8 as u16, line);
+    }
+
+    pub fn emit1(&mut self, op: OpCode, operand: u16, line: u32) {
+        self.write(op as u8 as u16, line);
+        self.write(operand, line);
+    }
+
+    pub fn emit2(&mut self, op: OpCode, op1: u16, op2: u16, line: u32) {
+        self.write(op as u8 as u16, line);
+        self.write(op1, line);
+        self.write(op2, line);
+    }
+
+    pub fn emit3(&mut self, op: OpCode, op1: u16, op2: u16, op3: u16, line: u32) {
+        self.write(op as u8 as u16, line);
+        self.write(op1, line);
+        self.write(op2, line);
+        self.write(op3, line);
+    }
+
+    pub fn emit4(&mut self, op: OpCode, op1: u16, op2: u16, op3: u16, op4: u16, line: u32) {
+        self.write(op as u8 as u16, line);
+        self.write(op1, line);
+        self.write(op2, line);
+        self.write(op3, line);
+        self.write(op4, line);
+    }
+
+    #[inline(always)]
+    pub fn pack(r1: u8, r2: u8) -> u16 {
+        ((r1 as u16) << 8) | (r2 as u16)
+    }
+
+    #[inline(always)]
+    pub fn pack_op(op: OpCode, reg: u8) -> u16 {
+        ((reg as u16) << 8) | (op as u8 as u16)
+    }
+
+    pub fn emit_rr(&mut self, op: OpCode, dest: u8, src: u8, line: u32) {
+        match op {
+            OpCode::LoadNull | OpCode::LoadTrue | OpCode::LoadFalse => {
+                self.write(Self::pack_op(op, dest), line);
+            }
+            _ => {
+                self.write(Self::pack_op(op, dest), line);
+                self.write(Self::pack(src, 0), line);
+            }
+        }
+    }
+
+    pub fn emit_rrr(&mut self, op: OpCode, dest: u8, src1: u8, src2: u8, line: u32) {
+        self.write(Self::pack_op(op, dest), line);
+        self.write(Self::pack(src1, src2), line);
+    }
+
+    pub fn emit_rrc(&mut self, op: OpCode, dest: u8, src: u8, const_idx: u16, line: u32) {
+        self.write(Self::pack_op(op, dest), line);
+        self.write(Self::pack(src, 0), line);
+        self.write(const_idx, line);
+    }
+
+    pub fn emit_rrc_ic(
+        &mut self,
+        op: OpCode,
+        dest: u8,
+        src: u8,
+        const_idx: u16,
+        cs_idx: u8,
+        line: u32,
+    ) {
+        self.write(Self::pack_op(op, dest), line);
+        self.write(Self::pack(src, cs_idx), line);
+        self.write(const_idx, line);
+    }
+
+    pub fn emit_rc(&mut self, op: OpCode, dest: u8, const_idx: u16, line: u32) {
+        self.write(Self::pack_op(op, dest), line);
+        self.write(const_idx, line);
+    }
+
+    pub fn emit_jump(&mut self, op: OpCode, line: u32) -> usize {
+        self.write(op as u8 as u16, line);
+        let patch_pos = self.code.len();
+        self.write(0xFFFF, line);
+        patch_pos
+    }
+
+    pub fn emit_cond_jump(&mut self, op: OpCode, cond_reg: u8, line: u32) -> usize {
+        self.write(Self::pack_op(op, cond_reg), line);
+        let patch_pos = self.code.len();
+        self.write(0xFFFF, line);
+        patch_pos
+    }
+
+    pub fn patch_jump(&mut self, patch_pos: usize) {
+        let offset = self.code.len() - patch_pos - 1;
+        assert!(
+            offset <= u16::MAX as usize,
+            "jump offset too large: {offset}"
+        );
+        self.code[patch_pos] = offset as u16;
+    }
+
+    pub fn emit_loop(&mut self, loop_start: usize, line: u32) {
+        let offset = self.code.len() - loop_start + 2;
+        assert!(
+            offset <= u16::MAX as usize,
+            "loop offset too large: {offset}"
+        );
+        self.emit1(OpCode::Loop, offset as u16, line);
+    }
+
+    pub fn add_constant(&mut self, entry: PoolEntry) -> u16 {
+        if let Some(&idx) = self.constants_map.get(&entry) {
+            return idx;
+        }
+        let idx = self.constants.len();
+        assert!(idx < u16::MAX as usize, "constant pool overflow");
+        let idx_u16 = idx as u16;
+        self.constants.push(entry.clone());
+        self.constants_map.insert(entry, idx_u16);
+        idx_u16
+    }
+
+    pub fn add_str(&mut self, s: impl AsRef<str>) -> u16 {
+        self.add_constant(PoolEntry::Literal(Literal::Str(Rc::from(s.as_ref()))))
+    }
+
+    pub fn add_int(&mut self, n: i64) -> u16 {
+        self.add_constant(PoolEntry::Literal(Literal::Int(n)))
+    }
+
+    pub fn add_symbol(&mut self, s: crate::value::RuntimeSymbol) -> u16 {
+        self.add_constant(PoolEntry::Literal(Literal::Symbol(s)))
+    }
+
+    pub fn emit_load_int(&mut self, dest: u8, n: i64, line: u32) {
+        if n >= i16::MIN as i64 && n <= i16::MAX as i64 {
+            self.write(Self::pack_op(OpCode::LoadInt, dest), line);
+            self.write(n as i16 as u16, line);
+        } else {
+            let idx = self.add_int(n);
+            self.emit_rc(OpCode::LoadConst, dest, idx, line);
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.code.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.code.is_empty()
+    }
+}

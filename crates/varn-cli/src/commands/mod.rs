@@ -1,0 +1,17 @@
+pub mod add;
+pub mod bench;
+pub mod build;
+pub mod check;
+pub mod completions;
+pub mod disasm;
+pub mod doctor;
+pub mod eval;
+pub mod info;
+pub mod init;
+pub mod inspect;
+pub mod install;
+pub mod lsp;
+pub mod remove;
+pub mod repl;
+pub mod run;
+pub mod update;

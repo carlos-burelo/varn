@@ -1,0 +1,6 @@
+// expect: error[Varn4104]
+class Wallet {
+    private balance: int = 0
+}
+const w = new Wallet()
+print(w.balance)

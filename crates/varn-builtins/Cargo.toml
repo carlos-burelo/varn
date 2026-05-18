@@ -1,0 +1,46 @@
+[package]
+name = "varn-builtins"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+runtime = [
+    "dep:parking_lot",
+    "dep:rust_decimal",
+    "dep:mio",
+    "dep:serde_json",
+    "dep:rand",
+    "dep:sha2",
+    "dep:hmac",
+    "dep:uuid",
+    "dep:base64",
+    "dep:hex",
+    "dep:url",
+    "dep:urlencoding",
+    "dep:ureq",
+    "dep:tiny_http",
+    "dep:chrono",
+]
+
+[dependencies]
+varn-core      = { path = "../varn-core" }
+varn-types     = { path = "../varn-types" }
+varn-modules   = { path = "../varn-modules" }
+varn-op-macros = { path = "../varn-op-macros" }
+
+parking_lot  = { version = "0.12.5", optional = true }
+rust_decimal = { version = "1", features = ["serde", "maths"], optional = true }
+mio          = { version = "1", features = ["os-poll", "net"], optional = true }
+serde_json   = { version = "1.0", optional = true }
+rand         = { version = "0.8", optional = true }
+sha2         = { version = "0.10", optional = true }
+hmac         = { version = "0.12", optional = true }
+uuid         = { version = "1", features = ["v4"], optional = true }
+base64       = { version = "0.21", optional = true }
+hex          = { version = "0.4", optional = true }
+url          = { version = "2", optional = true }
+urlencoding  = { version = "2", optional = true }
+ureq         = { version = "2", optional = true }
+tiny_http    = { version = "0.12", optional = true }
+chrono       = { version = "0.4", optional = true }
+rustc-hash   = "2.1"

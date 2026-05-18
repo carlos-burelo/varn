@@ -1,0 +1,18 @@
+enum R { A(int), B(str) }
+
+
+let x = R.A(42)
+let v = match x {
+    A(n) => n,
+    B(_) => -1,
+}
+assert("match ok", v === 42)
+
+let y = R.B("boom")
+let v2 = match y {
+    A(n) => n,
+    B(_) => -1,
+}
+assert("match err", v2 === -1)
+
+print("[PASSED] 29. Enum variant destructuring")

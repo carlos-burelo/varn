@@ -1,0 +1,135 @@
+
+// ── compose: right-to-left function composition ──────────────────
+function compose<A, B, C>(f: (B) => C, g: (A) => B): (A) => C {
+    return (x: A) => f(g(x))
+}
+
+function double(n: int): int { return n * 2 }
+function inc(n: int): int { return n + 1 }
+function square(n: int): int { return n * n }
+
+const doubleAfterInc = compose(double, inc)
+const squareAfterDouble = compose(square, double)
+
+assert("compose inc then double 3",  doubleAfterInc(3) === 8)
+assert("compose inc then double 0",  doubleAfterInc(0) === 2)
+assert("compose double then square", squareAfterDouble(3) === 36)
+assert("compose double then square 5", squareAfterDouble(5) === 100)
+
+// ── pipe: left-to-right function application ─────────────────────
+function pipe<A>(val: A, fns: ((A) => A)[]): A {
+    let result = val
+    for (const f of fns) result = f(result)
+    return result
+}
+
+const result1 = pipe(1, [inc, double, inc, double])
+assert("pipe 1 inc double inc double", result1 === 10)
+
+const result2 = pipe(5, [square, inc, double])
+assert("pipe 5 square inc double", result2 === 52)
+
+// ── memoize: closure capturing cache ─────────────────────────────
+function memoize<A, B>(f: (A) => B): (A) => B {
+    const cache: { [key: str]: B } = {}
+    return (arg: A) => {
+        const key = "" + arg
+        if (cache[key] !== null) return cache[key]
+        const val = f(arg)
+        cache[key] = val
+        return val
+    }
+}
+
+let callCount = 0
+function expensiveDouble(n: int): int {
+    callCount = callCount + 1
+    return n * 2
+}
+
+const memoDouble = memoize(expensiveDouble)
+assert("memoize first call 5",   memoDouble(5) === 10)
+assert("memoize second call 5",  memoDouble(5) === 10)
+assert("memoize first call 7",   memoDouble(7) === 14)
+assert("memoize call count",     callCount === 2)
+
+// ── once: run function at most once ──────────────────────────────
+function once<T>(f: () => T): () => T {
+    let ran = false
+    let result: T | null = null
+    return () => {
+        if (!ran) {
+            result = f()
+            ran = true
+        }
+        return result
+    }
+}
+
+let initCount = 0
+const init = once(() => {
+    initCount = initCount + 1
+    return 42
+})
+
+assert("once first call",  init() === 42)
+assert("once second call", init() === 42)
+assert("once third call",  init() === 42)
+assert("once ran once",    initCount === 1)
+
+// ── throttle-like: skip calls after first N ───────────────────────
+function takeFirst<T>(f: (T) => void, n: int): (T) => void {
+    let count = 0
+    return (x: T) => {
+        if (count < n) {
+            f(x)
+            count = count + 1
+        }
+    }
+}
+
+const log: int[] = []
+const logFirst3 = takeFirst((x: int) => log.push(x), 3)
+logFirst3(10)
+logFirst3(20)
+logFirst3(30)
+logFirst3(40)
+logFirst3(50)
+assert("takeFirst length",  log.length === 3)
+assert("takeFirst[0]",      log[0] === 10)
+assert("takeFirst[2]",      log[2] === 30)
+
+// ── flatMap via higher-order ─────────────────────────────────────
+function flatMap<A, B>(arr: A[], f: (A) => B[]): B[] {
+    const out: B[] = []
+    for (const x of arr) {
+        const chunk = f(x)
+        for (const y of chunk) out.push(y)
+    }
+    return out
+}
+
+const nested = flatMap([1, 2, 3], (n: int) => [n, n * 10])
+assert("flatMap length", nested.length === 6)
+assert("flatMap[0]",     nested[0] === 1)
+assert("flatMap[1]",     nested[1] === 10)
+assert("flatMap[4]",     nested[4] === 3)
+assert("flatMap[5]",     nested[5] === 30)
+
+// ── reduce ────────────────────────────────────────────────────────
+function reduce<A, B>(arr: A[], f: (a:B, b:A) => B, init: B): B {
+    let acc = init
+    for (const x of arr) acc = f(acc, x)
+    return acc
+}
+
+const sum = reduce([1, 2, 3, 4, 5], (acc: int, x: int) => acc + x, 0)
+assert("reduce sum", sum === 15)
+
+const product = reduce([1, 2, 3, 4], (acc: int, x: int) => acc * x, 1)
+assert("reduce product", product === 24)
+
+const concat_ = reduce(["a", "b", "c"], (acc: str, x: str) => acc + x, "")
+assert("reduce concat", concat_ === "abc")
+
+print("[PASSED] 38. Advanced higher-order functions")

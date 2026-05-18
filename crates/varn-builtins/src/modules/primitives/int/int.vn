@@ -1,0 +1,26 @@
+export declare class int {
+    static MAX_VALUE: int;
+    static MIN_VALUE: int;
+    static parse(s: str): int;
+    static isInteger(val: dynamic): bool;
+    static isSafeInteger(val: int): bool;
+
+    toString(): str;
+    valueOf(): int;
+    toLocaleString(): str;
+    toFixed(digits?: int): str;
+    abs(): int;
+    sign(): int;
+    negate(): int;
+    bitwiseNot(): int;
+    min(other: int): int;
+    max(other: int): int;
+    clamp(lo: int, hi: int): int;
+    toHex(): str;
+    toBinary(): str;
+    toOctal(): str;
+    toFloat(): float;
+    pow(exponent: int): int;
+    isEven(): bool;
+    isOdd(): bool;
+}

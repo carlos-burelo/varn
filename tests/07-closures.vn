@@ -1,0 +1,32 @@
+
+function makeAdder(n: int): (a: int) => int {
+    return (x: int) => x + n
+}
+const add5 = makeAdder(5)
+const add10 = makeAdder(10)
+assert("closure add5",   add5(3) === 8)
+assert("closure add10",  add10(3) === 13)
+assert("closure independent", add5(0) !== add10(0))
+
+function makeCounter(): () => int {
+    let c = 0
+    return () => {
+        c = c + 1
+        return c
+    }
+}
+const cnt1 = makeCounter()
+const cnt2 = makeCounter()
+assert("counter1 first",  cnt1() === 1)
+assert("counter1 second", cnt1() === 2)
+assert("counter2 fresh",  cnt2() === 1)
+
+function compose<A, B, C>(f: (a:B) => C, g: (b:A) => B): (c:A) => C {
+    return (x: A) => f(g(x))
+}
+const double = (n: int) => n * 2
+const inc    = (n: int) => n + 1
+const doubleInc = compose(double, inc)
+assert("compose", doubleInc(4) === 10)
+
+print("[PASSED] 7. Closures ")

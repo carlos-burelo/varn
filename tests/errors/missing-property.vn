@@ -1,0 +1,3 @@
+// expect: error[Varn3004]
+const obj = { name: "Alice" }
+print(obj.age)

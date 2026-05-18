@@ -1,0 +1,83 @@
+export type TimeParts = {
+    year: int;
+    month: int;
+    day: int;
+    hour: int;
+    minute: int;
+    second: int;
+    millisecond: int;
+    weekday?: int;
+};
+
+export type DurationParts = {
+    years?: int;
+    months?: int;
+    days?: int;
+    hours?: int;
+    minutes?: int;
+    seconds?: int;
+    milliseconds?: int;
+    sign?: int;
+};
+
+export type DurationLike = str | int | DurationParts;
+
+export namespace Time {
+    export declare function now(): int;
+    export declare function toISOString(ms: int): str;
+    export declare function fromISO(iso: str): int;
+    export declare function toParts(ms: int): TimeParts;
+    export declare function fromParts(parts: TimeParts): int;
+
+    export declare function durationFromString(s: str): int;
+    export declare function durationToString(ms: int): str;
+    export declare function durationParts(ms: int): DurationParts;
+}
+
+export namespace Now {
+    export declare function now(): int;
+    export declare function instant(): Instant;
+    export declare function plainDateTimeISO(): PlainDateTime;
+}
+
+export declare class Instant {
+    constructor(epochMilliseconds: int);
+    get epochMilliseconds(): int;
+    toString(): str;
+    static compare(a: Instant, b: Instant): int;
+}
+
+export declare class PlainDateTime {
+    constructor(year: int, month: int, day: int, hour?: int, minute?: int, second?: int, millisecond?: int);
+    get year(): int;
+    get month(): int;
+    get day(): int;
+    get hour(): int;
+    get minute(): int;
+    get second(): int;
+    get millisecond(): int;
+    
+    toString(): str;
+    static compare(a: PlainDateTime, b: PlainDateTime): int;
+}
+
+export declare class Duration {
+    constructor(input: DurationLike);
+    static from(item: DurationLike): Duration;
+
+    get milliseconds(): int;
+    get seconds(): int;
+    get minutes(): int;
+    get hours(): int;
+    get days(): int;
+    get totalMilliseconds(): int;
+
+    toString(): str;
+    toJSON(): str;
+    abs(): Duration;
+    negated(): Duration;
+    add(other: Duration | DurationLike): Duration;
+    subtract(other: Duration | DurationLike): Duration;
+    compare(other: Duration | DurationLike): int;
+    equals(other: Duration | DurationLike): bool;
+}

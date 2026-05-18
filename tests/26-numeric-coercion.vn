@@ -1,0 +1,42 @@
+// Numeric coercion tests — widening (implicit) vs narrowing (requires `as`)
+
+
+// ── Widening (implicit, always allowed) ──────────────────────────
+const i: int = 42
+const f: float = i        // int → float: safe widening
+assert("int to float",     f === 42.0)
+
+const d: decimal = i       // int → decimal: safe
+assert("int to decimal",   d.toString() === "42")
+
+const bi: bigint = i       // int → bigint: safe
+assert("int to bigint",    bi.toString() === "42")
+
+const litI = 100
+const litBi: bigint = litI  // literal int → bigint: safe
+assert("literal int to bigint", litBi.toString() === "100")
+
+// ── Narrowing (requires explicit `as` cast) ──────────────────────
+// These are compile-time errors WITHOUT `as`:
+//   let x: int = 3.14      // float → int: NOT implicit
+//   let y: int = 999n      // bigint → int: NOT implicit
+//   let z: float = 1.5d    // decimal → float: NOT implicit
+
+// TODO: `as` cast from float to int needs VM support
+// For now, test that widening works correctly
+
+// ── Function parameters (widening in arguments) ──────────────────
+function takesFloat(x: float): float { return x + 1.0 }
+assert("int arg to float param", takesFloat(5) === 6.0)
+
+function takesDecimal(x: decimal): decimal { return x + 1.0d }
+assert("int arg to decimal param", takesDecimal(3) === 4.0d)
+
+// ── Arithmetic with mixed types ─────────────────────────────────
+const a: int = 10
+const b: float = 2.5
+// a is widened to float for the operation
+const c: float = a + b
+assert("int + float = float", c === 12.5)
+
+print("[PASSED] 26. Numeric coercion ")

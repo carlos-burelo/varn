@@ -1,0 +1,16 @@
+declare class Range {
+    readonly start: int;
+    readonly end: int;
+    readonly inclusive: bool;
+    readonly length: int;
+
+    toString(): str;
+    contains(val: int): bool;
+    toArray(): int[];
+    step(n: int): int[];
+    forEach(callback: (val: int) => void): void;
+    map<T>(callback: (val: int) => T): T[];
+
+    static from(start: int, end: int): Range;
+    static fromInclusive(start: int, end: int): Range;
+}

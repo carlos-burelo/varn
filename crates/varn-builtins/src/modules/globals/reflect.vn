@@ -1,0 +1,11 @@
+export interface ClassRef {
+    name: str;
+}
+
+export interface FunctionRef {
+    name: str;
+    length: int;
+    apply(thisArg: dynamic, args?: dynamic[]): dynamic;
+    call(thisArg: dynamic, ...args: dynamic[]): dynamic;
+    bind(thisArg: dynamic, ...args: dynamic[]): FunctionRef;
+}

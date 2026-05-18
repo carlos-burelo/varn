@@ -1,0 +1,13 @@
+// std:test — pure IDL facade over runtime testing host operations.
+
+export namespace test {
+    export declare function assert(label: str, condition: bool): void;
+    export declare function assertEqual<T>(actual: T, expected: T, message?: str): void;
+    export declare function assertTrue(cond: bool, message?: str): void;
+    export declare function summary(): void;
+}
+
+// Top-level convenience exports
+export const assertEqual = test.assertEqual;
+export const assertTrue = test.assertTrue;
+export const fail = (msg?: str) => test.assert(msg ?? "fail", false);

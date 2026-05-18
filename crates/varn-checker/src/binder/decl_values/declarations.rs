@@ -1,0 +1,330 @@
+use super::super::type_inference::{infer_expr_type, widen_literal};
+use super::super::type_resolution::resolve_type_node;
+use crate::binder::{ClassMemberInfo, ClassMemberKind, PendingEnrich};
+use crate::scope::ScopeKind;
+use crate::symbol::{Symbol, SymbolKind};
+use crate::types::{FunctionType, Type};
+use std::rc::Rc;
+use varn_core::ast::{
+    EnumDecl, Expr, ExprKind, FunctionDecl, Pattern, Stmt, TypeAliasDecl, VarKind, VariableDecl,
+};
+
+impl super::super::Binder {
+    pub(crate) fn bind_variable(&mut self, v: &VariableDecl) {
+        let sym_kind = match v.kind {
+            VarKind::Const => SymbolKind::Const,
+            VarKind::Let => SymbolKind::Let,
+        };
+        for d in &v.declarators {
+            let line = d.range.start.line;
+            let has_explicit_ann = d.type_ann.is_some()
+                || matches!(
+                    &d.id,
+                    Pattern::Identifier {
+                        type_ann: Some(_),
+                        ..
+                    }
+                );
+            let ty = d
+                .type_ann
+                .as_ref()
+                .or(match &d.id {
+                    Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                    _ => None,
+                })
+                .map(|ann| resolve_type_node(ann, Some(self)))
+                .or_else(|| {
+                    d.init
+                        .as_ref()
+                        .map(|e| infer_expr_type(e, Some(self)))
+                        .map(|t| {
+                            if sym_kind == SymbolKind::Let && !has_explicit_ann {
+                                widen_literal(t)
+                            } else {
+                                t
+                            }
+                        })
+                });
+
+            let needs_enrich = ty.is_none();
+            self.bind_pattern(&d.id, sym_kind, line, v.doc.clone(), ty);
+
+            if let Pattern::Identifier { name, .. } = &d.id {
+                if let Some(init) = &d.init {
+                    if let ExprKind::Object { properties } = &init.kind {
+                        let fields = self.collect_object_members(properties);
+                        if !fields.is_empty() {
+                            self.type_members.objects.insert(name.clone(), fields);
+                        }
+                    }
+                }
+            }
+
+            if let Some(init_expr) = &d.init {
+                if needs_enrich
+                    && matches!(
+                        &init_expr.kind,
+                        ExprKind::Call { .. }
+                            | ExprKind::Await { .. }
+                            | ExprKind::Member { .. }
+                            | ExprKind::New { .. }
+                            | ExprKind::Match { .. }
+                    )
+                {
+                    let scope = self.scopes.get(self.current);
+                    if let Some(sym_id) =
+                        scope.lookup(if let Pattern::Identifier { name, .. } = &d.id {
+                            name.as_ref()
+                        } else {
+                            ""
+                        })
+                    {
+                        self.pending_enrich.push(PendingEnrich::Var {
+                            sym_id,
+                            init: init_expr as *const Expr,
+                        });
+                    }
+                }
+                self.bind_expr(init_expr);
+            }
+        }
+    }
+
+    pub(crate) fn bind_function(&mut self, f: &FunctionDecl) {
+        let line = f.range.start.line;
+        let params: Vec<crate::types::FunctionParam> = f
+            .params
+            .iter()
+            .map(|p| {
+                let name = Some(Rc::from(crate::binder::pattern_lead_name(&p.pattern)));
+                let mut ty = p
+                    .type_ann
+                    .as_ref()
+                    .or(match &p.pattern {
+                        Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                        _ => None,
+                    })
+                    .map(|ann| resolve_type_node(ann, Some(self)))
+                    .or_else(|| {
+                        p.default
+                            .as_ref()
+                            .map(|e| widen_literal(infer_expr_type(e, Some(self))))
+                    })
+                    .unwrap_or(Type::Dynamic);
+
+                if p.is_rest && !matches!(ty.0, varn_core::TypeKind::Array(_)) {
+                    ty = Type::array(ty);
+                }
+
+                crate::types::FunctionParam {
+                    name,
+                    ty,
+                    optional: p.is_optional || p.default.is_some(),
+                    is_rest: p.is_rest,
+                }
+            })
+            .collect();
+
+        let ret = if f.modifiers.is_generator {
+            Type::Dynamic
+        } else {
+            f.return_type
+                .as_ref()
+                .map(|ann| resolve_type_node(ann, Some(self)))
+                .unwrap_or(Type::Void)
+        };
+        let fn_type = Type::fn_(FunctionType {
+            params: params.clone(),
+            return_type: Box::new(ret),
+            is_arrow: false,
+            type_params: f
+                .type_params
+                .iter()
+                .map(|t| Rc::from(t.name.as_str()))
+                .collect(),
+        });
+
+        let mut sym = Symbol::new(SymbolKind::Function, f.id.clone(), line).with_type(fn_type);
+        sym.col = f.range.start.column + (f.id_offset - f.range.start.offset);
+        sym.offset = f.id_offset;
+        sym.has_explicit_type = f.return_type.is_some();
+        sym.is_async = f.modifiers.is_async;
+        sym.is_generator = f.modifiers.is_generator;
+        sym.doc = f.doc.as_ref().map(|s| Rc::from(s.as_str()));
+        sym.type_params = f
+            .type_params
+            .iter()
+            .map(|t| Rc::from(t.name.as_str()))
+            .collect();
+        sym.type_param_constraints = f
+            .type_params
+            .iter()
+            .map(|t| {
+                t.constraint
+                    .as_ref()
+                    .map(|c| resolve_type_node(c, Some(self)))
+            })
+            .collect();
+
+        let sym_id = self.define(f.id.to_string(), sym);
+
+        if f.return_type.is_none() && !f.modifiers.is_declare && !f.modifiers.is_generator {
+            self.pending_enrich.push(PendingEnrich::Fn {
+                sym_id,
+                body: &f.body as *const Stmt,
+                is_async: f.modifiers.is_async,
+            });
+        }
+
+        let child = self.scopes.child(ScopeKind::Function, self.current);
+        let saved = self.current;
+        self.current = child;
+
+        self.bind_type_params(&f.type_params, line);
+
+        for p in f.params.iter() {
+            let mut ty = p
+                .type_ann
+                .as_ref()
+                .or(match &p.pattern {
+                    Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                    _ => None,
+                })
+                .map(|ann| resolve_type_node(ann, Some(self)))
+                .or_else(|| {
+                    p.default
+                        .as_ref()
+                        .map(|e| widen_literal(infer_expr_type(e, Some(self))))
+                })
+                .unwrap_or(Type::Dynamic);
+
+            if p.is_rest && !matches!(ty.0, varn_core::TypeKind::Array(_)) {
+                ty = Type::array(ty);
+            }
+
+            self.bind_pattern(
+                &p.pattern,
+                SymbolKind::Parameter,
+                line,
+                f.doc.clone(),
+                Some(ty),
+            );
+        }
+
+        if !f.modifiers.is_declare {
+            self.bind_stmt(&f.body);
+        }
+        self.current = saved;
+
+        let _ = sym_id;
+    }
+
+    pub(crate) fn bind_type_alias(&mut self, t: &TypeAliasDecl) {
+        let has_type_params = !t.type_params.is_empty();
+
+        let ty = if has_type_params {
+            crate::types::Type::Dynamic
+        } else {
+            resolve_type_node(&t.alias, Some(self))
+        };
+        let mut sym =
+            Symbol::new(SymbolKind::TypeAlias, t.id.clone(), t.range.start.line).with_type(ty);
+        sym.offset = t.range.start.offset;
+        sym.col = t.range.start.column;
+        sym.doc = t.doc.as_ref().map(|s| Rc::from(s.as_str()));
+        sym.type_params = t
+            .type_params
+            .iter()
+            .map(|tp| Rc::from(tp.name.as_str()))
+            .collect();
+        if has_type_params {
+            sym.alias_node = Some(Box::new(t.alias.clone()));
+        }
+        self.define(t.id.to_string(), sym);
+    }
+
+    pub(crate) fn bind_enum(&mut self, e: &EnumDecl) {
+        let mut sym = Symbol::new(SymbolKind::Enum, e.id.clone(), e.range.start.line).with_type(
+            Type::named_with_origin(e.id.clone(), Some(Rc::from(self.source_file.as_ref()))),
+        );
+        sym.doc = e.doc.as_ref().map(|s| Rc::from(s.as_str()));
+        self.define(e.id.to_string(), sym);
+
+        let mut variants_info = Vec::new();
+
+        for (_i, member) in e.members.iter().enumerate() {
+            let fields: Vec<(Rc<str>, Type)> = member
+                .payload_fields
+                .iter()
+                .map(|f| {
+                    let ty = resolve_type_node(&f.ty, Some(self));
+                    (f.name.clone(), ty)
+                })
+                .collect();
+
+            self.sum_variant_parent
+                .insert(member.id.clone(), e.id.clone());
+            self.sum_variant_fields
+                .insert(member.id.clone(), fields.clone());
+
+            let variant_sym_id = if member.payload_fields.is_empty() {
+                let v_sym = Symbol::new(
+                    SymbolKind::EnumMember,
+                    member.id.clone(),
+                    member.range.start.line,
+                )
+                .with_type(Type::named(e.id.clone()));
+                self.define(member.id.to_string(), v_sym)
+            } else {
+                let params: Vec<crate::types::FunctionParam> = fields
+                    .iter()
+                    .map(|(fname, fty)| crate::types::FunctionParam {
+                        name: Some(fname.clone()),
+                        ty: fty.clone(),
+                        optional: false,
+                        is_rest: false,
+                    })
+                    .collect();
+                let fn_ty = Type::fn_(crate::types::FunctionType {
+                    params,
+                    return_type: Box::new(Type::named_with_origin(
+                        e.id.clone(),
+                        Some(Rc::from(self.source_file.as_ref())),
+                    )),
+                    is_arrow: false,
+                    type_params: vec![],
+                });
+                let v_sym = Symbol::new(
+                    SymbolKind::EnumMember,
+                    member.id.clone(),
+                    member.range.start.line,
+                )
+                .with_type(fn_ty);
+                self.define(member.id.to_string(), v_sym)
+            };
+
+            variants_info.push(ClassMemberInfo {
+                name: member.id.clone(),
+                kind: ClassMemberKind::Property,
+                is_async: false,
+                is_generator: false,
+                is_static: true,
+                is_optional: false,
+                line: member.range.start.line.saturating_sub(1),
+                col: member.range.start.column,
+                offset: member.range.start.offset,
+                ty: Type::named(e.id.clone()),
+                members: Vec::new(),
+                visibility: None,
+                is_abstract: false,
+                is_readonly: false,
+                is_override: false,
+                symbol_id: Some(variant_sym_id),
+            });
+        }
+
+        if !variants_info.is_empty() {
+            self.type_members.enums.insert(e.id.clone(), variants_info);
+        }
+    }
+}

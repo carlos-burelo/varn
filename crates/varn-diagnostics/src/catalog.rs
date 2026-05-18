@@ -1,0 +1,184 @@
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum ErrorCode {
+    UnterminatedString = 1001,
+    InvalidNumericLiteral = 1002,
+    UnknownCharacter = 1003,
+    UnterminatedTemplate = 1004,
+    UnterminatedRegex = 1005,
+    InvalidEscapeSequence = 1006,
+    UnterminatedBlockComment = 1007,
+    InvalidUnicodeEscape = 1008,
+
+    ExpectedToken = 2001,
+    UnexpectedToken = 2002,
+    UnterminatedParen = 2003,
+    UnterminatedBrace = 2004,
+    UnterminatedBracket = 2005,
+    InvalidExpression = 2006,
+    InvalidStatement = 2007,
+    InvalidTypeAnnotation = 2008,
+    InvalidPattern = 2009,
+    InvalidImportPath = 2010,
+    DuplicateLabel = 2011,
+    InvalidPropertyName = 2012,
+    InvalidDecoratorTarget = 2013,
+    ArrowWithoutParens = 2014,
+    InvalidGeneratorYield = 2015,
+
+    TypeMismatch = 3001,
+    UnknownSymbol = 3002,
+    NotCallable = 3003,
+    MissingProperty = 3004,
+    NotAssignable = 3005,
+    NotIndexable = 3006,
+    InvalidUnionMember = 3007,
+    InvalidIntersection = 3008,
+    CircularTypeReference = 3009,
+    InvalidTypeOperator = 3010,
+    TypeAnnotationRequired = 3011,
+    InvalidTypeofTarget = 3012,
+    InvalidInstanceofTarget = 3013,
+    InvalidAsCast = 3014,
+    InvalidSatisfies = 3015,
+
+    TypeArgInferenceFailed = 3201,
+    ConstraintViolation = 3202,
+    WrongTypeArgCount = 3203,
+    InvalidTypeParamConstraint = 3204,
+    GenericNotApplicableHere = 3205,
+
+    PossibleNullDereference = 3301,
+    NullNotAllowed = 3302,
+    OptionalChainOnNonNullable = 3303,
+
+    NonExhaustiveMatch = 4001,
+    DuplicateDeclaration = 4002,
+    UseBeforeDeclaration = 4003,
+    UnreachableCode = 4004,
+    InvalidBreakTarget = 4005,
+    InvalidContinueTarget = 4006,
+    ReturnOutsideFunction = 4007,
+    InvalidThrowOperand = 4008,
+    DuplicateCaseLabel = 4009,
+    InvalidPipelineReceiver = 4010,
+
+    MissingOverride = 4101,
+    SpuriousOverride = 4102,
+    NotASubclass = 4103,
+    PrivateMemberAccess = 4104,
+    ProtectedMemberAccess = 4105,
+    StaticMemberOnInstance = 4106,
+    AbstractMethodNotImplemented = 4107,
+    ConstructorNotCalled = 4108,
+    InvalidSuperCall = 4109,
+    DuplicateMemberName = 4110,
+    InvalidExtensionTarget = 4111,
+
+    UnsupportedExpression = 5001,
+    UnsupportedStatement = 5002,
+    UnsupportedPattern = 5003,
+    UnsupportedTypeNode = 5004,
+    CompilationInternalError = 5005,
+    BytecodeOverflow = 5006,
+    ConstantPoolOverflow = 5007,
+}
+
+impl ErrorCode {
+    pub fn name(self) -> &'static str {
+        match self {
+            ErrorCode::UnterminatedString => "unterminated-string",
+            ErrorCode::InvalidNumericLiteral => "invalid-numeric-literal",
+            ErrorCode::UnknownCharacter => "unknown-character",
+            ErrorCode::UnterminatedTemplate => "unterminated-template",
+            ErrorCode::UnterminatedRegex => "unterminated-regex",
+            ErrorCode::InvalidEscapeSequence => "invalid-escape-sequence",
+            ErrorCode::UnterminatedBlockComment => "unterminated-block-comment",
+            ErrorCode::InvalidUnicodeEscape => "invalid-unicode-escape",
+
+            ErrorCode::ExpectedToken => "expected-token",
+            ErrorCode::UnexpectedToken => "unexpected-token",
+            ErrorCode::UnterminatedParen => "unterminated-paren",
+            ErrorCode::UnterminatedBrace => "unterminated-brace",
+            ErrorCode::UnterminatedBracket => "unterminated-bracket",
+            ErrorCode::InvalidExpression => "invalid-expression",
+            ErrorCode::InvalidStatement => "invalid-statement",
+            ErrorCode::InvalidTypeAnnotation => "invalid-type-annotation",
+            ErrorCode::InvalidPattern => "invalid-pattern",
+            ErrorCode::InvalidImportPath => "invalid-import-path",
+            ErrorCode::DuplicateLabel => "duplicate-label",
+            ErrorCode::InvalidPropertyName => "invalid-property-name",
+            ErrorCode::InvalidDecoratorTarget => "invalid-decorator-target",
+            ErrorCode::ArrowWithoutParens => "arrow-without-parens",
+            ErrorCode::InvalidGeneratorYield => "invalid-generator-yield",
+
+            ErrorCode::TypeMismatch => "type-mismatch",
+            ErrorCode::UnknownSymbol => "unknown-symbol",
+            ErrorCode::NotCallable => "not-callable",
+            ErrorCode::MissingProperty => "missing-property",
+            ErrorCode::NotAssignable => "not-assignable",
+            ErrorCode::NotIndexable => "not-indexable",
+            ErrorCode::InvalidUnionMember => "invalid-union-member",
+            ErrorCode::InvalidIntersection => "invalid-intersection",
+            ErrorCode::CircularTypeReference => "circular-type-reference",
+            ErrorCode::InvalidTypeOperator => "invalid-type-operator",
+            ErrorCode::TypeAnnotationRequired => "type-annotation-required",
+            ErrorCode::InvalidTypeofTarget => "invalid-typeof-target",
+            ErrorCode::InvalidInstanceofTarget => "invalid-instanceof-target",
+            ErrorCode::InvalidAsCast => "invalid-as-cast",
+            ErrorCode::InvalidSatisfies => "invalid-satisfies",
+
+            ErrorCode::TypeArgInferenceFailed => "type-arg-inference-failed",
+            ErrorCode::ConstraintViolation => "constraint-violation",
+            ErrorCode::WrongTypeArgCount => "wrong-type-arg-count",
+            ErrorCode::InvalidTypeParamConstraint => "invalid-type-param-constraint",
+            ErrorCode::GenericNotApplicableHere => "generic-not-applicable-here",
+
+            ErrorCode::PossibleNullDereference => "possible-null-dereference",
+            ErrorCode::NullNotAllowed => "null-not-allowed",
+            ErrorCode::OptionalChainOnNonNullable => "optional-chain-on-non-nullable",
+
+            ErrorCode::NonExhaustiveMatch => "non-exhaustive-match",
+            ErrorCode::DuplicateDeclaration => "duplicate-declaration",
+            ErrorCode::UseBeforeDeclaration => "use-before-declaration",
+            ErrorCode::UnreachableCode => "unreachable-code",
+            ErrorCode::InvalidBreakTarget => "invalid-break-target",
+            ErrorCode::InvalidContinueTarget => "invalid-continue-target",
+            ErrorCode::ReturnOutsideFunction => "return-outside-function",
+            ErrorCode::InvalidThrowOperand => "invalid-throw-operand",
+            ErrorCode::DuplicateCaseLabel => "duplicate-case-label",
+            ErrorCode::InvalidPipelineReceiver => "invalid-pipeline-receiver",
+
+            ErrorCode::MissingOverride => "missing-override",
+            ErrorCode::SpuriousOverride => "spurious-override",
+            ErrorCode::NotASubclass => "not-a-subclass",
+            ErrorCode::PrivateMemberAccess => "private-member-access",
+            ErrorCode::ProtectedMemberAccess => "protected-member-access",
+            ErrorCode::StaticMemberOnInstance => "static-member-on-instance",
+            ErrorCode::AbstractMethodNotImplemented => "abstract-method-not-implemented",
+            ErrorCode::ConstructorNotCalled => "constructor-not-called",
+            ErrorCode::InvalidSuperCall => "invalid-super-call",
+            ErrorCode::DuplicateMemberName => "duplicate-member-name",
+            ErrorCode::InvalidExtensionTarget => "invalid-extension-target",
+
+            ErrorCode::UnsupportedExpression => "unsupported-expression",
+            ErrorCode::UnsupportedStatement => "unsupported-statement",
+            ErrorCode::UnsupportedPattern => "unsupported-pattern",
+            ErrorCode::UnsupportedTypeNode => "unsupported-type-node",
+            ErrorCode::CompilationInternalError => "compilation-internal-error",
+            ErrorCode::BytecodeOverflow => "bytecode-overflow",
+            ErrorCode::ConstantPoolOverflow => "constant-pool-overflow",
+        }
+    }
+
+    pub fn doc_url(self) -> String {
+        const DOCS_BASE_URL: &str = "https://varn-lang.dev/errors";
+        format!("{}/{}", DOCS_BASE_URL, self.name())
+    }
+}
+
+impl std::fmt::Display for ErrorCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "WR{}", *self as u32)
+    }
+}

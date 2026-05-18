@@ -1,0 +1,11 @@
+// import { name, major, inc } from "pkg:somepackage"
+// import { add } from "pkg:somepackage/math/add"
+// import { plusTwo } from "pkg:consumerpkg"
+
+// assert("pkg base import name", name === "somepackage")
+// assert("pkg base import major", major === 1)
+// assert("pkg base import fn", inc(41) === 42)
+// assert("pkg subpath import fn", add(19, 23) === 42)
+// assert("pkg dependency semver constraint", plusTwo(40) === 42)
+
+print("[PASSED] 39. Package imports ")

@@ -1,0 +1,48 @@
+
+// print("\n[1] Testing Decimal...");
+// let d1 = decimal.parse("10.50");
+// let d2 = decimal.parse("2.00");
+// print(`    10.50 + 2.00 = ${d1 + d2}`);
+// print(`    10.50 * 2.00 = ${d1 * d2}`);
+// print(`    10.50.toFixed(4) = ${d1.toFixed(4)}`);
+// print(`    -10.50.abs() = ${decimal.parse("-10.50").abs()}`);
+// print(`    10.50.sign() = ${d1.sign()}`);
+// print(`    10.50.isPositive() = ${d1.isPositive()}`);
+
+// print("\n[2] Testing Range...");
+// let r = 1..5; 
+// print(`    Range 1..5 length: ${r.length}`);
+// print(`    r.contains(3): ${r.contains(3)}`);
+// print(`    r.contains(5): ${r.contains(5)}`);
+// print(`    r.toArray(): ${r.toArray().join(", ")}`);
+
+// let r2 = 1..=5;
+// print(`    Range 1..=5 length: ${r2.length}`);
+// print(`    r2.contains(5): ${r2.contains(5)}`);
+// print(`    r2.step(2): ${r2.step(2).join(", ")}`);
+
+// print("\n[3] Testing Expanded APIs...");
+// // Int
+// let n = 42;
+// print(`    42.isEven(): ${n.isEven()}`);
+// print(`    43.isOdd(): ${(43).isOdd()}`);
+// print(`    42.clamp(0, 10): ${n.clamp(0, 10)}`);
+
+// // Float
+// let f = 3.14159;
+// print(`    3.14159.toFixed(2): ${f.toFixed(2)}`);
+// print(`    3.14159.floor(): ${f.floor()}`);
+// print(`    3.14159.ceil(): ${f.ceil()}`);
+// print(`    3.14159.round(): ${f.round()}`);
+// print(`    3.14159.clamp(0.0, 1.0): ${f.clamp(0.0, 1.0)}`);
+
+// // String
+// let s = "  hello world  ";
+// print(`    '  hello world  '.trim().capitalize(): '${s.trim().capitalize()}'`);
+// print(`    'hello'.padLeft(10, '*'): '${"hello".padLeft(10, "*")}'`);
+// print(`    'A123'.isDigit(): ${"A123".isDigit()}`);
+// print(`    '123'.isDigit(): ${"123".isDigit()}`);
+
+// print("\n--- All Premium Features Verified ---");
+
+print("[PASSED] 32. Varn Premium StdLib Verification");

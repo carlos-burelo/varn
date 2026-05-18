@@ -1,0 +1,97 @@
+// std:http — Pure IDL facade over runtime HTTP host operations.
+
+export namespace Http {
+    /**
+     * Fetches a resource from the network.
+     * @param url The URL to fetch.
+     * @param method The HTTP method (default "GET").
+     * @param headers Optional request headers.
+     * @param body Optional request body.
+     * @param timeoutMs Optional timeout in milliseconds (default 30000).
+     */
+    export declare function fetch(
+        url: str,
+        method?: str,
+        headers?: { [key: str]: str },
+        body?: str,
+        timeoutMs?: int
+    ): Task<Response>;
+
+    /**
+     * Creates a new HTTP server instance.
+     * @returns A server handle (int).
+     */
+    export declare function createServer(): int;
+
+    /**
+     * Adds a route to a server.
+     * @param serverId The server handle.
+     * @param method The HTTP method.
+     * @param pattern The URL pattern (e.g., "/api/:id").
+     * @param callback The handler function.
+     */
+    export declare function addRoute(
+        serverId: int,
+        method: str,
+        pattern: str,
+        callback: (req: Request, res: ServerResponse) => void
+    ): void;
+
+    /**
+     * Starts listening on a port for a server.
+     * @param serverId The server handle.
+     * @param port The port number.
+     * @param responseCtor The constructor for ServerResponse.
+     */
+    export declare function listen(
+        serverId: int,
+        port: int,
+        responseCtor: dynamic
+    ): void;
+
+    /**
+     * Sends a response from a server handler.
+     * Internal use only via ServerResponse.
+     */
+    export declare function sendResponse(
+        status: int,
+        body: str,
+        contentType: str,
+        headers: { [key: str]: str }
+    ): void;
+}
+
+export interface Response {
+    status: int;
+    statusText: str;
+    ok: bool;
+    body: str;
+    headers: { [key: str]: str };
+}
+
+export interface Request {
+    method: str;
+    path: str;
+    query: { [key: str]: str };
+    params: { [key: str]: str };
+    body: str;
+    headers: { [key: str]: str };
+}
+
+export class ServerResponse {
+    private isSent: bool = false;
+
+    send(status: int, body: str, contentType: str = "text/plain", headers: { [key: str]: str } = {}): void {
+        if (this.isSent) return;
+        Http.sendResponse(status, body, contentType, headers);
+        this.isSent = true;
+    }
+
+    json(data: dynamic, status: int = 200): void {
+        this.send(status, JSON.stringify(data), "application/json");
+    }
+
+    html(html: str, status: int = 200): void {
+        this.send(status, html, "text/html");
+    }
+}

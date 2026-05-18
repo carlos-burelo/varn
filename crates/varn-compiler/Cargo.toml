@@ -1,0 +1,12 @@
+[package]
+name = "varn-compiler"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+varn-core    = { path = "../varn-core" }
+varn-diagnostics  = { path = "../varn-diagnostics" }
+rustc-hash  = { workspace = true }
+varn-bytecode = { path = "../varn-bytecode" }
+varn-types = { path = "../varn-types" }
+rust_decimal = { version = "1", features = ["serde"] }

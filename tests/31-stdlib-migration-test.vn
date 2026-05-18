@@ -1,0 +1,97 @@
+import * as time_mod from "std:time";
+const { Duration, PlainDateTime, Now, Instant } = time_mod;
+import { List } from "std:collections";
+import { Http } from "std:http";
+import { JSON as json } from "std:json";
+import { crypto } from "std:crypto";
+
+
+// ── std:time / Duration ───────────────────────────────────────────
+let d = Duration.from("PT1H30M");
+assert("Duration totalMilliseconds", d.totalMilliseconds === 5400000)
+assert("Duration hours",             d.hours === 1)
+assert("Duration minutes",           d.minutes === 30)
+assert("Duration seconds",           d.seconds === 5400)
+
+
+
+let d2 = Duration.from("P1DT2H30M10S");
+assert("Duration days+time ms",      d2.totalMilliseconds === 95410000)
+
+// ── std:time / PlainDateTime ──────────────────────────────────────
+let now = new PlainDateTime(2026, 4, 21, 10, 0, 0, 0);
+assert("PlainDateTime year",         now.year === 2026)
+assert("PlainDateTime month",        now.month === 4)
+assert("PlainDateTime day",          now.day === 21)
+assert("PlainDateTime hour",         now.hour === 10)
+assert("PlainDateTime toString",     now.toString() === "2026-04-21T10:00:00.000")
+
+// ── std:time / Instant ────────────────────────────────────────────
+let t1 = Now.instant();
+let t2 = Now.instant();
+
+assert("Instant toString non-empty", t1.toString().length > 0)
+assert("Instant compare equal",      Instant.compare(t1, t1) === 0)
+assert("Instant compare order",      Instant.compare(t1, t2) <= 0)
+
+// ── std:collections / Range ───────────────────────────────────────
+let r = Range.from(0, 5);
+assert("Range start",                r.start === 0)
+assert("Range end",                  r.end === 5)
+assert("Range contains 3",           r.contains(3))
+assert("Range not contains 5",       !r.contains(5))
+assert("Range not contains -1",      !r.contains(-1))
+
+let ri = Range.fromInclusive(0, 5);
+assert("Range inclusive contains 5", ri.contains(5))
+assert("Range inclusive not 6",      !ri.contains(6))
+
+// ── std:collections / range() ─────────────────────────────────────
+// debug(range)
+let items = range(0, 10, 2);
+// debug(items)
+assert("range length",               items.length === 5)
+assert("range first",                items[0] === 0)
+assert("range last",                 items[4] === 8)
+
+// ── std:collections / List ────────────────────────────────────────
+let list = new List<str>(["A", "B"]);
+list.add("C");
+assert("List length",                list.length === 3)
+assert("List first",                 list.toArray()[0] === "A")
+assert("List last",                  list.toArray()[2] === "C")
+
+// ── std:json ──────────────────────────────────────────────────────
+let obj = { name: "Varn", version: 1 };
+let json_str = json.stringify(obj);
+assert("JSON stringify non-empty",   json_str.length > 0)
+assert("JSON stringify content",     json_str.includes("Varn"))
+
+let back = json.parse(json_str);
+assert("JSON parse name",            back["name"] === "Varn")
+assert("JSON parse version",         back["version"] === 1)
+
+// ── std:crypto / uuid ─────────────────────────────────────────────
+let uuid = crypto.uuid();
+assert("UUID length",                uuid.length === 36)
+assert("UUID dash at 8",             uuid[8] === "-")
+assert("UUID dash at 13",            uuid[13] === "-")
+assert("UUID dash at 18",            uuid[18] === "-")
+assert("UUID dash at 23",            uuid[23] === "-")
+
+// ── std:crypto / sha256 ───────────────────────────────────────────
+let hash = crypto.sha256("Hello Varn");
+assert("SHA-256 length",             hash.length === 64)
+let allHex = true;
+let hi = 0;
+while (hi < hash.length) {
+    let c = hash[hi];
+    if (!((c >= "0" && c <= "9") || (c >= "a" && c <= "f"))) { allHex = false; }
+    hi = hi + 1;
+}
+assert("SHA-256 hex chars",          allHex)
+
+// ── std:http ──────────────────────────────────────────────────────
+assert("Http namespace exists",      Http !== null)
+
+print("[PASSED] 31. StdLib Migration")

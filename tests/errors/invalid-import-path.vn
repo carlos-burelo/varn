@@ -1,0 +1,2 @@
+// expect: error[Varn2010]
+import { foo } from "./nonexistent-module"

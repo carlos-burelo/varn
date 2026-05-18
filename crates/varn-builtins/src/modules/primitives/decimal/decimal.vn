@@ -1,0 +1,21 @@
+export declare class decimal {
+    toString(): str;
+    toFixed(digits?: int): str;
+    abs(): decimal;
+    sign(): int;
+    negate(): decimal;
+    ceil(): decimal;
+    floor(): decimal;
+    round(): decimal;
+    trunc(): decimal;
+    fract(): decimal;
+    scale(): int;
+    isZero(): bool;
+    isPositive(): bool;
+    isNegative(): bool;
+    pow(exp: int): decimal;
+    toInt(): int;
+    toFloat(): float;
+
+    static parse(s: str): decimal;
+}

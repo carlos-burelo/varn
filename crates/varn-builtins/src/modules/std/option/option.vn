@@ -1,0 +1,31 @@
+export type Option<T> = T | null
+
+export function some<T>(value: T): Option<T> {
+    return value
+}
+
+export function none<T>(): Option<T> {
+    return null
+}
+
+export function option<T>(value: T | null): Option<T> {
+    return value
+}
+
+export function isSome<T>(value: Option<T>): bool {
+    return value !== null
+}
+
+export function isNone<T>(value: Option<T>): bool {
+    return value === null
+}
+
+export function unwrap<T>(value: Option<T>): T {
+    if (value === null) throw new Error("called unwrap on None")
+    return value as T
+}
+
+export function unwrapOr<T>(value: Option<T>, default_: T): T {
+    if (value === null) return default_
+    return value as T
+}

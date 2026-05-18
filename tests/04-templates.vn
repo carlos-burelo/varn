@@ -1,0 +1,8 @@
+
+const tval = 42
+assert("simple template",   `answer = ${tval}` === "answer = 42")
+assert("expr in template",  `${tval * 2}` === "84")
+assert("nested template",   `prefix_${"mid"}_suffix` === "prefix_mid_suffix")
+assert("template + concat", `a${1 + 1}b` + "c" === "a2bc")
+
+print("[PASSED] 4. Template literals ")

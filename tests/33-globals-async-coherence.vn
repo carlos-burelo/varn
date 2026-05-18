@@ -1,0 +1,25 @@
+import { sleep } from "std:task"
+
+
+let shared = 0
+
+async function writer(): int {
+    //await sleep(1)
+    shared = 7
+    return shared
+}
+
+async function reader(): int {
+    //await sleep(1)
+    return shared
+}
+
+async function runTest() {
+    const results = await parallel([writer(), reader()])
+    assert("writer result", results[0] === 7)
+    assert("reader sees writer global", results[1] === 7)
+}
+
+await runTest()
+
+print("[PASSED] 33. Globals Async Coherence")

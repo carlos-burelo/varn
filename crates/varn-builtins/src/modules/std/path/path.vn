@@ -1,0 +1,13 @@
+// std:path — pure IDL facade over runtime path host operations.
+
+export namespace path {
+    export const sep = "/";
+    export const delimiter = ":";
+
+    export declare function normalize(path: str): str;
+    export declare function join(...segments: str[]): str;
+    export declare function dirname(path: str): str;
+    export declare function basename(path: str, ext?: str): str;
+    export declare function extname(path: str): str;
+    export declare function isAbsolute(path: str): bool;
+}

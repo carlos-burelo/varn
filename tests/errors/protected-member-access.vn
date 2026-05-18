@@ -1,0 +1,7 @@
+// expect: error[Varn4105]
+class Animal {
+    protected name: str = "animal"
+}
+class Dog extends Animal {}
+const d = new Dog()
+print(d.name)

@@ -1,0 +1,48 @@
+class Box<T> {
+    value: T
+    constructor(v: T) { this.value = v }
+    get(): T { return this.value }
+    map<U>(f: (T) => U): Box<U> { return new Box<U>(f(this.value)) }
+}
+
+
+function identity<T>(v: T): T { return v }
+assert("generic id int",  identity<int>(42) === 42)
+assert("generic id str",  identity<str>("hi") === "hi")
+assert("generic id bool", identity<bool>(true) === true)
+
+function swap<A, B>(a: A, b: B): B { return b }
+assert("generic swap", swap<int, str>(1, "x") === "x")
+
+const intBox = new Box<int>(10)
+assert("generic box get",  intBox.get() === 10)
+const strBox = intBox.map((n) => `value=${n}`)
+assert("generic box map",  strBox.get() === "value=10")
+
+class Stack<T> {
+    private items: T[]
+    constructor() { this.items = [] }
+    push(item: T): void { this.items.push(item) }
+    pop(): T | null {
+        if (this.items.length === 0) return null
+        return this.items.pop()
+    }
+    peek(): T | null {
+        if (this.items.length === 0) return null
+        return this.items[this.items.length - 1]
+    }
+    get size(): int { return this.items.length }
+    get isEmpty(): bool { return this.items.length === 0 }
+}
+
+const stk = new Stack<int>()
+assert("stack empty init", stk.isEmpty)
+stk.push(1)
+stk.push(2)
+stk.push(3)
+assert("stack size",     stk.size === 3)
+assert("stack peek",     stk.peek() === 3)
+assert("stack pop",      stk.pop() === 3)
+assert("stack size dec", stk.size === 2)
+
+print("[PASSED] 14. Generics ")
