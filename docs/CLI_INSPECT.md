@@ -1,4 +1,4 @@
-# wr inspect — Dashboard del Compilador
+# vn inspect — Dashboard del Compilador
 
 `inspect` ejecuta el pipeline completo pero detiene antes de la VM, mostrando las estructuras internas de cada fase.
 
@@ -6,15 +6,15 @@
 
 ```bash
 # Todas las fases (default)
-wr inspect archivo.wr
+vn inspect archivo.vn
 
 # Código inline
-wr inspect -e "function add(a: int, b: int) = a + b"
+vn inspect -e "function add(a: int, b: int) = a + b"
 
 # Fases específicas
-wr inspect -p parse archivo.wr
-wr inspect -p check archivo.wr
-wr inspect -p compile archivo.wr
+vn inspect -p parse archivo.vn
+vn inspect -p check archivo.vn
+vn inspect -p compile archivo.vn
 ```
 
 ## Flag `-p` / `--phases`
@@ -39,11 +39,11 @@ AST anotado con los tipos resueltos por el type checker. Muestra firmas de funci
 **Cuándo usarlo:** Entender qué tipo infirió el checker para una expresión. Debuggear errores de tipo sutiles.
 
 ```bash
-wr inspect -p check -e "const x: int[] = [1, 2, 3]"
+vn inspect -p check -e "const x: int[] = [1, 2, 3]"
 ```
 
 ### `compile` — Bytecode
-Disassembly de las instrucciones generadas. Equivalente a `wr disasm` pero integrado en inspect.
+Disassembly de las instrucciones generadas. Equivalente a `vn disasm` pero integrado en inspect.
 
 **Cuándo usarlo:** Optimizar código, verificar que peephole optimizations se apliquen, contar instrucciones.
 
@@ -51,25 +51,25 @@ Disassembly de las instrucciones generadas. Equivalente a `wr disasm` pero integ
 
 ```bash
 # Ver AST de una función genérica
-wr inspect -p parse -e "function id<T>(x: T): T = x"
+vn inspect -p parse -e "function id<T>(x: T): T = x"
 
 # Ver tipos inferidos
-wr inspect -p check -e "const arr = [1, 2, 3]; print(arr.length)"
+vn inspect -p check -e "const arr = [1, 2, 3]; print(arr.length)"
 
 # Ver bytecode generado para una clase
-wr inspect -p compile src/models.wr
+vn inspect -p compile src/models.vn
 
 # Todas las fases en un archivo
-wr inspect tests/01-arithmetic.wr
+vn inspect tests/01-arithmetic.vn
 ```
 
 ## Diferencia con otros comandos
 
 | Comando | Descripción |
 |---------|-------------|
-| `wr inspect -p parse` | AST jerárquico |
-| `wr inspect -p check` | Tipos y SemanticDB |
-| `wr inspect -p compile` | Bytecode |
-| `wr disasm` | Solo bytecode (más compacto) |
-| `wr run --debug parse` | Debug inline durante ejecución |
-| `wr check` | Solo errores de tipos, sin output de estructuras |
+| `vn inspect -p parse` | AST jerárquico |
+| `vn inspect -p check` | Tipos y SemanticDB |
+| `vn inspect -p compile` | Bytecode |
+| `vn disasm` | Solo bytecode (más compacto) |
+| `vn run --debug parse` | Debug inline durante ejecución |
+| `vn check` | Solo errores de tipos, sin output de estructuras |

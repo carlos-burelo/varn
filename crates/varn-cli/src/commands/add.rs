@@ -10,7 +10,7 @@ pub fn execute(args: AddArgs) -> Result<(), CliError> {
         std::env::current_dir().map_err(|e| CliError::fatal(format!("cannot get cwd: {e}")))?;
 
     let manifest_path = find_project_manifest(&cwd)
-        .ok_or_else(|| CliError::fatal("no varn.json found — run `wr init` first".to_owned()))?;
+        .ok_or_else(|| CliError::fatal("no varn.json found — run `vn init` first".to_owned()))?;
     let project_root = manifest_path.parent().unwrap_or(&cwd).to_path_buf();
 
     DepOrigin::parse(&args.origin).map_err(|e| CliError::fatal(e))?;

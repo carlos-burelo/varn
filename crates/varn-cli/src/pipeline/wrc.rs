@@ -35,7 +35,7 @@ pub fn read_wrc(path: &str) -> Result<ModuleGraphArtifact, CliError> {
     let file_version = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
     if file_version != super::compile::CACHE_FORMAT_VERSION {
         return Err(CliError::fatal(format!(
-            "'{}' was compiled with format version {file_version}, runtime expects {}. Recompile with `wr build`.",
+            "'{}' was compiled with format version {file_version}, runtime expects {}. Recompile with `vn build`.",
             path,
             super::compile::CACHE_FORMAT_VERSION
         )));

@@ -6,7 +6,7 @@ Cada fase del pipeline vive en su propio crate. La jerarquía de dependencias es
 
 ```mermaid
 graph TD
-    SourceText["Código Fuente (.wr)"] --> Parser
+    SourceText["Código Fuente (.vn)"] --> Parser
 
     subgraph Frontend
         Lexer["varn-lexer (Tokenizer)"]
@@ -95,7 +95,7 @@ Binario `wr`. Pipeline completo: `run`, `check`, `build`, `bench`, `disasm`, `in
 LSP con tower-lsp + tokio. Consulta SemanticDB. Hover, completions, go-to-definition, semantic tokens.
 
 ### `varn-pm`
-Package manager. Resolución semver sobre GitHub/Gitea tags API. Caché global `~/.wr/cache/`. SHA256 integrity. Lockfile `varn.lock`.
+Package manager. Resolución semver sobre GitHub/Gitea tags API. Caché global `~/.vn/cache/`. SHA256 integrity. Lockfile `varn.lock`.
 
 ### `varn-debug`
 Profiling, disassembly, inspección de estructuras internas.

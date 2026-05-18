@@ -3,7 +3,7 @@
 [![License](https://img.shields.io/badge/License-Apache--2.0-blue?style=for-the-badge)](LICENSE)
 [![Built with Rust](https://img.shields.io/badge/Built_with-Rust-orange?style=for-the-badge)](https://www.rust-lang.org/)
 
-**Varn** es un lenguaje compilado con tipado estático y VM register-based de alto rendimiento escrita en Rust. Extensión de archivos: `.wr`.
+**Varn** es un lenguaje compilado con tipado estático y VM register-based de alto rendimiento escrita en Rust. Extensión de archivos: `.vn`.
 
 ---
 
@@ -14,7 +14,7 @@
 - **Async nativo** — `async`/`await`, generadores, `TaskGroup`, `parallel`, `spawn`
 - **Sistema de paquetes** — `varn.json`, `varn.lock`, resolución semver sobre git
 - **Compilado a `.wrc`** — bytecode portable, sin recompilación
-- **Tooling** — `wr bench`, `wr disasm`, `wr inspect`, LSP
+- **Tooling** — `vn bench`, `vn disasm`, `vn inspect`, LSP
 
 ---
 
@@ -425,13 +425,13 @@ Requiere **Rust stable**.
 ```bash
 git clone https://github.com/tu-usuario/Varn
 cd Varn
-cargo build --bin wr --release
+cargo build --bin vn --release
 ```
 
 Añade a PATH:
 
 ```bash
-cp target/release/wr ~/.local/bin/   # Linux/macOS
+cp target/release/vn ~/.local/bin/   # Linux/macOS
 ```
 
 ---
@@ -441,33 +441,33 @@ cp target/release/wr ~/.local/bin/   # Linux/macOS
 ### Ejecutar
 
 ```bash
-wr program.wr                    # implícito run
-wr run program.wr
-wr run program.wr -- arg1 arg2   # argumentos al script
-wr run program.wrc               # ejecutar compilado
+vn program.vn                    # implícito run
+vn run program.vn
+vn run program.vn -- arg1 arg2   # argumentos al script
+vn run program.wrc               # ejecutar compilado
 ```
 
 ### Type checking
 
 ```bash
-wr check program.wr
-wr check -v program.wr
+vn check program.vn
+vn check -v program.vn
 ```
 
 ### Evaluar inline
 
 ```bash
-wr eval "print(1 + 2)"
-wr eval "function double(x: int) = x * 2; print(double(21))"
-wr eval --debug all "print('hello')"
+vn eval "print(1 + 2)"
+vn eval "function double(x: int) = x * 2; print(double(21))"
+vn eval --debug all "print('hello')"
 ```
 
 ### Compilar a `.wrc`
 
 ```bash
-wr build program.wr              # → program.wrc junto al fuente
-wr build program.wr -o dist/     # → dist/program.wrc
-wr build program.wr -o out.wrc   # path explícito
+vn build program.vn              # → program.wrc junto al fuente
+vn build program.vn -o dist/     # → dist/program.wrc
+vn build program.vn -o out.wrc   # path explícito
 ```
 
 El `.wrc` contiene el grafo completo de bytecode. No incluye stdlib (embedded en el runtime). Ejecuta directo sin recompilar.
@@ -475,16 +475,16 @@ El `.wrc` contiene el grafo completo de bytecode. No incluye stdlib (embedded en
 ### Benchmark
 
 ```bash
-wr bench program.wr              # fases: read/lex/parse/check/compile/execute
-wr bench program.wr --runs 100
-wr bench program.wrc             # solo load + execute (compara contra .wr)
-wr bench --no-run program.wr     # solo mide compilación
-wr bench --with-output program.wr
+vn bench program.vn              # fases: read/lex/parse/check/compile/execute
+vn bench program.vn --runs 100
+vn bench program.wrc             # solo load + execute (compara contra .vn)
+vn bench --no-run program.vn     # solo mide compilación
+vn bench --with-output program.vn
 ```
 
 Output típico:
 ```
-Benchmark · tests/main.wr  (10 runs)
+Benchmark · tests/main.vn  (10 runs)
 Source  43 lines  1.1 KB  88 tokens
 
 Phase        min      p50     mean      max       σ      total
@@ -504,47 +504,47 @@ Throughput: 475.1 runs/s
 ### Inspección y disassembly
 
 ```bash
-wr disasm program.wr             # bytecode desensamblado
-wr inspect program.wr            # todas las fases
-wr inspect -p parse program.wr   # solo AST
-wr inspect -p check program.wr   # tipos inferidos
-wr inspect -e "function f(x: int) = x * 2"  # código inline
-wr info program.wr
-wr info --hashes program.wr
+vn disasm program.vn             # bytecode desensamblado
+vn inspect program.vn            # todas las fases
+vn inspect -p parse program.vn   # solo AST
+vn inspect -p check program.vn   # tipos inferidos
+vn inspect -e "function f(x: int) = x * 2"  # código inline
+vn info program.vn
+vn info --hashes program.vn
 ```
 
 ### REPL
 
 ```bash
-wr repl
-wr repl --debug-bytecode
+vn repl
+vn repl --debug-bytecode
 ```
 
 ### Paquetes
 
 ```bash
-wr add mathlib github.com/user/mathlib@^1.2.3
-wr remove mathlib
-wr install          # desde lockfile, offline si cacheado
-wr update           # re-resuelve contra tags remotos
+vn add mathlib github.com/user/mathlib@^1.2.3
+vn remove mathlib
+vn install          # desde lockfile, offline si cacheado
+vn update           # re-resuelve contra tags remotos
 ```
 
 ### Proyecto
 
 ```bash
-wr init                          # directorio actual
-wr init my-project
-wr init my-project --name "Mi App"
-wr doctor                        # diagnóstico del entorno
+vn init                          # directorio actual
+vn init my-project
+vn init my-project --name "Mi App"
+vn doctor                        # diagnóstico del entorno
 ```
 
 ### Debug
 
 ```bash
-wr run --debug parse program.wr
-wr run --debug check,compile program.wr
-wr run --debug all program.wr
-wr run --trace program.wr        # trace de ejecución instrucción a instrucción
+vn run --debug parse program.vn
+vn run --debug check,compile program.vn
+vn run --debug all program.vn
+vn run --trace program.vn        # trace de ejecución instrucción a instrucción
 
 # Fases: lex, parse, check, compile, vm, all
 ```
@@ -555,9 +555,9 @@ wr run --trace program.wr        # trace de ejecución instrucción a instrucci�
 
 ```
 my-project/
-├── main.wr
+├── main.vn
 ├── varn.json          ← manifest (nombre, versión, dependencias)
-└── .wr/
+└── .vn/
     ├── varn.lock      ← lockfile reproducible (commitear)
     ├── packages/      ← paquetes instalados por alias
     │   └── mathlib/
@@ -572,7 +572,7 @@ my-project/
 ## Arquitectura
 
 ```
-fuente .wr
+fuente .vn
     │
     ├── varn-lexer      → tokens
     ├── varn-parser     → AST
@@ -613,7 +613,7 @@ fuente .wr
 ## Testing
 
 ```bash
-cargo run --bin wr -- tests/main.wr
+cargo run --bin vn -- tests/main.vn
 ```
 
 ```

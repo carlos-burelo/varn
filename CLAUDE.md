@@ -9,10 +9,10 @@ Lenguaje compilado con tipado estático y VM register-based optimizada.
 cargo build --bin wr
 
 # Build en modo release (optimizado)
-cargo build --bin wr --release
+cargo build --bin vn --release
 
 # Ejecutar directamente
-cargo run --bin wr -- <command> [args]
+cargo run --bin vn -- <command> [args]
 ```
 
 ## Comandos Principales
@@ -22,7 +22,7 @@ cargo run --bin wr -- <command> [args]
 Ejecuta un archivo Varn. También es el comando por defecto si no se especifica subcomando.
 
 ```bash
-wr run <FILE> [-- <ARGS>...]
+vn run <FILE> [-- <ARGS>...]
 
 # Opciones:
   -v, --verbose         # Modo verbose
@@ -33,22 +33,22 @@ wr run <FILE> [-- <ARGS>...]
 **Ejemplos:**
 ```bash
 # Ejecutar un programa (run es implícito)
-wr tests/main.wr
+vn tests/main.vn
 
 # Explícito
-wr run tests/main.wr
+vn run tests/main.vn
 
 # Con argumentos para el script
-wr run script.wr -- arg1 arg2
+vn run script.vn -- arg1 arg2
 
 # Con tracing
-wr run --trace tests/main.wr
+vn run --trace tests/main.vn
 
 # Con debug de todas las fases
-wr run --debug all program.wr
+vn run --debug all program.vn
 
 # Con verbose
-wr run -v program.wr
+vn run -v program.vn
 ```
 
 ### `check` - Verificar tipos
@@ -56,7 +56,7 @@ wr run -v program.wr
 Verifica el programa sin ejecutarlo (type checking).
 
 ```bash
-wr check <FILE>
+vn check <FILE>
 
 # Opciones:
   -v, --verbose         # Modo verbose
@@ -66,13 +66,13 @@ wr check <FILE>
 **Ejemplos:**
 ```bash
 # Verificar tipos
-wr check src/main.wr
+vn check src/main.vn
 
 # Verbose
-wr check -v src/main.wr
+vn check -v src/main.vn
 
 # Con debug del checker
-wr check --debug check src/main.wr
+vn check --debug check src/main.vn
 ```
 
 ### `eval` - Evaluar código
@@ -80,7 +80,7 @@ wr check --debug check src/main.wr
 Evalúa código Varn directamente desde la línea de comandos.
 
 ```bash
-wr eval <CODE>
+vn eval <CODE>
 
 # Opciones:
   -v, --verbose         # Modo verbose
@@ -90,13 +90,13 @@ wr eval <CODE>
 **Ejemplos:**
 ```bash
 # Evaluar expresión
-wr eval "print(1 + 2)"
+vn eval "print(1 + 2)"
 
 # Evaluar código más complejo
-wr eval "function double(x: int) = x * 2; print(double(21))"
+vn eval "function double(x: int) = x * 2; print(double(21))"
 
 # Con debug
-wr eval --debug all "print('hello')"
+vn eval --debug all "print('hello')"
 ```
 
 ### `repl` - REPL Interactivo
@@ -104,7 +104,7 @@ wr eval --debug all "print('hello')"
 Inicia un REPL (Read-Eval-Print Loop) interactivo.
 
 ```bash
-wr repl
+vn repl
 
 # Opciones:
       --debug-bytecode  # Mostrar bytecode generado
@@ -113,10 +113,10 @@ wr repl
 **Ejemplos:**
 ```bash
 # Iniciar REPL
-wr repl
+vn repl
 
 # REPL con debug de bytecode
-wr repl --debug-bytecode
+vn repl --debug-bytecode
 ```
 
 ### `bench` - Benchmark
@@ -124,7 +124,7 @@ wr repl --debug-bytecode
 Ejecuta benchmarks detallados de rendimiento con métricas del VM.
 
 ```bash
-wr bench <FILE>
+vn bench <FILE>
 
 # Opciones:
       --runs <N>        # Número de runs (default: 10)
@@ -136,21 +136,21 @@ wr bench <FILE>
 **Ejemplos:**
 ```bash
 # Benchmark básico (10 runs)
-wr bench tests/main.wr
+vn bench tests/main.vn
 
 # Benchmark con 100 runs
-wr bench --runs 100 tests/main.wr
+vn bench --runs 100 tests/main.vn
 
 # Solo compilación (sin ejecución)
-wr bench --no-run tests/main.wr
+vn bench --no-run tests/main.vn
 
 # Con output visible (normalmente está silenciado)
-wr bench --with-output tests/main.wr
+vn bench --with-output tests/main.vn
 ```
 
 **Output del benchmark:**
 ```
-Benchmark · tests/main.wr  (10 runs)
+Benchmark · tests/main.vn  (10 runs)
 Source  43 lines  1.1 KB  88 tokens
 
 Phase           min      p50     mean      max       σ      total
@@ -204,7 +204,7 @@ Register VM Stats
 Muestra el bytecode desarmado (disassembly).
 
 ```bash
-wr disasm <FILE>
+vn disasm <FILE>
 
 # Opciones:
       --debug <PHASES>  # Debug de fases específicas
@@ -213,10 +213,10 @@ wr disasm <FILE>
 **Ejemplos:**
 ```bash
 # Ver bytecode
-wr disasm tests/main.wr
+vn disasm tests/main.vn
 
 # Con debug del compilador
-wr disasm --debug compile tests/main.wr
+vn disasm --debug compile tests/main.vn
 ```
 
 ### `inspect` - Inspeccionar AST/IR
@@ -224,7 +224,7 @@ wr disasm --debug compile tests/main.wr
 Inspecciona las estructuras internas del compilador (AST, tipos, etc.).
 
 ```bash
-wr inspect [FILE]
+vn inspect [FILE]
 
 # Opciones:
   -e, --eval <CODE>      # Evaluar código directamente
@@ -240,19 +240,19 @@ wr inspect [FILE]
 **Ejemplos:**
 ```bash
 # Inspeccionar todas las fases
-wr inspect tests/main.wr
+vn inspect tests/main.vn
 
 # Solo parsing
-wr inspect -p parse tests/main.wr
+vn inspect -p parse tests/main.vn
 
 # Inspeccionar código inline
-wr inspect -e "function add(a: int, b: int) = a + b"
+vn inspect -e "function add(a: int, b: int) = a + b"
 
 # Ver solo el AST checkeado
-wr inspect -p check tests/main.wr
+vn inspect -p check tests/main.vn
 
 # Evaluar y ver todas las fases
-wr inspect -e "print(42)"
+vn inspect -e "print(42)"
 ```
 
 ### `info` - Información de archivo
@@ -260,7 +260,7 @@ wr inspect -e "print(42)"
 Muestra información sobre un archivo Varn compilado.
 
 ```bash
-wr info <FILE>
+vn info <FILE>
 
 # Opciones:
       --hashes  # Mostrar hashes de módulos
@@ -269,10 +269,10 @@ wr info <FILE>
 **Ejemplos:**
 ```bash
 # Info básica
-wr info tests/main.wr
+vn info tests/main.vn
 
 # Con hashes
-wr info --hashes tests/main.wr
+vn info --hashes tests/main.vn
 ```
 
 ### `doctor` - Diagnóstico
@@ -280,12 +280,12 @@ wr info --hashes tests/main.wr
 Ejecuta diagnósticos del sistema y configuración.
 
 ```bash
-wr doctor
+vn doctor
 ```
 
 **Ejemplo:**
 ```bash
-wr doctor
+vn doctor
 ```
 
 ### `lsp` - Language Server Protocol
@@ -293,13 +293,13 @@ wr doctor
 Inicia el servidor LSP para integración con IDEs.
 
 ```bash
-wr lsp
+vn lsp
 ```
 
 **Uso con VSCode/editores:**
 ```bash
 # El LSP se comunica por stdio
-wr lsp
+vn lsp
 ```
 
 ### `init` - Inicializar proyecto
@@ -307,7 +307,7 @@ wr lsp
 Inicializa un nuevo proyecto Varn con estructura básica.
 
 ```bash
-wr init [DIR]
+vn init [DIR]
 
 # Opciones:
       --name <NAME>  # Nombre del proyecto
@@ -316,13 +316,13 @@ wr init [DIR]
 **Ejemplos:**
 ```bash
 # Crear proyecto en directorio actual
-wr init
+vn init
 
 # Crear proyecto en directorio específico
-wr init my-project
+vn init my-project
 
 # Con nombre personalizado
-wr init my-project --name "Mi Proyecto"
+vn init my-project --name "Mi Proyecto"
 ```
 
 ### `completions` - Autocompletado shell
@@ -330,7 +330,7 @@ wr init my-project --name "Mi Proyecto"
 Genera scripts de autocompletado para tu shell.
 
 ```bash
-wr completions <SHELL>
+vn completions <SHELL>
 
 # Shells soportados: bash, zsh, fish, powershell, elvish
 ```
@@ -338,16 +338,16 @@ wr completions <SHELL>
 **Ejemplos:**
 ```bash
 # Bash
-wr completions bash > ~/.local/share/bash-completion/completions/wr
+vn completions bash > ~/.local/share/bash-completion/completions/wr
 
 # Zsh (agregar a ~/.zshrc: fpath=(~/.zfunc $fpath))
-wr completions zsh > ~/.zfunc/_wr
+vn completions zsh > ~/.zfunc/_wr
 
 # Fish
-wr completions fish > ~/.config/fish/completions/wr.fish
+vn completions fish > ~/.config/fish/completions/wr.fish
 
 # PowerShell (agregar al $PROFILE)
-wr completions powershell > wr.ps1
+vn completions powershell > wr.ps1
 ```
 
 ## Flags de Debug
@@ -356,10 +356,10 @@ El flag `--debug <PHASES>` acepta fases separadas por comas:
 
 ```bash
 # Debug de todas las fases
-wr run --debug all program.wr
+vn run --debug all program.vn
 
 # Debug de fases específicas
-wr run --debug parse,check program.wr
+vn run --debug parse,check program.vn
 
 # Fases disponibles:
 # - lex: Lexer/Tokenizer
@@ -373,13 +373,13 @@ wr run --debug parse,check program.wr
 **Ejemplos:**
 ```bash
 # Ver output del parser
-wr run --debug parse program.wr
+vn run --debug parse program.vn
 
 # Debug del type checker
-wr check --debug check program.wr
+vn check --debug check program.vn
 
 # Debug completo
-wr run --debug all program.wr
+vn run --debug all program.vn
 ```
 
 ## Comando Implícito `run`
@@ -388,23 +388,23 @@ Si el primer argumento no es un subcomando conocido, se asume `run`:
 
 ```bash
 # Estos son equivalentes:
-wr tests/main.wr
-wr run tests/main.wr
+vn tests/main.vn
+vn run tests/main.vn
 
 # Con argumentos
-wr script.wr -- arg1 arg2
-wr run script.wr -- arg1 arg2
+vn script.vn -- arg1 arg2
+vn run script.vn -- arg1 arg2
 ```
 
 ## Variables de Entorno
 
 ```bash
 # Nivel de log (trace, debug, info, warn, error)
-RUST_LOG=debug wr run program.wr
+RUST_LOG=debug vn run program.vn
 
 # Backtrace completo en errores
-RUST_BACKTRACE=1 wr run program.wr
-RUST_BACKTRACE=full wr run program.wr
+RUST_BACKTRACE=1 vn run program.vn
+RUST_BACKTRACE=full vn run program.vn
 ```
 
 ## Arquitectura del VM
@@ -452,10 +452,10 @@ En benchmark de la suite completa (534 tests):
 
 ```bash
 # Ejecutar suite de tests completa
-wr run tests/main.wr
+vn run tests/main.vn
 
 # O explícitamente
-wr tests/main.wr
+vn tests/main.vn
 
 # Debería mostrar:
 # ════════════════════════════════════════
@@ -480,39 +480,39 @@ wr tests/main.wr
    - Error interno del VM, reportar como bug
 
 4. **Errores de tipos**
-   - Usa `wr check` para ver detalles del type checker
-   - Usa `wr inspect -p check` para ver el AST tipado
+   - Usa `vn check` para ver detalles del type checker
+   - Usa `vn inspect -p check` para ver el AST tipado
 
 ### Debug Avanzado
 
 ```bash
 # Trace completo de ejecución
-wr run --trace --debug all program.wr
+vn run --trace --debug all program.vn
 
 # Ver bytecode generado
-wr disasm program.wr
+vn disasm program.vn
 
 # Inspeccionar AST y tipos
-wr inspect program.wr
+vn inspect program.vn
 
 # Ver solo tipos
-wr inspect -p check program.wr
+vn inspect -p check program.vn
 
 # Benchmark con output visible
-wr bench --with-output program.wr
+vn bench --with-output program.vn
 ```
 
 ### Performance Debugging
 
 ```bash
 # Benchmark detallado
-wr bench --runs 100 program.wr
+vn bench --runs 100 program.vn
 
 # Ver qué fases son lentas
-wr bench --debug all program.wr
+vn bench --debug all program.vn
 
 # Solo medir compilación (sin ejecución)
-wr bench --no-run program.wr
+vn bench --no-run program.vn
 ```
 
 ## Ejemplos de Workflows
@@ -520,46 +520,46 @@ wr bench --no-run program.wr
 ### Desarrollo Normal
 ```bash
 # Verificar tipos
-wr check src/main.wr
+vn check src/main.vn
 
 # Ejecutar
-wr src/main.wr
+vn src/main.vn
 
 # Con debug si hay problemas
-wr run --debug all src/main.wr
+vn run --debug all src/main.vn
 ```
 
 ### Testing
 ```bash
 # Ejecutar tests
-wr tests/main.wr
+vn tests/main.vn
 
 # Benchmark de tests
-wr bench tests/main.wr
+vn bench tests/main.vn
 ```
 
 ### Inspección y Debug
 ```bash
 # Ver AST
-wr inspect -p parse src/main.wr
+vn inspect -p parse src/main.vn
 
 # Ver tipos inferidos
-wr inspect -p check src/main.wr
+vn inspect -p check src/main.vn
 
 # Ver bytecode
-wr disasm src/main.wr
+vn disasm src/main.vn
 
 # Trace de ejecución
-wr run --trace src/main.wr
+vn run --trace src/main.vn
 ```
 
 ### Integración con Editor
 ```bash
 # Iniciar LSP para tu editor
-wr lsp
+vn lsp
 
 # Generar completions para tu shell
-wr completions zsh > ~/.zfunc/_wr
+vn completions zsh > ~/.zfunc/_wr
 ```
 
 ## Contribuir

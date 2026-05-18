@@ -11,7 +11,7 @@ El formato actual usa postcard (serialización O(n) allocations). Para load sub-
 `NativeCtx::has_capability()` retorna `true` incondicionalmente. Las capabilities están declaradas en las macros (`cap = "fs.write"`) y el mask se almacena en `NativeOpEntry::capability_mask`, pero no se verifica en runtime. Conectar con un `CapabilitySet` real.
 
 ### Verificación IDL vs implementación
-Cada módulo stdlib tiene un archivo `.wr` (interfaz) y una implementación Rust. Actualmente no hay verificación automática de que coincidan. Añadir check compile-time o test de superficie.
+Cada módulo stdlib tiene un archivo `.vn` (interfaz) y una implementación Rust. Actualmente no hay verificación automática de que coincidan. Añadir check compile-time o test de superficie.
 
 ## Mediano plazo
 
@@ -23,7 +23,7 @@ Cada módulo stdlib tiene un archivo `.wr` (interfaz) y una implementación Rust
 ### Match guards
 `match x { n if n > 5 => ... }` — el parser/checker lo soportan parcialmente. Falta codegen completo del guard condicional con back-patching correcto.
 
-### `wr publish`
+### `vn publish`
 Publicar paquetes al registro. Requiere definir el protocolo del registro primero.
 
 ## Largo plazo

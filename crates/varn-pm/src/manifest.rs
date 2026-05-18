@@ -58,7 +58,7 @@ impl DepOrigin {
         }
     }
 
-    /// Logical name used as directory name inside `.wr/packages/`
+    /// Logical name used as directory name inside `.vn/packages/`
     pub fn local_name(&self) -> String {
         format!(
             "{}_{}_{}",
@@ -105,7 +105,7 @@ impl ProjectManifest {
 
 pub fn find_project_manifest(start: &Path) -> Option<PathBuf> {
     for dir in start.ancestors() {
-        // Skip inside .wr/packages/
+        // Skip inside .vn/packages/
         let mut in_pkg = false;
         let mut prev = None::<&std::ffi::OsStr>;
         for comp in dir.components() {

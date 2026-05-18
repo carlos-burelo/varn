@@ -13,7 +13,7 @@ cargo build --bin wr
 Verificar que todo funciona:
 
 ```bash
-cargo run --bin wr -- tests/main.wr
+cargo run --bin vn -- tests/main.vn
 # PASSED: 534 / FAILED: 0
 ```
 
@@ -24,7 +24,7 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo check --workspace
 cargo test --workspace
-cargo run --bin wr -- tests/main.wr   # suite completa
+cargo run --bin vn -- tests/main.vn   # suite completa
 ```
 
 ## Estructura del workspace
@@ -59,13 +59,13 @@ La jerarquía de dependencias es estricta: `varn-core` no depende de ningún cra
 - Tipos `Rc<T>` en el compilador/VM (single-threaded). `Arc<T>` solo donde hay concurrencia real.
 
 **Stdlib nativa (`varn-builtins`):**
-- Cada módulo stdlib tiene un archivo `.wr` (interfaz) y una implementación Rust.
+- Cada módulo stdlib tiene un archivo `.vn` (interfaz) y una implementación Rust.
 - Registrar funciones con `#[varn_fn]`, clases con `#[varn_class]`.
 - `NativeFnResult` = `Result<VmValue, String>` — tipo canónico para funciones nativas.
 
 **Tests:**
-- Los tests de integración viven en `tests/` como archivos `.wr`.
-- `tests/main.wr` ejecuta la suite completa. Debe pasar al 100% en todo PR.
+- Los tests de integración viven en `tests/` como archivos `.vn`.
+- `tests/main.vn` ejecuta la suite completa. Debe pasar al 100% en todo PR.
 - Tests unitarios Rust en `#[cfg(test)]` dentro del crate correspondiente.
 
 **Formato `.wrc` y cache:**
@@ -76,7 +76,7 @@ La jerarquía de dependencias es estricta: `varn-core` no depende de ningún cra
 
 1. Un PR = un foco. No mezcles refactors con features.
 2. Si cambias `FunctionProto` o `Chunk`: incrementa `CACHE_FORMAT_VERSION`.
-3. Si añades un módulo stdlib: implementa el `.wr` de interfaz + la implementación Rust + tests.
+3. Si añades un módulo stdlib: implementa el `.vn` de interfaz + la implementación Rust + tests.
 4. Si cambias el resolver de paquetes o el formato de `varn.lock`: documenta la migración.
 5. Sin código muerto, sin rutas alternativas heredadas, sin `TODO` sin issue asociado.
 
@@ -84,6 +84,6 @@ La jerarquía de dependencias es estricta: `varn-core` no depende de ningún cra
 
 Abre un issue con:
 - Versión de Rust (`rustc --version`)
-- Código `.wr` mínimo que reproduce el problema
+- Código `.vn` mínimo que reproduce el problema
 - Output esperado vs. obtenido
-- Si es un crash: `RUST_BACKTRACE=full wr run programa.wr`
+- Si es un crash: `RUST_BACKTRACE=full vn run programa.vn`

@@ -32,10 +32,10 @@ pub mod crypto_impl {
 
 La macro `#[varn_module]` genera `NativeOpEntry` en secciones del linker. Al arrancar, `build_module("std:crypto", ctx)` ensambla el objeto Varn completo.
 
-### 2. API pública en Varn (archivo `.wr`)
+### 2. API pública en Varn (archivo `.vn`)
 
 ```Varn
-// crates/varn-builtins/src/modules/std/crypto/crypto.wr
+// crates/varn-builtins/src/modules/std/crypto/crypto.vn
 export namespace crypto {
     export type HexDigest = str
 

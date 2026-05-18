@@ -11,18 +11,18 @@ Consulta [INSTALL.md](INSTALL.md).
 ## Ejecutar el primer programa
 
 ```Varn
-// hola.wr
+// hola.vn
 print("Hola, mundo!")
 ```
 
 ```sh
-wr hola.wr
+vn hola.vn
 ```
 
 ## Ejecutar la suite de tests
 
 ```sh
-wr tests/main.wr
+vn tests/main.vn
 # PASSED: 534 / FAILED: 0
 ```
 
@@ -30,15 +30,15 @@ wr tests/main.wr
 
 | Comando | Descripción |
 |---------|-------------|
-| `wr run <file>` | Ejecutar programa |
-| `wr check <file>` | Type-check sin ejecutar |
-| `wr build <file>` | Compilar a `.wrc` |
-| `wr bench <file>` | Benchmark con métricas VM |
-| `wr disasm <file>` | Ver bytecode |
-| `wr inspect <file>` | Inspeccionar AST/tipos/bytecode |
-| `wr repl` | REPL interactivo |
-| `wr add <alias> <origin>` | Añadir dependencia |
-| `wr install` | Instalar dependencias del proyecto |
+| `vn run <file>` | Ejecutar programa |
+| `vn check <file>` | Type-check sin ejecutar |
+| `vn build <file>` | Compilar a `.wrc` |
+| `vn bench <file>` | Benchmark con métricas VM |
+| `vn disasm <file>` | Ver bytecode |
+| `vn inspect <file>` | Inspeccionar AST/tipos/bytecode |
+| `vn repl` | REPL interactivo |
+| `vn add <alias> <origin>` | Añadir dependencia |
+| `vn install` | Instalar dependencias del proyecto |
 
 ## Ejemplo de lenguaje
 
@@ -142,7 +142,7 @@ Requiere configuración en `varn.json`:
 }
 ```
 
-Instalar: `wr install`
+Instalar: `vn install`
 
 ## Siguiente
 
