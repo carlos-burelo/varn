@@ -67,6 +67,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                             .join(" | "),
                         HoverContents::Markup(m) => m.value,
                     };
+                    let content = compact_debug_hover(content);
                     eprintln!(
                         "    {DIM}({:>2}:{:>2}){RESET} {YELLOW}{:<15}{RESET} → {BOLD}{}{RESET}",
                         tok.line + 1,
@@ -272,6 +273,17 @@ fn format_marked_string(ms: tower_lsp::lsp_types::MarkedString) -> String {
         tower_lsp::lsp_types::MarkedString::String(s) => s,
         tower_lsp::lsp_types::MarkedString::LanguageString(ls) => ls.value,
     }
+}
+
+fn compact_debug_hover(content: String) -> String {
+    const PRIMS: [&str; 7] = ["str", "int", "float", "bool", "char", "decimal", "bigint"];
+    for p in PRIMS {
+        let prefix = format!("class {p} {{");
+        if content.starts_with(&prefix) {
+            return format!("class {p}");
+        }
+    }
+    content
 }
 
 fn print_tagged_source(source: &str, sem_tokens: &[u32]) {

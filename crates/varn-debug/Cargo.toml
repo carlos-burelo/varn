@@ -10,7 +10,7 @@ varn-parser = { path = "../varn-parser" }
 varn-checker = { path = "../varn-checker" }
 varn-compiler = { path = "../varn-compiler" }
 varn-bytecode = { path = "../varn-bytecode" }
-# varn-lsp = { path = "../varn-lsp" }
+varn-lsp = { path = "../varn-lsp" }
 varn-types = { path = "../varn-types" }
 tower-lsp = "0.20"
 serde = { version = "1", features = ["derive"] }
