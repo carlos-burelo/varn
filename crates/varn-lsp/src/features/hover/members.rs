@@ -20,7 +20,8 @@ pub fn format_member_sig(parent_name: &str, member: &MemberRecord) -> String {
     } else {
         ""
     };
-    let prefix = if parent_name.is_empty() || parent_name == member.name {
+    let parent_is_unknown = parent_name.is_empty() || parent_name == "dynamic";
+    let prefix = if parent_is_unknown || parent_name == member.name {
         String::new()
     } else {
         format!("{}.", parent_name)

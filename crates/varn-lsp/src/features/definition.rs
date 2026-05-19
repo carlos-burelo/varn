@@ -16,29 +16,31 @@ pub fn build_goto_definition(
     })?;
 
     if let Some(chain) = state.resolve_chain_at(line, col) {
-        let (member_line, member_col, member_name) = match &chain {
-            ChainResult::Member { member, .. } => (member.line, member.col, member.name.clone()),
+        let (member_line, member_col, member_key) = match &chain {
+            ChainResult::Member { member, parent_name } => (
+                member.line,
+                member.col,
+                Some(member_global_key(parent_name, member)),
+            ),
             ChainResult::DynamicMember { member, .. } => {
-                (member.line, member.col, member.name.clone())
+                (member.line, member.col, None)
             }
-            ChainResult::Symbol(_) => (u32::MAX, 0, String::new()),
+            ChainResult::Symbol(_) => (u32::MAX, 0, None),
         };
 
         if member_line != u32::MAX {
-            if let Some(idx) = index {
-                let defs = idx.definitions_of(&member_name);
-                if !defs.is_empty() {
-                    let locs: Vec<Location> = defs
-                        .iter()
-                        .filter_map(|(uri, entry)| entry_location(uri, entry.line, entry.col))
-                        .collect();
-                    if !locs.is_empty() {
-                        return Some(if locs.len() == 1 {
-                            GotoDefinitionResponse::Scalar(locs.into_iter().next().unwrap())
-                        } else {
-                            GotoDefinitionResponse::Array(locs)
-                        });
-                    }
+            if let (Some(idx), Some(key)) = (index, member_key.as_deref()) {
+                let defs = idx.definitions_of_key(key);
+                let locs: Vec<Location> = defs
+                    .iter()
+                    .filter_map(|(uri, entry)| entry_location(uri, entry.line, entry.col))
+                    .collect();
+                if !locs.is_empty() {
+                    return Some(if locs.len() == 1 {
+                        GotoDefinitionResponse::Scalar(locs.into_iter().next().unwrap())
+                    } else {
+                        GotoDefinitionResponse::Array(locs)
+                    });
                 }
             }
 
@@ -55,17 +57,28 @@ pub fn build_goto_definition(
         }
     }
 
-    let local = if let Some(info) = state.db.expr_types.get(&token.offset) {
-        if let Some(sid) = info.symbol_id {
-            state.symbols.iter().find(|s| s.symbol_id == Some(sid))
-        } else {
-            state.symbols.iter().find(|s| s.name == token.lexeme)
-        }
-    } else {
-        state.symbols.iter().find(|s| s.name == token.lexeme)
-    };
+    let local = state
+        .db
+        .expr_types
+        .get(&token.offset)
+        .and_then(|info| info.symbol_id)
+        .and_then(|sid| state.symbols.iter().find(|s| s.symbol_id == Some(sid)));
 
     if let Some(sym) = local {
+        if let Some(idx) = index {
+            let defs = idx.definitions_of_key(&sym.global_key);
+            let locs: Vec<Location> = defs
+                .iter()
+                .filter_map(|(uri, entry)| entry_location(uri, entry.line, entry.col))
+                .collect();
+            if !locs.is_empty() {
+                return Some(if locs.len() == 1 {
+                    GotoDefinitionResponse::Scalar(locs.into_iter().next().unwrap())
+                } else {
+                    GotoDefinitionResponse::Array(locs)
+                });
+            }
+        }
         let pos = Position {
             line: sym.line,
             character: sym.col,
@@ -78,28 +91,7 @@ pub fn build_goto_definition(
         return Some(GotoDefinitionResponse::Scalar(Location::new(url, range)));
     }
 
-    let idx = index?;
-    let definitions = idx.definitions_of(&token.lexeme);
-    if definitions.is_empty() {
-        return None;
-    }
-
-    if definitions.len() == 1 {
-        let (uri, entry) = &definitions[0];
-        let loc = entry_location(uri, entry.line, entry.col)?;
-        return Some(GotoDefinitionResponse::Scalar(loc));
-    }
-
-    let locs: Vec<Location> = definitions
-        .iter()
-        .filter_map(|(uri, entry)| entry_location(uri, entry.line, entry.col))
-        .collect();
-
-    if locs.is_empty() {
-        None
-    } else {
-        Some(GotoDefinitionResponse::Array(locs))
-    }
+    None
 }
 
 fn entry_location(uri: &str, line: u32, col: u32) -> Option<Location> {
@@ -115,4 +107,12 @@ fn entry_location(uri: &str, line: u32, col: u32) -> Option<Location> {
             end: pos,
         },
     ))
+}
+
+fn member_global_key(parent_name: &str, member: &crate::document::MemberRecord) -> String {
+    let sid = member
+        .symbol_id
+        .map(|id| id.to_string())
+        .unwrap_or_else(|| "none".to_owned());
+    format!("member:{parent_name}:{}:{sid}", member.name)
 }

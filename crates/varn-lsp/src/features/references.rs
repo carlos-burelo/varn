@@ -1,11 +1,10 @@
 use crate::document::DocumentState;
-use crate::workspace::Workspace;
 use tower_lsp::lsp_types::{Location, Position, Range, Url};
 use varn_checker::symbol::SymbolId;
 
 pub fn build_references(
     state: &DocumentState,
-    workspace: &Workspace,
+    workspace: &crate::workspace::Workspace,
     line: u32,
     col: u32,
 ) -> Option<Vec<Location>> {
@@ -16,12 +15,12 @@ pub fn build_references(
             && (t.kind == varn_core::TokenKind::Identifier || t.kind.can_be_identifier())
     })?;
 
-    let target_id: Option<SymbolId> = state
+    let target_id: SymbolId = state
         .db
         .expr_types
         .get(&token.offset)
-        .and_then(|info| info.symbol_id);
-    let name = token.lexeme.clone();
+        .and_then(|info| info.symbol_id)?;
+    let target_key = symbol_global_key_for_id(state, target_id)?;
 
     let mut locs: Vec<Location> = Vec::new();
 
@@ -32,22 +31,11 @@ pub fn build_references(
             Ok(u) => u,
             Err(_) => continue,
         };
-
         for t in &file_state.tokens {
             if !(t.kind == varn_core::TokenKind::Identifier || t.kind.can_be_identifier()) {
                 continue;
             }
-            let matches = if let Some(id) = target_id {
-                file_state
-                    .db
-                    .expr_types
-                    .get(&t.offset)
-                    .and_then(|info| info.symbol_id)
-                    == Some(id)
-            } else {
-                t.lexeme == name
-            };
-            if !matches {
+            if token_global_key(file_state, t.offset).as_deref() != Some(target_key.as_str()) {
                 continue;
             }
             locs.push(Location::new(
@@ -71,4 +59,21 @@ pub fn build_references(
     } else {
         Some(locs)
     }
+}
+
+fn symbol_global_key_for_id(state: &DocumentState, id: SymbolId) -> Option<String> {
+    state
+        .symbols
+        .iter()
+        .find(|s| s.symbol_id == Some(id))
+        .map(|s| s.global_key.clone())
+}
+
+fn token_global_key(state: &DocumentState, offset: u32) -> Option<String> {
+    let sid = state
+        .db
+        .expr_types
+        .get(&offset)
+        .and_then(|info| info.symbol_id)?;
+    symbol_global_key_for_id(state, sid)
 }

@@ -1,5 +1,4 @@
 use crate::document::{DocumentState, SymbolRecord};
-use crate::util::ranking::symbol_priority;
 
 use super::member::member_at;
 use super::token::token_at;
@@ -25,22 +24,9 @@ pub fn symbol_at(state: &DocumentState, line: u32, col: u32) -> Option<&SymbolRe
         }
     }
 
-    if !state.symbol_map.contains_key(tok.lexeme.as_str()) {
-        return None;
+    if let Some((sid, _)) = state.db.resolve_at(&tok.lexeme, tok.offset) {
+        return state.symbols.iter().find(|s| s.symbol_id == Some(sid));
     }
 
-    let mut best: Option<&SymbolRecord> = None;
-    for sym in state.symbols.iter().filter(|s| s.name == tok.lexeme) {
-        best = Some(match best {
-            None => sym,
-            Some(prev) => {
-                if symbol_priority(sym.kind) < symbol_priority(prev.kind) {
-                    sym
-                } else {
-                    prev
-                }
-            }
-        });
-    }
-    best
+    None
 }

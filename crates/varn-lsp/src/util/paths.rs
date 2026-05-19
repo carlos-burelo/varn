@@ -16,5 +16,5 @@ pub fn is_stdlib_uri(uri: &str) -> bool {
 }
 
 pub fn is_varn_file(path: &str) -> bool {
-    path.ends_with(crate::constants::varn_EXTENSION)
+    path.ends_with(crate::constants::VARN_EXTENSION)
 }

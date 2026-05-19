@@ -85,6 +85,7 @@ pub struct SymbolRecord {
     pub type_params: Vec<String>,
     pub ty: Type,
     pub symbol_id: Option<varn_checker::symbol::SymbolId>,
+    pub global_key: String,
     pub full_range: varn_core::SourceRange,
     pub is_from_stdlib: bool,
     pub origin: Option<String>,
