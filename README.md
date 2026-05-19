@@ -13,7 +13,7 @@
 - **Tipado estático expresivo** — uniones, genéricos, exhaustividad total en `match`
 - **Async nativo** — `async`/`await`, generadores, `TaskGroup`, `parallel`, `spawn`
 - **Sistema de paquetes** — `varn.json`, `varn.lock`, resolución semver sobre git
-- **Compilado a `.wrc`** — bytecode portable, sin recompilación
+- **Compilado a `.vnc`** — bytecode portable, sin recompilación
 - **Tooling** — `vn bench`, `vn disasm`, `vn inspect`, LSP
 
 ---
@@ -444,7 +444,7 @@ cp target/release/vn ~/.local/bin/   # Linux/macOS
 vn program.vn                    # implícito run
 vn run program.vn
 vn run program.vn -- arg1 arg2   # argumentos al script
-vn run program.wrc               # ejecutar compilado
+vn run program.vnc               # ejecutar compilado
 ```
 
 ### Type checking
@@ -462,22 +462,22 @@ vn eval "function double(x: int) = x * 2; print(double(21))"
 vn eval --debug all "print('hello')"
 ```
 
-### Compilar a `.wrc`
+### Compilar a `.vnc`
 
 ```bash
-vn build program.vn              # → program.wrc junto al fuente
-vn build program.vn -o dist/     # → dist/program.wrc
-vn build program.vn -o out.wrc   # path explícito
+vn build program.vn              # → program.vnc junto al fuente
+vn build program.vn -o dist/     # → dist/program.vnc
+vn build program.vn -o out.vnc   # path explícito
 ```
 
-El `.wrc` contiene el grafo completo de bytecode. No incluye stdlib (embedded en el runtime). Ejecuta directo sin recompilar.
+El `.vnc` contiene el grafo completo de bytecode. No incluye stdlib (embedded en el runtime). Ejecuta directo sin recompilar.
 
 ### Benchmark
 
 ```bash
 vn bench program.vn              # fases: read/lex/parse/check/compile/execute
 vn bench program.vn --runs 100
-vn bench program.wrc             # solo load + execute (compara contra .vn)
+vn bench program.vnc             # solo load + execute (compara contra .vn)
 vn bench --no-run program.vn     # solo mide compilación
 vn bench --with-output program.vn
 ```

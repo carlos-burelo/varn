@@ -32,7 +32,7 @@ vn tests/main.vn
 |---------|-------------|
 | `vn run <file>` | Ejecutar programa |
 | `vn check <file>` | Type-check sin ejecutar |
-| `vn build <file>` | Compilar a `.wrc` |
+| `vn build <file>` | Compilar a `.vnc` |
 | `vn bench <file>` | Benchmark con métricas VM |
 | `vn disasm <file>` | Ver bytecode |
 | `vn inspect <file>` | Inspeccionar AST/tipos/bytecode |
