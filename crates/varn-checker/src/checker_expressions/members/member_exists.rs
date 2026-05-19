@@ -65,6 +65,19 @@ impl Checker {
         let res = match &ty.0 {
             TypeKind::Intrinsic(varn_core::TypeTag::Dynamic) => true,
             TypeKind::Intrinsic(varn_core::TypeTag::Never) => false,
+            TypeKind::Intrinsic(varn_core::TypeTag::Str) => {
+                if key == "length" {
+                    return true;
+                }
+                if let Some(b) = &bind.builtin {
+                    if let Some(members) = b.class_members.get(varn_core::IntrinsicType::Str.as_str()) {
+                        if members.members.iter().any(|m| m.name.as_ref() == key) {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
             TypeKind::Intrinsic(_) => {
                 let name = ty.to_string();
                 if let Some(b) = &bind.builtin {
@@ -77,6 +90,9 @@ impl Checker {
                 false
             }
             TypeKind::Named(name, origin) => {
+                if name.as_ref() == varn_core::IntrinsicType::Str.as_str() && key == "length" {
+                    return true;
+                }
                 if let Some(members) = bind.type_members.classes.get(name) {
                     if members.members.iter().any(|m| m.name.as_ref() == key) {
                         return true;

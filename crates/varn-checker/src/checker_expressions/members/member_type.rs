@@ -29,6 +29,9 @@ impl Checker {
     ) -> Option<(Type, Option<usize>)> {
         let res = match &ty.0 {
             TypeKind::Named(name, origin) => {
+                if name.as_ref() == varn_core::IntrinsicType::Str.as_str() && key == "length" {
+                    return Some((Type::Int, None));
+                }
                 if let Some(members) = bind.type_members.classes.get(name) {
                     if let Some(m) = members.members.iter().find(|m| m.name.as_ref() == key) {
                         return Some((m.ty.clone(), m.symbol_id));
@@ -137,6 +140,22 @@ impl Checker {
             TypeKind::LiteralInt(_) => self.find_member_info_uncached(&Type::Int, key, bind),
             TypeKind::LiteralFloat(_) => self.find_member_info_uncached(&Type::Float, key, bind),
             TypeKind::LiteralBool(_) => self.find_member_info_uncached(&Type::Bool, key, bind),
+            TypeKind::Intrinsic(varn_core::TypeTag::Str) => {
+                if key == "length" {
+                    Some((Type::Int, None))
+                } else {
+                    bind.builtin
+                        .as_ref()
+                        .and_then(|b| b.class_members.get(varn_core::IntrinsicType::Str.as_str()))
+                        .and_then(|members| {
+                            members
+                                .members
+                                .iter()
+                                .find(|m| m.name.as_ref() == key)
+                                .map(|m| (m.ty.clone(), m.symbol_id))
+                        })
+                }
+            }
             _ => None,
         };
         if res.is_none() {

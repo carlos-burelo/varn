@@ -2,6 +2,7 @@ use std::rc::Rc;
 use varn_core::ast::{Pattern, SumTypeDecl};
 
 use super::super::type_resolution::resolve_type_node;
+use crate::module_resolver;
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::Type;
 
@@ -80,6 +81,32 @@ impl super::super::Binder {
                                         .iter()
                                         .find(|m| m.name.as_ref() == prop.key.as_ref())
                                         .map(|m| m.ty.clone())
+                                })
+                                .or_else(|| {
+                                    if name.as_ref() != "*" {
+                                        return None;
+                                    }
+                                    let origin_path = origin.as_deref()?;
+                                    let mut visiting = vec![self.source_file.to_string()];
+                                    let exports = module_resolver::resolve_module_exports_ref(
+                                        origin_path,
+                                        &mut visiting,
+                                    );
+                                    exports
+                                                .get(prop.key.as_ref())
+                                                .and_then(|sym| sym.ty.clone())
+                                                .or_else(|| {
+                                                    self.type_members
+                                                        .namespaces
+                                                        .get(prop.key.as_ref())
+                                                        .and_then(|members| members.first())
+                                                        .map(|_| {
+                                                            Type::named_with_origin(
+                                                                prop.key.to_string(),
+                                                                Some(origin_path.to_string()),
+                                                            )
+                                                        })
+                                        })
                                 }),
                             _ => None,
                         });
