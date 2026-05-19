@@ -1919,6 +1919,7 @@ dependencies = [
  "varn-compiler",
  "varn-core",
  "varn-lexer",
+ "varn-lsp",
  "varn-parser",
  "varn-types",
 ]
