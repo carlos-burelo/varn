@@ -1,8 +1,6 @@
 use varn_checker::SymbolKind;
 use varn_core::TokenKind;
 
-use crate::util::ranking::symbol_priority;
-
 use super::{DocumentState, MethodHoverInfo, SymbolRecord};
 
 fn is_expression_keyword(kind: TokenKind) -> bool {
@@ -59,20 +57,7 @@ impl DocumentState {
             }
         }
 
-        let mut best: Option<&SymbolRecord> = None;
-        for sym in self.symbols.iter().filter(|s| s.name == tok.lexeme) {
-            best = Some(match best {
-                None => sym,
-                Some(prev) => {
-                    if symbol_priority(sym.kind) < symbol_priority(prev.kind) {
-                        sym
-                    } else {
-                        prev
-                    }
-                }
-            });
-        }
-        best
+        None
     }
 
     pub fn symbols_named(&self, name: &str) -> Vec<&SymbolRecord> {
@@ -96,6 +81,9 @@ impl DocumentState {
         }
 
         let param_name = self.tokens[ident_idx].lexeme.clone();
+        if !is_likely_param_list(&self.tokens, ident_idx) {
+            return None;
+        }
         let mut type_lexemes: Vec<(u32, u32, &str)> = Vec::new();
         let mut depth = 0i32;
         let mut j = ident_idx + 2;
@@ -258,6 +246,40 @@ impl DocumentState {
             init_value: member.init_value.clone(),
         })
     }
+}
+
+fn is_likely_param_list(tokens: &[super::TokenRecord], ident_idx: usize) -> bool {
+    let mut paren_depth = 0i32;
+    let mut brace_depth = 0i32;
+    let mut bracket_depth = 0i32;
+
+    for j in (0..ident_idx).rev() {
+        match tokens[j].kind {
+            TokenKind::RParen => paren_depth += 1,
+            TokenKind::LParen => {
+                if paren_depth == 0 && brace_depth == 0 && bracket_depth == 0 {
+                    return true;
+                }
+                paren_depth -= 1;
+            }
+            TokenKind::RBrace => brace_depth += 1,
+            TokenKind::LBrace => {
+                if brace_depth == 0 && paren_depth == 0 && bracket_depth == 0 {
+                    return false;
+                }
+                brace_depth -= 1;
+            }
+            TokenKind::RBracket => bracket_depth += 1,
+            TokenKind::LBracket => {
+                if bracket_depth == 0 && paren_depth == 0 && brace_depth == 0 {
+                    return false;
+                }
+                bracket_depth -= 1;
+            }
+            _ => {}
+        }
+    }
+    false
 }
 
 fn reconstruct_spaced_tokens(parts: &[(u32, u32, &str)]) -> String {

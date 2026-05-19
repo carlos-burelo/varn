@@ -97,6 +97,7 @@ pub fn inject_stdlib_symbols(
     symbol_map: &mut HashMap<String, SymbolKind>,
     bind: &BindResult,
     tokens: &[TokenRecord],
+    uri: &str,
 ) {
     for sym in bind.global_symbols() {
         if sym.origin_module.is_none() || symbol_map.contains_key(sym.name.as_ref()) {
@@ -172,6 +173,12 @@ pub fn inject_stdlib_symbols(
             type_params: sym.type_params.iter().map(|s| s.to_string()).collect(),
             ty: inferred_ty,
             symbol_id: None,
+            global_key: if let Some(origin_mod) = sym.origin_module.as_deref() {
+                let canonical_name = sym.original_name.as_deref().unwrap_or(sym.name.as_ref());
+                format!("m:{origin_mod}#{:?}:{canonical_name}", sym.kind)
+            } else {
+                format!("u:{uri}#{:?}:{}", sym.kind, sym.name)
+            },
             full_range: sym.full_range,
             is_from_stdlib: true,
             origin: sym.origin_module.as_deref().map(|s| s.to_owned()),

@@ -4,7 +4,7 @@ use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, Position, Range, 
 use varn_checker::SymbolKind;
 
 use crate::constants::{
-    SORT_AUTOIMPORT, STDLIB_STD_PATH, STD_LIB_PATH_SEGMENT, STD_PREFIX, varn_EXTENSION,
+    SORT_AUTOIMPORT, STDLIB_STD_PATH, STD_LIB_PATH_SEGMENT, STD_PREFIX, VARN_EXTENSION,
 };
 use crate::document::import::uri_to_path;
 use crate::index::ProjectIndex;
@@ -105,7 +105,7 @@ fn uri_to_specifier(from_uri: &str, target_uri: &str) -> String {
         let mod_suffix = concat!("/mod", ".vn"); // avoids literal ".vn" in non-constant position
         let module = rest
             .strip_suffix(mod_suffix)
-            .or_else(|| rest.strip_suffix(varn_EXTENSION))
+            .or_else(|| rest.strip_suffix(VARN_EXTENSION))
             .unwrap_or(rest);
         return format!("{STD_PREFIX}{module}");
     }
@@ -141,8 +141,8 @@ fn relative_import_path(from_file: &str, to_file: &str) -> String {
     }
     result.push_str(&downs.join("/"));
 
-    if result.ends_with(varn_EXTENSION) {
-        result.truncate(result.len() - varn_EXTENSION.len());
+    if result.ends_with(VARN_EXTENSION) {
+        result.truncate(result.len() - VARN_EXTENSION.len());
     }
 
     result

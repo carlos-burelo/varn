@@ -46,6 +46,31 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
         }
     }
 
+    // Prefer direct symbol/param/member resolution first (checker-backed, less heuristic).
+    if let Some(sym) = query::symbol_at(state, line, col) {
+        return Some(symbol_hover(sym));
+    }
+
+    if let Some(param) = query::param_at(state, line, col) {
+        let sig = if param.is_type_param {
+            format!("(type parameter) {}", param.name)
+        } else if param.type_str.is_empty() {
+            format!("(param) {}", param.name)
+        } else {
+            format!("(param) {}: {}", param.name, param.type_str)
+        };
+        return Some(make_lang_hover(sig));
+    }
+
+    if let Some((parent_name, parent_kind, member)) = query::member_at(state, line, col) {
+        let sig = if parent_kind == SymbolKind::Enum {
+            format_enum_member(&parent_name, &member.name, &member.init_value)
+        } else {
+            format_member_sig(&parent_name, member)
+        };
+        return Some(make_lang_hover(sig));
+    }
+
     if let Some(res) = query::resolve_chain(state, line, col) {
         match res {
             ChainResult::Symbol(sym) => return Some(symbol_hover(sym)),
@@ -62,30 +87,6 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
                 return Some(make_lang_hover(format_member_sig(&parent_name, &member)));
             }
         }
-    }
-
-    if let Some((parent_name, parent_kind, member)) = query::member_at(state, line, col) {
-        let sig = if parent_kind == SymbolKind::Enum {
-            format_enum_member(&parent_name, &member.name, &member.init_value)
-        } else {
-            format_member_sig(&parent_name, member)
-        };
-        return Some(make_lang_hover(sig));
-    }
-
-    if let Some(sym) = query::symbol_at(state, line, col) {
-        return Some(symbol_hover(sym));
-    }
-
-    if let Some(param) = query::param_at(state, line, col) {
-        let sig = if param.is_type_param {
-            format!("(type parameter) {}", param.name)
-        } else if param.type_str.is_empty() {
-            format!("(param) {}", param.name)
-        } else {
-            format!("(param) {}: {}", param.name, param.type_str)
-        };
-        return Some(make_lang_hover(sig));
     }
 
     None

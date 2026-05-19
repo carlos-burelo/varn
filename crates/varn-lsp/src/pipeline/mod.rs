@@ -14,6 +14,24 @@ use varn_checker::{module_resolver, SymbolKind};
 use varn_core::ast::{Decl, Stmt, StmtKind};
 use varn_core::{DiagnosticKind, TokenKind, TypeKind};
 
+fn stable_global_key(
+    uri: &str,
+    name: &str,
+    kind: SymbolKind,
+    symbol_id: Option<usize>,
+    origin: Option<&str>,
+    original_name: Option<&str>,
+) -> String {
+    if let Some(origin_mod) = origin {
+        let canonical_name = original_name.unwrap_or(name);
+        return format!("m:{origin_mod}#{kind:?}:{canonical_name}");
+    }
+    if let Some(sid) = symbol_id {
+        return format!("u:{uri}#{kind:?}:{sid}");
+    }
+    format!("u:{uri}#{kind:?}:{name}")
+}
+
 pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     let path = uri_to_path(&uri);
     let (raw_tokens, lex_errs) = varn_lexer::scan(&source, &path);
@@ -117,6 +135,19 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
                     .get(&sym.name)
                     .map(|ms| symbols::map_members(ms, &tokens))
                     .or_else(|| {
+                        if sym.kind == SymbolKind::Class {
+                            result
+                                .bind
+                                .get_class_entry(&sym.name)
+                                .map(|e| symbols::map_members(&e.members, &tokens))
+                        } else {
+                            result
+                                .bind
+                                .get_interface_members_local(&sym.name)
+                                .map(|ms| symbols::map_members(ms, &tokens))
+                        }
+                    })
+                    .or_else(|| {
                         sym.origin_module.as_ref().and_then(|origin| {
                             module_resolver::resolve_module_bind(origin).and_then(|rb| {
                                 let name = sym.original_name.as_ref().unwrap_or(&sym.name);
@@ -170,6 +201,14 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
                 _ => sym.ty.clone(),
             };
             let symbol_id = Some(id);
+            let global_key = stable_global_key(
+                &uri,
+                sym.name.as_ref(),
+                sym.kind,
+                symbol_id,
+                sym.origin_module.as_deref(),
+                sym.original_name.as_deref().map(|s| s.as_ref()),
+            );
 
             SymbolRecord {
                 name: sym.name.to_string(),
@@ -219,6 +258,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
                 type_params: sym.type_params.iter().map(|s| s.to_string()).collect(),
                 ty: inferred_ty.unwrap_or(varn_checker::types::Type::Dynamic),
                 symbol_id,
+                global_key,
                 full_range: sym.full_range,
                 is_from_stdlib: sym.origin_module.is_some(),
                 origin: sym.origin_module.as_deref().map(|s| s.to_owned()),
@@ -233,7 +273,13 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     }
 
     let mut all_symbols = sym_records;
-    symbols::inject_stdlib_symbols(&mut all_symbols, &mut symbol_map, &result.bind, &tokens);
+    symbols::inject_stdlib_symbols(
+        &mut all_symbols,
+        &mut symbol_map,
+        &result.bind,
+        &tokens,
+        &uri,
+    );
     let extension_members = extensions::build_extension_members(&result.bind);
 
     let param_scopes = params::collect_param_scopes(&tokens);

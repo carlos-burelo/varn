@@ -1,7 +1,7 @@
 use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind};
 use varn_checker::SymbolKind;
 
-use crate::constants::{STD_PREFIX, varn_EXTENSION};
+use crate::constants::{STD_PREFIX, VARN_EXTENSION};
 use crate::document::import::uri_to_path;
 
 pub fn build_import_completions(prefix: &str, doc_uri: &str) -> Vec<CompletionItem> {
@@ -78,8 +78,8 @@ fn relative_varn_completions(prefix: &str, doc_uri: &str) -> Vec<CompletionItem>
                     ..Default::default()
                 });
             }
-        } else if file_name.ends_with(varn_EXTENSION) {
-            let stem = &file_name[..file_name.len() - varn_EXTENSION.len()];
+        } else if file_name.ends_with(VARN_EXTENSION) {
+            let stem = &file_name[..file_name.len() - VARN_EXTENSION.len()];
             if doc_file.file_stem().and_then(|s| s.to_str()) == Some(stem) {
                 continue;
             }

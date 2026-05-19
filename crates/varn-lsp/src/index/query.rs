@@ -8,6 +8,10 @@ pub fn definitions_named<'a>(index: &'a ProjectIndex, name: &str) -> &'a [(Strin
     index.definitions_of(name)
 }
 
+pub fn definitions_keyed<'a>(index: &'a ProjectIndex, key: &str) -> &'a [(String, ExportEntry)] {
+    index.definitions_of_key(key)
+}
+
 pub fn search_by_name<'a>(
     index: &'a ProjectIndex,
     query: &str,

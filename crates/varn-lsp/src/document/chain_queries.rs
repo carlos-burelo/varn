@@ -1,26 +1,9 @@
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
-use varn_checker::{types::FunctionType, types::ObjectTypeMember, SymbolKind, Type};
+use varn_checker::{types::ObjectTypeMember, SymbolKind, Type};
 use varn_core::{IntrinsicType, TokenKind, TypeKind, TypeTag};
 
-use super::{ChainResult, DocumentState, MemberKind, MemberRecord};
-
-fn is_function_type(ty: &Type) -> bool {
-    match &ty.0 {
-        TypeKind::Fn(_) => true,
-        TypeKind::Intrinsic(TypeTag::Dynamic) => true,
-        TypeKind::Union(members) => members.iter().any(is_function_type),
-        _ => false,
-    }
-}
-
-fn get_function_type(ty: &Type) -> Option<&FunctionType> {
-    match &ty.0 {
-        TypeKind::Fn(f) => Some(f),
-        TypeKind::Union(members) => members.iter().find_map(get_function_type),
-        _ => None,
-    }
-}
+use super::{ChainResult, DocumentState, MemberRecord};
 
 fn is_expression_keyword(kind: TokenKind) -> bool {
     matches!(kind, TokenKind::Await | TokenKind::Yield)
@@ -99,18 +82,6 @@ impl DocumentState {
                     if let Some(sym) = self.symbols.iter().find(|s| s.symbol_id == Some(sid)) {
                         return Some(ChainResult::Symbol(sym));
                     }
-                }
-                if let Some(sym) = self.symbols.iter().find(|s| {
-                    s.name == base_ident.lexeme
-                        && matches!(
-                            s.kind,
-                            SymbolKind::Class
-                                | SymbolKind::Interface
-                                | SymbolKind::Namespace
-                                | SymbolKind::Enum
-                        )
-                }) {
-                    return Some(ChainResult::Symbol(sym));
                 }
             }
             if ty.is_dynamic() {
@@ -230,57 +201,9 @@ impl DocumentState {
                         _ => ty,
                     };
                 } else {
-                    if let Some(n) = current_parent_name {
-                        parent_name = n;
-                    }
                     break;
                 }
             }
-        }
-
-        let target_ident = &self.tokens[ident_idx];
-        if let Some(info) = self.db.expr_types.get(&target_ident.offset) {
-            let ty = &info.ty;
-            return Some(ChainResult::DynamicMember {
-                member: MemberRecord {
-                    name: target_ident.lexeme.clone(),
-                    type_str: if let Some(ft) = get_function_type(ty) {
-                        if !ft.is_arrow {
-                            ft.return_type.to_string()
-                        } else {
-                            ty.to_string()
-                        }
-                    } else {
-                        ty.to_string()
-                    },
-                    params_str: format_type_params_str(ty),
-                    is_static: false,
-                    is_optional: false,
-                    kind: if is_function_type(ty) {
-                        if chain.len() == 1 {
-                            MemberKind::Function
-                        } else {
-                            MemberKind::Method
-                        }
-                    } else {
-                        MemberKind::Property
-                    },
-                    is_arrow: if let Some(ft) = get_function_type(ty) {
-                        ft.is_arrow
-                    } else {
-                        false
-                    },
-                    is_async: false,
-                    is_generator: false,
-                    line: target_ident.line,
-                    col: target_ident.col,
-                    init_value: String::new(),
-                    ty: ty.clone(),
-                    symbol_id: info.symbol_id,
-                    members: Vec::new(),
-                },
-                parent_name: parent_name.clone(),
-            });
         }
 
         None
@@ -322,9 +245,6 @@ impl DocumentState {
                         member: substitute_member_record(m, &mapping),
                         parent_name: type_name.clone(),
                     });
-                }
-                if let Some(sym) = self.symbols.iter().find(|s| s.name == name) {
-                    return Some(ChainResult::Symbol(sym));
                 }
                 None
             }
@@ -462,7 +382,19 @@ impl DocumentState {
             })
             .map(|(_, t)| t)?;
 
-        for sym in &self.symbols {
+        for sym in self.symbols.iter().filter(|s| !s.is_from_stdlib) {
+            if let Some(member) =
+                self.find_member_at_pos_recursive(&sym.members, line, tok.col, &tok.lexeme)
+            {
+                let parent_name = self
+                    .find_direct_parent_name_recursive(&sym.members, member)
+                    .unwrap_or(&sym.name)
+                    .to_owned();
+                return Some((parent_name, sym.kind, member));
+            }
+        }
+
+        for sym in self.symbols.iter().filter(|s| s.is_from_stdlib) {
             if let Some(member) =
                 self.find_member_at_pos_recursive(&sym.members, line, tok.col, &tok.lexeme)
             {
@@ -501,30 +433,6 @@ impl DocumentState {
             }
         }
         None
-    }
-}
-
-fn format_type_params_str(ty: &Type) -> String {
-    if let Some(ft) = get_function_type(ty) {
-        let mut out = String::new();
-        for (i, p) in ft.params.iter().enumerate() {
-            if i > 0 {
-                out.push_str(", ");
-            }
-            if let Some(name) = &p.name {
-                out.push_str(name);
-            } else {
-                out.push_str(&format!("arg{i}"));
-            }
-            if p.optional {
-                out.push('?');
-            }
-            out.push_str(": ");
-            out.push_str(&format!("{}", p.ty));
-        }
-        out
-    } else {
-        String::new()
     }
 }
 
