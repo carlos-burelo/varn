@@ -60,6 +60,9 @@ pub struct RunArgs {
     #[arg(short, long)]
     pub verbose: bool,
 
+    #[arg(long = "no-run", alias = "noRun")]
+    pub no_run: bool,
+
     #[arg(long, value_name = "PHASES")]
     pub debug: Option<String>,
 

@@ -50,6 +50,9 @@ pub fn check(program: &Program, source: &str, debug: &DebugFlags) -> PipelineRes
     if debug.types {
         varn_debug::types::debug_types(program, debug);
     }
+    if debug.lsp {
+        varn_debug::lsp::debug_lsp(program.filename.as_ref(), source, debug);
+    }
 
     Ok(CheckResult {
         checker_result: check_result,

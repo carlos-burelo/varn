@@ -6,7 +6,7 @@ pub fn execute(args: RunArgs) -> Result<(), CliError> {
         file_path: args.file,
         eval: None,
         verbose: args.verbose,
-        no_run: false,
+        no_run: args.no_run,
         debug,
         trace: args.trace,
     })
