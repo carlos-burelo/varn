@@ -1,0 +1,9 @@
+{
+  "Varn.server.path": "C:\\Users\\x\\dev\\varn\\target\\debug\\vn-lsp.exe",
+  "Varn.cli.path": "C:\\Users\\x\\dev\\varn\\target\\debug\\vn.exe",
+  "Varn.inlayHints.enabled": true,
+  "Varn.run.verbose": false,
+  "Varn.run.debugPhases": [],
+  "Varn.codeLens.enabled": true,
+  "Varn.buildMode": "debug"
+}
