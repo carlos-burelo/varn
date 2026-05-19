@@ -9,9 +9,10 @@ let client;
 /**
  * Create (but do not start) an LSP client.
  */
-function createClient(binaryPath, outputChannel) {
+function createClient(binaryPath, outputChannel, args = []) {
     const serverOptions = {
         command:   binaryPath,
+        args:      args,
         transport: TransportKind.stdio,
     };
     

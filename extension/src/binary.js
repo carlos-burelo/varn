@@ -89,5 +89,5 @@ function resolveLspPath(context) {
 
 module.exports = {
     resolveCliPath,
-    resolveLspPath
+    resolveLspPath,
 };

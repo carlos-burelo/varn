@@ -6,6 +6,7 @@ const fs = require("fs");
 const { spawn } = require("child_process");
 const { resolveCliPath } = require("./binary");
 const { updateBuildModeStatusBar } = require("./status");
+const { stripAnsi } = require("./utils");
 
 /** @type {vscode.OutputChannel | undefined} */
 let runChannel;
@@ -182,7 +183,7 @@ async function toggleBuildMode() {
 function buildCliArgs(file, opts) {
     const args = [file];
     if (opts.verbose) args.push("--verbose");
-    if (opts.noRun)   args.push("--noRun");
+    if (opts.noRun)   args.push("--no-run");
     if (opts.debugPhases && opts.debugPhases.length > 0) {
         args.push(`--debug=${opts.debugPhases.join(",")}`);
     }
@@ -211,12 +212,13 @@ function runInOutputChannel(bin, args, cwd, label) {
     runChannel.clear();
     runChannel.show(true);
     runChannel.appendLine(`▶  ${label}`);
+    runChannel.appendLine(`  binary: ${bin}`);
     runChannel.appendLine("─".repeat(64));
 
     const proc = spawn(bin, args, { cwd });
 
-    proc.stdout.on("data", (d) => runChannel.append(d.toString()));
-    proc.stderr.on("data", (d) => runChannel.append(d.toString()));
+    proc.stdout.on("data", (d) => runChannel.append(stripAnsi(d.toString())));
+    proc.stderr.on("data", (d) => runChannel.append(stripAnsi(d.toString())));
     proc.on("error", (err) => {
         runChannel.appendLine(`\nError: ${err.message}`);
     });

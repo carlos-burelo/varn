@@ -3,6 +3,8 @@
 const path = require("path");
 const fs = require("fs");
 
+const ANSI_PATTERN = /\u001b\[[0-9;]*[A-Za-z]/g;
+
 /**
  * @param {string} binFile
  * @returns {string | undefined}
@@ -29,7 +31,17 @@ function findOnPath(executable) {
     return undefined;
 }
 
+/**
+ * Remove ANSI escape sequences from text destined for non-terminal outputs.
+ * @param {string} text
+ * @returns {string}
+ */
+function stripAnsi(text) {
+    return text.replace(ANSI_PATTERN, "");
+}
+
 module.exports = {
     varnHomeBinPath,
-    findOnPath
+    findOnPath,
+    stripAnsi
 };

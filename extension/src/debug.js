@@ -4,6 +4,7 @@ const vscode = require("vscode");
 const path = require("path");
 const { spawn } = require("child_process");
 const { resolveCliPath } = require("./binary");
+const { stripAnsi } = require("./utils");
 
 class VarnDebugAdapterFactory {
     /** @param {vscode.ExtensionContext} context */
@@ -125,8 +126,8 @@ class VarnDebugAdapter {
         const proc = spawn(this._cliPath, args, { cwd });
         this._proc = proc;
 
-        proc.stdout.on("data", (d) => this._output("stdout", d.toString()));
-        proc.stderr.on("data", (d) => this._output("stderr", d.toString()));
+        proc.stdout.on("data", (d) => this._output("stdout", stripAnsi(d.toString())));
+        proc.stderr.on("data", (d) => this._output("stderr", stripAnsi(d.toString())));
 
         proc.on("error", (err) => {
             this._output("stderr", `Error spawning Varn: ${err.message}\n`);
