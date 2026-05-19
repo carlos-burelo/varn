@@ -11,13 +11,13 @@ El lenguaje está completo y funcional:
 - **Stdlib**: `str`, `int`, `float`, `bool`, `char`, `decimal`, `array`, `range`, `map`, `set`, `math`, `json`, `fs`, `http`, `io`, `net`, `path`, `sys`, `time`, `task`, `collections`, `result`, `option`, `types`, `reflect`, `crypto`.
 - **Package manager**: `vn add/remove/install/update` con resolución semver sobre git tags, caché global SHA256-verified.
 - **Caché de bytecode**: `.vn/cache/` invalidado por hash de contenido.
-- **Compilados portables**: `vn build` → `.wrc`, `vn run program.wrc`.
+- **Compilados portables**: `vn build` → `.vnc`, `vn run program.vnc`.
 - **LSP**: servidor en `varn-lsp` con hover, completions, go-to-definition.
 - **Suite de tests**: 534 tests, 100% passing.
 
 ## Inmediato
 
-- [ ] Formato `.wrc` zero-copy (mmap + flat binary) para carga sub-milisegundo.
+- [ ] Formato `.vnc` zero-copy (mmap + flat binary) para carga sub-milisegundo.
 - [ ] Capability system: enforcement real en runtime (actualmente `has_capability` retorna `true` siempre).
 - [ ] Verificación compile-time de divergencia entre IDL `.vn` e implementación Rust.
 

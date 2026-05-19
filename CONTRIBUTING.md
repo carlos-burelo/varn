@@ -68,9 +68,9 @@ La jerarquía de dependencias es estricta: `varn-core` no depende de ningún cra
 - `tests/main.vn` ejecuta la suite completa. Debe pasar al 100% en todo PR.
 - Tests unitarios Rust en `#[cfg(test)]` dentro del crate correspondiente.
 
-**Formato `.wrc` y cache:**
+**Formato `.vnc` y cache:**
 - `CACHE_FORMAT_VERSION` en `varn-cli/src/pipeline/compile.rs` — incrementar si cambias `FunctionProto`, `Chunk`, o `PoolEntry`.
-- El formato `.wrc` usa el mismo versioning. Cambiar la versión invalida compilados previos (comportamiento correcto).
+- El formato `.vnc` usa el mismo versioning. Cambiar la versión invalida compilados previos (comportamiento correcto).
 
 ## Política de PRs
 

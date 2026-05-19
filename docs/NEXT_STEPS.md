@@ -4,7 +4,7 @@ Ver [ROADMAP.md](ROADMAP.md) para la hoja de ruta completa.
 
 ## Inmediato
 
-### `.wrc` zero-copy
+### `.vnc` zero-copy
 El formato actual usa postcard (serialización O(n) allocations). Para load sub-milisegundo: mmap + flat binary (estilo rkyv o formato propio). El postcard actual tarda ~650µs en cargar 80KB — aceptable pero mejorable.
 
 ### Capability system enforcement

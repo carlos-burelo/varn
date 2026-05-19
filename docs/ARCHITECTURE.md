@@ -137,6 +137,6 @@ Resolución centralizada en `varn-modules`. Caché de bytecode en `.vn/cache/` i
 
 ---
 
-## 8. Formato `.wrc`
+## 8. Formato `.vnc`
 
-`vn build program.vn` produce un `.wrc`: magic `WRC\0` + versión u32 LE + artefacto serializado con postcard. `vn run program.wrc` omite todas las fases de compilación y ejecuta directamente.
+`vn build program.vn` produce un `.vnc`: magic `WRC\0` + versión u32 LE + artefacto serializado con postcard. `vn run program.vnc` omite todas las fases de compilación y ejecuta directamente.

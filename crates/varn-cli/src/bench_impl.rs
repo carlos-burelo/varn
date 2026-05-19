@@ -549,7 +549,7 @@ fn run_bench_wrc(path: &str, runs: usize, no_run: bool, with_output: bool) -> Re
 
     eprintln!();
     eprintln!(
-        "  {BOLD}{CYAN}Benchmark{R} · {BOLD}{path}{R}  {DIM}({runs} runs)  [.wrc compiled]{R}"
+        "  {BOLD}{CYAN}Benchmark{R} · {BOLD}{path}{R}  {DIM}({runs} runs)  [.vnc compiled]{R}"
     );
     eprintln!(
         "  {DIM}Binary  {}  (no source phases){R}",

@@ -37,7 +37,7 @@ fn resolve_output_path(source_file: &str, output: Option<&str>) -> String {
             let out_path = Path::new(out);
             if out_path.is_dir() || out.ends_with('/') || out.ends_with('\\') {
                 out_path
-                    .join(format!("{stem}.wrc"))
+                    .join(format!("{stem}.vnc"))
                     .to_string_lossy()
                     .into_owned()
             } else {

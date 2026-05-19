@@ -5,7 +5,7 @@ const MAGIC: &[u8; 4] = b"WRC\0";
 
 pub fn write_wrc(path: &str, artifact: &ModuleGraphArtifact) -> Result<(), CliError> {
     let payload = postcard::to_allocvec(artifact)
-        .map_err(|e| CliError::fatal(format!("cannot serialize .wrc: {e}")))?;
+        .map_err(|e| CliError::fatal(format!("cannot serialize .vnc: {e}")))?;
 
     let mut out = Vec::with_capacity(8 + payload.len());
     out.extend_from_slice(MAGIC);
@@ -21,13 +21,13 @@ pub fn read_wrc(path: &str) -> Result<ModuleGraphArtifact, CliError> {
 
     if bytes.len() < 8 {
         return Err(CliError::fatal(format!(
-            "'{}' is not a valid .wrc file",
+            "'{}' is not a valid .vnc file",
             path
         )));
     }
     if &bytes[..4] != MAGIC {
         return Err(CliError::fatal(format!(
-            "'{}' is not a valid .wrc file (bad magic)",
+            "'{}' is not a valid .vnc file (bad magic)",
             path
         )));
     }
@@ -48,5 +48,5 @@ pub fn read_wrc(path: &str) -> Result<ModuleGraphArtifact, CliError> {
 }
 
 pub fn is_wrc(path: &str) -> bool {
-    path.ends_with(".wrc")
+    path.ends_with(".vnc")
 }

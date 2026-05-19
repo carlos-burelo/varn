@@ -13,7 +13,7 @@ Reporta de forma privada (ver abajo) si encuentras:
 - **CLI**: inyección de comandos, path traversal en resolución de módulos o paquetes.
 - **Package manager**: integrity bypass en verificación SHA256 de paquetes descargados, manipulación del lockfile.
 - **Stdlib nativa**: acceso a recursos (`fs`, `net`, `sys`) sin las capabilities declaradas.
-- **`.wrc`**: ejecución de bytecode corrupto o malicioso sin error.
+- **`.vnc`**: ejecución de bytecode corrupto o malicioso sin error.
 
 ## Qué NO es un vulnerability
 
