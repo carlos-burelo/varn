@@ -192,6 +192,61 @@ impl super::Binder {
         members: &mut Vec<ClassMemberInfo>,
     ) {
         match member {
+            ClassMember::Constructor {
+                params,
+                range,
+                ..
+            } => {
+                let ps: Vec<FunctionParam> = params
+                    .iter()
+                    .map(|p| {
+                        let mut ty = p
+                            .type_ann
+                            .as_ref()
+                            .or(match &p.pattern {
+                                Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                                _ => None,
+                            })
+                            .map(|ann| resolve_type_node(ann, Some(self)))
+                            .unwrap_or(Type::Dynamic);
+                        if p.is_rest && !matches!(ty.0, TypeKind::Array(_)) {
+                            ty = Type::array(ty);
+                        }
+                        FunctionParam {
+                            name: Some(Rc::from(pattern_lead_name(&p.pattern))),
+                            ty,
+                            optional: p.is_optional || p.default.is_some(),
+                            is_rest: p.is_rest,
+                        }
+                    })
+                    .collect();
+
+                let fn_ty = Type::fn_(FunctionType {
+                    params: ps,
+                    return_type: Box::new(Type::Void),
+                    is_arrow: false,
+                    type_params: vec![],
+                });
+
+                members.push(ClassMemberInfo {
+                    name: Rc::from("constructor"),
+                    kind: ClassMemberKind::Constructor,
+                    is_async: false,
+                    is_generator: false,
+                    is_static: false,
+                    is_optional: false,
+                    line: range.start.line.saturating_sub(1),
+                    col: range.start.column,
+                    offset: range.start.offset,
+                    ty: fn_ty,
+                    members: Vec::new(),
+                    visibility: None,
+                    is_abstract: false,
+                    is_readonly: false,
+                    is_override: false,
+                    symbol_id: None,
+                });
+            }
             ClassMember::Property {
                 key,
                 type_ann,
