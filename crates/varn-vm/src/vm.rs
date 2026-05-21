@@ -86,7 +86,7 @@ impl Vm {
         ));
 
         if self.ctx.frames.is_empty() {
-            self.ctx.push_frame(nan_closure);
+            self.ctx.push_frame(nan_closure)?;
         }
 
         self.ctx.run()
@@ -255,11 +255,7 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
             | OpCode::Instanceof
             | OpCode::SetIndex
             | OpCode::GetIndex
-            | OpCode::Jump
-            | OpCode::Loop
             | OpCode::Reexport
-            | OpCode::JumpIfFalse
-            | OpCode::JumpIfTrue
             | OpCode::LoadUpvalue
             | OpCode::StoreUpvalue
             | OpCode::CloseUpvalue
@@ -284,7 +280,12 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
                 ip += 2;
             }
 
-            OpCode::Call
+            // 3-word instructions (opcode + 2 operand words)
+            OpCode::Jump
+            | OpCode::Loop
+            | OpCode::JumpIfFalse
+            | OpCode::JumpIfTrue
+            | OpCode::Call
             | OpCode::CallSpread
             | OpCode::MakeClass
             | OpCode::Method
@@ -297,7 +298,6 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
             | OpCode::DefineGlobalIdx
             | OpCode::BuildArray
             | OpCode::BuildObjectWithShape
-            | OpCode::Try
             | OpCode::GetPropertyMaybe
             | OpCode::GetSymbol
             | OpCode::DeclareField
@@ -309,6 +309,11 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
 
             OpCode::GetProperty | OpCode::SetProperty => {
                 ip += 3;
+            }
+
+            // Try: 4 words (opcode + err_reg_word + hi_offset + lo_offset)
+            OpCode::Try => {
+                ip += 4;
             }
 
             OpCode::InvokeVirtual | OpCode::CallMethod => {
@@ -344,6 +349,19 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
                     let w2 = chunk.code[ip + 2];
                     let skip_count = (w2 >> 8) as usize;
                     ip += 3 + skip_count;
+                } else {
+                    ip += 1;
+                }
+            }
+
+            OpCode::AddImm | OpCode::SubImm => {
+                ip += 2;
+            }
+
+            OpCode::BuildStr => {
+                if ip < chunk.code.len() {
+                    let count = (chunk.code[ip] >> 8) as usize;
+                    ip += 1 + count;
                 } else {
                     ip += 1;
                 }

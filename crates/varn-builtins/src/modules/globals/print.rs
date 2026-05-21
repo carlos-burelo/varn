@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
 use varn_op_macros::varn_module;
 use varn_types::{NativeCtx, VmValue};
@@ -20,7 +21,10 @@ pub(crate) mod dispatch {
             .collect::<Vec<_>>()
             .join(" ");
         if !SILENT.load(Ordering::Relaxed) {
-            println!("{s}");
+            let stdout = std::io::stdout();
+            let mut out = stdout.lock();
+            let _ = writeln!(out, "{s}");
+            let _ = out.flush();
         }
         Ok(VmValue::null())
     }

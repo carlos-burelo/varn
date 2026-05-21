@@ -101,8 +101,6 @@ pub fn compile_function<'a>(
         .chunk
         .emit1(OpCode::Return, Chunk::pack(0, ret) as u16, line);
 
-    let _ir_metrics = child.analyze_ir();
-
     child.finish_function()
 }
 
@@ -133,7 +131,7 @@ pub fn declare_pattern_into<'a>(c: &mut Compiler<'a>, pattern: &Pattern, src_reg
         Pattern::Identifier { name, .. } => {
             if let Some(loc) = c.resolve_local(name) {
                 use super::compiler::VarLoc;
-                if let VarLoc::Reg(dest) = loc {
+                if let VarLoc::Reg(dest) | VarLoc::Captured(dest) = loc {
                     if dest != src_reg {
                         c.emit_rr(OpCode::Move, dest, src_reg);
                     }

@@ -36,6 +36,7 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
         }
 
         let instruction = code[offset];
+        let first_reg = (instruction >> 8) as usize;
         let op = match OpCode::from_u16(instruction) {
             Some(op) => op,
             None => {
@@ -78,9 +79,11 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
             | OpCode::Inherit
             | OpCode::Jump
             | OpCode::Loop => {
-                let w1 = code.get(offset + 1).copied().unwrap_or(0);
-                println!("{:?} {}", op, w1);
-                offset + 2
+                let hi = code.get(offset + 1).copied().unwrap_or(0) as u32;
+                let lo = code.get(offset + 2).copied().unwrap_or(0) as u32;
+                let jump_offset = (hi << 16) | lo;
+                println!("{:?} {}", op, jump_offset);
+                offset + 3
             }
 
             OpCode::LoadConst
@@ -131,7 +134,6 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
             | OpCode::MakeClass
             | OpCode::DeclareField
             | OpCode::MakeEnumVariant
-            | OpCode::Try
             | OpCode::Import
             | OpCode::Reexport
             | OpCode::Call
@@ -139,10 +141,21 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
             | OpCode::InvokeVirtual
             | OpCode::JumpIfFalse
             | OpCode::JumpIfTrue => {
-                let w1 = code.get(offset + 1).copied().unwrap_or(0);
-                let w2 = code.get(offset + 2).copied().unwrap_or(0);
-                println!("{:?} {} {}", op, w1, w2);
+                let hi = code.get(offset + 1).copied().unwrap_or(0) as u32;
+                let lo = code.get(offset + 2).copied().unwrap_or(0) as u32;
+                let jump_offset = (hi << 16) | lo;
+                println!("{:?} r{} +{}", op, first_reg, jump_offset);
                 offset + 3
+            }
+
+            OpCode::Try => {
+                let w1 = code.get(offset + 1).copied().unwrap_or(0);
+                let err_reg = (w1 >> 8) as usize;
+                let hi = code.get(offset + 2).copied().unwrap_or(0) as u32;
+                let lo = code.get(offset + 3).copied().unwrap_or(0) as u32;
+                let catch_offset = (hi << 16) | lo;
+                println!("{:?} err=r{} catch=+{}", op, err_reg, catch_offset);
+                offset + 4
             }
 
             OpCode::Method
@@ -206,6 +219,29 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
                 let w2 = code.get(offset + 2).copied().unwrap_or(0);
                 println!("{:?} {} {}", op, w1, w2);
                 offset + 3
+            }
+
+            OpCode::AddImm | OpCode::SubImm => {
+                let dest = instruction >> 8;
+                let w1 = code.get(offset + 1).copied().unwrap_or(0);
+                let src = w1 >> 8;
+                let imm = (w1 & 0xff) as u8 as i8;
+                let sign = if matches!(op, OpCode::SubImm) { "-" } else { "+" };
+                println!("r{} = r{} {} {}", dest, src, sign, imm);
+                offset + 2
+            }
+
+            OpCode::BuildStr => {
+                let dest = instruction >> 8;
+                let w1 = code.get(offset + 1).copied().unwrap_or(0);
+                let count = (w1 >> 8) as usize;
+                let mut reg_strs = Vec::with_capacity(count);
+                for i in 0..count {
+                    let w = code.get(offset + 2 + i).copied().unwrap_or(0);
+                    reg_strs.push(format!("r{}", w >> 8));
+                }
+                println!("r{} = concat({})", dest, reg_strs.join(", "));
+                offset + 2 + count
             }
         }
     }

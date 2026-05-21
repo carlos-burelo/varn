@@ -16,9 +16,17 @@ pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
         .find(|dir| dir.join("varn.json").exists())
         .unwrap_or(file_dir);
 
+    // Include a hash of the canonical path to avoid collisions when two files
+    // share the same filename but live in different directories.
+    let canonical = path
+        .canonicalize()
+        .unwrap_or_else(|_| path.to_path_buf());
+    let path_hash = super::hash::fnv1a64(canonical.to_string_lossy().as_bytes());
+
+    let stem = path.file_stem().unwrap_or_default().to_string_lossy();
     project_root.join(".vn").join("cache").join(format!(
-        "{}.bin",
-        path.file_name().unwrap_or_default().to_string_lossy()
+        "{}.{:x}.bin",
+        stem, path_hash as u32
     ))
 }
 

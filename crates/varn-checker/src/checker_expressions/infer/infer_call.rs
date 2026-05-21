@@ -1,6 +1,6 @@
 use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::checker_generics::build_call_mapping;
+use crate::checker_generics::{build_call_mapping, map_generics_cached};
 use crate::types::{FunctionParam, FunctionType, Type};
 use std::rc::Rc;
 use varn_core::ast::{Expr, ExprKind, Param};
@@ -37,11 +37,7 @@ impl Checker {
         };
 
         let mapping = build_call_mapping(callee, type_args, args, ft, self, bind);
-        let ret = if mapping.is_empty() {
-            *ft.return_type.clone()
-        } else {
-            ft.return_type.map_generics(&mapping)
-        };
+        let ret = map_generics_cached(self, &ft.return_type, &mapping);
 
         let ret = if matches!(ret.0, TypeKind::This) {
             if let ExprKind::Member { object, .. } = &callee.kind {

@@ -123,7 +123,7 @@ fn infer_arrow_with_context(
             if returns.is_empty() {
                 Type::Void
             } else if returns.len() == 1 {
-                returns.pop().unwrap()
+                returns.pop().expect("returns len==1 but pop failed")
             } else {
                 Type::union(returns)
             }
@@ -187,4 +187,29 @@ pub(crate) fn collect_type_inferences(
         }
         _ => {}
     }
+}
+
+/// Memoized wrapper around `Type::map_generics`.
+/// Repeated calls with the same `(base, mapping)` return cached results.
+pub(crate) fn map_generics_cached(
+    checker: &mut Checker,
+    base: &Type,
+    mapping: &FxHashMap<Rc<str>, Type>,
+) -> Type {
+    if mapping.is_empty() {
+        return base.clone();
+    }
+    // Build stable cache key: sort mapping entries by param name.
+    let sorted_args: Vec<Type> = {
+        let mut pairs: Vec<(&Rc<str>, &Type)> = mapping.iter().collect();
+        pairs.sort_by(|(a, _), (b, _)| a.cmp(b));
+        pairs.into_iter().map(|(_, v)| v.clone()).collect()
+    };
+    let key = (base.clone(), sorted_args);
+    if let Some(cached) = checker.map_generics_cache.get(&key) {
+        return cached.clone();
+    }
+    let result = base.map_generics(mapping);
+    checker.map_generics_cache.insert(key, result.clone());
+    result
 }

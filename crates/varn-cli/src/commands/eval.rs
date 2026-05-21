@@ -9,5 +9,6 @@ pub fn execute(args: EvalArgs) -> Result<(), CliError> {
         no_run: false,
         debug,
         trace: false,
+        strict: false,
     })
 }

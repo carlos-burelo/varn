@@ -1,6 +1,6 @@
 use crate::ParseProfile;
 use std::rc::Rc;
-use varn_core::{ErrorCode, SourceRange, Token, TokenKind};
+use varn_core::{ErrorCode, ParsedNumber, SourceRange, Token, TokenKind};
 
 pub struct TokenStream {
     tokens: Vec<Token>,
@@ -59,9 +59,25 @@ impl TokenStream {
         self.token().range
     }
 
+    /// Span from `start` to the end of the previously consumed token.
+    #[inline]
+    pub fn range_from(&self, start: SourceRange) -> SourceRange {
+        let end = if self.pos > 0 {
+            self.tokens[self.pos - 1].range
+        } else {
+            start
+        };
+        start.to(end)
+    }
+
     #[inline]
     pub fn lexeme(&self) -> &str {
         &self.token().lexeme
+    }
+
+    #[inline]
+    pub fn parsed_num(&self) -> Option<ParsedNumber> {
+        self.token().parsed_num
     }
 
     #[inline]

@@ -11,15 +11,19 @@ use crate::token_record::{push_token, TokenRecord};
 impl super::Scanner<'_> {
     pub(super) fn scan_number(&mut self, tokens: &mut Vec<TokenRecord>, lexemes: &mut Vec<u8>) {
         let start = self.pos;
-        let (sl, sc) = self.location_at(start);
+        let (sl, sc) = self.location();
 
         if self.peek(0) == b'0' && (self.peek(1) == b'b' || self.peek(1) == b'B') {
+            // '0' and 'b'/'B' — never newlines
+            self.cur_col += 2;
             self.pos += 2;
             while is_binary_digit(self.peek(0)) || self.peek(0) == b'_' {
+                self.cur_col += 1;
                 self.pos += 1;
             }
             let bigint = self.peek(0) == b'n';
             if bigint {
+                self.cur_col += 1;
                 self.pos += 1;
             }
             let (el, ec) = self.location();
@@ -45,12 +49,16 @@ impl super::Scanner<'_> {
         }
 
         if self.peek(0) == b'0' && (self.peek(1) == b'o' || self.peek(1) == b'O') {
+            // '0' and 'o'/'O' — never newlines
+            self.cur_col += 2;
             self.pos += 2;
             while is_octal_digit(self.peek(0)) || self.peek(0) == b'_' {
+                self.cur_col += 1;
                 self.pos += 1;
             }
             let bigint = self.peek(0) == b'n';
             if bigint {
+                self.cur_col += 1;
                 self.pos += 1;
             }
             let (el, ec) = self.location();
@@ -76,12 +84,16 @@ impl super::Scanner<'_> {
         }
 
         if self.peek(0) == b'0' && (self.peek(1) == b'x' || self.peek(1) == b'X') {
+            // '0' and 'x'/'X' — never newlines
+            self.cur_col += 2;
             self.pos += 2;
             while is_hex_digit(self.peek(0)) || self.peek(0) == b'_' {
+                self.cur_col += 1;
                 self.pos += 1;
             }
             let bigint = self.peek(0) == b'n';
             if bigint {
+                self.cur_col += 1;
                 self.pos += 1;
             }
             let (el, ec) = self.location();
@@ -102,32 +114,40 @@ impl super::Scanner<'_> {
             return;
         }
 
+        // Decimal integer part — digits/underscores are never newlines
         while is_digit(self.peek(0)) || self.peek(0) == b'_' {
+            self.cur_col += 1;
             self.pos += 1;
         }
         let mut is_float = false;
 
         if self.peek(0) == b'.' && is_digit(self.peek(1)) {
             is_float = true;
+            self.cur_col += 1;
             self.pos += 1;
             while is_digit(self.peek(0)) || self.peek(0) == b'_' {
+                self.cur_col += 1;
                 self.pos += 1;
             }
         }
 
         if self.peek(0) == b'e' || self.peek(0) == b'E' {
             is_float = true;
+            self.cur_col += 1;
             self.pos += 1;
             if self.peek(0) == b'+' || self.peek(0) == b'-' {
+                self.cur_col += 1;
                 self.pos += 1;
             }
             while is_digit(self.peek(0)) {
+                self.cur_col += 1;
                 self.pos += 1;
             }
         }
         let bigint = self.peek(0) == b'n';
         let decimal_suffix = !bigint && self.peek(0) == b'd';
         if bigint || decimal_suffix {
+            self.cur_col += 1;
             self.pos += 1;
         }
         let (el, ec) = self.location();
@@ -164,21 +184,29 @@ impl super::Scanner<'_> {
     ) {
         let start = self.pos;
         let (sl, sc) = self.location();
+        // opening quote — never a newline
+        self.cur_col += 1;
         self.pos += 1;
         let content_start = self.pos;
 
         while !self.is_eof() && self.peek(0) != quote {
             if self.peek(0) == b'\\' {
+                // backslash — never newline
+                self.cur_col += 1;
                 self.pos += 1;
                 if !self.is_eof() {
-                    self.pos += 1;
+                    // escaped char — could be anything including \n
+                    self.advance_byte();
                 }
             } else {
-                self.pos += 1;
+                // string content — could be newline
+                self.advance_byte();
             }
         }
         let content_end = self.pos;
         if !self.is_eof() {
+            // closing quote — never a newline
+            self.cur_col += 1;
             self.pos += 1;
         }
 
@@ -210,9 +238,49 @@ impl super::Scanner<'_> {
         let start = self.pos;
         let (sl, sc) = self.location();
 
-        self.pos += 1;
-        while !self.is_eof() && is_identifier_part(self.peek(0)) {
+        // Advance past the first char (which may be multi-byte).
+        // Identifier chars are never newlines.
+        if self.src[self.pos].is_ascii() {
+            self.cur_col += 1;
             self.pos += 1;
+        } else if let Ok(s) = std::str::from_utf8(&self.src[self.pos..]) {
+            if let Some(ch) = s.chars().next() {
+                let len = ch.len_utf8();
+                self.cur_col += len as u32;
+                self.pos += len;
+            } else {
+                self.cur_col += 1;
+                self.pos += 1;
+            }
+        } else {
+            self.cur_col += 1;
+            self.pos += 1;
+        }
+
+        while !self.is_eof() {
+            let c = self.peek(0);
+            if c.is_ascii() {
+                if is_identifier_part(c) {
+                    self.cur_col += 1;
+                    self.pos += 1;
+                } else {
+                    break;
+                }
+            } else if let Ok(s) = std::str::from_utf8(&self.src[self.pos..]) {
+                if let Some(ch) = s.chars().next() {
+                    if ch.is_alphanumeric() || ch == '_' {
+                        let len = ch.len_utf8();
+                        self.cur_col += len as u32;
+                        self.pos += len;
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
         }
 
         let raw = &self.src[start..self.pos];

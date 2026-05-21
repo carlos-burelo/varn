@@ -416,11 +416,21 @@ impl TokenKind {
 
 use std::borrow::Cow;
 
+/// Parsed numeric value attached to integer/float literal tokens so the parser
+/// never needs to re-parse the lexeme.
+#[derive(Clone, Copy, Debug)]
+pub enum ParsedNumber {
+    Int(i64),
+    Float(f64),
+}
+
 #[derive(Clone, Debug)]
 pub struct Token {
     pub kind: TokenKind,
     pub lexeme: Cow<'static, str>,
     pub range: SourceRange,
+    /// Set for integer/float/binary/octal/hex literal tokens.
+    pub parsed_num: Option<ParsedNumber>,
 }
 
 impl Token {
@@ -429,6 +439,7 @@ impl Token {
             kind,
             lexeme: lexeme.into(),
             range,
+            parsed_num: None,
         }
     }
 
@@ -437,6 +448,7 @@ impl Token {
             kind: TokenKind::EOF,
             lexeme: Cow::Borrowed(""),
             range,
+            parsed_num: None,
         }
     }
 

@@ -320,7 +320,7 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
 fn looks_like_generic_call(s: &TokenStream) -> bool {
     let mut depth = 0i32;
     let mut off = 0usize;
-    while off < 32 {
+    loop {
         match s.peek_kind(off) {
             TokenKind::LAngle => depth += 1,
             TokenKind::RAngle => {
@@ -339,7 +339,6 @@ fn looks_like_generic_call(s: &TokenStream) -> bool {
         }
         off += 1;
     }
-    false
 }
 
 fn is_ternary_question(s: &TokenStream) -> bool {

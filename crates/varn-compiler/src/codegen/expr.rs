@@ -57,13 +57,16 @@ pub fn compile_expr<'a>(c: &mut Compiler<'a>, expr: &Expr) -> u8 {
         ExprKind::BigIntLiteral { raw } => {
             let s = raw.trim_end_matches('n').replace('_', "");
             let num: i128 = if let Some(r) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
-                i128::from_str_radix(r, 16).unwrap_or(0)
+                i128::from_str_radix(r, 16)
+                    .unwrap_or_else(|_| panic!("bigint literal overflow: {raw}"))
             } else if let Some(r) = s.strip_prefix("0o").or_else(|| s.strip_prefix("0O")) {
-                i128::from_str_radix(r, 8).unwrap_or(0)
+                i128::from_str_radix(r, 8)
+                    .unwrap_or_else(|_| panic!("bigint literal overflow: {raw}"))
             } else if let Some(r) = s.strip_prefix("0b").or_else(|| s.strip_prefix("0B")) {
-                i128::from_str_radix(r, 2).unwrap_or(0)
+                i128::from_str_radix(r, 2)
+                    .unwrap_or_else(|_| panic!("bigint literal overflow: {raw}"))
             } else {
-                s.parse().unwrap_or(0)
+                s.parse().unwrap_or_else(|_| panic!("bigint literal overflow: {raw}"))
             };
             let idx = c.add_const(PoolEntry::Literal(Literal::BigInt(num)));
             let r = c.alloc_reg();
@@ -199,6 +202,12 @@ pub fn compile_expr<'a>(c: &mut Compiler<'a>, expr: &Expr) -> u8 {
         } => compile_update(c, op, *prefix, operand),
 
         ExprKind::Binary { op, left, right } => {
+            if let Some(folded) = try_fold_binary(c, op, left, right) {
+                return folded;
+            }
+            if let Some(r) = try_emit_imm_op(c, op, left, right) {
+                return r;
+            }
             let l = compile_expr(c, left);
             let r = compile_expr(c, right);
             let opcode = match op {
@@ -442,6 +451,11 @@ pub fn compile_expr<'a>(c: &mut Compiler<'a>, expr: &Expr) -> u8 {
         }
 
         ExprKind::Sequence { expressions } => {
+            if expressions.is_empty() {
+                let r = c.alloc_reg();
+                c.emit_rr(OpCode::LoadNull, r, 0);
+                return r;
+            }
             let mut last = 0u8;
             for (i, e) in expressions.iter().enumerate() {
                 let r = compile_expr(c, e);
@@ -1314,11 +1328,20 @@ fn compile_template<'a>(c: &mut Compiler<'a>, parts: &[TemplatePart]) -> u8 {
         return r;
     }
 
-    let acc = c.alloc_reg();
+    // Single literal: no concat needed.
+    if parts.len() == 1 {
+        if let TemplatePart::Literal(s) = &parts[0] {
+            let r = c.alloc_reg();
+            let idx = c.add_str(s);
+            c.emit_rc(OpCode::LoadConst, r, idx);
+            return r;
+        }
+    }
 
-    let mut first = true;
-    for part in parts {
-        let rhs = match part {
+    // Compile each part into a register (literals as LoadConst, expressions as ToString).
+    let part_regs: Vec<u8> = parts
+        .iter()
+        .map(|part| match part {
             TemplatePart::Literal(s) => {
                 let r = c.alloc_reg();
                 let idx = c.add_str(s);
@@ -1327,20 +1350,27 @@ fn compile_template<'a>(c: &mut Compiler<'a>, parts: &[TemplatePart]) -> u8 {
             }
             TemplatePart::Interpolation(e) => {
                 let r = compile_expr(c, e);
-
                 c.emit_rr(OpCode::ToString, r, r);
                 r
             }
-        };
-        if first {
-            c.emit_rr(OpCode::Move, acc, rhs);
-            first = false;
-        } else {
-            c.emit_rrr(OpCode::StrConcat, acc, acc, rhs);
-        }
+        })
+        .collect();
+
+    let dest = c.alloc_reg();
+    let count = part_regs.len() as u8;
+    let line = c.line;
+    c.chunk.write(crate::chunk::Chunk::pack_op(OpCode::BuildStr, dest), line);
+    c.chunk.write(crate::chunk::Chunk::pack(count, 0), line);
+    for &reg in &part_regs {
+        c.chunk.write(crate::chunk::Chunk::pack(reg, 0), line);
+    }
+
+    // Free all part registers in reverse LIFO order.
+    for _ in &part_regs {
         c.free_reg();
     }
-    acc
+
+    dest
 }
 
 fn compile_pipeline<'a>(c: &mut Compiler<'a>, left: &Expr, right: &Expr) -> u8 {
@@ -1538,5 +1568,119 @@ pub fn emit_field_inits<'a>(c: &mut Compiler<'a>) {
         let key_idx = c.add_str(&name);
         c.emit_property(OpCode::SetProperty, this_r, val, key_idx);
         c.free_reg();
+    }
+}
+
+/// Emit AddImm/SubImm when one operand is a small integer constant (-128..=127).
+/// Saves one instruction vs LoadInt + Add/Sub.
+fn try_emit_imm_op<'a>(
+    c: &mut Compiler<'a>,
+    op: &BinaryOp,
+    left: &Expr,
+    right: &Expr,
+) -> Option<u8> {
+    let (src_expr, imm, is_sub) = match op {
+        BinaryOp::Add => {
+            if let Some(k) = small_const_int(right) {
+                (left, k, false)
+            } else if let Some(k) = small_const_int(left) {
+                (right, k, false)
+            } else {
+                return None;
+            }
+        }
+        BinaryOp::Sub => {
+            if let Some(k) = small_const_int(right) {
+                (left, k, true)
+            } else {
+                return None;
+            }
+        }
+        _ => return None,
+    };
+    // Compile src, write result back into src's register (matches Add pattern).
+    let src = compile_expr(c, src_expr);
+    let line = c.line;
+    let opcode = if is_sub { OpCode::SubImm } else { OpCode::AddImm };
+    let imm_byte = imm as i8 as u8;
+    c.chunk.write(crate::chunk::Chunk::pack_op(opcode, src), line);
+    c.chunk.write(crate::chunk::Chunk::pack(src, imm_byte), line);
+    Some(src)
+}
+
+fn small_const_int(expr: &Expr) -> Option<i64> {
+    match &expr.kind {
+        ExprKind::IntLiteral { value, .. } if *value >= -128 && *value <= 127 => Some(*value),
+        ExprKind::Unary { op: UnaryOp::Minus, operand, .. } => {
+            if let ExprKind::IntLiteral { value, .. } = &operand.kind {
+                let neg = value.checked_neg()?;
+                if neg >= -128 && neg <= 127 { Some(neg) } else { None }
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Try to evaluate a binary expression at compile time.
+/// Returns `Some(reg)` if folded, `None` if runtime computation needed.
+fn try_fold_binary<'a>(
+    c: &mut Compiler<'a>,
+    op: &BinaryOp,
+    left: &Expr,
+    right: &Expr,
+) -> Option<u8> {
+    use BinaryOp::*;
+    let lv = const_int_value(left)?;
+    let rv = const_int_value(right)?;
+
+    // Integer arithmetic folding
+    let arith: Option<i64> = match op {
+        Add => lv.checked_add(rv),
+        Sub => lv.checked_sub(rv),
+        Mul => lv.checked_mul(rv),
+        Div if rv != 0 && lv % rv == 0 => Some(lv / rv),
+        Mod if rv != 0 => Some(lv % rv),
+        Shl => lv.checked_shl(rv as u32),
+        Shr => Some(lv >> (rv as u32).min(63)),
+        BitAnd => Some(lv & rv),
+        BitOr => Some(lv | rv),
+        BitXor => Some(lv ^ rv),
+        _ => None,
+    };
+    if let Some(result) = arith {
+        let r = c.alloc_reg();
+        let line = c.line;
+        c.chunk.emit_load_int(r, result, line);
+        return Some(r);
+    }
+
+    // Boolean comparison folding
+    let bool_result: bool = match op {
+        Eq => lv == rv,
+        NotEq => lv != rv,
+        Lt => lv < rv,
+        LtEq => lv <= rv,
+        Gt => lv > rv,
+        GtEq => lv >= rv,
+        _ => return None,
+    };
+    let r = c.alloc_reg();
+    let line = c.line;
+    let bool_op = if bool_result { OpCode::LoadTrue } else { OpCode::LoadFalse };
+    c.chunk.emit_rr(bool_op, r, 0, line);
+    Some(r)
+}
+
+fn const_int_value(expr: &Expr) -> Option<i64> {
+    match &expr.kind {
+        ExprKind::IntLiteral { value, .. } => Some(*value),
+        ExprKind::Unary {
+            op: UnaryOp::Minus,
+            operand,
+            ..
+        } => const_int_value(operand).and_then(|v| v.checked_neg()),
+        _ => None,
     }
 }

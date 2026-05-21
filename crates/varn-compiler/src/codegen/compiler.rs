@@ -35,7 +35,8 @@ pub struct LoopCtx {
 #[derive(Clone, Debug)]
 pub enum VarLoc {
     Reg(u8),
-
+    // Like Reg but marked as captured by a closure — CloseUpvalue will be emitted on scope exit.
+    Captured(u8),
     Upvalue(u8),
 }
 
@@ -46,7 +47,7 @@ pub struct RegAlloc {
     pub next_vreg: u16,
     pub max_vreg: u16,
     pub physical_map: std::collections::HashMap<u16, u8>,
-    pub physical_free: Vec<u8>,
+    pub physical_free: Option<Vec<u8>>,
     pub max_physical: u8,
 }
 
@@ -58,14 +59,15 @@ impl RegAlloc {
             next_vreg: 0,
             max_vreg: 0,
             physical_map: std::collections::HashMap::new(),
-            physical_free: (0u8..=255u8).collect(),
+            physical_free: None,
             max_physical: 0,
         }
     }
 
     pub fn alloc(&mut self) -> u8 {
         let r = self.next;
-        self.next = self.next.checked_add(1).expect("register overflow (>255)");
+        self.next = self.next.checked_add(1)
+            .expect("register overflow: function uses more than 255 registers. Split the function into smaller parts.");
         if self.next > self.max {
             self.max = self.next;
         }
@@ -114,7 +116,8 @@ impl RegAlloc {
             return Ok(phys);
         }
 
-        if let Some(phys) = self.physical_free.pop() {
+        let free = self.physical_free.get_or_insert_with(|| (0u8..=255u8).collect());
+        if let Some(phys) = free.pop() {
             self.physical_map.insert(vreg, phys);
             if phys > self.max_physical {
                 self.max_physical = phys;
@@ -174,6 +177,12 @@ pub struct Compiler<'a> {
     pub cache_count: u16,
     pub line: u32,
 
+    // Non-null means there is a parent compiler (this is a nested function).
+    // SAFETY: parent is always a stack-allocated Compiler that outlives this child,
+    // because compile_function() creates child inside the parent's call frame and
+    // joins before returning. No aliasing occurs: only resolve_upvalue accesses parent,
+    // and it is always called from within the child's compilation (child is borrowed mut,
+    // parent pointer is accessed only through the raw pointer, no second borrow exists).
     pub parent: *mut Compiler<'a>,
     pub parent_depth: usize,
 }
@@ -423,7 +432,7 @@ impl<'a> Compiler<'a> {
             let mut captured_regs: Vec<u8> = scope
                 .values()
                 .filter_map(|loc| {
-                    if let VarLoc::Reg(r) = loc {
+                    if let VarLoc::Captured(r) = loc {
                         Some(*r)
                     } else {
                         None
@@ -465,7 +474,7 @@ impl<'a> Compiler<'a> {
         for scope in self.scopes.iter().rev() {
             if let Some(loc) = scope.get(name) {
                 match loc.clone() {
-                    VarLoc::Reg(src) => {
+                    VarLoc::Reg(src) | VarLoc::Captured(src) => {
                         if src != dest {
                             self.emit_rr(OpCode::Move, dest, src);
                         }
@@ -495,7 +504,7 @@ impl<'a> Compiler<'a> {
         let loc = self.scopes.iter().rev().find_map(|s| s.get(name).cloned());
         if let Some(loc) = loc {
             match loc {
-                VarLoc::Reg(dest) => {
+                VarLoc::Reg(dest) | VarLoc::Captured(dest) => {
                     if dest != src {
                         self.emit_rr(OpCode::Move, dest, src);
                     }
@@ -523,10 +532,10 @@ impl<'a> Compiler<'a> {
     pub fn analyze_ir(&mut self) -> Option<IrAnalysisResult> {
         let ir_module = self.finalize_ir()?;
 
-        let vreg_count = ir_module.instrs.len() as u16;
         let bytecode_estimate = ir_module.estimate_bytecode_size();
         let instruction_count = ir_module.instrs.len();
         let vregs_used_count = ir_module.used_vregs().len();
+        let vreg_count = vregs_used_count as u16;
 
         let mut analyzer = super::liveness::LivenessAnalyzer::new();
         let live_ranges = analyzer.analyze_module(&ir_module);
@@ -563,9 +572,19 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn finish_function(self) -> (FunctionProto, Vec<UpvalueDesc>) {
-        let upvalues = self.upvalues.clone();
-        let proto = self.finish_module();
-        (proto, upvalues)
+        let proto = FunctionProto {
+            name: Some(self.name),
+            arity: self.arity,
+            register_count: self.regs.max as u16,
+            has_rest: self.has_rest,
+            is_async: self.is_async,
+            is_generator: self.is_generator,
+            has_this: self.has_this,
+            upvalue_count: self.upvalues.len(),
+            cache_count: self.cache_count as usize,
+            chunk: self.chunk,
+        };
+        (proto, self.upvalues)
     }
 
     pub fn compile_program(&mut self, program: &varn_core::ast::Program) {
@@ -582,12 +601,14 @@ impl<'a> Compiler<'a> {
         if self.parent.is_null() {
             return None;
         }
+        // SAFETY: See safety comment on the `parent` field. Parent outlives child,
+        // and no other borrow of parent exists at this call site.
         let parent = unsafe { &mut *self.parent };
         for scope in parent.scopes.iter_mut().rev() {
             if let Some(loc) = scope.get_mut(name) {
                 match loc.clone() {
-                    VarLoc::Reg(reg) => {
-                        *loc = VarLoc::Reg(reg);
+                    VarLoc::Reg(reg) | VarLoc::Captured(reg) => {
+                        *loc = VarLoc::Captured(reg); // mark as captured so CloseUpvalue is emitted
                         return Some(self.add_upvalue(reg as u16, true));
                     }
                     VarLoc::Upvalue(uv) => {

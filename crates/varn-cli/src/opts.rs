@@ -15,4 +15,5 @@ pub struct RunOpts {
     pub no_run: bool,
     pub debug: DebugFlags,
     pub trace: bool,
+    pub strict: bool,
 }

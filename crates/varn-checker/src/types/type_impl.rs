@@ -74,7 +74,30 @@ impl Type {
     }
 
     pub fn union(members: Vec<Type>) -> Self {
-        Type(TypeKind::Union(members), false)
+        // Flatten nested unions and deduplicate members.
+        let mut seen = rustc_hash::FxHashSet::default();
+        let mut flat: Vec<Type> = Vec::with_capacity(members.len());
+        for m in members {
+            match m.0 {
+                TypeKind::Union(inner) => {
+                    for t in inner {
+                        if seen.insert(t.clone()) {
+                            flat.push(t);
+                        }
+                    }
+                }
+                _ => {
+                    if seen.insert(m.clone()) {
+                        flat.push(m);
+                    }
+                }
+            }
+        }
+        if flat.len() == 1 {
+            flat.remove(0)
+        } else {
+            Type(TypeKind::Union(flat), false)
+        }
     }
 
     pub fn literal_int(v: i64) -> Self {

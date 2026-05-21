@@ -22,7 +22,7 @@ pub fn parse_type(s: &mut TokenStream) -> Result<TypeNode, String> {
                 true_type: Box::new(true_ty),
                 false_type: Box::new(false_ty),
             },
-            range: extend_range(start, end),
+            range: start.to(end),
         });
     }
 
@@ -45,7 +45,7 @@ fn parse_union_type(s: &mut TokenStream) -> Result<TypeNode, String> {
     Ok(TypeNode {
         id: 0,
         kind: TypeKind::Union(members),
-        range: extend_range(start, end),
+        range: start.to(end),
     })
 }
 
@@ -65,7 +65,7 @@ fn parse_intersection_type(s: &mut TokenStream) -> Result<TypeNode, String> {
     Ok(TypeNode {
         id: 0,
         kind: TypeKind::Intersection(members),
-        range: extend_range(start, end),
+        range: start.to(end),
     })
 }
 
@@ -81,7 +81,7 @@ fn parse_array_type(s: &mut TokenStream) -> Result<TypeNode, String> {
             ty = TypeNode {
                 id: 0,
                 kind: TypeKind::Array(Box::new(ty)),
-                range: extend_range(start, end_range),
+                range: start.to(end_range),
             };
         } else if s.check(TokenKind::LBracket) && s.peek_kind(1) != TokenKind::RBracket {
             s.advance();
@@ -94,7 +94,7 @@ fn parse_array_type(s: &mut TokenStream) -> Result<TypeNode, String> {
                     object: Box::new(ty),
                     index: Box::new(index),
                 },
-                range: extend_range(start, end_range),
+                range: start.to(end_range),
             };
         } else {
             break;
@@ -117,7 +117,7 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
                 return Ok(TypeNode {
                     id: 0,
                     kind: TypeKind::KeyOf(Box::new(inner)),
-                    range: extend_range(range, end),
+                    range: range.to(end),
                 });
             }
 
@@ -128,7 +128,7 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
                 return Ok(TypeNode {
                     id: 0,
                     kind: TypeKind::Infer(name.to_string()),
-                    range: extend_range(range, end),
+                    range: range.to(end),
                 });
             }
 
@@ -161,7 +161,7 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
             Ok(TypeNode {
                 id: 0,
                 kind,
-                range: extend_range(range, end),
+                range: range.to(end),
             })
         }
 
@@ -181,7 +181,7 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
             Ok(TypeNode {
                 id: 0,
                 kind: TypeKind::Typeof(Box::new(expr)),
-                range: extend_range(range, end),
+                range: range.to(end),
             })
         }
 
@@ -196,7 +196,7 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
                     return Ok(TypeNode {
                         id: 0,
                         kind: TypeKind::Fn((vec![], Box::new(ret))),
-                        range: extend_range(range, end),
+                        range: range.to(end),
                     });
                 }
                 return Err(format!(
@@ -217,7 +217,7 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
                 return Ok(TypeNode {
                     id: 0,
                     kind: TypeKind::Fn((params, Box::new(ret))),
-                    range: extend_range(range, end),
+                    range: range.to(end),
                 });
             }
 
@@ -246,7 +246,7 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
                 return Ok(TypeNode {
                     id: 0,
                     kind: TypeKind::Fn((params, Box::new(ret))),
-                    range: extend_range(range, end),
+                    range: range.to(end),
                 });
             }
 
@@ -265,7 +265,7 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
                         }],
                         Box::new(ret),
                     )),
-                    range: extend_range(range, end),
+                    range: range.to(end),
                 });
             }
 
@@ -286,7 +286,7 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
             Ok(TypeNode {
                 id: 0,
                 kind: TypeKind::Tuple(elements),
-                range: extend_range(range, end),
+                range: range.to(end),
             })
         }
 
@@ -324,7 +324,7 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
                         optional,
                         readonly: mapped_readonly,
                     },
-                    range: extend_range(range, end),
+                    range: range.to(end),
                 });
             }
 
@@ -344,7 +344,7 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
             Ok(TypeNode {
                 id: 0,
                 kind: TypeKind::Object(members),
-                range: extend_range(range, end),
+                range: range.to(end),
             })
         }
 
@@ -358,20 +358,30 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
         }
 
         TokenKind::IntegerLiteral => {
+            let pre_parsed = s.parsed_num();
             let value = s.lexeme().to_owned();
             s.advance();
+            let int_val = match pre_parsed {
+                Some(varn_core::ParsedNumber::Int(n)) => n,
+                _ => value.parse().unwrap_or(0),
+            };
             Ok(TypeNode {
                 id: 0,
-                kind: TypeKind::LiteralInt(value.parse().unwrap_or(0)),
+                kind: TypeKind::LiteralInt(int_val),
                 range,
             })
         }
         TokenKind::FloatLiteral => {
+            let pre_parsed = s.parsed_num();
             let value = s.lexeme().to_owned();
             s.advance();
+            let float_val = match pre_parsed {
+                Some(varn_core::ParsedNumber::Float(f)) => f,
+                _ => value.parse::<f64>().unwrap_or(0.0),
+            };
             Ok(TypeNode {
                 id: 0,
-                kind: TypeKind::LiteralFloat(value.parse::<f64>().unwrap_or(0.0).to_bits()),
+                kind: TypeKind::LiteralFloat(float_val.to_bits()),
                 range,
             })
         }
@@ -498,7 +508,7 @@ fn parse_template_literal_type(s: &mut TokenStream) -> Result<TypeNode, String> 
             return Ok(TypeNode {
                 id: 0,
                 kind: TypeKind::TemplateLiteral(parts),
-                range: extend_range(start, end),
+                range: start.to(end),
             });
         }
     }
@@ -539,7 +549,7 @@ pub fn parse_type_params(s: &mut TokenStream) -> Result<Vec<TypeParam>, String> 
             name: name.to_string(),
             constraint,
             default,
-            range: extend_range(range, end),
+            range: range.to(end),
         });
         if !s.eat(TokenKind::Comma) {
             break;
@@ -547,12 +557,6 @@ pub fn parse_type_params(s: &mut TokenStream) -> Result<Vec<TypeParam>, String> 
     }
     s.expect(TokenKind::RAngle)?;
     Ok(params)
-}
-
-use varn_core::SourceRange;
-
-fn extend_range(start: SourceRange, _end: SourceRange) -> SourceRange {
-    start
 }
 
 fn parse_fn_type_params(s: &mut TokenStream) -> Result<Vec<TypeParam>, String> {
@@ -575,7 +579,7 @@ fn parse_fn_type_params(s: &mut TokenStream) -> Result<Vec<TypeParam>, String> {
             name: name.to_string(),
             constraint: Some(ty),
             default: None,
-            range: extend_range(prange, end),
+            range: prange.to(end),
         });
         if !s.eat(TokenKind::Comma) {
             break;

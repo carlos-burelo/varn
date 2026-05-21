@@ -148,6 +148,11 @@ impl ExecCtx {
                             for _ in arg_count..arity {
                                 self.stack.push(VmValue::null());
                             }
+                            if self.frames.len() >= 10000 {
+                                return Err(crate::error::RuntimeError::new(
+                                    "stack overflow: call depth exceeded 10000",
+                                ));
+                            }
                             let new_base = self.stack.len() - arity;
                             let required = new_base + nc.proto.register_count as usize;
                             if self.stack.len() < required {
@@ -332,6 +337,11 @@ impl ExecCtx {
                     self.stack.push(v);
                 }
                 let full_arg_count = arg_count + 1;
+                if self.frames.len() >= 10000 {
+                    return Err(crate::error::RuntimeError::new(
+                        "stack overflow: call depth exceeded 10000",
+                    ));
+                }
                 let final_base = self.stack.len() - full_arg_count;
                 let required = final_base + nc.proto.register_count as usize;
                 if self.stack.len() < required {
@@ -952,6 +962,11 @@ impl ExecCtx {
                     .prepare_call(setter_nv2, 2)
                     .map_err(|e| crate::error::RuntimeError::new(e.message))?;
                 if let crate::exec::calls::PreparedCall::Frame(mut frame) = prepared {
+                    if self.frames.len() >= 10000 {
+                        return Err(crate::error::RuntimeError::new(
+                            "stack overflow: call depth exceeded 10000",
+                        ));
+                    }
                     frame.return_reg = None;
                     let required = frame.base + frame.closure.proto.register_count as usize;
                     if self.stack.len() < required {
@@ -1476,6 +1491,11 @@ impl ExecCtx {
                     .map_err(|e| crate::error::RuntimeError::new(e.message))?;
                 match prepared {
                     crate::exec::calls::PreparedCall::Frame(mut frame) => {
+                        if self.frames.len() >= 10000 {
+                            return Err(crate::error::RuntimeError::new(
+                                "stack overflow: call depth exceeded 10000",
+                            ));
+                        }
                         frame.return_reg = Some(dest as u16);
                         let required = frame.base + frame.closure.proto.register_count as usize;
                         if self.stack.len() < required {

@@ -30,10 +30,10 @@ pub fn run(opts: &RunOpts) -> PipelineResult<()> {
     } else {
         read_source(&opts.file_path)?
     };
-    let compiled = if opts.eval.is_none() && !opts.debug.any() {
+    let compiled = if opts.eval.is_none() && !opts.debug.any() && !opts.strict {
         compile_source_cached(&source, &opts.file_path, opts.verbose)?
     } else {
-        compile_source(&source, &opts.file_path, opts.verbose, &opts.debug)?
+        compile_source(&source, &opts.file_path, opts.verbose, &opts.debug, opts.strict)?
     };
     if opts.eval.is_none() {
         lockfile::sync_lockfile(&opts.file_path, &compiled.graph_artifact)?;
@@ -82,7 +82,7 @@ pub fn compile_file(
     debug: &DebugFlags,
 ) -> PipelineResult<FunctionProto> {
     let source = read_source(path)?;
-    let compiled = compile_source(&source, path, verbose, debug)?;
+    let compiled = compile_source(&source, path, verbose, debug, false)?;
     Ok(compiled.entry_proto)
 }
 
@@ -92,7 +92,7 @@ pub fn compile_source_for_build(
     verbose: bool,
     debug: &DebugFlags,
 ) -> PipelineResult<CompileOutput> {
-    compile_source(source, path, verbose, debug)
+    compile_source(source, path, verbose, debug, false)
 }
 
 fn compile_source(
@@ -100,11 +100,17 @@ fn compile_source(
     path: &str,
     verbose: bool,
     debug: &DebugFlags,
+    strict: bool,
 ) -> PipelineResult<CompileOutput> {
+    let canonical_path = std::path::Path::new(path)
+        .canonicalize()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| path.to_owned());
+    let path = canonical_path.as_str();
     let tokens = lex::lex(source, path, verbose, debug);
     let mut program = parse::parse(tokens, source, path, verbose, debug)?;
     varn_core::assign_ast_ids(&mut program);
-    let check_result = check::check(&program, source, debug)?;
+    let check_result = check::check(&program, source, debug, strict)?;
     let compiled = compile::compile(&program, source, check_result, verbose, debug)?;
 
     Ok(compiled)
@@ -132,7 +138,7 @@ fn compile_source_cached(source: &str, path: &str, verbose: bool) -> PipelineRes
         eprintln!("[Varn] compile cache miss");
     }
 
-    let compiled = compile_source(source, path, verbose, &DebugFlags::default())?;
+    let compiled = compile_source(source, path, verbose, &DebugFlags::default(), false)?;
     if let Err(e) = cache::store_cached_graph(&cache_path, &compiled.graph_artifact) {
         if verbose {
             eprintln!("[Varn] compile cache write skipped: {e}");

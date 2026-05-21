@@ -494,7 +494,10 @@ impl ExecCtx {
         )
     }
 
-    pub fn push_frame(&mut self, closure: Rc<VmClosure>) {
+    pub fn push_frame(&mut self, closure: Rc<VmClosure>) -> crate::error::VmResult<()> {
+        if self.frames.len() >= 10000 {
+            return Err(crate::error::RuntimeError::new("stack overflow: call depth exceeded 10000"));
+        }
         let base = self.stack.len();
         let required = base + closure.proto.register_count as usize;
         if self.stack.len() < required {
@@ -502,6 +505,7 @@ impl ExecCtx {
         }
         self.record_frame_push();
         self.frames.push(CallFrame::new(closure, base));
+        Ok(())
     }
 
     pub fn push_frame_at(&mut self, closure: Rc<VmClosure>, base: usize) {
@@ -613,7 +617,7 @@ impl ExecCtx {
             }
 
             let closure = crate::exec::calls::build_closure(proto, &mut self.heap);
-            self.push_frame(closure);
+            self.push_frame(closure)?;
             let res = self.run_until(self.frames.len() - 1)?;
             if self.vm_suspend.is_some() {
                 return Ok(VmValue::null());
@@ -644,7 +648,7 @@ impl ExecCtx {
                 }
 
                 let closure = crate::exec::calls::build_closure(proto, &mut self.heap);
-                self.push_frame(closure);
+                self.push_frame(closure)?;
                 let res = self.run_until(self.frames.len() - 1)?;
                 if self.vm_suspend.is_some() {
                     return Ok(VmValue::null());

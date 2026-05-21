@@ -2,7 +2,7 @@ use rustc_hash::FxHashSet;
 
 use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::checker_generics::build_call_mapping;
+use crate::checker_generics::{build_call_mapping, map_generics_cached};
 use crate::types::{FunctionParam, Type};
 use varn_core::ast::{Arg, Expr, ExprKind, TypeNode};
 use varn_core::source::SourceRange;
@@ -42,11 +42,7 @@ impl Checker {
 
         let effective_callee_ty = if let TypeKind::Fn(ft) = &callee_ty.0 {
             let mapping = build_call_mapping(callee, type_args, args, ft, self, bind);
-            if mapping.is_empty() {
-                callee_ty.clone()
-            } else {
-                callee_ty.map_generics(&mapping)
-            }
+            map_generics_cached(self, &callee_ty, &mapping)
         } else {
             callee_ty.clone()
         };
