@@ -34,7 +34,7 @@ fn stable_global_key(
 
 pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     let path = uri_to_path(&uri);
-    let (raw_tokens, lex_errs) = varn_lexer::scan(&source, &path);
+    let (raw_tokens, lexeme_buf, lex_errs) = varn_lexer::scan(&source, &path);
 
     let mut diagnostics: Vec<LspDiag> = Vec::new();
     for e in lex_errs {
@@ -58,18 +58,20 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
                 TokenKind::Whitespace | TokenKind::Newline | TokenKind::EOF | TokenKind::DocComment
             )
         })
-        .map(|t| TokenRecord {
-            kind: t.kind,
-
-            line: t.range.start.line.saturating_sub(1),
-            col: t.range.start.column,
-            length: t.lexeme.chars().count() as u32,
-            offset: t.range.start.offset,
-            lexeme: t.lexeme.to_string(),
+        .map(|t| {
+            let lex = t.get_lexeme(&lexeme_buf);
+            TokenRecord {
+                kind: t.kind,
+                line: t.range.start.line.saturating_sub(1),
+                col: t.range.start.column,
+                length: lex.chars().count() as u32,
+                offset: t.range.start.offset,
+                lexeme: lex.to_string(),
+            }
         })
         .collect();
 
-    let (mut program, parse_errs) = varn_parser::parse_partial(raw_tokens, &path);
+    let (mut program, parse_errs) = varn_parser::parse_partial(raw_tokens, lexeme_buf, &path);
     for e in parse_errs {
         diagnostics.push(LspDiag {
             message: e.message,

@@ -58,8 +58,8 @@ pub fn build_module_graph(
             .map_err(|e| format!("cannot read module '{module_path}': {e}"))?;
         source_hashes.insert(module_path.clone(), fnv1a64(source.as_bytes()));
 
-        let (tokens, _) = varn_lexer::scan(&source, &module_path);
-        let mut program = varn_parser::parse(tokens, &module_path)
+        let (tokens, lexeme_buf, _) = varn_lexer::scan(&source, &module_path);
+        let mut program = varn_parser::parse(tokens, lexeme_buf, &module_path)
             .map_err(|errs| format!("parse error in '{}': {}", module_path, errs[0].message))?;
         varn_core::assign_ast_ids(&mut program);
 

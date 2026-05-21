@@ -1,8 +1,9 @@
+use std::rc::Rc;
 use varn_core::Token;
 use varn_debug::flags::DebugFlags;
 
-pub fn lex(source: &str, path: &str, verbose: bool, debug: &DebugFlags) -> Vec<Token> {
-    let (tokens, errors) = varn_lexer::scan(source, path);
+pub fn lex(source: &str, path: &str, verbose: bool, debug: &DebugFlags) -> (Vec<Token>, Rc<[u8]>) {
+    let (tokens, lexeme_buf, errors) = varn_lexer::scan(source, path);
 
     for e in &errors {
         eprintln!(
@@ -23,8 +24,8 @@ pub fn lex(source: &str, path: &str, verbose: bool, debug: &DebugFlags) -> Vec<T
     }
 
     if debug.tokens {
-        varn_debug::tokens::debug_tokens(&tokens, path);
+        varn_debug::tokens::debug_tokens(&tokens, &lexeme_buf, path);
     }
 
-    tokens
+    (tokens, lexeme_buf)
 }

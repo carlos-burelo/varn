@@ -1,16 +1,18 @@
 use crate::error::CliError;
+use std::rc::Rc;
 use varn_debug::flags::DebugFlags;
 
 type PipelineResult<T> = Result<T, CliError>;
 
 pub fn parse(
     tokens: Vec<varn_core::Token>,
+    lexeme_buf: Rc<[u8]>,
     source: &str,
     path: &str,
     verbose: bool,
     debug: &DebugFlags,
 ) -> PipelineResult<varn_core::ast::Program> {
-    let program = varn_parser::parse(tokens, path).map_err(|errs| {
+    let program = varn_parser::parse(tokens, lexeme_buf, path).map_err(|errs| {
         let msgs: Vec<String> = errs
             .iter()
             .map(|e| {

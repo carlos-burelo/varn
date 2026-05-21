@@ -45,8 +45,8 @@ impl ModuleLoader for StdlibLoader {
 }
 
 fn compile_source(source: &str, path: &str) -> Result<FunctionProto, String> {
-    let (tokens, _) = varn_lexer::scan(source, path);
-    let mut program = varn_parser::parse(tokens, path).map_err(|errs| errs[0].message.clone())?;
+    let (tokens, lexeme_buf, _) = varn_lexer::scan(source, path);
+    let mut program = varn_parser::parse(tokens, lexeme_buf, path).map_err(|errs| errs[0].message.clone())?;
     varn_core::assign_ast_ids(&mut program);
     let check = varn_checker::Checker::check(&program);
     varn_compiler::compile_with_check_result(

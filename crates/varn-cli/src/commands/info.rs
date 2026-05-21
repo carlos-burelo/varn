@@ -6,8 +6,8 @@ pub fn execute(args: InfoArgs) -> Result<(), CliError> {
     let source = std::fs::read_to_string(&args.file)
         .map_err(|e| CliError::fatal(format!("no se puede leer '{}': {}", args.file, e)))?;
 
-    let tokens = pipeline::lex_raw(&source, &args.file);
-    let mut program = pipeline::parse_raw(tokens, &source, &args.file)?;
+    let (tokens, lexeme_buf) = pipeline::lex_raw(&source, &args.file);
+    let mut program = pipeline::parse_raw(tokens, lexeme_buf, &source, &args.file)?;
     varn_core::assign_ast_ids(&mut program);
 
     let (tree, stats) = build_info_tree(&args.file, &program)?;
@@ -60,8 +60,8 @@ fn build_info_tree(
         } else {
             let source = std::fs::read_to_string(&curr_path)
                 .map_err(|e| CliError::fatal(format!("cannot read module '{curr_path}': {e}")))?;
-            let tokens = pipeline::lex_raw(&source, &curr_path);
-            let mut p = pipeline::parse_raw(tokens, &source, &curr_path)?;
+            let (tokens, lexeme_buf) = pipeline::lex_raw(&source, &curr_path);
+            let mut p = pipeline::parse_raw(tokens, lexeme_buf, &source, &curr_path)?;
             varn_core::assign_ast_ids(&mut p);
             p
         };

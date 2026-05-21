@@ -74,7 +74,7 @@ pub unsafe extern "C" fn varn_free(ptr: *mut u8, len: u32) {
     }
 }
 
-pub fn scan(source: &str, filename: &str) -> (Vec<varn_core::Token>, Vec<varn_core::Diagnostic>) {
+pub fn scan(source: &str, filename: &str) -> (Vec<varn_core::Token>, std::rc::Rc<[u8]>, Vec<varn_core::Diagnostic>) {
     scan_with_config(source, filename, crate::scanner::LexerConfig::default())
 }
 
@@ -104,7 +104,7 @@ pub fn scan_with_config(
     source: &str,
     _filename: &str,
     config: crate::scanner::LexerConfig,
-) -> (Vec<varn_core::Token>, Vec<varn_core::Diagnostic>) {
+) -> (Vec<varn_core::Token>, std::rc::Rc<[u8]>, Vec<varn_core::Diagnostic>) {
     use varn_core::{SourceLocation, SourceRange, Token, TokenKind};
 
     let src_bytes = source.as_bytes();
@@ -116,9 +116,10 @@ pub fn scan_with_config(
     let tokens: Vec<varn_core::Token> = records
         .into_iter()
         .map(|r| {
-            let lexeme_bytes =
-                &lexeme_buf[r.lex_offset as usize..(r.lex_offset + r.lex_len) as usize];
-            let lexeme = String::from_utf8_lossy(lexeme_bytes).into_owned();
+            let lexeme_str = std::str::from_utf8(
+                &lexeme_buf[r.lex_offset as usize..(r.lex_offset + r.lex_len) as usize],
+            )
+            .unwrap_or("");
 
             let start = SourceLocation {
                 line: r.start_line,
@@ -133,16 +134,18 @@ pub fn scan_with_config(
             let range = SourceRange { start, end };
 
             let kind = TokenKind::from_u32(r.kind);
-            let parsed_num = parse_num_lexeme(kind, &lexeme);
+            let parsed_num = parse_num_lexeme(kind, lexeme_str);
 
             Token {
                 kind,
-                lexeme: lexeme.into(),
                 range,
                 parsed_num,
+                lex_start: r.lex_offset,
+                lex_len: r.lex_len,
             }
         })
         .collect();
 
-    (tokens, diagnostics)
+    let rc_buf: std::rc::Rc<[u8]> = lexeme_buf.into();
+    (tokens, rc_buf, diagnostics)
 }
