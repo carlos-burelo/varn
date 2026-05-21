@@ -139,7 +139,7 @@ pub fn prepare_call(
                     let closure = Rc::new(VmClosure::with_upvalues(
                         nc.proto.clone(),
                         upvalues,
-                        constants,
+                        Rc::new(constants),
                         nc.ic_cache.clone(),
                         new_feedback,
                     ));

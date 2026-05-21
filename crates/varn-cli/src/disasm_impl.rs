@@ -46,15 +46,19 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
         };
 
         match op {
-            OpCode::PopTry | OpCode::Nop => {
-                println!("{:?}", op);
+            OpCode::PopTry
+            | OpCode::Nop
+            | OpCode::LoadIntZero
+            | OpCode::LoadIntOne
+            | OpCode::LoadIntMinusOne
+            | OpCode::LoadNull
+            | OpCode::LoadTrue
+            | OpCode::LoadFalse => {
+                println!("{:?} r{}", op, first_reg);
                 offset + 1
             }
 
-            OpCode::LoadNull
-            | OpCode::LoadTrue
-            | OpCode::LoadFalse
-            | OpCode::Move
+            OpCode::Move
             | OpCode::Negate
             | OpCode::Not
             | OpCode::ToString

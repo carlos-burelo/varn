@@ -167,6 +167,86 @@ impl ExecCtx {
                         }
                     }
                 }
+
+                Some(crate::heap::HeapObj::BoundMethod(bm)) => {
+                    match &bm.target {
+                        varn_types::value::BoundMethodTarget::Native { func, .. } => {
+                            let f = *func;
+                            let receiver = self.heap.intern(bm.receiver.clone());
+                            self.record_call_native();
+                            let result = if arg_count + 1 <= 16 {
+                                let mut buf = [VmValue::null(); 17];
+                                buf[0] = receiver;
+                                for i in 0..arg_count {
+                                    buf[i + 1] = self.stack[base + arg_start + i];
+                                }
+                                (f)(self as &mut dyn varn_types::NativeCtx, &buf[..arg_count + 1])
+                            } else {
+                                let mut args = Vec::with_capacity(arg_count + 1);
+                                args.push(receiver);
+                                for i in 0..arg_count {
+                                    args.push(self.stack[base + arg_start + i]);
+                                }
+                                (f)(self as &mut dyn varn_types::NativeCtx, &args)
+                            }
+                            .map_err(|e| RuntimeError::new(e))?;
+                            self.stack[base + dest] = result;
+                            return Ok(false);
+                        }
+                        varn_types::value::BoundMethodTarget::Vm {
+                            closure: method_closure,
+                            owner_class,
+                        } => {
+                            if let Some(nc_w) = method_closure
+                                .as_any()
+                                .downcast_ref::<crate::frame::VmClosurePayload>()
+                            {
+                                let nc = &nc_w.0;
+                                if !nc.proto.is_generator
+                                    && !nc.proto.is_async
+                                    && !nc.proto.has_rest
+                                    && arg_count <= nc.proto.arity
+                                {
+                                    let nc = nc.clone();
+                                    let owner = owner_class.clone();
+                                    let receiver_val =
+                                        self.heap.intern(bm.receiver.clone());
+                                    let arity = nc.proto.arity;
+                                    self.stack.push(VmValue::null());
+                                    self.stack.push(receiver_val);
+                                    for i in 0..arg_count {
+                                        let v = self.stack[base + arg_start + i];
+                                        self.stack.push(v);
+                                    }
+                                    // arity includes `this` slot; fill remaining param slots
+                                    for _ in (arg_count + 1)..arity {
+                                        self.stack.push(VmValue::null());
+                                    }
+                                    if self.frames.len() >= 10000 {
+                                        return Err(crate::error::RuntimeError::new(
+                                            "stack overflow: call depth exceeded 10000",
+                                        ));
+                                    }
+                                    let new_base = self.stack.len() - arity;
+                                    let required =
+                                        new_base + nc.proto.register_count as usize;
+                                    if self.stack.len() < required {
+                                        self.stack.resize(required, VmValue::null());
+                                    }
+                                    let mut frame =
+                                        crate::frame::CallFrame::new(nc, new_base);
+                                    frame.return_reg = Some(dest as u16);
+                                    frame.current_class = owner;
+                                    self.record_call_vm_fast();
+                                    self.record_frame_push();
+                                    self.frames.push(frame);
+                                    return Ok(true);
+                                }
+                            }
+                        }
+                    }
+                }
+
                 _ => {}
             }
         }
@@ -213,15 +293,7 @@ impl ExecCtx {
             .str_val(name_nv)
             .ok_or_else(|| RuntimeError::new("CallMethod: non-string name"))?;
 
-        let receiver_class = if this_val.is_heap() {
-            if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get(this_val.as_heap_idx()) {
-                o.borrow().class()
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        let receiver_class = crate::exec::props::get_class(this_val, &self.heap);
         let cache_len = closure.ic_cache_len();
         if receiver_class.is_some() && cs < cache_len {
             type NativeFnPtr =

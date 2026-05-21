@@ -145,6 +145,11 @@ pub enum OpCode {
     // All count parts (pre-converted to strings) are concatenated in one heap alloc.
     BuildStr,
 
+    // Single-word load for the three most common integer constants.
+    LoadIntZero,
+    LoadIntOne,
+    LoadIntMinusOne,
+
     Nop,
 }
 

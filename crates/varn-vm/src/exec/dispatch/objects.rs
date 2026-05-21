@@ -4,6 +4,7 @@ use crate::exec::dispatch::ControlSignal;
 use crate::frame::VmClosure;
 use crate::value::VmValue;
 use std::rc::Rc;
+use std::sync::atomic::Ordering;
 
 impl ExecCtx {
     #[inline(always)]
@@ -68,14 +69,22 @@ impl ExecCtx {
                     }
                 } else if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
                     let slot = entry.slot as usize;
-                    if entry.is_class == 2 && cls.id == entry.id {
+                    if entry.is_class == 2
+                        && cls.id == entry.id
+                        && entry.vtable_ver
+                            == (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8
+                    {
                         let vtable = cls.vtable.borrow();
                         let vtable_owners = cls.vtable_owners.borrow();
                         if slot < vtable.len() {
                             found_method =
                                 Some((vtable[slot].clone(), vtable_owners[slot].clone()));
                         }
-                    } else if entry.is_class == 3 && cls.id == entry.id {
+                    } else if entry.is_class == 3
+                        && cls.id == entry.id
+                        && entry.vtable_ver
+                            == (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8
+                    {
                         let vtable = cls.getter_vtable.borrow();
                         if slot < vtable.len() {
                             found_getter = Some(vtable[slot].clone());
@@ -139,7 +148,8 @@ impl ExecCtx {
                                 id: cls.id,
                                 slot: slot as u16,
                                 is_class: 3,
-                                vtable_ver: 0,
+                                vtable_ver: (cls.vtable_version.load(Ordering::Relaxed) & 0xFF)
+                                    as u8,
                             };
                             closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
                         }
@@ -185,7 +195,8 @@ impl ExecCtx {
                                 id: cls.id,
                                 slot: slot as u16,
                                 is_class: 2,
-                                vtable_ver: 0,
+                                vtable_ver: (cls.vtable_version.load(Ordering::Relaxed) & 0xFF)
+                                    as u8,
                             };
                             closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
                         }
@@ -446,14 +457,22 @@ impl ExecCtx {
                     }
                 } else if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
                     let slot = entry.slot as usize;
-                    if entry.is_class == 2 && cls.id == entry.id {
+                    if entry.is_class == 2
+                        && cls.id == entry.id
+                        && entry.vtable_ver
+                            == (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8
+                    {
                         let vtable = cls.vtable.borrow();
                         let vtable_owners = cls.vtable_owners.borrow();
                         if slot < vtable.len() {
                             found_method =
                                 Some((vtable[slot].clone(), vtable_owners[slot].clone()));
                         }
-                    } else if entry.is_class == 3 && cls.id == entry.id {
+                    } else if entry.is_class == 3
+                        && cls.id == entry.id
+                        && entry.vtable_ver
+                            == (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8
+                    {
                         let vtable = cls.getter_vtable.borrow();
                         if slot < vtable.len() {
                             found_getter = Some(vtable[slot].clone());
@@ -517,7 +536,8 @@ impl ExecCtx {
                                 id: cls.id,
                                 slot: slot as u16,
                                 is_class: 3,
-                                vtable_ver: 0,
+                                vtable_ver: (cls.vtable_version.load(Ordering::Relaxed) & 0xFF)
+                                    as u8,
                             };
                             closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
                         }
@@ -563,7 +583,8 @@ impl ExecCtx {
                                 id: cls.id,
                                 slot: slot as u16,
                                 is_class: 2,
-                                vtable_ver: 0,
+                                vtable_ver: (cls.vtable_version.load(Ordering::Relaxed) & 0xFF)
+                                    as u8,
                             };
                             closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
                         }

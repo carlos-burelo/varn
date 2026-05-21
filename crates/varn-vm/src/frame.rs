@@ -88,14 +88,14 @@ impl VmClosure {
     pub fn with_upvalues(
         proto: Rc<FunctionProto>,
         upvalues: Vec<VmUpvalue>,
-        constants: Vec<VmValue>,
+        constants: Rc<Vec<VmValue>>,
         ic_cache: Rc<RefCell<Vec<PolyICSlot>>>,
         feedback: Rc<RefCell<varn_types::chunk::FeedbackVector>>,
     ) -> Self {
         Self {
             proto,
             upvalues,
-            constants: Rc::new(constants),
+            constants,
             ic_cache,
             feedback,
         }
