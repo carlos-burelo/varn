@@ -52,13 +52,54 @@ impl LivenessAnalyzer {
     }
 
     pub fn analyze(&mut self, vregs_used: Vec<u16>) -> Vec<LiveRange> {
+        self.analyze_with_back_edges(vregs_used, &[])
+    }
+
+    /// Like `analyze`, but extends live ranges across loop back-edges.
+    /// `back_edges` is a list of `(loop_header, loop_end)` pairs where
+    /// `loop_header` is the first instruction of the loop body and
+    /// `loop_end` is the position of the `Loop` instruction itself.
+    pub fn analyze_with_back_edges(
+        &mut self,
+        vregs_used: Vec<u16>,
+        back_edges: &[(usize, usize)],
+    ) -> Vec<LiveRange> {
         self.live_ranges.clear();
 
         for vreg in vregs_used {
             if let (Some(&start), Some(uses)) =
                 (self.def_sites.get(&vreg), self.use_sites.get(&vreg))
             {
-                let end = uses.iter().copied().max().unwrap_or(start);
+                let mut end = uses.iter().copied().max().unwrap_or(start);
+
+                // For each back-edge (header, loop_end):
+                // If this vreg is live anywhere inside the loop body [header..=loop_end],
+                // extend its range to cover the entire loop body so that the register
+                // stays allocated across iterations.
+                let mut changed = true;
+                while changed {
+                    changed = false;
+                    for &(header, loop_end) in back_edges {
+                        let live_in_loop = start <= loop_end && end >= header;
+                        if live_in_loop {
+                            if start > header {
+                                // Def is inside loop — extend start to header.
+                                // (Conservative: treat as live from loop entry.)
+                                // We don't mutate start here; instead extend end to loop_end.
+                            }
+                            if end < loop_end {
+                                end = loop_end;
+                                changed = true;
+                            }
+                            if start > header && start <= loop_end {
+                                // Def is inside loop body; treat as live from header.
+                                // Record this by extending end (start extension isn't needed
+                                // for correctness since def dominates use within the loop).
+                            }
+                        }
+                    }
+                }
+
                 self.live_ranges.push(LiveRange {
                     vreg,
                     start,
@@ -87,16 +128,24 @@ impl LivenessAnalyzer {
         if self.live_ranges.is_empty() {
             return 0;
         }
-        let max_point = self.live_ranges.iter().map(|r| r.end).max().unwrap_or(0);
+        // Sweep-line: O((L+N) log L) instead of O(L×N).
+        let mut events: Vec<(usize, bool)> = Vec::with_capacity(self.live_ranges.len() * 2);
+        for r in &self.live_ranges {
+            events.push((r.start, false)); // false = start
+            events.push((r.end + 1, true)); // true = end (exclusive)
+        }
+        // Sort by point; on tie, ends before starts so we don't over-count.
+        events.sort_unstable_by(|a, b| a.0.cmp(&b.0).then(b.1.cmp(&a.1)));
+        let mut live = 0i64;
         let mut max_live = 0usize;
-        for point in 0..=max_point {
-            let live = self
-                .live_ranges
-                .iter()
-                .filter(|r| r.start <= point && point <= r.end)
-                .count();
-            if live > max_live {
-                max_live = live;
+        for (_, is_end) in events {
+            if is_end {
+                live -= 1;
+            } else {
+                live += 1;
+                if live as usize > max_live {
+                    max_live = live as usize;
+                }
             }
         }
         max_live
@@ -152,10 +201,18 @@ impl InterferenceGraph {
         if self.nodes.is_empty() {
             return 0;
         }
+        // Largest-degree-first ordering gives a tighter upper bound than insertion order.
+        let mut ordered = self.nodes.clone();
+        ordered.sort_unstable_by(|a, b| {
+            let da = self.edges.get(a).map(|s| s.len()).unwrap_or(0);
+            let db = self.edges.get(b).map(|s| s.len()).unwrap_or(0);
+            db.cmp(&da)
+        });
+
         let mut coloring: HashMap<u16, usize> = HashMap::new();
         let mut max_color = 0usize;
 
-        for &node in &self.nodes {
+        for &node in &ordered {
             let neighbor_colors: HashSet<usize> = self
                 .edges
                 .get(&node)

@@ -9,6 +9,8 @@ impl super::Scanner<'_> {
     ) {
         let start = self.pos;
         let (sl, sc) = self.location();
+        // opening backtick — never newline
+        self.cur_col += 1;
         self.pos += 1;
 
         let kind = self.scan_template_chunk(false);
@@ -40,6 +42,8 @@ impl super::Scanner<'_> {
         tokens: &mut Vec<TokenRecord>,
         lexemes: &mut Vec<u8>,
     ) {
+        // Must use location_at here because rbrace_pos is a SAVED position
+        // from before advance_byte() was called on the '}'.
         let (sl, sc) = self.location_at(rbrace_pos);
 
         let kind = self.scan_template_chunk(true);
@@ -77,6 +81,8 @@ impl super::Scanner<'_> {
             }
             match self.peek(0) {
                 b'`' => {
+                    // closing backtick — never newline
+                    self.cur_col += 1;
                     self.pos += 1;
                     return if continuation {
                         TEMPLATE_TAIL
@@ -85,6 +91,8 @@ impl super::Scanner<'_> {
                     };
                 }
                 b'$' if self.peek(1) == b'{' => {
+                    // '$' and '{' — never newlines
+                    self.cur_col += 2;
                     self.pos += 2;
                     return if continuation {
                         TEMPLATE_MIDDLE
@@ -93,13 +101,17 @@ impl super::Scanner<'_> {
                     };
                 }
                 b'\\' => {
+                    // backslash — never newline
+                    self.cur_col += 1;
                     self.pos += 1;
                     if !self.is_eof() {
-                        self.pos += 1;
+                        // escaped char — could be anything including \n
+                        self.advance_byte();
                     }
                 }
                 _ => {
-                    self.pos += 1;
+                    // template content — could be newline
+                    self.advance_byte();
                 }
             }
         }
@@ -108,6 +120,8 @@ impl super::Scanner<'_> {
     pub(super) fn scan_regex(&mut self, tokens: &mut Vec<TokenRecord>, lexemes: &mut Vec<u8>) {
         let start = self.pos;
         let (sl, sc) = self.location();
+        // opening '/' — never newline
+        self.cur_col += 1;
         self.pos += 1;
 
         let mut in_char_class = false;
@@ -119,6 +133,8 @@ impl super::Scanner<'_> {
             }
             let c = self.peek(0);
             if escaped {
+                // regex escape target — never newline in valid regex
+                self.cur_col += 1;
                 self.pos += 1;
                 escaped = false;
                 continue;
@@ -126,30 +142,37 @@ impl super::Scanner<'_> {
             match c {
                 b'\\' => {
                     escaped = true;
+                    self.cur_col += 1;
                     self.pos += 1;
                 }
                 b'[' if !in_char_class => {
                     in_char_class = true;
+                    self.cur_col += 1;
                     self.pos += 1;
                 }
                 b']' if in_char_class => {
                     in_char_class = false;
+                    self.cur_col += 1;
                     self.pos += 1;
                 }
                 b'/' if !in_char_class => {
+                    self.cur_col += 1;
                     self.pos += 1;
                     break;
                 }
                 b'\n' => break,
                 _ => {
+                    self.cur_col += 1;
                     self.pos += 1;
                 }
             }
         }
 
+        // regex flags — all lowercase ASCII letters, never newlines
         while !self.is_eof() {
             let c = self.peek(0);
             if c.is_ascii_lowercase() {
+                self.cur_col += 1;
                 self.pos += 1;
             } else {
                 break;

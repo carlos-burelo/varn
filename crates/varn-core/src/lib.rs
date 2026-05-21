@@ -28,27 +28,26 @@ pub mod tag_ext;
 pub use intrinsics::{IntrinsicType, MemberKey, RuntimeTypeName};
 pub use module_id::{ImportSpecifier, ModuleId};
 pub use tag_ext::TypeTagExt;
-pub use token::{Token, TokenKind};
+pub use token::{ParsedNumber, Token, TokenKind};
 pub use typed_ir::{NumericKind, TypeAnnotations};
 pub use varn_base::TypeTag;
 
 use std::cell::RefCell;
-use std::collections::HashSet;
 use std::rc::Rc;
+use rustc_hash::FxHashMap;
 
 thread_local! {
-    static INTERNER: RefCell<HashSet<Rc<str>>> = RefCell::new(HashSet::new());
+    static INTERNER: RefCell<FxHashMap<Box<str>, Rc<str>>> = RefCell::new(FxHashMap::default());
 }
 
 pub fn intern_string(s: &str) -> Rc<str> {
     INTERNER.with(|interner| {
         let mut interner = interner.borrow_mut();
         if let Some(rc) = interner.get(s) {
-            rc.clone()
-        } else {
-            let rc: Rc<str> = Rc::from(s);
-            interner.insert(rc.clone());
-            rc
+            return rc.clone();
         }
+        let rc: Rc<str> = Rc::from(s);
+        interner.insert(Box::from(s), rc.clone());
+        rc
     })
 }

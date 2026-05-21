@@ -207,15 +207,17 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             }
 
             OpCode::Jump | OpCode::Loop => {
-                let w1 = w!();
-                let off = w1 as i16;
-                format!("→ {}", (pc as i64) + off as i64)
+                let hi = w!() as u32;
+                let lo = w!() as u32;
+                let offset = ((hi << 16) | lo) as usize;
+                format!("→ +{}", offset)
             }
             OpCode::JumpIfFalse | OpCode::JumpIfTrue => {
-                let w1 = w!();
-                let w2 = w!();
-                let off = w2 as i16;
-                format!("r{} → {}", hi(w1), (pc as i64) + off as i64)
+                let cond_reg = hi(op_val);
+                let hi = w!() as u32;
+                let lo = w!() as u32;
+                let offset = ((hi << 16) | lo) as usize;
+                format!("r{} → +{}", cond_reg, offset)
             }
 
             OpCode::Call | OpCode::CallSpread => {
@@ -401,8 +403,12 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             }
 
             OpCode::Try => {
-                let w1 = w!();
-                format!("catch → {}", (pc as i64) + w1 as i16 as i64)
+                let err_w = w!();
+                let err_reg = hi(err_w);
+                let hi_off = w!() as u32;
+                let lo_off = w!() as u32;
+                let catch_offset = ((hi_off << 16) | lo_off) as usize;
+                format!("err=r{} catch → +{}", err_reg, catch_offset)
             }
 
             OpCode::Import => {
@@ -433,6 +439,26 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                     let _ = w!();
                 }
                 format!("r{} = runtime[{}]({} args)", hi(w1), fn_idx, arg_count)
+            }
+
+            OpCode::AddImm | OpCode::SubImm => {
+                let dest = hi(op_val);
+                let w1 = w!();
+                let src = hi(w1);
+                let imm = lo(w1) as i8;
+                let sign = if matches!(op, OpCode::SubImm) { "-" } else { "+" };
+                format!("r{dest} = r{src} {sign} {imm}")
+            }
+
+            OpCode::BuildStr => {
+                let dest = hi(op_val);
+                let w1 = w!();
+                let count = hi(w1) as usize;
+                let mut reg_list = Vec::with_capacity(count);
+                for _ in 0..count {
+                    reg_list.push(format!("r{}", hi(w!())));
+                }
+                format!("r{dest} = concat({})", reg_list.join(", "))
             }
         };
 

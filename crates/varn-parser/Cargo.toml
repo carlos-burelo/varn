@@ -3,6 +3,9 @@ name = "varn-parser"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+profiling = []
+
 [dependencies]
 varn-core = { path = "../varn-core" }
 varn-lexer = { path = "../varn-lexer" }

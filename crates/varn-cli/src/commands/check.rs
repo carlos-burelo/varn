@@ -9,5 +9,6 @@ pub fn execute(args: CheckArgs) -> Result<(), CliError> {
         no_run: true,
         debug,
         trace: false,
+        strict: args.strict,
     })
 }

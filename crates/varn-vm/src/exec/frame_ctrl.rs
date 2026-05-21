@@ -12,6 +12,9 @@ impl ExecCtx {
     pub(crate) fn dispatch_prepared_call(&mut self, call: PreparedCall) -> VmResult<()> {
         match call {
             PreparedCall::Frame(frame) => {
+                if self.frames.len() >= 10000 {
+                    return Err(RuntimeError::new("stack overflow: call depth exceeded 10000"));
+                }
                 self.record_call_vm_fast();
                 let required = frame.base + frame.closure.proto.register_count as usize;
                 if self.stack.len() < required {
@@ -49,6 +52,9 @@ impl ExecCtx {
                 }
             }
             PreparedCall::Constructor(frame, instance_nv) => {
+                if self.frames.len() >= 10000 {
+                    return Err(RuntimeError::new("stack overflow: call depth exceeded 10000"));
+                }
                 self.record_call_vm_fast();
                 let ctor_frame_idx = self.frames.len();
                 let required = frame.base + frame.closure.proto.register_count as usize;

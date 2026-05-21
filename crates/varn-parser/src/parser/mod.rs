@@ -10,6 +10,7 @@ pub use stmts::parse_block;
 use crate::stream::TokenStream;
 use crate::ParseProfile;
 use std::rc::Rc;
+#[cfg(feature = "profiling")]
 use std::time::Instant;
 use varn_core::ast::Program;
 use varn_core::{ErrorCode, TokenKind};
@@ -57,6 +58,7 @@ impl Parser {
     ) -> (Program, varn_core::DiagnosticBag, ParseProfile) {
         let range = self.stream.range();
         let mut body = vec![];
+        #[cfg(feature = "profiling")]
         let started = Instant::now();
 
         while !self.stream.is_eof() {
@@ -69,7 +71,8 @@ impl Parser {
                 }
             }
         }
-        self.stream.profile.program_loop += started.elapsed();
+        #[cfg(feature = "profiling")]
+        { self.stream.profile.program_loop += started.elapsed(); }
 
         self.diagnostics
             .extend(std::mem::take(&mut self.stream.errors));
@@ -86,17 +89,27 @@ impl Parser {
     }
 
     fn recover(&mut self) {
+        #[cfg(feature = "profiling")]
         let started = Instant::now();
+        let mut depth: i32 = 0;
         loop {
             match self.stream.kind() {
                 TokenKind::EOF => break,
-                TokenKind::Semicolon => {
+                TokenKind::Semicolon if depth == 0 => {
                     self.stream.advance();
                     break;
                 }
-                TokenKind::RBrace => {
+                TokenKind::LBrace | TokenKind::LParen | TokenKind::LBracket => {
+                    depth += 1;
                     self.stream.advance();
-                    break;
+                }
+                TokenKind::RBrace | TokenKind::RParen | TokenKind::RBracket => {
+                    if depth == 0 {
+                        self.stream.advance();
+                        break;
+                    }
+                    depth -= 1;
+                    self.stream.advance();
                 }
                 TokenKind::Function
                 | TokenKind::Class
@@ -108,16 +121,18 @@ impl Parser {
                 | TokenKind::Return
                 | TokenKind::If
                 | TokenKind::For
-                | TokenKind::While => break,
+                | TokenKind::While if depth == 0 => break,
                 _ => {
                     self.stream.advance();
                 }
             }
         }
-        self.stream.profile.recover += started.elapsed();
+        #[cfg(feature = "profiling")]
+        { self.stream.profile.recover += started.elapsed(); }
     }
 
     fn parse_stmt_or_decl(&mut self) -> Result<varn_core::ast::Stmt, String> {
+        #[cfg(feature = "profiling")]
         let started = Instant::now();
         let s = &mut self.stream;
         while s.eat(TokenKind::Semicolon) {}
@@ -128,7 +143,8 @@ impl Parser {
             ));
         }
         let parsed = stmts::parse_stmt_or_decl_inner(s);
-        self.stream.profile.stmt_or_decl += started.elapsed();
+        #[cfg(feature = "profiling")]
+        { self.stream.profile.stmt_or_decl += started.elapsed(); }
         parsed
     }
 }

@@ -122,10 +122,46 @@ pub fn build_module_graph(
             .filter(|k| !sorted.contains(*k))
             .map(|s| s.as_str())
             .collect();
-        return Err(format!(
-            "circular dependency detected involving: {}",
-            cycle_nodes.join(", ")
-        ));
+        // Find an actual cycle path via DFS from any cycle node.
+        let cycle_set: std::collections::HashSet<&str> = cycle_nodes.iter().copied().collect();
+        let mut cycle_path: Vec<String> = Vec::new();
+        if let Some(&start) = cycle_nodes.first() {
+            let mut stack: Vec<&str> = vec![start];
+            let mut visited: Vec<&str> = Vec::new();
+            'dfs: loop {
+                let Some(&cur) = stack.last() else { break };
+                if let Some(pos) = visited.iter().position(|&v| v == cur) {
+                    cycle_path = visited[pos..].iter().map(|s| s.to_string()).collect();
+                    cycle_path.push(cur.to_string());
+                    break 'dfs;
+                }
+                visited.push(cur);
+                let mut found_next = false;
+                if let Some(deps) = graph.get(cur) {
+                    for dep in deps {
+                        if cycle_set.contains(dep.as_str()) {
+                            stack.push(dep.as_str());
+                            found_next = true;
+                            break;
+                        }
+                    }
+                }
+                if !found_next {
+                    break;
+                }
+            }
+        }
+        return if cycle_path.is_empty() {
+            Err(format!(
+                "circular dependency detected involving: {}",
+                cycle_nodes.join(", ")
+            ))
+        } else {
+            Err(format!(
+                "circular dependency detected: {}",
+                cycle_path.join(" → ")
+            ))
+        };
     }
 
     let mut modules: HashMap<String, FunctionProto> = HashMap::new();

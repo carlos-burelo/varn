@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 
 use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::checker_generics::build_generic_mapping;
+use crate::checker_generics::{build_generic_mapping, map_generics_cached};
 use crate::types::Type;
 use varn_core::ast::{Expr, ExprKind};
 use varn_core::TypeKind;
@@ -69,10 +69,7 @@ pub(super) fn infer_member_type(
             if let Some(res) = checker.find_member_info(&obj_ty, prop_name.as_ref(), bind) {
                 let m_ty = res.0;
                 if !m_ty.is_dynamic() {
-                    if mapping.is_empty() {
-                        return wrap_async_method_type(m_ty);
-                    }
-                    return wrap_async_method_type(m_ty.map_generics(&mapping));
+                    return wrap_async_method_type(map_generics_cached(checker, &m_ty, &mapping));
                 }
             }
         }
@@ -99,7 +96,7 @@ pub(super) fn infer_member_type(
             if let Some(res) = checker.find_member_info(&obj_ty, prop_name.as_ref(), bind) {
                 let m_ty = res.0;
                 if !m_ty.is_dynamic() {
-                    return wrap_async_method_type(m_ty.map_generics(&mapping));
+                    return wrap_async_method_type(map_generics_cached(checker, &m_ty, &mapping));
                 }
             }
         }

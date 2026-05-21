@@ -1,4 +1,4 @@
-use crate::char_class::{is_digit, is_identifier_start};
+use crate::char_class::{is_digit, is_identifier_start, is_identifier_start_char};
 use crate::token_kind::{
     BIGINT_LITERAL, BINARY_LITERAL, CHAR_TOK, DECIMAL_LITERAL, DOC_COMMENT, EOF, FALSE,
     FLOAT_LITERAL, HEX_LITERAL, IDENTIFIER, INTEGER_LITERAL, LBRACE, MINUSMINUS, NULL,
@@ -51,7 +51,7 @@ impl super::Scanner<'_> {
             while !self.is_eof() {
                 let c = self.peek(0);
                 if c == b' ' || c == b'\t' || c == b'\r' || c == b'\n' {
-                    self.pos += 1;
+                    self.advance_byte();
                 } else {
                     break;
                 }
@@ -66,14 +66,17 @@ impl super::Scanner<'_> {
             if c == b'/' {
                 let next = self.peek(1);
                 if next == b'/' {
-                    self.pos += 2;
+                    self.advance_bytes(2);
                     self.skip_line_comment();
                     continue;
                 }
                 if next == b'*' {
-                    self.pos += 2;
+                    self.advance_bytes(2);
 
-                    if self.peek(0) == b'*' && self.peek(1) != b'/' {
+                    if self.config.emit_doc_comments
+                        && self.peek(0) == b'*'
+                        && self.peek(1) != b'/'
+                    {
                         self.scan_doc_comment(&mut tokens, &mut lexemes);
                         self.last_kind = DOC_COMMENT;
                     } else {
@@ -109,7 +112,16 @@ impl super::Scanner<'_> {
                 continue;
             }
 
-            if is_identifier_start(c) {
+            let is_ident_start = if c.is_ascii() {
+                is_identifier_start(c)
+            } else {
+                std::str::from_utf8(&self.src[self.pos..])
+                    .ok()
+                    .and_then(|s| s.chars().next())
+                    .map(is_identifier_start_char)
+                    .unwrap_or(false)
+            };
+            if is_ident_start {
                 self.scan_identifier(&mut tokens, &mut lexemes);
                 self.last_kind = tokens.last().map(|t| t.kind).unwrap_or(self.last_kind);
                 continue;
@@ -129,7 +141,7 @@ impl super::Scanner<'_> {
                     self.brace_depth.pop();
                     self.template_depth -= 1;
                     let rbrace_pos = self.pos;
-                    self.pos += 1;
+                    self.advance_byte();
                     self.scan_template_continuation(rbrace_pos, &mut tokens, &mut lexemes);
                     self.last_kind = tokens.last().map(|t| t.kind).unwrap_or(self.last_kind);
                     continue;

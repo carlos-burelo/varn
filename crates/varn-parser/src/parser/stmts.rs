@@ -1,4 +1,5 @@
 use crate::stream::TokenStream;
+#[cfg(feature = "profiling")]
 use std::time::Instant;
 use varn_core::ast::operators::VarKind;
 use varn_core::ast::{CatchClause, ForInit, Stmt, StmtKind, SwitchCase, VarDeclarator};
@@ -22,6 +23,9 @@ pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> Result<Stmt, String> {
     {
         return decl_stmt;
     }
+
+    // Doc comment before a non-declaration statement — discard to avoid leaking.
+    let _ = s.take_pending_doc();
 
     match kind {
         TokenKind::LBrace => parse_block(s),
@@ -75,6 +79,7 @@ pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> Result<Stmt, String> {
 }
 
 pub fn parse_block(s: &mut TokenStream) -> Result<Stmt, String> {
+    #[cfg(feature = "profiling")]
     let started = Instant::now();
     let range = s.range();
     s.expect(TokenKind::LBrace)?;
@@ -115,7 +120,8 @@ pub fn parse_block(s: &mut TokenStream) -> Result<Stmt, String> {
         }
     }
     s.expect(TokenKind::RBrace)?;
-    s.profile.block += started.elapsed();
+    #[cfg(feature = "profiling")]
+    { s.profile.block += started.elapsed(); }
     Ok(Stmt::new_with_range(range, StmtKind::Block { stmts }))
 }
 

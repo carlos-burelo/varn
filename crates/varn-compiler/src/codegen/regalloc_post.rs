@@ -41,17 +41,20 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
     let op = OpCode::from_u16(*code.get(offset)?)?;
 
     let get = |off: usize| code.get(offset + off).copied().unwrap_or(0);
+    let w0 = get(0);
     let w1 = get(1);
     let w2 = get(2);
     let w3 = get(3);
     let w4 = get(4);
 
+    // hi byte of word[0] is the dest register (packed as pack_op(op, dest)).
+    let dest0 = (w0 >> 8) as u8;
     let hi1 = (w1 >> 8) as u8;
     let lo1 = (w1 & 0xff) as u8;
     let hi2 = (w2 >> 8) as u8;
-    let _lo2 = (w2 & 0xff) as u8;
-    let _hi3 = (w3 >> 8) as u8;
-    let _lo3 = (w3 & 0xff) as u8;
+    let lo2 = (w2 & 0xff) as u8;
+    let hi3 = (w3 >> 8) as u8;
+    let lo3 = (w3 & 0xff) as u8;
     let _hi4 = (w4 >> 8) as u8;
 
     let s = InstrInfo::simple;
@@ -154,11 +157,135 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
             s(3 + skip_count, Some(hi1), vec![lo1])
         }
 
+        // 2-word: [pack_op(op,dest), pack(src1,src2)]
+        OpCode::Add
+        | OpCode::Sub
+        | OpCode::Mul
+        | OpCode::Div
+        | OpCode::Mod
+        | OpCode::Pow
+        | OpCode::BitAnd
+        | OpCode::BitOr
+        | OpCode::BitXor
+        | OpCode::Shl
+        | OpCode::Shr
+        | OpCode::Ushr
+        | OpCode::Eq
+        | OpCode::Neq
+        | OpCode::Lt
+        | OpCode::Lte
+        | OpCode::Gt
+        | OpCode::Gte
+        | OpCode::Instanceof
+        | OpCode::In
+        | OpCode::StrConcat
+        | OpCode::StrSlice => s(2, Some(dest0), vec![hi1, lo1]),
+
+        OpCode::AddImm | OpCode::SubImm => s(2, Some(dest0), vec![hi1]),
+
+        // 2-word: [pack_op(op,dest), const_idx]
+        OpCode::LoadConst
+        | OpCode::LoadInt
+        | OpCode::LoadGlobal
+        | OpCode::LoadGlobalIdx => s(2, Some(dest0), vec![]),
+
+        // 3-word: [pack_op(op,dest), pack(src,0), const_idx]
+        OpCode::StoreGlobal
+        | OpCode::DefineGlobal
+        | OpCode::StoreGlobalIdx
+        | OpCode::DefineGlobalIdx => s(3, None, vec![hi1]),
+
+        // AssertNotNull: emit1(op, pack(0,r)) — 2 words: [op, pack(0,r)]
+        OpCode::AssertNotNull => s(2, None, vec![lo1]),
+
+        // MakeClass: emit_rrc → 3 words
+        OpCode::MakeClass => s(3, Some(hi1), vec![lo1]),
+
+        // Spawn: bare emit → 1 word
+        OpCode::Spawn => InstrInfo::opaque(1),
+
+        // DeclareField: bare emit → 1 word
+        OpCode::DeclareField => InstrInfo::opaque(1),
+
+        // ArrayExtend: [pack_op(op,dest), pack(src,0)]
+        OpCode::ArrayExtend => s(2, Some(dest0), vec![hi1]),
+
+        OpCode::Jump | OpCode::Loop => InstrInfo::opaque(3),
+
+        OpCode::JumpIfFalse | OpCode::JumpIfTrue => s(3, None, vec![dest0]),
+
+        OpCode::Try => InstrInfo::opaque(4),
+
         OpCode::InvokeRuntimeStatic => InstrInfo::opaque(5),
 
-        OpCode::GetProperty | OpCode::SetProperty => InstrInfo::opaque(3),
+        // GetProperty: word[0]=(op|dest), word[1]=(src|cs), word[2]=name_idx.
+        OpCode::GetProperty | OpCode::GetPropertyMaybe => s(3, Some(dest0), vec![hi1]),
 
-        OpCode::CallMethod => InstrInfo::opaque(4),
+        // SetProperty: word[0]=(op|obj), word[1]=(val|cs), word[2]=name_idx.
+        OpCode::SetProperty => s(3, None, vec![dest0, hi1]),
+
+        // GetFixedField/SetFixedField/GetSuper/GetSymbol/BindMethod: 3-word
+        OpCode::GetFixedField | OpCode::GetSuper | OpCode::GetSymbol | OpCode::BindMethod => {
+            s(3, Some(dest0), vec![hi1])
+        }
+        OpCode::SetFixedField => s(3, None, vec![dest0, hi1]),
+
+        // Method/DefineStatic/...: 3-word class member definitions
+        OpCode::Method
+        | OpCode::DefineStatic
+        | OpCode::DefineGetter
+        | OpCode::DefineSetter
+        | OpCode::DefineStaticGetter
+        | OpCode::DefineStaticSetter => InstrInfo::opaque(3),
+
+        // MakeEnumVariant: 3-word
+        OpCode::MakeEnumVariant => s(3, Some(dest0), vec![hi1, lo1]),
+
+        // Call/CallSpread/InvokeVirtual: [pack_op(op,0), pack(dest,fn_reg), pack(argc,arg_start)]
+        OpCode::Call | OpCode::CallSpread | OpCode::InvokeVirtual => {
+            let dest = hi1;
+            let fn_reg = lo1;
+            let argc = hi2;
+            let arg_start = lo2;
+            let mut uses = vec![fn_reg];
+            for i in 0..argc {
+                uses.push(arg_start.wrapping_add(i));
+            }
+            InstrInfo {
+                len: 3,
+                def: Some(dest),
+                uses,
+                call_args: Some((arg_start, argc)),
+                opaque: false,
+            }
+        }
+
+        // BuildStr: [pack_op(op,dest), pack(count,0), reg0, reg1, ...]
+        OpCode::BuildStr => {
+            let count = hi2 as usize;
+            let dest = hi1;
+            let mut uses = vec![];
+            for i in 0..count {
+                let w = get(2 + i);
+                uses.push((w >> 8) as u8);
+            }
+            InstrInfo {
+                len: 2 + count,
+                def: Some(dest),
+                uses,
+                call_args: None,
+                opaque: false,
+            }
+        }
+
+        // CallMethod: word[0]=(op|cs), word[1]=(dest|obj), word[2]=name_idx, word[3]=(argc|arg_start).
+        OpCode::CallMethod => {
+            let mut uses = vec![lo1];
+            for i in 0..hi3 {
+                uses.push(lo3.wrapping_add(i));
+            }
+            s(4, Some(hi1), uses)
+        }
 
         _ => InstrInfo::opaque(1),
     };
@@ -290,22 +417,29 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
             };
 
             let get = |off: usize| code.get(offset + off).copied().unwrap_or(0);
+            let w0 = get(0);
             let w1 = get(1);
             let w2 = get(2);
             let w3 = get(3);
             let w4 = get(4);
 
+            let dest0 = (w0 >> 8) as u8;
             let hi1 = (w1 >> 8) as u8;
             let lo1 = (w1 & 0xff) as u8;
             let hi2 = (w2 >> 8) as u8;
             let lo2 = (w2 & 0xff) as u8;
-            let _hi3 = (w3 >> 8) as u8;
-            let _lo3 = (w3 & 0xff) as u8;
+            let hi3 = (w3 >> 8) as u8;
+            let lo3 = (w3 & 0xff) as u8;
             let _hi4 = (w4 >> 8) as u8;
 
             #[inline(always)]
             fn pack(a: u8, b: u8) -> u16 {
                 ((a as u16) << 8) | (b as u16)
+            }
+
+            #[inline(always)]
+            fn pack_op(op: OpCode, reg: u8) -> u16 {
+                ((reg as u16) << 8) | (op as u8 as u16)
             }
 
             if OpCode::from_u16(code[offset]) == Some(OpCode::Try) {
@@ -442,14 +576,18 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                 }
 
                 OpCode::JumpIfFalse | OpCode::JumpIfTrue => {
-                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                    code[offset] = pack_op(op, m(mapping, dest0));
                 }
 
                 OpCode::GetProperty => {
+                    // dest in word[0] hi byte, src in word[1] hi byte.
+                    code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), lo1);
                 }
 
                 OpCode::SetProperty => {
+                    // obj in word[0] hi byte, val in word[1] hi byte.
+                    code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), lo1);
                 }
 
@@ -473,7 +611,7 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
 
                 OpCode::CallMethod => {
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
-                    code[offset + 3] = pack(_hi3, m(mapping, _lo3));
+                    code[offset + 3] = pack(hi3, m(mapping, lo3));
                 }
 
                 OpCode::Import => {
@@ -540,20 +678,27 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
     }
 }
 
-fn code_contains_loop(code: &[u16]) -> bool {
+/// Returns `(loop_header_pos, loop_instr_pos)` for every back-edge in the bytecode.
+/// `loop_header_pos` is the first instruction of the loop body (target of the back-jump).
+/// `loop_instr_pos` is the position of the `Loop` opcode itself (end of loop body).
+fn collect_back_edges(code: &[u16]) -> Vec<(usize, usize)> {
+    let mut edges = Vec::new();
     let mut offset = 0;
     while offset < code.len() {
-        if let Some(op) = OpCode::from_u16(code[offset]) {
-            if matches!(op, OpCode::Loop) {
-                return true;
-            }
+        if OpCode::from_u16(code[offset]) == Some(OpCode::Loop) {
+            let hi = code.get(offset + 1).copied().unwrap_or(0) as usize;
+            let lo = code.get(offset + 2).copied().unwrap_or(0) as usize;
+            let back_offset = (hi << 16) | lo;
+            // ip after Loop instruction = offset + 3; back-jump target = ip - back_offset
+            let target = (offset + 3).saturating_sub(back_offset);
+            edges.push((target, offset));
         }
         match decode(code, offset) {
             Some(info) => offset += info.len,
             None => break,
         }
     }
-    false
+    edges
 }
 
 pub fn optimize_function(proto: &mut FunctionProto) {
@@ -564,10 +709,7 @@ pub fn optimize_function(proto: &mut FunctionProto) {
         return;
     }
 
-    if code_contains_loop(&proto.chunk.code) {
-        return;
-    }
-
+    let back_edges = collect_back_edges(&proto.chunk.code);
     let scan = scan_bytecode(&proto.chunk.code);
 
     let all_regs: Vec<u16> = scan
@@ -601,7 +743,7 @@ pub fn optimize_function(proto: &mut FunctionProto) {
         }
     }
 
-    let ranges = analyzer.analyze(all_regs);
+    let ranges = analyzer.analyze_with_back_edges(all_regs, &back_edges);
     if ranges.is_empty() {
         return;
     }

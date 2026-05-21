@@ -157,9 +157,6 @@ impl TricolorMarker {
         }
 
         while let Some(idx) = self.gray_queue.pop_front() {
-            if self.gray_queue.len() > 10000 {
-                return Err(GcError::StackOverflow);
-            }
             self.mark_children(heap, idx)?;
             self.mark_black(idx);
         }
@@ -272,10 +269,35 @@ impl TricolorMarker {
                         self.mark_gray(ci);
                     }
                 }
-                HeapObj::Task(_)
-                | HeapObj::TaskHandle(_)
-                | HeapObj::Generator(_)
-                | HeapObj::AsyncQueue(_) => {}
+                HeapObj::Task(task) => {
+                    let task = task.clone();
+                    for v in &task.args {
+                        if let Some(ci) = heap.value_heap_idx(v) {
+                            self.mark_gray(ci);
+                        }
+                    }
+                    for uv in &task.closure.upvalues {
+                        if let Ok(inner) = uv.inner.try_borrow() {
+                            if let Some(ci) = heap.value_heap_idx(&inner.value) {
+                                self.mark_gray(ci);
+                            }
+                        }
+                    }
+                    for v in &task.closure.resolved_constants {
+                        if let Some(ci) = heap.value_heap_idx(v) {
+                            self.mark_gray(ci);
+                        }
+                    }
+                }
+                HeapObj::AsyncQueue(q) => {
+                    let inner = q.0.borrow();
+                    for v in &inner.queue {
+                        if let Some(ci) = heap.value_heap_idx(v) {
+                            self.mark_gray(ci);
+                        }
+                    }
+                }
+                HeapObj::TaskHandle(_) | HeapObj::Generator(_) => {}
             }
         }
         Ok(())
@@ -305,7 +327,6 @@ impl GcCollector {
     pub fn sweep_phase(&mut self, heap: &mut Heap) -> Result<usize, GcError> {
         self.swept_count = 0;
         let mut freed = 0;
-        let mut freed_indices: Vec<u32> = Vec::new();
 
         for idx in 0..heap.objects_len() {
             let color = self.marker.get_color(idx);
@@ -315,7 +336,6 @@ impl GcCollector {
                     heap.free_list_mut().push(idx);
                     freed += 1;
                     self.swept_count += 1;
-                    freed_indices.push(idx);
                 }
             }
         }

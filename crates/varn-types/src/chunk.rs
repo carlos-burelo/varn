@@ -46,7 +46,11 @@ impl PartialEq for Literal {
             (Self::Null, Self::Null) => true,
             (Self::Bool(a), Self::Bool(b)) => a == b,
             (Self::Int(a), Self::Int(b)) => a == b,
-            (Self::Float(a), Self::Float(b)) => a.to_bits() == b.to_bits(),
+            (Self::Float(a), Self::Float(b)) => {
+                let a = if *a == 0.0 { 0.0f64 } else { *a };
+                let b = if *b == 0.0 { 0.0f64 } else { *b };
+                a.to_bits() == b.to_bits()
+            }
             (Self::Str(a), Self::Str(b)) => a == b,
             (Self::BigInt(a), Self::BigInt(b)) => a == b,
             (Self::Decimal(a), Self::Decimal(b)) => a == b,
@@ -133,7 +137,10 @@ impl std::hash::Hash for Literal {
             Self::Null => {}
             Self::Bool(b) => b.hash(state),
             Self::Int(i) => i.hash(state),
-            Self::Float(f) => f.to_bits().hash(state),
+            Self::Float(f) => {
+                let f = if *f == 0.0 { 0.0f64 } else { *f };
+                f.to_bits().hash(state);
+            }
             Self::Str(s) => s.hash(state),
             Self::BigInt(b) => b.hash(state),
             Self::Decimal(d) => d.hash(state),
@@ -287,7 +294,10 @@ impl CacheEntry {
 #[derive(Clone, Debug)]
 pub struct PolyICSlot {
     pub entries: [CacheEntry; 4],
+    // `next`: victim slot for eviction (approximate LRU: updated away from last hit).
     pub next: u8,
+    // `last_hit`: index of most recently matched entry; steers eviction away from hot slots.
+    last_hit: u8,
 }
 
 impl PolyICSlot {
@@ -295,16 +305,21 @@ impl PolyICSlot {
         Self {
             entries: [CacheEntry::default(); 4],
             next: 0,
+            last_hit: 0,
         }
     }
 
     pub fn find_or_insert(&mut self, entry: CacheEntry) {
-        for e in &mut self.entries {
+        for (i, e) in self.entries.iter_mut().enumerate() {
             if e.matches(&entry) {
                 *e = entry;
+                self.last_hit = i as u8;
+                // Steer eviction to the slot opposite the hot slot.
+                self.next = (self.last_hit + 2) & 0x3;
                 return;
             }
         }
+        // Miss: evict `next`, which is steered away from the last-hit slot.
         self.entries[self.next as usize] = entry;
         self.next = (self.next + 1) & 0x3;
     }
@@ -374,6 +389,10 @@ pub struct LineEntry {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Default)]
 pub struct LineMapping {
     pub entries: Vec<LineEntry>,
+    // starts[i] = sum of entries[0..i].count (start instruction index of entry i).
+    // Kept in sync with entries at all times; not serialized (rebuilt after deserialization).
+    #[serde(skip)]
+    starts: Vec<u32>,
 }
 
 impl LineMapping {
@@ -381,21 +400,37 @@ impl LineMapping {
         if let Some(last) = self.entries.last_mut() {
             if last.line == line {
                 last.count += 1;
+                // starts[last] doesn't change — it's the start, not the end.
                 return;
             }
         }
+        // New entry starts right after all previous instructions.
+        let next_start: u32 = self.starts.last().copied().unwrap_or(0)
+            + self.entries.last().map(|e| e.count).unwrap_or(0);
+        self.starts.push(next_start);
         self.entries.push(LineEntry { count: 1, line });
     }
 
     pub fn get_line(&self, instruction_idx: usize) -> u32 {
-        let mut current = 0;
-        for entry in &self.entries {
-            current += entry.count as usize;
-            if instruction_idx < current {
-                return entry.line;
+        if self.starts.len() != self.entries.len() {
+            // starts out of sync (e.g. after deserialization) — fall back to linear
+            let mut base = 0usize;
+            for entry in &self.entries {
+                let next = base + entry.count as usize;
+                if instruction_idx < next {
+                    return entry.line;
+                }
+                base = next;
             }
+            return 0;
         }
-        0
+        let idx = instruction_idx as u32;
+        // Binary search: last entry whose start <= idx
+        let pos = self.starts.partition_point(|&s| s <= idx);
+        if pos == 0 {
+            return 0;
+        }
+        self.entries[pos - 1].line
     }
 
     pub fn truncate(&mut self, instruction_idx: usize) {
@@ -417,6 +452,7 @@ impl LineMapping {
         }
         if let Some(idx) = to_remove_from {
             self.entries.truncate(idx);
+            self.starts.truncate(idx);
         }
     }
 }
@@ -539,6 +575,7 @@ impl Chunk {
             OpCode::LoadNull | OpCode::LoadTrue | OpCode::LoadFalse => {
                 self.write(Self::pack_op(op, dest), line);
             }
+            OpCode::Move if dest == src => {} // elide no-op move
             _ => {
                 self.write(Self::pack_op(op, dest), line);
                 self.write(Self::pack(src, 0), line);
@@ -580,6 +617,7 @@ impl Chunk {
         self.write(op as u8 as u16, line);
         let patch_pos = self.code.len();
         self.write(0xFFFF, line);
+        self.write(0xFFFF, line);
         patch_pos
     }
 
@@ -587,25 +625,23 @@ impl Chunk {
         self.write(Self::pack_op(op, cond_reg), line);
         let patch_pos = self.code.len();
         self.write(0xFFFF, line);
+        self.write(0xFFFF, line);
         patch_pos
     }
 
     pub fn patch_jump(&mut self, patch_pos: usize) {
-        let offset = self.code.len() - patch_pos - 1;
-        assert!(
-            offset <= u16::MAX as usize,
-            "jump offset too large: {offset}"
-        );
-        self.code[patch_pos] = offset as u16;
+        let offset = self.code.len() - patch_pos - 2;
+        let offset = u32::try_from(offset).expect("jump offset overflows u32");
+        self.code[patch_pos] = (offset >> 16) as u16;
+        self.code[patch_pos + 1] = (offset & 0xFFFF) as u16;
     }
 
     pub fn emit_loop(&mut self, loop_start: usize, line: u32) {
-        let offset = self.code.len() - loop_start + 2;
-        assert!(
-            offset <= u16::MAX as usize,
-            "loop offset too large: {offset}"
-        );
-        self.emit1(OpCode::Loop, offset as u16, line);
+        let offset = self.code.len() - loop_start + 3;
+        let offset = u32::try_from(offset).expect("loop offset overflows u32");
+        self.write(OpCode::Loop as u8 as u16, line);
+        self.write((offset >> 16) as u16, line);
+        self.write((offset & 0xFFFF) as u16, line);
     }
 
     pub fn add_constant(&mut self, entry: PoolEntry) -> u16 {

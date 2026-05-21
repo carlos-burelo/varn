@@ -68,6 +68,9 @@ pub struct RunArgs {
 
     #[arg(long)]
     pub trace: bool,
+
+    #[arg(long, help = "Warn on implicit Dynamic types")]
+    pub strict: bool,
 }
 
 #[derive(Args)]
@@ -90,6 +93,9 @@ pub struct CheckArgs {
 
     #[arg(long, value_name = "PHASES")]
     pub debug: Option<String>,
+
+    #[arg(long, help = "Warn on implicit Dynamic types")]
+    pub strict: bool,
 }
 
 #[derive(Args)]

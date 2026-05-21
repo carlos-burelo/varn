@@ -137,10 +137,13 @@ fn parse_prop_key(s: &mut TokenStream) -> Result<PropKey, String> {
         TokenKind::Identifier => Ok(PropKey::Identifier(s.consume_lexeme().to_string())),
         TokenKind::Str => Ok(PropKey::Str(s.consume_lexeme().to_string())),
         TokenKind::IntegerLiteral => {
+            let pre_parsed = s.parsed_num();
             let raw = s.consume_lexeme();
-            Ok(PropKey::Int(
-                super::super::helpers::parse_int_radix(&raw).unwrap_or(0),
-            ))
+            let v = match pre_parsed {
+                Some(varn_core::ParsedNumber::Int(n)) => n,
+                _ => super::super::helpers::parse_int_radix(&raw).unwrap_or(0),
+            };
+            Ok(PropKey::Int(v))
         }
         TokenKind::LBracket => {
             s.advance();

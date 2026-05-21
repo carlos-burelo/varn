@@ -146,7 +146,14 @@ impl Checker {
                 let l_ty = self.infer_type(left, bind);
                 let r_ty = self.infer_type(right, bind);
                 match op {
-                    varn_core::ast::LogicalOp::And => r_ty,
+                    varn_core::ast::LogicalOp::And => {
+                        // a && b: returns a if falsy, b if truthy
+                        if l_ty == r_ty {
+                            l_ty
+                        } else {
+                            Type::union(vec![l_ty, r_ty])
+                        }
+                    }
                     varn_core::ast::LogicalOp::Nullish => {
                         let l_non_null = l_ty.non_nullified();
                         if l_non_null == r_ty {

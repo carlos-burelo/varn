@@ -3,6 +3,7 @@ use crate::frame::{VmClosure, VmClosurePayload, VmValueRef};
 use crate::gc::GcCollector;
 use crate::value::VmValue;
 use std::cell::RefCell;
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::rc::Rc;
 use varn_types::{
@@ -59,6 +60,26 @@ pub struct Heap {
     gc_collector: Option<GcCollector>,
 }
 
+#[inline]
+fn alloc_into(
+    objects: &mut Vec<Option<HeapObj>>,
+    free: &mut Vec<u32>,
+    alloc_count: &mut u64,
+    gc_alloc_since_collect: &mut u64,
+    obj: HeapObj,
+) -> u32 {
+    *alloc_count += 1;
+    *gc_alloc_since_collect += 1;
+    if let Some(idx) = free.pop() {
+        objects[idx as usize] = Some(obj);
+        idx
+    } else {
+        let idx = objects.len() as u32;
+        objects.push(Some(obj));
+        idx
+    }
+}
+
 impl Heap {
     pub fn new() -> Self {
         Self {
@@ -96,17 +117,7 @@ impl Heap {
     }
 
     pub fn alloc(&mut self, obj: HeapObj) -> u32 {
-        self.alloc_count += 1;
-        self.gc_alloc_since_collect += 1;
-        let idx = if let Some(idx) = self.free.pop() {
-            self.objects[idx as usize] = Some(obj);
-            idx
-        } else {
-            let idx = self.objects.len() as u32;
-            self.objects.push(Some(obj));
-            idx
-        };
-        idx
+        alloc_into(&mut self.objects, &mut self.free, &mut self.alloc_count, &mut self.gc_alloc_since_collect, obj)
     }
 
     #[inline(always)]
@@ -115,7 +126,7 @@ impl Heap {
     }
 
     #[inline(always)]
-    pub unsafe fn get_unchecked(&self, idx: u32) -> &HeapObj {
+    pub fn get_or_panic(&self, idx: u32) -> &HeapObj {
         self.objects
             .get(idx as usize)
             .and_then(|o| o.as_ref())
@@ -135,6 +146,8 @@ impl Heap {
             .expect("invalid heap index")
     }
 
+    /// Convert a `Value` to a `VmValue`, allocating heap objects as needed.
+    /// For strings, prefer `alloc_str` directly — it avoids the `Value` allocation.
     pub fn intern(&mut self, val: Value) -> VmValue {
         match val {
             Value::Null => VmValue::null(),
@@ -143,32 +156,40 @@ impl Heap {
             Value::Int(n) => VmValue::from_f64(n as f64),
             Value::Float(f) => VmValue::from_f64(f),
             Value::Char(c) => {
-                if let Some(&idx) = self.char_interner.get(&c) {
-                    VmValue::from_heap_idx(idx)
-                } else {
-                    let idx = self.alloc(HeapObj::Char(c));
-                    self.char_interner.insert(c, idx);
-                    VmValue::from_heap_idx(idx)
-                }
+                let idx = match self.char_interner.entry(c) {
+                    Entry::Occupied(e) => *e.get(),
+                    Entry::Vacant(e) => *e.insert(alloc_into(
+                        &mut self.objects, &mut self.free,
+                        &mut self.alloc_count, &mut self.gc_alloc_since_collect,
+                        HeapObj::Char(c),
+                    )),
+                };
+                VmValue::from_heap_idx(idx)
             }
             Value::Str(s) => self.alloc_str(s),
             Value::BigInt(n) => {
-                if let Some(&idx) = self.bigint_interner.get(&n) {
-                    VmValue::from_heap_idx(idx)
-                } else {
-                    let idx = self.alloc(HeapObj::BigInt(*n));
-                    self.bigint_interner.insert(*n, idx);
-                    VmValue::from_heap_idx(idx)
-                }
+                let n_val = *n;
+                let idx = match self.bigint_interner.entry(n_val) {
+                    Entry::Occupied(e) => *e.get(),
+                    Entry::Vacant(e) => *e.insert(alloc_into(
+                        &mut self.objects, &mut self.free,
+                        &mut self.alloc_count, &mut self.gc_alloc_since_collect,
+                        HeapObj::BigInt(n_val),
+                    )),
+                };
+                VmValue::from_heap_idx(idx)
             }
             Value::Decimal(d) => {
-                if let Some(&idx) = self.decimal_interner.get(&d) {
-                    VmValue::from_heap_idx(idx)
-                } else {
-                    let idx = self.alloc(HeapObj::Decimal(d.clone()));
-                    self.decimal_interner.insert(*d, idx);
-                    VmValue::from_heap_idx(idx)
-                }
+                let d_val = *d;
+                let idx = match self.decimal_interner.entry(d_val) {
+                    Entry::Occupied(e) => *e.get(),
+                    Entry::Vacant(e) => *e.insert(alloc_into(
+                        &mut self.objects, &mut self.free,
+                        &mut self.alloc_count, &mut self.gc_alloc_since_collect,
+                        HeapObj::Decimal(Box::new(d_val)),
+                    )),
+                };
+                VmValue::from_heap_idx(idx)
             }
             Value::Array(a) => {
                 let guard = a.borrow();
@@ -232,7 +253,10 @@ impl Heap {
     }
 
     pub fn extract(&self, nv: VmValue) -> Value {
-        self.extract_val(nv).unwrap_or(Value::Null)
+        match self.extract_val(nv) {
+            Ok(v) => v,
+            Err(e) => panic!("heap.extract: dangling or corrupted heap reference: {e}"),
+        }
     }
 
     pub fn extract_val(&self, nv: VmValue) -> VmResult<Value> {
@@ -296,21 +320,33 @@ impl Heap {
         if let Some(sso) = VmValue::try_from_sso(s_ref) {
             return sso;
         }
-        if let Some(&idx) = self.string_interner.get(s_ref) {
-            return VmValue::from_heap_idx(idx);
-        }
         let rs: RuntimeString = Rc::from(s_ref);
-        let idx = self.alloc(HeapObj::Str(rs.clone()));
-        self.string_interner.insert(rs, idx);
+        let idx = match self.string_interner.entry(rs) {
+            Entry::Occupied(e) => *e.get(),
+            Entry::Vacant(e) => {
+                let idx = alloc_into(
+                    &mut self.objects, &mut self.free,
+                    &mut self.alloc_count, &mut self.gc_alloc_since_collect,
+                    HeapObj::Str(e.key().clone()),
+                );
+                *e.insert(idx)
+            }
+        };
         VmValue::from_heap_idx(idx)
     }
 
     pub fn alloc_symbol(&mut self, s: RuntimeSymbol) -> VmValue {
-        if let Some(&idx) = self.symbol_interner.get(&s) {
-            return VmValue::from_heap_idx(idx);
-        }
-        let idx = self.alloc(HeapObj::Symbol(s.clone()));
-        self.symbol_interner.insert(s, idx);
+        let idx = match self.symbol_interner.entry(s) {
+            Entry::Occupied(e) => *e.get(),
+            Entry::Vacant(e) => {
+                let idx = alloc_into(
+                    &mut self.objects, &mut self.free,
+                    &mut self.alloc_count, &mut self.gc_alloc_since_collect,
+                    HeapObj::Symbol(e.key().clone()),
+                );
+                *e.insert(idx)
+            }
+        };
         VmValue::from_heap_idx(idx)
     }
 
@@ -455,13 +491,8 @@ impl Heap {
 
     pub fn should_trigger_gc(&self) -> bool {
         let used = self.objects.len() - self.free.len();
-        let free_ratio = if self.objects.len() > 0 {
-            self.free.len() as f64 / self.objects.len() as f64
-        } else {
-            0.0
-        };
-
-        free_ratio < 0.2 || used > 10000
+        // free_ratio < 0.2 without float division: free*5 < total
+        self.free.len() * 5 < self.objects.len() || used > 10000
     }
 
     #[inline(always)]

@@ -51,7 +51,14 @@ impl ExecCtx {
         'frame_loop: while self.frames.len() > depth {
             let frame_idx = self.frames.len() - 1;
 
-            let closure = self.frames[frame_idx].closure.clone();
+            // SAFETY: `closure` lives inside `self.frames[frame_idx]` which stays
+            // alive for the entire inner loop. We never push/pop frames inside the
+            // raw-pointer section without breaking to 'frame_loop first, so the
+            // referent is stable. Using a raw pointer avoids an Rc refcount bump on
+            // every frame entry (hot in recursive / iterative code).
+            let closure_ptr: *const crate::frame::VmClosure =
+                &*self.frames[frame_idx].closure;
+            let closure = unsafe { &*closure_ptr };
             let base = self.frames[frame_idx].base;
             let mut ip = self.frames[frame_idx].ip;
             let code_len = closure.proto.chunk.code.len();
@@ -80,6 +87,7 @@ impl ExecCtx {
                     }
                 };
 
+                #[cfg(feature = "profiling")]
                 if let Some(counts) = self.opcode_counts.as_ref() {
                     counts[(raw_op as u8) as usize]
                         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -184,6 +192,42 @@ impl ExecCtx {
                         reg![first_reg] = crate::exec::compare::logical_not(v);
                     }
 
+                    OpCode::AddImm => {
+                        let w1 = code[ip];
+                        ip += 1;
+                        let src = hi(w1) as usize;
+                        let imm = lo(w1) as i8 as i64;
+                        let v = reg![src];
+                        if v.is_int() {
+                            let (r, overflow) = v.as_int().overflowing_add(imm);
+                            reg![first_reg] = if overflow {
+                                VmValue::from_f64(v.as_int() as f64 + imm as f64)
+                            } else {
+                                VmValue::from_int(r)
+                            };
+                        } else {
+                            reg![first_reg] = crate::exec::arith::add(v, VmValue::from_int(imm), &mut self.heap)?;
+                        }
+                    }
+
+                    OpCode::SubImm => {
+                        let w1 = code[ip];
+                        ip += 1;
+                        let src = hi(w1) as usize;
+                        let imm = lo(w1) as i8 as i64;
+                        let v = reg![src];
+                        if v.is_int() {
+                            let (r, overflow) = v.as_int().overflowing_sub(imm);
+                            reg![first_reg] = if overflow {
+                                VmValue::from_f64(v.as_int() as f64 - imm as f64)
+                            } else {
+                                VmValue::from_int(r)
+                            };
+                        } else {
+                            reg![first_reg] = crate::exec::arith::sub(v, VmValue::from_int(imm), &mut self.heap)?;
+                        }
+                    }
+
                     OpCode::Eq
                     | OpCode::Neq
                     | OpCode::Lt
@@ -217,6 +261,26 @@ impl ExecCtx {
                         let combined = format!("{sa}{sb}");
                         reg![first_reg] = self.heap.alloc_str(combined);
                     }
+
+                    OpCode::BuildStr => {
+                        let count = hi(code[ip]) as usize;
+                        ip += 1;
+                        // Gather part strings, compute total capacity, concat in one alloc.
+                        let parts: Vec<String> = (0..count)
+                            .map(|i| {
+                                let reg_idx = hi(code[ip + i]) as usize;
+                                self.heap.str_repr(reg![reg_idx])
+                            })
+                            .collect();
+                        ip += count;
+                        let total_len: usize = parts.iter().map(|s| s.len()).sum();
+                        let mut combined = String::with_capacity(total_len);
+                        for p in &parts {
+                            combined.push_str(p);
+                        }
+                        reg![first_reg] = self.heap.alloc_str(combined);
+                    }
+
                     OpCode::StrLength => {
                         let src = hi(code[ip]);
                         ip += 1;
@@ -234,25 +298,25 @@ impl ExecCtx {
                     }
 
                     OpCode::Jump => {
-                        let offset = code[ip] as usize;
-                        ip += 1;
+                        let offset = ((code[ip] as u32) << 16 | code[ip + 1] as u32) as usize;
+                        ip += 2;
                         ip += offset;
                     }
                     OpCode::Loop => {
-                        let offset = code[ip] as usize;
-                        ip += 1;
+                        let offset = ((code[ip] as u32) << 16 | code[ip + 1] as u32) as usize;
+                        ip += 2;
                         ip -= offset;
                     }
                     OpCode::JumpIfFalse => {
-                        let offset = code[ip] as usize;
-                        ip += 1;
+                        let offset = ((code[ip] as u32) << 16 | code[ip + 1] as u32) as usize;
+                        ip += 2;
                         if !reg![first_reg].is_truthy() {
                             ip += offset;
                         }
                     }
                     OpCode::JumpIfTrue => {
-                        let offset = code[ip] as usize;
-                        ip += 1;
+                        let offset = ((code[ip] as u32) << 16 | code[ip + 1] as u32) as usize;
+                        ip += 2;
                         if reg![first_reg].is_truthy() {
                             ip += offset;
                         }
@@ -285,6 +349,8 @@ impl ExecCtx {
                             continue 'frame_loop;
                         }
 
+                        // exec_call_reg returned false: call resolved inline (native/bound),
+                        // no new frame was pushed. Re-fetch frame_idx in case frames shifted.
                         let frame_idx2 = self.frames.len() - 1;
                         ip = self.frames[frame_idx2].ip;
                     }
@@ -747,9 +813,11 @@ impl ExecCtx {
                         let w1 = code[ip];
                         ip += 1;
                         let err_reg = hi(w1) as u8;
-                        let catch_offset = code[ip] as i16 as isize;
-                        ip += 1;
-                        let catch_ip = (ip as isize + catch_offset) as usize;
+                        let offset_hi = code[ip] as u32;
+                        let offset_lo = code[ip + 1] as u32;
+                        let catch_offset = ((offset_hi << 16) | offset_lo) as usize;
+                        ip += 2;
+                        let catch_ip = ip + catch_offset;
                         crate::exec::exceptions::push_try(
                             &mut self.try_handlers,
                             catch_ip,

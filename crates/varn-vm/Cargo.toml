@@ -3,6 +3,9 @@ name = "varn-vm"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+profiling = []
+
 [dependencies]
 varn-types    = { path = "../varn-types" }
 varn-core     = { path = "../varn-core" }

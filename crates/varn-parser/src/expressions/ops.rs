@@ -8,7 +8,9 @@ use varn_core::TokenKind;
 pub(super) fn could_be_arrow(s: &TokenStream) -> bool {
     let k = s.kind();
     if k == TokenKind::LParen {
-        return true;
+        // Fast scan: look for closing ) followed by => (or : for return type then =>).
+        // Avoids full speculative parse for ordinary grouped expressions.
+        return paren_leads_to_arrow(s);
     }
     if k == TokenKind::Identifier && s.peek_kind(1) == TokenKind::FatArrow {
         return true;
@@ -20,6 +22,55 @@ pub(super) fn could_be_arrow(s: &TokenStream) -> bool {
         }
     }
     false
+}
+
+fn paren_leads_to_arrow(s: &TokenStream) -> bool {
+    let mut depth = 0i32;
+    let mut off = 0usize;
+    loop {
+        match s.peek_kind(off) {
+            TokenKind::LParen | TokenKind::LBracket | TokenKind::LBrace => depth += 1,
+            TokenKind::RParen | TokenKind::RBracket | TokenKind::RBrace => {
+                depth -= 1;
+                if depth == 0 {
+                    // After the closing paren: optional `: type`, then `=>`
+                    let mut next_off = off + 1;
+                    if s.peek_kind(next_off) == TokenKind::Colon {
+                        // skip over return type annotation tokens until we hit => or something else
+                        next_off += 1;
+                        let mut type_depth = 0i32;
+                        loop {
+                            match s.peek_kind(next_off) {
+                                TokenKind::LAngle | TokenKind::LBracket | TokenKind::LParen => {
+                                    type_depth += 1;
+                                }
+                                TokenKind::RAngle | TokenKind::RBracket | TokenKind::RParen => {
+                                    type_depth -= 1;
+                                }
+                                TokenKind::FatArrow if type_depth == 0 => return true,
+                                TokenKind::EOF
+                                | TokenKind::Semicolon
+                                | TokenKind::LBrace
+                                | TokenKind::RBrace => return false,
+                                _ => {}
+                            }
+                            next_off += 1;
+                            if next_off > 128 {
+                                return true; // give up, let speculative parse decide
+                            }
+                        }
+                    }
+                    return s.peek_kind(next_off) == TokenKind::FatArrow;
+                }
+            }
+            TokenKind::EOF | TokenKind::Semicolon => return false,
+            _ => {}
+        }
+        off += 1;
+        if off > 128 {
+            return true; // give up, let speculative parse decide
+        }
+    }
 }
 
 pub(super) fn try_parse_arrow(s: &mut TokenStream) -> Result<Option<Expr>, String> {

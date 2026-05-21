@@ -11,8 +11,12 @@ pub struct CheckResult {
     pub checker_result: varn_checker::CheckResult,
 }
 
-pub fn check(program: &Program, source: &str, debug: &DebugFlags) -> PipelineResult<CheckResult> {
-    let check_result = Checker::check(program);
+pub fn check(program: &Program, source: &str, debug: &DebugFlags, strict: bool) -> PipelineResult<CheckResult> {
+    let check_result = if strict {
+        Checker::check_strict(program)
+    } else {
+        Checker::check(program)
+    };
     if !check_result.diagnostics.is_empty() {
         let mut msgs = Vec::new();
         let error_count = check_result

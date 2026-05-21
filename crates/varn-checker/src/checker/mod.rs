@@ -125,22 +125,30 @@ pub struct Checker {
 
     pub(crate) record_expr_types: bool,
     pub(crate) node_scopes: FxHashMap<u32, ScopeId>,
+
+    // Cache for map_generics: (base_type, sorted_type_args) -> instantiated_type.
+    // Key vec is sorted by param name to give a stable order.
+    pub(crate) map_generics_cache: FxHashMap<(Type, Vec<Type>), Type>,
 }
 
 impl Checker {
     pub fn check(program: &Program) -> CheckResult {
-        Self::check_internal(program, false)
+        Self::check_internal(program, false, false)
+    }
+
+    pub fn check_strict(program: &Program) -> CheckResult {
+        Self::check_internal(program, false, true)
     }
 
     pub fn check_for_lsp(program: &Program) -> CheckResult {
-        Self::check_internal(program, true)
+        Self::check_internal(program, true, false)
     }
 
     pub fn check_with_profile(program: &Program) -> CheckResult {
-        Self::check_internal(program, true)
+        Self::check_internal(program, true, false)
     }
 
-    fn check_internal(program: &Program, record_expr_types: bool) -> CheckResult {
+    fn check_internal(program: &Program, record_expr_types: bool, warn_implicit_dynamic: bool) -> CheckResult {
         let mut profile = CheckProfile::default();
 
         let is_builtin = crate::builtins::is_builtin_file(&program.filename);
@@ -200,11 +208,12 @@ impl Checker {
             extension_set_members: FxHashMap::default(),
             member_exists_cache: FxHashMap::with_capacity_and_hasher(256, Default::default()),
             member_type_cache: FxHashMap::with_capacity_and_hasher(1024, Default::default()),
-            warn_implicit_dynamic: false,
+            warn_implicit_dynamic,
             expected_type: None,
             call_mappings: FxHashMap::default(),
             record_expr_types,
             node_scopes: FxHashMap::default(),
+            map_generics_cache: FxHashMap::with_capacity_and_hasher(512, Default::default()),
         };
 
         let started = Instant::now();

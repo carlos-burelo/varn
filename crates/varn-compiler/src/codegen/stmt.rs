@@ -15,6 +15,23 @@ use varn_core::{MemberKey, OpCode};
 pub fn compile_stmts<'a>(c: &mut Compiler<'a>, stmts: &[Stmt]) {
     for stmt in stmts {
         compile_stmt(c, stmt);
+        if stmt_terminates(stmt) {
+            break;
+        }
+    }
+}
+
+fn stmt_terminates(stmt: &Stmt) -> bool {
+    match &stmt.kind {
+        StmtKind::Return { .. } | StmtKind::Throw { .. } => true,
+        StmtKind::Break { .. } | StmtKind::Continue { .. } => true,
+        StmtKind::Block { stmts } => stmts.iter().any(stmt_terminates),
+        StmtKind::If { consequent, alternate, .. } => {
+            alternate.as_ref().map_or(false, |alt| {
+                stmt_terminates(consequent) && stmt_terminates(alt)
+            })
+        }
+        _ => false,
     }
 }
 
@@ -353,9 +370,11 @@ pub fn compile_stmt<'a>(c: &mut Compiler<'a>, stmt: &Stmt) {
             c.emit_loop(loop_start);
             c.patch_jump(exit_j);
 
-            c.free_reg();
-            c.free_reg();
-            c.free_reg();
+            // Free loop-internal registers before patching break jump targets so
+            // regalloc sees their live ranges end before the break landing pads.
+            c.free_reg(); // result_obj (or awaited)
+            c.free_reg(); // iterator
+            c.free_reg(); // iter_fn
             for p in ctx.break_jumps {
                 c.patch_jump(p);
             }
@@ -411,6 +430,7 @@ pub fn compile_stmt<'a>(c: &mut Compiler<'a>, stmt: &Stmt) {
             catch,
             finally,
         } => {
+            // Push finally onto stack so return/break/continue inside try body emit it.
             if let Some(fin) = finally {
                 c.finally_stack.push(fin.as_ref().clone());
             }
@@ -421,26 +441,67 @@ pub fn compile_stmt<'a>(c: &mut Compiler<'a>, stmt: &Stmt) {
             c.chunk.write(crate::chunk::Chunk::pack(err_reg, 0), line);
             let try_patch = c.chunk.code.len();
             c.chunk.write(0xFFFF, line);
+            c.chunk.write(0xFFFF, line);
 
             compile_stmt(c, block);
-            if finally.is_some() {
-                c.finally_stack.pop();
-            }
+
+            // Pop finally AFTER try body so return/break inside try body see it.
+            // Keep it on the stack while compiling catch (see below).
             c.emit(OpCode::PopTry);
-            let finally_j = c.emit_jump(OpCode::Jump);
+            let after_try_j = c.emit_jump(OpCode::Jump);
             c.patch_jump(try_patch);
 
             if let Some(catch_clause) = catch {
-                c.push_scope();
-                if let Some(param) = &catch_clause.param {
-                    declare_pattern_local(c, param, err_reg);
+                // Pop finally from stack now so catch body's return/break/continue
+                // don't double-emit it. We protect the catch body with its own Try
+                // so exceptions in catch still reach finally.
+                if finally.is_some() {
+                    c.finally_stack.pop();
                 }
-                compile_stmt(c, &catch_clause.body);
-                c.pop_scope();
-            }
-            c.free_reg();
 
-            c.patch_jump(finally_j);
+                if let Some(fin) = finally {
+                    // Wrap catch body in Try so exceptions reach finally + rethrow.
+                    let catch_err_reg = c.alloc_reg();
+                    c.chunk.emit(OpCode::Try, line);
+                    c.chunk.write(Chunk::pack(catch_err_reg, 0), line);
+                    let catch_try_patch = c.chunk.code.len();
+                    c.chunk.write(0xFFFF, line);
+                    c.chunk.write(0xFFFF, line);
+
+                    c.push_scope();
+                    if let Some(param) = &catch_clause.param {
+                        declare_pattern_local(c, param, err_reg);
+                    }
+                    compile_stmt(c, &catch_clause.body);
+                    c.pop_scope();
+
+                    c.emit(OpCode::PopTry);
+                    let catch_finally_j = c.emit_jump(OpCode::Jump);
+                    c.patch_jump(catch_try_patch);
+
+                    // Exception path in catch: run finally then rethrow.
+                    compile_stmt(c, fin);
+                    c.chunk.emit(OpCode::Throw, line);
+                    c.chunk
+                        .write(Chunk::pack(catch_err_reg, catch_err_reg), line);
+
+                    c.patch_jump(catch_finally_j);
+                    c.free_reg(); // catch_err_reg
+                } else {
+                    c.push_scope();
+                    if let Some(param) = &catch_clause.param {
+                        declare_pattern_local(c, param, err_reg);
+                    }
+                    compile_stmt(c, &catch_clause.body);
+                    c.pop_scope();
+                }
+            } else if finally.is_some() {
+                c.finally_stack.pop();
+            }
+
+            c.free_reg(); // err_reg
+
+            c.patch_jump(after_try_j);
             if let Some(fin) = finally {
                 compile_stmt(c, fin);
             }

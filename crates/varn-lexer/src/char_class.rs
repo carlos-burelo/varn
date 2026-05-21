@@ -20,7 +20,12 @@ pub(crate) fn is_octal_digit(c: u8) -> bool {
 
 #[inline]
 pub(crate) fn is_identifier_start(c: u8) -> bool {
-    c.is_ascii_lowercase() || c.is_ascii_uppercase() || c == b'_' || c == b'$' || c > 127
+    c.is_ascii_lowercase() || c.is_ascii_uppercase() || c == b'_' || c == b'$'
+}
+
+#[inline]
+pub(crate) fn is_identifier_start_char(c: char) -> bool {
+    c.is_alphabetic() || c == '_' || c == '$'
 }
 
 #[inline]

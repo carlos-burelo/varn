@@ -12,10 +12,10 @@ path = "src/main.rs"
 varn-diagnostics = { path = "../varn-diagnostics" }
 varn-core     = { path = "../varn-core" }
 varn-lexer    = { path = "../varn-lexer" }
-varn-parser   = { path = "../varn-parser" }
+varn-parser   = { path = "../varn-parser", features = ["profiling"] }
 varn-checker  = { path = "../varn-checker" }
 varn-compiler = { path = "../varn-compiler" }
-varn-vm       = { path = "../varn-vm" }
+varn-vm       = { path = "../varn-vm", features = ["profiling"] }
 varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
 # varn-lsp      = { path = "../varn-lsp" }
 varn-modules  = { path = "../varn-modules" }
