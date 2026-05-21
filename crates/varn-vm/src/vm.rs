@@ -80,7 +80,7 @@ impl Vm {
         let nan_closure = Rc::new(VmClosure::with_upvalues(
             closure.proto.clone(),
             upvalues,
-            constants,
+            Rc::new(constants),
             new_ic_cache,
             new_feedback,
         ));
@@ -214,6 +214,9 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
             OpCode::LoadNull
             | OpCode::LoadTrue
             | OpCode::LoadFalse
+            | OpCode::LoadIntZero
+            | OpCode::LoadIntOne
+            | OpCode::LoadIntMinusOne
             | OpCode::Nop
             | OpCode::PopTry => {
                 ip += 1;
@@ -359,9 +362,11 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
             }
 
             OpCode::BuildStr => {
-                if ip < chunk.code.len() {
-                    let count = (chunk.code[ip] >> 8) as usize;
-                    ip += 1 + count;
+                // [pack_op(op,dest), pack(count,0), pack(reg0,0), ...]
+                // count is in word[1] high byte
+                if ip + 1 < chunk.code.len() {
+                    let count = (chunk.code[ip + 1] >> 8) as usize;
+                    ip += 2 + count;
                 } else {
                     ip += 1;
                 }

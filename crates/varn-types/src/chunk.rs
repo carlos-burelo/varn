@@ -293,7 +293,7 @@ impl CacheEntry {
 
 #[derive(Clone, Debug)]
 pub struct PolyICSlot {
-    pub entries: [CacheEntry; 4],
+    pub entries: [CacheEntry; 8],
     // `next`: victim slot for eviction (approximate LRU: updated away from last hit).
     pub next: u8,
     // `last_hit`: index of most recently matched entry; steers eviction away from hot slots.
@@ -303,7 +303,7 @@ pub struct PolyICSlot {
 impl PolyICSlot {
     pub fn new() -> Self {
         Self {
-            entries: [CacheEntry::default(); 4],
+            entries: [CacheEntry::default(); 8],
             next: 0,
             last_hit: 0,
         }
@@ -315,13 +315,13 @@ impl PolyICSlot {
                 *e = entry;
                 self.last_hit = i as u8;
                 // Steer eviction to the slot opposite the hot slot.
-                self.next = (self.last_hit + 2) & 0x3;
+                self.next = (self.last_hit + 4) & 0x7;
                 return;
             }
         }
         // Miss: evict `next`, which is steered away from the last-hit slot.
         self.entries[self.next as usize] = entry;
-        self.next = (self.next + 1) & 0x3;
+        self.next = (self.next + 1) & 0x7;
     }
 }
 
@@ -669,12 +669,18 @@ impl Chunk {
     }
 
     pub fn emit_load_int(&mut self, dest: u8, n: i64, line: u32) {
-        if n >= i16::MIN as i64 && n <= i16::MAX as i64 {
-            self.write(Self::pack_op(OpCode::LoadInt, dest), line);
-            self.write(n as i16 as u16, line);
-        } else {
-            let idx = self.add_int(n);
-            self.emit_rc(OpCode::LoadConst, dest, idx, line);
+        match n {
+            0 => self.write(Self::pack_op(OpCode::LoadIntZero, dest), line),
+            1 => self.write(Self::pack_op(OpCode::LoadIntOne, dest), line),
+            -1 => self.write(Self::pack_op(OpCode::LoadIntMinusOne, dest), line),
+            _ if n >= i16::MIN as i64 && n <= i16::MAX as i64 => {
+                self.write(Self::pack_op(OpCode::LoadInt, dest), line);
+                self.write(n as i16 as u16, line);
+            }
+            _ => {
+                let idx = self.add_int(n);
+                self.emit_rc(OpCode::LoadConst, dest, idx, line);
+            }
         }
     }
 

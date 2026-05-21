@@ -42,6 +42,9 @@ pub struct ExecCtx {
     pub profile_counters: Option<Arc<ProfileCounters>>,
 
     pub proto_ic_caches: FxHashMap<usize, Rc<RefCell<Vec<varn_types::chunk::PolyICSlot>>>>,
+    pub proto_feedback:
+        FxHashMap<usize, Rc<RefCell<varn_types::chunk::FeedbackVector>>>,
+    pub proto_constants: FxHashMap<usize, Rc<Vec<VmValue>>>,
 }
 
 impl ExecCtx {
@@ -74,6 +77,8 @@ impl ExecCtx {
             opcode_counts: None,
             profile_counters: None,
             proto_ic_caches: FxHashMap::default(),
+            proto_feedback: FxHashMap::default(),
+            proto_constants: FxHashMap::default(),
         };
 
         if fresh {
@@ -146,6 +151,8 @@ impl ExecCtx {
             opcode_counts: None,
             profile_counters: None,
             proto_ic_caches: FxHashMap::default(),
+            proto_feedback: FxHashMap::default(),
+            proto_constants: FxHashMap::default(),
         }
     }
 
@@ -228,7 +235,7 @@ impl ExecCtx {
         let closure = Rc::new(VmClosure::with_upvalues(
             Rc::clone(&task.closure.proto),
             upvalues,
-            constants,
+            Rc::new(constants),
             new_ic_cache,
             new_feedback,
         ));

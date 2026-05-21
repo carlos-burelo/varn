@@ -114,6 +114,15 @@ impl ExecCtx {
                         ip += 1;
                         reg![first_reg] = VmValue::from_int(val as i64);
                     }
+                    OpCode::LoadIntZero => {
+                        reg![first_reg] = VmValue::from_int(0);
+                    }
+                    OpCode::LoadIntOne => {
+                        reg![first_reg] = VmValue::from_int(1);
+                    }
+                    OpCode::LoadIntMinusOne => {
+                        reg![first_reg] = VmValue::from_int(-1);
+                    }
                     OpCode::LoadConst => {
                         let cidx = code[ip] as usize;
                         ip += 1;
@@ -454,10 +463,17 @@ impl ExecCtx {
                                 upvalues.push(closure.upvalues[index].clone());
                             }
                         }
-                        let constants =
-                            crate::exec::calls::resolve_constants(&proto, &mut self.heap);
-
                         let proto_ptr = std::rc::Rc::as_ptr(&proto) as usize;
+                        let constants = self
+                            .proto_constants
+                            .entry(proto_ptr)
+                            .or_insert_with(|| {
+                                std::rc::Rc::new(crate::exec::calls::resolve_constants(
+                                    &proto,
+                                    &mut self.heap,
+                                ))
+                            })
+                            .clone();
                         let ic_cache = self
                             .proto_ic_caches
                             .entry(proto_ptr)
@@ -469,9 +485,15 @@ impl ExecCtx {
                                 ))
                             })
                             .clone();
-                        let new_feedback = std::rc::Rc::new(std::cell::RefCell::new(
-                            varn_types::chunk::FeedbackVector::new(proto.cache_count),
-                        ));
+                        let new_feedback = self
+                            .proto_feedback
+                            .entry(proto_ptr)
+                            .or_insert_with(|| {
+                                std::rc::Rc::new(std::cell::RefCell::new(
+                                    varn_types::chunk::FeedbackVector::new(proto.cache_count),
+                                ))
+                            })
+                            .clone();
                         let vm_closure = std::rc::Rc::new(crate::frame::VmClosure::with_upvalues(
                             proto,
                             upvalues,

@@ -31,8 +31,6 @@ pub fn compile_function<'a>(
         parent.current_superclass.clone(),
     );
 
-    child.enable_ir_collection();
-
     let mut arity = 0usize;
 
     if has_this {

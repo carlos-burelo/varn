@@ -555,7 +555,7 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn finish_module(self) -> FunctionProto {
-        let proto = FunctionProto {
+        let mut proto = FunctionProto {
             name: Some(self.name),
             arity: self.arity,
             register_count: self.regs.max as u16,
@@ -567,12 +567,12 @@ impl<'a> Compiler<'a> {
             cache_count: self.cache_count as usize,
             chunk: self.chunk,
         };
-
+        super::regalloc_post::optimize_function(&mut proto);
         proto
     }
 
     pub fn finish_function(self) -> (FunctionProto, Vec<UpvalueDesc>) {
-        let proto = FunctionProto {
+        let mut proto = FunctionProto {
             name: Some(self.name),
             arity: self.arity,
             register_count: self.regs.max as u16,
@@ -584,6 +584,7 @@ impl<'a> Compiler<'a> {
             cache_count: self.cache_count as usize,
             chunk: self.chunk,
         };
+        super::regalloc_post::optimize_function(&mut proto);
         (proto, self.upvalues)
     }
 
