@@ -15,8 +15,9 @@ pub fn parse_class_decl(
     s.expect(TokenKind::Class)?;
 
     let (id, id_offset) = if s.check(TokenKind::Identifier) {
-        let tok = s.consume();
-        (Some(tok.lexeme), tok.range.start.offset)
+        let id_offset = s.token().range.start.offset;
+        let id = s.consume_lexeme();
+        (Some(id), id_offset)
     } else {
         (None, 0)
     };
@@ -303,15 +304,15 @@ fn parse_class_member(s: &mut TokenStream, class_is_declare: bool) -> Result<Cla
 
 pub(super) fn member_key_name(s: &mut TokenStream) -> Result<String, String> {
     match s.kind() {
-        TokenKind::Identifier => Ok(s.consume().lexeme.into_owned()),
-        TokenKind::Str => Ok(s.consume().lexeme.into_owned()),
-        TokenKind::IntegerLiteral => Ok(s.consume().lexeme.into_owned()),
+        TokenKind::Identifier => Ok(s.consume_str()),
+        TokenKind::Str => Ok(s.consume_str()),
+        TokenKind::IntegerLiteral => Ok(s.consume_str()),
         TokenKind::Hash => {
             s.advance();
-            Ok(format!("#{}", s.consume().lexeme))
+            Ok(format!("#{}", s.consume_str()))
         }
         _ if s.kind().can_be_identifier() || s.kind().is_keyword() => {
-            Ok(s.consume().lexeme.into_owned())
+            Ok(s.consume_str())
         }
         _ => Err(format!("Expected class member name, got {:?}", s.kind())),
     }

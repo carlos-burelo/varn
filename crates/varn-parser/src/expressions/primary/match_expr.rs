@@ -93,6 +93,7 @@ fn parse_identifier_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, S
             varn_core::ast::ExprKind::Identifier { name: name.clone() },
         );
         s.advance();
+        let prop_name = s.lexeme().to_owned();
         let prop_tok = s.consume();
         let prop_range = prop_tok.range;
         let expr = Expr::new_with_range(
@@ -102,7 +103,7 @@ fn parse_identifier_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, S
                 property: Box::new(Expr::new_with_range(
                     prop_range,
                     varn_core::ast::ExprKind::Identifier {
-                        name: prop_tok.lexeme.to_string().into(),
+                        name: prop_name.into(),
                     },
                 )),
                 computed: false,

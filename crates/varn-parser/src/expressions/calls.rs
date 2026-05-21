@@ -113,6 +113,7 @@ pub fn parse_new_callee_expr(s: &mut TokenStream) -> Result<Expr, String> {
         match s.kind() {
             TokenKind::Dot => {
                 s.advance();
+                let prop_name = s.lexeme().to_owned();
                 let tok = s.consume();
                 let prop_range = tok.range;
                 let start_range = *expr.range();
@@ -123,7 +124,7 @@ pub fn parse_new_callee_expr(s: &mut TokenStream) -> Result<Expr, String> {
                         property: Box::new(Expr::new_with_range(
                             prop_range,
                             ExprKind::Identifier {
-                                name: tok.lexeme.to_string().into(),
+                                name: prop_name.into(),
                             },
                         )),
                         computed: false,
@@ -159,6 +160,7 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
         match s.kind() {
             TokenKind::Dot => {
                 s.advance();
+                let prop_name = s.lexeme().to_owned();
                 let prop_tok = s.consume();
                 let prop_range = prop_tok.range;
                 let start_range = *expr.range();
@@ -169,7 +171,7 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
                         property: Box::new(Expr::new_with_range(
                             prop_range,
                             ExprKind::Identifier {
-                                name: prop_tok.lexeme.to_string().into(),
+                                name: prop_name.into(),
                             },
                         )),
                         computed: false,
@@ -206,6 +208,7 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
                         },
                     );
                 } else {
+                    let prop_name = s.lexeme().to_owned();
                     let prop_tok = s.consume();
                     let prop_range = prop_tok.range;
                     let start_range = *expr.range();
@@ -216,7 +219,7 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
                             property: Box::new(Expr::new_with_range(
                                 prop_range,
                                 ExprKind::Identifier {
-                                    name: prop_tok.lexeme.to_string().into(),
+                                    name: prop_name.into(),
                                 },
                             )),
                             computed: false,

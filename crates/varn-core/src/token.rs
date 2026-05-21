@@ -414,8 +414,6 @@ impl TokenKind {
     }
 }
 
-use std::borrow::Cow;
-
 /// Parsed numeric value attached to integer/float literal tokens so the parser
 /// never needs to re-parse the lexeme.
 #[derive(Clone, Copy, Debug)]
@@ -427,32 +425,32 @@ pub enum ParsedNumber {
 #[derive(Clone, Debug)]
 pub struct Token {
     pub kind: TokenKind,
-    pub lexeme: Cow<'static, str>,
     pub range: SourceRange,
     /// Set for integer/float/binary/octal/hex literal tokens.
     pub parsed_num: Option<ParsedNumber>,
+    /// Byte offset into the shared lexeme buffer returned by the lexer.
+    pub lex_start: u32,
+    pub lex_len: u32,
 }
 
 impl Token {
-    pub fn new(kind: TokenKind, lexeme: impl Into<Cow<'static, str>>, range: SourceRange) -> Self {
-        Token {
-            kind,
-            lexeme: lexeme.into(),
-            range,
-            parsed_num: None,
-        }
+    pub fn new(kind: TokenKind, range: SourceRange, lex_start: u32, lex_len: u32) -> Self {
+        Token { kind, range, parsed_num: None, lex_start, lex_len }
     }
 
     pub fn eof(range: SourceRange) -> Self {
-        Token {
-            kind: TokenKind::EOF,
-            lexeme: Cow::Borrowed(""),
-            range,
-            parsed_num: None,
-        }
+        Token { kind: TokenKind::EOF, range, parsed_num: None, lex_start: 0, lex_len: 0 }
     }
 
     pub fn is(&self, kind: TokenKind) -> bool {
         self.kind == kind
+    }
+
+    /// Retrieve the lexeme slice from the shared buffer.
+    #[inline]
+    pub fn get_lexeme<'a>(&self, buf: &'a [u8]) -> &'a str {
+        let start = self.lex_start as usize;
+        let end = (self.lex_start + self.lex_len) as usize;
+        std::str::from_utf8(&buf[start..end]).unwrap_or("")
     }
 }

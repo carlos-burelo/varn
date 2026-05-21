@@ -4,6 +4,7 @@ use varn_core::{ErrorCode, ParsedNumber, SourceRange, Token, TokenKind};
 
 pub struct TokenStream {
     tokens: Vec<Token>,
+    lexeme_buf: Rc<[u8]>,
     pos: usize,
     pub filename: Rc<str>,
 
@@ -14,9 +15,10 @@ pub struct TokenStream {
 }
 
 impl TokenStream {
-    pub fn new(tokens: Vec<Token>, filename: Rc<str>) -> Self {
+    pub fn new(tokens: Vec<Token>, lexeme_buf: Rc<[u8]>, filename: Rc<str>) -> Self {
         TokenStream {
             tokens,
+            lexeme_buf,
             pos: 0,
             filename,
             pending_doc: None,
@@ -72,7 +74,15 @@ impl TokenStream {
 
     #[inline]
     pub fn lexeme(&self) -> &str {
-        &self.token().lexeme
+        let tok = self.token();
+        tok.get_lexeme(&self.lexeme_buf)
+    }
+
+    /// Consume the current token and return its lexeme as an owned `String`.
+    pub fn consume_str(&mut self) -> String {
+        let s = self.lexeme().to_owned();
+        self.advance();
+        s
     }
 
     #[inline]
@@ -98,6 +108,7 @@ impl TokenStream {
 
     pub fn consume(&mut self) -> Token {
         if self.pos < self.tokens.len() {
+            // Token is now a plain struct with only u32 fields — clone is free.
             let t = self.tokens[self.pos].clone();
             self.pos += 1;
             t
@@ -107,7 +118,7 @@ impl TokenStream {
     }
 
     pub fn consume_lexeme(&mut self) -> std::rc::Rc<str> {
-        let lexeme = varn_core::intern_string(&self.token().lexeme);
+        let lexeme = varn_core::intern_string(self.lexeme());
         self.advance();
         lexeme
     }
@@ -127,9 +138,10 @@ impl TokenStream {
             Ok(())
         } else {
             let tok = self.token();
+            let lex = tok.get_lexeme(&self.lexeme_buf);
             Err(format!(
                 "Expected {:?}, got {:?} ({:?}) at {}:{}",
-                kind, tok.kind, tok.lexeme, tok.range.start.line, tok.range.start.column
+                kind, tok.kind, lex, tok.range.start.line, tok.range.start.column
             ))
         }
     }
@@ -139,9 +151,10 @@ impl TokenStream {
             Ok(self.consume_lexeme())
         } else {
             let tok = self.token();
+            let lex = tok.get_lexeme(&self.lexeme_buf);
             Err(format!(
                 "Expected {:?}, got {:?} ({:?}) at {}:{}",
-                kind, tok.kind, tok.lexeme, tok.range.start.line, tok.range.start.column
+                kind, tok.kind, lex, tok.range.start.line, tok.range.start.column
             ))
         }
     }
@@ -151,9 +164,10 @@ impl TokenStream {
             Ok(self.consume())
         } else {
             let tok = self.token();
+            let lex = tok.get_lexeme(&self.lexeme_buf);
             Err(format!(
                 "Expected {:?}, got {:?} ({:?}) at {}:{}",
-                kind, tok.kind, tok.lexeme, tok.range.start.line, tok.range.start.column
+                kind, tok.kind, lex, tok.range.start.line, tok.range.start.column
             ))
         }
     }
@@ -163,9 +177,10 @@ impl TokenStream {
             Ok(self.consume_lexeme())
         } else {
             let tok = self.token();
+            let lex = tok.get_lexeme(&self.lexeme_buf);
             Err(format!(
                 "Expected Identifier, got {:?} ({:?}) at {}:{}",
-                tok.kind, tok.lexeme, tok.range.start.line, tok.range.start.column
+                tok.kind, lex, tok.range.start.line, tok.range.start.column
             ))
         }
     }
@@ -212,6 +227,13 @@ impl TokenStream {
 
     pub fn restore(&mut self, p: usize) {
         self.pos = p;
+    }
+
+    /// Access the raw lexeme buffer (needed when deriving lexeme from a `Token`
+    /// returned by `consume()` or `expect_token()`).
+    #[inline]
+    pub fn lexeme_buf(&self) -> &[u8] {
+        &self.lexeme_buf
     }
 
     pub fn store_pending_doc(&mut self, doc: Rc<str>) {

@@ -107,8 +107,8 @@ fn compile_source(
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_else(|_| path.to_owned());
     let path = canonical_path.as_str();
-    let tokens = lex::lex(source, path, verbose, debug);
-    let mut program = parse::parse(tokens, source, path, verbose, debug)?;
+    let (tokens, lexeme_buf) = lex::lex(source, path, verbose, debug);
+    let mut program = parse::parse(tokens, lexeme_buf, source, path, verbose, debug)?;
     varn_core::assign_ast_ids(&mut program);
     let check_result = check::check(&program, source, debug, strict)?;
     let compiled = compile::compile(&program, source, check_result, verbose, debug)?;
@@ -152,14 +152,15 @@ fn read_source(path: &str) -> PipelineResult<String> {
         .map_err(|e| CliError::fatal(format!("error[io]: cannot read '{}': {}", path, e)))
 }
 
-pub fn lex_raw(source: &str, path: &str) -> Vec<varn_core::Token> {
+pub fn lex_raw(source: &str, path: &str) -> (Vec<varn_core::Token>, std::rc::Rc<[u8]>) {
     lex::lex(source, path, false, &DebugFlags::default())
 }
 
 pub fn parse_raw(
     tokens: Vec<varn_core::Token>,
+    lexeme_buf: std::rc::Rc<[u8]>,
     source: &str,
     path: &str,
 ) -> PipelineResult<varn_core::ast::Program> {
-    parse::parse(tokens, source, path, false, &DebugFlags::default())
+    parse::parse(tokens, lexeme_buf, source, path, false, &DebugFlags::default())
 }

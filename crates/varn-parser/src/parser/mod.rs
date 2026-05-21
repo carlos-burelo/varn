@@ -21,9 +21,9 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(tokens: Vec<varn_core::Token>, filename: Rc<str>) -> Self {
+    pub fn new(tokens: Vec<varn_core::Token>, lexeme_buf: Rc<[u8]>, filename: Rc<str>) -> Self {
         Parser {
-            stream: TokenStream::new(tokens, filename),
+            stream: TokenStream::new(tokens, lexeme_buf, filename),
             diagnostics: varn_core::DiagnosticBag::new(),
         }
     }

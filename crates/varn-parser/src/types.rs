@@ -532,8 +532,9 @@ pub fn parse_type_params(s: &mut TokenStream) -> Result<Vec<TypeParam>, String> 
     let mut params = vec![];
     while !s.check(TokenKind::RAngle) && !s.is_eof() {
         let range = s.range();
-        let name_tok = s.expect_token(TokenKind::Identifier)?;
-        let name = varn_core::intern_string(&name_tok.lexeme);
+        let name_str = s.lexeme().to_owned();
+        let _name_tok = s.expect_token(TokenKind::Identifier)?;
+        let name = varn_core::intern_string(&name_str);
         let constraint = if s.eat(TokenKind::Extends) {
             Some(parse_union_type(s)?)
         } else {

@@ -270,8 +270,8 @@ fn cache_get_or_insert_ref(abs_path: &str) -> Option<Rc<BindResult>> {
 
     let canonical_abs = canonical_or_original(Path::new(abs_path));
     let source = read_to_string(&canonical_abs).ok()?;
-    let (tokens, lex_errs) = varn_lexer::scan(&source, &canonical_abs);
-    let program = varn_parser::parse(tokens, &canonical_abs).ok()?;
+    let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(&source, &canonical_abs);
+    let program = varn_parser::parse(tokens, lexeme_buf, &canonical_abs).ok()?;
     let mut bind = Binder::bind(&program);
     for e in lex_errs {
         bind.diagnostics.emit(e);
@@ -311,8 +311,8 @@ fn resolve_inner(abs_path: &str, visiting: &mut Vec<String>) -> ExportMap {
         Err(_) => return FxHashMap::default(),
     };
 
-    let (tokens, lex_errs) = varn_lexer::scan(&source, abs_path);
-    let program = match varn_parser::parse(tokens, abs_path) {
+    let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(&source, abs_path);
+    let program = match varn_parser::parse(tokens, lexeme_buf, abs_path) {
         Ok(p) => {
             for _e in lex_errs {}
             Rc::new(p)

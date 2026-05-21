@@ -226,12 +226,13 @@ pub fn run_bench(
         Ok(())
     })?;
 
-    let (tokens, _) = varn_lexer::scan(&source, path);
+    let (tokens, lexeme_buf, _) = varn_lexer::scan(&source, path);
     let token_count = tokens.len();
 
     let tokens_ref = &tokens;
+    let lexeme_buf_ref = lexeme_buf.clone();
     let parse_samples = time_n(runs, || {
-        varn_parser::parse(tokens_ref.clone(), path)
+        varn_parser::parse(tokens_ref.clone(), lexeme_buf_ref.clone(), path)
             .map(|_| ())
             .map_err(|errs| {
                 errs.iter()
@@ -247,7 +248,7 @@ pub fn run_bench(
     })?;
 
     let (program, parse_profile) =
-        varn_parser::parse_with_profile(tokens, path).map_err(|errs| {
+        varn_parser::parse_with_profile(tokens, lexeme_buf, path).map_err(|errs| {
             let msgs: Vec<String> = errs
                 .iter()
                 .map(|e| {
