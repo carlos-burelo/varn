@@ -67,6 +67,8 @@ pub struct VmClosure {
     pub constants: Rc<Vec<VmValue>>,
     pub ic_cache: Rc<RefCell<Vec<PolyICSlot>>>,
     pub feedback: Rc<RefCell<varn_types::chunk::FeedbackVector>>,
+    pub jit_entry: Option<varn_jit::JitFn>,
+    pub jit_code: Option<Rc<dyn std::any::Any>>,
 }
 
 impl VmClosure {
@@ -76,13 +78,17 @@ impl VmClosure {
         let feedback = Rc::new(RefCell::new(varn_types::chunk::FeedbackVector::new(
             cache_count,
         )));
-        Self {
+        let mut closure = Self {
             proto,
             upvalues: Vec::new(),
             constants: Rc::new(constants),
             ic_cache: Rc::new(RefCell::new(ic_cache)),
             feedback,
-        }
+            jit_entry: None,
+            jit_code: None,
+        };
+        closure.compile_jit();
+        closure
     }
 
     pub fn with_upvalues(
@@ -92,12 +98,23 @@ impl VmClosure {
         ic_cache: Rc<RefCell<Vec<PolyICSlot>>>,
         feedback: Rc<RefCell<varn_types::chunk::FeedbackVector>>,
     ) -> Self {
-        Self {
+        let mut closure = Self {
             proto,
             upvalues,
             constants,
             ic_cache,
             feedback,
+            jit_entry: None,
+            jit_code: None,
+        };
+        closure.compile_jit();
+        closure
+    }
+
+    pub fn compile_jit(&mut self) {
+        if let Ok((entry, code)) = varn_jit::compile(&self.proto) {
+            self.jit_entry = Some(entry);
+            self.jit_code = Some(code);
         }
     }
 

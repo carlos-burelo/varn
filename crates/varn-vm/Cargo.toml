@@ -16,3 +16,5 @@ varn-base     = { path = "../varn-base" }
 parking_lot  = "0.12"
 rust_decimal = "1.34"
 rustc-hash   = "2.1"
+varn-jit     = { path = "../varn-jit" }
+
