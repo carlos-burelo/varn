@@ -34,6 +34,9 @@ pub const REG_SCRATCH_1: Reg = Reg::R10;
 /// Scratch register 2 (used for calculated index/offsets).
 pub const REG_SCRATCH_2: Reg = Reg::R11;
 
+/// Callee-saved register allocated to cache the absolute frame base address.
+pub const REG_FRAME_BASE: Reg = Reg::Rbp;
+
 /// Returns the list of registers that must be preserved (callee-saved)
 /// if modified, according to the platform calling convention.
 pub fn callee_saved_registers() -> &'static [Reg] {
