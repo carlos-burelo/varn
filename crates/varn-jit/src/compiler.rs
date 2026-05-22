@@ -40,7 +40,10 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
                 ip += 1;
             }
             OpCode::LoadConst
-            | OpCode::LoadGlobalIdx => {
+            | OpCode::LoadGlobalIdx
+            | OpCode::LoadGlobal
+            | OpCode::LoadUpvalue
+            | OpCode::StoreUpvalue => {
                 ip += 1;
             }
             OpCode::StoreGlobalIdx
@@ -53,6 +56,26 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
             OpCode::AddImm
             | OpCode::SubImm => {
                 ip += 1;
+            }
+            OpCode::Eq
+            | OpCode::Neq
+            | OpCode::Lt
+            | OpCode::Lte
+            | OpCode::Gt
+            | OpCode::Gte
+            | OpCode::Add
+            | OpCode::Sub
+            | OpCode::Mul
+            | OpCode::ToString
+            | OpCode::IsNull => {
+                ip += 1;
+            }
+            OpCode::MakeClosure => {
+                let w1 = code[ip];
+                ip += 1;
+                let uv_count = (w1 & 0xFF) as usize;
+                ip += 1;
+                ip += uv_count;
             }
             OpCode::AddInt
             | OpCode::SubInt
@@ -304,6 +327,145 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
                 // Reload allocated regs from memory after helper call
                 emit_reload_all(&mut asm, &regmap);
             }
+            OpCode::Eq
+            | OpCode::Neq
+            | OpCode::Lt
+            | OpCode::Lte
+            | OpCode::Gt
+            | OpCode::Gte
+            | OpCode::Add
+            | OpCode::Sub
+            | OpCode::Mul => {
+                let w1 = code[ip];
+                ip += 1;
+                let src1 = (w1 >> 8) as usize;
+                let src2 = (w1 & 0xFF) as usize;
+
+                // 1. Flush physical registers to memory before helper call
+                emit_flush_all(&mut asm, &regmap);
+
+                // 2. Preserve arg registers
+                asm.push(ARG_CTX);
+                asm.push(ARG_CLOSURE);
+                asm.push(ARG_BASE);
+                asm.push(ARG_EXEC_CTX);
+
+                // 3. Align stack to 16 bytes:
+                let need_dummy = regmap.used_phys.len() % 2 != 0;
+                if need_dummy {
+                    asm.push(Reg::Rax);
+                }
+
+                // 4. Load the two operands into Rax and R11
+                emit_load(&mut asm, Reg::Rax, src1, &regmap);
+                emit_load(&mut asm, Reg::R11, src2, &regmap);
+
+                // 5. Windows ABI Shadow Space
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, -32);
+
+                // 6. Set up the three arguments for the extern "C" function:
+                asm.mov_reg_reg(ARG_BASE, Reg::R11);      // Arg 3 = b
+                asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);  // Arg 2 = a
+                asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);  // Arg 1 = exec_ctx
+
+                // 7. Get the corresponding helper address
+                let helper_addr = match op {
+                    OpCode::Eq => helpers.eq,
+                    OpCode::Neq => helpers.neq,
+                    OpCode::Lt => helpers.lt,
+                    OpCode::Lte => helpers.lte,
+                    OpCode::Gt => helpers.gt,
+                    OpCode::Gte => helpers.gte,
+                    OpCode::Add => helpers.add,
+                    OpCode::Sub => helpers.sub,
+                    OpCode::Mul => helpers.mul,
+                    _ => unreachable!(),
+                };
+
+                asm.mov_reg_imm64(Reg::R10, helper_addr as u64);
+                asm.call_reg(Reg::R10);
+
+                // 8. Restore Windows ABI Shadow Space
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, 32);
+
+                // 9. Save result from Rax into R11 before pops clobber Rax
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
+                // 10. Pop arguments and dummy alignment
+                if need_dummy {
+                    asm.pop(Reg::Rax);
+                }
+                asm.pop(ARG_EXEC_CTX);
+                asm.pop(ARG_BASE);
+                asm.pop(ARG_CLOSURE);
+                asm.pop(ARG_CTX);
+
+                // 11. Save the result back to virtual register first_reg
+                emit_store(&mut asm, Reg::R11, first_reg, &regmap);
+
+                // 12. Reload all other physical registers safely from memory
+                emit_reload_all_except(&mut asm, &regmap, Some(first_reg));
+            }
+            OpCode::ToString => {
+                let w1 = code[ip];
+                ip += 1;
+                let src = (w1 >> 8) as usize;
+
+                // 1. Flush physical registers to memory before helper call
+                emit_flush_all(&mut asm, &regmap);
+
+                // 2. Preserve arg registers
+                asm.push(ARG_CTX);
+                asm.push(ARG_CLOSURE);
+                asm.push(ARG_BASE);
+                asm.push(ARG_EXEC_CTX);
+
+                // 3. Align stack to 16 bytes:
+                let need_dummy = regmap.used_phys.len() % 2 != 0;
+                if need_dummy {
+                    asm.push(Reg::Rax);
+                }
+
+                // 4. Load the operand into Rax
+                emit_load(&mut asm, Reg::Rax, src, &regmap);
+
+                // 5. Windows ABI Shadow Space
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, -32);
+
+                // 6. Set up the two arguments for the extern "C" function:
+                asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);  // Arg 2 = v
+                asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);  // Arg 1 = exec_ctx
+
+                // 7. Call the helper address
+                let helper_addr = helpers.to_string;
+                asm.mov_reg_imm64(Reg::R10, helper_addr as u64);
+                asm.call_reg(Reg::R10);
+
+                // 8. Restore Windows ABI Shadow Space
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, 32);
+
+                // 9. Save result from Rax into R11 before pops clobber Rax
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
+                // 10. Pop arguments and dummy alignment
+                if need_dummy {
+                    asm.pop(Reg::Rax);
+                }
+                asm.pop(ARG_EXEC_CTX);
+                asm.pop(ARG_BASE);
+                asm.pop(ARG_CLOSURE);
+                asm.pop(ARG_CTX);
+
+                // 11. Save the result back to virtual register first_reg
+                emit_store(&mut asm, Reg::R11, first_reg, &regmap);
+
+                // 12. Reload all other physical registers safely from memory
+                emit_reload_all_except(&mut asm, &regmap, Some(first_reg));
+            }
             OpCode::Move => {
                 let w1 = code[ip];
                 ip += 1;
@@ -497,6 +659,216 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
 
                 let disp_zero = (falsy_pos as i32 - (p_zero as i32 + 4)) as u32;
                 asm.patch_u32(p_zero, disp_zero);
+            }
+            OpCode::IsNull => {
+                let src = (code[ip] >> 8) as usize;
+                ip += 1;
+
+                emit_load(&mut asm, Reg::Rax, src, &regmap);
+
+                // Mask: (v & 0x7FFF_0000_0000_0000)
+                asm.mov_reg_imm64(Reg::R11, 0x7FFF_0000_0000_0000u64);
+                asm.and_reg_reg(Reg::Rax, Reg::R11);
+
+                // Compare with 0x7FF9_0000_0000_0000u64
+                asm.mov_reg_imm64(Reg::R11, 0x7FF9_0000_0000_0000u64);
+                asm.cmp_reg_reg(Reg::Rax, Reg::R11);
+
+                // Jump if equal to true_path
+                let patch_je = asm.jmp_cond(Cond::Equal);
+
+                // False path: load false_val (0x7FFA_0000_0000_0000u64)
+                asm.mov_reg_imm64(Reg::Rax, 0x7FFA_0000_0000_0000u64);
+                let patch_jmp = asm.jmp_near();
+
+                // True path: load true_val (0x7FFB_0000_0000_0000u64)
+                let true_pos = asm.current_offset();
+                let disp_je = (true_pos as i32 - (patch_je as i32 + 4)) as u32;
+                asm.patch_u32(patch_je, disp_je);
+
+                asm.mov_reg_imm64(Reg::Rax, 0x7FFB_0000_0000_0000u64);
+
+                // End path
+                let end_pos = asm.current_offset();
+                let disp_jmp = (end_pos as i32 - (patch_jmp as i32 + 4)) as u32;
+                asm.patch_u32(patch_jmp, disp_jmp);
+
+                // Store in first_reg
+                emit_store(&mut asm, Reg::Rax, first_reg, &regmap);
+            }
+            OpCode::LoadGlobal => {
+                let idx = code[ip] as usize;
+                ip += 1;
+
+                emit_flush_all(&mut asm, &regmap);
+
+                asm.push(ARG_CTX);
+                asm.push(ARG_CLOSURE);
+                asm.push(ARG_BASE);
+                asm.push(ARG_EXEC_CTX);
+
+                let need_dummy = regmap.used_phys.len() % 2 != 0;
+                if need_dummy {
+                    asm.push(Reg::Rax);
+                }
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, -32);
+
+                asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+                asm.mov_reg_imm64(ARG_BASE, idx as u64);
+
+                asm.mov_reg_imm64(Reg::R10, helpers.load_global as u64);
+                asm.call_reg(Reg::R10);
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, 32);
+
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
+                if need_dummy {
+                    asm.pop(Reg::Rax);
+                }
+                asm.pop(ARG_EXEC_CTX);
+                asm.pop(ARG_BASE);
+                asm.pop(ARG_CLOSURE);
+                asm.pop(ARG_CTX);
+
+                emit_store(&mut asm, Reg::R11, first_reg, &regmap);
+                emit_reload_all_except(&mut asm, &regmap, Some(first_reg));
+            }
+            OpCode::LoadUpvalue => {
+                let w1 = code[ip];
+                ip += 1;
+                let dest = (w1 >> 8) as usize;
+                let uv = (w1 & 0xFF) as usize;
+
+                emit_flush_all(&mut asm, &regmap);
+
+                asm.push(ARG_CTX);
+                asm.push(ARG_CLOSURE);
+                asm.push(ARG_BASE);
+                asm.push(ARG_EXEC_CTX);
+
+                let need_dummy = regmap.used_phys.len() % 2 != 0;
+                if need_dummy {
+                    asm.push(Reg::Rax);
+                }
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, -32);
+
+                asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+                asm.mov_reg_imm64(ARG_BASE, uv as u64);
+
+                asm.mov_reg_imm64(Reg::R10, helpers.load_upvalue as u64);
+                asm.call_reg(Reg::R10);
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, 32);
+
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
+                if need_dummy {
+                    asm.pop(Reg::Rax);
+                }
+                asm.pop(ARG_EXEC_CTX);
+                asm.pop(ARG_BASE);
+                asm.pop(ARG_CLOSURE);
+                asm.pop(ARG_CTX);
+
+                emit_store(&mut asm, Reg::R11, dest, &regmap);
+                emit_reload_all_except(&mut asm, &regmap, Some(dest));
+            }
+            OpCode::StoreUpvalue => {
+                let w1 = code[ip];
+                ip += 1;
+                let uv = (w1 >> 8) as usize;
+                let src = (w1 & 0xFF) as usize;
+
+                emit_load(&mut asm, Reg::Rax, src, &regmap);
+
+                emit_flush_all(&mut asm, &regmap);
+
+                asm.push(ARG_CTX);
+                asm.push(ARG_CLOSURE);
+                asm.push(ARG_BASE);
+                asm.push(ARG_EXEC_CTX);
+
+                let need_dummy = regmap.used_phys.len() % 2 != 0;
+                if need_dummy {
+                    asm.push(Reg::Rax);
+                }
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, -32);
+
+                asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+                asm.mov_reg_imm64(ARG_BASE, uv as u64);
+                asm.mov_reg_reg(ARG_EXEC_CTX, Reg::Rax);
+
+                asm.mov_reg_imm64(Reg::R10, helpers.store_upvalue as u64);
+                asm.call_reg(Reg::R10);
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, 32);
+
+                if need_dummy {
+                    asm.pop(Reg::Rax);
+                }
+                asm.pop(ARG_EXEC_CTX);
+                asm.pop(ARG_BASE);
+                asm.pop(ARG_CLOSURE);
+                asm.pop(ARG_CTX);
+
+                emit_reload_all(&mut asm, &regmap);
+            }
+            OpCode::MakeClosure => {
+                let w1_ip = ip;
+                let w1 = code[ip];
+                ip += 1;
+                let dest = (w1 >> 8) as usize;
+                let uv_count = (w1 & 0xFF) as usize;
+                ip += 1; // skip proto_idx
+                ip += uv_count; // skip upvalues
+
+                emit_flush_all(&mut asm, &regmap);
+
+                asm.push(ARG_CTX);
+                asm.push(ARG_CLOSURE);
+                asm.push(ARG_BASE);
+                asm.push(ARG_EXEC_CTX);
+
+                let need_dummy = regmap.used_phys.len() % 2 != 0;
+                if need_dummy {
+                    asm.push(Reg::Rax);
+                }
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, -32);
+
+                asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+                asm.mov_reg_reg(ARG_EXEC_CTX, ARG_BASE);
+                asm.mov_reg_imm64(ARG_BASE, w1_ip as u64);
+
+                asm.mov_reg_imm64(Reg::R10, helpers.make_closure as u64);
+                asm.call_reg(Reg::R10);
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, 32);
+
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
+                if need_dummy {
+                    asm.pop(Reg::Rax);
+                }
+                asm.pop(ARG_EXEC_CTX);
+                asm.pop(ARG_BASE);
+                asm.pop(ARG_CLOSURE);
+                asm.pop(ARG_CTX);
+
+                emit_store(&mut asm, Reg::R11, dest, &regmap);
+                emit_reload_all_except(&mut asm, &regmap, Some(dest));
             }
             _ => unreachable!(),
         }

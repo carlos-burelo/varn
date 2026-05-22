@@ -117,10 +117,31 @@ impl VmClosure {
             load_global_idx: crate::exec::ctx::jit_load_global_idx as usize,
             store_global_idx: crate::exec::ctx::jit_store_global_idx as usize,
             define_global_idx: crate::exec::ctx::jit_define_global_idx as usize,
+            eq: crate::exec::ctx::jit_eq as usize,
+            neq: crate::exec::ctx::jit_neq as usize,
+            lt: crate::exec::ctx::jit_lt as usize,
+            lte: crate::exec::ctx::jit_lte as usize,
+            gt: crate::exec::ctx::jit_gt as usize,
+            gte: crate::exec::ctx::jit_gte as usize,
+            add: crate::exec::ctx::jit_add as usize,
+            sub: crate::exec::ctx::jit_sub as usize,
+            mul: crate::exec::ctx::jit_mul as usize,
+            to_string: crate::exec::ctx::jit_to_string as usize,
+            load_global: crate::exec::ctx::jit_load_global as usize,
+            load_upvalue: crate::exec::ctx::jit_load_upvalue as usize,
+            store_upvalue: crate::exec::ctx::jit_store_upvalue as usize,
+            make_closure: crate::exec::ctx::jit_make_closure as usize,
         };
-        if let Ok((entry, code)) = varn_jit::compile(&self.proto, helpers) {
-            self.jit_entry = Some(entry);
-            self.jit_code = Some(code);
+        match varn_jit::compile(&self.proto, helpers) {
+            Ok((entry, code)) => {
+                self.jit_entry = Some(entry);
+                self.jit_code = Some(code);
+            }
+            Err(e) => {
+                if std::env::var("VARN_JIT_DEBUG").is_ok() {
+                    eprintln!("JIT compilation failed for '{}': {}", self.proto.name.as_deref().unwrap_or("<anonymous>"), e);
+                }
+            }
         }
     }
 

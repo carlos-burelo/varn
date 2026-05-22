@@ -26,6 +26,20 @@ pub struct JitHelpers {
     pub load_global_idx: usize,
     pub store_global_idx: usize,
     pub define_global_idx: usize,
+    pub eq: usize,
+    pub neq: usize,
+    pub lt: usize,
+    pub lte: usize,
+    pub gt: usize,
+    pub gte: usize,
+    pub add: usize,
+    pub sub: usize,
+    pub mul: usize,
+    pub to_string: usize,
+    pub load_global: usize,
+    pub load_upvalue: usize,
+    pub store_upvalue: usize,
+    pub make_closure: usize,
 }
 
 use std::sync::atomic::{AtomicU64, Ordering};
