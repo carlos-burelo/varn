@@ -17,7 +17,7 @@ members = [
     "crates/varn-vm",
     "crates/varn-debug",
     "crates/varn-base",
-    "crates/varn-pm",
+    "crates/varn-pm", "crates/varn-jit",
 ]
 resolver = "2"
 

@@ -59,6 +59,60 @@ impl ExecCtx {
             let closure_ptr: *const crate::frame::VmClosure =
                 &*self.frames[frame_idx].closure;
             let closure = unsafe { &*closure_ptr };
+
+            if let Some(jit_fn) = closure.jit_entry {
+                if self.trace {
+                    self.trace_event("JIT ENTRY", frame_idx, closure, 0, None);
+                }
+                let res = unsafe {
+                    (jit_fn)(
+                        self.stack.as_mut_ptr() as *mut std::ffi::c_void,
+                        closure_ptr as *const std::ffi::c_void,
+                        self.frames[frame_idx].base,
+                    )
+                };
+                if self.trace {
+                    self.trace_event("JIT EXIT", frame_idx, closure, 0, None);
+                }
+
+                // Properly clean up frame and stack, replicating reg_return logic
+                let frame = self.frames.pop().unwrap();
+                self.record_frame_pop();
+                self.close_upvalues_above(frame.base);
+                self.stack.truncate(frame.base);
+
+                // Handle pending constructors
+                let ctor_pos = if !self.pending_constructors.is_empty() {
+                    self.pending_constructors
+                        .iter()
+                        .rposition(|(idx, _)| *idx == frame_idx)
+                } else {
+                    None
+                };
+
+                let final_val = if let Some(pos) = ctor_pos {
+                    let (_, instance_nv) = self.pending_constructors.remove(pos);
+                    if res.is_null() {
+                        instance_nv
+                    } else {
+                        res
+                    }
+                } else {
+                    res
+                };
+
+                // Write return value to the caller's stack slot
+                if let Some(return_reg) = frame.return_reg {
+                    let caller_base = self.frames.last().map(|f| f.base).unwrap_or(0);
+                    self.stack[caller_base + return_reg as usize] = final_val;
+                }
+
+                if self.frames.len() == depth {
+                    return Ok(final_val);
+                }
+                continue 'frame_loop;
+            }
+
             let base = self.frames[frame_idx].base;
             let mut ip = self.frames[frame_idx].ip;
             let code_len = closure.proto.chunk.code.len();

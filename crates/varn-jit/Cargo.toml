@@ -1,0 +1,9 @@
+[package]
+name = "varn-jit"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+varn-core = { path = "../varn-core" }
+varn-types = { path = "../varn-types" }
+varn-base = { path = "../varn-base" }
