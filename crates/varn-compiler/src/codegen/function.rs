@@ -31,13 +31,13 @@ pub fn compile_function<'a>(
         parent.current_superclass.clone(),
     );
 
-    let mut arity = 0usize;
-
+    let recv_reg = child.alloc_reg();
+    assert_eq!(recv_reg, 0, "First allocated register must be 0 for receiver");
     if has_this {
-        let r = child.alloc_reg();
-        child.define_local(Rc::from("this"), r);
-        arity += 1;
+        child.define_local(Rc::from("this"), 0);
     }
+
+    let mut arity = 1usize;
 
     let has_rest = params.iter().any(|p| p.is_rest);
     child.has_rest = has_rest;

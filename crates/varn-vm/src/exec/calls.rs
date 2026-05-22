@@ -92,11 +92,11 @@ pub fn try_prepare_call_fast(
             }
 
             if let BoundMethodTarget::Native { func, .. } = &bm.target {
-                return Some((PreparedCall::NativeImmediate(*func, arg_count + 1), true));
+                return Some((PreparedCall::NativeImmediate(*func, arg_count), true));
             }
             None
         }
-        HeapObj::NativeFn(_name, f) => Some((PreparedCall::NativeImmediate(*f, arg_count), false)),
+        HeapObj::NativeFn(_name, f) => Some((PreparedCall::RawNativeImmediate(*f, arg_count), false)),
         _ => None,
     }
 }
@@ -191,7 +191,7 @@ pub fn prepare_call(
             }
             HeapObj::NativeFn(_name, f) => {
                 let func = *f;
-                return Ok(PreparedCall::NativeImmediate(func, arg_count));
+                return Ok(PreparedCall::RawNativeImmediate(func, arg_count));
             }
             HeapObj::BoundMethod(bm) => {
                 let bm = bm.clone();
@@ -199,8 +199,12 @@ pub fn prepare_call(
                     BoundMethodTarget::Native { func, .. } => {
                         let recv_nv = heap.intern(bm.receiver);
                         let args_start = stack.len() - arg_count;
-                        stack.insert(args_start, recv_nv);
-                        return Ok(PreparedCall::NativeImmediate(func, arg_count + 1));
+                        if args_start >= stack.len() {
+                            stack.push(recv_nv);
+                        } else {
+                            stack[args_start] = recv_nv;
+                        }
+                        return Ok(PreparedCall::NativeImmediate(func, arg_count));
                     }
                     BoundMethodTarget::Vm {
                         closure,
@@ -216,9 +220,14 @@ pub fn prepare_call(
                                 "BoundMethod(Vm): invalid closure payload",
                             ));
                         };
-                        let mut full_arg_count = arg_count + 1;
+                        let mut full_arg_count = arg_count;
                         let base = stack.len() - arg_count;
-                        stack.insert(base, recv_nv);
+                        if base >= stack.len() {
+                            stack.push(recv_nv);
+                            full_arg_count = 1;
+                        } else {
+                            stack[base] = recv_nv;
+                        }
                         if !nc.proto.is_generator && !nc.proto.is_async {
                             bundle_rest_args(&nc.proto, &mut full_arg_count, stack, heap);
                             let final_base = stack.len() - full_arg_count;
@@ -236,9 +245,14 @@ pub fn prepare_call(
                 let oref = varn_types::value::ObjRef::new(data);
                 let instance_nv = VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref)));
                 if let Some(ctor) = cls.find_method("constructor") {
-                    let mut full_arg_count = arg_count + 1;
+                    let mut full_arg_count = arg_count;
                     let base = stack.len() - arg_count;
-                    stack.insert(base, instance_nv);
+                    if base >= stack.len() {
+                        stack.push(instance_nv);
+                        full_arg_count = 1;
+                    } else {
+                        stack[base] = instance_nv;
+                    }
                     match ctor {
                         Value::VmValue(payload) => {
                             if let Some(wrapper) =
@@ -268,7 +282,12 @@ pub fn prepare_call(
             HeapObj::EnumVariant(data) => {
                 let data = data.clone();
                 let args_start = stack.len() - arg_count;
-                let args: Vec<VmValue> = stack.drain(args_start..).collect();
+                let mut args: Vec<VmValue> = stack.drain(args_start..).collect();
+                // Under the Unified Slot 0 Receiver design, the first argument is the receiver slot (which is dummy/null).
+                // We discard it before extracting the actual variant payload.
+                if !args.is_empty() {
+                    args.remove(0);
+                }
                 let payload = if args.len() == 1 {
                     heap.extract(args[0])
                 } else {
@@ -344,6 +363,7 @@ pub enum PreparedCall {
     Constructor(CallFrame, VmValue),
     Native(varn_types::NativeFn, Vec<VmValue>),
     NativeImmediate(varn_types::NativeFn, usize),
+    RawNativeImmediate(varn_types::NativeFn, usize),
     NativeConstructor(varn_types::NativeFn, Vec<VmValue>, VmValue),
     PushValue(VmValue),
 }

@@ -99,4 +99,47 @@ impl GeneratorDriver for NanSyncGenDriver {
     fn is_async(&self) -> bool {
         false
     }
+
+    fn trace_vm_values(&self, callback: &mut dyn FnMut(varn_types::VmValue)) {
+        let inner = self.inner.borrow();
+
+        // 1. Stack values
+        for &nv in &inner.ctx.stack {
+            callback(varn_types::VmValue(nv.0));
+        }
+
+        // 2. Closure constants and upvalues in frames
+        for frame in &inner.ctx.frames {
+            for &c in frame.closure.constants.iter() {
+                callback(varn_types::VmValue(c.0));
+            }
+            for uv in &frame.closure.upvalues {
+                if let Ok(upval_inner) = uv.inner.try_borrow() {
+                    callback(varn_types::VmValue(upval_inner.value.0));
+                }
+            }
+        }
+
+        // 3. Open upvalues
+        for (_, uv) in &inner.ctx.open_upvalues {
+            if let Ok(upval_inner) = uv.inner.try_borrow() {
+                callback(varn_types::VmValue(upval_inner.value.0));
+            }
+        }
+
+        // 4. Pending constructors and setters
+        for (_, nv) in &inner.ctx.pending_constructors {
+            callback(varn_types::VmValue(nv.0));
+        }
+        for (_, nv) in &inner.ctx.pending_setters {
+            callback(varn_types::VmValue(nv.0));
+        }
+    }
+
+    fn trace_closures(&self, callback: &mut dyn FnMut(usize)) {
+        let inner = self.inner.borrow();
+        for frame in &inner.ctx.frames {
+            callback(Rc::as_ptr(&frame.closure) as *const () as usize);
+        }
+    }
 }

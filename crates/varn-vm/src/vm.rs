@@ -279,6 +279,26 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
             | OpCode::Return
             | OpCode::Import
             | OpCode::MergeExports
+            | OpCode::AddInt
+            | OpCode::SubInt
+            | OpCode::MulInt
+            | OpCode::DivInt
+            | OpCode::LtInt
+            | OpCode::GtInt
+            | OpCode::LteInt
+            | OpCode::GteInt
+            | OpCode::EqInt
+            | OpCode::NeqInt
+            | OpCode::AddFloat
+            | OpCode::SubFloat
+            | OpCode::MulFloat
+            | OpCode::DivFloat
+            | OpCode::LtFloat
+            | OpCode::GtFloat
+            | OpCode::LteFloat
+            | OpCode::GteFloat
+            | OpCode::EqFloat
+            | OpCode::NeqFloat
             | OpCode::Inherit => {
                 ip += 2;
             }

@@ -93,6 +93,28 @@ impl ExecCtx {
 
                 self.push(result);
             }
+            PreparedCall::RawNativeImmediate(f, arg_count) => {
+                self.record_call_native();
+                let args_start = self.stack.len() - arg_count;
+
+                let result = if arg_count <= 16 {
+                    let mut buf = [VmValue::null(); 16];
+                    buf[..arg_count]
+                        .copy_from_slice(&self.stack[args_start..args_start + arg_count]);
+                    self.stack.drain((args_start - 1)..);
+                    let slice = if arg_count > 0 { &buf[1..arg_count] } else { &buf[..0] };
+                    (f)(self as &mut dyn NativeCtx, slice)
+                } else {
+                    let vm_args: Vec<VmValue> =
+                        self.stack[args_start..args_start + arg_count].to_vec();
+                    self.stack.drain((args_start - 1)..);
+                    let slice = if arg_count > 0 { &vm_args[1..] } else { &vm_args[..] };
+                    (f)(self as &mut dyn NativeCtx, slice)
+                }
+                .map_err(|e| RuntimeError::new(e))?;
+
+                self.push(result);
+            }
             PreparedCall::NativeConstructor(f, args, instance_nv) => {
                 self.record_call_native();
                 let result =
@@ -390,9 +412,10 @@ impl NativeCtx for ExecCtx {
     }
 
     fn call_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String> {
+        self.stack.push(VmValue::null());
         self.stack.extend_from_slice(args);
         let prepared = self
-            .prepare_call(callee, args.len())
+            .prepare_call(callee, args.len() + 1)
             .map_err(|e| e.message)?;
         match prepared {
             PreparedCall::Native(f, args) => (f)(self as &mut dyn NativeCtx, &args),
@@ -401,6 +424,13 @@ impl NativeCtx for ExecCtx {
                 let vm_args: Vec<VmValue> = self.stack[args_start..args_start + arg_count].to_vec();
                 self.stack.drain((args_start - 1)..);
                 (f)(self as &mut dyn NativeCtx, &vm_args)
+            }
+            PreparedCall::RawNativeImmediate(f, arg_count) => {
+                let args_start = self.stack.len() - arg_count;
+                let vm_args: Vec<VmValue> = self.stack[args_start..args_start + arg_count].to_vec();
+                self.stack.drain((args_start - 1)..);
+                let slice = if arg_count > 0 { &vm_args[1..] } else { &vm_args[..] };
+                (f)(self as &mut dyn NativeCtx, slice)
             }
             PreparedCall::Frame(frame) => {
                 let depth = self.frames.len();
@@ -484,9 +514,10 @@ impl ExecCtx {
         }
         let callee_nv = self.heap.intern(callee);
         let arg_nvs: Vec<_> = args.iter().cloned().map(|a| self.heap.intern(a)).collect();
+        self.stack.push(VmValue::null());
         self.stack.extend(arg_nvs);
         let prepared = self
-            .prepare_call(callee_nv, args.len())
+            .prepare_call(callee_nv, args.len() + 1)
             .map_err(|e| e.message)?;
         self.dispatch_prepared_call(prepared)
             .map_err(|e| e.message)?;

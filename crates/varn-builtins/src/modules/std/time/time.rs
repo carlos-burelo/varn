@@ -95,7 +95,7 @@ pub(crate) mod dispatch {
 
         #[varn_fn("from")]
         pub fn duration_from(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-            let s = args.get(1).map(|&v| ctx.str_repr(v)).unwrap_or_default();
+            let s = args.get(0).map(|&v| ctx.str_repr(v)).unwrap_or_default();
             let ms = parse_iso_duration(&s);
             Ok(make_duration_obj(ctx, ms))
         }
@@ -106,7 +106,7 @@ pub(crate) mod dispatch {
             args: &[VmValue],
         ) -> Result<VmValue, String> {
             let ms = args
-                .get(1)
+                .get(0)
                 .and_then(|&v| {
                     if let Value::Int(n) = ctx.extract(v) {
                         Some(n)

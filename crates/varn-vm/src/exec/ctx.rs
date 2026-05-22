@@ -475,13 +475,21 @@ impl ExecCtx {
                     {
                         let recv_nv = self.heap.intern(bm.receiver.clone());
 
-                        match prepared {
+                         match prepared {
                             calls::PreparedCall::Frame(ref frame) => {
-                                self.stack.insert(frame.base, recv_nv);
+                                if frame.base >= self.stack.len() {
+                                    self.stack.push(recv_nv);
+                                } else {
+                                    self.stack[frame.base] = recv_nv;
+                                }
                             }
-                            calls::PreparedCall::NativeImmediate(_, _) => {
+                            calls::PreparedCall::NativeImmediate(_, _) | calls::PreparedCall::RawNativeImmediate(_, _) => {
                                 let args_start = self.stack.len() - arg_count;
-                                self.stack.insert(args_start, recv_nv);
+                                if args_start >= self.stack.len() {
+                                    self.stack.push(recv_nv);
+                                } else {
+                                    self.stack[args_start] = recv_nv;
+                                }
                             }
                             _ => {}
                         }

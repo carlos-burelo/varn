@@ -150,6 +150,30 @@ pub enum OpCode {
     LoadIntOne,
     LoadIntMinusOne,
 
+    // Typed integer operations
+    AddInt,
+    SubInt,
+    MulInt,
+    DivInt,
+    LtInt,
+    GtInt,
+    LteInt,
+    GteInt,
+    EqInt,
+    NeqInt,
+
+    // Typed float operations
+    AddFloat,
+    SubFloat,
+    MulFloat,
+    DivFloat,
+    LtFloat,
+    GtFloat,
+    LteFloat,
+    GteFloat,
+    EqFloat,
+    NeqFloat,
+
     Nop,
 }
 

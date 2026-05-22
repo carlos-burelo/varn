@@ -237,6 +237,180 @@ impl ExecCtx {
                         }
                     }
 
+                    OpCode::AddInt
+                    | OpCode::SubInt
+                    | OpCode::MulInt
+                    | OpCode::DivInt => {
+                        let w1 = code[ip];
+                        ip += 1;
+                        let (src1, src2) = (hi(w1), lo(w1));
+                        let a = reg![src1];
+                        let b = reg![src2];
+                        let res = if a.is_int() && b.is_int() {
+                            match op {
+                                OpCode::AddInt => {
+                                    let (r, overflow) = a.as_int().overflowing_add(b.as_int());
+                                    if overflow {
+                                        VmValue::from_f64(a.as_int() as f64 + b.as_int() as f64)
+                                    } else {
+                                        VmValue::from_int(r)
+                                    }
+                                }
+                                OpCode::SubInt => {
+                                    let (r, overflow) = a.as_int().overflowing_sub(b.as_int());
+                                    if overflow {
+                                        VmValue::from_f64(a.as_int() as f64 - b.as_int() as f64)
+                                    } else {
+                                        VmValue::from_int(r)
+                                    }
+                                }
+                                OpCode::MulInt => {
+                                    let (r, overflow) = a.as_int().overflowing_mul(b.as_int());
+                                    if overflow {
+                                        VmValue::from_f64(a.as_int() as f64 * b.as_int() as f64)
+                                    } else {
+                                        VmValue::from_int(r)
+                                    }
+                                }
+                                OpCode::DivInt => {
+                                    let bv = b.as_int();
+                                    if bv == 0 {
+                                        return Err(crate::error::RuntimeError::new("division by zero"));
+                                    }
+                                    let av = a.as_int();
+                                    if av == i64::MIN && bv == -1 {
+                                        VmValue::from_f64(av as f64 / bv as f64)
+                                    } else if av % bv == 0 {
+                                        VmValue::from_int(av / bv)
+                                    } else {
+                                        VmValue::from_f64(av as f64 / bv as f64)
+                                    }
+                                }
+                                _ => unreachable!(),
+                            }
+                        } else {
+                            let generic_op = match op {
+                                OpCode::AddInt => OpCode::Add,
+                                OpCode::SubInt => OpCode::Sub,
+                                OpCode::MulInt => OpCode::Mul,
+                                OpCode::DivInt => OpCode::Div,
+                                _ => unreachable!(),
+                            };
+                            self.exec_arith(generic_op, a, b)?
+                        };
+                        reg![first_reg] = res;
+                    }
+
+                    OpCode::LtInt
+                    | OpCode::GtInt
+                    | OpCode::LteInt
+                    | OpCode::GteInt
+                    | OpCode::EqInt
+                    | OpCode::NeqInt => {
+                        let w1 = code[ip];
+                        ip += 1;
+                        let (src1, src2) = (hi(w1), lo(w1));
+                        let a = reg![src1];
+                        let b = reg![src2];
+                        let res = if a.is_int() && b.is_int() {
+                            let cmp_res = match op {
+                                OpCode::LtInt => a.as_int() < b.as_int(),
+                                OpCode::GtInt => a.as_int() > b.as_int(),
+                                OpCode::LteInt => a.as_int() <= b.as_int(),
+                                OpCode::GteInt => a.as_int() >= b.as_int(),
+                                OpCode::EqInt => a.as_int() == b.as_int(),
+                                OpCode::NeqInt => a.as_int() != b.as_int(),
+                                _ => unreachable!(),
+                            };
+                            VmValue::from_bool(cmp_res)
+                        } else {
+                            let generic_op = match op {
+                                OpCode::LtInt => OpCode::Lt,
+                                OpCode::GtInt => OpCode::Gt,
+                                OpCode::LteInt => OpCode::Lte,
+                                OpCode::GteInt => OpCode::Gte,
+                                OpCode::EqInt => OpCode::Eq,
+                                OpCode::NeqInt => OpCode::Neq,
+                                _ => unreachable!(),
+                            };
+                            self.exec_cmp(generic_op, a, b)
+                        };
+                        reg![first_reg] = res;
+                    }
+
+                    OpCode::AddFloat
+                    | OpCode::SubFloat
+                    | OpCode::MulFloat
+                    | OpCode::DivFloat => {
+                        let w1 = code[ip];
+                        ip += 1;
+                        let (src1, src2) = (hi(w1), lo(w1));
+                        let a = reg![src1];
+                        let b = reg![src2];
+                        let res = if (a.is_f64() || a.is_int()) && (b.is_f64() || b.is_int()) {
+                            match op {
+                                OpCode::AddFloat => VmValue::from_f64(a.to_f64() + b.to_f64()),
+                                OpCode::SubFloat => VmValue::from_f64(a.to_f64() - b.to_f64()),
+                                OpCode::MulFloat => VmValue::from_f64(a.to_f64() * b.to_f64()),
+                                OpCode::DivFloat => {
+                                    let bv = b.to_f64();
+                                    if bv == 0.0 {
+                                        return Err(crate::error::RuntimeError::new("division by zero"));
+                                    }
+                                    VmValue::from_f64(a.to_f64() / bv)
+                                }
+                                _ => unreachable!(),
+                            }
+                        } else {
+                            let generic_op = match op {
+                                OpCode::AddFloat => OpCode::Add,
+                                OpCode::SubFloat => OpCode::Sub,
+                                OpCode::MulFloat => OpCode::Mul,
+                                OpCode::DivFloat => OpCode::Div,
+                                _ => unreachable!(),
+                            };
+                            self.exec_arith(generic_op, a, b)?
+                        };
+                        reg![first_reg] = res;
+                    }
+
+                    OpCode::LtFloat
+                    | OpCode::GtFloat
+                    | OpCode::LteFloat
+                    | OpCode::GteFloat
+                    | OpCode::EqFloat
+                    | OpCode::NeqFloat => {
+                        let w1 = code[ip];
+                        ip += 1;
+                        let (src1, src2) = (hi(w1), lo(w1));
+                        let a = reg![src1];
+                        let b = reg![src2];
+                        let res = if (a.is_f64() || a.is_int()) && (b.is_f64() || b.is_int()) {
+                            let cmp_res = match op {
+                                OpCode::LtFloat => a.to_f64() < b.to_f64(),
+                                OpCode::GtFloat => a.to_f64() > b.to_f64(),
+                                OpCode::LteFloat => a.to_f64() <= b.to_f64(),
+                                OpCode::GteFloat => a.to_f64() >= b.to_f64(),
+                                OpCode::EqFloat => a.to_f64() == b.to_f64(),
+                                OpCode::NeqFloat => a.to_f64() != b.to_f64(),
+                                _ => unreachable!(),
+                            };
+                            VmValue::from_bool(cmp_res)
+                        } else {
+                            let generic_op = match op {
+                                OpCode::LtFloat => OpCode::Lt,
+                                OpCode::GtFloat => OpCode::Gt,
+                                OpCode::LteFloat => OpCode::Lte,
+                                OpCode::GteFloat => OpCode::Gte,
+                                OpCode::EqFloat => OpCode::Eq,
+                                OpCode::NeqFloat => OpCode::Neq,
+                                _ => unreachable!(),
+                            };
+                            self.exec_cmp(generic_op, a, b)
+                        };
+                        reg![first_reg] = res;
+                    }
+
                     OpCode::Eq
                     | OpCode::Neq
                     | OpCode::Lt

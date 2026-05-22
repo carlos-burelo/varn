@@ -43,6 +43,8 @@ pub enum VarLoc {
 pub struct RegAlloc {
     pub next: u8,
     pub max: u8,
+    pub used: [u64; 4],
+    pub alloc_stack: Vec<u8>,
 
     pub next_vreg: u16,
     pub max_vreg: u16,
@@ -56,6 +58,8 @@ impl RegAlloc {
         Self {
             next: 0,
             max: 0,
+            used: [0; 4],
+            alloc_stack: Vec::new(),
             next_vreg: 0,
             max_vreg: 0,
             physical_map: std::collections::HashMap::new(),
@@ -65,9 +69,25 @@ impl RegAlloc {
     }
 
     pub fn alloc(&mut self) -> u8 {
-        let r = self.next;
-        self.next = self.next.checked_add(1)
-            .expect("register overflow: function uses more than 255 registers. Split the function into smaller parts.");
+        let mut r = 0u8;
+        'search: loop {
+            let word = (r / 64) as usize;
+            let bit = r % 64;
+            if (self.used[word] & (1 << bit)) == 0 {
+                break 'search;
+            }
+            if r == 255 {
+                panic!("register overflow: function uses more than 255 registers. Split the function into smaller parts.");
+            }
+            r += 1;
+        }
+
+        let word = (r / 64) as usize;
+        let bit = r % 64;
+        self.used[word] |= 1 << bit;
+        self.alloc_stack.push(r);
+
+        self.next = self.next.max(r + 1);
         if self.next > self.max {
             self.max = self.next;
         }
@@ -75,17 +95,60 @@ impl RegAlloc {
     }
 
     pub fn free(&mut self) {
-        if self.next > 0 {
-            self.next -= 1;
+        if let Some(r) = self.alloc_stack.pop() {
+            let word = (r / 64) as usize;
+            let bit = r % 64;
+            self.used[word] &= !(1 << bit);
+
+            let mut highest = 0u8;
+            let mut found = false;
+            for i in (0..=255).rev() {
+                let w = (i / 64) as usize;
+                let b = i % 64;
+                if (self.used[w] & (1 << b)) != 0 {
+                    highest = i;
+                    found = true;
+                    break;
+                }
+            }
+            self.next = if found { highest + 1 } else { 0 };
         }
     }
 
     pub fn save(&self) -> u8 {
-        self.next
+        self.alloc_stack.len() as u8
     }
 
     pub fn restore(&mut self, saved: u8) {
-        self.next = saved;
+        while self.alloc_stack.len() > saved as usize {
+            if let Some(r) = self.alloc_stack.pop() {
+                let word = (r / 64) as usize;
+                let bit = r % 64;
+                self.used[word] &= !(1 << bit);
+            }
+        }
+        let mut highest = 0u8;
+        let mut found = false;
+        for i in (0..=255).rev() {
+            let w = (i / 64) as usize;
+            let b = i % 64;
+            if (self.used[w] & (1 << b)) != 0 {
+                highest = i;
+                found = true;
+                break;
+            }
+        }
+        self.next = if found { highest + 1 } else { 0 };
+    }
+
+    pub fn mark_used(&mut self, reg: u8) {
+        let word = (reg / 64) as usize;
+        let bit = reg % 64;
+        self.used[word] |= 1 << bit;
+        self.next = self.next.max(reg + 1);
+        if self.next > self.max {
+            self.max = self.next;
+        }
     }
 
     pub fn alloc_vreg(&mut self) -> u16 {
@@ -424,7 +487,7 @@ impl<'a> Compiler<'a> {
 
     pub fn push_scope(&mut self) {
         self.scopes.push(FxHashMap::default());
-        self.scope_start_regs.push(self.regs.next);
+        self.scope_start_regs.push(self.regs.save());
     }
 
     pub fn pop_scope(&mut self) {
@@ -452,12 +515,9 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn define_local(&mut self, name: Rc<str>, reg: u8) {
+        self.regs.mark_used(reg);
         if let Some(scope) = self.scopes.last_mut() {
             scope.insert(name, VarLoc::Reg(reg));
-        }
-
-        if reg >= self.regs.next {
-            self.regs.next = reg + 1;
         }
     }
 

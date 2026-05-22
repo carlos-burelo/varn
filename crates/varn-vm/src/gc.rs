@@ -297,7 +297,36 @@ impl TricolorMarker {
                         }
                     }
                 }
-                HeapObj::TaskHandle(_) | HeapObj::Generator(_) => {}
+                HeapObj::TaskHandle(task) => {
+                    match task.peek_state() {
+                        varn_types::TaskState::Resolved(v) | varn_types::TaskState::Rejected(v) => {
+                            if let Some(ci) = heap.value_heap_idx(&v) {
+                                self.mark_gray(ci);
+                            }
+                        }
+                        varn_types::TaskState::Pending => {}
+                    }
+                }
+                HeapObj::Generator(gen) => {
+                    let mut visit = |nv: varn_types::VmValue| {
+                        if let Some(child_idx) = heap.get_heap_idx(nv) {
+                            self.mark_gray(child_idx);
+                        }
+                    };
+                    gen.0.trace_vm_values(&mut visit);
+
+                    let mut visit_closure = |closure_ptr: usize| {
+                        for (idx, obj) in heap.objects().iter().enumerate() {
+                            if let Some(HeapObj::VmClosure(hc)) = obj {
+                                if std::rc::Rc::as_ptr(hc) as *const () as usize == closure_ptr {
+                                    self.mark_gray(idx as u32);
+                                    break;
+                                }
+                            }
+                        }
+                    };
+                    gen.0.trace_closures(&mut visit_closure);
+                }
             }
         }
         Ok(())

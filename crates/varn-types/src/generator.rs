@@ -8,6 +8,8 @@ pub trait GeneratorDriver: std::fmt::Debug {
     fn next(&self, input: Value) -> Result<Value, String>;
     fn is_done(&self) -> bool;
     fn is_async(&self) -> bool;
+    fn trace_vm_values(&self, _callback: &mut dyn FnMut(crate::VmValue)) {}
+    fn trace_closures(&self, _callback: &mut dyn FnMut(usize)) {}
 }
 
 #[derive(Debug)]
