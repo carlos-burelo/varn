@@ -122,6 +122,7 @@ pub fn prepare_call(
                     let args_start = stack.len() - arg_count;
                     let arg_nvs: Vec<VmValue> = stack.drain(args_start..).collect();
                     let mut gen_ctx = Box::new(ExecCtx::new(GlobalStore::new()));
+                    gen_ctx.heap = heap.clone(); // Share the parent's Heap
                     gen_ctx.trace = false;
                     gen_ctx.stack = arg_nvs;
                     let constants = resolve_constants(&nc.proto, heap);
@@ -130,7 +131,7 @@ pub fn prepare_call(
                         .iter()
                         .map(|uv| {
                             let nv = uv.read(stack);
-                            VmUpvalue::closed(gen_ctx.heap.intern(heap.extract(nv)))
+                            VmUpvalue::closed(nv) // 0-copy direct copy
                         })
                         .collect();
                     let new_feedback = Rc::new(RefCell::new(

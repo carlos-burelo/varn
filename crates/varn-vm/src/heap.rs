@@ -3,6 +3,7 @@ use crate::frame::{VmClosure, VmClosurePayload, VmValueRef};
 use crate::gc::GcCollector;
 use crate::value::VmValue;
 use std::cell::RefCell;
+use std::ops::{Deref, DerefMut};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -40,7 +41,7 @@ pub enum HeapObj {
 }
 
 #[derive(Clone)]
-pub struct Heap {
+pub struct HeapInner {
     pub alloc_count: u64,
     pub intrinsic_classes: HashMap<String, Rc<ClassObj>>,
     pub gc_collections: u64,
@@ -80,7 +81,7 @@ fn alloc_into(
     }
 }
 
-impl Heap {
+impl HeapInner {
     pub fn new() -> Self {
         Self {
             objects: Vec::with_capacity(4096),
@@ -682,13 +683,47 @@ impl Heap {
     }
 }
 
+#[derive(Clone)]
+pub struct Heap {
+    inner: Rc<std::cell::UnsafeCell<HeapInner>>,
+}
+
+impl Heap {
+    pub fn new() -> Self {
+        Self {
+            inner: Rc::new(std::cell::UnsafeCell::new(HeapInner::new())),
+        }
+    }
+}
+
+impl std::ops::Deref for Heap {
+    type Target = HeapInner;
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.inner.get() }
+    }
+}
+
+impl std::ops::DerefMut for Heap {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { &mut *self.inner.get() }
+    }
+}
+
+impl std::fmt::Debug for Heap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Heap {{ alloc_count: {} }}", self.alloc_count)
+    }
+}
+
 impl NativeCtx for Heap {
     fn alloc_str(&mut self, s: &str) -> VmValue {
-        self.alloc_str(s)
+        self.deref_mut().alloc_str(s)
     }
 
     fn alloc_str_owned(&mut self, s: String) -> VmValue {
-        self.alloc_str(&s)
+        self.deref_mut().alloc_str(&s)
     }
 
     fn alloc_array(&mut self, items: Vec<VmValue>) -> VmValue {
@@ -696,12 +731,12 @@ impl NativeCtx for Heap {
     }
 
     fn alloc_object(&mut self) -> VmValue {
-        let map: HashMap<Rc<str>, VmValue> = HashMap::new();
-        VmValue::from_heap_idx(self.alloc(HeapObj::NativeModule(Rc::new(map))))
+        let oref = ObjRef::new(ObjData::new());
+        VmValue::from_heap_idx(self.alloc(HeapObj::Object(oref)))
     }
 
     fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue {
-        self.alloc_range(start, end, inclusive)
+        self.deref_mut().alloc_range(start, end, inclusive)
     }
 
     fn alloc_fn(&mut self, f: NativeFn, name: &'static str) -> VmValue {
@@ -713,7 +748,7 @@ impl NativeCtx for Heap {
     }
 
     fn is_string(&self, v: VmValue) -> bool {
-        self.is_string(v)
+        self.deref().is_string(v)
     }
 
     fn is_array(&self, v: VmValue) -> bool {
@@ -721,11 +756,11 @@ impl NativeCtx for Heap {
     }
 
     fn str_repr(&self, v: VmValue) -> String {
-        self.str_repr(v)
+        self.deref().str_repr(v)
     }
 
     fn str_owned(&self, v: VmValue) -> Option<String> {
-        self.str_owned(v)
+        self.deref().str_owned(v)
     }
 
     fn array_len(&self, arr: VmValue) -> usize {
@@ -786,13 +821,25 @@ impl NativeCtx for Heap {
     }
 
     fn get_field(&self, obj: VmValue, key: &str) -> Option<VmValue> {
-        self.native_module_get(obj, key)
+        if obj.is_heap() {
+            if let Some(HeapObj::Object(o)) = self.get(obj.as_heap_idx()) {
+                return o.borrow().get_field_nv(key);
+            }
+            if let Some(HeapObj::NativeModule(map)) = self.get(obj.as_heap_idx()) {
+                return map.get(key).copied();
+            }
+        }
+        None
     }
 
     fn set_field(&mut self, obj: VmValue, key: &str, val: VmValue) {
-        let idx = obj.as_heap_idx();
-        if let Some(HeapObj::NativeModule(map_rc)) = self.get_mut(idx) {
-            Rc::make_mut(map_rc).insert(Rc::from(key), val);
+        if obj.is_heap() {
+            let idx = obj.as_heap_idx();
+            if let Some(HeapObj::Object(o)) = self.get(idx) {
+                o.borrow_mut().set_field_nv(Rc::from(key), val);
+            } else if let Some(HeapObj::NativeModule(map_rc)) = self.get_mut(idx) {
+                Rc::make_mut(map_rc).insert(Rc::from(key), val);
+            }
         }
     }
 
@@ -831,11 +878,11 @@ impl NativeCtx for Heap {
     }
 
     fn extract(&self, v: VmValue) -> Value {
-        self.extract(v)
+        self.deref().extract(v)
     }
 
     fn intern(&mut self, v: Value) -> VmValue {
-        self.intern(v)
+        self.deref_mut().intern(v)
     }
 
     fn call_static(&mut self, f: NativeFn) -> VmValue {
