@@ -47,7 +47,7 @@ impl ExecCtx {
         })
     }
 
-    fn run_until_inner(&mut self, depth: usize) -> VmResult<VmValue> {
+    pub(crate) fn run_until_inner(&mut self, depth: usize) -> VmResult<VmValue> {
         'frame_loop: while self.frames.len() > depth {
             let frame_idx = self.frames.len() - 1;
 

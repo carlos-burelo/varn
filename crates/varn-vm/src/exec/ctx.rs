@@ -901,5 +901,199 @@ pub extern "C" fn jit_make_closure(
     }
 }
 
+pub extern "C" fn jit_call(
+    ctx: *mut ExecCtx,
+    args: *const varn_jit::JitCallArgs,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let args = &*args;
+        let caller_depth = ctx_ref.frames.len();
+        let frame_idx = caller_depth - 1;
+        let base = ctx_ref.frames[frame_idx].base;
+
+        ctx_ref.frames[frame_idx].ip = args.ip;
+
+        let res = ctx_ref.exec_call_reg(
+            args.callee,
+            base,
+            args.arg_start,
+            args.arg_count,
+            args.dest,
+            frame_idx,
+        );
+
+        match res {
+            Ok(true) => {
+                ctx_ref.run_until_inner(caller_depth).unwrap();
+            }
+            Ok(false) => {}
+            Err(e) => {
+                panic!("Runtime error in JIT call: {:?}", e);
+            }
+        }
+
+        ctx_ref.stack[base + args.dest]
+    }
+}
+
+pub extern "C" fn jit_call_method(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    args: *const varn_jit::JitCallMethodArgs,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let closure_ref = &*closure;
+        let args = &*args;
+        let caller_depth = ctx_ref.frames.len();
+        let frame_idx = caller_depth - 1;
+        let base = ctx_ref.frames[frame_idx].base;
+
+        ctx_ref.frames[frame_idx].ip = args.ip;
+
+        let res = ctx_ref.exec_call_method_reg(
+            args.this_val,
+            base,
+            args.name_idx,
+            args.cs,
+            args.arg_start,
+            args.arg_count,
+            args.dest,
+            frame_idx,
+            closure_ref,
+        );
+
+        match res {
+            Ok(true) => {
+                ctx_ref.run_until_inner(caller_depth).unwrap();
+            }
+            Ok(false) => {}
+            Err(e) => {
+                panic!("Runtime error in JIT call_method: {:?}", e);
+            }
+        }
+
+        ctx_ref.stack[base + args.dest]
+    }
+}
+
+pub extern "C" fn jit_get_property(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    args: *const varn_jit::JitGetPropertyArgs,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let closure_ref = &*closure;
+        let args = &*args;
+        let caller_depth = ctx_ref.frames.len();
+        let frame_idx = caller_depth - 1;
+        let base = ctx_ref.frames[frame_idx].base;
+
+        ctx_ref.frames[frame_idx].ip = args.ip;
+
+        let res = ctx_ref.exec_get_property_reg(
+            args.obj,
+            args.name_idx,
+            args.cs_idx,
+            args.dest,
+            base,
+            frame_idx,
+            closure_ref,
+        );
+
+        match res {
+            Ok(true) => {
+                ctx_ref.run_until_inner(caller_depth).unwrap();
+            }
+            Ok(false) => {}
+            Err(e) => {
+                panic!("Runtime error in JIT get_property: {:?}", e);
+            }
+        }
+
+        ctx_ref.stack[base + args.dest]
+    }
+}
+
+pub extern "C" fn jit_set_property(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    args: *const varn_jit::JitSetPropertyArgs,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let closure_ref = &*closure;
+        let args = &*args;
+        let caller_depth = ctx_ref.frames.len();
+        let frame_idx = caller_depth - 1;
+        let base = ctx_ref.frames[frame_idx].base;
+
+        ctx_ref.frames[frame_idx].ip = args.ip;
+
+        let res = ctx_ref.exec_set_property_reg(
+            args.obj,
+            args.val,
+            args.name_idx,
+            args.cs_idx,
+            base,
+            frame_idx,
+            closure_ref,
+        );
+
+        match res {
+            Ok(true) => {
+                ctx_ref.run_until_inner(caller_depth).unwrap();
+            }
+            Ok(false) => {}
+            Err(e) => {
+                panic!("Runtime error in JIT set_property: {:?}", e);
+            }
+        }
+    }
+}
+
+pub extern "C" fn jit_build_array(
+    ctx: *mut ExecCtx,
+    start_reg: usize,
+    count: usize,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let frame_idx = ctx_ref.frames.len() - 1;
+        let base = ctx_ref.frames[frame_idx].base;
+        let mut elems = Vec::with_capacity(count);
+        for i in 0..count {
+            let nv = ctx_ref.stack[base + start_reg + i];
+            elems.push(nv);
+        }
+        ctx_ref.heap.alloc_array(elems)
+    }
+}
+
+pub extern "C" fn jit_build_str(
+    ctx: *mut ExecCtx,
+    parts_ptr: *const VmValue,
+    count: usize,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let parts = std::slice::from_raw_parts(parts_ptr, count);
+        let mut total_len = 0;
+        let mut string_parts = Vec::with_capacity(count);
+        for &v in parts {
+            let s = ctx_ref.heap.str_repr(v);
+            total_len += s.len();
+            string_parts.push(s);
+        }
+        let mut combined = String::with_capacity(total_len);
+        for s in &string_parts {
+            combined.push_str(s);
+        }
+        ctx_ref.heap.alloc_str(&combined)
+    }
+}
+
 
 
