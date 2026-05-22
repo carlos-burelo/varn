@@ -47,7 +47,11 @@ impl RegMap {
                 | OpCode::LoadIntMinusOne => {
                     *freq.entry(first_reg).or_insert(0) += 1;
                 }
-                OpCode::LoadInt | OpCode::LoadConst | OpCode::LoadGlobalIdx => {
+                OpCode::LoadInt
+                | OpCode::LoadConst
+                | OpCode::LoadGlobalIdx
+                | OpCode::LoadGlobal
+                | OpCode::LoadUpvalue => {
                     *freq.entry(first_reg).or_insert(0) += 2;
                     ip += 1;
                 }
@@ -57,6 +61,12 @@ impl RegMap {
                     let src = (w1 >> 8) as usize;
                     *freq.entry(src).or_insert(0) += 2;
                     ip += 1;
+                }
+                OpCode::StoreUpvalue => {
+                    let w1 = code[ip];
+                    ip += 1;
+                    let src = (w1 & 0xFF) as usize;
+                    *freq.entry(src).or_insert(0) += 2;
                 }
                 OpCode::Move => {
                     let w1 = code[ip];
@@ -72,7 +82,39 @@ impl RegMap {
                     *freq.entry(first_reg).or_insert(0) += 2;
                     *freq.entry(src).or_insert(0) += 2;
                 }
-                OpCode::AddInt
+                OpCode::ToString | OpCode::IsNull => {
+                    let w1 = code[ip];
+                    ip += 1;
+                    let src = (w1 >> 8) as usize;
+                    *freq.entry(first_reg).or_insert(0) += 2;
+                    *freq.entry(src).or_insert(0) += 2;
+                }
+                OpCode::MakeClosure => {
+                    let w1 = code[ip];
+                    ip += 1;
+                    let uv_count = (w1 & 0xFF) as usize;
+                    ip += 1; // for proto_idx
+                    *freq.entry(first_reg).or_insert(0) += 2;
+                    for _ in 0..uv_count {
+                        let uv_desc = code[ip];
+                        ip += 1;
+                        let is_local = (uv_desc >> 8) != 0;
+                        let index = (uv_desc & 0xFF) as usize;
+                        if is_local {
+                            *freq.entry(index).or_insert(0) += 2;
+                        }
+                    }
+                }
+                OpCode::Eq
+                | OpCode::Neq
+                | OpCode::Lt
+                | OpCode::Lte
+                | OpCode::Gt
+                | OpCode::Gte
+                | OpCode::Add
+                | OpCode::Sub
+                | OpCode::Mul
+                | OpCode::AddInt
                 | OpCode::SubInt
                 | OpCode::MulInt
                 | OpCode::LtInt

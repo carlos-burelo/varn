@@ -122,30 +122,31 @@ fn fmt_bytes(n: usize) -> String {
 const W_NAME: usize = 10;
 const W_TIME: usize = 9;
 const W_SIG: usize = 8;
+const W_PCT: usize = 6;
 const SEP: &str = "─";
 
 fn sep_line() {
     let name_col = SEP.repeat(W_NAME);
     let time_col = SEP.repeat(W_TIME);
     let sig_col = SEP.repeat(W_SIG);
+    let pct_col = SEP.repeat(W_PCT);
     eprintln!(
-        "  {DIM}{name_col}  {time_col}  {time_col}  {time_col}  {time_col}  {sig_col}  {time_col}{R}"
+        "  {DIM}{name_col}  {time_col}  {time_col}  {time_col}  {time_col}  {sig_col}  {time_col}  {pct_col}{R}"
     );
 }
 
 fn header_line() {
     eprintln!(
-        "  {}{:<W_NAME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_SIG$}  {:>W_TIME$}{}",
-        DIM, "Phase", "min", "p50", "mean", "max", "σ", "total", R
+        "  {}{:<W_NAME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_SIG$}  {:>W_TIME$}  {:>W_PCT$}{}",
+        DIM, "Phase", "min", "p50", "mean", "max", "σ", "total", "%", R
     );
 }
 
 fn phase_line(stat: &PhaseStats, share: f64) {
-    let bar = make_bar(share, 8);
-    let pct = format!("{:.0}%", share * 100.0);
+    let pct = format!("{:.1}%", share * 100.0);
 
     eprintln!(
-        "  {}{}{:<W_NAME$}{}  {:>W_TIME$}  {:>W_TIME$}  {}{:>W_TIME$}{}  {:>W_TIME$}  {}{:>W_SIG$}{}  {}{}{}  {}{} {}{}",
+        "  {}{}{:<W_NAME$}{}  {:>W_TIME$}  {:>W_TIME$}  {}{:>W_TIME$}{}  {:>W_TIME$}  {}{:>W_SIG$}{}  {}{:>W_TIME$}{}  {}{:>W_PCT$}{}",
         BOLD, stat.color, stat.name, R,
         fmt_dur(stat.min),
         fmt_dur(stat.p50),
@@ -153,7 +154,7 @@ fn phase_line(stat: &PhaseStats, share: f64) {
         fmt_dur(stat.max),
         DIM, fmt_dur(stat.stddev), R,
         DIM, fmt_dur(stat.total), R,
-        DIM, bar, pct, R,
+        DIM, pct, R,
     );
 }
 
@@ -166,7 +167,7 @@ fn total_line(phases: &[PhaseStats]) {
     let mean = total / runs as u32;
 
     eprintln!(
-        "  {}{}{:<W_NAME$}{}  {:>W_TIME$}  {:>W_TIME$}  {}{:>W_TIME$}{}  {:>W_TIME$}  {:>W_SIG$}  {}{}{}",
+        "  {}{}{:<W_NAME$}{}  {:>W_TIME$}  {:>W_TIME$}  {}{:>W_TIME$}{}  {:>W_TIME$}  {:>W_SIG$}  {}{:>W_TIME$}{}  {}{:>W_PCT$}{}",
         BOLD, GRN, "total", R,
         fmt_dur(min),
         fmt_dur(p50),
@@ -174,14 +175,8 @@ fn total_line(phases: &[PhaseStats]) {
         fmt_dur(max),
         "",
         DIM, fmt_dur(total), R,
+        DIM, "100%", R,
     );
-}
-
-fn make_bar(fraction: f64, width: usize) -> String {
-    let filled = (fraction * width as f64).round() as usize;
-    let filled = filled.min(width);
-    let empty = width - filled;
-    format!("{}{}", "█".repeat(filled), "░".repeat(empty))
 }
 
 fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Duration>, CliError> {
@@ -269,17 +264,32 @@ pub fn run_bench(
 
     let check_result = Checker::check_with_profile(&program);
 
+    let optimize_samples = std::cell::RefCell::new(Vec::with_capacity(runs));
     let compile_samples = time_n(runs, || {
-        varn_compiler::compile_with_check_result(
+        varn_compiler::codegen::regalloc_post::OPTIMIZE_TIME.with(|t| t.set(Duration::ZERO));
+        varn_compiler::codegen::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(true));
+
+        let res = varn_compiler::compile_with_check_result(
             program_ref,
             &check_result.type_annotations,
             &check_result.extension_calls,
             &check_result.extension_members,
             &check_result.extension_set_members,
-        )
-        .map(|_| ())
-        .map_err(|e| format!("compile failed: {}", e))
+        );
+
+        varn_compiler::codegen::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(false));
+        let opt_dur = varn_compiler::codegen::regalloc_post::OPTIMIZE_TIME.with(|t| t.get());
+        optimize_samples.borrow_mut().push(opt_dur);
+
+        res.map(|_| ()).map_err(|e| format!("compile failed: {}", e))
     })?;
+
+    let optimize_samples = optimize_samples.into_inner();
+    let compile_only_samples: Vec<Duration> = compile_samples
+        .iter()
+        .zip(&optimize_samples)
+        .map(|(c, o)| c.saturating_sub(*o))
+        .collect();
 
     let proto = varn_compiler::compile_with_check_result(
         &program,
@@ -290,8 +300,10 @@ pub fn run_bench(
     )
     .map_err(|e| CliError::fatal(format!("compile error: {e}")))?;
 
+    let precompile_start = Instant::now();
     let graph_build = crate::module_precompile::build_module_graph(&program, &source, path, &proto)
         .map_err(|e| CliError::fatal(format!("module graph build error: {e}")))?;
+    let precompile_dur = precompile_start.elapsed();
     let precompiled = Rc::new(
         graph_build
             .modules
@@ -384,7 +396,8 @@ pub fn run_bench(
         PhaseStats::from_samples("lex", YEL, &lex_samples),
         PhaseStats::from_samples("parse", GRN, &parse_samples),
         PhaseStats::from_samples("check", RED, &check_samples),
-        PhaseStats::from_samples("compile", MAG, &compile_samples),
+        PhaseStats::from_samples("compile", MAG, &compile_only_samples),
+        PhaseStats::from_samples("optimize", YEL, &optimize_samples),
         PhaseStats::from_samples("execute", BLU, &exec_samples),
     ];
 
@@ -418,6 +431,7 @@ pub fn run_bench(
     sep_line();
     total_line(&stats);
     eprintln!();
+    let total_pipeline_dur: Duration = stats.iter().map(|s| s.total).sum();
     eprintln!(
         "  {}Throughput:{} {}{:.1} runs/s{}  {}(mean end-to-end: {}){}",
         DIM,
@@ -427,6 +441,22 @@ pub fn run_bench(
         R,
         DIM,
         fmt_dur(total_mean),
+        R
+    );
+    eprintln!(
+        "  {}Total pipeline time:{} {}{}{}",
+        DIM,
+        R,
+        CYAN,
+        fmt_dur(total_pipeline_dur),
+        R
+    );
+    eprintln!(
+        "  {}Module precompilation (cold startup):{} {}{}{}",
+        DIM,
+        R,
+        CYAN,
+        fmt_dur(precompile_dur),
         R
     );
     if !with_output {
@@ -571,10 +601,15 @@ fn run_bench_wrc(path: &str, runs: usize, no_run: bool, with_output: bool) -> Re
     sep_line();
     total_line(&stats);
     eprintln!();
+    let total_pipeline_dur: Duration = stats.iter().map(|s| s.total).sum();
     eprintln!(
         "  {DIM}Throughput:{R} {RED}{:.1} runs/s{R}  {DIM}(mean end-to-end: {}){R}",
         throughput,
         fmt_dur(total_mean),
+    );
+    eprintln!(
+        "  {DIM}Total pipeline time:{R} {CYAN}{}{R}",
+        fmt_dur(total_pipeline_dur)
     );
     if !with_output {
         eprintln!("  {DIM}Execution measured with stdout muted (--withOutput to disable){R}");

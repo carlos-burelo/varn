@@ -1,6 +1,13 @@
 use std::collections::HashMap;
+use std::cell::Cell;
+use std::time::{Duration, Instant};
 use varn_core::OpCode;
 use varn_types::FunctionProto;
+
+thread_local! {
+    pub static OPTIMIZE_TIME: Cell<Duration> = Cell::new(Duration::ZERO);
+    pub static OPTIMIZE_ENABLED: Cell<bool> = Cell::new(false);
+}
 
 use super::liveness::{LiveRange, LivenessAnalyzer};
 
@@ -848,6 +855,21 @@ fn collect_back_edges(code: &[u16]) -> Vec<(usize, usize)> {
 }
 
 pub fn optimize_function(proto: &mut FunctionProto) {
+    let start = if OPTIMIZE_ENABLED.with(|e| e.get()) {
+        Some(Instant::now())
+    } else {
+        None
+    };
+
+    optimize_function_inner(proto);
+
+    if let Some(start) = start {
+        let elapsed = start.elapsed();
+        OPTIMIZE_TIME.with(|t| t.set(t.get() + elapsed));
+    }
+}
+
+fn optimize_function_inner(proto: &mut FunctionProto) {
     // Async and generator functions save register state into a heap-allocated array.
     // Remapping registers would break the saved indices, so skip optimization for these.
     if proto.is_async || proto.is_generator {
