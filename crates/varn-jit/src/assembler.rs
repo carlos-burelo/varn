@@ -229,6 +229,36 @@ impl Assembler {
         self.emit_byte(imm);
     }
 
+    /// `sar reg, imm8` (64-bit arithmetic shift right)
+    pub fn sar_reg_imm8(&mut self, reg: Reg, imm: u8) {
+        self.emit_rex(true, 0, 0, reg as u8);
+        self.emit_byte(0xC1);
+        self.emit_modrm(0b11, 7, reg as u8); // /7 is sar extension
+        self.emit_byte(imm);
+    }
+
+    /// `shr reg, imm8` (64-bit logical shift right)
+    pub fn shr_reg_imm8(&mut self, reg: Reg, imm: u8) {
+        self.emit_rex(true, 0, 0, reg as u8);
+        self.emit_byte(0xC1);
+        self.emit_modrm(0b11, 5, reg as u8); // /5 is shr extension
+        self.emit_byte(imm);
+    }
+
+    /// `and dest, src` (64-bit register bitwise AND)
+    pub fn and_reg_reg(&mut self, dest: Reg, src: Reg) {
+        self.emit_rex(true, src as u8, 0, dest as u8);
+        self.emit_byte(0x21);
+        self.emit_modrm(0b11, src as u8, dest as u8);
+    }
+
+    /// `or dest, src` (64-bit register bitwise OR)
+    pub fn or_reg_reg(&mut self, dest: Reg, src: Reg) {
+        self.emit_rex(true, src as u8, 0, dest as u8);
+        self.emit_byte(0x09);
+        self.emit_modrm(0b11, src as u8, dest as u8);
+    }
+
     /// `sub dest, src` (64-bit register arithmetic)
     pub fn sub_reg_reg(&mut self, dest: Reg, src: Reg) {
         self.emit_rex(true, src as u8, 0, dest as u8);

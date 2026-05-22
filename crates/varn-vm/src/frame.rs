@@ -112,7 +112,13 @@ impl VmClosure {
     }
 
     pub fn compile_jit(&mut self) {
-        if let Ok((entry, code)) = varn_jit::compile(&self.proto) {
+        let helpers = varn_jit::JitHelpers {
+            load_const: crate::exec::ctx::jit_load_const as usize,
+            load_global_idx: crate::exec::ctx::jit_load_global_idx as usize,
+            store_global_idx: crate::exec::ctx::jit_store_global_idx as usize,
+            define_global_idx: crate::exec::ctx::jit_define_global_idx as usize,
+        };
+        if let Ok((entry, code)) = varn_jit::compile(&self.proto, helpers) {
             self.jit_entry = Some(entry);
             self.jit_code = Some(code);
         }
