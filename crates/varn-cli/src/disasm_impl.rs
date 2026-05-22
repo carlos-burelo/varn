@@ -53,7 +53,9 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
             | OpCode::LoadIntMinusOne
             | OpCode::LoadNull
             | OpCode::LoadTrue
-            | OpCode::LoadFalse => {
+            | OpCode::LoadFalse
+            | OpCode::CloseUpvalue
+            | OpCode::Inherit => {
                 println!("{:?} r{}", op, first_reg);
                 offset + 1
             }
@@ -73,32 +75,39 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
             | OpCode::StrLength
             | OpCode::GetEnumTag
             | OpCode::Await
-            | OpCode::Yield
-            | OpCode::Return
-            | OpCode::Throw
-            | OpCode::MergeExports
-            | OpCode::LoadUpvalue
-            | OpCode::StoreUpvalue
-            | OpCode::CloseUpvalue
-            | OpCode::Inherit
-            | OpCode::Jump
-            | OpCode::Loop => {
-                let hi = code.get(offset + 1).copied().unwrap_or(0) as u32;
-                let lo = code.get(offset + 2).copied().unwrap_or(0) as u32;
-                let jump_offset = (hi << 16) | lo;
-                println!("{:?} {}", op, jump_offset);
-                offset + 3
+            | OpCode::Yield => {
+                let w1 = code.get(offset + 1).copied().unwrap_or(0);
+                let src = (w1 >> 8) as usize;
+                println!("{:?} r{} r{}", op, first_reg, src);
+                offset + 2
+            }
+
+            OpCode::Return
+            | OpCode::Throw => {
+                let w1 = code.get(offset + 1).copied().unwrap_or(0);
+                let reg = (w1 >> 8) as usize;
+                println!("{:?} r{}", op, reg);
+                offset + 2
             }
 
             OpCode::LoadConst
             | OpCode::LoadInt
             | OpCode::LoadGlobal
             | OpCode::StoreGlobal
-            | OpCode::DefineGlobal
             | OpCode::DefineGlobalIdx
             | OpCode::LoadGlobalIdx
             | OpCode::StoreGlobalIdx
-            | OpCode::Add
+            | OpCode::MergeExports
+            | OpCode::LoadUpvalue
+            | OpCode::StoreUpvalue
+            | OpCode::Import
+            | OpCode::Reexport => {
+                let w1 = code.get(offset + 1).copied().unwrap_or(0);
+                println!("{:?} r{} +{}", op, first_reg, w1);
+                offset + 2
+            }
+
+            OpCode::Add
             | OpCode::Sub
             | OpCode::Mul
             | OpCode::Div
@@ -117,6 +126,26 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
             | OpCode::Shr
             | OpCode::Ushr
             | OpCode::StrConcat
+            | OpCode::AddInt
+            | OpCode::SubInt
+            | OpCode::MulInt
+            | OpCode::DivInt
+            | OpCode::LtInt
+            | OpCode::GtInt
+            | OpCode::LteInt
+            | OpCode::GteInt
+            | OpCode::EqInt
+            | OpCode::NeqInt
+            | OpCode::AddFloat
+            | OpCode::SubFloat
+            | OpCode::MulFloat
+            | OpCode::DivFloat
+            | OpCode::LtFloat
+            | OpCode::GtFloat
+            | OpCode::LteFloat
+            | OpCode::GteFloat
+            | OpCode::EqFloat
+            | OpCode::NeqFloat
             | OpCode::StrSlice
             | OpCode::In
             | OpCode::Instanceof
@@ -124,31 +153,72 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
             | OpCode::ObjectKeys
             | OpCode::ObjectMerge
             | OpCode::GetIndex
-            | OpCode::SetIndex
-            | OpCode::BuildArray
-            | OpCode::BuildObjectWithShape
-            | OpCode::GetProperty
+            | OpCode::SetIndex => {
+                let w1 = code.get(offset + 1).copied().unwrap_or(0);
+                let src1 = (w1 >> 8) as usize;
+                let src2 = (w1 & 0xFF) as usize;
+                println!("{:?} r{} r{} r{}", op, first_reg, src1, src2);
+                offset + 2
+            }
+
+            OpCode::DefineGlobal
+            | OpCode::MakeClass
+            | OpCode::BindMethod => {
+                let w1 = code.get(offset + 1).copied().unwrap_or(0);
+                let src = (w1 >> 8) as usize;
+                let const_idx = code.get(offset + 2).copied().unwrap_or(0);
+                println!("{:?} r{} r{} +{}", op, first_reg, src, const_idx);
+                offset + 3
+            }
+
+            OpCode::GetProperty
             | OpCode::GetPropertyMaybe
             | OpCode::SetProperty
             | OpCode::GetFixedField
             | OpCode::SetFixedField
             | OpCode::GetSuper
-            | OpCode::GetSymbol
-            | OpCode::BindMethod
-            | OpCode::MakeClass
-            | OpCode::DeclareField
-            | OpCode::MakeEnumVariant
-            | OpCode::Import
-            | OpCode::Reexport
-            | OpCode::Call
-            | OpCode::CallSpread
-            | OpCode::InvokeVirtual
+            | OpCode::GetSymbol => {
+                let w1 = code.get(offset + 1).copied().unwrap_or(0);
+                let src = (w1 >> 8) as usize;
+                let cs_idx = (w1 & 0xFF) as usize;
+                let const_idx = code.get(offset + 2).copied().unwrap_or(0);
+                println!("{:?} r{} r{} +{} cs={}", op, first_reg, src, const_idx, cs_idx);
+                offset + 3
+            }
+
+            OpCode::DeclareField => {
+                let w1 = code.get(offset + 1).copied().unwrap_or(0);
+                let class_reg = (w1 >> 8) as usize;
+                let name_idx = code.get(offset + 2).copied().unwrap_or(0);
+                println!("{:?} class=r{} name=+{}", op, class_reg, name_idx);
+                offset + 3
+            }
+
+            OpCode::Call
+            | OpCode::CallSpread => {
+                let w1 = code.get(offset + 1).copied().unwrap_or(0);
+                let callee_reg = (w1 >> 8) as usize;
+                let w2 = code.get(offset + 2).copied().unwrap_or(0);
+                let arg_count = (w2 >> 8) as usize;
+                let arg_start = (w2 & 0xFF) as usize;
+                println!("{:?} dest=r{} callee=r{} count={} start=r{}", op, first_reg, callee_reg, arg_count, arg_start);
+                offset + 3
+            }
+
+            OpCode::Jump
             | OpCode::JumpIfFalse
-            | OpCode::JumpIfTrue => {
+            | OpCode::JumpIfTrue
+            | OpCode::Loop => {
                 let hi = code.get(offset + 1).copied().unwrap_or(0) as u32;
                 let lo = code.get(offset + 2).copied().unwrap_or(0) as u32;
                 let jump_offset = (hi << 16) | lo;
-                println!("{:?} r{} +{}", op, first_reg, jump_offset);
+                if op == OpCode::Loop {
+                    println!("{:?} -{}", op, jump_offset);
+                } else if op == OpCode::Jump {
+                    println!("{:?} +{}", op, jump_offset);
+                } else {
+                    println!("{:?} r{} +{}", op, first_reg, jump_offset);
+                }
                 offset + 3
             }
 
@@ -169,16 +239,34 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
             | OpCode::DefineStaticGetter
             | OpCode::DefineStaticSetter => {
                 let w1 = code.get(offset + 1).copied().unwrap_or(0);
-                let w2 = code.get(offset + 2).copied().unwrap_or(0);
-                println!("{:?} {} {}", op, w1, w2);
+                let class_reg = (w1 >> 8) as usize;
+                let val_reg = (w1 & 0xFF) as usize;
+                let name_idx = code.get(offset + 2).copied().unwrap_or(0);
+                println!("{:?} class=r{} val=r{} name=+{}", op, class_reg, val_reg, name_idx);
                 offset + 3
             }
 
             OpCode::CallMethod => {
                 let w1 = code.get(offset + 1).copied().unwrap_or(0);
-                let w2 = code.get(offset + 2).copied().unwrap_or(0);
+                let dest = (w1 >> 8) as usize;
+                let obj = (w1 & 0xFF) as usize;
+                let name_idx = code.get(offset + 2).copied().unwrap_or(0) as usize;
                 let w3 = code.get(offset + 3).copied().unwrap_or(0);
-                println!("{:?} {} {} {}", op, w1, w2, w3);
+                let arg_count = (w3 >> 8) as usize;
+                let arg_start = (w3 & 0xFF) as usize;
+                println!("{:?} dest=r{} obj=r{} name=+{} count={} start=r{}", op, dest, obj, name_idx, arg_count, arg_start);
+                offset + 4
+            }
+
+            OpCode::InvokeVirtual => {
+                let w1 = code.get(offset + 1).copied().unwrap_or(0);
+                let dest = (w1 >> 8) as usize;
+                let obj = (w1 & 0xFF) as usize;
+                let name_idx = code.get(offset + 2).copied().unwrap_or(0) as usize;
+                let w3 = code.get(offset + 3).copied().unwrap_or(0);
+                let arg_count = (w3 >> 8) as usize;
+                let arg_start = (w3 & 0xFF) as usize;
+                println!("{:?} dest=r{} obj=r{} name=+{} count={} start=r{}", op, dest, obj, name_idx, arg_count, arg_start);
                 offset + 4
             }
 
@@ -188,8 +276,8 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
                 let dest = (w1 >> 8) as usize;
                 let uv_count = (w1 & 0xff) as usize;
                 println!(
-                    "{:?} {} {} (dest={}, uv_count={})",
-                    op, w1, proto_idx, dest, uv_count
+                    "{:?} dest=r{} proto_idx=+{} uv_count={}",
+                    op, dest, proto_idx, uv_count
                 );
                 offset + 3 + uv_count
             }
@@ -198,7 +286,7 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
                 let w1 = code.get(offset + 1).copied().unwrap_or(0);
                 let dest = (w1 >> 8) as usize;
                 let count = (w1 & 0xff) as usize;
-                println!("{:?} dest={} count={}", op, dest, count);
+                println!("{:?} dest=r{} count={}", op, dest, count);
                 offset + 2 + count * 2
             }
 
@@ -246,6 +334,10 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
                 }
                 println!("r{} = concat({})", dest, reg_strs.join(", "));
                 offset + 2 + count
+            }
+            _ => {
+                println!("{:?} (fallback size calculation)", op);
+                offset + 1
             }
         }
     }

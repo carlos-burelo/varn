@@ -16,18 +16,26 @@ fn apply_class_decorators<'a>(c: &mut Compiler<'a>, class_reg: u8, decorators: &
         let is_null = c.alloc_reg();
         let line = c.line;
 
+        let recv_reg = c.alloc_reg();
+        c.chunk.emit_rr(OpCode::LoadNull, recv_reg, 0, line);
+
+        let arg_class_reg = c.alloc_reg();
+        c.emit_rr(OpCode::Move, arg_class_reg, class_reg);
+
         c.chunk.emit(OpCode::Call, line);
         c.chunk.write(Chunk::pack(result, deco_reg), line);
-        c.chunk.write(Chunk::pack(1, class_reg), line);
+        c.chunk.write(Chunk::pack(2, recv_reg), line);
 
         c.emit_rr(OpCode::IsNull, is_null, result);
         let skip = c.emit_cond_jump(OpCode::JumpIfTrue, is_null);
         c.emit_rr(OpCode::Move, class_reg, result);
         c.patch_jump(skip);
 
-        c.free_reg();
-        c.free_reg();
-        c.free_reg();
+        c.free_reg(); // free arg_class_reg
+        c.free_reg(); // free recv_reg
+        c.free_reg(); // free is_null
+        c.free_reg(); // free result
+        c.free_reg(); // free deco_reg
     }
 }
 
@@ -96,14 +104,20 @@ fn apply_method_decorators<'a>(
         c.free_reg();
         c.free_reg();
 
+        let recv_reg = c.alloc_reg();
+        c.chunk.emit_rr(OpCode::LoadNull, recv_reg, 0, line);
+
         let a0 = c.alloc_reg();
-        let a1 = c.alloc_reg();
-        let result = c.alloc_reg();
         c.emit_rr(OpCode::Move, a0, method_reg);
+
+        let a1 = c.alloc_reg();
         c.emit_rr(OpCode::Move, a1, ctx_reg);
+
+        let result = c.alloc_reg();
+
         c.chunk.emit(OpCode::Call, line);
         c.chunk.write(Chunk::pack(result, deco_fn), line);
-        c.chunk.write(Chunk::pack(2, a0), line);
+        c.chunk.write(Chunk::pack(3, recv_reg), line);
 
         let is_null = c.alloc_reg();
         c.emit_rr(OpCode::IsNull, is_null, result);
@@ -111,12 +125,13 @@ fn apply_method_decorators<'a>(
         c.emit_rr(OpCode::Move, method_reg, result);
         c.patch_jump(skip);
 
-        c.free_reg();
-        c.free_reg();
-        c.free_reg();
-        c.free_reg();
-        c.free_reg();
-        c.free_reg();
+        c.free_reg(); // free is_null
+        c.free_reg(); // free result
+        c.free_reg(); // free a1
+        c.free_reg(); // free a0
+        c.free_reg(); // free recv_reg
+        c.free_reg(); // free ctx_reg
+        c.free_reg(); // free deco_fn
     }
 }
 

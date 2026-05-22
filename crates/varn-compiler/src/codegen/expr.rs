@@ -208,30 +208,77 @@ pub fn compile_expr<'a>(c: &mut Compiler<'a>, expr: &Expr) -> u8 {
             if let Some(r) = try_emit_imm_op(c, op, left, right) {
                 return r;
             }
-            let l = compile_expr(c, left);
-            let r = compile_expr(c, right);
-            let opcode = match op {
-                BinaryOp::Add => OpCode::Add,
-                BinaryOp::Sub => OpCode::Sub,
-                BinaryOp::Mul => OpCode::Mul,
-                BinaryOp::Div => OpCode::Div,
-                BinaryOp::Mod => OpCode::Mod,
-                BinaryOp::Pow => OpCode::Pow,
-                BinaryOp::Eq => OpCode::Eq,
-                BinaryOp::NotEq => OpCode::Neq,
-                BinaryOp::Lt => OpCode::Lt,
-                BinaryOp::LtEq => OpCode::Lte,
-                BinaryOp::Gt => OpCode::Gt,
-                BinaryOp::GtEq => OpCode::Gte,
-                BinaryOp::BitAnd => OpCode::BitAnd,
-                BinaryOp::BitOr => OpCode::BitOr,
-                BinaryOp::BitXor => OpCode::BitXor,
-                BinaryOp::Shl => OpCode::Shl,
-                BinaryOp::Shr => OpCode::Shr,
-                BinaryOp::UShr => OpCode::Ushr,
-                BinaryOp::Instanceof => OpCode::Instanceof,
-                BinaryOp::In => OpCode::In,
-            };
+             let l = compile_expr(c, left);
+             let r = compile_expr(c, right);
+             let numeric_kind = c.annotations.get_numeric(expr.range.start.offset);
+             let opcode = match numeric_kind {
+                 Some(varn_core::NumericKind::Int) => match op {
+                     BinaryOp::Add => OpCode::AddInt,
+                     BinaryOp::Sub => OpCode::SubInt,
+                     BinaryOp::Mul => OpCode::MulInt,
+                     BinaryOp::Div => OpCode::DivInt,
+                     BinaryOp::Eq => OpCode::EqInt,
+                     BinaryOp::NotEq => OpCode::NeqInt,
+                     BinaryOp::Lt => OpCode::LtInt,
+                     BinaryOp::LtEq => OpCode::LteInt,
+                     BinaryOp::Gt => OpCode::GtInt,
+                     BinaryOp::GtEq => OpCode::GteInt,
+                     BinaryOp::Mod => OpCode::Mod,
+                     BinaryOp::Pow => OpCode::Pow,
+                     BinaryOp::BitAnd => OpCode::BitAnd,
+                     BinaryOp::BitOr => OpCode::BitOr,
+                     BinaryOp::BitXor => OpCode::BitXor,
+                     BinaryOp::Shl => OpCode::Shl,
+                     BinaryOp::Shr => OpCode::Shr,
+                     BinaryOp::UShr => OpCode::Ushr,
+                     BinaryOp::Instanceof => OpCode::Instanceof,
+                     BinaryOp::In => OpCode::In,
+                 },
+                 Some(varn_core::NumericKind::Float) => match op {
+                     BinaryOp::Add => OpCode::AddFloat,
+                     BinaryOp::Sub => OpCode::SubFloat,
+                     BinaryOp::Mul => OpCode::MulFloat,
+                     BinaryOp::Div => OpCode::DivFloat,
+                     BinaryOp::Eq => OpCode::EqFloat,
+                     BinaryOp::NotEq => OpCode::NeqFloat,
+                     BinaryOp::Lt => OpCode::LtFloat,
+                     BinaryOp::LtEq => OpCode::LteFloat,
+                     BinaryOp::Gt => OpCode::GtFloat,
+                     BinaryOp::GtEq => OpCode::GteFloat,
+                     BinaryOp::Mod => OpCode::Mod,
+                     BinaryOp::Pow => OpCode::Pow,
+                     BinaryOp::BitAnd => OpCode::BitAnd,
+                     BinaryOp::BitOr => OpCode::BitOr,
+                     BinaryOp::BitXor => OpCode::BitXor,
+                     BinaryOp::Shl => OpCode::Shl,
+                     BinaryOp::Shr => OpCode::Shr,
+                     BinaryOp::UShr => OpCode::Ushr,
+                     BinaryOp::Instanceof => OpCode::Instanceof,
+                     BinaryOp::In => OpCode::In,
+                 },
+                 _ => match op {
+                     BinaryOp::Add => OpCode::Add,
+                     BinaryOp::Sub => OpCode::Sub,
+                     BinaryOp::Mul => OpCode::Mul,
+                     BinaryOp::Div => OpCode::Div,
+                     BinaryOp::Mod => OpCode::Mod,
+                     BinaryOp::Pow => OpCode::Pow,
+                     BinaryOp::Eq => OpCode::Eq,
+                     BinaryOp::NotEq => OpCode::Neq,
+                     BinaryOp::Lt => OpCode::Lt,
+                     BinaryOp::LtEq => OpCode::Lte,
+                     BinaryOp::Gt => OpCode::Gt,
+                     BinaryOp::GtEq => OpCode::Gte,
+                     BinaryOp::BitAnd => OpCode::BitAnd,
+                     BinaryOp::BitOr => OpCode::BitOr,
+                     BinaryOp::BitXor => OpCode::BitXor,
+                     BinaryOp::Shl => OpCode::Shl,
+                     BinaryOp::Shr => OpCode::Shr,
+                     BinaryOp::UShr => OpCode::Ushr,
+                     BinaryOp::Instanceof => OpCode::Instanceof,
+                     BinaryOp::In => OpCode::In,
+                 }
+             };
 
             c.emit_rrr(opcode, l, l, r);
             c.free_reg();
@@ -324,27 +371,31 @@ pub fn compile_expr<'a>(c: &mut Compiler<'a>, expr: &Expr) -> u8 {
 
         ExprKind::New { callee, args, .. } => {
             let callee_reg = compile_expr(c, callee);
+            let line = c.line;
+            let recv_reg = c.alloc_reg();
+            c.chunk.emit_rr(OpCode::LoadNull, recv_reg, 0, line);
+
             let (arg_start, arg_count, has_spread) =
                 compile_args_contiguous(c, expr.range.start.offset, args);
+            assert_eq!(arg_start, recv_reg + 1, "contiguous args must start right after receiver register");
 
             let dest = callee_reg;
-            let line = c.line;
             if has_spread {
-                let arr_reg = arg_start;
                 c.chunk.emit(OpCode::CallSpread, line);
                 c.chunk.write(Chunk::pack(dest, callee_reg), line);
-                c.chunk.write(Chunk::pack(arg_count as u8, arr_reg), line);
+                c.chunk.write(Chunk::pack((arg_count + 1) as u8, recv_reg), line);
             } else {
                 c.chunk.emit(OpCode::Call, line);
                 c.chunk.write(Chunk::pack(dest, callee_reg), line);
                 c.chunk.write(
-                    Chunk::pack(arg_count as u8, if arg_count > 0 { arg_start } else { 0 }),
+                    Chunk::pack((arg_count + 1) as u8, recv_reg),
                     line,
                 );
             }
             for _ in 0..arg_count {
                 c.free_reg();
             }
+            c.free_reg(); // Free receiver register
             dest
         }
 
@@ -928,24 +979,30 @@ fn compile_call<'a>(
         let super_idx = c.add_str("constructor");
         let fn_reg = c.alloc_reg();
         c.emit_rc(OpCode::GetSuper, fn_reg, super_idx);
-        let (arg_start, arg_count, has_spread) = compile_args_contiguous(c, offset, args);
-        let dest = fn_reg;
         let line = c.line;
+        let recv_reg = c.alloc_reg();
+        c.emit_rr(OpCode::Move, recv_reg, 0); // "this" is always Register 0
+
+        let (arg_start, arg_count, has_spread) = compile_args_contiguous(c, offset, args);
+        assert_eq!(arg_start, recv_reg + 1, "contiguous args must start right after receiver register");
+
+        let dest = fn_reg;
         if has_spread {
             c.chunk.emit(OpCode::CallSpread, line);
             c.chunk.write(Chunk::pack(dest, fn_reg), line);
-            c.chunk.write(Chunk::pack(arg_count as u8, arg_start), line);
+            c.chunk.write(Chunk::pack((arg_count + 1) as u8, recv_reg), line);
         } else {
             c.chunk.emit(OpCode::Call, line);
             c.chunk.write(Chunk::pack(dest, fn_reg), line);
             c.chunk.write(
-                Chunk::pack(arg_count as u8, if arg_count > 0 { arg_start } else { 0 }),
+                Chunk::pack((arg_count + 1) as u8, recv_reg),
                 line,
             );
         }
         for _ in 0..arg_count {
             c.free_reg();
         }
+        c.free_reg(); // Free receiver register copy
         if &*c.name == "constructor" {
             emit_field_inits(c);
         }
@@ -990,25 +1047,30 @@ fn emit_method_call<'a>(
 }
 
 fn emit_plain_call<'a>(c: &mut Compiler<'a>, callee_reg: u8, offset: u32, args: &[Arg]) -> u8 {
+    let line = c.line;
+    let recv_reg = c.alloc_reg();
+    c.chunk.emit_rr(OpCode::LoadNull, recv_reg, 0, line);
+
     let (arg_start, arg_count, has_spread) = compile_args_contiguous(c, offset, args);
+    assert_eq!(arg_start, recv_reg + 1, "contiguous args must start right after receiver register");
 
     let dest = callee_reg;
-    let line = c.line;
     if has_spread {
         c.chunk.emit(OpCode::CallSpread, line);
         c.chunk.write(Chunk::pack(dest, callee_reg), line);
-        c.chunk.write(Chunk::pack(arg_count as u8, arg_start), line);
+        c.chunk.write(Chunk::pack((arg_count + 1) as u8, recv_reg), line);
     } else {
         c.chunk.emit(OpCode::Call, line);
         c.chunk.write(Chunk::pack(dest, callee_reg), line);
         c.chunk.write(
-            Chunk::pack(arg_count as u8, if arg_count > 0 { arg_start } else { 0 }),
+            Chunk::pack((arg_count + 1) as u8, recv_reg),
             line,
         );
     }
     for _ in 0..arg_count {
         c.free_reg();
     }
+    c.free_reg(); // Free receiver register
     dest
 }
 
@@ -1402,13 +1464,22 @@ fn compile_pipeline<'a>(c: &mut Compiler<'a>, left: &Expr, right: &Expr) -> u8 {
         compile_expr(c, right)
     };
 
-    let arg = compile_expr(c, left);
     let line = c.line;
+    let recv_reg = c.alloc_reg();
+    c.chunk.emit_rr(OpCode::LoadNull, recv_reg, 0, line);
+
+    let arg = compile_expr(c, left);
+    assert_eq!(
+        arg,
+        recv_reg + 1,
+        "contiguous args must start right after receiver register"
+    );
 
     c.chunk.emit(OpCode::Call, line);
     c.chunk.write(Chunk::pack(fn_reg, fn_reg), line);
-    c.chunk.write(Chunk::pack(1, arg), line);
-    c.free_reg();
+    c.chunk.write(Chunk::pack(2, recv_reg), line);
+    c.free_reg(); // Free arg register
+    c.free_reg(); // Free receiver register
     fn_reg
 }
 

@@ -578,6 +578,57 @@ impl Heap {
             varn_types::Value::Set(s) => self.set_interner.get(s).copied(),
             varn_types::Value::BigInt(b) => self.bigint_interner.get(b.as_ref()).copied(),
             varn_types::Value::Decimal(d) => self.decimal_interner.get(d.as_ref()).copied(),
+            varn_types::Value::Char(c) => self.char_interner.get(c).copied(),
+            varn_types::Value::Class(c) => {
+                for (idx, obj) in self.objects.iter().enumerate() {
+                    if let Some(HeapObj::Class(hc)) = obj {
+                        if Rc::ptr_eq(c, hc) {
+                            return Some(idx as u32);
+                        }
+                    }
+                }
+                None
+            }
+            varn_types::Value::Task(t) => {
+                for (idx, obj) in self.objects.iter().enumerate() {
+                    if let Some(HeapObj::Task(ht)) = obj {
+                        if Rc::ptr_eq(t, ht) {
+                            return Some(idx as u32);
+                        }
+                    }
+                }
+                None
+            }
+            varn_types::Value::TaskHandle(th) => {
+                for (idx, obj) in self.objects.iter().enumerate() {
+                    if let Some(HeapObj::TaskHandle(hth)) = obj {
+                        if th == hth {
+                            return Some(idx as u32);
+                        }
+                    }
+                }
+                None
+            }
+            varn_types::Value::Generator(g) => {
+                for (idx, obj) in self.objects.iter().enumerate() {
+                    if let Some(HeapObj::Generator(hg)) = obj {
+                        if g == hg {
+                            return Some(idx as u32);
+                        }
+                    }
+                }
+                None
+            }
+            varn_types::Value::AsyncQueue(q) => {
+                for (idx, obj) in self.objects.iter().enumerate() {
+                    if let Some(HeapObj::AsyncQueue(hq)) = obj {
+                        if Rc::ptr_eq(&q.0, &hq.0) {
+                            return Some(idx as u32);
+                        }
+                    }
+                }
+                None
+            }
             _ => None,
         }
     }

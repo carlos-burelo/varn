@@ -192,7 +192,27 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
         | OpCode::Instanceof
         | OpCode::In
         | OpCode::StrConcat
-        | OpCode::StrSlice => s(2, Some(dest0), vec![hi1, lo1]),
+        | OpCode::StrSlice
+        | OpCode::AddInt
+        | OpCode::SubInt
+        | OpCode::MulInt
+        | OpCode::DivInt
+        | OpCode::LtInt
+        | OpCode::GtInt
+        | OpCode::LteInt
+        | OpCode::GteInt
+        | OpCode::EqInt
+        | OpCode::NeqInt
+        | OpCode::AddFloat
+        | OpCode::SubFloat
+        | OpCode::MulFloat
+        | OpCode::DivFloat
+        | OpCode::LtFloat
+        | OpCode::GtFloat
+        | OpCode::LteFloat
+        | OpCode::GteFloat
+        | OpCode::EqFloat
+        | OpCode::NeqFloat => s(2, Some(dest0), vec![hi1, lo1]),
 
         OpCode::AddImm | OpCode::SubImm => s(2, Some(dest0), vec![hi1]),
 
@@ -593,7 +613,27 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                 | OpCode::StrConcat
                 | OpCode::StrSlice
                 | OpCode::In
-                | OpCode::Instanceof => {
+                | OpCode::Instanceof
+                | OpCode::AddInt
+                | OpCode::SubInt
+                | OpCode::MulInt
+                | OpCode::DivInt
+                | OpCode::LtInt
+                | OpCode::GtInt
+                | OpCode::LteInt
+                | OpCode::GteInt
+                | OpCode::EqInt
+                | OpCode::NeqInt
+                | OpCode::AddFloat
+                | OpCode::SubFloat
+                | OpCode::MulFloat
+                | OpCode::DivFloat
+                | OpCode::LtFloat
+                | OpCode::GtFloat
+                | OpCode::LteFloat
+                | OpCode::GteFloat
+                | OpCode::EqFloat
+                | OpCode::NeqFloat => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
                 }

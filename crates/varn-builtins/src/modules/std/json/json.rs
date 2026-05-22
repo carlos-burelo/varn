@@ -11,7 +11,7 @@ pub(crate) mod dispatch {
 
         #[varn_fn("parse")]
         pub fn json_parse(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-            let input = args.get(1).map(|&v| ctx.str_repr(v)).unwrap_or_default();
+            let input = args.get(0).map(|&v| ctx.str_repr(v)).unwrap_or_default();
             let sv: serde_json::Value =
                 serde_json::from_str(&input).map_err(|e| format!("JSON.parse: {e}"))?;
             Ok(serde_to_vm(ctx, sv))
@@ -22,7 +22,7 @@ pub(crate) mod dispatch {
             ctx: &mut dyn NativeCtx,
             args: &[VmValue],
         ) -> Result<VmValue, String> {
-            if let Some(v) = args.get(1).copied() {
+            if let Some(v) = args.get(0).copied() {
                 let val = ctx.extract(v);
                 let json_val = value_to_serde(&val, ctx);
                 return Ok(ctx.alloc_str_owned(

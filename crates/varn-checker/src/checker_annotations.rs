@@ -1,4 +1,5 @@
 use crate::binder::infer_expr_type;
+use crate::binder::resolve_type_node;
 use crate::symbol::SymbolKind;
 use crate::BindResult;
 use varn_core::ast::operators::BinaryOp;
@@ -6,41 +7,97 @@ use varn_core::ast::ImportSpecifier;
 use varn_core::ast::{Arg, ArrayEl, Decl, Expr, ExprKind, ForInit, Program, Stmt, StmtKind};
 use varn_core::TypeKind;
 use varn_core::{NumericKind, TypeAnnotations};
+use crate::types::{Type, TypeContext};
+
+#[derive(Clone)]
+struct AnnotateCtx<'a> {
+    bind: &'a BindResult,
+    locals: rustc_hash::FxHashMap<std::rc::Rc<str>, Type>,
+}
+
+impl<'a> AnnotateCtx<'a> {
+    fn new(bind: &'a BindResult) -> Self {
+        Self {
+            bind,
+            locals: rustc_hash::FxHashMap::default(),
+        }
+    }
+}
+
+impl<'a> TypeContext for AnnotateCtx<'a> {
+    fn get_interface_members(
+        &self,
+        name: &str,
+        origin: Option<&str>,
+    ) -> Option<Vec<crate::types::ClassMemberInfo>> {
+        self.bind.get_interface_members(name, origin)
+    }
+
+    fn get_class_members(&self, name: &str, origin: Option<&str>) -> Option<Vec<crate::types::ClassMemberInfo>> {
+        self.bind.get_class_members(name, origin)
+    }
+
+    fn get_namespace_members(
+        &self,
+        name: &str,
+        origin: Option<&str>,
+    ) -> Option<Vec<crate::types::ClassMemberInfo>> {
+        self.bind.get_namespace_members(name, origin)
+    }
+
+    fn resolve_symbol(&self, name: &str) -> Option<Type> {
+        if let Some(ty) = self.locals.get(name) {
+            return Some(ty.clone());
+        }
+        self.bind.resolve_symbol(name)
+    }
+
+    fn source_file(&self) -> Option<&str> {
+        self.bind.source_file()
+    }
+
+    fn get_alias_node(&self, name: &str) -> Option<(Vec<String>, varn_core::ast::TypeNode)> {
+        self.bind.get_alias_node(name)
+    }
+}
 
 pub fn collect_type_annotations(program: &Program, bind: &BindResult) -> TypeAnnotations {
     let mut ann = TypeAnnotations::new();
+    let mut ctx = AnnotateCtx::new(bind);
     for stmt in &program.body {
-        annotate_stmt(stmt, &mut ann, bind);
+        annotate_stmt(stmt, &mut ann, &mut ctx);
     }
     ann
 }
 
-fn annotate_stmt(stmt: &Stmt, ann: &mut TypeAnnotations, bind: &BindResult) {
+fn annotate_stmt(stmt: &Stmt, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) {
     match &stmt.kind {
-        StmtKind::Expr { expression } => annotate_expr(expression, ann, bind),
+        StmtKind::Expr { expression } => annotate_expr(expression, ann, ctx),
         StmtKind::Return {
             argument: Some(arg),
-        } => annotate_expr(arg, ann, bind),
+        } => annotate_expr(arg, ann, ctx),
         StmtKind::Return { .. } => {}
         StmtKind::Block { stmts } => {
+            let old_locals = ctx.locals.clone();
             for s in stmts {
-                annotate_stmt(s, ann, bind);
+                annotate_stmt(s, ann, ctx);
             }
+            ctx.locals = old_locals;
         }
         StmtKind::If {
             test,
             consequent,
             alternate,
         } => {
-            annotate_expr(test, ann, bind);
-            annotate_stmt(consequent, ann, bind);
+            annotate_expr(test, ann, ctx);
+            annotate_stmt(consequent, ann, ctx);
             if let Some(alt) = alternate {
-                annotate_stmt(alt, ann, bind);
+                annotate_stmt(alt, ann, ctx);
             }
         }
         StmtKind::While { test, body } | StmtKind::DoWhile { test, body } => {
-            annotate_expr(test, ann, bind);
-            annotate_stmt(body, ann, bind);
+            annotate_expr(test, ann, ctx);
+            annotate_stmt(body, ann, ctx);
         }
         StmtKind::For {
             init,
@@ -48,43 +105,98 @@ fn annotate_stmt(stmt: &Stmt, ann: &mut TypeAnnotations, bind: &BindResult) {
             update,
             body,
         } => {
+            let old_locals = ctx.locals.clone();
             if let Some(init_box) = init {
                 match init_box.as_ref() {
-                    ForInit::Expr(e) => annotate_expr(e, ann, bind),
+                    ForInit::Expr(e) => annotate_expr(e, ann, ctx),
                     ForInit::Var { declarators, .. } => {
                         for d in declarators {
                             if let Some(init_expr) = &d.init {
-                                annotate_expr(init_expr, ann, bind);
+                                annotate_expr(init_expr, ann, ctx);
+                            }
+                            let name_opt = match &d.id {
+                                varn_core::ast::Pattern::Identifier { name, .. } => Some(name.clone()),
+                                _ => None,
+                            };
+                            if let Some(name) = name_opt {
+                                let type_ann = d.type_ann.as_ref().or(match &d.id {
+                                    varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                                    _ => None,
+                                });
+                                if let Some(ann_node) = type_ann {
+                                    let ty = resolve_type_node(ann_node, Some(ctx.bind));
+                                    ctx.locals.insert(name, ty);
+                                } else if let Some(init_expr) = &d.init {
+                                    let ty = infer_expr_type(init_expr, Some(ctx));
+                                    ctx.locals.insert(name, ty);
+                                }
                             }
                         }
                     }
                 }
             }
             if let Some(t) = test {
-                annotate_expr(t, ann, bind);
+                annotate_expr(t, ann, ctx);
             }
             if let Some(u) = update {
-                annotate_expr(u, ann, bind);
+                annotate_expr(u, ann, ctx);
             }
-            annotate_stmt(body, ann, bind);
+            annotate_stmt(body, ann, ctx);
+            ctx.locals = old_locals;
         }
-        StmtKind::Decl(decl) => annotate_decl(decl, ann, bind),
+        StmtKind::Decl(decl) => annotate_decl(decl, ann, ctx),
         _ => {}
     }
 }
 
-fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, bind: &BindResult) {
+fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) {
     match decl {
         Decl::Variable(v) => {
             for d in &v.declarators {
                 if let Some(init) = &d.init {
-                    annotate_expr(init, ann, bind);
+                    annotate_expr(init, ann, ctx);
+                }
+                let name_opt = match &d.id {
+                    varn_core::ast::Pattern::Identifier { name, .. } => Some(name.clone()),
+                    _ => None,
+                };
+                if let Some(name) = name_opt {
+                    let type_ann = d.type_ann.as_ref().or(match &d.id {
+                        varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                        _ => None,
+                    });
+                    if let Some(ann_node) = type_ann {
+                        let ty = resolve_type_node(ann_node, Some(ctx.bind));
+                        ctx.locals.insert(name, ty);
+                    } else if let Some(init) = &d.init {
+                        let ty = infer_expr_type(init, Some(ctx));
+                        ctx.locals.insert(name, ty);
+                    }
                 }
             }
         }
         Decl::Function(f) => {
             if !f.modifiers.is_declare {
-                annotate_stmt(&f.body, ann, bind);
+                let mut local_ctx = ctx.clone();
+                for p in &f.params {
+                    let name_opt = match &p.pattern {
+                        varn_core::ast::Pattern::Identifier { name, .. } => Some(name.clone()),
+                        _ => None,
+                    };
+                    if let Some(name) = name_opt {
+                        let type_ann = p.type_ann.as_ref().or(match &p.pattern {
+                            varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                            _ => None,
+                        });
+                        let ty = if let Some(ann_node) = type_ann {
+                            resolve_type_node(ann_node, Some(ctx.bind))
+                        } else {
+                            Type::Dynamic
+                        };
+                        local_ctx.locals.insert(name, ty);
+                    }
+                }
+                annotate_stmt(&f.body, ann, &mut local_ctx);
             }
         }
         Decl::Import(i) => {
@@ -94,9 +206,9 @@ fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, bind: &BindResult) {
                     ImportSpecifier::Named { local, .. } => local,
                     ImportSpecifier::Namespace { local, .. } => local,
                 };
-                let scope = bind.scopes.get(bind.global_scope);
-                if let Some(id) = scope.resolve(name, &bind.scopes) {
-                    let sym = bind.arena.get(id);
+                let scope = ctx.bind.scopes.get(ctx.bind.global_scope);
+                if let Some(id) = scope.resolve(name, &ctx.bind.scopes) {
+                    let sym = ctx.bind.arena.get(id);
                     if matches!(
                         sym.kind,
                         SymbolKind::Interface
@@ -113,79 +225,97 @@ fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, bind: &BindResult) {
     }
 }
 
-fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, _bind: &BindResult) {
+fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) {
     match &expr.kind {
         ExprKind::Binary { op, left, right } => {
-            annotate_expr(left, ann, _bind);
-            annotate_expr(right, ann, _bind);
+            annotate_expr(left, ann, ctx);
+            annotate_expr(right, ann, ctx);
 
             let is_arithmetic = matches!(
                 op,
                 BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div
             );
-            if !is_arithmetic {
+            let is_comparison = matches!(
+                op,
+                BinaryOp::Lt | BinaryOp::LtEq | BinaryOp::Gt | BinaryOp::GtEq | BinaryOp::Eq | BinaryOp::NotEq
+            );
+            if !is_arithmetic && !is_comparison {
                 return;
             }
 
-            let l = infer_expr_type(left, None);
-            let r = infer_expr_type(right, None);
+            let l = infer_expr_type(left, Some(ctx));
+            let r = infer_expr_type(right, Some(ctx));
 
             use varn_core::TypeTag;
-            let kind = match (op, &l.0, &r.0) {
-                (
-                    BinaryOp::Div,
-                    TypeKind::Intrinsic(TypeTag::Int),
-                    TypeKind::Intrinsic(TypeTag::Int),
-                ) => Some(NumericKind::Float),
-                (_, TypeKind::Intrinsic(TypeTag::Int), TypeKind::Intrinsic(TypeTag::Int)) => {
-                    Some(NumericKind::Int)
+            let kind = if is_arithmetic {
+                match (op, &l.0, &r.0) {
+                    (
+                        BinaryOp::Div,
+                        TypeKind::Intrinsic(TypeTag::Int),
+                        TypeKind::Intrinsic(TypeTag::Int),
+                    ) => Some(NumericKind::Float),
+                    (_, TypeKind::Intrinsic(TypeTag::Int), TypeKind::Intrinsic(TypeTag::Int)) => {
+                        Some(NumericKind::Int)
+                    }
+                    (_, TypeKind::Intrinsic(TypeTag::Float), _)
+                    | (_, _, TypeKind::Intrinsic(TypeTag::Float)) => Some(NumericKind::Float),
+                    _ => None,
                 }
-                (_, TypeKind::Intrinsic(TypeTag::Float), _)
-                | (_, _, TypeKind::Intrinsic(TypeTag::Float)) => Some(NumericKind::Float),
-                _ => None,
+            } else {
+                match (&l.0, &r.0) {
+                    (TypeKind::Intrinsic(TypeTag::Int), TypeKind::Intrinsic(TypeTag::Int)) => {
+                        Some(NumericKind::Int)
+                    }
+                    (TypeKind::Intrinsic(TypeTag::Float), TypeKind::Intrinsic(TypeTag::Int))
+                    | (TypeKind::Intrinsic(TypeTag::Int), TypeKind::Intrinsic(TypeTag::Float))
+                    | (TypeKind::Intrinsic(TypeTag::Float), TypeKind::Intrinsic(TypeTag::Float)) => {
+                        Some(NumericKind::Float)
+                    }
+                    _ => None,
+                }
             };
             if let Some(k) = kind {
                 ann.record_numeric(expr.range.start.offset, k);
             }
         }
-        ExprKind::Paren { expression } => annotate_expr(expression, ann, _bind),
-        ExprKind::Unary { operand, .. } => annotate_expr(operand, ann, _bind),
+        ExprKind::Paren { expression } => annotate_expr(expression, ann, ctx),
+        ExprKind::Unary { operand, .. } => annotate_expr(operand, ann, ctx),
         ExprKind::Logical { left, right, .. } => {
-            annotate_expr(left, ann, _bind);
-            annotate_expr(right, ann, _bind);
+            annotate_expr(left, ann, ctx);
+            annotate_expr(right, ann, ctx);
         }
         ExprKind::Assign { value, target, .. } => {
-            annotate_expr(target, ann, _bind);
-            annotate_expr(value, ann, _bind);
+            annotate_expr(target, ann, ctx);
+            annotate_expr(value, ann, ctx);
         }
         ExprKind::Conditional {
             test,
             consequent,
             alternate,
         } => {
-            annotate_expr(test, ann, _bind);
-            annotate_expr(consequent, ann, _bind);
-            annotate_expr(alternate, ann, _bind);
+            annotate_expr(test, ann, ctx);
+            annotate_expr(consequent, ann, ctx);
+            annotate_expr(alternate, ann, ctx);
         }
         ExprKind::Call { callee, args, .. } => {
-            annotate_expr(callee, ann, _bind);
+            annotate_expr(callee, ann, ctx);
             for arg in args {
                 let e = match arg {
                     Arg::Positional(e) => e,
                     Arg::Spread(e) => e,
                     Arg::Named { value, .. } => value,
                 };
-                annotate_expr(e, ann, _bind);
+                annotate_expr(e, ann, ctx);
             }
         }
-        ExprKind::Member { object, .. } => annotate_expr(object, ann, _bind),
+        ExprKind::Member { object, .. } => annotate_expr(object, ann, ctx),
         ExprKind::As { expression, .. } | ExprKind::Satisfies { expression, .. } => {
-            annotate_expr(expression, ann, _bind)
+            annotate_expr(expression, ann, ctx)
         }
         ExprKind::Array { elements } => {
             for el in elements {
                 if let ArrayEl::Expr(e) = el {
-                    annotate_expr(e, ann, _bind);
+                    annotate_expr(e, ann, ctx);
                 }
             }
         }

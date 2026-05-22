@@ -67,9 +67,10 @@ impl LivenessAnalyzer {
         self.live_ranges.clear();
 
         for vreg in vregs_used {
-            if let (Some(&start), Some(uses)) =
+            if let (Some(&start_val), Some(uses)) =
                 (self.def_sites.get(&vreg), self.use_sites.get(&vreg))
             {
+                let mut start = start_val;
                 let mut end = uses.iter().copied().max().unwrap_or(start);
 
                 // For each back-edge (header, loop_end):
@@ -85,16 +86,12 @@ impl LivenessAnalyzer {
                             if start > header {
                                 // Def is inside loop — extend start to header.
                                 // (Conservative: treat as live from loop entry.)
-                                // We don't mutate start here; instead extend end to loop_end.
+                                start = header;
+                                changed = true;
                             }
                             if end < loop_end {
                                 end = loop_end;
                                 changed = true;
-                            }
-                            if start > header && start <= loop_end {
-                                // Def is inside loop body; treat as live from header.
-                                // Record this by extending end (start extension isn't needed
-                                // for correctness since def dominates use within the loop).
                             }
                         }
                     }

@@ -132,7 +132,27 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             | OpCode::Lte
             | OpCode::Gt
             | OpCode::Gte
-            | OpCode::StrConcat => {
+            | OpCode::StrConcat
+            | OpCode::AddInt
+            | OpCode::SubInt
+            | OpCode::MulInt
+            | OpCode::DivInt
+            | OpCode::LtInt
+            | OpCode::GtInt
+            | OpCode::LteInt
+            | OpCode::GteInt
+            | OpCode::EqInt
+            | OpCode::NeqInt
+            | OpCode::AddFloat
+            | OpCode::SubFloat
+            | OpCode::MulFloat
+            | OpCode::DivFloat
+            | OpCode::LtFloat
+            | OpCode::GtFloat
+            | OpCode::LteFloat
+            | OpCode::GteFloat
+            | OpCode::EqFloat
+            | OpCode::NeqFloat => {
                 let w1 = w!();
                 let w2 = w!();
                 format!("r{} = r{} op r{}", hi(w1), lo(w1), hi(w2))
