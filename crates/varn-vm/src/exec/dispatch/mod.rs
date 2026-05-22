@@ -95,7 +95,29 @@ impl ExecCtx {
 
                 macro_rules! reg {
                     ($r:expr) => {
-                        self.stack[base + $r]
+                        *({
+                            #[cfg(debug_assertions)]
+                            {
+                                let idx = base + $r;
+                                if idx >= self.stack.len() {
+                                    panic!(
+                                        "💥 [VM FATAL] Register Access Out Of Bounds!\n\
+                                         • Function: {}\n\
+                                         • Base index: {}\n\
+                                         • Target Register: r{}\n\
+                                         • Computed Index: {}\n\
+                                         • Current Stack Size: {}\n\
+                                         Please check compiler register allocation.",
+                                        closure.proto.name.as_deref().unwrap_or("<anonymous>"),
+                                        base,
+                                        $r,
+                                        idx,
+                                        self.stack.len()
+                                    );
+                                }
+                            }
+                            &mut self.stack[base + $r]
+                        })
                     };
                 }
 

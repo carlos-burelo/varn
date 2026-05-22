@@ -240,9 +240,6 @@ impl ExecCtx {
                                 self.stack.push(callee);
                                 for i in 0..arg_count {
                                     let v = self.stack[base + arg_start + i];
-                                    if nc.proto.name.as_deref() == Some("trackClass") {
-                                        println!("DEBUG trackClass arg {}: base={} arg_start={} v={:?}", i, base, arg_start, v);
-                                    }
                                     self.stack.push(v);
                                 }
 

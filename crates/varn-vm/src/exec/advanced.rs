@@ -184,8 +184,9 @@ fn array_symbol_iterator(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<Vm
     let iter_nv = ctx.alloc_object();
     ctx.set_field(iter_nv, "__arr", arr_nv);
     ctx.set_field(iter_nv, "__idx", VmValue::from_int(0));
+    let extracted = ctx.extract(iter_nv);
     let next_nv = ctx.intern(Value::native_bound(
-        ctx.extract(iter_nv),
+        extracted,
         array_iter_next,
         "next",
     ));

@@ -1,4 +1,4 @@
-use crate::heap::{Heap, HeapObj};
+use crate::heap::{HeapInner, HeapObj};
 use crate::value::VmValue;
 use std::collections::VecDeque;
 use std::fmt;
@@ -139,7 +139,7 @@ impl TricolorMarker {
         self.marked_count = 0;
     }
 
-    pub fn process_gray_step(&mut self, heap: &Heap) -> Result<bool, GcError> {
+    pub fn process_gray_step(&mut self, heap: &HeapInner) -> Result<bool, GcError> {
         if let Some(idx) = self.gray_queue.pop_front() {
             self.mark_children(heap, idx)?;
             self.mark_black(idx);
@@ -149,7 +149,7 @@ impl TricolorMarker {
         }
     }
 
-    pub fn mark_from_roots(&mut self, heap: &Heap, roots: &[u32]) -> Result<(), GcError> {
+    pub fn mark_from_roots(&mut self, heap: &HeapInner, roots: &[u32]) -> Result<(), GcError> {
         for &root in roots {
             if root < heap.objects_len() {
                 self.mark_gray(root);
@@ -164,7 +164,7 @@ impl TricolorMarker {
         Ok(())
     }
 
-    fn mark_children(&mut self, heap: &Heap, idx: u32) -> Result<(), GcError> {
+    fn mark_children(&mut self, heap: &HeapInner, idx: u32) -> Result<(), GcError> {
         if let Some(Some(obj)) = heap.objects().get(idx as usize) {
             match obj {
                 HeapObj::Str(_)
@@ -211,7 +211,7 @@ impl TricolorMarker {
                 }
                 HeapObj::Class(cls) => {
                     let mark_value =
-                        |marker: &mut TricolorMarker, heap: &Heap, v: &varn_types::Value| {
+                        |marker: &mut TricolorMarker, heap: &HeapInner, v: &varn_types::Value| {
                             if let Some(ci) = heap.value_heap_idx(v) {
                                 marker.mark_gray(ci);
                             }
@@ -347,13 +347,13 @@ impl GcCollector {
         }
     }
 
-    pub fn mark_phase(&mut self, heap: &Heap, roots: &[u32]) -> Result<(), GcError> {
+    pub fn mark_phase(&mut self, heap: &HeapInner, roots: &[u32]) -> Result<(), GcError> {
         self.marker.clear();
         self.marker.mark_from_roots(heap, roots)?;
         Ok(())
     }
 
-    pub fn sweep_phase(&mut self, heap: &mut Heap) -> Result<usize, GcError> {
+    pub fn sweep_phase(&mut self, heap: &mut HeapInner) -> Result<usize, GcError> {
         self.swept_count = 0;
         let mut freed = 0;
 
@@ -372,13 +372,13 @@ impl GcCollector {
         Ok(freed)
     }
 
-    pub fn collect(&mut self, heap: &mut Heap, roots: &[u32]) -> Result<usize, GcError> {
+    pub fn collect(&mut self, heap: &mut HeapInner, roots: &[u32]) -> Result<usize, GcError> {
         self.mark_phase(heap, roots)?;
         let swept = self.sweep_phase(heap)?;
         Ok(swept)
     }
 
-    pub fn incremental_mark_step(&mut self, heap: &Heap) -> Result<bool, GcError> {
+    pub fn incremental_mark_step(&mut self, heap: &HeapInner) -> Result<bool, GcError> {
         self.marker.process_gray_step(heap)
     }
 
