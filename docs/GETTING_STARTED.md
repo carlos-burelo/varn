@@ -23,7 +23,7 @@ vn hola.vn
 
 ```sh
 vn tests/main.vn
-# PASSED: 534 / FAILED: 0
+# PASSED: 529 / FAILED: 0
 ```
 
 ## Comandos principales

@@ -13,7 +13,7 @@ El lenguaje está completo y funcional:
 - **Caché de bytecode**: `.vn/cache/` invalidado por hash de contenido.
 - **Compilados portables**: `vn build` → `.vnc`, `vn run program.vnc`.
 - **LSP**: servidor en `varn-lsp` con hover, completions, go-to-definition.
-- **Suite de tests**: 534 tests, 100% passing.
+- **Suite de tests**: 529 tests, 100% passing.
 
 ## Inmediato
 

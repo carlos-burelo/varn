@@ -73,7 +73,7 @@ Variables capturadas por funciones internas:
 - Primera vez: lookup en la shape del objeto. Guarda `(class_id, slot_index)` en el IC del opcode.
 - Siguiente vez con mismo objeto de misma clase: acceso directo por slot, sin hash lookup.
 
-En benchmark de la suite completa (534 tests): ~0% IC misses en steady state.
+En benchmark de la suite completa (529 tests): ~0% IC misses en steady state.
 
 ---
 
@@ -107,7 +107,7 @@ El frame queda "congelado". `varn-runtime` (Tokio) lo reanuda cuando la tarea re
 
 ## 9. Métricas de Performance
 
-En benchmark de la suite completa (534 tests):
+En benchmark de la suite completa (529 tests):
 
 ```
 VM Profile
