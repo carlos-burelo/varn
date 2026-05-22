@@ -56,6 +56,10 @@ try {
 } catch (e) {
     ve = e
 }
+print("DEBUG: ve is: ", ve)
+print("DEBUG: ve.name is: ", ve?.name)
+print("DEBUG: ve.message is: ", ve?.message)
+print("DEBUG: ve.field is: ", ve?.field)
 assert("custom error name",    ve?.name === "ValidationError")
 assert("custom error message", ve?.message === "invalid format")
 assert("custom error field",   ve?.field === "email")
