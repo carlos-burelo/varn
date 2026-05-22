@@ -8,6 +8,8 @@ pub const ARG_CTX: Reg = Reg::Rcx;
 pub const ARG_CLOSURE: Reg = Reg::Rdx;
 #[cfg(target_os = "windows")]
 pub const ARG_BASE: Reg = Reg::R8;
+#[cfg(target_os = "windows")]
+pub const ARG_EXEC_CTX: Reg = Reg::R9;
 
 #[cfg(not(target_os = "windows"))]
 pub const ARG_CTX: Reg = Reg::Rdi;
@@ -15,6 +17,8 @@ pub const ARG_CTX: Reg = Reg::Rdi;
 pub const ARG_CLOSURE: Reg = Reg::Rsi;
 #[cfg(not(target_os = "windows"))]
 pub const ARG_BASE: Reg = Reg::Rdx;
+#[cfg(not(target_os = "windows"))]
+pub const ARG_EXEC_CTX: Reg = Reg::Rcx;
 
 // --- Scratch and Acumulator Registers ---
 

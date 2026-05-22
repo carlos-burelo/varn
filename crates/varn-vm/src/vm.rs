@@ -35,6 +35,10 @@ impl Vm {
         self.ctx.trace = v;
     }
 
+    pub fn set_no_jit(&mut self, v: bool) {
+        self.ctx.no_jit = v;
+    }
+
     pub fn with_loader(mut self, loader: Rc<dyn ModuleLoader>) -> Self {
         self.ctx.loader = Some(loader);
         self

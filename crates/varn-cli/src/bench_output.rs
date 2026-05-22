@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use varn_core::OpCode;
 use varn_vm::VmProfile;
+use varn_vm::varn_jit::JitStatsSnapshot;
 
 const R: &str = "\x1b[0m";
 const BOLD: &str = "\x1b[1m";
@@ -10,6 +11,7 @@ const BLU: &str = "\x1b[34m";
 const RED: &str = "\x1b[31m";
 const GRN: &str = "\x1b[32m";
 const CYN: &str = "\x1b[96m";
+const MAG: &str = "\x1b[35m";
 
 pub fn print_parse_breakdown(profile: &varn_parser::ParseProfile) {
     let rows = [
@@ -264,4 +266,67 @@ fn fmt_num_u64(n: u64) -> String {
         out.push(c);
     }
     out.chars().rev().collect()
+}
+
+pub fn print_jit_stats(stats: &JitStatsSnapshot) {
+    eprintln!();
+    eprintln!("  {BOLD}{MAG}JIT Compiler & Execution Stats{R}{DIM}");
+
+    let total_compilations = stats.compile_success + stats.compile_fail;
+    eprintln!(
+        "  {:<22} {:>10}  (success: {}, failed: {})",
+        "functions compiled",
+        fmt_num_u64(total_compilations),
+        stats.compile_success,
+        stats.compile_fail
+    );
+
+    let compile_time = Duration::from_nanos(stats.total_compile_time_ns);
+    eprintln!(
+        "  {:<22} {:>10}",
+        "total compile time",
+        fmt_dur(compile_time)
+    );
+
+    eprintln!(
+        "  {:<22} {:>10}",
+        "total machine code",
+        fmt_bytes(stats.total_code_size_bytes as usize)
+    );
+
+    let total_runs = stats.jit_runs + stats.interp_runs;
+    let jit_ratio = if total_runs > 0 {
+        stats.jit_runs as f64 / total_runs as f64 * 100.0
+    } else {
+        0.0
+    };
+    let interp_ratio = if total_runs > 0 {
+        stats.interp_runs as f64 / total_runs as f64 * 100.0
+    } else {
+        0.0
+    };
+
+    eprintln!(
+        "  {:<22} {:>10}  ({:.1}%)",
+        "native JIT runs",
+        fmt_num_u64(stats.jit_runs),
+        jit_ratio
+    );
+    eprintln!(
+        "  {:<22} {:>10}  ({:.1}%)",
+        "interpreted runs",
+        fmt_num_u64(stats.interp_runs),
+        interp_ratio
+    );
+    eprintln!("{R}");
+}
+
+fn fmt_bytes(n: usize) -> String {
+    if n < 1_024 {
+        format!("{n} B")
+    } else if n < 1_048_576 {
+        format!("{:.1} KB", n as f64 / 1_024.0)
+    } else {
+        format!("{:.2} MB", n as f64 / 1_048_576.0)
+    }
 }

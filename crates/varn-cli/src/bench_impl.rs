@@ -354,10 +354,11 @@ pub fn run_bench(
         result
     })?;
 
+    varn_vm::varn_jit::JIT_STATS.reset();
     varn_builtins::reset_testing_counters();
     varn_builtins::set_print_silent(true);
     varn_builtins::set_testing_silent(true);
-    let (opcode_counts, vm_profile) = {
+    let (opcode_counts, vm_profile, jit_stats) = {
         let mut profile_vm = Vm::from_snapshot(
             snap_globals.clone(),
             snap_heap.clone(),
@@ -372,7 +373,8 @@ pub fn run_bench(
         profile_vm.collect_gc();
         let counts = profile_vm.take_opcode_counts();
         let profile = profile_vm.take_profile();
-        (counts, profile)
+        let stats = varn_vm::varn_jit::JIT_STATS.snapshot();
+        (counts, profile, stats)
     };
     varn_builtins::set_print_silent(false);
     varn_builtins::set_testing_silent(false);
@@ -436,6 +438,7 @@ pub fn run_bench(
     if let Some(ref profile) = vm_profile {
         print_vm_profile(profile);
     }
+    crate::bench_output::print_jit_stats(&jit_stats);
     eprintln!();
 
     Ok(())
@@ -513,10 +516,11 @@ fn run_bench_wrc(path: &str, runs: usize, no_run: bool, with_output: bool) -> Re
         result
     })?;
 
+    varn_vm::varn_jit::JIT_STATS.reset();
     varn_builtins::reset_testing_counters();
     varn_builtins::set_print_silent(true);
     varn_builtins::set_testing_silent(true);
-    let (opcode_counts, vm_profile) = {
+    let (opcode_counts, vm_profile, jit_stats) = {
         let mut profile_vm = Vm::from_snapshot(
             snap_globals.clone(),
             snap_heap.clone(),
@@ -531,7 +535,8 @@ fn run_bench_wrc(path: &str, runs: usize, no_run: bool, with_output: bool) -> Re
         profile_vm.collect_gc();
         let counts = profile_vm.take_opcode_counts();
         let profile = profile_vm.take_profile();
-        (counts, profile)
+        let stats = varn_vm::varn_jit::JIT_STATS.snapshot();
+        (counts, profile, stats)
     };
     varn_builtins::set_print_silent(false);
     varn_builtins::set_testing_silent(false);
@@ -578,6 +583,7 @@ fn run_bench_wrc(path: &str, runs: usize, no_run: bool, with_output: bool) -> Re
     if let Some(ref profile) = vm_profile {
         print_vm_profile(profile);
     }
+    crate::bench_output::print_jit_stats(&jit_stats);
     eprintln!();
 
     Ok(())

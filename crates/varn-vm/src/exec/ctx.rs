@@ -45,6 +45,7 @@ pub struct ExecCtx {
     pub proto_feedback:
         FxHashMap<usize, Rc<RefCell<varn_types::chunk::FeedbackVector>>>,
     pub proto_constants: FxHashMap<usize, Rc<Vec<VmValue>>>,
+    pub no_jit: bool,
 }
 
 impl ExecCtx {
@@ -79,6 +80,7 @@ impl ExecCtx {
             proto_ic_caches: FxHashMap::default(),
             proto_feedback: FxHashMap::default(),
             proto_constants: FxHashMap::default(),
+            no_jit: false,
         };
 
         if fresh {
@@ -153,6 +155,7 @@ impl ExecCtx {
             proto_ic_caches: FxHashMap::default(),
             proto_feedback: FxHashMap::default(),
             proto_constants: FxHashMap::default(),
+            no_jit: self.no_jit,
         }
     }
 
@@ -680,3 +683,34 @@ impl ExecCtx {
         )))
     }
 }
+
+// --- JIT Runtime Helper Callouts ---
+
+pub extern "C" fn jit_load_const(closure: *const crate::frame::VmClosure, idx: usize) -> VmValue {
+    unsafe {
+        let closure_ref = &*closure;
+        closure_ref.constants[idx]
+    }
+}
+
+pub extern "C" fn jit_load_global_idx(ctx: *mut ExecCtx, idx: usize) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        ctx_ref.globals.get_by_index(idx).unwrap_or(VmValue::null())
+    }
+}
+
+pub extern "C" fn jit_store_global_idx(ctx: *mut ExecCtx, idx: usize, val: VmValue) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        ctx_ref.globals.set_by_index(idx, val);
+    }
+}
+
+pub extern "C" fn jit_define_global_idx(ctx: *mut ExecCtx, idx: usize, val: VmValue) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        ctx_ref.globals.set_by_index(idx, val);
+    }
+}
+

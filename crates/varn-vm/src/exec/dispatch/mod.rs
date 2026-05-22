@@ -60,7 +60,13 @@ impl ExecCtx {
                 &*self.frames[frame_idx].closure;
             let closure = unsafe { &*closure_ptr };
 
-            if let Some(jit_fn) = closure.jit_entry {
+            let is_first_entry = self.frames[frame_idx].ip == 0;
+
+            if !self.no_jit && closure.jit_entry.is_some() {
+                let jit_fn = closure.jit_entry.unwrap();
+                if is_first_entry {
+                    varn_jit::JIT_STATS.jit_runs.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
                 if self.trace {
                     self.trace_event("JIT ENTRY", frame_idx, closure, 0, None);
                 }
@@ -69,6 +75,7 @@ impl ExecCtx {
                         self.stack.as_mut_ptr() as *mut std::ffi::c_void,
                         closure_ptr as *const std::ffi::c_void,
                         self.frames[frame_idx].base,
+                        self as *mut ExecCtx as *mut std::ffi::c_void,
                     )
                 };
                 if self.trace {
@@ -111,6 +118,10 @@ impl ExecCtx {
                     return Ok(final_val);
                 }
                 continue 'frame_loop;
+            } else {
+                if is_first_entry {
+                    varn_jit::JIT_STATS.interp_runs.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
             }
 
             let base = self.frames[frame_idx].base;
