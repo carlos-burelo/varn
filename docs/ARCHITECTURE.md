@@ -98,7 +98,7 @@ Las variables locales son offsets numéricos sobre el registro base del frame ac
 Variables capturadas por closures. **Abiertas**: índice en registros del frame padre. **Cerradas**: copiadas al heap cuando el frame padre termina.
 
 ### Inline Cache
-`GetProp`/`SetProp` y llamadas a métodos se cachean por clase y slot. En benchmark de la suite (534 tests), fast-path calls representan ~60% de todas las llamadas.
+`GetProp`/`SetProp` y llamadas a métodos se cachean por clase y slot. En benchmark de la suite (529 tests), fast-path calls representan ~60% de todas las llamadas.
 
 ---
 

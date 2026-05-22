@@ -34,7 +34,7 @@ Copy-Item target\release\wr.exe "$env:USERPROFILE\.cargo\bin\wr.exe"
 ```sh
 vn doctor
 vn tests/main.vn
-# PASSED: 534 / FAILED: 0
+# PASSED: 529 / FAILED: 0
 ```
 
 ## Modo desarrollo
