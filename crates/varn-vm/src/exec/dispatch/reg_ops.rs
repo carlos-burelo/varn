@@ -85,7 +85,7 @@ impl ExecCtx {
         Ok(())
     }
 
-    pub(super) fn exec_call_reg(
+    pub(crate) fn exec_call_reg(
         &mut self,
         callee: VmValue,
         base: usize,
@@ -294,7 +294,7 @@ impl ExecCtx {
         Ok(false)
     }
 
-    pub(super) fn exec_call_method_reg(
+    pub(crate) fn exec_call_method_reg(
         &mut self,
         this_val: VmValue,
         base: usize,
@@ -696,7 +696,7 @@ impl ExecCtx {
         Ok(false)
     }
 
-    pub(super) fn exec_get_property_reg(
+    pub(crate) fn exec_get_property_reg(
         &mut self,
         obj: VmValue,
         name_idx: usize,
@@ -877,7 +877,7 @@ impl ExecCtx {
         Ok(false)
     }
 
-    pub(super) fn exec_set_property_reg(
+    pub(crate) fn exec_set_property_reg(
         &mut self,
         obj: VmValue,
         val: VmValue,

@@ -40,6 +40,12 @@ pub struct JitHelpers {
     pub load_upvalue: usize,
     pub store_upvalue: usize,
     pub make_closure: usize,
+    pub call: usize,
+    pub call_method: usize,
+    pub get_property: usize,
+    pub set_property: usize,
+    pub build_array: usize,
+    pub build_str: usize,
 }
 
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -127,4 +133,46 @@ pub fn compile(proto: &FunctionProto, helpers: JitHelpers) -> Result<(JitFn, Rc<
             Err(e)
         }
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct JitCallArgs {
+    pub callee: VmValue,
+    pub arg_start: usize,
+    pub arg_count: usize,
+    pub dest: usize,
+    pub ip: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct JitCallMethodArgs {
+    pub this_val: VmValue,
+    pub name_idx: usize,
+    pub cs: usize,
+    pub arg_start: usize,
+    pub arg_count: usize,
+    pub dest: usize,
+    pub ip: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct JitGetPropertyArgs {
+    pub obj: VmValue,
+    pub name_idx: usize,
+    pub cs_idx: usize,
+    pub dest: usize,
+    pub ip: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct JitSetPropertyArgs {
+    pub obj: VmValue,
+    pub val: VmValue,
+    pub name_idx: usize,
+    pub cs_idx: usize,
+    pub ip: usize,
 }
