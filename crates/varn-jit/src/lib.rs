@@ -1,6 +1,7 @@
 pub mod assembler;
 pub mod compiler;
 pub mod mem;
+pub mod regalloc;
 pub mod registers;
 pub mod safepoint;
 

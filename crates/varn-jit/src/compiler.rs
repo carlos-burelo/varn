@@ -3,7 +3,8 @@ use varn_types::FunctionProto;
 
 use crate::assembler::{Assembler, Reg, Cond};
 use crate::mem::JitBuffer;
-use crate::safepoint::{emit_load_reg, emit_store_reg};
+use crate::safepoint::emit_load_reg;
+use crate::regalloc::{RegMap, emit_prologue, emit_epilogue, emit_load, emit_store, emit_flush_all, emit_reload_all, emit_reload_all_except};
 
 use crate::registers::{ARG_CTX, ARG_CLOSURE, ARG_BASE, ARG_EXEC_CTX};
 
@@ -27,7 +28,6 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
 
         match op {
             OpCode::Return => {
-                // Return has 1 extra word operand in bytecode
                 ip += 1;
             }
             OpCode::LoadNull
@@ -35,11 +35,8 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
             | OpCode::LoadFalse
             | OpCode::LoadIntZero
             | OpCode::LoadIntOne
-            | OpCode::LoadIntMinusOne => {
-                // These have no extra operand words
-            }
+            | OpCode::LoadIntMinusOne => {}
             OpCode::LoadInt => {
-                // LoadInt has 1 extra word operand (immediate)
                 ip += 1;
             }
             OpCode::LoadConst
@@ -51,12 +48,10 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
                 ip += 2;
             }
             OpCode::Move => {
-                // Move has 1 extra word operand
                 ip += 1;
             }
             OpCode::AddImm
             | OpCode::SubImm => {
-                // These have 1 extra word operand
                 ip += 1;
             }
             OpCode::AddInt
@@ -68,14 +63,12 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
             | OpCode::GteInt
             | OpCode::EqInt
             | OpCode::NeqInt => {
-                // These have 1 extra word operand (src1/src2)
                 ip += 1;
             }
             OpCode::Jump
             | OpCode::Loop
             | OpCode::JumpIfFalse
             | OpCode::JumpIfTrue => {
-                // Jumps have 2 extra word operands for 32-bit big-endian offset
                 ip += 2;
             }
             _ => {
@@ -87,6 +80,9 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
         }
     }
 
+    // 1b. Build register allocation map from bytecode frequency analysis.
+    let regmap = RegMap::from_bytecode(code);
+
     // 2. Main Compilation Pass
     let mut asm = Assembler::new();
     let mut ip = 0;
@@ -95,6 +91,14 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
     // Map from bytecode offset to assembler instruction byte offset
     let mut ip_to_asm_pos = vec![0; code_len + 1];
     let mut jump_patches: Vec<JumpPatch> = Vec::new();
+
+    // Emit function prologue: save callee-saved physical regs.
+    // We also load the initial values of all allocated virtual regs from the VM stack.
+    emit_prologue(&mut asm, &regmap);
+    // Load initial values from VM stack into allocated physical regs
+    for (&vreg, &phys) in regmap.map_iter() {
+        emit_load_reg(&mut asm, phys, vreg);
+    }
 
     while ip < code_len {
         ip_to_asm_pos[ip] = asm.current_offset();
@@ -108,113 +112,136 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
             OpCode::LoadNull => {
                 let null_val = 0x7FF9_0000_0000_0000u64;
                 asm.mov_reg_imm64(Reg::Rax, null_val);
-                emit_store_reg(&mut asm, Reg::Rax, first_reg);
+                emit_store(&mut asm, Reg::Rax, first_reg, &regmap);
             }
             OpCode::LoadTrue => {
                 let true_val = 0x7FFB_0000_0000_0000u64;
                 asm.mov_reg_imm64(Reg::Rax, true_val);
-                emit_store_reg(&mut asm, Reg::Rax, first_reg);
+                emit_store(&mut asm, Reg::Rax, first_reg, &regmap);
             }
             OpCode::LoadFalse => {
                 let false_val = 0x7FFA_0000_0000_0000u64;
                 asm.mov_reg_imm64(Reg::Rax, false_val);
-                emit_store_reg(&mut asm, Reg::Rax, first_reg);
+                emit_store(&mut asm, Reg::Rax, first_reg, &regmap);
             }
             OpCode::LoadInt => {
                 let val = code[ip] as i16;
                 ip += 1;
                 let int_val = 0x7FFC_0000_0000_0000u64 | (val as u64 & 0x0000_FFFF_FFFF_FFFFu64);
                 asm.mov_reg_imm64(Reg::Rax, int_val);
-                emit_store_reg(&mut asm, Reg::Rax, first_reg);
+                emit_store(&mut asm, Reg::Rax, first_reg, &regmap);
             }
             OpCode::LoadIntZero => {
                 let int_val = 0x7FFC_0000_0000_0000u64;
                 asm.mov_reg_imm64(Reg::Rax, int_val);
-                emit_store_reg(&mut asm, Reg::Rax, first_reg);
+                emit_store(&mut asm, Reg::Rax, first_reg, &regmap);
             }
             OpCode::LoadIntOne => {
                 let int_val = 0x7FFC_0000_0000_0001u64;
                 asm.mov_reg_imm64(Reg::Rax, int_val);
-                emit_store_reg(&mut asm, Reg::Rax, first_reg);
+                emit_store(&mut asm, Reg::Rax, first_reg, &regmap);
             }
             OpCode::LoadIntMinusOne => {
                 let int_val = 0x7FFC_FFFF_FFFF_FFFFu64;
                 asm.mov_reg_imm64(Reg::Rax, int_val);
-                emit_store_reg(&mut asm, Reg::Rax, first_reg);
+                emit_store(&mut asm, Reg::Rax, first_reg, &regmap);
             }
             OpCode::LoadConst => {
                 let idx = code[ip] as usize;
                 ip += 1;
 
-                // 1. Push/preserve registers
+                // Flush allocated regs to memory before helper call
+                emit_flush_all(&mut asm, &regmap);
+
+                // Push/preserve arg regs
                 asm.push(ARG_CTX);
                 asm.push(ARG_CLOSURE);
                 asm.push(ARG_BASE);
                 asm.push(ARG_EXEC_CTX);
-                asm.push(Reg::Rbx);
 
-                // 2. Allocate shadow space on Windows
+                // Align stack to 16 bytes:
+                // Total bytes pushed = 8 (ret) + 8 (Rbp) + K*8 (used_phys) + 32 (args) = K*8 + 48.
+                // 48 is a multiple of 16. If K is odd, we need 8 bytes padding, so we push Rax as dummy.
+                let need_dummy = regmap.used_phys.len() % 2 != 0;
+                if need_dummy {
+                    asm.push(Reg::Rax);
+                }
+
                 #[cfg(target_os = "windows")]
                 asm.add_reg_imm8(Reg::Rsp, -32);
 
-                // 3. Set up helper arguments
-                asm.mov_reg_reg(ARG_CTX, ARG_CLOSURE); // Argument 1: closure
-                asm.mov_reg_imm64(ARG_CLOSURE, idx as u64); // Argument 2: idx
+                asm.mov_reg_reg(ARG_CTX, ARG_CLOSURE);
+                asm.mov_reg_imm64(ARG_CLOSURE, idx as u64);
 
-                // 4. Call helper
                 asm.mov_reg_imm64(Reg::R10, helpers.load_const as u64);
                 asm.call_reg(Reg::R10);
 
-                // 5. Deallocate shadow space on Windows
                 #[cfg(target_os = "windows")]
                 asm.add_reg_imm8(Reg::Rsp, 32);
 
-                // 6. Pop/restore registers
-                asm.pop(Reg::Rbx);
+                // Save result before pops clobber Rax
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
+                if need_dummy {
+                    asm.pop(Reg::Rax);
+                }
                 asm.pop(ARG_EXEC_CTX);
                 asm.pop(ARG_BASE);
                 asm.pop(ARG_CLOSURE);
                 asm.pop(ARG_CTX);
 
-                // 7. Store return value (in Rax) back to VM stack in first_reg
-                emit_store_reg(&mut asm, Reg::Rax, first_reg);
+                emit_store(&mut asm, Reg::R11, first_reg, &regmap);
+
+                // Reload allocated regs from memory after helper call
+                emit_reload_all_except(&mut asm, &regmap, Some(first_reg));
             }
             OpCode::LoadGlobalIdx => {
                 let idx = code[ip] as usize;
                 ip += 1;
 
-                // 1. Push/preserve registers
-                asm.push(ARG_CTX);
-                asm.push(ARG_CLOSURE);
-                asm.push(ARG_BASE);
-                asm.push(ARG_EXEC_CTX);
-                asm.push(Reg::Rbx);
+                // Flush allocated regs to memory before helper call
+                emit_flush_all(&mut asm, &regmap);
 
-                // 2. Allocate shadow space on Windows
-                #[cfg(target_os = "windows")]
-                asm.add_reg_imm8(Reg::Rsp, -32);
+                 asm.push(ARG_CTX);
+                 asm.push(ARG_CLOSURE);
+                 asm.push(ARG_BASE);
+                 asm.push(ARG_EXEC_CTX);
 
-                // 3. Set up helper arguments
-                asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // Argument 1: exec_ctx
-                asm.mov_reg_imm64(ARG_CLOSURE, idx as u64); // Argument 2: idx
+                 // Align stack to 16 bytes:
+                 // Total bytes pushed = 8 (ret) + 8 (Rbp) + K*8 (used_phys) + 32 (args) = K*8 + 48.
+                 // 48 is a multiple of 16. If K is odd, we need 8 bytes padding, so we push Rax as dummy.
+                 let need_dummy = regmap.used_phys.len() % 2 != 0;
+                 if need_dummy {
+                     asm.push(Reg::Rax);
+                 }
 
-                // 4. Call helper
-                asm.mov_reg_imm64(Reg::R10, helpers.load_global_idx as u64);
-                asm.call_reg(Reg::R10);
+                 #[cfg(target_os = "windows")]
+                 asm.add_reg_imm8(Reg::Rsp, -32);
 
-                // 5. Deallocate shadow space on Windows
-                #[cfg(target_os = "windows")]
-                asm.add_reg_imm8(Reg::Rsp, 32);
+                 asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+                 asm.mov_reg_imm64(ARG_CLOSURE, idx as u64);
 
-                // 6. Pop/restore registers
-                asm.pop(Reg::Rbx);
-                asm.pop(ARG_EXEC_CTX);
-                asm.pop(ARG_BASE);
-                asm.pop(ARG_CLOSURE);
-                asm.pop(ARG_CTX);
+                 asm.mov_reg_imm64(Reg::R10, helpers.load_global_idx as u64);
+                 asm.call_reg(Reg::R10);
 
-                // 7. Store return value (in Rax) back to VM stack in first_reg
-                emit_store_reg(&mut asm, Reg::Rax, first_reg);
+                 #[cfg(target_os = "windows")]
+                 asm.add_reg_imm8(Reg::Rsp, 32);
+
+                 // Save result before pops clobber Rax
+                 asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
+                 if need_dummy {
+                     asm.pop(Reg::Rax);
+                 }
+                 asm.pop(ARG_EXEC_CTX);
+                 asm.pop(ARG_BASE);
+                 asm.pop(ARG_CLOSURE);
+                 asm.pop(ARG_CTX);
+
+                emit_store(&mut asm, Reg::R11, first_reg, &regmap);
+
+                // Reload allocated regs from memory after helper call
+                emit_reload_all_except(&mut asm, &regmap, Some(first_reg));
             }
             OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx => {
                 let w1 = code[ip];
@@ -223,26 +250,38 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
                 let idx = code[ip] as usize;
                 ip += 1;
 
-                // 1. Load src value into Rax
-                emit_load_reg(&mut asm, Reg::Rax, src);
+                // Load src value — may be in a physical reg
+                emit_load(&mut asm, Reg::Rax, src, &regmap);
 
-                // 2. Push/preserve registers
+                // Flush allocated regs to memory before helper call
+                emit_flush_all(&mut asm, &regmap);
+
                 asm.push(ARG_CTX);
                 asm.push(ARG_CLOSURE);
                 asm.push(ARG_BASE);
                 asm.push(ARG_EXEC_CTX);
-                asm.push(Reg::Rbx);
 
-                // 3. Allocate shadow space on Windows
+                // Align stack to 16 bytes:
+                // Total bytes pushed = 8 (ret) + 8 (Rbp) + K*8 (used_phys) + 32 (args) = K*8 + 48.
+                // 48 is a multiple of 16. If K is odd, we need 8 bytes padding, so we push Rax as dummy.
+                let need_dummy = regmap.used_phys.len() % 2 != 0;
+                if need_dummy {
+                    asm.push(Reg::Rax);
+                }
+
+                // Rax holds the value to store. Need it as arg 3.
+                // On Windows: arg1=RCX, arg2=RDX, arg3=R8. ARG_BASE=R8.
+                // On Unix: arg1=RDI, arg2=RSI, arg3=RDX. ARG_BASE=RDX.
+                // Save value from Rax to R11 before we clobber arg regs.
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
                 #[cfg(target_os = "windows")]
                 asm.add_reg_imm8(Reg::Rsp, -32);
 
-                // 4. Set up helper arguments
-                asm.mov_reg_reg(ARG_BASE, Reg::Rax); // Argument 3: val
-                asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // Argument 1: exec_ctx
-                asm.mov_reg_imm64(ARG_CLOSURE, idx as u64); // Argument 2: idx
+                asm.mov_reg_reg(ARG_BASE, Reg::R11);   // arg3: val
+                asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // arg1: exec_ctx
+                asm.mov_reg_imm64(ARG_CLOSURE, idx as u64); // arg2: idx
 
-                // 5. Call helper
                 let helper_addr = if op == OpCode::StoreGlobalIdx {
                     helpers.store_global_idx
                 } else {
@@ -251,29 +290,36 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
                 asm.mov_reg_imm64(Reg::R10, helper_addr as u64);
                 asm.call_reg(Reg::R10);
 
-                // 6. Deallocate shadow space on Windows
                 #[cfg(target_os = "windows")]
                 asm.add_reg_imm8(Reg::Rsp, 32);
 
-                // 7. Pop/restore registers
-                asm.pop(Reg::Rbx);
+                if need_dummy {
+                    asm.pop(Reg::Rax);
+                }
                 asm.pop(ARG_EXEC_CTX);
                 asm.pop(ARG_BASE);
                 asm.pop(ARG_CLOSURE);
                 asm.pop(ARG_CTX);
+
+                // Reload allocated regs from memory after helper call
+                emit_reload_all(&mut asm, &regmap);
             }
             OpCode::Move => {
                 let w1 = code[ip];
                 ip += 1;
                 let src = (w1 >> 8) as usize;
-                emit_load_reg(&mut asm, Reg::Rax, src);
-                emit_store_reg(&mut asm, Reg::Rax, first_reg);
+                emit_load(&mut asm, Reg::Rax, src, &regmap);
+                emit_store(&mut asm, Reg::Rax, first_reg, &regmap);
             }
             OpCode::Return => {
                 let w1 = code[ip];
                 ip += 1;
                 let src = (w1 & 0xFF) as usize;
-                emit_load_reg(&mut asm, Reg::Rax, src);
+                emit_load(&mut asm, Reg::Rax, src, &regmap);
+                // Save return value before epilogue pops clobber regs
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+                emit_epilogue(&mut asm, &regmap);
+                asm.mov_reg_reg(Reg::Rax, Reg::R11);
                 asm.ret();
             }
             OpCode::AddImm | OpCode::SubImm => {
@@ -282,29 +328,20 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
                 let src = (w1 >> 8) as usize;
                 let imm = (w1 & 0xFF) as i8 as i32;
 
-                // Load virtual register `src` into physical register `rax`
-                emit_load_reg(&mut asm, Reg::Rax, src);
+                emit_load(&mut asm, Reg::Rax, src, &regmap);
 
-                // Sign-extend 48-bit to 64-bit signed integer
                 asm.shl_reg_imm8(Reg::Rax, 16);
                 asm.sar_reg_imm8(Reg::Rax, 16);
 
-                // Perform the addition or subtraction of the immediate
-                let adjust = if op == OpCode::SubImm {
-                    -imm
-                } else {
-                    imm
-                };
+                let adjust = if op == OpCode::SubImm { -imm } else { imm };
                 asm.add_reg_imm32(Reg::Rax, adjust);
 
-                // Mask back to 48-bit and apply TAG_INT tag (0x7FFC_0000_0000_0000)
                 asm.mov_reg_imm64(Reg::R10, 0x0000_FFFF_FFFF_FFFFu64);
                 asm.and_reg_reg(Reg::Rax, Reg::R10);
                 asm.mov_reg_imm64(Reg::R10, 0x7FFC_0000_0000_0000u64);
                 asm.or_reg_reg(Reg::Rax, Reg::R10);
 
-                // Store back to the VM stack
-                emit_store_reg(&mut asm, Reg::Rax, first_reg);
+                emit_store(&mut asm, Reg::Rax, first_reg, &regmap);
             }
             OpCode::AddInt | OpCode::SubInt | OpCode::MulInt => {
                 let w1 = code[ip];
@@ -312,32 +349,27 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
                 let src1 = (w1 >> 8) as usize;
                 let src2 = (w1 & 0xFF) as usize;
 
-                // Load virtual registers into physical registers
-                emit_load_reg(&mut asm, Reg::Rax, src1);
-                emit_load_reg(&mut asm, Reg::R9, src2);
+                emit_load(&mut asm, Reg::Rax, src1, &regmap);
+                emit_load(&mut asm, Reg::R11, src2, &regmap);
 
-                // Sign-extend 48-bit to 64-bit signed integer
                 asm.shl_reg_imm8(Reg::Rax, 16);
                 asm.sar_reg_imm8(Reg::Rax, 16);
-                asm.shl_reg_imm8(Reg::R9, 16);
-                asm.sar_reg_imm8(Reg::R9, 16);
+                asm.shl_reg_imm8(Reg::R11, 16);
+                asm.sar_reg_imm8(Reg::R11, 16);
 
-                // Execute the native x86_64 instruction
                 match op {
-                    OpCode::AddInt => asm.add_reg_reg(Reg::Rax, Reg::R9),
-                    OpCode::SubInt => asm.sub_reg_reg(Reg::Rax, Reg::R9),
-                    OpCode::MulInt => asm.imul_reg_reg(Reg::Rax, Reg::R9),
+                    OpCode::AddInt => asm.add_reg_reg(Reg::Rax, Reg::R11),
+                    OpCode::SubInt => asm.sub_reg_reg(Reg::Rax, Reg::R11),
+                    OpCode::MulInt => asm.imul_reg_reg(Reg::Rax, Reg::R11),
                     _ => unreachable!(),
                 }
 
-                // Mask back to 48-bit and apply TAG_INT tag (0x7FFC_0000_0000_0000)
                 asm.mov_reg_imm64(Reg::R10, 0x0000_FFFF_FFFF_FFFFu64);
                 asm.and_reg_reg(Reg::Rax, Reg::R10);
                 asm.mov_reg_imm64(Reg::R10, 0x7FFC_0000_0000_0000u64);
                 asm.or_reg_reg(Reg::Rax, Reg::R10);
 
-                // Store back to the VM stack
-                emit_store_reg(&mut asm, Reg::Rax, first_reg);
+                emit_store(&mut asm, Reg::Rax, first_reg, &regmap);
             }
             OpCode::LtInt
             | OpCode::GtInt
@@ -350,15 +382,15 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
                 let src1 = (w1 >> 8) as usize;
                 let src2 = (w1 & 0xFF) as usize;
 
-                emit_load_reg(&mut asm, Reg::Rax, src1);
-                emit_load_reg(&mut asm, Reg::R9, src2);
+                emit_load(&mut asm, Reg::Rax, src1, &regmap);
+                emit_load(&mut asm, Reg::R11, src2, &regmap);
 
                 asm.shl_reg_imm8(Reg::Rax, 16);
                 asm.sar_reg_imm8(Reg::Rax, 16);
-                asm.shl_reg_imm8(Reg::R9, 16);
-                asm.sar_reg_imm8(Reg::R9, 16);
+                asm.shl_reg_imm8(Reg::R11, 16);
+                asm.sar_reg_imm8(Reg::R11, 16);
 
-                asm.cmp_reg_reg(Reg::Rax, Reg::R9);
+                asm.cmp_reg_reg(Reg::Rax, Reg::R11);
 
                 let cond = match op {
                     OpCode::LtInt => Cond::Less,
@@ -372,12 +404,10 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
 
                 let jmp_true_patch = asm.jmp_cond(cond);
 
-                // False path
                 let false_val = 0x7FFA_0000_0000_0000u64;
                 asm.mov_reg_imm64(Reg::Rax, false_val);
                 let jmp_end_patch = asm.jmp_near();
 
-                // True path
                 let true_pos = asm.current_offset();
                 let disp_true = (true_pos as i32 - (jmp_true_patch as i32 + 4)) as u32;
                 asm.patch_u32(jmp_true_patch, disp_true);
@@ -385,12 +415,11 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
                 let true_val = 0x7FFB_0000_0000_0000u64;
                 asm.mov_reg_imm64(Reg::Rax, true_val);
 
-                // End path
                 let end_pos = asm.current_offset();
                 let disp_end = (end_pos as i32 - (jmp_end_patch as i32 + 4)) as u32;
                 asm.patch_u32(jmp_end_patch, disp_end);
 
-                emit_store_reg(&mut asm, Reg::Rax, first_reg);
+                emit_store(&mut asm, Reg::Rax, first_reg, &regmap);
             }
             OpCode::Jump => {
                 let offset = ((code[ip] as u32) << 16 | code[ip + 1] as u32) as usize;
@@ -419,9 +448,8 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
                 let target_bytecode_ip = ip + 2 + offset;
                 ip += 2;
 
-                emit_load_reg(&mut asm, Reg::Rax, first_reg);
+                emit_load(&mut asm, Reg::Rax, first_reg, &regmap);
 
-                // Compare RAX with false, null, and int_zero
                 asm.mov_reg_imm64(Reg::R10, 0x7FFA_0000_0000_0000u64); // bool_false
                 asm.cmp_reg_reg(Reg::Rax, Reg::R10);
                 let p1 = asm.jmp_cond(Cond::Equal);
@@ -443,9 +471,8 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
                 let target_bytecode_ip = ip + 2 + offset;
                 ip += 2;
 
-                emit_load_reg(&mut asm, Reg::Rax, first_reg);
+                emit_load(&mut asm, Reg::Rax, first_reg, &regmap);
 
-                // If falsy, jump past the unconditional jump to target
                 asm.mov_reg_imm64(Reg::R10, 0x7FFA_0000_0000_0000u64); // bool_false
                 asm.cmp_reg_reg(Reg::Rax, Reg::R10);
                 let p_false = asm.jmp_cond(Cond::Equal);
@@ -458,11 +485,9 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
                 asm.cmp_reg_reg(Reg::Rax, Reg::R10);
                 let p_zero = asm.jmp_cond(Cond::Equal);
 
-                // If not falsy, then it is truthy, so jump to target
                 let p_target = asm.jmp_near();
                 jump_patches.push(JumpPatch { patch_pos: p_target, target_bytecode_ip });
 
-                // Falsy label
                 let falsy_pos = asm.current_offset();
                 let disp_false = (falsy_pos as i32 - (p_false as i32 + 4)) as u32;
                 asm.patch_u32(p_false, disp_false);
