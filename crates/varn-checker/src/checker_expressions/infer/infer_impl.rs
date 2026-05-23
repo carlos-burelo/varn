@@ -177,7 +177,13 @@ impl Checker {
                 varn_core::ast::operators::UnaryOp::Minus
                 | varn_core::ast::operators::UnaryOp::Plus => self.infer_type(operand, bind),
                 varn_core::ast::operators::UnaryOp::Typeof => Type::Str,
-                _ => Type::Dynamic,
+                varn_core::ast::operators::UnaryOp::BitNot => {
+                    let inner = self.infer_type(operand, bind);
+                    match &inner.0 {
+                        TypeKind::Intrinsic(TypeTag::Int) => Type::intrinsic(TypeTag::Int),
+                        _ => Type::Dynamic,
+                    }
+                }
             },
             ExprKind::Update { operand, .. } => self.infer_type(operand, bind),
             ExprKind::Assign { value, .. } => self.infer_type(value, bind),
@@ -221,6 +227,31 @@ impl Checker {
             ExprKind::CharLiteral { .. } => Type::Char,
             ExprKind::BoolLiteral { .. } => Type::Bool,
             ExprKind::NullLiteral => Type::Null,
+            ExprKind::Range { .. } => Type::intrinsic(varn_core::TypeTag::Range),
+            ExprKind::Match { cases, .. } => {
+                let mut tys = Vec::new();
+                for case in cases {
+                    match &case.body {
+                        varn_core::ast::MatchBody::Expr(e) => {
+                            let ty = self.infer_type(e, bind);
+                            tys.push(ty);
+                        }
+                        varn_core::ast::MatchBody::Block(_) => {
+                            tys.push(Type::Void);
+                        }
+                    }
+                }
+                if tys.is_empty() {
+                    Type::Dynamic
+                } else {
+                    let first = tys[0].clone();
+                    if tys.iter().all(|t| t == &first) {
+                        first
+                    } else {
+                        Type::union(tys)
+                    }
+                }
+            }
             _ => Type::Dynamic,
         }
     }

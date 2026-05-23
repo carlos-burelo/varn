@@ -68,21 +68,15 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
                 if member.line == u32::MAX {
                     continue;
                 }
-                let tt = if sym.kind == SymbolKind::Enum {
-                    TT_ENUM_MEMBER
-                } else {
-                    match member.kind {
-                        MemberKind::Property | MemberKind::Variable => TT_PROPERTY,
-                        MemberKind::Method
-                        | MemberKind::Function
-                        | MemberKind::Getter
-                        | MemberKind::Setter => TT_FUNCTION,
-                        MemberKind::Constructor => continue,
-                        MemberKind::Class | MemberKind::Namespace | MemberKind::Struct => TT_CLASS,
-                        MemberKind::Interface => TT_INTERFACE,
-                        MemberKind::Enum => TT_ENUM_MEMBER,
-                        MemberKind::EnumMember => TT_ENUM_MEMBER,
-                    }
+                let tt = match member.kind {
+                    MemberKind::Property | MemberKind::Variable | MemberKind::Getter | MemberKind::Setter => TT_PROPERTY,
+                    MemberKind::Method
+                    | MemberKind::Function => TT_FUNCTION,
+                    MemberKind::Constructor => continue,
+                    MemberKind::Class | MemberKind::Namespace | MemberKind::Struct => TT_CLASS,
+                    MemberKind::Interface => TT_INTERFACE,
+                    MemberKind::Enum => TT_ENUM_MEMBER,
+                    MemberKind::EnumMember => TT_ENUM_MEMBER,
                 };
                 let mods = if member.is_static { MOD_STATIC } else { 0 };
                 member_overrides.insert((member.line, member.name.clone()), (tt, mods));

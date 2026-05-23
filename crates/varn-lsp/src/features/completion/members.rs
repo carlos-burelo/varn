@@ -136,23 +136,39 @@ pub fn dot_receiver(
 
     let before = line_toks[dot_idx - 1];
 
-    if before.kind == TokenKind::This {
-        let enclosing = state
-            .symbols
-            .iter()
-            .filter(|s| {
-                !s.is_from_stdlib
-                    && matches!(
-                        s.kind,
-                        varn_checker::SymbolKind::Class | varn_checker::SymbolKind::Interface
-                    )
-                    && s.line <= line
-            })
-            .max_by_key(|s| s.line);
-        if let Some(cls) = enclosing {
-            return Some(ReceiverInfo::Named(cls.name.clone(), true));
+    if let Some(info) = state.expr_info_at_token(before) {
+        let mut ty = info.ty.clone();
+        if ty.is_nullable() {
+            ty = ty.non_nullified();
         }
-        return None;
+
+        match &ty.0 {
+            varn_core::TypeKind::Object(members) => {
+                let recs = members.iter().filter_map(type_member_to_record).collect();
+                return Some(ReceiverInfo::Anonymous(recs));
+            }
+            varn_core::TypeKind::Intrinsic(tag) => {
+                if tag.is_primitive() || *tag == varn_core::TypeTag::Array {
+                    return Some(ReceiverInfo::Named(tag.name().to_owned(), true));
+                }
+            }
+            varn_core::TypeKind::Named(name, _) | varn_core::TypeKind::Generic(name, ..) => {
+                let mut is_instance = true;
+                if let Some(sym) = state.symbols.iter().find(|s| s.name.as_str() == name.as_ref()) {
+                    if matches!(
+                        sym.kind,
+                        varn_checker::SymbolKind::Class
+                            | varn_checker::SymbolKind::Namespace
+                            | varn_checker::SymbolKind::Interface
+                            | varn_checker::SymbolKind::Enum
+                    ) {
+                        is_instance = false;
+                    }
+                }
+                return Some(ReceiverInfo::Named(name.to_string(), is_instance));
+            }
+            _ => {}
+        }
     }
 
     let literal_type: Option<&str> = match before.kind {
@@ -170,59 +186,6 @@ pub fn dot_receiver(
     };
     if let Some(prim) = literal_type {
         return Some(ReceiverInfo::Named(prim.to_owned(), true));
-    }
-
-    if before.kind == TokenKind::Identifier {
-        let sym = state.symbols.iter().find(|s| s.name == before.lexeme);
-        if let Some(sym) = sym {
-            match sym.kind {
-                varn_checker::SymbolKind::Class
-                | varn_checker::SymbolKind::Namespace
-                | varn_checker::SymbolKind::Interface
-                | varn_checker::SymbolKind::Enum => {
-                    return Some(ReceiverInfo::Named(sym.name.clone(), false));
-                }
-                varn_checker::SymbolKind::Let
-                | varn_checker::SymbolKind::Var
-                | varn_checker::SymbolKind::Const
-                | varn_checker::SymbolKind::Parameter => {
-                    if !sym.members.is_empty() {
-                        return Some(ReceiverInfo::Anonymous(sym.members.clone()));
-                    }
-                    if !sym.type_str.is_empty() {
-                        if sym.type_str.ends_with("[]") {
-                            return Some(ReceiverInfo::Named(
-                                IntrinsicType::Array.as_str().to_owned(),
-                                true,
-                            ));
-                        }
-                        let class_name = sym.type_str.split('<').next().unwrap_or("").trim();
-                        if !class_name.is_empty() {
-                            return Some(ReceiverInfo::Named(class_name.to_owned(), true));
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-
-    if let Some(info) = state.db.expr_types.get(&before.offset) {
-        match &info.ty.0 {
-            varn_core::TypeKind::Object(members) => {
-                let recs = members.iter().filter_map(type_member_to_record).collect();
-                return Some(ReceiverInfo::Anonymous(recs));
-            }
-            varn_core::TypeKind::Intrinsic(tag) => {
-                if tag.is_primitive() || *tag == varn_core::TypeTag::Array {
-                    return Some(ReceiverInfo::Named(tag.name().to_owned(), true));
-                }
-            }
-            varn_core::TypeKind::Named(name, _) | varn_core::TypeKind::Generic(name, ..) => {
-                return Some(ReceiverInfo::Named(name.to_string(), true));
-            }
-            _ => {}
-        }
     }
 
     None
@@ -379,7 +342,7 @@ pub fn pattern_receiver(state: &DocumentState, line: u32, col: u32) -> Option<Re
     }
     let rhs_tok = line_toks[rhs_idx];
 
-    if let Some(info) = state.db.expr_types.get(&rhs_tok.offset) {
+    if let Some(info) = state.expr_info_at_token(rhs_tok) {
         match &info.ty.0 {
             varn_core::TypeKind::Object(members) => {
                 let recs = members.iter().filter_map(type_member_to_record).collect();
@@ -389,19 +352,6 @@ pub fn pattern_receiver(state: &DocumentState, line: u32, col: u32) -> Option<Re
                 return Some(ReceiverInfo::Named(name.to_string(), true));
             }
             _ => {}
-        }
-    } else if rhs_tok.kind == TokenKind::Identifier {
-        let sym = state.symbols.iter().find(|s| s.name == rhs_tok.lexeme);
-        if let Some(sym) = sym {
-            if !sym.members.is_empty() {
-                return Some(ReceiverInfo::Anonymous(sym.members.clone()));
-            }
-            if !sym.type_str.is_empty() {
-                let class_name = sym.type_str.split('<').next().unwrap_or("").trim();
-                if !class_name.is_empty() {
-                    return Some(ReceiverInfo::Named(class_name.to_owned(), true));
-                }
-            }
         }
     }
 

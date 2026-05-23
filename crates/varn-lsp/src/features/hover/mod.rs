@@ -10,7 +10,7 @@ use tower_lsp::lsp_types::{Hover, HoverContents, LanguageString, MarkedString};
 use varn_checker::SymbolKind;
 use varn_core::TokenKind;
 
-use crate::document::{ChainResult, DocumentState};
+use crate::document::{ChainResult, DocumentState, MemberKind};
 use crate::query;
 
 pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> {
@@ -51,6 +51,15 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
         return Some(symbol_hover(sym));
     }
 
+    if let Some((parent_name, parent_kind, member)) = query::member_at(state, line, col) {
+        let sig = if parent_kind == SymbolKind::Enum && member.kind == MemberKind::EnumMember {
+            format_enum_member(&parent_name, &member.name, &member.init_value)
+        } else {
+            format_member_sig(&parent_name, member)
+        };
+        return Some(make_lang_hover(sig));
+    }
+
     if let Some(param) = query::param_at(state, line, col) {
         let sig = if param.is_type_param {
             format!("(type parameter) {}", param.name)
@@ -58,15 +67,6 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
             format!("(param) {}", param.name)
         } else {
             format!("(param) {}: {}", param.name, param.type_str)
-        };
-        return Some(make_lang_hover(sig));
-    }
-
-    if let Some((parent_name, parent_kind, member)) = query::member_at(state, line, col) {
-        let sig = if parent_kind == SymbolKind::Enum {
-            format_enum_member(&parent_name, &member.name, &member.init_value)
-        } else {
-            format_member_sig(&parent_name, member)
         };
         return Some(make_lang_hover(sig));
     }

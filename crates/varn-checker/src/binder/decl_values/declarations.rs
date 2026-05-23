@@ -6,7 +6,7 @@ use crate::symbol::{Symbol, SymbolKind};
 use crate::types::{FunctionType, Type};
 use std::rc::Rc;
 use varn_core::ast::{
-    EnumDecl, Expr, ExprKind, FunctionDecl, Pattern, Stmt, TypeAliasDecl, VarKind, VariableDecl,
+    ClassMember, EnumDecl, Expr, ExprKind, FunctionDecl, Pattern, Stmt, TypeAliasDecl, VarKind, VariableDecl,
 };
 
 impl super::super::Binder {
@@ -126,7 +126,7 @@ impl super::super::Binder {
             .collect();
 
         let ret = if f.modifiers.is_generator {
-            Type::Dynamic
+            Type::generic("Generator", vec![Type::Dynamic])
         } else {
             f.return_type
                 .as_ref()
@@ -244,10 +244,25 @@ impl super::super::Binder {
     }
 
     pub(crate) fn bind_enum(&mut self, e: &EnumDecl) {
-        let mut sym = Symbol::new(SymbolKind::Enum, e.id.clone(), e.range.start.line).with_type(
+        let line = e.range.start.line;
+        let mut sym = Symbol::new(SymbolKind::Enum, e.id.clone(), line).with_type(
             Type::named_with_origin(e.id.clone(), Some(Rc::from(self.source_file.as_ref()))),
         );
         sym.doc = e.doc.as_ref().map(|s| Rc::from(s.as_str()));
+        sym.type_params = e
+            .type_params
+            .iter()
+            .map(|t| Rc::from(t.name.as_str()))
+            .collect();
+        sym.type_param_constraints = e
+            .type_params
+            .iter()
+            .map(|t| {
+                t.constraint
+                    .as_ref()
+                    .map(|con| resolve_type_node(con, Some(self)))
+            })
+            .collect();
         self.define(e.id.to_string(), sym);
 
         let mut variants_info = Vec::new();
@@ -323,8 +338,135 @@ impl super::super::Binder {
             });
         }
 
+
+
+        // Bind the Enum body (methods/properties) as a class-like environment
+        let child = self
+            .scopes
+            .child(crate::scope::ScopeKind::Class, self.current);
+        let saved = self.current;
+        self.current = child;
+
+        self.bind_type_params(&e.type_params, line);
+
+        let mut methods: rustc_hash::FxHashMap<Rc<str>, Type> = rustc_hash::FxHashMap::default();
+        let mut members: Vec<ClassMemberInfo> = Vec::new();
+
+        for member in &e.body {
+            self.collect_class_member(member, e.id.as_ref(), &mut methods, &mut members);
+        }
+
+        for member in &e.body {
+            match member {
+                ClassMember::Constructor {
+                    params,
+                    body,
+                    range,
+                    ..
+                } => {
+                    self.bind_inline_function(&[], params, None, body, range);
+                }
+                ClassMember::Method {
+                    key,
+                    type_params,
+                    params,
+                    return_type,
+                    body: Some(body),
+                    range,
+                    modifiers,
+                    ..
+                } => {
+                    let key_rc: Rc<str> = Rc::from(key.as_ref());
+                    if return_type.is_none() && !modifiers.is_abstract {
+                        self.pending_enrich.push(PendingEnrich::Method {
+                            class_name: e.id.clone(),
+                            key: key_rc,
+                            body: body as *const Stmt,
+                            is_async: modifiers.is_async,
+                        });
+                    }
+                    self.bind_inline_function(
+                        type_params,
+                        params,
+                        return_type.as_ref(),
+                        body,
+                        range,
+                    );
+                }
+                ClassMember::Getter {
+                    key,
+                    return_type,
+                    body: Some(body),
+                    range: _,
+                    ..
+                } => {
+                    let key_rc: Rc<str> = Rc::from(key.as_ref());
+                    if return_type.is_none() {
+                        self.pending_enrich.push(PendingEnrich::Getter {
+                            class_name: e.id.clone(),
+                            key: key_rc,
+                            body: body as *const Stmt,
+                        });
+                    }
+                    self.bind_stmt(body);
+                }
+                ClassMember::Setter {
+                    key,
+                    param,
+                    body: Some(body),
+                    range,
+                    ..
+                } => {
+                    let key_rc: Rc<str> = Rc::from(key.as_ref());
+                    self.pending_enrich.push(PendingEnrich::Setter {
+                        class_name: e.id.clone(),
+                        key: key_rc,
+                        body: body as *const Stmt,
+                    });
+                    self.bind_stmt(body);
+                    self.bind_pattern(
+                        &param.pattern,
+                        SymbolKind::Parameter,
+                        range.start.line,
+                        None,
+                        None,
+                    );
+                }
+                ClassMember::Property {
+                    init: Some(init), ..
+                } => {
+                    self.bind_expr(init);
+                }
+                _ => {}
+            }
+        }
+
+        let class_info = ClassMemberInfo {
+            name: e.id.clone(),
+            kind: ClassMemberKind::Class,
+            is_async: false,
+            is_generator: false,
+            is_static: false,
+            is_optional: false,
+            line: e.range.start.line.saturating_sub(1),
+            col: e.range.start.column,
+            offset: e.range.start.offset,
+            ty: Type::named_with_origin(e.id.clone(), Some(Rc::from(self.source_file.as_ref()))),
+            members: members.clone(),
+            visibility: None,
+            is_abstract: false,
+            is_readonly: false,
+            is_override: false,
+            symbol_id: None,
+        };
+
+        self.type_members.classes.insert(e.id.clone(), class_info);
+
+        variants_info.extend(members);
         if !variants_info.is_empty() {
             self.type_members.enums.insert(e.id.clone(), variants_info);
         }
+
+        self.current = saved;
     }
 }

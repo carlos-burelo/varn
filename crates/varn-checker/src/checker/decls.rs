@@ -181,7 +181,146 @@ impl Checker {
                 self.current_class = saved_class;
             }
 
-            Decl::Enum(_) => {}
+            Decl::Enum(e) => {
+                let saved_class = self.current_class.replace(e.id.clone());
+                let saved_scope = self.current_scope;
+                if let Some(enum_scope) = self.next_child_scope(bind) {
+                    self.current_scope = enum_scope;
+                }
+
+                for member in &e.body {
+                    match member {
+                        ClassMember::Property {
+                            key,
+                            type_ann,
+                            init,
+                            range,
+                            ..
+                        } => {
+                            if let Some(init_expr) = init {
+                                if let Some(ann) = type_ann {
+                                    let prop_ty = self.resolve_type_node_cached(ann, bind);
+                                    self.with_expected(Some(prop_ty.clone()), |checker| {
+                                        checker.check_expr(init_expr, bind);
+                                        let init_ty = checker.infer_type(init_expr, bind);
+                                        if !checker.types_compatible_cached(&prop_ty, &init_ty, Some(bind)) {
+                                            checker.emit(
+                                                Diagnostic::error(ErrorCode::TypeMismatch, format!(
+                                                    "type mismatch: property '{}' is declared as '{}' but initialised with '{}'",
+                                                    key, prop_ty, init_ty
+                                                ))
+                                                .with_range(*range),
+                                            );
+                                        }
+                                    });
+                                }
+                            }
+                        }
+                        ClassMember::Method {
+                            type_params,
+                            return_type,
+                            body,
+                            range,
+                            ..
+                        } => {
+                            if let Some(body_stmt) = body {
+                                let saved_method_scope = self.current_scope;
+                                if let Some(m_scope) = self.next_child_scope(bind) {
+                                    self.current_scope = m_scope;
+                                    self.record_scope(range.start.offset);
+                                }
+
+                                let saved_expected = self.expected_return_type.take();
+                                self.expected_return_type = return_type.as_ref().map(|rt| self.resolve_type_node_cached(rt, bind));
+
+                                for tp in type_params {
+                                    self.active_type_params.insert(Rc::from(tp.name.as_str()));
+                                }
+
+                                self.check_stmt(body_stmt, bind);
+
+                                for tp in type_params {
+                                    self.active_type_params.remove(tp.name.as_str());
+                                }
+
+                                self.expected_return_type = saved_expected;
+                                self.current_scope = saved_method_scope;
+                            }
+                        }
+                        ClassMember::Getter {
+                            return_type,
+                            body,
+                            range,
+                            ..
+                        } => {
+                            if let Some(body_stmt) = body {
+                                let saved_getter_scope = self.current_scope;
+                                if let Some(g_scope) = self.next_child_scope(bind) {
+                                    self.current_scope = g_scope;
+                                    self.record_scope(range.start.offset);
+                                }
+
+                                let saved_expected = self.expected_return_type.take();
+                                self.expected_return_type = return_type
+                                    .as_ref()
+                                    .map(|rt| self.resolve_type_node_cached(rt, bind));
+
+                                self.check_stmt(body_stmt, bind);
+
+                                self.expected_return_type = saved_expected;
+                                self.current_scope = saved_getter_scope;
+                            }
+                        }
+                        ClassMember::Setter {
+                            param,
+                            body,
+                            range,
+                            ..
+                        } => {
+                            if let Some(body_stmt) = body {
+                                let saved_setter_scope = self.current_scope;
+                                if let Some(s_scope) = self.next_child_scope(bind) {
+                                    self.current_scope = s_scope;
+                                    self.record_scope(range.start.offset);
+                                }
+
+                                let param_ty = param
+                                    .type_ann
+                                    .as_ref()
+                                    .map(|node| self.resolve_type_node_cached(node, bind))
+                                    .unwrap_or(Type::Dynamic);
+
+                                self.check_pattern(&param.pattern, &param_ty, bind);
+                                self.check_stmt(body_stmt, bind);
+
+                                self.current_scope = saved_setter_scope;
+                            }
+                        }
+                        ClassMember::Constructor { body, .. } => {
+                            let saved_scope = self.current_scope;
+                            if let Some(ctor_scope) = self.next_child_scope(bind) {
+                                self.current_scope = ctor_scope;
+                                self.record_scope(body.range.start.offset);
+                            }
+                            self.check_stmt(body, bind);
+                            self.current_scope = saved_scope;
+                        }
+                        ClassMember::StaticBlock { body, range } => {
+                            let saved_block_scope = self.current_scope;
+                            if let Some(m_scope) = self.next_child_scope(bind) {
+                                self.current_scope = m_scope;
+                                self.record_scope(range.start.offset);
+                            }
+                            self.check_stmt(body, bind);
+                            self.current_scope = saved_block_scope;
+                        }
+                        _ => {}
+                    }
+                }
+
+                self.current_scope = saved_scope;
+                self.current_class = saved_class;
+            }
 
             Decl::Interface(_) => {
                 self.next_child_scope(bind);

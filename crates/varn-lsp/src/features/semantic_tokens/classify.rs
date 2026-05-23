@@ -138,10 +138,10 @@ pub fn param_scope_type(tok: &TokenRecord, scopes: &[ParamScope]) -> bool {
 
 pub fn map_member_kind_to_tt(kind: &MemberKind) -> u32 {
     match kind {
-        MemberKind::Method | MemberKind::Function | MemberKind::Getter | MemberKind::Setter => {
+        MemberKind::Method | MemberKind::Function => {
             TT_FUNCTION
         }
-        MemberKind::Property | MemberKind::Variable => TT_PROPERTY,
+        MemberKind::Property | MemberKind::Variable | MemberKind::Getter | MemberKind::Setter => TT_PROPERTY,
         MemberKind::EnumMember => TT_ENUM_MEMBER,
         MemberKind::Constructor => TT_KEYWORD,
         MemberKind::Class | MemberKind::Struct => TT_CLASS,

@@ -89,10 +89,58 @@ impl Checker {
                 }
                 false
             }
+            TypeKind::EnumVariant { enum_name, variant_name: _, type_args: _, payload_ty } => {
+                if key == "rawValue" || key == "__tag" || key == "name" || key == "__variant_name__" {
+                    return true;
+                }
+                if self.member_exists(payload_ty, key, bind) {
+                    return true;
+                }
+                self.member_exists(&Type::named(enum_name.clone()), key, bind)
+            }
             TypeKind::Named(name, origin) => {
                 if name.as_ref() == varn_core::IntrinsicType::Str.as_str() && key == "length" {
                     return true;
                 }
+
+                let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
+                let is_enum = bind.get_enum_members_local(name.as_ref()).is_some()
+                    || bind.builtin.as_ref().map_or(false, |b| b.enum_members.contains_key(name.as_ref()))
+                    || crate::module_resolver::find_module_bind_for_type(name, &origin_modules)
+                        .as_ref()
+                        .map_or(false, |eb| eb.get_enum_members_local(name.as_ref()).is_some());
+
+                if is_enum {
+                    if key == "rawValue" || key == "__tag" || key == "name" || key == "__variant_name__" {
+                        return true;
+                    }
+                    
+                    // Look up variant payload fields
+                    let mut variants = Vec::new();
+                    if let Some(members) = bind.get_enum_members_local(name.as_ref()) {
+                        variants.extend(members.iter().map(|m| m.name.clone()));
+                    }
+                    if let Some(ext_bind) = crate::module_resolver::find_module_bind_for_type(name, &origin_modules) {
+                        if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
+                            variants.extend(members.iter().map(|m| m.name.clone()));
+                        }
+                    }
+                    for v in &variants {
+                        if let Some(fields) = bind.sum_variant_fields.get(v) {
+                            if fields.iter().any(|(fname, _)| fname.as_ref() == key) {
+                                return true;
+                            }
+                        }
+                        if let Some(ext_bind) = crate::module_resolver::find_module_bind_for_type(name, &origin_modules) {
+                            if let Some(fields) = ext_bind.sum_variant_fields.get(v) {
+                                if fields.iter().any(|(fname, _)| fname.as_ref() == key) {
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if let Some(members) = bind.type_members.classes.get(name) {
                     if members.members.iter().any(|m| m.name.as_ref() == key) {
                         return true;
