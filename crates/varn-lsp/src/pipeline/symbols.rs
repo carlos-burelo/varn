@@ -46,7 +46,7 @@ fn map_members_inner(
                 params_str: m.params_str(),
                 is_static: m.is_static,
                 is_optional: m.is_optional,
-                kind: if is_enum && m.kind == ClassMemberKind::Property {
+                kind: if is_enum && m.kind == ClassMemberKind::Property && m.is_static {
                     MemberKind::EnumMember
                 } else {
                     class_member_kind(&m.kind)

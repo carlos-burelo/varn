@@ -119,7 +119,7 @@ fn infer_arrow_with_context(
         }
         ArrowBody::Block(s) => {
             let mut returns = Vec::new();
-            collect_returns(s, &mut returns);
+            collect_returns(s, &mut returns, checker, bind);
             if returns.is_empty() {
                 Type::Void
             } else if returns.len() == 1 {
@@ -138,22 +138,28 @@ fn infer_arrow_with_context(
     }))
 }
 
-fn collect_returns(stmt: &Stmt, out: &mut Vec<Type>) {
+fn collect_returns(stmt: &Stmt, out: &mut Vec<Type>, checker: &mut Checker, bind: &BindResult) {
     match &stmt.kind {
         StmtKind::Block { stmts } => {
             for s in stmts {
-                collect_returns(s, out);
+                collect_returns(s, out, checker, bind);
             }
         }
-        StmtKind::Return { .. } => {}
+        StmtKind::Return { argument } => {
+            if let Some(val_expr) = argument {
+                out.push(checker.infer_type(val_expr, bind));
+            } else {
+                out.push(Type::Void);
+            }
+        }
         StmtKind::If {
             consequent,
             alternate,
             ..
         } => {
-            collect_returns(consequent, out);
+            collect_returns(consequent, out, checker, bind);
             if let Some(alt) = alternate {
-                collect_returns(alt, out);
+                collect_returns(alt, out, checker, bind);
             }
         }
         _ => {}
@@ -183,6 +189,21 @@ pub(crate) fn collect_type_inferences(
         TypeKind::Array(e_inner) => {
             if let TypeKind::Array(a_inner) = &actual.0 {
                 collect_type_inferences(e_inner, a_inner, params, out);
+            }
+        }
+        TypeKind::Fn(e_ft) => {
+            if let TypeKind::Fn(a_ft) = &actual.0 {
+                for (ep, ap) in e_ft.params.iter().zip(a_ft.params.iter()) {
+                    collect_type_inferences(&ep.ty, &ap.ty, params, out);
+                }
+                collect_type_inferences(&e_ft.return_type, &a_ft.return_type, params, out);
+            }
+        }
+        TypeKind::Union(e_members) => {
+            if let TypeKind::Union(a_members) = &actual.0 {
+                for (ea, aa) in e_members.iter().zip(a_members.iter()) {
+                    collect_type_inferences(ea, aa, params, out);
+                }
             }
         }
         _ => {}

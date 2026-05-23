@@ -28,9 +28,66 @@ impl Checker {
         bind: &BindResult,
     ) -> Option<(Type, Option<usize>)> {
         let res = match &ty.0 {
+            TypeKind::EnumVariant { enum_name, variant_name: _, type_args: _, payload_ty } => {
+                if key == "name" || key == "__variant_name__" {
+                    return Some((Type::Str, None));
+                }
+                if key == "__tag" || key == "rawValue" {
+                    return Some((Type::Int, None));
+                }
+                if let Some(res) = self.find_member_info_uncached(payload_ty, key, bind) {
+                    return Some(res);
+                }
+                return self.find_member_info_uncached(&Type::named(enum_name.clone()), key, bind);
+            }
             TypeKind::Named(name, origin) => {
                 if name.as_ref() == varn_core::IntrinsicType::Str.as_str() && key == "length" {
                     return Some((Type::Int, None));
+                }
+
+                let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
+                let is_enum = bind.get_enum_members_local(name.as_ref()).is_some()
+                    || bind.builtin.as_ref().map_or(false, |b| b.enum_members.contains_key(name.as_ref()))
+                    || crate::module_resolver::find_module_bind_for_type(name, &origin_modules)
+                        .as_ref()
+                        .map_or(false, |eb| eb.get_enum_members_local(name.as_ref()).is_some());
+
+                if is_enum {
+                    if key == "rawValue" || key == "__tag" {
+                        return Some((Type::Int, None));
+                    }
+                    if key == "name" || key == "__variant_name__" {
+                        return Some((Type::Str, None));
+                    }
+
+                    // Look up variant payload fields
+                    let mut variants = Vec::new();
+                    if let Some(members) = bind.get_enum_members_local(name.as_ref()) {
+                        variants.extend(members.iter().map(|m| m.name.clone()));
+                    }
+                    if let Some(ext_bind) = crate::module_resolver::find_module_bind_for_type(name, &origin_modules) {
+                        if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
+                            variants.extend(members.iter().map(|m| m.name.clone()));
+                        }
+                    }
+                    let mut found_tys = Vec::new();
+                    for v in &variants {
+                        if let Some(fields) = bind.sum_variant_fields.get(v) {
+                            if let Some((_, ty)) = fields.iter().find(|(fname, _)| fname.as_ref() == key) {
+                                found_tys.push(ty.clone());
+                            }
+                        }
+                        if let Some(ext_bind) = crate::module_resolver::find_module_bind_for_type(name, &origin_modules) {
+                            if let Some(fields) = ext_bind.sum_variant_fields.get(v) {
+                                if let Some((_, ty)) = fields.iter().find(|(fname, _)| fname.as_ref() == key) {
+                                    found_tys.push(ty.clone());
+                                }
+                            }
+                        }
+                    }
+                    if !found_tys.is_empty() {
+                        return Some((Type::union(found_tys), None));
+                    }
                 }
                 if let Some(members) = bind.type_members.classes.get(name) {
                     if let Some(m) = members.members.iter().find(|m| m.name.as_ref() == key) {
@@ -38,6 +95,11 @@ impl Checker {
                     }
                 }
                 if let Some(members) = bind.type_members.interfaces.get(name) {
+                    if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
+                        return Some((m.ty.clone(), m.symbol_id));
+                    }
+                }
+                if let Some(members) = bind.get_enum_members_local(name.as_ref()) {
                     if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
                         return Some((m.ty.clone(), m.symbol_id));
                     }
@@ -80,6 +142,11 @@ impl Checker {
                         }
                     }
                     if let Some(members) = ext_bind.type_members.interfaces.get(name) {
+                        if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
+                            return Some((m.ty.clone(), m.symbol_id));
+                        }
+                    }
+                    if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
                         if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
                             return Some((m.ty.clone(), m.symbol_id));
                         }
@@ -190,6 +257,28 @@ impl Checker {
         bind: &BindResult,
     ) -> Option<ObjectTypeMember> {
         let res = match &ty.0 {
+            TypeKind::EnumVariant { enum_name, variant_name: _, type_args: _, payload_ty } => {
+                if key == "name" {
+                    return Some(ObjectTypeMember::Property {
+                        name: Rc::from(key),
+                        ty: Type::Str,
+                        optional: false,
+                        readonly: true,
+                    });
+                }
+                if key == "__tag" {
+                    return Some(ObjectTypeMember::Property {
+                        name: Rc::from(key),
+                        ty: Type::Int,
+                        optional: false,
+                        readonly: true,
+                    });
+                }
+                if let Some(res) = self.find_member(payload_ty, key, bind) {
+                    return Some(res);
+                }
+                return self.find_member(&Type::named(enum_name.clone()), key, bind);
+            }
             TypeKind::Object(members) => members.iter().find(|m| m.name() == key).cloned(),
             TypeKind::Named(name, _) | TypeKind::Generic(name, _, _) => {
                 if let Some(entry) = bind.get_class_entry(name.as_ref()) {

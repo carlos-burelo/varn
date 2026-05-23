@@ -184,7 +184,7 @@ impl super::Binder {
         self.current = saved;
     }
 
-    fn collect_class_member(
+    pub(crate) fn collect_class_member(
         &self,
         member: &ClassMember,
         _class_name: &str,

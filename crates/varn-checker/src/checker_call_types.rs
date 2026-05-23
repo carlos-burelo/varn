@@ -263,6 +263,40 @@ pub(crate) fn infer_call_type(
             ))
         }
 
+        ExprKind::Match { cases, .. } => {
+            let mut tys = Vec::new();
+            for case in cases {
+                match &case.body {
+                    varn_core::ast::MatchBody::Expr(e) => {
+                        if let Some(ty) = infer_call_type(
+                            fn_map,
+                            fn_type_params,
+                            class_methods,
+                            sym_map,
+                            e,
+                            ctx,
+                            current_class,
+                        ) {
+                            tys.push(ty);
+                        }
+                    }
+                    varn_core::ast::MatchBody::Block(_) => {
+                        tys.push(Type::Void);
+                    }
+                }
+            }
+            if tys.is_empty() {
+                Some(Type::Dynamic)
+            } else {
+                let first = tys[0].clone();
+                if tys.iter().all(|t| t == &first) {
+                    Some(first)
+                } else {
+                    Some(Type::union(tys))
+                }
+            }
+        }
+
         _ => Some(Type::Dynamic),
     }
 }

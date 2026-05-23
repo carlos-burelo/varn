@@ -67,6 +67,10 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
             match op {
                 UnaryOp::Minus | UnaryOp::Plus => inner,
                 UnaryOp::Not => Type::Bool,
+                UnaryOp::BitNot => match &inner.0 {
+                    TypeKind::Intrinsic(varn_core::TypeTag::Int) => Type::Int,
+                    _ => Type::Dynamic,
+                },
                 _ => Type::Dynamic,
             }
         }
@@ -112,8 +116,16 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
         ExprKind::Function {
             params,
             return_type,
+            is_generator,
             ..
-        } => build_fn_type(params, return_type, false, ctx, Type::Dynamic),
+        } => {
+            let ret = if *is_generator {
+                Type::generic("Generator", vec![Type::Dynamic])
+            } else {
+                Type::Dynamic
+            };
+            build_fn_type(params, return_type, false, ctx, ret)
+        },
         ExprKind::Match { cases, .. } => {
             if let Some(first) = cases.first() {
                 match &first.body {
@@ -125,6 +137,7 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
             }
         }
         ExprKind::Object { properties } => infer_object(properties, ctx),
+        ExprKind::Range { .. } => Type::intrinsic(varn_core::TypeTag::Range),
         _ => Type::Dynamic,
     }
 }
@@ -151,10 +164,30 @@ fn infer_member(
     if let Some(ctx) = ctx {
         match &obj_ty.0 {
             TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin) => {
+                if let Some(variants) = ctx.get_enum_members(name.as_ref(), origin.as_deref()) {
+                    if prop_name.as_ref() == "rawValue" || prop_name.as_ref() == "__tag" {
+                        return Type::Int;
+                    }
+                    if prop_name.as_ref() == "name" || prop_name.as_ref() == "__variant_name__" {
+                        return Type::Str;
+                    }
+                    let mut found_tys = Vec::new();
+                    for v in &variants {
+                        if let TypeKind::Fn(ft) = &v.ty.0 {
+                            if let Some(p) = ft.params.iter().find(|p| p.name.as_ref().map_or(false, |pn| pn.as_ref() == prop_name.as_ref())) {
+                                found_tys.push(p.ty.clone());
+                            }
+                        }
+                    }
+                    if !found_tys.is_empty() {
+                        return Type::union(found_tys);
+                    }
+                }
                 if let Some(members) = ctx
                     .get_class_members(name.as_ref(), origin.as_deref())
                     .or_else(|| ctx.get_interface_members(name.as_ref(), origin.as_deref()))
                     .or_else(|| ctx.get_namespace_members(name.as_ref(), origin.as_deref()))
+                    .or_else(|| ctx.get_enum_members(name.as_ref(), origin.as_deref()))
                 {
                     if let Some(m) = members
                         .iter()
@@ -238,7 +271,17 @@ fn infer_binary(
         | BinaryOp::GtEq
         | BinaryOp::Instanceof
         | BinaryOp::In => Type::Bool,
-        _ => Type::Dynamic,
+        BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor | BinaryOp::Shl | BinaryOp::Shr | BinaryOp::UShr => {
+            let l = infer_expr_type(left, ctx);
+            let r = infer_expr_type(right, ctx);
+            match (&l.0, &r.0) {
+                (
+                    &TypeKind::Intrinsic(varn_core::TypeTag::Int),
+                    &TypeKind::Intrinsic(varn_core::TypeTag::Int),
+                ) => Type::Int,
+                _ => Type::Dynamic,
+            }
+        }
     }
 }
 

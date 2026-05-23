@@ -84,6 +84,21 @@ impl TypeContext for Binder {
         self.type_members.namespaces.get(name).cloned()
     }
 
+    fn get_enum_members(
+        &self,
+        name: &str,
+        origin: Option<&str>,
+    ) -> Option<Vec<ClassMemberInfo>> {
+        if let Some(origin) = origin {
+            if origin != self.source_file.as_ref() {
+                if let Some(rb) = resolve_module_bind_ref(origin) {
+                    return rb.type_members.enums.get(name).cloned();
+                }
+            }
+        }
+        self.type_members.enums.get(name).cloned()
+    }
+
     fn resolve_symbol(&self, name: &str) -> Option<Type> {
         let scope = self.scopes.get(self.current);
         let id = scope.resolve(name, &self.scopes)?;

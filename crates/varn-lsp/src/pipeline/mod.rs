@@ -1,7 +1,7 @@
 mod extensions;
 mod format;
 mod params;
-mod symbols;
+pub(crate) mod symbols;
 
 use std::collections::HashMap;
 

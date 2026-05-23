@@ -1,95 +1,62 @@
-use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, InsertTextFormat};
+use tower_lsp::lsp_types::{CompletionItem, InsertTextFormat};
 use varn_checker::SymbolKind;
 
-use crate::constants::{SORT_GLOBAL, SORT_LOCAL, SORT_PARAM};
 use crate::document::DocumentState;
+use crate::util::converters::to_completion_kind;
 
 pub fn build_scope_completions(state: &DocumentState, line: u32) -> Vec<CompletionItem> {
     let mut items: Vec<CompletionItem> = Vec::new();
 
-    let best_scope = state
-        .param_scopes
-        .iter()
-        .filter(|s| line >= s.body_start_line && line <= s.body_end_line)
-        .max_by_key(|s| s.body_start_line);
+    let cursor_offset = state.offset_at_line_col(line, 0);
+    let mut scope_id = state.db.scope_at_offset(cursor_offset);
 
-    if let Some(scope) = best_scope {
-        for (name, type_str) in &scope.params {
-            let detail = if type_str.is_empty() {
-                None
-            } else {
-                Some(type_str.clone())
-            };
-            items.push(CompletionItem {
-                label: name.clone(),
-                kind: Some(CompletionItemKind::VARIABLE),
-                detail,
-                sort_text: Some(format!("{SORT_LOCAL}{name}")),
-                ..Default::default()
-            });
-        }
-    }
+    let mut seen_names = std::collections::HashSet::new();
 
-    let cursor_fn_bodies: Vec<(u32, u32)> = state
-        .param_scopes
-        .iter()
-        .filter(|s| line >= s.body_start_line && line <= s.body_end_line)
-        .map(|s| (s.body_start_line, s.body_end_line))
-        .collect();
+    loop {
+        let scope = state.db.scopes.get(scope_id);
 
-    for sym in &state.symbols {
-        if sym.line == u32::MAX {
-            continue;
-        }
-        if sym.line > line {
-            continue;
-        }
+        for &symbol_id in &scope.ordered {
+            let sym = state.db.arena.get(symbol_id);
+            if seen_names.insert(sym.name.to_string()) {
+                let ty = state
+                    .db
+                    .symbol_types
+                    .get(&symbol_id)
+                    .cloned()
+                    .or_else(|| sym.ty.clone())
+                    .unwrap_or(varn_checker::types::Type::Dynamic);
 
-        let sym_in_any_fn = state
-            .param_scopes
-            .iter()
-            .any(|s| sym.line >= s.body_start_line && sym.line <= s.body_end_line);
-        if sym_in_any_fn {
-            let in_accessible_fn = cursor_fn_bodies
-                .iter()
-                .any(|(start, end)| sym.line >= *start && sym.line <= *end);
-            if !in_accessible_fn {
-                continue;
-            }
-        }
-
-        match sym.kind {
-            SymbolKind::Let | SymbolKind::Const | SymbolKind::Var => {
-                let detail = if sym.type_str.is_empty() {
+                let detail = if ty.is_dynamic() {
                     None
                 } else {
-                    Some(sym.type_str.clone())
+                    Some(ty.to_string())
                 };
+
+                let (insert_text, insert_text_format) =
+                    if sym.kind == SymbolKind::Function {
+                        (
+                            Some(format!("{}($0)", sym.name)),
+                            Some(InsertTextFormat::SNIPPET),
+                        )
+                    } else {
+                        (None, None)
+                    };
+
                 items.push(CompletionItem {
-                    label: sym.name.clone(),
-                    kind: Some(CompletionItemKind::VARIABLE),
+                    label: sym.name.to_string(),
+                    kind: Some(to_completion_kind(sym.kind)),
                     detail,
-                    sort_text: Some(format!("{SORT_PARAM}{}", sym.name)),
+                    insert_text,
+                    insert_text_format,
                     ..Default::default()
                 });
             }
-            SymbolKind::Function => {
-                let detail = if sym.type_str.is_empty() {
-                    None
-                } else {
-                    Some(sym.type_str.clone())
-                };
-                items.push(CompletionItem {
-                    label: sym.name.clone(),
-                    kind: Some(CompletionItemKind::FUNCTION),
-                    detail,
-                    insert_text: Some(format!("{}($0)", sym.name)),
-                    insert_text_format: Some(InsertTextFormat::SNIPPET),
-                    sort_text: Some(format!("{SORT_GLOBAL}{}", sym.name)),
-                    ..Default::default()
-                });
-            }
-            _ => {}
+        }
+
+        if let Some(parent) = scope.parent {
+            scope_id = parent;
+        } else {
+            break;
         }
     }
 
