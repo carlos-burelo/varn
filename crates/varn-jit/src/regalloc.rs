@@ -114,6 +114,9 @@ impl RegMap {
                 | OpCode::Add
                 | OpCode::Sub
                 | OpCode::Mul
+                | OpCode::Div
+                | OpCode::Mod
+                | OpCode::Pow
                 | OpCode::AddInt
                 | OpCode::SubInt
                 | OpCode::MulInt
@@ -122,7 +125,9 @@ impl RegMap {
                 | OpCode::LteInt
                 | OpCode::GteInt
                 | OpCode::EqInt
-                | OpCode::NeqInt => {
+                | OpCode::NeqInt
+                | OpCode::GetIndex
+                | OpCode::Instanceof => {
                     let w1 = code[ip];
                     ip += 1;
                     let src1 = (w1 >> 8) as usize;
@@ -130,6 +135,22 @@ impl RegMap {
                     *freq.entry(first_reg).or_insert(0) += 2;
                     *freq.entry(src1).or_insert(0) += 2;
                     *freq.entry(src2).or_insert(0) += 2;
+                }
+                OpCode::SetIndex => {
+                    let w1 = code[ip];
+                    ip += 1;
+                    let idx_reg = (w1 >> 8) as usize;
+                    let val_reg = (w1 & 0xFF) as usize;
+                    *freq.entry(first_reg).or_insert(0) += 2;
+                    *freq.entry(idx_reg).or_insert(0) += 2;
+                    *freq.entry(val_reg).or_insert(0) += 2;
+                }
+                OpCode::Typeof => {
+                    let w1 = code[ip];
+                    ip += 1;
+                    let src = (w1 >> 8) as usize;
+                    *freq.entry(first_reg).or_insert(0) += 2;
+                    *freq.entry(src).or_insert(0) += 2;
                 }
                 OpCode::Jump | OpCode::Loop => {
                     ip += 2;

@@ -1106,5 +1106,73 @@ pub extern "C" fn jit_logical_not(_ctx: *mut ExecCtx, v: VmValue) -> VmValue {
     crate::exec::compare::logical_not(v)
 }
 
+pub extern "C" fn jit_div(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        match crate::exec::arith::div(a, b, &mut ctx_ref.heap) {
+            Ok(v) => v,
+            Err(e) => panic!("Runtime error in JIT div: {:?}", e),
+        }
+    }
+}
+
+pub extern "C" fn jit_modulo(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        match crate::exec::arith::modulo(a, b, &mut ctx_ref.heap) {
+            Ok(v) => v,
+            Err(e) => panic!("Runtime error in JIT mod: {:?}", e),
+        }
+    }
+}
+
+pub extern "C" fn jit_pow(_ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    crate::exec::arith::pow(a, b)
+}
+
+pub extern "C" fn jit_get_index(
+    ctx: *mut ExecCtx,
+    args: *const varn_jit::JitGetIndexArgs,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let args = &*args;
+        match crate::exec::collections::get_index(args.obj, args.key, &mut ctx_ref.heap) {
+            Ok(v) => v,
+            Err(e) => panic!("Runtime error in JIT get_index: {:?}", e),
+        }
+    }
+}
+
+pub extern "C" fn jit_set_index(
+    ctx: *mut ExecCtx,
+    args: *const varn_jit::JitSetIndexArgs,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let args = &*args;
+        match crate::exec::collections::set_index(args.obj, args.key, args.val, &mut ctx_ref.heap) {
+            Ok(()) => {}
+            Err(e) => panic!("Runtime error in JIT set_index: {:?}", e),
+        }
+    }
+}
+
+pub extern "C" fn jit_typeof_val(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let s = crate::exec::advanced::typeof_val(v, &ctx_ref.heap);
+        ctx_ref.heap.alloc_str(s)
+    }
+}
+
+pub extern "C" fn jit_instanceof(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    unsafe {
+        let ctx_ref = &*ctx;
+        let r = crate::exec::advanced::instanceof(a, b, &ctx_ref.heap);
+        VmValue::from_bool(r)
+    }
+}
+
 
 

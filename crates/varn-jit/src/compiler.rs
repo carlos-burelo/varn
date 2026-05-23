@@ -66,10 +66,25 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
             | OpCode::Add
             | OpCode::Sub
             | OpCode::Mul
+            | OpCode::Div
+            | OpCode::Mod
+            | OpCode::Pow
             | OpCode::ToString
             | OpCode::IsNull
             | OpCode::Not
             | OpCode::Negate => {
+                ip += 1;
+            }
+            OpCode::GetIndex => {
+                ip += 1;
+            }
+            OpCode::SetIndex => {
+                ip += 1;
+            }
+            OpCode::Typeof => {
+                ip += 1;
+            }
+            OpCode::Instanceof => {
                 ip += 1;
             }
             OpCode::MakeClosure => {
@@ -369,6 +384,9 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
                     OpCode::Add => helpers.add,
                     OpCode::Sub => helpers.sub,
                     OpCode::Mul => helpers.mul,
+                    OpCode::Div => helpers.div,
+                    OpCode::Mod => helpers.modulo,
+                    OpCode::Pow => helpers.pow,
                     _ => unreachable!(),
                 };
 
@@ -1456,6 +1474,200 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
 
                 emit_store(&mut asm, Reg::R11, first_reg, &regmap);
                 emit_reload_all_except(&mut asm, &regmap, Some(first_reg));
+            }
+            OpCode::GetIndex => {
+                let w1 = code[ip];
+                ip += 1;
+                let obj_reg = (w1 >> 8) as usize;
+                let key_reg = (w1 & 0xFF) as usize;
+
+                emit_flush_all(&mut asm, &regmap);
+
+                emit_load(&mut asm, Reg::Rax, obj_reg, &regmap);
+                emit_load(&mut asm, Reg::R11, key_reg, &regmap);
+
+                asm.push(ARG_CTX);
+                asm.push(ARG_CLOSURE);
+                asm.push(ARG_BASE);
+                asm.push(ARG_EXEC_CTX);
+
+                let need_dummy = (regmap.used_phys.len() + 3) % 2 != 0;
+                if need_dummy {
+                    asm.push(Reg::Rax);
+                }
+
+                // Push JitGetIndexArgs struct in reverse: dest, key, obj
+                asm.mov_reg_imm64(Reg::R10, first_reg as u64);
+                asm.push(Reg::R10);
+                asm.push(Reg::R11);  // key
+                asm.push(Reg::Rax);  // obj
+
+                asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+                asm.mov_reg_reg(ARG_CLOSURE, Reg::Rsp);
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, -32);
+
+                asm.mov_reg_imm64(Reg::R10, helpers.get_index as u64);
+                asm.call_reg(Reg::R10);
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, 32);
+
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
+                asm.add_reg_imm8(Reg::Rsp, 24); // pop 3 * 8 bytes (obj, key, dest)
+
+                if need_dummy {
+                    asm.pop(Reg::Rax);
+                }
+                asm.pop(ARG_EXEC_CTX);
+                asm.pop(ARG_BASE);
+                asm.pop(ARG_CLOSURE);
+                asm.pop(ARG_CTX);
+
+                emit_store(&mut asm, Reg::R11, first_reg, &regmap);
+                emit_reload_all_except(&mut asm, &regmap, Some(first_reg));
+            }
+            OpCode::SetIndex => {
+                let w1 = code[ip];
+                ip += 1;
+                let idx_reg = (w1 >> 8) as usize;
+                let val_reg = (w1 & 0xFF) as usize;
+                let obj_reg = first_reg;
+
+                emit_flush_all(&mut asm, &regmap);
+
+                emit_load(&mut asm, Reg::Rax, obj_reg, &regmap);
+                emit_load(&mut asm, Reg::R11, idx_reg, &regmap);
+                emit_load(&mut asm, Reg::R12, val_reg, &regmap);
+
+                asm.push(ARG_CTX);
+                asm.push(ARG_CLOSURE);
+                asm.push(ARG_BASE);
+                asm.push(ARG_EXEC_CTX);
+
+                let need_dummy = (regmap.used_phys.len() + 3) % 2 != 0;
+                if need_dummy {
+                    asm.push(Reg::Rax);
+                }
+
+                // Push JitSetIndexArgs: val, key, obj
+                asm.push(Reg::R12);  // val
+                asm.push(Reg::R11);  // key
+                asm.push(Reg::Rax);  // obj
+
+                asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+                asm.mov_reg_reg(ARG_CLOSURE, Reg::Rsp);
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, -32);
+
+                asm.mov_reg_imm64(Reg::R10, helpers.set_index as u64);
+                asm.call_reg(Reg::R10);
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, 32);
+
+                asm.add_reg_imm8(Reg::Rsp, 24); // pop 3 * 8 bytes
+
+                if need_dummy {
+                    asm.pop(Reg::Rax);
+                }
+                asm.pop(ARG_EXEC_CTX);
+                asm.pop(ARG_BASE);
+                asm.pop(ARG_CLOSURE);
+                asm.pop(ARG_CTX);
+
+                emit_reload_all(&mut asm, &regmap);
+            }
+            OpCode::Typeof => {
+                let w1 = code[ip];
+                ip += 1;
+                let src = (w1 >> 8) as usize;
+
+                emit_flush_all(&mut asm, &regmap);
+
+                emit_load(&mut asm, Reg::Rax, src, &regmap);
+
+                asm.push(ARG_CTX);
+                asm.push(ARG_CLOSURE);
+                asm.push(ARG_BASE);
+                asm.push(ARG_EXEC_CTX);
+
+                let need_dummy = regmap.used_phys.len() % 2 != 0;
+                if need_dummy {
+                    asm.push(Reg::Rax);
+                }
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, -32);
+
+                asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);  // arg2: v
+                asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);  // arg1: ctx
+
+                asm.mov_reg_imm64(Reg::R10, helpers.typeof_val as u64);
+                asm.call_reg(Reg::R10);
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, 32);
+
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
+                if need_dummy {
+                    asm.pop(Reg::Rax);
+                }
+                asm.pop(ARG_EXEC_CTX);
+                asm.pop(ARG_BASE);
+                asm.pop(ARG_CLOSURE);
+                asm.pop(ARG_CTX);
+
+                emit_store(&mut asm, Reg::R11, first_reg, &regmap);
+                emit_reload_all_except(&mut asm, &regmap, Some(first_reg));
+            }
+            OpCode::Instanceof => {
+                let w1 = code[ip];
+                ip += 1;
+                let src1 = (w1 >> 8) as usize;
+                let src2 = (w1 & 0xFF) as usize;
+
+                emit_load(&mut asm, Reg::Rax, src1, &regmap);
+                emit_load(&mut asm, Reg::R11, src2, &regmap);
+
+                asm.push(ARG_CTX);
+                asm.push(ARG_CLOSURE);
+                asm.push(ARG_BASE);
+                asm.push(ARG_EXEC_CTX);
+
+                let need_dummy = regmap.used_phys.len() % 2 != 0;
+                if need_dummy {
+                    asm.push(Reg::Rax);
+                }
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, -32);
+
+                asm.mov_reg_reg(ARG_BASE, Reg::R11);      // arg3: b
+                asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);  // arg2: a
+                asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);  // arg1: ctx
+
+                asm.mov_reg_imm64(Reg::R10, helpers.instanceof as u64);
+                asm.call_reg(Reg::R10);
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, 32);
+
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
+                if need_dummy {
+                    asm.pop(Reg::Rax);
+                }
+                asm.pop(ARG_EXEC_CTX);
+                asm.pop(ARG_BASE);
+                asm.pop(ARG_CLOSURE);
+                asm.pop(ARG_CTX);
+
+                emit_store(&mut asm, Reg::R11, first_reg, &regmap);
             }
             _ => unreachable!(),
         }

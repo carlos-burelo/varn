@@ -35,6 +35,9 @@ pub struct JitHelpers {
     pub add: usize,
     pub sub: usize,
     pub mul: usize,
+    pub div: usize,
+    pub modulo: usize,
+    pub pow: usize,
     pub to_string: usize,
     pub load_global: usize,
     pub load_upvalue: usize,
@@ -48,6 +51,26 @@ pub struct JitHelpers {
     pub build_str: usize,
     pub negate: usize,
     pub logical_not: usize,
+    pub get_index: usize,
+    pub set_index: usize,
+    pub typeof_val: usize,
+    pub instanceof: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct JitGetIndexArgs {
+    pub obj: VmValue,
+    pub key: VmValue,
+    pub dest: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct JitSetIndexArgs {
+    pub obj: VmValue,
+    pub key: VmValue,
+    pub val: VmValue,
 }
 
 use std::sync::atomic::{AtomicU64, Ordering};
