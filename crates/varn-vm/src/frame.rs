@@ -126,6 +126,9 @@ impl VmClosure {
             add: crate::exec::ctx::jit_add as usize,
             sub: crate::exec::ctx::jit_sub as usize,
             mul: crate::exec::ctx::jit_mul as usize,
+            div: crate::exec::ctx::jit_div as usize,
+            modulo: crate::exec::ctx::jit_modulo as usize,
+            pow: crate::exec::ctx::jit_pow as usize,
             to_string: crate::exec::ctx::jit_to_string as usize,
             load_global: crate::exec::ctx::jit_load_global as usize,
             load_upvalue: crate::exec::ctx::jit_load_upvalue as usize,
@@ -139,6 +142,10 @@ impl VmClosure {
             build_str: crate::exec::ctx::jit_build_str as usize,
             negate: crate::exec::ctx::jit_negate as usize,
             logical_not: crate::exec::ctx::jit_logical_not as usize,
+            get_index: crate::exec::ctx::jit_get_index as usize,
+            set_index: crate::exec::ctx::jit_set_index as usize,
+            typeof_val: crate::exec::ctx::jit_typeof_val as usize,
+            instanceof: crate::exec::ctx::jit_instanceof as usize,
         };
         match varn_jit::compile(&self.proto, helpers) {
             Ok((entry, code)) => {
