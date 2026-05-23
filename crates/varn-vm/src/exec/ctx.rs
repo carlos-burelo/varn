@@ -1095,5 +1095,16 @@ pub extern "C" fn jit_build_str(
     }
 }
 
+pub extern "C" fn jit_negate(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        crate::exec::arith::negate(v, &mut ctx_ref.heap)
+    }
+}
+
+pub extern "C" fn jit_logical_not(_ctx: *mut ExecCtx, v: VmValue) -> VmValue {
+    crate::exec::compare::logical_not(v)
+}
+
 
 

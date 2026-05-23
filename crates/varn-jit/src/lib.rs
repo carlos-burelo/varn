@@ -46,6 +46,8 @@ pub struct JitHelpers {
     pub set_property: usize,
     pub build_array: usize,
     pub build_str: usize,
+    pub negate: usize,
+    pub logical_not: usize,
 }
 
 use std::sync::atomic::{AtomicU64, Ordering};

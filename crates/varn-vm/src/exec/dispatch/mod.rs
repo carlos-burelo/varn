@@ -1285,7 +1285,7 @@ impl ExecCtx {
         })
     }
 
-    fn exec_typeof(&self, v: VmValue) -> &'static str {
+    pub(crate) fn exec_typeof(&self, v: VmValue) -> &'static str {
         if v.is_null() {
             return "null";
         }

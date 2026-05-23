@@ -6,7 +6,7 @@ use varn_core::ast::expr::{Arg, ArrowBody, ObjectProp, PropKey, TemplatePart};
 use varn_core::ast::operators::{AssignOp, BinaryOp, LogicalOp, Modifiers, UnaryOp, UpdateOp};
 use varn_core::ast::pattern::MatchPattern;
 use varn_core::ast::{ArrayEl, Expr, ExprKind, MatchBody, Param, Pattern, Stmt, StmtKind};
-use varn_core::{well_known as wk, MemberKey, OpCode};
+use varn_core::{well_known as wk, OpCode};
 
 pub fn compile_expr<'a>(c: &mut Compiler<'a>, expr: &Expr) -> u8 {
     c.line = expr.range.start.line;
@@ -1570,7 +1570,7 @@ fn compile_match<'a>(
                 bindings,
                 ..
             } => {
-                let tag_key = c.add_str(MemberKey::Tag.as_str());
+                let tag_key = c.add_str("__variant_name__");
                 let tag_r = c.alloc_reg();
                 c.emit_property(OpCode::GetProperty, tag_r, subj, tag_key);
                 let vname_idx = c.add_str(variant_name);

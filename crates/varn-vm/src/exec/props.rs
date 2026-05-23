@@ -83,6 +83,12 @@ pub fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Heap) -> V
             o.borrow_mut().set_field_nv(Rc::from(key), val);
             Ok(())
         }
+        Some(HeapObj::EnumVariant(ev)) => {
+            if let Value::Object(o) = &ev.payload {
+                o.borrow_mut().set_field_nv(Rc::from(key), val);
+            }
+            Ok(())
+        }
         Some(HeapObj::Class(c)) => {
             let v = heap.extract(val);
             c.add_static(key, v);
@@ -162,6 +168,7 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
 
 fn get_class_for_value(val: &Value, heap: &Heap) -> Option<Rc<ClassObj>> {
     match val {
+        Value::EnumVariant(ev) => heap.get_intrinsic_class(&ev.enum_name),
         Value::Object(o) => o.borrow().class(),
         Value::Class(cls) => Some(cls.clone()),
         _ => {
@@ -191,6 +198,10 @@ fn resolve_intrinsic_method_property(obj: &Value, key: &str, heap: &mut Heap) ->
         if key == "next" {
             return Some(Value::native_bound(obj.clone(), generator_next, "next"));
         }
+    }
+
+    if matches!(obj, Value::EnumVariant(_)) && key == "name" {
+        return None;
     }
 
     let cls = get_class_for_value(obj, heap)?;
@@ -250,12 +261,38 @@ fn resolve_specialized_value_property(obj: &Value, key: &str) -> Option<Result<V
                 None
             }
         }
-        Value::EnumVariant(ev) => match key {
-            "__tag" => Some(Ok(Value::Str(ev.variant_name.clone()))),
-            "rawValue" => Some(Ok(Value::Int(ev.variant_tag as i64))),
-            "name" => Some(Ok(Value::Str(ev.variant_name.clone()))),
-            "value0" => Some(Ok(ev.payload.clone())),
-            _ => None,
+        Value::EnumVariant(ev) => {
+            if let Value::Object(o) = &ev.payload {
+                let guard = o.borrow();
+                if let Some(f) = guard.get_field(key) {
+                    return Some(Ok(f));
+                }
+            }
+            if key.starts_with("value") && key.len() > 5 {
+                if let Ok(idx) = key[5..].parse::<usize>() {
+                    if !ev.fields.is_empty() {
+                        if idx < ev.fields.len() {
+                            let field_name = &ev.fields[idx];
+                            if let Value::Object(o) = &ev.payload {
+                                if let Some(f) = o.borrow().get_field(field_name) {
+                                    return Some(Ok(f));
+                                }
+                            }
+                            return Some(Ok(Value::Null));
+                        }
+                    } else if idx == 0 {
+                        return Some(Ok(ev.payload.clone()));
+                    }
+                }
+            }
+            match key {
+                "__tag" => Some(Ok(Value::Int(ev.variant_tag as i64))),
+                "__variant_name__" => Some(Ok(Value::Str(ev.variant_name.clone()))),
+                "name" => Some(Ok(Value::Str(ev.variant_name.clone()))),
+                "rawValue" => Some(Ok(Value::Int(ev.variant_tag as i64))),
+                "value0" if ev.fields.is_empty() => Some(Ok(ev.payload.clone())),
+                _ => None,
+            }
         },
         _ => None,
     }

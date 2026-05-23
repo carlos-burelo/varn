@@ -67,7 +67,9 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
             | OpCode::Sub
             | OpCode::Mul
             | OpCode::ToString
-            | OpCode::IsNull => {
+            | OpCode::IsNull
+            | OpCode::Not
+            | OpCode::Negate => {
                 ip += 1;
             }
             OpCode::MakeClosure => {
@@ -325,7 +327,10 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
             }
             OpCode::Add
             | OpCode::Sub
-            | OpCode::Mul => {
+            | OpCode::Mul
+            | OpCode::Div
+            | OpCode::Mod
+            | OpCode::Pow => {
                 let w1 = code[ip];
                 ip += 1;
                 let src1 = (w1 >> 8) as usize;
@@ -518,6 +523,167 @@ pub fn compile_proto(proto: &FunctionProto, helpers: crate::JitHelpers) -> Resul
 
                 // 12. Reload all other physical registers safely from memory
                 emit_reload_all_except(&mut asm, &regmap, Some(first_reg));
+            }
+            OpCode::Not => {
+                let w1 = code[ip];
+                ip += 1;
+                let src = (w1 >> 8) as usize;
+
+                // Load operand into Rax
+                emit_load(&mut asm, Reg::Rax, src, &regmap);
+
+                // Check if the value is a boolean: (v & 0x7FFE_0000_0000_0000) == 0x7FFA_0000_0000_0000
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+                asm.mov_reg_imm64(Reg::R10, 0x7FFE_0000_0000_0000u64);
+                asm.and_reg_reg(Reg::R11, Reg::R10);
+                asm.mov_reg_imm64(Reg::R10, 0x7FFA_0000_0000_0000u64);
+                asm.cmp_reg_reg(Reg::R11, Reg::R10);
+
+                // Jump if equal to the boolean fast path
+                let patch_je = asm.jmp_cond(Cond::Equal);
+
+                // --- Slow Path: FFI helper call ---
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
+                emit_flush_all(&mut asm, &regmap);
+                asm.push(ARG_CTX);
+                asm.push(ARG_CLOSURE);
+                asm.push(ARG_BASE);
+                asm.push(ARG_EXEC_CTX);
+
+                let need_dummy = regmap.used_phys.len() % 2 != 0;
+                if need_dummy {
+                    asm.push(Reg::Rax);
+                }
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, -32);
+
+                asm.mov_reg_reg(ARG_CLOSURE, Reg::R11);  // Arg 2 = v
+                asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);  // Arg 1 = exec_ctx
+
+                let helper_addr = helpers.logical_not;
+                asm.mov_reg_imm64(Reg::R10, helper_addr as u64);
+                asm.call_reg(Reg::R10);
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, 32);
+
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
+                if need_dummy {
+                    asm.pop(Reg::Rax);
+                }
+                asm.pop(ARG_EXEC_CTX);
+                asm.pop(ARG_BASE);
+                asm.pop(ARG_CLOSURE);
+                asm.pop(ARG_CTX);
+
+                emit_reload_all_except(&mut asm, &regmap, Some(first_reg));
+                let patch_jmp = asm.jmp_near();
+
+                // --- Fast Path: Boolean toggle ---
+                let bool_pos = asm.current_offset();
+                let disp_je = (bool_pos as i32 - (patch_je as i32 + 4)) as u32;
+                asm.patch_u32(patch_je, disp_je);
+
+                // Toggle bit 48: v ^ 0x0001_0000_0000_0000
+                asm.mov_reg_imm64(Reg::R10, 0x0001_0000_0000_0000u64);
+                asm.xor_reg_reg(Reg::Rax, Reg::R10);
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
+                // --- End Path ---
+                let end_pos = asm.current_offset();
+                let disp_jmp = (end_pos as i32 - (patch_jmp as i32 + 4)) as u32;
+                asm.patch_u32(patch_jmp, disp_jmp);
+
+                emit_store(&mut asm, Reg::R11, first_reg, &regmap);
+            }
+            OpCode::Negate => {
+                let w1 = code[ip];
+                ip += 1;
+                let src = (w1 >> 8) as usize;
+
+                // Load operand into Rax
+                emit_load(&mut asm, Reg::Rax, src, &regmap);
+
+                // Check if the value is an integer: (v & 0x7FFF_0000_0000_0000) == 0x7FFC_0000_0000_0000
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+                asm.mov_reg_imm64(Reg::R10, 0x7FFF_0000_0000_0000u64);
+                asm.and_reg_reg(Reg::R11, Reg::R10);
+                asm.mov_reg_imm64(Reg::R10, 0x7FFC_0000_0000_0000u64);
+                asm.cmp_reg_reg(Reg::R11, Reg::R10);
+
+                // Jump if equal to the integer fast path
+                let patch_je = asm.jmp_cond(Cond::Equal);
+
+                // --- Slow Path: FFI helper call ---
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
+                emit_flush_all(&mut asm, &regmap);
+                asm.push(ARG_CTX);
+                asm.push(ARG_CLOSURE);
+                asm.push(ARG_BASE);
+                asm.push(ARG_EXEC_CTX);
+
+                let need_dummy = regmap.used_phys.len() % 2 != 0;
+                if need_dummy {
+                    asm.push(Reg::Rax);
+                }
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, -32);
+
+                asm.mov_reg_reg(ARG_CLOSURE, Reg::R11);  // Arg 2 = v
+                asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);  // Arg 1 = exec_ctx
+
+                let helper_addr = helpers.negate;
+                asm.mov_reg_imm64(Reg::R10, helper_addr as u64);
+                asm.call_reg(Reg::R10);
+
+                #[cfg(target_os = "windows")]
+                asm.add_reg_imm8(Reg::Rsp, 32);
+
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
+                if need_dummy {
+                    asm.pop(Reg::Rax);
+                }
+                asm.pop(ARG_EXEC_CTX);
+                asm.pop(ARG_BASE);
+                asm.pop(ARG_CLOSURE);
+                asm.pop(ARG_CTX);
+
+                emit_reload_all_except(&mut asm, &regmap, Some(first_reg));
+                let patch_jmp = asm.jmp_near();
+
+                // --- Fast Path: Integer Negation ---
+                let int_pos = asm.current_offset();
+                let disp_je = (int_pos as i32 - (patch_je as i32 + 4)) as u32;
+                asm.patch_u32(patch_je, disp_je);
+
+                // Shift left 16, arithmetic shift right 16 to sign extend
+                asm.shl_reg_imm8(Reg::Rax, 16);
+                asm.sar_reg_imm8(Reg::Rax, 16);
+
+                // Negate: Rax = 0 - Rax
+                asm.mov_reg_reg(Reg::R10, Reg::Rax);
+                asm.mov_reg_imm64(Reg::Rax, 0);
+                asm.sub_reg_reg(Reg::Rax, Reg::R10);
+
+                // Re-tag: (rax & 0x0000_FFFF_FFFF_FFFF) | 0x7FFC_0000_0000_0000
+                asm.mov_reg_imm64(Reg::R10, 0x0000_FFFF_FFFF_FFFFu64);
+                asm.and_reg_reg(Reg::Rax, Reg::R10);
+                asm.mov_reg_imm64(Reg::R10, 0x7FFC_0000_0000_0000u64);
+                asm.or_reg_reg(Reg::Rax, Reg::R10);
+                asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
+                // --- End Path ---
+                let end_pos = asm.current_offset();
+                let disp_jmp = (end_pos as i32 - (patch_jmp as i32 + 4)) as u32;
+                asm.patch_u32(patch_jmp, disp_jmp);
+
+                emit_store(&mut asm, Reg::R11, first_reg, &regmap);
             }
             OpCode::Move => {
                 let w1 = code[ip];
