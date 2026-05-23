@@ -146,12 +146,14 @@ pub fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Heap) -> V
                 }
                 g.push(val);
             }
+            heap.write_barrier(obj.as_heap_idx(), val);
             Ok(())
         }
         Some(HeapObj::Object(o)) => {
             let o = o.clone();
             o.borrow_mut()
                 .set_field(Rc::from(key_s.as_str()), heap.extract(val));
+            heap.write_barrier(obj.as_heap_idx(), val);
             Ok(())
         }
         _ => Err(RuntimeError::new("OpSetIndex: not indexable")),
@@ -174,6 +176,7 @@ pub fn array_push(arr: VmValue, val: VmValue, heap: &mut Heap) -> VmResult<()> {
     if arr.is_heap() {
         if let Some(HeapObj::Array(a)) = heap.get(arr.as_heap_idx()) {
             a.borrow_mut().push(val);
+            heap.write_barrier(arr.as_heap_idx(), val);
             return Ok(());
         }
     }
@@ -196,7 +199,11 @@ pub fn array_extend(dst: VmValue, src: VmValue, heap: &Heap) -> VmResult<()> {
             (heap.get(dst.as_heap_idx()), heap.get(src.as_heap_idx()))
         {
             let items: Vec<VmValue> = sa.borrow().clone();
-            da.borrow_mut().extend(items);
+            da.borrow_mut().extend(items.clone());
+            let mut heap_mut = unsafe { heap.inner_mut() };
+            for &item in &items {
+                heap_mut.write_barrier(dst.as_heap_idx(), item);
+            }
             return Ok(());
         }
     }

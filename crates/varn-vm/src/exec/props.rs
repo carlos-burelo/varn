@@ -81,11 +81,13 @@ pub fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Heap) -> V
     match heap.get(idx).cloned() {
         Some(HeapObj::Object(o)) => {
             o.borrow_mut().set_field_nv(Rc::from(key), val);
+            heap.write_barrier(idx, val);
             Ok(())
         }
         Some(HeapObj::EnumVariant(ev)) => {
             if let Value::Object(o) = &ev.payload {
                 o.borrow_mut().set_field_nv(Rc::from(key), val);
+                heap.write_barrier(idx, val);
             }
             Ok(())
         }
@@ -125,6 +127,7 @@ pub fn set_fixed_field(obj: VmValue, slot: usize, val: VmValue, heap: &mut Heap)
             let mut g = o.borrow_mut();
             if slot < g.inner.values.len() {
                 g.inner.values[slot] = val;
+                heap.write_barrier(obj.as_heap_idx(), val);
                 return Ok(());
             }
             return Err(RuntimeError::new(format!(

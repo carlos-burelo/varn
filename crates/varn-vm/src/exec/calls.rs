@@ -31,7 +31,7 @@ pub fn resolve_constants(proto: &FunctionProto, heap: &mut Heap) -> Vec<VmValue>
                         }
                     }
                     Literal::Float(f) => VmValue::from_f64(*f),
-                    Literal::Str(s) => heap.alloc_str(s.as_ref()),
+                    Literal::Str(s) => heap.alloc_str_interned(s.as_ref()),
                     Literal::BigInt(n) => heap.intern(Value::BigInt(Box::new(*n))),
                     Literal::Decimal(d) => heap.intern(Value::Decimal(Box::new(*d))),
                     Literal::Symbol(s) => heap.intern(Value::Symbol(s.clone())),

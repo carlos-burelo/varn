@@ -1244,23 +1244,23 @@ impl ExecCtx {
         crate::exec::collections::object_keys(obj, &mut self.heap)
     }
 
-    pub(super) fn exec_array_length(&mut self, arr: VmValue) -> VmResult<VmValue> {
+    pub(crate) fn exec_array_length(&mut self, arr: VmValue) -> VmResult<VmValue> {
         crate::exec::collections::array_length(arr, &self.heap)
     }
 
-    pub(super) fn exec_array_push(&mut self, arr: VmValue, val: VmValue) -> VmResult<()> {
+    pub(crate) fn exec_array_push(&mut self, arr: VmValue, val: VmValue) -> VmResult<()> {
         crate::exec::collections::array_push(arr, val, &mut self.heap)
     }
 
-    pub(super) fn exec_array_pop(&mut self, arr: VmValue) -> VmResult<VmValue> {
+    pub(crate) fn exec_array_pop(&mut self, arr: VmValue) -> VmResult<VmValue> {
         crate::exec::collections::array_pop(arr, &mut self.heap)
     }
 
-    pub(super) fn exec_array_extend(&mut self, arr: VmValue, src: VmValue) -> VmResult<()> {
+    pub(crate) fn exec_array_extend(&mut self, arr: VmValue, src: VmValue) -> VmResult<()> {
         crate::exec::collections::array_extend(arr, src, &self.heap)
     }
 
-    pub(super) fn exec_str_length(&mut self, v: VmValue) -> VmResult<VmValue> {
+    pub(crate) fn exec_str_length(&mut self, v: VmValue) -> VmResult<VmValue> {
         if v.is_heap() {
             if let Some(crate::heap::HeapObj::Str(s)) = self.heap.get(v.as_heap_idx()) {
                 return Ok(VmValue::from_i32(s.chars().count() as i32));
@@ -1269,7 +1269,7 @@ impl ExecCtx {
         Ok(VmValue::from_i32(0))
     }
 
-    pub(super) fn exec_str_slice(&mut self, s: VmValue, idx: VmValue) -> VmResult<VmValue> {
+    pub(crate) fn exec_str_slice(&mut self, s: VmValue, idx: VmValue) -> VmResult<VmValue> {
         if s.is_heap() {
             if let Some(crate::heap::HeapObj::Str(st)) = self.heap.get(s.as_heap_idx()) {
                 let start = idx.as_i32().max(0) as usize;

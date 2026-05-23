@@ -438,6 +438,58 @@ impl ExecCtx {
         }
     }
 
+    pub fn run_minor_gc(&mut self) {
+        // Build a flat buffer: [stack... | globals... | modules... | module_exports...]
+        // Minor GC updates the entire slice in-place.
+        let stack_len = self.stack.len();
+
+        let mut all_vals: Vec<VmValue> = Vec::with_capacity(
+            stack_len
+                + self.globals.values.len()
+                + self.modules.len()
+                + self.module_exports.len(),
+        );
+
+        all_vals.extend_from_slice(&self.stack);
+        let globals_start = all_vals.len();
+        all_vals.extend_from_slice(&self.globals.values);
+        let modules_start = all_vals.len();
+        for v in self.modules.values() {
+            all_vals.push(*v);
+        }
+        let module_exports_start = all_vals.len();
+        for v in self.module_exports.values() {
+            all_vals.push(*v);
+        }
+
+        self.heap.minor_gc(&mut all_vals, &[]);
+
+        // Write back stack.
+        self.stack.copy_from_slice(&all_vals[..stack_len]);
+
+        // Write back globals.
+        let globals_slice = &all_vals[globals_start..modules_start];
+        self.globals.values.copy_from_slice(globals_slice);
+
+        // Write back modules.
+        {
+            let mut mi = modules_start;
+            for v in self.modules.values_mut() {
+                *v = all_vals[mi];
+                mi += 1;
+            }
+        }
+
+        // Write back module_exports.
+        {
+            let mut ei = module_exports_start;
+            for v in self.module_exports.values_mut() {
+                *v = all_vals[ei];
+                ei += 1;
+            }
+        }
+    }
+
     pub fn trigger_gc(&mut self) {
         let mut roots: Vec<u32> = Vec::with_capacity(256);
         for v in &self.stack {
@@ -1173,6 +1225,101 @@ pub extern "C" fn jit_instanceof(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> V
         VmValue::from_bool(r)
     }
 }
+
+pub extern "C" fn jit_array_length(ctx: *mut ExecCtx, arr: VmValue) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        match ctx_ref.exec_array_length(arr) {
+            Ok(v) => v,
+            Err(e) => panic!("Runtime error in JIT array_length: {:?}", e),
+        }
+    }
+}
+
+pub extern "C" fn jit_array_push(ctx: *mut ExecCtx, arr: VmValue, val: VmValue) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        match ctx_ref.exec_array_push(arr, val) {
+            Ok(()) => {}
+            Err(e) => panic!("Runtime error in JIT array_push: {:?}", e),
+        }
+    }
+}
+
+pub extern "C" fn jit_array_pop(ctx: *mut ExecCtx, arr: VmValue) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        match ctx_ref.exec_array_pop(arr) {
+            Ok(v) => v,
+            Err(e) => panic!("Runtime error in JIT array_pop: {:?}", e),
+        }
+    }
+}
+
+pub extern "C" fn jit_array_extend(ctx: *mut ExecCtx, arr: VmValue, src: VmValue) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        match ctx_ref.exec_array_extend(arr, src) {
+            Ok(()) => {}
+            Err(e) => panic!("Runtime error in JIT array_extend: {:?}", e),
+        }
+    }
+}
+
+pub extern "C" fn jit_str_concat(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let sa = ctx_ref.heap.str_repr(a);
+        let sb = ctx_ref.heap.str_repr(b);
+        let combined = format!("{sa}{sb}");
+        ctx_ref.heap.alloc_str(&combined)
+    }
+}
+
+pub extern "C" fn jit_str_slice(ctx: *mut ExecCtx, s: VmValue, idx: VmValue) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        match ctx_ref.exec_str_slice(s, idx) {
+            Ok(v) => v,
+            Err(e) => panic!("Runtime error in JIT str_slice: {:?}", e),
+        }
+    }
+}
+
+pub extern "C" fn jit_str_length(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        match ctx_ref.exec_str_length(v) {
+            Ok(len) => len,
+            Err(e) => panic!("Runtime error in JIT str_length: {:?}", e),
+        }
+    }
+}
+
+pub extern "C" fn jit_bitand(_ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    crate::exec::arith::bit_and(a, b)
+}
+
+pub extern "C" fn jit_bitor(_ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    crate::exec::arith::bit_or(a, b)
+}
+
+pub extern "C" fn jit_bitxor(_ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    crate::exec::arith::bit_xor(a, b)
+}
+
+pub extern "C" fn jit_shl(_ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    crate::exec::arith::shl(a, b)
+}
+
+pub extern "C" fn jit_shr(_ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    crate::exec::arith::shr(a, b)
+}
+
+pub extern "C" fn jit_ushr(_ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    crate::exec::arith::ushr(a, b)
+}
+
 
 
 

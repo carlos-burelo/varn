@@ -23,6 +23,10 @@ impl ExecCtx {
                 self.record_frame_push();
                 self.frames.push(frame);
 
+                if self.heap.needs_minor_gc() {
+                    self.run_minor_gc();
+                }
+
                 if self.heap.needs_gc() {
                     let mut roots: Vec<u32> = Vec::with_capacity(256);
                     for v in &self.stack {
@@ -304,8 +308,7 @@ impl NativeCtx for ExecCtx {
     }
 
     fn alloc_array(&mut self, items: Vec<VmValue>) -> VmValue {
-        let va = varn_types::VmArray::new(items);
-        VmValue::from_heap_idx(self.heap.alloc(HeapObj::Array(va)))
+        self.heap.alloc_array_vm(items)
     }
 
     fn array_len(&self, arr: VmValue) -> usize {
@@ -386,6 +389,7 @@ impl NativeCtx for ExecCtx {
         if obj.is_heap() {
             if let Some(HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
                 o.borrow_mut().set_field_nv(std::rc::Rc::from(key), val);
+                self.heap.write_barrier(obj.as_heap_idx(), val);
             } else if let Some(HeapObj::NativeModule(map_rc)) = self.heap.get_mut(obj.as_heap_idx())
             {
                 std::rc::Rc::make_mut(map_rc).insert(std::rc::Rc::from(key), val);

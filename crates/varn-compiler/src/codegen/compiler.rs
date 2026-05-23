@@ -626,6 +626,8 @@ impl<'a> Compiler<'a> {
             upvalue_count: self.upvalues.len(),
             cache_count: self.cache_count as usize,
             chunk: self.chunk,
+            jit_entry: std::cell::Cell::new(None),
+            jit_code: std::cell::RefCell::new(None),
         };
         super::regalloc_post::optimize_function(&mut proto);
         proto
@@ -643,6 +645,8 @@ impl<'a> Compiler<'a> {
             upvalue_count: self.upvalues.len(),
             cache_count: self.cache_count as usize,
             chunk: self.chunk,
+            jit_entry: std::cell::Cell::new(None),
+            jit_code: std::cell::RefCell::new(None),
         };
         super::regalloc_post::optimize_function(&mut proto);
         (proto, self.upvalues)

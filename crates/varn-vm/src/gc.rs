@@ -1,4 +1,5 @@
 use crate::heap::{HeapInner, HeapObj};
+use crate::nursery::{is_old_idx, old_idx_raw};
 use crate::value::VmValue;
 use std::collections::VecDeque;
 use std::fmt;
@@ -103,11 +104,14 @@ impl TricolorMarker {
         }
     }
 
+    /// Mark an old-gen object gray. `idx` may be a packed index (with OLD_GEN_FLAG) or raw.
+    /// Nursery indices are silently skipped — they are managed by Minor GC.
     pub fn mark_gray(&mut self, idx: u32) {
-        let current = self.marks.get_color(idx);
+        let raw = if is_old_idx(idx) { old_idx_raw(idx) } else { idx };
+        let current = self.marks.get_color(raw);
         if current == MarkColor::White {
-            self.marks.set_color(idx, MarkColor::Gray);
-            self.gray_queue.push_back(idx);
+            self.marks.set_color(raw, MarkColor::Gray);
+            self.gray_queue.push_back(raw);
             self.marked_count += 1;
         }
     }
@@ -151,9 +155,15 @@ impl TricolorMarker {
 
     pub fn mark_from_roots(&mut self, heap: &HeapInner, roots: &[u32]) -> Result<(), GcError> {
         for &root in roots {
-            if root < heap.objects_len() {
-                self.mark_gray(root);
+            // Roots may be packed old-gen indices (with OLD_GEN_FLAG) or nursery indices.
+            if is_old_idx(root) {
+                let raw = old_idx_raw(root);
+                if raw < heap.objects_len() {
+                    self.mark_gray(raw);
+                }
             }
+            // Nursery indices: scan their old-gen children so GC doesn't sweep them.
+            // (The nursery objects themselves are managed by Minor GC, not swept here.)
         }
 
         while let Some(idx) = self.gray_queue.pop_front() {
@@ -206,6 +216,11 @@ impl TricolorMarker {
                             if let Some(child_idx) = heap.get_heap_idx(upval_inner.value) {
                                 self.mark_gray(child_idx);
                             }
+                        }
+                    }
+                    for &constant in clos.constants.iter() {
+                        if let Some(child_idx) = heap.get_heap_idx(constant) {
+                            self.mark_gray(child_idx);
                         }
                     }
                 }
