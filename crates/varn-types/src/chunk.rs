@@ -457,7 +457,7 @@ impl LineMapping {
     }
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct FunctionProto {
     #[serde(with = "opt_rc_str_serde")]
     pub name: Option<Rc<str>>,
@@ -471,6 +471,46 @@ pub struct FunctionProto {
     pub upvalue_count: usize,
     pub cache_count: usize,
     pub chunk: Chunk,
+
+    #[serde(skip)]
+    #[serde(default)]
+    pub jit_entry: std::cell::Cell<Option<usize>>,
+
+    #[serde(skip)]
+    #[serde(default)]
+    pub jit_code: std::cell::RefCell<Option<Rc<dyn std::any::Any>>>,
+}
+
+impl PartialEq for FunctionProto {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.arity == other.arity
+            && self.register_count == other.register_count
+            && self.has_rest == other.has_rest
+            && self.is_async == other.is_async
+            && self.is_generator == other.is_generator
+            && self.has_this == other.has_this
+            && self.upvalue_count == other.upvalue_count
+            && self.cache_count == other.cache_count
+            && self.chunk == other.chunk
+    }
+}
+
+impl Eq for FunctionProto {}
+
+impl std::hash::Hash for FunctionProto {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.arity.hash(state);
+        self.register_count.hash(state);
+        self.has_rest.hash(state);
+        self.is_async.hash(state);
+        self.is_generator.hash(state);
+        self.has_this.hash(state);
+        self.upvalue_count.hash(state);
+        self.cache_count.hash(state);
+        self.chunk.hash(state);
+    }
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

@@ -112,6 +112,13 @@ impl VmClosure {
     }
 
     pub fn compile_jit(&mut self) {
+        if let Some(entry_usize) = self.proto.jit_entry.get() {
+            let entry: varn_jit::JitFn = unsafe { std::mem::transmute(entry_usize) };
+            self.jit_entry = Some(entry);
+            self.jit_code = self.proto.jit_code.borrow().clone();
+            return;
+        }
+
         let helpers = varn_jit::JitHelpers {
             load_const: crate::exec::ctx::jit_load_const as usize,
             load_global_idx: crate::exec::ctx::jit_load_global_idx as usize,
@@ -146,11 +153,28 @@ impl VmClosure {
             set_index: crate::exec::ctx::jit_set_index as usize,
             typeof_val: crate::exec::ctx::jit_typeof_val as usize,
             instanceof: crate::exec::ctx::jit_instanceof as usize,
+            array_length: crate::exec::ctx::jit_array_length as usize,
+            array_push: crate::exec::ctx::jit_array_push as usize,
+            array_pop: crate::exec::ctx::jit_array_pop as usize,
+            array_extend: crate::exec::ctx::jit_array_extend as usize,
+            str_concat: crate::exec::ctx::jit_str_concat as usize,
+            str_slice: crate::exec::ctx::jit_str_slice as usize,
+            str_length: crate::exec::ctx::jit_str_length as usize,
+            bit_and: crate::exec::ctx::jit_bitand as usize,
+            bit_or: crate::exec::ctx::jit_bitor as usize,
+            bit_xor: crate::exec::ctx::jit_bitxor as usize,
+            shl: crate::exec::ctx::jit_shl as usize,
+            shr: crate::exec::ctx::jit_shr as usize,
+            ushr: crate::exec::ctx::jit_ushr as usize,
         };
         match varn_jit::compile(&self.proto, helpers) {
             Ok((entry, code)) => {
                 self.jit_entry = Some(entry);
-                self.jit_code = Some(code);
+                self.jit_code = Some(code.clone());
+
+                let entry_usize: usize = unsafe { std::mem::transmute(entry) };
+                self.proto.jit_entry.set(Some(entry_usize));
+                *self.proto.jit_code.borrow_mut() = Some(code);
             }
             Err(e) => {
                 if std::env::var("VARN_JIT_DEBUG").is_ok() {

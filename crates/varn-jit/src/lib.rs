@@ -55,6 +55,19 @@ pub struct JitHelpers {
     pub set_index: usize,
     pub typeof_val: usize,
     pub instanceof: usize,
+    pub array_length: usize,
+    pub array_push: usize,
+    pub array_pop: usize,
+    pub array_extend: usize,
+    pub str_concat: usize,
+    pub str_slice: usize,
+    pub str_length: usize,
+    pub bit_and: usize,
+    pub bit_or: usize,
+    pub bit_xor: usize,
+    pub shl: usize,
+    pub shr: usize,
+    pub ushr: usize,
 }
 
 #[derive(Debug, Clone, Copy)]

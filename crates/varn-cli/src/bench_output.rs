@@ -138,6 +138,21 @@ pub fn print_vm_profile(profile: &VmProfile) {
     eprintln!("  {BOLD}{CYN}GC Stats{R}{DIM}");
     eprintln!(
         "  {:<22} {:>10}",
+        "nursery allocs",
+        fmt_num_u64(profile.nursery_allocs)
+    );
+    eprintln!(
+        "  {:<22} {:>10}",
+        "minor gc runs",
+        fmt_num_u64(profile.minor_gc_count)
+    );
+    eprintln!(
+        "  {:<22} {:>10}",
+        "minor gc promoted",
+        fmt_num_u64(profile.minor_gc_promoted)
+    );
+    eprintln!(
+        "  {:<22} {:>10}",
         "gc collections",
         fmt_num_u64(profile.gc_collections)
     );

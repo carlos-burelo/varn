@@ -150,6 +150,9 @@ pub struct VmProfile {
     pub gc_freed: u64,
     pub heap_live: u64,
     pub heap_total: u64,
+    pub nursery_allocs: u64,
+    pub minor_gc_count: u64,
+    pub minor_gc_promoted: u64,
 }
 
 impl VmProfile {
@@ -175,6 +178,9 @@ impl VmProfile {
             gc_freed: 0,
             heap_live: 0,
             heap_total: 0,
+            nursery_allocs: 0,
+            minor_gc_count: 0,
+            minor_gc_promoted: 0,
         }
     }
 }

@@ -243,6 +243,15 @@ pub fn modulo(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
 
 #[inline(always)]
 pub fn pow(a: VmValue, b: VmValue) -> VmValue {
+    if a.is_int() && b.is_int() {
+        let base = a.as_int();
+        let exp = b.as_int();
+        if exp >= 0 && exp <= 62 {
+            if let Some(r) = base.checked_pow(exp as u32) {
+                return VmValue::from_int(r);
+            }
+        }
+    }
     VmValue::from_f64(a.to_f64().powf(b.to_f64()))
 }
 

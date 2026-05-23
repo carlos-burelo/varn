@@ -82,7 +82,13 @@ impl RegMap {
                     *freq.entry(first_reg).or_insert(0) += 2;
                     *freq.entry(src).or_insert(0) += 2;
                 }
-                OpCode::ToString | OpCode::IsNull => {
+                OpCode::ToString
+                | OpCode::IsNull
+                | OpCode::ArrayLength
+                | OpCode::ArrayPush
+                | OpCode::ArrayPop
+                | OpCode::ArrayExtend
+                | OpCode::StrLength => {
                     let w1 = code[ip];
                     ip += 1;
                     let src = (w1 >> 8) as usize;
@@ -111,6 +117,12 @@ impl RegMap {
                 | OpCode::Lte
                 | OpCode::Gt
                 | OpCode::Gte
+                | OpCode::EqFloat
+                | OpCode::NeqFloat
+                | OpCode::LtFloat
+                | OpCode::LteFloat
+                | OpCode::GtFloat
+                | OpCode::GteFloat
                 | OpCode::Add
                 | OpCode::Sub
                 | OpCode::Mul
@@ -120,14 +132,27 @@ impl RegMap {
                 | OpCode::AddInt
                 | OpCode::SubInt
                 | OpCode::MulInt
+                | OpCode::DivInt
                 | OpCode::LtInt
                 | OpCode::GtInt
                 | OpCode::LteInt
                 | OpCode::GteInt
                 | OpCode::EqInt
                 | OpCode::NeqInt
+                | OpCode::AddFloat
+                | OpCode::SubFloat
+                | OpCode::MulFloat
+                | OpCode::DivFloat
                 | OpCode::GetIndex
-                | OpCode::Instanceof => {
+                | OpCode::Instanceof
+                | OpCode::StrConcat
+                | OpCode::StrSlice
+                | OpCode::BitAnd
+                | OpCode::BitOr
+                | OpCode::BitXor
+                | OpCode::Shl
+                | OpCode::Shr
+                | OpCode::Ushr => {
                     let w1 = code[ip];
                     ip += 1;
                     let src1 = (w1 >> 8) as usize;

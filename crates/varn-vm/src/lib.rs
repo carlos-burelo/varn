@@ -8,6 +8,7 @@ pub mod generator;
 pub mod globals;
 pub mod heap;
 pub mod loader;
+pub mod nursery;
 pub mod profile;
 pub mod value;
 pub mod vm;
