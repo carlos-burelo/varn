@@ -259,6 +259,13 @@ impl Assembler {
         self.emit_modrm(0b11, src as u8, dest as u8);
     }
 
+    /// `xor dest, src` (64-bit register bitwise XOR)
+    pub fn xor_reg_reg(&mut self, dest: Reg, src: Reg) {
+        self.emit_rex(true, src as u8, 0, dest as u8);
+        self.emit_byte(0x31);
+        self.emit_modrm(0b11, src as u8, dest as u8);
+    }
+
     /// `sub dest, src` (64-bit register arithmetic)
     pub fn sub_reg_reg(&mut self, dest: Reg, src: Reg) {
         self.emit_rex(true, src as u8, 0, dest as u8);

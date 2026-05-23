@@ -82,7 +82,7 @@ pub fn parse_class_decl(
     })
 }
 
-fn parse_class_member(s: &mut TokenStream, class_is_declare: bool) -> Result<ClassMember, String> {
+pub fn parse_class_member(s: &mut TokenStream, class_is_declare: bool) -> Result<ClassMember, String> {
     let range = s.range();
     let decorators = super::super::patterns::parse_decorator_list(s)?;
 

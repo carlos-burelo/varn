@@ -393,48 +393,322 @@ pub fn compile_enum_decl<'a>(c: &mut Compiler<'a>, en: &EnumDecl) {
 }
 
 fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
-    let base = c.regs.next;
-    let n = en.members.len();
+    let name_idx = c.add_str(&en.id);
+    let class_reg = c.alloc_reg();
+    let line = c.line;
+    c.chunk.emit_rrc(OpCode::MakeClass, class_reg, 0, name_idx, line);
 
-    for _ in 0..n {
-        c.alloc_reg();
-    }
+    let local_name: Rc<str> = Rc::from(format!("__class_{}__", en.id));
+    c.define_local(local_name, class_reg);
 
-    for (i, member) in en.members.iter().enumerate() {
-        let variant_reg = base + i as u8;
-        let val_reg: u8 = if let Some(init) = &member.init {
-            compile_expr(c, init) as u8
+    let saved_class = c.current_class.clone();
+    let saved_superclass = c.current_superclass.clone();
+    let saved_inits = std::mem::take(&mut c.pending_field_inits);
+    c.current_class = Some(en.id.clone());
+
+    // Compilar todas las variantes del Enum como miembros estáticos
+    let mut current_tag = 0i64;
+    for member in en.members.iter() {
+        if let Some(init_expr) = &member.init {
+            if let varn_core::ast::ExprKind::IntLiteral { value, .. } = &init_expr.kind {
+                current_tag = *value;
+            }
+        }
+
+        let fields_str = member
+            .payload_fields
+            .iter()
+            .map(|f| f.name.as_ref())
+            .collect::<Vec<&str>>()
+            .join(",");
+        let variant_meta = if fields_str.is_empty() {
+            format!("{}.{}", en.id, member.id)
         } else {
-            let r = c.alloc_reg();
-            c.emit_load_int(r, i as i64);
-            r
+            format!("{}.{}:{}", en.id, member.id, fields_str)
         };
-        let name_idx = c.add_str(&member.id);
+        let meta_idx = c.add_str(&variant_meta);
+
         let tag_reg = c.alloc_reg();
-        c.emit_load_int(tag_reg, i as i64);
+        c.emit_load_int(tag_reg, current_tag);
+
+        let variant_reg = c.alloc_reg();
         let line = c.line;
         c.chunk.emit(OpCode::MakeEnumVariant, line);
-        c.chunk.write(Chunk::pack(variant_reg, val_reg), line);
-        c.chunk.write(name_idx, line);
-        c.free_reg();
-        c.free_reg();
-    }
+        c.chunk.write(Chunk::pack(variant_reg, tag_reg), line);
+        c.chunk.write(meta_idx, line);
 
-    for _ in 0..n {
-        c.free_reg();
-    }
-    let dest = c.alloc_reg();
+        c.free_reg(); // tag_reg
+        current_tag += 1;
 
-    let count = n as u8;
-    let line = c.line;
-    c.chunk.emit(OpCode::BuildObject, line);
-    c.chunk.write(Chunk::pack(dest, count), line);
-    for (i, member) in en.members.iter().enumerate() {
         let key_idx = c.add_str(&member.id);
+        c.chunk.emit(OpCode::DefineStatic, line);
+        c.chunk.write(Chunk::pack(class_reg, variant_reg), line);
         c.chunk.write(key_idx, line);
-        c.chunk.write(Chunk::pack(base + i as u8, 0), line);
+
+        c.free_reg(); // variant_reg
     }
-    dest
+
+    // Compilar cuerpo del Enum (si tiene)
+    for member in &en.body {
+        if let ClassMember::Property {
+            key,
+            init,
+            modifiers,
+            ..
+        } = member
+        {
+            if modifiers.is_static {
+                let val_reg: u8 = if let Some(expr) = init {
+                    compile_expr(c, expr) as u8
+                } else {
+                    let r = c.alloc_reg();
+                    c.emit_rr(OpCode::LoadNull, r, 0);
+                    r
+                };
+                let key_idx = c.add_str(key);
+                let line = c.line;
+                c.chunk.emit(OpCode::DefineStatic, line);
+                c.chunk.write(Chunk::pack(class_reg, val_reg as u8), line);
+                c.chunk.write(key_idx, line);
+                c.free_reg();
+            } else {
+                let key_idx = c.add_str(key);
+                let line = c.line;
+                c.chunk.emit(OpCode::DeclareField, line);
+                c.chunk.write(Chunk::pack(class_reg, 0), line);
+                c.chunk.write(key_idx, line);
+                if let Some(expr) = init {
+                    c.pending_field_inits.push((key.clone(), expr.clone()));
+                }
+            }
+        }
+    }
+
+    let mut has_constructor = false;
+    for member in &en.body {
+        match member {
+            ClassMember::Constructor { params, body, .. } => {
+                has_constructor = true;
+                let (proto, upvalues) =
+                    compile_function(c, "constructor".into(), params, body, false, false, true);
+                let ctor_reg = emit_closure(c, proto, upvalues);
+                let key_idx = c.add_str("constructor");
+                let line = c.line;
+                c.chunk.emit(OpCode::Method, line);
+                c.chunk.write(Chunk::pack(class_reg, ctor_reg as u8), line);
+                c.chunk.write(key_idx, line);
+                c.free_reg();
+            }
+            ClassMember::Method {
+                key,
+                params,
+                body: Some(body),
+                modifiers,
+                decorators,
+                ..
+            } => {
+                let (proto, upvalues) = compile_function(
+                    c,
+                    key.clone(),
+                    params,
+                    body,
+                    modifiers.is_async,
+                    modifiers.is_generator,
+                    !modifiers.is_static,
+                );
+                let method_reg = emit_closure(c, proto, upvalues);
+                apply_method_decorators(c, class_reg, method_reg, key, modifiers, decorators);
+                let key_idx = c.add_str(key);
+                let line = c.line;
+                if modifiers.is_static {
+                    c.chunk.emit(OpCode::DefineStatic, line);
+                } else {
+                    c.chunk.emit(OpCode::Method, line);
+                }
+                c.chunk
+                    .write(Chunk::pack(class_reg, method_reg as u8), line);
+                c.chunk.write(key_idx, line);
+                c.free_reg();
+            }
+            ClassMember::Getter {
+                key,
+                body: Some(body),
+                modifiers,
+                ..
+            } => {
+                let (proto, upvalues) = compile_function(
+                    c,
+                    key.clone(),
+                    &[],
+                    body,
+                    false,
+                    false,
+                    !modifiers.is_static,
+                );
+                let fn_reg = emit_closure(c, proto, upvalues);
+                let key_idx = c.add_str(key);
+                let line = c.line;
+                let op = if modifiers.is_static {
+                    OpCode::DefineStaticGetter
+                } else {
+                    OpCode::DefineGetter
+                };
+                c.chunk.emit(op, line);
+                c.chunk.write(Chunk::pack(class_reg, fn_reg as u8), line);
+                c.chunk.write(key_idx, line);
+                c.free_reg();
+            }
+            ClassMember::Setter {
+                key,
+                param,
+                body: Some(body),
+                modifiers,
+                ..
+            } => {
+                let (proto, upvalues) = compile_function(
+                    c,
+                    key.clone(),
+                    std::slice::from_ref(param),
+                    body,
+                    false,
+                    false,
+                    !modifiers.is_static,
+                );
+                let fn_reg = emit_closure(c, proto, upvalues);
+                let key_idx = c.add_str(key);
+                let line = c.line;
+                let op = if modifiers.is_static {
+                    OpCode::DefineStaticSetter
+                } else {
+                    OpCode::DefineSetter
+                };
+                c.chunk.emit(op, line);
+                c.chunk.write(Chunk::pack(class_reg, fn_reg as u8), line);
+                c.chunk.write(key_idx, line);
+                c.free_reg();
+            }
+            ClassMember::StaticBlock { body, .. } => {
+                let (proto, upvalues) = compile_function(
+                    c,
+                    Rc::from("<static_block>"),
+                    &[],
+                    body,
+                    false,
+                    false,
+                    false,
+                );
+                let fn_reg = emit_closure(c, proto, upvalues);
+                let result = c.alloc_reg();
+                let line = c.line;
+                c.chunk.emit(OpCode::Call, line);
+                c.chunk.write(Chunk::pack(result, fn_reg as u8), line);
+                c.chunk.write(Chunk::pack(0, 0), line);
+                c.free_reg();
+                c.free_reg();
+            }
+            ClassMember::Destructor { body, .. } => {
+                let (proto, upvalues) =
+                    compile_function(c, Rc::from("dispose"), &[], body, false, false, true);
+                let fn_reg = emit_closure(c, proto, upvalues);
+                let key_idx = c.add_str("dispose");
+                let line = c.line;
+                c.chunk.emit(OpCode::Method, line);
+                c.chunk.write(Chunk::pack(class_reg, fn_reg as u8), line);
+                c.chunk.write(key_idx, line);
+                c.free_reg();
+            }
+            _ => {}
+        }
+    }
+
+    if !has_constructor && !c.pending_field_inits.is_empty() {
+        let empty = Stmt::new_with_range(
+            varn_core::SourceRange::default(),
+            StmtKind::Block { stmts: vec![] },
+        );
+        let (proto, upvalues) =
+            compile_function(c, Rc::from("constructor"), &[], &empty, false, false, true);
+        let ctor_reg = emit_closure(c, proto, upvalues);
+        let key_idx = c.add_str("constructor");
+        let line = c.line;
+        c.chunk.emit(OpCode::Method, line);
+        c.chunk.write(Chunk::pack(class_reg, ctor_reg as u8), line);
+        c.chunk.write(key_idx, line);
+        c.free_reg();
+    }
+
+    // Inicializar variantes estáticas con sus constructores si tienen argumentos constantes en su declaración
+    let ctor_key = c.add_str("constructor");
+    for member in &en.members {
+        let mut const_args = vec![];
+        for f in &member.payload_fields {
+            match &f.ty.kind {
+                varn_core::TypeKind::LiteralInt(val) => {
+                    const_args.push(varn_core::ast::ExprKind::IntLiteral {
+                        value: *val,
+                        raw: Rc::from(val.to_string()),
+                    });
+                }
+                varn_core::TypeKind::LiteralStr(val) => {
+                    const_args.push(varn_core::ast::ExprKind::StrLiteral {
+                        value: val.clone(),
+                    });
+                }
+                varn_core::TypeKind::LiteralFloat(bits) => {
+                    const_args.push(varn_core::ast::ExprKind::FloatLiteral {
+                        value: f64::from_bits(*bits),
+                        raw: Rc::from(f64::from_bits(*bits).to_string()),
+                    });
+                }
+                varn_core::TypeKind::LiteralBool(val) => {
+                    const_args.push(varn_core::ast::ExprKind::BoolLiteral {
+                        value: *val,
+                    });
+                }
+                _ => {}
+            }
+        }
+
+        if !const_args.is_empty() {
+            let saved_regs = c.regs.save();
+
+            // 1. Obtener la variante estática de la clase. Esta actuará como el receptor `this` (en reg_start).
+            let var_name_idx = c.add_str(&member.id);
+            let receiver_reg = c.alloc_reg();
+            c.emit_property(OpCode::GetProperty, receiver_reg, class_reg, var_name_idx);
+
+            // 2. Compilar los argumentos de forma contigua y natural.
+            let mut arg_count = 1;
+            for arg_kind in const_args {
+                let arg_expr = varn_core::ast::Expr {
+                    id: 0,
+                    range: varn_core::SourceRange::default(),
+                    kind: arg_kind,
+                };
+                compile_expr(c, &arg_expr);
+                arg_count += 1;
+            }
+
+            // 3. Obtener el constructor de la clase
+            let ctor_reg = c.alloc_reg();
+            c.emit_property(OpCode::GetProperty, ctor_reg, receiver_reg, ctor_key);
+
+            // 4. Emitir la llamada directa
+            let dest = c.alloc_reg();
+            let line = c.line;
+            c.chunk.emit(OpCode::Call, line);
+            c.chunk.write(Chunk::pack(dest, ctor_reg), line);
+            c.chunk.write(Chunk::pack(arg_count as u8, receiver_reg), line);
+
+            c.regs.restore(saved_regs);
+        }
+    }
+
+    c.current_class = saved_class;
+    c.current_superclass = saved_superclass;
+    c.pending_field_inits = saved_inits;
+
+    class_reg
 }
 
 pub fn compile_namespace_decl<'a>(c: &mut Compiler<'a>, ns: &NamespaceDecl) {

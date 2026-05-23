@@ -506,11 +506,26 @@ impl<'a> IdAssigner<'a> {
             }
             Decl::Enum(e) => {
                 e.ast_id = self.next_id();
+                for tp in &mut e.type_params {
+                    if let Some(c) = &mut tp.constraint {
+                        self.assign_type_node(c);
+                    }
+                    if let Some(d) = &mut tp.default {
+                        self.assign_type_node(d);
+                    }
+                }
+                for imp in &mut e.implements {
+                    self.assign_type_node(imp);
+                }
                 for m in &mut e.members {
                     if let Some(init) = &mut m.init {
                         self.assign_expr(init);
                     }
+                    for field in &mut m.payload_fields {
+                        self.assign_type_node(&mut field.ty);
+                    }
                 }
+                self.assign_class_members(&mut e.body);
             }
             Decl::Namespace(n) => {
                 n.ast_id = self.next_id();
@@ -630,7 +645,20 @@ impl<'a> IdAssigner<'a> {
 
     fn assign_class_decl(&mut self, c: &mut ClassDecl) {
         self.assign_decorators(&mut c.decorators);
-        for member in &mut c.body {
+        self.assign_class_members(&mut c.body);
+        if let Some(sc) = &mut c.super_class {
+            self.assign_expr(sc);
+        }
+        for e in &mut c.super_type_args {
+            self.assign_type_node(e);
+        }
+        for imp in &mut c.implements {
+            self.assign_type_node(imp);
+        }
+    }
+
+    fn assign_class_members(&mut self, members: &mut [ClassMember]) {
+        for member in members {
             match member {
                 ClassMember::Constructor {
                     ref mut body,
@@ -716,15 +744,6 @@ impl<'a> IdAssigner<'a> {
                     self.assign_stmt(body);
                 }
             }
-        }
-        if let Some(sc) = &mut c.super_class {
-            self.assign_expr(sc);
-        }
-        for e in &mut c.super_type_args {
-            self.assign_type_node(e);
-        }
-        for imp in &mut c.implements {
-            self.assign_type_node(imp);
         }
     }
 

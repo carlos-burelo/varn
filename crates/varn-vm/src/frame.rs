@@ -137,6 +137,8 @@ impl VmClosure {
             set_property: crate::exec::ctx::jit_set_property as usize,
             build_array: crate::exec::ctx::jit_build_array as usize,
             build_str: crate::exec::ctx::jit_build_str as usize,
+            negate: crate::exec::ctx::jit_negate as usize,
+            logical_not: crate::exec::ctx::jit_logical_not as usize,
         };
         match varn_jit::compile(&self.proto, helpers) {
             Ok((entry, code)) => {

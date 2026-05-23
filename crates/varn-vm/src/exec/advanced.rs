@@ -132,9 +132,25 @@ pub fn assert_not_null(val: VmValue) -> VmResult<()> {
 
 pub fn make_enum_variant(tag: u8, name: &str, payload: VmValue, heap: &mut Heap) -> VmValue {
     let payload_val = heap.extract(payload);
+    let (name_part, fields_part) = match name.find(':') {
+        Some(idx) => (&name[..idx], &name[idx + 1..]),
+        None => (name, ""),
+    };
+    let (enum_name_str, variant_name_str) = match name_part.rfind('.') {
+        Some(idx) => (&name_part[..idx], &name_part[idx + 1..]),
+        None => ("", name_part),
+    };
+    let fields: Vec<Rc<str>> = if fields_part.is_empty() {
+        vec![]
+    } else {
+        fields_part.split(',').map(Rc::from).collect()
+    };
+
     let data = Box::new(EnumVariantData {
-        variant_name: Rc::from(name),
+        enum_name: Rc::from(enum_name_str),
+        variant_name: Rc::from(variant_name_str),
         variant_tag: tag,
+        fields,
         payload: payload_val,
     });
     VmValue::from_heap_idx(heap.alloc(HeapObj::EnumVariant(data)))

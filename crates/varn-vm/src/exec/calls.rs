@@ -289,13 +289,32 @@ pub fn prepare_call(
                 if !args.is_empty() {
                     args.remove(0);
                 }
-                let payload = if args.len() == 1 {
+
+                if data.fields.is_empty() && args.is_empty() {
+                    return Ok(PreparedCall::PushValue(callee_nv));
+                }
+
+                let payload = if !data.fields.is_empty() {
+                    let mut obj_data = varn_types::value::ObjData::new();
+                    for (idx, field_name) in data.fields.iter().enumerate() {
+                        let val = if idx < args.len() {
+                            heap.extract(args[idx])
+                        } else {
+                            Value::Null
+                        };
+                        obj_data.set_field(field_name.clone(), val);
+                    }
+                    Value::Object(varn_types::value::ObjRef::new(obj_data))
+                } else if args.len() == 1 {
                     heap.extract(args[0])
-                } else {
+                } else if args.len() > 1 {
                     Value::Array(varn_types::value::ArrayRef::new(
                         args.iter().map(|&nv| heap.extract(nv)).collect(),
                     ))
+                } else {
+                    Value::Null
                 };
+
                 let mut new_data = *data;
                 new_data.payload = payload;
                 return Ok(PreparedCall::PushValue(VmValue::from_heap_idx(

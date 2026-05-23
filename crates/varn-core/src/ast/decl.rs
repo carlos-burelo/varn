@@ -219,7 +219,10 @@ pub struct TypeAliasDecl {
 pub struct EnumDecl {
     pub id: Rc<str>,
     pub ast_id: AstId,
+    pub type_params: Vec<TypeParam>,
+    pub implements: Vec<TypeNode>,
     pub members: Vec<EnumMember>,
+    pub body: Vec<ClassMember>,
     pub doc: Option<String>,
     pub range: SourceRange,
 }

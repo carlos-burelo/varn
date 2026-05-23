@@ -71,10 +71,12 @@ impl std::fmt::Display for RuntimeSymbol {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct EnumVariantData {
+    pub enum_name: Rc<str>,
     pub variant_name: Rc<str>,
     pub variant_tag: u8,
+    pub fields: Vec<Rc<str>>,
     pub payload: Value,
 }
 

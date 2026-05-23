@@ -199,9 +199,32 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
     let range = s.range();
     s.expect(TokenKind::Enum)?;
     let id = s.expect_lexeme(TokenKind::Identifier)?;
+
+    let type_params = if s.check(TokenKind::LAngle) {
+        parse_type_params(s)?
+    } else {
+        vec![]
+    };
+
+    let implements = if s.eat(TokenKind::Implements) {
+        let mut impls = vec![parse_type(s)?];
+        while s.eat(TokenKind::Comma) {
+            impls.push(parse_type(s)?);
+        }
+        impls
+    } else {
+        vec![]
+    };
+
     s.expect(TokenKind::LBrace)?;
     let mut members = vec![];
+    let mut body = vec![];
+
     while !s.check(TokenKind::RBrace) && !s.is_eof() {
+        if s.eat(TokenKind::Semicolon) {
+            break;
+        }
+
         let mem_range = s.range();
         let name = s.expect_lexeme(TokenKind::Identifier)?;
 
@@ -246,15 +269,35 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
             payload_fields,
             range: mem_range,
         });
-        if !s.eat(TokenKind::Comma) {
+
+        let has_comma = s.eat(TokenKind::Comma);
+        if s.check(TokenKind::Semicolon) {
+            continue;
+        }
+        if !has_comma && !s.check(TokenKind::Identifier) && !s.check(TokenKind::Semicolon) {
             break;
         }
     }
+
+    while !s.check(TokenKind::RBrace) && !s.is_eof() {
+        while s.eat(TokenKind::Semicolon) {}
+        while s.check(TokenKind::DocComment) {
+            s.advance();
+        }
+        if s.check(TokenKind::RBrace) {
+            break;
+        }
+        body.push(super::class::parse_class_member(s, false)?);
+    }
+
     s.expect(TokenKind::RBrace)?;
     Ok(EnumDecl {
         id,
         ast_id: 0,
+        type_params,
+        implements,
         members,
+        body,
         doc: None,
         range,
     })

@@ -7,6 +7,7 @@ use varn_types::{value::ObjRef, ClassObj, ObjData, Value};
 
 pub fn op_class(name: &str, heap: &mut Heap) -> VmValue {
     let cls = ClassObj::new_rc(name);
+    heap.set_intrinsic_class(name, cls.clone());
     VmValue::from_heap_idx(heap.alloc(HeapObj::Class(cls)))
 }
 

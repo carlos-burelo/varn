@@ -1485,11 +1485,29 @@ impl ExecCtx {
             .str_val(name_nv)
             .ok_or_else(|| RuntimeError::new("MakeEnumVariant: non-string const"))?;
         let tag = self.stack[base + tag_reg].as_i32() as u8;
+
+        let name_str = name.as_ref();
+        let (name_part, fields_part) = match name_str.find(':') {
+            Some(idx) => (&name_str[..idx], &name_str[idx + 1..]),
+            None => (name_str, ""),
+        };
+        let (enum_name_str, variant_name_str) = match name_part.rfind('.') {
+            Some(idx) => (&name_part[..idx], &name_part[idx + 1..]),
+            None => ("", name_part),
+        };
+        let fields: Vec<Rc<str>> = if fields_part.is_empty() {
+            vec![]
+        } else {
+            fields_part.split(',').map(Rc::from).collect()
+        };
+
         let variant =
             varn_types::Value::EnumVariant(Box::new(varn_types::value::EnumVariantData {
-                variant_name: Rc::from(name.as_ref()),
+                enum_name: Rc::from(enum_name_str),
+                variant_name: Rc::from(variant_name_str),
                 variant_tag: tag,
-                payload: varn_types::Value::Null,
+                fields,
+                payload: varn_types::Value::Object(varn_types::value::ObjRef::new(varn_types::value::ObjData::new())),
             }));
         self.stack[base + dest] = self.heap.intern(variant);
         self.frames[frame_idx].ip = *ip;
