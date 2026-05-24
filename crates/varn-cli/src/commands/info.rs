@@ -38,7 +38,7 @@ fn build_info_tree(
     let mut package_count = 0;
     let mut local_count = 0;
 
-    let canonical_entry = canonical_or_original(Path::new(entry_path));
+    let canonical_entry = varn_modules::canonical_or_original(Path::new(entry_path));
     queue.push_back((canonical_entry.clone(), Some(entry_program.clone())));
 
     while let Some((curr_path, program)) = queue.pop_front() {
@@ -109,7 +109,7 @@ fn print_info(entry: &str, tree: &HashMap<String, Node>, stats: &Stats) {
     println!();
     println!("  {BOLD}grafo de dependencias:{R}");
 
-    let canonical_entry = canonical_or_original(Path::new(entry));
+    let canonical_entry = varn_modules::canonical_or_original(Path::new(entry));
     let mut visited = HashSet::new();
     print_tree_node(&canonical_entry, tree, &mut visited, "", true);
 
@@ -158,19 +158,3 @@ fn print_tree_node(
     }
 }
 
-fn canonical_or_original(path: &Path) -> String {
-    if let Ok(canonical) = std::fs::canonicalize(path) {
-        return normalize_path(canonical.to_string_lossy().into_owned());
-    }
-    normalize_path(path.to_string_lossy().into_owned())
-}
-
-fn normalize_path(path: String) -> String {
-    #[cfg(windows)]
-    {
-        if let Some(rest) = path.strip_prefix("\\\\?\\") {
-            return rest.to_owned();
-        }
-    }
-    path
-}

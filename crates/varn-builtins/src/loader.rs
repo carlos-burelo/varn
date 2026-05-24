@@ -8,11 +8,11 @@ const ENV_VARN_HOME: &str = "VARN_HOME";
 const BUILTINS_DIR_NAME: &str = "varn-builtins";
 const VARN_HOME_STDLIB_SUBDIR: &str = "stdlib";
 
-pub struct ModuleLoader {
+pub struct BuiltinSourceLocator {
     stdlib_root: PathBuf,
 }
 
-impl ModuleLoader {
+impl BuiltinSourceLocator {
     pub fn new(stdlib_root: PathBuf) -> Self {
         Self { stdlib_root }
     }

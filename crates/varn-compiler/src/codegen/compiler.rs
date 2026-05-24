@@ -633,6 +633,7 @@ impl<'a> Compiler<'a> {
             chunk: self.chunk,
             jit_entry: std::cell::Cell::new(None),
             jit_code: std::cell::RefCell::new(None),
+            jit_failed: std::cell::Cell::new(false),
         };
         super::regalloc_post::optimize_function(&mut proto);
         proto
@@ -653,6 +654,7 @@ impl<'a> Compiler<'a> {
             chunk: self.chunk,
             jit_entry: std::cell::Cell::new(None),
             jit_code: std::cell::RefCell::new(None),
+            jit_failed: std::cell::Cell::new(false),
         };
         super::regalloc_post::optimize_function(&mut proto);
         (proto, self.upvalues)

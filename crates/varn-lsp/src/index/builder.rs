@@ -118,7 +118,7 @@ fn member_kind_to_symbol_kind(kind: MemberKind) -> SymbolKind {
 
 fn resolve_specifier_to_uri(specifier: &str, doc_dir: Option<&std::path::Path>) -> Option<String> {
     if specifier.starts_with(STD_PREFIX) || specifier.starts_with(BUILTIN_PREFIX) {
-        let loader = varn_builtins::ModuleLoader::from_env();
+        let loader = varn_builtins::BuiltinSourceLocator::from_env();
         if loader.embedded_source(specifier).is_some() {
             return Some(format!("varn-stdlib://{specifier}"));
         }

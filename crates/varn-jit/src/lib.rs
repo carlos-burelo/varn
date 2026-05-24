@@ -68,6 +68,10 @@ pub struct JitHelpers {
     pub shl: usize,
     pub shr: usize,
     pub ushr: usize,
+    pub load_module: usize,
+    pub load_module_slot: usize,
+    pub build_object_with_shape: usize,
+    pub range: usize,
 }
 
 #[derive(Debug, Clone, Copy)]

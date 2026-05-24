@@ -373,7 +373,7 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                 if let ExprKind::Identifier { name: prop_name } = &property.kind {
                     let obj_ty = infer_expr_type(object, Some(ctx));
                     if let TypeKind::Named(_, Some(ref origin_path)) = &obj_ty.non_nullified().0 {
-                        let exports = if crate::module_resolver::is_known_stdlib(origin_path) {
+                        let exports = if crate::module_resolver::is_known_module(origin_path) {
                             crate::module_resolver::resolve_stdlib_module_exports_ref(origin_path)
                         } else {
                             crate::module_resolver::resolve_module_exports_ref(origin_path, &mut vec![])

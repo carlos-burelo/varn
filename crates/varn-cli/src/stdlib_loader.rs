@@ -26,7 +26,7 @@ impl ModuleLoader for StdlibLoader {
             _ => return Ok(None),
         };
 
-        let loader = varn_builtins::ModuleLoader::from_env();
+        let loader = varn_builtins::BuiltinSourceLocator::from_env();
         let source = loader
             .embedded_source(spec)
             .map(|s| s.to_owned())

@@ -731,6 +731,11 @@ impl ExecCtx {
                 return Ok(final_val);
             }
 
+            debug_assert!(
+                proto.export_names.windows(2).all(|w| w[0] <= w[1]),
+                "FunctionProto export_names must be sorted alphabetically (slot contract violated for {})",
+                resolved.as_str()
+            );
             let mut export_map = rustc_hash::FxHashMap::default();
             for (idx, name) in proto.export_names.iter().enumerate() {
                 export_map.insert(name.clone(), idx);
@@ -1387,6 +1392,102 @@ pub extern "C" fn jit_shr(_ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue
 
 pub extern "C" fn jit_ushr(_ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     crate::exec::arith::ushr(a, b)
+}
+
+pub extern "C" fn jit_load_module(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    const_idx: usize,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let closure_ref = &*closure;
+        let spec_nv = closure_ref.constants[const_idx];
+        let spec = match ctx_ref.heap.str_val(spec_nv) {
+            Some(s) => s,
+            None => return VmValue::null(),
+        };
+        match ctx_ref.load_module(&spec) {
+            Ok(v) => v,
+            Err(e) => panic!("JIT load_module failed: {:?}", e),
+        }
+    }
+}
+
+pub extern "C" fn jit_load_module_slot(
+    ctx: *mut ExecCtx,
+    module_val: VmValue,
+    slot_idx: usize,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        if !module_val.is_heap() {
+            return VmValue::null();
+        }
+        if let Some(crate::heap::HeapObj::Module(m)) = ctx_ref.heap.get(module_val.as_heap_idx()) {
+            m.get_slot(slot_idx).unwrap_or(VmValue::null())
+        } else {
+            VmValue::null()
+        }
+    }
+}
+
+pub extern "C" fn jit_build_object_with_shape(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    start_reg: usize,
+    shape_idx: usize,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let closure_ref = &*closure;
+        let keys = match closure_ref.proto.chunk.constants.get(shape_idx) {
+            Some(varn_types::chunk::PoolEntry::Shape(k)) => k.clone(),
+            _ => return VmValue::null(),
+        };
+        let count = keys.len();
+        let frame_idx = ctx_ref.frames.len() - 1;
+        let base = ctx_ref.frames[frame_idx].base;
+        // Inline object construction without pushing to ctx.stack (which could reallocate
+        // and invalidate the JIT frame's REG_FRAME_BASE pointer).
+        let mut inner = varn_types::RuntimeObject::new();
+        for (i, key) in keys.iter().enumerate() {
+            let val_nv = ctx_ref.stack[base + start_reg + i];
+            if val_nv.is_heap() {
+                if let Some(crate::heap::HeapObj::VmClosure(nc)) = ctx_ref.heap.get(val_nv.as_heap_idx()) {
+                    let nc = nc.clone();
+                    for uv in &nc.upvalues {
+                        uv.close(&ctx_ref.stack);
+                    }
+                }
+            }
+            inner.insert(key.clone(), val_nv);
+        }
+        let oref = varn_types::value::ObjRef::new(varn_types::ObjData::from_inner(inner));
+        VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Object(oref)))
+    }
+}
+
+pub extern "C" fn jit_range(
+    ctx: *mut ExecCtx,
+    start_reg: usize,
+    end_reg: usize,
+    flag: usize,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let frame_idx = ctx_ref.frames.len() - 1;
+        let base = ctx_ref.frames[frame_idx].base;
+        let start_val = ctx_ref.stack[base + start_reg];
+        let end_val = ctx_ref.stack[base + end_reg];
+        // Use a local vec to avoid reallocating ctx.stack (which would invalidate
+        // the JIT frame's REG_FRAME_BASE pointer).
+        let mut temp = vec![start_val, end_val];
+        match crate::exec::advanced::invoke_runtime_static("__range__", &mut temp, &mut ctx_ref.heap, flag as u16) {
+            Ok(v) => v,
+            Err(e) => panic!("JIT range failed: {:?}", e),
+        }
+    }
 }
 
 fn extract_exports_from_source(source: &str) -> Vec<String> {

@@ -23,7 +23,7 @@ impl super::Binder {
             None
         };
 
-        let is_stdlib = !is_relative && module_resolver::is_known_stdlib(&i.source);
+        let is_stdlib = !is_relative && module_resolver::is_known_module(&i.source);
 
         let relative_exports = if let Some(abs) = &resolved_target {
             let mut visiting = vec![self.source_file.to_string()];

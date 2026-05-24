@@ -3,7 +3,6 @@ use crate::symbol::{Symbol, SymbolKind};
 use crate::types::Type;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
-use std::fs::canonicalize;
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -180,7 +179,7 @@ pub fn find_module_bind_for_type_ref(
     None
 }
 
-pub fn is_known_stdlib(specifier: &str) -> bool {
+pub fn is_known_module(specifier: &str) -> bool {
     varn_modules::BUILTIN_MODULES.contains(&specifier)
         || varn_modules::STD_MODULES.contains(&specifier)
 }
@@ -209,11 +208,7 @@ pub fn resolve_specifier_path(base_dir: &Path, specifier: &str) -> Option<String
 
     for candidate in candidates {
         if candidate.exists() {
-            let res = if let Ok(canonical) = canonicalize(&candidate) {
-                canonical.to_string_lossy().into_owned()
-            } else {
-                candidate.to_string_lossy().into_owned()
-            };
+            let res = varn_modules::canonical_or_original(&candidate);
 
             RESOLVED_PATH_CACHE.with(|c| {
                 let mut guard = c.borrow_mut();
@@ -242,7 +237,7 @@ pub fn resolve_module_exports_ref(abs_path: &str, visiting: &mut Vec<String>) ->
         return cached;
     }
 
-    let canonical_abs = canonical_or_original(Path::new(abs_path));
+    let canonical_abs = varn_modules::canonical_or_original(Path::new(abs_path));
 
     if canonical_abs != abs_path {
         if let Some(cached) = export_cache_get(&canonical_abs) {
@@ -268,11 +263,16 @@ fn cache_get_or_insert_ref(abs_path: &str) -> Option<Rc<BindResult>> {
         return Some(cached);
     }
 
-    let canonical_abs = canonical_or_original(Path::new(abs_path));
+    let canonical_abs = varn_modules::canonical_or_original(Path::new(abs_path));
     let source = read_to_string(&canonical_abs).ok()?;
     let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(&source, &canonical_abs);
-    let program = varn_parser::parse(tokens, lexeme_buf, &canonical_abs).ok()?;
-    let mut bind = Binder::bind(&program);
+    let program = Rc::new(varn_parser::parse(tokens, lexeme_buf, &canonical_abs).ok()?);
+    PROGRAM_CACHE.with(|c| {
+        let mut guard = c.borrow_mut();
+        let cache = guard.get_or_insert_with(FxHashMap::default);
+        cache.entry(canonical_abs.clone()).or_insert_with(|| Rc::clone(&program));
+    });
+    let mut bind = Binder::bind(&*program);
     for e in lex_errs {
         bind.diagnostics.emit(e);
     }
@@ -404,7 +404,7 @@ fn collect_exports(
                 source: Some(src),
                 ..
             } => {
-                let src_exports = if is_known_stdlib(src) {
+                let src_exports = if is_known_module(src) {
                     resolve_stdlib_module_exports_ref(src)
                 } else {
                     let src_abs = resolve_relative(base_dir, src);
@@ -425,7 +425,7 @@ fn collect_exports(
                 alias: None,
                 ..
             } => {
-                let src_exports = if is_known_stdlib(source) {
+                let src_exports = if is_known_module(source) {
                     resolve_stdlib_module_exports_ref(source)
                 } else {
                     let src_abs = resolve_relative(base_dir, source);
@@ -445,7 +445,7 @@ fn collect_exports(
                 alias: Some(ns),
                 ..
             } => {
-                let src_exports = if is_known_stdlib(source) {
+                let src_exports = if is_known_module(source) {
                     resolve_stdlib_module_exports_ref(source)
                 } else {
                     let src_abs = resolve_relative(base_dir, source);
@@ -512,18 +512,11 @@ fn lookup_global<'a>(bind: &'a BindResult, name: &str) -> Option<&'a Symbol> {
 }
 
 fn resolve_relative(base_dir: &Path, specifier: &str) -> String {
-    if varn_modules::is_pkg_specifier(specifier) {
-        resolve_package_specifier_path(base_dir, specifier)
-            .unwrap_or_else(|| base_dir.join(specifier).to_string_lossy().into_owned())
-    } else {
-        resolve_specifier_path(base_dir, specifier)
-            .unwrap_or_else(|| base_dir.join(specifier).to_string_lossy().into_owned())
+    match varn_core::ImportSpecifier::parse(specifier) {
+        varn_core::ImportSpecifier::Package(_) => resolve_package_specifier_path(base_dir, specifier)
+            .unwrap_or_else(|| base_dir.join(specifier).to_string_lossy().into_owned()),
+        _ => resolve_specifier_path(base_dir, specifier)
+            .unwrap_or_else(|| base_dir.join(specifier).to_string_lossy().into_owned()),
     }
 }
 
-fn canonical_or_original(path: &Path) -> String {
-    if let Ok(canonical) = canonicalize(path) {
-        return canonical.to_string_lossy().into_owned();
-    }
-    path.to_string_lossy().into_owned()
-}

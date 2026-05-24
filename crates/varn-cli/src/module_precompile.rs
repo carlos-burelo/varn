@@ -21,7 +21,7 @@ pub fn build_module_graph(
     entry_path: &str,
     entry_proto: &FunctionProto,
 ) -> Result<ModuleGraphBuild, String> {
-    let canonical_entry = canonical_or_original(Path::new(entry_path));
+    let canonical_entry = varn_modules::canonical_or_original(Path::new(entry_path));
 
     let mut graph: HashMap<String, Vec<String>> = HashMap::new();
     let mut source_hashes: HashMap<String, u64> = HashMap::new();
@@ -202,14 +202,14 @@ pub fn build_module_graph(
 
 fn read_module_source(module_path: &str) -> Result<String, String> {
     if let Some(specifier) = module_path.strip_prefix(varn_modules::EMBEDDED_MODULE_PREFIX) {
-        let loader = varn_builtins::ModuleLoader::from_env();
+        let loader = varn_builtins::BuiltinSourceLocator::from_env();
         return loader
             .embedded_source(specifier)
             .map(|s| s.to_owned())
             .ok_or_else(|| format!("embedded source not found for '{specifier}'"));
     }
-    if module_path.starts_with("std:") || module_path.starts_with("builtin:") {
-        let loader = varn_builtins::ModuleLoader::from_env();
+    if matches!(varn_core::ImportSpecifier::parse(module_path), varn_core::ImportSpecifier::Stdlib(_)) {
+        let loader = varn_builtins::BuiltinSourceLocator::from_env();
         return loader
             .embedded_source(module_path)
             .map(|s| s.to_owned())
@@ -232,7 +232,7 @@ pub fn resolve_import_specifier(
 
     match ImportSpecifier::parse(specifier) {
         ImportSpecifier::Stdlib(_) => {
-            let loader = varn_builtins::ModuleLoader::from_env();
+            let loader = varn_builtins::BuiltinSourceLocator::from_env();
             if loader.embedded_source(specifier).is_some() {
                 return Ok(Some(specifier.to_owned()));
             }
@@ -254,11 +254,11 @@ pub fn resolve_import_specifier(
             for candidate in candidates {
                 if candidate.exists() {
                     if let Ok(canonical) = std::fs::canonicalize(&candidate) {
-                        return Ok(Some(normalize_path_string(
+                        return Ok(Some(varn_modules::normalize_path_string(
                             canonical.to_string_lossy().into_owned(),
                         )));
                     }
-                    return Ok(Some(normalize_path_string(
+                    return Ok(Some(varn_modules::normalize_path_string(
                         candidate.to_string_lossy().into_owned(),
                     )));
                 }
@@ -285,19 +285,3 @@ pub fn resolve_import_specifier(
     }
 }
 
-fn canonical_or_original(path: &Path) -> String {
-    if let Ok(canonical) = std::fs::canonicalize(path) {
-        return normalize_path_string(canonical.to_string_lossy().into_owned());
-    }
-    normalize_path_string(path.to_string_lossy().into_owned())
-}
-
-fn normalize_path_string(path: String) -> String {
-    #[cfg(windows)]
-    {
-        if let Some(rest) = path.strip_prefix("\\\\?\\") {
-            return rest.to_owned();
-        }
-    }
-    path
-}
