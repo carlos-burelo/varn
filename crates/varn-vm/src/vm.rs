@@ -265,7 +265,8 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
             | OpCode::Instanceof
             | OpCode::SetIndex
             | OpCode::GetIndex
-            | OpCode::Reexport
+            | OpCode::LoadModule
+            | OpCode::StoreModuleSlot
             | OpCode::LoadUpvalue
             | OpCode::StoreUpvalue
             | OpCode::CloseUpvalue
@@ -284,8 +285,6 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
             | OpCode::Spawn
             | OpCode::Throw
             | OpCode::Return
-            | OpCode::Import
-            | OpCode::MergeExports
             | OpCode::AddInt
             | OpCode::SubInt
             | OpCode::MulInt
@@ -333,7 +332,8 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
             | OpCode::DeclareField
             | OpCode::MakeEnumVariant
             | OpCode::GetFixedField
-            | OpCode::SetFixedField => {
+            | OpCode::SetFixedField
+            | OpCode::LoadModuleSlot => {
                 ip += 3;
             }
 

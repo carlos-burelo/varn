@@ -128,11 +128,11 @@ pub enum OpCode {
 
     PopTry,
 
-    Import,
+    LoadModule,
 
-    Reexport,
+    LoadModuleSlot,
 
-    MergeExports,
+    StoreModuleSlot,
 
     InvokeRuntimeStatic,
 

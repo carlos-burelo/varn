@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use varn_types::{
     generator::{AsyncQueue, GeneratorObj},
-    value::{ArrayRef, EnumVariantData, MapRef, ObjRef, RangeData, RuntimeSymbol, SetRef},
+    value::{ArrayRef, EnumVariantData, MapRef, ObjRef, RangeData, RuntimeSymbol, SetRef, ModuleObj},
     AsyncTask, ClassObj, LazyTask, NativeCtx, NativeFn, ObjData, ResourceStore, RuntimeString,
     Value, VmArray,
 };
@@ -21,7 +21,7 @@ pub enum HeapObj {
     Array(VmArray),
     Object(ObjRef),
 
-    NativeModule(Rc<HashMap<Rc<str>, VmValue>>),
+    Module(Rc<ModuleObj>),
     VmClosure(Rc<VmClosure>),
     Class(Rc<ClassObj>),
     NativeFn(&'static str, NativeFn),
@@ -326,6 +326,7 @@ impl HeapInner {
                     VmValue::null()
                 }
             }
+            Value::Module(m) => VmValue::from_heap_idx(self.alloc(HeapObj::Module(m))),
         }
     }
 
@@ -385,7 +386,7 @@ impl HeapInner {
                 HeapObj::AsyncQueue(q) => Value::AsyncQueue(q.clone()),
                 HeapObj::Spread(inner) => Value::Spread(Box::new(self.extract(*inner))),
 
-                HeapObj::NativeModule(_) => Value::Null,
+                HeapObj::Module(m) => Value::Module(m.clone()),
             });
         }
         Ok(Value::Null)
@@ -498,6 +499,10 @@ impl HeapInner {
 
     pub fn alloc_vm_closure(&mut self, c: Rc<VmClosure>) -> VmValue {
         VmValue::from_heap_idx(self.alloc(HeapObj::VmClosure(c)))
+    }
+
+    pub fn alloc_module(&mut self, m: Rc<ModuleObj>) -> VmValue {
+        VmValue::from_heap_idx(self.alloc(HeapObj::Module(m)))
     }
 
     pub fn str_val(&self, nv: VmValue) -> Option<RuntimeString> {
@@ -769,8 +774,9 @@ impl HeapInner {
 
     pub fn native_module_get(&self, obj: VmValue, key: &str) -> Option<VmValue> {
         let idx = obj.as_heap_idx();
-        if let Some(HeapObj::NativeModule(map)) = self.get(idx) {
-            return map.get(key).copied();
+        if let Some(HeapObj::Module(m)) = self.get(idx) {
+            let &slot = m.export_map.get(key)?;
+            return m.get_slot(slot);
         }
         None
     }
@@ -923,8 +929,9 @@ impl NativeCtx for Heap {
             if let Some(HeapObj::Object(o)) = self.get_by_idx(obj.as_heap_idx()) {
                 return o.borrow().get_field_nv(key);
             }
-            if let Some(HeapObj::NativeModule(map)) = self.get_by_idx(obj.as_heap_idx()) {
-                return map.get(key).copied();
+            if let Some(HeapObj::Module(m)) = self.get_by_idx(obj.as_heap_idx()) {
+                let slot = m.export_map.get(key).copied()?;
+                return m.get_slot(slot);
             }
         }
         None
@@ -935,8 +942,15 @@ impl NativeCtx for Heap {
             let raw_idx = obj.as_heap_idx();
             if let Some(HeapObj::Object(o)) = self.get_by_idx(raw_idx) {
                 o.borrow_mut().set_field_nv(Rc::from(key), val);
-            } else if let Some(HeapObj::NativeModule(map_rc)) = self.get_by_idx_mut(raw_idx) {
-                Rc::make_mut(map_rc).insert(Rc::from(key), val);
+            } else if let Some(HeapObj::Module(m)) = self.get_by_idx_mut(raw_idx) {
+                if let Some(s) = m.export_map.get(key).copied() {
+                    Rc::make_mut(m).set_slot(s, val);
+                } else {
+                    let m = Rc::make_mut(m);
+                    let slot = m.exports.len();
+                    m.exports.push(val);
+                    m.export_map.insert(Rc::from(key), slot);
+                }
             }
         }
     }

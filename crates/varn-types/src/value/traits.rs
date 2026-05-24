@@ -90,6 +90,7 @@ impl Value {
             Value::Char(_) => IntrinsicType::Char.as_str(),
             Value::EnumVariant(_) => RuntimeTypeName::Enum.as_str(),
             Value::VmValue(_payload) => "vm_payload",
+            Value::Module(_) => "module",
         }
     }
 
@@ -271,6 +272,7 @@ impl std::hash::Hash for Value {
                 data.payload.hash(state);
             }
             Value::VmValue(_) => {}
+            Value::Module(m) => Rc::as_ptr(m).hash(state),
         }
     }
 }
@@ -407,6 +409,7 @@ impl fmt::Display for Value {
                 write!(f, "{}({})", data.variant_name, data.payload)
             }
             Value::VmValue(payload) => write!(f, "{:?}", payload),
+            Value::Module(m) => write!(f, "[module {}]", m.id.as_str()),
         }
     }
 }

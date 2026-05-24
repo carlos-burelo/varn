@@ -302,6 +302,7 @@ fn resolve_inner(abs_path: &str, visiting: &mut Vec<String>) -> ExportMap {
                 visiting,
                 &mut exports,
             );
+            assign_slots(&mut exports);
             return exports;
         }
     }
@@ -344,7 +345,18 @@ fn resolve_inner(abs_path: &str, visiting: &mut Vec<String>) -> ExportMap {
         visiting,
         &mut exports,
     );
+    assign_slots(&mut exports);
     exports
+}
+
+fn assign_slots(exports: &mut ExportMap) {
+    let mut keys: Vec<String> = exports.keys().cloned().collect();
+    keys.sort();
+    for (idx, key) in keys.iter().enumerate() {
+        if let Some(sym) = exports.get_mut(key) {
+            sym.slot_idx = Some(idx);
+        }
+    }
 }
 
 fn collect_exports(

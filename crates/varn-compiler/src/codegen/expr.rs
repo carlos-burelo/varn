@@ -795,6 +795,21 @@ fn compile_member_access<'a>(
     offset: u32,
 ) -> u8 {
     if !computed {
+        if let Some(slot_idx) = c.annotations.get_slot_idx(offset) {
+            let obj = compile_expr(c, object);
+            if optional {
+                let is_null = c.alloc_reg();
+                c.emit_rr(OpCode::IsNull, is_null, obj);
+                let end = c.emit_cond_jump(OpCode::JumpIfTrue, is_null);
+                c.free_reg();
+                c.emit_rrc(OpCode::LoadModuleSlot, obj, obj, slot_idx as u16);
+                c.patch_jump(end);
+            } else {
+                c.emit_rrc(OpCode::LoadModuleSlot, obj, obj, slot_idx as u16);
+            }
+            return obj;
+        }
+
         if let Some(mangled) = c.extension_members.get(&offset).cloned() {
             let obj = compile_expr(c, object);
             if optional {

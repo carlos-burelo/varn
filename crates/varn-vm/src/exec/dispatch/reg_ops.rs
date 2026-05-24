@@ -1539,14 +1539,14 @@ impl ExecCtx {
         first_reg: usize,
     ) -> VmResult<()> {
         match op {
-            OpCode::Import => {
-                self.op_import(code, ip, closure, frame_idx, first_reg)?;
+            OpCode::LoadModule => {
+                self.op_load_module(code, ip, closure, frame_idx, first_reg)?;
             }
-            OpCode::Reexport => {
-                self.op_reexport(code, ip, frame_idx, closure)?;
+            OpCode::LoadModuleSlot => {
+                self.op_load_module_slot(code, ip, frame_idx, first_reg)?;
             }
-            OpCode::MergeExports => {
-                self.op_merge_exports(code, ip, frame_idx, first_reg)?;
+            OpCode::StoreModuleSlot => {
+                self.op_store_module_slot(code, ip, frame_idx, first_reg)?;
             }
             _ => {}
         }

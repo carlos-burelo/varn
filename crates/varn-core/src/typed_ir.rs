@@ -7,6 +7,7 @@ pub struct ExprAnnotation {
     pub numeric: Option<NumericKind>,
     pub type_only: bool,
     pub call_mapping: Option<Vec<Option<usize>>>,
+    pub slot_idx: Option<usize>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -41,6 +42,14 @@ impl TypeAnnotations {
 
     pub fn get_call_mapping(&self, call_id: u32) -> Option<&Vec<Option<usize>>> {
         self.inner.get(&call_id)?.call_mapping.as_ref()
+    }
+
+    pub fn record_slot_idx(&mut self, offset: u32, slot_idx: usize) {
+        self.inner.entry(offset).or_default().slot_idx = Some(slot_idx);
+    }
+
+    pub fn get_slot_idx(&self, offset: u32) -> Option<usize> {
+        self.inner.get(&offset)?.slot_idx
     }
 
     pub fn is_empty(&self) -> bool {

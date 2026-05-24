@@ -47,9 +47,9 @@ pub fn find_setter(obj: VmValue, key: &str, heap: &Heap) -> Option<Value> {
 
 pub fn get_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
-        if let Some(HeapObj::NativeModule(map)) = heap.get(obj.as_heap_idx()) {
-            let map = map.clone();
-            return Ok(map.get(key).copied().unwrap_or(VmValue::null()));
+        if let Some(HeapObj::Module(m)) = heap.get(obj.as_heap_idx()) {
+            let val = m.export_map.get(key).and_then(|&s| m.get_slot(s)).unwrap_or(VmValue::null());
+            return Ok(val);
         }
     }
 
@@ -74,7 +74,7 @@ pub fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Heap) -> V
         )));
     }
 
-    if matches!(heap.get(obj.as_heap_idx()), Some(HeapObj::NativeModule(_))) {
+    if matches!(heap.get(obj.as_heap_idx()), Some(HeapObj::Module(_))) {
         return Ok(());
     }
     let idx = obj.as_heap_idx();

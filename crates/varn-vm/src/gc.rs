@@ -184,10 +184,10 @@ impl TricolorMarker {
                 | HeapObj::Decimal(_)
                 | HeapObj::Range(_)
                 | HeapObj::NativeFn(_, _) => {}
-                HeapObj::NativeModule(map) => {
-                    let map = map.clone();
-                    for val in map.values() {
-                        if let Some(child_idx) = heap.get_heap_idx(*val) {
+                HeapObj::Module(m) => {
+                    let exports = m.exports.clone();
+                    for val in exports {
+                        if let Some(child_idx) = heap.get_heap_idx(val) {
                             self.mark_gray(child_idx);
                         }
                     }

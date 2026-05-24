@@ -640,7 +640,7 @@ fn compile_fn_decl<'a>(c: &mut Compiler<'a>, decl: &FunctionDecl) {
 fn compile_import<'a>(c: &mut Compiler<'a>, decl: &ImportDecl) {
     let src_idx = c.add_str(&decl.source);
     let mod_reg = c.alloc_reg();
-    c.emit_rc(OpCode::Import, mod_reg, src_idx);
+    c.emit_rc(OpCode::LoadModule, mod_reg, src_idx);
 
     if decl.is_type {
         c.free_reg();
@@ -649,10 +649,14 @@ fn compile_import<'a>(c: &mut Compiler<'a>, decl: &ImportDecl) {
 
     for spec in &decl.specifiers {
         match spec {
-            ImportSpecifier::Default { local, .. } => {
-                let key_idx = c.add_str("default");
+            ImportSpecifier::Default { local, range, .. } => {
                 let dest = c.alloc_reg();
-                c.emit_property(OpCode::GetProperty, dest, mod_reg, key_idx);
+                if let Some(slot_idx) = c.annotations.get_slot_idx(range.start.offset) {
+                    c.emit_rrc(OpCode::LoadModuleSlot, dest, mod_reg, slot_idx as u16);
+                } else {
+                    let key_idx = c.add_str("default");
+                    c.emit_property(OpCode::GetProperty, dest, mod_reg, key_idx);
+                }
                 let local_idx = c.add_str(local);
                 let line = c.line;
                 c.chunk
@@ -660,11 +664,18 @@ fn compile_import<'a>(c: &mut Compiler<'a>, decl: &ImportDecl) {
                 c.free_reg();
             }
             ImportSpecifier::Named {
-                local, imported, ..
+                local,
+                imported,
+                range,
+                ..
             } => {
-                let key_idx = c.add_str(imported);
                 let dest = c.alloc_reg();
-                c.emit_property(OpCode::GetProperty, dest, mod_reg, key_idx);
+                if let Some(slot_idx) = c.annotations.get_slot_idx(range.start.offset) {
+                    c.emit_rrc(OpCode::LoadModuleSlot, dest, mod_reg, slot_idx as u16);
+                } else {
+                    let key_idx = c.add_str(imported);
+                    c.emit_property(OpCode::GetProperty, dest, mod_reg, key_idx);
+                }
                 let local_idx = c.add_str(local);
                 let line = c.line;
                 c.chunk
@@ -692,12 +703,13 @@ fn compile_export<'a>(c: &mut Compiler<'a>, decl: &ExportDecl) {
                 if !c.emit_load_var(&name, val_reg) {
                     c.emit_rc(OpCode::LoadGlobal, val_reg, idx);
                 }
-                let key = c.add_str(&name);
-                c.emit_rc(OpCode::MergeExports, val_reg, key);
+                if let Some(slot_idx) = c.annotations.get_slot_idx(declaration.range().start.offset) {
+                    c.emit_rc(OpCode::StoreModuleSlot, val_reg, slot_idx as u16);
+                }
                 c.free_reg();
             }
         }
-        ExportDecl::Default { declaration, .. } => match declaration.as_ref() {
+        ExportDecl::Default { declaration, range, .. } => match declaration.as_ref() {
             ExportDefaultDecl::Function(f) => {
                 if !f.modifiers.is_declare {
                     compile_fn_decl(c, f);
@@ -706,8 +718,9 @@ fn compile_export<'a>(c: &mut Compiler<'a>, decl: &ExportDecl) {
                     if !c.emit_load_var(&f.id, val_reg) {
                         c.emit_rc(OpCode::LoadGlobal, val_reg, idx);
                     }
-                    let key = c.add_str("default");
-                    c.emit_rc(OpCode::MergeExports, val_reg, key);
+                    if let Some(slot_idx) = c.annotations.get_slot_idx(range.start.offset) {
+                        c.emit_rc(OpCode::StoreModuleSlot, val_reg, slot_idx as u16);
+                    }
                     c.free_reg();
                 }
             }
@@ -720,33 +733,40 @@ fn compile_export<'a>(c: &mut Compiler<'a>, decl: &ExportDecl) {
                         if !c.emit_load_var(id, val_reg) {
                             c.emit_rc(OpCode::LoadGlobal, val_reg, idx);
                         }
-                        let key = c.add_str("default");
-                        c.emit_rc(OpCode::MergeExports, val_reg, key);
+                        if let Some(slot_idx) = c.annotations.get_slot_idx(range.start.offset) {
+                            c.emit_rc(OpCode::StoreModuleSlot, val_reg, slot_idx as u16);
+                        }
                         c.free_reg();
                     }
                 }
             }
             ExportDefaultDecl::Expr(e) => {
                 let r = compile_expr(c, e);
-                let key = c.add_str("default");
-                c.emit_rc(OpCode::MergeExports, r, key);
+                if let Some(slot_idx) = c.annotations.get_slot_idx(range.start.offset) {
+                    c.emit_rc(OpCode::StoreModuleSlot, r, slot_idx as u16);
+                }
                 c.free_reg();
                 let _ = r;
             }
         },
         ExportDecl::Named {
-            specifiers, source, ..
+            specifiers, source, range: _, ..
         } => match source {
             Some(src) if !specifiers.is_empty() => {
                 let src_idx = c.add_str(src);
                 let mod_reg = c.alloc_reg();
-                c.emit_rc(OpCode::Import, mod_reg, src_idx);
+                c.emit_rc(OpCode::LoadModule, mod_reg, src_idx);
                 for spec in specifiers {
                     let imported_idx = c.add_str(&spec.local);
                     let val_reg = c.alloc_reg();
-                    c.emit_property(OpCode::GetProperty, val_reg, mod_reg, imported_idx);
-                    let exported_idx = c.add_str(&spec.exported);
-                    c.emit_rc(OpCode::MergeExports, val_reg, exported_idx);
+                    if let Some(imported_slot) = c.annotations.get_slot_idx(spec.range.start.offset) {
+                        c.emit_rrc(OpCode::LoadModuleSlot, val_reg, mod_reg, imported_slot as u16);
+                    } else {
+                        c.emit_property(OpCode::GetProperty, val_reg, mod_reg, imported_idx);
+                    }
+                    if let Some(exported_slot) = c.annotations.get_slot_idx(spec.range.start.offset) {
+                        c.emit_rc(OpCode::StoreModuleSlot, val_reg, exported_slot as u16);
+                    }
                     c.free_reg();
                 }
                 c.free_reg();
@@ -759,24 +779,28 @@ fn compile_export<'a>(c: &mut Compiler<'a>, decl: &ExportDecl) {
                     if !c.emit_load_var(&spec.local, val_reg) {
                         c.emit_rc(OpCode::LoadGlobal, val_reg, idx);
                     }
-                    let key = c.add_str(&spec.exported);
-                    c.emit_rc(OpCode::MergeExports, val_reg, key);
+                    if let Some(exported_slot) = c.annotations.get_slot_idx(spec.range.start.offset) {
+                        c.emit_rc(OpCode::StoreModuleSlot, val_reg, exported_slot as u16);
+                    }
                     c.free_reg();
                 }
             }
         },
-        ExportDecl::All { source, alias, .. } => {
+        ExportDecl::All { source, alias, range, .. } => {
             let src_idx = c.add_str(source);
             match alias {
-                Some(alias_name) => {
+                Some(_alias_name) => {
                     let mod_reg = c.alloc_reg();
-                    c.emit_rc(OpCode::Import, mod_reg, src_idx);
-                    let key = c.add_str(alias_name);
-                    c.emit_rc(OpCode::MergeExports, mod_reg, key);
+                    c.emit_rc(OpCode::LoadModule, mod_reg, src_idx);
+                    if let Some(slot_idx) = c.annotations.get_slot_idx(range.start.offset) {
+                        c.emit_rc(OpCode::StoreModuleSlot, mod_reg, slot_idx as u16);
+                    }
                     c.free_reg();
                 }
                 None => {
-                    c.emit1(OpCode::Reexport, src_idx);
+                    let mod_reg = c.alloc_reg();
+                    c.emit_rc(OpCode::LoadModule, mod_reg, src_idx);
+                    c.free_reg();
                 }
             }
         }

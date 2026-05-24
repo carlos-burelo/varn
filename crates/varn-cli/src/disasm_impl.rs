@@ -97,14 +97,20 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
             | OpCode::DefineGlobalIdx
             | OpCode::LoadGlobalIdx
             | OpCode::StoreGlobalIdx
-            | OpCode::MergeExports
+            | OpCode::LoadModule
+            | OpCode::StoreModuleSlot
             | OpCode::LoadUpvalue
-            | OpCode::StoreUpvalue
-            | OpCode::Import
-            | OpCode::Reexport => {
+            | OpCode::StoreUpvalue => {
                 let w1 = code.get(offset + 1).copied().unwrap_or(0);
                 println!("{:?} r{} +{}", op, first_reg, w1);
                 offset + 2
+            }
+
+            OpCode::LoadModuleSlot => {
+                let w1 = code.get(offset + 1).copied().unwrap_or(0);
+                let w2 = code.get(offset + 2).copied().unwrap_or(0);
+                println!("{:?} r{} r{} +{}", op, first_reg, w1 >> 8, w2);
+                offset + 3
             }
 
             OpCode::Add

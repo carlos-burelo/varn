@@ -248,6 +248,7 @@ pub struct Compiler<'a> {
     // parent pointer is accessed only through the raw pointer, no second borrow exists).
     pub parent: *mut Compiler<'a>,
     pub parent_depth: usize,
+    pub export_names: Vec<Rc<str>>,
 }
 
 impl<'a> Compiler<'a> {
@@ -258,6 +259,7 @@ impl<'a> Compiler<'a> {
         extension_members: &'a FxHashMap<u32, Rc<str>>,
         extension_set_members: &'a FxHashMap<u32, Rc<str>>,
         protos: Rc<RefCell<Vec<FunctionProto>>>,
+        export_names: Vec<Rc<str>>,
     ) -> Self {
         let mut chunk = Chunk::new();
         chunk.source_file = source_file.clone();
@@ -292,6 +294,7 @@ impl<'a> Compiler<'a> {
             line: 0,
             parent: std::ptr::null_mut(),
             parent_depth: 0,
+            export_names,
         }
     }
 
@@ -344,6 +347,7 @@ impl<'a> Compiler<'a> {
             line: 0,
             parent,
             parent_depth,
+            export_names: Vec::new(),
         }
     }
 
@@ -618,6 +622,7 @@ impl<'a> Compiler<'a> {
         let mut proto = FunctionProto {
             name: Some(self.name),
             arity: self.arity,
+            export_names: self.export_names,
             register_count: self.regs.max as u16,
             has_rest: self.has_rest,
             is_async: self.is_async,
@@ -637,6 +642,7 @@ impl<'a> Compiler<'a> {
         let mut proto = FunctionProto {
             name: Some(self.name),
             arity: self.arity,
+            export_names: Vec::new(),
             register_count: self.regs.max as u16,
             has_rest: self.has_rest,
             is_async: self.is_async,

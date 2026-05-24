@@ -2,6 +2,7 @@ mod alloc;
 mod class;
 mod closure;
 mod constructors;
+mod module;
 mod object;
 mod shape;
 mod task;
@@ -17,6 +18,7 @@ pub use alloc::{
 pub use class::{find_method_with_owner, ClassObj};
 pub use closure::{Closure, Upvalue, UpvalueInner};
 pub use constructors::{new_array, new_object};
+pub use module::ModuleObj;
 pub use object::{nv_to_value, value_to_nv, ObjData};
 use rust_decimal::Decimal;
 pub use shape::{root_shape, RuntimeObject, Shape};
@@ -124,6 +126,7 @@ pub enum Value {
     Char(char),
     EnumVariant(Box<EnumVariantData>),
     VmValue(Box<dyn VmValuePayload>),
+    Module(Rc<ModuleObj>),
 }
 
 pub type ResultType = Result<Value, String>;

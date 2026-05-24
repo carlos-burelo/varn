@@ -3,7 +3,7 @@ use crate::binder::resolve_type_node;
 use crate::symbol::SymbolKind;
 use crate::BindResult;
 use varn_core::ast::operators::BinaryOp;
-use varn_core::ast::ImportSpecifier;
+use varn_core::ast::{ImportSpecifier, ExportDecl};
 use varn_core::ast::{Arg, ArrayEl, Decl, Expr, ExprKind, ForInit, Program, Stmt, StmtKind};
 use varn_core::TypeKind;
 use varn_core::{NumericKind, TypeAnnotations};
@@ -209,6 +209,9 @@ fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                 let scope = ctx.bind.scopes.get(ctx.bind.global_scope);
                 if let Some(id) = scope.resolve(name, &ctx.bind.scopes) {
                     let sym = ctx.bind.arena.get(id);
+                    if let Some(slot_idx) = sym.slot_idx {
+                        ann.record_slot_idx(spec.range().start.offset, slot_idx);
+                    }
                     if matches!(
                         sym.kind,
                         SymbolKind::Interface
@@ -217,6 +220,57 @@ fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                             | SymbolKind::Extension
                     ) {
                         ann.record_type_only(spec.range().start.offset);
+                    }
+                }
+            }
+        }
+        Decl::Export(e) => {
+            let exports = crate::module_resolver::resolve_module_exports_ref(&ctx.bind.source_file, &mut vec![]);
+            match e {
+                ExportDecl::Decl { declaration, .. } => {
+                    annotate_decl(declaration, ann, ctx);
+                    if let Some(name) = decl_primary_name(declaration) {
+                        if let Some(sym) = exports.get(name.as_ref()) {
+                            if let Some(slot_idx) = sym.slot_idx {
+                                ann.record_slot_idx(declaration.range().start.offset, slot_idx);
+                            }
+                        }
+                    }
+                }
+                ExportDecl::Default { declaration, range, .. } => {
+                    match declaration.as_ref() {
+                        varn_core::ast::ExportDefaultDecl::Function(f) => {
+                            annotate_decl(&Decl::Function(f.clone()), ann, ctx);
+                        }
+                        varn_core::ast::ExportDefaultDecl::Class(c) => {
+                            annotate_decl(&Decl::Class(c.clone()), ann, ctx);
+                        }
+                        varn_core::ast::ExportDefaultDecl::Expr(ex) => {
+                            annotate_expr(ex, ann, ctx);
+                        }
+                    }
+                    if let Some(sym) = exports.get("default") {
+                        if let Some(slot_idx) = sym.slot_idx {
+                            ann.record_slot_idx(range.start.offset, slot_idx);
+                        }
+                    }
+                }
+                ExportDecl::Named { specifiers, .. } => {
+                    for spec in specifiers {
+                        if let Some(sym) = exports.get(&spec.exported.to_string()) {
+                            if let Some(slot_idx) = sym.slot_idx {
+                                ann.record_slot_idx(spec.range.start.offset, slot_idx);
+                            }
+                        }
+                    }
+                }
+                ExportDecl::All { alias, range, .. } => {
+                    if let Some(ns) = alias {
+                        if let Some(sym) = exports.get(&ns.to_string()) {
+                            if let Some(slot_idx) = sym.slot_idx {
+                                ann.record_slot_idx(range.start.offset, slot_idx);
+                            }
+                        }
                     }
                 }
             }
@@ -308,7 +362,31 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                 annotate_expr(e, ann, ctx);
             }
         }
-        ExprKind::Member { object, .. } => annotate_expr(object, ann, ctx),
+        ExprKind::Member {
+            object,
+            property,
+            computed,
+            ..
+        } => {
+            annotate_expr(object, ann, ctx);
+            if !computed {
+                if let ExprKind::Identifier { name: prop_name } = &property.kind {
+                    let obj_ty = infer_expr_type(object, Some(ctx));
+                    if let TypeKind::Named(_, Some(ref origin_path)) = &obj_ty.non_nullified().0 {
+                        let exports = if crate::module_resolver::is_known_stdlib(origin_path) {
+                            crate::module_resolver::resolve_stdlib_module_exports_ref(origin_path)
+                        } else {
+                            crate::module_resolver::resolve_module_exports_ref(origin_path, &mut vec![])
+                        };
+                        if let Some(sym) = exports.get(prop_name.as_ref()) {
+                            if let Some(slot_idx) = sym.slot_idx {
+                                ann.record_slot_idx(expr.range.start.offset, slot_idx);
+                            }
+                        }
+                    }
+                }
+            }
+        }
         ExprKind::As { expression, .. } | ExprKind::Satisfies { expression, .. } => {
             annotate_expr(expression, ann, ctx)
         }
@@ -320,5 +398,22 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
             }
         }
         _ => {}
+    }
+}
+
+fn decl_primary_name(decl: &Decl) -> Option<std::rc::Rc<str>> {
+    match decl {
+        Decl::Variable(v) => v.declarators.first().and_then(|d| match &d.id {
+            varn_core::ast::Pattern::Identifier { name, .. } => Some(name.clone()),
+            _ => None,
+        }),
+        Decl::Function(f) => Some(f.id.clone()),
+        Decl::Class(c) => c.id.clone(),
+        Decl::Enum(e) => Some(e.id.clone()),
+        Decl::Interface(i) => Some(i.id.clone()),
+        Decl::TypeAlias(t) => Some(t.id.clone()),
+        Decl::Namespace(n) => Some(n.id.clone()),
+        Decl::Struct(s) => Some(s.id.clone()),
+        _ => None,
     }
 }
