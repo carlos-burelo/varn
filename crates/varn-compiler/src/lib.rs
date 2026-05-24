@@ -18,6 +18,7 @@ pub fn compile(
     extension_calls: &FxHashMap<u32, Rc<str>>,
     extension_members: &FxHashMap<u32, Rc<str>>,
     extension_set_members: &FxHashMap<u32, Rc<str>>,
+    export_names: Vec<Rc<str>>,
 ) -> Result<FunctionProto, Rc<str>> {
     codegen::compile_direct(
         program,
@@ -25,6 +26,7 @@ pub fn compile(
         extension_calls,
         extension_members,
         extension_set_members,
+        export_names,
     )
 }
 
@@ -34,6 +36,7 @@ pub fn compile_with_check_result(
     extension_calls: &FxHashMap<u32, Rc<str>>,
     extension_members: &FxHashMap<u32, Rc<str>>,
     extension_set_members: &FxHashMap<u32, Rc<str>>,
+    export_names: Vec<Rc<str>>,
 ) -> Result<FunctionProto, Rc<str>> {
     codegen::compile_direct(
         program,
@@ -41,6 +44,7 @@ pub fn compile_with_check_result(
         extension_calls,
         extension_members,
         extension_set_members,
+        export_names,
     )
 }
 
@@ -51,6 +55,7 @@ pub fn compile_with_check_result_and_layout(
     extension_members: &FxHashMap<u32, Rc<str>>,
     extension_set_members: &FxHashMap<u32, Rc<str>>,
     _global_layout: Option<GlobalLayout>,
+    export_names: Vec<Rc<str>>,
 ) -> Result<FunctionProto, Rc<str>> {
     codegen::compile_direct(
         program,
@@ -58,5 +63,6 @@ pub fn compile_with_check_result_and_layout(
         extension_calls,
         extension_members,
         extension_set_members,
+        export_names,
     )
 }

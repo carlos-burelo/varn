@@ -1180,7 +1180,7 @@ impl ExecCtx {
                         reg![dest] = self.exec_spawn(task_val)?;
                     }
 
-                    OpCode::Import | OpCode::Reexport | OpCode::MergeExports => {
+                    OpCode::LoadModule | OpCode::LoadModuleSlot | OpCode::StoreModuleSlot => {
                         self.frames[frame_idx].ip = ip;
                         self.exec_module_op_reg(
                             op, code, &mut ip, base, frame_idx, &closure, first_reg,

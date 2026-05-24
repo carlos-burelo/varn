@@ -66,6 +66,7 @@ pub struct Symbol {
     pub re_export_path: Vec<Rc<str>>,
     pub original_name: Option<Rc<str>>,
     pub alias_node: Option<Box<TypeNode>>,
+    pub slot_idx: Option<usize>,
 }
 
 impl Symbol {
@@ -88,6 +89,7 @@ impl Symbol {
             re_export_path: Vec::new(),
             original_name: None,
             alias_node: None,
+            slot_idx: None,
         }
     }
 

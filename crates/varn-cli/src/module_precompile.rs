@@ -176,12 +176,16 @@ pub fn build_module_graph(
         };
 
         let check = varn_checker::Checker::check(program);
+        let exports = varn_checker::module_resolver::resolve_module_exports_ref(&program.filename, &mut vec![]);
+        let mut export_names: Vec<std::rc::Rc<str>> = exports.keys().map(|k| std::rc::Rc::from(k.as_str())).collect();
+        export_names.sort();
         let module_proto = varn_compiler::compile(
             program,
             &check.type_annotations,
             &check.extension_calls,
             &check.extension_members,
             &check.extension_set_members,
+            export_names,
         )
         .map_err(|e| format!("compile error in '{module_path}': {e}"))?;
 

@@ -2,16 +2,17 @@ use crate::error::VmResult;
 use crate::exec::ctx::ExecCtx;
 use crate::exec::dispatch::ControlSignal;
 use crate::frame::VmClosure;
+use crate::value::VmValue;
 
 impl ExecCtx {
     #[inline(always)]
-    pub(super) fn op_import(
+    pub(super) fn op_load_module(
         &mut self,
         code: &[u16],
         ip: &mut usize,
         closure: &VmClosure,
         frame_idx: usize,
-        first_reg: usize,
+        dest_reg: usize,
     ) -> VmResult<ControlSignal> {
         let spec_idx = code[*ip] as usize;
         *ip += 1;
@@ -19,7 +20,7 @@ impl ExecCtx {
         let spec = self
             .heap
             .str_val(spec_nv)
-            .expect("OpImport: not a string constant");
+            .expect("OpLoadModule: not a string constant");
 
         self.frames[frame_idx].ip = *ip;
         let module_nv = self.load_module(&spec)?;
@@ -29,83 +30,89 @@ impl ExecCtx {
             return Ok(ControlSignal::ContinueInstruction);
         }
         let base = self.frames[frame_idx].base;
-        self.stack[base + first_reg] = module_nv;
+        self.stack[base + dest_reg] = module_nv;
         Ok(ControlSignal::ContinueInstruction)
     }
 
     #[inline(always)]
-    pub(super) fn op_merge_exports(
+    pub(super) fn op_load_module_slot(
         &mut self,
         code: &[u16],
         ip: &mut usize,
         frame_idx: usize,
-        first_reg: usize,
+        dest_reg: usize,
     ) -> VmResult<ControlSignal> {
-        let val_reg = first_reg;
-        let key_idx = code[*ip] as usize;
+        let w = code[*ip];
         *ip += 1;
-        let key = self.read_str_const_at(key_idx, frame_idx)?;
+        let src_reg = (w >> 8) as usize; // equivalent to hi(w)
+        let slot_idx = code[*ip] as usize;
+        *ip += 1;
+
+        let base = self.frames[frame_idx].base;
+        let module_val = self.stack[base + src_reg];
+        if !module_val.is_heap() {
+            return Err(crate::error::RuntimeError::new(format!(
+                "OpLoadModuleSlot: target is not a module object: {:?}",
+                module_val
+            )));
+        }
+
+        if let Some(crate::heap::HeapObj::Module(m)) = self.heap.get(module_val.as_heap_idx()) {
+            if let Some(val) = m.get_slot(slot_idx) {
+                self.stack[base + dest_reg] = val;
+            } else {
+                return Err(crate::error::RuntimeError::new(format!(
+                    "OpLoadModuleSlot: slot {} out of bounds for module {}",
+                    slot_idx, m.id.as_str()
+                )));
+            }
+        } else {
+            return Err(crate::error::RuntimeError::new(format!(
+                "OpLoadModuleSlot: target is not a ModuleObj heap object: {:?}",
+                module_val
+            )));
+        }
+
+        Ok(ControlSignal::ContinueInstruction)
+    }
+
+    #[inline(always)]
+    pub(super) fn op_store_module_slot(
+        &mut self,
+        code: &[u16],
+        ip: &mut usize,
+        frame_idx: usize,
+        val_reg: usize,
+    ) -> VmResult<ControlSignal> {
+        let slot_idx = code[*ip] as usize;
+        *ip += 1;
+
         let base = self.frames[frame_idx].base;
         let val_nv = self.stack[base + val_reg];
 
         let exports_nv = if let Some(nv) = self.module_exports.get(&frame_idx).copied() {
             nv
         } else {
-            let nv = self.heap.intern(varn_types::Value::plain_object());
-            self.module_exports.insert(frame_idx, nv);
-            nv
+            return Err(crate::error::RuntimeError::new(
+                "OpStoreModuleSlot: no active module object for current frame".to_string(),
+            ));
         };
 
-        crate::exec::modules::reexport(exports_nv, key.as_ref(), val_nv, &mut self.heap)?;
-        Ok(ControlSignal::ContinueInstruction)
-    }
+        if !exports_nv.is_heap() {
+            return Err(crate::error::RuntimeError::new(
+                "OpStoreModuleSlot: active module object is not a heap object".to_string(),
+            ));
+        }
 
-    #[inline(always)]
-    pub(super) fn op_reexport(
-        &mut self,
-        code: &[u16],
-        ip: &mut usize,
-        frame_idx: usize,
-        closure: &VmClosure,
-    ) -> VmResult<ControlSignal> {
-        let idx = code[*ip] as usize;
-        *ip += 1;
-        let spec_nv = closure.constants[idx];
-        let spec = self
-            .heap
-            .str_val(spec_nv)
-            .expect("OpReexport: not a string constant");
-
-        self.frames[frame_idx].ip = *ip;
-        let module_id = crate::exec::modules::resolve_specifier_from_path(
-            &spec,
-            &closure.proto.chunk.source_file,
-        )?;
-        let resolved = module_id.as_str();
-
-        let src_nv = if let Some(&cached) = self.modules.get(&resolved) {
-            cached
-        } else if let Some(nv) = varn_builtins::build_module(&resolved, &mut self.heap) {
-            self.modules.insert(resolved.to_string(), nv);
-            nv
-        } else if let Some(proto) = self.precompiled.get(&resolved).cloned() {
-            self.load_module(&resolved)?
+        if let Some(crate::heap::HeapObj::Module(m)) = self.heap.get_mut(exports_nv.as_heap_idx()) {
+            let m = std::rc::Rc::make_mut(m);
+            m.set_slot(slot_idx, val_nv);
         } else {
-            return Err(crate::error::RuntimeError::new(format!(
-                "module not found: {}",
-                spec
-            )));
-        };
+            return Err(crate::error::RuntimeError::new(
+                "OpStoreModuleSlot: active module object is not a ModuleObj".to_string(),
+            ));
+        }
 
-        let exports_nv = if let Some(nv) = self.module_exports.get(&frame_idx).copied() {
-            nv
-        } else {
-            let nv = self.heap.intern(varn_types::Value::plain_object());
-            self.module_exports.insert(frame_idx, nv);
-            nv
-        };
-
-        crate::exec::modules::merge_exports(exports_nv, src_nv, &mut self.heap)?;
         Ok(ControlSignal::ContinueInstruction)
     }
 }

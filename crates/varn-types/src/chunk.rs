@@ -463,6 +463,8 @@ pub struct FunctionProto {
     pub name: Option<Rc<str>>,
     pub arity: usize,
 
+    pub export_names: Vec<Rc<str>>,
+
     pub register_count: u16,
     pub has_rest: bool,
     pub is_async: bool,
@@ -485,6 +487,7 @@ impl PartialEq for FunctionProto {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
             && self.arity == other.arity
+            && self.export_names == other.export_names
             && self.register_count == other.register_count
             && self.has_rest == other.has_rest
             && self.is_async == other.is_async
@@ -502,6 +505,7 @@ impl std::hash::Hash for FunctionProto {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.name.hash(state);
         self.arity.hash(state);
+        self.export_names.hash(state);
         self.register_count.hash(state);
         self.has_rest.hash(state);
         self.is_async.hash(state);

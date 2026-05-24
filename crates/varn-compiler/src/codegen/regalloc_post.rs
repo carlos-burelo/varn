@@ -96,15 +96,17 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
 
         OpCode::ArrayPush | OpCode::Inherit => s(2, None, vec![hi1, lo1]),
         OpCode::Yield | OpCode::Return | OpCode::Throw => s(2, None, vec![lo1]),
-        OpCode::MergeExports => s(2, None, vec![hi1]),
         OpCode::StoreUpvalue => s(2, None, vec![lo1]),
         OpCode::CloseUpvalue => s(2, None, vec![lo1]),
 
         // 2-word emit_rc: [pack_op(op,dest), const_idx]
-        OpCode::Import => s(2, Some(dest0), vec![]),
+        OpCode::LoadModule => s(2, Some(dest0), vec![]),
 
-        // emit1(op, const_idx) — 2 words: [opcode, const_idx]
-        OpCode::Reexport => s(2, None, vec![]),
+        // emit_rc: [pack_op(op,val_reg), slot_idx]
+        OpCode::StoreModuleSlot => s(2, None, vec![dest0]),
+
+        // emit_rrc: [pack_op(op,dest), pack(src,0), const_idx]
+        OpCode::LoadModuleSlot => s(3, Some(dest0), vec![hi1]),
 
         OpCode::MakeClosure => {
             let uv_count = lo1 as usize;
@@ -550,9 +552,6 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                 OpCode::Yield | OpCode::Return | OpCode::Throw => {
                     code[offset + 1] = pack(hi1, m(mapping, lo1));
                 }
-                OpCode::MergeExports => {
-                    code[offset + 1] = pack(m(mapping, hi1), lo1);
-                }
                 OpCode::StoreUpvalue => {
                     code[offset + 1] = pack(hi1, m(mapping, lo1));
                 }
@@ -653,7 +652,8 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                 // 3-word with dest=dest0, src=hi1: remap both word[0] and word[1]
                 OpCode::GetPropertyMaybe
                 | OpCode::GetFixedField
-                | OpCode::GetSymbol => {
+                | OpCode::GetSymbol
+                | OpCode::LoadModuleSlot => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), lo1);
                 }
@@ -723,9 +723,9 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                 }
 
                 // emit_rc: [pack_op(op,dest), const_idx] — word[1] is raw index
-                OpCode::Import => {
+                OpCode::LoadModule | OpCode::StoreModuleSlot => {
                     code[offset] = pack_op(op, m(mapping, dest0));
-                    // word[1] = path const_idx, do not touch
+                    // word[1] = const_idx, do not touch
                 }
 
                 OpCode::MakeClosure => {

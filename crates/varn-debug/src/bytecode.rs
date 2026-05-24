@@ -107,7 +107,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w1 = w!();
                 format!("r{} uv={}", hi(w1), lo(w1))
             }
-            OpCode::Return | OpCode::Throw | OpCode::MergeExports | OpCode::Yield => {
+            OpCode::Return | OpCode::Throw | OpCode::StoreModuleSlot | OpCode::Yield => {
                 let w1 = w!();
                 format!("r{}", lo(w1))
             }
@@ -435,18 +435,20 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 format!("err=r{} catch → +{}", err_reg, catch_offset)
             }
 
-            OpCode::Import => {
-                let w1 = w!();
-                let spec_idx = w!();
-                if let Some(c) = proto.chunk.constants.get(spec_idx as usize) {
+            OpCode::LoadModule => {
+                let dest = hi(op_val);
+                let const_idx = w!();
+                if let Some(c) = proto.chunk.constants.get(const_idx as usize) {
                     hint = format!("{:?}", c);
                 }
-                format!("r{} = import[{}]", hi(w1), spec_idx)
+                format!("r{} = load module[{}]", dest, const_idx)
             }
-            OpCode::Reexport => {
+            OpCode::LoadModuleSlot => {
+                let dest = hi(op_val);
                 let w1 = w!();
-                let _w2 = w!();
-                format!("reexport [{}]", hi(w1))
+                let src = hi(w1);
+                let slot_idx = w!();
+                format!("r{} = load module slot r{}[{}]", dest, src, slot_idx)
             }
 
             OpCode::Spawn => {

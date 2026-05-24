@@ -28,12 +28,17 @@ pub fn compile(
         eprintln!("[Varn] generating bytecode...");
     }
 
+    let exports = varn_checker::module_resolver::resolve_module_exports_ref(&program.filename, &mut vec![]);
+    let mut export_names: Vec<std::rc::Rc<str>> = exports.keys().map(|k| std::rc::Rc::from(k.as_str())).collect();
+    export_names.sort();
+
     let proto = varn_compiler::compile(
         program,
         &check_result.checker_result.type_annotations,
         &check_result.checker_result.extension_calls,
         &check_result.checker_result.extension_members,
         &check_result.checker_result.extension_set_members,
+        export_names,
     )
     .map_err(|e| {
         CliError::fatal(format!(

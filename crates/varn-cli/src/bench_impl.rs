@@ -269,12 +269,17 @@ pub fn run_bench(
         varn_compiler::codegen::regalloc_post::OPTIMIZE_TIME.with(|t| t.set(Duration::ZERO));
         varn_compiler::codegen::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(true));
 
+        let exports = varn_checker::module_resolver::resolve_module_exports_ref(&program_ref.filename, &mut vec![]);
+        let mut export_names: Vec<std::rc::Rc<str>> = exports.keys().map(|k| std::rc::Rc::from(k.as_str())).collect();
+        export_names.sort();
+
         let res = varn_compiler::compile_with_check_result(
             program_ref,
             &check_result.type_annotations,
             &check_result.extension_calls,
             &check_result.extension_members,
             &check_result.extension_set_members,
+            export_names,
         );
 
         varn_compiler::codegen::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(false));
@@ -291,12 +296,17 @@ pub fn run_bench(
         .map(|(c, o)| c.saturating_sub(*o))
         .collect();
 
+    let exports = varn_checker::module_resolver::resolve_module_exports_ref(&program.filename, &mut vec![]);
+    let mut export_names: Vec<std::rc::Rc<str>> = exports.keys().map(|k| std::rc::Rc::from(k.as_str())).collect();
+    export_names.sort();
+
     let proto = varn_compiler::compile_with_check_result(
         &program,
         &check_result.type_annotations,
         &check_result.extension_calls,
         &check_result.extension_members,
         &check_result.extension_set_members,
+        export_names,
     )
     .map_err(|e| CliError::fatal(format!("compile error: {e}")))?;
 

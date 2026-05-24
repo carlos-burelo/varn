@@ -24,6 +24,7 @@ pub fn compile_direct(
     extension_calls: &FxHashMap<u32, Rc<str>>,
     extension_members: &FxHashMap<u32, Rc<str>>,
     extension_set_members: &FxHashMap<u32, Rc<str>>,
+    export_names: Vec<Rc<str>>,
 ) -> Result<FunctionProto, Rc<str>> {
     use std::cell::RefCell;
     let protos = Rc::new(RefCell::new(Vec::new()));
@@ -34,6 +35,7 @@ pub fn compile_direct(
         extension_members,
         extension_set_members,
         protos,
+        export_names,
     );
     c.compile_program(program);
     Ok(c.finish_module())

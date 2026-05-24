@@ -378,8 +378,9 @@ impl NativeCtx for ExecCtx {
                 return o.borrow().get_field_nv(key);
             }
 
-            if let Some(HeapObj::NativeModule(map)) = self.heap.get(obj.as_heap_idx()) {
-                return map.get(key).copied();
+            if let Some(HeapObj::Module(m)) = self.heap.get(obj.as_heap_idx()) {
+                let slot = m.export_map.get(key).copied()?;
+                return m.get_slot(slot);
             }
         }
         None
@@ -390,9 +391,15 @@ impl NativeCtx for ExecCtx {
             if let Some(HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
                 o.borrow_mut().set_field_nv(std::rc::Rc::from(key), val);
                 self.heap.write_barrier(obj.as_heap_idx(), val);
-            } else if let Some(HeapObj::NativeModule(map_rc)) = self.heap.get_mut(obj.as_heap_idx())
-            {
-                std::rc::Rc::make_mut(map_rc).insert(std::rc::Rc::from(key), val);
+            } else if let Some(HeapObj::Module(m)) = self.heap.get_mut(obj.as_heap_idx()) {
+                if let Some(s) = m.export_map.get(key).copied() {
+                    std::rc::Rc::make_mut(m).set_slot(s, val);
+                } else {
+                    let m = std::rc::Rc::make_mut(m);
+                    let slot = m.exports.len();
+                    m.exports.push(val);
+                    m.export_map.insert(std::rc::Rc::from(key), slot);
+                }
             } else {
                 eprintln!(
                     "[set_field] MISS key={key} obj_heap_idx={} is_heap={}",
