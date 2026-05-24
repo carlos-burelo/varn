@@ -1,7 +1,7 @@
 pub mod loader;
 pub mod registry;
 
-pub use loader::ModuleLoader;
+pub use loader::BuiltinSourceLocator;
 pub use registry::{is_known, spec_for, MODULE_REGISTRY};
 
 #[cfg(feature = "runtime")]

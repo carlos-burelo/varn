@@ -481,6 +481,10 @@ pub struct FunctionProto {
     #[serde(skip)]
     #[serde(default)]
     pub jit_code: std::cell::RefCell<Option<Rc<dyn std::any::Any>>>,
+
+    #[serde(skip)]
+    #[serde(default)]
+    pub jit_failed: std::cell::Cell<bool>,
 }
 
 impl PartialEq for FunctionProto {

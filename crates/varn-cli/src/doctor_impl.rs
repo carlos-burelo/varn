@@ -6,7 +6,7 @@ pub fn run_doctor() -> CliResult<()> {
     let exe = std::env::current_exe().ok();
     let home = varn_core::paths::varn_home_dir();
     let cache = varn_core::paths::varn_cache_dir();
-    let loader = varn_builtins::ModuleLoader::from_env();
+    let loader = varn_builtins::BuiltinSourceLocator::from_env();
     let stdlib = loader.stdlib_root();
 
     println!("Varn Doctor");

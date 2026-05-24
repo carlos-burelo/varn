@@ -300,7 +300,7 @@ fn canonical_or_string(path: &Path) -> Option<String> {
     Some(normalize_path_string(path.to_string_lossy().into_owned()))
 }
 
-fn normalize_path_string(path: String) -> String {
+pub fn normalize_path_string(path: String) -> String {
     #[cfg(windows)]
     {
         if let Some(rest) = path.strip_prefix("\\\\?\\") {
@@ -361,6 +361,13 @@ fn nearest_owner_manifest(base_dir: &Path) -> Option<PackageManifest> {
         });
     }
     None
+}
+
+pub fn canonical_or_original(path: &Path) -> String {
+    if let Ok(canonical) = std::fs::canonicalize(path) {
+        return normalize_path_string(canonical.to_string_lossy().into_owned());
+    }
+    normalize_path_string(path.to_string_lossy().into_owned())
 }
 
 pub fn varn_source_for(specifier: &str) -> Option<&'static str> {

@@ -112,6 +112,9 @@ impl VmClosure {
     }
 
     pub fn compile_jit(&mut self) {
+        if self.proto.jit_failed.get() {
+            return;
+        }
         if let Some(entry_usize) = self.proto.jit_entry.get() {
             let entry: varn_jit::JitFn = unsafe { std::mem::transmute(entry_usize) };
             self.jit_entry = Some(entry);
@@ -166,6 +169,10 @@ impl VmClosure {
             shl: crate::exec::ctx::jit_shl as usize,
             shr: crate::exec::ctx::jit_shr as usize,
             ushr: crate::exec::ctx::jit_ushr as usize,
+            load_module: crate::exec::ctx::jit_load_module as usize,
+            load_module_slot: crate::exec::ctx::jit_load_module_slot as usize,
+            build_object_with_shape: crate::exec::ctx::jit_build_object_with_shape as usize,
+            range: crate::exec::ctx::jit_range as usize,
         };
         match varn_jit::compile(&self.proto, helpers) {
             Ok((entry, code)) => {
@@ -177,6 +184,7 @@ impl VmClosure {
                 *self.proto.jit_code.borrow_mut() = Some(code);
             }
             Err(e) => {
+                self.proto.jit_failed.set(true);
                 if std::env::var("VARN_JIT_DEBUG").is_ok() {
                     eprintln!("JIT compilation failed for '{}': {}", self.proto.name.as_deref().unwrap_or("<anonymous>"), e);
                 }
