@@ -6,6 +6,9 @@ let v = match x {
     A(n) => n,
     B(_) => -1,
 }
+if (v !== 42) {
+    throw new Error("DEBUG FAIL: v is not 42, it is: " + v)
+}
 assert("match ok", v === 42)
 
 let y = R.B("boom")

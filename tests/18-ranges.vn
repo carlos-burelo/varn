@@ -1,5 +1,4 @@
 
-
 const r1 = 0..5
 const r2 = 1..=5
 

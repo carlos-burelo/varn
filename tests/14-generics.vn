@@ -45,4 +45,12 @@ assert("stack peek",     stk.peek() === 3)
 assert("stack pop",      stk.pop() === 3)
 assert("stack size dec", stk.size === 2)
 
+const blockStrBox = intBox.map((n) => { return `val=${n}` })
+assert("generic box block map", blockStrBox.get() === "val=10")
+
+function applyFunc<T, U>(f: (T) => U, val: T): U {
+    return f(val)
+}
+assert("generic fn infer", applyFunc((x: int) => x.toString(), 123) === "123")
+
 print("[PASSED] 14. Generics ")

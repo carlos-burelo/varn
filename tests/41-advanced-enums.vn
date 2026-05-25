@@ -1,0 +1,124 @@
+// 41. Advanced Enums and Algebraic Data Types (ADTs)
+
+// 1. Basic Enums & Singleton Identity
+enum Direction {
+    North,
+    South,
+    East,
+    West
+}
+
+const dir = Direction.North
+assert("basic enum name", dir.name === "North")
+assert("basic enum rawValue", dir.rawValue === 0)
+assert("singleton identity", Direction.North === Direction.North)
+assert("singleton inequality", Direction.North !== Direction.South)
+
+// 2. Explicit Raw Values
+enum Status {
+    Pending,
+    Success = 10,
+    Error
+}
+
+assert("explicit pending rawValue", Status.Pending.rawValue === 0)
+assert("explicit success rawValue", Status.Success.rawValue === 10)
+assert("explicit error rawValue", Status.Error.rawValue === 11)
+
+// 3. Payload Variants & Construction (Positional & Named)
+enum Token {
+    Identifier(name: str),
+    Number(value: float),
+    String(value: str),
+    Plus,
+    Minus
+}
+
+const t1 = Token.Number(123)
+const t2 = Token.Identifier(name: "hello")
+
+assert("positional payload name", t1.name === "Number")
+assert("positional payload value", t1.value === 123)
+assert("named payload name", t2.name === "hello")
+
+// Pattern matching on payload variants
+const v1 = match (t1) {
+    Number(val) => val,
+    _ => 0
+}
+assert("match positional", v1 === 123)
+
+const v2 = match (t2) {
+    Identifier(n) => n,
+    _ => "none"
+}
+assert("match named", v2 === "hello")
+
+// 4. Shared Fields & Constructors
+enum HttpStatus {
+    Ok(200, "OK"),
+    NotFound(404, "Not Found");
+
+    code: int
+    message: str
+
+    constructor(code: int, message: str) {
+        this.code = code
+        this.message = message
+    }
+}
+
+assert("shared field code Ok", HttpStatus.Ok.code === 200)
+assert("shared field message Ok", HttpStatus.Ok.message === "OK")
+assert("shared field code NotFound", HttpStatus.NotFound.code === 404)
+assert("shared field message NotFound", HttpStatus.NotFound.message === "Not Found")
+
+// 5. Instance Methods with Pattern Matching on 'this'
+enum Shape {
+    Circle(radius: float),
+    Rectangle(width: float, height: float);
+
+    area(): float {
+        return match (this) {
+            Circle(radius) => 3.14159 * radius * radius,
+            Rectangle(width, height) => width * height
+        }
+    }
+}
+
+const circle = Shape.Circle(10.0)
+const rect = Shape.Rectangle(10.0, 20.0)
+
+assert("circle area", circle.area() === 314.159)
+assert("rect area", rect.area() === 200.0)
+
+// 6. Generic Enums
+enum Result<T, E> {
+    Ok(value: T),
+    Err(error: E)
+}
+
+const resOk = Result.Ok<int, str>(42)
+const valOk = match (resOk) {
+    Ok(val) => val,
+    Err(err) => 0
+}
+assert("generic enum Ok", valOk === 42)
+
+// 7. Interface Implementation
+interface Display {
+    toString(): str
+}
+
+enum CustomDisplay implements Display {
+    A,
+    B;
+
+    toString(): str {
+        return "CustomDisplay." + this.name
+    }
+}
+
+assert("interface method implementation", CustomDisplay.A.toString() === "CustomDisplay.A")
+
+print("[PASSED] 41. Advanced Enums and ADTs")
