@@ -125,7 +125,7 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
                 Type::Dynamic
             };
             build_fn_type(params, return_type, false, ctx, ret)
-        },
+        }
         ExprKind::Match { cases, .. } => {
             if let Some(first) = cases.first() {
                 match &first.body {
@@ -174,7 +174,11 @@ fn infer_member(
                     let mut found_tys = Vec::new();
                     for v in &variants {
                         if let TypeKind::Fn(ft) = &v.ty.0 {
-                            if let Some(p) = ft.params.iter().find(|p| p.name.as_ref().map_or(false, |pn| pn.as_ref() == prop_name.as_ref())) {
+                            if let Some(p) = ft.params.iter().find(|p| {
+                                p.name
+                                    .as_ref()
+                                    .map_or(false, |pn| pn.as_ref() == prop_name.as_ref())
+                            }) {
                                 found_tys.push(p.ty.clone());
                             }
                         }
@@ -271,7 +275,12 @@ fn infer_binary(
         | BinaryOp::GtEq
         | BinaryOp::Instanceof
         | BinaryOp::In => Type::Bool,
-        BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor | BinaryOp::Shl | BinaryOp::Shr | BinaryOp::UShr => {
+        BinaryOp::BitAnd
+        | BinaryOp::BitOr
+        | BinaryOp::BitXor
+        | BinaryOp::Shl
+        | BinaryOp::Shr
+        | BinaryOp::UShr => {
             let l = infer_expr_type(left, ctx);
             let r = infer_expr_type(right, ctx);
             match (&l.0, &r.0) {

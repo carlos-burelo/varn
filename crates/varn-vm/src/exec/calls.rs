@@ -96,7 +96,9 @@ pub fn try_prepare_call_fast(
             }
             None
         }
-        HeapObj::NativeFn(_name, f) => Some((PreparedCall::RawNativeImmediate(*f, arg_count), false)),
+        HeapObj::NativeFn(_name, f) => {
+            Some((PreparedCall::RawNativeImmediate(*f, arg_count), false))
+        }
         _ => None,
     }
 }

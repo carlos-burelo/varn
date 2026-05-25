@@ -1,6 +1,6 @@
-use std::rc::Rc;
-use rustc_hash::FxHashMap;
 use crate::vm_value::VmValue;
+use rustc_hash::FxHashMap;
+use std::rc::Rc;
 use varn_core::ModuleId;
 
 #[derive(Debug, Clone)]

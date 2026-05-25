@@ -107,7 +107,11 @@ impl TricolorMarker {
     /// Mark an old-gen object gray. `idx` may be a packed index (with OLD_GEN_FLAG) or raw.
     /// Nursery indices are silently skipped — they are managed by Minor GC.
     pub fn mark_gray(&mut self, idx: u32) {
-        let raw = if is_old_idx(idx) { old_idx_raw(idx) } else { idx };
+        let raw = if is_old_idx(idx) {
+            old_idx_raw(idx)
+        } else {
+            idx
+        };
         let current = self.marks.get_color(raw);
         if current == MarkColor::White {
             self.marks.set_color(raw, MarkColor::Gray);
@@ -312,16 +316,14 @@ impl TricolorMarker {
                         }
                     }
                 }
-                HeapObj::TaskHandle(task) => {
-                    match task.peek_state() {
-                        varn_types::TaskState::Resolved(v) | varn_types::TaskState::Rejected(v) => {
-                            if let Some(ci) = heap.value_heap_idx(&v) {
-                                self.mark_gray(ci);
-                            }
+                HeapObj::TaskHandle(task) => match task.peek_state() {
+                    varn_types::TaskState::Resolved(v) | varn_types::TaskState::Rejected(v) => {
+                        if let Some(ci) = heap.value_heap_idx(&v) {
+                            self.mark_gray(ci);
                         }
-                        varn_types::TaskState::Pending => {}
                     }
-                }
+                    varn_types::TaskState::Pending => {}
+                },
                 HeapObj::Generator(gen) => {
                     let mut visit = |nv: varn_types::VmValue| {
                         if let Some(child_idx) = heap.get_heap_idx(nv) {

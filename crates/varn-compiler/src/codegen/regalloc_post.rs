@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use std::cell::Cell;
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use varn_core::OpCode;
 use varn_types::FunctionProto;
@@ -226,10 +226,9 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
         OpCode::AddImm | OpCode::SubImm => s(2, Some(dest0), vec![hi1]),
 
         // 2-word: [pack_op(op,dest), const_idx]
-        OpCode::LoadConst
-        | OpCode::LoadInt
-        | OpCode::LoadGlobal
-        | OpCode::LoadGlobalIdx => s(2, Some(dest0), vec![]),
+        OpCode::LoadConst | OpCode::LoadInt | OpCode::LoadGlobal | OpCode::LoadGlobalIdx => {
+            s(2, Some(dest0), vec![])
+        }
 
         // 3-word: [pack_op(op,dest), pack(src,0), const_idx]
         OpCode::StoreGlobal
@@ -316,7 +315,7 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
         // word[0]=pack_op(op,dest), word[1]=pack(count,0), word[2+i]=pack(reg_i,0)
         OpCode::BuildStr => {
             let count = hi1 as usize; // count is in word[1] high byte
-            let dest = dest0;         // dest is in word[0] high byte
+            let dest = dest0; // dest is in word[0] high byte
             let mut uses = vec![];
             for i in 0..count {
                 let w = get(2 + i);

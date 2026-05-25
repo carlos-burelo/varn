@@ -32,15 +32,14 @@ pub fn build_scope_completions(state: &DocumentState, line: u32) -> Vec<Completi
                     Some(ty.to_string())
                 };
 
-                let (insert_text, insert_text_format) =
-                    if sym.kind == SymbolKind::Function {
-                        (
-                            Some(format!("{}($0)", sym.name)),
-                            Some(InsertTextFormat::SNIPPET),
-                        )
-                    } else {
-                        (None, None)
-                    };
+                let (insert_text, insert_text_format) = if sym.kind == SymbolKind::Function {
+                    (
+                        Some(format!("{}($0)", sym.name)),
+                        Some(InsertTextFormat::SNIPPET),
+                    )
+                } else {
+                    (None, None)
+                };
 
                 items.push(CompletionItem {
                     label: sym.name.to_string(),

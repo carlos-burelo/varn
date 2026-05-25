@@ -28,8 +28,12 @@ pub fn compile(
         eprintln!("[Varn] generating bytecode...");
     }
 
-    let exports = varn_checker::module_resolver::resolve_module_exports_ref(&program.filename, &mut vec![]);
-    let mut export_names: Vec<std::rc::Rc<str>> = exports.keys().map(|k| std::rc::Rc::from(k.as_str())).collect();
+    let exports =
+        varn_checker::module_resolver::resolve_module_exports_ref(&program.filename, &mut vec![]);
+    let mut export_names: Vec<std::rc::Rc<str>> = exports
+        .keys()
+        .map(|k| std::rc::Rc::from(k.as_str()))
+        .collect();
     export_names.sort();
 
     let proto = varn_compiler::compile(
@@ -84,12 +88,9 @@ pub fn compile(
     }
 
     // Fibonacci mix: order-sensitive, avoids XOR-fold collisions from permuted modules.
-    let graph_hash = graph_build
-        .source_hashes
-        .values()
-        .fold(0u64, |acc, &h| {
-            acc.wrapping_mul(0x9e3779b97f4a7c15).wrapping_add(h)
-        });
+    let graph_hash = graph_build.source_hashes.values().fold(0u64, |acc, &h| {
+        acc.wrapping_mul(0x9e3779b97f4a7c15).wrapping_add(h)
+    });
     let graph_artifact = ModuleGraphArtifact {
         format_version: CACHE_FORMAT_VERSION,
         entry_path: graph_build.entry_path.clone(),

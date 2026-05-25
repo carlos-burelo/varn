@@ -472,7 +472,11 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w1 = w!();
                 let src = hi(w1);
                 let imm = lo(w1) as i8;
-                let sign = if matches!(op, OpCode::SubImm) { "-" } else { "+" };
+                let sign = if matches!(op, OpCode::SubImm) {
+                    "-"
+                } else {
+                    "+"
+                };
                 format!("r{dest} = r{src} {sign} {imm}")
             }
 

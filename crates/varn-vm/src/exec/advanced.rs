@@ -30,9 +30,7 @@ pub fn typeof_val(val: VmValue, heap: &Heap) -> &'static str {
             | Some(HeapObj::BoundMethod(..)) => "function",
             Some(HeapObj::Class(_)) => RuntimeTypeName::Class.as_str(),
             Some(HeapObj::Array(_)) => RuntimeTypeName::Array.as_str(),
-            Some(HeapObj::Object(_)) | Some(HeapObj::Module(_)) => {
-                RuntimeTypeName::Object.as_str()
-            }
+            Some(HeapObj::Object(_)) | Some(HeapObj::Module(_)) => RuntimeTypeName::Object.as_str(),
             Some(HeapObj::Map(_)) => "map",
             Some(HeapObj::Set(_)) => "set",
             Some(HeapObj::BigInt(_)) => IntrinsicType::BigInt.as_str(),
@@ -201,11 +199,7 @@ fn array_symbol_iterator(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<Vm
     ctx.set_field(iter_nv, "__arr", arr_nv);
     ctx.set_field(iter_nv, "__idx", VmValue::from_int(0));
     let extracted = ctx.extract(iter_nv);
-    let next_nv = ctx.intern(Value::native_bound(
-        extracted,
-        array_iter_next,
-        "next",
-    ));
+    let next_nv = ctx.intern(Value::native_bound(extracted, array_iter_next, "next"));
     ctx.set_field(iter_nv, "next", next_nv);
     Ok(iter_nv)
 }

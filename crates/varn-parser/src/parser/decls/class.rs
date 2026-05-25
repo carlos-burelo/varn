@@ -82,7 +82,10 @@ pub fn parse_class_decl(
     })
 }
 
-pub fn parse_class_member(s: &mut TokenStream, class_is_declare: bool) -> Result<ClassMember, String> {
+pub fn parse_class_member(
+    s: &mut TokenStream,
+    class_is_declare: bool,
+) -> Result<ClassMember, String> {
     let range = s.range();
     let decorators = super::super::patterns::parse_decorator_list(s)?;
 
@@ -311,9 +314,7 @@ pub(super) fn member_key_name(s: &mut TokenStream) -> Result<String, String> {
             s.advance();
             Ok(format!("#{}", s.consume_str()))
         }
-        _ if s.kind().can_be_identifier() || s.kind().is_keyword() => {
-            Ok(s.consume_str())
-        }
+        _ if s.kind().can_be_identifier() || s.kind().is_keyword() => Ok(s.consume_str()),
         _ => Err(format!("Expected class member name, got {:?}", s.kind())),
     }
 }

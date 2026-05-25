@@ -55,13 +55,6 @@ pub fn callee_saved_registers() -> &'static [Reg] {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        &[
-            Reg::Rbx,
-            Reg::Rbp,
-            Reg::R12,
-            Reg::R13,
-            Reg::R14,
-            Reg::R15,
-        ]
+        &[Reg::Rbx, Reg::Rbp, Reg::R12, Reg::R13, Reg::R14, Reg::R15]
     }
 }

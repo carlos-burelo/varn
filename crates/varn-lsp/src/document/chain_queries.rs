@@ -3,7 +3,7 @@ use std::rc::Rc;
 use varn_checker::{SymbolKind, Type};
 use varn_core::{IntrinsicType, TokenKind, TypeKind, TypeTag};
 
-use super::{ChainResult, DocumentState, MemberRecord, MemberKind};
+use super::{ChainResult, DocumentState, MemberKind, MemberRecord};
 
 fn is_expression_keyword(kind: TokenKind) -> bool {
     matches!(kind, TokenKind::Await | TokenKind::Yield)
@@ -42,7 +42,10 @@ impl DocumentState {
         bytes.len() as u32
     }
 
-    pub(crate) fn expr_info_at_token(&self, tok: &super::TokenRecord) -> Option<&varn_checker::ExprInfo> {
+    pub(crate) fn expr_info_at_token(
+        &self,
+        tok: &super::TokenRecord,
+    ) -> Option<&varn_checker::ExprInfo> {
         if let Some(info) = self.db.expr_types.get(&tok.offset) {
             return Some(info);
         }
@@ -189,15 +192,22 @@ impl DocumentState {
 
     fn find_chain_result(&self, ty: &Type, name: &str) -> Option<ChainResult> {
         let type_name = type_name_str(ty)?;
-        let mut is_enum = self.symbols.iter().any(|s| s.name == type_name && s.kind == SymbolKind::Enum);
+        let mut is_enum = self
+            .symbols
+            .iter()
+            .any(|s| s.name == type_name && s.kind == SymbolKind::Enum);
         if !is_enum {
             let origin = match &ty.0 {
-                TypeKind::Named(_, o) | TypeKind::Generic(_, _, o) => o.as_ref().map(|s| s.as_ref()),
+                TypeKind::Named(_, o) | TypeKind::Generic(_, _, o) => {
+                    o.as_ref().map(|s| s.as_ref())
+                }
                 _ => None,
             };
             if let Some(origin_mod) = origin {
                 if let Some(rb) = varn_checker::module_resolver::resolve_module_bind_ref(origin_mod)
-                    .or_else(|| varn_checker::module_resolver::resolve_stdlib_module_bind_ref(origin_mod))
+                    .or_else(|| {
+                        varn_checker::module_resolver::resolve_stdlib_module_bind_ref(origin_mod)
+                    })
                 {
                     is_enum = rb.get_enum_members_local(&type_name).is_some();
                 }
@@ -206,7 +216,9 @@ impl DocumentState {
         if !is_enum {
             for import_path in &self.import_paths {
                 let rb = varn_checker::module_resolver::resolve_module_bind_ref(import_path)
-                    .or_else(|| varn_checker::module_resolver::resolve_stdlib_module_bind_ref(import_path));
+                    .or_else(|| {
+                        varn_checker::module_resolver::resolve_stdlib_module_bind_ref(import_path)
+                    });
                 if let Some(ref_rb) = rb {
                     if ref_rb.get_enum_members_local(&type_name).is_some() {
                         is_enum = true;
@@ -280,25 +292,39 @@ impl DocumentState {
                 }
                 // Fallback to origin module definition if not resolved in local symbols (e.g. for destructured imports)
                 let origin = match &ty.0 {
-                    TypeKind::Named(_, o) | TypeKind::Generic(_, _, o) => o.as_ref().map(|s| s.as_ref()),
+                    TypeKind::Named(_, o) | TypeKind::Generic(_, _, o) => {
+                        o.as_ref().map(|s| s.as_ref())
+                    }
                     _ => None,
                 };
                 let mut resolved_rb = None;
                 if let Some(origin_mod) = origin {
-                    resolved_rb = varn_checker::module_resolver::resolve_module_bind_ref(origin_mod)
-                        .or_else(|| varn_checker::module_resolver::resolve_stdlib_module_bind_ref(origin_mod));
+                    resolved_rb = varn_checker::module_resolver::resolve_module_bind_ref(
+                        origin_mod,
+                    )
+                    .or_else(|| {
+                        varn_checker::module_resolver::resolve_stdlib_module_bind_ref(origin_mod)
+                    });
                 }
 
                 // If no origin was found or resolved, check all imported modules in the current file
                 if resolved_rb.is_none() {
                     for import_path in &self.import_paths {
-                        let rb = varn_checker::module_resolver::resolve_module_bind_ref(import_path)
-                            .or_else(|| varn_checker::module_resolver::resolve_stdlib_module_bind_ref(import_path));
+                        let rb =
+                            varn_checker::module_resolver::resolve_module_bind_ref(import_path)
+                                .or_else(|| {
+                                    varn_checker::module_resolver::resolve_stdlib_module_bind_ref(
+                                        import_path,
+                                    )
+                                });
                         if let Some(ref_rb) = rb {
                             if ref_rb.get_class_entry(&type_name).is_some()
                                 || ref_rb.get_interface_members_local(&type_name).is_some()
                                 || ref_rb.get_enum_members_local(&type_name).is_some()
-                                || ref_rb.type_members.namespaces.contains_key(type_name.as_str())
+                                || ref_rb
+                                    .type_members
+                                    .namespaces
+                                    .contains_key(type_name.as_str())
                             {
                                 resolved_rb = Some(ref_rb);
                                 break;
@@ -308,7 +334,8 @@ impl DocumentState {
                 }
 
                 if let Some(rb) = resolved_rb {
-                    let ms = if let Some(ms) = rb.get_flattened_members(&type_name)
+                    let ms = if let Some(ms) = rb
+                        .get_flattened_members(&type_name)
                         .or_else(|| rb.get_class_entry(&type_name).map(|e| &e.members))
                         .or_else(|| rb.get_interface_members_local(&type_name))
                     {
@@ -338,7 +365,8 @@ impl DocumentState {
                 // Fall back to compiler built-in types (Array, str, int, float, etc.)
                 let builtins = varn_checker::builtins::loader::builtin_members_ref();
                 if let Some(members_info) = builtins.class_members.get(type_name.as_str()) {
-                    let ms = crate::pipeline::symbols::map_members(&members_info.members, &self.tokens);
+                    let ms =
+                        crate::pipeline::symbols::map_members(&members_info.members, &self.tokens);
                     if let Some(m) = self.find_member_recursive(&ms, name) {
                         if mapping.is_empty() {
                             return Some(ChainResult::DynamicMember {
@@ -488,8 +516,6 @@ impl DocumentState {
             }
         }
 
-
-
         for (type_name, members) in &self.db.extension_members {
             if let Some(member) =
                 self.find_member_at_pos_recursive(members, line, tok.col, &tok.lexeme)
@@ -509,7 +535,8 @@ impl DocumentState {
         name: &str,
     ) -> Option<&'a MemberRecord> {
         for m in members {
-            if m.line == line && m.name == name && col >= m.col && col < m.col + m.name.len() as u32 {
+            if m.line == line && m.name == name && col >= m.col && col < m.col + m.name.len() as u32
+            {
                 return Some(m);
             }
             if let Some(found) = self.find_member_at_pos_recursive(&m.members, line, col, name) {

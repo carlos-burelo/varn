@@ -1,16 +1,20 @@
 use crate::error::{RuntimeError, VmResult};
 use crate::frame::{VmClosure, VmClosurePayload, VmValueRef};
 use crate::gc::GcCollector;
-use crate::nursery::{pack_old_idx, Nursery, OLD_GEN_FLAG, is_nursery_idx, is_old_idx, old_idx_raw};
+use crate::nursery::{
+    is_nursery_idx, is_old_idx, old_idx_raw, pack_old_idx, Nursery, OLD_GEN_FLAG,
+};
 use crate::value::VmValue;
 use std::cell::RefCell;
-use std::ops::{Deref, DerefMut};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use varn_types::{
     generator::{AsyncQueue, GeneratorObj},
-    value::{ArrayRef, EnumVariantData, MapRef, ObjRef, RangeData, RuntimeSymbol, SetRef, ModuleObj},
+    value::{
+        ArrayRef, EnumVariantData, MapRef, ModuleObj, ObjRef, RangeData, RuntimeSymbol, SetRef,
+    },
     AsyncTask, ClassObj, LazyTask, NativeCtx, NativeFn, ObjData, ResourceStore, RuntimeString,
     Value, VmArray,
 };
@@ -131,7 +135,13 @@ impl HeapInner {
             }
             _ => {}
         }
-        pack_old_idx(alloc_into(&mut self.objects, &mut self.free, &mut self.alloc_count, &mut self.gc_alloc_since_collect, obj))
+        pack_old_idx(alloc_into(
+            &mut self.objects,
+            &mut self.free,
+            &mut self.alloc_count,
+            &mut self.gc_alloc_since_collect,
+            obj,
+        ))
     }
 
     /// Allocate directly into old gen without bumping GC pressure counter.
@@ -157,7 +167,10 @@ impl HeapInner {
     /// Record a reference write from parent container to child value.
     #[inline(always)]
     pub fn write_barrier(&mut self, parent_packed_idx: u32, new_val: VmValue) {
-        if is_old_idx(parent_packed_idx) && new_val.is_heap() && is_nursery_idx(new_val.as_heap_idx()) {
+        if is_old_idx(parent_packed_idx)
+            && new_val.is_heap()
+            && is_nursery_idx(new_val.as_heap_idx())
+        {
             self.nursery.remember(parent_packed_idx);
         }
     }
@@ -236,8 +249,10 @@ impl HeapInner {
                 let packed = match self.char_interner.entry(c) {
                     Entry::Occupied(e) => *e.get(),
                     Entry::Vacant(e) => *e.insert(pack_old_idx(alloc_into(
-                        &mut self.objects, &mut self.free,
-                        &mut self.alloc_count, &mut self.gc_alloc_since_collect,
+                        &mut self.objects,
+                        &mut self.free,
+                        &mut self.alloc_count,
+                        &mut self.gc_alloc_since_collect,
                         HeapObj::Char(c),
                     ))),
                 };
@@ -249,8 +264,10 @@ impl HeapInner {
                 let packed = match self.bigint_interner.entry(n_val) {
                     Entry::Occupied(e) => *e.get(),
                     Entry::Vacant(e) => *e.insert(pack_old_idx(alloc_into(
-                        &mut self.objects, &mut self.free,
-                        &mut self.alloc_count, &mut self.gc_alloc_since_collect,
+                        &mut self.objects,
+                        &mut self.free,
+                        &mut self.alloc_count,
+                        &mut self.gc_alloc_since_collect,
                         HeapObj::BigInt(n_val),
                     ))),
                 };
@@ -261,8 +278,10 @@ impl HeapInner {
                 let packed = match self.decimal_interner.entry(d_val) {
                     Entry::Occupied(e) => *e.get(),
                     Entry::Vacant(e) => *e.insert(pack_old_idx(alloc_into(
-                        &mut self.objects, &mut self.free,
-                        &mut self.alloc_count, &mut self.gc_alloc_since_collect,
+                        &mut self.objects,
+                        &mut self.free,
+                        &mut self.alloc_count,
+                        &mut self.gc_alloc_since_collect,
                         HeapObj::Decimal(Box::new(d_val)),
                     ))),
                 };
@@ -406,7 +425,12 @@ impl HeapInner {
         // are not interned to avoid stale references after Minor GC resets the nursery).
         if let Some(&packed) = self.string_interner.get(&rs) {
             let raw = old_idx_raw(packed);
-            if self.objects.get(raw as usize).map(|o| o.is_some()).unwrap_or(false) {
+            if self
+                .objects
+                .get(raw as usize)
+                .map(|o| o.is_some())
+                .unwrap_or(false)
+            {
                 return VmValue::from_heap_idx(packed);
             }
             self.string_interner.remove(&rs);
@@ -414,12 +438,14 @@ impl HeapInner {
 
         // Allocate in nursery if space available; otherwise old gen.
         let idx = if let Some(ni) = self.nursery.try_alloc(HeapObj::Str(rs.clone())) {
-            ni  // nursery index (bit31 = 0)
+            ni // nursery index (bit31 = 0)
         } else {
             // Nursery full — allocate in old gen and intern.
             let oi = alloc_into(
-                &mut self.objects, &mut self.free,
-                &mut self.alloc_count, &mut self.gc_alloc_since_collect,
+                &mut self.objects,
+                &mut self.free,
+                &mut self.alloc_count,
+                &mut self.gc_alloc_since_collect,
                 HeapObj::Str(rs.clone()),
             );
             let packed = pack_old_idx(oi);
@@ -438,14 +464,21 @@ impl HeapInner {
         let rs: RuntimeString = Rc::from(s_ref);
         if let Some(&packed) = self.string_interner.get(&rs) {
             let raw = old_idx_raw(packed);
-            if self.objects.get(raw as usize).map(|o| o.is_some()).unwrap_or(false) {
+            if self
+                .objects
+                .get(raw as usize)
+                .map(|o| o.is_some())
+                .unwrap_or(false)
+            {
                 return VmValue::from_heap_idx(packed);
             }
             self.string_interner.remove(&rs);
         }
         let oi = alloc_into(
-            &mut self.objects, &mut self.free,
-            &mut self.alloc_count, &mut self.gc_alloc_since_collect,
+            &mut self.objects,
+            &mut self.free,
+            &mut self.alloc_count,
+            &mut self.gc_alloc_since_collect,
             HeapObj::Str(rs.clone()),
         );
         let packed = pack_old_idx(oi);
@@ -458,8 +491,10 @@ impl HeapInner {
             Entry::Occupied(e) => *e.get(),
             Entry::Vacant(e) => {
                 let packed = pack_old_idx(alloc_into(
-                    &mut self.objects, &mut self.free,
-                    &mut self.alloc_count, &mut self.gc_alloc_since_collect,
+                    &mut self.objects,
+                    &mut self.free,
+                    &mut self.alloc_count,
+                    &mut self.gc_alloc_since_collect,
                     HeapObj::Symbol(e.key().clone()),
                 ));
                 *e.insert(packed)
@@ -634,17 +669,28 @@ impl HeapInner {
 
         let check = |packed: u32, objects: &Vec<Option<HeapObj>>| -> bool {
             let raw = old_idx_raw(packed);
-            objects.get(raw as usize).map(|o| o.is_some()).unwrap_or(false)
+            objects
+                .get(raw as usize)
+                .map(|o| o.is_some())
+                .unwrap_or(false)
         };
 
-        self.symbol_interner.retain(|_, &mut packed| check(packed, &self.objects));
-        self.char_interner.retain(|_, &mut packed| check(packed, &self.objects));
-        self.bigint_interner.retain(|_, &mut packed| check(packed, &self.objects));
-        self.decimal_interner.retain(|_, &mut packed| check(packed, &self.objects));
-        self.array_interner.retain(|_, &mut packed| check(packed, &self.objects));
-        self.object_interner.retain(|_, &mut packed| check(packed, &self.objects));
-        self.map_interner.retain(|_, &mut packed| check(packed, &self.objects));
-        self.set_interner.retain(|_, &mut packed| check(packed, &self.objects));
+        self.symbol_interner
+            .retain(|_, &mut packed| check(packed, &self.objects));
+        self.char_interner
+            .retain(|_, &mut packed| check(packed, &self.objects));
+        self.bigint_interner
+            .retain(|_, &mut packed| check(packed, &self.objects));
+        self.decimal_interner
+            .retain(|_, &mut packed| check(packed, &self.objects));
+        self.array_interner
+            .retain(|_, &mut packed| check(packed, &self.objects));
+        self.object_interner
+            .retain(|_, &mut packed| check(packed, &self.objects));
+        self.map_interner
+            .retain(|_, &mut packed| check(packed, &self.objects));
+        self.set_interner
+            .retain(|_, &mut packed| check(packed, &self.objects));
     }
 
     pub fn objects(&self) -> &Vec<Option<HeapObj>> {

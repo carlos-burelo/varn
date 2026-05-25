@@ -32,7 +32,9 @@ impl super::Binder {
             let existing_from_extern = existing_sym.origin_module.is_some()
                 || (existing_sym.line == 0 && existing_sym.full_range.start.line == 0);
             let new_is_import = sym.origin_module.is_some();
-            if existing_sym.kind == crate::symbol::SymbolKind::EnumMember || sym.kind == crate::symbol::SymbolKind::EnumMember {
+            if existing_sym.kind == crate::symbol::SymbolKind::EnumMember
+                || sym.kind == crate::symbol::SymbolKind::EnumMember
+            {
                 let id = self.arena.push(sym);
                 let rc_name: Rc<str> = name.clone().into();
                 self.scopes.get_mut(self.current).define(rc_name, id);

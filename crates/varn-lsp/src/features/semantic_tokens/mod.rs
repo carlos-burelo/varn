@@ -69,9 +69,11 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
                     continue;
                 }
                 let tt = match member.kind {
-                    MemberKind::Property | MemberKind::Variable | MemberKind::Getter | MemberKind::Setter => TT_PROPERTY,
-                    MemberKind::Method
-                    | MemberKind::Function => TT_FUNCTION,
+                    MemberKind::Property
+                    | MemberKind::Variable
+                    | MemberKind::Getter
+                    | MemberKind::Setter => TT_PROPERTY,
+                    MemberKind::Method | MemberKind::Function => TT_FUNCTION,
                     MemberKind::Constructor => continue,
                     MemberKind::Class | MemberKind::Namespace | MemberKind::Struct => TT_CLASS,
                     MemberKind::Interface => TT_INTERFACE,

@@ -176,8 +176,14 @@ pub fn build_module_graph(
         };
 
         let check = varn_checker::Checker::check(program);
-        let exports = varn_checker::module_resolver::resolve_module_exports_ref(&program.filename, &mut vec![]);
-        let mut export_names: Vec<std::rc::Rc<str>> = exports.keys().map(|k| std::rc::Rc::from(k.as_str())).collect();
+        let exports = varn_checker::module_resolver::resolve_module_exports_ref(
+            &program.filename,
+            &mut vec![],
+        );
+        let mut export_names: Vec<std::rc::Rc<str>> = exports
+            .keys()
+            .map(|k| std::rc::Rc::from(k.as_str()))
+            .collect();
         export_names.sort();
         let module_proto = varn_compiler::compile(
             program,
@@ -208,7 +214,10 @@ fn read_module_source(module_path: &str) -> Result<String, String> {
             .map(|s| s.to_owned())
             .ok_or_else(|| format!("embedded source not found for '{specifier}'"));
     }
-    if matches!(varn_core::ImportSpecifier::parse(module_path), varn_core::ImportSpecifier::Stdlib(_)) {
+    if matches!(
+        varn_core::ImportSpecifier::parse(module_path),
+        varn_core::ImportSpecifier::Stdlib(_)
+    ) {
         let loader = varn_builtins::BuiltinSourceLocator::from_env();
         return loader
             .embedded_source(module_path)
@@ -284,4 +293,3 @@ pub fn resolve_import_specifier(
         }
     }
 }
-

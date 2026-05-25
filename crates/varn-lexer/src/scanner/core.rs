@@ -73,9 +73,7 @@ impl super::Scanner<'_> {
                 if next == b'*' {
                     self.advance_bytes(2);
 
-                    if self.config.emit_doc_comments
-                        && self.peek(0) == b'*'
-                        && self.peek(1) != b'/'
+                    if self.config.emit_doc_comments && self.peek(0) == b'*' && self.peek(1) != b'/'
                     {
                         self.scan_doc_comment(&mut tokens, &mut lexemes);
                         self.last_kind = DOC_COMMENT;

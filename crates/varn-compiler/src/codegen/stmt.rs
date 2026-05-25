@@ -26,11 +26,13 @@ fn stmt_terminates(stmt: &Stmt) -> bool {
         StmtKind::Return { .. } | StmtKind::Throw { .. } => true,
         StmtKind::Break { .. } | StmtKind::Continue { .. } => true,
         StmtKind::Block { stmts } => stmts.iter().any(stmt_terminates),
-        StmtKind::If { consequent, alternate, .. } => {
-            alternate.as_ref().map_or(false, |alt| {
-                stmt_terminates(consequent) && stmt_terminates(alt)
-            })
-        }
+        StmtKind::If {
+            consequent,
+            alternate,
+            ..
+        } => alternate.as_ref().map_or(false, |alt| {
+            stmt_terminates(consequent) && stmt_terminates(alt)
+        }),
         _ => false,
     }
 }
@@ -703,13 +705,16 @@ fn compile_export<'a>(c: &mut Compiler<'a>, decl: &ExportDecl) {
                 if !c.emit_load_var(&name, val_reg) {
                     c.emit_rc(OpCode::LoadGlobal, val_reg, idx);
                 }
-                if let Some(slot_idx) = c.annotations.get_slot_idx(declaration.range().start.offset) {
+                if let Some(slot_idx) = c.annotations.get_slot_idx(declaration.range().start.offset)
+                {
                     c.emit_rc(OpCode::StoreModuleSlot, val_reg, slot_idx as u16);
                 }
                 c.free_reg();
             }
         }
-        ExportDecl::Default { declaration, range, .. } => match declaration.as_ref() {
+        ExportDecl::Default {
+            declaration, range, ..
+        } => match declaration.as_ref() {
             ExportDefaultDecl::Function(f) => {
                 if !f.modifiers.is_declare {
                     compile_fn_decl(c, f);
@@ -750,7 +755,10 @@ fn compile_export<'a>(c: &mut Compiler<'a>, decl: &ExportDecl) {
             }
         },
         ExportDecl::Named {
-            specifiers, source, range: _, ..
+            specifiers,
+            source,
+            range: _,
+            ..
         } => match source {
             Some(src) if !specifiers.is_empty() => {
                 let src_idx = c.add_str(src);
@@ -759,12 +767,19 @@ fn compile_export<'a>(c: &mut Compiler<'a>, decl: &ExportDecl) {
                 for spec in specifiers {
                     let imported_idx = c.add_str(&spec.local);
                     let val_reg = c.alloc_reg();
-                    if let Some(imported_slot) = c.annotations.get_slot_idx(spec.range.start.offset) {
-                        c.emit_rrc(OpCode::LoadModuleSlot, val_reg, mod_reg, imported_slot as u16);
+                    if let Some(imported_slot) = c.annotations.get_slot_idx(spec.range.start.offset)
+                    {
+                        c.emit_rrc(
+                            OpCode::LoadModuleSlot,
+                            val_reg,
+                            mod_reg,
+                            imported_slot as u16,
+                        );
                     } else {
                         c.emit_property(OpCode::GetProperty, val_reg, mod_reg, imported_idx);
                     }
-                    if let Some(exported_slot) = c.annotations.get_slot_idx(spec.range.start.offset) {
+                    if let Some(exported_slot) = c.annotations.get_slot_idx(spec.range.start.offset)
+                    {
                         c.emit_rc(OpCode::StoreModuleSlot, val_reg, exported_slot as u16);
                     }
                     c.free_reg();
@@ -779,14 +794,20 @@ fn compile_export<'a>(c: &mut Compiler<'a>, decl: &ExportDecl) {
                     if !c.emit_load_var(&spec.local, val_reg) {
                         c.emit_rc(OpCode::LoadGlobal, val_reg, idx);
                     }
-                    if let Some(exported_slot) = c.annotations.get_slot_idx(spec.range.start.offset) {
+                    if let Some(exported_slot) = c.annotations.get_slot_idx(spec.range.start.offset)
+                    {
                         c.emit_rc(OpCode::StoreModuleSlot, val_reg, exported_slot as u16);
                     }
                     c.free_reg();
                 }
             }
         },
-        ExportDecl::All { source, alias, range, .. } => {
+        ExportDecl::All {
+            source,
+            alias,
+            range,
+            ..
+        } => {
             let src_idx = c.add_str(source);
             match alias {
                 Some(_alias_name) => {

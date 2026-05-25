@@ -313,7 +313,11 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         arena,
         scopes,
         global_scope,
-        flattened_members: result.flattened_members.into_iter().map(|(k, v)| (k.to_string(), v)).collect(),
+        flattened_members: result
+            .flattened_members
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v))
+            .collect(),
         extension_members,
     };
 

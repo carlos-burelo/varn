@@ -12,11 +12,7 @@ pub trait TypeContext {
         name: &str,
         origin: Option<&str>,
     ) -> Option<Vec<ClassMemberInfo>>;
-    fn get_enum_members(
-        &self,
-        _name: &str,
-        _origin: Option<&str>,
-    ) -> Option<Vec<ClassMemberInfo>> {
+    fn get_enum_members(&self, _name: &str, _origin: Option<&str>) -> Option<Vec<ClassMemberInfo>> {
         None
     }
     fn resolve_symbol(&self, name: &str) -> Option<Type>;

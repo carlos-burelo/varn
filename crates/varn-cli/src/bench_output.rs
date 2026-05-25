@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use varn_core::OpCode;
-use varn_vm::VmProfile;
 use varn_vm::varn_jit::JitStatsSnapshot;
+use varn_vm::VmProfile;
 
 const R: &str = "\x1b[0m";
 const BOLD: &str = "\x1b[1m";
@@ -289,22 +289,27 @@ pub fn print_jit_stats(stats: &JitStatsSnapshot) {
 
     let total_compilations = stats.compile_success + stats.compile_fail;
     eprintln!(
-        "  {:<22} {:>10}  (success: {}, failed: {})",
-        "functions compiled",
+        "  {:<26} {:>10}  (success: {}, failed: {})",
+        "freshly compiled",
         fmt_num_u64(total_compilations),
         stats.compile_success,
         stats.compile_fail
     );
+    eprintln!(
+        "  {:<26} {:>10}",
+        "using cached JIT",
+        fmt_num_u64(stats.jit_cached)
+    );
 
     let compile_time = Duration::from_nanos(stats.total_compile_time_ns);
     eprintln!(
-        "  {:<22} {:>10}",
+        "  {:<26} {:>10}",
         "total compile time",
         fmt_dur(compile_time)
     );
 
     eprintln!(
-        "  {:<22} {:>10}",
+        "  {:<26} {:>10}",
         "total machine code",
         fmt_bytes(stats.total_code_size_bytes as usize)
     );
@@ -322,13 +327,13 @@ pub fn print_jit_stats(stats: &JitStatsSnapshot) {
     };
 
     eprintln!(
-        "  {:<22} {:>10}  ({:.1}%)",
-        "native JIT runs",
+        "  {:<26} {:>10}  ({:.1}%)",
+        "JIT runs",
         fmt_num_u64(stats.jit_runs),
         jit_ratio
     );
     eprintln!(
-        "  {:<22} {:>10}  ({:.1}%)",
+        "  {:<26} {:>10}  ({:.1}%)",
         "interpreted runs",
         fmt_num_u64(stats.interp_runs),
         interp_ratio

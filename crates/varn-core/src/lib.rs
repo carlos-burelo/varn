@@ -32,9 +32,9 @@ pub use token::{ParsedNumber, Token, TokenKind};
 pub use typed_ir::{NumericKind, TypeAnnotations};
 pub use varn_base::TypeTag;
 
+use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
-use rustc_hash::FxHashMap;
 
 thread_local! {
     static INTERNER: RefCell<FxHashMap<Box<str>, Rc<str>>> = RefCell::new(FxHashMap::default());

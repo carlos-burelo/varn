@@ -13,7 +13,9 @@ pub struct LexerConfig {
 
 impl Default for LexerConfig {
     fn default() -> Self {
-        Self { emit_doc_comments: true }
+        Self {
+            emit_doc_comments: true,
+        }
     }
 }
 
@@ -133,7 +135,10 @@ impl<'a> Scanner<'a> {
     }
 
     pub(super) fn location_at(&self, pos: usize) -> (u32, u32) {
-        let line_idx = self.line_starts.partition_point(|&s| s <= pos).saturating_sub(1);
+        let line_idx = self
+            .line_starts
+            .partition_point(|&s| s <= pos)
+            .saturating_sub(1);
         let line = (line_idx + 1) as u32;
         let col = (pos - self.line_starts[line_idx]) as u32;
         (line, col)

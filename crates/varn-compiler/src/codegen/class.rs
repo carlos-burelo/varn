@@ -396,7 +396,8 @@ fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
     let name_idx = c.add_str(&en.id);
     let class_reg = c.alloc_reg();
     let line = c.line;
-    c.chunk.emit_rrc(OpCode::MakeClass, class_reg, 0, name_idx, line);
+    c.chunk
+        .emit_rrc(OpCode::MakeClass, class_reg, 0, name_idx, line);
 
     let local_name: Rc<str> = Rc::from(format!("__class_{}__", en.id));
     c.define_local(local_name, class_reg);
@@ -650,9 +651,7 @@ fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
                     });
                 }
                 varn_core::TypeKind::LiteralStr(val) => {
-                    const_args.push(varn_core::ast::ExprKind::StrLiteral {
-                        value: val.clone(),
-                    });
+                    const_args.push(varn_core::ast::ExprKind::StrLiteral { value: val.clone() });
                 }
                 varn_core::TypeKind::LiteralFloat(bits) => {
                     const_args.push(varn_core::ast::ExprKind::FloatLiteral {
@@ -661,9 +660,7 @@ fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
                     });
                 }
                 varn_core::TypeKind::LiteralBool(val) => {
-                    const_args.push(varn_core::ast::ExprKind::BoolLiteral {
-                        value: *val,
-                    });
+                    const_args.push(varn_core::ast::ExprKind::BoolLiteral { value: *val });
                 }
                 _ => {}
             }
@@ -698,7 +695,8 @@ fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
             let line = c.line;
             c.chunk.emit(OpCode::Call, line);
             c.chunk.write(Chunk::pack(dest, ctor_reg), line);
-            c.chunk.write(Chunk::pack(arg_count as u8, receiver_reg), line);
+            c.chunk
+                .write(Chunk::pack(arg_count as u8, receiver_reg), line);
 
             c.regs.restore(saved_regs);
         }

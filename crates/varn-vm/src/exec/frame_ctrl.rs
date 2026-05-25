@@ -13,7 +13,9 @@ impl ExecCtx {
         match call {
             PreparedCall::Frame(frame) => {
                 if self.frames.len() >= 10000 {
-                    return Err(RuntimeError::new("stack overflow: call depth exceeded 10000"));
+                    return Err(RuntimeError::new(
+                        "stack overflow: call depth exceeded 10000",
+                    ));
                 }
                 self.record_call_vm_fast();
                 let required = frame.base + frame.closure.proto.register_count as usize;
@@ -57,7 +59,9 @@ impl ExecCtx {
             }
             PreparedCall::Constructor(frame, instance_nv) => {
                 if self.frames.len() >= 10000 {
-                    return Err(RuntimeError::new("stack overflow: call depth exceeded 10000"));
+                    return Err(RuntimeError::new(
+                        "stack overflow: call depth exceeded 10000",
+                    ));
                 }
                 self.record_call_vm_fast();
                 let ctor_frame_idx = self.frames.len();
@@ -106,13 +110,21 @@ impl ExecCtx {
                     buf[..arg_count]
                         .copy_from_slice(&self.stack[args_start..args_start + arg_count]);
                     self.stack.drain((args_start - 1)..);
-                    let slice = if arg_count > 0 { &buf[1..arg_count] } else { &buf[..0] };
+                    let slice = if arg_count > 0 {
+                        &buf[1..arg_count]
+                    } else {
+                        &buf[..0]
+                    };
                     (f)(self as &mut dyn NativeCtx, slice)
                 } else {
                     let vm_args: Vec<VmValue> =
                         self.stack[args_start..args_start + arg_count].to_vec();
                     self.stack.drain((args_start - 1)..);
-                    let slice = if arg_count > 0 { &vm_args[1..] } else { &vm_args[..] };
+                    let slice = if arg_count > 0 {
+                        &vm_args[1..]
+                    } else {
+                        &vm_args[..]
+                    };
                     (f)(self as &mut dyn NativeCtx, slice)
                 }
                 .map_err(|e| RuntimeError::new(e))?;
@@ -440,7 +452,11 @@ impl NativeCtx for ExecCtx {
                 let args_start = self.stack.len() - arg_count;
                 let vm_args: Vec<VmValue> = self.stack[args_start..args_start + arg_count].to_vec();
                 self.stack.drain((args_start - 1)..);
-                let slice = if arg_count > 0 { &vm_args[1..] } else { &vm_args[..] };
+                let slice = if arg_count > 0 {
+                    &vm_args[1..]
+                } else {
+                    &vm_args[..]
+                };
                 (f)(self as &mut dyn NativeCtx, slice)
             }
             PreparedCall::Frame(frame) => {

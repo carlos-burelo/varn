@@ -93,19 +93,19 @@ impl super::super::Binder {
                                         &mut visiting,
                                     );
                                     exports
+                                        .get(prop.key.as_ref())
+                                        .and_then(|sym| sym.ty.clone())
+                                        .or_else(|| {
+                                            self.type_members
+                                                .namespaces
                                                 .get(prop.key.as_ref())
-                                                .and_then(|sym| sym.ty.clone())
-                                                .or_else(|| {
-                                                    self.type_members
-                                                        .namespaces
-                                                        .get(prop.key.as_ref())
-                                                        .and_then(|members| members.first())
-                                                        .map(|_| {
-                                                            Type::named_with_origin(
-                                                                prop.key.to_string(),
-                                                                Some(origin_path.to_string()),
-                                                            )
-                                                        })
+                                                .and_then(|members| members.first())
+                                                .map(|_| {
+                                                    Type::named_with_origin(
+                                                        prop.key.to_string(),
+                                                        Some(origin_path.to_string()),
+                                                    )
+                                                })
                                         })
                                 }),
                             _ => None,

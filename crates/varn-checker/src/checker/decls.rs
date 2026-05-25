@@ -231,7 +231,9 @@ impl Checker {
                                 }
 
                                 let saved_expected = self.expected_return_type.take();
-                                self.expected_return_type = return_type.as_ref().map(|rt| self.resolve_type_node_cached(rt, bind));
+                                self.expected_return_type = return_type
+                                    .as_ref()
+                                    .map(|rt| self.resolve_type_node_cached(rt, bind));
 
                                 for tp in type_params {
                                     self.active_type_params.insert(Rc::from(tp.name.as_str()));
@@ -272,10 +274,7 @@ impl Checker {
                             }
                         }
                         ClassMember::Setter {
-                            param,
-                            body,
-                            range,
-                            ..
+                            param, body, range, ..
                         } => {
                             if let Some(body_stmt) = body {
                                 let saved_setter_scope = self.current_scope;

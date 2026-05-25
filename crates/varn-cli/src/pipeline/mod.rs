@@ -33,7 +33,13 @@ pub fn run(opts: &RunOpts) -> PipelineResult<()> {
     let compiled = if opts.eval.is_none() && !opts.debug.any() && !opts.strict {
         compile_source_cached(&source, &opts.file_path, opts.verbose)?
     } else {
-        compile_source(&source, &opts.file_path, opts.verbose, &opts.debug, opts.strict)?
+        compile_source(
+            &source,
+            &opts.file_path,
+            opts.verbose,
+            &opts.debug,
+            opts.strict,
+        )?
     };
     if opts.eval.is_none() {
         lockfile::sync_lockfile(&opts.file_path, &compiled.graph_artifact)?;
@@ -162,5 +168,12 @@ pub fn parse_raw(
     source: &str,
     path: &str,
 ) -> PipelineResult<varn_core::ast::Program> {
-    parse::parse(tokens, lexeme_buf, source, path, false, &DebugFlags::default())
+    parse::parse(
+        tokens,
+        lexeme_buf,
+        source,
+        path,
+        false,
+        &DebugFlags::default(),
+    )
 }

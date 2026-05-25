@@ -6,7 +6,8 @@ use crate::symbol::{Symbol, SymbolKind};
 use crate::types::{FunctionType, Type};
 use std::rc::Rc;
 use varn_core::ast::{
-    ClassMember, EnumDecl, Expr, ExprKind, FunctionDecl, Pattern, Stmt, TypeAliasDecl, VarKind, VariableDecl,
+    ClassMember, EnumDecl, Expr, ExprKind, FunctionDecl, Pattern, Stmt, TypeAliasDecl, VarKind,
+    VariableDecl,
 };
 
 impl super::super::Binder {
@@ -337,8 +338,6 @@ impl super::super::Binder {
                 symbol_id: Some(variant_sym_id),
             });
         }
-
-
 
         // Bind the Enum body (methods/properties) as a class-like environment
         let child = self

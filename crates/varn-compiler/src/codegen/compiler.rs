@@ -179,7 +179,9 @@ impl RegAlloc {
             return Ok(phys);
         }
 
-        let free = self.physical_free.get_or_insert_with(|| (0u8..=255u8).collect());
+        let free = self
+            .physical_free
+            .get_or_insert_with(|| (0u8..=255u8).collect());
         if let Some(phys) = free.pop() {
             self.physical_map.insert(vreg, phys);
             if phys > self.max_physical {

@@ -27,11 +27,7 @@ mod sys {
             lpflOldProtect: *mut u32,
         ) -> i32;
 
-        pub fn VirtualFree(
-            lpAddress: *mut c_void,
-            dwSize: usize,
-            dwFreeType: u32,
-        ) -> i32;
+        pub fn VirtualFree(lpAddress: *mut c_void, dwSize: usize, dwFreeType: u32) -> i32;
 
         pub fn FlushInstructionCache(
             hProcess: *mut c_void,
@@ -50,7 +46,7 @@ mod sys {
     pub const PROT_READ: i32 = 1;
     pub const PROT_WRITE: i32 = 2;
     pub const PROT_EXEC: i32 = 4;
-    
+
     pub const MAP_PRIVATE: i32 = 0x02;
     pub const MAP_ANONYMOUS: i32 = 0x20;
     pub const MAP_FAILED: *mut c_void = !0 as *mut c_void;
@@ -156,12 +152,19 @@ impl JitBuffer {
                 )
             };
             if success == 0 {
-                return Err("Failed to change memory protection to executable (PAGE_EXECUTE_READ)".to_owned());
+                return Err(
+                    "Failed to change memory protection to executable (PAGE_EXECUTE_READ)"
+                        .to_owned(),
+                );
             }
 
             // Flush the instruction cache to ensure CPU sees our newly written bytes
             unsafe {
-                sys::FlushInstructionCache(sys::GetCurrentProcess(), self.ptr as *const c_void, self.size);
+                sys::FlushInstructionCache(
+                    sys::GetCurrentProcess(),
+                    self.ptr as *const c_void,
+                    self.size,
+                );
             }
         }
 
@@ -175,7 +178,9 @@ impl JitBuffer {
                 )
             };
             if res != 0 {
-                return Err("Failed to change memory protection to executable (mprotect)".to_owned());
+                return Err(
+                    "Failed to change memory protection to executable (mprotect)".to_owned(),
+                );
             }
 
             // Flush CPU instruction cache

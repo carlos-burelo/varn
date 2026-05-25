@@ -146,7 +146,9 @@ impl ExecCtx {
             v
         };
         let extracted = self.heap.extract(val);
-        let spread = self.heap.intern(varn_types::Value::Spread(Box::new(extracted)));
+        let spread = self
+            .heap
+            .intern(varn_types::Value::Spread(Box::new(extracted)));
         self.stack.push(spread);
         ControlSignal::ContinueInstruction
     }
