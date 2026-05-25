@@ -1,5 +1,7 @@
 #[path = "array/mod.rs"]
 pub mod array;
+#[path = "bigint/bigint.rs"]
+pub mod bigint;
 #[path = "bool/bool.rs"]
 pub mod bool;
 #[path = "char/char.rs"]
@@ -18,6 +20,8 @@ pub mod range;
 pub mod set;
 #[path = "str/str.rs"]
 pub mod string;
+#[path = "symbol/symbol.rs"]
+pub mod symbol;
 
 pub use bool::boolean_to_string;
 pub use decimal::decimal_parse;

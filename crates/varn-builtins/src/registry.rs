@@ -1,17 +1,17 @@
 use varn_modules::spec::{ModuleKind, ModuleSpec};
 use varn_modules::{
-    BUILTIN_ARRAY, BUILTIN_ASYNC, BUILTIN_BOOL, BUILTIN_CHAR, BUILTIN_CLASSES, BUILTIN_COLLECTIONS,
-    BUILTIN_DECIMAL, BUILTIN_ERRORS, BUILTIN_FLOAT, BUILTIN_GLOBAL, BUILTIN_INT, BUILTIN_ITERATORS,
-    BUILTIN_RANGE, BUILTIN_REFLECT, BUILTIN_STR, STD_COLLECTIONS, STD_CORE, STD_CRYPTO,
-    STD_DISPOSE, STD_FS, STD_HTTP, STD_IO, STD_JSON, STD_MATH, STD_NET, STD_OPTION, STD_PATH,
-    STD_REFLECT, STD_RESULT, STD_SYS, STD_TASK, STD_TEST, STD_TIME, STD_TYPES,
+    CORE_ARRAY, CORE_ASYNC, CORE_BIGINT, CORE_BOOL, CORE_CHAR, CORE_COLLECTIONS, CORE_DECIMAL,
+    CORE_FLOAT, CORE_GLOBAL, CORE_INT, CORE_ITERATORS, CORE_MAP, CORE_RANGE, CORE_REFLECT,
+    CORE_SET, CORE_STR, CORE_SYMBOL, STD_COLLECTIONS, STD_CRYPTO, STD_DISPOSE, STD_FS, STD_HTTP,
+    STD_IO, STD_JSON, STD_MATH, STD_NET, STD_OPTION, STD_PATH, STD_REFLECT, STD_RESULT, STD_SYS,
+    STD_TASK, STD_TEST, STD_TIME, STD_TYPES,
 };
 
 macro_rules! primitive_spec {
     ($id:expr, $name:literal) => {
         ModuleSpec::new(
             $id,
-            ModuleKind::Builtin,
+            ModuleKind::Core,
             concat!(
                 "crates/varn-builtins/src/modules/primitives/",
                 $name,
@@ -63,35 +63,27 @@ macro_rules! global_spec {
 }
 
 pub static MODULE_REGISTRY: &[ModuleSpec] = &[
-    global_spec!(BUILTIN_GLOBAL, ModuleKind::Builtin, "globals", "globals"),
-    global_spec!(BUILTIN_CLASSES, ModuleKind::Builtin, "globals", "classes"),
-    global_spec!(BUILTIN_ERRORS, ModuleKind::Builtin, "globals", "errors"),
-    global_spec!(
-        BUILTIN_COLLECTIONS,
-        ModuleKind::Builtin,
-        "globals",
-        "collections"
-    ),
-    global_spec!(BUILTIN_ASYNC, ModuleKind::Builtin, "globals", "async"),
-    global_spec!(
-        BUILTIN_ITERATORS,
-        ModuleKind::Builtin,
-        "globals",
-        "iterators"
-    ),
-    global_spec!(BUILTIN_REFLECT, ModuleKind::Builtin, "globals", "reflect"),
-    primitive_spec!(BUILTIN_STR, "str"),
-    primitive_spec!(BUILTIN_INT, "int"),
-    primitive_spec!(BUILTIN_FLOAT, "float"),
-    primitive_spec!(BUILTIN_BOOL, "bool"),
-    primitive_spec!(BUILTIN_CHAR, "char"),
-    primitive_spec!(BUILTIN_DECIMAL, "decimal"),
-    primitive_spec!(BUILTIN_RANGE, "range"),
-    primitive_spec!(BUILTIN_ARRAY, "array"),
+    global_spec!(CORE_GLOBAL, ModuleKind::Core, "globals", "globals"),
+    primitive_spec!(CORE_BIGINT, "bigint"),
+    primitive_spec!(CORE_MAP, "map"),
+    primitive_spec!(CORE_SET, "set"),
+    primitive_spec!(CORE_SYMBOL, "symbol"),
+    stdlib_spec!(CORE_COLLECTIONS, ModuleKind::Core, "std", "collections"),
+    stdlib_spec!(CORE_ASYNC, ModuleKind::Core, "std", "task"),
+    stdlib_spec!(CORE_ITERATORS, ModuleKind::Core, "std", "task"),
+    stdlib_spec!(CORE_REFLECT, ModuleKind::Core, "std", "reflect"),
+    primitive_spec!(CORE_STR, "str"),
+    primitive_spec!(CORE_INT, "int"),
+    primitive_spec!(CORE_FLOAT, "float"),
+    primitive_spec!(CORE_BOOL, "bool"),
+    primitive_spec!(CORE_CHAR, "char"),
+    primitive_spec!(CORE_DECIMAL, "decimal"),
+    primitive_spec!(CORE_RANGE, "range"),
+    primitive_spec!(CORE_ARRAY, "array"),
     stdlib_spec!(STD_TASK, ModuleKind::Stdlib, "std", "task"),
     stdlib_spec!(STD_COLLECTIONS, ModuleKind::Stdlib, "std", "collections"),
     stdlib_spec!(STD_CRYPTO, ModuleKind::Stdlib, "std", "crypto"),
-    global_spec!(STD_DISPOSE, ModuleKind::Stdlib, "globals", "dispose"),
+    stdlib_spec!(STD_DISPOSE, ModuleKind::Stdlib, "std", "dispose"),
     stdlib_spec!(STD_FS, ModuleKind::Stdlib, "std", "fs"),
     stdlib_spec!(STD_HTTP, ModuleKind::Stdlib, "std", "http"),
     stdlib_spec!(STD_IO, ModuleKind::Stdlib, "std", "io"),
@@ -106,7 +98,6 @@ pub static MODULE_REGISTRY: &[ModuleSpec] = &[
     stdlib_spec!(STD_TEST, ModuleKind::Stdlib, "std", "testing"),
     stdlib_spec!(STD_TIME, ModuleKind::Stdlib, "std", "time"),
     stdlib_spec!(STD_TYPES, ModuleKind::Stdlib, "std", "types"),
-    stdlib_spec!(STD_CORE, ModuleKind::Stdlib, "std", "core"),
 ];
 
 pub fn is_known(specifier: &str) -> bool {

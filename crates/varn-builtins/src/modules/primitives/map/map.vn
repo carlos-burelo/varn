@@ -1,0 +1,13 @@
+export declare class Map<V> {
+    constructor();
+    get(key: str): V | null;
+    set(key: str, value: V): void;
+    has(key: str): bool;
+    delete(key: str): bool;
+    clear(): void;
+    keys(): str[];
+    values(): V[];
+    entries(): [str, V][];
+    forEach(callback: (value: V, key: str, map: Map<V>) => void): void;
+    readonly size: int;
+}

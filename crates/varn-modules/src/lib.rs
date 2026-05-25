@@ -1,19 +1,22 @@
+pub mod resolver;
 pub mod spec;
+pub mod uri;
 
 use semver::{Version, VersionReq};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
-pub const BUILTIN_GLOBAL: &str = "builtin:global";
-pub const BUILTIN_CLASSES: &str = "builtin:classes";
-pub const BUILTIN_ERRORS: &str = "builtin:errors";
-pub const BUILTIN_COLLECTIONS: &str = "builtin:collections";
-pub const BUILTIN_ASYNC: &str = "builtin:async";
-pub const BUILTIN_ITERATORS: &str = "builtin:iterators";
-pub const BUILTIN_REFLECT: &str = "builtin:reflect";
+pub const CORE_GLOBAL: &str = "core:global";
+pub const CORE_BIGINT: &str = "core:bigint";
+pub const CORE_MAP: &str = "core:map";
+pub const CORE_SET: &str = "core:set";
+pub const CORE_SYMBOL: &str = "core:symbol";
+pub const CORE_COLLECTIONS: &str = "core:collections";
+pub const CORE_ASYNC: &str = "core:async";
+pub const CORE_ITERATORS: &str = "core:iterators";
+pub const CORE_REFLECT: &str = "core:reflect";
 
 pub const PKG_PREFIX: &str = "pkg:";
-pub const EMBEDDED_MODULE_PREFIX: &str = "varn-embedded:";
 pub const ENV_DIR_NAME: &str = ".vn";
 pub const MODULES_DIR_NAME: &str = "packages";
 pub const PACKAGE_MANIFEST_FILE: &str = "varn.json";
@@ -22,18 +25,17 @@ pub const VARN_INDEX_FILE: &str = "index.vn";
 pub const DEFAULT_PACKAGE_VERSION: &str = "0.0.0";
 pub const RELATIVE_EXPORT_PREFIX: &str = "./";
 
-pub const BUILTIN_STR: &str = "builtin:str";
-pub const BUILTIN_INT: &str = "builtin:int";
-pub const BUILTIN_FLOAT: &str = "builtin:float";
-pub const BUILTIN_BOOL: &str = "builtin:bool";
-pub const BUILTIN_CHAR: &str = "builtin:char";
-pub const BUILTIN_DECIMAL: &str = "builtin:decimal";
-pub const BUILTIN_RANGE: &str = "builtin:range";
-pub const BUILTIN_ARRAY: &str = "builtin:array";
+pub const CORE_STR: &str = "core:str";
+pub const CORE_INT: &str = "core:int";
+pub const CORE_FLOAT: &str = "core:float";
+pub const CORE_BOOL: &str = "core:bool";
+pub const CORE_CHAR: &str = "core:char";
+pub const CORE_DECIMAL: &str = "core:decimal";
+pub const CORE_RANGE: &str = "core:range";
+pub const CORE_ARRAY: &str = "core:array";
 
 pub const STD_TASK: &str = "std:task";
 pub const STD_COLLECTIONS: &str = "std:collections";
-pub const STD_CORE: &str = "std:core";
 pub const STD_CRYPTO: &str = "std:crypto";
 pub const STD_DISPOSE: &str = "std:dispose";
 pub const STD_FS: &str = "std:fs";
@@ -51,28 +53,29 @@ pub const STD_TEST: &str = "std:test";
 pub const STD_TIME: &str = "std:time";
 pub const STD_TYPES: &str = "std:types";
 
-pub const BUILTIN_MODULES: &[&str] = &[
-    BUILTIN_GLOBAL,
-    BUILTIN_CLASSES,
-    BUILTIN_ERRORS,
-    BUILTIN_COLLECTIONS,
-    BUILTIN_ASYNC,
-    BUILTIN_ITERATORS,
-    BUILTIN_REFLECT,
-    BUILTIN_STR,
-    BUILTIN_INT,
-    BUILTIN_FLOAT,
-    BUILTIN_BOOL,
-    BUILTIN_CHAR,
-    BUILTIN_DECIMAL,
-    BUILTIN_RANGE,
-    BUILTIN_ARRAY,
+pub const CORE_MODULES: &[&str] = &[
+    CORE_GLOBAL,
+    CORE_BIGINT,
+    CORE_MAP,
+    CORE_SET,
+    CORE_SYMBOL,
+    CORE_COLLECTIONS,
+    CORE_ASYNC,
+    CORE_ITERATORS,
+    CORE_REFLECT,
+    CORE_STR,
+    CORE_INT,
+    CORE_FLOAT,
+    CORE_BOOL,
+    CORE_CHAR,
+    CORE_DECIMAL,
+    CORE_RANGE,
+    CORE_ARRAY,
 ];
 
 pub const STD_MODULES: &[&str] = &[
     STD_TASK,
     STD_COLLECTIONS,
-    STD_CORE,
     STD_CRYPTO,
     STD_DISPOSE,
     STD_FS,
@@ -92,10 +95,6 @@ pub const STD_MODULES: &[&str] = &[
 ];
 
 pub use spec::{ModuleKind, ModuleSpec};
-
-pub fn is_embedded_module_path(path: &str) -> bool {
-    path.starts_with(EMBEDDED_MODULE_PREFIX)
-}
 
 pub fn is_package_module_path(path: &str) -> bool {
     let as_path = Path::new(path);
@@ -270,7 +269,7 @@ fn load_package_manifest(package_root: &Path) -> Result<PackageManifest, String>
     })
 }
 
-fn resolve_path_candidates(target: &Path) -> Option<String> {
+pub(crate) fn resolve_path_candidates(target: &Path) -> Option<String> {
     let mut candidates = Vec::new();
     if target.extension().is_some() {
         candidates.push(target.to_path_buf());
@@ -370,65 +369,70 @@ pub fn canonical_or_original(path: &Path) -> String {
     normalize_path_string(path.to_string_lossy().into_owned())
 }
 
+pub fn resolve_specifier_path(base_dir: &Path, specifier: &str) -> Option<String> {
+    let target = base_dir.join(specifier);
+    resolve_path_candidates(&target)
+}
+
 pub fn varn_source_for(specifier: &str) -> Option<&'static str> {
     Some(match specifier {
-        BUILTIN_GLOBAL => concat!(
+        CORE_GLOBAL => concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../crates/varn-builtins/src/modules/globals/globals.vn"
         ),
-        BUILTIN_CLASSES => concat!(
+        CORE_BIGINT => concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/globals/classes.vn"
+            "/../../crates/varn-builtins/src/modules/primitives/bigint/bigint.vn"
         ),
-        BUILTIN_ERRORS => concat!(
+        CORE_SYMBOL => concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/globals/errors.vn"
+            "/../../crates/varn-builtins/src/modules/primitives/symbol/symbol.vn"
         ),
-        BUILTIN_COLLECTIONS => concat!(
+        CORE_COLLECTIONS => concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/globals/collections.vn"
+            "/../../crates/varn-builtins/src/modules/std/collections/collections.vn"
         ),
-        BUILTIN_ASYNC => concat!(
+        CORE_ASYNC => concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/globals/async.vn"
+            "/../../crates/varn-builtins/src/modules/std/task/task.vn"
         ),
-        BUILTIN_ITERATORS => concat!(
+        CORE_ITERATORS => concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/globals/iterators.vn"
+            "/../../crates/varn-builtins/src/modules/std/task/task.vn"
         ),
-        BUILTIN_REFLECT => concat!(
+        CORE_REFLECT => concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/globals/reflect.vn"
+            "/../../crates/varn-builtins/src/modules/std/reflect/reflect.vn"
         ),
-        BUILTIN_STR => concat!(
+        CORE_STR => concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../crates/varn-builtins/src/modules/primitives/str/str.vn"
         ),
-        BUILTIN_INT => concat!(
+        CORE_INT => concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../crates/varn-builtins/src/modules/primitives/int/int.vn"
         ),
-        BUILTIN_FLOAT => concat!(
+        CORE_FLOAT => concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../crates/varn-builtins/src/modules/primitives/float/float.vn"
         ),
-        BUILTIN_BOOL => concat!(
+        CORE_BOOL => concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../crates/varn-builtins/src/modules/primitives/boolean/boolean.vn"
         ),
-        BUILTIN_CHAR => concat!(
+        CORE_CHAR => concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../crates/varn-builtins/src/modules/primitives/char/char.vn"
         ),
-        BUILTIN_DECIMAL => concat!(
+        CORE_DECIMAL => concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../crates/varn-builtins/src/modules/primitives/decimal/decimal.vn"
         ),
-        BUILTIN_RANGE => concat!(
+        CORE_RANGE => concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../crates/varn-builtins/src/modules/primitives/range/range.vn"
         ),
-        BUILTIN_ARRAY => concat!(
+        CORE_ARRAY => concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../crates/varn-builtins/src/modules/primitives/array/array.vn"
         ),
@@ -440,17 +444,13 @@ pub fn varn_source_for(specifier: &str) -> Option<&'static str> {
             env!("CARGO_MANIFEST_DIR"),
             "/../../crates/varn-builtins/src/modules/std/collections/collections.vn"
         ),
-        STD_CORE => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/core/core.vn"
-        ),
         STD_CRYPTO => concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../crates/varn-builtins/src/modules/std/crypto/crypto.vn"
         ),
         STD_DISPOSE => concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/globals/dispose.vn"
+            "/../../crates/varn-builtins/src/modules/std/dispose/dispose.vn"
         ),
         STD_FS => concat!(
             env!("CARGO_MANIFEST_DIR"),
