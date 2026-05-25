@@ -39,6 +39,7 @@ import "./37-complex-closures"
 import "./38-advanced-higher-order"
 import "./39-package-imports"
 import "./40-named-arguments"
+import "./41-advanced-enums"
 
-print("\nModules executed in suite: 40")
+print("\nModules executed in suite: 41")
 assertSummary()
