@@ -2,7 +2,7 @@ use std::env::{current_dir, current_exe, var};
 use std::path::PathBuf;
 
 pub fn varn_home_dir() -> PathBuf {
-    if let Ok(raw) = var("varn_HOME") {
+    if let Ok(raw) = var("VARN_HOME") {
         let p = PathBuf::from(raw);
         if !p.as_os_str().is_empty() {
             return p;
@@ -19,7 +19,7 @@ pub fn varn_home_dir() -> PathBuf {
 }
 
 pub fn varn_cache_dir() -> PathBuf {
-    if let Ok(raw) = var("varn_CACHE_DIR") {
+    if let Ok(raw) = var("VARN_CACHE_DIR") {
         let p = PathBuf::from(raw);
         if !p.as_os_str().is_empty() {
             return p;
@@ -31,7 +31,7 @@ pub fn varn_cache_dir() -> PathBuf {
 pub fn stdlib_candidates() -> Vec<PathBuf> {
     let mut out = Vec::with_capacity(8);
 
-    if let Ok(raw) = var("varn_STDLIB") {
+    if let Ok(raw) = var("VARN_STDLIB") {
         let p = PathBuf::from(raw);
         if !p.as_os_str().is_empty() {
             out.push(p);

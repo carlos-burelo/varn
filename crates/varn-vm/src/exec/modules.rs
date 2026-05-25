@@ -229,12 +229,4 @@ pub fn reexport(exports_nv: VmValue, name: &str, val_nv: VmValue, heap: &mut Hea
     Err(RuntimeError::new("OpReexport: exports is not an object"))
 }
 
-fn normalize_path_string(path: String) -> String {
-    #[cfg(windows)]
-    {
-        if let Some(rest) = path.strip_prefix("\\\\?\\") {
-            return rest.to_owned();
-        }
-    }
-    path
-}
+use varn_modules::resolver::normalize_path_string;

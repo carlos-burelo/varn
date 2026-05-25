@@ -24,7 +24,6 @@ pub fn parse_stmt_or_decl_inner(s: &mut TokenStream) -> Result<Stmt, String> {
         return decl_stmt;
     }
 
-    // Doc comment before a non-declaration statement — discard to avoid leaking.
     let _ = s.take_pending_doc();
 
     match kind {

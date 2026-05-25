@@ -59,11 +59,11 @@ pub fn sync_lockfile(entry_file: &str, graph: &ModuleGraphArtifact) -> Result<()
             CliError::fatal(format!("invalid lockfile '{}': {e}", lock_path.display()))
         })?;
         if lock_mismatch(&prev, &next) {
-            if std::env::var("varn_LOCK_UPDATE").ok().as_deref() == Some("1") {
+            if std::env::var("VARN_LOCK_UPDATE").ok().as_deref() == Some("1") {
                 return write_lockfile(&lock_path, &next);
             }
             return Err(CliError::fatal(format!(
-                "lockfile mismatch at '{}'. Re-run with varn_LOCK_UPDATE=1 to refresh.",
+                "lockfile mismatch at '{}'. Re-run with VARN_LOCK_UPDATE=1 to refresh.",
                 lock_path.display(),
             )));
         }

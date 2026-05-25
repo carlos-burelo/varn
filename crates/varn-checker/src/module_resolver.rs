@@ -180,8 +180,7 @@ pub fn find_module_bind_for_type_ref(
 }
 
 pub fn is_known_module(specifier: &str) -> bool {
-    varn_modules::BUILTIN_MODULES.contains(&specifier)
-        || varn_modules::STD_MODULES.contains(&specifier)
+    varn_modules::resolver::is_known_module(specifier)
 }
 
 pub fn resolve_specifier_path(base_dir: &Path, specifier: &str) -> Option<String> {
@@ -199,27 +198,14 @@ pub fn resolve_specifier_path(base_dir: &Path, specifier: &str) -> Option<String
         return Some(res);
     }
 
-    let joined = base_dir.join(specifier);
-    let candidates = if joined.extension().is_some() {
-        vec![joined]
-    } else {
-        vec![joined.with_extension("vn"), joined]
-    };
+    let res = varn_modules::resolver::resolve_specifier_path(base_dir, specifier)?;
 
-    for candidate in candidates {
-        if candidate.exists() {
-            let res = varn_modules::canonical_or_original(&candidate);
-
-            RESOLVED_PATH_CACHE.with(|c| {
-                let mut guard = c.borrow_mut();
-                let cache = guard.get_or_insert_with(FxHashMap::default);
-                cache.insert((base_str.clone(), specifier.to_owned()), res.clone());
-            });
-            return Some(res);
-        }
-    }
-
-    None
+    RESOLVED_PATH_CACHE.with(|c| {
+        let mut guard = c.borrow_mut();
+        let cache = guard.get_or_insert_with(FxHashMap::default);
+        cache.insert((base_str.clone(), specifier.to_owned()), res.clone());
+    });
+    Some(res)
 }
 
 pub fn resolve_package_specifier_path(base_dir: &Path, specifier: &str) -> Option<String> {

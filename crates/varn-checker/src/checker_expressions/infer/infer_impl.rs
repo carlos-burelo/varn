@@ -147,7 +147,6 @@ impl Checker {
                 let r_ty = self.infer_type(right, bind);
                 match op {
                     varn_core::ast::LogicalOp::And => {
-                        // a && b: returns a if falsy, b if truthy
                         if l_ty == r_ty {
                             l_ty
                         } else {

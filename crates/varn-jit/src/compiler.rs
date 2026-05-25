@@ -12,14 +12,10 @@ use crate::codegen::{
     CodegenCtx,
 };
 
-/// Compiles a `FunctionProto` bytecode function into native x86_64 machine code.
-/// Returns a `JitBuffer` containing the executable pages on success, or a bailout error on failure.
 pub fn compile_proto(
     proto: &FunctionProto,
     helpers: crate::JitHelpers,
 ) -> Result<JitBuffer, String> {
-    // 1. Audit opcodes to verify if we support all of them.
-    // If we find any unsupported opcode, we perform an eager bailout to the interpreter.
     let code = &proto.chunk.code;
     let mut ip = 0;
     while ip < code.len() {
@@ -150,12 +146,11 @@ pub fn compile_proto(
                 ip += 2;
             }
             OpCode::InvokeRuntimeStatic => {
-                // Only __range__ is supported; verify at audit time
                 let _w1 = code[ip];
                 ip += 1;
                 let method_idx = code[ip] as usize;
                 ip += 1;
-                ip += 2; // w3, w4
+                ip += 2;
                 match proto.chunk.constants.get(method_idx) {
                     Some(varn_types::chunk::PoolEntry::Literal(
                         varn_types::chunk::Literal::Str(s),
@@ -176,14 +171,11 @@ pub fn compile_proto(
         }
     }
 
-    // 1b. Build register allocation map from bytecode frequency analysis.
     let regmap = RegMap::from_bytecode(code);
 
-    // 2. Main Compilation Pass
     let asm = Assembler::new();
     let code_len = code.len();
 
-    // Map from bytecode offset to assembler instruction byte offset
     let ip_to_asm_pos = vec![0usize; code_len + 1];
     let jump_patches = Vec::new();
 
@@ -198,10 +190,8 @@ pub fn compile_proto(
         helpers: &helpers,
     };
 
-    // Emit function prologue: save callee-saved physical regs.
-    // We also load the initial values of all allocated virtual regs from the VM stack.
     emit_prologue(&mut cctx.asm, &cctx.regmap);
-    // Load initial values from VM stack into allocated physical regs
+
     for (&vreg, &phys) in cctx.regmap.map_iter() {
         emit_load_reg(&mut cctx.asm, phys, vreg);
     }
@@ -285,9 +275,7 @@ pub fn compile_proto(
                 emit_closures(&mut cctx, op, first_reg)?
             }
 
-            OpCode::GetProperty | OpCode::SetProperty => {
-                emit_properties(&mut cctx, op, first_reg)?
-            }
+            OpCode::GetProperty | OpCode::SetProperty => emit_properties(&mut cctx, op, first_reg)?,
 
             OpCode::Call | OpCode::CallMethod => emit_calls(&mut cctx, op, first_reg)?,
 
@@ -306,9 +294,9 @@ pub fn compile_proto(
                 emit_indexing(&mut cctx, op, first_reg)?
             }
 
-            OpCode::LoadModuleSlot
-            | OpCode::BuildObjectWithShape
-            | OpCode::InvokeRuntimeStatic => emit_modules(&mut cctx, op, first_reg)?,
+            OpCode::LoadModuleSlot | OpCode::BuildObjectWithShape | OpCode::InvokeRuntimeStatic => {
+                emit_modules(&mut cctx, op, first_reg)?
+            }
 
             _ => unreachable!(),
         }
@@ -316,15 +304,12 @@ pub fn compile_proto(
 
     cctx.ip_to_asm_pos[code_len] = cctx.asm.current_offset();
 
-    // 3. Post-compilation Jump Patching Pass
     for patch in &cctx.jump_patches {
         let target_asm_pos = cctx.ip_to_asm_pos[patch.target_bytecode_ip];
-        let displacement =
-            (target_asm_pos as isize - (patch.patch_pos + 4) as isize) as i32;
+        let displacement = (target_asm_pos as isize - (patch.patch_pos + 4) as isize) as i32;
         cctx.asm.patch_u32(patch.patch_pos, displacement as u32);
     }
 
-    // 4. Assemble and mark executable
     let native_bytes = cctx.asm.into_bytes();
     let mut jit_buf = JitBuffer::new(native_bytes.len())?;
     jit_buf.as_mut_slice()[..native_bytes.len()].copy_from_slice(&native_bytes);

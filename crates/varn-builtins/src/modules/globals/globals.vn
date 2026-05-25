@@ -1,22 +1,27 @@
-// Builtin globals — zero dynamic.
-// Every declaration uses concrete types or `dynamic` where
-// the implementation truly accepts any value.
-
 export declare function print(...args: dynamic[]): void;
 export declare function debug(...args: dynamic[]): void;
 export declare function assert(label: str, cond: bool): void;
 export declare function assertSummary(): void;
 export declare function input(prompt?: str): str;
-export declare function range(start: int, end: int, step?: int): int[];
+
+export declare class Error {
+    message: str;
+    name: str;
+    stack: str;
+    constructor(message?: str);
+    toString(): str;
+}
+
+export declare class TypeError extends Error {
+    constructor(message?: str);
+}
+
+export declare class RangeError extends Error {
+    constructor(message?: str);
+}
 
 export declare const NaN: float;
 export declare const Infinity: float;
-
-/// Symbol namespace — typed, not dynamic.
-export declare const Symbol: {
-    readonly iterator: symbol;
-    readonly asyncIterator: symbol;
-};
 
 export declare namespace console {
     declare function log(...args: dynamic[]): void

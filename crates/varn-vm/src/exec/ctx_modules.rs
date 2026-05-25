@@ -177,7 +177,6 @@ fn extract_exports_from_source(source: &str) -> Vec<String> {
         match c {
             '/' => {
                 if chars.peek() == Some(&'/') {
-                    // Line comment, skip to end of line
                     chars.next();
                     while let Some(next_c) = chars.next() {
                         if next_c == '\n' {
@@ -185,7 +184,6 @@ fn extract_exports_from_source(source: &str) -> Vec<String> {
                         }
                     }
                 } else if chars.peek() == Some(&'*') {
-                    // Block comment, skip until */
                     chars.next();
                     while let Some(next_c) = chars.next() {
                         if next_c == '*' && chars.peek() == Some(&'/') {
@@ -196,7 +194,6 @@ fn extract_exports_from_source(source: &str) -> Vec<String> {
                 }
             }
             '"' | '\'' | '`' => {
-                // String literal, skip until matching quote
                 let quote = c;
                 let mut escaped = false;
                 while let Some(next_c) = chars.next() {
@@ -218,7 +215,6 @@ fn extract_exports_from_source(source: &str) -> Vec<String> {
                 }
             }
             _ => {
-                // If we are at top-level (brace_depth == 0) and we see a word character, let's see if it's "export"
                 if brace_depth == 0 && (c.is_alphabetic() || c == '_') {
                     let mut word = String::new();
                     word.push(c);
@@ -232,14 +228,10 @@ fn extract_exports_from_source(source: &str) -> Vec<String> {
                     }
 
                     if word == "export" {
-                        // We found an export declaration at the top level!
-                        // Now let's skip whitespace/comments until we find the identifier
                         let mut words = Vec::new();
                         while words.len() < 5 {
-                            // Skip whitespace and comments
                             skip_whitespace_and_comments(&mut chars);
 
-                            // Peek the next character. If it's a word character, read the word.
                             if let Some(&next_c) = chars.peek() {
                                 if next_c.is_alphanumeric() || next_c == '_' {
                                     let mut w = String::new();
@@ -309,7 +301,7 @@ fn skip_whitespace_and_comments(chars: &mut std::iter::Peekable<std::str::Chars>
         if c.is_whitespace() {
             chars.next();
         } else if c == '/' {
-            chars.next(); // Consume '/'
+            chars.next();
             if chars.peek() == Some(&'/') {
                 chars.next();
                 while let Some(next_c) = chars.next() {

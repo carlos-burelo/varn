@@ -6,7 +6,7 @@ pub fn run_doctor() -> CliResult<()> {
     let exe = std::env::current_exe().ok();
     let home = varn_core::paths::varn_home_dir();
     let cache = varn_core::paths::varn_cache_dir();
-    let loader = varn_builtins::BuiltinSourceLocator::from_env();
+    let loader = varn_builtins::CoreSourceLocator::from_env();
     let stdlib = loader.stdlib_root();
 
     println!("Varn Doctor");
@@ -17,10 +17,10 @@ pub fn run_doctor() -> CliResult<()> {
         println!("  exe: <unavailable>");
     }
 
-    println!("  varn_HOME: {}", home.display());
+    println!("  VARN_HOME: {}", home.display());
     println!("  cache dir: {}", cache.display());
 
-    if let Ok(raw) = std::env::var("varn_STDLIB") {
+    if let Ok(raw) = std::env::var("VARN_STDLIB") {
         println!("  varn_STDLIB env: {raw}");
     } else {
         println!("  varn_STDLIB env: <not set>");

@@ -18,19 +18,18 @@ use super::calls::{self, PreparedCall};
 use super::VmSuspend;
 use varn_types::generator::GenChannel;
 
-// Re-export JIT callout functions so existing `crate::exec::ctx::jit_*` paths remain valid.
-pub use super::ctx_jit_values::{
-    jit_add, jit_build_array, jit_build_str, jit_call, jit_call_method, jit_define_global_idx,
-    jit_eq, jit_get_property, jit_gt, jit_gte, jit_load_const, jit_load_global,
-    jit_load_global_idx, jit_load_upvalue, jit_lt, jit_lte, jit_make_closure, jit_mul, jit_neq,
-    jit_set_property, jit_store_global_idx, jit_store_upvalue, jit_sub, jit_to_string,
-};
 pub use super::ctx_jit_runtime::{
     jit_array_extend, jit_array_length, jit_array_pop, jit_array_push, jit_bitand, jit_bitor,
     jit_bitxor, jit_build_object_with_shape, jit_div, jit_get_index, jit_instanceof,
     jit_load_module, jit_load_module_slot, jit_logical_not, jit_modulo, jit_negate, jit_pow,
     jit_range, jit_set_index, jit_shl, jit_shr, jit_str_concat, jit_str_length, jit_str_slice,
     jit_typeof_val, jit_ushr,
+};
+pub use super::ctx_jit_values::{
+    jit_add, jit_build_array, jit_build_str, jit_call, jit_call_method, jit_define_global_idx,
+    jit_eq, jit_get_property, jit_gt, jit_gte, jit_load_const, jit_load_global,
+    jit_load_global_idx, jit_load_upvalue, jit_lt, jit_lte, jit_make_closure, jit_mul, jit_neq,
+    jit_set_property, jit_store_global_idx, jit_store_upvalue, jit_sub, jit_to_string,
 };
 
 pub struct ExecCtx {
@@ -39,11 +38,8 @@ pub struct ExecCtx {
     pub globals: GlobalStore,
     pub heap: Heap,
     pub try_handlers: Vec<TryHandler>,
-
     pub modules: FxHashMap<String, VmValue>,
-
     pub precompiled: Rc<FxHashMap<String, Rc<FunctionProto>>>,
-
     pub loader: Option<Rc<dyn ModuleLoader>>,
     pub trace: bool,
     pub open_upvalues: Vec<(usize, VmUpvalue)>,
@@ -55,7 +51,6 @@ pub struct ExecCtx {
     pub module_exports: FxHashMap<usize, VmValue>,
     pub opcode_counts: Option<Rc<Vec<std::sync::atomic::AtomicU64>>>,
     pub profile_counters: Option<Arc<ProfileCounters>>,
-
     pub proto_ic_caches: FxHashMap<usize, Rc<RefCell<Vec<varn_types::chunk::PolyICSlot>>>>,
     pub proto_feedback: FxHashMap<usize, Rc<RefCell<varn_types::chunk::FeedbackVector>>>,
     pub proto_constants: FxHashMap<usize, Rc<Vec<VmValue>>>,
@@ -174,8 +169,6 @@ impl ExecCtx {
     }
 
     pub fn run_minor_gc(&mut self) {
-        // Build a flat buffer: [stack... | globals... | modules... | module_exports...]
-        // Minor GC updates the entire slice in-place.
         let stack_len = self.stack.len();
 
         let mut all_vals: Vec<VmValue> = Vec::with_capacity(
@@ -196,14 +189,11 @@ impl ExecCtx {
 
         self.heap.minor_gc(&mut all_vals, &[]);
 
-        // Write back stack.
         self.stack.copy_from_slice(&all_vals[..stack_len]);
 
-        // Write back globals.
         let globals_slice = &all_vals[globals_start..modules_start];
         self.globals.values.copy_from_slice(globals_slice);
 
-        // Write back modules.
         {
             let mut mi = modules_start;
             for v in self.modules.values_mut() {
@@ -212,7 +202,6 @@ impl ExecCtx {
             }
         }
 
-        // Write back module_exports.
         {
             let mut ei = module_exports_start;
             for v in self.module_exports.values_mut() {

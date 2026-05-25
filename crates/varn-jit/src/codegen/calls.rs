@@ -6,11 +6,7 @@ use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
 
 use super::CodegenCtx;
 
-pub(crate) fn emit_calls(
-    ctx: &mut CodegenCtx,
-    op: OpCode,
-    first_reg: usize,
-) -> Result<(), String> {
+pub(crate) fn emit_calls(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) -> Result<(), String> {
     match op {
         OpCode::Call => emit_call(ctx, first_reg),
         OpCode::CallMethod => emit_call_method(ctx, first_reg),
@@ -35,7 +31,7 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
     let arg_count = (w2 >> 8) as usize;
     let arg_start = (w2 & 0xFF) as usize;
 
-    let _ = first_reg; // first_reg not used for Call
+    let _ = first_reg;
 
     emit_flush_all(asm, regmap);
 
@@ -51,20 +47,18 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
         asm.push(Reg::Rax);
     }
 
-    // Push JitCallArgs struct fields in reverse order:
-    // 1. ip
     asm.mov_reg_imm64(Reg::R11, *ip as u64);
     asm.push(Reg::R11);
-    // 2. dest
+
     asm.mov_reg_imm64(Reg::R11, dest as u64);
     asm.push(Reg::R11);
-    // 3. arg_count
+
     asm.mov_reg_imm64(Reg::R11, arg_count as u64);
     asm.push(Reg::R11);
-    // 4. arg_start
+
     asm.mov_reg_imm64(Reg::R11, arg_start as u64);
     asm.push(Reg::R11);
-    // 5. callee
+
     asm.push(Reg::Rax);
 
     asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
@@ -128,26 +122,24 @@ fn emit_call_method(ctx: &mut CodegenCtx, first_reg: usize) {
         asm.push(Reg::Rax);
     }
 
-    // Push JitCallMethodArgs struct fields in reverse order:
-    // 1. ip
     asm.mov_reg_imm64(Reg::R11, *ip as u64);
     asm.push(Reg::R11);
-    // 2. dest
+
     asm.mov_reg_imm64(Reg::R11, dest as u64);
     asm.push(Reg::R11);
-    // 3. arg_count
+
     asm.mov_reg_imm64(Reg::R11, arg_count as u64);
     asm.push(Reg::R11);
-    // 4. arg_start
+
     asm.mov_reg_imm64(Reg::R11, arg_start as u64);
     asm.push(Reg::R11);
-    // 5. cs
+
     asm.mov_reg_imm64(Reg::R11, cs as u64);
     asm.push(Reg::R11);
-    // 6. name_idx
+
     asm.mov_reg_imm64(Reg::R11, name_idx as u64);
     asm.push(Reg::R11);
-    // 7. this_val
+
     asm.push(Reg::Rax);
 
     asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);

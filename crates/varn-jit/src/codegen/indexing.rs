@@ -1,7 +1,9 @@
 use varn_core::OpCode;
 
 use crate::assembler::Reg;
-use crate::regalloc::{emit_flush_all, emit_load, emit_reload_all, emit_reload_all_except, emit_store};
+use crate::regalloc::{
+    emit_flush_all, emit_load, emit_reload_all, emit_reload_all_except, emit_store,
+};
 use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
 
 use super::CodegenCtx;
@@ -48,11 +50,10 @@ fn emit_get_index(ctx: &mut CodegenCtx, first_reg: usize) {
         asm.push(Reg::Rax);
     }
 
-    // Push JitGetIndexArgs struct in reverse: dest, key, obj
     asm.mov_reg_imm64(Reg::R10, first_reg as u64);
     asm.push(Reg::R10);
-    asm.push(Reg::R11); // key
-    asm.push(Reg::Rax); // obj
+    asm.push(Reg::R11);
+    asm.push(Reg::Rax);
 
     asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
     asm.mov_reg_reg(ARG_CLOSURE, Reg::Rsp);
@@ -68,7 +69,7 @@ fn emit_get_index(ctx: &mut CodegenCtx, first_reg: usize) {
 
     asm.mov_reg_reg(Reg::R11, Reg::Rax);
 
-    asm.add_reg_imm8(Reg::Rsp, 24); // pop 3 * 8 bytes (obj, key, dest)
+    asm.add_reg_imm8(Reg::Rsp, 24);
 
     if need_dummy {
         asm.pop(Reg::Rax);
@@ -111,10 +112,9 @@ fn emit_set_index(ctx: &mut CodegenCtx, first_reg: usize) {
         asm.push(Reg::Rax);
     }
 
-    // Push JitSetIndexArgs: val, key, obj
-    asm.push(Reg::R12); // val
-    asm.push(Reg::R11); // key
-    asm.push(Reg::Rax); // obj
+    asm.push(Reg::R12);
+    asm.push(Reg::R11);
+    asm.push(Reg::Rax);
 
     asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
     asm.mov_reg_reg(ARG_CLOSURE, Reg::Rsp);
@@ -128,7 +128,7 @@ fn emit_set_index(ctx: &mut CodegenCtx, first_reg: usize) {
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, 32);
 
-    asm.add_reg_imm8(Reg::Rsp, 24); // pop 3 * 8 bytes
+    asm.add_reg_imm8(Reg::Rsp, 24);
 
     if need_dummy {
         asm.pop(Reg::Rax);
@@ -169,8 +169,8 @@ fn emit_typeof(ctx: &mut CodegenCtx, first_reg: usize) {
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax); // arg2: v
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // arg1: ctx
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
 
     asm.mov_reg_imm64(Reg::R10, helpers.typeof_val as u64);
     asm.call_reg(Reg::R10);
@@ -220,9 +220,9 @@ fn emit_instanceof(ctx: &mut CodegenCtx, first_reg: usize) {
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    asm.mov_reg_reg(ARG_BASE, Reg::R11); // arg3: b
-    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax); // arg2: a
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // arg1: ctx
+    asm.mov_reg_reg(ARG_BASE, Reg::R11);
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
 
     asm.mov_reg_imm64(Reg::R10, helpers.instanceof as u64);
     asm.call_reg(Reg::R10);

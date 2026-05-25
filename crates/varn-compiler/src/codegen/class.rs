@@ -31,11 +31,11 @@ fn apply_class_decorators<'a>(c: &mut Compiler<'a>, class_reg: u8, decorators: &
         c.emit_rr(OpCode::Move, class_reg, result);
         c.patch_jump(skip);
 
-        c.free_reg(); // free arg_class_reg
-        c.free_reg(); // free recv_reg
-        c.free_reg(); // free is_null
-        c.free_reg(); // free result
-        c.free_reg(); // free deco_reg
+        c.free_reg();
+        c.free_reg();
+        c.free_reg();
+        c.free_reg();
+        c.free_reg();
     }
 }
 
@@ -125,13 +125,13 @@ fn apply_method_decorators<'a>(
         c.emit_rr(OpCode::Move, method_reg, result);
         c.patch_jump(skip);
 
-        c.free_reg(); // free is_null
-        c.free_reg(); // free result
-        c.free_reg(); // free a1
-        c.free_reg(); // free a0
-        c.free_reg(); // free recv_reg
-        c.free_reg(); // free ctx_reg
-        c.free_reg(); // free deco_fn
+        c.free_reg();
+        c.free_reg();
+        c.free_reg();
+        c.free_reg();
+        c.free_reg();
+        c.free_reg();
+        c.free_reg();
     }
 }
 
@@ -407,7 +407,6 @@ fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
     let saved_inits = std::mem::take(&mut c.pending_field_inits);
     c.current_class = Some(en.id.clone());
 
-    // Compilar todas las variantes del Enum como miembros estáticos
     let mut current_tag = 0i64;
     for member in en.members.iter() {
         if let Some(init_expr) = &member.init {
@@ -438,7 +437,7 @@ fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
         c.chunk.write(Chunk::pack(variant_reg, tag_reg), line);
         c.chunk.write(meta_idx, line);
 
-        c.free_reg(); // tag_reg
+        c.free_reg();
         current_tag += 1;
 
         let key_idx = c.add_str(&member.id);
@@ -446,10 +445,9 @@ fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
         c.chunk.write(Chunk::pack(class_reg, variant_reg), line);
         c.chunk.write(key_idx, line);
 
-        c.free_reg(); // variant_reg
+        c.free_reg();
     }
 
-    // Compilar cuerpo del Enum (si tiene)
     for member in &en.body {
         if let ClassMember::Property {
             key,
@@ -638,7 +636,6 @@ fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
         c.free_reg();
     }
 
-    // Inicializar variantes estáticas con sus constructores si tienen argumentos constantes en su declaración
     let ctor_key = c.add_str("constructor");
     for member in &en.members {
         let mut const_args = vec![];
@@ -669,12 +666,10 @@ fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
         if !const_args.is_empty() {
             let saved_regs = c.regs.save();
 
-            // 1. Obtener la variante estática de la clase. Esta actuará como el receptor `this` (en reg_start).
             let var_name_idx = c.add_str(&member.id);
             let receiver_reg = c.alloc_reg();
             c.emit_property(OpCode::GetProperty, receiver_reg, class_reg, var_name_idx);
 
-            // 2. Compilar los argumentos de forma contigua y natural.
             let mut arg_count = 1;
             for arg_kind in const_args {
                 let arg_expr = varn_core::ast::Expr {
@@ -686,11 +681,9 @@ fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
                 arg_count += 1;
             }
 
-            // 3. Obtener el constructor de la clase
             let ctor_reg = c.alloc_reg();
             c.emit_property(OpCode::GetProperty, ctor_reg, receiver_reg, ctor_key);
 
-            // 4. Emitir la llamada directa
             let dest = c.alloc_reg();
             let line = c.line;
             c.chunk.emit(OpCode::Call, line);

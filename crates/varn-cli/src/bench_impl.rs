@@ -334,7 +334,7 @@ pub fn run_bench(
             .collect::<FxHashMap<String, Rc<FunctionProto>>>(),
     );
 
-    let builtin_protos: Vec<FunctionProto> = crate::pipeline::builtin_protos_owned()?;
+    let builtin_protos: Vec<FunctionProto> = crate::pipeline::core_protos_owned()?;
 
     varn_builtins::set_print_silent(true);
     varn_builtins::set_testing_silent(true);
@@ -517,8 +517,7 @@ fn run_bench_wrc(path: &str, runs: usize, no_run: bool, with_output: bool) -> Re
             .map_err(|e| e.message.clone())
     })?;
 
-    let builtin_protos: Vec<varn_compiler::FunctionProto> =
-        crate::pipeline::builtin_protos_owned()?;
+    let builtin_protos: Vec<varn_compiler::FunctionProto> = crate::pipeline::core_protos_owned()?;
 
     varn_builtins::set_print_silent(true);
     varn_builtins::set_testing_silent(true);

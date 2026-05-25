@@ -50,9 +50,9 @@ fn emit_load_module_slot(ctx: &mut CodegenCtx, first_reg: usize) {
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    asm.mov_reg_imm64(ARG_BASE, slot_idx as u64); // arg3 = slot_idx
-    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax); // arg2 = module_val
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // arg1 = exec_ctx
+    asm.mov_reg_imm64(ARG_BASE, slot_idx as u64);
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
 
     asm.mov_reg_imm64(Reg::R10, helpers.load_module_slot as u64);
     asm.call_reg(Reg::R10);
@@ -105,10 +105,10 @@ fn emit_build_object_with_shape(ctx: &mut CodegenCtx, first_reg: usize) {
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // arg1 = ctx (FIRST, before clobbering ARG_EXEC_CTX)
-                                            // ARG_CLOSURE is already the closure pointer      // arg2 = closure
-    asm.mov_reg_imm64(ARG_BASE, start_reg as u64); // arg3 = start_reg
-    asm.mov_reg_imm64(ARG_EXEC_CTX, shape_idx as u64); // arg4 = shape_idx
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+
+    asm.mov_reg_imm64(ARG_BASE, start_reg as u64);
+    asm.mov_reg_imm64(ARG_EXEC_CTX, shape_idx as u64);
 
     asm.mov_reg_imm64(Reg::R10, helpers.build_object_with_shape as u64);
     asm.call_reg(Reg::R10);
@@ -167,10 +167,10 @@ fn emit_invoke_runtime_static(ctx: &mut CodegenCtx, first_reg: usize) {
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // arg1 = ctx (FIRST, before clobbering ARG_EXEC_CTX)
-    asm.mov_reg_imm64(ARG_CLOSURE, arg_start as u64); // arg2 = arg_start (start_reg)
-    asm.mov_reg_imm64(ARG_BASE, end_reg as u64); // arg3 = end_reg
-    asm.mov_reg_imm64(ARG_EXEC_CTX, flag as u64); // arg4 = flag
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+    asm.mov_reg_imm64(ARG_CLOSURE, arg_start as u64);
+    asm.mov_reg_imm64(ARG_BASE, end_reg as u64);
+    asm.mov_reg_imm64(ARG_EXEC_CTX, flag as u64);
 
     asm.mov_reg_imm64(Reg::R10, helpers.range as u64);
     asm.call_reg(Reg::R10);

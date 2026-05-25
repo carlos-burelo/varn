@@ -5,15 +5,15 @@ use crate::types::{ClassMemberInfo, Type};
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
-use varn_modules::spec::BUILTIN_PREFIX;
+use varn_modules::spec::CORE_PREFIX;
 
 thread_local! {
-    static BUILTIN_EXPORTS: RefCell<Option<Rc<FxHashMap<Rc<str>, Symbol>>>> = RefCell::new(None);
-    static BUILTIN_MEMBERS: RefCell<Option<Rc<BuiltinMembers>>> = RefCell::new(None);
+    static CORE_EXPORTS: RefCell<Option<Rc<FxHashMap<Rc<str>, Symbol>>>> = RefCell::new(None);
+    static CORE_MEMBERS: RefCell<Option<Rc<CoreMembers>>> = RefCell::new(None);
 }
 
 #[derive(Clone, Default)]
-pub struct BuiltinMembers {
+pub struct CoreMembers {
     pub class_methods: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Type>>,
     pub class_members: FxHashMap<Rc<str>, ClassMemberInfo>,
     pub interface_members: FxHashMap<Rc<str>, Vec<ClassMemberInfo>>,
@@ -24,50 +24,50 @@ pub struct BuiltinMembers {
     pub class_type_params: FxHashMap<Rc<str>, Vec<Rc<str>>>,
 }
 
-pub fn is_builtin_file(filename: &str) -> bool {
+pub fn is_core_file(filename: &str) -> bool {
     filename.contains("varn-stdlib/builtins")
         || filename.contains(r"varn-stdlib\builtins")
         || filename.contains("varn-builtins")
-        || filename.starts_with(BUILTIN_PREFIX)
+        || filename.starts_with(CORE_PREFIX)
 }
 
 pub fn load_global_exports() -> FxHashMap<Rc<str>, Symbol> {
-    BUILTIN_EXPORTS.with(|c| {
+    CORE_EXPORTS.with(|c| {
         let mut guard = c.borrow_mut();
         if guard.is_none() {
-            *guard = Some(Rc::new(build_builtin_exports()));
+            *guard = Some(Rc::new(build_core_exports()));
         }
         guard.as_ref().unwrap().as_ref().clone()
     })
 }
 
 pub fn global_exports_ref() -> Rc<FxHashMap<Rc<str>, Symbol>> {
-    BUILTIN_EXPORTS.with(|c| {
+    CORE_EXPORTS.with(|c| {
         let mut guard = c.borrow_mut();
         if guard.is_none() {
-            *guard = Some(Rc::new(build_builtin_exports()));
+            *guard = Some(Rc::new(build_core_exports()));
         }
         Rc::clone(guard.as_ref().unwrap())
     })
 }
 
-pub fn builtin_members_ref() -> Rc<BuiltinMembers> {
-    BUILTIN_MEMBERS.with(|c| {
+pub fn core_members_ref() -> Rc<CoreMembers> {
+    CORE_MEMBERS.with(|c| {
         let mut guard = c.borrow_mut();
         if guard.is_none() {
-            *guard = Some(Rc::new(build_builtin_members()));
+            *guard = Some(Rc::new(build_core_members()));
         }
         Rc::clone(guard.as_ref().unwrap())
     })
 }
 
-pub fn merge_builtin_members(bind: &mut BindResult) {
-    bind.builtin = Some(builtin_members_ref());
+pub fn merge_core_members(bind: &mut BindResult) {
+    bind.core = Some(core_members_ref());
 }
 
-fn build_builtin_exports() -> FxHashMap<Rc<str>, Symbol> {
+fn build_core_exports() -> FxHashMap<Rc<str>, Symbol> {
     let mut globals = FxHashMap::default();
-    for spec in varn_modules::BUILTIN_MODULES {
+    for spec in varn_modules::CORE_MODULES {
         for (k, v) in resolve_stdlib_module_exports(spec) {
             globals.insert(Rc::from(k.as_str()), v);
         }
@@ -75,9 +75,9 @@ fn build_builtin_exports() -> FxHashMap<Rc<str>, Symbol> {
     globals
 }
 
-fn build_builtin_members() -> BuiltinMembers {
-    let mut members = BuiltinMembers::default();
-    for spec in varn_modules::BUILTIN_MODULES {
+fn build_core_members() -> CoreMembers {
+    let mut members = CoreMembers::default();
+    for spec in varn_modules::CORE_MODULES {
         if let Some(rb) = resolve_stdlib_module_bind(spec) {
             let scope = rb.scopes.get(rb.global_scope);
             for (name, &sid) in &scope.bindings {

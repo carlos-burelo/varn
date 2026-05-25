@@ -5,11 +5,7 @@ use crate::regalloc::emit_load;
 
 use super::{CodegenCtx, JumpPatch};
 
-pub(crate) fn emit_jumps(
-    ctx: &mut CodegenCtx,
-    op: OpCode,
-    first_reg: usize,
-) -> Result<(), String> {
+pub(crate) fn emit_jumps(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) -> Result<(), String> {
     let asm = &mut ctx.asm;
     let code = ctx.code;
     let ip = &mut ctx.ip;
@@ -46,15 +42,15 @@ pub(crate) fn emit_jumps(
 
             emit_load(asm, Reg::Rax, first_reg, regmap);
 
-            asm.mov_reg_imm64(Reg::R10, 0x7FFA_0000_0000_0000u64); // bool_false
+            asm.mov_reg_imm64(Reg::R10, 0x7FFA_0000_0000_0000u64);
             asm.cmp_reg_reg(Reg::Rax, Reg::R10);
             let p1 = asm.jmp_cond(Cond::Equal);
 
-            asm.mov_reg_imm64(Reg::R10, 0x7FF9_0000_0000_0000u64); // null
+            asm.mov_reg_imm64(Reg::R10, 0x7FF9_0000_0000_0000u64);
             asm.cmp_reg_reg(Reg::Rax, Reg::R10);
             let p2 = asm.jmp_cond(Cond::Equal);
 
-            asm.mov_reg_imm64(Reg::R10, 0x7FFC_0000_0000_0000u64); // int_zero
+            asm.mov_reg_imm64(Reg::R10, 0x7FFC_0000_0000_0000u64);
             asm.cmp_reg_reg(Reg::Rax, Reg::R10);
             let p3 = asm.jmp_cond(Cond::Equal);
 
@@ -78,15 +74,15 @@ pub(crate) fn emit_jumps(
 
             emit_load(asm, Reg::Rax, first_reg, regmap);
 
-            asm.mov_reg_imm64(Reg::R10, 0x7FFA_0000_0000_0000u64); // bool_false
+            asm.mov_reg_imm64(Reg::R10, 0x7FFA_0000_0000_0000u64);
             asm.cmp_reg_reg(Reg::Rax, Reg::R10);
             let p_false = asm.jmp_cond(Cond::Equal);
 
-            asm.mov_reg_imm64(Reg::R10, 0x7FF9_0000_0000_0000u64); // null
+            asm.mov_reg_imm64(Reg::R10, 0x7FF9_0000_0000_0000u64);
             asm.cmp_reg_reg(Reg::Rax, Reg::R10);
             let p_null = asm.jmp_cond(Cond::Equal);
 
-            asm.mov_reg_imm64(Reg::R10, 0x7FFC_0000_0000_0000u64); // int_zero
+            asm.mov_reg_imm64(Reg::R10, 0x7FFC_0000_0000_0000u64);
             asm.cmp_reg_reg(Reg::Rax, Reg::R10);
             let p_zero = asm.jmp_cond(Cond::Equal);
 

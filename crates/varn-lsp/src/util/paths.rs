@@ -1,20 +1,15 @@
 pub fn uri_to_path_str(uri: &str) -> String {
-    let s = uri
-        .trim_start_matches("file:///")
-        .trim_start_matches("file://");
-    let s = s.replace("%20", " ");
-    s.replace('\\', "/")
+    varn_modules::resolver::uri_to_path(uri)
 }
 
 pub fn path_to_uri(path: &str) -> String {
-    let normalized = path.replace('\\', "/");
-    format!("file:///{}", normalized.trim_start_matches('/'))
+    varn_modules::resolver::path_to_uri(path)
 }
 
 pub fn is_stdlib_uri(uri: &str) -> bool {
-    uri.contains(crate::constants::STD_LIB_PATH_SEGMENT)
+    varn_modules::resolver::is_varn_uri(uri)
 }
 
 pub fn is_varn_file(path: &str) -> bool {
-    path.ends_with(crate::constants::VARN_EXTENSION)
+    varn_modules::resolver::is_varn_file(path)
 }

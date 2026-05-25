@@ -79,7 +79,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w1 = w!();
                 format!("r{} = r{}", hi(w1), lo(w1))
             }
-            // 1-word opcodes: dest is in the high byte of op_val itself.
+
             OpCode::LoadNull | OpCode::LoadTrue | OpCode::LoadFalse => {
                 format!("r{}", hi(op_val))
             }
@@ -200,7 +200,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let val = w!() as i16;
                 format!("r{} = {}", hi(w1), val)
             }
-            // 1-word opcodes: dest in high byte of op_val.
+
             OpCode::LoadIntZero => format!("r{} = 0", hi(op_val)),
             OpCode::LoadIntOne => format!("r{} = 1", hi(op_val)),
             OpCode::LoadIntMinusOne => format!("r{} = -1", hi(op_val)),

@@ -181,7 +181,7 @@ impl Binder {
             sum_variant_parent: b.sum_variant_parent,
             sum_variant_fields: b.sum_variant_fields,
             extensions: b.extensions,
-            builtin: None,
+            core: None,
             pending_enrich: b.pending_enrich,
         }
     }

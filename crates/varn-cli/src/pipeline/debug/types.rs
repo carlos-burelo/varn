@@ -7,11 +7,7 @@ pub fn debug_types(program: &Program, flags: &DebugFlags) {
     use super::super::colors::{footer, header};
     
     let source_code = std::fs::read_to_string(&program.filename).unwrap_or_default();
-    let uri = if cfg!(windows) {
-        format!("file:///{}", program.filename.replace('\\', "/"))
-    } else {
-        format!("file://{}", program.filename)
-    };
+    let uri = varn_modules::resolver::path_to_uri(&program.filename);
 
     let analysis = varn_lsp::pipeline::run_pipeline(source_code, uri);
     header(C_TYPES, "type inference engine", &program.filename);

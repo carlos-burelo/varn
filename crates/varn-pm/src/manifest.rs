@@ -3,17 +3,15 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-/// Parsed dependency origin: `github.com/user/repo@^1.2.3`
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DepOrigin {
     pub host: String,
     pub user: String,
     pub repo: String,
-    pub req: String, // semver requirement string, e.g. "^1.2.3"
+    pub req: String,
 }
 
 impl DepOrigin {
-    /// Parse `github.com/user/repo@^1.2.3` or `github.com/user/repo` (no constraint = `*`)
     pub fn parse(s: &str) -> Result<Self, String> {
         let (host_path, req) = if let Some(at) = s.rfind('@') {
             (&s[..at], s[at + 1..].to_owned())
@@ -37,28 +35,13 @@ impl DepOrigin {
     }
 
     pub fn tarball_url(&self, version: &str) -> String {
-        format!(
-            "https://{}/{}/{}/archive/refs/tags/v{}.tar.gz",
-            self.host, self.user, self.repo, version
-        )
+        varn_modules::resolver::forge_tarball_url(&self.host, &self.user, &self.repo, version)
     }
 
     pub fn tags_api_url(&self) -> String {
-        if self.host == "github.com" {
-            format!(
-                "https://api.github.com/repos/{}/{}/tags",
-                self.user, self.repo
-            )
-        } else {
-            // Gitea / Forgejo compatible
-            format!(
-                "https://{}/api/v1/repos/{}/{}/tags",
-                self.host, self.user, self.repo
-            )
-        }
+        varn_modules::resolver::forge_tags_api_url(&self.host, &self.user, &self.repo)
     }
 
-    /// Logical name used as directory name inside `.vn/packages/`
     pub fn local_name(&self) -> String {
         format!(
             "{}_{}_{}",
@@ -75,7 +58,7 @@ pub struct ProjectManifest {
     pub name: Option<String>,
     #[serde(default)]
     pub version: Option<String>,
-    /// Map of alias → origin string (`github.com/user/repo@^1.2.3`)
+
     #[serde(default)]
     pub dependencies: HashMap<String, String>,
 }
@@ -105,7 +88,6 @@ impl ProjectManifest {
 
 pub fn find_project_manifest(start: &Path) -> Option<PathBuf> {
     for dir in start.ancestors() {
-        // Skip inside .vn/packages/
         let mut in_pkg = false;
         let mut prev = None::<&std::ffi::OsStr>;
         for comp in dir.components() {

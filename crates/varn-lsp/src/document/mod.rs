@@ -220,9 +220,6 @@ pub struct DocumentState {
     pub import_paths: Vec<String>,
 }
 
-// Safety: the LSP runs on a single-thread tokio runtime (current_thread).
-// DocumentState contains Rc<str> inside checker arenas which are created,
-// used, and dropped on that same thread — they never actually cross threads.
 unsafe impl Send for DocumentState {}
 unsafe impl Sync for DocumentState {}
 

@@ -7,8 +7,8 @@ use varn_core::ast::pattern::MatchPattern;
 use varn_core::ast::{ArrayEl, Expr, ExprKind, MatchBody, Param, Pattern, Stmt, StmtKind};
 use varn_core::OpCode;
 
-use super::compile_expr;
 use super::super::function::{compile_function, emit_closure};
+use super::compile_expr;
 
 pub(super) fn compile_template<'a>(c: &mut Compiler<'a>, parts: &[TemplatePart]) -> u8 {
     if parts.is_empty() {
@@ -18,7 +18,6 @@ pub(super) fn compile_template<'a>(c: &mut Compiler<'a>, parts: &[TemplatePart])
         return r;
     }
 
-    // Single literal: no concat needed.
     if parts.len() == 1 {
         if let TemplatePart::Literal(s) = &parts[0] {
             let r = c.alloc_reg();
@@ -28,7 +27,6 @@ pub(super) fn compile_template<'a>(c: &mut Compiler<'a>, parts: &[TemplatePart])
         }
     }
 
-    // Compile each part into a register (literals as LoadConst, expressions as ToString).
     let part_regs: Vec<u8> = parts
         .iter()
         .map(|part| match part {
@@ -56,7 +54,6 @@ pub(super) fn compile_template<'a>(c: &mut Compiler<'a>, parts: &[TemplatePart])
         c.chunk.write(crate::chunk::Chunk::pack(reg, 0), line);
     }
 
-    // Free all part registers in reverse LIFO order.
     for _ in &part_regs {
         c.free_reg();
     }
@@ -107,8 +104,8 @@ pub(super) fn compile_pipeline<'a>(c: &mut Compiler<'a>, left: &Expr, right: &Ex
     c.chunk.emit(OpCode::Call, line);
     c.chunk.write(Chunk::pack(fn_reg, fn_reg), line);
     c.chunk.write(Chunk::pack(2, recv_reg), line);
-    c.free_reg(); // Free arg register
-    c.free_reg(); // Free receiver register
+    c.free_reg();
+    c.free_reg();
     fn_reg
 }
 
@@ -145,11 +142,7 @@ fn pipeline_has_placeholder(expr: &Expr) -> bool {
     }
 }
 
-pub(super) fn compile_match<'a>(
-    c: &mut Compiler<'a>,
-    subject: &Expr,
-    cases: &[MatchCase],
-) -> u8 {
+pub(super) fn compile_match<'a>(c: &mut Compiler<'a>, subject: &Expr, cases: &[MatchCase]) -> u8 {
     let subj = compile_expr(c, subject);
     let dest = c.alloc_reg();
     c.emit_rr(OpCode::LoadNull, dest, 0);

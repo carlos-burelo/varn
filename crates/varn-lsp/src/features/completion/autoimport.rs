@@ -3,9 +3,9 @@ use std::collections::HashSet;
 use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, Position, Range, TextEdit};
 use varn_checker::SymbolKind;
 
-use crate::constants::{
-    SORT_AUTOIMPORT, STDLIB_STD_PATH, STD_LIB_PATH_SEGMENT, STD_PREFIX, VARN_EXTENSION,
-};
+use varn_modules::resolver::{normalize_display_path, relative_import_path};
+
+use crate::constants::{SORT_AUTOIMPORT, STDLIB_STD_PATH, STD_PREFIX};
 use crate::document::import::uri_to_path;
 use crate::index::ProjectIndex;
 
@@ -93,57 +93,27 @@ fn import_insert_position(source: &str) -> Position {
 }
 
 fn is_stdlib_uri(uri: &str) -> bool {
-    uri.contains(STD_LIB_PATH_SEGMENT)
+    varn_modules::resolver::is_varn_uri(uri)
 }
 
 fn uri_to_specifier(from_uri: &str, target_uri: &str) -> String {
+    if let Some(spec) = varn_modules::resolver::specifier_from_uri(target_uri) {
+        return spec;
+    }
+
     let target_path = uri_to_path(target_uri);
-    let normalized = target_path.replace('\\', "/");
+    let normalized = normalize_display_path(&target_path);
 
     if let Some(idx) = normalized.find(STDLIB_STD_PATH) {
         let rest = &normalized[idx + STDLIB_STD_PATH.len()..];
-        let mod_suffix = concat!("/mod", ".vn"); // avoids literal ".vn" in non-constant position
+        let mod_suffix = concat!("/mod", ".vn");
         let module = rest
             .strip_suffix(mod_suffix)
-            .or_else(|| rest.strip_suffix(VARN_EXTENSION))
+            .or_else(|| rest.strip_suffix(".vn"))
             .unwrap_or(rest);
         return format!("{STD_PREFIX}{module}");
     }
 
     let from_path = uri_to_path(from_uri);
     relative_import_path(&from_path, &target_path)
-}
-
-fn relative_import_path(from_file: &str, to_file: &str) -> String {
-    let from = from_file.replace('\\', "/");
-    let to = to_file.replace('\\', "/");
-
-    let from_dir = from.rsplit_once('/').map(|(d, _)| d).unwrap_or("");
-    let from_parts: Vec<&str> = from_dir.split('/').filter(|p| !p.is_empty()).collect();
-    let to_parts: Vec<&str> = to.split('/').filter(|p| !p.is_empty()).collect();
-
-    let common = from_parts
-        .iter()
-        .zip(to_parts.iter())
-        .take_while(|(a, b)| a == b)
-        .count();
-
-    let ups = from_parts.len() - common;
-    let downs = &to_parts[common..];
-
-    let mut result = String::new();
-    if ups == 0 {
-        result.push_str("./");
-    } else {
-        for _ in 0..ups {
-            result.push_str("../");
-        }
-    }
-    result.push_str(&downs.join("/"));
-
-    if result.ends_with(VARN_EXTENSION) {
-        result.truncate(result.len() - VARN_EXTENSION.len());
-    }
-
-    result
 }

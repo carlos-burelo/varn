@@ -47,7 +47,7 @@ pub(super) fn build_enrich_context(bind: &BindResult) -> (EnrichContext, FxHashM
     }
 
     let mut class_methods = bind.class_methods.clone();
-    if let Some(b) = &bind.builtin {
+    if let Some(b) = &bind.core {
         for (k, v) in &b.class_methods {
             class_methods.entry(k.clone()).or_insert_with(|| v.clone());
         }

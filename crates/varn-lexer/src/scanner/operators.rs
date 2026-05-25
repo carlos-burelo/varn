@@ -13,7 +13,7 @@ impl super::Scanner<'_> {
     pub(super) fn scan_operator(&mut self, tokens: &mut Vec<TokenRecord>, lexemes: &mut Vec<u8>) {
         let start = self.pos;
         let (sl, sc) = self.location();
-        // advance() now tracks line/col
+
         let c = self.advance();
 
         let kind = match c {
@@ -34,7 +34,6 @@ impl super::Scanner<'_> {
             b'\n' => NEWLINE,
             b'.' => {
                 if self.peek(0) == b'.' {
-                    // '.' — never newline
                     self.cur_col += 1;
                     self.pos += 1;
                     if self.match_byte(b'.') {

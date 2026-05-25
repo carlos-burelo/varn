@@ -414,8 +414,6 @@ impl TokenKind {
     }
 }
 
-/// Parsed numeric value attached to integer/float literal tokens so the parser
-/// never needs to re-parse the lexeme.
 #[derive(Clone, Copy, Debug)]
 pub enum ParsedNumber {
     Int(i64),
@@ -426,9 +424,9 @@ pub enum ParsedNumber {
 pub struct Token {
     pub kind: TokenKind,
     pub range: SourceRange,
-    /// Set for integer/float/binary/octal/hex literal tokens.
+
     pub parsed_num: Option<ParsedNumber>,
-    /// Byte offset into the shared lexeme buffer returned by the lexer.
+
     pub lex_start: u32,
     pub lex_len: u32,
 }
@@ -458,7 +456,6 @@ impl Token {
         self.kind == kind
     }
 
-    /// Retrieve the lexeme slice from the shared buffer.
     #[inline]
     pub fn get_lexeme<'a>(&self, buf: &'a [u8]) -> &'a str {
         let start = self.lex_start as usize;

@@ -52,6 +52,7 @@ pub struct HeapInner {
     pub gc_collections: u64,
     pub gc_total_freed: u64,
     pub gc_alloc_since_collect: u64,
+    pub nursery: Nursery,
     free: Vec<u32>,
     objects: Vec<Option<HeapObj>>,
     string_interner: HashMap<RuntimeString, u32>,
@@ -64,8 +65,6 @@ pub struct HeapInner {
     decimal_interner: HashMap<rust_decimal::Decimal, u32>,
     char_interner: HashMap<char, u32>,
     gc_collector: Option<GcCollector>,
-    /// Young generation bump allocator.
-    pub nursery: Nursery,
 }
 
 #[inline]
@@ -125,7 +124,6 @@ impl HeapInner {
         VmValue::from_heap_idx(self.alloc(HeapObj::NativeFn(name, f)))
     }
 
-    /// Allocate in old gen or nursery depending on type. Returns a packed index suitable for VmValue.
     pub fn alloc(&mut self, obj: HeapObj) -> u32 {
         match obj {
             HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Object(_) => {
@@ -144,8 +142,6 @@ impl HeapInner {
         ))
     }
 
-    /// Allocate directly into old gen without bumping GC pressure counter.
-    /// Used only by the nursery Minor GC to promote objects.
     pub fn alloc_raw(&mut self, obj: HeapObj) -> u32 {
         self.alloc_count += 1;
         if let Some(idx) = self.free.pop() {
@@ -158,13 +154,11 @@ impl HeapInner {
         }
     }
 
-    /// True if the nursery is full and a Minor GC should run before the next allocation.
     #[inline(always)]
     pub fn needs_minor_gc(&self) -> bool {
         self.nursery.is_full()
     }
 
-    /// Record a reference write from parent container to child value.
     #[inline(always)]
     pub fn write_barrier(&mut self, parent_packed_idx: u32, new_val: VmValue) {
         if is_old_idx(parent_packed_idx)
@@ -175,7 +169,6 @@ impl HeapInner {
         }
     }
 
-    /// Get an object by raw VmValue heap index, checking nursery or old-gen.
     #[inline(always)]
     pub fn get_by_idx(&self, idx: u32) -> Option<&HeapObj> {
         if is_nursery_idx(idx) {
@@ -194,16 +187,12 @@ impl HeapInner {
         }
     }
 
-    /// Run a Minor GC: evacuate all live nursery objects to old gen.
-    /// `stack` is the full ExecCtx stack slice (mutated in-place).
-    /// `extra_packed` are additional old-gen packed indices to use as roots.
     pub fn minor_gc(&mut self, stack: &mut [VmValue], extra_packed: &[u32]) {
         let mut nursery = std::mem::take(&mut self.nursery);
         nursery.collect(self, stack, extra_packed);
         self.nursery = nursery;
     }
 
-    /// Get by VmValue heap index (handles both nursery and old-gen automatically).
     #[inline(always)]
     pub fn get(&self, idx: u32) -> Option<&HeapObj> {
         self.get_by_idx(idx)
@@ -214,7 +203,6 @@ impl HeapInner {
         self.get_by_idx(idx).expect("invalid heap index")
     }
 
-    /// Get by VmValue heap index (handles both nursery and old-gen automatically).
     #[inline(always)]
     pub fn get_mut(&mut self, idx: u32) -> Option<&mut HeapObj> {
         self.get_by_idx_mut(idx)
@@ -225,7 +213,6 @@ impl HeapInner {
         self.get_by_idx_mut(idx).expect("invalid heap index")
     }
 
-    /// Get by raw old-gen index without flag stripping. For GC internals only.
     #[inline(always)]
     pub fn get_raw(&self, raw_old_idx: u32) -> Option<&HeapObj> {
         self.objects.get(raw_old_idx as usize)?.as_ref()
@@ -236,8 +223,6 @@ impl HeapInner {
         self.objects.get_mut(raw_old_idx as usize)?.as_mut()
     }
 
-    /// Convert a `Value` to a `VmValue`, allocating heap objects as needed.
-    /// For strings, prefer `alloc_str` directly — it avoids the `Value` allocation.
     pub fn intern(&mut self, val: Value) -> VmValue {
         match val {
             Value::Null => VmValue::null(),
@@ -414,15 +399,12 @@ impl HeapInner {
     pub fn alloc_str(&mut self, s: impl AsRef<str>) -> VmValue {
         let s_ref = s.as_ref();
 
-        // SSO: strings ≤5 ASCII bytes live in the VmValue itself — zero alloc.
         if let Some(sso) = VmValue::try_from_sso(s_ref) {
             return sso;
         }
 
         let rs: RuntimeString = Rc::from(s_ref);
 
-        // Check string interner. Only old-gen strings are interned (nursery strings
-        // are not interned to avoid stale references after Minor GC resets the nursery).
         if let Some(&packed) = self.string_interner.get(&rs) {
             let raw = old_idx_raw(packed);
             if self
@@ -436,11 +418,9 @@ impl HeapInner {
             self.string_interner.remove(&rs);
         }
 
-        // Allocate in nursery if space available; otherwise old gen.
         let idx = if let Some(ni) = self.nursery.try_alloc(HeapObj::Str(rs.clone())) {
-            ni // nursery index (bit31 = 0)
+            ni
         } else {
-            // Nursery full — allocate in old gen and intern.
             let oi = alloc_into(
                 &mut self.objects,
                 &mut self.free,
@@ -455,7 +435,6 @@ impl HeapInner {
         VmValue::from_heap_idx(idx)
     }
 
-    /// Allocate a string directly in old-gen (interned). Use for long-lived strings like constants.
     pub fn alloc_str_interned(&mut self, s: impl AsRef<str>) -> VmValue {
         let s_ref = s.as_ref();
         if let Some(sso) = VmValue::try_from_sso(s_ref) {
@@ -648,7 +627,7 @@ impl HeapInner {
 
     pub fn should_trigger_gc(&self) -> bool {
         let used = self.objects.len() - self.free.len();
-        // free_ratio < 0.2 without float division: free*5 < total
+
         self.free.len() * 5 < self.objects.len() || used > 10000
     }
 
@@ -659,7 +638,6 @@ impl HeapInner {
 
     pub fn compact_interners(&mut self) {
         self.string_interner.retain(|_, &mut packed| {
-            // string_interner stores packed old-gen indices (with OLD_GEN_FLAG).
             let raw = old_idx_raw(packed);
             self.objects
                 .get(raw as usize)
@@ -840,7 +818,6 @@ impl Heap {
         }
     }
 
-    /// Access the mutable inner heap, useful when only holding a shared Heap reference.
     #[inline(always)]
     pub unsafe fn inner_mut(&self) -> &mut HeapInner {
         &mut *self.inner.get()

@@ -97,7 +97,8 @@ impl ExecCtx {
             if let Some((f, receiver)) = ic_native {
                 self.record_ic_hit_callmethod();
                 self.record_call_native();
-                let result = self.call_native_with_receiver(f, receiver, base, arg_start, arg_count)?;
+                let result =
+                    self.call_native_with_receiver(f, receiver, base, arg_start, arg_count)?;
                 self.stack[base + dest] = result;
                 return Ok(false);
             }
@@ -113,7 +114,6 @@ impl ExecCtx {
                         self.stack.push(v);
                     }
                 } else {
-                    // Inline rest-arg bundling: this_val is arg 0, rest-param is last.
                     let arity = nc.proto.arity;
                     let rest_idx = arity.saturating_sub(1);
                     self.stack.push(this_val);
@@ -313,8 +313,6 @@ impl ExecCtx {
         Ok(false)
     }
 
-    /// Helper: call a native function with a receiver as first arg, followed by
-    /// `arg_count` args from `self.stack[base + arg_start..]`.
     #[inline(always)]
     fn call_native_with_receiver(
         &mut self,
@@ -330,7 +328,10 @@ impl ExecCtx {
             for i in 0..arg_count {
                 buf[i + 1] = self.stack[base + arg_start + i];
             }
-            (f)(self as &mut dyn varn_types::NativeCtx, &buf[..arg_count + 1])
+            (f)(
+                self as &mut dyn varn_types::NativeCtx,
+                &buf[..arg_count + 1],
+            )
         } else {
             let mut args = Vec::with_capacity(arg_count + 1);
             args.push(receiver);

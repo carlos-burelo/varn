@@ -80,14 +80,10 @@ pub fn compile(
     let mut precompiled_map = FxHashMap::default();
     for (path, module_proto) in graph_build.modules.iter() {
         if path != &graph_build.entry_path {
-            let clean_path = path
-                .strip_prefix(varn_modules::EMBEDDED_MODULE_PREFIX)
-                .unwrap_or(path);
-            precompiled_map.insert(clean_path.to_owned(), Rc::new(module_proto.clone()));
+            precompiled_map.insert(path.to_owned(), Rc::new(module_proto.clone()));
         }
     }
 
-    // Fibonacci mix: order-sensitive, avoids XOR-fold collisions from permuted modules.
     let graph_hash = graph_build.source_hashes.values().fold(0u64, |acc, &h| {
         acc.wrapping_mul(0x9e3779b97f4a7c15).wrapping_add(h)
     });

@@ -67,7 +67,6 @@ mod sys {
     }
 }
 
-/// A safe wrapper around dynamically allocated executable memory pages.
 pub struct JitBuffer {
     ptr: *mut u8,
     size: usize,
@@ -75,13 +74,11 @@ pub struct JitBuffer {
 }
 
 impl JitBuffer {
-    /// Allocates a new Read-Write (RW) buffer of a given size.
     pub fn new(size: usize) -> Result<Self, String> {
         if size == 0 {
             return Err("Size must be greater than zero".to_owned());
         }
 
-        // Round up to system page size (typically 4096 bytes)
         let page_size = 4096;
         let size = (size + page_size - 1) & !(page_size - 1);
 
@@ -128,13 +125,11 @@ impl JitBuffer {
         }
     }
 
-    /// Returns a slice of the buffer for writing. Only valid if not yet marked executable.
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
         assert!(!self.executable, "Cannot modify an executable JIT buffer");
         unsafe { std::slice::from_raw_parts_mut(self.ptr, self.size) }
     }
 
-    /// Makes the buffer executable (RX) and flushes the CPU instruction cache.
     pub fn make_executable(&mut self) -> Result<(), String> {
         if self.executable {
             return Ok(());
@@ -158,7 +153,6 @@ impl JitBuffer {
                 );
             }
 
-            // Flush the instruction cache to ensure CPU sees our newly written bytes
             unsafe {
                 sys::FlushInstructionCache(
                     sys::GetCurrentProcess(),
@@ -183,11 +177,8 @@ impl JitBuffer {
                 );
             }
 
-            // Flush CPU instruction cache
             #[cfg(target_arch = "x86_64")]
             {
-                // x86_64 has hardware-managed instruction cache coherence,
-                // but we flush caches or execute a fence to be strictly correct.
                 unsafe {
                     std::arch::asm!("mfence", "lfence", options(nostack, preserves_flags));
                 }
@@ -195,14 +186,10 @@ impl JitBuffer {
 
             #[cfg(target_arch = "aarch64")]
             {
-                // AArch64 requires explicit cache flushing.
                 unsafe {
                     let start = self.ptr as usize;
                     let end = start + self.size;
-                    // Clear data cache, then instruction cache, then sync
-                    // Note: In pure Rust we can call __builtin___clear_cache via GCC/Clang builtins
-                    // but on ARM64 we can also use asm.
-                    // For now, let's use the clear_cache builtin if compiling with standard linkers.
+
                     extern "C" {
                         fn __clear_cache(start: *mut c_void, end: *mut c_void);
                     }
@@ -215,12 +202,10 @@ impl JitBuffer {
         Ok(())
     }
 
-    /// Returns the raw pointer to the allocated memory.
     pub fn as_ptr(&self) -> *const u8 {
         self.ptr
     }
 
-    /// Returns the size of the allocated memory.
     pub fn size(&self) -> usize {
         self.size
     }

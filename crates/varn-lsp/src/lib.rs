@@ -9,7 +9,7 @@ pub mod util;
 pub mod workspace;
 
 #[tokio::main(flavor = "current_thread")]
-// Single-thread runtime: Rc<str> in checker types never cross thread boundaries.
+
 pub async fn run_server() {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();

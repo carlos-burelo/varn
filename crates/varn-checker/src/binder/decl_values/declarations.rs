@@ -339,7 +339,6 @@ impl super::super::Binder {
             });
         }
 
-        // Bind the Enum body (methods/properties) as a class-like environment
         let child = self
             .scopes
             .child(crate::scope::ScopeKind::Class, self.current);

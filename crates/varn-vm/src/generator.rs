@@ -103,12 +103,10 @@ impl GeneratorDriver for NanSyncGenDriver {
     fn trace_vm_values(&self, callback: &mut dyn FnMut(varn_types::VmValue)) {
         let inner = self.inner.borrow();
 
-        // 1. Stack values
         for &nv in &inner.ctx.stack {
             callback(varn_types::VmValue(nv.0));
         }
 
-        // 2. Closure constants and upvalues in frames
         for frame in &inner.ctx.frames {
             for &c in frame.closure.constants.iter() {
                 callback(varn_types::VmValue(c.0));
@@ -120,14 +118,12 @@ impl GeneratorDriver for NanSyncGenDriver {
             }
         }
 
-        // 3. Open upvalues
         for (_, uv) in &inner.ctx.open_upvalues {
             if let Ok(upval_inner) = uv.inner.try_borrow() {
                 callback(varn_types::VmValue(upval_inner.value.0));
             }
         }
 
-        // 4. Pending constructors and setters
         for (_, nv) in &inner.ctx.pending_constructors {
             callback(varn_types::VmValue(nv.0));
         }

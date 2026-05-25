@@ -15,8 +15,6 @@ impl ExecCtx {
         frame_idx: usize,
     ) -> VmResult<bool> {
         if callee.is_heap() {
-            // First, check for BoundMethod to avoid holding a reference into self.heap
-            // while we do mutations and calls!
             let mut bound_method = None;
             if let Some(crate::heap::HeapObj::BoundMethod(bm)) = self.heap.get(callee.as_heap_idx())
             {
@@ -25,7 +23,7 @@ impl ExecCtx {
 
             if let Some(bm) = bound_method {
                 let receiver = self.heap.intern(bm.receiver.clone());
-                self.stack[base + arg_start] = receiver; // Overwrite dummy null with actual bound receiver!
+                self.stack[base + arg_start] = receiver;
                 match &bm.target {
                     varn_types::value::BoundMethodTarget::Native { func, .. } => {
                         let f = *func;
@@ -105,11 +103,9 @@ impl ExecCtx {
                                     } else {
                                         vec![]
                                     };
-                                    let rest_nv = VmValue::from_heap_idx(
-                                        self.heap.alloc(crate::heap::HeapObj::Array(
-                                            VmArray::new(rest_items),
-                                        )),
-                                    );
+                                    let rest_nv = VmValue::from_heap_idx(self.heap.alloc(
+                                        crate::heap::HeapObj::Array(VmArray::new(rest_items)),
+                                    ));
                                     self.stack.push(rest_nv);
                                 }
                                 if self.frames.len() >= 10000 {
@@ -134,7 +130,6 @@ impl ExecCtx {
                     }
                 }
             } else {
-                // If it is not a bound method, do the other checks
                 match self.heap.get(callee.as_heap_idx()) {
                     Some(crate::heap::HeapObj::NativeFn(_name, f)) => {
                         let f = *f;
@@ -214,8 +209,6 @@ impl ExecCtx {
                                 self.frames.push(frame);
                                 return Ok(true);
                             } else if nc.proto.has_rest && arg_count <= arity {
-                                // Fast path for rest-param functions when arg count fits within arity.
-                                // Avoids prepare_call + bundle_rest_args overhead for the common case.
                                 let nc = nc.clone();
                                 let rest_idx = arity.saturating_sub(1);
                                 self.stack.push(callee);
@@ -234,10 +227,10 @@ impl ExecCtx {
                                 } else {
                                     vec![]
                                 };
-                                let rest_nv = VmValue::from_heap_idx(
-                                    self.heap
-                                        .alloc(crate::heap::HeapObj::Array(VmArray::new(rest_items))),
-                                );
+                                let rest_nv =
+                                    VmValue::from_heap_idx(self.heap.alloc(
+                                        crate::heap::HeapObj::Array(VmArray::new(rest_items)),
+                                    ));
                                 self.stack.push(rest_nv);
                                 if self.frames.len() >= 10000 {
                                     return Err(crate::error::RuntimeError::new(

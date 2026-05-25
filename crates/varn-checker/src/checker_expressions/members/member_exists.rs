@@ -69,7 +69,7 @@ impl Checker {
                 if key == "length" {
                     return true;
                 }
-                if let Some(b) = &bind.builtin {
+                if let Some(b) = &bind.core {
                     if let Some(members) =
                         b.class_members.get(varn_core::IntrinsicType::Str.as_str())
                     {
@@ -82,7 +82,7 @@ impl Checker {
             }
             TypeKind::Intrinsic(_) => {
                 let name = ty.to_string();
-                if let Some(b) = &bind.builtin {
+                if let Some(b) = &bind.core {
                     if let Some(members) = b.class_members.get(name.as_str()) {
                         if members.members.iter().any(|m| m.name.as_ref() == key) {
                             return true;
@@ -114,7 +114,7 @@ impl Checker {
                 let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
                 let is_enum = bind.get_enum_members_local(name.as_ref()).is_some()
                     || bind
-                        .builtin
+                        .core
                         .as_ref()
                         .map_or(false, |b| b.enum_members.contains_key(name.as_ref()))
                     || crate::module_resolver::find_module_bind_for_type(name, &origin_modules)
@@ -132,7 +132,6 @@ impl Checker {
                         return true;
                     }
 
-                    // Look up variant payload fields
                     let mut variants = Vec::new();
                     if let Some(members) = bind.get_enum_members_local(name.as_ref()) {
                         variants.extend(members.iter().map(|m| m.name.clone()));
@@ -189,7 +188,7 @@ impl Checker {
                 {
                     return true;
                 }
-                if let Some(b) = &bind.builtin {
+                if let Some(b) = &bind.core {
                     if let Some(members) = b.class_members.get(name.as_ref()) {
                         if members.members.iter().any(|m| m.name.as_ref() == key) {
                             return true;
@@ -216,7 +215,7 @@ impl Checker {
             }
             TypeKind::Object(members) => members.iter().any(|m| m.name() == key),
             TypeKind::Array(_) => {
-                if let Some(b) = &bind.builtin {
+                if let Some(b) = &bind.core {
                     if let Some(members) = b.class_members.get("Array") {
                         return members.members.iter().any(|m| m.name.as_ref() == key);
                     }

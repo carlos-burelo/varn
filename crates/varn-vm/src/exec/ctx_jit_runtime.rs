@@ -226,8 +226,7 @@ pub extern "C" fn jit_build_object_with_shape(
         let count = keys.len();
         let frame_idx = ctx_ref.frames.len() - 1;
         let base = ctx_ref.frames[frame_idx].base;
-        // Inline object construction without pushing to ctx.stack (which could reallocate
-        // and invalidate the JIT frame's REG_FRAME_BASE pointer).
+
         let mut inner = varn_types::RuntimeObject::new();
         for (i, key) in keys.iter().enumerate() {
             let val_nv = ctx_ref.stack[base + start_reg + i];
@@ -260,8 +259,7 @@ pub extern "C" fn jit_range(
         let base = ctx_ref.frames[frame_idx].base;
         let start_val = ctx_ref.stack[base + start_reg];
         let end_val = ctx_ref.stack[base + end_reg];
-        // Use a local vec to avoid reallocating ctx.stack (which would invalidate
-        // the JIT frame's REG_FRAME_BASE pointer).
+
         let mut temp = vec![start_val, end_val];
         match crate::exec::advanced::invoke_runtime_static(
             "__range__",

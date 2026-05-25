@@ -14,7 +14,6 @@ impl super::Scanner<'_> {
         let (sl, sc) = self.location();
 
         if self.peek(0) == b'0' && (self.peek(1) == b'b' || self.peek(1) == b'B') {
-            // '0' and 'b'/'B' — never newlines
             self.cur_col += 2;
             self.pos += 2;
             while is_binary_digit(self.peek(0)) || self.peek(0) == b'_' {
@@ -49,7 +48,6 @@ impl super::Scanner<'_> {
         }
 
         if self.peek(0) == b'0' && (self.peek(1) == b'o' || self.peek(1) == b'O') {
-            // '0' and 'o'/'O' — never newlines
             self.cur_col += 2;
             self.pos += 2;
             while is_octal_digit(self.peek(0)) || self.peek(0) == b'_' {
@@ -84,7 +82,6 @@ impl super::Scanner<'_> {
         }
 
         if self.peek(0) == b'0' && (self.peek(1) == b'x' || self.peek(1) == b'X') {
-            // '0' and 'x'/'X' — never newlines
             self.cur_col += 2;
             self.pos += 2;
             while is_hex_digit(self.peek(0)) || self.peek(0) == b'_' {
@@ -114,7 +111,6 @@ impl super::Scanner<'_> {
             return;
         }
 
-        // Decimal integer part — digits/underscores are never newlines
         while is_digit(self.peek(0)) || self.peek(0) == b'_' {
             self.cur_col += 1;
             self.pos += 1;
@@ -184,28 +180,24 @@ impl super::Scanner<'_> {
     ) {
         let start = self.pos;
         let (sl, sc) = self.location();
-        // opening quote — never a newline
+
         self.cur_col += 1;
         self.pos += 1;
         let content_start = self.pos;
 
         while !self.is_eof() && self.peek(0) != quote {
             if self.peek(0) == b'\\' {
-                // backslash — never newline
                 self.cur_col += 1;
                 self.pos += 1;
                 if !self.is_eof() {
-                    // escaped char — could be anything including \n
                     self.advance_byte();
                 }
             } else {
-                // string content — could be newline
                 self.advance_byte();
             }
         }
         let content_end = self.pos;
         if !self.is_eof() {
-            // closing quote — never a newline
             self.cur_col += 1;
             self.pos += 1;
         }
@@ -238,8 +230,6 @@ impl super::Scanner<'_> {
         let start = self.pos;
         let (sl, sc) = self.location();
 
-        // Advance past the first char (which may be multi-byte).
-        // Identifier chars are never newlines.
         if self.src[self.pos].is_ascii() {
             self.cur_col += 1;
             self.pos += 1;

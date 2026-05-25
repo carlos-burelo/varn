@@ -1,4 +1,4 @@
-use crate::builtins::loader::BuiltinMembers;
+use crate::core::loader::CoreMembers;
 use crate::module_resolver::resolve_module_bind_ref;
 use crate::scope::{ScopeArena, ScopeId};
 use crate::symbol::{Symbol, SymbolArena, SymbolId};
@@ -74,7 +74,7 @@ pub struct BindResult {
     pub sum_variant_parent: FxHashMap<Rc<str>, Rc<str>>,
     pub sum_variant_fields: FxHashMap<Rc<str>, Vec<(Rc<str>, Type)>>,
     pub extensions: Extensions,
-    pub builtin: Option<Rc<BuiltinMembers>>,
+    pub core: Option<Rc<CoreMembers>>,
     pub pending_enrich: Vec<PendingEnrich>,
 }
 
@@ -85,16 +85,15 @@ impl BindResult {
     }
 
     pub fn get_class_entry(&self, name: &str) -> Option<&ClassMemberInfo> {
-        self.type_members.classes.get(name).or_else(|| {
-            self.builtin
-                .as_ref()
-                .and_then(|b| b.class_members.get(name))
-        })
+        self.type_members
+            .classes
+            .get(name)
+            .or_else(|| self.core.as_ref().and_then(|b| b.class_members.get(name)))
     }
 
     pub fn get_interface_members_local(&self, name: &str) -> Option<&Vec<ClassMemberInfo>> {
         self.type_members.interfaces.get(name).or_else(|| {
-            self.builtin
+            self.core
                 .as_ref()
                 .and_then(|b| b.interface_members.get(name))
         })
@@ -102,7 +101,7 @@ impl BindResult {
 
     pub fn get_namespace_members_local(&self, name: &str) -> Option<&Vec<ClassMemberInfo>> {
         self.type_members.namespaces.get(name).or_else(|| {
-            self.builtin
+            self.core
                 .as_ref()
                 .and_then(|b| b.namespace_members.get(name))
         })
@@ -112,15 +111,13 @@ impl BindResult {
         self.type_members
             .enums
             .get(name)
-            .or_else(|| self.builtin.as_ref().and_then(|b| b.enum_members.get(name)))
+            .or_else(|| self.core.as_ref().and_then(|b| b.enum_members.get(name)))
     }
 
     pub fn get_class_methods_for(&self, name: &str) -> Option<&FxHashMap<Rc<str>, Type>> {
-        self.class_methods.get(name).or_else(|| {
-            self.builtin
-                .as_ref()
-                .and_then(|b| b.class_methods.get(name))
-        })
+        self.class_methods
+            .get(name)
+            .or_else(|| self.core.as_ref().and_then(|b| b.class_methods.get(name)))
     }
 
     pub fn get_class_parent(&self, name: &str) -> Option<&str> {
@@ -128,7 +125,7 @@ impl BindResult {
             .get(name)
             .map(|s| s.as_ref())
             .or_else(|| {
-                self.builtin
+                self.core
                     .as_ref()
                     .and_then(|b| b.class_parents.get(name))
                     .map(|s| s.as_ref())
@@ -137,7 +134,7 @@ impl BindResult {
 
     pub fn get_flattened_members(&self, name: &str) -> Option<&Vec<ClassMemberInfo>> {
         self.type_members.flattened.get(name).or_else(|| {
-            self.builtin
+            self.core
                 .as_ref()
                 .and_then(|b| b.flattened_members.get(name))
         })
@@ -149,7 +146,7 @@ impl BindResult {
             || self.type_members.namespaces.contains_key(name)
             || self.type_members.enums.contains_key(name)
             || self
-                .builtin
+                .core
                 .as_ref()
                 .map(|b| {
                     b.class_members.contains_key(name)

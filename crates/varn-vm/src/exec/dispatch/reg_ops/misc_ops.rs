@@ -7,7 +7,11 @@ use std::rc::Rc;
 use varn_types::PoolEntry;
 
 impl ExecCtx {
-    pub(in crate::exec::dispatch) fn exec_get_fixed_field(&mut self, obj: VmValue, slot: usize) -> VmResult<VmValue> {
+    pub(in crate::exec::dispatch) fn exec_get_fixed_field(
+        &mut self,
+        obj: VmValue,
+        slot: usize,
+    ) -> VmResult<VmValue> {
         crate::exec::props::get_fixed_field(obj, slot, &mut self.heap)
     }
 
@@ -83,7 +87,11 @@ impl ExecCtx {
         crate::exec::class::op_declare_field(obj, &name, &mut self.heap)
     }
 
-    pub(in crate::exec::dispatch) fn exec_get_index_nv(&mut self, obj: VmValue, key_nv: VmValue) -> VmResult<VmValue> {
+    pub(in crate::exec::dispatch) fn exec_get_index_nv(
+        &mut self,
+        obj: VmValue,
+        key_nv: VmValue,
+    ) -> VmResult<VmValue> {
         crate::exec::collections::get_index(obj, key_nv, &mut self.heap)
     }
 
@@ -138,7 +146,10 @@ impl ExecCtx {
         crate::exec::collections::object_rest(obj, &owned, &mut self.heap)
     }
 
-    pub(in crate::exec::dispatch) fn exec_object_keys(&mut self, obj: VmValue) -> VmResult<VmValue> {
+    pub(in crate::exec::dispatch) fn exec_object_keys(
+        &mut self,
+        obj: VmValue,
+    ) -> VmResult<VmValue> {
         crate::exec::collections::object_keys(obj, &mut self.heap)
     }
 

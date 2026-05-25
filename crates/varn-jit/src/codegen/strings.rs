@@ -48,8 +48,8 @@ fn emit_str_length(ctx: &mut CodegenCtx, first_reg: usize) {
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax); // arg2: v
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // arg1: ctx
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
 
     asm.mov_reg_imm64(Reg::R10, helpers.str_length as u64);
     asm.call_reg(Reg::R10);
@@ -101,9 +101,9 @@ fn emit_str_concat(ctx: &mut CodegenCtx, first_reg: usize) {
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    asm.mov_reg_reg(ARG_BASE, Reg::R11); // arg3: b
-    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax); // arg2: a
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // arg1: ctx
+    asm.mov_reg_reg(ARG_BASE, Reg::R11);
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
 
     asm.mov_reg_imm64(Reg::R10, helpers.str_concat as u64);
     asm.call_reg(Reg::R10);
@@ -155,9 +155,9 @@ fn emit_str_slice(ctx: &mut CodegenCtx, first_reg: usize) {
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    asm.mov_reg_reg(ARG_BASE, Reg::R11); // arg3: idx
-    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax); // arg2: s
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // arg1: ctx
+    asm.mov_reg_reg(ARG_BASE, Reg::R11);
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
 
     asm.mov_reg_imm64(Reg::R10, helpers.str_slice as u64);
     asm.call_reg(Reg::R10);

@@ -44,7 +44,7 @@ impl ExecCtx {
     ) -> VmResult<ControlSignal> {
         let w = code[*ip];
         *ip += 1;
-        let src_reg = (w >> 8) as usize; // equivalent to hi(w)
+        let src_reg = (w >> 8) as usize;
         let slot_idx = code[*ip] as usize;
         *ip += 1;
 

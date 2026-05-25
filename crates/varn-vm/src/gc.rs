@@ -104,8 +104,6 @@ impl TricolorMarker {
         }
     }
 
-    /// Mark an old-gen object gray. `idx` may be a packed index (with OLD_GEN_FLAG) or raw.
-    /// Nursery indices are silently skipped — they are managed by Minor GC.
     pub fn mark_gray(&mut self, idx: u32) {
         let raw = if is_old_idx(idx) {
             old_idx_raw(idx)
@@ -159,15 +157,12 @@ impl TricolorMarker {
 
     pub fn mark_from_roots(&mut self, heap: &HeapInner, roots: &[u32]) -> Result<(), GcError> {
         for &root in roots {
-            // Roots may be packed old-gen indices (with OLD_GEN_FLAG) or nursery indices.
             if is_old_idx(root) {
                 let raw = old_idx_raw(root);
                 if raw < heap.objects_len() {
                     self.mark_gray(raw);
                 }
             }
-            // Nursery indices: scan their old-gen children so GC doesn't sweep them.
-            // (The nursery objects themselves are managed by Minor GC, not swept here.)
         }
 
         while let Some(idx) = self.gray_queue.pop_front() {
