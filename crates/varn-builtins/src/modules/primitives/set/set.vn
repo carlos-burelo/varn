@@ -1,0 +1,10 @@
+export declare class Set<T> {
+    constructor();
+    add(value: T): void;
+    has(value: T): bool;
+    delete(value: T): bool;
+    clear(): void;
+    values(): T[];
+    forEach(callback: (value: T, value2: T, set: Set<T>) => void): void;
+    readonly size: int;
+}
