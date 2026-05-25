@@ -121,7 +121,9 @@ pub fn parse_block(s: &mut TokenStream) -> Result<Stmt, String> {
     }
     s.expect(TokenKind::RBrace)?;
     #[cfg(feature = "profiling")]
-    { s.profile.block += started.elapsed(); }
+    {
+        s.profile.block += started.elapsed();
+    }
     Ok(Stmt::new_with_range(range, StmtKind::Block { stmts }))
 }
 

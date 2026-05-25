@@ -36,10 +36,10 @@ pub enum Cond {
     NoSign = 9,
     Parity = 10,
     NoParity = 11,
-    Less = 12,          // Signed <
-    GreaterEqual = 13,  // Signed >=
-    LessEqual = 14,     // Signed <=
-    Greater = 15,       // Signed >
+    Less = 12,         // Signed <
+    GreaterEqual = 13, // Signed >=
+    LessEqual = 14,    // Signed <=
+    Greater = 15,      // Signed >
 }
 
 /// A lightweight, clean machine code emitter for x86_64.
@@ -50,7 +50,9 @@ pub struct Assembler {
 impl Assembler {
     /// Creates a new, empty assembler.
     pub fn new() -> Self {
-        Self { code: Vec::with_capacity(256) }
+        Self {
+            code: Vec::with_capacity(256),
+        }
     }
 
     /// Consumes the assembler and returns the generated machine code bytes.

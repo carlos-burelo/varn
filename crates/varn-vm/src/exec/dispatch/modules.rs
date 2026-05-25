@@ -63,7 +63,8 @@ impl ExecCtx {
             } else {
                 return Err(crate::error::RuntimeError::new(format!(
                     "OpLoadModuleSlot: slot {} out of bounds for module {}",
-                    slot_idx, m.id.as_str()
+                    slot_idx,
+                    m.id.as_str()
                 )));
             }
         } else {

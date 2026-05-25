@@ -17,14 +17,15 @@ pub fn build_goto_definition(
 
     if let Some(chain) = state.resolve_chain_at(line, col) {
         let (member_line, member_col, member_key) = match &chain {
-            ChainResult::Member { member, parent_name } => (
+            ChainResult::Member {
+                member,
+                parent_name,
+            } => (
                 member.line,
                 member.col,
                 Some(member_global_key(parent_name, member)),
             ),
-            ChainResult::DynamicMember { member, .. } => {
-                (member.line, member.col, None)
-            }
+            ChainResult::DynamicMember { member, .. } => (member.line, member.col, None),
             ChainResult::Symbol(_) => (u32::MAX, 0, None),
         };
 

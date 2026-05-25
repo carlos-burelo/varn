@@ -13,7 +13,11 @@ pub struct SourceLocation {
 
 impl SourceLocation {
     pub fn new(line: u32, column: u32, offset: u32) -> Self {
-        Self { offset, line, column }
+        Self {
+            offset,
+            line,
+            column,
+        }
     }
 }
 
@@ -23,7 +27,10 @@ impl SourceRange {
     }
 
     pub fn zero(loc: SourceLocation) -> Self {
-        Self { start: loc, end: loc }
+        Self {
+            start: loc,
+            end: loc,
+        }
     }
 
     pub fn at(line: u32, column: u32, offset: u32) -> Self {

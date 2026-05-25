@@ -198,7 +198,12 @@ pub(super) fn infer_binary_type(
                     }
                     Type::Dynamic.tainted()
                 }
-                BinaryOp::BitAnd | BinaryOp::BitOr | BinaryOp::BitXor | BinaryOp::Shl | BinaryOp::Shr | BinaryOp::UShr => {
+                BinaryOp::BitAnd
+                | BinaryOp::BitOr
+                | BinaryOp::BitXor
+                | BinaryOp::Shl
+                | BinaryOp::Shr
+                | BinaryOp::UShr => {
                     if matches!(l.0, TypeKind::Intrinsic(TypeTag::Int))
                         && matches!(r.0, TypeKind::Intrinsic(TypeTag::Int))
                     {

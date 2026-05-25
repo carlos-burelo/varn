@@ -271,7 +271,9 @@ impl Nursery {
         for (slot, nursery_idx) in fixups {
             let packed = self.evacuate(nursery_idx, old_gen);
             let new_val = VmValue::from_heap_idx(packed);
-            let Some(obj) = old_gen.get_raw_mut(raw_old) else { continue };
+            let Some(obj) = old_gen.get_raw_mut(raw_old) else {
+                continue;
+            };
             match (slot, obj) {
                 (ChildSlot::ArrayItem(i), HeapObj::Array(arr)) => {
                     if let Some(s) = arr.0.borrow_mut().get_mut(i) {

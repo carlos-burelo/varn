@@ -82,8 +82,7 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
                 offset + 2
             }
 
-            OpCode::Return
-            | OpCode::Throw => {
+            OpCode::Return | OpCode::Throw => {
                 let w1 = code.get(offset + 1).copied().unwrap_or(0);
                 let reg = (w1 >> 8) as usize;
                 println!("{:?} r{}", op, reg);
@@ -167,9 +166,7 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
                 offset + 2
             }
 
-            OpCode::DefineGlobal
-            | OpCode::MakeClass
-            | OpCode::BindMethod => {
+            OpCode::DefineGlobal | OpCode::MakeClass | OpCode::BindMethod => {
                 let w1 = code.get(offset + 1).copied().unwrap_or(0);
                 let src = (w1 >> 8) as usize;
                 let const_idx = code.get(offset + 2).copied().unwrap_or(0);
@@ -188,7 +185,10 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
                 let src = (w1 >> 8) as usize;
                 let cs_idx = (w1 & 0xFF) as usize;
                 let const_idx = code.get(offset + 2).copied().unwrap_or(0);
-                println!("{:?} r{} r{} +{} cs={}", op, first_reg, src, const_idx, cs_idx);
+                println!(
+                    "{:?} r{} r{} +{} cs={}",
+                    op, first_reg, src, const_idx, cs_idx
+                );
                 offset + 3
             }
 
@@ -200,21 +200,20 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
                 offset + 3
             }
 
-            OpCode::Call
-            | OpCode::CallSpread => {
+            OpCode::Call | OpCode::CallSpread => {
                 let w1 = code.get(offset + 1).copied().unwrap_or(0);
                 let callee_reg = (w1 >> 8) as usize;
                 let w2 = code.get(offset + 2).copied().unwrap_or(0);
                 let arg_count = (w2 >> 8) as usize;
                 let arg_start = (w2 & 0xFF) as usize;
-                println!("{:?} dest=r{} callee=r{} count={} start=r{}", op, first_reg, callee_reg, arg_count, arg_start);
+                println!(
+                    "{:?} dest=r{} callee=r{} count={} start=r{}",
+                    op, first_reg, callee_reg, arg_count, arg_start
+                );
                 offset + 3
             }
 
-            OpCode::Jump
-            | OpCode::JumpIfFalse
-            | OpCode::JumpIfTrue
-            | OpCode::Loop => {
+            OpCode::Jump | OpCode::JumpIfFalse | OpCode::JumpIfTrue | OpCode::Loop => {
                 let hi = code.get(offset + 1).copied().unwrap_or(0) as u32;
                 let lo = code.get(offset + 2).copied().unwrap_or(0) as u32;
                 let jump_offset = (hi << 16) | lo;
@@ -248,7 +247,10 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
                 let class_reg = (w1 >> 8) as usize;
                 let val_reg = (w1 & 0xFF) as usize;
                 let name_idx = code.get(offset + 2).copied().unwrap_or(0);
-                println!("{:?} class=r{} val=r{} name=+{}", op, class_reg, val_reg, name_idx);
+                println!(
+                    "{:?} class=r{} val=r{} name=+{}",
+                    op, class_reg, val_reg, name_idx
+                );
                 offset + 3
             }
 
@@ -260,7 +262,10 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
                 let w3 = code.get(offset + 3).copied().unwrap_or(0);
                 let arg_count = (w3 >> 8) as usize;
                 let arg_start = (w3 & 0xFF) as usize;
-                println!("{:?} dest=r{} obj=r{} name=+{} count={} start=r{}", op, dest, obj, name_idx, arg_count, arg_start);
+                println!(
+                    "{:?} dest=r{} obj=r{} name=+{} count={} start=r{}",
+                    op, dest, obj, name_idx, arg_count, arg_start
+                );
                 offset + 4
             }
 
@@ -272,7 +277,10 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
                 let w3 = code.get(offset + 3).copied().unwrap_or(0);
                 let arg_count = (w3 >> 8) as usize;
                 let arg_start = (w3 & 0xFF) as usize;
-                println!("{:?} dest=r{} obj=r{} name=+{} count={} start=r{}", op, dest, obj, name_idx, arg_count, arg_start);
+                println!(
+                    "{:?} dest=r{} obj=r{} name=+{} count={} start=r{}",
+                    op, dest, obj, name_idx, arg_count, arg_start
+                );
                 offset + 4
             }
 
@@ -324,7 +332,11 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
                 let w1 = code.get(offset + 1).copied().unwrap_or(0);
                 let src = w1 >> 8;
                 let imm = (w1 & 0xff) as u8 as i8;
-                let sign = if matches!(op, OpCode::SubImm) { "-" } else { "+" };
+                let sign = if matches!(op, OpCode::SubImm) {
+                    "-"
+                } else {
+                    "+"
+                };
                 println!("r{} = r{} {} {}", dest, src, sign, imm);
                 offset + 2
             }

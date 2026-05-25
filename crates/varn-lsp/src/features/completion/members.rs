@@ -154,7 +154,11 @@ pub fn dot_receiver(
             }
             varn_core::TypeKind::Named(name, _) | varn_core::TypeKind::Generic(name, ..) => {
                 let mut is_instance = true;
-                if let Some(sym) = state.symbols.iter().find(|s| s.name.as_str() == name.as_ref()) {
+                if let Some(sym) = state
+                    .symbols
+                    .iter()
+                    .find(|s| s.name.as_str() == name.as_ref())
+                {
                     if matches!(
                         sym.kind,
                         varn_checker::SymbolKind::Class

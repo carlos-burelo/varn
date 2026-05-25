@@ -1,13 +1,13 @@
 use crate::binder::infer_expr_type;
 use crate::binder::resolve_type_node;
 use crate::symbol::SymbolKind;
+use crate::types::{Type, TypeContext};
 use crate::BindResult;
 use varn_core::ast::operators::BinaryOp;
-use varn_core::ast::{ImportSpecifier, ExportDecl};
 use varn_core::ast::{Arg, ArrayEl, Decl, Expr, ExprKind, ForInit, Program, Stmt, StmtKind};
+use varn_core::ast::{ExportDecl, ImportSpecifier};
 use varn_core::TypeKind;
 use varn_core::{NumericKind, TypeAnnotations};
-use crate::types::{Type, TypeContext};
 
 #[derive(Clone)]
 struct AnnotateCtx<'a> {
@@ -33,7 +33,11 @@ impl<'a> TypeContext for AnnotateCtx<'a> {
         self.bind.get_interface_members(name, origin)
     }
 
-    fn get_class_members(&self, name: &str, origin: Option<&str>) -> Option<Vec<crate::types::ClassMemberInfo>> {
+    fn get_class_members(
+        &self,
+        name: &str,
+        origin: Option<&str>,
+    ) -> Option<Vec<crate::types::ClassMemberInfo>> {
         self.bind.get_class_members(name, origin)
     }
 
@@ -115,12 +119,16 @@ fn annotate_stmt(stmt: &Stmt, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                                 annotate_expr(init_expr, ann, ctx);
                             }
                             let name_opt = match &d.id {
-                                varn_core::ast::Pattern::Identifier { name, .. } => Some(name.clone()),
+                                varn_core::ast::Pattern::Identifier { name, .. } => {
+                                    Some(name.clone())
+                                }
                                 _ => None,
                             };
                             if let Some(name) = name_opt {
                                 let type_ann = d.type_ann.as_ref().or(match &d.id {
-                                    varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                                    varn_core::ast::Pattern::Identifier { type_ann, .. } => {
+                                        type_ann.as_ref()
+                                    }
                                     _ => None,
                                 });
                                 if let Some(ann_node) = type_ann {
@@ -185,7 +193,9 @@ fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                     };
                     if let Some(name) = name_opt {
                         let type_ann = p.type_ann.as_ref().or(match &p.pattern {
-                            varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                            varn_core::ast::Pattern::Identifier { type_ann, .. } => {
+                                type_ann.as_ref()
+                            }
                             _ => None,
                         });
                         let ty = if let Some(ann_node) = type_ann {
@@ -225,7 +235,10 @@ fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
             }
         }
         Decl::Export(e) => {
-            let exports = crate::module_resolver::resolve_module_exports_ref(&ctx.bind.source_file, &mut vec![]);
+            let exports = crate::module_resolver::resolve_module_exports_ref(
+                &ctx.bind.source_file,
+                &mut vec![],
+            );
             match e {
                 ExportDecl::Decl { declaration, .. } => {
                     annotate_decl(declaration, ann, ctx);
@@ -237,7 +250,9 @@ fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                         }
                     }
                 }
-                ExportDecl::Default { declaration, range, .. } => {
+                ExportDecl::Default {
+                    declaration, range, ..
+                } => {
                     match declaration.as_ref() {
                         varn_core::ast::ExportDefaultDecl::Function(f) => {
                             annotate_decl(&Decl::Function(f.clone()), ann, ctx);
@@ -291,7 +306,12 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
             );
             let is_comparison = matches!(
                 op,
-                BinaryOp::Lt | BinaryOp::LtEq | BinaryOp::Gt | BinaryOp::GtEq | BinaryOp::Eq | BinaryOp::NotEq
+                BinaryOp::Lt
+                    | BinaryOp::LtEq
+                    | BinaryOp::Gt
+                    | BinaryOp::GtEq
+                    | BinaryOp::Eq
+                    | BinaryOp::NotEq
             );
             if !is_arithmetic && !is_comparison {
                 return;
@@ -376,7 +396,10 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                         let exports = if crate::module_resolver::is_known_module(origin_path) {
                             crate::module_resolver::resolve_stdlib_module_exports_ref(origin_path)
                         } else {
-                            crate::module_resolver::resolve_module_exports_ref(origin_path, &mut vec![])
+                            crate::module_resolver::resolve_module_exports_ref(
+                                origin_path,
+                                &mut vec![],
+                            )
                         };
                         if let Some(sym) = exports.get(prop_name.as_ref()) {
                             if let Some(slot_idx) = sym.slot_idx {

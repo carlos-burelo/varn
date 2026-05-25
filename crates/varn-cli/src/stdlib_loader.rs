@@ -46,11 +46,15 @@ impl ModuleLoader for StdlibLoader {
 
 fn compile_source(source: &str, path: &str) -> Result<FunctionProto, String> {
     let (tokens, lexeme_buf, _) = varn_lexer::scan(source, path);
-    let mut program = varn_parser::parse(tokens, lexeme_buf, path).map_err(|errs| errs[0].message.clone())?;
+    let mut program =
+        varn_parser::parse(tokens, lexeme_buf, path).map_err(|errs| errs[0].message.clone())?;
     varn_core::assign_ast_ids(&mut program);
     let check = varn_checker::Checker::check(&program);
     let exports = varn_checker::module_resolver::resolve_stdlib_module_exports_ref(path);
-    let mut export_names: Vec<std::rc::Rc<str>> = exports.keys().map(|k| std::rc::Rc::from(k.as_str())).collect();
+    let mut export_names: Vec<std::rc::Rc<str>> = exports
+        .keys()
+        .map(|k| std::rc::Rc::from(k.as_str()))
+        .collect();
     export_names.sort();
     varn_compiler::compile_with_check_result(
         &program,

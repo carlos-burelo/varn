@@ -11,7 +11,12 @@ pub struct CheckResult {
     pub checker_result: varn_checker::CheckResult,
 }
 
-pub fn check(program: &Program, source: &str, debug: &DebugFlags, strict: bool) -> PipelineResult<CheckResult> {
+pub fn check(
+    program: &Program,
+    source: &str,
+    debug: &DebugFlags,
+    strict: bool,
+) -> PipelineResult<CheckResult> {
     let check_result = if strict {
         Checker::check_strict(program)
     } else {

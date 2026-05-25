@@ -4,6 +4,7 @@ pub mod mem;
 pub mod regalloc;
 pub mod registers;
 pub mod safepoint;
+pub(crate) mod codegen;
 
 use std::any::Any;
 use std::rc::Rc;
@@ -99,6 +100,7 @@ pub struct JitStatsSnapshot {
     pub total_compile_time_ns: u64,
     pub total_code_size_bytes: u64,
     pub jit_runs: u64,
+    pub jit_cached: u64,
     pub interp_runs: u64,
 }
 
@@ -108,6 +110,8 @@ pub struct JitStats {
     pub total_compile_time_ns: AtomicU64,
     pub total_code_size_bytes: AtomicU64,
     pub jit_runs: AtomicU64,
+    /// Incremented when a proto already has a cached JIT entry (no recompilation needed).
+    pub jit_cached: AtomicU64,
     pub interp_runs: AtomicU64,
 }
 
@@ -119,6 +123,7 @@ impl JitStats {
             total_compile_time_ns: AtomicU64::new(0),
             total_code_size_bytes: AtomicU64::new(0),
             jit_runs: AtomicU64::new(0),
+            jit_cached: AtomicU64::new(0),
             interp_runs: AtomicU64::new(0),
         }
     }
@@ -129,6 +134,7 @@ impl JitStats {
         self.total_compile_time_ns.store(0, Ordering::Relaxed);
         self.total_code_size_bytes.store(0, Ordering::Relaxed);
         self.jit_runs.store(0, Ordering::Relaxed);
+        self.jit_cached.store(0, Ordering::Relaxed);
         self.interp_runs.store(0, Ordering::Relaxed);
     }
 
@@ -139,6 +145,7 @@ impl JitStats {
             total_compile_time_ns: self.total_compile_time_ns.load(Ordering::Relaxed),
             total_code_size_bytes: self.total_code_size_bytes.load(Ordering::Relaxed),
             jit_runs: self.jit_runs.load(Ordering::Relaxed),
+            jit_cached: self.jit_cached.load(Ordering::Relaxed),
             interp_runs: self.interp_runs.load(Ordering::Relaxed),
         }
     }
@@ -156,22 +163,28 @@ pub fn compile(proto: &FunctionProto, helpers: JitHelpers) -> Result<(JitFn, Rc<
     match res {
         Ok(jit_buf) => {
             JIT_STATS.compile_success.fetch_add(1, Ordering::Relaxed);
-            JIT_STATS.total_compile_time_ns.fetch_add(elapsed, Ordering::Relaxed);
-            JIT_STATS.total_code_size_bytes.fetch_add(jit_buf.size() as u64, Ordering::Relaxed);
-            
+            JIT_STATS
+                .total_compile_time_ns
+                .fetch_add(elapsed, Ordering::Relaxed);
+            JIT_STATS
+                .total_code_size_bytes
+                .fetch_add(jit_buf.size() as u64, Ordering::Relaxed);
+
             let entry_ptr = jit_buf.as_ptr();
-            
+
             // Cast the raw executable pointer to a function pointer
             let jit_fn: JitFn = unsafe { std::mem::transmute(entry_ptr) };
-            
+
             // Wrap the JitBuffer in an Rc<dyn Any> to pass ownership to the VM cleanly
             let jit_code = Rc::new(jit_buf) as Rc<dyn Any>;
-            
+
             Ok((jit_fn, jit_code))
         }
         Err(e) => {
             JIT_STATS.compile_fail.fetch_add(1, Ordering::Relaxed);
-            JIT_STATS.total_compile_time_ns.fetch_add(elapsed, Ordering::Relaxed);
+            JIT_STATS
+                .total_compile_time_ns
+                .fetch_add(elapsed, Ordering::Relaxed);
             Err(e)
         }
     }

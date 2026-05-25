@@ -19,6 +19,5 @@ pub use heap::{Heap, HeapObj};
 pub use loader::{CompositeLoader, ModuleError, ModuleLoader};
 pub use profile::{ProfileCounters, VmProfile};
 pub use value::VmValue;
-pub use vm::Vm;
 pub use varn_jit;
-
+pub use vm::Vm;

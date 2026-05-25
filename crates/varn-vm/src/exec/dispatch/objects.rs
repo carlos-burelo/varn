@@ -277,7 +277,9 @@ impl ExecCtx {
 
                 if let Some(slot) = found_slot {
                     self.record_ic_hit_setprop();
-                    let o_cloned = if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
+                    let o_cloned = if let Some(crate::heap::HeapObj::Object(o)) =
+                        self.heap.get(obj.as_heap_idx())
+                    {
                         Some(o.clone())
                     } else {
                         None
@@ -322,7 +324,9 @@ impl ExecCtx {
         } else {
             if !used_ic {
                 if obj.is_heap() {
-                    let o_cloned = if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
+                    let o_cloned = if let Some(crate::heap::HeapObj::Object(o)) =
+                        self.heap.get(obj.as_heap_idx())
+                    {
                         Some(o.clone())
                     } else {
                         None

@@ -28,7 +28,12 @@ impl Checker {
         bind: &BindResult,
     ) -> Option<(Type, Option<usize>)> {
         let res = match &ty.0 {
-            TypeKind::EnumVariant { enum_name, variant_name: _, type_args: _, payload_ty } => {
+            TypeKind::EnumVariant {
+                enum_name,
+                variant_name: _,
+                type_args: _,
+                payload_ty,
+            } => {
                 if key == "name" || key == "__variant_name__" {
                     return Some((Type::Str, None));
                 }
@@ -47,10 +52,15 @@ impl Checker {
 
                 let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
                 let is_enum = bind.get_enum_members_local(name.as_ref()).is_some()
-                    || bind.builtin.as_ref().map_or(false, |b| b.enum_members.contains_key(name.as_ref()))
+                    || bind
+                        .builtin
+                        .as_ref()
+                        .map_or(false, |b| b.enum_members.contains_key(name.as_ref()))
                     || crate::module_resolver::find_module_bind_for_type(name, &origin_modules)
                         .as_ref()
-                        .map_or(false, |eb| eb.get_enum_members_local(name.as_ref()).is_some());
+                        .map_or(false, |eb| {
+                            eb.get_enum_members_local(name.as_ref()).is_some()
+                        });
 
                 if is_enum {
                     if key == "rawValue" || key == "__tag" {
@@ -65,7 +75,9 @@ impl Checker {
                     if let Some(members) = bind.get_enum_members_local(name.as_ref()) {
                         variants.extend(members.iter().map(|m| m.name.clone()));
                     }
-                    if let Some(ext_bind) = crate::module_resolver::find_module_bind_for_type(name, &origin_modules) {
+                    if let Some(ext_bind) =
+                        crate::module_resolver::find_module_bind_for_type(name, &origin_modules)
+                    {
                         if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
                             variants.extend(members.iter().map(|m| m.name.clone()));
                         }
@@ -73,13 +85,19 @@ impl Checker {
                     let mut found_tys = Vec::new();
                     for v in &variants {
                         if let Some(fields) = bind.sum_variant_fields.get(v) {
-                            if let Some((_, ty)) = fields.iter().find(|(fname, _)| fname.as_ref() == key) {
+                            if let Some((_, ty)) =
+                                fields.iter().find(|(fname, _)| fname.as_ref() == key)
+                            {
                                 found_tys.push(ty.clone());
                             }
                         }
-                        if let Some(ext_bind) = crate::module_resolver::find_module_bind_for_type(name, &origin_modules) {
+                        if let Some(ext_bind) =
+                            crate::module_resolver::find_module_bind_for_type(name, &origin_modules)
+                        {
                             if let Some(fields) = ext_bind.sum_variant_fields.get(v) {
-                                if let Some((_, ty)) = fields.iter().find(|(fname, _)| fname.as_ref() == key) {
+                                if let Some((_, ty)) =
+                                    fields.iter().find(|(fname, _)| fname.as_ref() == key)
+                                {
                                     found_tys.push(ty.clone());
                                 }
                             }
@@ -257,7 +275,12 @@ impl Checker {
         bind: &BindResult,
     ) -> Option<ObjectTypeMember> {
         let res = match &ty.0 {
-            TypeKind::EnumVariant { enum_name, variant_name: _, type_args: _, payload_ty } => {
+            TypeKind::EnumVariant {
+                enum_name,
+                variant_name: _,
+                type_args: _,
+                payload_ty,
+            } => {
                 if key == "name" {
                     return Some(ObjectTypeMember::Property {
                         name: Rc::from(key),

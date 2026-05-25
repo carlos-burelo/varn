@@ -72,7 +72,9 @@ impl Parser {
             }
         }
         #[cfg(feature = "profiling")]
-        { self.stream.profile.program_loop += started.elapsed(); }
+        {
+            self.stream.profile.program_loop += started.elapsed();
+        }
 
         self.diagnostics
             .extend(std::mem::take(&mut self.stream.errors));
@@ -121,14 +123,20 @@ impl Parser {
                 | TokenKind::Return
                 | TokenKind::If
                 | TokenKind::For
-                | TokenKind::While if depth == 0 => break,
+                | TokenKind::While
+                    if depth == 0 =>
+                {
+                    break
+                }
                 _ => {
                     self.stream.advance();
                 }
             }
         }
         #[cfg(feature = "profiling")]
-        { self.stream.profile.recover += started.elapsed(); }
+        {
+            self.stream.profile.recover += started.elapsed();
+        }
     }
 
     fn parse_stmt_or_decl(&mut self) -> Result<varn_core::ast::Stmt, String> {
@@ -144,7 +152,9 @@ impl Parser {
         }
         let parsed = stmts::parse_stmt_or_decl_inner(s);
         #[cfg(feature = "profiling")]
-        { self.stream.profile.stmt_or_decl += started.elapsed(); }
+        {
+            self.stream.profile.stmt_or_decl += started.elapsed();
+        }
         parsed
     }
 }

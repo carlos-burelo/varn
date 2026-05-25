@@ -148,7 +148,11 @@ impl Checker {
         Self::check_internal(program, true, false)
     }
 
-    fn check_internal(program: &Program, record_expr_types: bool, warn_implicit_dynamic: bool) -> CheckResult {
+    fn check_internal(
+        program: &Program,
+        record_expr_types: bool,
+        warn_implicit_dynamic: bool,
+    ) -> CheckResult {
         let mut profile = CheckProfile::default();
 
         let is_builtin = crate::builtins::is_builtin_file(&program.filename);

@@ -3,12 +3,12 @@ mod object;
 mod template;
 
 use super::helpers::{parse_int_radix, split_regex, unescape_string};
-use varn_core::ParsedNumber;
 use super::{parse_call_args, parse_seq_expr, try_parse_arrow};
 use crate::stream::TokenStream;
 use crate::types::parse_type_args;
 use std::rc::Rc;
 use varn_core::ast::{ArrayEl, Expr, ExprKind};
+use varn_core::ParsedNumber;
 use varn_core::TokenKind;
 
 use self::match_expr::parse_match_expr;
@@ -27,9 +27,8 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             let raw = s.consume_lexeme();
             let value: i64 = match pre_parsed {
                 Some(ParsedNumber::Int(v)) => v,
-                _ => parse_int_radix(&raw).ok_or_else(|| {
-                    format!("integer literal `{}` overflows i64", raw)
-                })?,
+                _ => parse_int_radix(&raw)
+                    .ok_or_else(|| format!("integer literal `{}` overflows i64", raw))?,
             };
             Ok(Expr::new_with_range(
                 range,
@@ -44,9 +43,10 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             let raw = s.consume_lexeme();
             let value: f64 = match pre_parsed {
                 Some(ParsedNumber::Float(v)) => v,
-                _ => raw.replace('_', "").parse().map_err(|_| {
-                    format!("float literal `{}` is not a valid number", raw)
-                })?,
+                _ => raw
+                    .replace('_', "")
+                    .parse()
+                    .map_err(|_| format!("float literal `{}` is not a valid number", raw))?,
             };
             Ok(Expr::new_with_range(
                 range,

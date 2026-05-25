@@ -48,7 +48,11 @@ pub fn find_setter(obj: VmValue, key: &str, heap: &Heap) -> Option<Value> {
 pub fn get_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
         if let Some(HeapObj::Module(m)) = heap.get(obj.as_heap_idx()) {
-            let val = m.export_map.get(key).and_then(|&s| m.get_slot(s)).unwrap_or(VmValue::null());
+            let val = m
+                .export_map
+                .get(key)
+                .and_then(|&s| m.get_slot(s))
+                .unwrap_or(VmValue::null());
             return Ok(val);
         }
     }
@@ -296,7 +300,7 @@ fn resolve_specialized_value_property(obj: &Value, key: &str) -> Option<Result<V
                 "value0" if ev.fields.is_empty() => Some(Ok(ev.payload.clone())),
                 _ => None,
             }
-        },
+        }
         _ => None,
     }
 }

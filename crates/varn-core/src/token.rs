@@ -435,11 +435,23 @@ pub struct Token {
 
 impl Token {
     pub fn new(kind: TokenKind, range: SourceRange, lex_start: u32, lex_len: u32) -> Self {
-        Token { kind, range, parsed_num: None, lex_start, lex_len }
+        Token {
+            kind,
+            range,
+            parsed_num: None,
+            lex_start,
+            lex_len,
+        }
     }
 
     pub fn eof(range: SourceRange) -> Self {
-        Token { kind: TokenKind::EOF, range, parsed_num: None, lex_start: 0, lex_len: 0 }
+        Token {
+            kind: TokenKind::EOF,
+            range,
+            parsed_num: None,
+            lex_start: 0,
+            lex_len: 0,
+        }
     }
 
     pub fn is(&self, kind: TokenKind) -> bool {

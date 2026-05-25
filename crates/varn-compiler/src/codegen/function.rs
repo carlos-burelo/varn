@@ -32,7 +32,10 @@ pub fn compile_function<'a>(
     );
 
     let recv_reg = child.alloc_reg();
-    assert_eq!(recv_reg, 0, "First allocated register must be 0 for receiver");
+    assert_eq!(
+        recv_reg, 0,
+        "First allocated register must be 0 for receiver"
+    );
     if has_this {
         child.define_local(Rc::from("this"), 0);
     }

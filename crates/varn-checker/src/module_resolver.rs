@@ -270,7 +270,9 @@ fn cache_get_or_insert_ref(abs_path: &str) -> Option<Rc<BindResult>> {
     PROGRAM_CACHE.with(|c| {
         let mut guard = c.borrow_mut();
         let cache = guard.get_or_insert_with(FxHashMap::default);
-        cache.entry(canonical_abs.clone()).or_insert_with(|| Rc::clone(&program));
+        cache
+            .entry(canonical_abs.clone())
+            .or_insert_with(|| Rc::clone(&program));
     });
     let mut bind = Binder::bind(&*program);
     for e in lex_errs {
@@ -513,10 +515,11 @@ fn lookup_global<'a>(bind: &'a BindResult, name: &str) -> Option<&'a Symbol> {
 
 fn resolve_relative(base_dir: &Path, specifier: &str) -> String {
     match varn_core::ImportSpecifier::parse(specifier) {
-        varn_core::ImportSpecifier::Package(_) => resolve_package_specifier_path(base_dir, specifier)
-            .unwrap_or_else(|| base_dir.join(specifier).to_string_lossy().into_owned()),
+        varn_core::ImportSpecifier::Package(_) => {
+            resolve_package_specifier_path(base_dir, specifier)
+                .unwrap_or_else(|| base_dir.join(specifier).to_string_lossy().into_owned())
+        }
         _ => resolve_specifier_path(base_dir, specifier)
             .unwrap_or_else(|| base_dir.join(specifier).to_string_lossy().into_owned()),
     }
 }
-

@@ -242,8 +242,8 @@ pub fn run_bench(
             })
     })?;
 
-    let (program, parse_profile) =
-        varn_parser::parse_with_profile(tokens, lexeme_buf, path).map_err(|errs| {
+    let (program, parse_profile) = varn_parser::parse_with_profile(tokens, lexeme_buf, path)
+        .map_err(|errs| {
             let msgs: Vec<String> = errs
                 .iter()
                 .map(|e| {
@@ -269,8 +269,14 @@ pub fn run_bench(
         varn_compiler::codegen::regalloc_post::OPTIMIZE_TIME.with(|t| t.set(Duration::ZERO));
         varn_compiler::codegen::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(true));
 
-        let exports = varn_checker::module_resolver::resolve_module_exports_ref(&program_ref.filename, &mut vec![]);
-        let mut export_names: Vec<std::rc::Rc<str>> = exports.keys().map(|k| std::rc::Rc::from(k.as_str())).collect();
+        let exports = varn_checker::module_resolver::resolve_module_exports_ref(
+            &program_ref.filename,
+            &mut vec![],
+        );
+        let mut export_names: Vec<std::rc::Rc<str>> = exports
+            .keys()
+            .map(|k| std::rc::Rc::from(k.as_str()))
+            .collect();
         export_names.sort();
 
         let res = varn_compiler::compile_with_check_result(
@@ -286,7 +292,8 @@ pub fn run_bench(
         let opt_dur = varn_compiler::codegen::regalloc_post::OPTIMIZE_TIME.with(|t| t.get());
         optimize_samples.borrow_mut().push(opt_dur);
 
-        res.map(|_| ()).map_err(|e| format!("compile failed: {}", e))
+        res.map(|_| ())
+            .map_err(|e| format!("compile failed: {}", e))
     })?;
 
     let optimize_samples = optimize_samples.into_inner();
@@ -296,8 +303,12 @@ pub fn run_bench(
         .map(|(c, o)| c.saturating_sub(*o))
         .collect();
 
-    let exports = varn_checker::module_resolver::resolve_module_exports_ref(&program.filename, &mut vec![]);
-    let mut export_names: Vec<std::rc::Rc<str>> = exports.keys().map(|k| std::rc::Rc::from(k.as_str())).collect();
+    let exports =
+        varn_checker::module_resolver::resolve_module_exports_ref(&program.filename, &mut vec![]);
+    let mut export_names: Vec<std::rc::Rc<str>> = exports
+        .keys()
+        .map(|k| std::rc::Rc::from(k.as_str()))
+        .collect();
     export_names.sort();
 
     let proto = varn_compiler::compile_with_check_result(
@@ -411,9 +422,9 @@ pub fn run_bench(
         PhaseStats::from_samples("execute", BLU, &exec_samples),
     ];
 
-    let total_mean: Duration = stats.iter().map(|s| s.mean()).sum();
-    let throughput = if total_mean.as_nanos() > 0 {
-        1_000_000_000.0 / total_mean.as_nanos() as f64
+    let total_p50: Duration = stats.iter().map(|s| s.p50).sum();
+    let throughput = if total_p50.as_nanos() > 0 {
+        1_000_000_000.0 / total_p50.as_nanos() as f64
     } else {
         f64::INFINITY
     };
@@ -435,7 +446,11 @@ pub fn run_bench(
     header_line();
     sep_line();
     for s in &stats {
-        let share = s.mean().as_nanos() as f64 / total_mean.as_nanos() as f64;
+        let share = if total_p50.as_nanos() > 0 {
+            s.p50.as_nanos() as f64 / total_p50.as_nanos() as f64
+        } else {
+            0.0
+        };
         phase_line(s, share);
     }
     sep_line();
@@ -443,14 +458,14 @@ pub fn run_bench(
     eprintln!();
     let total_pipeline_dur: Duration = stats.iter().map(|s| s.total).sum();
     eprintln!(
-        "  {}Throughput:{} {}{:.1} runs/s{}  {}(mean end-to-end: {}){}",
+        "  {}Throughput:{} {}{:.1} runs/s{}  {}(p50 end-to-end: {}){}",
         DIM,
         R,
         RED,
         throughput,
         R,
         DIM,
-        fmt_dur(total_mean),
+        fmt_dur(total_p50),
         R
     );
     eprintln!(
@@ -586,9 +601,9 @@ fn run_bench_wrc(path: &str, runs: usize, no_run: bool, with_output: bool) -> Re
         PhaseStats::from_samples("execute", BLU, &exec_samples),
     ];
 
-    let total_mean: Duration = stats.iter().map(|s| s.mean()).sum();
-    let throughput = if total_mean.as_nanos() > 0 {
-        1_000_000_000.0 / total_mean.as_nanos() as f64
+    let total_p50: Duration = stats.iter().map(|s| s.p50).sum();
+    let throughput = if total_p50.as_nanos() > 0 {
+        1_000_000_000.0 / total_p50.as_nanos() as f64
     } else {
         f64::INFINITY
     };
@@ -605,7 +620,11 @@ fn run_bench_wrc(path: &str, runs: usize, no_run: bool, with_output: bool) -> Re
     header_line();
     sep_line();
     for s in &stats {
-        let share = s.mean().as_nanos() as f64 / total_mean.as_nanos() as f64;
+        let share = if total_p50.as_nanos() > 0 {
+            s.p50.as_nanos() as f64 / total_p50.as_nanos() as f64
+        } else {
+            0.0
+        };
         phase_line(s, share);
     }
     sep_line();
@@ -613,9 +632,9 @@ fn run_bench_wrc(path: &str, runs: usize, no_run: bool, with_output: bool) -> Re
     eprintln!();
     let total_pipeline_dur: Duration = stats.iter().map(|s| s.total).sum();
     eprintln!(
-        "  {DIM}Throughput:{R} {RED}{:.1} runs/s{R}  {DIM}(mean end-to-end: {}){R}",
+        "  {DIM}Throughput:{R} {RED}{:.1} runs/s{R}  {DIM}(p50 end-to-end: {}){R}",
         throughput,
-        fmt_dur(total_mean),
+        fmt_dur(total_p50),
     );
     eprintln!(
         "  {DIM}Total pipeline time:{R} {CYAN}{}{R}",

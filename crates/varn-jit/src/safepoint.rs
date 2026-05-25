@@ -14,4 +14,3 @@ pub fn emit_store_reg(asm: &mut Assembler, src_cpu: Reg, virtual_reg: usize) {
     let displacement = (virtual_reg * 8) as i32;
     asm.mov_mem_reg(REG_FRAME_BASE, displacement, src_cpu);
 }
-

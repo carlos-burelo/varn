@@ -192,11 +192,7 @@ impl super::Binder {
         members: &mut Vec<ClassMemberInfo>,
     ) {
         match member {
-            ClassMember::Constructor {
-                params,
-                range,
-                ..
-            } => {
+            ClassMember::Constructor { params, range, .. } => {
                 let ps: Vec<FunctionParam> = params
                     .iter()
                     .map(|p| {

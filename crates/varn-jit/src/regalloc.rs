@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use varn_core::OpCode;
 use crate::assembler::{Assembler, Reg};
 use crate::safepoint::{emit_load_reg, emit_store_reg};
+use std::collections::HashMap;
+use varn_core::OpCode;
 
 /// Available callee-saved physical registers for virtual reg mapping.
 /// On Windows: Rbx, R12-R15 are callee-saved.

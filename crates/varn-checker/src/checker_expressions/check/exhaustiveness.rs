@@ -93,7 +93,8 @@ impl Checker {
                 .iter()
                 .filter(|v| {
                     // Only check actual enum variants, not custom methods, properties, or constructors.
-                    let is_variant = bind.sum_variant_parent
+                    let is_variant = bind
+                        .sum_variant_parent
                         .get(v.name.as_ref())
                         .map_or(false, |parent| parent.as_ref() == type_name.as_ref());
                     if !is_variant {
@@ -104,26 +105,29 @@ impl Checker {
                             return false;
                         }
                         match &c.pattern {
-                             MatchPattern::Wildcard => true,
-                             MatchPattern::EnumVariant { variant_name, .. } => {
-                                 let last_part = variant_name.rsplit('.').next().unwrap_or(variant_name.as_ref());
-                                 last_part == v.name.as_ref()
-                             }
-                             MatchPattern::Literal(e) => {
-                                 use varn_core::ast::ExprKind;
-                                 if let ExprKind::Member { property, .. } = &e.kind {
-                                     if let ExprKind::Identifier { name } = &property.kind {
-                                         name.as_ref() == v.name.as_ref()
-                                     } else {
-                                         false
-                                     }
-                                 } else if let ExprKind::Identifier { name } = &e.kind {
-                                     name.as_ref() == v.name.as_ref()
-                                 } else {
-                                     false
-                                 }
-                             }
-                             _ => false,
+                            MatchPattern::Wildcard => true,
+                            MatchPattern::EnumVariant { variant_name, .. } => {
+                                let last_part = variant_name
+                                    .rsplit('.')
+                                    .next()
+                                    .unwrap_or(variant_name.as_ref());
+                                last_part == v.name.as_ref()
+                            }
+                            MatchPattern::Literal(e) => {
+                                use varn_core::ast::ExprKind;
+                                if let ExprKind::Member { property, .. } = &e.kind {
+                                    if let ExprKind::Identifier { name } = &property.kind {
+                                        name.as_ref() == v.name.as_ref()
+                                    } else {
+                                        false
+                                    }
+                                } else if let ExprKind::Identifier { name } = &e.kind {
+                                    name.as_ref() == v.name.as_ref()
+                                } else {
+                                    false
+                                }
+                            }
+                            _ => false,
                         }
                     })
                 })

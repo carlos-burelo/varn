@@ -56,8 +56,7 @@ impl ExecCtx {
             // raw-pointer section without breaking to 'frame_loop first, so the
             // referent is stable. Using a raw pointer avoids an Rc refcount bump on
             // every frame entry (hot in recursive / iterative code).
-            let closure_ptr: *const crate::frame::VmClosure =
-                &*self.frames[frame_idx].closure;
+            let closure_ptr: *const crate::frame::VmClosure = &*self.frames[frame_idx].closure;
             let closure = unsafe { &*closure_ptr };
 
             let is_first_entry = self.frames[frame_idx].ip == 0;
@@ -65,7 +64,9 @@ impl ExecCtx {
             if !self.no_jit && closure.jit_entry.is_some() {
                 let jit_fn = closure.jit_entry.unwrap();
                 if is_first_entry {
-                    varn_jit::JIT_STATS.jit_runs.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    varn_jit::JIT_STATS
+                        .jit_runs
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 }
                 if self.trace {
                     self.trace_event("JIT ENTRY", frame_idx, closure, 0, None);
@@ -120,7 +121,9 @@ impl ExecCtx {
                 continue 'frame_loop;
             } else {
                 if is_first_entry {
-                    varn_jit::JIT_STATS.interp_runs.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    varn_jit::JIT_STATS
+                        .interp_runs
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 }
             }
 
@@ -302,7 +305,8 @@ impl ExecCtx {
                                 VmValue::from_int(r)
                             };
                         } else {
-                            reg![first_reg] = crate::exec::arith::add(v, VmValue::from_int(imm), &mut self.heap)?;
+                            reg![first_reg] =
+                                crate::exec::arith::add(v, VmValue::from_int(imm), &mut self.heap)?;
                         }
                     }
 
@@ -320,14 +324,12 @@ impl ExecCtx {
                                 VmValue::from_int(r)
                             };
                         } else {
-                            reg![first_reg] = crate::exec::arith::sub(v, VmValue::from_int(imm), &mut self.heap)?;
+                            reg![first_reg] =
+                                crate::exec::arith::sub(v, VmValue::from_int(imm), &mut self.heap)?;
                         }
                     }
 
-                    OpCode::AddInt
-                    | OpCode::SubInt
-                    | OpCode::MulInt
-                    | OpCode::DivInt => {
+                    OpCode::AddInt | OpCode::SubInt | OpCode::MulInt | OpCode::DivInt => {
                         let w1 = code[ip];
                         ip += 1;
                         let (src1, src2) = (hi(w1), lo(w1));
@@ -362,7 +364,9 @@ impl ExecCtx {
                                 OpCode::DivInt => {
                                     let bv = b.as_int();
                                     if bv == 0 {
-                                        return Err(crate::error::RuntimeError::new("division by zero"));
+                                        return Err(crate::error::RuntimeError::new(
+                                            "division by zero",
+                                        ));
                                     }
                                     let av = a.as_int();
                                     if av == i64::MIN && bv == -1 {
@@ -425,10 +429,7 @@ impl ExecCtx {
                         reg![first_reg] = res;
                     }
 
-                    OpCode::AddFloat
-                    | OpCode::SubFloat
-                    | OpCode::MulFloat
-                    | OpCode::DivFloat => {
+                    OpCode::AddFloat | OpCode::SubFloat | OpCode::MulFloat | OpCode::DivFloat => {
                         let w1 = code[ip];
                         ip += 1;
                         let (src1, src2) = (hi(w1), lo(w1));
@@ -442,7 +443,9 @@ impl ExecCtx {
                                 OpCode::DivFloat => {
                                     let bv = b.to_f64();
                                     if bv == 0.0 {
-                                        return Err(crate::error::RuntimeError::new("division by zero"));
+                                        return Err(crate::error::RuntimeError::new(
+                                            "division by zero",
+                                        ));
                                     }
                                     VmValue::from_f64(a.to_f64() / bv)
                                 }
