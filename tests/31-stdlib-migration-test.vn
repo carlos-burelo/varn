@@ -46,13 +46,22 @@ let ri = Range.fromInclusive(0, 5);
 assert("Range inclusive contains 5", ri.contains(5))
 assert("Range inclusive not 6",      !ri.contains(6))
 
-// ── std:collections / range() ─────────────────────────────────────
-// debug(range)
-let items = range(0, 10, 2);
+// ── std:collections / Range primitive ─────────────────────────────
+let items = Range.from(0, 10).step(2);
 // debug(items)
 assert("range length",               items.length === 5)
 assert("range first",                items[0] === 0)
 assert("range last",                 items[4] === 8)
+
+// ── Symbol primitive ─────────────────────────────────────────────
+assert("Symbol iterator stable",     Symbol.iterator === Symbol.iterator)
+assert("Symbol async stable",        Symbol.asyncIterator === Symbol.asyncIterator)
+assert("Symbol values differ",       Symbol.iterator !== Symbol.asyncIterator)
+
+// ── globals / Error classes ───────────────────────────────────────
+let err = new Error("boom");
+assert("Error name",                err.name === "Error")
+assert("Error toString",            err.toString() === "Error: boom")
 
 // ── std:collections / List ────────────────────────────────────────
 let list = new List<str>(["A", "B"]);

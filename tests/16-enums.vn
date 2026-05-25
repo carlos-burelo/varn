@@ -5,7 +5,7 @@ enum HttpMethod { GET = 0, POST = 1, PUT = 2, DELETE = 3 }
 const dir: Direction = Direction.North
 assert("enum value",       dir === Direction.North)
 assert("enum neq",         Direction.North !== Direction.South)
-assert("enum explicit",    HttpMethod.POST === 1)
+assert("enum explicit",    HttpMethod.POST.rawValue === 1)
 assert("enum rawValue",    Direction.East.rawValue === 2)
 
 function describeDir(d: Direction): str {

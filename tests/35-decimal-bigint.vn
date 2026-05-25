@@ -46,6 +46,10 @@ assert("decimal is decimal", isDecimalType(1.0d))
 // ── BigInt ───────────────────────────────────────────────────────
 const bi1: bigint = 100n
 const bi2: bigint = 1n
+assert("bigint toString",   bi1.toString() === "100")
+assert("bigint toStr",      bi2.toStr() === "1")
+assert("bigint toInt",      bi1.toInt() === 100)
+assert("bigint toFloat",    bi2.toFloat() === 1.0)
 assert("bigint eq",          100n === 100n)
 assert("bigint neq",         1n !== 2n)
 assert("bigint lt",          bi2 < bi1)
