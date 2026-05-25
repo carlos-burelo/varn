@@ -1,11 +1,7 @@
 #[path = "std/collections/collections.rs"]
 pub mod collections;
-#[path = "std/core/core.rs"]
-pub mod core;
 #[path = "std/crypto/crypto.rs"]
 pub mod crypto;
-#[path = "globals/errors.rs"]
-pub mod errors;
 #[path = "std/fs/fs.rs"]
 pub mod fs;
 #[path = "globals/globals.rs"]
@@ -28,12 +24,8 @@ pub mod option;
 pub mod path;
 #[path = "primitives/mod.rs"]
 pub mod primitives;
-#[path = "globals/print.rs"]
-pub mod print;
 #[path = "std/reflect/reflect.rs"]
 pub mod reflect;
-#[path = "globals/symbols.rs"]
-pub mod symbols;
 #[path = "std/sys/sys.rs"]
 pub mod sys;
 #[path = "std/task/task.rs"]
