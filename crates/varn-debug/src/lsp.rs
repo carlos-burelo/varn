@@ -6,15 +6,10 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
     use crate::colors::{footer, header};
     header(C_TYPES, "lsp analysis dashboard", path);
 
-    let uri = if cfg!(windows) {
-        format!("file:///{}", path.replace('\\', "/"))
-    } else {
-        format!("file://{}", path)
-    };
+    let uri = varn_modules::resolver::path_to_uri(path);
 
     let analysis = varn_lsp::pipeline::run_pipeline(source.to_string(), uri);
 
-    // 1. SYMBOLS
     if flags.lsp_symbols {
         eprintln!(
             "  {BOLD}{BLUE}Symbols:{RESET}",
@@ -45,7 +40,6 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
         eprintln!();
     }
 
-    // 2. HOVERS
     if flags.lsp_hovers {
         eprintln!(
             "  {BOLD}{BLUE}Simulated Hovers:{RESET}",
@@ -85,7 +79,6 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
         eprintln!();
     }
 
-    // 3. COMPLETIONS
     if flags.lsp_completions {
         eprintln!(
             "  {BOLD}{BLUE}Simulated Completions:{RESET}",
@@ -133,7 +126,6 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
         eprintln!();
     }
 
-    // 4. EXPRESSION TYPES
     if flags.lsp_types && !analysis.db.expr_types.is_empty() {
         eprintln!(
             "  {BOLD}{BLUE}Expression Types (Detailed Mapping):{RESET}",
@@ -156,7 +148,6 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
         eprintln!();
     }
 
-    // 5. SEMANTIC TOKENS
     let sem_tokens = varn_lsp::features::semantic_tokens::build_semantic_tokens(&analysis);
     if flags.lsp_semantic {
         eprintln!(
@@ -202,7 +193,6 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
         eprintln!();
     }
 
-    // 6. COLORIZE (Contextual Tagging View)
     if flags.lsp_colorize {
         eprintln!(
             "  {BOLD}{BLUE}Semantic Tagging View:{RESET}",
@@ -318,14 +308,12 @@ fn print_tagged_source(source: &str, sem_tokens: &[u32]) {
                 curr_col = delta_start;
             }
 
-            // Print uncolored text before the token
             if curr_col > last_col {
                 let start = last_col as usize;
                 let end = (curr_col as usize).min(line.len());
                 eprint!("{}", &line[start..end]);
             }
 
-            // Print token with its tag
             let type_name = legend
                 .token_types
                 .get(type_idx)
@@ -348,7 +336,6 @@ fn print_tagged_source(source: &str, sem_tokens: &[u32]) {
             last_col = curr_col + length;
         }
 
-        // Print remaining text in line
         if (last_col as usize) < line.len() {
             eprint!("{}", &line[last_col as usize..]);
         }

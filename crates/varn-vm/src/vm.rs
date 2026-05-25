@@ -309,7 +309,6 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
                 ip += 2;
             }
 
-            // 3-word instructions (opcode + 2 operand words)
             OpCode::Jump
             | OpCode::Loop
             | OpCode::JumpIfFalse
@@ -341,7 +340,6 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
                 ip += 3;
             }
 
-            // Try: 4 words (opcode + err_reg_word + hi_offset + lo_offset)
             OpCode::Try => {
                 ip += 4;
             }
@@ -389,8 +387,6 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
             }
 
             OpCode::BuildStr => {
-                // [pack_op(op,dest), pack(count,0), pack(reg0,0), ...]
-                // count is in word[1] high byte
                 if ip + 1 < chunk.code.len() {
                     let count = (chunk.code[ip + 1] >> 8) as usize;
                     ip += 2 + count;

@@ -6,15 +6,10 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
 
     header(C_TYPES, "lsp analysis dashboard", path);
 
-    let uri = if cfg!(windows) {
-        format!("file:///{}", path.replace('\\', "/"))
-    } else {
-        format!("file://{}", path)
-    };
+    let uri = varn_modules::resolver::path_to_uri(path);
 
     let analysis = varn_lsp::pipeline::run_pipeline(source.to_string(), uri);
 
-    // 1. SYMBOLS
     if flags.lsp_symbols {
         eprintln!("  {BOLD}{BLUE}Symbols:{RESET}", BOLD=BOLD, BLUE=BLUE, RESET=R);
         for sym in &analysis.symbols {
@@ -29,7 +24,6 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
         eprintln!();
     }
 
-    // 2. HOVERS
     if flags.lsp_hovers {
         eprintln!("  {BOLD}{BLUE}Simulated Hovers:{RESET}", BOLD=BOLD, BLUE=BLUE, RESET=R);
         for tok in &analysis.tokens {
@@ -51,7 +45,6 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
         eprintln!();
     }
 
-    // 3. COMPLETIONS
     if flags.lsp_completions {
         eprintln!("  {BOLD}{BLUE}Simulated Completions:{RESET}", BOLD=BOLD, BLUE=BLUE, RESET=R);
         for tok in &analysis.tokens {
@@ -75,7 +68,6 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
         eprintln!();
     }
 
-    // 4. EXPRESSION TYPES
     if flags.lsp_types && !analysis.db.expr_types.is_empty() {
         eprintln!("  {BOLD}{BLUE}Expression Types (Detailed Mapping):{RESET}", BOLD=BOLD, BLUE=BLUE, RESET=R);
         let mut sorted: Vec<_> = analysis.db.expr_types.iter().collect();
@@ -86,7 +78,6 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
         eprintln!();
     }
 
-    // 5. SEMANTIC TOKENS
     let sem_tokens = varn_lsp::features::semantic_tokens::build_semantic_tokens(&analysis);
     if flags.lsp_semantic {
         eprintln!("  {BOLD}{BLUE}Semantic Tokens Mapping:{RESET}", BOLD=BOLD, BLUE=BLUE, RESET=R);

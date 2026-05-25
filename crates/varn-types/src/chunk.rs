@@ -1,5 +1,4 @@
 use std::rc::Rc;
-
 use varn_core::OpCode;
 
 mod rc_str_serde {
@@ -294,9 +293,9 @@ impl CacheEntry {
 #[derive(Clone, Debug)]
 pub struct PolyICSlot {
     pub entries: [CacheEntry; 8],
-    // `next`: victim slot for eviction (approximate LRU: updated away from last hit).
+
     pub next: u8,
-    // `last_hit`: index of most recently matched entry; steers eviction away from hot slots.
+
     last_hit: u8,
 }
 
@@ -314,12 +313,12 @@ impl PolyICSlot {
             if e.matches(&entry) {
                 *e = entry;
                 self.last_hit = i as u8;
-                // Steer eviction to the slot opposite the hot slot.
+
                 self.next = (self.last_hit + 4) & 0x7;
                 return;
             }
         }
-        // Miss: evict `next`, which is steered away from the last-hit slot.
+
         self.entries[self.next as usize] = entry;
         self.next = (self.next + 1) & 0x7;
     }
@@ -389,8 +388,7 @@ pub struct LineEntry {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq, Hash, Default)]
 pub struct LineMapping {
     pub entries: Vec<LineEntry>,
-    // starts[i] = sum of entries[0..i].count (start instruction index of entry i).
-    // Kept in sync with entries at all times; not serialized (rebuilt after deserialization).
+
     #[serde(skip)]
     starts: Vec<u32>,
 }
@@ -400,11 +398,11 @@ impl LineMapping {
         if let Some(last) = self.entries.last_mut() {
             if last.line == line {
                 last.count += 1;
-                // starts[last] doesn't change — it's the start, not the end.
+
                 return;
             }
         }
-        // New entry starts right after all previous instructions.
+
         let next_start: u32 = self.starts.last().copied().unwrap_or(0)
             + self.entries.last().map(|e| e.count).unwrap_or(0);
         self.starts.push(next_start);
@@ -413,7 +411,6 @@ impl LineMapping {
 
     pub fn get_line(&self, instruction_idx: usize) -> u32 {
         if self.starts.len() != self.entries.len() {
-            // starts out of sync (e.g. after deserialization) — fall back to linear
             let mut base = 0usize;
             for entry in &self.entries {
                 let next = base + entry.count as usize;
@@ -425,7 +422,7 @@ impl LineMapping {
             return 0;
         }
         let idx = instruction_idx as u32;
-        // Binary search: last entry whose start <= idx
+
         let pos = self.starts.partition_point(|&s| s <= idx);
         if pos == 0 {
             return 0;
@@ -623,7 +620,7 @@ impl Chunk {
             OpCode::LoadNull | OpCode::LoadTrue | OpCode::LoadFalse => {
                 self.write(Self::pack_op(op, dest), line);
             }
-            OpCode::Move if dest == src => {} // elide no-op move
+            OpCode::Move if dest == src => {}
             _ => {
                 self.write(Self::pack_op(op, dest), line);
                 self.write(Self::pack(src, 0), line);

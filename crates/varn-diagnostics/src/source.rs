@@ -37,7 +37,6 @@ impl SourceRange {
         Self::zero(SourceLocation::new(line, column, offset))
     }
 
-    /// Extend this range's end to `other`'s end, keeping this range's start.
     pub fn to(&self, other: SourceRange) -> Self {
         Self {
             start: self.start,
@@ -45,7 +44,6 @@ impl SourceRange {
         }
     }
 
-    /// Hull of two ranges: min start, max end.
     pub fn merge(&self, other: SourceRange) -> Self {
         Self {
             start: self.start.min(other.start),

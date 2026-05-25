@@ -2,6 +2,7 @@ use std::path::Path;
 
 use crate::constants::STD_PREFIX;
 use crate::document::uri_to_path;
+use varn_modules::resolver::normalize_display_path;
 
 use super::make_lang_hover;
 use tower_lsp::lsp_types::Hover;
@@ -41,12 +42,4 @@ fn resolve_import_module_path(specifier: &str, doc_uri: &str) -> String {
     }
 
     normalize_display_path(&resolved.to_string_lossy())
-}
-
-fn normalize_display_path(path: &str) -> String {
-    let without_verbatim = path
-        .strip_prefix(r"\\?\")
-        .or_else(|| path.strip_prefix("//?/"))
-        .unwrap_or(path);
-    without_verbatim.replace('\\', "/")
 }

@@ -210,8 +210,6 @@ pub(crate) fn collect_type_inferences(
     }
 }
 
-/// Memoized wrapper around `Type::map_generics`.
-/// Repeated calls with the same `(base, mapping)` return cached results.
 pub(crate) fn map_generics_cached(
     checker: &mut Checker,
     base: &Type,
@@ -220,7 +218,7 @@ pub(crate) fn map_generics_cached(
     if mapping.is_empty() {
         return base.clone();
     }
-    // Build stable cache key: sort mapping entries by param name.
+
     let sorted_args: Vec<Type> = {
         let mut pairs: Vec<(&Rc<str>, &Type)> = mapping.iter().collect();
         pairs.sort_by(|(a, _), (b, _)| a.cmp(b));

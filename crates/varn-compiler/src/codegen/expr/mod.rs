@@ -231,7 +231,7 @@ pub fn compile_expr<'a>(c: &mut Compiler<'a>, expr: &Expr) -> u8 {
             for _ in 0..arg_count {
                 c.free_reg();
             }
-            c.free_reg(); // Free receiver register
+            c.free_reg();
             dest
         }
 

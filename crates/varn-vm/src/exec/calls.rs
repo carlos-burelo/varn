@@ -124,7 +124,7 @@ pub fn prepare_call(
                     let args_start = stack.len() - arg_count;
                     let arg_nvs: Vec<VmValue> = stack.drain(args_start..).collect();
                     let mut gen_ctx = Box::new(ExecCtx::new(GlobalStore::new()));
-                    gen_ctx.heap = heap.clone(); // Share the parent's Heap
+                    gen_ctx.heap = heap.clone();
                     gen_ctx.trace = false;
                     gen_ctx.stack = arg_nvs;
                     let constants = resolve_constants(&nc.proto, heap);
@@ -133,7 +133,7 @@ pub fn prepare_call(
                         .iter()
                         .map(|uv| {
                             let nv = uv.read(stack);
-                            VmUpvalue::closed(nv) // 0-copy direct copy
+                            VmUpvalue::closed(nv)
                         })
                         .collect();
                     let new_feedback = Rc::new(RefCell::new(
@@ -286,8 +286,7 @@ pub fn prepare_call(
                 let data = data.clone();
                 let args_start = stack.len() - arg_count;
                 let mut args: Vec<VmValue> = stack.drain(args_start..).collect();
-                // Under the Unified Slot 0 Receiver design, the first argument is the receiver slot (which is dummy/null).
-                // We discard it before extracting the actual variant payload.
+
                 if !args.is_empty() {
                     args.remove(0);
                 }

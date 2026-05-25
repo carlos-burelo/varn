@@ -61,7 +61,6 @@ impl TokenStream {
         self.token().range
     }
 
-    /// Span from `start` to the end of the previously consumed token.
     #[inline]
     pub fn range_from(&self, start: SourceRange) -> SourceRange {
         let end = if self.pos > 0 {
@@ -78,7 +77,6 @@ impl TokenStream {
         tok.get_lexeme(&self.lexeme_buf)
     }
 
-    /// Consume the current token and return its lexeme as an owned `String`.
     pub fn consume_str(&mut self) -> String {
         let s = self.lexeme().to_owned();
         self.advance();
@@ -108,7 +106,6 @@ impl TokenStream {
 
     pub fn consume(&mut self) -> Token {
         if self.pos < self.tokens.len() {
-            // Token is now a plain struct with only u32 fields — clone is free.
             let t = self.tokens[self.pos].clone();
             self.pos += 1;
             t
@@ -229,8 +226,6 @@ impl TokenStream {
         self.pos = p;
     }
 
-    /// Access the raw lexeme buffer (needed when deriving lexeme from a `Token`
-    /// returned by `consume()` or `expect_token()`).
     #[inline]
     pub fn lexeme_buf(&self) -> &[u8] {
         &self.lexeme_buf

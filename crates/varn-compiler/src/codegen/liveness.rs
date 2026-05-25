@@ -55,10 +55,6 @@ impl LivenessAnalyzer {
         self.analyze_with_back_edges(vregs_used, &[])
     }
 
-    /// Like `analyze`, but extends live ranges across loop back-edges.
-    /// `back_edges` is a list of `(loop_header, loop_end)` pairs where
-    /// `loop_header` is the first instruction of the loop body and
-    /// `loop_end` is the position of the `Loop` instruction itself.
     pub fn analyze_with_back_edges(
         &mut self,
         vregs_used: Vec<u16>,
@@ -73,10 +69,6 @@ impl LivenessAnalyzer {
                 let mut start = start_val;
                 let mut end = uses.iter().copied().max().unwrap_or(start);
 
-                // For each back-edge (header, loop_end):
-                // If this vreg is live anywhere inside the loop body [header..=loop_end],
-                // extend its range to cover the entire loop body so that the register
-                // stays allocated across iterations.
                 let mut changed = true;
                 while changed {
                     changed = false;
@@ -84,8 +76,6 @@ impl LivenessAnalyzer {
                         let live_in_loop = start <= loop_end && end >= header;
                         if live_in_loop {
                             if start > header {
-                                // Def is inside loop — extend start to header.
-                                // (Conservative: treat as live from loop entry.)
                                 start = header;
                                 changed = true;
                             }
@@ -125,13 +115,13 @@ impl LivenessAnalyzer {
         if self.live_ranges.is_empty() {
             return 0;
         }
-        // Sweep-line: O((L+N) log L) instead of O(L×N).
+
         let mut events: Vec<(usize, bool)> = Vec::with_capacity(self.live_ranges.len() * 2);
         for r in &self.live_ranges {
-            events.push((r.start, false)); // false = start
-            events.push((r.end + 1, true)); // true = end (exclusive)
+            events.push((r.start, false));
+            events.push((r.end + 1, true));
         }
-        // Sort by point; on tie, ends before starts so we don't over-count.
+
         events.sort_unstable_by(|a, b| a.0.cmp(&b.0).then(b.1.cmp(&a.1)));
         let mut live = 0i64;
         let mut max_live = 0usize;
@@ -198,7 +188,7 @@ impl InterferenceGraph {
         if self.nodes.is_empty() {
             return 0;
         }
-        // Largest-degree-first ordering gives a tighter upper bound than insertion order.
+
         let mut ordered = self.nodes.clone();
         ordered.sort_unstable_by(|a, b| {
             let da = self.edges.get(a).map(|s| s.len()).unwrap_or(0);

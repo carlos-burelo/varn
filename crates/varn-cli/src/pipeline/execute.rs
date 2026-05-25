@@ -1,4 +1,4 @@
-use super::builtins;
+use super::core;
 use crate::error::CliError;
 use crate::opts::DebugFlags;
 use rustc_hash::FxHashMap;
@@ -23,7 +23,7 @@ pub fn execute(
         eprintln!("[cli:execute] starting builtin initialization");
     }
 
-    for builtin_proto in builtins::builtin_protos_owned()? {
+    for builtin_proto in core::core_protos_owned()? {
         if _debug.trace {
             let name = builtin_proto.name.as_deref().unwrap_or("<builtin>");
             eprintln!("[cli:execute] running builtin {}", name);

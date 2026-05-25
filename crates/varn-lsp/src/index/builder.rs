@@ -1,5 +1,6 @@
 use varn_checker::SymbolKind;
-use varn_modules::spec::{BUILTIN_PREFIX, STD_PREFIX};
+use varn_modules::resolver::path_to_uri;
+use varn_modules::spec::{CORE_PREFIX, STD_PREFIX};
 
 use crate::document::{import::uri_to_path, DocumentState, MemberKind, MemberRecord};
 
@@ -22,8 +23,6 @@ pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
         })
         .collect();
 
-    // Index exported members with stable keys so cross-file go-to-definition
-    // can resolve methods/properties without name heuristics.
     for sym in state
         .symbols
         .iter()
@@ -117,10 +116,10 @@ fn member_kind_to_symbol_kind(kind: MemberKind) -> SymbolKind {
 }
 
 fn resolve_specifier_to_uri(specifier: &str, doc_dir: Option<&std::path::Path>) -> Option<String> {
-    if specifier.starts_with(STD_PREFIX) || specifier.starts_with(BUILTIN_PREFIX) {
-        let loader = varn_builtins::BuiltinSourceLocator::from_env();
+    if specifier.starts_with(STD_PREFIX) || specifier.starts_with(CORE_PREFIX) {
+        let loader = varn_builtins::CoreSourceLocator::from_env();
         if loader.embedded_source(specifier).is_some() {
-            return Some(format!("varn-stdlib://{specifier}"));
+            return Some(varn_modules::resolver::to_varn_uri(specifier));
         }
         let mod_path = loader.vn_source_path(specifier)?;
         if mod_path.is_file() {
@@ -132,26 +131,13 @@ fn resolve_specifier_to_uri(specifier: &str, doc_dir: Option<&std::path::Path>) 
 
     if specifier.starts_with('.') {
         let dir = doc_dir?;
-        let joined = dir.join(specifier);
-        let with_ext = if joined.extension().is_none() {
-            joined.with_extension("vn")
-        } else {
-            joined
-        };
-        let canonical = std::fs::canonicalize(&with_ext).ok()?;
+        let mut joined = dir.join(specifier);
+        varn_modules::resolver::ensure_varn_extension(&mut joined);
+        let canonical = std::fs::canonicalize(&joined).ok()?;
         return Some(path_to_uri(&canonical.to_string_lossy()));
     }
 
     None
-}
-
-fn path_to_uri(path: &str) -> String {
-    let normalized = path.replace('\\', "/");
-    if normalized.starts_with('/') {
-        format!("file://{normalized}")
-    } else {
-        format!("file:///{normalized}")
-    }
 }
 
 fn is_indexable(kind: SymbolKind, line: u32) -> bool {

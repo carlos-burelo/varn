@@ -1,7 +1,7 @@
-mod builtins;
 pub mod cache;
 mod check;
 mod compile;
+mod core;
 mod execute;
 pub mod hash;
 mod lex;
@@ -16,8 +16,8 @@ use varn_debug::flags::DebugFlags;
 
 type PipelineResult<T> = Result<T, CliError>;
 
-pub use builtins::builtin_protos_owned;
 pub use compile::CompileOutput;
+pub use core::core_protos_owned;
 pub use execute::execute;
 
 pub fn run(opts: &RunOpts) -> PipelineResult<()> {

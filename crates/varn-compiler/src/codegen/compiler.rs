@@ -1,21 +1,22 @@
 use super::ir::{ImmValue, IrBuilder, RegId};
-use crate::chunk::{Chunk, FunctionProto, PoolEntry};
+use crate::{
+    chunk::{Chunk, FunctionProto, PoolEntry},
+    codegen::liveness::{InterferenceGraph, LivenessAnalyzer},
+};
 use rustc_hash::FxHashMap;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
+use std::ptr::null_mut;
 use std::rc::Rc;
+use varn_core::ast::{Expr, Program, Stmt};
 use varn_core::{OpCode, TypeAnnotations};
 
 pub struct IrAnalysisResult {
     pub vreg_count: u16,
-
     pub bytecode_estimate: usize,
-
     pub vregs_used: usize,
-
     pub instruction_count: usize,
-
     pub max_concurrent_live: usize,
-
     pub optimal_register_count: usize,
 }
 
@@ -35,7 +36,6 @@ pub struct LoopCtx {
 #[derive(Clone, Debug)]
 pub enum VarLoc {
     Reg(u8),
-    // Like Reg but marked as captured by a closure — CloseUpvalue will be emitted on scope exit.
     Captured(u8),
     Upvalue(u8),
 }
@@ -45,10 +45,9 @@ pub struct RegAlloc {
     pub max: u8,
     pub used: [u64; 4],
     pub alloc_stack: Vec<u8>,
-
     pub next_vreg: u16,
     pub max_vreg: u16,
-    pub physical_map: std::collections::HashMap<u16, u8>,
+    pub physical_map: HashMap<u16, u8>,
     pub physical_free: Option<Vec<u8>>,
     pub max_physical: u8,
 }
@@ -62,7 +61,7 @@ impl RegAlloc {
             alloc_stack: Vec::new(),
             next_vreg: 0,
             max_vreg: 0,
-            physical_map: std::collections::HashMap::new(),
+            physical_map: HashMap::new(),
             physical_free: None,
             max_physical: 0,
         }
@@ -200,31 +199,20 @@ impl RegAlloc {
 
 pub struct Compiler<'a> {
     pub chunk: Chunk,
-
     pub scopes: Vec<FxHashMap<Rc<str>, VarLoc>>,
-
     pub regs: RegAlloc,
-
     pub scope_start_regs: Vec<u8>,
-
     pub ir_builder: Option<IrBuilder>,
-
     pub phys_to_vreg: FxHashMap<u8, RegId>,
-
     pub is_global: bool,
     pub current_class: Option<Rc<str>>,
     pub current_superclass: Option<Rc<str>>,
-
-    pub pending_field_inits: Vec<(Rc<str>, varn_core::ast::Expr)>,
-
+    pub pending_field_inits: Vec<(Rc<str>, Expr)>,
     pub disposables: Vec<(u8, bool, usize)>,
-
     pub upvalues: Vec<UpvalueDesc>,
     pub loop_stack: Vec<LoopCtx>,
-    pub finally_stack: Vec<varn_core::ast::Stmt>,
-
+    pub finally_stack: Vec<Stmt>,
     pub protos: Rc<RefCell<Vec<FunctionProto>>>,
-
     pub is_async: bool,
     pub is_generator: bool,
     pub has_this: bool,
@@ -242,12 +230,6 @@ pub struct Compiler<'a> {
     pub cache_count: u16,
     pub line: u32,
 
-    // Non-null means there is a parent compiler (this is a nested function).
-    // SAFETY: parent is always a stack-allocated Compiler that outlives this child,
-    // because compile_function() creates child inside the parent's call frame and
-    // joins before returning. No aliasing occurs: only resolve_upvalue accesses parent,
-    // and it is always called from within the child's compilation (child is borrowed mut,
-    // parent pointer is accessed only through the raw pointer, no second borrow exists).
     pub parent: *mut Compiler<'a>,
     pub parent_depth: usize,
     pub export_names: Vec<Rc<str>>,
@@ -294,7 +276,7 @@ impl<'a> Compiler<'a> {
             extension_set_members,
             cache_count: 0,
             line: 0,
-            parent: std::ptr::null_mut(),
+            parent: null_mut(),
             parent_depth: 0,
             export_names,
         }
@@ -603,11 +585,11 @@ impl<'a> Compiler<'a> {
         let vregs_used_count = ir_module.used_vregs().len();
         let vreg_count = vregs_used_count as u16;
 
-        let mut analyzer = super::liveness::LivenessAnalyzer::new();
+        let mut analyzer = LivenessAnalyzer::new();
         let live_ranges = analyzer.analyze_module(&ir_module);
         let max_concurrent_live = analyzer.max_concurrent_live();
 
-        let graph = super::liveness::InterferenceGraph::from_live_ranges(&live_ranges);
+        let graph = InterferenceGraph::from_live_ranges(&live_ranges);
         let optimal_register_count = graph.chromatic_number_upper_bound();
 
         Some(IrAnalysisResult {
@@ -633,9 +615,9 @@ impl<'a> Compiler<'a> {
             upvalue_count: self.upvalues.len(),
             cache_count: self.cache_count as usize,
             chunk: self.chunk,
-            jit_entry: std::cell::Cell::new(None),
-            jit_code: std::cell::RefCell::new(None),
-            jit_failed: std::cell::Cell::new(false),
+            jit_entry: Cell::new(None),
+            jit_code: RefCell::new(None),
+            jit_failed: Cell::new(false),
         };
         super::regalloc_post::optimize_function(&mut proto);
         proto
@@ -654,15 +636,15 @@ impl<'a> Compiler<'a> {
             upvalue_count: self.upvalues.len(),
             cache_count: self.cache_count as usize,
             chunk: self.chunk,
-            jit_entry: std::cell::Cell::new(None),
-            jit_code: std::cell::RefCell::new(None),
-            jit_failed: std::cell::Cell::new(false),
+            jit_entry: Cell::new(None),
+            jit_code: RefCell::new(None),
+            jit_failed: Cell::new(false),
         };
         super::regalloc_post::optimize_function(&mut proto);
         (proto, self.upvalues)
     }
 
-    pub fn compile_program(&mut self, program: &varn_core::ast::Program) {
+    pub fn compile_program(&mut self, program: &Program) {
         use super::stmt::compile_stmts;
         compile_stmts(self, &program.body);
         let line = self.line;
@@ -676,14 +658,13 @@ impl<'a> Compiler<'a> {
         if self.parent.is_null() {
             return None;
         }
-        // SAFETY: See safety comment on the `parent` field. Parent outlives child,
-        // and no other borrow of parent exists at this call site.
+
         let parent = unsafe { &mut *self.parent };
         for scope in parent.scopes.iter_mut().rev() {
             if let Some(loc) = scope.get_mut(name) {
                 match loc.clone() {
                     VarLoc::Reg(reg) | VarLoc::Captured(reg) => {
-                        *loc = VarLoc::Captured(reg); // mark as captured so CloseUpvalue is emitted
+                        *loc = VarLoc::Captured(reg);
                         return Some(self.add_upvalue(reg as u16, true));
                     }
                     VarLoc::Upvalue(uv) => {

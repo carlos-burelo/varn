@@ -47,32 +47,26 @@ fn emit_float_compare(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     let src1 = (w1 >> 8) as usize;
     let src2 = (w1 & 0xFF) as usize;
 
-    // 1. Preserve arg registers
     asm.push(ARG_CTX);
     asm.push(ARG_CLOSURE);
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    // 2. Align stack to 16 bytes:
     let need_dummy = regmap.used_phys.len() % 2 != 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
 
-    // 3. Load the two operands into Rax and R11
     emit_load(asm, Reg::Rax, src1, regmap);
     emit_load(asm, Reg::R11, src2, regmap);
 
-    // 4. Windows ABI Shadow Space
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    // 5. Set up the three arguments for the extern "C" function:
-    asm.mov_reg_reg(ARG_BASE, Reg::R11); // Arg 3 = b
-    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax); // Arg 2 = a
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // Arg 1 = exec_ctx
+    asm.mov_reg_reg(ARG_BASE, Reg::R11);
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
 
-    // 6. Get the corresponding helper address
     let helper_addr = match op {
         OpCode::Eq | OpCode::EqFloat => helpers.eq,
         OpCode::Neq | OpCode::NeqFloat => helpers.neq,
@@ -86,14 +80,11 @@ fn emit_float_compare(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     asm.mov_reg_imm64(Reg::R10, helper_addr as u64);
     asm.call_reg(Reg::R10);
 
-    // 7. Restore Windows ABI Shadow Space
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, 32);
 
-    // 8. Save result from Rax into R11 before pops clobber Rax
     asm.mov_reg_reg(Reg::R11, Reg::Rax);
 
-    // 9. Pop arguments and dummy alignment
     if need_dummy {
         asm.pop(Reg::Rax);
     }
@@ -102,7 +93,6 @@ fn emit_float_compare(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     asm.pop(ARG_CLOSURE);
     asm.pop(ARG_CTX);
 
-    // 10. Save the result back to virtual register first_reg
     emit_store(asm, Reg::R11, first_reg, regmap);
 }
 

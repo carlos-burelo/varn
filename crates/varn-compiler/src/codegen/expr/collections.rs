@@ -5,8 +5,8 @@ use varn_core::ast::expr::{ObjectProp, PropKey};
 use varn_core::ast::ArrayEl;
 use varn_core::OpCode;
 
-use super::compile_expr;
 use super::super::function::{compile_function, emit_closure};
+use super::compile_expr;
 
 pub(super) fn compile_array<'a>(c: &mut Compiler<'a>, elements: &[ArrayEl]) -> u8 {
     let has_spread = elements.iter().any(|e| matches!(e, ArrayEl::Spread(_)));

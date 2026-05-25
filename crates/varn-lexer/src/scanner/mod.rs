@@ -6,8 +6,6 @@ mod templates;
 
 #[derive(Clone, Copy, Debug)]
 pub struct LexerConfig {
-    /// Emit doc comments (`/** ... */`) as `DocComment` tokens.
-    /// When false, doc comments are discarded like regular block comments.
     pub emit_doc_comments: bool,
 }
 

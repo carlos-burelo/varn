@@ -1,7 +1,9 @@
 use varn_core::OpCode;
 
 use crate::assembler::Reg;
-use crate::regalloc::{emit_flush_all, emit_load, emit_reload_all, emit_reload_all_except, emit_store};
+use crate::regalloc::{
+    emit_flush_all, emit_load, emit_reload_all, emit_reload_all_except, emit_store,
+};
 use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
 
 use super::CodegenCtx;
@@ -47,20 +49,18 @@ fn emit_get_property(ctx: &mut CodegenCtx, first_reg: usize) {
         asm.push(Reg::Rax);
     }
 
-    // Push JitGetPropertyArgs struct fields in reverse order:
-    // 1. ip
     asm.mov_reg_imm64(Reg::R11, *ip as u64);
     asm.push(Reg::R11);
-    // 2. dest
+
     asm.mov_reg_imm64(Reg::R11, first_reg as u64);
     asm.push(Reg::R11);
-    // 3. cs_idx
+
     asm.mov_reg_imm64(Reg::R11, cs_idx as u64);
     asm.push(Reg::R11);
-    // 4. name_idx
+
     asm.mov_reg_imm64(Reg::R11, name_idx as u64);
     asm.push(Reg::R11);
-    // 5. obj
+
     asm.push(Reg::Rax);
 
     asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
@@ -121,19 +121,17 @@ fn emit_set_property(ctx: &mut CodegenCtx, first_reg: usize) {
         asm.push(Reg::Rax);
     }
 
-    // Push JitSetPropertyArgs struct fields in reverse order:
-    // 1. ip
     asm.mov_reg_imm64(Reg::R10, *ip as u64);
     asm.push(Reg::R10);
-    // 2. cs_idx
+
     asm.mov_reg_imm64(Reg::R10, cs_idx as u64);
     asm.push(Reg::R10);
-    // 3. name_idx
+
     asm.mov_reg_imm64(Reg::R10, name_idx as u64);
     asm.push(Reg::R10);
-    // 4. val
+
     asm.push(Reg::R11);
-    // 5. obj
+
     asm.push(Reg::Rax);
 
     asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);

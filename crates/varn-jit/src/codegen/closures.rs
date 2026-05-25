@@ -125,8 +125,8 @@ fn emit_make_closure(ctx: &mut CodegenCtx) {
     *ip += 1;
     let dest = (w1 >> 8) as usize;
     let uv_count = (w1 & 0xFF) as usize;
-    *ip += 1; // skip proto_idx
-    *ip += uv_count; // skip upvalues
+    *ip += 1;
+    *ip += uv_count;
 
     emit_flush_all(asm, regmap);
 

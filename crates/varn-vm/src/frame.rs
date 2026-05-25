@@ -119,7 +119,9 @@ impl VmClosure {
             let entry: varn_jit::JitFn = unsafe { std::mem::transmute(entry_usize) };
             self.jit_entry = Some(entry);
             self.jit_code = self.proto.jit_code.borrow().clone();
-            varn_jit::JIT_STATS.jit_cached.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            varn_jit::JIT_STATS
+                .jit_cached
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             return;
         }
 

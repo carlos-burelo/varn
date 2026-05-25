@@ -54,7 +54,6 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
     let w3 = get(3);
     let w4 = get(4);
 
-    // hi byte of word[0] is the dest register (packed as pack_op(op, dest)).
     let dest0 = (w0 >> 8) as u8;
     let hi1 = (w1 >> 8) as u8;
     let lo1 = (w1 & 0xff) as u8;
@@ -68,7 +67,6 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
     let info = match op {
         OpCode::PopTry | OpCode::Nop => s(1, None, vec![]),
 
-        // 1-word opcodes: dest is in the high byte of word[0] (dest0), no second word.
         OpCode::LoadNull
         | OpCode::LoadTrue
         | OpCode::LoadFalse
@@ -77,8 +75,6 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
         | OpCode::LoadIntMinusOne => s(1, Some(dest0), vec![]),
         OpCode::LoadUpvalue => s(2, Some(hi1), vec![]),
 
-        // 2-word emit_rr: [pack_op(op,dest), pack(src,0)]
-        // dest = dest0 (word[0] high), src = hi1 (word[1] high), lo1 = 0 (padding)
         OpCode::Move
         | OpCode::Negate
         | OpCode::Not
@@ -99,13 +95,10 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
         OpCode::StoreUpvalue => s(2, None, vec![lo1]),
         OpCode::CloseUpvalue => s(2, None, vec![lo1]),
 
-        // 2-word emit_rc: [pack_op(op,dest), const_idx]
         OpCode::LoadModule => s(2, Some(dest0), vec![]),
 
-        // emit_rc: [pack_op(op,val_reg), slot_idx]
         OpCode::StoreModuleSlot => s(2, None, vec![dest0]),
 
-        // emit_rrc: [pack_op(op,dest), pack(src,0), const_idx]
         OpCode::LoadModuleSlot => s(3, Some(dest0), vec![hi1]),
 
         OpCode::MakeClosure => {
@@ -167,11 +160,8 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
             }
         }
 
-        // 2-word emit_rrr: [pack_op(op,dest), pack(src1,src2)]
-        // GetIndex: dest=dest0, obj=hi1, key=lo1
         OpCode::GetIndex => s(2, Some(dest0), vec![hi1, lo1]),
 
-        // SetIndex: emit_rrr(op, obj, key, val) → dest0=obj (used not def), hi1=key, lo1=val
         OpCode::SetIndex => s(2, None, vec![dest0, hi1, lo1]),
 
         OpCode::ObjectRest => {
@@ -179,7 +169,6 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
             s(3 + skip_count, Some(hi1), vec![lo1])
         }
 
-        // 2-word: [pack_op(op,dest), pack(src1,src2)]
         OpCode::Add
         | OpCode::Sub
         | OpCode::Mul
@@ -225,31 +214,23 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
 
         OpCode::AddImm | OpCode::SubImm => s(2, Some(dest0), vec![hi1]),
 
-        // 2-word: [pack_op(op,dest), const_idx]
         OpCode::LoadConst | OpCode::LoadInt | OpCode::LoadGlobal | OpCode::LoadGlobalIdx => {
             s(2, Some(dest0), vec![])
         }
 
-        // 3-word: [pack_op(op,dest), pack(src,0), const_idx]
         OpCode::StoreGlobal
         | OpCode::DefineGlobal
         | OpCode::StoreGlobalIdx
         | OpCode::DefineGlobalIdx => s(3, None, vec![hi1]),
 
-        // AssertNotNull: emit1(op, pack(0,r)) — 2 words: [op, pack(0,r)]
         OpCode::AssertNotNull => s(2, None, vec![lo1]),
 
-        // MakeClass: emit_rrc(op,dest,src,const_idx) → [pack_op(op,dest), pack(src,0), const_idx]
-        // dest=dest0, src=hi1, lo1=0 (padding), word[2]=name_idx
         OpCode::MakeClass => s(3, Some(dest0), vec![hi1]),
 
-        // Spawn: bare emit → 1 word
         OpCode::Spawn => InstrInfo::opaque(1),
 
-        // DeclareField: bare emit → 1 word
         OpCode::DeclareField => InstrInfo::opaque(1),
 
-        // ArrayExtend: [pack_op(op,dest), pack(src,0)]
         OpCode::ArrayExtend => s(2, Some(dest0), vec![hi1]),
 
         OpCode::Jump | OpCode::Loop => InstrInfo::opaque(3),
@@ -260,27 +241,18 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
 
         OpCode::InvokeRuntimeStatic => InstrInfo::opaque(5),
 
-        // GetProperty: word[0]=(op|dest), word[1]=(src|cs), word[2]=name_idx.
         OpCode::GetProperty | OpCode::GetPropertyMaybe => s(3, Some(dest0), vec![hi1]),
 
-        // SetProperty: word[0]=(op|obj), word[1]=(val|cs), word[2]=name_idx.
         OpCode::SetProperty => s(3, None, vec![dest0, hi1]),
 
-        // GetFixedField: [pack_op(op,dest), pack(obj,0), slot_idx] — dest=dest0, obj=hi1
-        // GetSymbol: [pack_op(op,dest), pack(obj,cs), sym_idx] — dest=dest0, obj=hi1
         OpCode::GetFixedField | OpCode::GetSymbol => s(3, Some(dest0), vec![hi1]),
 
-        // SetFixedField: [pack_op(op,obj), pack(val,0), slot_idx] — obj=dest0, val=hi1
         OpCode::SetFixedField => s(3, None, vec![dest0, hi1]),
 
-        // GetSuper: emit_rc(op,dest,name_idx) → [pack_op(op,dest), name_idx] — dest=dest0, no reg src
         OpCode::GetSuper => s(2, Some(dest0), vec![]),
 
-        // BindMethod: emit(op) then write(pack(dest,obj)) then write(name_idx)
-        // word[0]=opcode only, word[1]=pack(dest,obj), word[2]=name_idx
         OpCode::BindMethod => s(3, Some(hi1), vec![lo1]),
 
-        // Method/DefineStatic/...: 3-word class member definitions
         OpCode::Method
         | OpCode::DefineStatic
         | OpCode::DefineGetter
@@ -288,11 +260,8 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
         | OpCode::DefineStaticGetter
         | OpCode::DefineStaticSetter => InstrInfo::opaque(3),
 
-        // MakeEnumVariant: emit(op), write(pack(variant_reg,val_reg)), write(name_idx)
-        // word[0]=opcode only, word[1]=pack(variant_reg,val_reg), word[2]=name_idx
         OpCode::MakeEnumVariant => s(3, Some(hi1), vec![lo1]),
 
-        // Call/CallSpread/InvokeVirtual: [pack_op(op,0), pack(dest,fn_reg), pack(argc,arg_start)]
         OpCode::Call | OpCode::CallSpread | OpCode::InvokeVirtual => {
             let dest = hi1;
             let fn_reg = lo1;
@@ -311,11 +280,9 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
             }
         }
 
-        // BuildStr: [pack_op(op,dest), pack(count,0), pack(reg0,0), pack(reg1,0), ...]
-        // word[0]=pack_op(op,dest), word[1]=pack(count,0), word[2+i]=pack(reg_i,0)
         OpCode::BuildStr => {
-            let count = hi1 as usize; // count is in word[1] high byte
-            let dest = dest0; // dest is in word[0] high byte
+            let count = hi1 as usize;
+            let dest = dest0;
             let mut uses = vec![];
             for i in 0..count {
                 let w = get(2 + i);
@@ -330,8 +297,6 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
             }
         }
 
-        // CallMethod: word[0]=(op|cs), word[1]=(dest|obj), word[2]=name_idx, word[3]=(argc|arg_start).
-        // arg_start=lo3, argc=hi3; args must stay contiguous so track call_args.
         OpCode::CallMethod => {
             let mut uses = vec![lo1];
             for i in 0..hi3 {
@@ -517,7 +482,6 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                 | OpCode::LoadIntZero
                 | OpCode::LoadIntOne
                 | OpCode::LoadIntMinusOne => {
-                    // dest is in the high byte of word[0]; no second word to touch.
                     let op_byte = code[offset] & 0xFF;
                     code[offset] = ((m(mapping, dest0) as u16) << 8) | op_byte;
                 }
@@ -539,8 +503,6 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                 | OpCode::GetEnumTag
                 | OpCode::Await
                 | OpCode::ObjectKeys => {
-                    // emit_rr: [pack_op(op,dest), pack(src,0)]
-                    // dest=dest0, src=hi1, lo1=0 (padding, not a register)
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), 0);
                 }
@@ -566,28 +528,22 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
 
                 OpCode::Jump | OpCode::Loop => {}
 
-                // emit_rc: [pack_op(op,dest), const_idx] — word[1] is a raw index, not a register
                 OpCode::LoadConst
                 | OpCode::LoadInt
                 | OpCode::LoadGlobal
                 | OpCode::LoadGlobalIdx => {
                     code[offset] = pack_op(op, m(mapping, dest0));
-                    // word[1] = const_idx, do not touch
                 }
-                // emit_rrc: [pack_op(op,dest), pack(src,0), const_idx]
-                // dest=dest0, src=hi1, lo1=0 (padding)
+
                 OpCode::MakeClass => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), 0);
                 }
-                // emit_rc: [pack_op(op,dest), name_idx] — no src register
+
                 OpCode::GetSuper => {
                     code[offset] = pack_op(op, m(mapping, dest0));
-                    // word[1] = name_idx, do not touch
                 }
 
-                // emit_rrc(op,0,src,name_idx): [pack_op(op,0), pack(src,0), name_idx]
-                // src = hi1, lo1 = 0 (padding), word[2] = name_idx (not a register)
                 OpCode::StoreGlobal
                 | OpCode::DefineGlobal
                 | OpCode::StoreGlobalIdx
@@ -595,8 +551,6 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                     code[offset + 1] = pack(m(mapping, hi1), 0);
                 }
 
-                // emit_rrr: [pack_op(op,dest), pack(src1,src2)] — 2 words only
-                // dest=dest0, src1=hi1, src2=lo1
                 OpCode::Add
                 | OpCode::Sub
                 | OpCode::Mul
@@ -643,12 +597,10 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
                 }
                 OpCode::ArrayExtend => {
-                    // emit_rrr: dest=dest0, src=hi1
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), 0);
                 }
 
-                // 3-word with dest=dest0, src=hi1: remap both word[0] and word[1]
                 OpCode::GetPropertyMaybe
                 | OpCode::GetFixedField
                 | OpCode::GetSymbol
@@ -656,16 +608,15 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), lo1);
                 }
-                // BindMethod: word[0]=opcode only, word[1]=pack(dest,obj), word[2]=name_idx
+
                 OpCode::BindMethod => {
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
                 }
-                // MakeEnumVariant: word[0]=opcode only, word[1]=pack(variant_reg,val_reg)
+
                 OpCode::MakeEnumVariant => {
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
                 }
-                // SetFixedField: word[0]=pack_op(op,obj), word[1]=pack(val,0)
-                // obj=dest0, val=hi1
+
                 OpCode::SetFixedField => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), 0);
@@ -687,13 +638,11 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                 }
 
                 OpCode::GetProperty => {
-                    // dest in word[0] hi byte, src in word[1] hi byte.
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), lo1);
                 }
 
                 OpCode::SetProperty => {
-                    // obj in word[0] hi byte, val in word[1] hi byte.
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), lo1);
                 }
@@ -721,10 +670,8 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                     code[offset + 3] = pack(hi3, m(mapping, lo3));
                 }
 
-                // emit_rc: [pack_op(op,dest), const_idx] — word[1] is raw index
                 OpCode::LoadModule | OpCode::StoreModuleSlot => {
                     code[offset] = pack_op(op, m(mapping, dest0));
-                    // word[1] = const_idx, do not touch
                 }
 
                 OpCode::MakeClosure => {
@@ -766,12 +713,11 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, start as u8));
                 }
 
-                // emit_rrr 2-word: GetIndex dest=dest0, obj=hi1, key=lo1
                 OpCode::GetIndex => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
                 }
-                // emit_rrr 2-word: SetIndex obj=dest0, key=hi1, val=lo1 (no def)
+
                 OpCode::SetIndex => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
@@ -781,14 +727,11 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
                 }
 
-                // [pack_op(op,dest), pack(src,imm)] — dest=dest0, src=hi1, lo1=imm (not a register)
                 OpCode::AddImm | OpCode::SubImm => {
                     code[offset] = pack_op(op, m(mapping, dest0));
-                    code[offset + 1] = pack(m(mapping, hi1), lo1); // preserve imm in lo byte
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
                 }
 
-                // [pack_op(op,dest), pack(count,0), pack(reg0,0), ...]
-                // dest=dest0, count=hi1 (not a register), each word[2+i] hi = reg_i
                 OpCode::BuildStr => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     let count = hi1 as usize;
@@ -809,12 +752,7 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
     }
 }
 
-/// Returns `(loop_header_instr_idx, loop_instr_idx)` for every back-edge in the bytecode.
-/// Both values are instruction indices (matching the units used by `scan_bytecode`).
-/// `loop_header_instr_idx` is the instruction index of the loop body's first instruction.
-/// `loop_instr_idx` is the instruction index of the `Loop` opcode itself.
 fn collect_back_edges(code: &[u16]) -> Vec<(usize, usize)> {
-    // First pass: build word_offset → instr_idx map.
     let mut word_to_instr: HashMap<usize, usize> = HashMap::new();
     let mut offset = 0usize;
     let mut instr_idx = 0usize;
@@ -829,7 +767,6 @@ fn collect_back_edges(code: &[u16]) -> Vec<(usize, usize)> {
         }
     }
 
-    // Second pass: find Loop opcodes, compute targets in instr_idx units.
     let mut edges = Vec::new();
     let mut offset = 0usize;
     let mut instr_idx = 0usize;
@@ -869,8 +806,6 @@ pub fn optimize_function(proto: &mut FunctionProto) {
 }
 
 fn optimize_function_inner(proto: &mut FunctionProto) {
-    // Async and generator functions save register state into a heap-allocated array.
-    // Remapping registers would break the saved indices, so skip optimization for these.
     if proto.is_async || proto.is_generator {
         return;
     }

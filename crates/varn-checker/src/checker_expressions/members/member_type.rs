@@ -53,7 +53,7 @@ impl Checker {
                 let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
                 let is_enum = bind.get_enum_members_local(name.as_ref()).is_some()
                     || bind
-                        .builtin
+                        .core
                         .as_ref()
                         .map_or(false, |b| b.enum_members.contains_key(name.as_ref()))
                     || crate::module_resolver::find_module_bind_for_type(name, &origin_modules)
@@ -70,7 +70,6 @@ impl Checker {
                         return Some((Type::Str, None));
                     }
 
-                    // Look up variant payload fields
                     let mut variants = Vec::new();
                     if let Some(members) = bind.get_enum_members_local(name.as_ref()) {
                         variants.extend(members.iter().map(|m| m.name.clone()));
@@ -129,7 +128,7 @@ impl Checker {
                 {
                     return Some((ty.clone(), None));
                 }
-                if let Some(b) = &bind.builtin {
+                if let Some(b) = &bind.core {
                     if let Some(members) = b.class_members.get(name.as_ref()) {
                         if let Some(m) = members.members.iter().find(|m| m.name.as_ref() == key) {
                             return Some((m.ty.clone(), m.symbol_id));
@@ -229,7 +228,7 @@ impl Checker {
                 if key == "length" {
                     Some((Type::Int, None))
                 } else {
-                    bind.builtin
+                    bind.core
                         .as_ref()
                         .and_then(|b| b.class_members.get(varn_core::IntrinsicType::Str.as_str()))
                         .and_then(|members| {

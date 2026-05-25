@@ -1,7 +1,9 @@
 use varn_core::OpCode;
 
 use crate::assembler::Reg;
-use crate::regalloc::{emit_flush_all, emit_load, emit_reload_all, emit_reload_all_except, emit_store};
+use crate::regalloc::{
+    emit_flush_all, emit_load, emit_reload_all, emit_reload_all_except, emit_store,
+};
 use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
 
 use super::CodegenCtx;
@@ -107,8 +109,8 @@ fn emit_array_length(ctx: &mut CodegenCtx, first_reg: usize) {
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax); // arg2: arr
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // arg1: ctx
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
 
     asm.mov_reg_imm64(Reg::R10, helpers.array_length as u64);
     asm.call_reg(Reg::R10);
@@ -153,15 +155,15 @@ fn emit_array_push(ctx: &mut CodegenCtx, first_reg: usize) {
         asm.push(Reg::Rax);
     }
 
-    emit_load(asm, Reg::Rax, first_reg, regmap); // arr
-    emit_load(asm, Reg::R11, src, regmap); // val
+    emit_load(asm, Reg::Rax, first_reg, regmap);
+    emit_load(asm, Reg::R11, src, regmap);
 
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    asm.mov_reg_reg(ARG_BASE, Reg::R11); // arg3: val
-    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax); // arg2: arr
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // arg1: ctx
+    asm.mov_reg_reg(ARG_BASE, Reg::R11);
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
 
     asm.mov_reg_imm64(Reg::R10, helpers.array_push as u64);
     asm.call_reg(Reg::R10);
@@ -208,8 +210,8 @@ fn emit_array_pop(ctx: &mut CodegenCtx, first_reg: usize) {
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax); // arg2: arr
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // arg1: ctx
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
 
     asm.mov_reg_imm64(Reg::R10, helpers.array_pop as u64);
     asm.call_reg(Reg::R10);
@@ -254,15 +256,15 @@ fn emit_array_extend(ctx: &mut CodegenCtx, first_reg: usize) {
         asm.push(Reg::Rax);
     }
 
-    emit_load(asm, Reg::Rax, first_reg, regmap); // arr
-    emit_load(asm, Reg::R11, src, regmap); // src
+    emit_load(asm, Reg::Rax, first_reg, regmap);
+    emit_load(asm, Reg::R11, src, regmap);
 
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    asm.mov_reg_reg(ARG_BASE, Reg::R11); // arg3: src
-    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax); // arg2: arr
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // arg1: ctx
+    asm.mov_reg_reg(ARG_BASE, Reg::R11);
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
 
     asm.mov_reg_imm64(Reg::R10, helpers.array_extend as u64);
     asm.call_reg(Reg::R10);

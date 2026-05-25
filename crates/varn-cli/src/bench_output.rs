@@ -27,7 +27,7 @@ pub fn print_check_breakdown(profile: &varn_checker::CheckProfile) {
     let rows = [
         ("load_globals", profile.load_globals),
         ("bind", profile.bind),
-        ("merge_builtins", profile.merge_builtin_members),
+        ("merge_core", profile.merge_core_members),
         ("enrich_calls", profile.enrich_call_returns),
         ("check_stmts", profile.check_stmts),
         ("annotations", profile.collect_annotations),

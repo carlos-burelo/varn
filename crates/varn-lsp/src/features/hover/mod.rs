@@ -46,7 +46,6 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
         }
     }
 
-    // Prefer direct symbol/param/member resolution first (checker-backed, less heuristic).
     if let Some(sym) = query::symbol_at(state, line, col) {
         return Some(symbol_hover(sym));
     }

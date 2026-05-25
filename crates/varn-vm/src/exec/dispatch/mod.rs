@@ -51,11 +51,6 @@ impl ExecCtx {
         'frame_loop: while self.frames.len() > depth {
             let frame_idx = self.frames.len() - 1;
 
-            // SAFETY: `closure` lives inside `self.frames[frame_idx]` which stays
-            // alive for the entire inner loop. We never push/pop frames inside the
-            // raw-pointer section without breaking to 'frame_loop first, so the
-            // referent is stable. Using a raw pointer avoids an Rc refcount bump on
-            // every frame entry (hot in recursive / iterative code).
             let closure_ptr: *const crate::frame::VmClosure = &*self.frames[frame_idx].closure;
             let closure = unsafe { &*closure_ptr };
 
@@ -83,13 +78,11 @@ impl ExecCtx {
                     self.trace_event("JIT EXIT", frame_idx, closure, 0, None);
                 }
 
-                // Properly clean up frame and stack, replicating reg_return logic
                 let frame = self.frames.pop().unwrap();
                 self.record_frame_pop();
                 self.close_upvalues_above(frame.base);
                 self.stack.truncate(frame.base);
 
-                // Handle pending constructors
                 let ctor_pos = if !self.pending_constructors.is_empty() {
                     self.pending_constructors
                         .iter()
@@ -109,7 +102,6 @@ impl ExecCtx {
                     res
                 };
 
-                // Write return value to the caller's stack slot
                 if let Some(return_reg) = frame.return_reg {
                     let caller_base = self.frames.last().map(|f| f.base).unwrap_or(0);
                     self.stack[caller_base + return_reg as usize] = final_val;
@@ -538,7 +530,7 @@ impl ExecCtx {
                     OpCode::BuildStr => {
                         let count = hi(code[ip]) as usize;
                         ip += 1;
-                        // Gather part strings, compute total capacity, concat in one alloc.
+
                         let parts: Vec<String> = (0..count)
                             .map(|i| {
                                 let reg_idx = hi(code[ip + i]) as usize;
@@ -622,8 +614,6 @@ impl ExecCtx {
                             continue 'frame_loop;
                         }
 
-                        // exec_call_reg returned false: call resolved inline (native/bound),
-                        // no new frame was pushed. Re-fetch frame_idx in case frames shifted.
                         let frame_idx2 = self.frames.len() - 1;
                         ip = self.frames[frame_idx2].ip;
                     }

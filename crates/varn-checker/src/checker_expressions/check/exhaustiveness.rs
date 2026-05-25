@@ -92,7 +92,6 @@ impl Checker {
             let uncovered: Vec<String> = variants
                 .iter()
                 .filter(|v| {
-                    // Only check actual enum variants, not custom methods, properties, or constructors.
                     let is_variant = bind
                         .sum_variant_parent
                         .get(v.name.as_ref())

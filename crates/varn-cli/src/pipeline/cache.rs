@@ -16,8 +16,6 @@ pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
         .find(|dir| dir.join("varn.json").exists())
         .unwrap_or(file_dir);
 
-    // Include a hash of the canonical path to avoid collisions when two files
-    // share the same filename but live in different directories.
     let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let path_hash = super::hash::fnv1a64(canonical.to_string_lossy().as_bytes());
 
@@ -87,8 +85,6 @@ pub fn store_cached_graph(cache_path: &Path, graph: &ModuleGraphArtifact) -> Pip
 }
 
 pub fn compile_output_from_graph(graph: ModuleGraphArtifact) -> PipelineResult<CompileOutput> {
-    use varn_modules::EMBEDDED_MODULE_PREFIX;
-
     let entry_path = graph.entry_path.clone();
     let entry_proto = graph.entry_proto().cloned().ok_or_else(|| {
         CliError::fatal(format!(
@@ -104,8 +100,7 @@ pub fn compile_output_from_graph(graph: ModuleGraphArtifact) -> PipelineResult<C
         if *path == entry_path {
             continue;
         }
-        let clean_path = path.strip_prefix(EMBEDDED_MODULE_PREFIX).unwrap_or(path);
-        precompiled.insert(clean_path.to_owned(), Rc::new(proto.clone()));
+        precompiled.insert(path.to_owned(), Rc::new(proto.clone()));
     }
 
     Ok(CompileOutput {

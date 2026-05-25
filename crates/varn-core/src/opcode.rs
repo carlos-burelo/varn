@@ -136,21 +136,15 @@ pub enum OpCode {
 
     InvokeRuntimeStatic,
 
-    // Specialized int-immediate opcodes: [opcode|dest] [src|imm8_signed]
-    // imm8 is treated as i8 (sign-extended). Used for x+k, x-k patterns.
     AddImm,
     SubImm,
 
-    // Template string builder: [BuildStr|dest] [count|0] [reg0|0] [reg1|0] ...
-    // All count parts (pre-converted to strings) are concatenated in one heap alloc.
     BuildStr,
 
-    // Single-word load for the three most common integer constants.
     LoadIntZero,
     LoadIntOne,
     LoadIntMinusOne,
 
-    // Typed integer operations
     AddInt,
     SubInt,
     MulInt,
@@ -162,7 +156,6 @@ pub enum OpCode {
     EqInt,
     NeqInt,
 
-    // Typed float operations
     AddFloat,
     SubFloat,
     MulFloat,

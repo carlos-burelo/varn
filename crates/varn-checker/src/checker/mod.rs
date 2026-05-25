@@ -1,9 +1,9 @@
 pub(crate) mod compat;
 mod decls;
 mod stmts;
-
 use crate::binder::{BindResult, Binder};
 use crate::scope::ScopeId;
+use crate::symbol::SymbolId;
 use crate::types::Type;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::rc::Rc;
@@ -18,7 +18,7 @@ pub(crate) use crate::checker_enrichment::enrich_call_returns;
 #[derive(Clone, Debug)]
 pub struct ExprInfo {
     pub ty: Type,
-    pub symbol_id: Option<crate::symbol::SymbolId>,
+    pub symbol_id: Option<SymbolId>,
 }
 
 impl std::fmt::Display for ExprInfo {
@@ -34,14 +34,11 @@ pub struct CheckResult {
     pub flattened_members: FxHashMap<Rc<str>, Vec<crate::types::ClassMemberInfo>>,
     pub type_annotations: varn_core::TypeAnnotations,
     pub profile: CheckProfile,
-
     pub extension_calls: FxHashMap<u32, Rc<str>>,
     pub extension_members: FxHashMap<u32, Rc<str>>,
     pub extension_set_members: FxHashMap<u32, Rc<str>>,
-
     pub node_scopes: FxHashMap<u32, crate::scope::ScopeId>,
-
-    pub symbol_types: FxHashMap<crate::symbol::SymbolId, crate::types::Type>,
+    pub symbol_types: FxHashMap<SymbolId, crate::types::Type>,
 }
 
 impl CheckResult {
@@ -61,7 +58,7 @@ impl CheckResult {
         &self,
         name: &str,
         cursor_offset: u32,
-    ) -> Option<(crate::symbol::SymbolId, crate::types::Type)> {
+    ) -> Option<(SymbolId, crate::types::Type)> {
         let scope_id = self.scope_at_offset(cursor_offset);
         let scope = self.bind.scopes.get(scope_id);
         let sym_id = scope.resolve(name, &self.bind.scopes)?;
@@ -79,7 +76,7 @@ impl CheckResult {
 pub struct CheckProfile {
     pub load_globals: Duration,
     pub bind: Duration,
-    pub merge_builtin_members: Duration,
+    pub merge_core_members: Duration,
     pub enrich_call_returns: Duration,
     pub check_stmts: Duration,
     pub collect_annotations: Duration,
@@ -91,9 +88,9 @@ pub struct Checker {
     pub(crate) source_file: std::rc::Rc<str>,
     pub(crate) current_scope: crate::scope::ScopeId,
     pub(crate) expected_return_type: Option<Type>,
-    pub(crate) narrowed_types: FxHashMap<crate::symbol::SymbolId, Vec<Type>>,
+    pub(crate) narrowed_types: FxHashMap<SymbolId, Vec<Type>>,
     pub(crate) narrowings_cache:
-        FxHashMap<(u32, bool, crate::scope::ScopeId), Vec<(crate::symbol::SymbolId, Type)>>,
+        FxHashMap<(u32, bool, crate::scope::ScopeId), Vec<(SymbolId, Type)>>,
     pub(crate) child_indices: FxHashMap<ScopeId, usize>,
     pub(crate) expr_types: FxHashMap<u32, ExprInfo>,
     pub(crate) infer_cache: FxHashMap<(u32, ScopeId, u32), Type>,
@@ -101,13 +98,10 @@ pub struct Checker {
     pub(crate) compat_cache: FxHashMap<(Type, Type, usize), bool>,
     pub(crate) type_node_cache: FxHashMap<(u32, usize), Type>,
     pub(crate) symbol_type_params_cache: FxHashMap<(Rc<str>, u8), Vec<Rc<str>>>,
-    pub(crate) symbol_types: FxHashMap<crate::symbol::SymbolId, Type>,
-
+    pub(crate) symbol_types: FxHashMap<SymbolId, Type>,
     pub(crate) current_class: Option<Rc<str>>,
     pub(crate) active_type_params: FxHashSet<Rc<str>>,
-
     pub(crate) abstract_classes: FxHashSet<Rc<str>>,
-
     pub(crate) is_assignment_target: bool,
     pub(crate) in_pipeline_rhs: bool,
     pub(crate) pipeline_value_type: Option<Type>,
@@ -116,19 +110,12 @@ pub struct Checker {
     pub(crate) extension_set_members: FxHashMap<u32, Rc<str>>,
     pub(crate) member_exists_cache: FxHashMap<(Type, Rc<str>), bool>,
     pub(crate) member_type_cache: FxHashMap<(Type, Rc<str>), Option<(Type, Option<usize>)>>,
-
-    pub warn_implicit_dynamic: bool,
-
     pub(crate) expected_type: Option<Type>,
-
     pub(crate) call_mappings: FxHashMap<u32, Vec<Option<usize>>>,
-
     pub(crate) record_expr_types: bool,
     pub(crate) node_scopes: FxHashMap<u32, ScopeId>,
-
-    // Cache for map_generics: (base_type, sorted_type_args) -> instantiated_type.
-    // Key vec is sorted by param name to give a stable order.
     pub(crate) map_generics_cache: FxHashMap<(Type, Vec<Type>), Type>,
+    pub warn_implicit_dynamic: bool,
 }
 
 impl Checker {
@@ -155,10 +142,10 @@ impl Checker {
     ) -> CheckResult {
         let mut profile = CheckProfile::default();
 
-        let is_builtin = crate::builtins::is_builtin_file(&program.filename);
+        let is_builtin = crate::core::is_core_file(&program.filename);
         let globals_ref = if !is_builtin {
             let started = Instant::now();
-            let globals = crate::builtins::global_exports_ref();
+            let globals = crate::core::global_exports_ref();
             profile.load_globals = started.elapsed();
             Some(globals)
         } else {
@@ -173,8 +160,8 @@ impl Checker {
         profile.bind = started.elapsed();
 
         let started = Instant::now();
-        crate::builtins::merge_builtin_members(&mut bind);
-        profile.merge_builtin_members = started.elapsed();
+        crate::core::merge_core_members(&mut bind);
+        profile.merge_core_members = started.elapsed();
 
         let started = Instant::now();
         enrich_call_returns(&mut bind);
@@ -414,7 +401,7 @@ impl Checker {
         {
             bind.arena.get(sid).type_params.clone()
         } else {
-            bind.builtin
+            bind.core
                 .as_ref()
                 .and_then(|b| b.class_type_params.get(name))
                 .cloned()

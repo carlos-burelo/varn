@@ -65,7 +65,7 @@ pub(crate) fn emit_immediates(
             *ip += 1;
             let src = (w1 & 0xFF) as usize;
             emit_load(asm, Reg::Rax, src, regmap);
-            // Save return value before epilogue pops clobber regs
+
             asm.mov_reg_reg(Reg::R11, Reg::Rax);
             emit_epilogue(asm, regmap);
             asm.mov_reg_reg(Reg::Rax, Reg::R11);
@@ -91,15 +91,11 @@ fn emit_load_const(ctx: &mut CodegenCtx, first_reg: usize) {
     let idx = code[*ip] as usize;
     *ip += 1;
 
-    // Push/preserve arg regs
     asm.push(ARG_CTX);
     asm.push(ARG_CLOSURE);
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    // Align stack to 16 bytes:
-    // Total bytes pushed = 8 (ret) + 8 (Rbp) + K*8 (used_phys) + 32 (args) = K*8 + 48.
-    // 48 is a multiple of 16. If K is odd, we need 8 bytes padding, so we push Rax as dummy.
     let need_dummy = regmap.used_phys.len() % 2 != 0;
     if need_dummy {
         asm.push(Reg::Rax);
@@ -117,7 +113,6 @@ fn emit_load_const(ctx: &mut CodegenCtx, first_reg: usize) {
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, 32);
 
-    // Save result before pops clobber Rax
     asm.mov_reg_reg(Reg::R11, Reg::Rax);
 
     if need_dummy {

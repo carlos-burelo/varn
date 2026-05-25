@@ -116,7 +116,7 @@ pub(super) fn compile_call<'a>(
         c.emit_rc(OpCode::GetSuper, fn_reg, super_idx);
         let line = c.line;
         let recv_reg = c.alloc_reg();
-        c.emit_rr(OpCode::Move, recv_reg, 0); // "this" is always Register 0
+        c.emit_rr(OpCode::Move, recv_reg, 0);
 
         let (arg_start, arg_count, has_spread) = compile_args_contiguous(c, offset, args);
         assert_eq!(
@@ -140,7 +140,7 @@ pub(super) fn compile_call<'a>(
         for _ in 0..arg_count {
             c.free_reg();
         }
-        c.free_reg(); // Free receiver register copy
+        c.free_reg();
         if &*c.name == "constructor" {
             emit_field_inits(c);
         }
@@ -216,7 +216,7 @@ pub(super) fn emit_plain_call<'a>(
     for _ in 0..arg_count {
         c.free_reg();
     }
-    c.free_reg(); // Free receiver register
+    c.free_reg();
     dest
 }
 

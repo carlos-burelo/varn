@@ -1,5 +1,4 @@
 pub(crate) mod arith;
-pub(crate) mod unary;
 pub(crate) mod arrays;
 pub(crate) mod calls;
 pub(crate) mod closures;
@@ -11,6 +10,7 @@ pub(crate) mod jumps;
 pub(crate) mod modules;
 pub(crate) mod properties;
 pub(crate) mod strings;
+pub(crate) mod unary;
 
 pub(crate) use arith::emit_arith;
 pub(crate) use arrays::emit_arrays;

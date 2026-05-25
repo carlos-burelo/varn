@@ -1,5 +1,24 @@
-use varn_op_macros::varn_module;
+#[allow(unused_imports)]
+use std::io::Write;
+use std::sync::atomic::{AtomicBool, Ordering};
+#[allow(unused_imports)]
+use varn_op_macros::{varn_class, varn_constructor, varn_method, varn_module};
 use varn_types::{NativeCtx, VmValue};
+
+static SILENT: AtomicBool = AtomicBool::new(false);
+
+pub fn set_print_silent(silent: bool) {
+    SILENT.store(silent, Ordering::Relaxed);
+}
+
+fn init_error(ctx: &mut dyn NativeCtx, this: VmValue, args: &[VmValue], class_name: &'static str) {
+    let msg = args.first().copied().unwrap_or(VmValue::null());
+    ctx.set_field(this, "message", msg);
+    let name = ctx.alloc_str(class_name);
+    ctx.set_field(this, "name", name);
+    let stack = ctx.alloc_str("");
+    ctx.set_field(this, "stack", stack);
+}
 
 #[varn_module("globals")]
 pub(crate) mod dispatch {
@@ -7,22 +26,34 @@ pub(crate) mod dispatch {
 
     #[varn_fn]
     pub fn print(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        crate::modules::print::print(ctx, args)
+        let s = args
+            .iter()
+            .map(|&v| ctx.str_repr(v))
+            .collect::<Vec<_>>()
+            .join(" ");
+        if !SILENT.load(Ordering::Relaxed) {
+            let stdout = std::io::stdout();
+            let mut out = stdout.lock();
+            let _ = writeln!(out, "{s}");
+            let _ = out.flush();
+        }
+        Ok(VmValue::null())
     }
 
     #[varn_fn]
     pub fn debug(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        crate::modules::print::debug(ctx, args)
+        let s = args
+            .iter()
+            .map(|&v| ctx.str_repr(v))
+            .collect::<Vec<_>>()
+            .join(" ");
+        eprintln!("[debug] {s}");
+        Ok(VmValue::null())
     }
 
     #[varn_fn]
     pub fn input(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         crate::modules::io::dispatch::read_line(ctx, args)
-    }
-
-    #[varn_fn]
-    pub fn range(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        crate::modules::primitives::range::range_op(ctx, args)
     }
 
     #[varn_fn("assertSummary")]
@@ -44,6 +75,73 @@ pub(crate) mod dispatch {
             crate::modules::testing::inc_failed();
             eprintln!("ASSERT FAIL: {label}");
             Err(label)
+        }
+    }
+
+    #[varn_class("Error")]
+    pub mod error_class {
+        use super::*;
+
+        #[varn_constructor]
+        pub fn constructor(
+            ctx: &mut dyn NativeCtx,
+            this: VmValue,
+            args: &[VmValue],
+        ) -> Result<(), String> {
+            init_error(ctx, this, args, "Error");
+            Ok(())
+        }
+
+        #[varn_method("toString")]
+        pub fn to_string(
+            ctx: &mut dyn NativeCtx,
+            this: VmValue,
+            _args: &[VmValue],
+        ) -> Result<VmValue, String> {
+            let name = ctx
+                .get_field(this, "name")
+                .and_then(|v| ctx.str_owned(v))
+                .unwrap_or_else(|| "Error".to_owned());
+            let message = ctx
+                .get_field(this, "message")
+                .and_then(|v| ctx.str_owned(v))
+                .unwrap_or_default();
+            let rendered = if message.is_empty() {
+                name
+            } else {
+                format!("{name}: {message}")
+            };
+            Ok(ctx.alloc_str_owned(rendered))
+        }
+    }
+
+    #[varn_class("TypeError", extends = "Error")]
+    pub mod type_error_class {
+        use super::*;
+
+        #[varn_constructor]
+        pub fn constructor(
+            ctx: &mut dyn NativeCtx,
+            this: VmValue,
+            args: &[VmValue],
+        ) -> Result<(), String> {
+            init_error(ctx, this, args, "TypeError");
+            Ok(())
+        }
+    }
+
+    #[varn_class("RangeError", extends = "Error")]
+    pub mod range_error_class {
+        use super::*;
+
+        #[varn_constructor]
+        pub fn constructor(
+            ctx: &mut dyn NativeCtx,
+            this: VmValue,
+            args: &[VmValue],
+        ) -> Result<(), String> {
+            init_error(ctx, this, args, "RangeError");
+            Ok(())
         }
     }
 }

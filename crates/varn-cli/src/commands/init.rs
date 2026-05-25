@@ -3,9 +3,9 @@ use std::path::Path;
 
 pub fn execute(args: InitArgs) -> Result<(), CliError> {
     let dir = args.dir.as_deref().unwrap_or(".");
+    let base = Path::new(dir);
     let name = args.name.unwrap_or_else(|| {
-        Path::new(dir)
-            .file_name()
+        base.file_name()
             .and_then(|n| n.to_str())
             .unwrap_or("mi-proyecto")
             .to_owned()
@@ -16,23 +16,9 @@ pub fn execute(args: InitArgs) -> Result<(), CliError> {
             .map_err(|e| CliError::fatal(format!("no se puede crear '{dir}': {e}")))?;
     }
 
-    let main_path = if dir == "." {
-        "main.vn".to_owned()
-    } else {
-        format!("{dir}/main.vn")
-    };
-
-    let manifest_path = if dir == "." {
-        "varn.json".to_owned()
-    } else {
-        format!("{dir}/varn.json")
-    };
-
-    let wr_dir = if dir == "." {
-        ".vn".to_owned()
-    } else {
-        format!("{dir}/.vn")
-    };
+    let main_path = base.join("main.vn").to_string_lossy().to_string();
+    let manifest_path = base.join("varn.json").to_string_lossy().to_string();
+    let wr_dir = base.join(".vn").to_string_lossy().to_string();
 
     if Path::new(&main_path).exists() {
         return Err(CliError::fatal(format!("'{main_path}' ya existe")));
@@ -64,7 +50,8 @@ pub fn execute(args: InitArgs) -> Result<(), CliError> {
     std::fs::create_dir_all(&wr_dir)
         .map_err(|e| CliError::fatal(format!("no se puede crear '{wr_dir}': {e}")))?;
 
-    let env_path = format!("{wr_dir}/.env");
+    let wr_base = Path::new(&wr_dir);
+    let env_path = wr_base.join(".env").to_string_lossy().to_string();
     if !Path::new(&env_path).exists() {
         std::fs::write(
             &env_path,
@@ -73,14 +60,14 @@ pub fn execute(args: InitArgs) -> Result<(), CliError> {
         .map_err(|e| CliError::fatal(format!("no se puede escribir '{env_path}': {e}")))?;
     }
 
-    let gitignore_path = format!("{wr_dir}/.gitignore");
+    let gitignore_path = wr_base.join(".gitignore").to_string_lossy().to_string();
     std::fs::write(&gitignore_path, ".env\npackages/\ncache/\n")
         .map_err(|e| CliError::fatal(format!("no se puede escribir '{gitignore_path}': {e}")))?;
 
     println!("Proyecto inicializado en '{dir}'");
     println!("  {manifest_path}");
     println!("  {main_path}");
-    println!("  {wr_dir}/.env");
+    println!("  {env_path}");
     println!();
     println!("Ejecutar con:  vn run {main_path}");
     Ok(())

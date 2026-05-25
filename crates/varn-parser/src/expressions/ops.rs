@@ -8,8 +8,6 @@ use varn_core::TokenKind;
 pub(super) fn could_be_arrow(s: &TokenStream) -> bool {
     let k = s.kind();
     if k == TokenKind::LParen {
-        // Fast scan: look for closing ) followed by => (or : for return type then =>).
-        // Avoids full speculative parse for ordinary grouped expressions.
         return paren_leads_to_arrow(s);
     }
     if k == TokenKind::Identifier && s.peek_kind(1) == TokenKind::FatArrow {
@@ -33,10 +31,8 @@ fn paren_leads_to_arrow(s: &TokenStream) -> bool {
             TokenKind::RParen | TokenKind::RBracket | TokenKind::RBrace => {
                 depth -= 1;
                 if depth == 0 {
-                    // After the closing paren: optional `: type`, then `=>`
                     let mut next_off = off + 1;
                     if s.peek_kind(next_off) == TokenKind::Colon {
-                        // skip over return type annotation tokens until we hit => or something else
                         next_off += 1;
                         let mut type_depth = 0i32;
                         loop {
@@ -56,7 +52,7 @@ fn paren_leads_to_arrow(s: &TokenStream) -> bool {
                             }
                             next_off += 1;
                             if next_off > 128 {
-                                return true; // give up, let speculative parse decide
+                                return true;
                             }
                         }
                     }
@@ -68,7 +64,7 @@ fn paren_leads_to_arrow(s: &TokenStream) -> bool {
         }
         off += 1;
         if off > 128 {
-            return true; // give up, let speculative parse decide
+            return true;
         }
     }
 }

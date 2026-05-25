@@ -122,7 +122,6 @@ pub fn build_module_graph(
             .filter(|k| !sorted.contains(*k))
             .map(|s| s.as_str())
             .collect();
-        // Find an actual cycle path via DFS from any cycle node.
         let cycle_set: std::collections::HashSet<&str> = cycle_nodes.iter().copied().collect();
         let mut cycle_path: Vec<String> = Vec::new();
         if let Some(&start) = cycle_nodes.first() {
@@ -207,18 +206,11 @@ pub fn build_module_graph(
 }
 
 fn read_module_source(module_path: &str) -> Result<String, String> {
-    if let Some(specifier) = module_path.strip_prefix(varn_modules::EMBEDDED_MODULE_PREFIX) {
-        let loader = varn_builtins::BuiltinSourceLocator::from_env();
-        return loader
-            .embedded_source(specifier)
-            .map(|s| s.to_owned())
-            .ok_or_else(|| format!("embedded source not found for '{specifier}'"));
-    }
     if matches!(
         varn_core::ImportSpecifier::parse(module_path),
         varn_core::ImportSpecifier::Stdlib(_)
     ) {
-        let loader = varn_builtins::BuiltinSourceLocator::from_env();
+        let loader = varn_builtins::CoreSourceLocator::from_env();
         return loader
             .embedded_source(module_path)
             .map(|s| s.to_owned())
@@ -241,7 +233,7 @@ pub fn resolve_import_specifier(
 
     match ImportSpecifier::parse(specifier) {
         ImportSpecifier::Stdlib(_) => {
-            let loader = varn_builtins::BuiltinSourceLocator::from_env();
+            let loader = varn_builtins::CoreSourceLocator::from_env();
             if loader.embedded_source(specifier).is_some() {
                 return Ok(Some(specifier.to_owned()));
             }

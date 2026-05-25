@@ -1,5 +1,5 @@
-use crate::value::VmValue;
 use super::ctx::ExecCtx;
+use crate::value::VmValue;
 
 pub extern "C" fn jit_load_const(closure: *const crate::frame::VmClosure, idx: usize) -> VmValue {
     unsafe {

@@ -1,9 +1,9 @@
-pub const BUILTIN_PREFIX: &str = "builtin:";
+pub const CORE_PREFIX: &str = "core:";
 pub const STD_PREFIX: &str = "std:";
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ModuleKind {
-    Builtin,
+    Core,
 
     Stdlib,
 }

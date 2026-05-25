@@ -1,4 +1,4 @@
-declare class Range {
+export declare class Range {
     readonly start: int;
     readonly end: int;
     readonly inclusive: bool;

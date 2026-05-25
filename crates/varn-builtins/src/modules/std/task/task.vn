@@ -1,14 +1,33 @@
 // std:task - pure IDL facade over runtime concurrency host operations.
 
+export declare class Generator<T> {
+    next(value?: dynamic): { value: T; done: bool; };
+    return(value?: T): { value: T; done: bool; };
+}
+
+export declare class AsyncGenerator<T> {
+    next(value?: dynamic): Task<{ value: T; done: bool; }>;
+    return(value?: T): Task<{ value: T; done: bool; }>;
+}
+
+export interface Iterator<T> {
+    next(): { value: T; done: bool; };
+}
+
+export interface AsyncIterator<T> {
+    next(): Task<{ value: T; done: bool; }>;
+}
+
 export interface TaskHandle<T = dynamic> {
     isCompleted(): bool;
     await(): T;
     cancel(): void;
 }
 
+export declare function parallel<T>(tasks: Array<Task<T> >): Task<Array<T> >;
+
 export declare function spawn<T>(target: Task<T> | ((...args: dynamic[]) => T), ...args: dynamic[]): TaskHandle<T>;
 export declare function sleep(ms: int): TaskHandle<void>;
-export declare function parallel<T>(tasks: Task<T>[]): TaskHandle<T[]>;
 
 export declare class TaskGroup<T = dynamic> {
     constructor();

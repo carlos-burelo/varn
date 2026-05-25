@@ -290,7 +290,7 @@ impl DocumentState {
                         parent_name: type_name.clone(),
                     });
                 }
-                // Fallback to origin module definition if not resolved in local symbols (e.g. for destructured imports)
+
                 let origin = match &ty.0 {
                     TypeKind::Named(_, o) | TypeKind::Generic(_, _, o) => {
                         o.as_ref().map(|s| s.as_ref())
@@ -307,7 +307,6 @@ impl DocumentState {
                     });
                 }
 
-                // If no origin was found or resolved, check all imported modules in the current file
                 if resolved_rb.is_none() {
                     for import_path in &self.import_paths {
                         let rb =
@@ -362,8 +361,7 @@ impl DocumentState {
                     }
                 }
 
-                // Fall back to compiler built-in types (Array, str, int, float, etc.)
-                let builtins = varn_checker::builtins::loader::builtin_members_ref();
+                let builtins = varn_checker::core::loader::core_members_ref();
                 if let Some(members_info) = builtins.class_members.get(type_name.as_str()) {
                     let ms =
                         crate::pipeline::symbols::map_members(&members_info.members, &self.tokens);

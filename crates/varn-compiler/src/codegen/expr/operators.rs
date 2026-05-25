@@ -212,8 +212,6 @@ pub(super) fn compile_binary<'a>(
     l
 }
 
-/// Emit AddImm/SubImm when one operand is a small integer constant (-128..=127).
-/// Saves one instruction vs LoadInt + Add/Sub.
 pub(super) fn try_emit_imm_op<'a>(
     c: &mut Compiler<'a>,
     op: &BinaryOp,
@@ -277,8 +275,6 @@ pub(super) fn small_const_int(expr: &Expr) -> Option<i64> {
     }
 }
 
-/// Try to evaluate a binary expression at compile time.
-/// Returns `Some(reg)` if folded, `None` if runtime computation needed.
 pub(super) fn try_fold_binary<'a>(
     c: &mut Compiler<'a>,
     op: &BinaryOp,

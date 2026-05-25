@@ -74,7 +74,6 @@ impl Type {
     }
 
     pub fn union(members: Vec<Type>) -> Self {
-        // Flatten nested unions and deduplicate members.
         let mut seen = rustc_hash::FxHashSet::default();
         let mut flat: Vec<Type> = Vec::with_capacity(members.len());
         for m in members {

@@ -8,11 +8,11 @@ const ENV_VARN_HOME: &str = "VARN_HOME";
 const BUILTINS_DIR_NAME: &str = "varn-builtins";
 const VARN_HOME_STDLIB_SUBDIR: &str = "stdlib";
 
-pub struct BuiltinSourceLocator {
+pub struct CoreSourceLocator {
     stdlib_root: PathBuf,
 }
 
-impl BuiltinSourceLocator {
+impl CoreSourceLocator {
     pub fn new(stdlib_root: PathBuf) -> Self {
         Self { stdlib_root }
     }
@@ -43,8 +43,8 @@ impl BuiltinSourceLocator {
         spec_for(specifier)
     }
 
-    pub fn is_builtin(&self, specifier: &str) -> bool {
-        spec_for(specifier).is_some_and(|s| s.kind == ModuleKind::Builtin)
+    pub fn is_core(&self, specifier: &str) -> bool {
+        spec_for(specifier).is_some_and(|s| s.kind == ModuleKind::Core)
     }
 
     pub fn is_stdlib(&self, specifier: &str) -> bool {
@@ -65,10 +65,10 @@ impl BuiltinSourceLocator {
         }
     }
 
-    pub fn builtins(&self) -> impl Iterator<Item = &'static ModuleSpec> {
+    pub fn core_modules(&self) -> impl Iterator<Item = &'static ModuleSpec> {
         MODULE_REGISTRY
             .iter()
-            .filter(|m| m.kind == ModuleKind::Builtin)
+            .filter(|m| m.kind == ModuleKind::Core)
     }
 
     pub fn stdlib_modules(&self) -> impl Iterator<Item = &'static ModuleSpec> {

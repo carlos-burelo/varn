@@ -47,7 +47,7 @@ fn build_info_tree(
         }
         visited.insert(curr_path.clone());
 
-        if varn_modules::is_embedded_module_path(&curr_path) {
+        if curr_path.starts_with("core:") || curr_path.starts_with("std:") {
             stdlib_count += 1;
         } else if varn_modules::is_package_module_path(&curr_path) {
             package_count += 1;
@@ -132,12 +132,7 @@ fn print_tree_node(
     };
 
     let connector = if is_last { "└─ " } else { "├─ " };
-    let display_path =
-        if let Some(embedded) = path.strip_prefix(varn_modules::EMBEDDED_MODULE_PREFIX) {
-            format!("std:{embedded} (builtin)")
-        } else {
-            path.to_owned()
-        };
+    let display_path = path.to_owned();
 
     println!("{prefix}{connector}{display_path}");
 
