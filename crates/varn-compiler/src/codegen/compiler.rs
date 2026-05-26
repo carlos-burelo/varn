@@ -603,6 +603,11 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn finish_module(self) -> FunctionProto {
+        let required_caps: Vec<std::rc::Rc<str>> = self.annotations.module_caps()
+            .iter()
+            .map(|s| std::rc::Rc::from(s.as_str()))
+            .collect();
+        let cache_count = self.cache_count as usize;
         let mut proto = FunctionProto {
             name: Some(self.name),
             arity: self.arity,
@@ -613,17 +618,25 @@ impl<'a> Compiler<'a> {
             is_generator: self.is_generator,
             has_this: self.has_this,
             upvalue_count: self.upvalues.len(),
-            cache_count: self.cache_count as usize,
+            cache_count,
             chunk: self.chunk,
+            required_caps,
             jit_entry: Cell::new(None),
             jit_code: RefCell::new(None),
             jit_failed: Cell::new(false),
+            ic_cache: std::rc::Rc::new(std::cell::RefCell::new(
+                (0..cache_count).map(|_| varn_types::chunk::PolyICSlot::new()).collect(),
+            )),
+            feedback: std::rc::Rc::new(std::cell::RefCell::new(
+                varn_types::chunk::FeedbackVector::new(cache_count),
+            )),
         };
         super::regalloc_post::optimize_function(&mut proto);
         proto
     }
 
     pub fn finish_function(self) -> (FunctionProto, Vec<UpvalueDesc>) {
+        let cache_count = self.cache_count as usize;
         let mut proto = FunctionProto {
             name: Some(self.name),
             arity: self.arity,
@@ -634,11 +647,18 @@ impl<'a> Compiler<'a> {
             is_generator: self.is_generator,
             has_this: self.has_this,
             upvalue_count: self.upvalues.len(),
-            cache_count: self.cache_count as usize,
+            cache_count,
             chunk: self.chunk,
+            required_caps: Vec::new(),
             jit_entry: Cell::new(None),
             jit_code: RefCell::new(None),
             jit_failed: Cell::new(false),
+            ic_cache: std::rc::Rc::new(std::cell::RefCell::new(
+                (0..cache_count).map(|_| varn_types::chunk::PolyICSlot::new()).collect(),
+            )),
+            feedback: std::rc::Rc::new(std::cell::RefCell::new(
+                varn_types::chunk::FeedbackVector::new(cache_count),
+            )),
         };
         super::regalloc_post::optimize_function(&mut proto);
         (proto, self.upvalues)

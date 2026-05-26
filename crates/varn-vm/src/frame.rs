@@ -73,16 +73,14 @@ pub struct VmClosure {
 
 impl VmClosure {
     pub fn new(proto: Rc<FunctionProto>, constants: Vec<VmValue>) -> Self {
-        let cache_count = proto.cache_count;
-        let ic_cache = Self::make_ic_slots(cache_count);
-        let feedback = Rc::new(RefCell::new(varn_types::chunk::FeedbackVector::new(
-            cache_count,
-        )));
+        proto.ensure_ic();
+        let ic_cache = Rc::clone(&proto.ic_cache);
+        let feedback = Rc::clone(&proto.feedback);
         let mut closure = Self {
             proto,
             upvalues: Vec::new(),
             constants: Rc::new(constants),
-            ic_cache: Rc::new(RefCell::new(ic_cache)),
+            ic_cache,
             feedback,
             jit_entry: None,
             jit_code: None,
@@ -95,9 +93,10 @@ impl VmClosure {
         proto: Rc<FunctionProto>,
         upvalues: Vec<VmUpvalue>,
         constants: Rc<Vec<VmValue>>,
-        ic_cache: Rc<RefCell<Vec<PolyICSlot>>>,
-        feedback: Rc<RefCell<varn_types::chunk::FeedbackVector>>,
     ) -> Self {
+        proto.ensure_ic();
+        let ic_cache = Rc::clone(&proto.ic_cache);
+        let feedback = Rc::clone(&proto.feedback);
         let mut closure = Self {
             proto,
             upvalues,

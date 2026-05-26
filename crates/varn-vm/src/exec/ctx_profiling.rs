@@ -92,20 +92,6 @@ impl ExecCtx {
     }
 
     #[inline(always)]
-    pub fn record_reg_load(&self) {
-        if let Some(ref c) = self.profile_counters {
-            c.record_reg_load();
-        }
-    }
-
-    #[inline(always)]
-    pub fn record_reg_store(&self) {
-        if let Some(ref c) = self.profile_counters {
-            c.record_reg_store();
-        }
-    }
-
-    #[inline(always)]
     pub fn record_frame_push(&self) {
         if let Some(ref c) = self.profile_counters {
             c.record_frame_push();

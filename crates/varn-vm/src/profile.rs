@@ -14,8 +14,6 @@ pub struct ProfileCounters {
     pub calls_prepare_slow: AtomicU64,
     pub calls_native: AtomicU64,
     pub heap_allocs: AtomicU64,
-    pub reg_loads: AtomicU64,
-    pub reg_stores: AtomicU64,
     pub frame_pushes: AtomicU64,
     pub frame_pops: AtomicU64,
 }
@@ -35,8 +33,6 @@ impl ProfileCounters {
             calls_prepare_slow: AtomicU64::new(0),
             calls_native: AtomicU64::new(0),
             heap_allocs: AtomicU64::new(0),
-            reg_loads: AtomicU64::new(0),
-            reg_stores: AtomicU64::new(0),
             frame_pushes: AtomicU64::new(0),
             frame_pops: AtomicU64::new(0),
         })
@@ -109,16 +105,6 @@ impl ProfileCounters {
     }
 
     #[inline(always)]
-    pub fn record_reg_load(&self) {
-        self.reg_loads.fetch_add(1, Ordering::Relaxed);
-    }
-
-    #[inline(always)]
-    pub fn record_reg_store(&self) {
-        self.reg_stores.fetch_add(1, Ordering::Relaxed);
-    }
-
-    #[inline(always)]
     pub fn record_frame_push(&self) {
         self.frame_pushes.fetch_add(1, Ordering::Relaxed);
     }
@@ -142,8 +128,7 @@ pub struct VmProfile {
     pub calls_prepare_slow: u64,
     pub calls_native: u64,
     pub heap_allocs: u64,
-    pub reg_loads: u64,
-    pub reg_stores: u64,
+    pub move_opcodes: u64,
     pub frame_pushes: u64,
     pub frame_pops: u64,
     pub gc_collections: u64,
@@ -170,8 +155,7 @@ impl VmProfile {
             calls_prepare_slow: c.calls_prepare_slow.load(Ordering::Relaxed),
             calls_native: c.calls_native.load(Ordering::Relaxed),
             heap_allocs: c.heap_allocs.load(Ordering::Relaxed),
-            reg_loads: c.reg_loads.load(Ordering::Relaxed),
-            reg_stores: c.reg_stores.load(Ordering::Relaxed),
+            move_opcodes: 0,
             frame_pushes: c.frame_pushes.load(Ordering::Relaxed),
             frame_pops: c.frame_pops.load(Ordering::Relaxed),
             gc_collections: 0,

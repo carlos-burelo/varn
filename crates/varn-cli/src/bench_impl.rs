@@ -2,13 +2,12 @@ use crate::bench_output::{
     print_check_breakdown, print_opcode_hotspots, print_parse_breakdown, print_vm_profile,
 };
 use crate::error::CliError;
-use crate::opts::DebugFlags;
 use rustc_hash::FxHashMap;
-use std::fs::read_to_string;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 use varn_checker::Checker;
 use varn_compiler::FunctionProto;
+use varn_core::ModuleId;
 use varn_types::value::Closure;
 use varn_vm::Vm;
 
@@ -194,52 +193,35 @@ fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Durati
 pub fn run_bench(
     path: &str,
     runs: usize,
-    debug: &DebugFlags,
-    no_run: bool,
-    with_output: bool,
+    show_output: bool,
 ) -> Result<(), CliError> {
     if crate::pipeline::wrc::is_wrc(path) {
-        return run_bench_wrc(path, runs, no_run, with_output);
+        return run_bench_wrc(path, runs, show_output);
     }
 
-    if debug.any() || no_run {
-        crate::pipeline::compile_file(path, false, debug)?;
-        if no_run {
-            return Ok(());
-        }
-    }
+    let canonical = crate::pipeline::canonicalize_path(path)?;
+    let path = canonical.as_str();
 
-    let source =
-        read_to_string(path).map_err(|e| CliError::fatal(format!("cannot read '{path}': {e}")))?;
+    let source = crate::pipeline::read_source_file(path)?;
 
     let read_samples = time_n(runs, || {
-        read_to_string(path).map(|_| ()).map_err(|e| e.to_string())
+        crate::pipeline::read_source_file(path).map(|_| ()).map_err(|e| e.message.clone())
     })?;
 
     let lex_samples = time_n(runs, || {
-        let _ = varn_lexer::scan(&source, path);
+        let _ = crate::pipeline::phase_lex(&source, path, false, &varn_debug::flags::DebugFlags::default());
         Ok(())
     })?;
 
-    let (tokens, lexeme_buf, _) = varn_lexer::scan(&source, path);
+    let (tokens, lexeme_buf) = crate::pipeline::phase_lex(&source, path, false, &varn_debug::flags::DebugFlags::default());
     let token_count = tokens.len();
 
     let tokens_ref = &tokens;
     let lexeme_buf_ref = lexeme_buf.clone();
     let parse_samples = time_n(runs, || {
-        varn_parser::parse(tokens_ref.clone(), lexeme_buf_ref.clone(), path)
+        crate::pipeline::phase_parse(tokens_ref.clone(), lexeme_buf_ref.clone(), &source, path, false, &varn_debug::flags::DebugFlags::default())
             .map(|_| ())
-            .map_err(|errs| {
-                errs.iter()
-                    .map(|e| {
-                        format!(
-                            "{}:{}:{}: {}",
-                            path, e.range.start.line, e.range.start.column, e.message
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join("; ")
-            })
+            .map_err(|e| format!("{e}"))
     })?;
 
     let (program, parse_profile) = varn_parser::parse_with_profile(tokens, lexeme_buf, path)
@@ -258,8 +240,9 @@ pub fn run_bench(
 
     let program_ref = &program;
     let check_samples = time_n(runs, || {
-        let _ = Checker::check(program_ref);
-        Ok(())
+        crate::pipeline::phase_check(program_ref, &source, &varn_debug::flags::DebugFlags::default(), false)
+            .map(|_| ())
+            .map_err(|e| format!("{e}"))
     })?;
 
     let check_result = Checker::check_with_profile(&program);
@@ -330,8 +313,10 @@ pub fn run_bench(
             .modules
             .into_iter()
             .filter(|(module_path, _)| module_path != &graph_build.entry_path)
-            .map(|(module_path, module_proto)| (module_path, Rc::new(module_proto)))
-            .collect::<FxHashMap<String, Rc<FunctionProto>>>(),
+            .map(|(module_path, module_proto)| {
+                (ModuleId::from_canonical_str(&module_path), Rc::new(module_proto))
+            })
+            .collect::<FxHashMap<ModuleId, Rc<FunctionProto>>>(),
     );
 
     let builtin_protos: Vec<FunctionProto> = crate::pipeline::core_protos_owned()?;
@@ -339,11 +324,7 @@ pub fn run_bench(
     varn_builtins::set_print_silent(true);
     varn_builtins::set_testing_silent(true);
 
-    let mut precompiled_string_map = FxHashMap::default();
-    for (name, proto) in precompiled.iter() {
-        precompiled_string_map.insert(name.to_string(), proto.clone());
-    }
-    let optimized_precompiled_base = Rc::new(precompiled_string_map);
+    let optimized_precompiled_base = precompiled.clone();
 
     let mut init_vm = Vm::new(optimized_precompiled_base.clone());
     for bp in &builtin_protos {
@@ -372,8 +353,8 @@ pub fn run_bench(
     let snap_heap_ref = &snap_heap;
     let exec_samples = time_n(runs, || {
         varn_builtins::reset_testing_counters();
-        varn_builtins::set_print_silent(!with_output);
-        varn_builtins::set_testing_silent(!with_output);
+        varn_builtins::set_print_silent(!show_output);
+        varn_builtins::set_testing_silent(!show_output);
 
         let mut machine = Vm::from_snapshot(
             snap_globals_ref.clone(),
@@ -391,7 +372,7 @@ pub fn run_bench(
     varn_builtins::reset_testing_counters();
     varn_builtins::set_print_silent(true);
     varn_builtins::set_testing_silent(true);
-    let (opcode_counts, vm_profile, jit_stats) = {
+    let (opcode_counts, mut vm_profile, jit_stats) = {
         let mut profile_vm = Vm::from_snapshot(
             snap_globals.clone(),
             snap_heap.clone(),
@@ -484,13 +465,36 @@ pub fn run_bench(
         fmt_dur(precompile_dur),
         R
     );
-    if !with_output {
-        eprintln!("  {DIM}Execution measured with stdout muted (--withOutput to disable){R}");
+    let cold_start = precompile_dur + total_p50;
+    let cold_throughput = if cold_start.as_nanos() > 0 {
+        1_000_000_000.0 / cold_start.as_nanos() as f64
+    } else {
+        f64::INFINITY
+    };
+    eprintln!(
+        "  {}Cold-start throughput:{} {}{:.1} runs/s{}  {}(precompile + p50: {}){}",
+        DIM,
+        R,
+        YEL,
+        cold_throughput,
+        R,
+        DIM,
+        fmt_dur(cold_start),
+        R
+    );
+    if !show_output {
+        eprintln!("  {DIM}Execution measured with stdout muted (--show-output to disable){R}");
     }
     print_parse_breakdown(&parse_profile);
     print_check_breakdown(&check_result.profile);
     print_opcode_hotspots(&opcode_counts);
-    if let Some(ref profile) = vm_profile {
+    if let Some(ref mut profile) = vm_profile {
+        let move_count = opcode_counts
+            .iter()
+            .find(|(op, _)| matches!(op, varn_core::OpCode::Move))
+            .map(|(_, n)| *n)
+            .unwrap_or(0);
+        profile.move_opcodes = move_count;
         print_vm_profile(profile);
     }
     crate::bench_output::print_jit_stats(&jit_stats);
@@ -499,13 +503,9 @@ pub fn run_bench(
     Ok(())
 }
 
-fn run_bench_wrc(path: &str, runs: usize, no_run: bool, with_output: bool) -> Result<(), CliError> {
+fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliError> {
     let compiled = crate::pipeline::wrc::read_wrc(path)?;
     let compile_output = crate::pipeline::cache::compile_output_from_graph(compiled)?;
-
-    if no_run {
-        return Ok(());
-    }
 
     let file_size = std::fs::metadata(path)
         .map(|m| m.len() as usize)
@@ -522,11 +522,7 @@ fn run_bench_wrc(path: &str, runs: usize, no_run: bool, with_output: bool) -> Re
     varn_builtins::set_print_silent(true);
     varn_builtins::set_testing_silent(true);
 
-    let mut precompiled_map = FxHashMap::default();
-    for (name, proto) in compile_output.precompiled.iter() {
-        precompiled_map.insert(name.to_string(), proto.clone());
-    }
-    let precompiled_base = Rc::new(precompiled_map);
+    let precompiled_base = compile_output.precompiled.clone();
 
     let mut init_vm = Vm::new(precompiled_base.clone());
     for bp in &builtin_protos {
@@ -556,8 +552,8 @@ fn run_bench_wrc(path: &str, runs: usize, no_run: bool, with_output: bool) -> Re
 
     let exec_samples = time_n(runs, || {
         varn_builtins::reset_testing_counters();
-        varn_builtins::set_print_silent(!with_output);
-        varn_builtins::set_testing_silent(!with_output);
+        varn_builtins::set_print_silent(!show_output);
+        varn_builtins::set_testing_silent(!show_output);
         let mut machine = Vm::from_snapshot(
             snap_globals_ref.clone(),
             snap_heap_ref.clone(),
@@ -574,7 +570,7 @@ fn run_bench_wrc(path: &str, runs: usize, no_run: bool, with_output: bool) -> Re
     varn_builtins::reset_testing_counters();
     varn_builtins::set_print_silent(true);
     varn_builtins::set_testing_silent(true);
-    let (opcode_counts, vm_profile, jit_stats) = {
+    let (opcode_counts, mut vm_profile, jit_stats) = {
         let mut profile_vm = Vm::from_snapshot(
             snap_globals.clone(),
             snap_heap.clone(),
@@ -639,11 +635,17 @@ fn run_bench_wrc(path: &str, runs: usize, no_run: bool, with_output: bool) -> Re
         "  {DIM}Total pipeline time:{R} {CYAN}{}{R}",
         fmt_dur(total_pipeline_dur)
     );
-    if !with_output {
-        eprintln!("  {DIM}Execution measured with stdout muted (--withOutput to disable){R}");
+    if !show_output {
+        eprintln!("  {DIM}Execution measured with stdout muted (--show-output to disable){R}");
     }
     print_opcode_hotspots(&opcode_counts);
-    if let Some(ref profile) = vm_profile {
+    if let Some(ref mut profile) = vm_profile {
+        let move_count = opcode_counts
+            .iter()
+            .find(|(op, _)| matches!(op, varn_core::OpCode::Move))
+            .map(|(_, n)| *n)
+            .unwrap_or(0);
+        profile.move_opcodes = move_count;
         print_vm_profile(profile);
     }
     crate::bench_output::print_jit_stats(&jit_stats);

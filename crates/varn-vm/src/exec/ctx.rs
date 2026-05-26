@@ -14,6 +14,8 @@ use varn_core::OpCode;
 use varn_types::value::LazyTask;
 use varn_types::{FunctionProto, Literal, ModuleObj, NativeCtx, PoolEntry, Value};
 
+use crate::linker::Linker;
+
 use super::calls::{self, PreparedCall};
 use super::VmSuspend;
 use varn_types::generator::GenChannel;
@@ -38,8 +40,8 @@ pub struct ExecCtx {
     pub globals: GlobalStore,
     pub heap: Heap,
     pub try_handlers: Vec<TryHandler>,
-    pub modules: FxHashMap<String, VmValue>,
-    pub precompiled: Rc<FxHashMap<String, Rc<FunctionProto>>>,
+    pub modules: FxHashMap<ModuleId, VmValue>,
+    pub precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
     pub loader: Option<Rc<dyn ModuleLoader>>,
     pub trace: bool,
     pub open_upvalues: Vec<(usize, VmUpvalue)>,
@@ -51,10 +53,9 @@ pub struct ExecCtx {
     pub module_exports: FxHashMap<usize, VmValue>,
     pub opcode_counts: Option<Rc<Vec<std::sync::atomic::AtomicU64>>>,
     pub profile_counters: Option<Arc<ProfileCounters>>,
-    pub proto_ic_caches: FxHashMap<usize, Rc<RefCell<Vec<varn_types::chunk::PolyICSlot>>>>,
-    pub proto_feedback: FxHashMap<usize, Rc<RefCell<varn_types::chunk::FeedbackVector>>>,
     pub proto_constants: FxHashMap<usize, Rc<Vec<VmValue>>>,
     pub no_jit: bool,
+    pub linker: Linker,
 }
 
 impl ExecCtx {
@@ -86,16 +87,27 @@ impl ExecCtx {
             module_exports: FxHashMap::default(),
             opcode_counts: None,
             profile_counters: None,
-            proto_ic_caches: FxHashMap::default(),
-            proto_feedback: FxHashMap::default(),
             proto_constants: FxHashMap::default(),
             no_jit: false,
+            linker: Linker::new(),
         };
 
         if fresh {
             ctx.init_intrinsics();
+            ctx.preload_strings();
         }
         ctx
+    }
+
+    fn preload_strings(&mut self) {
+        const COMMON_STRINGS: &[&str] = &[
+            "PASSED", "FAILED", "error", "message", "value", "result",
+            "length", "name", "type", "ok", "err", "true", "false",
+            "toString", "valueOf", "constructor",
+        ];
+        for s in COMMON_STRINGS {
+            self.heap.alloc_str_interned(s);
+        }
     }
 
     fn init_intrinsics(&mut self) {
@@ -161,10 +173,9 @@ impl ExecCtx {
             module_exports: FxHashMap::default(),
             opcode_counts: None,
             profile_counters: None,
-            proto_ic_caches: FxHashMap::default(),
-            proto_feedback: FxHashMap::default(),
             proto_constants: FxHashMap::default(),
             no_jit: self.no_jit,
+            linker: self.linker.clone_state(),
         }
     }
 

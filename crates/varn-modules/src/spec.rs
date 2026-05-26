@@ -3,9 +3,14 @@ pub const STD_PREFIX: &str = "std:";
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ModuleKind {
+    /// Intrinsic domain: primitive methods, compiler-known symbols.
     Core,
 
+    /// Public standard library: stable API, versioned.
     Stdlib,
+
+    /// ABI boundary: low-level runtime ops, native-only.
+    Runtime,
 }
 
 pub struct ModuleSpec {

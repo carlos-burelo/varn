@@ -37,7 +37,8 @@ pub fn debug_symbols(
 
         let origin = sym.origin_module.as_deref().unwrap_or("");
 
-        let is_core = origin.starts_with("builtin:")
+        let is_core = origin.starts_with("core:")
+            || origin.starts_with("builtin:")
             || origin.contains("varn-stdlib/builtins")
             || origin.contains(r"varn-stdlib\builtins")
             || (origin.is_empty() && sym.full_range.start.line == 0);

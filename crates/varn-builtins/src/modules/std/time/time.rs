@@ -69,7 +69,7 @@ fn make_instant(ctx: &mut dyn NativeCtx, epoch_ms: i64) -> VmValue {
     if let Some(cls) = ctx.get_class("Instant") {
         let obj = ObjData::new_instance(cls);
         let nv = ctx.intern(Value::Object(ObjRef(Rc::new(RefCell::new(obj)))));
-        ctx.set_field(nv, "__epochMs", VmValue::from_int(epoch_ms));
+        ctx.set_field(nv, "epochMs", VmValue::from_int(epoch_ms));
         nv
     } else {
         VmValue::null()
@@ -159,7 +159,7 @@ pub(crate) mod dispatch {
             args: &[VmValue],
         ) -> Result<(), String> {
             let ms = args.first().copied().unwrap_or(VmValue::null());
-            ctx.set_field(this, "__epochMs", ms);
+            ctx.set_field(this, "epochMs", ms);
             Ok(())
         }
 
@@ -170,7 +170,7 @@ pub(crate) mod dispatch {
             _args: &[VmValue],
         ) -> Result<VmValue, String> {
             let ms = ctx
-                .get_field(this, "__epochMs")
+                .get_field(this, "epochMs")
                 .and_then(|v| {
                     if let varn_types::Value::Int(n) = ctx.extract(v) {
                         Some(n)
@@ -187,7 +187,7 @@ pub(crate) mod dispatch {
             let a = args.first().copied().unwrap_or(VmValue::null());
             let b = args.get(1).copied().unwrap_or(VmValue::null());
             let a_ms = ctx
-                .get_field(a, "__epochMs")
+                .get_field(a, "epochMs")
                 .and_then(|v| {
                     if let varn_types::Value::Int(n) = ctx.extract(v) {
                         Some(n)
@@ -197,7 +197,7 @@ pub(crate) mod dispatch {
                 })
                 .unwrap_or(0);
             let b_ms = ctx
-                .get_field(b, "__epochMs")
+                .get_field(b, "epochMs")
                 .and_then(|v| {
                     if let varn_types::Value::Int(n) = ctx.extract(v) {
                         Some(n)

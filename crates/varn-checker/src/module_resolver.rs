@@ -4,7 +4,7 @@ use crate::types::Type;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::fs::read_to_string;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::rc::Rc;
 use varn_core::ast::{Decl, ExportDecl, ExportDefaultDecl, Pattern, Stmt, StmtKind};
 use varn_core::ModuleId;
@@ -110,10 +110,6 @@ pub fn invalidate_module_cache() {
 
 pub type ExportMap = FxHashMap<String, Symbol>;
 
-pub fn stdlib_path_for(specifier: &str) -> Option<PathBuf> {
-    varn_modules::varn_source_for(specifier).map(PathBuf::from)
-}
-
 pub fn resolve_stdlib_module_exports(specifier: &str) -> ExportMap {
     resolve_stdlib_module_exports_ref(specifier)
         .as_ref()
@@ -128,25 +124,115 @@ pub fn resolve_stdlib_module_exports_ref(specifier: &str) -> Rc<ExportMap> {
         return cached;
     }
 
-    let abs = match stdlib_path_for(specifier) {
-        Some(p) => p.to_string_lossy().into_owned(),
-        None => return Rc::new(FxHashMap::default()),
-    };
+    // Prefer embedded source — no filesystem dependency, works in release builds.
+    if let Some(spec) = varn_builtins::spec_for(specifier) {
+        if let Some(source) = spec.embedded {
+            let mut visiting = vec![];
+            let result = resolve_from_embedded_source(specifier, source, &mut visiting);
+            export_cache_insert(key, Rc::clone(&result));
+            return result;
+        }
+    }
 
-    let mut visiting = vec![];
-    let result = resolve_module_exports_ref(&abs, &mut visiting);
+    // Fallback: CoreSourceLocator disk path (dev builds with source tree available).
+    let locator = varn_builtins::CoreSourceLocator::from_env();
+    if let Some(path) = locator.vn_source_path(specifier) {
+        let abs = path.to_string_lossy().into_owned();
+        let mut visiting = vec![];
+        let result = resolve_module_exports_ref(&abs, &mut visiting);
+        export_cache_insert(key, Rc::clone(&result));
+        return result;
+    }
 
-    export_cache_insert(key, Rc::clone(&result));
-    result
+    Rc::new(FxHashMap::default())
 }
 
 pub fn resolve_stdlib_module_bind_ref(specifier: &str) -> Option<Rc<BindResult>> {
-    let abs = stdlib_path_for(specifier)?;
-    resolve_module_bind_ref(&abs.to_string_lossy())
+    // Prefer embedded source.
+    if let Some(spec) = varn_builtins::spec_for(specifier) {
+        if let Some(source) = spec.embedded {
+            return bind_from_embedded_source(specifier, source);
+        }
+    }
+    // Fallback: disk path.
+    let locator = varn_builtins::CoreSourceLocator::from_env();
+    let path = locator.vn_source_path(specifier)?;
+    cache_get_or_insert_ref(&path.to_string_lossy())
 }
 
 pub fn resolve_stdlib_module_bind(specifier: &str) -> Option<BindResult> {
     resolve_stdlib_module_bind_ref(specifier).map(|bind| (*bind).clone())
+}
+
+fn resolve_from_embedded_source(
+    virtual_id: &str,
+    source: &str,
+    visiting: &mut Vec<String>,
+) -> Rc<ExportMap> {
+    if visiting.iter().any(|v| v == virtual_id) {
+        return Rc::new(FxHashMap::default());
+    }
+    visiting.push(virtual_id.to_owned());
+
+    let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(source, virtual_id);
+    let program = match varn_parser::parse(tokens, lexeme_buf, virtual_id) {
+        Ok(p) => {
+            drop(lex_errs);
+            Rc::new(p)
+        }
+        Err(_) => {
+            visiting.pop();
+            return Rc::new(FxHashMap::default());
+        }
+    };
+
+    PROGRAM_CACHE.with(|c| {
+        let mut guard = c.borrow_mut();
+        let cache = guard.get_or_insert_with(FxHashMap::default);
+        cache
+            .entry(virtual_id.to_owned())
+            .or_insert_with(|| Rc::clone(&program));
+    });
+
+    let bind = Rc::new(Binder::bind(&program));
+    bind_cache_insert(virtual_id.to_owned(), Rc::clone(&bind));
+
+    let base_dir = Path::new(".");
+    let mut exports = ExportMap::default();
+    collect_exports(
+        &program.body,
+        bind.as_ref(),
+        virtual_id,
+        base_dir,
+        visiting,
+        &mut exports,
+    );
+    assign_slots(&mut exports);
+
+    visiting.pop();
+    Rc::new(exports)
+}
+
+fn bind_from_embedded_source(virtual_id: &str, source: &str) -> Option<Rc<BindResult>> {
+    if let Some(cached) = bind_cache_get(virtual_id) {
+        return Some(cached);
+    }
+    let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(source, virtual_id);
+    let program = Rc::new(varn_parser::parse(tokens, lexeme_buf, virtual_id).ok()?);
+    PROGRAM_CACHE.with(|c| {
+        let mut guard = c.borrow_mut();
+        let cache = guard.get_or_insert_with(FxHashMap::default);
+        cache
+            .entry(virtual_id.to_owned())
+            .or_insert_with(|| Rc::clone(&program));
+    });
+    let mut bind = Binder::bind(&*program);
+    for e in lex_errs {
+        bind.diagnostics.emit(e);
+    }
+    let result = Rc::new(bind);
+    bind_cache_insert(virtual_id.to_owned(), Rc::clone(&result));
+    Some(result)
 }
 
 pub fn resolve_module_bind_ref(abs_path: &str) -> Option<Rc<BindResult>> {
@@ -234,6 +320,11 @@ pub fn resolve_module_exports_ref(abs_path: &str, visiting: &mut Vec<String>) ->
     if visiting.iter().any(|v| v == &canonical_abs) {
         return Rc::new(FxHashMap::default());
     }
+
+    // Insert sentinel before resolving so re-entrant calls (from bind_import's fresh visiting
+    // vectors) hit the cache and return empty rather than recursing infinitely.
+    let sentinel = Rc::new(FxHashMap::default());
+    export_cache_insert(canonical_abs.clone(), Rc::clone(&sentinel));
 
     visiting.push(canonical_abs.clone());
     let result = Rc::new(resolve_inner(&canonical_abs, visiting));

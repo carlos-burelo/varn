@@ -171,13 +171,8 @@ pub fn print_vm_profile(profile: &VmProfile) {
     eprintln!("  {BOLD}{CYN}Register VM Stats{R}{DIM}");
     eprintln!(
         "  {:<22} {:>10}",
-        "reg loads",
-        fmt_num_u64(profile.reg_loads)
-    );
-    eprintln!(
-        "  {:<22} {:>10}",
-        "reg stores",
-        fmt_num_u64(profile.reg_stores)
+        "Move opcodes",
+        fmt_num_u64(profile.move_opcodes)
     );
     eprintln!(
         "  {:<22} {:>10}",

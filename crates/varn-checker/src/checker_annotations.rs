@@ -65,11 +65,49 @@ impl<'a> TypeContext for AnnotateCtx<'a> {
     }
 }
 
+fn extract_caps_from_decorators(decorators: &[varn_core::ast::Decorator]) -> Vec<String> {
+    let mut caps = Vec::new();
+    for dec in decorators {
+        if let varn_core::ast::ExprKind::Call { callee, args, .. } = &dec.expression.kind {
+            let is_cap_fn = matches!(
+                &callee.kind,
+                varn_core::ast::ExprKind::Identifier { name } if name.as_ref() == "cap"
+            );
+            if !is_cap_fn {
+                continue;
+            }
+            if let Some(first_arg) = args.first() {
+                let value_expr = match first_arg {
+                    varn_core::ast::Arg::Positional(e) => e,
+                    varn_core::ast::Arg::Named { value, .. } => value,
+                    varn_core::ast::Arg::Spread(e) => e,
+                };
+                if let varn_core::ast::ExprKind::StrLiteral { value } = &value_expr.kind {
+                    caps.push(value.clone());
+                }
+            }
+        }
+    }
+    caps
+}
+
 pub fn collect_type_annotations(program: &Program, bind: &BindResult) -> TypeAnnotations {
     let mut ann = TypeAnnotations::new();
     let mut ctx = AnnotateCtx::new(bind);
     for stmt in &program.body {
         annotate_stmt(stmt, &mut ann, &mut ctx);
+    }
+    // Scan exported functions for @cap decorators
+    for stmt in &program.body {
+        if let StmtKind::Decl(decl_node) = &stmt.kind {
+            if let Decl::Export(ExportDecl::Decl { declaration, .. }) = &**decl_node {
+                if let Decl::Function(f) = declaration.as_ref() {
+                    for cap in extract_caps_from_decorators(&f.decorators) {
+                        ann.record_module_cap(cap);
+                    }
+                }
+            }
+        }
     }
     ann
 }
@@ -235,10 +273,16 @@ fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
             }
         }
         Decl::Export(e) => {
-            let exports = crate::module_resolver::resolve_module_exports_ref(
-                &ctx.bind.source_file,
-                &mut vec![],
-            );
+            let exports = if ctx.bind.source_file.starts_with("std:")
+                || ctx.bind.source_file.starts_with("core:")
+            {
+                crate::module_resolver::resolve_stdlib_module_exports_ref(&ctx.bind.source_file)
+            } else {
+                crate::module_resolver::resolve_module_exports_ref(
+                    &ctx.bind.source_file,
+                    &mut vec![],
+                )
+            };
             match e {
                 ExportDecl::Decl { declaration, .. } => {
                     annotate_decl(declaration, ann, ctx);

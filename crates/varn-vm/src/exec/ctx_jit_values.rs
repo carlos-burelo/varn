@@ -197,18 +197,8 @@ pub extern "C" fn jit_make_closure(
             })
             .clone();
 
-        let cache_count = proto.cache_count;
-        let mut ic_slots = Vec::with_capacity(cache_count);
-        for _ in 0..cache_count {
-            ic_slots.push(varn_types::chunk::PolyICSlot::new());
-        }
-        let ic_cache = std::rc::Rc::new(std::cell::RefCell::new(ic_slots));
-        let feedback = std::rc::Rc::new(std::cell::RefCell::new(
-            varn_types::chunk::FeedbackVector::new(cache_count),
-        ));
-
         let new_closure =
-            crate::frame::VmClosure::with_upvalues(proto, upvalues, constants, ic_cache, feedback);
+            crate::frame::VmClosure::with_upvalues(proto, upvalues, constants);
 
         ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(new_closure))
     }

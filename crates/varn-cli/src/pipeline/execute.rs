@@ -4,19 +4,25 @@ use crate::opts::DebugFlags;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_compiler::FunctionProto;
+use varn_core::ModuleId;
 use varn_types::value::Closure;
+use varn_vm::loader::CompositeLoader;
 use varn_vm::Vm;
 
 type PipelineResult<T> = Result<T, CliError>;
 
 pub fn execute(
     proto: FunctionProto,
-    precompiled: Rc<FxHashMap<String, Rc<FunctionProto>>>,
+    precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
     _source: &str,
     _path: &str,
     _debug: &DebugFlags,
 ) -> PipelineResult<()> {
-    let mut machine = Vm::new(precompiled.clone());
+    let loader = Rc::new(CompositeLoader::new(vec![
+        Box::new(crate::stdlib_loader::FileLoader),
+        Box::new(crate::stdlib_loader::StdlibLoader),
+    ]));
+    let mut machine = Vm::new(precompiled.clone()).with_loader(loader);
     machine.set_trace(_debug.trace);
 
     if _debug.trace {

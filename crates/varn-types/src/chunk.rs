@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::rc::Rc;
 use varn_core::OpCode;
 
@@ -471,6 +472,9 @@ pub struct FunctionProto {
     pub cache_count: usize,
     pub chunk: Chunk,
 
+    #[serde(default)]
+    pub required_caps: Vec<std::rc::Rc<str>>,
+
     #[serde(skip)]
     #[serde(default)]
     pub jit_entry: std::cell::Cell<Option<usize>>,
@@ -482,6 +486,37 @@ pub struct FunctionProto {
     #[serde(skip)]
     #[serde(default)]
     pub jit_failed: std::cell::Cell<bool>,
+
+    #[serde(skip, default = "proto_ic_default")]
+    pub ic_cache: Rc<RefCell<Vec<PolyICSlot>>>,
+
+    #[serde(skip, default = "proto_feedback_default")]
+    pub feedback: Rc<RefCell<FeedbackVector>>,
+}
+
+fn proto_ic_default() -> Rc<RefCell<Vec<PolyICSlot>>> {
+    Rc::new(RefCell::new(Vec::new()))
+}
+
+fn proto_feedback_default() -> Rc<RefCell<FeedbackVector>> {
+    Rc::new(RefCell::new(FeedbackVector::default()))
+}
+
+impl FunctionProto {
+    pub fn ensure_ic(&self) {
+        let n = self.cache_count;
+        if n == 0 {
+            return;
+        }
+        let mut ic = self.ic_cache.borrow_mut();
+        if ic.is_empty() {
+            ic.resize_with(n, PolyICSlot::new);
+        }
+        let mut fb = self.feedback.borrow_mut();
+        if fb.sites.is_empty() {
+            *fb = FeedbackVector::new(n);
+        }
+    }
 }
 
 impl PartialEq for FunctionProto {
@@ -497,6 +532,7 @@ impl PartialEq for FunctionProto {
             && self.upvalue_count == other.upvalue_count
             && self.cache_count == other.cache_count
             && self.chunk == other.chunk
+            && self.required_caps == other.required_caps
     }
 }
 
@@ -515,6 +551,7 @@ impl std::hash::Hash for FunctionProto {
         self.upvalue_count.hash(state);
         self.cache_count.hash(state);
         self.chunk.hash(state);
+        self.required_caps.hash(state);
     }
 }
 

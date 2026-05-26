@@ -136,15 +136,10 @@ pub fn prepare_call(
                             VmUpvalue::closed(nv)
                         })
                         .collect();
-                    let new_feedback = Rc::new(RefCell::new(
-                        varn_types::chunk::FeedbackVector::new(nc.proto.cache_count),
-                    ));
                     let closure = Rc::new(VmClosure::with_upvalues(
                         nc.proto.clone(),
                         upvalues,
                         Rc::new(constants),
-                        nc.ic_cache.clone(),
-                        new_feedback,
                     ));
                     let required = nc.proto.register_count as usize;
                     if gen_ctx.stack.len() < required {

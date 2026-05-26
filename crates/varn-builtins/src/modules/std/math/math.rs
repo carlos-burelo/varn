@@ -1,4 +1,4 @@
-use varn_op_macros::varn_module;
+use varn_op_macros::{varn_module};
 use varn_types::{NativeCtx, VmValue};
 
 #[varn_module("std:math")]
@@ -104,5 +104,55 @@ pub(crate) mod dispatch {
         use rand::Rng;
         let mut rng = rand::thread_rng();
         Ok(VmValue::from_f64(rng.gen()))
+    }
+
+    #[varn_namespace("Math")]
+    pub mod math_ns {
+        use super::*;
+
+        #[varn_fn("abs")]
+        pub fn abs_ns(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+            super::abs(_ctx, args)
+        }
+
+        #[varn_fn("sqrt")]
+        pub fn sqrt_ns(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+            super::sqrt(_ctx, args)
+        }
+
+        #[varn_fn("sin")]
+        pub fn sin_ns(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+            super::sin(_ctx, args)
+        }
+
+        #[varn_fn("cos")]
+        pub fn cos_ns(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+            super::cos(_ctx, args)
+        }
+
+        #[varn_fn("tan")]
+        pub fn tan_ns(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+            super::tan(_ctx, args)
+        }
+
+        #[varn_fn("floor")]
+        pub fn floor_ns(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+            super::floor(_ctx, args)
+        }
+
+        #[varn_fn("ceil")]
+        pub fn ceil_ns(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+            super::ceil(_ctx, args)
+        }
+
+        #[varn_fn("round")]
+        pub fn round_ns(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+            super::round(_ctx, args)
+        }
+
+        #[varn_fn("random")]
+        pub fn random_ns(_ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, String> {
+            super::random(_ctx, _args)
+        }
     }
 }

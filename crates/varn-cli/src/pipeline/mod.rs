@@ -11,7 +11,6 @@ pub mod wrc;
 
 use crate::error::CliError;
 use crate::opts::RunOpts;
-use varn_compiler::FunctionProto;
 use varn_debug::flags::DebugFlags;
 
 type PipelineResult<T> = Result<T, CliError>;
@@ -19,6 +18,20 @@ type PipelineResult<T> = Result<T, CliError>;
 pub use compile::CompileOutput;
 pub use core::core_protos_owned;
 pub use execute::execute;
+pub use lex::lex as phase_lex;
+pub use parse::parse as phase_parse;
+pub use check::check as phase_check;
+
+pub fn canonicalize_path(path: &str) -> PipelineResult<String> {
+    std::path::Path::new(path)
+        .canonicalize()
+        .map(|p| p.to_string_lossy().into_owned())
+        .map_err(|e| CliError::fatal(format!("cannot resolve '{}': {}", path, e)))
+}
+
+pub fn read_source_file(path: &str) -> PipelineResult<String> {
+    read_source(path)
+}
 
 pub fn run(opts: &RunOpts) -> PipelineResult<()> {
     if wrc::is_wrc(&opts.file_path) {
@@ -80,16 +93,6 @@ fn run_wrc(opts: &RunOpts) -> PipelineResult<()> {
         &opts.file_path,
         &debug,
     )
-}
-
-pub fn compile_file(
-    path: &str,
-    verbose: bool,
-    debug: &DebugFlags,
-) -> PipelineResult<FunctionProto> {
-    let source = read_source(path)?;
-    let compiled = compile_source(&source, path, verbose, debug, false)?;
-    Ok(compiled.entry_proto)
 }
 
 pub fn compile_source_for_build(
@@ -158,22 +161,3 @@ fn read_source(path: &str) -> PipelineResult<String> {
         .map_err(|e| CliError::fatal(format!("error[io]: cannot read '{}': {}", path, e)))
 }
 
-pub fn lex_raw(source: &str, path: &str) -> (Vec<varn_core::Token>, std::rc::Rc<[u8]>) {
-    lex::lex(source, path, false, &DebugFlags::default())
-}
-
-pub fn parse_raw(
-    tokens: Vec<varn_core::Token>,
-    lexeme_buf: std::rc::Rc<[u8]>,
-    source: &str,
-    path: &str,
-) -> PipelineResult<varn_core::ast::Program> {
-    parse::parse(
-        tokens,
-        lexeme_buf,
-        source,
-        path,
-        false,
-        &DebugFlags::default(),
-    )
-}
