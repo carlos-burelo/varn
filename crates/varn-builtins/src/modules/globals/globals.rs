@@ -26,15 +26,16 @@ pub(crate) mod dispatch {
 
     #[varn_fn]
     pub fn print(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        let s = args
-            .iter()
-            .map(|&v| ctx.str_repr(v))
-            .collect::<Vec<_>>()
-            .join(" ");
         if !SILENT.load(Ordering::Relaxed) {
             let stdout = std::io::stdout();
             let mut out = stdout.lock();
-            let _ = writeln!(out, "{s}");
+            for (i, &v) in args.iter().enumerate() {
+                if i > 0 {
+                    let _ = write!(out, " ");
+                }
+                let _ = write!(out, "{}", ctx.str_repr_borrowed(v));
+            }
+            let _ = writeln!(out);
             let _ = out.flush();
         }
         Ok(VmValue::null())
@@ -44,7 +45,7 @@ pub(crate) mod dispatch {
     pub fn debug(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let s = args
             .iter()
-            .map(|&v| ctx.str_repr(v))
+            .map(|&v| ctx.str_repr_borrowed(v))
             .collect::<Vec<_>>()
             .join(" ");
         eprintln!("[debug] {s}");

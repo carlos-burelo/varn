@@ -9,7 +9,7 @@ pub(crate) mod dispatch {
     #[varn_fn(cap = "io.write")]
     pub fn write(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         for &v in args {
-            print!("{}", ctx.str_repr(v));
+            print!("{}", ctx.str_repr_borrowed(v));
         }
         Ok(VmValue::null())
     }
@@ -17,7 +17,7 @@ pub(crate) mod dispatch {
     #[varn_fn(cap = "io.write")]
     pub fn writeln(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         for &v in args {
-            print!("{}", ctx.str_repr(v));
+            print!("{}", ctx.str_repr_borrowed(v));
         }
         println!();
         Ok(VmValue::null())
@@ -35,7 +35,7 @@ pub(crate) mod dispatch {
     pub fn read_line(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         if let Some(&prompt) = args.first() {
             if !prompt.is_null() {
-                print!("{}", ctx.str_repr(prompt));
+                print!("{}", ctx.str_repr_borrowed(prompt));
                 let _ = std::io::stdout().flush();
             }
         }

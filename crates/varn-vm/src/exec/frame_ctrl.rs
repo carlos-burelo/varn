@@ -306,6 +306,10 @@ impl NativeCtx for ExecCtx {
         self.heap.str_repr(v)
     }
 
+    fn str_repr_borrowed<'a>(&'a self, v: VmValue) -> std::borrow::Cow<'a, str> {
+        self.heap.str_repr_borrowed(v)
+    }
+
     fn str_owned(&self, v: VmValue) -> Option<String> {
         self.heap.str_owned(v)
     }
