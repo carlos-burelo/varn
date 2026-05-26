@@ -218,12 +218,23 @@ impl ExecCtx {
                         reg![first_reg] = reg![hi(w1)];
                     }
 
+                    OpCode::LoadGlobalIdx => {
+                        let gidx = code[ip] as usize;
+                        ip += 1;
+                        debug_assert!(gidx < self.globals.values.len(), "LoadGlobalIdx out of bounds: {gidx} >= {}", self.globals.values.len());
+                        reg![first_reg] = self.globals.values[gidx];
+                    }
+                    OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx => {
+                        let src = (code[ip] >> 8) as usize;
+                        let gidx = code[ip + 1] as usize;
+                        ip += 2;
+                        debug_assert!(gidx < self.globals.values.len(), "StoreGlobalIdx out of bounds: {gidx} >= {}", self.globals.values.len());
+                        let val = reg![src];
+                        self.globals.set_by_index_unchecked(gidx, val);
+                    }
                     OpCode::LoadGlobal
                     | OpCode::StoreGlobal
-                    | OpCode::DefineGlobal
-                    | OpCode::LoadGlobalIdx
-                    | OpCode::StoreGlobalIdx
-                    | OpCode::DefineGlobalIdx => {
+                    | OpCode::DefineGlobal => {
                         self.frames[frame_idx].ip = ip;
                         self.exec_variable_op(
                             op, code, &mut ip, base, frame_idx, &closure, first_reg,

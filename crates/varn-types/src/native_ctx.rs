@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::rc::Rc;
 
 use crate::native::NativeFn;
@@ -30,6 +31,9 @@ pub trait NativeCtx {
         v.is_null()
     }
     fn str_repr(&self, v: VmValue) -> String;
+    fn str_repr_borrowed<'a>(&'a self, v: VmValue) -> Cow<'a, str> {
+        Cow::Owned(self.str_repr(v))
+    }
     fn str_owned(&self, v: VmValue) -> Option<String>;
 
     fn array_len(&self, arr: VmValue) -> usize;

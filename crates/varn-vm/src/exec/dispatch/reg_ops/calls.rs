@@ -1,8 +1,25 @@
+use std::mem::MaybeUninit;
+
 use crate::error::{RuntimeError, VmResult};
 use crate::exec::ctx::ExecCtx;
 use crate::frame::VmClosure;
 use crate::value::VmValue;
 use varn_types::{Value, VmArray};
+
+#[inline(always)]
+unsafe fn copy_args_to_buf(
+    stack: &[VmValue],
+    base: usize,
+    arg_start: usize,
+    arg_count: usize,
+    buf: &mut [MaybeUninit<VmValue>; 16],
+) -> usize {
+    let n = arg_count.min(16);
+    for i in 0..n {
+        buf[i] = MaybeUninit::new(stack[base + arg_start + i]);
+    }
+    n
+}
 
 impl ExecCtx {
     pub(crate) fn exec_call_reg(
@@ -29,28 +46,15 @@ impl ExecCtx {
                         let f = *func;
                         self.record_call_native();
                         let result = if arg_count <= 16 {
-                            let mut buf = [
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                            ];
-                            for i in 0..arg_count {
-                                buf[i] = self.stack[base + arg_start + i];
-                            }
-                            (f)(self as &mut dyn varn_types::NativeCtx, &buf[..arg_count])
+                            let mut buf: [MaybeUninit<VmValue>; 16] =
+                                unsafe { MaybeUninit::uninit().assume_init() };
+                            let n = unsafe {
+                                copy_args_to_buf(&self.stack, base, arg_start, arg_count, &mut buf)
+                            };
+                            let slice = unsafe {
+                                std::slice::from_raw_parts(buf.as_ptr().cast::<VmValue>(), n)
+                            };
+                            (f)(self as &mut dyn varn_types::NativeCtx, slice)
                         } else {
                             let varn_args: Vec<VmValue> = (0..arg_count)
                                 .map(|i| self.stack[base + arg_start + i])
@@ -135,31 +139,21 @@ impl ExecCtx {
                         let f = *f;
                         self.record_call_native();
                         let result = if arg_count <= 16 {
-                            let mut buf = [
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                                VmValue::null(),
-                            ];
-                            for i in 0..arg_count {
-                                buf[i] = self.stack[base + arg_start + i];
-                            }
-                            let slice = if arg_count > 0 {
-                                &buf[1..arg_count]
+                            let mut buf: [MaybeUninit<VmValue>; 16] =
+                                unsafe { MaybeUninit::uninit().assume_init() };
+                            let n = unsafe {
+                                copy_args_to_buf(&self.stack, base, arg_start, arg_count, &mut buf)
+                            };
+                            // skip slot 0 (callee/receiver), pass actual args
+                            let slice = if n > 0 {
+                                unsafe {
+                                    std::slice::from_raw_parts(
+                                        buf.as_ptr().cast::<VmValue>().add(1),
+                                        n - 1,
+                                    )
+                                }
                             } else {
-                                &buf[..0]
+                                &[]
                             };
                             (f)(self as &mut dyn varn_types::NativeCtx, slice)
                         } else {

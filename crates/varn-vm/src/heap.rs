@@ -126,7 +126,17 @@ impl HeapInner {
 
     pub fn alloc(&mut self, obj: HeapObj) -> u32 {
         match obj {
-            HeapObj::Str(_) | HeapObj::Array(_) | HeapObj::Object(_) => {
+            HeapObj::Str(_)
+            | HeapObj::Array(_)
+            | HeapObj::Object(_)
+            | HeapObj::VmClosure(_)
+            | HeapObj::BoundMethod(_)
+            | HeapObj::EnumVariant(_)
+            | HeapObj::Range(_)
+            | HeapObj::Char(_)
+            | HeapObj::Symbol(_)
+            | HeapObj::BigInt(_)
+            | HeapObj::Decimal(_) => {
                 if let Some(ni) = self.nursery.try_alloc(obj.clone()) {
                     return ni;
                 }
@@ -558,6 +568,15 @@ impl HeapInner {
         None
     }
 
+    pub fn str_repr_borrowed<'a>(&'a self, nv: VmValue) -> std::borrow::Cow<'a, str> {
+        if nv.is_heap() {
+            if let Some(HeapObj::Str(s)) = self.get_by_idx(nv.as_heap_idx()) {
+                return std::borrow::Cow::Borrowed(s.as_ref());
+            }
+        }
+        std::borrow::Cow::Owned(self.str_repr(nv))
+    }
+
     pub fn str_repr(&self, nv: VmValue) -> String {
         if nv.is_null() {
             return "null".into();
@@ -884,6 +903,10 @@ impl NativeCtx for Heap {
 
     fn str_repr(&self, v: VmValue) -> String {
         self.deref().str_repr(v)
+    }
+
+    fn str_repr_borrowed<'a>(&'a self, v: VmValue) -> std::borrow::Cow<'a, str> {
+        self.deref().str_repr_borrowed(v)
     }
 
     fn str_owned(&self, v: VmValue) -> Option<String> {
