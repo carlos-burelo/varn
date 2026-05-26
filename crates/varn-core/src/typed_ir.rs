@@ -13,11 +13,22 @@ pub struct ExprAnnotation {
 #[derive(Clone, Debug, Default)]
 pub struct TypeAnnotations {
     inner: HashMap<u32, ExprAnnotation>,
+    module_caps: Vec<String>,
 }
 
 impl TypeAnnotations {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn record_module_cap(&mut self, cap: String) {
+        if !self.module_caps.contains(&cap) {
+            self.module_caps.push(cap);
+        }
+    }
+
+    pub fn module_caps(&self) -> &[String] {
+        &self.module_caps
     }
 
     pub fn record_numeric(&mut self, offset: u32, kind: NumericKind) {

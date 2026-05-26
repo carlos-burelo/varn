@@ -20,6 +20,8 @@ pub struct DebugFlags {
     pub consts: bool,
     pub scope: bool,
     pub graph: bool,
+    pub cap_trace: bool,
+    pub info: bool,
     pub lsp: bool,
     pub lsp_hovers: bool,
     pub lsp_semantic: bool,
@@ -115,6 +117,16 @@ impl DebugFlags {
                     "consts" => flags.consts = true,
                     "scope" => flags.scope = true,
                     "graph" => flags.graph = true,
+                    "cap-trace" | "cap" | "caps" => flags.cap_trace = true,
+                    "check" => {
+                        flags.symbols = true;
+                        flags.symbols_all = true;
+                        flags.binds = true;
+                        flags.types = true;
+                        flags.types_all = true;
+                        flags.expr = true;
+                    }
+                    "info" => flags.info = true,
                     "lsp" => flags.lsp = true,
                     "all" => {
                         flags.tokens = true;
@@ -127,13 +139,16 @@ impl DebugFlags {
                         flags.types_all = true;
                         flags.expr = true;
                         flags.scope = true;
+                        flags.info = true;
+                        flags.graph = true;
+                        flags.cap_trace = true;
                         flags.lsp = true;
                         flags.lsp_all();
                     }
                     unknown => {
                         return Err(CliError::usage(format!(
                             "unknown debug phase: '{unknown}'\n\
-                             Valid phases: tokens, ast, bytecode, symbols, binds, modules, types, expr, errors, trace, calls, consts, scope, graph, lsp\n\
+                             Valid phases: tokens, ast, check, bytecode, graph, caps, info, all\n\
                              LSP sub-phases: lsp:hovers, lsp:semantic, lsp:types, lsp:completions, lsp:symbols, lsp:colorize, lsp:all\n\
                              Line range filter: types:N  types:all  expr:N"
                         )));
@@ -159,6 +174,8 @@ impl DebugFlags {
             || self.consts
             || self.scope
             || self.graph
+            || self.cap_trace
+            || self.info
             || self.lsp
     }
 

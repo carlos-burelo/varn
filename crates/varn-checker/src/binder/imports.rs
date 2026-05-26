@@ -7,6 +7,24 @@ use crate::symbol::{Symbol, SymbolKind};
 
 impl super::Binder {
     pub(super) fn bind_import(&mut self, i: &ImportDecl) {
+        // core:* are intrinsic domains — not user-importable.
+        // Allow within stdlib context (source_file starts with "core:" or "std:").
+        let in_stdlib_context = self.source_file.starts_with("core:")
+            || self.source_file.starts_with("std:");
+        if i.source.starts_with("core:") && !in_stdlib_context {
+            self.diagnostics.push(
+                Diagnostic::error(
+                    ErrorCode::InvalidImportPath,
+                    format!(
+                        "'{}' is an intrinsic module and cannot be imported; use 'std:' equivalents",
+                        i.source
+                    ),
+                )
+                .with_range(i.range),
+            );
+            return;
+        }
+
         let is_relative = i.source.starts_with('.') || i.source.starts_with('/');
         let is_package = varn_modules::is_pkg_specifier(&i.source);
 
@@ -90,8 +108,11 @@ impl super::Binder {
             let module_path = resolved_target
                 .clone()
                 .or_else(|| {
-                    module_resolver::stdlib_path_for(&i.source)
-                        .map(|p| p.to_string_lossy().into_owned())
+                    if module_resolver::is_known_module(&i.source) {
+                        Some(i.source.to_string())
+                    } else {
+                        None
+                    }
                 })
                 .map(Rc::from);
 

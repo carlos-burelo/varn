@@ -76,7 +76,7 @@ impl Nursery {
 
     #[inline(always)]
     pub fn is_full(&self) -> bool {
-        self.objects.len() >= NURSERY_CAPACITY
+        self.objects.len() >= NURSERY_CAPACITY * 3 / 4
     }
 
     #[inline(always)]

@@ -728,32 +728,10 @@ impl ExecCtx {
                                 ))
                             })
                             .clone();
-                        let ic_cache = self
-                            .proto_ic_caches
-                            .entry(proto_ptr)
-                            .or_insert_with(|| {
-                                std::rc::Rc::new(std::cell::RefCell::new(
-                                    (0..proto.cache_count)
-                                        .map(|_| varn_types::chunk::PolyICSlot::new())
-                                        .collect::<Vec<_>>(),
-                                ))
-                            })
-                            .clone();
-                        let new_feedback = self
-                            .proto_feedback
-                            .entry(proto_ptr)
-                            .or_insert_with(|| {
-                                std::rc::Rc::new(std::cell::RefCell::new(
-                                    varn_types::chunk::FeedbackVector::new(proto.cache_count),
-                                ))
-                            })
-                            .clone();
                         let vm_closure = std::rc::Rc::new(crate::frame::VmClosure::with_upvalues(
                             proto,
                             upvalues,
                             constants,
-                            ic_cache,
-                            new_feedback,
                         ));
                         reg![dest] = self.heap.alloc_vm_closure(vm_closure);
                     }
@@ -1236,7 +1214,8 @@ impl ExecCtx {
             let source_file = frame.closure.proto.chunk.source_file.to_string();
             let module_exports = self.module_exports.remove(&returning_frame_idx);
             let cached = module_exports.unwrap_or(final_val);
-            self.modules.insert(source_file, cached);
+            let module_id = varn_core::ModuleId::from_canonical_str(&source_file);
+            self.modules.insert(module_id, cached);
         }
 
         if let Some(return_reg) = frame.return_reg {

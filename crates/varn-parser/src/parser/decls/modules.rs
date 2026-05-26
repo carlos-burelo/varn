@@ -209,7 +209,17 @@ pub fn parse_export_decl(
             None => return Err("Expected declaration after `export declare`".to_owned()),
         }
     } else {
-        super::super::stmts::parse_stmt_or_decl_inner(s)?
+        match super::super::stmt_decls::try_parse_decl_stmt_mode(
+            s,
+            s.kind(),
+            s.peek_kind(1),
+            decorators,
+            false,
+        ) {
+            Some(Ok(stmt)) => stmt,
+            Some(Err(e)) => return Err(e),
+            None => super::super::stmts::parse_stmt_or_decl_inner(s)?,
+        }
     };
     if let StmtKind::Decl(d) = decl.kind {
         return Ok(ExportDecl::Decl {

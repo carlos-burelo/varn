@@ -75,21 +75,10 @@ impl ExecCtx {
                 VmUpvalue::closed(fork.heap.intern(val))
             })
             .collect();
-        let cache_count = task.closure.proto.cache_count;
-        let new_ic_cache = Rc::new(RefCell::new(
-            (0..cache_count)
-                .map(|_| varn_types::chunk::PolyICSlot::new())
-                .collect(),
-        ));
-        let new_feedback = Rc::new(RefCell::new(varn_types::chunk::FeedbackVector::new(
-            cache_count,
-        )));
         let closure = Rc::new(VmClosure::with_upvalues(
             Rc::clone(&task.closure.proto),
             upvalues,
             Rc::new(constants),
-            new_ic_cache,
-            new_feedback,
         ));
         let stack_values: Vec<VmValue> = task
             .args

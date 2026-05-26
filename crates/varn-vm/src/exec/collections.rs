@@ -151,8 +151,7 @@ pub fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Heap) -> V
         }
         Some(HeapObj::Object(o)) => {
             let o = o.clone();
-            o.borrow_mut()
-                .set_field(Rc::from(key_s.as_str()), heap.extract(val));
+            o.borrow_mut().set_field_nv(Rc::from(key_s.as_str()), val);
             heap.write_barrier(obj.as_heap_idx(), val);
             Ok(())
         }

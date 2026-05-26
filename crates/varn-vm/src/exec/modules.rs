@@ -1,41 +1,14 @@
 use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
-use std::path::Path;
 use std::rc::Rc;
-use varn_core::{ImportSpecifier, ModuleId};
+use varn_core::ModuleId;
 use varn_types::Value;
 
 pub fn resolve_specifier_to_id(specifier: &str, from: &ModuleId) -> VmResult<ModuleId> {
-    match ImportSpecifier::parse(specifier) {
-        ImportSpecifier::Stdlib(s) => Ok(ModuleId::Stdlib(s)),
-        ImportSpecifier::Package(s) => {
-            let base_str = match from {
-                ModuleId::Local(s) => s.as_ref(),
-                _ => ".",
-            };
-            let base_dir = Path::new(base_str).parent().unwrap_or(Path::new("."));
-            varn_modules::resolve_pkg_specifier(base_dir, s.as_ref())
-                .map(|p| ModuleId::local_str(&p))
-                .ok_or_else(|| RuntimeError::new(format!("cannot resolve '{}'", specifier)))
-        }
-        ImportSpecifier::Relative(rel) => {
-            let base_str = match from {
-                ModuleId::Local(s) => s.as_ref(),
-                _ => "",
-            };
-            let base = Path::new(base_str).parent().unwrap_or(Path::new("."));
-            let mut p = base.join(&rel);
-            if p.extension().is_none() {
-                p.set_extension("vn");
-            }
-            p.canonicalize()
-                .map(|c| {
-                    ModuleId::local_str(&normalize_path_string(c.to_string_lossy().into_owned()))
-                })
-                .map_err(|e| RuntimeError::new(format!("cannot resolve '{}': {}", specifier, e)))
-        }
-    }
+    varn_modules::resolver::ModuleResolver::new()
+        .resolve(specifier, from)
+        .map_err(RuntimeError::new)
 }
 
 pub fn resolve_specifier_from_path(specifier: &str, source_file: &str) -> VmResult<ModuleId> {

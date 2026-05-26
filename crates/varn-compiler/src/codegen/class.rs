@@ -711,7 +711,12 @@ pub fn compile_namespace_decl<'a>(c: &mut Compiler<'a>, ns: &NamespaceDecl) {
 
     for stmt in &ns.body {
         super::stmt::compile_decl(c, stmt);
-        match stmt {
+        // unwrap export wrapper transparently
+        let inner = match stmt {
+            Decl::Export(ExportDecl::Decl { declaration, .. }) => declaration.as_ref(),
+            other => other,
+        };
+        match inner {
             Decl::Variable(v) => {
                 for d in &v.declarators {
                     if let Pattern::Identifier { name, .. } = &d.id {

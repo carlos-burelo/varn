@@ -20,12 +20,7 @@ pub(super) fn try_stdlib_generic_alias(
     let bind_rc = STD_TYPES.with(|c| {
         let mut guard = c.borrow_mut();
         if guard.is_none() {
-            let path = crate::module_resolver::stdlib_path_for("std:types")?;
-            let source = std::fs::read_to_string(&path).ok()?;
-            let abs = path.to_string_lossy().into_owned();
-            let (tokens, lexeme_buf, _) = varn_lexer::scan(&source, &abs);
-            let program = varn_parser::parse(tokens, lexeme_buf, &abs).ok()?;
-            *guard = Some(Rc::new(crate::binder::Binder::bind(&program)));
+            *guard = crate::module_resolver::resolve_stdlib_module_bind_ref("std:types");
         }
         guard.as_ref().map(Rc::clone)
     })?;

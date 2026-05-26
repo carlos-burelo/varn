@@ -4,6 +4,73 @@ pub use super::{
     resolve_pkg_specifier_detailed, resolve_specifier_path,
 };
 
+use std::path::{Component, Path, PathBuf};
+use varn_core::ModuleId;
+
+/// Pure-logic module resolver. No source file I/O — resolves specifiers to `ModuleId` using
+/// path math and manifest reads only.
+pub struct ModuleResolver;
+
+impl Default for ModuleResolver {
+    fn default() -> Self { Self }
+}
+
+impl ModuleResolver {
+    pub fn new() -> Self { Self }
+
+    pub fn resolve(&self, spec: &str, referrer: &ModuleId) -> Result<ModuleId, String> {
+        use varn_core::ImportSpecifier;
+        match ImportSpecifier::parse(spec) {
+            ImportSpecifier::Stdlib(s) => Ok(ModuleId::Std(s)),
+            ImportSpecifier::Core(s) => {
+                let in_intrinsic_context = matches!(referrer, ModuleId::Core(_) | ModuleId::Std(_));
+                if !in_intrinsic_context {
+                    return Err(format!(
+                        "'{}' is an intrinsic module and cannot be imported; use 'std:' equivalents",
+                        spec
+                    ));
+                }
+                Ok(ModuleId::Core(s))
+            }
+            ImportSpecifier::Runtime(s) => Ok(ModuleId::Runtime(s)),
+            ImportSpecifier::Relative(rel) => {
+                let base = match referrer {
+                    ModuleId::Local(s) => PathBuf::from(s.as_ref()),
+                    _ => PathBuf::from("."),
+                };
+                let base_dir = base.parent().unwrap_or(Path::new("."));
+                let joined = base_dir.join(&rel);
+                let normalized = normalize_components(&joined);
+                let path_str = normalize_path_string(normalized.to_string_lossy().into_owned());
+                Ok(ModuleId::local_str(&path_str))
+            }
+            ImportSpecifier::Package(s) => {
+                let base = match referrer {
+                    ModuleId::Local(s) => PathBuf::from(s.as_ref()),
+                    _ => PathBuf::from("."),
+                };
+                let base_dir = base.parent().unwrap_or(Path::new("."));
+                super::resolve_pkg_specifier(base_dir, s.as_ref())
+                    .map(|p| ModuleId::local_str(&p))
+                    .ok_or_else(|| format!("cannot resolve package '{spec}'"))
+            }
+        }
+    }
+}
+
+/// Resolve `..` and `.` components without touching the filesystem.
+fn normalize_components(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for c in path.components() {
+        match c {
+            Component::ParentDir => { out.pop(); }
+            Component::CurDir => {}
+            other => out.push(other),
+        }
+    }
+    out
+}
+
 pub fn normalize_display_path(path: &str) -> String {
     let without_prefix = path
         .strip_prefix(r"\\?\")
@@ -47,7 +114,9 @@ pub fn relative_import_path(from_file: &str, to_file: &str) -> String {
 }
 
 pub fn is_known_module(specifier: &str) -> bool {
-    super::CORE_MODULES.contains(&specifier) || super::STD_MODULES.contains(&specifier)
+    super::CORE_MODULES.contains(&specifier)
+        || super::STD_MODULES.contains(&specifier)
+        || super::RUNTIME_MODULES.contains(&specifier)
 }
 
 pub const VARN_SCHEME: &str = "varn://";

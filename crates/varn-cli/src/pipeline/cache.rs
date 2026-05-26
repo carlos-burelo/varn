@@ -48,6 +48,23 @@ pub fn load_cached_graph(
         }
     }
 
+    // Validate all file-based dependencies.
+    for (path, &cached_hash) in &graph.source_hashes {
+        if path == &graph.entry_path {
+            continue;
+        }
+        // Only check paths that look like filesystem paths (not std:/core:/runtime:).
+        if path.contains(':') && !path.contains('/') && !path.contains('\\') {
+            continue;
+        }
+        if let Ok(src) = std::fs::read(path) {
+            let current_hash = crate::pipeline::hash::fnv1a64(&src);
+            if cached_hash != current_hash {
+                return Ok(None);
+            }
+        }
+    }
+
     Ok(Some(graph))
 }
 
@@ -95,12 +112,12 @@ pub fn compile_output_from_graph(graph: ModuleGraphArtifact) -> PipelineResult<C
         ))
     })?;
 
-    let mut precompiled: FxHashMap<String, Rc<varn_compiler::FunctionProto>> = FxHashMap::default();
+    let mut precompiled: FxHashMap<varn_core::ModuleId, Rc<varn_compiler::FunctionProto>> = FxHashMap::default();
     for (path, proto) in &graph.modules {
         if *path == entry_path {
             continue;
         }
-        precompiled.insert(path.to_owned(), Rc::new(proto.clone()));
+        precompiled.insert(varn_core::ModuleId::from_canonical_str(path), Rc::new(proto.clone()));
     }
 
     Ok(CompileOutput {

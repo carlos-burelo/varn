@@ -21,7 +21,6 @@ pub const ENV_DIR_NAME: &str = ".vn";
 pub const MODULES_DIR_NAME: &str = "packages";
 pub const PACKAGE_MANIFEST_FILE: &str = "varn.json";
 pub const VARN_FILE_EXTENSION: &str = "vn";
-pub const VARN_INDEX_FILE: &str = "index.vn";
 pub const DEFAULT_PACKAGE_VERSION: &str = "0.0.0";
 pub const RELATIVE_EXPORT_PREFIX: &str = "./";
 
@@ -52,6 +51,26 @@ pub const STD_SYS: &str = "std:sys";
 pub const STD_TEST: &str = "std:test";
 pub const STD_TIME: &str = "std:time";
 pub const STD_TYPES: &str = "std:types";
+
+/// runtime:* ABI boundary — unstable, runtime-versioned, not for direct user import.
+pub const RUNTIME_PREFIX: &str = "runtime:";
+pub const RUNTIME_FS: &str = "runtime:fs";
+pub const RUNTIME_IO: &str = "runtime:io";
+pub const RUNTIME_TIME: &str = "runtime:time";
+pub const RUNTIME_NET: &str = "runtime:net";
+pub const RUNTIME_PROCESS: &str = "runtime:process";
+pub const RUNTIME_CRYPTO: &str = "runtime:crypto";
+pub const RUNTIME_TASK: &str = "runtime:task";
+
+pub const RUNTIME_MODULES: &[&str] = &[
+    RUNTIME_FS,
+    RUNTIME_IO,
+    RUNTIME_TIME,
+    RUNTIME_NET,
+    RUNTIME_PROCESS,
+    RUNTIME_CRYPTO,
+    RUNTIME_TASK,
+];
 
 pub const CORE_MODULES: &[&str] = &[
     CORE_GLOBAL,
@@ -270,21 +289,7 @@ fn load_package_manifest(package_root: &Path) -> Result<PackageManifest, String>
 }
 
 pub(crate) fn resolve_path_candidates(target: &Path) -> Option<String> {
-    let mut candidates = Vec::new();
-    if target.extension().is_some() {
-        candidates.push(target.to_path_buf());
-    } else {
-        candidates.push(target.with_extension(VARN_FILE_EXTENSION));
-        candidates.push(target.join(VARN_INDEX_FILE));
-        candidates.push(target.to_path_buf());
-    }
-
-    for candidate in candidates {
-        if let Some(resolved) = canonical_or_string(&candidate) {
-            return Some(resolved);
-        }
-    }
-    None
+    canonical_or_string(target)
 }
 
 fn canonical_or_string(path: &Path) -> Option<String> {
@@ -303,9 +308,11 @@ pub fn normalize_path_string(path: String) -> String {
     #[cfg(windows)]
     {
         if let Some(rest) = path.strip_prefix("\\\\?\\") {
-            return rest.to_owned();
+            return rest.replace('\\', "/");
         }
+        return path.replace('\\', "/");
     }
+    #[cfg(not(windows))]
     path
 }
 
@@ -374,140 +381,3 @@ pub fn resolve_specifier_path(base_dir: &Path, specifier: &str) -> Option<String
     resolve_path_candidates(&target)
 }
 
-pub fn varn_source_for(specifier: &str) -> Option<&'static str> {
-    Some(match specifier {
-        CORE_GLOBAL => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/globals/globals.vn"
-        ),
-        CORE_BIGINT => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/primitives/bigint/bigint.vn"
-        ),
-        CORE_SYMBOL => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/primitives/symbol/symbol.vn"
-        ),
-        CORE_COLLECTIONS => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/collections/collections.vn"
-        ),
-        CORE_ASYNC => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/task/task.vn"
-        ),
-        CORE_ITERATORS => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/task/task.vn"
-        ),
-        CORE_REFLECT => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/reflect/reflect.vn"
-        ),
-        CORE_STR => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/primitives/str/str.vn"
-        ),
-        CORE_INT => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/primitives/int/int.vn"
-        ),
-        CORE_FLOAT => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/primitives/float/float.vn"
-        ),
-        CORE_BOOL => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/primitives/boolean/boolean.vn"
-        ),
-        CORE_CHAR => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/primitives/char/char.vn"
-        ),
-        CORE_DECIMAL => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/primitives/decimal/decimal.vn"
-        ),
-        CORE_RANGE => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/primitives/range/range.vn"
-        ),
-        CORE_ARRAY => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/primitives/array/array.vn"
-        ),
-        STD_TASK => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/task/task.vn"
-        ),
-        STD_COLLECTIONS => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/collections/collections.vn"
-        ),
-        STD_CRYPTO => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/crypto/crypto.vn"
-        ),
-        STD_DISPOSE => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/dispose/dispose.vn"
-        ),
-        STD_FS => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/fs/fs.vn"
-        ),
-        STD_HTTP => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/http/http.vn"
-        ),
-        STD_IO => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/io/io.vn"
-        ),
-        STD_JSON => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/json/json.vn"
-        ),
-        STD_MATH => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/math/math.vn"
-        ),
-        STD_NET => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/net/net.vn"
-        ),
-        STD_OPTION => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/option/option.vn"
-        ),
-        STD_PATH => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/path/path.vn"
-        ),
-        STD_REFLECT => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/reflect/reflect.vn"
-        ),
-        STD_RESULT => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/result/result.vn"
-        ),
-        STD_SYS => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/sys/sys.vn"
-        ),
-        STD_TEST => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/testing/testing.vn"
-        ),
-        STD_TIME => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/time/time.vn"
-        ),
-        STD_TYPES => concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../crates/varn-builtins/src/modules/std/types/types.vn"
-        ),
-        _ => return None,
-    })
-}

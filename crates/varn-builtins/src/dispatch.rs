@@ -83,7 +83,7 @@ pub fn describe_op(id: u64) -> Option<OpMeta> {
     })
 }
 
-pub fn dispatch_host_op(
+pub fn dispatch_runtime_op(
     id: u64,
     ctx: &mut dyn NativeCtx,
     args: &[VmValue],
@@ -93,13 +93,13 @@ pub fn dispatch_host_op(
         if let Some(capability) = entry.capability {
             if !ctx.has_capability(capability) {
                 return Err(format!(
-                    "E_HOST_PERMISSION_DENIED:id={id}:capability={capability}"
+                    "E_RUNTIME_PERMISSION_DENIED:id={id}:capability={capability}"
                 ));
             }
         }
-        return (entry.func)(ctx, args).map_err(|err| format!("E_HOST_FAILURE:id={id}:{err}"));
+        return (entry.func)(ctx, args).map_err(|err| format!("E_RUNTIME_FAILURE:id={id}:{err}"));
     }
-    Err(format!("E_HOST_UNKNOWN_WIRE:id={id}"))
+    Err(format!("E_RUNTIME_UNKNOWN_WIRE:id={id}"))
 }
 
 fn resolve_ns<'a>(
@@ -150,7 +150,6 @@ pub(crate) fn build_module(id: &str, ctx: &mut dyn NativeCtx) -> Option<VmValue>
             continue;
         }
         has_entries = true;
-
         let symbol = entry.symbol_name();
         let ns_path = entry.namespace_path();
 

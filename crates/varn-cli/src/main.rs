@@ -2,7 +2,6 @@ mod bench_impl;
 mod bench_output;
 mod cli;
 mod commands;
-mod disasm_impl;
 mod doctor_impl;
 mod error;
 mod fmt;
@@ -37,18 +36,13 @@ fn dispatch(cmd: Commands) -> Result<(), error::CliError> {
         Commands::Eval(args) => commands::eval::execute(args),
         Commands::Repl(args) => commands::repl::execute(args),
         Commands::Bench(args) => commands::bench::execute(args),
-        Commands::Disasm(args) => commands::disasm::execute(args),
-        Commands::Inspect(args) => commands::inspect::execute(args),
-        Commands::Info(args) => commands::info::execute(args),
+        Commands::Debug(args) => commands::debug::execute(args),
+        Commands::Build(args) => commands::build::execute(args),
+        Commands::Pkg(sub) => commands::pkg::execute(sub),
         Commands::Doctor => commands::doctor::execute(),
         Commands::Lsp => commands::lsp::execute(),
         Commands::Init(args) => commands::init::execute(args),
         Commands::Completions(args) => commands::completions::execute(args),
-        Commands::Build(args) => commands::build::execute(args),
-        Commands::Add(args) => commands::add::execute(args),
-        Commands::Remove(args) => commands::remove::execute(args),
-        Commands::Install => commands::install::execute(),
-        Commands::Update => commands::update::execute(),
     }
 }
 
@@ -59,18 +53,13 @@ fn implicit_run(mut args: Vec<String>) -> Vec<String> {
         "eval",
         "repl",
         "bench",
-        "disasm",
-        "inspect",
-        "info",
+        "debug",
+        "build",
+        "pkg",
+        "init",
         "doctor",
         "lsp",
-        "init",
         "completions",
-        "build",
-        "add",
-        "remove",
-        "install",
-        "update",
         "help",
         "--help",
         "-h",

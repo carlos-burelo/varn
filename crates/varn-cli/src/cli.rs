@@ -2,7 +2,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
 #[command(
-    name = "Varn",
+    name = "vn",
     version,
     about = "Lenguaje compilado con tipado estático",
     arg_required_else_help = true,
@@ -15,170 +15,169 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
+    /// Ejecutar un archivo Varn
     Run(RunArgs),
-
+    /// Verificar tipos sin ejecutar
     Check(CheckArgs),
-
+    /// Evaluar código directamente desde la línea de comandos
     Eval(EvalArgs),
-
+    /// Iniciar REPL interactivo
     Repl(ReplArgs),
-
+    /// Ejecutar benchmarks de rendimiento
     Bench(BenchArgs),
-
-    Disasm(DisasmArgs),
-
-    Inspect(InspectArgs),
-
-    Info(InfoArgs),
-
-    Doctor,
-
-    Lsp,
-
-    Init(InitArgs),
-
-    Completions(CompletionsArgs),
-
+    /// Inspeccionar AST, tipos, bytecode y otras estructuras internas
+    Debug(DebugArgs),
+    /// Compilar proyecto
     Build(BuildArgs),
-
-    Add(AddArgs),
-
-    Remove(RemoveArgs),
-
-    Install,
-
-    Update,
+    /// Gestión de paquetes
+    #[command(subcommand)]
+    Pkg(PkgCommands),
+    /// Inicializar nuevo proyecto Varn
+    Init(InitArgs),
+    /// Diagnóstico del sistema y configuración
+    Doctor,
+    /// Iniciar servidor LSP (comunica por stdio)
+    Lsp,
+    /// Generar scripts de autocompletado para el shell
+    Completions(CompletionsArgs),
 }
 
 #[derive(Args)]
 pub struct RunArgs {
+    /// Archivo Varn a ejecutar
     pub file: String,
 
+    /// Argumentos para el script
     #[arg(last = true, value_name = "ARGS")]
     pub script_args: Vec<String>,
 
+    /// Modo verbose
     #[arg(short, long)]
     pub verbose: bool,
 
-    #[arg(long = "no-run", alias = "noRun")]
-    pub no_run: bool,
-
-    #[arg(long, value_name = "PHASES")]
-    pub debug: Option<String>,
-
+    /// Tracing de ejecución
     #[arg(long)]
     pub trace: bool,
 
-    #[arg(long, help = "Warn on implicit Dynamic types")]
+    /// Advertir sobre tipos Dynamic implícitos
+    #[arg(long)]
     pub strict: bool,
 }
 
 #[derive(Args)]
-pub struct InspectArgs {
+pub struct DebugArgs {
+    /// Archivo Varn a inspeccionar
     pub file: Option<String>,
 
-    #[arg(short, long)]
+    /// Evaluar código directamente en lugar de archivo
+    #[arg(short, long, value_name = "CODE")]
     pub eval: Option<String>,
 
-    #[arg(short, long, value_name = "PHASES", default_value = "all")]
-    pub phases: String,
+    /// Fase a mostrar: tokens, ast, check, bytecode, symbols, binds, types[:N],
+    /// expr, modules, graph, caps, scope, errors, trace, info, lsp[:sub], all
+    #[arg(short, long, value_name = "PHASE", default_value = "all")]
+    pub phase: String,
 }
 
 #[derive(Args)]
 pub struct CheckArgs {
+    /// Archivo Varn a verificar
     pub file: String,
 
+    /// Modo verbose
     #[arg(short, long)]
     pub verbose: bool,
 
-    #[arg(long, value_name = "PHASES")]
-    pub debug: Option<String>,
-
-    #[arg(long, help = "Warn on implicit Dynamic types")]
+    /// Advertir sobre tipos Dynamic implícitos
+    #[arg(long)]
     pub strict: bool,
 }
 
 #[derive(Args)]
 pub struct EvalArgs {
+    /// Código Varn a evaluar
     pub code: String,
 
+    /// Modo verbose
     #[arg(short, long)]
     pub verbose: bool,
-
-    #[arg(long, value_name = "PHASES")]
-    pub debug: Option<String>,
 }
 
 #[derive(Args)]
 pub struct ReplArgs {
+    /// Mostrar bytecode generado en cada evaluación
     #[arg(long)]
     pub debug_bytecode: bool,
 }
 
 #[derive(Args)]
 pub struct BenchArgs {
+    /// Archivo Varn a medir
     pub file: String,
+
+    /// Número de runs (default: 10)
     #[arg(long, default_value = "10", value_name = "N")]
     pub runs: usize,
-    #[arg(long)]
-    pub no_run: bool,
-    #[arg(long)]
-    pub with_output: bool,
-    #[arg(long, value_name = "PHASES")]
-    pub debug: Option<String>,
-}
 
-#[derive(Args)]
-pub struct DisasmArgs {
-    pub file: String,
-    #[arg(long, value_name = "PHASES")]
-    pub debug: Option<String>,
-}
-
-#[derive(Args)]
-pub struct InfoArgs {
-    pub file: String,
+    /// Mostrar output del programa (normalmente silenciado)
     #[arg(long)]
-    pub hashes: bool,
+    pub show_output: bool,
 }
 
 #[derive(Args)]
 pub struct InitArgs {
+    /// Directorio del proyecto (default: directorio actual)
     pub dir: Option<String>,
 
+    /// Nombre del proyecto
     #[arg(long)]
     pub name: Option<String>,
 }
 
 #[derive(Args)]
 pub struct CompletionsArgs {
+    /// Shell para el que generar completions
     pub shell: Shell,
 }
 
 #[derive(Args)]
 pub struct BuildArgs {
+    /// Archivo Varn a compilar
     pub file: String,
 
+    /// Ruta de salida del binario compilado
     #[arg(short, long, value_name = "PATH")]
     pub output: Option<String>,
 
+    /// Modo verbose
     #[arg(short, long)]
     pub verbose: bool,
-
-    #[arg(long, value_name = "PHASES")]
-    pub debug: Option<String>,
 }
 
 #[derive(Args)]
 pub struct AddArgs {
+    /// Alias del paquete
     pub alias: String,
-
+    /// Origen del paquete (URL o ruta)
     pub origin: String,
 }
 
 #[derive(Args)]
 pub struct RemoveArgs {
+    /// Alias del paquete a eliminar
     pub alias: String,
+}
+
+#[derive(Subcommand)]
+pub enum PkgCommands {
+    /// Agregar dependencia al proyecto
+    Add(AddArgs),
+    /// Eliminar dependencia del proyecto
+    Remove(RemoveArgs),
+    /// Instalar dependencias del proyecto
+    Install,
+    /// Actualizar dependencias del proyecto
+    Update,
 }
 
 #[derive(ValueEnum, Clone, Debug)]

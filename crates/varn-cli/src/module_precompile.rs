@@ -13,6 +13,8 @@ pub struct ModuleGraphBuild {
     pub modules: HashMap<String, FunctionProto>,
     pub source_hashes: HashMap<String, u64>,
     pub package_nodes: Vec<varn_types::PackageNode>,
+    /// Dependency edges: module_path → [direct_dep_paths].
+    pub deps: HashMap<String, Vec<String>>,
 }
 
 pub fn build_module_graph(
@@ -175,10 +177,14 @@ pub fn build_module_graph(
         };
 
         let check = varn_checker::Checker::check(program);
-        let exports = varn_checker::module_resolver::resolve_module_exports_ref(
-            &program.filename,
-            &mut vec![],
-        );
+        let exports = if program.filename.starts_with("std:") || program.filename.starts_with("core:") {
+            varn_checker::module_resolver::resolve_stdlib_module_exports_ref(&program.filename)
+        } else {
+            varn_checker::module_resolver::resolve_module_exports_ref(
+                &program.filename,
+                &mut vec![],
+            )
+        };
         let mut export_names: Vec<std::rc::Rc<str>> = exports
             .keys()
             .map(|k| std::rc::Rc::from(k.as_str()))
@@ -202,13 +208,14 @@ pub fn build_module_graph(
         modules,
         source_hashes,
         package_nodes: package_nodes.into_values().collect(),
+        deps: graph,
     })
 }
 
 fn read_module_source(module_path: &str) -> Result<String, String> {
     if matches!(
         varn_core::ImportSpecifier::parse(module_path),
-        varn_core::ImportSpecifier::Stdlib(_)
+        varn_core::ImportSpecifier::Stdlib(_) | varn_core::ImportSpecifier::Core(_)
     ) {
         let loader = varn_builtins::CoreSourceLocator::from_env();
         return loader
@@ -232,7 +239,7 @@ pub fn resolve_import_specifier(
     use varn_core::ImportSpecifier;
 
     match ImportSpecifier::parse(specifier) {
-        ImportSpecifier::Stdlib(_) => {
+        ImportSpecifier::Stdlib(_) | ImportSpecifier::Core(_) => {
             let loader = varn_builtins::CoreSourceLocator::from_env();
             if loader.embedded_source(specifier).is_some() {
                 return Ok(Some(specifier.to_owned()));
@@ -242,27 +249,19 @@ pub fn resolve_import_specifier(
             }
             Ok(None)
         }
+        // runtime:* modules are native-only; no .vn source to precompile.
+        ImportSpecifier::Runtime(_) => Ok(Some(specifier.to_owned())),
         ImportSpecifier::Relative(rel) => {
             let joined = module_dir.join(&rel);
-            let candidates = if joined.extension().is_some() {
-                vec![joined]
-            } else {
-                vec![
-                    joined.with_extension(varn_modules::VARN_FILE_EXTENSION),
-                    joined,
-                ]
-            };
-            for candidate in candidates {
-                if candidate.exists() {
-                    if let Ok(canonical) = std::fs::canonicalize(&candidate) {
-                        return Ok(Some(varn_modules::normalize_path_string(
-                            canonical.to_string_lossy().into_owned(),
-                        )));
-                    }
+            if joined.exists() {
+                if let Ok(canonical) = std::fs::canonicalize(&joined) {
                     return Ok(Some(varn_modules::normalize_path_string(
-                        candidate.to_string_lossy().into_owned(),
+                        canonical.to_string_lossy().into_owned(),
                     )));
                 }
+                return Ok(Some(varn_modules::normalize_path_string(
+                    joined.to_string_lossy().into_owned(),
+                )));
             }
             Ok(None)
         }

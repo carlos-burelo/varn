@@ -1,11 +1,11 @@
-use crate::host_ops::HostOpFn;
+use crate::runtime_ops::RuntimeOpFn;
 
 #[derive(Clone, Copy)]
 pub struct DispatchEntry {
     pub id: u64,
     pub module_id: &'static str,
     pub name: &'static str,
-    pub func: HostOpFn,
+    pub func: RuntimeOpFn,
     pub capability: Option<&'static str>,
 }
 

@@ -29,7 +29,7 @@ fn target_key(ctx: &dyn NativeCtx, v: VmValue) -> String {
 fn meta_key_id(ctx: &dyn NativeCtx, this: VmValue) -> Option<String> {
     if let Value::Object(o) = ctx.extract(this) {
         let guard = o.borrow();
-        if let Some(nv) = guard.inner.get("__meta_id__") {
+        if let Some(nv) = guard.inner.get("metaId") {
             return ctx.str_owned(nv);
         }
     }
@@ -65,11 +65,11 @@ fn build_meta_key_class_obj() -> Rc<ClassObj> {
 
 fn meta_key_create_raw(ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, String> {
     let id = META_KEY_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let key_name = format!("__meta_{}", id);
+    let key_name = format!("meta_{}", id);
     let cls = get_meta_key_class();
     let mut obj = ObjData::new_instance(cls);
     let key_nv = ctx.alloc_str_owned(key_name);
-    obj.inner.insert(Rc::from("__meta_id__"), key_nv);
+    obj.inner.insert(Rc::from("metaId"), key_nv);
     let nv = ctx.intern(Value::Object(ObjRef(Rc::new(RefCell::new(obj)))));
     Ok(nv)
 }
@@ -164,12 +164,12 @@ pub(crate) mod dispatch {
         #[varn_static("create")]
         pub fn create(ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, String> {
             let id = META_KEY_COUNTER.fetch_add(1, Ordering::Relaxed);
-            let key_name = format!("__meta_{}", id);
+            let key_name = format!("meta_{}", id);
 
             let cls = get_meta_key_class();
             let mut obj = ObjData::new_instance(cls);
             let key_nv = ctx.alloc_str_owned(key_name);
-            obj.inner.insert(Rc::from("__meta_id__"), key_nv);
+            obj.inner.insert(Rc::from("metaId"), key_nv);
             let nv = ctx.intern(Value::Object(ObjRef(Rc::new(RefCell::new(obj)))));
             Ok(nv)
         }
@@ -183,7 +183,7 @@ pub(crate) mod dispatch {
             let target = args.first().copied().unwrap_or(VmValue::null());
             let val = args.get(1).copied().unwrap_or(VmValue::null());
             if let Some(meta_id) = ctx.str_owned(
-                ctx.get_field(this, "__meta_id__")
+                ctx.get_field(this, "metaId")
                     .unwrap_or(VmValue::null()),
             ) {
                 let target_k = if target.is_heap() {
@@ -208,7 +208,7 @@ pub(crate) mod dispatch {
         ) -> Result<VmValue, String> {
             let target = args.first().copied().unwrap_or(VmValue::null());
             if let Some(meta_id) = ctx.str_owned(
-                ctx.get_field(this, "__meta_id__")
+                ctx.get_field(this, "metaId")
                     .unwrap_or(VmValue::null()),
             ) {
                 let target_k = if target.is_heap() {
@@ -237,7 +237,7 @@ pub(crate) mod dispatch {
         ) -> Result<VmValue, String> {
             let target = args.first().copied().unwrap_or(VmValue::null());
             if let Some(meta_id) = ctx.str_owned(
-                ctx.get_field(this, "__meta_id__")
+                ctx.get_field(this, "metaId")
                     .unwrap_or(VmValue::null()),
             ) {
                 let target_k = if target.is_heap() {

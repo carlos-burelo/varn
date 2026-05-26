@@ -13,7 +13,7 @@ use std::cmp::Reverse;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use varn_core::OpCode;
+use varn_core::{ModuleId, OpCode};
 use varn_types::chunk::FunctionProto;
 use varn_types::chunk::PoolEntry;
 use varn_types::{Closure, Literal};
@@ -24,7 +24,7 @@ pub struct Vm {
 
 impl Vm {
     pub fn new(
-        precompiled: Rc<rustc_hash::FxHashMap<String, Rc<varn_types::FunctionProto>>>,
+        precompiled: Rc<rustc_hash::FxHashMap<ModuleId, Rc<varn_types::FunctionProto>>>,
     ) -> Self {
         let mut ctx = ExecCtx::new(GlobalStore::new());
         ctx.precompiled = precompiled;
@@ -47,7 +47,7 @@ impl Vm {
     pub fn from_snapshot(
         globals: GlobalStore,
         heap: Heap,
-        precompiled: Rc<rustc_hash::FxHashMap<String, Rc<varn_types::FunctionProto>>>,
+        precompiled: Rc<rustc_hash::FxHashMap<ModuleId, Rc<varn_types::FunctionProto>>>,
     ) -> Self {
         let mut ctx = ExecCtx::new(globals);
         ctx.heap = heap;
@@ -71,22 +71,10 @@ impl Vm {
             })
             .collect();
 
-        let cache_count = closure.proto.cache_count;
-        let new_ic_cache = Rc::new(RefCell::new(
-            (0..cache_count)
-                .map(|_| varn_types::chunk::PolyICSlot::new())
-                .collect(),
-        ));
-
-        let new_feedback = Rc::new(RefCell::new(varn_types::chunk::FeedbackVector::new(
-            cache_count,
-        )));
         let nan_closure = Rc::new(VmClosure::with_upvalues(
             closure.proto.clone(),
             upvalues,
             Rc::new(constants),
-            new_ic_cache,
-            new_feedback,
         ));
 
         if self.ctx.frames.is_empty() {
