@@ -7,7 +7,7 @@ edition = "2021"
 varn-diagnostics = { path = "../varn-diagnostics" }
 varn-base = { path = "../varn-base" }
 serde = { version = "1", features = ["derive", "rc"] }
-rustc-hash = "1.1.0"
+rustc-hash = { workspace = true }
 
 [features]
 default = []
