@@ -34,6 +34,7 @@ pub use super::ctx_jit_values::{
     jit_set_property, jit_store_global_idx, jit_store_upvalue, jit_sub, jit_to_string,
 };
 
+#[repr(C)]
 pub struct ExecCtx {
     pub stack: Vec<VmValue>,
     pub frames: Vec<CallFrame>,

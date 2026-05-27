@@ -61,6 +61,7 @@ impl VmUpvalue {
 }
 
 #[derive(Debug, Clone)]
+#[repr(C)]
 pub struct VmClosure {
     pub proto: Rc<FunctionProto>,
     pub upvalues: Vec<VmUpvalue>,

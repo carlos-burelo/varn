@@ -84,44 +84,18 @@ fn emit_load_const(ctx: &mut CodegenCtx, first_reg: usize) {
     let code = ctx.code;
     let ip = &mut ctx.ip;
     let regmap = &ctx.regmap;
-    let helpers = ctx.helpers;
 
-    use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
+    use crate::registers::ARG_CLOSURE;
 
     let idx = code[*ip] as usize;
     *ip += 1;
 
-    asm.push(ARG_CTX);
-    asm.push(ARG_CLOSURE);
-    asm.push(ARG_BASE);
-    asm.push(ARG_EXEC_CTX);
-
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
-    if need_dummy {
-        asm.push(Reg::Rax);
-    }
-
-    #[cfg(target_os = "windows")]
-    asm.add_reg_imm8(Reg::Rsp, -32);
-
-    asm.mov_reg_reg(ARG_CTX, ARG_CLOSURE);
-    asm.mov_reg_imm64(ARG_CLOSURE, idx as u64);
-
-    asm.mov_reg_imm64(Reg::R10, helpers.load_const as u64);
-    asm.call_reg(Reg::R10);
-
-    #[cfg(target_os = "windows")]
-    asm.add_reg_imm8(Reg::Rsp, 32);
-
-    asm.mov_reg_reg(Reg::R11, Reg::Rax);
-
-    if need_dummy {
-        asm.pop(Reg::Rax);
-    }
-    asm.pop(ARG_EXEC_CTX);
-    asm.pop(ARG_BASE);
-    asm.pop(ARG_CLOSURE);
-    asm.pop(ARG_CTX);
+    // Load constants Rc pointer from VmClosure: closure.constants is at offset 32
+    asm.mov_reg_mem(Reg::R11, ARG_CLOSURE, 32);
+    // Load Vec data ptr from RcBox: Vec starts at 16, Vec's ptr is at 8 (16 + 8 = 24)
+    asm.mov_reg_mem(Reg::R11, Reg::R11, 24);
+    // Load VmValue from constants: values_ptr[idx]
+    asm.mov_reg_mem(Reg::R11, Reg::R11, (idx * 8) as i32);
 
     emit_store(asm, Reg::R11, first_reg, regmap);
 }
