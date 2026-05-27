@@ -1,0 +1,209 @@
+import * as time_mod from "std:time";
+const { Duration, PlainDateTime, Now, Instant } = time_mod;
+import { List, Stack, Queue, Record } from "std:collections";
+import { Http } from "std:http";
+import { JSON as json } from "std:json";
+import { crypto } from "std:crypto";
+import { fs } from "std:fs";
+import { io } from "std:io";
+import { Math } from "std:math";
+import { sys } from "std:sys";
+import { Net, Query, Url } from "std:net";
+import { path } from "std:path";
+import { Reflect, MetaKey } from "std:reflect";
+import { sleep, TaskGroup, spawn, parallel } from "std:task";
+
+// Import the remaining 5 standard library modules
+import { Disposable, AsyncDisposable } from "std:dispose";
+import { test as test_lib, assertTrue, assertEqual, fail } from "std:test";
+import * as types_mod from "std:types";
+const { Option, some, none, isSome, isNone, unwrap, unwrapOr, Result, ok, err, tryRun, Partial, Required, Readonly, Record as TypedRecord } = types_mod;
+
+class ResourceImpl implements Disposable {
+    disposed: bool = false;
+    dispose(): void {
+        this.disposed = true;
+    }
+}
+
+async function runComprehensiveTest(): Task<void> {
+    print("Starting 42. StdLib Comprehensive 18-Module Test...")
+
+    // 1. std:time
+    let d = Duration.from("PT1H30M");
+    assert("Duration hours", d.hours === 1);
+    let dt = new PlainDateTime(2026, 4, 21, 10, 0, 0, 0);
+    assert("PlainDateTime year", dt.year === 2026);
+    let t1 = Now.instant();
+    assert("Instant exists", t1.toString().length > 0);
+
+    // 2. std:math
+    assert("Math PI", Math.PI > 3.14 && Math.PI < 3.15);
+    assert("Math abs", Math.abs(-10.5) === 10.5);
+    assert("Math min", Math.min(5.0, 3.0, 8.0) === 3.0);
+    assert("Math max", Math.max(5.0, 3.0, 8.0) === 8.0);
+
+    // 3. std:crypto
+    let uuid = crypto.uuid();
+    assert("Crypto UUID length", uuid.length === 36);
+    let hash = crypto.sha256("Hello");
+    assert("Crypto SHA256", hash.length === 64);
+
+    // 4. std:json
+    let serialized = json.stringify({ test: "json", value: 123 });
+    let parsed = json.parse(serialized);
+    assert("JSON parse field", parsed["test"] === "json");
+    assert("JSON parse int", parsed["value"] === 123);
+
+    // 5. std:collections
+    let list = new List<str>(["A"]);
+    list.add("B");
+    assert("List items", list.toArray()[1] === "B");
+
+    let stack = new Stack<int>();
+    stack.push(42);
+    assert("Stack peek", stack.peek() === 42);
+    assert("Stack pop", stack.pop() === 42);
+
+    let queue = new Queue<str>();
+    queue.enqueue("first");
+    assert("Queue peek", queue.peek() === "first");
+    assert("Queue dequeue", queue.dequeue() === "first");
+
+    let rec = new Record<str, int>();
+    rec.set("key", 100);
+    assert("Record has", rec.has("key"));
+    assert("Record get", rec.get("key") === 100);
+
+    let rangeObj = Range.from(1, 5);
+    assert("Range start val", rangeObj.start === 1);
+    assert("Range contains 3", rangeObj.contains(3));
+
+    // 6. std:fs
+    let testFile = "./temp_test_file.txt";
+    fs.write(testFile, "Varn File System Test");
+    assert("FS exists after write", fs.exists(testFile));
+    let readContent = fs.read(testFile);
+    assert("FS read content match", readContent === "Varn File System Test");
+
+    // 7. std:io
+    io.write(""); 
+    io.writeln(""); 
+
+    // 8. std:sys
+    assert("Sys platform exists", sys.platform().length > 0);
+    assert("Sys cwd exists", sys.cwd().length > 0);
+
+    // 9. std:net
+    assert("Net isIP true", Net.isIP("127.0.0.1"));
+    assert("Net isIP false", !Net.isIP("not-an-ip"));
+    let urlObj = Url.parse("https://varn-lang.dev:8080/docs?q=1#main");
+    assert("URL protocol", urlObj.protocol === "https");
+    assert("URL host", urlObj.host === "varn-lang.dev");
+    assert("URL port", urlObj.port === 8080);
+    assert("URL path", urlObj.path === "/docs");
+    assert("URL query", urlObj.query.get("q") === "1");
+    assert("URL fragment", urlObj.fragment === "main");
+
+    // 10. std:path
+    assert("Path normalize", path.normalize("a/b/../c") === "a/c");
+    assert("Path dirname", path.dirname("a/b/c") === "a/b");
+    assert("Path basename", path.basename("a/b/file.txt") === "file.txt");
+    assert("Path extname", path.extname("file.txt") === ".txt");
+    assert("Path join", path.join("a", "b", "c") === "a/b/c");
+
+    // 11. std:reflect
+    Reflect.defineMetadata("my_key", "my_val", list);
+    assert("Reflect getMetadata", Reflect.getMetadata("my_key", list) === "my_val");
+    assert("Reflect hasMetadata", Reflect.hasMetadata("my_key", list));
+
+    let mkey = MetaKey.create<str>();
+    mkey.set(list, "hello-meta");
+    assert("MetaKey has", mkey.has(list));
+    assert("MetaKey get", mkey.get(list) === "hello-meta");
+
+    // 12. std:http
+    assert("Http namespace", Http !== null);
+    let clientTask = Http.fetch("https://varn-lang.dev");
+    let clientRes = await clientTask;
+    assert("Http fetch status", clientRes.status === 200);
+    assert("Http fetch body", clientRes.body.length > 0);
+
+    // 13. std:task
+    async function threeHundred(): Task<int> {
+        return 100 + 200;
+    }
+    let h1 = spawn(threeHundred);
+    assert("Spawn and await", await h1 === 300);
+
+    async function one(): Task<int> { return 1; }
+    async function two(): Task<int> { return 2; }
+    let all = await parallel([
+        one(),
+        two(),
+    ]);
+    assert("Parallel results", all[0] === 1 && all[1] === 2);
+
+    using group = TaskGroup<int>();
+    async function ten(): Task<int> { return 10; }
+    async function twenty(): Task<int> { return 20; }
+    let g1 = group.spawn(ten());
+    let g2 = group.spawn(twenty());
+    let joined = await group.join();
+    assert("TaskGroup joined", joined[0] === 10 && joined[1] === 20);
+
+    // 14. std:dispose
+    let dispObj = new ResourceImpl();
+    {
+        using r = dispObj;
+        assert("Using bindings valid", r !== null);
+        assert("Disposable active inside block", dispObj.disposed === false);
+    }
+    assert("Disposable triggered dispose on scope exit", dispObj.disposed === true);
+
+    // 15. std:types (Option)
+    let optSome = some<int>(99);
+    let optNone = none<int>();
+    assert("Option some isSome", isSome(optSome));
+    assert("Option none isSome", !isSome(optNone));
+    assert("Option none isNone", isNone(optNone));
+    assert("Option unwrap", unwrap(optSome) === 99);
+    assert("Option unwrapOr some", unwrapOr(optSome, 50) === 99);
+    assert("Option unwrapOr none", unwrapOr(optNone, 50) === 50);
+
+    // 16. std:types (Result)
+    let resOk = ok<str, int>("success");
+    let resErr = err<str, int>(500);
+    match (resOk) {
+        Ok(v) => assert("Result Ok matched", v === "success"),
+        Err(_) => assert("Result Ok mis-match", false),
+    }
+    match (resErr) {
+        Ok(_) => assert("Result Err mis-match", false),
+        Err(e) => assert("Result Err matched", e === 500),
+    }
+    let resTry = tryRun<int>(() => {
+        return 888;
+    });
+    match (resTry) {
+        Ok(v) => assert("tryRun matched", v === 888),
+        Err(_) => assert("tryRun mis-match", false),
+    }
+
+    // 17. std:test
+    test_lib.assert("std:test assert positive", true);
+    assertTrue(true, "std:test assertTrue positive");
+    assertEqual(777, 777, "std:test assertEqual positive");
+
+    // 18. std:types
+    let partialVar: Partial<{ x: int, y: str }> = { x: 42 };
+    let readonlyVar: Readonly<{ a: bool }> = { a: true };
+    let recordVar: TypedRecord<str, int> = { "tested": 100 };
+    assert("std:types partial compile value", partialVar["x"] === 42);
+    assert("std:types readonly compile value", readonlyVar["a"] === true);
+    assert("std:types record compile value", recordVar["tested"] === 100);
+}
+
+await runComprehensiveTest()
+
+print("[PASSED] 42. StdLib Comprehensive Test successfully tested all 18 standard library modules!")

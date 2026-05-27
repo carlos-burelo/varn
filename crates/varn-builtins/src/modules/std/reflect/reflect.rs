@@ -1,11 +1,8 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
-#[allow(unused_imports)]
-use varn_op_macros::{varn_class, varn_method, varn_module, varn_static};
-use varn_types::value::{ClassObj, ObjData, ObjRef};
-use varn_types::{NativeCtx, Value, VmValue};
+use varn_op_macros::varn_module;
+use varn_types::{NativeCtx, VmValue};
 
 thread_local! {
     static METADATA: RefCell<HashMap<String, HashMap<String, VmValue>>> =
@@ -26,102 +23,13 @@ fn target_key(ctx: &dyn NativeCtx, v: VmValue) -> String {
     }
 }
 
-fn meta_key_id(ctx: &dyn NativeCtx, this: VmValue) -> Option<String> {
-    if let Value::Object(o) = ctx.extract(this) {
-        let guard = o.borrow();
-        if let Some(nv) = guard.inner.get("metaId") {
-            return ctx.str_owned(nv);
-        }
-    }
-    None
-}
-
 static META_KEY_COUNTER: AtomicU64 = AtomicU64::new(1);
 
-thread_local! {
-    static META_KEY_CLASS_CACHE: RefCell<Option<Rc<ClassObj>>> = RefCell::new(None);
-}
-
-fn get_meta_key_class() -> Rc<ClassObj> {
-    META_KEY_CLASS_CACHE.with(|c| {
-        let mut guard = c.borrow_mut();
-        if let Some(ref cls) = *guard {
-            return cls.clone();
-        }
-        let cls = build_meta_key_class_obj();
-        *guard = Some(cls.clone());
-        cls
-    })
-}
-
-fn build_meta_key_class_obj() -> Rc<ClassObj> {
-    let cls = ClassObj::new_native_rc("MetaKey");
-    cls.add_static("create", Value::native(meta_key_create_raw, "create"));
-    cls.add_method("set", Value::native(meta_key_set_raw, "set"));
-    cls.add_method("get", Value::native(meta_key_get_raw, "get"));
-    cls.add_method("has", Value::native(meta_key_has_raw, "has"));
-    cls
-}
-
-fn meta_key_create_raw(ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, String> {
-    let id = META_KEY_COUNTER.fetch_add(1, Ordering::Relaxed);
-    let key_name = format!("meta_{}", id);
-    let cls = get_meta_key_class();
-    let mut obj = ObjData::new_instance(cls);
-    let key_nv = ctx.alloc_str_owned(key_name);
-    obj.inner.insert(Rc::from("metaId"), key_nv);
-    let nv = ctx.intern(Value::Object(ObjRef(Rc::new(RefCell::new(obj)))));
-    Ok(nv)
-}
-
-fn meta_key_set_raw(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-    if let (Some(&this), Some(&target), Some(&val)) = (args.first(), args.get(1), args.get(2)) {
-        if let Some(meta_id) = meta_key_id(ctx, this) {
-            let target_k = target_key(ctx, target);
-            with_metadata(|m| {
-                m.entry(target_k).or_default().insert(meta_id, val);
-            });
-        }
-    }
-    Ok(VmValue::null())
-}
-
-fn meta_key_get_raw(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-    if let (Some(&this), Some(&target)) = (args.first(), args.get(1)) {
-        if let Some(meta_id) = meta_key_id(ctx, this) {
-            let target_k = target_key(ctx, target);
-            let res = with_metadata(|m| {
-                m.get(&target_k)
-                    .and_then(|m| m.get(&meta_id))
-                    .copied()
-                    .unwrap_or(VmValue::null())
-            });
-            return Ok(res);
-        }
-    }
-    Ok(VmValue::null())
-}
-
-fn meta_key_has_raw(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-    if let (Some(&this), Some(&target)) = (args.first(), args.get(1)) {
-        if let Some(meta_id) = meta_key_id(ctx, this) {
-            let target_k = target_key(ctx, target);
-            let found = with_metadata(|m| {
-                m.get(&target_k)
-                    .map(|m| m.contains_key(&meta_id))
-                    .unwrap_or(false)
-            });
-            return Ok(VmValue::from_bool(found));
-        }
-    }
-    Ok(VmValue::from_bool(false))
-}
-
-#[varn_module("std:reflect")]
+#[varn_module("runtime:reflect")]
 pub(crate) mod dispatch {
     use super::*;
 
-    #[varn_fn("defineMetadata")]
+    #[varn_fn("reflectDefineMetadata")]
     pub fn define_metadata(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let key = args.first().map(|&v| ctx.str_repr(v)).unwrap_or_default();
         let val = args.get(1).cloned().unwrap_or(VmValue::null());
@@ -132,7 +40,7 @@ pub(crate) mod dispatch {
         Ok(VmValue::null())
     }
 
-    #[varn_fn("getMetadata")]
+    #[varn_fn("reflectGetMetadata")]
     pub fn get_metadata(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let key = args.first().map(|&v| ctx.str_repr(v)).unwrap_or_default();
         let target = args.get(1).map(|&v| target_key(ctx, v)).unwrap_or_default();
@@ -145,7 +53,7 @@ pub(crate) mod dispatch {
         Ok(res)
     }
 
-    #[varn_fn("hasMetadata")]
+    #[varn_fn("reflectHasMetadata")]
     pub fn has_metadata(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let key = args.first().map(|&v| ctx.str_repr(v)).unwrap_or_default();
         let target = args.get(1).map(|&v| target_key(ctx, v)).unwrap_or_default();
@@ -157,104 +65,53 @@ pub(crate) mod dispatch {
         Ok(VmValue::from_bool(found))
     }
 
-    #[varn_class("MetaKey")]
-    pub mod meta_key_class {
-        use super::*;
+    #[varn_fn("reflectCreateMetaKey")]
+    pub fn create_meta_key(ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, String> {
+        let id = META_KEY_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let key_name = format!("meta_{}", id);
+        Ok(ctx.alloc_str_owned(key_name))
+    }
 
-        #[varn_static("create")]
-        pub fn create(ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, String> {
-            let id = META_KEY_COUNTER.fetch_add(1, Ordering::Relaxed);
-            let key_name = format!("meta_{}", id);
-
-            let cls = get_meta_key_class();
-            let mut obj = ObjData::new_instance(cls);
-            let key_nv = ctx.alloc_str_owned(key_name);
-            obj.inner.insert(Rc::from("metaId"), key_nv);
-            let nv = ctx.intern(Value::Object(ObjRef(Rc::new(RefCell::new(obj)))));
-            Ok(nv)
+    #[varn_fn("reflectSetMetaKey")]
+    pub fn set_meta_key(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+        if let (Some(&meta_id_val), Some(&target), Some(&val)) = (args.first(), args.get(1), args.get(2)) {
+            let meta_id = ctx.str_repr(meta_id_val);
+            let target_k = target_key(ctx, target);
+            with_metadata(|m| {
+                m.entry(target_k).or_default().insert(meta_id, val);
+            });
         }
+        Ok(VmValue::null())
+    }
 
-        #[varn_method("set")]
-        pub fn set_meta(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            let target = args.first().copied().unwrap_or(VmValue::null());
-            let val = args.get(1).copied().unwrap_or(VmValue::null());
-            if let Some(meta_id) = ctx.str_owned(
-                ctx.get_field(this, "metaId")
-                    .unwrap_or(VmValue::null()),
-            ) {
-                let target_k = if target.is_heap() {
-                    format!("heap:{:x}", target.as_heap_idx())
-                } else if target.is_int() {
-                    format!("int:{}", target.as_int())
-                } else {
-                    ctx.str_repr(target)
-                };
-                with_metadata(|m| {
-                    m.entry(target_k).or_default().insert(meta_id, val);
-                });
-            }
-            Ok(VmValue::null())
+    #[varn_fn("reflectGetMetaKey")]
+    pub fn get_meta_key(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+        if let (Some(&meta_id_val), Some(&target)) = (args.first(), args.get(1)) {
+            let meta_id = ctx.str_repr(meta_id_val);
+            let target_k = target_key(ctx, target);
+            let res = with_metadata(|m| {
+                m.get(&target_k)
+                    .and_then(|m| m.get(&meta_id))
+                    .cloned()
+                    .unwrap_or(VmValue::null())
+            });
+            return Ok(res);
         }
+        Ok(VmValue::null())
+    }
 
-        #[varn_method("get")]
-        pub fn get_meta(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            let target = args.first().copied().unwrap_or(VmValue::null());
-            if let Some(meta_id) = ctx.str_owned(
-                ctx.get_field(this, "metaId")
-                    .unwrap_or(VmValue::null()),
-            ) {
-                let target_k = if target.is_heap() {
-                    format!("heap:{:x}", target.as_heap_idx())
-                } else if target.is_int() {
-                    format!("int:{}", target.as_int())
-                } else {
-                    ctx.str_repr(target)
-                };
-                let res = with_metadata(|m| {
-                    m.get(&target_k)
-                        .and_then(|m| m.get(&meta_id))
-                        .copied()
-                        .unwrap_or(VmValue::null())
-                });
-                return Ok(res);
-            }
-            Ok(VmValue::null())
+    #[varn_fn("reflectHasMetaKey")]
+    pub fn has_meta_key(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+        if let (Some(&meta_id_val), Some(&target)) = (args.first(), args.get(1)) {
+            let meta_id = ctx.str_repr(meta_id_val);
+            let target_k = target_key(ctx, target);
+            let found = with_metadata(|m| {
+                m.get(&target_k)
+                    .map(|m| m.contains_key(&meta_id))
+                    .unwrap_or(false)
+            });
+            return Ok(VmValue::from_bool(found));
         }
-
-        #[varn_method("has")]
-        pub fn has_meta(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            let target = args.first().copied().unwrap_or(VmValue::null());
-            if let Some(meta_id) = ctx.str_owned(
-                ctx.get_field(this, "metaId")
-                    .unwrap_or(VmValue::null()),
-            ) {
-                let target_k = if target.is_heap() {
-                    format!("heap:{:x}", target.as_heap_idx())
-                } else if target.is_int() {
-                    format!("int:{}", target.as_int())
-                } else {
-                    ctx.str_repr(target)
-                };
-                let found = with_metadata(|m| {
-                    m.get(&target_k)
-                        .map(|m| m.contains_key(&meta_id))
-                        .unwrap_or(false)
-                });
-                return Ok(VmValue::from_bool(found));
-            }
-            Ok(VmValue::from_bool(false))
-        }
+        Ok(VmValue::from_bool(false))
     }
 }

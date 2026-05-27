@@ -1,10 +1,36 @@
-// std:sys — pure IDL facade over runtime system host operations.
+// std:sys — Pure Varn facade over runtime process host operations.
+
+import {
+    processPlatform,
+    processCwd,
+    processArgs,
+    processExit,
+    processEnv,
+    processSetEnv
+} from "runtime:process";
 
 export namespace sys {
-    export declare function platform(): str;
-    export declare function cwd(): str;
-    export declare function args(): str[];
-    export declare function exit(code?: int): void;
-    export declare function env(key: str): str;
-    export declare function setEnv(key: str, val: str): void;
+    export function platform(): str {
+        return processPlatform();
+    }
+
+    export function cwd(): str {
+        return processCwd();
+    }
+
+    export function args(): str[] {
+        return processArgs();
+    }
+
+    export function exit(code?: int): void {
+        processExit(code);
+    }
+
+    export function env(key: str): str {
+        return processEnv(key);
+    }
+
+    export function setEnv(key: str, val: str): void {
+        processSetEnv(key, val);
+    }
 }

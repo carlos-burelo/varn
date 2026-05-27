@@ -1,10 +1,30 @@
-// std:io — pure IDL facade over runtime host operations.
+import { ioWrite, ioWriteln, ioFlush, ioReadLine } from "runtime:io";
 
 export namespace io {
-    export declare function write(...args: dynamic[]): void;
-    export declare function writeln(...args: dynamic[]): void;
-    export declare function print(...args: dynamic[]): void;
-    export declare function flush(): void;
-    export declare function readLine(prompt?: str): str;
-    export declare function readAll(): str;
+    export function write(...args: dynamic[]): void {
+        ioWrite(...args);
+    }
+
+    export function writeln(...args: dynamic[]): void {
+        ioWriteln(...args);
+    }
+
+    export function print(...args: dynamic[]): void {
+        ioWriteln(...args);
+    }
+
+    export function flush(): void {
+        ioFlush();
+    }
+
+    export function readLine(prompt?: str): str {
+        if (prompt === null) {
+            return ioReadLine("");
+        }
+        return ioReadLine(prompt);
+    }
+
+    export function readAll(): str {
+        return "";
+    }
 }

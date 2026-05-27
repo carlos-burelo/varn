@@ -18,8 +18,6 @@ pub mod json;
 pub mod math;
 #[path = "std/net/net.rs"]
 pub mod net;
-#[path = "std/option/option.rs"]
-pub mod option;
 #[path = "std/path/path.rs"]
 pub mod path;
 #[path = "primitives/mod.rs"]

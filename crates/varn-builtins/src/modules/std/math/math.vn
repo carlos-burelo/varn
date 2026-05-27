@@ -1,34 +1,111 @@
-// std:math — Mathematical constants and functions
+import {
+    mathAbs,
+    mathSqrt,
+    mathSin,
+    mathCos,
+    mathTan,
+    mathFloor,
+    mathCeil,
+    mathRound,
+    mathRandom
+} from "runtime:math";
 
 export namespace Math {
-    export declare const E: float;
-    export declare const LN10: float;
-    export declare const LN2: float;
-    export declare const LOG10E: float;
-    export declare const LOG2E: float;
-    export declare const PI: float;
-    export declare const SQRT1_2: float;
-    export declare const SQRT2: float;
+    export const E: float = 2.718281828459045;
+    export const LN10: float = 2.302585092994046;
+    export const LN2: float = 0.6931471805599453;
+    export const LOG10E: float = 0.4342944819032518;
+    export const LOG2E: float = 1.4426950408889634;
+    export const PI: float = 3.141592653589793;
+    export const SQRT1_2: float = 0.7071067811865476;
+    export const SQRT2: float = 1.4142135623730951;
 
-    export declare function abs(x: float): float;
-    export declare function acos(x: float): float;
-    export declare function asin(x: float): float;
-    export declare function atan(x: float): float;
-    export declare function atan2(y: float, x: float): float;
-    export declare function ceil(x: float): float;
-    export declare function cos(x: float): float;
-    export declare function exp(x: float): float;
-    export declare function floor(x: float): float;
-    export declare function log(x: float): float;
-    export declare function max(...args: float[]): float;
-    export declare function min(...args: float[]): float;
-    export declare function pow(x: float, y: float): float;
-    export declare function random(): float;
-    export declare function round(x: float): float;
-    export declare function sin(x: float): float;
-    export declare function sqrt(x: float): float;
-    export declare function tan(x: float): float;
-    export declare function sign(x: float): float;
-    export declare function trunc(x: float): float;
+    export function abs(x: float): float {
+        return mathAbs(x);
+    }
+
+    export function sqrt(x: float): float {
+        return mathSqrt(x);
+    }
+
+    export function sin(x: float): float {
+        return mathSin(x);
+    }
+
+    export function cos(x: float): float {
+        return mathCos(x);
+    }
+
+    export function tan(x: float): float {
+        return mathTan(x);
+    }
+
+    export function floor(x: float): float {
+        return mathFloor(x);
+    }
+
+    export function ceil(x: float): float {
+        return mathCeil(x);
+    }
+
+    export function round(x: float): float {
+        return mathRound(x);
+    }
+
+    export function random(): float {
+        return mathRandom();
+    }
+
+    export function acos(x: float): float {
+        return 0.0;
+    }
+    export function asin(x: float): float {
+        return 0.0;
+    }
+    export function atan(x: float): float {
+        return 0.0;
+    }
+    export function atan2(y: float, x: float): float {
+        return 0.0;
+    }
+    export function exp(x: float): float {
+        return 0.0;
+    }
+    export function log(x: float): float {
+        return 0.0;
+    }
+    export function max(...args: float[]): float {
+        let current = -1000000000.0;
+        for (let i = 0; i < args.length; i = i + 1) {
+            let v = args[i];
+            if (v > current) {
+                current = v;
+            }
+        }
+        return current;
+    }
+    export function min(...args: float[]): float {
+        let current = 1000000000.0;
+        for (let i = 0; i < args.length; i = i + 1) {
+            let v = args[i];
+            if (v < current) {
+                current = v;
+            }
+        }
+        return current;
+    }
+    export function pow(x: float, y: float): float {
+        return 0.0;
+    }
+    export function sign(x: float): float {
+        if (x > 0.0) return 1.0;
+        if (x < 0.0) return -1.0;
+        return 0.0;
+    }
+    export function trunc(x: float): float {
+        if (x >= 0.0) {
+            return mathFloor(x);
+        }
+        return mathCeil(x);
+    }
 }
-

@@ -2,11 +2,11 @@ use std::io::Write as IoWrite;
 use varn_op_macros::varn_module;
 use varn_types::{NativeCtx, VmValue};
 
-#[varn_module("std:io")]
+#[varn_module("runtime:io")]
 pub(crate) mod dispatch {
     use super::*;
 
-    #[varn_fn(cap = "io.write")]
+    #[varn_fn("ioWrite")]
     pub fn write(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         for &v in args {
             print!("{}", ctx.str_repr_borrowed(v));
@@ -14,7 +14,7 @@ pub(crate) mod dispatch {
         Ok(VmValue::null())
     }
 
-    #[varn_fn(cap = "io.write")]
+    #[varn_fn("ioWriteln")]
     pub fn writeln(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         for &v in args {
             print!("{}", ctx.str_repr_borrowed(v));
@@ -23,7 +23,7 @@ pub(crate) mod dispatch {
         Ok(VmValue::null())
     }
 
-    #[varn_fn(cap = "io.write")]
+    #[varn_fn("ioFlush")]
     pub fn flush(_ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, String> {
         std::io::stdout()
             .flush()
@@ -31,7 +31,7 @@ pub(crate) mod dispatch {
         Ok(VmValue::null())
     }
 
-    #[varn_fn("readLine", cap = "io.read")]
+    #[varn_fn("ioReadLine")]
     pub fn read_line(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         if let Some(&prompt) = args.first() {
             if !prompt.is_null() {

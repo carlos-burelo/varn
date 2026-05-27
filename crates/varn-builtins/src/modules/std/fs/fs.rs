@@ -2,11 +2,11 @@ use std::fs;
 use varn_op_macros::varn_module;
 use varn_types::{NativeCtx, VmValue};
 
-#[varn_module("std:fs")]
+#[varn_module("runtime:fs")]
 pub(crate) mod dispatch {
     use super::*;
 
-    #[varn_fn(cap = "fs.read")]
+    #[varn_fn("fsRead")]
     pub fn read(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let path = args
             .first()
@@ -16,7 +16,7 @@ pub(crate) mod dispatch {
         Ok(ctx.alloc_str_owned(content))
     }
 
-    #[varn_fn(cap = "fs.write")]
+    #[varn_fn("fsWrite")]
     pub fn write(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let path = args
             .first()
@@ -26,16 +26,17 @@ pub(crate) mod dispatch {
             .get(1)
             .map(|&v| ctx.str_repr(v))
             .ok_or("fs.write: expected content")?;
-        fs::write(path, content).map_err(|e| e.to_string())?;
+        fs::write(&path, &content).map_err(|e| e.to_string())?;
         Ok(VmValue::null())
     }
 
-    #[varn_fn(cap = "fs.read")]
+    #[varn_fn("fsExists")]
     pub fn exists(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let path = args
             .first()
             .map(|&v| ctx.str_repr(v))
             .ok_or("fs.exists: expected path")?;
-        Ok(VmValue::from_bool(std::path::Path::new(&path).exists()))
+        let exists = std::path::Path::new(&path).exists();
+        Ok(VmValue::from_bool(exists))
     }
 }

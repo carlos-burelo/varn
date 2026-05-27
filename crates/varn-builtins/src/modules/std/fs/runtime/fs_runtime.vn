@@ -1,0 +1,5 @@
+// runtime:fs — low-level host filesystem operations.
+
+export declare function fsRead(path: str): str;
+export declare function fsWrite(path: str, content: str): void;
+export declare function fsExists(path: str): bool;

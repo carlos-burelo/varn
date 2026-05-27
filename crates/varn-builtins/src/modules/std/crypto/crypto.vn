@@ -1,12 +1,35 @@
-// std:crypto — pure IDL facade over runtime cryptographic host operations.
+import { cryptoSha256, cryptoSha512, cryptoUuid, cryptoRandomBytes, cryptoRandomHex, cryptoBase64Enc, cryptoBase64Dec, cryptoHmac } from "runtime:crypto";
 
 export namespace crypto {
-    export declare function sha256(data: str): str;
-    export declare function sha512(data: str): str;
-    export declare function randomBytes(size: int): int[];
-    export declare function randomHex(size: int): str;
-    export declare function base64_enc(data: str): str;
-    export declare function base64_dec(data: str): str;
-    export declare function uuid(): str;
-    export declare function hmac(algo: str, key: str, data: str): str;
+    export function sha256(data: str): str {
+        return cryptoSha256(data);
+    }
+
+    export function sha512(data: str): str {
+        return cryptoSha512(data);
+    }
+
+    export function randomBytes(size: int): int[] {
+        return cryptoRandomBytes(size);
+    }
+
+    export function randomHex(size: int): str {
+        return cryptoRandomHex(size);
+    }
+
+    export function base64_enc(data: str): str {
+        return cryptoBase64Enc(data);
+    }
+
+    export function base64_dec(data: str): str {
+        return cryptoBase64Dec(data);
+    }
+
+    export function uuid(): str {
+        return cryptoUuid();
+    }
+
+    export function hmac(algo: str, key: str, data: str): str {
+        return cryptoHmac(algo, key, data);
+    }
 }

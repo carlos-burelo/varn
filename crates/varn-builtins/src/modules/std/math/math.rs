@@ -1,11 +1,11 @@
 use varn_op_macros::{varn_module};
 use varn_types::{NativeCtx, VmValue};
 
-#[varn_module("std:math")]
+#[varn_module("runtime:math")]
 pub(crate) mod dispatch {
     use super::*;
 
-    #[varn_fn]
+    #[varn_fn("mathAbs")]
     pub fn abs(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let v = args.first().copied().unwrap_or(VmValue::null());
         if v.is_int() {
@@ -17,7 +17,7 @@ pub(crate) mod dispatch {
         }
     }
 
-    #[varn_fn]
+    #[varn_fn("mathSqrt")]
     pub fn sqrt(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let v = args.first().copied().unwrap_or(VmValue::null());
         let val = if v.is_int() {
@@ -30,7 +30,7 @@ pub(crate) mod dispatch {
         Ok(VmValue::from_f64(val.sqrt()))
     }
 
-    #[varn_fn]
+    #[varn_fn("mathSin")]
     pub fn sin(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let v = args.first().copied().unwrap_or(VmValue::null());
         let val = if v.is_int() {
@@ -43,7 +43,7 @@ pub(crate) mod dispatch {
         Ok(VmValue::from_f64(val.sin()))
     }
 
-    #[varn_fn]
+    #[varn_fn("mathCos")]
     pub fn cos(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let v = args.first().copied().unwrap_or(VmValue::null());
         let val = if v.is_int() {
@@ -56,7 +56,7 @@ pub(crate) mod dispatch {
         Ok(VmValue::from_f64(val.cos()))
     }
 
-    #[varn_fn]
+    #[varn_fn("mathTan")]
     pub fn tan(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let v = args.first().copied().unwrap_or(VmValue::null());
         let val = if v.is_int() {
@@ -69,7 +69,7 @@ pub(crate) mod dispatch {
         Ok(VmValue::from_f64(val.tan()))
     }
 
-    #[varn_fn]
+    #[varn_fn("mathFloor")]
     pub fn floor(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let v = args.first().copied().unwrap_or(VmValue::null());
         if v.is_int() {
@@ -79,7 +79,7 @@ pub(crate) mod dispatch {
         Ok(VmValue::from_f64(val.floor()))
     }
 
-    #[varn_fn]
+    #[varn_fn("mathCeil")]
     pub fn ceil(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let v = args.first().copied().unwrap_or(VmValue::null());
         if v.is_int() {
@@ -89,7 +89,7 @@ pub(crate) mod dispatch {
         Ok(VmValue::from_f64(val.ceil()))
     }
 
-    #[varn_fn]
+    #[varn_fn("mathRound")]
     pub fn round(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let v = args.first().copied().unwrap_or(VmValue::null());
         if v.is_int() {
@@ -99,60 +99,10 @@ pub(crate) mod dispatch {
         Ok(VmValue::from_f64(val.round()))
     }
 
-    #[varn_fn]
+    #[varn_fn("mathRandom")]
     pub fn random(_ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, String> {
         use rand::Rng;
         let mut rng = rand::thread_rng();
         Ok(VmValue::from_f64(rng.gen()))
-    }
-
-    #[varn_namespace("Math")]
-    pub mod math_ns {
-        use super::*;
-
-        #[varn_fn("abs")]
-        pub fn abs_ns(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-            super::abs(_ctx, args)
-        }
-
-        #[varn_fn("sqrt")]
-        pub fn sqrt_ns(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-            super::sqrt(_ctx, args)
-        }
-
-        #[varn_fn("sin")]
-        pub fn sin_ns(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-            super::sin(_ctx, args)
-        }
-
-        #[varn_fn("cos")]
-        pub fn cos_ns(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-            super::cos(_ctx, args)
-        }
-
-        #[varn_fn("tan")]
-        pub fn tan_ns(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-            super::tan(_ctx, args)
-        }
-
-        #[varn_fn("floor")]
-        pub fn floor_ns(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-            super::floor(_ctx, args)
-        }
-
-        #[varn_fn("ceil")]
-        pub fn ceil_ns(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-            super::ceil(_ctx, args)
-        }
-
-        #[varn_fn("round")]
-        pub fn round_ns(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-            super::round(_ctx, args)
-        }
-
-        #[varn_fn("random")]
-        pub fn random_ns(_ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, String> {
-            super::random(_ctx, _args)
-        }
     }
 }

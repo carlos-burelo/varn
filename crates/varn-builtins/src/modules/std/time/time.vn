@@ -1,3 +1,5 @@
+import { timeNowMs, timeParseIsoDuration, timeMsToParts } from "runtime:time";
+
 export type TimeParts = {
     year: int;
     month: int;
@@ -22,62 +24,267 @@ export type DurationParts = {
 
 export type DurationLike = str | int | DurationParts;
 
-export namespace Time {
-    export declare function now(): int;
-    export declare function toISOString(ms: int): str;
-    export declare function fromISO(iso: str): int;
-    export declare function toParts(ms: int): TimeParts;
-    export declare function fromParts(parts: TimeParts): int;
+let int_div = function(a: int, b: int): int {
+    return (a - (a % b)) / b;
+};
 
-    export declare function durationFromString(s: str): int;
-    export declare function durationToString(ms: int): str;
-    export declare function durationParts(ms: int): DurationParts;
+export namespace Time {
+    export function now(): int {
+        return timeNowMs();
+    }
+
+    export function toISOString(ms: int): str {
+        let parts = timeMsToParts(ms);
+        let pad2 = function(n: int): str {
+            if (n < 10) return "0" + n;
+            return "" + n;
+        };
+        let pad3 = function(n: int): str {
+            if (n < 10) return "00" + n;
+            if (n < 100) return "0" + n;
+            return "" + n;
+        };
+        let pad4 = function(n: int): str {
+            if (n < 10) return "000" + n;
+            if (n < 100) return "00" + n;
+            if (n < 1000) return "0" + n;
+            return "" + n;
+        };
+        return pad4(parts["year"] as int) + "-" + pad2(parts["month"] as int) + "-" + pad2(parts["day"] as int) + "T" + pad2(parts["hour"] as int) + ":" + pad2(parts["minute"] as int) + ":" + pad2(parts["second"] as int) + "." + pad3(parts["millisecond"] as int) + "Z";
+    }
+
+    export function fromISO(iso: str): int {
+        return timeParseIsoDuration(iso);
+    }
+
+    export function toParts(ms: int): TimeParts {
+        let parts = timeMsToParts(ms);
+        return {
+            year: parts["year"] as int,
+            month: parts["month"] as int,
+            day: parts["day"] as int,
+            hour: parts["hour"] as int,
+            minute: parts["minute"] as int,
+            second: parts["second"] as int,
+            millisecond: parts["millisecond"] as int
+        };
+    }
+
+    export function fromParts(parts: TimeParts): int {
+        return 0;
+    }
+
+    export function durationFromString(s: str): int {
+        return timeParseIsoDuration(s);
+    }
+
+    export function durationToString(ms: int): str {
+        return "Duration(" + ms + "ms)";
+    }
+
+    export function durationParts(ms: int): DurationParts {
+        let total_s = int_div(ms, 1000);
+        return {
+            days: int_div(total_s, 86400),
+            hours: int_div(total_s % 86400, 3600),
+            minutes: int_div(total_s % 3600, 60),
+            seconds: (total_s % 60),
+            milliseconds: (ms % 1000)
+        };
+    }
 }
 
 export namespace Now {
-    export declare function now(): int;
-    export declare function instant(): Instant;
-    export declare function plainDateTimeISO(): PlainDateTime;
+    export function now(): int {
+        return timeNowMs();
+    }
+
+    export function instant(): Instant {
+        return new Instant(timeNowMs());
+    }
+
+    export function plainDateTimeISO(): PlainDateTime {
+        let parts = timeMsToParts(timeNowMs());
+        return new PlainDateTime(
+            parts["year"] as int,
+            parts["month"] as int,
+            parts["day"] as int,
+            parts["hour"] as int,
+            parts["minute"] as int,
+            parts["second"] as int,
+            parts["millisecond"] as int
+        );
+    }
 }
 
-export declare class Instant {
-    constructor(epochMilliseconds: int);
-    get epochMilliseconds(): int;
-    toString(): str;
-    static compare(a: Instant, b: Instant): int;
+export class Instant {
+    epochMilliseconds: int;
+
+    constructor(epochMilliseconds: int) {
+        this.epochMilliseconds = epochMilliseconds;
+    }
+
+    toString(): str {
+        return `Instant(${this.epochMilliseconds}ms)`;
+    }
+
+    static compare(a: Instant, b: Instant): int {
+        return a.epochMilliseconds - b.epochMilliseconds;
+    }
 }
 
-export declare class PlainDateTime {
-    constructor(year: int, month: int, day: int, hour?: int, minute?: int, second?: int, millisecond?: int);
-    get year(): int;
-    get month(): int;
-    get day(): int;
-    get hour(): int;
-    get minute(): int;
-    get second(): int;
-    get millisecond(): int;
-    
-    toString(): str;
-    static compare(a: PlainDateTime, b: PlainDateTime): int;
+export class PlainDateTime {
+    year: int;
+    month: int;
+    day: int;
+    hour: int;
+    minute: int;
+    second: int;
+    millisecond: int;
+
+    constructor(year: int, month: int, day: int, hour: int = 0, minute: int = 0, second: int = 0, millisecond: int = 0) {
+        this.year = year;
+        this.month = month;
+        this.day = day;
+        this.hour = hour;
+        this.minute = minute;
+        this.second = second;
+        this.millisecond = millisecond;
+    }
+
+    toString(): str {
+        let yr = this.year;
+        let mo = this.month;
+        let dy = this.day;
+        let hr = this.hour;
+        let mn = this.minute;
+        let sc = this.second;
+        let ms = this.millisecond;
+
+        let pad2 = function(n: int): str {
+            if (n < 10) return "0" + n;
+            return "" + n;
+        };
+        let pad3 = function(n: int): str {
+            if (n < 10) return "00" + n;
+            if (n < 100) return "0" + n;
+            return "" + n;
+        };
+        let pad4 = function(n: int): str {
+            if (n < 10) return "000" + n;
+            if (n < 100) return "00" + n;
+            if (n < 1000) return "0" + n;
+            return "" + n;
+        };
+
+        return pad4(yr) + "-" + pad2(mo) + "-" + pad2(dy) + "T" + pad2(hr) + ":" + pad2(mn) + ":" + pad2(sc) + "." + pad3(ms);
+    }
+
+    static compare(a: PlainDateTime, b: PlainDateTime): int {
+        if (a.year !== b.year) return a.year - b.year;
+        if (a.month !== b.month) return a.month - b.month;
+        if (a.day !== b.day) return a.day - b.day;
+        if (a.hour !== b.hour) return a.hour - b.hour;
+        if (a.minute !== b.minute) return a.minute - b.minute;
+        if (a.second !== b.second) return a.second - b.second;
+        return a.millisecond - b.millisecond;
+    }
 }
 
-export declare class Duration {
-    constructor(input: DurationLike);
-    static from(item: DurationLike): Duration;
+export class Duration {
+    totalMilliseconds: int;
+    hours: int;
+    minutes: int;
+    seconds: int;
+    days: int;
+    milliseconds: int;
 
-    get milliseconds(): int;
-    get seconds(): int;
-    get minutes(): int;
-    get hours(): int;
-    get days(): int;
-    get totalMilliseconds(): int;
+    constructor(ms: int) {
+        let total_s = int_div(ms, 1000);
+        this.totalMilliseconds = ms;
+        this.hours = int_div(total_s, 3600);
+        this.minutes = int_div(total_s % 3600, 60);
+        this.seconds = total_s;
+        this.days = int_div(total_s, 86400);
+        this.milliseconds = ms % 1000;
+    }
 
-    toString(): str;
-    toJSON(): str;
-    abs(): Duration;
-    negated(): Duration;
-    add(other: Duration | DurationLike): Duration;
-    subtract(other: Duration | DurationLike): Duration;
-    compare(other: Duration | DurationLike): int;
-    equals(other: Duration | DurationLike): bool;
+    static from(input: dynamic): Duration {
+        if (input instanceof str) {
+            let ms = timeParseIsoDuration(input);
+            return new Duration(ms);
+        } else if (input instanceof int) {
+            return new Duration(input);
+        } else {
+            let ms = 0;
+            if (input["milliseconds"] !== null) ms = ms + (input["milliseconds"] as int);
+            if (input["seconds"] !== null) ms = ms + (input["seconds"] as int) * 1000;
+            if (input["minutes"] !== null) ms = ms + (input["minutes"] as int) * 60000;
+            if (input["hours"] !== null) ms = ms + (input["hours"] as int) * 3600000;
+            if (input["days"] !== null) ms = ms + (input["days"] as int) * 86400000;
+            return new Duration(ms);
+        }
+    }
+
+    abs(): Duration {
+        let ms = this.totalMilliseconds;
+        if (ms < 0) ms = -ms;
+        return new Duration(ms);
+    }
+
+    negated(): Duration {
+        return new Duration(-this.totalMilliseconds);
+    }
+
+    add(other: dynamic): Duration {
+        let other_ms = 0;
+        if (other instanceof Duration) {
+            other_ms = other.totalMilliseconds;
+        } else {
+            let od = Duration.from(other);
+            other_ms = od.totalMilliseconds;
+        }
+        return new Duration(this.totalMilliseconds + other_ms);
+    }
+
+    subtract(other: dynamic): Duration {
+        let other_ms = 0;
+        if (other instanceof Duration) {
+            other_ms = other.totalMilliseconds;
+        } else {
+            let od = Duration.from(other);
+            other_ms = od.totalMilliseconds;
+        }
+        return new Duration(this.totalMilliseconds - other_ms);
+    }
+
+    compare(other: dynamic): int {
+        let other_ms = 0;
+        if (other instanceof Duration) {
+            other_ms = other.totalMilliseconds;
+        } else {
+            let od = Duration.from(other);
+            other_ms = od.totalMilliseconds;
+        }
+        return this.totalMilliseconds - other_ms;
+    }
+
+    equals(other: dynamic): bool {
+        let other_ms = 0;
+        if (other instanceof Duration) {
+            other_ms = other.totalMilliseconds;
+        } else {
+            let od = Duration.from(other);
+            other_ms = od.totalMilliseconds;
+        }
+        return this.totalMilliseconds === other_ms;
+    }
+
+    toString(): str {
+        return "Duration(" + this.totalMilliseconds + "ms)";
+    }
+
+    toJSON(): str {
+        return this.toString();
+    }
 }

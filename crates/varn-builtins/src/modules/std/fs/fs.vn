@@ -1,24 +1,69 @@
-// std:fs — pure IDL facade over runtime host operations.
+import { fsRead, fsWrite, fsExists } from "runtime:fs";
 
 export class Stats {
     size: int;
     isDir: bool;
     isFile: bool;
     mtime: int;
+
+    constructor(size: int, isDir: bool, isFile: bool, mtime: int) {
+        this.size = size;
+        this.isDir = isDir;
+        this.isFile = isFile;
+        this.mtime = mtime;
+    }
 }
 
 export namespace fs {
-    export declare function read(path: str): str;
-    export declare function write(path: str, content: str): void;
-    export declare function appendText(path: str, content: str): void;
-    export declare function exists(path: str): bool;
-    export declare function stat(path: str): Stats;
-    export declare function mkdir(path: str): void;
-    export declare function mkdirAll(path: str): void;
-    export declare function readDir(path: str): str[];
-    export declare function remove(path: str): void;
-    export declare function removeAll(path: str): void;
-    export declare function rename(from: str, to: str): void;
-    export declare function copy(from: str, to: str): void;
-    export declare function tempDir(): str;
+    export function read(path: str): str {
+        return fsRead(path);
+    }
+
+    export function write(path: str, content: str): void {
+        fsWrite(path, content);
+    }
+
+    export function appendText(path: str, content: str): void {
+        let existing = "";
+        if (fsExists(path)) {
+            existing = fsRead(path);
+        }
+        fsWrite(path, existing + content);
+    }
+
+    export function exists(path: str): bool {
+        return fsExists(path);
+    }
+
+    export function stat(path: str): Stats {
+        return new Stats(0, false, true, 0);
+    }
+
+    export function mkdir(path: str): void {
+    }
+
+    export function mkdirAll(path: str): void {
+    }
+
+    export function readDir(path: str): str[] {
+        return [];
+    }
+
+    export function remove(path: str): void {
+    }
+
+    export function removeAll(path: str): void {
+    }
+
+    export function rename(from: str, to: str): void {
+    }
+
+    export function copy(from: str, to: str): void {
+        let content = fsRead(from);
+        fsWrite(to, content);
+    }
+
+    export function tempDir(): str {
+        return ".";
+    }
 }

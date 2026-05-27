@@ -1,11 +1,11 @@
 use varn_op_macros::varn_module;
 use varn_types::{NativeCtx, VmValue};
 
-#[varn_module("std:path")]
+#[varn_module("runtime:path")]
 pub(crate) mod dispatch {
     use super::*;
 
-    #[varn_fn]
+    #[varn_fn("pathNormalize")]
     pub fn normalize(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let s = args.first().map(|&v| ctx.str_repr(v)).unwrap_or_default();
         let p = std::path::Path::new(&s);
@@ -25,7 +25,7 @@ pub(crate) mod dispatch {
         Ok(ctx.alloc_str_owned(comps.join(std::path::MAIN_SEPARATOR_STR)))
     }
 
-    #[varn_fn]
+    #[varn_fn("pathDirname")]
     pub fn dirname(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let s = args.first().map(|&v| ctx.str_repr(v)).unwrap_or_default();
         let dir = std::path::Path::new(&s)
@@ -35,7 +35,7 @@ pub(crate) mod dispatch {
         Ok(ctx.alloc_str_owned(dir))
     }
 
-    #[varn_fn]
+    #[varn_fn("pathBasename")]
     pub fn basename(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let s = args.first().map(|&v| ctx.str_repr(v)).unwrap_or_default();
         let name = std::path::Path::new(&s)

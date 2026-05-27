@@ -10,20 +10,37 @@ pub(super) fn try_stdlib_generic_alias(
     ctx: Option<&dyn TypeContext>,
 ) -> Option<Type> {
     use crate::binder::BindResult;
+    use std::cell::Cell;
     use std::cell::RefCell;
     use std::rc::Rc;
 
     thread_local! {
         static STD_TYPES: RefCell<Option<Rc<BindResult>>> = RefCell::new(None);
+        static STD_TYPES_LOADING: Cell<bool> = Cell::new(false);
     }
 
-    let bind_rc = STD_TYPES.with(|c| {
-        let mut guard = c.borrow_mut();
-        if guard.is_none() {
-            *guard = crate::module_resolver::resolve_stdlib_module_bind_ref("std:types");
+    let needs_init = STD_TYPES.with(|c| c.borrow().is_none());
+    if needs_init {
+        let already_loading = STD_TYPES_LOADING.with(|flag| {
+            if flag.get() {
+                true
+            } else {
+                flag.set(true);
+                false
+            }
+        });
+        if already_loading {
+            return None;
         }
-        guard.as_ref().map(Rc::clone)
-    })?;
+
+        let resolved = crate::module_resolver::resolve_stdlib_module_bind_ref("std:types");
+        STD_TYPES.with(|c| {
+            *c.borrow_mut() = resolved;
+        });
+        STD_TYPES_LOADING.with(|flag| flag.set(false));
+    }
+
+    let bind_rc = STD_TYPES.with(|c| c.borrow().as_ref().map(Rc::clone))?;
     let bind = bind_rc.as_ref();
 
     let (params, alias_node) = bind.get_alias_node(name)?;

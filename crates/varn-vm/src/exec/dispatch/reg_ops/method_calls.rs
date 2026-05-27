@@ -325,8 +325,12 @@ impl ExecCtx {
         let result = if arg_count + 1 <= 16 {
             let mut buf = [VmValue::null(); 17];
             buf[0] = receiver;
-            for i in 0..arg_count {
-                buf[i + 1] = self.stack[base + arg_start + i];
+            if arg_count > 0 {
+                unsafe {
+                    let src_ptr = self.stack.as_ptr().add(base + arg_start);
+                    let dest_ptr = buf.as_mut_ptr().add(1);
+                    std::ptr::copy_nonoverlapping(src_ptr, dest_ptr, arg_count);
+                }
             }
             (f)(
                 self as &mut dyn varn_types::NativeCtx,
@@ -335,8 +339,13 @@ impl ExecCtx {
         } else {
             let mut args = Vec::with_capacity(arg_count + 1);
             args.push(receiver);
-            for i in 0..arg_count {
-                args.push(self.stack[base + arg_start + i]);
+            if arg_count > 0 {
+                unsafe {
+                    let src_ptr = self.stack.as_ptr().add(base + arg_start);
+                    let dest_ptr = args.as_mut_ptr().add(1);
+                    std::ptr::copy_nonoverlapping(src_ptr, dest_ptr, arg_count);
+                    args.set_len(arg_count + 1);
+                }
             }
             (f)(self as &mut dyn varn_types::NativeCtx, &args)
         }

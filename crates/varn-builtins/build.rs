@@ -29,10 +29,8 @@ fn collect_registry_entries(dir: &Path, out: &mut impl Write) {
                 let raw = fs::read_to_string(&json_path)
                     .unwrap_or_else(|e| panic!("cannot read {}: {e}", json_path.display()));
 
-                // Find the .vn file in this directory (same name as dir).
-                let dir_name = path.file_name().unwrap().to_str().unwrap();
-                let vn_rel = format!("{}/{}.vn", path.display(), dir_name)
-                    .replace('\\', "/");
+                let vn_rel = find_vn_source(&path)
+                    .unwrap_or_else(|| panic!("cannot find .vn source in {}", path.display()));
                 // Relative to crate src root (for the vn_source field).
                 let vn_source_rel = vn_rel
                     .trim_start_matches("src/")
@@ -46,6 +44,20 @@ fn collect_registry_entries(dir: &Path, out: &mut impl Write) {
             collect_registry_entries(&path, out);
         }
     }
+}
+
+fn find_vn_source(dir: &Path) -> Option<String> {
+    let Ok(entries) = fs::read_dir(dir) else { return None };
+    let mut candidates: Vec<_> = entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("vn"))
+        .collect();
+    candidates.sort();
+    candidates
+        .into_iter()
+        .next()
+        .map(|path| path.to_string_lossy().replace('\\', "/"))
 }
 
 fn emit_entries_from_json(json: &str, vn_source_field: &str, vn_include_path: &str, out: &mut impl Write) {

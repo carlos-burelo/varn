@@ -1,0 +1,5 @@
+// runtime:time — low-level host time operations.
+
+export declare function timeNowMs(): int;
+export declare function timeParseIsoDuration(s: str): int;
+export declare function timeMsToParts(ms: int): dynamic;

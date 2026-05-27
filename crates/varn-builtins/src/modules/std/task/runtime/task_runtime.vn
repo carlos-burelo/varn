@@ -1,0 +1,5 @@
+// runtime:task — low-level host task operations.
+
+export declare function taskSpawn<T>(target: Task<T> | ((...args: dynamic[]) => T), ...args: dynamic[]): TaskHandle<T>;
+export declare function taskSleep(ms: int): TaskHandle<void>;
+export declare function taskParallel<T>(tasks: Array<Task<T> >): Task<Array<T> >;

@@ -177,7 +177,7 @@ pub fn build_module_graph(
         };
 
         let check = varn_checker::Checker::check(program);
-        let exports = if program.filename.starts_with("std:") || program.filename.starts_with("core:") {
+        let exports = if program.filename.starts_with("std:") || program.filename.starts_with("core:") || program.filename.starts_with("runtime:") {
             varn_checker::module_resolver::resolve_stdlib_module_exports_ref(&program.filename)
         } else {
             varn_checker::module_resolver::resolve_module_exports_ref(
@@ -215,7 +215,7 @@ pub fn build_module_graph(
 fn read_module_source(module_path: &str) -> Result<String, String> {
     if matches!(
         varn_core::ImportSpecifier::parse(module_path),
-        varn_core::ImportSpecifier::Stdlib(_) | varn_core::ImportSpecifier::Core(_)
+        varn_core::ImportSpecifier::Stdlib(_) | varn_core::ImportSpecifier::Core(_) | varn_core::ImportSpecifier::Runtime(_)
     ) {
         let loader = varn_builtins::CoreSourceLocator::from_env();
         return loader

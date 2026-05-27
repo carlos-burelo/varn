@@ -1,36 +1,31 @@
 use varn_op_macros::varn_module;
 use varn_types::{NativeCtx, Value, VmValue};
 
-#[varn_module("std:json")]
+#[varn_module("runtime:json")]
 pub(crate) mod dispatch {
     use super::*;
 
-    #[varn_group("JSON")]
-    pub mod json_ns {
-        use super::*;
+    #[varn_fn("jsonParse")]
+    pub fn json_parse(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+        let input = args.get(0).map(|&v| ctx.str_repr(v)).unwrap_or_default();
+        let sv: serde_json::Value =
+            serde_json::from_str(&input).map_err(|e| format!("JSON.parse: {e}"))?;
+        Ok(serde_to_vm(ctx, sv))
+    }
 
-        #[varn_fn("parse")]
-        pub fn json_parse(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-            let input = args.get(0).map(|&v| ctx.str_repr(v)).unwrap_or_default();
-            let sv: serde_json::Value =
-                serde_json::from_str(&input).map_err(|e| format!("JSON.parse: {e}"))?;
-            Ok(serde_to_vm(ctx, sv))
+    #[varn_fn("jsonStringify")]
+    pub fn json_stringify(
+        ctx: &mut dyn NativeCtx,
+        args: &[VmValue],
+    ) -> Result<VmValue, String> {
+        if let Some(v) = args.get(0).copied() {
+            let val = ctx.extract(v);
+            let json_val = value_to_serde(&val, ctx);
+            return Ok(ctx.alloc_str_owned(
+                serde_json::to_string(&json_val).unwrap_or_else(|_| "null".to_string()),
+            ));
         }
-
-        #[varn_fn("stringify")]
-        pub fn json_stringify(
-            ctx: &mut dyn NativeCtx,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            if let Some(v) = args.get(0).copied() {
-                let val = ctx.extract(v);
-                let json_val = value_to_serde(&val, ctx);
-                return Ok(ctx.alloc_str_owned(
-                    serde_json::to_string(&json_val).unwrap_or_else(|_| "null".to_string()),
-                ));
-            }
-            Ok(ctx.alloc_str("null"))
-        }
+        Ok(ctx.alloc_str("null"))
     }
 }
 

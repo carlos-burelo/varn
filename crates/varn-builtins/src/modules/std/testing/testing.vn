@@ -1,13 +1,29 @@
-// std:test — pure IDL facade over runtime testing host operations.
+import { testAssert, testAssertEqual, testSummary } from "runtime:test";
 
-export namespace test {
-    export declare function assert(label: str, condition: bool): void;
-    export declare function assertEqual<T>(actual: T, expected: T, message?: str): void;
-    export declare function assertTrue(cond: bool, message?: str): void;
-    export declare function summary(): void;
+export function assert(label: str, condition: bool): void {
+    testAssert(label, condition);
 }
 
+export function assertEqual<T>(actual: T, expected: T, message?: str): void {
+    testAssertEqual(actual, expected, message);
+}
+
+export function assertTrue(cond: bool, message?: str): void {
+    testAssert(message ?? "assertTrue", cond);
+}
+
+export function summary(): void {
+    testSummary();
+}
+
+const testImpl = {
+    assert: assert,
+    assertEqual: assertEqual,
+    assertTrue: assertTrue,
+    summary: summary
+};
+
+export const test = testImpl;
+
 // Top-level convenience exports
-export const assertEqual = test.assertEqual;
-export const assertTrue = test.assertTrue;
-export const fail = (msg?: str) => test.assert(msg ?? "fail", false);
+export const fail = (msg?: str) => assert(msg ?? "fail", false);

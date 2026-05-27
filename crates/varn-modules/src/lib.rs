@@ -45,8 +45,6 @@ pub const STD_MATH: &str = "std:math";
 pub const STD_NET: &str = "std:net";
 pub const STD_PATH: &str = "std:path";
 pub const STD_REFLECT: &str = "std:reflect";
-pub const STD_RESULT: &str = "std:result";
-pub const STD_OPTION: &str = "std:option";
 pub const STD_SYS: &str = "std:sys";
 pub const STD_TEST: &str = "std:test";
 pub const STD_TIME: &str = "std:time";
@@ -61,6 +59,11 @@ pub const RUNTIME_NET: &str = "runtime:net";
 pub const RUNTIME_PROCESS: &str = "runtime:process";
 pub const RUNTIME_CRYPTO: &str = "runtime:crypto";
 pub const RUNTIME_TASK: &str = "runtime:task";
+pub const RUNTIME_HTTP: &str = "runtime:http";
+pub const RUNTIME_REFLECT: &str = "runtime:reflect";
+pub const RUNTIME_JSON: &str = "runtime:json";
+pub const RUNTIME_PATH: &str = "runtime:path";
+pub const RUNTIME_TEST: &str = "runtime:test";
 
 pub const RUNTIME_MODULES: &[&str] = &[
     RUNTIME_FS,
@@ -70,6 +73,11 @@ pub const RUNTIME_MODULES: &[&str] = &[
     RUNTIME_PROCESS,
     RUNTIME_CRYPTO,
     RUNTIME_TASK,
+    RUNTIME_HTTP,
+    RUNTIME_REFLECT,
+    RUNTIME_JSON,
+    RUNTIME_PATH,
+    RUNTIME_TEST,
 ];
 
 pub const CORE_MODULES: &[&str] = &[
@@ -103,10 +111,8 @@ pub const STD_MODULES: &[&str] = &[
     STD_JSON,
     STD_MATH,
     STD_NET,
-    STD_OPTION,
     STD_PATH,
     STD_REFLECT,
-    STD_RESULT,
     STD_SYS,
     STD_TEST,
     STD_TIME,
