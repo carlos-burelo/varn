@@ -46,7 +46,17 @@ impl super::Binder {
                 self.scopes.get_mut(self.current).define(rc_name, id);
                 return id;
             }
-            let msg = format!("duplicate declaration of '{}'", name);
+            let existing_origin = existing_sym
+                .origin_module
+                .as_ref()
+                .map(|m| m.as_ref().to_owned())
+                .unwrap_or_else(|| self.source_file.to_string());
+            let msg = format!(
+                "duplicate declaration of '{}' (already declared as {} in {})",
+                name,
+                existing_sym.kind.label().trim(),
+                existing_origin
+            );
 
             let mut range = sym.full_range;
             if range.start.line == 0 && range.end.line == 0 {

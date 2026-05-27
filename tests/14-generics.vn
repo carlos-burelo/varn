@@ -19,7 +19,7 @@ assert("generic box get",  intBox.get() === 10)
 const strBox = intBox.map((n) => `value=${n}`)
 assert("generic box map",  strBox.get() === "value=10")
 
-class Stack<T> {
+class GenericStack<T> {
     private items: T[]
     constructor() { this.items = [] }
     push(item: T): void { this.items.push(item) }
@@ -35,7 +35,7 @@ class Stack<T> {
     get isEmpty(): bool { return this.items.length === 0 }
 }
 
-const stk = new Stack<int>()
+const stk = new GenericStack<int>()
 assert("stack empty init", stk.isEmpty)
 stk.push(1)
 stk.push(2)
