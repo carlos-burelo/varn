@@ -652,7 +652,7 @@ impl HeapInner {
 
     #[inline(always)]
     pub fn needs_gc(&self) -> bool {
-        self.gc_alloc_since_collect >= 512
+        self.gc_alloc_since_collect >= 4096
     }
 
     pub fn compact_interners(&mut self) {
@@ -834,6 +834,13 @@ impl Heap {
     pub fn new() -> Self {
         Self {
             inner: Rc::new(std::cell::UnsafeCell::new(HeapInner::new())),
+        }
+    }
+
+    pub fn deep_clone(&self) -> Self {
+        let inner_clone = unsafe { (*self.inner.get()).clone() };
+        Self {
+            inner: Rc::new(std::cell::UnsafeCell::new(inner_clone)),
         }
     }
 

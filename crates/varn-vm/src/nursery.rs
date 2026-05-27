@@ -1,5 +1,6 @@
 use crate::heap::{HeapInner, HeapObj};
 use crate::value::VmValue;
+use std::rc::Rc;
 
 pub const OLD_GEN_FLAG: u32 = 0x8000_0000;
 pub const NURSERY_CAPACITY: usize = 2048;
@@ -109,8 +110,11 @@ impl Nursery {
         }
 
         for raw_idx in 0..old_gen.objects().len() {
-            if let Some(HeapObj::VmClosure(_)) = old_gen.get_raw(raw_idx as u32) {
-                self.scan_and_fix_old_obj(raw_idx as u32, old_gen);
+            match old_gen.get_raw(raw_idx as u32) {
+                Some(HeapObj::VmClosure(_)) | Some(HeapObj::BoundMethod(_)) | Some(HeapObj::Class(_)) | Some(HeapObj::Module(_)) => {
+                    self.scan_and_fix_old_obj(raw_idx as u32, old_gen);
+                }
+                _ => {}
             }
         }
 
@@ -201,6 +205,36 @@ impl Nursery {
                         fixups.push((ChildSlot::Spread, v.as_heap_idx()));
                     }
                 }
+                HeapObj::BoundMethod(bm) => {
+                    if let Some(idx) = old_gen.value_heap_idx(&bm.receiver) {
+                        if is_nursery_idx(idx) {
+                            fixups.push((ChildSlot::BoundMethodReceiver, idx));
+                        }
+                    }
+                }
+                HeapObj::Class(cls) => {
+                    for (i, v) in cls.vtable.borrow().iter().enumerate() {
+                        if let Some(idx) = old_gen.value_heap_idx(v) {
+                            if is_nursery_idx(idx) {
+                                fixups.push((ChildSlot::ClassVtableItem(i), idx));
+                            }
+                        }
+                    }
+                    for (k, v) in cls.statics.borrow().iter() {
+                        if let Some(idx) = old_gen.value_heap_idx(v) {
+                            if is_nursery_idx(idx) {
+                                fixups.push((ChildSlot::ClassStatic(k.clone()), idx));
+                            }
+                        }
+                    }
+                }
+                HeapObj::Module(m) => {
+                    for (i, &v) in m.exports.iter().enumerate() {
+                        if v.is_heap() && is_nursery_idx(v.as_heap_idx()) {
+                            fixups.push((ChildSlot::ModuleExport(i), v.as_heap_idx()));
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -208,6 +242,14 @@ impl Nursery {
         for (slot, nursery_idx) in fixups {
             let packed = self.evacuate(nursery_idx, old_gen);
             let new_val = VmValue::from_heap_idx(packed);
+            let extracted_val = if matches!(slot, ChildSlot::BoundMethodReceiver)
+                || matches!(slot, ChildSlot::ClassVtableItem(_))
+                || matches!(slot, ChildSlot::ClassStatic(_))
+            {
+                Some(old_gen.extract(new_val))
+            } else {
+                None
+            };
             let Some(obj) = old_gen.get_raw_mut(raw_old) else {
                 continue;
             };
@@ -232,16 +274,34 @@ impl Nursery {
                 (ChildSlot::Spread, HeapObj::Spread(v)) => {
                     *v = new_val;
                 }
+                (ChildSlot::BoundMethodReceiver, HeapObj::BoundMethod(bm)) => {
+                    bm.receiver = extracted_val.unwrap();
+                }
+                (ChildSlot::ClassVtableItem(i), HeapObj::Class(cls)) => {
+                    cls.vtable.borrow_mut()[i] = extracted_val.unwrap();
+                }
+                (ChildSlot::ClassStatic(k), HeapObj::Class(cls)) => {
+                    cls.statics.borrow_mut().insert(k, extracted_val.unwrap());
+                }
+                (ChildSlot::ModuleExport(i), HeapObj::Module(m)) => {
+                    if let Some(s) = Rc::make_mut(m).exports.get_mut(i) {
+                        *s = new_val;
+                    }
+                }
                 _ => {}
             }
         }
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 enum ChildSlot {
     ArrayItem(usize),
     ObjField(usize),
     Upvalue(usize),
     Spread,
+    BoundMethodReceiver,
+    ClassVtableItem(usize),
+    ClassStatic(std::rc::Rc<str>),
+    ModuleExport(usize),
 }

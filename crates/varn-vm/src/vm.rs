@@ -50,7 +50,7 @@ impl Vm {
         precompiled: Rc<rustc_hash::FxHashMap<ModuleId, Rc<varn_types::FunctionProto>>>,
     ) -> Self {
         let mut ctx = ExecCtx::new(globals);
-        ctx.heap = heap;
+        ctx.heap = heap.deep_clone();
         ctx.precompiled = precompiled;
         Self { ctx }
     }
@@ -118,7 +118,7 @@ impl Vm {
     }
 
     pub fn collect_gc(&mut self) -> usize {
-        let roots: Vec<u32> = self
+        let mut roots: Vec<u32> = self
             .ctx
             .stack
             .iter()
@@ -126,6 +126,16 @@ impl Vm {
             .filter(|v| v.is_heap())
             .map(|v| v.as_heap_idx())
             .collect();
+        for v in self.ctx.modules.values() {
+            if v.is_heap() {
+                roots.push(v.as_heap_idx());
+            }
+        }
+        for v in self.ctx.module_exports.values() {
+            if v.is_heap() {
+                roots.push(v.as_heap_idx());
+            }
+        }
         self.ctx.heap.collect(&roots).unwrap_or(0)
     }
 
