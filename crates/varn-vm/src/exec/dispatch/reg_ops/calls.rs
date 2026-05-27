@@ -15,8 +15,10 @@ unsafe fn copy_args_to_buf(
     buf: &mut [MaybeUninit<VmValue>; 16],
 ) -> usize {
     let n = arg_count.min(16);
-    for i in 0..n {
-        buf[i] = MaybeUninit::new(stack[base + arg_start + i]);
+    if n > 0 {
+        let src_ptr = stack.as_ptr().add(base + arg_start);
+        let dest_ptr = buf.as_mut_ptr() as *mut VmValue;
+        std::ptr::copy_nonoverlapping(src_ptr, dest_ptr, n);
     }
     n
 }

@@ -1,4 +1,14 @@
-// std:reflect — pure IDL facade over runtime reflection host operations.
+// std:reflect — pure Varn facade over runtime reflection host operations.
+
+import {
+    reflectDefineMetadata,
+    reflectGetMetadata,
+    reflectHasMetadata,
+    reflectCreateMetaKey,
+    reflectSetMetaKey,
+    reflectGetMetaKey,
+    reflectHasMetaKey
+} from "runtime:reflect";
 
 export interface ClassRef {
     name: str;
@@ -13,18 +23,51 @@ export interface FunctionRef {
 }
 
 export namespace Reflect {
-    export declare function defineMetadata(metadataKey: dynamic, metadataValue: dynamic, target: dynamic): void;
-    export declare function getMetadata(metadataKey: dynamic, target: dynamic): dynamic;
-    export declare function hasMetadata(metadataKey: dynamic, target: dynamic): bool;
-    export declare function getMetadataKeys(target: dynamic): dynamic[];
+    export function defineMetadata(metadataKey: dynamic, metadataValue: dynamic, target: dynamic): void {
+        reflectDefineMetadata(metadataKey, metadataValue, target);
+    }
+
+    export function getMetadata(metadataKey: dynamic, target: dynamic): dynamic {
+        return reflectGetMetadata(metadataKey, target);
+    }
+
+    export function hasMetadata(metadataKey: dynamic, target: dynamic): bool {
+        return reflectHasMetadata(metadataKey, target);
+    }
+
+    export function getMetadataKeys(target: dynamic): dynamic[] {
+        return [];
+    }
 }
 
-export declare class MetaKey<T = dynamic> {
-    static create<R>(): MetaKey<R>;
-    set(target: dynamic, value: T): void;
-    get(target: dynamic): T | null;
-    has(target: dynamic): bool;
-    keys(target: dynamic): dynamic[];
+export class MetaKey<T = dynamic> {
+    private metaId: str;
+
+    constructor(metaId: str) {
+        this.metaId = metaId;
+    }
+
+    static create<R>(): MetaKey<R> {
+        let id = reflectCreateMetaKey();
+        return new MetaKey<R>(id);
+    }
+
+    set(target: dynamic, value: T): void {
+        reflectSetMetaKey(this.metaId, target, value);
+    }
+
+    get(target: dynamic): T | null {
+        let val = reflectGetMetaKey(this.metaId, target);
+        return val as T;
+    }
+
+    has(target: dynamic): bool {
+        return reflectHasMetaKey(this.metaId, target);
+    }
+
+    keys(target: dynamic): dynamic[] {
+        return [];
+    }
 }
 
 export interface MethodContext {

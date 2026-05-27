@@ -1,0 +1,31 @@
+// runtime:http — low-level host HTTP operations.
+
+export declare function httpFetch(
+    url: str,
+    method?: str,
+    headers?: { [key: str]: str },
+    body?: str,
+    timeoutMs?: int
+): Task<dynamic>;
+
+export declare function httpCreateServer(): int;
+
+export declare function httpAddRoute(
+    serverId: int,
+    method: str,
+    pattern: str,
+    callback: (req: dynamic, res: dynamic) => void
+): void;
+
+export declare function httpListen(
+    serverId: int,
+    port: int,
+    responseCtor: dynamic
+): void;
+
+export declare function httpSendResponse(
+    status: int,
+    body: str,
+    contentType: str,
+    headers: { [key: str]: str }
+): void;

@@ -1,0 +1,8 @@
+// runtime:net — low-level host network operations.
+
+export declare function netIsIP(s: str): bool;
+export declare function netIsIPv4(s: str): bool;
+export declare function netIsIPv6(s: str): bool;
+export declare function netParseUrl(url: str): dynamic;
+export declare function netEncodeURIComponent(value: str): str;
+export declare function netDecodeURIComponent(value: str): str;

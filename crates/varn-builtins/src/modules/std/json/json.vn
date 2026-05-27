@@ -1,14 +1,15 @@
 // std:json — JSON parsing and serialization.
-// Json is a proper recursive union type — no dynamic.
 
-/// Represents any value that can be expressed in JSON.
-/// Recursive union: arrays and objects contain Json values.
+import { jsonParse, jsonStringify } from "runtime:json";
+
 export type Json = int | float | str | bool | null | Json[] | { [key: str]: Json };
 
 export namespace JSON {
-    /// Parses a JSON str into a Json value.
-    export declare function parse(text: str): Json;
+    export function parse(text: str): Json {
+        return jsonParse(text) as Json;
+    }
 
-    /// Serializes a Json value into a JSON str.
-    export declare function stringify(value: Json, space?: int): str;
+    export function stringify(value: Json, space?: int): str {
+        return jsonStringify(value);
+    }
 }

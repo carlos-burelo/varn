@@ -1,0 +1,8 @@
+// runtime:process — low-level host process/system operations.
+
+export declare function processPlatform(): str;
+export declare function processCwd(): str;
+export declare function processArgs(): str[];
+export declare function processExit(code?: int): void;
+export declare function processEnv(key: str): str;
+export declare function processSetEnv(key: str, val: str): void;

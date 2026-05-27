@@ -1,18 +1,13 @@
 // std:net — host-backed network primitives and URL/query value types.
 
-declare function netIsIP(s: str): bool;
-declare function netIsIPv4(s: str): bool;
-declare function netIsIPv6(s: str): bool;
-declare function netParseUrl(url: str): {
-    protocol: str;
-    host: str;
-    port: int | null;
-    path: str;
-    query: str;
-    fragment: str;
-};
-declare function netEncodeURIComponent(value: str): str;
-declare function netDecodeURIComponent(value: str): str;
+import {
+    netIsIP,
+    netIsIPv4,
+    netIsIPv6,
+    netParseUrl,
+    netEncodeURIComponent,
+    netDecodeURIComponent
+} from "runtime:net";
 
 function trimPrefixQ(s: str): str {
     if (s.startsWith("?")) {
@@ -119,12 +114,12 @@ export class Url {
     static parse(url: str): Url {
         const parts = netParseUrl(url);
         const out = new Url();
-        out.protocol = parts.protocol;
-        out.host = parts.host;
-        out.port = parts.port;
-        out.path = parts.path;
-        out.query = Query.parse(parts.query);
-        out.fragment = parts.fragment;
+        out.protocol = parts["protocol"] as str;
+        out.host = parts["host"] as str;
+        out.port = parts["port"] as int;
+        out.path = parts["path"] as str;
+        out.query = Query.parse(parts["query"] as str);
+        out.fragment = parts["fragment"] as str;
         return out;
     }
 

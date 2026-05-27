@@ -1,0 +1,4 @@
+// runtime:json — low-level host JSON operations.
+
+export declare function jsonParse(text: str): dynamic;
+export declare function jsonStringify(value: dynamic): str;

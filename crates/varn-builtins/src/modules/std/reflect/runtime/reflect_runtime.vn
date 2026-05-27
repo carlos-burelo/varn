@@ -1,0 +1,10 @@
+// runtime:reflect — low-level host reflection operations.
+
+export declare function reflectDefineMetadata(metadataKey: dynamic, metadataValue: dynamic, target: dynamic): void;
+export declare function reflectGetMetadata(metadataKey: dynamic, target: dynamic): dynamic;
+export declare function reflectHasMetadata(metadataKey: dynamic, target: dynamic): bool;
+
+export declare function reflectCreateMetaKey(): str;
+export declare function reflectSetMetaKey(metaId: str, target: dynamic, value: dynamic): void;
+export declare function reflectGetMetaKey(metaId: str, target: dynamic): dynamic;
+export declare function reflectHasMetaKey(metaId: str, target: dynamic): bool;

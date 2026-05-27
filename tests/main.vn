@@ -39,6 +39,7 @@ import "./38-advanced-higher-order.vn"
 import "./39-package-imports.vn"
 import "./40-named-arguments.vn"
 import "./41-advanced-enums.vn"
+import "./42-stdlib-comprehensive-test.vn"
 
-print("\nModules executed in suite: 41")
+print("\nModules executed in suite: 42")
 assertSummary()

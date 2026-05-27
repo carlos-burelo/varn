@@ -1,33 +1,32 @@
 use url::Url;
 use urlencoding::{decode, encode};
-use varn_op_macros::{varn_module};
+use varn_op_macros::varn_module;
 use varn_types::{NativeCtx, VmValue};
 
-// Native helpers registered as globals so net.vn can call them as global functions.
-#[varn_module("globals")]
+#[varn_module("runtime:net")]
 pub(crate) mod dispatch {
     use super::*;
 
     #[varn_fn("netIsIP")]
-    pub fn net_is_ip(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+    pub fn is_ip(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let s = args.first().map(|&v| ctx.str_repr(v)).unwrap_or_default();
         Ok(VmValue::from_bool(s.parse::<std::net::IpAddr>().is_ok()))
     }
 
     #[varn_fn("netIsIPv4")]
-    pub fn net_is_ipv4(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+    pub fn is_ipv4(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let s = args.first().map(|&v| ctx.str_repr(v)).unwrap_or_default();
         Ok(VmValue::from_bool(s.parse::<std::net::Ipv4Addr>().is_ok()))
     }
 
     #[varn_fn("netIsIPv6")]
-    pub fn net_is_ipv6(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+    pub fn is_ipv6(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let s = args.first().map(|&v| ctx.str_repr(v)).unwrap_or_default();
         Ok(VmValue::from_bool(s.parse::<std::net::Ipv6Addr>().is_ok()))
     }
 
     #[varn_fn("netParseUrl")]
-    pub fn net_parse_url(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+    pub fn parse_url(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let s = args.first().map(|&v| ctx.str_repr(v)).unwrap_or_default();
         let url = Url::parse(&s).map_err(|e| format!("Net.parseURL: {e}"))?;
 
@@ -49,7 +48,7 @@ pub(crate) mod dispatch {
     }
 
     #[varn_fn("netEncodeURIComponent")]
-    pub fn net_encode_uri_component(
+    pub fn encode_uri_component(
         ctx: &mut dyn NativeCtx,
         args: &[VmValue],
     ) -> Result<VmValue, String> {
@@ -58,7 +57,7 @@ pub(crate) mod dispatch {
     }
 
     #[varn_fn("netDecodeURIComponent")]
-    pub fn net_decode_uri_component(
+    pub fn decode_uri_component(
         ctx: &mut dyn NativeCtx,
         args: &[VmValue],
     ) -> Result<VmValue, String> {
@@ -66,6 +65,4 @@ pub(crate) mod dispatch {
         let decoded = decode(&s).map_err(|e| format!("Net.decodeURIComponent: {e}"))?;
         Ok(ctx.alloc_str_owned(decoded.into_owned()))
     }
-
-    // No native `Net` namespace here; module-level `net*` helpers are provided above.
 }

@@ -1,4 +1,6 @@
-// std:task - pure IDL facade over runtime concurrency host operations.
+// std:task - pure Varn facade over runtime concurrency host operations.
+
+import { taskSpawn, taskSleep, taskParallel } from "runtime:task";
 
 export declare class Generator<T> {
     next(value?: dynamic): { value: T; done: bool; };
@@ -24,18 +26,77 @@ export interface TaskHandle<T = dynamic> {
     cancel(): void;
 }
 
-export declare function parallel<T>(tasks: Array<Task<T> >): Task<Array<T> >;
-
-export declare function spawn<T>(target: Task<T> | ((...args: dynamic[]) => T), ...args: dynamic[]): TaskHandle<T>;
-export declare function sleep(ms: int): TaskHandle<void>;
-
-export declare class TaskGroup<T = dynamic> {
-    constructor();
-    spawn(task: Task<T>): Task<T>;
-    join(): Task<Array<T> >;
-    cancel(): void;
-    dispose(): void;
-    disposeAsync(): Task<void>;
+export function parallel<T>(tasks: Array<Task<T> >): Task<Array<T> > {
+    return taskParallel(tasks);
 }
 
-export declare function task_group<T>(): TaskGroup<T>;
+export function spawn<T>(target: Task<T> | ((...args: dynamic[]) => T), ...args: dynamic[]): TaskHandle<T> {
+    return taskSpawn(target, ...args);
+}
+
+export function sleep(ms: int): TaskHandle<void> {
+    return taskSleep(ms);
+}
+
+async function wrapTask<T>(task: Task<T>, group: TaskGroupImpl<T>): Task<T> {
+    try {
+        let res = await task;
+        if (group.isCancelled) {
+            throw new Error("TaskGroup cancelled");
+        }
+        return res;
+    } catch (e) {
+        if (group.isCancelled) {
+            throw new Error("TaskGroup cancelled");
+        }
+        throw e;
+    }
+}
+
+class TaskGroupImpl<T = dynamic> {
+    tasks: Array<Task<T> >;
+    isCancelled: bool;
+
+    constructor() {
+        this.tasks = [];
+        this.isCancelled = false;
+    }
+
+    spawn(task: Task<T>): Task<T> {
+        if (this.isCancelled) {
+            throw new Error("TaskGroup is cancelled");
+        }
+        let wrapped = wrapTask(task, this);
+        this.tasks.push(wrapped);
+        return wrapped;
+    }
+
+    async join(): Task<Array<T> > {
+        if (this.isCancelled) {
+            throw new Error("TaskGroup is cancelled");
+        }
+        return await parallel(this.tasks);
+    }
+
+    cancel(): void {
+        this.isCancelled = true;
+    }
+
+    dispose(): void {
+        this.cancel();
+    }
+
+    async disposeAsync(): Task<void> {
+        this.cancel();
+    }
+}
+
+export type TaskGroup<T = dynamic> = TaskGroupImpl<T>;
+
+export function TaskGroup<T = dynamic>(): TaskGroupImpl<T> {
+    return new TaskGroupImpl<T>();
+}
+
+export function task_group<T>(): TaskGroupImpl<T> {
+    return new TaskGroupImpl<T>();
+}

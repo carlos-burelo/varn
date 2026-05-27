@@ -1,0 +1,11 @@
+// runtime:math — low-level host math operations.
+
+export declare function mathAbs(x: float): float;
+export declare function mathSqrt(x: float): float;
+export declare function mathSin(x: float): float;
+export declare function mathCos(x: float): float;
+export declare function mathTan(x: float): float;
+export declare function mathFloor(x: float): float;
+export declare function mathCeil(x: float): float;
+export declare function mathRound(x: float): float;
+export declare function mathRandom(): float;
