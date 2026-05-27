@@ -32,3 +32,4 @@ target/
 extension/node_modules/
 *.rar
 *.zip
+.codegraph/

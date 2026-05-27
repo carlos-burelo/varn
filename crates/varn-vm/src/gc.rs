@@ -239,6 +239,9 @@ impl TricolorMarker {
                     {
                         mark_value(self, heap, v);
                     }
+                    if let Some(super_cls) = cls.superclass.borrow().as_ref() {
+                        mark_value(self, heap, &varn_types::Value::Class(super_cls.clone()));
+                    }
                     for v in cls.statics.borrow().values() {
                         mark_value(self, heap, v);
                     }
