@@ -329,7 +329,6 @@ pub fn run_bench(
     let optimized_precompiled_base = precompiled.clone();
 
     let mut init_vm = Vm::new(optimized_precompiled_base.clone());
-    init_vm.set_no_jit(true);
     for bp in &builtin_protos {
         let closure = Rc::new(Closure::new(Rc::new(bp.clone()), Vec::new(), Vec::new()));
         init_vm
@@ -348,6 +347,7 @@ pub fn run_bench(
     }
     let optimized_precompiled = Rc::new(optimized_precompiled_map);
 
+    init_vm.ctx.run_minor_gc();
     init_vm.collect_gc();
 
     let (snap_globals, snap_heap) = init_vm.snapshot();
@@ -366,7 +366,6 @@ pub fn run_bench(
             snap_heap_ref.clone(),
             precompiled_ref.clone(),
         );
-        machine.set_no_jit(true);
         let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
         let result = machine.run(closure).map(|_| ()).map_err(|e| e.to_string());
         varn_builtins::set_print_silent(false);
@@ -384,7 +383,6 @@ pub fn run_bench(
             snap_heap.clone(),
             optimized_precompiled.clone(),
         );
-        profile_vm.set_no_jit(true);
         profile_vm.enable_opcode_profiling();
         profile_vm.enable_profiling();
         let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
@@ -550,6 +548,7 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     }
     let optimized_precompiled = Rc::new(optimized_precompiled_map);
 
+    init_vm.ctx.run_minor_gc();
     init_vm.collect_gc();
 
     let (snap_globals, snap_heap) = init_vm.snapshot();
