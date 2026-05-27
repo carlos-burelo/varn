@@ -4,6 +4,7 @@ use rustc_hash::FxHashMap;
 use std::rc::Rc;
 
 #[derive(Clone)]
+#[repr(C)]
 pub struct GlobalStore {
     pub values: Vec<VmValue>,
     names: FxHashMap<Rc<str>, usize>,
