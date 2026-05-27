@@ -24,7 +24,7 @@ impl GlobalStore {
         let mut names = FxHashMap::default();
 
         let prioritized = ["print", "assert"];
-        let mut remaining: FxHashMap<Rc<str>, VmValue> = native_map;
+        let mut remaining = native_map;
         for &name in &prioritized {
             if let Some(val) = remaining.remove(name) {
                 let idx = values.len();

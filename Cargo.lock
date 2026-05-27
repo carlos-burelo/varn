@@ -1228,12 +1228,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 
 [[package]]
-name = "rustc-hash"
-version = "2.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "357703d41365b4b27c590e3ed91eabb1b663f07c4c084095e60cbed4362dff0d"
-
-[[package]]
 name = "rustc_version"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1828,7 +1822,7 @@ dependencies = [
  "parking_lot",
  "rand",
  "rust_decimal",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "serde_json",
  "sha2",
  "tiny_http",
@@ -1853,7 +1847,8 @@ dependencies = [
 name = "varn-checker"
 version = "0.1.0"
 dependencies = [
- "rustc-hash 2.1.1",
+ "rustc-hash",
+ "varn-builtins",
  "varn-core",
  "varn-lexer",
  "varn-modules",
@@ -1867,7 +1862,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "postcard",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "serde",
  "serde_json",
  "tower-lsp",
@@ -1890,7 +1885,7 @@ name = "varn-compiler"
 version = "0.1.0"
 dependencies = [
  "rust_decimal",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "varn-bytecode",
  "varn-core",
  "varn-diagnostics",
@@ -1901,7 +1896,7 @@ dependencies = [
 name = "varn-core"
 version = "0.1.0"
 dependencies = [
- "rustc-hash 1.1.0",
+ "rustc-hash",
  "serde",
  "varn-base",
  "varn-diagnostics",
@@ -1920,6 +1915,7 @@ dependencies = [
  "varn-core",
  "varn-lexer",
  "varn-lsp",
+ "varn-modules",
  "varn-parser",
  "varn-types",
 ]
@@ -1951,7 +1947,7 @@ version = "0.1.0"
 dependencies = [
  "dashmap",
  "once_cell",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "serde_json",
  "tokio",
  "tower-lsp",
@@ -2021,7 +2017,7 @@ version = "0.1.0"
 dependencies = [
  "parking_lot",
  "rust_decimal",
- "rustc-hash 1.1.0",
+ "rustc-hash",
  "serde",
  "varn-base",
  "varn-core",
@@ -2033,7 +2029,7 @@ version = "0.1.0"
 dependencies = [
  "parking_lot",
  "rust_decimal",
- "rustc-hash 2.1.1",
+ "rustc-hash",
  "varn-base",
  "varn-builtins",
  "varn-core",
