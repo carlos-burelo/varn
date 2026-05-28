@@ -2030,6 +2030,7 @@ dependencies = [
  "parking_lot",
  "rust_decimal",
  "rustc-hash",
+ "tokio",
  "varn-base",
  "varn-builtins",
  "varn-core",

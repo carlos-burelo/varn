@@ -33,3 +33,6 @@ extension/node_modules/
 *.rar
 *.zip
 .codegraph/
+
+# remove all *.bin files (cache files) in any directory
+**/*.bin
