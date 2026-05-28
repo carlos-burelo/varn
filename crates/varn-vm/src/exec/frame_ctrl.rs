@@ -439,13 +439,18 @@ impl NativeCtx for ExecCtx {
     }
 
     fn call_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String> {
+        self.stack.push(callee);
         self.stack.push(VmValue::null());
         self.stack.extend_from_slice(args);
         let prepared = self
             .prepare_call(callee, args.len() + 1)
             .map_err(|e| e.message)?;
         match prepared {
-            PreparedCall::Native(f, args) => (f)(self as &mut dyn NativeCtx, &args),
+            PreparedCall::Native(f, args) => {
+                let res = (f)(self as &mut dyn NativeCtx, &args);
+                self.stack.pop();
+                res
+            }
             PreparedCall::NativeImmediate(f, arg_count) => {
                 let args_start = self.stack.len() - arg_count;
                 let vm_args: Vec<VmValue> = self.stack[args_start..args_start + arg_count].to_vec();
@@ -471,13 +476,35 @@ impl NativeCtx for ExecCtx {
                 }
                 self.frames.push(frame);
                 let res = self.run_until(depth).map_err(|e| e.message)?;
+                self.stack.pop();
                 Ok(res)
             }
             PreparedCall::PushValue(nv) => {
                 self.stack.pop();
                 Ok(nv)
             }
-            _ => Err("unsupported call from NativeCtx".into()),
+            PreparedCall::Constructor(frame, instance_nv) => {
+                let depth = self.frames.len();
+                let required = frame.base + frame.closure.proto.register_count as usize;
+                if self.stack.len() < required {
+                    self.stack.resize(required, VmValue::null());
+                }
+                self.frames.push(frame);
+                self.pending_constructors.push((depth, instance_nv));
+                let _ = self.run_until(depth).map_err(|e| e.message)?;
+                self.stack.pop();
+                Ok(instance_nv)
+            }
+            PreparedCall::NativeConstructor(f, args, instance_nv) => {
+                let result = (f)(self as &mut dyn NativeCtx, &args).map_err(|e| e)?;
+                self.stack.pop();
+                let nv = if result.is_null() {
+                    instance_nv
+                } else {
+                    result
+                };
+                Ok(nv)
+            }
         }
     }
 
@@ -504,8 +531,19 @@ impl NativeCtx for ExecCtx {
 
     fn suspend_timer(&mut self, ms: u64) -> VmValue {
         let output = varn_types::AsyncTask::pending();
-        std::thread::sleep(std::time::Duration::from_millis(ms));
-        output.resolve(varn_types::Value::Null);
+        let output_clone = output.clone();
+        
+        let spawned = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            tokio::task::spawn_local(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+                output_clone.resolve(varn_types::Value::Null);
+            });
+        })).is_ok();
+
+        if !spawned {
+            std::thread::sleep(std::time::Duration::from_millis(ms));
+            output.resolve(varn_types::Value::Null);
+        }
         self.heap.intern(varn_types::Value::TaskHandle(output))
     }
 
@@ -545,6 +583,7 @@ impl ExecCtx {
         }
         let callee_nv = self.heap.intern(callee);
         let arg_nvs: Vec<_> = args.iter().cloned().map(|a| self.heap.intern(a)).collect();
+        self.stack.push(callee_nv);
         self.stack.push(VmValue::null());
         self.stack.extend(arg_nvs);
         let prepared = self

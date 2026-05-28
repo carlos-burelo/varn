@@ -90,4 +90,39 @@ pub(crate) mod dispatch {
         set_int(ctx, obj, "millisecond", (ms % 1000) as i64);
         Ok(obj)
     }
+
+    #[varn_fn("timePartsToMs")]
+    pub fn raw_parts_to_ms(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+        let obj = args.first().copied().ok_or("timePartsToMs: expected parts object")?;
+        
+        let get_int = |key: &str| -> i64 {
+            ctx.get_field(obj, key)
+                .and_then(|v| {
+                    if let Value::Int(n) = ctx.extract(v) {
+                        Some(n)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(0)
+        };
+
+        let year = get_int("year") as i32;
+        let month = get_int("month") as u32;
+        let day = get_int("day") as u32;
+        let hour = get_int("hour") as u32;
+        let minute = get_int("minute") as u32;
+        let second = get_int("second") as u32;
+        let millisecond = get_int("millisecond") as u32;
+
+        use chrono::{TimeZone, Utc, Timelike};
+        let dt = Utc
+            .with_ymd_and_hms(year, month, day, hour, minute, second)
+            .single()
+            .ok_or_else(|| "Invalid date parts".to_string())?
+            .with_nanosecond(millisecond * 1_000_000)
+            .ok_or_else(|| "Invalid millisecond".to_string())?;
+
+        Ok(VmValue::from_int(dt.timestamp_millis()))
+    }
 }

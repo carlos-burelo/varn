@@ -1,4 +1,16 @@
-import { fsRead, fsWrite, fsExists } from "runtime:fs";
+import {
+    fsRead,
+    fsWrite,
+    fsExists,
+    fsStat,
+    fsMkdir,
+    fsMkdirAll,
+    fsReadDir,
+    fsRemove,
+    fsRemoveAll,
+    fsRename,
+    fsTempDir
+} from "runtime:fs";
 
 export class Stats {
     size: int;
@@ -36,26 +48,37 @@ export namespace fs {
     }
 
     export function stat(path: str): Stats {
-        return new Stats(0, false, true, 0);
+        let raw = fsStat(path);
+        return new Stats(
+            raw["size"] as int,
+            raw["isDir"] as bool,
+            raw["isFile"] as bool,
+            raw["mtime"] as int
+        );
     }
 
     export function mkdir(path: str): void {
+        fsMkdir(path);
     }
 
     export function mkdirAll(path: str): void {
+        fsMkdirAll(path);
     }
 
     export function readDir(path: str): str[] {
-        return [];
+        return fsReadDir(path) as str[];
     }
 
     export function remove(path: str): void {
+        fsRemove(path);
     }
 
     export function removeAll(path: str): void {
+        fsRemoveAll(path);
     }
 
     export function rename(from: str, to: str): void {
+        fsRename(from, to);
     }
 
     export function copy(from: str, to: str): void {
@@ -64,6 +87,6 @@ export namespace fs {
     }
 
     export function tempDir(): str {
-        return ".";
+        return fsTempDir();
     }
 }

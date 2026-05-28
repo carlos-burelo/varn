@@ -29,3 +29,5 @@ export declare function httpSendResponse(
     contentType: str,
     headers: { [key: str]: str }
 ): void;
+
+export declare function httpClose(serverId: int): void;
