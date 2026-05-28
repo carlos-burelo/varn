@@ -1,4 +1,4 @@
-import { timeNowMs, timeParseIsoDuration, timeMsToParts } from "runtime:time";
+import { timeNowMs, timeParseIsoDuration, timeMsToParts, timePartsToMs } from "runtime:time";
 
 export type TimeParts = {
     year: int;
@@ -71,7 +71,7 @@ export namespace Time {
     }
 
     export function fromParts(parts: TimeParts): int {
-        return 0;
+        return timePartsToMs(parts);
     }
 
     export function durationFromString(s: str): int {

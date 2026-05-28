@@ -8,7 +8,6 @@ pub mod op_meta;
 pub mod opcode;
 pub mod paths;
 pub mod source;
-pub mod stdlib;
 pub mod time;
 pub mod token;
 pub mod typed_ir;

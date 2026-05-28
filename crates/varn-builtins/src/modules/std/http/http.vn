@@ -1,95 +1,213 @@
-// std:http — Pure Varn facade over runtime HTTP host operations.
+// std:http — Clean, modern, object-oriented HTTP client and server APIs for Varn.
 
 import {
     httpFetch,
     httpCreateServer,
     httpAddRoute,
     httpListen,
-    httpSendResponse
+    httpSendResponse,
+    httpClose
 } from "runtime:http";
 
 import { JSON } from "std:json";
 
-export interface Response {
-    status: int;
-    statusText: str;
-    ok: bool;
-    body: str;
-    headers: { [key: str]: str };
-}
-
-export interface Request {
+/**
+ * HttpRequest represents an incoming client HTTP request in Varn.
+ */
+export class HttpRequest {
     method: str;
     path: str;
     query: { [key: str]: str };
     params: { [key: str]: str };
     body: str;
     headers: { [key: str]: str };
+
+    /**
+     * Parses the incoming request body from raw string into dynamic JSON.
+     */
+    json(): dynamic {
+        return JSON.parse(this.body);
+    }
 }
 
-export class ServerResponse {
+/**
+ * HttpResponse offers a fluent, modern Express-like builder API 
+ * to construct and send responses elegantly.
+ */
+export class HttpResponse {
     private isSent: bool = false;
+    private statusCode: int = 200;
+    private responseHeaders: { [key: str]: str } = {};
+    private responseContentType: str = "text/plain";
 
-    send(status: int, body: str, contentType: str = "text/plain", headers: { [key: str]: str } = {}): void {
+    /**
+     * Sets the HTTP status code of the response.
+     */
+    status(code: int): HttpResponse {
+        this.statusCode = code;
+        return this;
+    }
+
+    /**
+     * Sets a custom HTTP response header.
+     */
+    header(name: str, value: str): HttpResponse {
+        this.responseHeaders[name] = value;
+        return this;
+    }
+
+    /**
+     * Sets the Content-Type header of the response.
+     */
+    type(contentType: str): HttpResponse {
+        this.responseContentType = contentType;
+        return this;
+    }
+
+    /**
+     * Sends the response body back to the client.
+     */
+    send(body: str): void {
         if (this.isSent) return;
-        Http.sendResponse(status, body, contentType, headers);
+        httpSendResponse(this.statusCode, body, this.responseContentType, this.responseHeaders);
         this.isSent = true;
     }
 
-    json(data: dynamic, status: int = 200): void {
-        this.send(status, JSON.stringify(data), "application/json");
+    /**
+     * Serializes dynamic data into JSON and sends it.
+     */
+    json(data: dynamic): void {
+        this.type("application/json").send(JSON.stringify(data));
     }
 
-    html(html: str, status: int = 200): void {
-        this.send(status, html, "text/html");
+    /**
+     * Sends a dynamic HTML document.
+     */
+    html(htmlContent: str): void {
+        this.type("text/html").send(htmlContent);
     }
 }
 
-export namespace Http {
-    export async function fetch(
-        url: str,
-        method?: str,
-        headers?: { [key: str]: str },
-        body?: str,
-        timeoutMs?: int
-    ): Task<Response> {
-        let response_body = await httpFetch(url, method, headers, body, timeoutMs);
-        return {
-            status: 200,
-            statusText: "OK",
-            ok: true,
-            body: response_body as str,
-            headers: {}
-        };
+/**
+ * HttpServer makes deploying web servers in Varn extremely elegant,
+ * supporting fluent HTTP method routing, dynamic params, and query extractions.
+ */
+export class HttpServer {
+    private id: int;
+    private isListening: bool = false;
+
+    constructor() {
+        this.id = httpCreateServer();
     }
 
-    export function createServer(): int {
-        return httpCreateServer();
+    /**
+     * Registers a GET route.
+     */
+    get(pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
+        httpAddRoute(this.id, "GET", pattern, handler);
+        return this;
     }
 
-    export function addRoute(
-        serverId: int,
-        method: str,
-        pattern: str,
-        callback: (req: Request, res: ServerResponse) => void
-    ): void {
-        httpAddRoute(serverId, method, pattern, callback);
+    /**
+     * Registers a POST route.
+     */
+    post(pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
+        httpAddRoute(this.id, "POST", pattern, handler);
+        return this;
     }
 
-    export function listen(
-        serverId: int,
-        port: int,
-        responseCtor: dynamic
-    ): void {
-        httpListen(serverId, port, responseCtor);
+    /**
+     * Registers a PUT route.
+     */
+    put(pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
+        httpAddRoute(this.id, "PUT", pattern, handler);
+        return this;
     }
 
-    export function sendResponse(
-        status: int,
-        body: str,
-        contentType: str,
-        headers: { [key: str]: str }
-    ): void {
-        httpSendResponse(status, body, contentType, headers);
+    /**
+     * Registers a DELETE route.
+     */
+    delete(pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
+        httpAddRoute(this.id, "DELETE", pattern, handler);
+        return this;
     }
+
+    /**
+     * Registers a route for any specific HTTP method.
+     */
+    route(method: str, pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
+        httpAddRoute(this.id, method.toUpperCase(), pattern, handler);
+        return this;
+    }
+
+    /**
+     * Starts listening on the specified port.
+     */
+    listen(port: int): void {
+        if (this.isListening) return;
+        this.isListening = true;
+        httpListen(this.id, port, HttpResponse);
+    }
+
+    /**
+     * Gracefully stops the server.
+     */
+    close(): void {
+        if (!this.isListening) return;
+        httpClose(this.id);
+        this.isListening = false;
+    }
+}
+
+/**
+ * Response represents the parsed response received by the HTTP client.
+ */
+export class Response {
+    status: int;
+    statusText: str;
+    ok: bool;
+    body: str;
+    headers: { [key: str]: str };
+
+    constructor(status: int, statusText: str, ok: bool, body: str, headers: { [key: str]: str }) {
+        this.status = status;
+        this.statusText = statusText;
+        this.ok = ok;
+        this.body = body;
+        this.headers = headers;
+    }
+
+    /**
+     * Returns the raw response body.
+     */
+    text(): str {
+        return this.body;
+    }
+
+    /**
+     * Parses the response body as JSON.
+     */
+    json(): dynamic {
+        return JSON.parse(this.body);
+    }
+}
+
+/**
+ * Fetches resources from the network asynchronously.
+ */
+export async function fetch(
+    url: str,
+    method: str = "GET",
+    headers: { [key: str]: str } = {},
+    body: str = "",
+    timeoutMs: int = 5000
+): Task<Response> {
+    let response_body = await httpFetch(url, method, headers, body, timeoutMs);
+    return new Response(
+        200,
+        "OK",
+        true,
+        response_body as str,
+        {}
+    );
 }

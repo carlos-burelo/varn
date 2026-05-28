@@ -11,6 +11,7 @@ varn-types    = { path = "../varn-types" }
 varn-core     = { path = "../varn-core" }
 varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
 varn-runtime  = { path = "../varn-runtime" }
+tokio         = { version = "1", features = ["time", "rt"] }
 varn-modules  = { path = "../varn-modules" }
 varn-base     = { path = "../varn-base" }
 parking_lot  = "0.12"
