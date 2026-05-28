@@ -40,6 +40,7 @@ import "./39-package-imports.vn"
 import "./40-named-arguments.vn"
 import "./41-advanced-enums.vn"
 import "./42-stdlib-comprehensive-test.vn"
+import "./43-server-client-http.vn"
 
-print("\nModules executed in suite: 42")
+print("\nModules executed in suite: 43")
 assertSummary()

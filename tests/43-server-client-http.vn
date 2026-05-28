@@ -1,0 +1,30 @@
+import { fetch, HttpServer } from "std:http";
+
+// 1. Test Client: Fetch GET
+let getTask = fetch("https://varn-lang.dev");
+let getRes = await getTask;
+assert("Http client fetch GET status", getRes.status === 200);
+assert("Http client fetch GET body", getRes.text().length > 0);
+
+// 2. Test Client: Fetch POST with body & headers
+let postTask = fetch("https://varn-lang.dev/api", "POST", { "Content-Type": "application/json" }, '{"message":"hello"}');
+let postRes = await postTask;
+assert("Http client fetch POST status", postRes.status === 200);
+assert("Http client fetch POST body", postRes.text().length > 0);
+
+// 3. Test Server registration & routing configuration
+let server = new HttpServer();
+assert("Http server created successfully", server !== null);
+
+// Adding valid routes using fluent chain
+server.get("/api/v1/users", (req, res) => {
+    res.status(200).send("users");
+})
+.post("/api/v1/users", (req, res) => {
+    res.status(200).json({ created: true });
+})
+.get("/api/v1/users/:id", (req, res) => {
+    res.status(200).html("<h1>User Profile</h1>");
+});
+
+print("[PASSED] 43. Varn Native HTTP Client and Server Config Verification");
