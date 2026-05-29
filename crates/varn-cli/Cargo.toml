@@ -9,7 +9,7 @@ name = "vn"
 path = "src/main.rs"
 
 [dependencies]
-varn-pipeline = { path = "../varn-pipeline" }
+varn-pipeline = { path = "../varn-pipeline", features = ["lsp-debug"] }
 varn-core     = { path = "../varn-core" }
 varn-parser   = { path = "../varn-parser", features = ["profiling"] }
 varn-checker  = { path = "../varn-checker" }

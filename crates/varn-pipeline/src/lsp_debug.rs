@@ -185,6 +185,53 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
         eprintln!();
     }
 
+    if flags.lsp_colorize {
+        eprintln!(
+            "  {BOLD}{BLUE}Annotated Source:{RESET}  {DIM}(token#tag  tags: kw=keyword  ty=type  fn=function  cls=class  var=variable  param  prop=property  num=number  str=string  em=enum  ns=namespace  iface  tp=type_param){RESET}",
+            BOLD = BOLD,
+            BLUE = BLUE,
+            DIM = DIM,
+            RESET = R
+        );
+
+        let mut abs_spans: Vec<(u32, u32, u32, u32)> = Vec::new();
+        {
+            let mut curr_line = 0u32;
+            let mut curr_col = 0u32;
+            for chunk in sem_tokens.chunks_exact(5) {
+                curr_line += chunk[0];
+                curr_col = if chunk[0] == 0 { curr_col + chunk[1] } else { chunk[1] };
+                abs_spans.push((curr_line, curr_col, chunk[2], chunk[3]));
+            }
+        }
+
+        let mut line_spans: std::collections::HashMap<u32, Vec<(u32, u32, u32)>> =
+            std::collections::HashMap::new();
+        for (line, col, len, tt) in &abs_spans {
+            line_spans.entry(*line).or_default().push((*col, *len, *tt));
+        }
+
+        let source_lines: Vec<&str> = source.lines().collect();
+        let gutter = source_lines.len().to_string().len();
+
+        for (line_idx, line_text) in source_lines.iter().enumerate() {
+            let line_num = line_idx as u32;
+            let empty = vec![];
+            let mut spans = line_spans.get(&line_num).unwrap_or(&empty).clone();
+            spans.sort_by_key(|(col, _, _)| *col);
+            let colored = annotate_line(line_text, &spans);
+            eprintln!(
+                "  {DIM}{:>gutter$} │{RESET} {}",
+                line_idx + 1,
+                colored,
+                DIM = DIM,
+                RESET = R,
+                gutter = gutter
+            );
+        }
+        eprintln!();
+    }
+
     if !analysis.diagnostics.is_empty() {
         eprintln!(
             "  {BOLD}{BLUE}LSP Diagnostics:{RESET}",
@@ -212,6 +259,55 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
             sem_tokens.len() / 5
         ),
     );
+}
+
+fn annotate_line(line: &str, spans: &[(u32, u32, u32)]) -> String {
+    if spans.is_empty() {
+        return line.to_string();
+    }
+    let chars: Vec<char> = line.chars().collect();
+    let char_len = chars.len();
+    let mut result = String::new();
+    let mut pos = 0usize;
+    for &(col, len, tt) in spans {
+        let col = col as usize;
+        let end = (col + len as usize).min(char_len);
+        if col > char_len {
+            break;
+        }
+        if col > pos {
+            result.extend(&chars[pos..col]);
+        }
+        let token_text: String = chars[col..end].iter().collect();
+        result.push_str(&token_text);
+        result.push_str("\x1b[34m#");
+        result.push_str(tt_to_tag(tt));
+        result.push_str("\x1b[0m");
+        pos = end;
+    }
+    if pos < char_len {
+        result.extend(&chars[pos..]);
+    }
+    result
+}
+
+fn tt_to_tag(tt: u32) -> &'static str {
+    match tt {
+        0 => "kw",
+        1 => "ty",
+        2 => "var",
+        3 => "fn",
+        4 => "cls",
+        5 => "param",
+        6 => "prop",
+        7 => "num",
+        8 => "str",
+        9 => "em",
+        10 => "ns",
+        11 => "iface",
+        12 => "tp",
+        _ => "?",
+    }
 }
 
 fn find_lexeme(
