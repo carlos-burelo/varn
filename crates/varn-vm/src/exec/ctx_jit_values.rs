@@ -214,6 +214,42 @@ pub extern "C" fn jit_call(ctx: *mut ExecCtx, args: *const varn_jit::JitCallArgs
 
         ctx_ref.frames[frame_idx].ip = args.ip;
 
+        // Fast path: plain NativeFn — skips exec_call_reg dispatch + BoundMethod check
+        if args.callee.is_heap() {
+            if let Some(crate::heap::HeapObj::NativeFn(_name, f)) =
+                ctx_ref.heap.get(args.callee.as_heap_idx())
+            {
+                let f = *f;
+                ctx_ref.record_call_native();
+                let arg_base = base + args.arg_start;
+                // stack layout: [callee, arg1, arg2, ...]; actual args start at +1
+                let result = if args.arg_count <= 1 {
+                    (f)(ctx_ref as &mut dyn varn_types::NativeCtx, &[])
+                } else {
+                    let actual_count = args.arg_count - 1;
+                    if actual_count <= 8 {
+                        let mut buf = [VmValue::null(); 8];
+                        for i in 0..actual_count {
+                            buf[i] = ctx_ref.stack[arg_base + 1 + i];
+                        }
+                        (f)(ctx_ref as &mut dyn varn_types::NativeCtx, &buf[..actual_count])
+                    } else {
+                        let vargs: Vec<VmValue> = (1..=actual_count)
+                            .map(|i| ctx_ref.stack[arg_base + i])
+                            .collect();
+                        (f)(ctx_ref as &mut dyn varn_types::NativeCtx, &vargs)
+                    }
+                };
+                let v = match result {
+                    Ok(v) => v,
+                    Err(e) => panic!("Runtime error in JIT native call: {:?}", e),
+                };
+                ctx_ref.stack[base + args.dest] = v;
+                return v;
+            }
+        }
+
+        // General dispatch
         let res = ctx_ref.exec_call_reg(
             args.callee,
             base,
