@@ -41,3 +41,12 @@ extension/node_modules/
 .codegraph/codegraph.db-wal
 docs/OPTIMIZATIONS.md
 tests/.vn/**
+
+# all .vn/ folder in any directory
+**/.vn/
+*.txt
+*.log
+
+# all .lock and all .bin files in any directory
+**/*.lock
+**/*.bin

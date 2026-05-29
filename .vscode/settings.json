@@ -5,5 +5,9 @@
   "Varn.run.verbose": false,
   "Varn.run.debugPhases": [],
   "Varn.codeLens.enabled": true,
-  "Varn.buildMode": "debug"
+  "Varn.buildMode": "debug",
+  "editor.semanticHighlighting.enabled": true,
+  "[Varn]": {
+    "editor.semanticHighlighting.enabled": true
+}
 }
