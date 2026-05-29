@@ -152,6 +152,18 @@ pub fn dot_receiver(
                     return Some(ReceiverInfo::Named(tag.name().to_owned(), true));
                 }
             }
+            varn_core::TypeKind::LiteralStr(_) => {
+                return Some(ReceiverInfo::Named("str".to_owned(), true));
+            }
+            varn_core::TypeKind::LiteralInt(_) => {
+                return Some(ReceiverInfo::Named("int".to_owned(), true));
+            }
+            varn_core::TypeKind::LiteralFloat(_) => {
+                return Some(ReceiverInfo::Named("float".to_owned(), true));
+            }
+            varn_core::TypeKind::LiteralBool(_) => {
+                return Some(ReceiverInfo::Named("bool".to_owned(), true));
+            }
             varn_core::TypeKind::Named(name, _) | varn_core::TypeKind::Generic(name, ..) => {
                 let mut is_instance = true;
                 if let Some(sym) = state
@@ -351,6 +363,23 @@ pub fn pattern_receiver(state: &DocumentState, line: u32, col: u32) -> Option<Re
             varn_core::TypeKind::Object(members) => {
                 let recs = members.iter().filter_map(type_member_to_record).collect();
                 return Some(ReceiverInfo::Anonymous(recs));
+            }
+            varn_core::TypeKind::Intrinsic(tag) => {
+                if tag.is_primitive() || *tag == varn_core::TypeTag::Array {
+                    return Some(ReceiverInfo::Named(tag.name().to_owned(), true));
+                }
+            }
+            varn_core::TypeKind::LiteralStr(_) => {
+                return Some(ReceiverInfo::Named("str".to_owned(), true));
+            }
+            varn_core::TypeKind::LiteralInt(_) => {
+                return Some(ReceiverInfo::Named("int".to_owned(), true));
+            }
+            varn_core::TypeKind::LiteralFloat(_) => {
+                return Some(ReceiverInfo::Named("float".to_owned(), true));
+            }
+            varn_core::TypeKind::LiteralBool(_) => {
+                return Some(ReceiverInfo::Named("bool".to_owned(), true));
             }
             varn_core::TypeKind::Named(name, _) | varn_core::TypeKind::Generic(name, ..) => {
                 return Some(ReceiverInfo::Named(name.to_string(), true));

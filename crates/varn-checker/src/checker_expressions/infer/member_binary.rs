@@ -54,9 +54,6 @@ pub(super) fn infer_member_type(
         }
     };
 
-    if let Some(res) = checker.find_member_info(&obj_ty, prop_name.as_ref(), bind) {
-        return wrap_async_method_type(res.0);
-    }
 
     match &obj_ty.0 {
         TypeKind::Named(class_name, _origin) | TypeKind::Generic(class_name, _, _origin) => {

@@ -277,6 +277,7 @@ impl super::Binder {
             }
             ClassMember::Method {
                 key,
+                type_params,
                 params,
                 return_type,
                 modifiers,
@@ -321,11 +322,16 @@ impl super::Binder {
                     })
                     .collect();
 
+                let fn_tps: Vec<Rc<str>> = type_params
+                    .iter()
+                    .map(|tp| Rc::from(tp.name.as_str()))
+                    .collect();
+
                 let fn_ty = Type::fn_(FunctionType {
                     params: ps,
                     return_type: Box::new(ret),
                     is_arrow: false,
-                    type_params: vec![],
+                    type_params: fn_tps,
                 });
 
                 members.push(ClassMemberInfo {

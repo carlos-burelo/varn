@@ -62,7 +62,12 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
     for sym in &state.symbols {
         if matches!(
             sym.kind,
-            SymbolKind::Class | SymbolKind::Interface | SymbolKind::Enum
+            SymbolKind::Class
+                | SymbolKind::Interface
+                | SymbolKind::Enum
+                | SymbolKind::Const
+                | SymbolKind::Let
+                | SymbolKind::Var
         ) {
             for member in &sym.members {
                 if member.line == u32::MAX {
@@ -72,7 +77,13 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
                     MemberKind::Property
                     | MemberKind::Variable
                     | MemberKind::Getter
-                    | MemberKind::Setter => TT_PROPERTY,
+                    | MemberKind::Setter => {
+                        if matches!(member.ty.0, varn_core::TypeKind::Fn(_)) {
+                            TT_FUNCTION
+                        } else {
+                            TT_PROPERTY
+                        }
+                    }
                     MemberKind::Method | MemberKind::Function => TT_FUNCTION,
                     MemberKind::Constructor => continue,
                     MemberKind::Class | MemberKind::Namespace | MemberKind::Struct => TT_CLASS,
@@ -131,7 +142,7 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
                             match s.kind {
                                 SymbolKind::Function | SymbolKind::Method => TT_FUNCTION,
                                 SymbolKind::Class | SymbolKind::Struct => TT_CLASS,
-                                SymbolKind::Extension => TT_VARIABLE,
+                                SymbolKind::Extension => TT_CLASS,
                                 SymbolKind::Namespace => TT_NAMESPACE,
                                 SymbolKind::Interface => TT_INTERFACE,
                                 SymbolKind::TypeAlias | SymbolKind::Enum => TT_TYPE,
@@ -161,10 +172,18 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
                             }
                         }
                         crate::document::ChainResult::Member { member, .. } => {
-                            classify::map_member_kind_to_tt(&member.kind)
+                            if matches!(member.ty.0, varn_core::TypeKind::Fn(_)) {
+                                TT_FUNCTION
+                            } else {
+                                classify::map_member_kind_to_tt(&member.kind)
+                            }
                         }
                         crate::document::ChainResult::DynamicMember { member, .. } => {
-                            classify::map_member_kind_to_tt(&member.kind)
+                            if matches!(member.ty.0, varn_core::TypeKind::Fn(_)) {
+                                TT_FUNCTION
+                            } else {
+                                classify::map_member_kind_to_tt(&member.kind)
+                            }
                         }
                     });
                 }
@@ -173,12 +192,16 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
 
         if token_type.is_none() {
             if let Some((_, _, m)) = query::member_at(state, tok.line, tok.col) {
-                token_type = Some(classify::map_member_kind_to_tt(&m.kind));
+                token_type = Some(if matches!(m.ty.0, varn_core::TypeKind::Fn(_)) {
+                    TT_FUNCTION
+                } else {
+                    classify::map_member_kind_to_tt(&m.kind)
+                });
             }
         }
 
         if token_type.is_none() {
-            token_type = if tok.kind == TokenKind::Identifier
+            token_type = if (tok.kind == TokenKind::Identifier || tok.kind.is_keyword())
                 && !prev_is_dot
                 && !next_is_lparen
                 && paren_depth > 0
@@ -193,13 +216,38 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
                 } else {
                     Some(TT_PARAMETER)
                 }
-            } else if tok.kind == TokenKind::Identifier
+            } else if (tok.kind == TokenKind::Identifier || tok.kind.is_keyword())
                 && !prev_is_dot
                 && !next_is_lparen
                 && paren_depth == 0
                 && next_is_colon
             {
-                Some(TT_PROPERTY)
+                let is_fn_val = if let Some(val_tok) = tokens.get(i + 2) {
+                    match val_tok.kind {
+                        TokenKind::LParen | TokenKind::Function | TokenKind::Async | TokenKind::Lt => true,
+                        TokenKind::Identifier => {
+                            if let Some((_, ty)) = state.db.resolve_at(&val_tok.lexeme, val_tok.offset) {
+                                matches!(ty.0, varn_core::TypeKind::Fn(_))
+                            } else {
+                                false
+                            }
+                        }
+                        _ => false,
+                    }
+                } else {
+                    false
+                };
+                if is_fn_val {
+                    Some(TT_FUNCTION)
+                } else if let Some((_, _, m)) = query::member_at(state, tok.line, tok.col) {
+                    if matches!(m.ty.0, varn_core::TypeKind::Fn(_)) {
+                        Some(TT_FUNCTION)
+                    } else {
+                        Some(TT_PROPERTY)
+                    }
+                } else {
+                    Some(TT_PROPERTY)
+                }
             } else if tok.kind == TokenKind::Identifier
                 && !prev_is_dot
                 && !next_is_lparen

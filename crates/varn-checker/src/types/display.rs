@@ -5,7 +5,15 @@ impl fmt::Display for Type {
         match &self.0 {
             TypeKind::Intrinsic(tag) => write!(f, "{}", tag.name()),
             TypeKind::This => write!(f, "this"),
-            TypeKind::Array(t) => write!(f, "{t}[]"),
+            TypeKind::Array(t) => {
+                match &t.0 {
+                    TypeKind::Union(_)
+                    | TypeKind::Intersection(_)
+                    | TypeKind::Fn(_)
+                    | TypeKind::Conditional { .. } => write!(f, "({t})[]"),
+                    _ => write!(f, "{t}[]"),
+                }
+            }
             TypeKind::Union(members) => {
                 let non_null: Vec<_> = members.iter().filter(|m| !m.is_nullable()).collect();
                 if non_null.len() == 1 && non_null.len() < members.len() {

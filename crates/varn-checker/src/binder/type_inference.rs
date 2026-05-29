@@ -101,6 +101,9 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
         ExprKind::Identifier { name } => ctx
             .and_then(|c| c.resolve_symbol(name))
             .unwrap_or(Type::Dynamic),
+        ExprKind::This => ctx
+            .and_then(|c| c.resolve_symbol("this"))
+            .unwrap_or(Type::This),
         ExprKind::Arrow {
             params,
             return_type,
@@ -153,6 +156,7 @@ fn infer_member(
         return match &obj_ty.0 {
             TypeKind::Array(inner) => (**inner).clone(),
             TypeKind::Intrinsic(varn_core::TypeTag::Str) => Type::Str,
+            TypeKind::Named(name, _) if name.as_ref() == "str" => Type::Str,
             _ => Type::Dynamic,
         };
     }

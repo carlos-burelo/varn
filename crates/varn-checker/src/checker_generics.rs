@@ -4,7 +4,7 @@ use crate::symbol::SymbolKind;
 use crate::types::{FunctionParam, FunctionType, Type};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
-use varn_core::ast::{Arg, ArrowBody, Expr, ExprKind, Stmt, StmtKind, TypeNode};
+use varn_core::ast::{Arg, ArrowBody, Expr, ExprKind, Param, Stmt, StmtKind, TypeNode};
 use varn_core::TypeKind;
 
 pub(crate) fn build_generic_mapping(
@@ -66,10 +66,40 @@ pub(crate) fn infer_mapping_from_args(
     bind: &BindResult,
 ) -> FxHashMap<Rc<str>, Type> {
     let mut mapping = FxHashMap::default();
+    
+    // Pass 1: Process non-arrow/non-callback arguments to resolve as many generic type parameters as possible
     for (param, arg) in param_types.iter().zip(args.iter()) {
+        let is_arrow = match arg {
+            Arg::Positional(e) => matches!(e.kind, ExprKind::Arrow { .. }),
+            Arg::Named { value, .. } => matches!(value.kind, ExprKind::Arrow { .. }),
+            _ => false,
+        };
+        if is_arrow {
+            continue;
+        }
+        let arg_ty = match arg {
+            Arg::Positional(e) => checker.infer_type(e, bind),
+            Arg::Named { value, .. } => checker.infer_type(value, bind),
+            Arg::Spread(_) => continue,
+        };
+        collect_type_inferences(&param.ty, &arg_ty, type_params, &mut mapping);
+    }
+
+    // Pass 2: Process arrow/callback arguments using the partially resolved type parameter mappings so far
+    for (param, arg) in param_types.iter().zip(args.iter()) {
+        let is_arrow = match arg {
+            Arg::Positional(e) => matches!(e.kind, ExprKind::Arrow { .. }),
+            Arg::Named { value, .. } => matches!(value.kind, ExprKind::Arrow { .. }),
+            _ => false,
+        };
+        if !is_arrow {
+            continue;
+        }
+        
+        let mapped_param_ty = map_generics_cached(checker, &param.ty, &mapping);
         let arg_ty = match arg {
             Arg::Positional(e) => {
-                if let TypeKind::Fn(expected_fn) = &param.ty.0 {
+                if let TypeKind::Fn(expected_fn) = &mapped_param_ty.0 {
                     if let Some(concrete) = infer_arrow_with_context(e, expected_fn, checker, bind)
                     {
                         collect_type_inferences(&param.ty, &concrete, type_params, &mut mapping);
@@ -83,6 +113,7 @@ pub(crate) fn infer_mapping_from_args(
         };
         collect_type_inferences(&param.ty, &arg_ty, type_params, &mut mapping);
     }
+
     mapping
 }
 
@@ -98,12 +129,47 @@ fn infer_arrow_with_context(
 
     let mut actual_params = Vec::new();
     for (ap, ep) in params.iter().zip(expected_fn.params.iter()) {
+        let explicit_ty = ap
+            .type_ann
+            .as_ref()
+            .or(match &ap.pattern {
+                varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                _ => None,
+            })
+            .map(|m| checker.resolve_type_node_cached(m, bind));
+
         actual_params.push(FunctionParam {
             name: Some(Rc::from(pattern_lead_name(&ap.pattern))),
-            ty: ep.ty.clone(),
+            ty: explicit_ty.unwrap_or_else(|| ep.ty.clone()),
             optional: ap.is_optional,
             is_rest: ap.is_rest,
         });
+    }
+
+    let arrow_scope = find_arrow_scope(checker.current_scope, params, bind);
+    let saved_scope = checker.current_scope;
+    
+    if let Some(scope_id) = arrow_scope {
+        checker.current_scope = scope_id;
+        for (ap, ep) in params.iter().zip(expected_fn.params.iter()) {
+            let name = pattern_lead_name(&ap.pattern);
+            if !name.is_empty() && name != "_" {
+                let scope = bind.scopes.get(scope_id);
+                if let Some(sym_id) = scope.resolve(&name, &bind.scopes) {
+                    let explicit_ty = ap
+                        .type_ann
+                        .as_ref()
+                        .or(match &ap.pattern {
+                            varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                            _ => None,
+                        })
+                        .map(|m| checker.resolve_type_node_cached(m, bind));
+                    
+                    let ty = explicit_ty.unwrap_or_else(|| ep.ty.clone());
+                    checker.symbol_types.insert(sym_id, ty);
+                }
+            }
+        }
     }
 
     let ret_ty = match body.as_ref() {
@@ -130,12 +196,51 @@ fn infer_arrow_with_context(
         }
     };
 
+    if arrow_scope.is_some() {
+        checker.current_scope = saved_scope;
+    }
+
     Some(Type::fn_(FunctionType {
         params: actual_params,
         return_type: Box::new(ret_ty),
         is_arrow: true,
         type_params: Vec::new(),
     }))
+}
+
+fn find_arrow_scope(
+    current_scope: crate::scope::ScopeId,
+    params: &[Param],
+    bind: &BindResult,
+) -> Option<crate::scope::ScopeId> {
+    if params.is_empty() {
+        return None;
+    }
+    let param_names: Vec<&str> = params
+        .iter()
+        .map(|p| pattern_lead_name(&p.pattern))
+        .filter(|name| !name.is_empty() && *name != "_")
+        .collect();
+
+    if param_names.is_empty() {
+        return None;
+    }
+
+    let children = &bind.scopes.get(current_scope).children;
+    for &child_id in children {
+        let child_scope = bind.scopes.get(child_id);
+        let mut matches = true;
+        for name in &param_names {
+            if !child_scope.bindings.contains_key(*name) {
+                matches = false;
+                break;
+            }
+        }
+        if matches {
+            return Some(child_id);
+        }
+    }
+    None
 }
 
 fn collect_returns(stmt: &Stmt, out: &mut Vec<Type>, checker: &mut Checker, bind: &BindResult) {

@@ -175,8 +175,14 @@ impl Checker {
             ExprKind::Spawn { argument } => self.check_expr(argument, bind),
             ExprKind::Try { expression } => self.check_expr(expression, bind),
             ExprKind::Yield { argument, .. } => {
-                if let Some(arg) = argument {
+                let ty = if let Some(arg) = argument {
                     self.check_expr(arg, bind);
+                    self.infer_type(arg, bind)
+                } else {
+                    Type::Void
+                };
+                if let Some(yields) = &mut self.yielded_types {
+                    yields.push(ty);
                 }
             }
             ExprKind::Unary { operand, .. } => self.check_expr(operand, bind),

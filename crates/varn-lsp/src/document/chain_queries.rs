@@ -258,7 +258,11 @@ impl DocumentState {
             TypeKind::Named(_, _)
             | TypeKind::Generic(_, _, _)
             | TypeKind::Intrinsic(_)
-            | TypeKind::Array(_) => {
+            | TypeKind::Array(_)
+            | TypeKind::LiteralStr(_)
+            | TypeKind::LiteralInt(_)
+            | TypeKind::LiteralFloat(_)
+            | TypeKind::LiteralBool(_) => {
                 let mapping = if let TypeKind::Generic(gname, type_args, _) = &ty.0 {
                     self.build_generic_mapping_lsp(gname, type_args)
                 } else {
@@ -611,6 +615,10 @@ fn type_name_str(ty: &Type) -> Option<String> {
             }
         }
         TypeKind::Array(_) => Some("Array".to_owned()),
+        TypeKind::LiteralStr(_) => Some("str".to_owned()),
+        TypeKind::LiteralInt(_) => Some("int".to_owned()),
+        TypeKind::LiteralFloat(_) => Some("float".to_owned()),
+        TypeKind::LiteralBool(_) => Some("bool".to_owned()),
         TypeKind::Union(members) => {
             let non_null: Vec<_> = members
                 .iter()

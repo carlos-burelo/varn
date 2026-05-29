@@ -13,6 +13,16 @@ impl super::super::Binder {
 
         let receiver_ty = resolve_type_node(&e.target, Some(self));
 
+        if let Some(id) = &e.id {
+            let name = id.clone();
+            let line = e.range.start.line;
+            let ext_type = receiver_ty.clone();
+            let mut sym = Symbol::new(SymbolKind::Extension, name.clone(), line).with_type(ext_type);
+            sym.col = e.range.start.column;
+            sym.offset = e.range.start.offset;
+            self.define(name.to_string(), sym);
+        }
+
         for member in &e.members {
             match member {
                 ExtensionMember::Method(method) => {

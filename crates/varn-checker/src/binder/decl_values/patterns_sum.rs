@@ -1,6 +1,7 @@
 use std::rc::Rc;
 use varn_core::ast::{Pattern, SumTypeDecl};
 
+use super::super::type_inference::infer_expr_type;
 use super::super::type_resolution::resolve_type_node;
 use crate::module_resolver;
 use crate::symbol::{Symbol, SymbolKind};
@@ -26,7 +27,7 @@ impl super::super::Binder {
                 sym.doc = doc.map(Rc::from);
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
-                sym.has_explicit_type = type_ann.is_some() || ty.is_some();
+                sym.has_explicit_type = type_ann.is_some();
                 if let Some(ann) = type_ann {
                     sym.ty = Some(resolve_type_node(ann, Some(self)));
                 } else {
@@ -35,11 +36,20 @@ impl super::super::Binder {
                 self.define(name.to_string(), sym);
             }
             Pattern::Array { elements, rest, .. } => {
+                let elem_ty = ty.as_ref().and_then(|t| match &t.0 {
+                    varn_core::TypeKind::Array(inner) => Some((**inner).clone()),
+                    varn_core::TypeKind::Generic(name, args, _)
+                        if name.as_ref() == "Array" && args.len() == 1 =>
+                    {
+                        Some(args[0].clone())
+                    }
+                    _ => None,
+                });
                 for el in elements.iter().flatten() {
-                    self.bind_pattern(&el.pattern, kind, line, doc.clone(), None);
+                    self.bind_pattern(&el.pattern, kind, line, doc.clone(), elem_ty.clone());
                 }
                 if let Some(r) = rest {
-                    self.bind_pattern(r, kind, line, doc.clone(), None);
+                    self.bind_pattern(r, kind, line, doc.clone(), ty);
                 }
             }
             Pattern::Object {
@@ -113,14 +123,24 @@ impl super::super::Binder {
                     self.bind_pattern(&prop.value, kind, line, doc.clone(), prop_ty);
                 }
                 if let Some(r) = rest {
-                    self.bind_pattern(r, kind, line, doc.clone(), None);
+                    self.bind_pattern(r, kind, line, doc.clone(), ty);
                 }
             }
-            Pattern::Assignment { left, .. } => {
-                self.bind_pattern(left, kind, line, doc, ty);
+            Pattern::Assignment { left, right, .. } => {
+                let resolved_ty = if ty.is_none() || ty.as_ref().map_or(false, |t| t.is_dynamic()) {
+                    let inferred = infer_expr_type(right, Some(self));
+                    if inferred.is_dynamic() {
+                        ty
+                    } else {
+                        Some(inferred)
+                    }
+                } else {
+                    ty
+                };
+                self.bind_pattern(left, kind, line, doc, resolved_ty);
             }
             Pattern::Rest { argument, .. } => {
-                self.bind_pattern(argument, kind, line, doc, None);
+                self.bind_pattern(argument, kind, line, doc, ty);
             }
         }
     }

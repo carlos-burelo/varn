@@ -1,5 +1,6 @@
 use crate::document::{MemberKind, MemberRecord, SymbolRecord};
 use varn_checker::SymbolKind;
+use varn_core::TypeTag;
 
 pub fn format_type_params(type_params: &[String]) -> String {
     if type_params.is_empty() {
@@ -33,7 +34,13 @@ pub fn format_signature(sym: &SymbolRecord) -> String {
         SymbolKind::Var => format_binding("var", sym),
         SymbolKind::Parameter => format_binding("(param)", sym),
         SymbolKind::Property => format_binding("prop", sym),
-        SymbolKind::Extension => format!("extension {}", sym.name),
+        SymbolKind::Extension => {
+            if sym.type_str.is_empty() {
+                format!("extension {}", sym.name)
+            } else {
+                format!("extension {} on {}", sym.name, sym.type_str)
+            }
+        }
         SymbolKind::TypeParameter => format!("type {}", sym.name),
         SymbolKind::EnumMember => format_binding("(enum member)", sym),
     }
@@ -60,9 +67,13 @@ fn format_fn(sym: &SymbolRecord) -> String {
     )
 }
 
+fn is_primitive_class_name(name: &str) -> bool {
+    TypeTag::from_str(name).map(|t| t.is_primitive()).unwrap_or(false)
+}
+
 fn format_class(sym: &SymbolRecord) -> String {
     let tp = format_type_params(&sym.type_params);
-    if sym.members.is_empty() {
+    if sym.members.is_empty() || is_primitive_class_name(&sym.name) {
         return format!("class {}{}", sym.name, tp);
     }
     let mut lines = vec![format!("class {}{} {{", sym.name, tp)];
