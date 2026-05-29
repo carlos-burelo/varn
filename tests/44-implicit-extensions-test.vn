@@ -1,0 +1,50 @@
+import { File, fs } from "std:fs";
+import { Reader, Writer } from "std:io";
+
+function runTest(): void {
+
+    let testFile = "./temp_implicit_ext.txt";
+    let backupFile = "./temp_implicit_ext.bak";
+
+    // 1. Escribir a un archivo usando el Stream Writer
+    {
+        using file = File.open(testFile, "w");
+        file.write("Maestría de Greenfield en Varn!");
+    }
+
+    // Verificar que el archivo existe por el namespace normal
+    assert("File exists", fs.exists(testFile));
+
+    // 2. Leer del archivo usando el método de extensión implícito .readAll()
+    let content = "";
+    {
+        using file: Reader = File.open(testFile, "r");
+        // .readAll() es un método de extensión en std:io sobre Reader.
+        // ¡Se autopropaga y funciona sin imports manuales de extensiones!
+        content = file.readAll();
+    }
+    assert("Content matches", content === "Maestría de Greenfield en Varn!");
+
+    // 3. Copiar archivo usando el método de extensión implícito .pipeTo()
+    {
+        using src: Reader = File.open(testFile, "r");
+        using dst: Writer = File.open(backupFile, "w");
+        // .pipeTo() es otro método de extensión en std:io sobre Reader.
+        src.pipeTo(dst);
+    }
+
+    // Verificar que el backup contiene lo mismo
+    let backupContent = "";
+    {
+        using file: Reader = File.open(backupFile, "r");
+        backupContent = file.readAll();
+    }
+    assert("Backup content matches", backupContent === "Maestría de Greenfield en Varn!");
+
+    // Limpieza
+    fs.remove(testFile);
+    fs.remove(backupFile);
+
+}
+
+runTest();
