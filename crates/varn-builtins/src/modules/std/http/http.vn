@@ -211,3 +211,10 @@ export async function fetch(
         {}
     );
 }
+
+export const Http = {
+    Request: HttpRequest,
+    Response: HttpResponse,
+    Server: HttpServer,
+    fetch,
+};
