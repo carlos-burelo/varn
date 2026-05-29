@@ -166,6 +166,17 @@ fn parse_object_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
         let key = s.consume_lexeme();
         let (value, shorthand) = if s.eat(TokenKind::Colon) {
             (parse_pattern(s)?, false)
+        } else if s.eat(TokenKind::As) {
+            let alias_range = s.range();
+            let alias = s.consume_lexeme();
+            (
+                Pattern::Identifier {
+                    name: alias,
+                    type_ann: None,
+                    range: alias_range,
+                },
+                false,
+            )
         } else {
             (
                 Pattern::Identifier {
