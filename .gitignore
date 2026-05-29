@@ -36,3 +36,7 @@ extension/node_modules/
 
 # remove all *.bin files (cache files) in any directory
 **/*.bin
+.codegraph/codegraph.db
+.codegraph/codegraph.db-shm
+.codegraph/codegraph.db-wal
+docs/OPTIMIZATIONS.md
