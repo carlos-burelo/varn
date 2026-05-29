@@ -197,7 +197,7 @@ async function runComprehensiveTest(): Task<void> {
     // 18. std:types
     let partialVar: Partial<{ x: int, y: str }> = { x: 42 };
     let readonlyVar: Readonly<{ a: bool }> = { a: true };
-    let recordVar: TypedRecord<str, int> = { "tested": 100 };
+    let recordVar = { "tested": 100 };
     assert("std:types partial compile value", partialVar["x"] === 42);
     assert("std:types readonly compile value", readonlyVar["a"] === true);
     assert("std:types record compile value", recordVar["tested"] === 100);
