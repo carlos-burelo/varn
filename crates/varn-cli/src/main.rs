@@ -4,12 +4,9 @@ mod cli;
 mod commands;
 mod doctor_impl;
 mod error;
-mod fmt;
-mod import_collector;
 mod module_precompile;
 mod opts;
 mod pipeline;
-pub mod stdlib_loader;
 
 use clap::Parser;
 use cli::{Cli, Commands};

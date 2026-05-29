@@ -40,3 +40,4 @@ extension/node_modules/
 .codegraph/codegraph.db-shm
 .codegraph/codegraph.db-wal
 docs/OPTIMIZATIONS.md
+tests/.vn/**

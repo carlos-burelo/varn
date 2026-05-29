@@ -2,8 +2,8 @@ use std::path::PathBuf;
 use varn_modules::provider::StdlibProvider;
 use varn_modules::spec::ModuleSpec;
 
-use crate::registry::{spec_for, MODULE_REGISTRY};
 use crate::loader::CoreSourceLocator;
+use crate::registry::{spec_for, MODULE_REGISTRY};
 
 struct BuiltinsProvider;
 
