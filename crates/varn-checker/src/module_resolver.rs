@@ -125,38 +125,31 @@ pub fn resolve_stdlib_module_exports_ref(specifier: &str) -> Rc<ExportMap> {
     }
 
     // Prefer embedded source — no filesystem dependency, works in release builds.
-    if let Some(spec) = varn_builtins::spec_for(specifier) {
-        if let Some(source) = spec.embedded {
+    if let Some(provider) = varn_modules::provider::get() {
+        if let Some(source) = provider.embedded_source(specifier) {
             let mut visiting = vec![];
             let result = resolve_from_embedded_source(specifier, source, &mut visiting);
             export_cache_insert(key, Rc::clone(&result));
             return result;
         }
-    }
-
-    // Fallback: CoreSourceLocator disk path (dev builds with source tree available).
-    let locator = varn_builtins::CoreSourceLocator::from_env();
-    if let Some(path) = locator.vn_source_path(specifier) {
-        let abs = path.to_string_lossy().into_owned();
-        let mut visiting = vec![];
-        let result = resolve_module_exports_ref(&abs, &mut visiting);
-        export_cache_insert(key, Rc::clone(&result));
-        return result;
+        if let Some(path) = provider.source_path(specifier) {
+            let abs = path.to_string_lossy().into_owned();
+            let mut visiting = vec![];
+            let result = resolve_module_exports_ref(&abs, &mut visiting);
+            export_cache_insert(key, Rc::clone(&result));
+            return result;
+        }
     }
 
     Rc::new(FxHashMap::default())
 }
 
 pub fn resolve_stdlib_module_bind_ref(specifier: &str) -> Option<Rc<BindResult>> {
-    // Prefer embedded source.
-    if let Some(spec) = varn_builtins::spec_for(specifier) {
-        if let Some(source) = spec.embedded {
-            return bind_from_embedded_source(specifier, source);
-        }
+    let provider = varn_modules::provider::get()?;
+    if let Some(source) = provider.embedded_source(specifier) {
+        return bind_from_embedded_source(specifier, source);
     }
-    // Fallback: disk path.
-    let locator = varn_builtins::CoreSourceLocator::from_env();
-    let path = locator.vn_source_path(specifier)?;
+    let path = provider.source_path(specifier)?;
     cache_get_or_insert_ref(&path.to_string_lossy())
 }
 

@@ -2,12 +2,12 @@
 
 pub mod error;
 pub mod exec;
-pub mod linker;
 pub mod frame;
 pub mod gc;
 pub mod generator;
 pub mod globals;
 pub mod heap;
+pub mod linker;
 pub mod loader;
 pub mod nursery;
 pub mod profile;

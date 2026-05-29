@@ -197,8 +197,7 @@ pub extern "C" fn jit_make_closure(
             })
             .clone();
 
-        let new_closure =
-            crate::frame::VmClosure::with_upvalues(proto, upvalues, constants);
+        let new_closure = crate::frame::VmClosure::with_upvalues(proto, upvalues, constants);
 
         ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(new_closure))
     }
@@ -232,7 +231,10 @@ pub extern "C" fn jit_call(ctx: *mut ExecCtx, args: *const varn_jit::JitCallArgs
                         for i in 0..actual_count {
                             buf[i] = ctx_ref.stack[arg_base + 1 + i];
                         }
-                        (f)(ctx_ref as &mut dyn varn_types::NativeCtx, &buf[..actual_count])
+                        (f)(
+                            ctx_ref as &mut dyn varn_types::NativeCtx,
+                            &buf[..actual_count],
+                        )
                     } else {
                         let vargs: Vec<VmValue> = (1..=actual_count)
                             .map(|i| ctx_ref.stack[arg_base + i])

@@ -6,11 +6,7 @@ pub fn execute(args: DebugArgs) -> Result<(), CliError> {
     let (file_path, eval) = match (args.file, args.eval) {
         (_, Some(code)) => ("(eval)".to_owned(), Some(code)),
         (Some(file), None) => (file, None),
-        (None, None) => {
-            return Err(CliError::usage(
-                "Provide a file or inline code with --eval",
-            ))
-        }
+        (None, None) => return Err(CliError::usage("Provide a file or inline code with --eval")),
     };
 
     pipeline::run(&RunOpts {

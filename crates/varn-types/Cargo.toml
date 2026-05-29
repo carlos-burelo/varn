@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-parking_lot = "0.12.5"
-varn-core = { path = "../varn-core" }
-varn-base = { path = "../varn-base" }
-rust_decimal = { version = "1", features = ["serde"] }
-rustc-hash = { workspace = true }
-serde = { version = "1", features = ["derive", "rc"] }
+varn-core    = { path = "../varn-core" }
+varn-base    = { path = "../varn-base" }
+parking_lot  = { workspace = true }
+rust_decimal = { workspace = true }
+rustc-hash   = { workspace = true }
+serde        = { workspace = true, features = ["rc"] }

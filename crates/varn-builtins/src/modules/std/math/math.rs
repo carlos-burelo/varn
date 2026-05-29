@@ -1,4 +1,4 @@
-use varn_op_macros::{varn_module};
+use varn_op_macros::varn_module;
 use varn_types::{NativeCtx, VmValue};
 
 #[varn_module("runtime:math")]

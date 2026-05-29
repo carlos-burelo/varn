@@ -20,9 +20,7 @@ pub(crate) mod dispatch {
 
     #[varn_fn("processArgs")]
     pub fn args(ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, String> {
-        let sys_args: Vec<VmValue> = std::env::args()
-            .map(|s| ctx.alloc_str_owned(s))
-            .collect();
+        let sys_args: Vec<VmValue> = std::env::args().map(|s| ctx.alloc_str_owned(s)).collect();
         Ok(ctx.alloc_array(sys_args))
     }
 

@@ -28,10 +28,10 @@ varn-types     = { path = "../varn-types" }
 varn-modules   = { path = "../varn-modules" }
 varn-op-macros = { path = "../varn-op-macros" }
 
-parking_lot  = { version = "0.12.5", optional = true }
-rust_decimal = { version = "1", features = ["serde", "maths"], optional = true }
+parking_lot  = { workspace = true, optional = true }
+rust_decimal = { workspace = true, optional = true }
 mio          = { version = "1", features = ["os-poll", "net"], optional = true }
-serde_json   = { version = "1.0", optional = true }
+serde_json   = { workspace = true, optional = true }
 rand         = { version = "0.8", optional = true }
 sha2         = { version = "0.10", optional = true }
 hmac         = { version = "0.12", optional = true }

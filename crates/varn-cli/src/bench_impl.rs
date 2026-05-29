@@ -190,11 +190,7 @@ fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Durati
     Ok(samples)
 }
 
-pub fn run_bench(
-    path: &str,
-    runs: usize,
-    show_output: bool,
-) -> Result<(), CliError> {
+pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliError> {
     if crate::pipeline::wrc::is_wrc(path) {
         return run_bench_wrc(path, runs, show_output);
     }
@@ -205,23 +201,42 @@ pub fn run_bench(
     let source = crate::pipeline::read_source_file(path)?;
 
     let read_samples = time_n(runs, || {
-        crate::pipeline::read_source_file(path).map(|_| ()).map_err(|e| e.message.clone())
+        crate::pipeline::read_source_file(path)
+            .map(|_| ())
+            .map_err(|e| e.message.clone())
     })?;
 
     let lex_samples = time_n(runs, || {
-        let _ = crate::pipeline::phase_lex(&source, path, false, &varn_debug::flags::DebugFlags::default());
+        let _ = crate::pipeline::phase_lex(
+            &source,
+            path,
+            false,
+            &varn_debug::flags::DebugFlags::default(),
+        );
         Ok(())
     })?;
 
-    let (tokens, lexeme_buf) = crate::pipeline::phase_lex(&source, path, false, &varn_debug::flags::DebugFlags::default());
+    let (tokens, lexeme_buf) = crate::pipeline::phase_lex(
+        &source,
+        path,
+        false,
+        &varn_debug::flags::DebugFlags::default(),
+    );
     let token_count = tokens.len();
 
     let tokens_ref = &tokens;
     let lexeme_buf_ref = lexeme_buf.clone();
     let parse_samples = time_n(runs, || {
-        crate::pipeline::phase_parse(tokens_ref.clone(), lexeme_buf_ref.clone(), &source, path, false, &varn_debug::flags::DebugFlags::default())
-            .map(|_| ())
-            .map_err(|e| format!("{e}"))
+        crate::pipeline::phase_parse(
+            tokens_ref.clone(),
+            lexeme_buf_ref.clone(),
+            &source,
+            path,
+            false,
+            &varn_debug::flags::DebugFlags::default(),
+        )
+        .map(|_| ())
+        .map_err(|e| format!("{e}"))
     })?;
 
     let (mut program, parse_profile) = varn_parser::parse_with_profile(tokens, lexeme_buf, path)
@@ -242,9 +257,14 @@ pub fn run_bench(
 
     let program_ref = &program;
     let check_samples = time_n(runs, || {
-        crate::pipeline::phase_check(program_ref, &source, &varn_debug::flags::DebugFlags::default(), false)
-            .map(|_| ())
-            .map_err(|e| format!("{e}"))
+        crate::pipeline::phase_check(
+            program_ref,
+            &source,
+            &varn_debug::flags::DebugFlags::default(),
+            false,
+        )
+        .map(|_| ())
+        .map_err(|e| format!("{e}"))
     })?;
 
     let check_result = Checker::check_with_profile(&program);
@@ -316,7 +336,10 @@ pub fn run_bench(
             .into_iter()
             .filter(|(module_path, _)| module_path != &graph_build.entry_path)
             .map(|(module_path, module_proto)| {
-                (ModuleId::from_canonical_str(&module_path), Rc::new(module_proto))
+                (
+                    ModuleId::from_canonical_str(&module_path),
+                    Rc::new(module_proto),
+                )
             })
             .collect::<FxHashMap<ModuleId, Rc<FunctionProto>>>(),
     );

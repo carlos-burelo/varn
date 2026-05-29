@@ -111,7 +111,10 @@ impl Nursery {
 
         for raw_idx in 0..old_gen.objects().len() {
             match old_gen.get_raw(raw_idx as u32) {
-                Some(HeapObj::VmClosure(_)) | Some(HeapObj::BoundMethod(_)) | Some(HeapObj::Class(_)) | Some(HeapObj::Module(_)) => {
+                Some(HeapObj::VmClosure(_))
+                | Some(HeapObj::BoundMethod(_))
+                | Some(HeapObj::Class(_))
+                | Some(HeapObj::Module(_)) => {
                     self.scan_and_fix_old_obj(raw_idx as u32, old_gen);
                 }
                 _ => {}

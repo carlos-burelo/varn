@@ -85,7 +85,8 @@ pub fn compile(
         print_module_graph(&graph_build);
     }
 
-    let mut precompiled_map: FxHashMap<varn_core::ModuleId, Rc<FunctionProto>> = FxHashMap::default();
+    let mut precompiled_map: FxHashMap<varn_core::ModuleId, Rc<FunctionProto>> =
+        FxHashMap::default();
     for (path, module_proto) in graph_build.modules.iter() {
         if path != &graph_build.entry_path {
             precompiled_map.insert(
@@ -137,7 +138,7 @@ fn print_graph_node(
     prefix: &str,
     is_last: bool,
 ) {
-    use varn_debug::colors::{C_MODULES, C_ERRORS, R};
+    use varn_debug::colors::{C_ERRORS, C_MODULES, R};
     let connector = if is_last { "└─" } else { "├─" };
     let short = shorten_path(node);
     if visited.contains(node) {

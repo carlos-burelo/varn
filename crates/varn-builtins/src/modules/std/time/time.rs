@@ -61,7 +61,10 @@ pub(crate) mod dispatch {
     }
 
     #[varn_fn("timeParseIsoDuration")]
-    pub fn raw_parse_iso_duration(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+    pub fn raw_parse_iso_duration(
+        ctx: &mut dyn NativeCtx,
+        args: &[VmValue],
+    ) -> Result<VmValue, String> {
         let s = args.get(0).map(|&v| ctx.str_repr(v)).unwrap_or_default();
         let ms = parse_iso_duration(&s);
         Ok(VmValue::from_int(ms))
@@ -69,15 +72,18 @@ pub(crate) mod dispatch {
 
     #[varn_fn("timeMsToParts")]
     pub fn raw_ms_to_parts(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        let ms = args.first().and_then(|&v| {
-            if let Value::Int(n) = ctx.extract(v) {
-                Some(n)
-            } else {
-                None
-            }
-        }).unwrap_or(0);
+        let ms = args
+            .first()
+            .and_then(|&v| {
+                if let Value::Int(n) = ctx.extract(v) {
+                    Some(n)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(0);
 
-        use chrono::{TimeZone, Utc, Datelike, Timelike};
+        use chrono::{Datelike, TimeZone, Timelike, Utc};
         let dt = Utc.timestamp_millis_opt(ms).unwrap();
 
         let obj = ctx.alloc_object();
@@ -93,8 +99,11 @@ pub(crate) mod dispatch {
 
     #[varn_fn("timePartsToMs")]
     pub fn raw_parts_to_ms(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        let obj = args.first().copied().ok_or("timePartsToMs: expected parts object")?;
-        
+        let obj = args
+            .first()
+            .copied()
+            .ok_or("timePartsToMs: expected parts object")?;
+
         let get_int = |key: &str| -> i64 {
             ctx.get_field(obj, key)
                 .and_then(|v| {
@@ -115,7 +124,7 @@ pub(crate) mod dispatch {
         let second = get_int("second") as u32;
         let millisecond = get_int("millisecond") as u32;
 
-        use chrono::{TimeZone, Utc, Timelike};
+        use chrono::{TimeZone, Timelike, Utc};
         let dt = Utc
             .with_ymd_and_hms(year, month, day, hour, minute, second)
             .single()

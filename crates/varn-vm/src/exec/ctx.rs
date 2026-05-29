@@ -102,9 +102,22 @@ impl ExecCtx {
 
     fn preload_strings(&mut self) {
         const COMMON_STRINGS: &[&str] = &[
-            "PASSED", "FAILED", "error", "message", "value", "result",
-            "length", "name", "type", "ok", "err", "true", "false",
-            "toString", "valueOf", "constructor",
+            "PASSED",
+            "FAILED",
+            "error",
+            "message",
+            "value",
+            "result",
+            "length",
+            "name",
+            "type",
+            "ok",
+            "err",
+            "true",
+            "false",
+            "toString",
+            "valueOf",
+            "constructor",
         ];
         for s in COMMON_STRINGS {
             self.heap.alloc_str_interned(s);

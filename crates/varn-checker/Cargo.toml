@@ -4,9 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-varn-core     = { path = "../varn-core" }
-varn-lexer    = { path = "../varn-lexer" }
-varn-parser   = { path = "../varn-parser" }
-varn-modules  = { path = "../varn-modules" }
-varn-builtins = { path = "../varn-builtins" }
+varn-core    = { path = "../varn-core" }
+varn-lexer   = { path = "../varn-lexer" }
+varn-parser  = { path = "../varn-parser" }
+varn-modules = { path = "../varn-modules" }
 rustc-hash   = { workspace = true }

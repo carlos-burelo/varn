@@ -5,6 +5,7 @@ mod core;
 mod execute;
 pub mod hash;
 mod lex;
+pub mod lsp_debug;
 mod lockfile;
 mod parse;
 pub mod wrc;
@@ -15,12 +16,12 @@ use varn_debug::flags::DebugFlags;
 
 type PipelineResult<T> = Result<T, CliError>;
 
+pub use check::check as phase_check;
 pub use compile::CompileOutput;
 pub use core::core_protos_owned;
 pub use execute::execute;
 pub use lex::lex as phase_lex;
 pub use parse::parse as phase_parse;
-pub use check::check as phase_check;
 
 pub fn canonicalize_path(path: &str) -> PipelineResult<String> {
     std::path::Path::new(path)
@@ -160,4 +161,3 @@ fn read_source(path: &str) -> PipelineResult<String> {
     std::fs::read_to_string(path)
         .map_err(|e| CliError::fatal(format!("error[io]: cannot read '{}': {}", path, e)))
 }
-

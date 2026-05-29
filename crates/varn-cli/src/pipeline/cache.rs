@@ -120,12 +120,16 @@ pub fn compile_output_from_graph(graph: ModuleGraphArtifact) -> PipelineResult<C
         ))
     })?;
 
-    let mut precompiled: FxHashMap<varn_core::ModuleId, Rc<varn_compiler::FunctionProto>> = FxHashMap::default();
+    let mut precompiled: FxHashMap<varn_core::ModuleId, Rc<varn_compiler::FunctionProto>> =
+        FxHashMap::default();
     for (path, proto) in &graph.modules {
         if *path == entry_path {
             continue;
         }
-        precompiled.insert(varn_core::ModuleId::from_canonical_str(path), Rc::new(proto.clone()));
+        precompiled.insert(
+            varn_core::ModuleId::from_canonical_str(path),
+            Rc::new(proto.clone()),
+        );
     }
 
     Ok(CompileOutput {

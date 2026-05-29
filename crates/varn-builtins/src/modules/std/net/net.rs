@@ -35,7 +35,10 @@ pub(crate) mod dispatch {
         ctx.set_field(obj, "protocol", proto);
         let host = ctx.alloc_str(url.host_str().unwrap_or(""));
         ctx.set_field(obj, "host", host);
-        let port = url.port().map(|p| VmValue::from_int(p as i64)).unwrap_or(VmValue::null());
+        let port = url
+            .port()
+            .map(|p| VmValue::from_int(p as i64))
+            .unwrap_or(VmValue::null());
         ctx.set_field(obj, "port", port);
         let path = ctx.alloc_str(url.path());
         ctx.set_field(obj, "path", path);

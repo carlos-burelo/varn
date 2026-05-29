@@ -16,6 +16,8 @@ use cli::{Cli, Commands};
 use std::process;
 
 fn main() {
+    varn_builtins::register_provider();
+
     let raw: Vec<String> = std::env::args().collect();
     let effective = implicit_run(raw);
 

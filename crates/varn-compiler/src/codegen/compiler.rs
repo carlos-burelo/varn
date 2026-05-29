@@ -603,7 +603,9 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn finish_module(self) -> FunctionProto {
-        let required_caps: Vec<std::rc::Rc<str>> = self.annotations.module_caps()
+        let required_caps: Vec<std::rc::Rc<str>> = self
+            .annotations
+            .module_caps()
             .iter()
             .map(|s| std::rc::Rc::from(s.as_str()))
             .collect();
@@ -625,7 +627,9 @@ impl<'a> Compiler<'a> {
             jit_code: RefCell::new(None),
             jit_failed: Cell::new(false),
             ic_cache: std::rc::Rc::new(std::cell::RefCell::new(
-                (0..cache_count).map(|_| varn_types::chunk::PolyICSlot::new()).collect(),
+                (0..cache_count)
+                    .map(|_| varn_types::chunk::PolyICSlot::new())
+                    .collect(),
             )),
             feedback: std::rc::Rc::new(std::cell::RefCell::new(
                 varn_types::chunk::FeedbackVector::new(cache_count),
@@ -654,7 +658,9 @@ impl<'a> Compiler<'a> {
             jit_code: RefCell::new(None),
             jit_failed: Cell::new(false),
             ic_cache: std::rc::Rc::new(std::cell::RefCell::new(
-                (0..cache_count).map(|_| varn_types::chunk::PolyICSlot::new()).collect(),
+                (0..cache_count)
+                    .map(|_| varn_types::chunk::PolyICSlot::new())
+                    .collect(),
             )),
             feedback: std::rc::Rc::new(std::cell::RefCell::new(
                 varn_types::chunk::FeedbackVector::new(cache_count),

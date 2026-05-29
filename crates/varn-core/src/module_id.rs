@@ -72,9 +72,7 @@ impl ModuleId {
     }
 
     pub fn local(path: impl AsRef<Path>) -> Self {
-        Self::Local(normalize_local_path(
-            &path.as_ref().to_string_lossy(),
-        ))
+        Self::Local(normalize_local_path(&path.as_ref().to_string_lossy()))
     }
 
     pub fn local_str(path: &str) -> Self {

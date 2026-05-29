@@ -86,11 +86,11 @@ impl ExecCtx {
             // Circular dependency detected. Return the partial module that was
             // pre-inserted before evaluation started. Accessing an uninitialized
             // export from within this cycle constitutes a TDZ violation.
-            return self
-                .modules
-                .get(&resolved)
-                .copied()
-                .ok_or_else(|| RuntimeError::new(format!("E_BINDING_TDZ: circular dependency on '{specifier}'")));
+            return self.modules.get(&resolved).copied().ok_or_else(|| {
+                RuntimeError::new(format!(
+                    "E_BINDING_TDZ: circular dependency on '{specifier}'"
+                ))
+            });
         }
 
         // 4. Precompiled map (ahead-of-time compiled dependencies).

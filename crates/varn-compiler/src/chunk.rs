@@ -1,1 +1,1 @@
-pub use varn_bytecode::*;
+pub use varn_types::chunk::*;

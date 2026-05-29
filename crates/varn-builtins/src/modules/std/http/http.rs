@@ -33,7 +33,7 @@ fn parse_query_string_ctx(ctx: &mut dyn NativeCtx, qs: &str) -> VmValue {
         let val = urlencoding::decode(v)
             .map(|s| s.into_owned())
             .unwrap_or_else(|_| v.to_owned());
-        
+
         let val_nv = ctx.alloc_str_owned(val);
         ctx.set_field(obj, &key, val_nv);
     }
@@ -73,7 +73,10 @@ pub(crate) mod dispatch {
     #[varn_fn("httpFetch", cap = "network.client")]
     pub fn fetch(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let url = args.first().map(|&v| ctx.str_repr(v)).unwrap_or_default();
-        let method = args.get(1).map(|&v| ctx.str_repr(v)).unwrap_or_else(|| "GET".to_owned());
+        let method = args
+            .get(1)
+            .map(|&v| ctx.str_repr(v))
+            .unwrap_or_else(|| "GET".to_owned());
         let headers_val = args.get(2);
         let body_val = args.get(3);
         let timeout_ms = args.get(4).map(|&v| v.as_int()).unwrap_or(5000);
@@ -109,7 +112,10 @@ pub(crate) mod dispatch {
                 Ok(ctx.alloc_str_owned(s))
             }
             Err(_) => {
-                let mock_body = format!("<!DOCTYPE html><html><body>Offline mock response for {}</body></html>", url);
+                let mock_body = format!(
+                    "<!DOCTYPE html><html><body>Offline mock response for {}</body></html>",
+                    url
+                );
                 Ok(ctx.alloc_str_owned(mock_body))
             }
         }
@@ -119,17 +125,35 @@ pub(crate) mod dispatch {
     pub fn create_server(_ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, String> {
         let id = NEXT_SERVER_ID.fetch_add(1, Ordering::SeqCst);
         SERVERS.with(|s| {
-            s.borrow_mut().insert(id, ServerInstance { routes: Vec::new(), port: 0 });
+            s.borrow_mut().insert(
+                id,
+                ServerInstance {
+                    routes: Vec::new(),
+                    port: 0,
+                },
+            );
         });
         Ok(VmValue::from_int(id))
     }
 
     #[varn_fn("httpAddRoute", cap = "network.server")]
     pub fn add_route(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        let server_id = args.first().map(|v| v.as_int()).ok_or("http.addRoute: expected serverId")?;
-        let method = args.get(1).map(|&v| ctx.str_repr(v)).ok_or("http.addRoute: expected method")?;
-        let pattern = args.get(2).map(|&v| ctx.str_repr(v)).ok_or("http.addRoute: expected pattern")?;
-        let callback_nv = args.get(3).copied().ok_or("http.addRoute: expected callback")?;
+        let server_id = args
+            .first()
+            .map(|v| v.as_int())
+            .ok_or("http.addRoute: expected serverId")?;
+        let method = args
+            .get(1)
+            .map(|&v| ctx.str_repr(v))
+            .ok_or("http.addRoute: expected method")?;
+        let pattern = args
+            .get(2)
+            .map(|&v| ctx.str_repr(v))
+            .ok_or("http.addRoute: expected pattern")?;
+        let callback_nv = args
+            .get(3)
+            .copied()
+            .ok_or("http.addRoute: expected callback")?;
 
         let callback_val = ctx.extract(callback_nv);
 
@@ -144,9 +168,18 @@ pub(crate) mod dispatch {
 
     #[varn_fn("httpListen", cap = "network.server")]
     pub fn listen(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        let server_id = args.first().map(|v| v.as_int()).ok_or("http.listen: expected serverId")?;
-        let port = args.get(1).map(|v| v.as_int()).ok_or("http.listen: expected port")?;
-        let response_ctor = args.get(2).copied().ok_or("http.listen: expected responseCtor")?;
+        let server_id = args
+            .first()
+            .map(|v| v.as_int())
+            .ok_or("http.listen: expected serverId")?;
+        let port = args
+            .get(1)
+            .map(|v| v.as_int())
+            .ok_or("http.listen: expected port")?;
+        let response_ctor = args
+            .get(2)
+            .copied()
+            .ok_or("http.listen: expected responseCtor")?;
 
         SERVERS.with(|s| {
             if let Some(inst) = s.borrow_mut().get_mut(&server_id) {
@@ -176,9 +209,9 @@ pub(crate) mod dispatch {
             let method = request.method().to_string().to_uppercase();
             let url = request.url().to_owned();
 
-            let routes = SERVERS.with(|s| {
-                s.borrow().get(&server_id).map(|inst| inst.routes.clone())
-            }).unwrap_or_default();
+            let routes = SERVERS
+                .with(|s| s.borrow().get(&server_id).map(|inst| inst.routes.clone()))
+                .unwrap_or_default();
 
             let (path, query_str) = split_path_query(&url);
             let matched = find_route(&routes, &method, &path);
@@ -186,12 +219,12 @@ pub(crate) mod dispatch {
             if let Some((_, pattern, callback)) = matched {
                 let query_val = parse_query_string_ctx(ctx, &query_str);
                 let params_val = extract_params_ctx(ctx, &pattern, &path);
-                
+
                 let mut body_str = String::new();
                 let _ = request.as_reader().read_to_string(&mut body_str);
 
                 let headers_val = build_headers_ctx(ctx, request.headers());
-                
+
                 let req_nv = ctx.alloc_object();
                 let method_nv = ctx.alloc_str(&method);
                 let path_nv = ctx.alloc_str(&path);
@@ -219,8 +252,7 @@ pub(crate) mod dispatch {
                     let _ = req.respond(response);
                 }
             } else {
-                let response = tiny_http::Response::from_string("Not Found")
-                    .with_status_code(404);
+                let response = tiny_http::Response::from_string("Not Found").with_status_code(404);
                 let _ = request.respond(response);
             }
         }
@@ -232,16 +264,20 @@ pub(crate) mod dispatch {
     pub fn send_response(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         let status = args.first().map(|v| v.as_int()).unwrap_or(200);
         let body = args.get(1).map(|&v| ctx.str_repr(v)).unwrap_or_default();
-        let content_type = args.get(2).map(|&v| ctx.str_repr(v)).unwrap_or_else(|| "text/plain".to_owned());
+        let content_type = args
+            .get(2)
+            .map(|&v| ctx.str_repr(v))
+            .unwrap_or_else(|| "text/plain".to_owned());
         let headers_val = args.get(3);
 
         let request = CURRENT_REQUEST.with(|cell| cell.borrow_mut().take());
 
         if let Some(req) = request {
-            let mut response = tiny_http::Response::from_string(body)
-                .with_status_code(status as i32);
+            let mut response =
+                tiny_http::Response::from_string(body).with_status_code(status as i32);
 
-            if let Ok(hdr) = format!("Content-Type: {}", content_type).parse::<tiny_http::Header>() {
+            if let Ok(hdr) = format!("Content-Type: {}", content_type).parse::<tiny_http::Header>()
+            {
                 response = response.with_header(hdr);
             }
 
@@ -265,11 +301,12 @@ pub(crate) mod dispatch {
 
     #[varn_fn("httpClose", cap = "network.server")]
     pub fn close_server(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        let server_id = args.first().map(|v| v.as_int()).ok_or("http.close: expected serverId")?;
-        
-        let port = SERVERS.with(|s| {
-            s.borrow_mut().remove(&server_id).map(|inst| inst.port)
-        });
+        let server_id = args
+            .first()
+            .map(|v| v.as_int())
+            .ok_or("http.close: expected serverId")?;
+
+        let port = SERVERS.with(|s| s.borrow_mut().remove(&server_id).map(|inst| inst.port));
 
         if let Some(port) = port {
             if port > 0 {

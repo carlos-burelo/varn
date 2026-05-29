@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 varn-diagnostics = { path = "../varn-diagnostics" }
 varn-base = { path = "../varn-base" }
-serde = { version = "1", features = ["derive", "rc"] }
+serde      = { workspace = true, features = ["rc"] }
 rustc-hash = { workspace = true }
 
 [features]

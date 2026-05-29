@@ -1,5 +1,8 @@
 pub mod loader;
+pub mod provider_impl;
 pub mod registry;
+
+pub use provider_impl::register_provider;
 
 pub use loader::CoreSourceLocator;
 pub use registry::{is_known, spec_for, MODULE_REGISTRY};
@@ -7,11 +10,11 @@ pub use registry::{is_known, spec_for, MODULE_REGISTRY};
 #[cfg(feature = "runtime")]
 pub mod dispatch;
 #[cfg(feature = "runtime")]
-pub mod runtime_ops;
-#[cfg(feature = "runtime")]
 pub mod modules;
 #[cfg(feature = "runtime")]
 pub mod resource;
+#[cfg(feature = "runtime")]
+pub mod runtime_ops;
 
 #[cfg(feature = "runtime")]
 pub use dispatch::{describe_op, dispatch_runtime_op, register_globals_vm};
