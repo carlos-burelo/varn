@@ -18,6 +18,7 @@ members = [
     "crates/varn-base",
     "crates/varn-pm",
     "crates/varn-jit",
+    "crates/varn-pipeline",
 ]
 resolver = "2"
 

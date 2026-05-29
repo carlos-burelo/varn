@@ -1,0 +1,26 @@
+[package]
+name = "varn-pipeline"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+lsp-debug = ["dep:varn-lsp", "dep:tower-lsp"]
+
+[dependencies]
+varn-core        = { path = "../varn-core" }
+varn-lexer       = { path = "../varn-lexer" }
+varn-parser      = { path = "../varn-parser", features = ["profiling"] }
+varn-checker     = { path = "../varn-checker" }
+varn-compiler    = { path = "../varn-compiler" }
+varn-vm          = { path = "../varn-vm" }
+varn-builtins    = { path = "../varn-builtins", features = ["runtime"] }
+varn-modules     = { path = "../varn-modules" }
+varn-types       = { path = "../varn-types" }
+varn-debug       = { path = "../varn-debug" }
+varn-diagnostics = { path = "../varn-diagnostics" }
+varn-lsp         = { path = "../varn-lsp", optional = true }
+rustc-hash       = { workspace = true }
+serde            = { workspace = true }
+serde_json       = { workspace = true }
+tower-lsp        = { workspace = true, optional = true }
+postcard         = { version = "1", features = ["alloc"] }

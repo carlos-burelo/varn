@@ -1863,11 +1863,9 @@ dependencies = [
  "varn-compiler",
  "varn-core",
  "varn-debug",
- "varn-diagnostics",
- "varn-lexer",
  "varn-lsp",
- "varn-modules",
  "varn-parser",
+ "varn-pipeline",
  "varn-pm",
  "varn-types",
  "varn-vm",
@@ -1972,6 +1970,29 @@ dependencies = [
  "varn-base",
  "varn-core",
  "varn-lexer",
+]
+
+[[package]]
+name = "varn-pipeline"
+version = "0.1.0"
+dependencies = [
+ "postcard",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "tower-lsp",
+ "varn-builtins",
+ "varn-checker",
+ "varn-compiler",
+ "varn-core",
+ "varn-debug",
+ "varn-diagnostics",
+ "varn-lexer",
+ "varn-lsp",
+ "varn-modules",
+ "varn-parser",
+ "varn-types",
+ "varn-vm",
 ]
 
 [[package]]
