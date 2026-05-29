@@ -1,5 +1,15 @@
 import { ioWrite, ioWriteln, ioFlush, ioReadLine } from "runtime:io";
 
+export interface Writer {
+    write(content: str): void
+}
+
+export interface Reader {
+    read(size?: int): str
+    readAll(): str
+    pipeTo(dst: dynamic): void
+}
+
 export namespace io {
     export function write(...args: dynamic[]): void {
         ioWrite(...args);

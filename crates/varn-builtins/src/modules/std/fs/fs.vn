@@ -90,3 +90,41 @@ export namespace fs {
         return fsTempDir();
     }
 }
+
+export class File {
+    private _path: str;
+    private _mode: str;
+
+    constructor(path: str, mode: str) {
+        this._path = path;
+        this._mode = mode;
+    }
+
+    static open(path: str, mode: str): File {
+        return new File(path, mode);
+    }
+
+    write(content: str): void {
+        if (this._mode === "a") {
+            const existing = fsExists(this._path) ? fsRead(this._path) : "";
+            fsWrite(this._path, existing + content);
+        } else {
+            fsWrite(this._path, content);
+        }
+    }
+
+    read(size?: int): str {
+        return fsRead(this._path);
+    }
+
+    readAll(): str {
+        return fsRead(this._path);
+    }
+
+    pipeTo(dst: dynamic): void {
+        const content = this.readAll();
+        dst.write(content);
+    }
+
+    dispose(): void {}
+}
