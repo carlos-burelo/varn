@@ -19,7 +19,11 @@ pub fn build_import_completions(prefix: &str, doc_uri: &str) -> Vec<CompletionIt
 }
 
 fn stdlib_module_completions(prefix: &str) -> Vec<CompletionItem> {
-    varn_builtins::MODULE_REGISTRY
+    let Some(provider) = varn_modules::provider::get() else {
+        return Vec::new();
+    };
+    provider
+        .all_specs()
         .iter()
         .filter(|m| matches!(m.kind, varn_modules::ModuleKind::Stdlib) && m.id.starts_with(prefix))
         .map(|m| CompletionItem {

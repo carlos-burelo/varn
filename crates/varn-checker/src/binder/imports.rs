@@ -9,8 +9,8 @@ impl super::Binder {
     pub(super) fn bind_import(&mut self, i: &ImportDecl) {
         // core:* are intrinsic domains — not user-importable.
         // Allow within stdlib context (source_file starts with "core:" or "std:").
-        let in_stdlib_context = self.source_file.starts_with("core:")
-            || self.source_file.starts_with("std:");
+        let in_stdlib_context =
+            self.source_file.starts_with("core:") || self.source_file.starts_with("std:");
         if i.source.starts_with("core:") && !in_stdlib_context {
             self.diagnostics.push(
                 Diagnostic::error(

@@ -47,9 +47,13 @@ pub(crate) mod dispatch {
             .map(|&v| ctx.str_repr(v))
             .ok_or("fs.stat: expected path")?;
         let meta = fs::metadata(&path).map_err(|e| e.to_string())?;
-        
-        let mtime = meta.modified()
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))
+
+        let mtime = meta
+            .modified()
+            .and_then(|t| {
+                t.duration_since(std::time::UNIX_EPOCH)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
+            })
             .map(|d| d.as_millis() as i64)
             .unwrap_or(0);
 

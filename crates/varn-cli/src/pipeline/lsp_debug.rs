@@ -1,9 +1,9 @@
-use crate::colors::{BLUE, BOLD, C_TYPES, DIM, GREEN, R, RESET, YELLOW};
-use crate::flags::DebugFlags;
 use tower_lsp::lsp_types::HoverContents;
+use varn_debug::colors::{BLUE, BOLD, C_TYPES, DIM, GREEN, R, YELLOW};
+use varn_debug::flags::DebugFlags;
 
 pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
-    use crate::colors::{footer, header};
+    use varn_debug::colors::{footer, header};
     header(C_TYPES, "lsp analysis dashboard", path);
 
     let uri = varn_modules::resolver::path_to_uri(path);
@@ -22,19 +22,16 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 continue;
             }
             let kind_str = format!("{:?}", sym.kind);
-            let tag = if sym.is_from_stdlib {
-                if sym.line == u32::MAX || sym.origin.as_deref() == Some("builtin") {
-                    format!("{DIM}[core]{RESET} ")
-                } else {
-                    format!("{DIM}[std]{RESET} ")
-                }
-            } else {
-                format!("{DIM}[usr]{RESET} ")
-            };
             eprintln!(
-                "    {DIM}{:<12}{RESET} {BOLD}{tag}{:<20}{RESET} : {YELLOW}{:<20}{RESET} {DIM}(ln:{}, col:{}){RESET}",
-                kind_str, sym.name, sym.type_str, sym.line + 1, sym.col + 1,
-                tag = tag, DIM=DIM, RESET=R, BOLD=BOLD, YELLOW=YELLOW
+                "    {DIM}{:<12}{RESET} {BOLD}{:<20}{RESET} : {YELLOW}{:<20}{RESET} {DIM}(ln:{}){RESET}",
+                kind_str,
+                sym.name,
+                sym.type_str,
+                sym.line + 1,
+                DIM = DIM,
+                RESET = R,
+                BOLD = BOLD,
+                YELLOW = YELLOW
             );
         }
         eprintln!();
@@ -48,7 +45,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
             RESET = R
         );
         for tok in &analysis.tokens {
-            if tok.kind.can_be_identifier() {
+            if tok.kind == varn_core::TokenKind::Identifier || tok.kind.can_be_identifier() {
                 if let Some(hover) =
                     varn_lsp::features::hover::build_hover(&analysis, tok.line, tok.col)
                 {
@@ -61,7 +58,6 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                             .join(" | "),
                         HoverContents::Markup(m) => m.value,
                     };
-                    let content = compact_debug_hover(content);
                     eprintln!(
                         "    {DIM}({:>2}:{:>2}){RESET} {YELLOW}{:<15}{RESET} → {BOLD}{}{RESET}",
                         tok.line + 1,
@@ -135,11 +131,11 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
         );
         let mut sorted: Vec<_> = analysis.db.expr_types.iter().collect();
         sorted.sort_by_key(|(off, _)| *off);
-        for (off, info) in sorted {
+        for (off, ty) in sorted {
             eprintln!(
                 "    {DIM}offset {:>4}{RESET} : {YELLOW}{}{RESET}",
                 off,
-                info.ty,
+                ty,
                 DIM = DIM,
                 RESET = R,
                 YELLOW = YELLOW
@@ -171,36 +167,19 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 .get(chunk[3] as usize)
                 .map(|t| t.as_str())
                 .unwrap_or("dynamic");
-            let mods = chunk[4];
-            let mut mod_names = Vec::new();
-            for (bit, m) in legend.token_modifiers.iter().enumerate() {
-                if (mods & (1 << bit)) != 0 {
-                    mod_names.push(m.as_str());
-                }
-            }
-            let mods_str = if mod_names.is_empty() {
-                String::new()
-            } else {
-                format!(" [{}]", mod_names.join(", "))
-            };
             let lexeme = find_lexeme(&analysis, curr_line, curr_col, chunk[2]);
             eprintln!(
-                "    {DIM}({:>2}:{:>2}){RESET} {YELLOW}{:<15}{RESET} → {GREEN}{}{RESET}{BOLD}{BLUE}{}{RESET}",
-                curr_line + 1, curr_col + 1, lexeme, type_name, mods_str,
-                DIM=DIM, RESET=R, YELLOW=YELLOW, GREEN=GREEN, BOLD=BOLD, BLUE=BLUE
+                "    {DIM}({:>2}:{:>2}){RESET} {YELLOW}{:<15}{RESET} → {GREEN}{}{RESET}",
+                curr_line + 1,
+                curr_col + 1,
+                lexeme,
+                type_name,
+                DIM = DIM,
+                RESET = R,
+                YELLOW = YELLOW,
+                GREEN = GREEN
             );
         }
-        eprintln!();
-    }
-
-    if flags.lsp_colorize {
-        eprintln!(
-            "  {BOLD}{BLUE}Semantic Tagging View:{RESET}",
-            BOLD = BOLD,
-            BLUE = BLUE,
-            RESET = R
-        );
-        print_tagged_source(source, &sem_tokens);
         eprintln!();
     }
 
@@ -262,83 +241,5 @@ fn format_marked_string(ms: tower_lsp::lsp_types::MarkedString) -> String {
     match ms {
         tower_lsp::lsp_types::MarkedString::String(s) => s,
         tower_lsp::lsp_types::MarkedString::LanguageString(ls) => ls.value,
-    }
-}
-
-fn compact_debug_hover(content: String) -> String {
-    const PRIMS: [&str; 7] = ["str", "int", "float", "bool", "char", "decimal", "bigint"];
-    for p in PRIMS {
-        let prefix = format!("class {p} {{");
-        if content.starts_with(&prefix) {
-            return format!("class {p}");
-        }
-    }
-    content
-}
-
-fn print_tagged_source(source: &str, sem_tokens: &[u32]) {
-    use crate::colors::{BLUE, BOLD, DIM, RESET, YELLOW};
-    let legend = &varn_lsp::features::semantic_tokens::LEGEND;
-
-    let lines: Vec<&str> = source.lines().collect();
-    let mut curr_line = 0;
-    let mut curr_col = 0;
-    let mut tokens_iter = sem_tokens.chunks_exact(5).peekable();
-
-    for (i, line) in lines.iter().enumerate() {
-        let line_num = i as u32;
-        let mut last_col = 0;
-        eprint!("    {DIM}{:>3} | {RESET}", line_num + 1);
-
-        while let Some(chunk) = tokens_iter.peek() {
-            let delta_line = chunk[0];
-            let delta_start = chunk[1];
-            let length = chunk[2];
-            let type_idx = chunk[3] as usize;
-
-            if curr_line + delta_line > line_num {
-                break;
-            }
-
-            tokens_iter.next();
-            curr_line += delta_line;
-            if delta_line == 0 {
-                curr_col += delta_start;
-            } else {
-                curr_col = delta_start;
-            }
-
-            if curr_col > last_col {
-                let start = last_col as usize;
-                let end = (curr_col as usize).min(line.len());
-                eprint!("{}", &line[start..end]);
-            }
-
-            let type_name = legend
-                .token_types
-                .get(type_idx)
-                .map(|t| t.as_str())
-                .unwrap_or("dynamic");
-            let start = curr_col as usize;
-            let end = ((curr_col + length) as usize).min(line.len());
-            let lexeme = &line[start..end];
-
-            eprint!(
-                "{BOLD}{lexeme}{RESET}{BLUE}[{YELLOW}{type_name}{BLUE}]{RESET}",
-                BOLD = BOLD,
-                RESET = RESET,
-                BLUE = BLUE,
-                YELLOW = YELLOW,
-                lexeme = lexeme,
-                type_name = type_name
-            );
-
-            last_col = curr_col + length;
-        }
-
-        if (last_col as usize) < line.len() {
-            eprint!("{}", &line[last_col as usize..]);
-        }
-        eprintln!();
     }
 }

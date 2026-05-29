@@ -14,10 +14,7 @@ pub(crate) mod dispatch {
     }
 
     #[varn_fn("jsonStringify")]
-    pub fn json_stringify(
-        ctx: &mut dyn NativeCtx,
-        args: &[VmValue],
-    ) -> Result<VmValue, String> {
+    pub fn json_stringify(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
         if let Some(v) = args.get(0).copied() {
             let val = ctx.extract(v);
             let json_val = value_to_serde(&val, ctx);

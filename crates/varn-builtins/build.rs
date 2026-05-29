@@ -18,7 +18,9 @@ fn main() {
 }
 
 fn collect_registry_entries(dir: &Path, out: &mut impl Write) {
-    let Ok(entries) = fs::read_dir(dir) else { return };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
     let mut paths: Vec<_> = entries.flatten().map(|e| e.path()).collect();
     paths.sort();
 
@@ -32,9 +34,7 @@ fn collect_registry_entries(dir: &Path, out: &mut impl Write) {
                 let vn_rel = find_vn_source(&path)
                     .unwrap_or_else(|| panic!("cannot find .vn source in {}", path.display()));
                 // Relative to crate src root (for the vn_source field).
-                let vn_source_rel = vn_rel
-                    .trim_start_matches("src/")
-                    .to_string();
+                let vn_source_rel = vn_rel.trim_start_matches("src/").to_string();
                 let vn_source_field = format!("crates/varn-builtins/src/{vn_source_rel}");
 
                 // Parse JSON — handle both {"id":...} and {"modules":[...]} forms.
@@ -47,11 +47,15 @@ fn collect_registry_entries(dir: &Path, out: &mut impl Write) {
 }
 
 fn find_vn_source(dir: &Path) -> Option<String> {
-    let Ok(entries) = fs::read_dir(dir) else { return None };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return None;
+    };
     let mut candidates: Vec<_> = entries
         .flatten()
         .map(|entry| entry.path())
-        .filter(|path| path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("vn"))
+        .filter(|path| {
+            path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("vn")
+        })
         .collect();
     candidates.sort();
     candidates
@@ -60,7 +64,12 @@ fn find_vn_source(dir: &Path) -> Option<String> {
         .map(|path| path.to_string_lossy().replace('\\', "/"))
 }
 
-fn emit_entries_from_json(json: &str, vn_source_field: &str, vn_include_path: &str, out: &mut impl Write) {
+fn emit_entries_from_json(
+    json: &str,
+    vn_source_field: &str,
+    vn_include_path: &str,
+    out: &mut impl Write,
+) {
     // Minimal JSON parsing — avoid pulling in serde_json at build time.
     let json = json.trim();
 
@@ -68,16 +77,31 @@ fn emit_entries_from_json(json: &str, vn_source_field: &str, vn_include_path: &s
         // Array form: {"modules": [...]}
         let inner = extract_array(json, "modules");
         for entry in parse_object_array(&inner) {
-            if let (Some(id), Some(kind)) = (extract_str(&entry, "id"), extract_str(&entry, "kind")) {
+            if let (Some(id), Some(kind)) = (extract_str(&entry, "id"), extract_str(&entry, "kind"))
+            {
                 let capabilities = extract_capabilities(&entry);
-                emit_spec_entry(out, &id, &kind, vn_source_field, vn_include_path, &capabilities);
+                emit_spec_entry(
+                    out,
+                    &id,
+                    &kind,
+                    vn_source_field,
+                    vn_include_path,
+                    &capabilities,
+                );
             }
         }
     } else {
         // Single object form: {"id": "...", "kind": "..."}
         if let (Some(id), Some(kind)) = (extract_str(json, "id"), extract_str(json, "kind")) {
             let capabilities = extract_capabilities(json);
-            emit_spec_entry(out, &id, &kind, vn_source_field, vn_include_path, &capabilities);
+            emit_spec_entry(
+                out,
+                &id,
+                &kind,
+                vn_source_field,
+                vn_include_path,
+                &capabilities,
+            );
         }
     }
 }
@@ -106,7 +130,7 @@ fn extract_str(json: &str, key: &str) -> Option<String> {
     let needle = format!("\"{key}\"");
     let pos = json.find(&needle)?;
     let after_key = &json[pos + needle.len()..];
-    let colon = after_key.find(':')? ;
+    let colon = after_key.find(':')?;
     let after_colon = after_key[colon + 1..].trim_start();
     if !after_colon.starts_with('"') {
         return None;
@@ -147,7 +171,9 @@ fn parse_object_array(inner: &str) -> Vec<String> {
     for (i, c) in inner.char_indices() {
         match c {
             '{' => {
-                if depth == 0 { start = Some(i); }
+                if depth == 0 {
+                    start = Some(i);
+                }
                 depth += 1;
             }
             '}' => {

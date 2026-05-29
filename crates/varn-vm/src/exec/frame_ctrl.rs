@@ -532,13 +532,14 @@ impl NativeCtx for ExecCtx {
     fn suspend_timer(&mut self, ms: u64) -> VmValue {
         let output = varn_types::AsyncTask::pending();
         let output_clone = output.clone();
-        
+
         let spawned = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
             tokio::task::spawn_local(async move {
                 tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
                 output_clone.resolve(varn_types::Value::Null);
             });
-        })).is_ok();
+        }))
+        .is_ok();
 
         if !spawned {
             std::thread::sleep(std::time::Duration::from_millis(ms));

@@ -9,8 +9,8 @@ pub mod util;
 pub mod workspace;
 
 #[tokio::main(flavor = "current_thread")]
-
 pub async fn run_server() {
+    varn_builtins::register_provider();
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
     let (service, socket) = tower_lsp::LspService::new(backend::Backend::new);

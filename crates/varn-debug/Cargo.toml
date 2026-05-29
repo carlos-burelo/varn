@@ -4,15 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-varn-core = { path = "../varn-core" }
-varn-lexer = { path = "../varn-lexer" }
-varn-parser = { path = "../varn-parser" }
-varn-checker = { path = "../varn-checker" }
+varn-core     = { path = "../varn-core" }
+varn-lexer    = { path = "../varn-lexer" }
+varn-parser   = { path = "../varn-parser" }
+varn-checker  = { path = "../varn-checker" }
 varn-compiler = { path = "../varn-compiler" }
-varn-bytecode = { path = "../varn-bytecode" }
-varn-lsp = { path = "../varn-lsp" }
-varn-modules = { path = "../varn-modules" }
-varn-types = { path = "../varn-types" }
-tower-lsp = "0.20"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+varn-modules  = { path = "../varn-modules" }
+varn-types    = { path = "../varn-types" }

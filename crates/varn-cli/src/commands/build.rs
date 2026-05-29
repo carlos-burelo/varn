@@ -6,7 +6,8 @@ pub fn execute(args: BuildArgs) -> Result<(), CliError> {
     let source = std::fs::read_to_string(&args.file)
         .map_err(|e| CliError::fatal(format!("cannot read '{}': {e}", args.file)))?;
 
-    let compiled = pipeline::compile_source_for_build(&source, &args.file, args.verbose, &Default::default())?;
+    let compiled =
+        pipeline::compile_source_for_build(&source, &args.file, args.verbose, &Default::default())?;
 
     let out_path = resolve_output_path(&args.file, args.output.as_deref());
 

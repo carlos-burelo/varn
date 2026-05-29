@@ -1837,18 +1837,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "varn-bytecode"
-version = "0.1.0"
-dependencies = [
- "varn-types",
-]
-
-[[package]]
 name = "varn-checker"
 version = "0.1.0"
 dependencies = [
  "rustc-hash",
- "varn-builtins",
  "varn-core",
  "varn-lexer",
  "varn-modules",
@@ -1873,6 +1865,7 @@ dependencies = [
  "varn-debug",
  "varn-diagnostics",
  "varn-lexer",
+ "varn-lsp",
  "varn-modules",
  "varn-parser",
  "varn-pm",
@@ -1886,7 +1879,6 @@ version = "0.1.0"
 dependencies = [
  "rust_decimal",
  "rustc-hash",
- "varn-bytecode",
  "varn-core",
  "varn-diagnostics",
  "varn-types",
@@ -1906,15 +1898,10 @@ dependencies = [
 name = "varn-debug"
 version = "0.1.0"
 dependencies = [
- "serde",
- "serde_json",
- "tower-lsp",
- "varn-bytecode",
  "varn-checker",
  "varn-compiler",
  "varn-core",
  "varn-lexer",
- "varn-lsp",
  "varn-modules",
  "varn-parser",
  "varn-types",

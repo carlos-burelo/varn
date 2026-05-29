@@ -4,7 +4,6 @@ members = [
     "crates/varn-lexer",
     "crates/varn-parser",
     "crates/varn-checker",
-    "crates/varn-bytecode",
     "crates/varn-compiler",
     "crates/varn-types",
     "crates/varn-op-macros",
@@ -17,12 +16,18 @@ members = [
     "crates/varn-vm",
     "crates/varn-debug",
     "crates/varn-base",
-    "crates/varn-pm", "crates/varn-jit",
+    "crates/varn-pm",
+    "crates/varn-jit",
 ]
 resolver = "2"
 
 [workspace.dependencies]
-rustc-hash = "1.1.0"
+rustc-hash   = "1.1.0"
+rust_decimal = { version = "1", features = ["serde", "maths"] }
+parking_lot  = "0.12.5"
+serde        = { version = "1", features = ["derive"] }
+serde_json   = "1"
+tower-lsp    = "0.20"
 
 [profile.release]
 opt-level = 3

@@ -12,11 +12,15 @@ use varn_core::ModuleId;
 pub struct ModuleResolver;
 
 impl Default for ModuleResolver {
-    fn default() -> Self { Self }
+    fn default() -> Self {
+        Self
+    }
 }
 
 impl ModuleResolver {
-    pub fn new() -> Self { Self }
+    pub fn new() -> Self {
+        Self
+    }
 
     pub fn resolve(&self, spec: &str, referrer: &ModuleId) -> Result<ModuleId, String> {
         use varn_core::ImportSpecifier;
@@ -63,7 +67,9 @@ fn normalize_components(path: &Path) -> PathBuf {
     let mut out = PathBuf::new();
     for c in path.components() {
         match c {
-            Component::ParentDir => { out.pop(); }
+            Component::ParentDir => {
+                out.pop();
+            }
             Component::CurDir => {}
             other => out.push(other),
         }

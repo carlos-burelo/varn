@@ -60,7 +60,7 @@ pub fn check(
         varn_debug::types::debug_types(program, debug);
     }
     if debug.lsp {
-        varn_debug::lsp::debug_lsp(program.filename.as_ref(), source, debug);
+        crate::pipeline::lsp_debug::debug_lsp(program.filename.as_ref(), source, debug);
     }
 
     Ok(CheckResult {

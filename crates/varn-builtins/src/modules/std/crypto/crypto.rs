@@ -9,7 +9,12 @@ use varn_types::{NativeCtx, VmValue};
 pub(crate) mod dispatch {
     use super::*;
 
-    fn str_arg(ctx: &mut dyn NativeCtx, args: &[VmValue], index: usize, label: &str) -> Result<String, String> {
+    fn str_arg(
+        ctx: &mut dyn NativeCtx,
+        args: &[VmValue],
+        index: usize,
+        label: &str,
+    ) -> Result<String, String> {
         args.get(index)
             .map(|&v| ctx.str_repr(v))
             .ok_or_else(|| format!("crypto.{label}: expected argument {index}"))
@@ -45,7 +50,10 @@ pub(crate) mod dispatch {
     }
 
     #[varn_fn("cryptoRandomBytes")]
-    pub fn crypto_random_bytes(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+    pub fn crypto_random_bytes(
+        ctx: &mut dyn NativeCtx,
+        args: &[VmValue],
+    ) -> Result<VmValue, String> {
         let size = args.first().map(|&v| v.as_int()).unwrap_or_default();
         if size < 0 {
             return Err("crypto.randomBytes: size must be non-negative".to_string());

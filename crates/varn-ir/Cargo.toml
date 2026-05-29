@@ -1,9 +1,0 @@
-[package]
-name = "varn-ir"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-varn-core = { path = "../varn-core" }
-varn-types = { path = "../varn-types" }
-rustc-hash = { workspace = true }

@@ -2,7 +2,6 @@ pub mod class;
 pub mod expr;
 pub mod function;
 pub mod ir;
-pub mod ir_demo;
 pub mod liveness;
 pub mod regalloc_post;
 pub mod stmt;

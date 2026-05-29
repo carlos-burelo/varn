@@ -74,7 +74,9 @@ pub(crate) mod dispatch {
 
     #[varn_fn("reflectSetMetaKey")]
     pub fn set_meta_key(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        if let (Some(&meta_id_val), Some(&target), Some(&val)) = (args.first(), args.get(1), args.get(2)) {
+        if let (Some(&meta_id_val), Some(&target), Some(&val)) =
+            (args.first(), args.get(1), args.get(2))
+        {
             let meta_id = ctx.str_repr(meta_id_val);
             let target_k = target_key(ctx, target);
             with_metadata(|m| {

@@ -1,3 +1,4 @@
+pub mod provider;
 pub mod resolver;
 pub mod spec;
 pub mod uri;
@@ -386,4 +387,3 @@ pub fn resolve_specifier_path(base_dir: &Path, specifier: &str) -> Option<String
     let target = base_dir.join(specifier);
     resolve_path_candidates(&target)
 }
-

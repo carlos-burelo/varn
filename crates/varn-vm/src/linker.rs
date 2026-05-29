@@ -21,12 +21,16 @@ pub struct Linker {
 }
 
 impl Default for Linker {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Linker {
     pub fn new() -> Self {
-        Self { state: FxHashMap::default() }
+        Self {
+            state: FxHashMap::default(),
+        }
     }
 
     /// Returns the cached result for `id`, if evaluation is complete.
@@ -53,6 +57,8 @@ impl Linker {
     }
 
     pub fn clone_state(&self) -> Self {
-        Self { state: self.state.clone() }
+        Self {
+            state: self.state.clone(),
+        }
     }
 }
