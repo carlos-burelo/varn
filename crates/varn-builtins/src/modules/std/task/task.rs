@@ -11,7 +11,7 @@ pub(crate) mod dispatch {
             .first()
             .copied()
             .ok_or("task.spawn: missing function")?;
-        ctx.call_vm(first, if args.len() > 1 { &args[1..] } else { &[] })
+        ctx.spawn_vm(first, if args.len() > 1 { &args[1..] } else { &[] })
     }
 
     #[varn_fn("taskSleep", cap = "async")]

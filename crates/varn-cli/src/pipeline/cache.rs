@@ -53,8 +53,16 @@ pub fn load_cached_graph(
         if path == &graph.entry_path {
             continue;
         }
-        // Only check paths that look like filesystem paths (not std:/core:/runtime:).
+        // Check stdlib/core/runtime modules against their embedded source.
         if path.contains(':') && !path.contains('/') && !path.contains('\\') {
+            if let Some(spec) = varn_builtins::spec_for(path) {
+                if let Some(src) = spec.source() {
+                    let current_hash = crate::pipeline::hash::fnv1a64(src.as_bytes());
+                    if cached_hash != current_hash {
+                        return Ok(None);
+                    }
+                }
+            }
             continue;
         }
         if let Ok(src) = std::fs::read(path) {
