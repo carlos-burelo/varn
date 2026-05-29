@@ -115,6 +115,7 @@ pub struct Checker {
     pub(crate) record_expr_types: bool,
     pub(crate) node_scopes: FxHashMap<u32, ScopeId>,
     pub(crate) map_generics_cache: FxHashMap<(Type, Vec<Type>), Type>,
+    pub(crate) yielded_types: Option<Vec<Type>>,
     pub warn_implicit_dynamic: bool,
 }
 
@@ -205,6 +206,7 @@ impl Checker {
             record_expr_types,
             node_scopes: FxHashMap::default(),
             map_generics_cache: FxHashMap::with_capacity_and_hasher(512, Default::default()),
+            yielded_types: None,
         };
 
         let started = Instant::now();

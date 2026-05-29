@@ -220,6 +220,10 @@ impl Checker {
                     None
                 }
             }
+            TypeKind::Array(inner) => {
+                let array_ty = Type::generic(varn_core::IntrinsicType::Array.as_str().to_owned(), vec![*inner.clone()]);
+                self.find_member_info_uncached(&array_ty, key, bind)
+            }
             TypeKind::LiteralStr(_) => self.find_member_info_uncached(&Type::Str, key, bind),
             TypeKind::LiteralInt(_) => self.find_member_info_uncached(&Type::Int, key, bind),
             TypeKind::LiteralFloat(_) => self.find_member_info_uncached(&Type::Float, key, bind),
@@ -239,6 +243,10 @@ impl Checker {
                                 .map(|m| (m.ty.clone(), m.symbol_id))
                         })
                 }
+            }
+            TypeKind::Intrinsic(varn_core::TypeTag::Range) => {
+                let range_ty = Type::named(varn_core::IntrinsicType::Range.as_str().to_owned());
+                self.find_member_info_uncached(&range_ty, key, bind)
             }
             _ => None,
         };

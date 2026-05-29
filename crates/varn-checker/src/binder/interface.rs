@@ -97,6 +97,7 @@ impl super::Binder {
             }
             InterfaceMember::Method {
                 key,
+                type_params,
                 params,
                 return_type,
                 optional,
@@ -130,11 +131,17 @@ impl super::Binder {
                         }
                     })
                     .collect::<Vec<_>>();
+
+                let fn_tps: Vec<Rc<str>> = type_params
+                    .iter()
+                    .map(|tp| Rc::from(tp.name.as_str()))
+                    .collect();
+
                 let fn_type = Type::fn_(FunctionType {
                     params: params_list,
                     return_type: Box::new(ret),
                     is_arrow: false,
-                    type_params: vec![],
+                    type_params: fn_tps,
                 });
                 members.push(ClassMemberInfo {
                     name: key.clone(),

@@ -101,7 +101,7 @@ pub fn classify_identifier(
     match symbol_map.get(name) {
         Some(SymbolKind::Function) | Some(SymbolKind::Method) => TT_FUNCTION,
         Some(SymbolKind::Class) | Some(SymbolKind::Struct) => TT_CLASS,
-        Some(SymbolKind::Extension) => TT_VARIABLE,
+        Some(SymbolKind::Extension) => TT_CLASS,
         Some(SymbolKind::Interface) => TT_INTERFACE,
         Some(SymbolKind::Namespace) => TT_NAMESPACE,
         Some(SymbolKind::TypeAlias) | Some(SymbolKind::Enum) => TT_TYPE,

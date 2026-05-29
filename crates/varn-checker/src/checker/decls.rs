@@ -67,7 +67,32 @@ impl Checker {
                     self.record_scope(f.body.range.start.offset);
                 }
 
+                let is_gen = f.modifiers.is_generator;
+                let old_yields = if is_gen {
+                    self.yielded_types.replace(Vec::new())
+                } else {
+                    None
+                };
+
                 self.check_stmt(&f.body, bind);
+
+                if is_gen {
+                    let yields = self.yielded_types.take().unwrap_or_default();
+                    if f.return_type.is_none() {
+                        let inferred_yield = if yields.is_empty() { Type::Void } else { Type::union(yields) };
+                        let scope = bind.scopes.get(saved_scope);
+                        if let Some(sym_id) = scope.resolve(&f.id, &bind.scopes) {
+                            if let Some(mut fn_ty) = self.symbol_types.get(&sym_id).cloned().or_else(|| bind.arena.get(sym_id).ty.clone()) {
+                                if let TypeKind::Fn(ref mut ft) = fn_ty.0 {
+                                    ft.return_type = Box::new(Type::generic("Generator", vec![inferred_yield]));
+                                }
+                                self.symbol_types.insert(sym_id, fn_ty.clone());
+                                self.record_type_with_symbol(f.id_offset, fn_ty, sym_id);
+                            }
+                        }
+                    }
+                    self.yielded_types = old_yields;
+                }
 
                 self.current_scope = saved_scope;
                 self.expected_return_type = saved_expected;
