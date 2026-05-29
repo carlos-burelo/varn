@@ -44,4 +44,3 @@ function identity<T>(value: T, label: str): T {
 assert("Generic function named args", identity<int>(value: 42, label: "Answer") == 42);
 
 print("[PASSED] 40. Named arguments ")
-print("40 FINISHED")

@@ -27,7 +27,6 @@ class ResourceImpl implements Disposable {
 }
 
 async function runComprehensiveTest(): Task<void> {
-    print("Starting 42. StdLib Comprehensive 18-Module Test...")
 
     // 1. std:time
     let d = Duration.from("PT1H30M");
