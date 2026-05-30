@@ -43,7 +43,7 @@ graph TD
     Compiler -- FunctionProto --> Runtime
 
     subgraph Tools["Herramientas"]
-        CLI["varn-cli (binario wr)"]
+        CLI["varn-cli (binario vn)"]
         LSP["varn-lsp (IDE integration)"]
         PM["varn-pm (package manager)"]
         Debug["varn-debug (profiling, disasm)"]
@@ -89,7 +89,7 @@ Proc macros: `#[varn_module]`, `#[varn_fn]`, `#[varn_class]`, `#[varn_constructo
 Registro canónico de módulos (`MODULE_REGISTRY`). Resolución topológica. Especificadores `std:*`, `builtin:*`.
 
 ### `varn-cli`
-Binario `wr`. Pipeline completo: `run`, `check`, `build`, `bench`, `disasm`, `inspect`, `repl`, `eval`, `info`, `init`, `lsp`, `doctor`, `add`, `remove`, `install`, `update`.
+Binario `vn`. Pipeline completo: `run`, `check`, `eval`, `repl`, `bench`, `debug`, `build`, `pkg`, `init`, `doctor`, `lsp`, `completions`.
 
 ### `varn-lsp`
 LSP con tower-lsp + tokio. Consulta SemanticDB. Hover, completions, go-to-definition, semantic tokens.
@@ -98,7 +98,7 @@ LSP con tower-lsp + tokio. Consulta SemanticDB. Hover, completions, go-to-defini
 Package manager. Resolución semver sobre GitHub/Gitea tags API. Caché global `~/.vn/cache/`. SHA256 integrity. Lockfile `varn.lock`.
 
 ### `varn-debug`
-Profiling, disassembly, inspección de estructuras internas.
+Profiling, bytecode, inspección de estructuras internas.
 
 ### `varn-diagnostics`
 Reporte de errores con spans y subrayados. Formato CLI y LSP.

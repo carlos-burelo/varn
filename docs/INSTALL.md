@@ -14,19 +14,19 @@ cd Varn
 cargo build --bin vn --release
 ```
 
-El binario queda en `target/release/wr`.
+El binario queda en `target/release/vn`.
 
 ### Agregar al PATH
 
 **Linux/macOS:**
 ```sh
-cp target/release/vn ~/.local/bin/wr
+cp target/release/vn ~/.local/bin/vn
 # O agregar target/release/ al PATH en ~/.bashrc / ~/.zshrc
 ```
 
 **Windows (PowerShell):**
 ```powershell
-Copy-Item target\release\wr.exe "$env:USERPROFILE\.cargo\bin\wr.exe"
+Copy-Item target\release\vn.exe "$env:USERPROFILE\.cargo\bin\vn.exe"
 ```
 
 ## Verificar instalación
@@ -41,7 +41,7 @@ vn tests/main.vn
 
 ```sh
 # Build dev (más rápido de compilar)
-cargo build --bin wr
+cargo build --bin vn
 
 # Ejecutar directamente sin instalar
 cargo run --bin vn -- tests/main.vn

@@ -13,8 +13,8 @@
 - **Tipado estático expresivo** — uniones, genéricos, exhaustividad total en `match`
 - **Async nativo** — `async`/`await`, generadores, `TaskGroup`, `parallel`, `spawn`
 - **Sistema de paquetes** — `varn.json`, `varn.lock`, resolución semver sobre git
-- **Compilado a `.vnc`** — bytecode portable, sin recompilación
-- **Tooling** — `vn bench`, `vn disasm`, `vn inspect`, LSP
+- **Compilado a `.vnc`** — artefacto portable, sin recompilación
+- **Tooling** — `vn bench`, `vn debug -p bytecode`, `vn debug`, LSP
 
 ---
 
@@ -466,7 +466,6 @@ vn eval --debug all "print('hello')"
 
 ```bash
 vn build program.vn              # → program.vnc junto al fuente
-vn build program.vn -o dist/     # → dist/program.vnc
 vn build program.vn -o out.vnc   # path explícito
 ```
 
@@ -478,8 +477,7 @@ El `.vnc` contiene el grafo completo de bytecode. No incluye stdlib (embedded en
 vn bench program.vn              # fases: read/lex/parse/check/compile/execute
 vn bench program.vn --runs 100
 vn bench program.vnc             # solo load + execute (compara contra .vn)
-vn bench --no-run program.vn     # solo mide compilación
-vn bench --with-output program.vn
+vn bench --show-output program.vn
 ```
 
 Output típico:
@@ -501,17 +499,17 @@ total     1.862 ms 2.077 ms 2.105 ms 2.393 ms          21.05 ms
 Throughput: 475.1 runs/s
 ```
 
-### Inspección y disassembly
+### Debug e inspección
 
 ```bash
-vn disasm program.vn             # bytecode desensamblado
-vn inspect program.vn            # todas las fases
-vn inspect -p parse program.vn   # solo AST
-vn inspect -p check program.vn   # tipos inferidos
-vn inspect -e "function f(x: int) = x * 2"  # código inline
-vn info program.vn
-vn info --hashes program.vn
+vn debug program.vn               # todas las fases
+vn debug -p ast program.vn        # solo AST
+vn debug -p check program.vn      # tipos inferidos
+vn debug -p bytecode program.vn   # bytecode desensamblado
+vn debug -e "function f(x: int) = x * 2"  # código inline
 ```
+
+Fases disponibles: `tokens`, `ast`, `check`, `bytecode`, `symbols`, `binds`, `types[:N]`, `expr`, `modules`, `graph`, `caps`, `scope`, `errors`, `trace`, `info`, `lsp[:sub]` y `all`.
 
 ### REPL
 
@@ -523,10 +521,10 @@ vn repl --debug-bytecode
 ### Paquetes
 
 ```bash
-vn add mathlib github.com/user/mathlib@^1.2.3
-vn remove mathlib
-vn install          # desde lockfile, offline si cacheado
-vn update           # re-resuelve contra tags remotos
+vn pkg add mathlib github.com/user/mathlib@^1.2.3
+vn pkg remove mathlib
+vn pkg install      # desde lockfile, offline si cacheado
+vn pkg update       # re-resuelve contra tags remotos
 ```
 
 ### Proyecto
@@ -536,17 +534,20 @@ vn init                          # directorio actual
 vn init my-project
 vn init my-project --name "Mi App"
 vn doctor                        # diagnóstico del entorno
+vn lsp                           # servidor LSP por stdio
+vn completions bash              # completions de shell
 ```
 
 ### Debug
 
 ```bash
-vn run --debug parse program.vn
-vn run --debug check,compile program.vn
-vn run --debug all program.vn
+vn debug -p ast program.vn
+vn debug -p check program.vn
+vn debug -p bytecode program.vn
+vn debug program.vn
 vn run --trace program.vn        # trace de ejecución instrucción a instrucción
 
-# Fases: lex, parse, check, compile, vm, all
+# Fases: tokens, ast, check, bytecode, symbols, binds, types[:N], expr, modules, graph, caps, scope, errors, trace, info, lsp[:sub], all
 ```
 
 ---
@@ -596,8 +597,8 @@ fuente .vn
 | `varn-builtins` | Stdlib nativa |
 | `varn-modules` | Resolución de paquetes, manifests |
 | `varn-pm` | Package manager (add/install/update/remove) |
-| `varn-cli` | Binario `wr`, pipeline completo |
-| `varn-debug` | Inspección, profiling, disassembly |
+| `varn-cli` | Binario `vn`, pipeline completo |
+| `varn-debug` | Inspección de fases, profiling, bytecode |
 | `varn-op-macros` | Proc macros para bindings nativos |
 
 ### VM — características

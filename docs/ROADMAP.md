@@ -9,7 +9,7 @@ El lenguaje está completo y funcional:
 - **Lenguaje**: tipos, genéricos, async/await, generators, closures, destructuring, match exhaustivo, `using`, decoradores, named arguments, pipeline `|>`, extensions.
 - **VM**: register-based con NaN-boxing, Inline Cache, fast-path calls (~60% de llamadas), upvalues open/closed.
 - **Stdlib**: `str`, `int`, `float`, `bool`, `char`, `decimal`, `array`, `range`, `map`, `set`, `math`, `json`, `fs`, `http`, `io`, `net`, `path`, `sys`, `time`, `task`, `collections`, `result`, `option`, `types`, `reflect`, `crypto`.
-- **Package manager**: `vn add/remove/install/update` con resolución semver sobre git tags, caché global SHA256-verified.
+- **Package manager**: `vn pkg add/remove/install/update` con resolución semver sobre git tags, caché global SHA256-verified.
 - **Caché de bytecode**: `.vn/cache/` invalidado por hash de contenido.
 - **Compilados portables**: `vn build` → `.vnc`, `vn run program.vnc`.
 - **LSP**: servidor en `varn-lsp` con hover, completions, go-to-definition.
