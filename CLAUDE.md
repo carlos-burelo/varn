@@ -1,3 +1,47 @@
+# Mapa Rápido del Workspace
+
+Este repo es un monorepo Rust. Para moverse rápido, usa estas reglas antes de leer notas antiguas más abajo.
+
+## Dónde mirar primero
+
+- CLI y orquestación: [crates/varn-cli/src/cli.rs](crates/varn-cli/src/cli.rs), [crates/varn-cli/src/commands/](crates/varn-cli/src/commands/), [crates/varn-cli/src/pipeline/](crates/varn-cli/src/pipeline/)
+- Pipeline compartido: [crates/varn-pipeline/src/](crates/varn-pipeline/src/)
+- Lexer y parser: [crates/varn-lexer/src/](crates/varn-lexer/src/), [crates/varn-parser/src/](crates/varn-parser/src/)
+- Type checker: [crates/varn-checker/src/](crates/varn-checker/src/)
+- Codegen: [crates/varn-compiler/src/](crates/varn-compiler/src/)
+- VM y runtime: [crates/varn-vm/src/](crates/varn-vm/src/), [crates/varn-runtime/src/](crates/varn-runtime/src/)
+- Builtins, módulos y paquetes: [crates/varn-builtins/](crates/varn-builtins/), [crates/varn-modules/](crates/varn-modules/), [crates/varn-pm/](crates/varn-pm/)
+- LSP y debug: [crates/varn-lsp/](crates/varn-lsp/), [crates/varn-debug/](crates/varn-debug/)
+- Tipos compartidos: [crates/varn-types/](crates/varn-types/), [crates/varn-core/](crates/varn-core/), [crates/varn-base/](crates/varn-base/)
+- Tests de integración: [tests/main.vn](tests/main.vn) y [tests/](tests/)
+- Docs de referencia: [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md), [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/CRATES_STATE.md](docs/CRATES_STATE.md), [docs/COMPILER_ARCHITECTURE.md](docs/COMPILER_ARCHITECTURE.md), [docs/VM_ARCHITECTURE.md](docs/VM_ARCHITECTURE.md), [docs/RUNTIME_ARCHITECTURE.md](docs/RUNTIME_ARCHITECTURE.md)
+
+## Cómo moverse más rápido
+
+- Empieza por el crate que decide el comportamiento, no por los wrappers.
+- Si cambias la CLI, toca juntos `crates/varn-cli/src/cli.rs`, el comando en `crates/varn-cli/src/commands/`, `docs/CLI_REFERENCE.md`, `docs/CLI_INSPECT.md`, `docs/GETTING_STARTED.md` y `README.md`.
+- Si cambias sintaxis o análisis, revisa `varn-parser`, `varn-checker` y el test `.vn` más cercano antes de tocar la VM.
+- Si cambias ejecución o bytecode, valida `varn-compiler`, `varn-vm`, `varn-runtime` y luego el flujo `vn run tests/main.vn`.
+- Si cambias paquetes o módulos, revisa `varn-pm`, `varn-modules` y la documentación de arquitectura asociada.
+
+## Validación rápida
+
+- CLI: `cargo check -p varn-cli` y `target/release/vn.exe --help`
+- Cambios de parser/checker/compiler/vm: `cargo test --workspace` o el crate más cercano si el cambio es localizado
+- Integración del lenguaje: `cargo run --bin vn -- tests/main.vn`
+- Solo docs: `git diff --check`
+
+## Skills disponibles
+
+- [varn-repo-map](.claude/skills/varn-repo-map/SKILL.md)
+- [varn-cli-sync](.claude/skills/varn-cli-sync/SKILL.md)
+- [varn-test-triage](.claude/skills/varn-test-triage/SKILL.md)
+- [varn-implementation-governor](.claude/skills/varn-implementation-governor/SKILL.md)
+
+## Nota
+
+El contenido legado más abajo sigue siendo útil como referencia histórica, pero para trabajar rápido usa primero este mapa y la [CLI_REFERENCE](docs/CLI_REFERENCE.md).
+
 # Varn Language - CLI Documentation
 
 Lenguaje compilado con tipado estático y VM register-based optimizada.
@@ -404,7 +448,7 @@ Arguments:
 Options:
   -h, --help  Print help
 
-# Shells soportados: bash, zsh, fish, powershell, elvish
+# Shells soportados: bash, zsh, fish, power-shell, elvish
 ```
 
 **Ejemplos:**
@@ -419,7 +463,7 @@ vn completions zsh > ~/.zfunc/_vn
 vn completions fish > ~/.config/fish/completions/vn.fish
 
 # PowerShell (agregar al $PROFILE)
-vn completions powershell > vn.ps1
+vn completions power-shell > vn.ps1
 ```
 
 ## Flags de Debug

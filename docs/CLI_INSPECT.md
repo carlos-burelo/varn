@@ -2,6 +2,8 @@
 
 `vn debug` ejecuta el pipeline completo pero detiene antes de la VM, mostrando las estructuras internas de cada fase.
 
+Para el panorama completo de comandos, flags y ejemplos, ver [CLI_REFERENCE.md](CLI_REFERENCE.md).
+
 ## Uso
 
 ```bash

@@ -438,6 +438,8 @@ cp target/release/vn ~/.local/bin/   # Linux/macOS
 
 ## Comandos
 
+Referencia completa: [CLI_REFERENCE.md](docs/CLI_REFERENCE.md)
+
 ### Ejecutar
 
 ```bash
@@ -537,6 +539,10 @@ vn doctor                        # diagnóstico del entorno
 vn lsp                           # servidor LSP por stdio
 vn completions bash              # completions de shell
 ```
+
+### Referencia completa
+
+Consulta [docs/CLI_REFERENCE.md](docs/CLI_REFERENCE.md) para ver la ayuda consolidada de todos los comandos, flags y ejemplos.
 
 ### Debug
 
