@@ -34,11 +34,11 @@ vn tests/main.vn
 | `vn check <file>` | Type-check sin ejecutar |
 | `vn build <file>` | Compilar a `.vnc` |
 | `vn bench <file>` | Benchmark con métricas VM |
-| `vn disasm <file>` | Ver bytecode |
-| `vn inspect <file>` | Inspeccionar AST/tipos/bytecode |
+| `vn debug -p bytecode <file>` | Ver bytecode |
+| `vn debug <file>` | Inspeccionar AST/tipos/bytecode |
 | `vn repl` | REPL interactivo |
-| `vn add <alias> <origin>` | Añadir dependencia |
-| `vn install` | Instalar dependencias del proyecto |
+| `vn pkg add <alias> <origin>` | Añadir dependencia |
+| `vn pkg install` | Instalar dependencias del proyecto |
 
 ## Ejemplo de lenguaje
 
@@ -142,7 +142,7 @@ Requiere configuración en `varn.json`:
 }
 ```
 
-Instalar: `vn install`
+Instalar: `vn pkg install`
 
 ## Siguiente
 

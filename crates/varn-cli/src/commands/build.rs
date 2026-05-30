@@ -42,6 +42,6 @@ fn resolve_output_path(source_file: &str, output: Option<&str>) -> String {
                 out.to_owned()
             }
         }
-        None => src.with_extension("wrc").to_string_lossy().into_owned(),
+        None => src.with_extension("vnc").to_string_lossy().into_owned(),
     }
 }

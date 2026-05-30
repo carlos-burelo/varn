@@ -6,7 +6,7 @@ Lenguaje compilado con tipado estático y VM register-based optimizada.
 
 ```bash
 # Build en modo desarrollo
-cargo build --bin wr
+cargo build --bin vn
 
 # Build en modo release (optimizado)
 cargo build --bin vn --release
@@ -24,10 +24,22 @@ Ejecuta un archivo Varn. También es el comando por defecto si no se especifica 
 ```bash
 vn run <FILE> [-- <ARGS>...]
 
-# Opciones:
-  -v, --verbose         # Modo verbose
-      --debug <PHASES>  # Debug de fases específicas
-      --trace           # Tracing de ejecución
+Ejecutar un archivo Varn
+
+Usage: vn.exe run [OPTIONS] <FILE> [-- <ARGS>...]
+
+Arguments:
+  <FILE>     Archivo Varn a ejecutar
+  [ARGS]...  Argumentos para el script
+
+Options:
+  -v, --verbose  Modo verbose
+      --trace    Tracing de ejecución
+      --strict   Advertir sobre tipos Dynamic implícitos
+  -h, --help     Print help
+PS C:\Users\x\dev\varn>
+
+
 ```
 
 **Ejemplos:**
@@ -45,7 +57,7 @@ vn run script.vn -- arg1 arg2
 vn run --trace tests/main.vn
 
 # Con debug de todas las fases
-vn run --debug all program.vn
+vn debug program.vn
 
 # Con verbose
 vn run -v program.vn
@@ -58,9 +70,18 @@ Verifica el programa sin ejecutarlo (type checking).
 ```bash
 vn check <FILE>
 
-# Opciones:
-  -v, --verbose         # Modo verbose
-      --debug <PHASES>  # Debug de fases específicas
+Verificar tipos sin ejecutar
+
+Usage: vn.exe check [OPTIONS] <FILE>
+
+Arguments:
+  <FILE>  Archivo Varn a verificar
+
+Options:
+  -v, --verbose  Modo verbose
+      --strict   Advertir sobre tipos Dynamic implícitos
+  -h, --help     Print help
+PS C:\Users\x\dev\varn>
 ```
 
 **Ejemplos:**
@@ -71,8 +92,6 @@ vn check src/main.vn
 # Verbose
 vn check -v src/main.vn
 
-# Con debug del checker
-vn check --debug check src/main.vn
 ```
 
 ### `eval` - Evaluar código
@@ -82,9 +101,16 @@ Evalúa código Varn directamente desde la línea de comandos.
 ```bash
 vn eval <CODE>
 
-# Opciones:
-  -v, --verbose         # Modo verbose
-      --debug <PHASES>  # Debug de fases específicas
+Evaluar código directamente desde la línea de comandos
+
+Usage: vn.exe eval [OPTIONS] <CODE>
+
+Arguments:
+  <CODE>  Código Varn a evaluar
+
+Options:
+  -v, --verbose  Modo verbose
+  -h, --help     Print help
 ```
 
 **Ejemplos:**
@@ -95,8 +121,6 @@ vn eval "print(1 + 2)"
 # Evaluar código más complejo
 vn eval "function double(x: int) = x * 2; print(double(21))"
 
-# Con debug
-vn eval --debug all "print('hello')"
 ```
 
 ### `repl` - REPL Interactivo
@@ -106,8 +130,13 @@ Inicia un REPL (Read-Eval-Print Loop) interactivo.
 ```bash
 vn repl
 
-# Opciones:
-      --debug-bytecode  # Mostrar bytecode generado
+Iniciar REPL interactivo
+
+Usage: vn.exe repl [OPTIONS]
+
+Options:
+      --debug-bytecode  Mostrar bytecode generado en cada evaluación
+  -h, --help            Print help
 ```
 
 **Ejemplos:**
@@ -115,8 +144,6 @@ vn repl
 # Iniciar REPL
 vn repl
 
-# REPL con debug de bytecode
-vn repl --debug-bytecode
 ```
 
 ### `bench` - Benchmark
@@ -126,11 +153,17 @@ Ejecuta benchmarks detallados de rendimiento con métricas del VM.
 ```bash
 vn bench <FILE>
 
-# Opciones:
-      --runs <N>        # Número de runs (default: 10)
-      --no-run          # Solo compilar, no ejecutar
-      --with-output     # Mostrar output del programa
-      --debug <PHASES>  # Debug de fases específicas
+Ejecutar benchmarks de rendimiento
+
+Usage: vn.exe bench [OPTIONS] <FILE>
+
+Arguments:
+  <FILE>  Archivo Varn a medir
+
+Options:
+      --runs <N>     Número de runs (default: 10) [default: 10]
+      --show-output  Mostrar output del programa (normalmente silenciado)
+  -h, --help         Print help
 ```
 
 **Ejemplos:**
@@ -141,54 +174,102 @@ vn bench tests/main.vn
 # Benchmark con 100 runs
 vn bench --runs 100 tests/main.vn
 
-# Solo compilación (sin ejecución)
-vn bench --no-run tests/main.vn
-
 # Con output visible (normalmente está silenciado)
-vn bench --with-output tests/main.vn
+vn bench --show-output tests/main.vn
 ```
 
 **Output del benchmark:**
 ```
-Benchmark · tests/main.vn  (10 runs)
-Source  43 lines  1.1 KB  88 tokens
+Benchmark · \\?\C:\Users\x\dev\varn\tests\main.vn  (10 runs)
+  Source  46 lines  1.4 KB  94 tokens
 
-Phase           min      p50     mean      max       σ      total
-────────── ───────── ──────── ──────── ──────── ──────── ─────────
-read         26.8 µs  43.4 µs  43.1 µs  87.6 µs  18 µs    431 µs    ░░ 2%
-lex          15.3 µs  16.4 µs  16.9 µs  21.2 µs  1.67 µs  169 µs    ░░ 1%
-parse        16.5 µs  23.4 µs  26.8 µs  59.9 µs  12.4 µs  268 µs    ░░ 1%
-check        74 µs    78.2 µs  81.9 µs  113 µs   10.9 µs  819 µs    ░░ 4%
-compile      6.6 µs   7 µs     7.38 µs  9.5 µs   821 ns   73.8 µs   ░░ 0%
-execute      1.723 ms 1.909 ms 1.929 ms 2.101 ms 127 µs   19.29 ms  ██ 92%
-────────── ───────── ──────── ──────── ──────── ──────── ─────────
-total        1.862 ms 2.077 ms 2.105 ms 2.393 ms          21.05 ms
+  Phase             min        p50       mean        max         σ      total       %
+  ──────────  ─────────  ─────────  ─────────  ─────────  ────────  ─────────  ──────
+  read          18.2 µs    21.8 µs    21.4 µs      25 µs   2.06 µs     214 µs    3.5%
+  lex           12.2 µs    12.5 µs    12.9 µs    14.9 µs    769 ns     129 µs    2.0%
+  parse          7.9 µs     9.3 µs    12.9 µs    28.7 µs   7.14 µs     129 µs    1.5%
+  check         56.4 µs    63.3 µs    64.2 µs    77.8 µs   6.65 µs     642 µs   10.3%
+  compile       31.3 µs    37.5 µs    37.6 µs    42.2 µs    2.8 µs     376 µs    6.1%
+  optimize       4.2 µs     4.4 µs    5.79 µs    18.6 µs   4.07 µs    63.7 µs    0.7%
+  execute        442 µs     466 µs     477 µs     531 µs   27.1 µs   4.774 ms   75.8%
+  ──────────  ─────────  ─────────  ─────────  ─────────  ────────  ─────────  ──────
+  total          572 µs     614 µs     633 µs     738 µs             6.328 ms    100%
 
-Throughput: 475.1 runs/s  (mean end-to-end: 2.105 ms)
+  Throughput: 1627.6 runs/s  (p50 end-to-end: 614 µs)
+  Total pipeline time: 6.328 ms
+  Module precompilation (cold startup): 43.5 ms
+  Cold-start throughput: 22.7 runs/s  (precompile + p50: 44.12 ms)
+  Execution measured with stdout muted (--show-output to disable)
 
-Parser Breakdown
-  program_loop      18.4 µs    64%
-  stmt_or_decl      10.5 µs    36%
-  ...
+  Parser Breakdown
+  program_loop       6.5 µs    59%
+  stmt_or_decl       4.5 µs    41%
+  block                0 ns     0%
+  recover              0 ns     0%
+  total               11 µs
 
-Checker Breakdown
-  bind              21.9 µs    57%
-  check_stmts       16 µs      42%
-  ...
 
-VM Profile
-  IC hits                         0  (0.0% hit rate)
-  IC misses                       0
-  calls vm-fast                 687  (60.3%)
-  calls slow/prepare             23  (2.0%)
-  calls native                  429  (37.7%)
-  heap allocs                 1 359
+  Checker Breakdown
+  load_globals         0 ns     0%
+  bind              14.6 µs    44%
+  merge_core           0 ns     0%
+  enrich_calls         0 ns     0%
+  check_stmts       18.1 µs    55%
+  annotations        300 ns     1%
+  finalize           100 ns     0%
+  total             33.1 µs
 
-Register VM Stats
-  reg loads                       0
-  reg stores                      0
-  frame pushes                  133
-  frame pops                    192
+
+  VM Opcode Hotspots
+  LoadGlobalIdx               309    16%
+  LoadConst                   205    10%
+  Call                        193    10%
+  LoadNull                    185     9%
+  LoadInt                     109     6%
+  DefineGlobalIdx             106     5%
+  GetProperty                  98     5%
+  Move                         76     4%
+  MakeClosure                  70     4%
+  Eq                           66     3%
+  JumpIfTrue                   36     2%
+  CallMethod                   35     2%
+  total                     1 959
+
+
+  VM Profile
+  IC hits                       185  (93.0% hit rate)
+  IC misses                      14
+    GetProp IC hits              85  (96.6% hit rate)
+    CallMethod IC hits          100  (90.1% hit rate)
+  calls vm-fast                 109  (19.2%)
+  calls slow/prepare             24  (4.2%)
+  calls native                  436  (76.6%)
+  heap allocs                   648
+
+  GC Stats
+  nursery allocs                357
+  minor gc runs                   1
+  minor gc promoted               0
+  gc collections                  2
+  gc freed                      575
+  heap live (post-gc)            73
+  heap total slots              639
+
+  Register VM Stats
+  Move opcodes                   76
+  frame pushes                  140
+  frame pops                    199
+
+
+  JIT Compiler & Execution Stats
+  freshly compiled                    0  (success: 0, failed: 0)
+  using cached JIT                   99
+  total compile time               0 ns
+  total machine code                0 B
+  JIT runs                          183  (86.7%)
+  interpreted runs                   28  (13.3%)
+
+
 ```
 
 **Métricas explicadas:**
@@ -204,7 +285,7 @@ Register VM Stats
 Muestra el bytecode desarmado (disassembly).
 
 ```bash
-vn disasm <FILE>
+vn debug -p bytecode <FILE>
 
 # Opciones:
       --debug <PHASES>  # Debug de fases específicas
@@ -213,66 +294,47 @@ vn disasm <FILE>
 **Ejemplos:**
 ```bash
 # Ver bytecode
-vn disasm tests/main.vn
+vn debug -p bytecode tests/main.vn
 
-# Con debug del compilador
-vn disasm --debug compile tests/main.vn
 ```
 
-### `inspect` - Inspeccionar AST/IR
+### `debug` - Inspeccionar AST/IR
 
 Inspecciona las estructuras internas del compilador (AST, tipos, etc.).
 
 ```bash
-vn inspect [FILE]
+vn debug [FILE]
 
-# Opciones:
-  -e, --eval <CODE>      # Evaluar código directamente
-  -p, --phases <PHASES>  # Fases a mostrar (default: all)
+Inspeccionar AST, tipos, bytecode y otras estructuras internas
+
+Usage: vn.exe debug [OPTIONS] [FILE]
+
+Arguments:
+  [FILE]  Archivo Varn a inspeccionar
+
+Options:
+  -e, --eval <CODE>    Evaluar código directamente en lugar de archivo
+  -p, --phase <PHASE>  Fase a mostrar: tokens, ast, check, bytecode, symbols, binds, types[:N], expr, modules, graph, caps, scope, errors, trace, info, lsp[:sub], all [default: all]
+  -h, --help           Print help
+PS C:\Users\x\dev\varn>
 ```
-
-**Fases disponibles:**
-- `parse` - Abstract Syntax Tree
-- `check` - Type-checked AST
-- `compile` - Bytecode/IR
-- `all` - Todas las fases (default)
 
 **Ejemplos:**
 ```bash
 # Inspeccionar todas las fases
-vn inspect tests/main.vn
+vn debug tests/main.vn
 
 # Solo parsing
-vn inspect -p parse tests/main.vn
+vn debug -p parse tests/main.vn
 
 # Inspeccionar código inline
-vn inspect -e "function add(a: int, b: int) = a + b"
+vn debug -e "function add(a: int, b: int) = a + b"
 
 # Ver solo el AST checkeado
-vn inspect -p check tests/main.vn
+vn debug -p check tests/main.vn
 
 # Evaluar y ver todas las fases
-vn inspect -e "print(42)"
-```
-
-### `info` - Información de archivo
-
-Muestra información sobre un archivo Varn compilado.
-
-```bash
-vn info <FILE>
-
-# Opciones:
-      --hashes  # Mostrar hashes de módulos
-```
-
-**Ejemplos:**
-```bash
-# Info básica
-vn info tests/main.vn
-
-# Con hashes
-vn info --hashes tests/main.vn
+vn debug -e "print(42)"
 ```
 
 ### `doctor` - Diagnóstico
@@ -332,22 +394,32 @@ Genera scripts de autocompletado para tu shell.
 ```bash
 vn completions <SHELL>
 
+Generar scripts de autocompletado para el shell
+
+Usage: vn.exe completions <SHELL>
+
+Arguments:
+  <SHELL>  Shell para el que generar completions [possible values: bash, zsh, fish, power-shell, elvish]
+
+Options:
+  -h, --help  Print help
+
 # Shells soportados: bash, zsh, fish, powershell, elvish
 ```
 
 **Ejemplos:**
 ```bash
 # Bash
-vn completions bash > ~/.local/share/bash-completion/completions/wr
+vn completions bash > ~/.local/share/bash-completion/completions/vn
 
 # Zsh (agregar a ~/.zshrc: fpath=(~/.zfunc $fpath))
-vn completions zsh > ~/.zfunc/_wr
+vn completions zsh > ~/.zfunc/_vn
 
 # Fish
-vn completions fish > ~/.config/fish/completions/wr.fish
+vn completions fish > ~/.config/fish/completions/vn.fish
 
 # PowerShell (agregar al $PROFILE)
-vn completions powershell > wr.ps1
+vn completions powershell > vn.ps1
 ```
 
 ## Flags de Debug
@@ -356,30 +428,39 @@ El flag `--debug <PHASES>` acepta fases separadas por comas:
 
 ```bash
 # Debug de todas las fases
-vn run --debug all program.vn
+vn debug program.vn
 
-# Debug de fases específicas
-vn run --debug parse,check program.vn
 
 # Fases disponibles:
-# - lex: Lexer/Tokenizer
-# - parse: Parser
+# - tokens: Lexer/Tokenizer
+# - ast: Parser
 # - check: Type checker
-# - compile: Compiler/Codegen
-# - vm: Virtual Machine
+# - bytecode: Compiler/Codegen
+# - symbols: Symbol table
+# - binds: Binding graph
+# - types: Typed AST
+# - expr: Expression tree
+# - modules: Module graph
+# - graph: Import graph
+# - caps: Capability graph
+# - scope: Scope tree
+# - errors: Diagnostics
+# - trace: Execution trace
+# - info: Runtime info
+# - lsp: LSP submodes
 # - all: Todas las fases
 ```
 
 **Ejemplos:**
 ```bash
 # Ver output del parser
-vn run --debug parse program.vn
+vn debug -p ast program.vn
 
 # Debug del type checker
-vn check --debug check program.vn
+vn debug -p check program.vn
 
 # Debug completo
-vn run --debug all program.vn
+vn debug program.vn
 ```
 
 ## Comando Implícito `run`
@@ -481,7 +562,7 @@ vn tests/main.vn
 
 4. **Errores de tipos**
    - Usa `vn check` para ver detalles del type checker
-   - Usa `vn inspect -p check` para ver el AST tipado
+   - Usa `vn debug -p check` para ver el AST tipado
 
 ### Debug Avanzado
 
@@ -490,16 +571,16 @@ vn tests/main.vn
 vn run --trace --debug all program.vn
 
 # Ver bytecode generado
-vn disasm program.vn
+vn debug -p bytecode program.vn
 
 # Inspeccionar AST y tipos
-vn inspect program.vn
+vn debug program.vn
 
 # Ver solo tipos
-vn inspect -p check program.vn
+vn debug -p check program.vn
 
 # Benchmark con output visible
-vn bench --with-output program.vn
+vn bench --show-output program.vn
 ```
 
 ### Performance Debugging
@@ -509,10 +590,7 @@ vn bench --with-output program.vn
 vn bench --runs 100 program.vn
 
 # Ver qué fases son lentas
-vn bench --debug all program.vn
-
-# Solo medir compilación (sin ejecución)
-vn bench --no-run program.vn
+vn debug program.vn
 ```
 
 ## Ejemplos de Workflows
@@ -526,7 +604,7 @@ vn check src/main.vn
 vn src/main.vn
 
 # Con debug si hay problemas
-vn run --debug all src/main.vn
+vn debug src/main.vn
 ```
 
 ### Testing
@@ -541,13 +619,13 @@ vn bench tests/main.vn
 ### Inspección y Debug
 ```bash
 # Ver AST
-vn inspect -p parse src/main.vn
+vn debug -p parse src/main.vn
 
 # Ver tipos inferidos
-vn inspect -p check src/main.vn
+vn debug -p check src/main.vn
 
 # Ver bytecode
-vn disasm src/main.vn
+vn debug -p bytecode src/main.vn
 
 # Trace de ejecución
 vn run --trace src/main.vn
@@ -559,7 +637,7 @@ vn run --trace src/main.vn
 vn lsp
 
 # Generar completions para tu shell
-vn completions zsh > ~/.zfunc/_wr
+vn completions zsh > ~/.zfunc/_vn
 ```
 
 ## Contribuir

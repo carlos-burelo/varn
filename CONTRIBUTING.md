@@ -7,7 +7,7 @@ Requisitos: Rust stable, Cargo.
 ```bash
 git clone https://github.com/tu-usuario/Varn
 cd Varn
-cargo build --bin wr
+cargo build --bin vn
 ```
 
 Verificar que todo funciona:
@@ -42,8 +42,8 @@ crates/
 ├── varn-modules     # Resolución de paquetes y manifests
 ├── varn-pm          # Package manager (add/install/update/remove)
 ├── varn-op-macros   # Proc macros para bindings nativos
-├── varn-cli         # Binario `wr`, pipeline completo
-├── varn-debug       # Inspección, profiling, disassembly
+├── varn-cli         # Binario `vn`, pipeline completo
+├── varn-debug       # Inspección de fases, profiling, bytecode
 ├── varn-diagnostics # Reporte de errores
 ├── varn-runtime     # Async runtime
 └── varn-base        # Utilidades base

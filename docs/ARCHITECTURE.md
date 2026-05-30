@@ -52,10 +52,10 @@ Código Fuente (.vn)
 - **`varn-base`**: Utilidades compartidas.
 
 ### Herramientas
-- **`varn-cli`**: Binario `wr`. Orquesta el pipeline completo. Comandos: `run`, `check`, `build`, `bench`, `disasm`, `inspect`, `repl`, `add`, `install`, etc.
+- **`varn-cli`**: Binario `vn`. Orquesta el pipeline completo. Comandos: `run`, `check`, `eval`, `repl`, `bench`, `debug`, `build`, `pkg`, `init`, `doctor`, `lsp`, `completions`.
 - **`varn-lsp`**: Language Server Protocol (tower-lsp + tokio). Consulta SemanticDB del checker. Hover, completions, go-to-definition.
 - **`varn-pm`**: Package manager. Resolución semver sobre git tags, caché global `~/.vn/cache/`, SHA256 integrity.
-- **`varn-debug`**: Profiling, disassembly, inspección.
+- **`varn-debug`**: Profiling, bytecode, inspección de fases.
 
 ---
 
