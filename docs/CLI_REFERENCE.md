@@ -1,0 +1,190 @@
+# CLI de Varn
+
+Referencia completa del binario `vn`.
+
+## Reglas generales
+
+- Si no indicas un subcomando y el primer argumento no empieza por `-`, `vn` asume `run`.
+- `-h` / `--help` muestran la ayuda del comando actual.
+- `-V` / `--version` muestran la versión.
+- `run` y `check` aceptan `--strict`; `run` además acepta `--trace` y `-v`.
+
+## Comandos de primer nivel
+
+### `run`
+
+Ejecuta un archivo Varn.
+
+```bash
+vn run archivo.vn
+vn archivo.vn
+vn run archivo.vn -- arg1 arg2
+vn run -v --trace archivo.vn
+```
+
+Flags:
+
+- `-v, --verbose`: salida más detallada.
+- `--trace`: trazado de ejecución.
+- `--strict`: advierte sobre tipos `Dynamic` implícitos.
+
+### `check`
+
+Verifica tipos sin ejecutar el programa.
+
+```bash
+vn check archivo.vn
+vn check -v --strict archivo.vn
+```
+
+Flags:
+
+- `-v, --verbose`: salida más detallada.
+- `--strict`: advierte sobre tipos `Dynamic` implícitos.
+
+### `eval`
+
+Evalúa código inline desde la línea de comandos.
+
+```bash
+vn eval "print(1 + 2)"
+vn eval -v "function double(x: int) = x * 2; print(double(21))"
+```
+
+Flags:
+
+- `-v, --verbose`: salida más detallada.
+
+### `repl`
+
+Abre el REPL interactivo.
+
+```bash
+vn repl
+vn repl --debug-bytecode
+```
+
+Flags:
+
+- `--debug-bytecode`: imprime el bytecode generado para cada evaluación.
+
+Comandos dentro del REPL:
+
+- `.help`: muestra la ayuda interna.
+- `.clear`: limpia el buffer actual.
+- `.exit` / `.quit`: sale del REPL.
+- `Ctrl+D`: EOF para salir.
+
+### `bench`
+
+Mide tiempos del pipeline y de la ejecución.
+
+```bash
+vn bench archivo.vn
+vn bench --runs 100 archivo.vn
+vn bench --show-output archivo.vn
+```
+
+Flags:
+
+- `--runs <N>`: número de ejecuciones, por defecto `10`.
+- `--show-output`: muestra la salida del programa durante el benchmark.
+
+### `debug`
+
+Inspecciona el pipeline sin ejecutar la VM.
+
+```bash
+vn debug archivo.vn
+vn debug -p ast archivo.vn
+vn debug -p check archivo.vn
+vn debug -p bytecode archivo.vn
+vn debug -e "function add(a: int, b: int) = a + b"
+```
+
+Flags:
+
+- `-e, --eval <CODE>`: evalúa código inline en vez de archivo.
+- `-p, --phase <PHASE>`: fase a mostrar. Valores: `tokens`, `ast`, `check`, `bytecode`, `symbols`, `binds`, `types[:N]`, `expr`, `modules`, `graph`, `caps`, `scope`, `errors`, `trace`, `info`, `lsp[:sub]`, `all`.
+
+### `build`
+
+Compila un archivo Varn a `.vnc`.
+
+```bash
+vn build archivo.vn
+vn build archivo.vn -o out.vnc
+vn build -v archivo.vn
+```
+
+Flags:
+
+- `-o, --output <PATH>`: ruta de salida del binario compilado.
+- `-v, --verbose`: salida más detallada.
+
+### `pkg`
+
+Gestión de paquetes.
+
+```bash
+vn pkg add mathlib github.com/user/mathlib@^1.2.3
+vn pkg remove mathlib
+vn pkg install
+vn pkg update
+```
+
+Subcomandos:
+
+- `add <alias> <origin>`: agrega una dependencia al proyecto.
+- `remove <alias>`: elimina una dependencia.
+- `install`: instala dependencias del proyecto.
+- `update`: actualiza dependencias.
+
+### `init`
+
+Inicializa un nuevo proyecto Varn.
+
+```bash
+vn init
+vn init mi-proyecto
+vn init mi-proyecto --name "Mi Proyecto"
+```
+
+Flags:
+
+- `--name <NAME>`: nombre del proyecto.
+
+### `doctor`
+
+Ejecuta diagnósticos del sistema y configuración.
+
+```bash
+vn doctor
+```
+
+### `lsp`
+
+Inicia el servidor LSP por stdio.
+
+```bash
+vn lsp
+```
+
+### `completions`
+
+Genera scripts de autocompletado para shell.
+
+```bash
+vn completions bash
+vn completions zsh
+vn completions fish
+vn completions power-shell
+vn completions elvish
+```
+
+Shells soportados: `bash`, `zsh`, `fish`, `power-shell`, `elvish`.
+
+## Comandos útiles relacionados
+
+- `vn help <subcomando>`: ayuda específica del subcomando.
+- `vn --help`: vista general del CLI.

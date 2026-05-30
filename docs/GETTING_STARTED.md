@@ -28,6 +28,8 @@ vn tests/main.vn
 
 ## Comandos principales
 
+Referencia completa: [CLI_REFERENCE.md](CLI_REFERENCE.md)
+
 | Comando | Descripción |
 |---------|-------------|
 | `vn run <file>` | Ejecutar programa |
