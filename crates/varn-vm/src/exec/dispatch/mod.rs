@@ -1,6 +1,6 @@
 use crate::error::VmResult;
+use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
-use std::cell::RefCell;
 use varn_core::OpCode;
 
 pub mod collections;
@@ -13,6 +13,11 @@ pub mod objects;
 pub mod reg_ops;
 pub mod variables;
 
+pub mod ops_control_calls;
+pub mod ops_literals_vars;
+pub mod ops_math_cmp;
+pub mod ops_objects_collections;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum ControlSignal {
     ContinueInstruction,
@@ -20,8 +25,6 @@ pub enum ControlSignal {
     Return(VmValue),
     None,
 }
-
-use crate::exec::ctx::ExecCtx;
 
 #[inline(always)]
 fn hi(w: u16) -> usize {
@@ -182,89 +185,28 @@ impl ExecCtx {
                 }
 
                 match op {
-                    OpCode::LoadNull => {
-                        reg![first_reg] = VmValue::null();
-                    }
-                    OpCode::LoadTrue => {
-                        reg![first_reg] = VmValue::bool_true();
-                    }
-                    OpCode::LoadFalse => {
-                        reg![first_reg] = VmValue::bool_false();
-                    }
-                    OpCode::LoadInt => {
-                        let val = code[ip] as i16;
-                        ip += 1;
-                        reg![first_reg] = VmValue::from_int(val as i64);
-                    }
-                    OpCode::LoadIntZero => {
-                        reg![first_reg] = VmValue::from_int(0);
-                    }
-                    OpCode::LoadIntOne => {
-                        reg![first_reg] = VmValue::from_int(1);
-                    }
-                    OpCode::LoadIntMinusOne => {
-                        reg![first_reg] = VmValue::from_int(-1);
-                    }
-                    OpCode::LoadConst => {
-                        let cidx = code[ip] as usize;
-                        ip += 1;
-                        let nv = closure.constants[cidx];
-                        reg![first_reg] = nv;
-                    }
-
-                    OpCode::Move => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        reg![first_reg] = reg![hi(w1)];
-                    }
-
-                    OpCode::LoadGlobalIdx => {
-                        let gidx = code[ip] as usize;
-                        ip += 1;
-                        debug_assert!(
-                            gidx < self.globals.values.len(),
-                            "LoadGlobalIdx out of bounds: {gidx} >= {}",
-                            self.globals.values.len()
-                        );
-                        reg![first_reg] = self.globals.values[gidx];
-                    }
-                    OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx => {
-                        let src = (code[ip] >> 8) as usize;
-                        let gidx = code[ip + 1] as usize;
-                        ip += 2;
-                        debug_assert!(
-                            gidx < self.globals.values.len(),
-                            "StoreGlobalIdx out of bounds: {gidx} >= {}",
-                            self.globals.values.len()
-                        );
-                        let val = reg![src];
-                        self.globals.set_by_index_unchecked(gidx, val);
-                    }
-                    OpCode::LoadGlobal | OpCode::StoreGlobal | OpCode::DefineGlobal => {
-                        self.frames[frame_idx].ip = ip;
-                        self.exec_variable_op(
+                    OpCode::LoadGlobal
+                    | OpCode::LoadGlobalIdx
+                    | OpCode::StoreGlobal
+                    | OpCode::StoreGlobalIdx
+                    | OpCode::DefineGlobal
+                    | OpCode::DefineGlobalIdx
+                    | OpCode::LoadUpvalue
+                    | OpCode::StoreUpvalue
+                    | OpCode::CloseUpvalue
+                    | OpCode::LoadNull
+                    | OpCode::LoadTrue
+                    | OpCode::LoadFalse
+                    | OpCode::LoadInt
+                    | OpCode::LoadIntZero
+                    | OpCode::LoadIntOne
+                    | OpCode::LoadIntMinusOne
+                    | OpCode::LoadConst
+                    | OpCode::Move => {
+                        let handled = self.exec_literals_vars_op(
                             op, code, &mut ip, base, frame_idx, &closure, first_reg,
                         )?;
-                    }
-
-                    OpCode::LoadUpvalue => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let (dest, uv) = (hi(w1), lo(w1));
-                        reg![dest] = closure.upvalues[uv].read(&self.stack);
-                    }
-                    OpCode::StoreUpvalue => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let (uv, src) = (hi(w1), lo(w1));
-                        let val = reg![src];
-                        closure.upvalues[uv].write(val, &mut self.stack);
-                    }
-                    OpCode::CloseUpvalue => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let lowest = hi(w1);
-                        self.close_upvalues_above(base + lowest);
+                        debug_assert!(handled, "exec_literals_vars_op must handle grouped opcodes");
                     }
 
                     OpCode::Add
@@ -278,737 +220,110 @@ impl ExecCtx {
                     | OpCode::BitXor
                     | OpCode::Shl
                     | OpCode::Shr
-                    | OpCode::Ushr => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let (src1, src2) = (hi(w1), lo(w1));
-                        let a = reg![src1];
-                        let b = reg![src2];
-                        let r = self.exec_arith(op, a, b)?;
-                        reg![first_reg] = r;
-                    }
-                    OpCode::Negate => {
-                        let src = hi(code[ip]);
-                        ip += 1;
-                        let v = reg![src];
-                        reg![first_reg] = crate::exec::arith::negate(v, &mut self.heap);
-                    }
-                    OpCode::Not => {
-                        let src = hi(code[ip]);
-                        ip += 1;
-                        let v = reg![src];
-                        reg![first_reg] = crate::exec::compare::logical_not(v);
-                    }
-
-                    OpCode::AddImm => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let src = hi(w1) as usize;
-                        let imm = lo(w1) as i8 as i64;
-                        let v = reg![src];
-                        if v.is_int() {
-                            let (r, overflow) = v.as_int().overflowing_add(imm);
-                            reg![first_reg] = if overflow {
-                                VmValue::from_f64(v.as_int() as f64 + imm as f64)
-                            } else {
-                                VmValue::from_int(r)
-                            };
-                        } else {
-                            reg![first_reg] =
-                                crate::exec::arith::add(v, VmValue::from_int(imm), &mut self.heap)?;
-                        }
-                    }
-
-                    OpCode::SubImm => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let src = hi(w1) as usize;
-                        let imm = lo(w1) as i8 as i64;
-                        let v = reg![src];
-                        if v.is_int() {
-                            let (r, overflow) = v.as_int().overflowing_sub(imm);
-                            reg![first_reg] = if overflow {
-                                VmValue::from_f64(v.as_int() as f64 - imm as f64)
-                            } else {
-                                VmValue::from_int(r)
-                            };
-                        } else {
-                            reg![first_reg] =
-                                crate::exec::arith::sub(v, VmValue::from_int(imm), &mut self.heap)?;
-                        }
-                    }
-
-                    OpCode::AddInt | OpCode::SubInt | OpCode::MulInt | OpCode::DivInt => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let (src1, src2) = (hi(w1), lo(w1));
-                        let a = reg![src1];
-                        let b = reg![src2];
-                        let res = if a.is_int() && b.is_int() {
-                            match op {
-                                OpCode::AddInt => {
-                                    let (r, overflow) = a.as_int().overflowing_add(b.as_int());
-                                    if overflow {
-                                        VmValue::from_f64(a.as_int() as f64 + b.as_int() as f64)
-                                    } else {
-                                        VmValue::from_int(r)
-                                    }
-                                }
-                                OpCode::SubInt => {
-                                    let (r, overflow) = a.as_int().overflowing_sub(b.as_int());
-                                    if overflow {
-                                        VmValue::from_f64(a.as_int() as f64 - b.as_int() as f64)
-                                    } else {
-                                        VmValue::from_int(r)
-                                    }
-                                }
-                                OpCode::MulInt => {
-                                    let (r, overflow) = a.as_int().overflowing_mul(b.as_int());
-                                    if overflow {
-                                        VmValue::from_f64(a.as_int() as f64 * b.as_int() as f64)
-                                    } else {
-                                        VmValue::from_int(r)
-                                    }
-                                }
-                                OpCode::DivInt => {
-                                    let bv = b.as_int();
-                                    if bv == 0 {
-                                        return Err(crate::error::RuntimeError::new(
-                                            "division by zero",
-                                        ));
-                                    }
-                                    let av = a.as_int();
-                                    if av == i64::MIN && bv == -1 {
-                                        VmValue::from_f64(av as f64 / bv as f64)
-                                    } else if av % bv == 0 {
-                                        VmValue::from_int(av / bv)
-                                    } else {
-                                        VmValue::from_f64(av as f64 / bv as f64)
-                                    }
-                                }
-                                _ => unreachable!(),
-                            }
-                        } else {
-                            let generic_op = match op {
-                                OpCode::AddInt => OpCode::Add,
-                                OpCode::SubInt => OpCode::Sub,
-                                OpCode::MulInt => OpCode::Mul,
-                                OpCode::DivInt => OpCode::Div,
-                                _ => unreachable!(),
-                            };
-                            self.exec_arith(generic_op, a, b)?
-                        };
-                        reg![first_reg] = res;
-                    }
-
-                    OpCode::LtInt
+                    | OpCode::Ushr
+                    | OpCode::Negate
+                    | OpCode::Not
+                    | OpCode::AddImm
+                    | OpCode::SubImm
+                    | OpCode::AddInt
+                    | OpCode::SubInt
+                    | OpCode::MulInt
+                    | OpCode::DivInt
+                    | OpCode::LtInt
                     | OpCode::GtInt
                     | OpCode::LteInt
                     | OpCode::GteInt
                     | OpCode::EqInt
-                    | OpCode::NeqInt => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let (src1, src2) = (hi(w1), lo(w1));
-                        let a = reg![src1];
-                        let b = reg![src2];
-                        let res = if a.is_int() && b.is_int() {
-                            let cmp_res = match op {
-                                OpCode::LtInt => a.as_int() < b.as_int(),
-                                OpCode::GtInt => a.as_int() > b.as_int(),
-                                OpCode::LteInt => a.as_int() <= b.as_int(),
-                                OpCode::GteInt => a.as_int() >= b.as_int(),
-                                OpCode::EqInt => a.as_int() == b.as_int(),
-                                OpCode::NeqInt => a.as_int() != b.as_int(),
-                                _ => unreachable!(),
-                            };
-                            VmValue::from_bool(cmp_res)
-                        } else {
-                            let generic_op = match op {
-                                OpCode::LtInt => OpCode::Lt,
-                                OpCode::GtInt => OpCode::Gt,
-                                OpCode::LteInt => OpCode::Lte,
-                                OpCode::GteInt => OpCode::Gte,
-                                OpCode::EqInt => OpCode::Eq,
-                                OpCode::NeqInt => OpCode::Neq,
-                                _ => unreachable!(),
-                            };
-                            self.exec_cmp(generic_op, a, b)
-                        };
-                        reg![first_reg] = res;
-                    }
-
-                    OpCode::AddFloat | OpCode::SubFloat | OpCode::MulFloat | OpCode::DivFloat => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let (src1, src2) = (hi(w1), lo(w1));
-                        let a = reg![src1];
-                        let b = reg![src2];
-                        let res = if (a.is_f64() || a.is_int()) && (b.is_f64() || b.is_int()) {
-                            match op {
-                                OpCode::AddFloat => VmValue::from_f64(a.to_f64() + b.to_f64()),
-                                OpCode::SubFloat => VmValue::from_f64(a.to_f64() - b.to_f64()),
-                                OpCode::MulFloat => VmValue::from_f64(a.to_f64() * b.to_f64()),
-                                OpCode::DivFloat => {
-                                    let bv = b.to_f64();
-                                    if bv == 0.0 {
-                                        return Err(crate::error::RuntimeError::new(
-                                            "division by zero",
-                                        ));
-                                    }
-                                    VmValue::from_f64(a.to_f64() / bv)
-                                }
-                                _ => unreachable!(),
-                            }
-                        } else {
-                            let generic_op = match op {
-                                OpCode::AddFloat => OpCode::Add,
-                                OpCode::SubFloat => OpCode::Sub,
-                                OpCode::MulFloat => OpCode::Mul,
-                                OpCode::DivFloat => OpCode::Div,
-                                _ => unreachable!(),
-                            };
-                            self.exec_arith(generic_op, a, b)?
-                        };
-                        reg![first_reg] = res;
-                    }
-
-                    OpCode::LtFloat
+                    | OpCode::NeqInt
+                    | OpCode::AddFloat
+                    | OpCode::SubFloat
+                    | OpCode::MulFloat
+                    | OpCode::DivFloat
+                    | OpCode::LtFloat
                     | OpCode::GtFloat
                     | OpCode::LteFloat
                     | OpCode::GteFloat
                     | OpCode::EqFloat
-                    | OpCode::NeqFloat => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let (src1, src2) = (hi(w1), lo(w1));
-                        let a = reg![src1];
-                        let b = reg![src2];
-                        let res = if (a.is_f64() || a.is_int()) && (b.is_f64() || b.is_int()) {
-                            let cmp_res = match op {
-                                OpCode::LtFloat => a.to_f64() < b.to_f64(),
-                                OpCode::GtFloat => a.to_f64() > b.to_f64(),
-                                OpCode::LteFloat => a.to_f64() <= b.to_f64(),
-                                OpCode::GteFloat => a.to_f64() >= b.to_f64(),
-                                OpCode::EqFloat => a.to_f64() == b.to_f64(),
-                                OpCode::NeqFloat => a.to_f64() != b.to_f64(),
-                                _ => unreachable!(),
-                            };
-                            VmValue::from_bool(cmp_res)
-                        } else {
-                            let generic_op = match op {
-                                OpCode::LtFloat => OpCode::Lt,
-                                OpCode::GtFloat => OpCode::Gt,
-                                OpCode::LteFloat => OpCode::Lte,
-                                OpCode::GteFloat => OpCode::Gte,
-                                OpCode::EqFloat => OpCode::Eq,
-                                OpCode::NeqFloat => OpCode::Neq,
-                                _ => unreachable!(),
-                            };
-                            self.exec_cmp(generic_op, a, b)
-                        };
-                        reg![first_reg] = res;
-                    }
-
-                    OpCode::Eq
+                    | OpCode::NeqFloat
+                    | OpCode::Eq
                     | OpCode::Neq
                     | OpCode::Lt
                     | OpCode::Lte
                     | OpCode::Gt
-                    | OpCode::Gte => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let (src1, src2) = (hi(w1), lo(w1));
-                        let a = reg![src1];
-                        let b = reg![src2];
-                        let r = self.exec_cmp(op, a, b);
-                        reg![first_reg] = r;
-                    }
-
-                    OpCode::ToString => {
-                        let src = hi(code[ip]);
-                        ip += 1;
-                        let v = reg![src];
-                        let s = self.heap.str_repr(v);
-                        reg![first_reg] = self.heap.alloc_str(s);
-                    }
-                    OpCode::StrConcat => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let (src1, src2) = (hi(w1), lo(w1));
-                        let a = reg![src1];
-                        let b = reg![src2];
-                        let sa = self.heap.str_repr(a);
-                        let sb = self.heap.str_repr(b);
-                        let combined = format!("{sa}{sb}");
-                        reg![first_reg] = self.heap.alloc_str(combined);
-                    }
-
-                    OpCode::BuildStr => {
-                        let count = hi(code[ip]) as usize;
-                        ip += 1;
-
-                        let parts: Vec<String> = (0..count)
-                            .map(|i| {
-                                let reg_idx = hi(code[ip + i]) as usize;
-                                self.heap.str_repr(reg![reg_idx])
-                            })
-                            .collect();
-                        ip += count;
-                        let total_len: usize = parts.iter().map(|s| s.len()).sum();
-                        let mut combined = String::with_capacity(total_len);
-                        for p in &parts {
-                            combined.push_str(p);
-                        }
-                        reg![first_reg] = self.heap.alloc_str(combined);
-                    }
-
-                    OpCode::StrLength => {
-                        let src = hi(code[ip]);
-                        ip += 1;
-                        let v = reg![src];
-                        let len = self.exec_str_length(v)?;
-                        reg![first_reg] = len;
-                    }
-                    OpCode::StrSlice => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let (src1, src2) = (hi(w1), lo(w1));
-                        let s = reg![src1];
-                        let idx = reg![src2];
-                        reg![first_reg] = self.exec_str_slice(s, idx)?;
-                    }
-
-                    OpCode::Jump => {
-                        let offset = ((code[ip] as u32) << 16 | code[ip + 1] as u32) as usize;
-                        ip += 2;
-                        ip += offset;
-                    }
-                    OpCode::Loop => {
-                        let offset = ((code[ip] as u32) << 16 | code[ip + 1] as u32) as usize;
-                        ip += 2;
-                        ip -= offset;
-                    }
-                    OpCode::JumpIfFalse => {
-                        let offset = ((code[ip] as u32) << 16 | code[ip + 1] as u32) as usize;
-                        ip += 2;
-                        if !reg![first_reg].is_truthy() {
-                            ip += offset;
-                        }
-                    }
-                    OpCode::JumpIfTrue => {
-                        let offset = ((code[ip] as u32) << 16 | code[ip + 1] as u32) as usize;
-                        ip += 2;
-                        if reg![first_reg].is_truthy() {
-                            ip += offset;
-                        }
-                    }
-
-                    OpCode::Return => {
-                        let w1 = code[ip];
-                        let src = lo(w1);
-                        let val = reg![src];
-                        let res = self.reg_return(base, src);
-                        if self.frames.len() == depth {
-                            return Ok(res);
-                        }
-                        let _ = val;
-                        continue 'frame_loop;
-                    }
-
-                    OpCode::Call => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let w2 = code[ip];
-                        ip += 1;
-                        let (dest, callee_reg) = (hi(w1), lo(w1));
-                        let (arg_count, arg_start) = (hi(w2), lo(w2));
-                        self.frames[frame_idx].ip = ip;
-                        let callee = reg![callee_reg];
-                        let result = self
-                            .exec_call_reg(callee, base, arg_start, arg_count, dest, frame_idx)?;
-                        if result {
-                            continue 'frame_loop;
-                        }
-
-                        let frame_idx2 = self.frames.len() - 1;
-                        ip = self.frames[frame_idx2].ip;
-                    }
-
-                    OpCode::CallMethod => {
-                        let cs = first_reg;
-                        let w1 = code[ip];
-                        ip += 1;
-                        let name_idx = code[ip] as usize;
-                        ip += 1;
-                        let w3 = code[ip];
-                        ip += 1;
-                        let (dest, obj_reg) = (hi(w1), lo(w1));
-                        let (arg_count, arg_start) = (hi(w3), lo(w3));
-                        self.frames[frame_idx].ip = ip;
-                        let this_val = reg![obj_reg];
-                        let jumped = self.exec_call_method_reg(
-                            this_val, base, name_idx, cs, arg_start, arg_count, dest, frame_idx,
-                            &closure,
+                    | OpCode::Gte
+                    | OpCode::ToString
+                    | OpCode::StrConcat
+                    | OpCode::BuildStr
+                    | OpCode::StrLength
+                    | OpCode::StrSlice => {
+                        let handled = self.exec_math_cmp_op(
+                            op, code, &mut ip, base, frame_idx, &closure, first_reg,
                         )?;
-                        if jumped {
-                            continue 'frame_loop;
-                        }
-                        let frame_idx2 = self.frames.len() - 1;
-                        ip = self.frames[frame_idx2].ip;
+                        debug_assert!(handled, "exec_math_cmp_op must handle grouped opcodes");
                     }
 
-                    OpCode::InvokeVirtual => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let name_idx = code[ip] as usize;
-                        ip += 1;
-                        let w3 = code[ip];
-                        ip += 1;
-                        let (dest, this_reg) = (hi(w1), lo(w1));
-                        let (arg_count, arg_start) = (hi(w3), lo(w3));
-                        self.frames[frame_idx].ip = ip;
-                        let this_val = reg![this_reg];
-                        let method_name_nv = closure.constants[name_idx];
-                        let method_name = self
-                            .heap
-                            .str_val(method_name_nv)
-                            .expect("InvokeVirtual: not a string const");
-                        let method_nv = crate::exec::props::get_property(
-                            this_val,
-                            &method_name,
-                            &mut self.heap,
-                        )?;
-                        let jumped = self.exec_call_reg(
-                            method_nv, base, arg_start, arg_count, dest, frame_idx,
-                        )?;
-                        if jumped {
-                            continue 'frame_loop;
-                        }
-                        let frame_idx2 = self.frames.len() - 1;
-                        ip = self.frames[frame_idx2].ip;
-                    }
-
-                    OpCode::CallSpread => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let w2 = code[ip];
-                        ip += 1;
-                        let (dest, callee_reg) = (hi(w1), lo(w1));
-                        let (arg_count, arg_start) = (hi(w2), lo(w2));
-                        self.frames[frame_idx].ip = ip;
-                        let callee = reg![callee_reg];
-                        let jumped = self.exec_call_spread_reg(
-                            callee, base, arg_start, arg_count, dest, frame_idx,
-                        )?;
-                        if jumped {
-                            continue 'frame_loop;
-                        }
-                        let frame_idx2 = self.frames.len() - 1;
-                        ip = self.frames[frame_idx2].ip;
-                    }
-
-                    OpCode::MakeClosure => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let proto_idx = code[ip] as usize;
-                        ip += 1;
-                        let (dest, uv_count) = (hi(w1), lo(w1));
-                        let proto = match closure.proto.chunk.constants.get(proto_idx) {
-                            Some(varn_types::PoolEntry::Function(p)) => p.clone(),
-                            _ => {
-                                return Err(crate::error::RuntimeError::new(format!(
-                                    "MakeClosure: const {proto_idx} is not a function"
-                                )))
-                            }
-                        };
-                        let mut upvalues = Vec::with_capacity(uv_count);
-                        for _ in 0..uv_count {
-                            let uv_desc = code[ip];
-                            ip += 1;
-                            let is_local = hi(uv_desc) != 0;
-                            let index = lo(uv_desc);
-                            if is_local {
-                                upvalues.push(self.capture_upvalue(base + index));
-                            } else {
-                                upvalues.push(closure.upvalues[index].clone());
+                    OpCode::Jump
+                    | OpCode::Loop
+                    | OpCode::JumpIfFalse
+                    | OpCode::JumpIfTrue
+                    | OpCode::Return
+                    | OpCode::Call
+                    | OpCode::CallMethod
+                    | OpCode::InvokeVirtual
+                    | OpCode::CallSpread => {
+                        if let Some(flow) = self.exec_control_calls_op(
+                            op, code, &mut ip, base, frame_idx, &closure, first_reg, depth,
+                        )? {
+                            match flow {
+                                crate::exec::dispatch::ops_control_calls::ControlCallFlow::ContinueInstruction => {}
+                                crate::exec::dispatch::ops_control_calls::ControlCallFlow::ContinueFrame => {
+                                    continue 'frame_loop;
+                                }
+                                crate::exec::dispatch::ops_control_calls::ControlCallFlow::Return(v) => {
+                                    return Ok(v);
+                                }
                             }
                         }
-                        let proto_ptr = std::rc::Rc::as_ptr(&proto) as usize;
-                        let constants = self
-                            .proto_constants
-                            .entry(proto_ptr)
-                            .or_insert_with(|| {
-                                std::rc::Rc::new(crate::exec::calls::resolve_constants(
-                                    &proto,
-                                    &mut self.heap,
-                                ))
-                            })
-                            .clone();
-                        let vm_closure = std::rc::Rc::new(crate::frame::VmClosure::with_upvalues(
-                            proto, upvalues, constants,
-                        ));
-                        reg![dest] = self.heap.alloc_vm_closure(vm_closure);
                     }
 
-                    OpCode::GetProperty => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let obj_reg = hi(w1);
-                        let cs_idx = lo(w1);
-                        let name_idx = code[ip] as usize;
-                        ip += 1;
-                        self.frames[frame_idx].ip = ip;
-                        let obj = reg![obj_reg];
-                        let jumped = self.exec_get_property_reg(
-                            obj, name_idx, cs_idx, first_reg, base, frame_idx, &closure,
-                        )?;
-                        if jumped {
-                            continue 'frame_loop;
+                    OpCode::MakeClosure
+                    | OpCode::GetProperty
+                    | OpCode::GetPropertyMaybe
+                    | OpCode::SetProperty
+                    | OpCode::GetFixedField
+                    | OpCode::SetFixedField
+                    | OpCode::GetSuper
+                    | OpCode::GetSymbol
+                    | OpCode::AssertNotNull
+                    | OpCode::DeclareField
+                    | OpCode::GetIndex
+                    | OpCode::SetIndex
+                    | OpCode::BuildArray
+                    | OpCode::BuildObject
+                    | OpCode::BuildObjectWithShape
+                    | OpCode::ObjectRest
+                    | OpCode::ObjectKeys
+                    | OpCode::ObjectMerge
+                    | OpCode::WrapSpread
+                    | OpCode::ArrayLength
+                    | OpCode::ArrayPush
+                    | OpCode::ArrayPop
+                    | OpCode::ArrayExtend
+                    | OpCode::In
+                    | OpCode::Instanceof
+                    | OpCode::Typeof
+                    | OpCode::IsNull
+                    | OpCode::IsArray => {
+                        if let Some(flow) = self.exec_objects_collections_op(
+                            op, code, &mut ip, base, frame_idx, &closure, first_reg,
+                        )? {
+                            match flow {
+                                crate::exec::dispatch::ops_objects_collections::ObjectFlow::ContinueInstruction => {}
+                                crate::exec::dispatch::ops_objects_collections::ObjectFlow::ContinueFrame => {
+                                    continue 'frame_loop;
+                                }
+                            }
                         }
-                        let frame_idx2 = self.frames.len() - 1;
-                        ip = self.frames[frame_idx2].ip;
-                    }
-                    OpCode::GetPropertyMaybe => {
-                        let obj_reg = hi(code[ip]);
-                        ip += 1;
-                        let name_idx = code[ip] as usize;
-                        ip += 1;
-                        let obj = reg![obj_reg];
-                        let name_nv = closure.constants[name_idx];
-                        let name = self.heap.str_val(name_nv).unwrap_or_else(|| {
-                            closure.proto.chunk.constants[name_idx]
-                                .as_str()
-                                .unwrap_or("")
-                                .into()
-                        });
-                        let result =
-                            crate::exec::props::get_property_maybe(obj, &name, &mut self.heap);
-                        reg![first_reg] = result;
-                    }
-                    OpCode::SetProperty => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let val_reg = hi(w1);
-                        let cs_idx = lo(w1);
-                        let name_idx = code[ip] as usize;
-                        ip += 1;
-                        let obj_reg = first_reg;
-                        self.frames[frame_idx].ip = ip;
-                        let obj = reg![obj_reg];
-                        let val = reg![val_reg];
-                        let jumped = self.exec_set_property_reg(
-                            obj, val, name_idx, cs_idx, base, frame_idx, &closure,
-                        )?;
-                        if jumped {
-                            continue 'frame_loop;
-                        }
-                        let frame_idx2 = self.frames.len() - 1;
-                        ip = self.frames[frame_idx2].ip;
-                    }
-                    OpCode::GetFixedField => {
-                        let obj_reg = hi(code[ip]);
-                        ip += 1;
-                        let slot = code[ip] as usize;
-                        ip += 1;
-                        let obj = reg![obj_reg];
-                        reg![first_reg] = self.exec_get_fixed_field(obj, slot)?;
-                    }
-                    OpCode::SetFixedField => {
-                        let val_reg = hi(code[ip]);
-                        ip += 1;
-                        let slot = code[ip] as usize;
-                        ip += 1;
-                        let obj = reg![first_reg];
-                        let val = reg![val_reg];
-                        self.exec_set_fixed_field(obj, slot, val)?;
-                    }
-                    OpCode::GetSuper => {
-                        let name_idx = code[ip] as usize;
-                        ip += 1;
-
-                        let this_val = self.stack[base];
-                        self.frames[frame_idx].ip = ip;
-                        let val =
-                            self.exec_get_super_reg(this_val, name_idx, frame_idx, &closure)?;
-                        let frame_idx2 = self.frames.len() - 1;
-                        self.stack[base + first_reg] = val;
-                        ip = self.frames[frame_idx2].ip;
-                    }
-                    OpCode::GetSymbol => {
-                        let obj_reg = hi(code[ip]);
-                        ip += 1;
-                        let sym_idx = code[ip] as usize;
-                        ip += 1;
-                        let obj = reg![obj_reg];
-                        reg![first_reg] = self.exec_get_symbol(obj, sym_idx, &closure)?;
-                    }
-                    OpCode::AssertNotNull => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let src = hi(w1);
-                        let v = reg![src];
-                        self.exec_assert_not_null(v)?;
-                    }
-                    OpCode::DeclareField => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let name_idx = code[ip] as usize;
-                        ip += 1;
-                        let obj_reg = hi(w1);
-                        let obj = reg![obj_reg];
-                        self.exec_declare_field(obj, name_idx, frame_idx, &closure)?;
-                    }
-
-                    OpCode::GetIndex => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let obj_reg = hi(w1);
-                        let idx_reg = lo(w1);
-                        let obj = reg![obj_reg];
-                        let key_nv = reg![idx_reg];
-                        let result = self.exec_get_index_nv(obj, key_nv)?;
-                        reg![first_reg] = result;
-                    }
-                    OpCode::SetIndex => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let idx_reg = hi(w1);
-                        let val_reg = lo(w1);
-                        let obj = reg![first_reg];
-                        let idx = reg![idx_reg];
-                        let val = reg![val_reg];
-                        self.exec_set_index(obj, idx, val)?;
-                    }
-                    OpCode::BuildArray => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let w2 = code[ip];
-                        ip += 1;
-                        let (dest, start_reg) = (hi(w1), lo(w1));
-                        let count = hi(w2);
-                        let mut elems = Vec::with_capacity(count);
-                        for i in 0..count {
-                            let nv = self.stack[base + start_reg + i];
-                            elems.push(self.heap.extract(nv));
-                        }
-                        reg![dest] = self.heap.alloc_array(elems);
-                    }
-                    OpCode::BuildObject => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let (dest, count) = (hi(w1), lo(w1));
-                        let obj_nv = self.heap.alloc_object();
-                        for _ in 0..count {
-                            let k_idx = code[ip] as usize;
-                            ip += 1;
-                            let w = code[ip];
-                            ip += 1;
-                            let val_reg = hi(w);
-                            let key_nv = closure.constants[k_idx];
-                            let key = self
-                                .heap
-                                .str_val(key_nv)
-                                .map(|s| s.to_string())
-                                .unwrap_or_else(|| {
-                                    closure.proto.chunk.constants[k_idx]
-                                        .as_str()
-                                        .unwrap_or("")
-                                        .to_string()
-                                });
-                            let val = reg![val_reg];
-                            crate::exec::props::set_property(obj_nv, &key, val, &mut self.heap)?;
-                        }
-                        reg![dest] = obj_nv;
-                    }
-                    OpCode::BuildObjectWithShape => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let shape_idx = code[ip] as usize;
-                        ip += 1;
-                        let (dest, start_reg) = (hi(w1), lo(w1));
-                        reg![dest] = self
-                            .exec_build_object_with_shape(base, start_reg, shape_idx, &closure)?;
-                    }
-                    OpCode::ObjectRest => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let w2 = code[ip];
-                        ip += 1;
-                        let (dest, src) = (hi(w1), lo(w1));
-                        let skip_count = hi(w2);
-                        let mut skip_keys = Vec::with_capacity(skip_count);
-                        for _ in 0..skip_count {
-                            let k_idx = code[ip] as usize;
-                            ip += 1;
-                            let key_nv = closure.constants[k_idx];
-                            skip_keys.push(self.heap.str_val(key_nv).unwrap_or_else(|| {
-                                closure.proto.chunk.constants[k_idx]
-                                    .as_str()
-                                    .unwrap_or("")
-                                    .into()
-                            }));
-                        }
-                        let obj = reg![src];
-                        reg![dest] = self.exec_object_rest(obj, &skip_keys)?;
-                    }
-                    OpCode::ObjectKeys => {
-                        let src = hi(code[ip]);
-                        ip += 1;
-                        let obj = reg![src];
-                        reg![first_reg] = self.exec_object_keys(obj)?;
-                    }
-                    OpCode::ObjectMerge => {
-                        let src = hi(code[ip]);
-                        ip += 1;
-                        let dest_nv = reg![first_reg];
-                        let src_nv = reg![src];
-                        reg![first_reg] = crate::exec::collections::object_merge(
-                            dest_nv,
-                            src_nv,
-                            &mut self.heap,
-                        )?;
-                    }
-                    OpCode::WrapSpread => {
-                        let src = hi(code[ip]);
-                        ip += 1;
-                        let v = self.heap.extract(reg![src]);
-                        reg![first_reg] = self.heap.intern(varn_types::Value::Spread(Box::new(v)));
-                    }
-                    OpCode::ArrayLength => {
-                        let src = hi(code[ip]);
-                        ip += 1;
-                        let arr = reg![src];
-                        reg![first_reg] = self.exec_array_length(arr)?;
-                    }
-                    OpCode::ArrayPush => {
-                        let val_reg = hi(code[ip]);
-                        ip += 1;
-                        let arr = reg![first_reg];
-                        let val = reg![val_reg];
-                        self.exec_array_push(arr, val)?;
-                    }
-                    OpCode::ArrayPop => {
-                        let arr_reg = hi(code[ip]);
-                        ip += 1;
-                        let arr = reg![arr_reg];
-                        reg![first_reg] = self.exec_array_pop(arr)?;
-                    }
-                    OpCode::ArrayExtend => {
-                        let src_reg = hi(code[ip]);
-                        ip += 1;
-                        let arr = reg![first_reg];
-                        let src = reg![src_reg];
-                        self.exec_array_extend(arr, src)?;
-                    }
-                    OpCode::In => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let (src1, src2) = (hi(w1), lo(w1));
-                        let a = reg![src1];
-                        let b = reg![src2];
-                        let r = crate::exec::advanced::op_in(a, b, &self.heap);
-                        reg![first_reg] = VmValue::from_bool(r);
                     }
 
                     OpCode::MakeClass
@@ -1027,44 +342,6 @@ impl ExecCtx {
                         let frame_idx2 = self.frames.len() - 1;
                         ip = self.frames[frame_idx2].ip;
                     }
-                    OpCode::Instanceof => {
-                        let w1 = code[ip];
-                        ip += 1;
-                        let (src1, src2) = (hi(w1), lo(w1));
-                        let a = reg![src1];
-                        let b = reg![src2];
-                        let r = crate::exec::advanced::instanceof(a, b, &self.heap);
-                        reg![first_reg] = VmValue::from_bool(r);
-                    }
-
-                    OpCode::Typeof => {
-                        let src = hi(code[ip]);
-                        ip += 1;
-                        let v = reg![src];
-                        let s = self.exec_typeof(v);
-                        reg![first_reg] = self.heap.alloc_str(s);
-                    }
-                    OpCode::IsNull => {
-                        let src = hi(code[ip]);
-                        ip += 1;
-                        let v = reg![src];
-                        reg![first_reg] = VmValue::from_bool(v.is_null());
-                    }
-                    OpCode::IsArray => {
-                        let src = hi(code[ip]);
-                        ip += 1;
-                        let v = reg![src];
-                        let is_arr = if v.is_heap() {
-                            matches!(
-                                self.heap.get(v.as_heap_idx()),
-                                Some(crate::heap::HeapObj::Array(_))
-                            )
-                        } else {
-                            false
-                        };
-                        reg![first_reg] = VmValue::from_bool(is_arr);
-                    }
-
                     OpCode::MakeEnumVariant => {
                         self.frames[frame_idx].ip = ip;
                         self.exec_make_enum_variant_reg(code, &mut ip, base, frame_idx, &closure)?;
@@ -1194,7 +471,7 @@ impl ExecCtx {
         Ok(VmValue::null())
     }
 
-    fn reg_return(&mut self, base: usize, src: usize) -> VmValue {
+    pub(super) fn reg_return(&mut self, base: usize, src: usize) -> VmValue {
         let val = self.stack[base + src];
         let returning_frame_idx = self.frames.len().saturating_sub(1);
         self.record_frame_pop();
@@ -1240,7 +517,7 @@ impl ExecCtx {
         final_val
     }
 
-    fn exec_arith(&mut self, op: OpCode, a: VmValue, b: VmValue) -> VmResult<VmValue> {
+    pub(super) fn exec_arith(&mut self, op: OpCode, a: VmValue, b: VmValue) -> VmResult<VmValue> {
         use crate::exec::arith;
         match op {
             OpCode::Add => arith::add(a, b, &mut self.heap),
@@ -1259,7 +536,7 @@ impl ExecCtx {
         }
     }
 
-    fn exec_cmp(&mut self, op: OpCode, a: VmValue, b: VmValue) -> VmValue {
+    pub(super) fn exec_cmp(&mut self, op: OpCode, a: VmValue, b: VmValue) -> VmValue {
         use crate::exec::compare;
         VmValue::from_bool(match op {
             OpCode::Eq => compare::eq(a, b, &self.heap),

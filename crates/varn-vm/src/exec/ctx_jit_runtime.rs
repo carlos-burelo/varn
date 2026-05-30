@@ -272,3 +272,79 @@ pub extern "C" fn jit_range(
         }
     }
 }
+
+pub extern "C" fn jit_assert_not_null(_ctx: *mut ExecCtx, _val: VmValue) {
+    panic!("JIT helper assert_not_null not implemented");
+}
+pub extern "C" fn jit_close_upvalue(_ctx: *mut ExecCtx, _lowest: usize) {
+    panic!("JIT helper close_upvalue not implemented");
+}
+pub extern "C" fn jit_get_enum_tag(_ctx: *mut ExecCtx, _val: VmValue) -> VmValue {
+    panic!("JIT helper get_enum_tag not implemented");
+}
+pub extern "C" fn jit_is_array_stub(_ctx: *mut ExecCtx, _val: VmValue) -> VmValue {
+    panic!("JIT helper is_array not implemented");
+}
+pub extern "C" fn jit_wrap_spread_stub(_ctx: *mut ExecCtx, _val: VmValue) -> VmValue {
+    panic!("JIT helper wrap_spread not implemented");
+}
+pub extern "C" fn jit_object_keys_stub(_ctx: *mut ExecCtx, _val: VmValue) -> VmValue {
+    panic!("JIT helper object_keys not implemented");
+}
+pub extern "C" fn jit_op_in_stub(_ctx: *mut ExecCtx, _a: VmValue, _b: VmValue) -> VmValue {
+    panic!("JIT helper op_in not implemented");
+}
+pub extern "C" fn jit_object_merge_stub(_ctx: *mut ExecCtx, _a: VmValue, _b: VmValue) -> VmValue {
+    panic!("JIT helper object_merge not implemented");
+}
+pub extern "C" fn jit_get_fixed_field(_ctx: *mut ExecCtx, _obj: VmValue, _slot: usize) -> VmValue {
+    panic!("JIT helper get_fixed_field not implemented");
+}
+pub extern "C" fn jit_set_fixed_field(_ctx: *mut ExecCtx, _obj: VmValue, _slot: usize, _val: VmValue) {
+    panic!("JIT helper set_fixed_field not implemented");
+}
+pub extern "C" fn jit_get_property_maybe_stub(_ctx: *mut ExecCtx, _obj: VmValue, _name_idx: usize) -> VmValue {
+    panic!("JIT helper get_property_maybe not implemented");
+}
+pub extern "C" fn jit_get_super(_ctx: *mut ExecCtx, _name_idx: usize) -> VmValue {
+    panic!("JIT helper get_super not implemented");
+}
+pub extern "C" fn jit_get_symbol(_ctx: *mut ExecCtx, _obj: VmValue, _sym_idx: usize) -> VmValue {
+    panic!("JIT helper get_symbol not implemented");
+}
+pub extern "C" fn jit_bind_method(_ctx: *mut ExecCtx, _obj: VmValue, _name_idx: usize) -> VmValue {
+    panic!("JIT helper bind_method not implemented");
+}
+pub extern "C" fn jit_define_global(_ctx: *mut ExecCtx, _src: VmValue, _name_idx: usize) {
+    panic!("JIT helper define_global not implemented");
+}
+pub extern "C" fn jit_store_global(_ctx: *mut ExecCtx, _src: VmValue, _name_idx: usize) {
+    panic!("JIT helper store_global not implemented");
+}
+pub extern "C" fn jit_declare_field(_ctx: *mut ExecCtx, _class_val: VmValue, _name_idx: usize) {
+    panic!("JIT helper declare_field not implemented");
+}
+pub extern "C" fn jit_make_class(_ctx: *mut ExecCtx, _super_val: VmValue, _name_idx: usize) -> VmValue {
+    panic!("JIT helper make_class not implemented");
+}
+pub extern "C" fn jit_inherit(_ctx: *mut ExecCtx, _class_val: VmValue, _super_val: VmValue) {
+    panic!("JIT helper inherit not implemented");
+}
+pub extern "C" fn jit_class_member_op(_ctx: *mut ExecCtx, _args: *const std::ffi::c_void) {
+    panic!("JIT helper class_member_op not implemented");
+}
+pub extern "C" fn jit_build_object(_ctx: *mut ExecCtx, _ip_before: usize) -> VmValue {
+    panic!("JIT helper build_object not implemented");
+}
+pub extern "C" fn jit_object_rest(_ctx: *mut ExecCtx, _ip_before: usize) -> VmValue {
+    panic!("JIT helper object_rest not implemented");
+}
+pub extern "C" fn jit_make_enum_variant(_ctx: *mut ExecCtx, _ip_before: usize) -> VmValue {
+    panic!("JIT helper make_enum_variant not implemented");
+}
+pub extern "C" fn jit_call_spread(_ctx: *mut ExecCtx, _args: *const std::ffi::c_void) -> VmValue {
+    panic!("JIT helper call_spread not implemented");
+}
+pub extern "C" fn jit_load_module_by_idx(_ctx: *mut ExecCtx, _spec_idx: usize) -> VmValue {
+    panic!("JIT helper load_module_by_idx not implemented");
+}
