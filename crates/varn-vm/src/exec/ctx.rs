@@ -26,6 +26,12 @@ pub use super::ctx_jit_runtime::{
     jit_load_module, jit_load_module_slot, jit_logical_not, jit_modulo, jit_negate, jit_pow,
     jit_range, jit_set_index, jit_shl, jit_shr, jit_str_concat, jit_str_length, jit_str_slice,
     jit_typeof_val, jit_ushr,
+    jit_assert_not_null, jit_close_upvalue, jit_get_enum_tag, jit_is_array_stub, jit_wrap_spread_stub,
+    jit_object_keys_stub, jit_op_in_stub, jit_object_merge_stub, jit_get_fixed_field,
+    jit_set_fixed_field, jit_get_property_maybe_stub, jit_get_super, jit_get_symbol,
+    jit_bind_method, jit_define_global, jit_store_global, jit_declare_field, jit_make_class,
+    jit_inherit, jit_class_member_op, jit_build_object, jit_object_rest, jit_make_enum_variant,
+    jit_call_spread, jit_load_module_by_idx,
 };
 pub use super::ctx_jit_values::{
     jit_add, jit_build_array, jit_build_str, jit_call, jit_call_method, jit_define_global_idx,
