@@ -47,7 +47,7 @@ impl super::super::Binder {
                         })
                 });
 
-            let needs_enrich = ty.is_none();
+            let needs_enrich = !has_explicit_ann && (ty.is_none() || ty.as_ref().map_or(false, |t| t.is_dynamic()));
             self.bind_pattern(&d.id, sym_kind, line, v.doc.clone(), ty);
 
             if let Pattern::Identifier { name, .. } = &d.id {
@@ -70,6 +70,7 @@ impl super::super::Binder {
                             | ExprKind::Member { .. }
                             | ExprKind::New { .. }
                             | ExprKind::Match { .. }
+                            | ExprKind::Pipeline { .. }
                     )
                 {
                     let scope = self.scopes.get(self.current);

@@ -141,6 +141,7 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
         }
         ExprKind::Object { properties } => infer_object(properties, ctx),
         ExprKind::Range { .. } => Type::intrinsic(varn_core::TypeTag::Range),
+        ExprKind::Pipeline { right, .. } => infer_expr_type(right, ctx),
         _ => Type::Dynamic,
     }
 }

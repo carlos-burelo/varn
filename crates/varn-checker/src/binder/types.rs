@@ -231,4 +231,9 @@ impl TypeContext for BindResult {
             *node.clone(),
         ))
     }
+
+    fn get_extension_method(&self, type_name: &str, method_name: &str) -> Option<Type> {
+        let mangled = self.extensions.methods.get(type_name)?.get(method_name)?;
+        self.resolve_symbol(mangled)
+    }
 }

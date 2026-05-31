@@ -18,7 +18,7 @@ pub fn enrich_call_returns(bind: &mut BindResult) {
     for entry in &pending {
         match entry {
             PendingEnrich::Var { sym_id, init } => {
-                if bind.arena.get(*sym_id).ty.is_some() {
+                if bind.arena.get(*sym_id).ty.as_ref().map_or(false, |t| !t.is_dynamic()) {
                     continue;
                 }
                 let expr: &Expr = unsafe { &**init };

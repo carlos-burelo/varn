@@ -56,6 +56,7 @@ impl super::super::Binder {
                 properties, rest, ..
             } => {
                 for prop in properties {
+                    let mut prop_kind = kind;
                     let prop_ty =
                         ty.as_ref().and_then(|t| match &t.0 {
                             varn_core::TypeKind::Object(members) => {
@@ -102,25 +103,26 @@ impl super::super::Binder {
                                         origin_path,
                                         &mut visiting,
                                     );
-                                    exports
-                                        .get(prop.key.as_ref())
-                                        .and_then(|sym| sym.ty.clone())
-                                        .or_else(|| {
-                                            self.type_members
-                                                .namespaces
-                                                .get(prop.key.as_ref())
-                                                .and_then(|members| members.first())
-                                                .map(|_| {
-                                                    Type::named_with_origin(
-                                                        prop.key.to_string(),
-                                                        Some(origin_path.to_string()),
-                                                    )
-                                                })
-                                        })
+                                    if let Some(sym) = exports.get(prop.key.as_ref()) {
+                                        prop_kind = sym.kind;
+                                        sym.ty.clone()
+                                    } else {
+                                        self.type_members
+                                            .namespaces
+                                            .get(prop.key.as_ref())
+                                            .and_then(|members| members.first())
+                                            .map(|_| {
+                                                prop_kind = SymbolKind::Namespace;
+                                                Type::named_with_origin(
+                                                    prop.key.to_string(),
+                                                    Some(origin_path.to_string()),
+                                                )
+                                            })
+                                    }
                                 }),
                             _ => None,
                         });
-                    self.bind_pattern(&prop.value, kind, line, doc.clone(), prop_ty);
+                    self.bind_pattern(&prop.value, prop_kind, line, doc.clone(), prop_ty);
                 }
                 if let Some(r) = rest {
                     self.bind_pattern(r, kind, line, doc.clone(), ty);

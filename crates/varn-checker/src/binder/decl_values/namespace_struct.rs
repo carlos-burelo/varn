@@ -35,6 +35,7 @@ impl super::super::Binder {
     fn collect_namespace_members(&self, body: &[varn_core::ast::Decl]) -> Vec<ClassMemberInfo> {
         use varn_core::ast::Decl;
         let mut members = Vec::new();
+        let scope = self.scopes.get(self.current);
         for decl in body {
             match decl {
                 Decl::Function(f) => {
@@ -79,6 +80,7 @@ impl super::super::Binder {
                             .map(|t| Rc::from(t.name.as_str()))
                             .collect(),
                     });
+                    let symbol_id = scope.resolve(&f.id, &self.scopes);
                     members.push(ClassMemberInfo {
                         name: f.id.clone(),
                         kind: ClassMemberKind::Function,
@@ -95,7 +97,7 @@ impl super::super::Binder {
                         is_abstract: false,
                         is_readonly: false,
                         is_override: false,
-                        symbol_id: None,
+                        symbol_id,
                     });
                 }
                 Decl::Class(c) => {
@@ -106,6 +108,7 @@ impl super::super::Binder {
                         .get(&name)
                         .map(|e| e.members.clone())
                         .unwrap_or_default();
+                    let symbol_id = scope.resolve(&name, &self.scopes);
                     members.push(ClassMemberInfo {
                         name: name.clone(),
                         kind: ClassMemberKind::Class,
@@ -125,7 +128,7 @@ impl super::super::Binder {
                         is_abstract: false,
                         is_readonly: false,
                         is_override: false,
-                        symbol_id: None,
+                        symbol_id,
                     });
                 }
                 Decl::Variable(v) => {
@@ -140,8 +143,9 @@ impl super::super::Binder {
                                     .as_ref()
                                     .map(|e| infer_expr_type(e, Some(self)))
                                     .filter(|t| !t.is_dynamic())
-                            })
+                             })
                             .unwrap_or(Type::Dynamic);
+                        let symbol_id = scope.resolve(&name, &self.scopes);
                         members.push(ClassMemberInfo {
                             name,
                             kind: ClassMemberKind::Variable,
@@ -158,12 +162,13 @@ impl super::super::Binder {
                             is_abstract: false,
                             is_readonly: false,
                             is_override: false,
-                            symbol_id: None,
+                            symbol_id,
                         });
                     }
                 }
                 Decl::Namespace(n) => {
                     let inner_members = self.collect_namespace_members(&n.body);
+                    let symbol_id = scope.resolve(&n.id, &self.scopes);
                     members.push(ClassMemberInfo {
                         name: n.id.clone(),
                         kind: ClassMemberKind::Namespace,
@@ -180,10 +185,11 @@ impl super::super::Binder {
                         is_abstract: false,
                         is_readonly: false,
                         is_override: false,
-                        symbol_id: None,
+                        symbol_id,
                     });
                 }
                 Decl::TypeAlias(t) => {
+                    let symbol_id = scope.resolve(&t.id, &self.scopes);
                     members.push(ClassMemberInfo {
                         name: t.id.clone(),
                         kind: ClassMemberKind::Property,
@@ -203,7 +209,7 @@ impl super::super::Binder {
                         is_abstract: false,
                         is_readonly: false,
                         is_override: false,
-                        symbol_id: None,
+                        symbol_id,
                     });
                 }
                 Decl::Enum(e) => {
@@ -213,6 +219,7 @@ impl super::super::Binder {
                         .get(&e.id)
                         .cloned()
                         .unwrap_or_default();
+                    let symbol_id = scope.resolve(&e.id, &self.scopes);
                     members.push(ClassMemberInfo {
                         name: e.id.clone(),
                         kind: ClassMemberKind::Enum,
@@ -229,7 +236,7 @@ impl super::super::Binder {
                         is_abstract: false,
                         is_readonly: false,
                         is_override: false,
-                        symbol_id: None,
+                        symbol_id,
                     });
                 }
                 Decl::Struct(s) => {
@@ -239,6 +246,7 @@ impl super::super::Binder {
                         .get(&s.id)
                         .cloned()
                         .unwrap_or_default();
+                    let symbol_id = scope.resolve(&s.id, &self.scopes);
                     members.push(ClassMemberInfo {
                         name: s.id.clone(),
                         kind: ClassMemberKind::Struct,
@@ -255,7 +263,7 @@ impl super::super::Binder {
                         is_abstract: false,
                         is_readonly: false,
                         is_override: false,
-                        symbol_id: None,
+                        symbol_id,
                     });
                 }
                 Decl::Interface(i) => {
@@ -265,6 +273,7 @@ impl super::super::Binder {
                         .get(&i.id)
                         .cloned()
                         .unwrap_or_default();
+                    let symbol_id = scope.resolve(&i.id, &self.scopes);
                     members.push(ClassMemberInfo {
                         name: i.id.clone(),
                         kind: ClassMemberKind::Interface,
@@ -281,7 +290,7 @@ impl super::super::Binder {
                         is_abstract: false,
                         is_readonly: false,
                         is_override: false,
-                        symbol_id: None,
+                        symbol_id,
                     });
                 }
                 Decl::Export(e) => {
@@ -308,6 +317,17 @@ impl super::super::Binder {
         let mut members = Vec::new();
         for field in &s.fields {
             let ty = resolve_type_node(&field.type_ann, Some(self));
+
+            let mut field_sym = Symbol::new(
+                SymbolKind::Property,
+                field.name.clone(),
+                field.range.start.line,
+            )
+            .with_type(ty.clone());
+            field_sym.col = field.range.start.column;
+            field_sym.offset = field.range.start.offset;
+            let symbol_id = self.arena.push(field_sym);
+
             members.push(ClassMemberInfo {
                 name: field.name.clone(),
                 kind: ClassMemberKind::Property,
@@ -324,7 +344,7 @@ impl super::super::Binder {
                 is_abstract: false,
                 is_readonly: false,
                 is_override: false,
-                symbol_id: None,
+                symbol_id: Some(symbol_id),
             });
         }
         let struct_info = ClassMemberInfo {

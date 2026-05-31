@@ -251,6 +251,16 @@ impl Checker {
                     }
                 }
             }
+            ExprKind::Pipeline { left, right } => {
+                let lhs_ty = self.infer_type(left, bind);
+                let saved_pipeline = self.in_pipeline_rhs;
+                let saved_pipe_ty = self.pipeline_value_type.replace(lhs_ty);
+                self.in_pipeline_rhs = true;
+                let res = self.infer_type(right, bind);
+                self.in_pipeline_rhs = saved_pipeline;
+                self.pipeline_value_type = saved_pipe_ty;
+                res
+            }
             _ => Type::Dynamic,
         }
     }
