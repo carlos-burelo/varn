@@ -62,11 +62,20 @@ pub fn build_references(
 }
 
 fn symbol_global_key_for_id(state: &DocumentState, id: SymbolId) -> Option<String> {
-    state
-        .symbols
-        .iter()
-        .find(|s| s.symbol_id == Some(id))
-        .map(|s| s.global_key.clone())
+    if id >= state.db.arena.len() {
+        return None;
+    }
+    let sym = state.db.arena.get(id);
+    let name = sym.name.as_ref();
+    let kind = sym.kind;
+    let origin = sym.origin_module.as_deref();
+    let original_name = sym.original_name.as_deref();
+
+    if let Some(origin_mod) = origin {
+        let canonical_name = original_name.unwrap_or(name);
+        return Some(format!("m:{origin_mod}#{kind:?}:{canonical_name}"));
+    }
+    Some(format!("u:{}#{kind:?}:{}", state.uri, id))
 }
 
 fn token_global_key(state: &DocumentState, offset: u32) -> Option<String> {

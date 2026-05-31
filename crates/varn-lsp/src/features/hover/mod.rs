@@ -25,7 +25,7 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
     if let Some(tok) = tok_any {
         if matches!(
             tok.kind,
-            TokenKind::From | TokenKind::As | TokenKind::Import | TokenKind::Export
+            TokenKind::As | TokenKind::Import | TokenKind::Export
         ) {
             return None;
         }
@@ -43,6 +43,34 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
                 return Some(make_lang_hover(format!("(this) this: {}", cls.name)));
             }
             return Some(make_lang_hover("(this) this".to_owned()));
+        }
+    }
+
+    if let Some(res) = query::resolve_chain(state, line, col) {
+        match res {
+            ChainResult::Symbol(sym) => return Some(symbol_hover(sym)),
+            ChainResult::Member {
+                member,
+                parent_name,
+            } => {
+                let sig = if member.kind == MemberKind::EnumMember {
+                    format_enum_member(&parent_name, &member.name, &member.init_value)
+                } else {
+                    format_member_sig(&parent_name, member)
+                };
+                return Some(make_lang_hover(sig));
+            }
+            ChainResult::DynamicMember {
+                member,
+                parent_name,
+            } => {
+                let sig = if member.kind == MemberKind::EnumMember {
+                    format_enum_member(&parent_name, &member.name, &member.init_value)
+                } else {
+                    format_member_sig(&parent_name, &member)
+                };
+                return Some(make_lang_hover(sig));
+            }
         }
     }
 
@@ -68,24 +96,6 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
             format!("(param) {}: {}", param.name, param.type_str)
         };
         return Some(make_lang_hover(sig));
-    }
-
-    if let Some(res) = query::resolve_chain(state, line, col) {
-        match res {
-            ChainResult::Symbol(sym) => return Some(symbol_hover(sym)),
-            ChainResult::Member {
-                member,
-                parent_name,
-            } => {
-                return Some(make_lang_hover(format_member_sig(&parent_name, member)));
-            }
-            ChainResult::DynamicMember {
-                member,
-                parent_name,
-            } => {
-                return Some(make_lang_hover(format_member_sig(&parent_name, &member)));
-            }
-        }
     }
 
     None

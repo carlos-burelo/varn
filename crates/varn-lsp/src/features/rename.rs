@@ -12,7 +12,16 @@ pub fn build_prepare_rename(
 ) -> Option<PrepareRenameResponse> {
     let token = find_ident_at(state, line, col)?;
     let sid = resolve_symbol_id(state, token.offset)?;
-    state.symbols.iter().find(|s| s.symbol_id == Some(sid))?;
+    
+    // Ensure the symbol is local to the current project/file (no external origin module)
+    if sid >= state.db.arena.len() {
+        return None;
+    }
+    let sym = state.db.arena.get(sid);
+    if sym.origin_module.is_some() {
+        return None;
+    }
+
     let range = range_on_line(line, token.col, token.col + token.length);
     Some(PrepareRenameResponse::Range(range))
 }
@@ -88,11 +97,20 @@ fn resolve_symbol_id(state: &DocumentState, offset: u32) -> Option<SymbolId> {
 }
 
 fn symbol_global_key_for_id(state: &DocumentState, id: SymbolId) -> Option<String> {
-    state
-        .symbols
-        .iter()
-        .find(|s| s.symbol_id == Some(id))
-        .map(|s| s.global_key.clone())
+    if id >= state.db.arena.len() {
+        return None;
+    }
+    let sym = state.db.arena.get(id);
+    let name = sym.name.as_ref();
+    let kind = sym.kind;
+    let origin = sym.origin_module.as_deref();
+    let original_name = sym.original_name.as_deref();
+
+    if let Some(origin_mod) = origin {
+        let canonical_name = original_name.unwrap_or(name);
+        return Some(format!("m:{origin_mod}#{kind:?}:{canonical_name}"));
+    }
+    Some(format!("u:{}#{kind:?}:{}", state.uri, id))
 }
 
 fn token_global_key(state: &DocumentState, offset: u32) -> Option<String> {

@@ -73,6 +73,52 @@ fn insert_at_depth(nodes: &mut Vec<DocumentSymbol>, depth: usize, sym: DocumentS
         nodes.push(sym);
     }
 }
+#[allow(deprecated)]
+fn member_to_doc(m: &crate::document::MemberRecord) -> DocumentSymbol {
+    let name_end = m.col + m.name.len() as u32;
+    // Map MemberKind to SymbolKind
+    let kind = match m.kind {
+        crate::document::MemberKind::Constructor => SymbolKind::Method,
+        crate::document::MemberKind::Method => SymbolKind::Method,
+        crate::document::MemberKind::Function => SymbolKind::Function,
+        crate::document::MemberKind::Property => SymbolKind::Property,
+        crate::document::MemberKind::Variable => SymbolKind::Let,
+        crate::document::MemberKind::EnumMember => SymbolKind::EnumMember,
+        crate::document::MemberKind::Getter => SymbolKind::Method,
+        crate::document::MemberKind::Setter => SymbolKind::Method,
+        crate::document::MemberKind::Class => SymbolKind::Class,
+        crate::document::MemberKind::Interface => SymbolKind::Interface,
+        crate::document::MemberKind::Namespace => SymbolKind::Namespace,
+        crate::document::MemberKind::Enum => SymbolKind::Enum,
+        crate::document::MemberKind::Struct => SymbolKind::Struct,
+    };
+    
+    let full_range = range_on_line(m.line, m.col, name_end);
+    let select_range = range_on_line(m.line, m.col, name_end);
+    
+    let detail = if m.type_str.is_empty() {
+        None
+    } else {
+        Some(m.type_str.clone())
+    };
+    
+    let children = if m.members.is_empty() {
+        None
+    } else {
+        Some(m.members.iter().map(member_to_doc).collect())
+    };
+    
+    DocumentSymbol {
+        name: m.name.clone(),
+        detail,
+        kind: to_lsp_symbol_kind(kind),
+        tags: None,
+        deprecated: None,
+        range: full_range,
+        selection_range: select_range,
+        children,
+    }
+}
 
 #[allow(deprecated)]
 fn sym_to_doc(sym: &SymbolRecord) -> DocumentSymbol {
@@ -101,6 +147,12 @@ fn sym_to_doc(sym: &SymbolRecord) -> DocumentSymbol {
         Some(sym.type_str.clone())
     };
 
+    let children = if sym.members.is_empty() {
+        None
+    } else {
+        Some(sym.members.iter().map(member_to_doc).collect())
+    };
+
     DocumentSymbol {
         name: sym.name.clone(),
         detail,
@@ -109,6 +161,6 @@ fn sym_to_doc(sym: &SymbolRecord) -> DocumentSymbol {
         deprecated: None,
         range: full_range,
         selection_range: select_range,
-        children: None,
+        children,
     }
 }
