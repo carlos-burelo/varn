@@ -1,0 +1,17 @@
+import { timeNowMs } from "runtime:time";
+
+function runBench() {
+    let start = timeNowMs();
+    let sum: any = 0;
+    let i: any = 0;
+    while (i < 10000000) {
+        sum = sum + i;
+        i = i + 1;
+    }
+    let end = timeNowMs();
+    print("Dynamic Benchmark complete.");
+    print("Sum: " + sum);
+    print("Time taken: " + (end - start) + " ms");
+}
+
+runBench();

@@ -59,7 +59,7 @@ impl ExecCtx {
 
             let is_first_entry = self.frames[frame_idx].ip == 0;
 
-            if !self.no_jit && closure.jit_entry.is_some() {
+            if !self.no_jit && closure.jit_entry.is_some() && is_first_entry {
                 let jit_fn = closure.jit_entry.unwrap();
                 if is_first_entry {
                     varn_jit::JIT_STATS
@@ -69,13 +69,81 @@ impl ExecCtx {
                 if self.trace {
                     self.trace_event("JIT ENTRY", frame_idx, closure, 0, None);
                 }
-                let res = unsafe {
-                    (jit_fn)(
-                        self.stack.as_mut_ptr() as *mut std::ffi::c_void,
-                        closure_ptr as *const std::ffi::c_void,
-                        self.frames[frame_idx].base,
-                        self as *mut ExecCtx as *mut std::ffi::c_void,
-                    )
+                let is_outer = self.jit_jmp_buf.is_null();
+                let mut jmp_buf = super::ctx::JmpBuf::default();
+                let jmp_res = if is_outer {
+                    unsafe { super::ctx::my_setjmp(&mut jmp_buf) }
+                } else {
+                    0
+                };
+
+                let res = if jmp_res == 0 {
+                    if is_outer {
+                        self.jit_jmp_buf = &mut jmp_buf as *mut super::ctx::JmpBuf;
+                    }
+                    let val = unsafe {
+                        (jit_fn)(
+                            self.stack.as_mut_ptr() as *mut std::ffi::c_void,
+                            closure_ptr as *const std::ffi::c_void,
+                            self.frames[frame_idx].base,
+                            self as *mut ExecCtx as *mut std::ffi::c_void,
+                        )
+                    };
+                    if is_outer {
+                        self.jit_jmp_buf = std::ptr::null_mut();
+                    }
+                    Ok(val)
+                } else {
+                    if is_outer {
+                        self.jit_jmp_buf = std::ptr::null_mut();
+                    }
+                    Err(jmp_res)
+                };
+
+                let res = match res {
+                    Ok(val) => val,
+                    Err(code) => {
+                        if code == 1 {
+                            let handler = self.jit_panic_exception_handler.take();
+                            let error = self.jit_panic_exception_error.take().unwrap_or(VmValue::null());
+                            let err_obj = self.jit_panic_exception_err_obj.take();
+                            
+                            if let Some(handler) = handler {
+                                while self.frames.len() > handler.frame_depth {
+                                    self.record_frame_pop();
+                                    let f = self.frames.pop().unwrap();
+                                    self.close_upvalues_above(f.base);
+                                }
+
+                                let f2 = self.frames.len() - 1;
+                                let b2 = self.frames[f2].base;
+                                let required_depth =
+                                    b2 + self.frames[f2].closure.proto.register_count as usize;
+                                self.stack.truncate(required_depth);
+                                let thrown_val = error;
+
+                                let slot = b2 + handler.err_reg as usize;
+                                if slot < self.stack.len() {
+                                    self.stack[slot] = thrown_val;
+                                } else {
+                                    self.stack.resize(slot + 1, VmValue::null());
+                                    self.stack[slot] = thrown_val;
+                                }
+                                let new_frame_idx = self.frames.len() - 1;
+                                self.frames[new_frame_idx].ip = handler.catch_ip;
+                                continue 'frame_loop;
+                            } else {
+                                return Err(err_obj.unwrap());
+                            }
+                        } else if code == 2 {
+                            let resume_ip = self.jit_panic_suspend_resume_ip.take().unwrap();
+                            let frame_idx2 = self.frames.len() - 1;
+                            self.frames[frame_idx2].ip = resume_ip;
+                            return Ok(VmValue::null());
+                        } else {
+                            panic!("Unknown longjmp code: {}", code);
+                        }
+                    }
                 };
                 if self.trace {
                     self.trace_event("JIT EXIT", frame_idx, closure, 0, None);
@@ -83,6 +151,14 @@ impl ExecCtx {
 
                 let frame = self.frames.pop().unwrap();
                 self.record_frame_pop();
+                while self
+                    .try_handlers
+                    .last()
+                    .map(|h| h.frame_depth > self.frames.len())
+                    .unwrap_or(false)
+                {
+                    self.try_handlers.pop();
+                }
                 self.close_upvalues_above(frame.base);
                 self.stack.truncate(frame.base);
 

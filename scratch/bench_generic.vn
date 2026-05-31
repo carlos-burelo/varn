@@ -1,0 +1,29 @@
+import { timeNowMs } from "runtime:time";
+
+type Number = int | float;
+
+class Boxed {
+    val: Number
+    constructor(v: Number) {
+        this.val = v;
+    }
+}
+
+function runBench() {
+    let start = timeNowMs();
+    let sum = new Boxed(0);
+    let i = new Boxed(0);
+    while (i.val instanceof int && i.val < 1000000) {
+        sum.val = sum.val + i.val;
+        let iv = i.val;
+        if (iv instanceof int) {
+            i.val = iv + 1;
+        }
+    }
+    let end = timeNowMs();
+    print("Generic Benchmark complete.");
+    print("Sum: " + sum.val);
+    print("Time taken: " + (end - start) + " ms");
+}
+
+runBench();

@@ -99,6 +99,11 @@ pub struct JitHelpers {
     pub call_spread: usize,
     pub load_module_by_idx: usize,
     pub invoke_virtual: usize,
+    pub try_push: usize,
+    pub try_pop: usize,
+    pub throw: usize,
+    pub await_helper: usize,
+    pub yield_helper: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -180,6 +185,9 @@ impl JitStats {
 pub static JIT_STATS: JitStats = JitStats::new();
 
 pub fn compile(proto: &FunctionProto, helpers: JitHelpers) -> Result<(JitFn, Rc<dyn Any>), String> {
+    if proto.chunk.code.len() > 250 {
+        return Err("JIT Bailout: function too large".to_owned());
+    }
     let start = std::time::Instant::now();
     let res = compiler::compile_proto(proto, helpers);
     let elapsed = start.elapsed().as_nanos() as u64;

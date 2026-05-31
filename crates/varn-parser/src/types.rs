@@ -69,6 +69,40 @@ fn parse_intersection_type(s: &mut TokenStream) -> Result<TypeNode, String> {
     })
 }
 
+fn is_ternary_at(s: &TokenStream) -> bool {
+    if s.kind() != TokenKind::Question {
+        return false;
+    }
+    let start_line = s.line();
+    let mut off = 1;
+    let next = s.peek_kind(off);
+    if next == TokenKind::Colon {
+        return false;
+    }
+    loop {
+        if s.peek_line(off) != start_line {
+            return false;
+        }
+        let kind = s.peek_kind(off);
+        if kind == TokenKind::Colon {
+            return true;
+        }
+        if kind == TokenKind::Semicolon
+            || kind == TokenKind::Comma
+            || kind == TokenKind::RParen
+            || kind == TokenKind::RBracket
+            || kind == TokenKind::RBrace
+            || kind == TokenKind::EOF
+            || kind == TokenKind::Question
+            || kind == TokenKind::Eq
+            || kind.starts_statement()
+        {
+            return false;
+        }
+        off += 1;
+    }
+}
+
 fn parse_array_type(s: &mut TokenStream) -> Result<TypeNode, String> {
     let start = s.range();
     let mut ty = parse_primary_type(s)?;
@@ -94,6 +128,21 @@ fn parse_array_type(s: &mut TokenStream) -> Result<TypeNode, String> {
                     object: Box::new(ty),
                     index: Box::new(index),
                 },
+                range: start.to(end_range),
+            };
+        } else if s.check(TokenKind::Question) && !is_ternary_at(s) {
+            s.advance();
+            let end_range = s.range();
+            ty = TypeNode {
+                id: 0,
+                kind: TypeKind::Union(vec![
+                    ty,
+                    TypeNode {
+                        id: 0,
+                        kind: TypeKind::Intrinsic(TypeTag::Null),
+                        range: end_range,
+                    },
+                ]),
                 range: start.to(end_range),
             };
         } else {

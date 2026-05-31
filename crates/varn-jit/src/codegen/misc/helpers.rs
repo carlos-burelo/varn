@@ -761,3 +761,276 @@ pub(crate) fn emit_spawn(ctx: &mut CodegenCtx, first_reg: usize) {
     emit_store(asm, Reg::R11, dest, regmap);
     emit_reload_all_except(asm, regmap, Some(dest));
 }
+
+/// Try: ip+1 (w1, err_reg=hi(w1)), ip+2 (offset_hi), ip+3 (offset_lo)
+/// Signature: jit_push_try(ctx, catch_ip, err_reg) -> void
+pub(crate) fn emit_try(ctx: &mut CodegenCtx, first_reg: usize) {
+    let asm = &mut ctx.asm;
+    let code = ctx.code;
+    let ip = &mut ctx.ip;
+    let regmap = &ctx.regmap;
+    let helpers = ctx.helpers;
+
+    let w1 = code[*ip];
+    *ip += 1;
+    let err_reg = (w1 >> 8) as usize;
+    let offset_hi = code[*ip] as u32;
+    *ip += 1;
+    let offset_lo = code[*ip] as u32;
+    *ip += 1;
+
+    let catch_offset = ((offset_hi << 16) | offset_lo) as usize;
+    let catch_ip = *ip + catch_offset;
+
+    let _ = first_reg;
+
+    emit_flush_all(asm, regmap);
+
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
+
+    asm.push(ARG_CTX);
+    asm.push(ARG_CLOSURE);
+    asm.push(ARG_BASE);
+    asm.push(ARG_EXEC_CTX);
+
+    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    if need_dummy {
+        asm.push(Reg::Rax);
+    }
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, -32);
+
+    asm.mov_reg_imm64(ARG_BASE, err_reg as u64); // 3rd arg = err_reg
+    asm.mov_reg_imm64(ARG_CLOSURE, catch_ip as u64); // 2nd arg = catch_ip
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // 1st arg = ctx
+
+    asm.mov_reg_imm64(Reg::R10, helpers.try_push as u64);
+    asm.call_reg(Reg::R10);
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, 32);
+
+    if need_dummy {
+        asm.pop(Reg::Rax);
+    }
+    asm.pop(ARG_EXEC_CTX);
+    asm.pop(ARG_BASE);
+    asm.pop(ARG_CLOSURE);
+    asm.pop(ARG_CTX);
+
+    emit_reload_all_except(asm, regmap, None);
+}
+
+/// PopTry: Only opcode
+/// Signature: jit_pop_try(ctx) -> void
+pub(crate) fn emit_pop_try(ctx: &mut CodegenCtx) {
+    let asm = &mut ctx.asm;
+    let regmap = &ctx.regmap;
+    let helpers = ctx.helpers;
+
+    emit_flush_all(asm, regmap);
+
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
+
+    asm.push(ARG_CTX);
+    asm.push(ARG_CLOSURE);
+    asm.push(ARG_BASE);
+    asm.push(ARG_EXEC_CTX);
+
+    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    if need_dummy {
+        asm.push(Reg::Rax);
+    }
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, -32);
+
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // 1st arg = ctx
+
+    asm.mov_reg_imm64(Reg::R10, helpers.try_pop as u64);
+    asm.call_reg(Reg::R10);
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, 32);
+
+    if need_dummy {
+        asm.pop(Reg::Rax);
+    }
+    asm.pop(ARG_EXEC_CTX);
+    asm.pop(ARG_BASE);
+    asm.pop(ARG_CLOSURE);
+    asm.pop(ARG_CTX);
+
+    emit_reload_all_except(asm, regmap, None);
+}
+
+/// Throw: ip+1 (w1, src=hi(w1))
+/// Signature: jit_throw(ctx, error) -> void
+pub(crate) fn emit_throw(ctx: &mut CodegenCtx) {
+    let asm = &mut ctx.asm;
+    let code = ctx.code;
+    let ip = &mut ctx.ip;
+    let regmap = &ctx.regmap;
+    let helpers = ctx.helpers;
+
+    let w1 = code[*ip];
+    *ip += 1;
+    let src = (w1 >> 8) as usize;
+
+    emit_flush_all(asm, regmap);
+    emit_load(asm, Reg::Rax, src, regmap);
+
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
+
+    asm.push(ARG_CTX);
+    asm.push(ARG_CLOSURE);
+    asm.push(ARG_BASE);
+    asm.push(ARG_EXEC_CTX);
+
+    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    if need_dummy {
+        asm.push(Reg::Rax);
+    }
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, -32);
+
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax); // 2nd arg = error (thrown value)
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX); // 1st arg = ctx
+
+    asm.mov_reg_imm64(Reg::R10, helpers.throw as u64);
+    asm.call_reg(Reg::R10);
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, 32);
+
+    if need_dummy {
+        asm.pop(Reg::Rax);
+    }
+    asm.pop(ARG_EXEC_CTX);
+    asm.pop(ARG_BASE);
+    asm.pop(ARG_CLOSURE);
+    asm.pop(ARG_CTX);
+
+    emit_reload_all_except(asm, regmap, None);
+}
+
+/// Await: ip+1 (w1, src=hi(w1)), dest=first_reg
+/// Signature: jit_await(ctx, fut, dest, resume_ip) -> void
+pub(crate) fn emit_await(ctx: &mut CodegenCtx, first_reg: usize) {
+    let asm = &mut ctx.asm;
+    let code = ctx.code;
+    let ip = &mut ctx.ip;
+    let regmap = &ctx.regmap;
+    let helpers = ctx.helpers;
+
+    let w1 = code[*ip];
+    *ip += 1;
+    let src = (w1 >> 8) as usize;
+    let dest = first_reg;
+
+    emit_flush_all(asm, regmap);
+    emit_load(asm, Reg::Rax, src, regmap);
+
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
+
+    asm.push(ARG_CTX);
+    asm.push(ARG_CLOSURE);
+    asm.push(ARG_BASE);
+    asm.push(ARG_EXEC_CTX);
+
+    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    if need_dummy {
+        asm.push(Reg::Rax);
+    }
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, -32);
+
+    // Copy ExecCtx pointer to scratch register R11
+    asm.mov_reg_reg(Reg::R11, ARG_EXEC_CTX);
+
+    asm.mov_reg_imm64(ARG_EXEC_CTX, *ip as u64); // 4th arg = resume_ip
+    asm.mov_reg_imm64(ARG_BASE, dest as u64); // 3rd arg = dest
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax); // 2nd arg = fut
+    asm.mov_reg_reg(ARG_CTX, Reg::R11); // 1st arg = ctx
+
+    asm.mov_reg_imm64(Reg::R10, helpers.await_helper as u64);
+    asm.call_reg(Reg::R10);
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, 32);
+
+    if need_dummy {
+        asm.pop(Reg::Rax);
+    }
+    asm.pop(ARG_EXEC_CTX);
+    asm.pop(ARG_BASE);
+    asm.pop(ARG_CLOSURE);
+    asm.pop(ARG_CTX);
+
+    emit_reload_all_except(asm, regmap, None);
+}
+
+/// Yield: ip+1 (w1, src=lo(w1)), dest=first_reg
+/// Signature: jit_yield(ctx, val, dest, resume_ip) -> void
+pub(crate) fn emit_yield(ctx: &mut CodegenCtx, first_reg: usize) {
+    let asm = &mut ctx.asm;
+    let code = ctx.code;
+    let ip = &mut ctx.ip;
+    let regmap = &ctx.regmap;
+    let helpers = ctx.helpers;
+
+    let w1 = code[*ip];
+    *ip += 1;
+    let src = (w1 & 0xFF) as usize;
+    let dest = first_reg;
+
+    emit_flush_all(asm, regmap);
+    emit_load(asm, Reg::Rax, src, regmap);
+
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
+
+    asm.push(ARG_CTX);
+    asm.push(ARG_CLOSURE);
+    asm.push(ARG_BASE);
+    asm.push(ARG_EXEC_CTX);
+
+    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    if need_dummy {
+        asm.push(Reg::Rax);
+    }
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, -32);
+
+    // Copy ExecCtx pointer to scratch register R11
+    asm.mov_reg_reg(Reg::R11, ARG_EXEC_CTX);
+
+    asm.mov_reg_imm64(ARG_EXEC_CTX, *ip as u64); // 4th arg = resume_ip
+    asm.mov_reg_imm64(ARG_BASE, dest as u64); // 3rd arg = dest
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax); // 2nd arg = val
+    asm.mov_reg_reg(ARG_CTX, Reg::R11); // 1st arg = ctx
+
+    asm.mov_reg_imm64(Reg::R10, helpers.yield_helper as u64);
+    asm.call_reg(Reg::R10);
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, 32);
+
+    if need_dummy {
+        asm.pop(Reg::Rax);
+    }
+    asm.pop(ARG_EXEC_CTX);
+    asm.pop(ARG_BASE);
+    asm.pop(ARG_CLOSURE);
+    asm.pop(ARG_CTX);
+
+    emit_reload_all_except(asm, regmap, None);
+}

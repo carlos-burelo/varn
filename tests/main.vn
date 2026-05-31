@@ -41,6 +41,7 @@ import "./40-named-arguments.vn"
 import "./41-advanced-enums.vn"
 import "./42-stdlib-comprehensive-test.vn"
 import "./43-server-client-http.vn"
+import "./46-extreme-nullable-edgecases.vn"
 
-print("\nModules executed in suite: 43")
+print("\nModules executed in suite: 44")
 assertSummary()

@@ -1,24 +1,24 @@
 
 // nullable scalar
-const a: str | null = null
-const b: str | null = "hello"
-const c: bool | null = true
+const a: str? = null
+const b: str? = "hello"
+const c: bool? = true
 
 // array of T
 const d: int[] = [1, 2, 3]
 const e: str[] = ["a", "b"]
 
 // array of nullable T  →  (T | null)[]
-const f: (int | null)[] = [1, null, 3]
-const g: (str | null)[] = [null, "x", null]
+const f: int?[] = [1, null, 3]
+const g: str?[] = [null, "x", null]
 
 // nullable array of T  →  T[] | null
-const h: int[] | null = null
-const i: str[] | null = ["a", "b"]
+const h: int[]? = null
+const i: str[]? = ["a", "b"]
 
 // nullable array of nullable T
-const j: (int | null)[] | null = null
-const k: (int | null)[] | null = [1, null, 3]
+const j: int?[]? = null
+const k: int?[]? = [1, null, 3]
 
 // 2d array
 const l: int[][] = [[1, 2], [3, 4]]
@@ -46,22 +46,22 @@ const u: Array<str | null> | null = null
 const v: Array<str | null> | null = [null, "x"]
 
 // in function signatures
-function identity(x: int | null): int | null {
+function identity(x: int?): int? {
     return x
 }
 
-function first(arr: (int | null)[] | null): int | null {
+function first(arr: int?[]?): int? {
     if (arr === null) return null
     if (arr.length === 0) return null
     return arr[0]
 }
 
-function wrap(x: int): int[] | null {
+function wrap(x: int): int[]? {
     if (x < 0) return null
     return [x]
 }
 
-function matrix(flag: bool): (int | null)[][] | null {
+function matrix(flag: bool): int?[][]? {
     if (!flag) return null
     return [[1, null], [null, 2]]
 }
