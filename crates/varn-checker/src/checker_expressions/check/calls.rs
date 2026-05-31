@@ -53,7 +53,7 @@ impl Checker {
             self.record_type(callee.range.start.offset, effective_callee_ty.clone());
         }
 
-        let params_for_context: Vec<FunctionParam> = if let TypeKind::Fn(ft) = &callee_ty.0 {
+        let params_for_context: Vec<FunctionParam> = if let TypeKind::Fn(ft) = &effective_callee_ty.0 {
             ft.params.clone()
         } else {
             vec![]

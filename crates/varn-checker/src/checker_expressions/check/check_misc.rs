@@ -99,11 +99,44 @@ impl Checker {
             let scope = bind.scopes.get(self.current_scope);
             if let Some(id) = scope.resolve(name, &bind.scopes) {
                 let sym = bind.arena.get(id);
-                if sym.kind == crate::symbol::SymbolKind::Const {
-                    self.emit(
-                        Diagnostic::error(ErrorCode::NotAssignable, format!("cannot reassign to constant '{name}'"))
-                            .with_range(*range),
-                    );
+                match sym.kind {
+                    crate::symbol::SymbolKind::Const => {
+                        self.emit(
+                            Diagnostic::error(ErrorCode::NotAssignable, format!("cannot reassign to constant '{name}'"))
+                                .with_range(*range),
+                        );
+                    }
+                    crate::symbol::SymbolKind::Class => {
+                        self.emit(
+                            Diagnostic::error(ErrorCode::NotAssignable, format!("cannot reassign to class '{name}'"))
+                                .with_range(*range),
+                        );
+                    }
+                    crate::symbol::SymbolKind::Namespace => {
+                        self.emit(
+                            Diagnostic::error(ErrorCode::NotAssignable, format!("cannot reassign to namespace '{name}'"))
+                                .with_range(*range),
+                        );
+                    }
+                    crate::symbol::SymbolKind::Interface => {
+                        self.emit(
+                            Diagnostic::error(ErrorCode::NotAssignable, format!("cannot reassign to interface '{name}'"))
+                                .with_range(*range),
+                        );
+                    }
+                    crate::symbol::SymbolKind::Enum => {
+                        self.emit(
+                            Diagnostic::error(ErrorCode::NotAssignable, format!("cannot reassign to enum '{name}'"))
+                                .with_range(*range),
+                        );
+                    }
+                    crate::symbol::SymbolKind::Function => {
+                        self.emit(
+                            Diagnostic::error(ErrorCode::NotAssignable, format!("cannot reassign to function '{name}'"))
+                                .with_range(*range),
+                        );
+                    }
+                    _ => {}
                 }
             }
         }

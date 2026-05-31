@@ -21,4 +21,8 @@ pub trait TypeContext {
     fn get_alias_node(&self, _name: &str) -> Option<(Vec<String>, varn_core::ast::TypeNode)> {
         None
     }
+
+    fn get_extension_method(&self, _type_name: &str, _method_name: &str) -> Option<Type> {
+        None
+    }
 }

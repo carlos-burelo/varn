@@ -76,6 +76,17 @@ impl super::Binder {
                 ..
             } => {
                 let ty = resolve_type_node(type_ann, Some(self));
+
+                let mut sym = Symbol::new(
+                    SymbolKind::Property,
+                    key.clone(),
+                    range.start.line,
+                )
+                .with_type(ty.clone());
+                sym.col = range.start.column;
+                sym.offset = range.start.offset;
+                let symbol_id = self.arena.push(sym);
+
                 members.push(ClassMemberInfo {
                     name: key.clone(),
                     kind: ClassMemberKind::Property,
@@ -92,7 +103,7 @@ impl super::Binder {
                     is_abstract: false,
                     is_readonly: false,
                     is_override: false,
-                    symbol_id: None,
+                    symbol_id: Some(symbol_id),
                 });
             }
             InterfaceMember::Method {
@@ -143,6 +154,17 @@ impl super::Binder {
                     is_arrow: false,
                     type_params: fn_tps,
                 });
+
+                let mut sym = Symbol::new(
+                    SymbolKind::Method,
+                    key.clone(),
+                    range.start.line,
+                )
+                .with_type(fn_type.clone());
+                sym.col = range.start.column;
+                sym.offset = range.start.offset;
+                let symbol_id = self.arena.push(sym);
+
                 members.push(ClassMemberInfo {
                     name: key.clone(),
                     kind: ClassMemberKind::Method,
@@ -159,7 +181,7 @@ impl super::Binder {
                     is_abstract: false,
                     is_readonly: false,
                     is_override: false,
-                    symbol_id: None,
+                    symbol_id: Some(symbol_id),
                 });
             }
             InterfaceMember::Index {

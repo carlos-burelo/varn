@@ -57,6 +57,14 @@ pub(crate) fn infer_call_type(
                         return Some(m.ty.clone());
                     }
                 }
+                if let Some(ext_ty) = ctx.get_extension_method(class_name, prop_name) {
+                    return Some(ext_ty);
+                }
+            }
+            if let Some(methods) = class_methods.get(class_name) {
+                if let Some(ty) = methods.get(prop_name) {
+                    return Some(ty.clone());
+                }
             }
             None
         }
@@ -296,6 +304,16 @@ pub(crate) fn infer_call_type(
                 }
             }
         }
+
+        ExprKind::Pipeline { right, .. } => infer_call_type(
+            fn_map,
+            fn_type_params,
+            class_methods,
+            sym_map,
+            right,
+            ctx,
+            current_class,
+        ),
 
         _ => Some(Type::Dynamic),
     }

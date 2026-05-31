@@ -21,6 +21,7 @@ impl Checker {
         self.node_scopes.insert(expr.id, self.current_scope);
         let ty = self.infer_type(expr, bind);
 
+
         let mut symbol_id = None;
         if let ExprKind::Identifier { name } = &expr.kind {
             let scope = bind.scopes.get(self.current_scope);

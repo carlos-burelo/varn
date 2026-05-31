@@ -185,7 +185,7 @@ impl super::Binder {
     }
 
     pub(crate) fn collect_class_member(
-        &self,
+        &mut self,
         member: &ClassMember,
         _class_name: &str,
         _methods: &mut FxHashMap<Rc<str>, Type>,
@@ -224,6 +224,16 @@ impl super::Binder {
                     type_params: vec![],
                 });
 
+                let mut sym = Symbol::new(
+                    SymbolKind::Method,
+                    Rc::from("constructor"),
+                    range.start.line,
+                )
+                .with_type(fn_ty.clone());
+                sym.col = range.start.column;
+                sym.offset = range.start.offset;
+                let symbol_id = self.arena.push(sym);
+
                 members.push(ClassMemberInfo {
                     name: Rc::from("constructor"),
                     kind: ClassMemberKind::Constructor,
@@ -240,7 +250,7 @@ impl super::Binder {
                     is_abstract: false,
                     is_readonly: false,
                     is_override: false,
-                    symbol_id: None,
+                    symbol_id: Some(symbol_id),
                 });
             }
             ClassMember::Property {
@@ -255,6 +265,16 @@ impl super::Binder {
                     .as_ref()
                     .map(|ann| resolve_type_node(ann, Some(self)))
                     .unwrap_or(Type::Dynamic);
+
+                let mut sym = Symbol::new(
+                    SymbolKind::Property,
+                    key_rc.clone(),
+                    range.start.line,
+                )
+                .with_type(ty.clone());
+                sym.col = range.start.column;
+                sym.offset = range.start.offset;
+                let symbol_id = self.arena.push(sym);
 
                 members.push(ClassMemberInfo {
                     name: key_rc,
@@ -272,7 +292,7 @@ impl super::Binder {
                     is_abstract: false,
                     is_readonly: modifiers.is_readonly,
                     is_override: modifiers.is_override,
-                    symbol_id: None,
+                    symbol_id: Some(symbol_id),
                 });
             }
             ClassMember::Method {
@@ -334,6 +354,18 @@ impl super::Binder {
                     type_params: fn_tps,
                 });
 
+                let mut sym = Symbol::new(
+                    SymbolKind::Method,
+                    key_rc.clone(),
+                    range.start.line,
+                )
+                .with_type(fn_ty.clone());
+                sym.col = range.start.column;
+                sym.offset = range.start.offset;
+                sym.is_async = modifiers.is_async;
+                sym.is_generator = modifiers.is_generator;
+                let symbol_id = self.arena.push(sym);
+
                 members.push(ClassMemberInfo {
                     name: key_rc,
                     kind: ClassMemberKind::Method,
@@ -350,7 +382,7 @@ impl super::Binder {
                     is_abstract: modifiers.is_abstract,
                     is_readonly: false,
                     is_override: modifiers.is_override,
-                    symbol_id: None,
+                    symbol_id: Some(symbol_id),
                 });
             }
             ClassMember::Getter {
@@ -365,6 +397,17 @@ impl super::Binder {
                     .as_ref()
                     .map(|ann| resolve_type_node(ann, Some(self)))
                     .unwrap_or(Type::Dynamic);
+
+                let mut sym = Symbol::new(
+                    SymbolKind::Property,
+                    key_rc.clone(),
+                    range.start.line,
+                )
+                .with_type(ty.clone());
+                sym.col = range.start.column;
+                sym.offset = range.start.offset;
+                let symbol_id = self.arena.push(sym);
+
                 members.push(ClassMemberInfo {
                     name: key_rc,
                     kind: ClassMemberKind::Getter,
@@ -381,7 +424,7 @@ impl super::Binder {
                     is_abstract: modifiers.is_abstract,
                     is_readonly: false,
                     is_override: false,
-                    symbol_id: None,
+                    symbol_id: Some(symbol_id),
                 });
             }
             ClassMember::Setter {
@@ -391,6 +434,17 @@ impl super::Binder {
                 ..
             } => {
                 let key_rc: Rc<str> = Rc::from(key.as_ref());
+
+                let mut sym = Symbol::new(
+                    SymbolKind::Property,
+                    key_rc.clone(),
+                    range.start.line,
+                )
+                .with_type(Type::Dynamic);
+                sym.col = range.start.column;
+                sym.offset = range.start.offset;
+                let symbol_id = self.arena.push(sym);
+
                 members.push(ClassMemberInfo {
                     name: key_rc,
                     kind: ClassMemberKind::Setter,
@@ -407,7 +461,7 @@ impl super::Binder {
                     is_abstract: modifiers.is_abstract,
                     is_readonly: false,
                     is_override: false,
-                    symbol_id: None,
+                    symbol_id: Some(symbol_id),
                 });
             }
             _ => {}
