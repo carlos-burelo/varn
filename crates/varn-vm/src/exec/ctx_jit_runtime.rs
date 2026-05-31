@@ -210,6 +210,45 @@ pub extern "C" fn jit_load_module_slot(
     }
 }
 
+pub extern "C" fn jit_store_module_slot(
+    ctx: *mut ExecCtx,
+    slot_idx: usize,
+    val_nv: VmValue,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let caller_depth = ctx_ref.frames.len();
+        let frame_idx = caller_depth - 1;
+
+        let exports_nv = if let Some(nv) = ctx_ref.module_exports.get(&frame_idx).copied() {
+            nv
+        } else {
+            panic!("OpStoreModuleSlot: no active module object for current frame");
+        };
+
+        if !exports_nv.is_heap() {
+            panic!("OpStoreModuleSlot: active module object is not a heap object");
+        }
+
+        if let Some(crate::heap::HeapObj::Module(m)) = ctx_ref.heap.get_mut(exports_nv.as_heap_idx()) {
+            let m = std::rc::Rc::make_mut(m);
+            m.set_slot(slot_idx, val_nv);
+        } else {
+            panic!("OpStoreModuleSlot: active module object is not a ModuleObj");
+        }
+    }
+}
+
+pub extern "C" fn jit_spawn(
+    ctx: *mut ExecCtx,
+    task_val: VmValue,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        ctx_ref.exec_spawn(task_val).unwrap()
+    }
+}
+
 pub extern "C" fn jit_build_object_with_shape(
     ctx: *mut ExecCtx,
     closure: *const crate::frame::VmClosure,

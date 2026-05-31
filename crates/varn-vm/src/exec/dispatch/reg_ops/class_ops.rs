@@ -251,7 +251,7 @@ impl ExecCtx {
         }
     }
 
-    pub(in crate::exec::dispatch) fn exec_spawn(&mut self, task_val: VmValue) -> VmResult<VmValue> {
+    pub(crate) fn exec_spawn(&mut self, task_val: VmValue) -> VmResult<VmValue> {
         let task = self.heap.extract(task_val);
         Ok(self.heap.intern(task))
     }

@@ -33,7 +33,8 @@ pub fn compile_proto(
             | OpCode::LoadFalse
             | OpCode::LoadIntZero
             | OpCode::LoadIntOne
-            | OpCode::LoadIntMinusOne => {}
+            | OpCode::LoadIntMinusOne
+            | OpCode::Nop => {}
             OpCode::LoadInt => {
                 ip += 1;
             }
@@ -131,7 +132,7 @@ pub fn compile_proto(
             OpCode::GetProperty | OpCode::SetProperty | OpCode::Call | OpCode::BuildArray => {
                 ip += 2;
             }
-            OpCode::CallMethod => {
+            OpCode::CallMethod | OpCode::InvokeVirtual => {
                 ip += 3;
             }
             OpCode::BuildStr => {
@@ -172,7 +173,9 @@ pub fn compile_proto(
             | OpCode::In
             | OpCode::GetSuper
             | OpCode::Inherit
-            | OpCode::LoadModule => {
+            | OpCode::LoadModule
+            | OpCode::StoreModuleSlot
+            | OpCode::Spawn => {
                 ip += 1;
             }
             OpCode::GetFixedField
@@ -318,7 +321,9 @@ pub fn compile_proto(
 
             OpCode::GetProperty | OpCode::SetProperty => emit_properties(&mut cctx, op, first_reg)?,
 
-            OpCode::Call | OpCode::CallMethod => emit_calls(&mut cctx, op, first_reg)?,
+            OpCode::Call | OpCode::CallMethod | OpCode::InvokeVirtual => {
+                emit_calls(&mut cctx, op, first_reg)?
+            }
 
             OpCode::BuildArray
             | OpCode::ArrayLength
@@ -368,7 +373,11 @@ pub fn compile_proto(
             | OpCode::ObjectRest
             | OpCode::MakeEnumVariant
             | OpCode::CallSpread
-            | OpCode::LoadModule => emit_misc_ops(&mut cctx, op, first_reg)?,
+            | OpCode::LoadModule
+            | OpCode::StoreModuleSlot
+            | OpCode::Spawn => emit_misc_ops(&mut cctx, op, first_reg)?,
+
+            OpCode::Nop => {}
 
             _ => unreachable!(),
         }

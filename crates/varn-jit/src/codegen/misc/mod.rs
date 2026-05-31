@@ -46,6 +46,8 @@ pub(crate) fn emit_misc_ops(
         OpCode::MakeEnumVariant => helpers::emit_make_enum_variant(ctx, first_reg),
         OpCode::CallSpread => helpers::emit_call_spread(ctx, first_reg),
         OpCode::LoadModule => helpers::emit_load_module(ctx, first_reg),
+        OpCode::StoreModuleSlot => helpers::emit_store_module_slot(ctx, first_reg),
+        OpCode::Spawn => helpers::emit_spawn(ctx, first_reg),
         _ => unreachable!("emit_misc_ops called with {:?}", op),
     }
     Ok(())
