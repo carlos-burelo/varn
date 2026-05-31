@@ -48,6 +48,20 @@ impl TokenStream {
     }
 
     #[inline]
+    pub fn peek_line(&self, offset: usize) -> u32 {
+        let idx = self.pos + offset;
+        if idx < self.tokens.len() {
+            self.tokens[idx].range.start.line
+        } else {
+            if let Some(last) = self.tokens.last() {
+                last.range.end.line
+            } else {
+                0
+            }
+        }
+    }
+
+    #[inline]
     pub fn token(&self) -> &Token {
         if self.pos < self.tokens.len() {
             &self.tokens[self.pos]

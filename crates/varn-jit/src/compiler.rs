@@ -12,6 +12,7 @@ use crate::codegen::{
     emit_misc_ops, CodegenCtx,
 };
 
+#[allow(unreachable_patterns)]
 pub fn compile_proto(
     proto: &FunctionProto,
     helpers: crate::JitHelpers,
@@ -34,6 +35,7 @@ pub fn compile_proto(
             | OpCode::LoadIntZero
             | OpCode::LoadIntOne
             | OpCode::LoadIntMinusOne
+            | OpCode::PopTry
             | OpCode::Nop => {}
             OpCode::LoadInt => {
                 ip += 1;
@@ -132,7 +134,7 @@ pub fn compile_proto(
             OpCode::GetProperty | OpCode::SetProperty | OpCode::Call | OpCode::BuildArray => {
                 ip += 2;
             }
-            OpCode::CallMethod | OpCode::InvokeVirtual => {
+            OpCode::CallMethod | OpCode::InvokeVirtual | OpCode::Try => {
                 ip += 3;
             }
             OpCode::BuildStr => {
@@ -175,7 +177,10 @@ pub fn compile_proto(
             | OpCode::Inherit
             | OpCode::LoadModule
             | OpCode::StoreModuleSlot
-            | OpCode::Spawn => {
+            | OpCode::Spawn
+            | OpCode::Throw
+            | OpCode::Await
+            | OpCode::Yield => {
                 ip += 1;
             }
             OpCode::GetFixedField
@@ -375,7 +380,12 @@ pub fn compile_proto(
             | OpCode::CallSpread
             | OpCode::LoadModule
             | OpCode::StoreModuleSlot
-            | OpCode::Spawn => emit_misc_ops(&mut cctx, op, first_reg)?,
+            | OpCode::Spawn
+            | OpCode::Try
+            | OpCode::PopTry
+            | OpCode::Throw
+            | OpCode::Await
+            | OpCode::Yield => emit_misc_ops(&mut cctx, op, first_reg)?,
 
             OpCode::Nop => {}
 

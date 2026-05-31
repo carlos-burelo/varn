@@ -48,6 +48,11 @@ pub(crate) fn emit_misc_ops(
         OpCode::LoadModule => helpers::emit_load_module(ctx, first_reg),
         OpCode::StoreModuleSlot => helpers::emit_store_module_slot(ctx, first_reg),
         OpCode::Spawn => helpers::emit_spawn(ctx, first_reg),
+        OpCode::Try => helpers::emit_try(ctx, first_reg),
+        OpCode::PopTry => helpers::emit_pop_try(ctx),
+        OpCode::Throw => helpers::emit_throw(ctx),
+        OpCode::Await => helpers::emit_await(ctx, first_reg),
+        OpCode::Yield => helpers::emit_yield(ctx, first_reg),
         _ => unreachable!("emit_misc_ops called with {:?}", op),
     }
     Ok(())

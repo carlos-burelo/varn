@@ -32,6 +32,7 @@ pub use super::ctx_jit_runtime::{
     jit_bind_method, jit_define_global, jit_store_global, jit_declare_field, jit_make_class,
     jit_inherit, jit_class_member_op, jit_build_object, jit_object_rest, jit_make_enum_variant,
     jit_spawn, jit_call_spread, jit_load_module_by_idx,
+    jit_push_try, jit_pop_try, jit_throw, jit_await, jit_yield,
 };
 pub use super::ctx_jit_values::{
     jit_add, jit_build_array, jit_build_str, jit_call, jit_call_method, jit_define_global_idx,
@@ -64,6 +65,11 @@ pub struct ExecCtx {
     pub proto_constants: FxHashMap<usize, Rc<Vec<VmValue>>>,
     pub no_jit: bool,
     pub linker: Linker,
+    pub jit_jmp_buf: *mut JmpBuf,
+    pub jit_panic_exception_handler: Option<crate::frame::TryHandler>,
+    pub jit_panic_exception_error: Option<VmValue>,
+    pub jit_panic_exception_err_obj: Option<crate::error::RuntimeError>,
+    pub jit_panic_suspend_resume_ip: Option<usize>,
 }
 
 impl ExecCtx {
@@ -98,6 +104,11 @@ impl ExecCtx {
             proto_constants: FxHashMap::default(),
             no_jit: false,
             linker: Linker::new(),
+            jit_jmp_buf: std::ptr::null_mut(),
+            jit_panic_exception_handler: None,
+            jit_panic_exception_error: None,
+            jit_panic_exception_err_obj: None,
+            jit_panic_suspend_resume_ip: None,
         };
 
         if fresh {
@@ -197,6 +208,11 @@ impl ExecCtx {
             proto_constants: FxHashMap::default(),
             no_jit: self.no_jit,
             linker: self.linker.clone_state(),
+            jit_jmp_buf: std::ptr::null_mut(),
+            jit_panic_exception_handler: None,
+            jit_panic_exception_error: None,
+            jit_panic_exception_err_obj: None,
+            jit_panic_suspend_resume_ip: None,
         }
     }
 
@@ -270,4 +286,56 @@ impl ExecCtx {
         }
         let _ = self.heap.collect(&roots);
     }
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+#[repr(C)]
+pub struct JmpBuf {
+    pub rdi: u64,
+    pub rsi: u64,
+    pub rbx: u64,
+    pub rbp: u64,
+    pub r12: u64,
+    pub r13: u64,
+    pub r14: u64,
+    pub r15: u64,
+    pub rsp: u64,
+    pub rip: u64,
+}
+
+#[unsafe(naked)]
+pub unsafe extern "C" fn my_setjmp(_buf: *mut JmpBuf) -> i32 {
+    std::arch::naked_asm!(
+        "mov [rcx + 0],  rdi",
+        "mov [rcx + 8],  rsi",
+        "mov [rcx + 16], rbx",
+        "mov [rcx + 24], rbp",
+        "mov [rcx + 32], r12",
+        "mov [rcx + 40], r13",
+        "mov [rcx + 48], r14",
+        "mov [rcx + 56], r15",
+        "lea r10, [rsp + 8]",
+        "mov [rcx + 64], r10",
+        "mov r10, [rsp]",
+        "mov [rcx + 72], r10",
+        "xor eax, eax",
+        "ret"
+    );
+}
+
+#[unsafe(naked)]
+pub unsafe extern "C" fn my_longjmp(_buf: *const JmpBuf, _val: i32) -> ! {
+    std::arch::naked_asm!(
+        "mov rdi, [rcx + 0]",
+        "mov rsi, [rcx + 8]",
+        "mov rbx, [rcx + 16]",
+        "mov rbp, [rcx + 24]",
+        "mov r12, [rcx + 32]",
+        "mov r13, [rcx + 40]",
+        "mov r14, [rcx + 48]",
+        "mov r15, [rcx + 56]",
+        "mov rsp, [rcx + 64]",
+        "mov eax, edx",
+        "jmp qword ptr [rcx + 72]"
+    );
 }

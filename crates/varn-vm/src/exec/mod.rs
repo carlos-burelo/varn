@@ -37,3 +37,15 @@ pub enum VmSuspend {
         dest_reg: u16,
     },
 }
+
+#[derive(Debug, Clone)]
+pub enum JitPanic {
+    Exception {
+        handler: Option<crate::frame::TryHandler>,
+        error: VmValue,
+        err_obj: Option<crate::error::RuntimeError>,
+    },
+    Suspend {
+        resume_ip: usize,
+    },
+}

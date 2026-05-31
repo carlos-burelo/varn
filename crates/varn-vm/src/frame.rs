@@ -220,6 +220,11 @@ impl VmClosure {
             call_spread: crate::exec::ctx::jit_call_spread as usize,
             load_module_by_idx: crate::exec::ctx::jit_load_module_by_idx as usize,
             invoke_virtual: crate::exec::ctx::jit_invoke_virtual as usize,
+            try_push: crate::exec::ctx::jit_push_try as usize,
+            try_pop: crate::exec::ctx::jit_pop_try as usize,
+            throw: crate::exec::ctx::jit_throw as usize,
+            await_helper: crate::exec::ctx::jit_await as usize,
+            yield_helper: crate::exec::ctx::jit_yield as usize,
         };
         match varn_jit::compile(&self.proto, helpers) {
             Ok((entry, code)) => {
@@ -296,6 +301,7 @@ impl CallFrame {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct TryHandler {
     pub catch_ip: usize,
     pub frame_depth: usize,
