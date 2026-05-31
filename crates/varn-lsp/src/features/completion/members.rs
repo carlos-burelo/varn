@@ -148,7 +148,7 @@ pub fn dot_receiver(
                 return Some(ReceiverInfo::Anonymous(recs));
             }
             varn_core::TypeKind::Intrinsic(tag) => {
-                if tag.is_primitive() || *tag == varn_core::TypeTag::Array {
+                if tag.is_primitive() || tag == &varn_core::TypeTag::Array {
                     return Some(ReceiverInfo::Named(tag.name().to_owned(), true));
                 }
             }
@@ -365,7 +365,7 @@ pub fn pattern_receiver(state: &DocumentState, line: u32, col: u32) -> Option<Re
                 return Some(ReceiverInfo::Anonymous(recs));
             }
             varn_core::TypeKind::Intrinsic(tag) => {
-                if tag.is_primitive() || *tag == varn_core::TypeTag::Array {
+                if tag.is_primitive() || tag == &varn_core::TypeTag::Array {
                     return Some(ReceiverInfo::Named(tag.name().to_owned(), true));
                 }
             }
