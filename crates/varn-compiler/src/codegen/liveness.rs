@@ -31,7 +31,10 @@ impl LivenessAnalyzer {
 
         for (idx, instr) in module.instrs.iter().enumerate() {
             if !instr.dest.is_none() {
-                self.def_sites.insert(instr.dest.0, idx);
+                self.def_sites
+                    .entry(instr.dest.0)
+                    .and_modify(|existing| *existing = (*existing).min(idx))
+                    .or_insert(idx);
             }
             if !instr.src1.is_none() {
                 self.use_sites
@@ -101,7 +104,10 @@ impl LivenessAnalyzer {
     }
 
     pub fn record_def(&mut self, vreg: u16, instr_idx: usize) {
-        self.def_sites.insert(vreg, instr_idx);
+        self.def_sites
+            .entry(vreg)
+            .and_modify(|existing| *existing = (*existing).min(instr_idx))
+            .or_insert(instr_idx);
     }
 
     pub fn record_use(&mut self, vreg: u16, instr_idx: usize) {

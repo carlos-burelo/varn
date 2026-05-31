@@ -32,6 +32,9 @@ fn emit_load_upvalue(ctx: &mut CodegenCtx) {
     let dest = (w1 >> 8) as usize;
     let uv = (w1 & 0xFF) as usize;
 
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
+
     asm.push(ARG_CTX);
     asm.push(ARG_CLOSURE);
     asm.push(ARG_BASE);
@@ -78,6 +81,9 @@ fn emit_store_upvalue(ctx: &mut CodegenCtx) {
     *ip += 1;
     let uv = (w1 >> 8) as usize;
     let src = (w1 & 0xFF) as usize;
+
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
 
     emit_load(asm, Reg::Rax, src, regmap);
 
@@ -129,6 +135,9 @@ fn emit_make_closure(ctx: &mut CodegenCtx) {
     *ip += uv_count;
 
     emit_flush_all(asm, regmap);
+
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
 
     asm.push(ARG_CTX);
     asm.push(ARG_CLOSURE);

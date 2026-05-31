@@ -176,6 +176,48 @@ impl RegMap {
                     *freq.entry(first_reg).or_insert(0) += 3;
                     ip += 2;
                 }
+                OpCode::AssertNotNull
+                | OpCode::CloseUpvalue
+                | OpCode::GetEnumTag
+                | OpCode::IsArray
+                | OpCode::WrapSpread
+                | OpCode::ObjectKeys
+                | OpCode::ObjectMerge
+                | OpCode::In
+                | OpCode::GetSuper
+                | OpCode::Inherit
+                | OpCode::LoadModule => {
+                    ip += 1;
+                }
+                OpCode::GetFixedField
+                | OpCode::SetFixedField
+                | OpCode::GetPropertyMaybe
+                | OpCode::GetSymbol
+                | OpCode::BindMethod
+                | OpCode::DefineGlobal
+                | OpCode::StoreGlobal
+                | OpCode::DeclareField
+                | OpCode::MakeClass
+                | OpCode::Method
+                | OpCode::DefineStatic
+                | OpCode::DefineGetter
+                | OpCode::DefineSetter
+                | OpCode::DefineStaticGetter
+                | OpCode::DefineStaticSetter
+                | OpCode::MakeEnumVariant
+                | OpCode::CallSpread => {
+                    ip += 2;
+                }
+                OpCode::BuildObject => {
+                    let w1 = code[ip];
+                    let count = (w1 & 0xFF) as usize;
+                    ip += 1 + count * 2;
+                }
+                OpCode::ObjectRest => {
+                    let w2 = code[ip + 1];
+                    let skip_count = (w2 >> 8) as usize;
+                    ip += 2 + skip_count;
+                }
                 _ => break,
             }
         }
@@ -221,12 +263,20 @@ pub fn emit_prologue(asm: &mut Assembler, regmap: &RegMap) {
     for &phys in &regmap.used_phys {
         asm.push(phys);
     }
+
+    // Save closure pointer to avoid clobbering by helper/native calls
+    asm.push(crate::registers::ARG_CLOSURE);
+    asm.push(Reg::Rax); // Dummy register to maintain 16-byte stack alignment
 }
 
 pub fn emit_epilogue(asm: &mut Assembler, regmap: &RegMap) {
     for (&vreg, &phys) in &regmap.map {
         emit_store_phys_to_mem(asm, phys, vreg);
     }
+
+    // Restore dummy and closure pointer
+    asm.pop(Reg::Rax);
+    asm.pop(crate::registers::ARG_CLOSURE);
 
     for &phys in regmap.used_phys.iter().rev() {
         asm.pop(phys);

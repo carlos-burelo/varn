@@ -137,7 +137,7 @@ impl ExecCtx {
         Ok(result)
     }
 
-    pub(in crate::exec::dispatch) fn exec_object_rest(
+    pub(crate) fn exec_object_rest(
         &mut self,
         obj: VmValue,
         skip_keys: &[Rc<str>],

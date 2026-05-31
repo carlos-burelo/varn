@@ -92,24 +92,31 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             | OpCode::AssertNotNull
             | OpCode::WrapSpread
             | OpCode::ArrayLength
-            | OpCode::ArrayPop
             | OpCode::StrLength
             | OpCode::GetEnumTag
             | OpCode::Await => {
                 let w1 = w!();
-                format!("r{} = r{}", hi(w1), lo(w1))
+                format!("r{} = r{}", hi(op_val), hi(w1))
+            }
+            OpCode::ArrayPop => {
+                let w1 = w!();
+                format!("r{} = r{}[].pop()", hi(op_val), hi(w1))
             }
             OpCode::ArrayPush => {
                 let w1 = w!();
-                format!("r{}[].push r{}", hi(w1), lo(w1))
+                format!("r{}[].push r{}", hi(op_val), hi(w1))
             }
             OpCode::LoadUpvalue | OpCode::StoreUpvalue | OpCode::CloseUpvalue => {
                 let w1 = w!();
                 format!("r{} uv={}", hi(w1), lo(w1))
             }
-            OpCode::Return | OpCode::Throw | OpCode::StoreModuleSlot | OpCode::Yield => {
+            OpCode::Return | OpCode::Throw | OpCode::Yield => {
                 let w1 = w!();
                 format!("r{}", lo(w1))
+            }
+            OpCode::StoreModuleSlot => {
+                let slot_idx = w!();
+                format!("r{} slot[{}]", hi(op_val), slot_idx)
             }
             OpCode::PopTry => String::new(),
             OpCode::Nop => String::new(),
@@ -154,51 +161,48 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             | OpCode::EqFloat
             | OpCode::NeqFloat => {
                 let w1 = w!();
-                let w2 = w!();
-                format!("r{} = r{} op r{}", hi(w1), lo(w1), hi(w2))
+                format!("r{} = r{} op r{}", hi(op_val), hi(w1), lo(w1))
             }
             OpCode::StrSlice => {
                 let w1 = w!();
-                let w2 = w!();
-                format!("r{} = r{}[r{}..r{}]", hi(w1), lo(w1), hi(w2), lo(w2))
+                format!("r{} = r{}[r{}]", hi(op_val), hi(w1), lo(w1))
             }
             OpCode::In | OpCode::Instanceof => {
                 let w1 = w!();
-                let w2 = w!();
-                format!("r{} = r{} in r{}", hi(w1), lo(w1), hi(w2))
+                let op_str = if matches!(op, OpCode::In) { "in" } else { "instanceof" };
+                format!("r{} = r{} {} r{}", hi(op_val), hi(w1), lo(w1), op_str)
             }
             OpCode::ArrayExtend => {
                 let w1 = w!();
-                let w2 = w!();
-                format!("r{}[].extend r{}", hi(w1), hi(w2))
+                format!("r{}[].extend r{}", hi(op_val), hi(w1))
             }
             OpCode::ObjectKeys => {
                 let w1 = w!();
-                let w2 = w!();
-                format!("r{} = keys(r{})", hi(w1), lo(w2))
+                format!("r{} = keys(r{})", hi(op_val), hi(w1))
             }
             OpCode::ObjectMerge => {
                 let w1 = w!();
                 format!("r{} |= r{}", hi(w1), lo(w1))
             }
-            OpCode::GetIndex | OpCode::SetIndex => {
+            OpCode::GetIndex => {
                 let w1 = w!();
-                let w2 = w!();
-                format!("r{}[r{}] = r{}", hi(w1), lo(w1), hi(w2))
+                format!("r{} = r{}[r{}]", hi(op_val), hi(w1), lo(w1))
+            }
+            OpCode::SetIndex => {
+                let w1 = w!();
+                format!("r{}[r{}] = r{}", hi(op_val), hi(w1), lo(w1))
             }
 
             OpCode::LoadConst => {
-                let w1 = w!();
                 let idx = w!();
                 if let Some(c) = proto.chunk.constants.get(idx as usize) {
                     hint = format!("{:?}", c);
                 }
-                format!("r{} = const[{}]", hi(w1), idx)
+                format!("r{} = const[{}]", hi(op_val), idx)
             }
             OpCode::LoadInt => {
-                let w1 = w!();
                 let val = w!() as i16;
-                format!("r{} = {}", hi(w1), val)
+                format!("r{} = {}", hi(op_val), val)
             }
 
             OpCode::LoadIntZero => format!("r{} = 0", hi(op_val)),
@@ -206,12 +210,11 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             OpCode::LoadIntMinusOne => format!("r{} = -1", hi(op_val)),
 
             OpCode::LoadGlobal | OpCode::LoadGlobalIdx => {
-                let w1 = w!();
                 let idx = w!();
                 if let Some(c) = proto.chunk.constants.get(idx as usize) {
                     hint = format!("{:?}", c);
                 }
-                format!("r{} = global[{}]", hi(w1), idx)
+                format!("r{} = global[{}]", hi(op_val), idx)
             }
             OpCode::StoreGlobal | OpCode::StoreGlobalIdx => {
                 let w1 = w!();
@@ -219,7 +222,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 if let Some(c) = proto.chunk.constants.get(idx as usize) {
                     hint = format!("{:?}", c);
                 }
-                format!("global[{}] = r{}", idx, lo(w1))
+                format!("global[{}] = r{}", idx, hi(w1))
             }
             OpCode::DefineGlobal | OpCode::DefineGlobalIdx => {
                 let w1 = w!();
@@ -227,7 +230,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 if let Some(c) = proto.chunk.constants.get(idx as usize) {
                     hint = format!("{:?}", c);
                 }
-                format!("def global[{}] = r{}", idx, lo(w1))
+                format!("def global[{}] = r{}", idx, hi(w1))
             }
 
             OpCode::Jump | OpCode::Loop => {
@@ -343,7 +346,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             OpCode::BuildArray => {
                 let w1 = w!();
                 let w2 = w!();
-                format!("r{} = [r{}..+{}]", hi(w1), lo(w1), lo(w2))
+                format!("r{} = [r{}..+{}]", hi(w1), lo(w1), hi(w2))
             }
             OpCode::BuildObject => {
                 let w1 = w!();
@@ -364,7 +367,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             OpCode::ObjectRest => {
                 let w1 = w!();
                 let w2 = w!();
-                let skip = lo(w2) as usize;
+                let skip = hi(w2) as usize;
                 for _ in 0..skip {
                     let _ = w!();
                 }
@@ -460,11 +463,13 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             OpCode::InvokeRuntimeStatic => {
                 let w1 = w!();
                 let fn_idx = w!();
-                let arg_count = lo(w1);
-                for _ in 0..arg_count {
-                    let _ = w!();
+                let w3 = w!();
+                let _w4 = w!();
+                let arg_count = hi(w3);
+                if let Some(c) = proto.chunk.constants.get(fn_idx as usize) {
+                    hint = format!("{:?}", c);
                 }
-                format!("r{} = runtime[{}]({} args)", hi(w1), fn_idx, arg_count)
+                format!("r{} = runtime[{}]({} args @ r{})", hi(w1), fn_idx, arg_count, lo(w3))
             }
 
             OpCode::AddImm | OpCode::SubImm => {

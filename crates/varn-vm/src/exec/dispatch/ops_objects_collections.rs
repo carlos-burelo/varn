@@ -363,7 +363,11 @@ impl ExecCtx {
                 let src = hi(code[*ip]);
                 *ip += 1;
                 let v = self.stack[base + src];
-                self.stack[base + first_reg] = VmValue::from_bool(v.is_null());
+                let res = VmValue::from_bool(v.is_null());
+                if std::env::var("VARN_JIT_DEBUG").is_ok() {
+                    eprintln!("DEBUG INTERP IsNull: src_val={:?}, res={:?}", v, res);
+                }
+                self.stack[base + first_reg] = res;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::IsArray => {

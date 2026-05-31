@@ -23,6 +23,9 @@ pub(crate) fn emit_build_object(ctx: &mut CodegenCtx, _first_reg: usize) {
 
     emit_flush_all(asm, regmap);
 
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
+
     asm.push(ARG_CTX);
     asm.push(ARG_CLOSURE);
     asm.push(ARG_BASE);
@@ -79,6 +82,9 @@ pub(crate) fn emit_object_rest(ctx: &mut CodegenCtx, _first_reg: usize) {
     *ip += skip_count; // skip the key indices
 
     emit_flush_all(asm, regmap);
+
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
 
     asm.push(ARG_CTX);
     asm.push(ARG_CLOSURE);

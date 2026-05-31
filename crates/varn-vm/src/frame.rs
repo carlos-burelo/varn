@@ -39,8 +39,20 @@ impl VmUpvalue {
     pub fn read(&self, stack: &[VmValue]) -> VmValue {
         let g = self.inner.borrow_mut();
         match g.stack_slot {
-            Some(slot) => stack[slot],
-            None => g.value,
+            Some(slot) => {
+                let v = stack[slot];
+                if std::env::var("VARN_JIT_DEBUG").is_ok() {
+                    eprintln!("DEBUG: reading open upvalue at slot {}, value={:?}", slot, v);
+                }
+                v
+            }
+            None => {
+                let v = g.value;
+                if std::env::var("VARN_JIT_DEBUG").is_ok() {
+                    eprintln!("DEBUG: reading closed upvalue, value={:?}", v);
+                }
+                v
+            }
         }
     }
 
@@ -112,6 +124,10 @@ impl VmClosure {
     }
 
     pub fn compile_jit(&mut self) {
+        if self.proto.name.as_deref() == Some("<module>") {
+            self.proto.jit_failed.set(true);
+            return;
+        }
         if self.proto.jit_failed.get() {
             return;
         }
@@ -204,6 +220,9 @@ impl VmClosure {
         };
         match varn_jit::compile(&self.proto, helpers) {
             Ok((entry, code)) => {
+                if std::env::var("VARN_JIT_DEBUG").is_ok() {
+                    eprintln!("JIT compilation succeeded for '{}'", self.proto.name.as_deref().unwrap_or("<anonymous>"));
+                }
                 self.jit_entry = Some(entry);
                 self.jit_code = Some(code.clone());
 
@@ -215,8 +234,9 @@ impl VmClosure {
                 self.proto.jit_failed.set(true);
                 if std::env::var("VARN_JIT_DEBUG").is_ok() {
                     eprintln!(
-                        "JIT compilation failed for '{}': {}",
+                        "JIT compilation failed for '{}' file={:?}: {}",
                         self.proto.name.as_deref().unwrap_or("<anonymous>"),
+                        &*self.proto.chunk.source_file,
                         e
                     );
                 }

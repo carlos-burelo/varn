@@ -61,7 +61,8 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
     let lo2 = (w2 & 0xff) as u8;
     let hi3 = (w3 >> 8) as u8;
     let lo3 = (w3 & 0xff) as u8;
-    let _hi4 = (w4 >> 8) as u8;
+    let hi4 = (w4 >> 8) as u8;
+    let _lo4 = (w4 & 0xff) as u8;
 
     let s = InstrInfo::simple;
     let info = match op {
@@ -164,6 +165,8 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
 
         OpCode::SetIndex => s(2, None, vec![dest0, hi1, lo1]),
 
+        OpCode::ObjectMerge => s(2, Some(dest0), vec![hi1]),
+
         OpCode::ObjectRest => {
             let skip_count = hi2 as usize;
             s(3 + skip_count, Some(hi1), vec![lo1])
@@ -227,9 +230,9 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
 
         OpCode::MakeClass => s(3, Some(dest0), vec![hi1]),
 
-        OpCode::Spawn => InstrInfo::opaque(1),
+        OpCode::Spawn => s(2, Some(hi1), vec![lo1]),
 
-        OpCode::DeclareField => InstrInfo::opaque(1),
+        OpCode::DeclareField => s(3, None, vec![hi1]),
 
         OpCode::ArrayExtend => s(2, Some(dest0), vec![hi1]),
 
@@ -237,9 +240,15 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
 
         OpCode::JumpIfFalse | OpCode::JumpIfTrue => s(3, None, vec![dest0]),
 
-        OpCode::Try => InstrInfo::opaque(4),
+        OpCode::Try => s(4, Some(hi1), vec![]),
 
-        OpCode::InvokeRuntimeStatic => InstrInfo::opaque(5),
+        OpCode::InvokeRuntimeStatic => InstrInfo {
+            len: 5,
+            def: Some(hi1),
+            uses: vec![lo3, hi4],
+            call_args: None,
+            opaque: false,
+        },
 
         OpCode::GetProperty | OpCode::GetPropertyMaybe => s(3, Some(dest0), vec![hi1]),
 
@@ -258,11 +267,29 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
         | OpCode::DefineGetter
         | OpCode::DefineSetter
         | OpCode::DefineStaticGetter
-        | OpCode::DefineStaticSetter => InstrInfo::opaque(3),
+        | OpCode::DefineStaticSetter => s(3, None, vec![hi1, lo1]),
 
         OpCode::MakeEnumVariant => s(3, Some(hi1), vec![lo1]),
 
-        OpCode::Call | OpCode::CallSpread | OpCode::InvokeVirtual => {
+        OpCode::InvokeVirtual => {
+            let dest = hi1;
+            let this_reg = lo1;
+            let argc = hi3;
+            let arg_start = lo3;
+            let mut uses = vec![this_reg];
+            for i in 0..argc {
+                uses.push(arg_start.wrapping_add(i));
+            }
+            InstrInfo {
+                len: 4,
+                def: Some(dest),
+                uses,
+                call_args: Some((arg_start, argc)),
+                opaque: false,
+            }
+        }
+
+        OpCode::Call | OpCode::CallSpread => {
             let dest = hi1;
             let fn_reg = lo1;
             let argc = hi2;
@@ -310,8 +337,6 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
                 opaque: false,
             }
         }
-
-        _ => InstrInfo::opaque(1),
     };
 
     Some(info)
@@ -454,7 +479,8 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
             let lo2 = (w2 & 0xff) as u8;
             let hi3 = (w3 >> 8) as u8;
             let lo3 = (w3 & 0xff) as u8;
-            let _hi4 = (w4 >> 8) as u8;
+            let hi4 = (w4 >> 8) as u8;
+            let lo4 = (w4 & 0xff) as u8;
 
             #[inline(always)]
             fn pack(a: u8, b: u8) -> u16 {
@@ -523,7 +549,8 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                     code[offset + 1] = pack(m(mapping, hi1), lo1);
                 }
                 OpCode::ObjectMerge => {
-                    code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    code[offset + 1] = pack(m(mapping, hi1), 0);
                 }
 
                 OpCode::Jump | OpCode::Loop => {}
@@ -600,6 +627,14 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), 0);
                 }
+                OpCode::Spawn => {
+                    code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
+                }
+                OpCode::InvokeRuntimeStatic => {
+                    code[offset + 1] = pack(m(mapping, hi1), 0);
+                    code[offset + 3] = pack(hi3, m(mapping, lo3));
+                    code[offset + 4] = pack(m(mapping, hi4), lo4);
+                }
 
                 OpCode::GetPropertyMaybe
                 | OpCode::GetFixedField
@@ -660,9 +695,9 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                 }
 
                 OpCode::InvokeVirtual => {
-                    let arg_start = lo2;
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
-                    code[offset + 3] = pack(hi2, m(mapping, arg_start));
+                    // word 2 is the name constant index — not a register, leave untouched
+                    code[offset + 3] = pack(hi3, m(mapping, lo3));
                 }
 
                 OpCode::CallMethod => {

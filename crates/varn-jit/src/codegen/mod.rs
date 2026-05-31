@@ -25,6 +25,7 @@ pub(crate) use jumps::emit_jumps;
 pub(crate) use modules::emit_modules;
 pub(crate) use properties::emit_properties;
 pub(crate) use strings::emit_strings;
+pub(crate) use misc::emit_misc_ops;
 
 use crate::assembler::Assembler;
 use crate::regalloc::RegMap;

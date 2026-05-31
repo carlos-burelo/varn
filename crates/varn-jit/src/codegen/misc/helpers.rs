@@ -614,6 +614,9 @@ pub(crate) fn emit_load_module(ctx: &mut CodegenCtx, first_reg: usize) {
 
     emit_flush_all(asm, regmap);
 
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
+
     asm.push(ARG_CTX);
     asm.push(ARG_CLOSURE);
     asm.push(ARG_BASE);
@@ -627,7 +630,7 @@ pub(crate) fn emit_load_module(ctx: &mut CodegenCtx, first_reg: usize) {
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    asm.mov_reg_imm64(ARG_CLOSURE, spec_idx as u64);
+    asm.mov_reg_imm64(ARG_BASE, spec_idx as u64);
     asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
 
     asm.mov_reg_imm64(Reg::R10, helpers.load_module_by_idx as u64);

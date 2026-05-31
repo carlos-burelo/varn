@@ -112,6 +112,9 @@ fn emit_call_method(ctx: &mut CodegenCtx, first_reg: usize) {
 
     emit_load(asm, Reg::Rax, obj_reg, regmap);
 
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
+
     asm.push(ARG_CTX);
     asm.push(ARG_CLOSURE);
     asm.push(ARG_BASE);
