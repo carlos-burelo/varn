@@ -9,7 +9,7 @@ use crate::safepoint::emit_load_reg;
 use crate::codegen::{
     emit_arith, emit_arrays, emit_calls, emit_closures, emit_compare, emit_globals,
     emit_immediates, emit_indexing, emit_jumps, emit_modules, emit_properties, emit_strings,
-    CodegenCtx,
+    emit_misc_ops, CodegenCtx,
 };
 
 pub fn compile_proto(
@@ -162,6 +162,48 @@ pub fn compile_proto(
                     }
                 }
             }
+            OpCode::AssertNotNull
+            | OpCode::CloseUpvalue
+            | OpCode::GetEnumTag
+            | OpCode::IsArray
+            | OpCode::WrapSpread
+            | OpCode::ObjectKeys
+            | OpCode::ObjectMerge
+            | OpCode::In
+            | OpCode::GetSuper
+            | OpCode::Inherit
+            | OpCode::LoadModule => {
+                ip += 1;
+            }
+            OpCode::GetFixedField
+            | OpCode::SetFixedField
+            | OpCode::GetPropertyMaybe
+            | OpCode::GetSymbol
+            | OpCode::BindMethod
+            | OpCode::DefineGlobal
+            | OpCode::StoreGlobal
+            | OpCode::DeclareField
+            | OpCode::MakeClass
+            | OpCode::Method
+            | OpCode::DefineStatic
+            | OpCode::DefineGetter
+            | OpCode::DefineSetter
+            | OpCode::DefineStaticGetter
+            | OpCode::DefineStaticSetter
+            | OpCode::MakeEnumVariant
+            | OpCode::CallSpread => {
+                ip += 2;
+            }
+            OpCode::BuildObject => {
+                let w1 = code[ip];
+                let count = (w1 & 0xFF) as usize;
+                ip += 1 + count * 2;
+            }
+            OpCode::ObjectRest => {
+                let w2 = code[ip + 1];
+                let skip_count = (w2 >> 8) as usize;
+                ip += 2 + skip_count;
+            }
             _ => {
                 return Err(format!(
                     "JIT Bailout: Opcode '{:?}' is not supported in the JIT compiler",
@@ -203,7 +245,6 @@ pub fn compile_proto(
         cctx.ip += 1;
         let first_reg = (raw_op >> 8) as usize;
         let op = OpCode::from_u8(raw_op as u8).unwrap();
-
         match op {
             OpCode::LoadNull
             | OpCode::LoadTrue
@@ -297,6 +338,37 @@ pub fn compile_proto(
             OpCode::LoadModuleSlot | OpCode::BuildObjectWithShape | OpCode::InvokeRuntimeStatic => {
                 emit_modules(&mut cctx, op, first_reg)?
             }
+
+            OpCode::AssertNotNull
+            | OpCode::CloseUpvalue
+            | OpCode::GetEnumTag
+            | OpCode::IsArray
+            | OpCode::WrapSpread
+            | OpCode::ObjectKeys
+            | OpCode::ObjectMerge
+            | OpCode::In
+            | OpCode::GetFixedField
+            | OpCode::SetFixedField
+            | OpCode::GetPropertyMaybe
+            | OpCode::GetSuper
+            | OpCode::GetSymbol
+            | OpCode::BindMethod
+            | OpCode::DefineGlobal
+            | OpCode::StoreGlobal
+            | OpCode::DeclareField
+            | OpCode::MakeClass
+            | OpCode::Inherit
+            | OpCode::Method
+            | OpCode::DefineStatic
+            | OpCode::DefineGetter
+            | OpCode::DefineSetter
+            | OpCode::DefineStaticGetter
+            | OpCode::DefineStaticSetter
+            | OpCode::BuildObject
+            | OpCode::ObjectRest
+            | OpCode::MakeEnumVariant
+            | OpCode::CallSpread
+            | OpCode::LoadModule => emit_misc_ops(&mut cctx, op, first_reg)?,
 
             _ => unreachable!(),
         }

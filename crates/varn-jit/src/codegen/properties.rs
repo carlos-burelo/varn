@@ -39,6 +39,9 @@ fn emit_get_property(ctx: &mut CodegenCtx, first_reg: usize) {
 
     emit_load(asm, Reg::Rax, obj_reg, regmap);
 
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
+
     asm.push(ARG_CTX);
     asm.push(ARG_CLOSURE);
     asm.push(ARG_BASE);
@@ -110,6 +113,9 @@ fn emit_set_property(ctx: &mut CodegenCtx, first_reg: usize) {
 
     emit_load(asm, Reg::Rax, obj_reg, regmap);
     emit_load(asm, Reg::R11, val_reg, regmap);
+
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
 
     asm.push(ARG_CTX);
     asm.push(ARG_CLOSURE);

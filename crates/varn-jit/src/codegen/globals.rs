@@ -1,7 +1,9 @@
 use varn_core::OpCode;
 
 use crate::assembler::Reg;
-use crate::regalloc::{emit_load, emit_store};
+use crate::regalloc::{
+    emit_flush_all, emit_load, emit_reload_all, emit_reload_all_except, emit_store,
+};
 use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
 
 use super::CodegenCtx;
@@ -22,14 +24,42 @@ pub(crate) fn emit_globals(
             let idx = code[*ip] as usize;
             *ip += 1;
 
-            use crate::registers::ARG_EXEC_CTX;
+            emit_flush_all(asm, regmap);
 
-            // R11 = ctx.globals.values.as_ptr() (offset 56 inside ExecCtx)
-            asm.mov_reg_mem(Reg::R11, ARG_EXEC_CTX, 56);
-            // Load the value: values_ptr[idx]
-            asm.mov_reg_mem(Reg::R11, Reg::R11, (idx * 8) as i32);
+            asm.push(ARG_CTX);
+            asm.push(ARG_CLOSURE);
+            asm.push(ARG_BASE);
+            asm.push(ARG_EXEC_CTX);
+
+            let need_dummy = regmap.used_phys.len() % 2 != 0;
+            if need_dummy {
+                asm.push(Reg::Rax);
+            }
+
+            #[cfg(target_os = "windows")]
+            asm.add_reg_imm8(Reg::Rsp, -32);
+
+            asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+            asm.mov_reg_imm64(ARG_CLOSURE, idx as u64);
+
+            asm.mov_reg_imm64(Reg::R10, helpers.load_global_idx as u64);
+            asm.call_reg(Reg::R10);
+
+            #[cfg(target_os = "windows")]
+            asm.add_reg_imm8(Reg::Rsp, 32);
+
+            asm.mov_reg_reg(Reg::R11, Reg::Rax);
+
+            if need_dummy {
+                asm.pop(Reg::Rax);
+            }
+            asm.pop(ARG_EXEC_CTX);
+            asm.pop(ARG_BASE);
+            asm.pop(ARG_CLOSURE);
+            asm.pop(ARG_CTX);
 
             emit_store(asm, Reg::R11, first_reg, regmap);
+            emit_reload_all_except(asm, regmap, Some(first_reg));
         }
         OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx => {
             let w1 = code[*ip];
@@ -38,18 +68,54 @@ pub(crate) fn emit_globals(
             let idx = code[*ip] as usize;
             *ip += 1;
 
-            use crate::registers::ARG_EXEC_CTX;
-
-            // Load source value into Rax
+            emit_flush_all(asm, regmap);
             emit_load(asm, Reg::Rax, src, regmap);
-            // R11 = values.as_ptr()
-            asm.mov_reg_mem(Reg::R11, ARG_EXEC_CTX, 56);
-            // Store value: values_ptr[idx] = Rax
-            asm.mov_mem_reg(Reg::R11, (idx * 8) as i32, Reg::Rax);
+
+            asm.push(ARG_CTX);
+            asm.push(ARG_CLOSURE);
+            asm.push(ARG_BASE);
+            asm.push(ARG_EXEC_CTX);
+
+            let need_dummy = regmap.used_phys.len() % 2 != 0;
+            if need_dummy {
+                asm.push(Reg::Rax);
+            }
+
+            #[cfg(target_os = "windows")]
+            asm.add_reg_imm8(Reg::Rsp, -32);
+
+            asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+            asm.mov_reg_imm64(ARG_CLOSURE, idx as u64);
+            asm.mov_reg_reg(ARG_BASE, Reg::Rax);
+
+            let helper_addr = if op == OpCode::StoreGlobalIdx {
+                helpers.store_global_idx
+            } else {
+                helpers.define_global_idx
+            };
+
+            asm.mov_reg_imm64(Reg::R10, helper_addr as u64);
+            asm.call_reg(Reg::R10);
+
+            #[cfg(target_os = "windows")]
+            asm.add_reg_imm8(Reg::Rsp, 32);
+
+            if need_dummy {
+                asm.pop(Reg::Rax);
+            }
+            asm.pop(ARG_EXEC_CTX);
+            asm.pop(ARG_BASE);
+            asm.pop(ARG_CLOSURE);
+            asm.pop(ARG_CTX);
+
+            emit_reload_all(asm, regmap);
         }
         OpCode::LoadGlobal => {
             let idx = code[*ip] as usize;
             *ip += 1;
+
+            // Reload closure pointer from saved stack slot
+            asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
 
             asm.push(ARG_CTX);
             asm.push(ARG_CLOSURE);
@@ -89,3 +155,4 @@ pub(crate) fn emit_globals(
     }
     Ok(())
 }
+

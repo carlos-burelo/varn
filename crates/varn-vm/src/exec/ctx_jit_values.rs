@@ -116,10 +116,8 @@ pub extern "C" fn jit_load_global(
         let closure_ref = &*closure;
         let name_nv = closure_ref.constants[name_idx];
         let name = ctx_ref.heap.str_val(name_nv).unwrap();
-        ctx_ref
-            .globals
-            .get_by_name(&name)
-            .unwrap_or(VmValue::null())
+        let result = ctx_ref.globals.get_by_name(&name).unwrap_or(VmValue::null());
+        result
     }
 }
 
@@ -173,13 +171,14 @@ pub extern "C" fn jit_make_closure(
         };
 
         let mut upvalues = Vec::with_capacity(uv_count);
-        for _ in 0..uv_count {
+        for uv_i in 0..uv_count {
             let uv_desc = code[ip];
             ip += 1;
             let is_local = (uv_desc >> 8) != 0;
             let index = (uv_desc & 0xFF) as usize;
             if is_local {
-                upvalues.push(ctx_ref.capture_upvalue(base + index));
+                let slot = base + index;
+                upvalues.push(ctx_ref.capture_upvalue(slot));
             } else {
                 upvalues.push(closure_ref.upvalues[index].clone());
             }

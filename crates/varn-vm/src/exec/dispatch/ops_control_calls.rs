@@ -40,7 +40,11 @@ impl ExecCtx {
             OpCode::JumpIfFalse => {
                 let offset = ((code[*ip] as u32) << 16 | code[*ip + 1] as u32) as usize;
                 *ip += 2;
-                if !self.stack[base + first_reg].is_truthy() {
+                let cond = self.stack[base + first_reg];
+                if std::env::var("VARN_JIT_DEBUG").is_ok() {
+                    eprintln!("DEBUG INTERP JumpIfFalse: cond={:?}, is_truthy={}", cond, cond.is_truthy());
+                }
+                if !cond.is_truthy() {
                     *ip += offset;
                 }
                 Ok(Some(ControlCallFlow::ContinueInstruction))
@@ -48,7 +52,11 @@ impl ExecCtx {
             OpCode::JumpIfTrue => {
                 let offset = ((code[*ip] as u32) << 16 | code[*ip + 1] as u32) as usize;
                 *ip += 2;
-                if self.stack[base + first_reg].is_truthy() {
+                let cond = self.stack[base + first_reg];
+                if std::env::var("VARN_JIT_DEBUG").is_ok() {
+                    eprintln!("DEBUG INTERP JumpIfTrue: cond={:?}, is_truthy={}", cond, cond.is_truthy());
+                }
+                if cond.is_truthy() {
                     *ip += offset;
                 }
                 Ok(Some(ControlCallFlow::ContinueInstruction))

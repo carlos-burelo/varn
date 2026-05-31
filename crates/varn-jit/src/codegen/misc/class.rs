@@ -21,6 +21,9 @@ pub(crate) fn emit_declare_field(ctx: &mut CodegenCtx, _first_reg: usize) {
     emit_flush_all(asm, regmap);
     emit_load(asm, Reg::Rax, obj_reg, regmap);
 
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
+
     asm.push(ARG_CTX);
     asm.push(ARG_CLOSURE);
     asm.push(ARG_BASE);
@@ -78,6 +81,9 @@ pub(crate) fn emit_make_class(ctx: &mut CodegenCtx, first_reg: usize) {
         asm.mov_reg_imm64(Reg::Rax, NULL_BITS);
     }
 
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
+
     asm.push(ARG_CTX);
     asm.push(ARG_CLOSURE);
     asm.push(ARG_BASE);
@@ -132,6 +138,9 @@ pub(crate) fn emit_inherit(ctx: &mut CodegenCtx, _first_reg: usize) {
     emit_flush_all(asm, regmap);
     emit_load(asm, Reg::Rax, class_reg, regmap);
     emit_load(asm, Reg::R11, super_reg, regmap);
+
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
 
     asm.push(ARG_CTX);
     asm.push(ARG_CLOSURE);
@@ -193,6 +202,9 @@ pub(crate) fn emit_class_member_op(ctx: &mut CodegenCtx, _first_reg: usize, kind
     emit_flush_all(asm, regmap);
     emit_load(asm, Reg::Rax, class_reg, regmap);
     emit_load(asm, Reg::R11, fn_reg, regmap);
+
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
 
     asm.push(ARG_CTX);
     asm.push(ARG_CLOSURE);

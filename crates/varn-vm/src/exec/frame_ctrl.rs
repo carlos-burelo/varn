@@ -145,24 +145,7 @@ impl ExecCtx {
             }
             PreparedCall::PushValue(nv) => {
                 self.stack.pop();
-
-                let final_nv = if nv.is_heap() {
-                    if let Some(crate::heap::HeapObj::Task(lazy)) = self.heap.get(nv.as_heap_idx())
-                    {
-                        let lazy = lazy.clone();
-                        let handle = self.run_lazy_task_sync(lazy.as_ref());
-                        let resolved = match handle.peek_state() {
-                            varn_types::task::TaskState::Resolved(v) => v,
-                            _ => varn_types::Value::Null,
-                        };
-                        self.heap.intern(resolved)
-                    } else {
-                        nv
-                    }
-                } else {
-                    nv
-                };
-                self.push(final_nv);
+                self.push(nv);
             }
         }
         Ok(())
@@ -416,12 +399,6 @@ impl NativeCtx for ExecCtx {
                     m.exports.push(val);
                     m.export_map.insert(std::rc::Rc::from(key), slot);
                 }
-            } else {
-                eprintln!(
-                    "[set_field] MISS key={key} obj_heap_idx={} is_heap={}",
-                    obj.as_heap_idx(),
-                    obj.is_heap()
-                );
             }
         }
     }
@@ -579,8 +556,15 @@ impl ExecCtx {
         callee: varn_types::Value,
         args: &[varn_types::Value],
     ) -> Result<varn_types::Value, String> {
-        if args.is_empty() {
-            return self.start_task_internal(callee);
+        match callee {
+            varn_types::Value::Task(t) => {
+                let handle = self.run_lazy_task_sync(t.as_ref());
+                return Ok(varn_types::Value::TaskHandle(handle));
+            }
+            varn_types::Value::TaskHandle(f) => {
+                return Ok(varn_types::Value::TaskHandle(f));
+            }
+            _ => {}
         }
         let callee_nv = self.heap.intern(callee);
         let arg_nvs: Vec<_> = args.iter().cloned().map(|a| self.heap.intern(a)).collect();
@@ -597,19 +581,5 @@ impl ExecCtx {
         let output = varn_types::AsyncTask::pending();
         output.resolve(value);
         Ok(varn_types::Value::TaskHandle(output))
-    }
-
-    fn start_task_internal(
-        &mut self,
-        task: varn_types::Value,
-    ) -> Result<varn_types::Value, String> {
-        match task {
-            varn_types::Value::Task(t) => {
-                let handle = self.run_lazy_task_sync(t.as_ref());
-                Ok(varn_types::Value::TaskHandle(handle))
-            }
-            varn_types::Value::TaskHandle(f) => Ok(varn_types::Value::TaskHandle(f)),
-            other => Err(format!("expected Task, got {}", other.type_name())),
-        }
     }
 }

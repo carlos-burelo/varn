@@ -273,78 +273,422 @@ pub extern "C" fn jit_range(
     }
 }
 
-pub extern "C" fn jit_assert_not_null(_ctx: *mut ExecCtx, _val: VmValue) {
-    panic!("JIT helper assert_not_null not implemented");
+#[repr(C)]
+pub struct JitClassMemberArgs {
+    pub class_val: VmValue,
+    pub fn_val: VmValue,
+    pub name_idx: usize,
+    pub kind: u8,
 }
-pub extern "C" fn jit_close_upvalue(_ctx: *mut ExecCtx, _lowest: usize) {
-    panic!("JIT helper close_upvalue not implemented");
+
+pub extern "C" fn jit_assert_not_null(_ctx: *mut ExecCtx, val: VmValue) {
+    if val.is_null() {
+        panic!("Runtime error in JIT assert_not_null: value is null");
+    }
 }
-pub extern "C" fn jit_get_enum_tag(_ctx: *mut ExecCtx, _val: VmValue) -> VmValue {
-    panic!("JIT helper get_enum_tag not implemented");
+
+pub extern "C" fn jit_close_upvalue(ctx: *mut ExecCtx, lowest: usize) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let frame_idx = ctx_ref.frames.len() - 1;
+        let base = ctx_ref.frames[frame_idx].base;
+        ctx_ref.close_upvalues_above(base + lowest);
+    }
 }
-pub extern "C" fn jit_is_array_stub(_ctx: *mut ExecCtx, _val: VmValue) -> VmValue {
-    panic!("JIT helper is_array not implemented");
+
+pub extern "C" fn jit_get_enum_tag(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        match crate::exec::advanced::get_enum_tag(val, &ctx_ref.heap) {
+            Ok(tag_val) => tag_val,
+            Err(e) => panic!("Runtime error in JIT get_enum_tag: {:?}", e),
+        }
+    }
 }
-pub extern "C" fn jit_wrap_spread_stub(_ctx: *mut ExecCtx, _val: VmValue) -> VmValue {
-    panic!("JIT helper wrap_spread not implemented");
+
+pub extern "C" fn jit_is_array_stub(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
+    unsafe {
+        let ctx_ref = &*ctx;
+        VmValue::from_bool(crate::exec::advanced::is_array(val, &ctx_ref.heap))
+    }
 }
-pub extern "C" fn jit_object_keys_stub(_ctx: *mut ExecCtx, _val: VmValue) -> VmValue {
-    panic!("JIT helper object_keys not implemented");
+
+pub extern "C" fn jit_wrap_spread_stub(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let extracted = ctx_ref.heap.extract(val);
+        ctx_ref.heap.intern(varn_types::Value::Spread(Box::new(extracted)))
+    }
 }
-pub extern "C" fn jit_op_in_stub(_ctx: *mut ExecCtx, _a: VmValue, _b: VmValue) -> VmValue {
-    panic!("JIT helper op_in not implemented");
+
+pub extern "C" fn jit_object_keys_stub(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        match crate::exec::collections::object_keys(val, &mut ctx_ref.heap) {
+            Ok(keys_val) => keys_val,
+            Err(e) => panic!("Runtime error in JIT object_keys: {:?}", e),
+        }
+    }
 }
-pub extern "C" fn jit_object_merge_stub(_ctx: *mut ExecCtx, _a: VmValue, _b: VmValue) -> VmValue {
-    panic!("JIT helper object_merge not implemented");
+
+pub extern "C" fn jit_op_in_stub(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    unsafe {
+        let ctx_ref = &*ctx;
+        VmValue::from_bool(crate::exec::advanced::op_in(a, b, &ctx_ref.heap))
+    }
 }
-pub extern "C" fn jit_get_fixed_field(_ctx: *mut ExecCtx, _obj: VmValue, _slot: usize) -> VmValue {
-    panic!("JIT helper get_fixed_field not implemented");
+
+pub extern "C" fn jit_object_merge_stub(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        match crate::exec::collections::object_merge(a, b, &mut ctx_ref.heap) {
+            Ok(res) => res,
+            Err(e) => panic!("Runtime error in JIT object_merge: {:?}", e),
+        }
+    }
 }
-pub extern "C" fn jit_set_fixed_field(_ctx: *mut ExecCtx, _obj: VmValue, _slot: usize, _val: VmValue) {
-    panic!("JIT helper set_fixed_field not implemented");
+
+pub extern "C" fn jit_get_fixed_field(ctx: *mut ExecCtx, obj: VmValue, slot: usize) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        match crate::exec::props::get_fixed_field(obj, slot, &mut ctx_ref.heap) {
+            Ok(val) => val,
+            Err(e) => panic!("Runtime error in JIT get_fixed_field: {:?}", e),
+        }
+    }
 }
-pub extern "C" fn jit_get_property_maybe_stub(_ctx: *mut ExecCtx, _obj: VmValue, _name_idx: usize) -> VmValue {
-    panic!("JIT helper get_property_maybe not implemented");
+
+pub extern "C" fn jit_set_fixed_field(ctx: *mut ExecCtx, obj: VmValue, slot: usize, val: VmValue) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        if let Err(e) = crate::exec::props::set_fixed_field(obj, slot, val, &mut ctx_ref.heap) {
+            panic!("Runtime error in JIT set_fixed_field: {:?}", e);
+        }
+    }
 }
-pub extern "C" fn jit_get_super(_ctx: *mut ExecCtx, _name_idx: usize) -> VmValue {
-    panic!("JIT helper get_super not implemented");
+
+pub extern "C" fn jit_get_property_maybe_stub(ctx: *mut ExecCtx, obj: VmValue, name_idx: usize) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let frame_idx = ctx_ref.frames.len() - 1;
+        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let name_nv = closure_ref.constants[name_idx];
+        let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
+        crate::exec::props::get_property_maybe(obj, &name, &mut ctx_ref.heap)
+    }
 }
-pub extern "C" fn jit_get_symbol(_ctx: *mut ExecCtx, _obj: VmValue, _sym_idx: usize) -> VmValue {
-    panic!("JIT helper get_symbol not implemented");
+
+pub extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let frame_idx = ctx_ref.frames.len() - 1;
+        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let base = ctx_ref.frames[frame_idx].base;
+        let this_val = ctx_ref.stack[base];
+        let name_nv = closure_ref.constants[name_idx];
+        let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
+
+        let cls = ctx_ref.frames[frame_idx]
+            .current_class
+            .clone()
+            .or_else(|| crate::exec::props::get_class(this_val, &ctx_ref.heap))
+            .expect("GetSuper: 'this' has no class");
+        let class_nv = ctx_ref.heap.intern(varn_types::Value::Class(cls));
+        match crate::exec::class::op_get_super(class_nv, &name, this_val, &mut ctx_ref.heap) {
+            Ok(v) => v,
+            Err(e) => panic!("Runtime error in JIT get_super: {:?}", e),
+        }
+    }
 }
-pub extern "C" fn jit_bind_method(_ctx: *mut ExecCtx, _obj: VmValue, _name_idx: usize) -> VmValue {
-    panic!("JIT helper bind_method not implemented");
+
+pub extern "C" fn jit_get_symbol(ctx: *mut ExecCtx, obj: VmValue, sym_idx: usize) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let frame_idx = ctx_ref.frames.len() - 1;
+        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let sym_nv = closure_ref.constants[sym_idx];
+        let sym_val = ctx_ref.heap.extract(sym_nv);
+        match sym_val {
+            varn_types::Value::Symbol(s) => {
+                match crate::exec::advanced::get_symbol_property(obj, s, &mut ctx_ref.heap) {
+                    Ok(v) => v,
+                    Err(e) => panic!("Runtime error in JIT get_symbol: {:?}", e),
+                }
+            }
+            _ => panic!("GetSymbol: non-symbol constant"),
+        }
+    }
 }
-pub extern "C" fn jit_define_global(_ctx: *mut ExecCtx, _src: VmValue, _name_idx: usize) {
-    panic!("JIT helper define_global not implemented");
+
+pub extern "C" fn jit_bind_method(ctx: *mut ExecCtx, obj: VmValue, name_idx: usize) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let frame_idx = ctx_ref.frames.len() - 1;
+        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let key_nv = closure_ref.constants[name_idx];
+        let key = ctx_ref.heap.str_val(key_nv).expect("non-string const");
+        let method = match crate::exec::props::get_property(obj, &key, &mut ctx_ref.heap) {
+            Ok(m) => m,
+            Err(e) => panic!("Runtime error in JIT bind_method: {:?}", e),
+        };
+        match crate::exec::advanced::bind_method(obj, method, &mut ctx_ref.heap) {
+            Ok(v) => v,
+            Err(e) => panic!("Runtime error in JIT bind_method: {:?}", e),
+        }
+    }
 }
-pub extern "C" fn jit_store_global(_ctx: *mut ExecCtx, _src: VmValue, _name_idx: usize) {
-    panic!("JIT helper store_global not implemented");
+
+pub extern "C" fn jit_define_global(ctx: *mut ExecCtx, src: VmValue, name_idx: usize) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let frame_idx = ctx_ref.frames.len() - 1;
+        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let name_nv = closure_ref.constants[name_idx];
+        let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
+        ctx_ref.globals.define(&name, src);
+    }
 }
-pub extern "C" fn jit_declare_field(_ctx: *mut ExecCtx, _class_val: VmValue, _name_idx: usize) {
-    panic!("JIT helper declare_field not implemented");
+
+pub extern "C" fn jit_store_global(ctx: *mut ExecCtx, src: VmValue, name_idx: usize) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let frame_idx = ctx_ref.frames.len() - 1;
+        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let name_nv = closure_ref.constants[name_idx];
+        let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
+        ctx_ref.globals.set_by_name(&name, src);
+    }
 }
-pub extern "C" fn jit_make_class(_ctx: *mut ExecCtx, _super_val: VmValue, _name_idx: usize) -> VmValue {
-    panic!("JIT helper make_class not implemented");
+
+pub extern "C" fn jit_declare_field(ctx: *mut ExecCtx, class_val: VmValue, name_idx: usize) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let frame_idx = ctx_ref.frames.len() - 1;
+        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let key_nv = closure_ref.constants[name_idx];
+        let key = ctx_ref.heap.str_val(key_nv).expect("non-string const");
+        if let Err(e) = crate::exec::class::op_declare_field(class_val, &key, &mut ctx_ref.heap) {
+            panic!("Runtime error in JIT declare_field: {:?}", e);
+        }
+    }
 }
-pub extern "C" fn jit_inherit(_ctx: *mut ExecCtx, _class_val: VmValue, _super_val: VmValue) {
-    panic!("JIT helper inherit not implemented");
+
+pub extern "C" fn jit_make_class(ctx: *mut ExecCtx, super_val: VmValue, name_idx: usize) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let frame_idx = ctx_ref.frames.len() - 1;
+        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let name_nv = closure_ref.constants[name_idx];
+        let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
+        let cls = crate::exec::class::op_class(&name, &mut ctx_ref.heap);
+        if !super_val.is_null() {
+            if let Err(e) = crate::exec::class::op_inherit(cls, super_val, &mut ctx_ref.heap) {
+                panic!("Runtime error in JIT make_class: {:?}", e);
+            }
+        }
+        cls
+    }
 }
-pub extern "C" fn jit_class_member_op(_ctx: *mut ExecCtx, _args: *const std::ffi::c_void) {
-    panic!("JIT helper class_member_op not implemented");
+
+pub extern "C" fn jit_inherit(ctx: *mut ExecCtx, class_val: VmValue, super_val: VmValue) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        if let Err(e) = crate::exec::class::op_inherit(class_val, super_val, &mut ctx_ref.heap) {
+            panic!("Runtime error in JIT inherit: {:?}", e);
+        }
+    }
 }
-pub extern "C" fn jit_build_object(_ctx: *mut ExecCtx, _ip_before: usize) -> VmValue {
-    panic!("JIT helper build_object not implemented");
+
+pub extern "C" fn jit_class_member_op(ctx: *mut ExecCtx, args: *const std::ffi::c_void) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let args = &*(args as *const JitClassMemberArgs);
+        let frame_idx = ctx_ref.frames.len() - 1;
+        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let key_nv = closure_ref.constants[args.name_idx];
+        let key = ctx_ref.heap.str_val(key_nv).expect("non-string const");
+        
+        let res = match args.kind {
+            0 => crate::exec::class::op_method(args.class_val, &key, args.fn_val, &mut ctx_ref.heap),
+            1 => crate::exec::class::op_define_static(args.class_val, &key, args.fn_val, &mut ctx_ref.heap),
+            2 => crate::exec::class::op_define_getter(args.class_val, &key, args.fn_val, &mut ctx_ref.heap),
+            3 => crate::exec::class::op_define_setter(args.class_val, &key, args.fn_val, &mut ctx_ref.heap),
+            4 => crate::exec::class::op_define_static_getter(args.class_val, &key, args.fn_val, &mut ctx_ref.heap),
+            5 => crate::exec::class::op_define_static_setter(args.class_val, &key, args.fn_val, &mut ctx_ref.heap),
+            _ => panic!("Unknown class member op kind: {}", args.kind),
+        };
+        if let Err(e) = res {
+            panic!("Runtime error in JIT class_member_op: {:?}", e);
+        }
+    }
 }
-pub extern "C" fn jit_object_rest(_ctx: *mut ExecCtx, _ip_before: usize) -> VmValue {
-    panic!("JIT helper object_rest not implemented");
+
+pub extern "C" fn jit_build_object(ctx: *mut ExecCtx, ip_before: usize) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let frame_idx = ctx_ref.frames.len() - 1;
+        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let base = ctx_ref.frames[frame_idx].base;
+        let code = &closure_ref.proto.chunk.code;
+
+        let mut temp_ip = ip_before;
+        let w1 = code[temp_ip];
+        temp_ip += 1;
+        let count = (w1 & 0xFF) as usize;
+        let obj_nv = ctx_ref.heap.alloc_object();
+        for _ in 0..count {
+            let k_idx = code[temp_ip] as usize;
+            temp_ip += 1;
+            let w = code[temp_ip];
+            temp_ip += 1;
+            let val_reg = (w >> 8) as usize;
+            let key_nv = closure_ref.constants[k_idx];
+            let key = ctx_ref.heap.str_val(key_nv)
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| {
+                    closure_ref.proto.chunk.constants[k_idx]
+                        .as_str()
+                        .unwrap_or("")
+                        .to_string()
+                });
+            let val = ctx_ref.stack[base + val_reg];
+            if let Err(e) = crate::exec::props::set_property(obj_nv, &key, val, &mut ctx_ref.heap) {
+                panic!("Runtime error in JIT build_object: {:?}", e);
+            }
+        }
+        obj_nv
+    }
 }
-pub extern "C" fn jit_make_enum_variant(_ctx: *mut ExecCtx, _ip_before: usize) -> VmValue {
-    panic!("JIT helper make_enum_variant not implemented");
+
+pub extern "C" fn jit_object_rest(ctx: *mut ExecCtx, ip_before: usize) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let frame_idx = ctx_ref.frames.len() - 1;
+        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let base = ctx_ref.frames[frame_idx].base;
+        let code = &closure_ref.proto.chunk.code;
+
+        let mut temp_ip = ip_before;
+        let w1 = code[temp_ip];
+        temp_ip += 1;
+        let w2 = code[temp_ip];
+        temp_ip += 1;
+        let src = (w1 & 0xFF) as usize;
+        let skip_count = (w2 >> 8) as usize;
+        let mut skip_keys = Vec::with_capacity(skip_count);
+        for _ in 0..skip_count {
+            let k_idx = code[temp_ip] as usize;
+            temp_ip += 1;
+            let key_nv = closure_ref.constants[k_idx];
+            skip_keys.push(ctx_ref.heap.str_val(key_nv).unwrap_or_else(|| {
+                closure_ref.proto.chunk.constants[k_idx]
+                    .as_str()
+                    .unwrap_or("")
+                    .into()
+            }));
+        }
+        let obj = ctx_ref.stack[base + src];
+        match ctx_ref.exec_object_rest(obj, &skip_keys) {
+            Ok(v) => v,
+            Err(e) => panic!("Runtime error in JIT object_rest: {:?}", e),
+        }
+    }
 }
-pub extern "C" fn jit_call_spread(_ctx: *mut ExecCtx, _args: *const std::ffi::c_void) -> VmValue {
-    panic!("JIT helper call_spread not implemented");
+
+pub extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usize) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let frame_idx = ctx_ref.frames.len() - 1;
+        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let base = ctx_ref.frames[frame_idx].base;
+        let code = &closure_ref.proto.chunk.code;
+
+        let mut temp_ip = ip_before;
+        let w1 = code[temp_ip];
+        temp_ip += 1;
+        let name_idx = code[temp_ip] as usize;
+        let tag_reg = (w1 & 0xFF) as usize;
+        let name_nv = closure_ref.constants[name_idx];
+        let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
+        let tag = ctx_ref.stack[base + tag_reg].as_i32() as u8;
+
+        let name_str = name.as_ref();
+        let (name_part, fields_part) = match name_str.find(':') {
+            Some(idx) => (&name_str[..idx], &name_str[idx + 1..]),
+            None => (name_str, ""),
+        };
+        let (enum_name_str, variant_name_str) = match name_part.rfind('.') {
+            Some(idx) => (&name_part[..idx], &name_part[idx + 1..]),
+            None => ("", name_part),
+        };
+        let fields: Vec<std::rc::Rc<str>> = if fields_part.is_empty() {
+            vec![]
+        } else {
+            fields_part.split(',').map(std::rc::Rc::from).collect()
+        };
+
+        let variant =
+            varn_types::Value::EnumVariant(Box::new(varn_types::value::EnumVariantData {
+                enum_name: std::rc::Rc::from(enum_name_str),
+                variant_name: std::rc::Rc::from(variant_name_str),
+                variant_tag: tag,
+                fields,
+                payload: varn_types::Value::Object(varn_types::value::ObjRef::new(
+                    varn_types::value::ObjData::new(),
+                )),
+            }));
+        ctx_ref.heap.intern(variant)
+    }
 }
-pub extern "C" fn jit_load_module_by_idx(_ctx: *mut ExecCtx, _spec_idx: usize) -> VmValue {
-    panic!("JIT helper load_module_by_idx not implemented");
+
+pub extern "C" fn jit_call_spread(ctx: *mut ExecCtx, args: *const std::ffi::c_void) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let args = &*(args as *const varn_jit::JitCallArgs);
+        let caller_depth = ctx_ref.frames.len();
+        let frame_idx = caller_depth - 1;
+        let base = ctx_ref.frames[frame_idx].base;
+
+        ctx_ref.frames[frame_idx].ip = args.ip;
+
+        let res = ctx_ref.exec_call_spread_reg(
+            args.callee,
+            base,
+            args.arg_start,
+            args.arg_count,
+            args.dest,
+            frame_idx,
+        );
+
+        match res {
+            Ok(true) => {
+                ctx_ref.run_until_inner(caller_depth).unwrap();
+            }
+            Ok(false) => {}
+            Err(e) => {
+                panic!("Runtime error in JIT call_spread: {:?}", e);
+            }
+        }
+
+        ctx_ref.stack[base + args.dest]
+    }
+}
+pub extern "C" fn jit_load_module_by_idx(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    spec_idx: usize,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let closure_ref = &*closure;
+        let spec_nv = closure_ref.constants[spec_idx];
+        let spec = match ctx_ref.heap.str_val(spec_nv) {
+            Some(s) => s,
+            None => return VmValue::null(),
+        };
+        match ctx_ref.load_module(&spec) {
+            Ok(v) => v,
+            Err(e) => panic!("JIT load_module failed: {:?}", e),
+        }
+    }
 }

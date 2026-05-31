@@ -276,7 +276,7 @@ impl ExecCtx {
         Ok(false)
     }
 
-    pub(in crate::exec::dispatch) fn exec_call_spread_reg(
+    pub(crate) fn exec_call_spread_reg(
         &mut self,
         callee: VmValue,
         base: usize,

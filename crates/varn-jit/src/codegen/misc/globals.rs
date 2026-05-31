@@ -16,7 +16,6 @@ pub(crate) fn emit_define_global(ctx: &mut CodegenCtx, _first_reg: usize) {
     *ip += 1;
     let name_idx = code[*ip] as usize;
     *ip += 1;
-
     emit_flush_all(asm, regmap);
     emit_load(asm, Reg::Rax, src, regmap);
 

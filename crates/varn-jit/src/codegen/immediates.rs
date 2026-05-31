@@ -90,6 +90,9 @@ fn emit_load_const(ctx: &mut CodegenCtx, first_reg: usize) {
     let idx = code[*ip] as usize;
     *ip += 1;
 
+    // Reload closure pointer from saved stack slot
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
+
     // Load constants Rc pointer from VmClosure: closure.constants is at offset 32
     asm.mov_reg_mem(Reg::R11, ARG_CLOSURE, 32);
     // Load Vec data ptr from RcBox: Vec starts at 16, Vec's ptr is at 8 (16 + 8 = 24)
