@@ -6,7 +6,8 @@ import {
     netIsIPv6,
     netParseUrl,
     netEncodeURIComponent,
-    netDecodeURIComponent
+    netDecodeURIComponent,
+    ParsedUrl
 } from "runtime:net";
 
 function trimPrefixQ(s: str): str {
@@ -57,7 +58,7 @@ export class Query {
         return query;
     }
 
-    get(key: str): str | null {
+    get(key: str): str? {
         const bucket = this.values[key];
         if (bucket == null || bucket.length == 0) {
             return null;
@@ -106,7 +107,7 @@ export class Query {
 export class Url {
     protocol: str = "";
     host: str = "";
-    port: int | null = null;
+    port: int? = null;
     path: str = "";
     query: Query = new Query();
     fragment: str = "";
@@ -114,12 +115,12 @@ export class Url {
     static parse(url: str): Url {
         const parts = netParseUrl(url);
         const out = new Url();
-        out.protocol = parts["protocol"] as str;
-        out.host = parts["host"] as str;
-        out.port = parts["port"] as int;
-        out.path = parts["path"] as str;
-        out.query = Query.parse(parts["query"] as str);
-        out.fragment = parts["fragment"] as str;
+        out.protocol = parts.protocol;
+        out.host = parts.host;
+        out.port = parts.port;
+        out.path = parts.path;
+        out.query = Query.parse(parts.query);
+        out.fragment = parts.fragment;
         return out;
     }
 

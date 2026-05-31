@@ -9,8 +9,11 @@ import {
     fsRemove,
     fsRemoveAll,
     fsRename,
-    fsTempDir
+    fsTempDir,
+    RawStats
 } from "runtime:fs";
+
+import { Writer } from "std:io";
 
 export class Stats {
     size: int;
@@ -50,10 +53,10 @@ export namespace fs {
     export function stat(path: str): Stats {
         let raw = fsStat(path);
         return new Stats(
-            raw["size"] as int,
-            raw["isDir"] as bool,
-            raw["isFile"] as bool,
-            raw["mtime"] as int
+            raw.size,
+            raw.isDir,
+            raw.isFile,
+            raw.mtime
         );
     }
 
@@ -121,7 +124,7 @@ export class File {
         return fsRead(this._path);
     }
 
-    pipeTo(dst: dynamic): void {
+    pipeTo(dst: Writer): void {
         const content = this.readAll();
         dst.write(content);
     }

@@ -6,11 +6,11 @@ export declare class Array<T> {
     unshift(item: T): void;
     join(separator?: str): str;
     slice(start?: int, end?: int): T[];
-    at(index: int): T | null;
+    at(index: int): T?;
     concat(...items: T[][]): T[];
     fill(value: T, start?: int, end?: int): T[];
     filter(predicate: (item: T, index: int, array: T[]) => bool): T[];
-    find(predicate: (item: T, index: int, array: T[]) => bool): T | null;
+    find(predicate: (item: T, index: int, array: T[]) => bool): T?;
     findIndex(predicate: (item: T, index: int, array: T[]) => bool): int;
     flat(depth?: int): T[];
     flatMap<U>(callback: (item: T, index: int, array: T[]) => U[]): U[];

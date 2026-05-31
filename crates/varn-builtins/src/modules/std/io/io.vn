@@ -7,7 +7,7 @@ export interface Writer {
 export interface Reader {
     read(size?: int): str
     readAll(): str
-    pipeTo(dst: dynamic): void
+    pipeTo(dst: Writer): void
 }
 
 export namespace io {

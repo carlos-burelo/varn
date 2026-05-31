@@ -6,7 +6,7 @@ export declare function httpFetch(
     headers?: { [key: str]: str },
     body?: str,
     timeoutMs?: int
-): Task<dynamic>;
+): Task<str>;
 
 export declare function httpCreateServer(): int;
 

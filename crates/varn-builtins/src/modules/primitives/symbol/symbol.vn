@@ -2,7 +2,7 @@ export declare class Symbol {
     static readonly iterator: symbol;
     static readonly asyncIterator: symbol;
 
-    readonly description: str | null;
+    readonly description: str?;
 
     constructor(description?: str);
 }

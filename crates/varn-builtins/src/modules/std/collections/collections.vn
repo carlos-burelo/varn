@@ -9,7 +9,7 @@ export class List<T> {
 
     add(item: T): void { this.items.push(item); }
     push(item: T): void { this.items.push(item); }
-    pop(): T | null { return this.items.pop(); }
+    pop(): T? { return this.items.pop(); }
 
     get(index: int): T { return this.items[index]; }
     set(index: int, val: T): void { this.items[index] = val; }
@@ -23,8 +23,8 @@ export class List<T> {
 export class Stack<S> {
     private items: S[] = [];
     push(item: S): void { this.items.push(item); }
-    pop(): S | null { return this.items.pop(); }
-    peek(): S | null { return this.items[this.items.length - 1]; }
+    pop(): S? { return this.items.pop(); }
+    peek(): S? { return this.items[this.items.length - 1]; }
     get size(): int { return this.items.length; }
     get isEmpty(): bool { return this.items.length === 0; }
 }
@@ -32,8 +32,8 @@ export class Stack<S> {
 export class Queue<Q> {
     private items: Q[] = [];
     enqueue(item: Q): void { this.items.push(item); }
-    dequeue(): Q | null { return this.items.shift(); }
-    peek(): Q | null { return this.items[0]; }
+    dequeue(): Q? { return this.items.shift(); }
+    peek(): Q? { return this.items[0]; }
     get size(): int { return this.items.length; }
     get isEmpty(): bool { return this.items.length === 0; }
 }
@@ -41,7 +41,7 @@ export class Queue<Q> {
 /// Record<K, V> — a map-like object type.
 export declare class Record<K, V> {
     constructor();
-    get(key: K): V | null;
+    get(key: K): V?;
     set(key: K, value: V): void;
     has(key: K): bool;
     delete(key: K): bool;
