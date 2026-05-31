@@ -69,6 +69,7 @@ pub struct JitHelpers {
     pub ushr: usize,
     pub load_module: usize,
     pub load_module_slot: usize,
+    pub store_module_slot: usize,
     pub build_object_with_shape: usize,
     pub range: usize,
     pub assert_not_null: usize,
@@ -94,8 +95,10 @@ pub struct JitHelpers {
     pub build_object: usize,
     pub object_rest: usize,
     pub make_enum_variant: usize,
+    pub spawn: usize,
     pub call_spread: usize,
     pub load_module_by_idx: usize,
+    pub invoke_virtual: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -248,5 +251,16 @@ pub struct JitSetPropertyArgs {
     pub val: VmValue,
     pub name_idx: usize,
     pub cs_idx: usize,
+    pub ip: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct JitInvokeVirtualArgs {
+    pub this_val: VmValue,
+    pub name_idx: usize,
+    pub arg_start: usize,
+    pub arg_count: usize,
+    pub dest: usize,
     pub ip: usize,
 }

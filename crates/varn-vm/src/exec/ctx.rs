@@ -23,7 +23,7 @@ use varn_types::generator::GenChannel;
 pub use super::ctx_jit_runtime::{
     jit_array_extend, jit_array_length, jit_array_pop, jit_array_push, jit_bitand, jit_bitor,
     jit_bitxor, jit_build_object_with_shape, jit_div, jit_get_index, jit_instanceof,
-    jit_load_module, jit_load_module_slot, jit_logical_not, jit_modulo, jit_negate, jit_pow,
+    jit_load_module, jit_load_module_slot, jit_store_module_slot, jit_logical_not, jit_modulo, jit_negate, jit_pow,
     jit_range, jit_set_index, jit_shl, jit_shr, jit_str_concat, jit_str_length, jit_str_slice,
     jit_typeof_val, jit_ushr,
     jit_assert_not_null, jit_close_upvalue, jit_get_enum_tag, jit_is_array_stub, jit_wrap_spread_stub,
@@ -31,13 +31,14 @@ pub use super::ctx_jit_runtime::{
     jit_set_fixed_field, jit_get_property_maybe_stub, jit_get_super, jit_get_symbol,
     jit_bind_method, jit_define_global, jit_store_global, jit_declare_field, jit_make_class,
     jit_inherit, jit_class_member_op, jit_build_object, jit_object_rest, jit_make_enum_variant,
-    jit_call_spread, jit_load_module_by_idx,
+    jit_spawn, jit_call_spread, jit_load_module_by_idx,
 };
 pub use super::ctx_jit_values::{
     jit_add, jit_build_array, jit_build_str, jit_call, jit_call_method, jit_define_global_idx,
     jit_eq, jit_get_property, jit_gt, jit_gte, jit_load_const, jit_load_global,
     jit_load_global_idx, jit_load_upvalue, jit_lt, jit_lte, jit_make_closure, jit_mul, jit_neq,
     jit_set_property, jit_store_global_idx, jit_store_upvalue, jit_sub, jit_to_string,
+    jit_invoke_virtual,
 };
 
 #[repr(C)]

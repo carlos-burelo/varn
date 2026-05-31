@@ -427,3 +427,51 @@ pub extern "C" fn jit_build_str(
         ctx_ref.heap.alloc_str(&combined)
     }
 }
+
+pub extern "C" fn jit_invoke_virtual(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    args: *const varn_jit::JitInvokeVirtualArgs,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let closure_ref = &*closure;
+        let args = &*args;
+        let caller_depth = ctx_ref.frames.len();
+        let frame_idx = caller_depth - 1;
+        let base = ctx_ref.frames[frame_idx].base;
+
+        ctx_ref.frames[frame_idx].ip = args.ip;
+
+        let method_name_nv = closure_ref.constants[args.name_idx];
+        let method_name = ctx_ref
+            .heap
+            .str_val(method_name_nv)
+            .expect("InvokeVirtual: not a string const");
+
+        let method_nv =
+            crate::exec::props::get_property(args.this_val, &method_name, &mut ctx_ref.heap)
+                .unwrap();
+
+        let jumped = ctx_ref.exec_call_reg(
+            method_nv,
+            base,
+            args.arg_start,
+            args.arg_count,
+            args.dest,
+            frame_idx,
+        );
+
+        match jumped {
+            Ok(true) => {
+                ctx_ref.run_until_inner(caller_depth).unwrap();
+            }
+            Ok(false) => {}
+            Err(e) => {
+                panic!("Runtime error in JIT invoke_virtual: {:?}", e);
+            }
+        }
+
+        ctx_ref.stack[base + args.dest]
+    }
+}

@@ -190,6 +190,7 @@ impl VmClosure {
             ushr: crate::exec::ctx::jit_ushr as usize,
             load_module: crate::exec::ctx::jit_load_module as usize,
             load_module_slot: crate::exec::ctx::jit_load_module_slot as usize,
+            store_module_slot: crate::exec::ctx::jit_store_module_slot as usize,
             build_object_with_shape: crate::exec::ctx::jit_build_object_with_shape as usize,
             range: crate::exec::ctx::jit_range as usize,
             assert_not_null: crate::exec::ctx::jit_assert_not_null as usize,
@@ -215,8 +216,10 @@ impl VmClosure {
             build_object: crate::exec::ctx::jit_build_object as usize,
             object_rest: crate::exec::ctx::jit_object_rest as usize,
             make_enum_variant: crate::exec::ctx::jit_make_enum_variant as usize,
+            spawn: crate::exec::ctx::jit_spawn as usize,
             call_spread: crate::exec::ctx::jit_call_spread as usize,
             load_module_by_idx: crate::exec::ctx::jit_load_module_by_idx as usize,
+            invoke_virtual: crate::exec::ctx::jit_invoke_virtual as usize,
         };
         match varn_jit::compile(&self.proto, helpers) {
             Ok((entry, code)) => {
