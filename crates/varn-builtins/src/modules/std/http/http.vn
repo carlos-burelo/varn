@@ -9,7 +9,7 @@ import {
     httpClose
 } from "runtime:http";
 
-import { JSON } from "std:json";
+import { JSON, Json } from "std:json";
 
 /**
  * HttpRequest represents an incoming client HTTP request in Varn.
@@ -25,7 +25,7 @@ export class HttpRequest {
     /**
      * Parses the incoming request body from raw string into dynamic JSON.
      */
-    json(): dynamic {
+    json(): Json {
         return JSON.parse(this.body);
     }
 }
@@ -76,7 +76,7 @@ export class HttpResponse {
     /**
      * Serializes dynamic data into JSON and sends it.
      */
-    json(data: dynamic): void {
+    json(data: Json): void {
         this.type("application/json").send(JSON.stringify(data));
     }
 
@@ -187,7 +187,7 @@ export class Response {
     /**
      * Parses the response body as JSON.
      */
-    json(): dynamic {
+    json(): Json {
         return JSON.parse(this.body);
     }
 }
@@ -207,7 +207,7 @@ export async function fetch(
         200,
         "OK",
         true,
-        response_body as str,
+        response_body,
         {}
     );
 }

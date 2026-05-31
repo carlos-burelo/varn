@@ -1,6 +1,6 @@
 export declare class Map<V> {
     constructor();
-    get(key: str): V | null;
+    get(key: str): V?;
     set(key: str, value: V): void;
     has(key: str): bool;
     delete(key: str): bool;

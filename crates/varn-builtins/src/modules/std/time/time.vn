@@ -1,4 +1,4 @@
-import { timeNowMs, timeParseIsoDuration, timeMsToParts, timePartsToMs } from "runtime:time";
+import { timeNowMs, timeParseIsoDuration, timeMsToParts, timePartsToMs, RuntimeTimeParts } from "runtime:time";
 
 export type TimeParts = {
     year: int;
@@ -50,7 +50,7 @@ export namespace Time {
             if (n < 1000) return "0" + n;
             return "" + n;
         };
-        return pad4(parts["year"] as int) + "-" + pad2(parts["month"] as int) + "-" + pad2(parts["day"] as int) + "T" + pad2(parts["hour"] as int) + ":" + pad2(parts["minute"] as int) + ":" + pad2(parts["second"] as int) + "." + pad3(parts["millisecond"] as int) + "Z";
+        return pad4(parts.year) + "-" + pad2(parts.month) + "-" + pad2(parts.day) + "T" + pad2(parts.hour) + ":" + pad2(parts.minute) + ":" + pad2(parts.second) + "." + pad3(parts.millisecond) + "Z";
     }
 
     export function fromISO(iso: str): int {
@@ -60,13 +60,13 @@ export namespace Time {
     export function toParts(ms: int): TimeParts {
         let parts = timeMsToParts(ms);
         return {
-            year: parts["year"] as int,
-            month: parts["month"] as int,
-            day: parts["day"] as int,
-            hour: parts["hour"] as int,
-            minute: parts["minute"] as int,
-            second: parts["second"] as int,
-            millisecond: parts["millisecond"] as int
+            year: parts.year,
+            month: parts.month,
+            day: parts.day,
+            hour: parts.hour,
+            minute: parts.minute,
+            second: parts.second,
+            millisecond: parts.millisecond
         };
     }
 
@@ -106,13 +106,13 @@ export namespace Now {
     export function plainDateTimeISO(): PlainDateTime {
         let parts = timeMsToParts(timeNowMs());
         return new PlainDateTime(
-            parts["year"] as int,
-            parts["month"] as int,
-            parts["day"] as int,
-            parts["hour"] as int,
-            parts["minute"] as int,
-            parts["second"] as int,
-            parts["millisecond"] as int
+            parts.year,
+            parts.month,
+            parts.day,
+            parts.hour,
+            parts.minute,
+            parts.second,
+            parts.millisecond
         );
     }
 }
@@ -209,19 +209,20 @@ export class Duration {
         this.milliseconds = ms % 1000;
     }
 
-    static from(input: dynamic): Duration {
+    static from(input: DurationLike): Duration {
         if (input instanceof str) {
             let ms = timeParseIsoDuration(input);
             return new Duration(ms);
         } else if (input instanceof int) {
             return new Duration(input);
         } else {
+            let parts = input as DurationParts;
             let ms = 0;
-            if (input["milliseconds"] !== null) ms = ms + (input["milliseconds"] as int);
-            if (input["seconds"] !== null) ms = ms + (input["seconds"] as int) * 1000;
-            if (input["minutes"] !== null) ms = ms + (input["minutes"] as int) * 60000;
-            if (input["hours"] !== null) ms = ms + (input["hours"] as int) * 3600000;
-            if (input["days"] !== null) ms = ms + (input["days"] as int) * 86400000;
+            if (parts.milliseconds !== null) ms = ms + parts.milliseconds;
+            if (parts.seconds !== null) ms = ms + parts.seconds * 1000;
+            if (parts.minutes !== null) ms = ms + parts.minutes * 60000;
+            if (parts.hours !== null) ms = ms + parts.hours * 3600000;
+            if (parts.days !== null) ms = ms + parts.days * 86400000;
             return new Duration(ms);
         }
     }
@@ -236,7 +237,7 @@ export class Duration {
         return new Duration(-this.totalMilliseconds);
     }
 
-    add(other: dynamic): Duration {
+    add(other: Duration | DurationLike): Duration {
         let other_ms = 0;
         if (other instanceof Duration) {
             other_ms = other.totalMilliseconds;
@@ -247,7 +248,7 @@ export class Duration {
         return new Duration(this.totalMilliseconds + other_ms);
     }
 
-    subtract(other: dynamic): Duration {
+    subtract(other: Duration | DurationLike): Duration {
         let other_ms = 0;
         if (other instanceof Duration) {
             other_ms = other.totalMilliseconds;
@@ -258,7 +259,7 @@ export class Duration {
         return new Duration(this.totalMilliseconds - other_ms);
     }
 
-    compare(other: dynamic): int {
+    compare(other: Duration | DurationLike): int {
         let other_ms = 0;
         if (other instanceof Duration) {
             other_ms = other.totalMilliseconds;
@@ -269,7 +270,7 @@ export class Duration {
         return this.totalMilliseconds - other_ms;
     }
 
-    equals(other: dynamic): bool {
+    equals(other: Duration | DurationLike): bool {
         let other_ms = 0;
         if (other instanceof Duration) {
             other_ms = other.totalMilliseconds;

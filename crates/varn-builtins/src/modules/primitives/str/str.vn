@@ -22,7 +22,7 @@ export declare class str {
     lastIndexOf(search: str): int;
     substring(start: int, end?: int): str;
     slice(start: int, end?: int): str;
-    at(index: int): str | null;
+    at(index: int): str?;
     replace(from: str, to: str): str;
     replaceAll(from: str, to: str): str;
     split(separator?: str): str[];

@@ -1,5 +1,20 @@
 // runtime:fs — low-level host filesystem operations.
 
+export interface RawStats {
+    size: int;
+    isDir: bool;
+    isFile: bool;
+    mtime: int;
+}
+
 export declare function fsRead(path: str): str;
 export declare function fsWrite(path: str, content: str): void;
 export declare function fsExists(path: str): bool;
+export declare function fsStat(path: str): RawStats;
+export declare function fsMkdir(path: str): void;
+export declare function fsMkdirAll(path: str): void;
+export declare function fsReadDir(path: str): str[];
+export declare function fsRemove(path: str): void;
+export declare function fsRemoveAll(path: str): void;
+export declare function fsRename(from: str, to: str): void;
+export declare function fsTempDir(): str;

@@ -56,7 +56,7 @@ export class MetaKey<T = dynamic> {
         reflectSetMetaKey(this.metaId, target, value);
     }
 
-    get(target: dynamic): T | null {
+    get(target: dynamic): T? {
         let val = reflectGetMetaKey(this.metaId, target);
         return val as T;
     }
