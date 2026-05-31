@@ -105,11 +105,14 @@ async function runComprehensiveTest(): Task<void> {
     assert("URL fragment", urlObj.fragment === "main");
 
     // 10. std:path
-    assert("Path normalize", path.normalize("a/b/../c") === "a/c");
+    let isWindows = sys.platform() === "windows";
+    let expectedNormalize = isWindows ? "a\\c" : "a/c";
+    let expectedJoin = isWindows ? "a\\b\\c" : "a/b/c";
+    assert("Path normalize", path.normalize("a/b/../c") === expectedNormalize);
     assert("Path dirname", path.dirname("a/b/c") === "a/b");
     assert("Path basename", path.basename("a/b/file.txt") === "file.txt");
     assert("Path extname", path.extname("file.txt") === ".txt");
-    assert("Path join", path.join("a", "b", "c") === "a/b/c");
+    assert("Path join", path.join("a", "b", "c") === expectedJoin);
 
     // 11. std:reflect
     Reflect.defineMetadata("my_key", "my_val", list);
