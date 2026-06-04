@@ -1,7 +1,7 @@
 pub(crate) mod entry;
 
 pub use entry::DispatchEntry;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use std::sync::OnceLock;
 use varn_core::op_meta::OpMeta;
@@ -50,10 +50,10 @@ pub(crate) fn iter_native_ops() -> impl Iterator<Item = &'static NativeOpEntry> 
     }
 }
 
-static TABLE: OnceLock<HashMap<u64, DispatchEntry>> = OnceLock::new();
+static TABLE: OnceLock<FxHashMap<u64, DispatchEntry>> = OnceLock::new();
 
-fn build_table() -> HashMap<u64, DispatchEntry> {
-    let mut table = HashMap::with_capacity(512);
+fn build_table() -> FxHashMap<u64, DispatchEntry> {
+    let mut table = FxHashMap::with_capacity_and_hasher(512, Default::default());
     for entry in iter_native_ops() {
         let module = entry.module_id();
         let symbol = entry.symbol_name();
@@ -70,6 +70,18 @@ fn build_table() -> HashMap<u64, DispatchEntry> {
         );
     }
     table
+}
+
+static MODULE_OPS: OnceLock<FxHashMap<String, Vec<&'static NativeOpEntry>>> = OnceLock::new();
+
+fn build_module_ops_index() -> FxHashMap<String, Vec<&'static NativeOpEntry>> {
+    let mut map = FxHashMap::default();
+    for entry in iter_native_ops() {
+        map.entry(entry.module_id().to_string())
+            .or_insert_with(Vec::new)
+            .push(entry);
+    }
+    map
 }
 
 pub fn describe_op(id: u64) -> Option<OpMeta> {
@@ -106,7 +118,7 @@ fn resolve_ns<'a>(
     root: VmValue,
     ns_path: &str,
     ctx: &mut dyn NativeCtx,
-    cache: &'a mut HashMap<String, VmValue>,
+    cache: &'a mut FxHashMap<String, VmValue>,
 ) -> VmValue {
     let parts: Vec<&str> = if ns_path.contains(':') {
         ns_path.split(':').filter(|p| !p.is_empty()).collect()
@@ -141,15 +153,16 @@ fn resolve_ns<'a>(
 }
 
 pub(crate) fn build_module(id: &str, ctx: &mut dyn NativeCtx) -> Option<VmValue> {
-    let root = ctx.alloc_object();
-    let mut has_entries = false;
-    let mut ns_cache: HashMap<String, VmValue> = HashMap::new();
+    let map = MODULE_OPS.get_or_init(build_module_ops_index);
+    let entries = map.get(id)?;
+    if entries.is_empty() {
+        return None;
+    }
 
-    for entry in iter_native_ops() {
-        if entry.module_id() != id {
-            continue;
-        }
-        has_entries = true;
+    let root = ctx.alloc_object();
+    let mut ns_cache = FxHashMap::default();
+
+    for entry in entries {
         let symbol = entry.symbol_name();
         let ns_path = entry.namespace_path();
 
@@ -169,11 +182,7 @@ pub(crate) fn build_module(id: &str, ctx: &mut dyn NativeCtx) -> Option<VmValue>
         ctx.set_field(target, symbol, val);
     }
 
-    if has_entries {
-        Some(ctx.finalize(root))
-    } else {
-        None
-    }
+    Some(ctx.finalize(root))
 }
 
 pub fn register_globals_vm(ctx: &mut dyn NativeCtx) -> rustc_hash::FxHashMap<Rc<str>, VmValue> {
@@ -209,7 +218,8 @@ fn collect_module_fields(
 }
 
 pub fn has_native_module_id(id: &str) -> bool {
-    iter_native_ops().any(|e| e.module_id() == id)
+    let map = MODULE_OPS.get_or_init(build_module_ops_index);
+    map.contains_key(id)
 }
 
 pub struct DevNullModuleCtx;

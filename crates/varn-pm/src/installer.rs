@@ -77,7 +77,7 @@ pub fn install_locked(project_root: &Path, lock: &PmLockfile) -> Result<(), Stri
         let origin = DepOrigin::parse(&pkg.origin)?;
 
         if !cache::is_cached(&origin, &pkg.version, &pkg.integrity) {
-            eprintln!("  downloading {}@{} ...", pkg.name, pkg.version);
+            varn_utilities::terminal::info(format!("downloading {}@{} ...", pkg.name, pkg.version));
             let dest = cache::cached_package_path(&origin, &pkg.version);
             let actual = fetcher::fetch_and_extract(&origin, &pkg.version, &dest)?;
             if actual != pkg.integrity {

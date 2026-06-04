@@ -11,6 +11,7 @@ mod pipeline;
 use clap::Parser;
 use cli::{Cli, Commands};
 use std::process;
+use varn_utilities::terminal;
 
 fn main() {
     varn_builtins::register_provider();
@@ -23,7 +24,7 @@ fn main() {
     let result = dispatch(cli.command);
 
     if let Err(e) = result {
-        eprintln!("{e}");
+        terminal::error(&e);
         process::exit(e.exit_code);
     }
 }
@@ -39,6 +40,7 @@ fn dispatch(cmd: Commands) -> Result<(), error::CliError> {
         Commands::Build(args) => commands::build::execute(args),
         Commands::Pkg(sub) => commands::pkg::execute(sub),
         Commands::Doctor => commands::doctor::execute(),
+        Commands::Cache(sub) => commands::cache::execute(sub),
         Commands::Lsp => commands::lsp::execute(),
         Commands::Init(args) => commands::init::execute(args),
         Commands::Completions(args) => commands::completions::execute(args),
@@ -57,6 +59,7 @@ fn implicit_run(mut args: Vec<String>) -> Vec<String> {
         "pkg",
         "init",
         "doctor",
+        "cache",
         "lsp",
         "completions",
         "help",

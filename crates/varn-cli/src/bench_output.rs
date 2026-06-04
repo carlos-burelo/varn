@@ -1,17 +1,10 @@
 use std::time::Duration;
 
 use varn_core::OpCode;
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal;
 use varn_vm::varn_jit::JitStatsSnapshot;
 use varn_vm::VmProfile;
-
-const R: &str = "\x1b[0m";
-const BOLD: &str = "\x1b[1m";
-const DIM: &str = "\x1b[2m";
-const BLU: &str = "\x1b[34m";
-const RED: &str = "\x1b[31m";
-const GRN: &str = "\x1b[32m";
-const CYN: &str = "\x1b[96m";
-const MAG: &str = "\x1b[35m";
 
 pub fn print_parse_breakdown(profile: &varn_parser::ParseProfile) {
     let rows = [
@@ -20,7 +13,7 @@ pub fn print_parse_breakdown(profile: &varn_parser::ParseProfile) {
         ("block", profile.block),
         ("recover", profile.recover),
     ];
-    print_duration_rows("Parser Breakdown", GRN, &rows);
+    print_duration_rows_green("Parser Breakdown", &rows);
 }
 
 pub fn print_check_breakdown(profile: &varn_checker::CheckProfile) {
@@ -33,12 +26,12 @@ pub fn print_check_breakdown(profile: &varn_checker::CheckProfile) {
         ("annotations", profile.collect_annotations),
         ("finalize", profile.finalize),
     ];
-    print_duration_rows("Checker Breakdown", RED, &rows);
+    print_duration_rows_red("Checker Breakdown", &rows);
 }
 
 pub fn print_vm_profile(profile: &VmProfile) {
-    eprintln!();
-    eprintln!("  {BOLD}{CYN}VM Profile{R}{DIM}");
+    terminal::blank();
+    terminal::log(chalk("VM Profile").cyan().bold());
 
     let ic_total = profile.ic_hits + profile.ic_misses;
     let ic_hit_rate = if ic_total > 0 {
@@ -46,17 +39,17 @@ pub fn print_vm_profile(profile: &VmProfile) {
     } else {
         0.0
     };
-    eprintln!(
+    terminal::log(format!(
         "  {:<22} {:>10}  ({:.1}% hit rate)",
         "IC hits",
         fmt_num_u64(profile.ic_hits),
         ic_hit_rate
-    );
-    eprintln!(
+    ));
+    terminal::log(format!(
         "  {:<22} {:>10}",
         "IC misses",
         fmt_num_u64(profile.ic_misses)
-    );
+    ));
 
     if profile.ic_hits_getprop > 0 || profile.ic_misses_getprop > 0 {
         let getprop_total = profile.ic_hits_getprop + profile.ic_misses_getprop;
@@ -65,12 +58,12 @@ pub fn print_vm_profile(profile: &VmProfile) {
         } else {
             0.0
         };
-        eprintln!(
+        terminal::log(format!(
             "  {:<22} {:>10}  ({:.1}% hit rate)",
             "  GetProp IC hits",
             fmt_num_u64(profile.ic_hits_getprop),
             getprop_rate
-        );
+        ));
     }
 
     if profile.ic_hits_setprop > 0 || profile.ic_misses_setprop > 0 {
@@ -80,12 +73,12 @@ pub fn print_vm_profile(profile: &VmProfile) {
         } else {
             0.0
         };
-        eprintln!(
+        terminal::log(format!(
             "  {:<22} {:>10}  ({:.1}% hit rate)",
             "  SetProp IC hits",
             fmt_num_u64(profile.ic_hits_setprop),
             setprop_rate
-        );
+        ));
     }
 
     if profile.ic_hits_callmethod > 0 || profile.ic_misses_callmethod > 0 {
@@ -95,12 +88,12 @@ pub fn print_vm_profile(profile: &VmProfile) {
         } else {
             0.0
         };
-        eprintln!(
+        terminal::log(format!(
             "  {:<22} {:>10}  ({:.1}% hit rate)",
             "  CallMethod IC hits",
             fmt_num_u64(profile.ic_hits_callmethod),
             cm_rate
-        );
+        ));
     }
 
     let call_total = profile.calls_vm_fast + profile.calls_prepare_slow + profile.calls_native;
@@ -111,80 +104,80 @@ pub fn print_vm_profile(profile: &VmProfile) {
             0.0
         }
     };
-    eprintln!(
+    terminal::log(format!(
         "  {:<22} {:>10}  ({:.1}%)",
         "calls vm-fast",
         fmt_num_u64(profile.calls_vm_fast),
         pct(profile.calls_vm_fast)
-    );
-    eprintln!(
+    ));
+    terminal::log(format!(
         "  {:<22} {:>10}  ({:.1}%)",
         "calls slow/prepare",
         fmt_num_u64(profile.calls_prepare_slow),
         pct(profile.calls_prepare_slow)
-    );
-    eprintln!(
+    ));
+    terminal::log(format!(
         "  {:<22} {:>10}  ({:.1}%)",
         "calls native",
         fmt_num_u64(profile.calls_native),
         pct(profile.calls_native)
-    );
-    eprintln!(
+    ));
+    terminal::log(format!(
         "  {:<22} {:>10}",
         "heap allocs",
         fmt_num_u64(profile.heap_allocs)
-    );
-    eprintln!();
-    eprintln!("  {BOLD}{CYN}GC Stats{R}{DIM}");
-    eprintln!(
+    ));
+    terminal::blank();
+    terminal::log(chalk("GC Stats").cyan().bold());
+    terminal::log(format!(
         "  {:<22} {:>10}",
         "nursery allocs",
         fmt_num_u64(profile.nursery_allocs)
-    );
-    eprintln!(
+    ));
+    terminal::log(format!(
         "  {:<22} {:>10}",
         "minor gc runs",
         fmt_num_u64(profile.minor_gc_count)
-    );
-    eprintln!(
+    ));
+    terminal::log(format!(
         "  {:<22} {:>10}",
         "minor gc promoted",
         fmt_num_u64(profile.minor_gc_promoted)
-    );
-    eprintln!(
+    ));
+    terminal::log(format!(
         "  {:<22} {:>10}",
         "gc collections",
         fmt_num_u64(profile.gc_collections)
-    );
-    eprintln!("  {:<22} {:>10}", "gc freed", fmt_num_u64(profile.gc_freed));
-    eprintln!(
+    ));
+    terminal::log(format!("  {:<22} {:>10}", "gc freed", fmt_num_u64(profile.gc_freed)));
+    terminal::log(format!(
         "  {:<22} {:>10}",
         "heap live (post-gc)",
         fmt_num_u64(profile.heap_live)
-    );
-    eprintln!(
+    ));
+    terminal::log(format!(
         "  {:<22} {:>10}",
         "heap total slots",
         fmt_num_u64(profile.heap_total)
-    );
-    eprintln!();
-    eprintln!("  {BOLD}{CYN}Register VM Stats{R}{DIM}");
-    eprintln!(
+    ));
+    terminal::blank();
+    terminal::log(chalk("Register VM Stats").cyan().bold());
+    terminal::log(format!(
         "  {:<22} {:>10}",
         "Move opcodes",
         fmt_num_u64(profile.move_opcodes)
-    );
-    eprintln!(
+    ));
+    terminal::log(format!(
         "  {:<22} {:>10}",
         "frame pushes",
         fmt_num_u64(profile.frame_pushes)
-    );
-    eprintln!(
+    ));
+    terminal::log(format!(
         "  {:<22} {:>10}",
         "frame pops",
         fmt_num_u64(profile.frame_pops)
-    );
-    eprintln!("{R}");
+    ));
+    terminal::blank();
 }
 
 pub fn print_opcode_hotspots(rows: &[(OpCode, u64)]) {
@@ -193,40 +186,61 @@ pub fn print_opcode_hotspots(rows: &[(OpCode, u64)]) {
         return;
     }
 
-    eprintln!();
-    eprintln!("  {BOLD}{BLU}VM Opcode Hotspots{R}{DIM}");
+    terminal::blank();
+    terminal::log(chalk("VM Opcode Hotspots").blue().bold());
     for (op, count) in rows.iter().take(12) {
         let share = *count as f64 / total as f64;
-        eprintln!(
+        terminal::log(format!(
             "  {:<20} {:>10}  {:>4.0}%",
             format!("{op:?}").trim_start_matches("Op"),
             fmt_num_u64(*count),
             share * 100.0
-        );
+        ));
     }
-    eprintln!("  {:<20} {:>10}", "total", fmt_num_u64(total));
-    eprintln!("{R}");
+    terminal::log(format!("  {:<20} {:>10}", "total", fmt_num_u64(total)));
+    terminal::blank();
 }
 
-fn print_duration_rows(title: &str, color: &str, rows: &[(&str, Duration)]) {
+fn print_duration_rows_green(title: &str, rows: &[(&str, Duration)]) {
     let total: Duration = rows.iter().map(|(_, d)| *d).sum();
     if total.is_zero() {
         return;
     }
 
-    eprintln!();
-    eprintln!("  {BOLD}{color}{title}{R}{DIM}");
+    terminal::blank();
+    terminal::log(chalk(title).green().bold());
     for (name, dur) in rows {
         let share = dur.as_nanos() as f64 / total.as_nanos() as f64;
-        eprintln!(
+        terminal::log(format!(
             "  {:<14} {:>10}  {:>4.0}%",
             name,
             fmt_dur(*dur),
             share * 100.0
-        );
+        ));
     }
-    eprintln!("  {:<14} {:>10}", "total", fmt_dur(total));
-    eprintln!("{R}");
+    terminal::log(format!("  {:<14} {:>10}", "total", fmt_dur(total)));
+    terminal::blank();
+}
+
+fn print_duration_rows_red(title: &str, rows: &[(&str, Duration)]) {
+    let total: Duration = rows.iter().map(|(_, d)| *d).sum();
+    if total.is_zero() {
+        return;
+    }
+
+    terminal::blank();
+    terminal::log(chalk(title).red().bold());
+    for (name, dur) in rows {
+        let share = dur.as_nanos() as f64 / total.as_nanos() as f64;
+        terminal::log(format!(
+            "  {:<14} {:>10}  {:>4.0}%",
+            name,
+            fmt_dur(*dur),
+            share * 100.0
+        ));
+    }
+    terminal::log(format!("  {:<14} {:>10}", "total", fmt_dur(total)));
+    terminal::blank();
 }
 
 fn fmt_dur(d: Duration) -> String {
@@ -279,35 +293,35 @@ fn fmt_num_u64(n: u64) -> String {
 }
 
 pub fn print_jit_stats(stats: &JitStatsSnapshot) {
-    eprintln!();
-    eprintln!("  {BOLD}{MAG}JIT Compiler & Execution Stats{R}{DIM}");
+    terminal::blank();
+    terminal::log(chalk("JIT Compiler & Execution Stats").magenta().bold());
 
     let total_compilations = stats.compile_success + stats.compile_fail;
-    eprintln!(
+    terminal::log(format!(
         "  {:<26} {:>10}  (success: {}, failed: {})",
         "freshly compiled",
         fmt_num_u64(total_compilations),
         stats.compile_success,
         stats.compile_fail
-    );
-    eprintln!(
+    ));
+    terminal::log(format!(
         "  {:<26} {:>10}",
         "using cached JIT",
         fmt_num_u64(stats.jit_cached)
-    );
+    ));
 
     let compile_time = Duration::from_nanos(stats.total_compile_time_ns);
-    eprintln!(
+    terminal::log(format!(
         "  {:<26} {:>10}",
         "total compile time",
         fmt_dur(compile_time)
-    );
+    ));
 
-    eprintln!(
+    terminal::log(format!(
         "  {:<26} {:>10}",
         "total machine code",
         fmt_bytes(stats.total_code_size_bytes as usize)
-    );
+    ));
 
     let total_runs = stats.jit_runs + stats.interp_runs;
     let jit_ratio = if total_runs > 0 {
@@ -321,19 +335,19 @@ pub fn print_jit_stats(stats: &JitStatsSnapshot) {
         0.0
     };
 
-    eprintln!(
+    terminal::log(format!(
         "  {:<26} {:>10}  ({:.1}%)",
         "JIT runs",
         fmt_num_u64(stats.jit_runs),
         jit_ratio
-    );
-    eprintln!(
+    ));
+    terminal::log(format!(
         "  {:<26} {:>10}  ({:.1}%)",
         "interpreted runs",
         fmt_num_u64(stats.interp_runs),
         interp_ratio
-    );
-    eprintln!("{R}");
+    ));
+    terminal::blank();
 }
 
 fn fmt_bytes(n: usize) -> String {

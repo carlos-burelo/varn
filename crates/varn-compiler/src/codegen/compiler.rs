@@ -479,6 +479,29 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn pop_scope(&mut self) {
+        let current_depth = self.scopes.len();
+        let mut to_dispose: Vec<(u8, bool)> = Vec::new();
+        self.disposables.retain(|&(reg, is_await, depth)| {
+            if depth == current_depth {
+                to_dispose.push((reg, is_await));
+                false
+            } else {
+                true
+            }
+        });
+        to_dispose.reverse();
+        for (reg, is_await) in to_dispose {
+            let method = if is_await { "disposeAsync" } else { "dispose" };
+            let str_idx = self.add_str(method);
+            let cs = self.alloc_cache() as u8;
+            let line = self.line;
+            self.chunk
+                .write(Chunk::pack_op(OpCode::CallMethod, cs), line);
+            self.chunk.write(Chunk::pack(reg, reg), line);
+            self.chunk.write(str_idx, line);
+            self.chunk.write(Chunk::pack(0u8, 0u8), line);
+        }
+
         if let Some(scope) = self.scopes.last() {
             let mut captured_regs: Vec<u8> = scope
                 .values()

@@ -12,6 +12,7 @@ pub mod scope;
 pub mod symbols;
 pub mod tokens;
 pub mod types;
+pub mod terminal;
 
 pub use cap_trace::debug_cap_trace;
 pub use flags::DebugFlags;

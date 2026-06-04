@@ -1,8 +1,8 @@
-use crate::colors::{C_CONSTS, DIM, RESET};
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal::Section;
 
 pub fn debug_consts(filename: &str) {
-    use crate::colors::{footer, header};
-    header(C_CONSTS, "constant folding", filename);
-    eprintln!("  {DIM}(Constant evaluation trace not implemented){RESET}");
-    footer(C_CONSTS, "const trace complete");
+    Section::new("constant folding").subtitle(filename).color(|c| c.yellow()).print();
+    varn_utilities::terminal::log(format!("  {}", chalk("(Constant evaluation trace not implemented)").dim()));
+    Section::new("constant folding").close();
 }

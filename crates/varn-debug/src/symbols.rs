@@ -1,4 +1,6 @@
-use crate::colors::{BOLD, C_TYPES, DIM, R, RESET, YELLOW};
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal;
+use varn_utilities::terminal::Section;
 use varn_checker::CheckResult;
 
 pub fn debug_symbols(
@@ -6,19 +8,14 @@ pub fn debug_symbols(
     filename: &str,
     _flags: &crate::flags::DebugFlags,
 ) {
-    use crate::colors::{footer, header};
-    header(C_TYPES, "type inference engine", filename);
+    Section::new("type inference engine").subtitle(filename).color(|c| c.blue()).print();
 
-    eprintln!("  Symbol Types");
-    eprintln!(
-        "  {DIM}{:<8} │ {:<15} │ {:<20} │ Type Details{RESET}",
-        "Loc",
-        "Kind",
-        "Name",
-        DIM = DIM,
-        RESET = R
-    );
-    eprintln!("  {}", "─".repeat(80));
+    terminal::log("  Symbol Types");
+    terminal::log(format!(
+        "  {}",
+        chalk(format!("{:<8} │ {:<15} │ {:<20} │ Type Details", "Loc", "Kind", "Name")).dim()
+    ));
+    terminal::log(format!("  {}", "─".repeat(80)));
 
     for (id, sym) in check_result.bind.arena.all().iter().enumerate() {
         let loc = format!(
@@ -48,31 +45,26 @@ pub fn debug_symbols(
                 || origin.contains("varn-stdlib/")
                 || origin.contains(r"varn-stdlib\"));
 
-        let tag = if is_core {
-            format!("{DIM}[core]{RESET} ")
+        let tag_label = if is_core {
+            "[core]"
         } else if is_std {
-            format!("{DIM}[std]{RESET} ")
+            "[std]"
         } else {
-            format!("{DIM}[usr]{RESET} ")
+            "[usr]"
         };
 
-        eprintln!(
-            "  {DIM}{:<8}{RESET} │ {:<15} │ {BOLD}{tag}{:<20}{RESET} │ {YELLOW}{}{RESET}",
-            loc,
+        terminal::log(format!(
+            "  {} │ {:<15} │ {} {} │ {}",
+            chalk(format!("{:<8}", loc)).dim(),
             kind_str,
-            name,
-            ty,
-            tag = tag,
-            DIM = DIM,
-            RESET = R,
-            BOLD = BOLD,
-            YELLOW = YELLOW
-        );
+            chalk(tag_label).dim(),
+            chalk(format!("{:<20}", name)).bold(),
+            chalk(&ty).yellow()
+        ));
     }
 
-    eprintln!();
-    footer(
-        C_TYPES,
-        &format!("{} symbols analyzed", check_result.bind.arena.len()),
-    );
+    terminal::blank();
+    Section::new("type inference engine")
+        .subtitle(format!("{} symbols analyzed", check_result.bind.arena.len()))
+        .close();
 }

@@ -4,6 +4,7 @@ use varn_pm::{
     installer, lockfile,
     manifest::{find_project_manifest, ProjectManifest},
 };
+use varn_utilities::terminal;
 
 pub fn execute(args: RemoveArgs) -> Result<(), CliError> {
     let cwd =
@@ -53,6 +54,6 @@ pub fn execute(args: RemoveArgs) -> Result<(), CliError> {
             .map_err(|e| CliError::fatal(e))?;
     }
 
-    eprintln!("Removed '{}'", args.alias);
+    terminal::log(format!("Removed '{}'", args.alias));
     Ok(())
 }

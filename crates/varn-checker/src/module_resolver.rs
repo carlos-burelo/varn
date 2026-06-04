@@ -6,10 +6,102 @@ use std::cell::RefCell;
 use std::fs::read_to_string;
 use std::path::Path;
 use std::rc::Rc;
+use std::hash::{Hash, Hasher};
 use varn_core::ast::{Decl, ExportDecl, ExportDefaultDecl, Pattern, Stmt, StmtKind};
 use varn_core::ModuleId;
 
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CachedModule {
+    exports: ExportMap,
+    bind: BindResult,
+}
+
+fn compute_source_hash(source: &str) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    source.hash(&mut hasher);
+    hasher.finish()
+}
+
+fn get_cache_dir() -> std::path::PathBuf {
+    PROJECT_ROOT.with(|r| {
+        let mut guard = r.borrow_mut();
+        if guard.is_none() {
+            let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let root = varn_modules::artifact::find_project_root(&current_dir);
+            *guard = Some(root);
+        }
+        varn_modules::artifact::get_types_cache_dir(guard.as_ref().unwrap())
+    })
+}
+
+fn try_load_cache(virtual_id: &str, source: &str) -> Option<CachedModule> {
+    if virtual_id == "std:types" {
+        return None;
+    }
+    let hash = compute_source_hash(source);
+    let name = if virtual_id.contains(':') {
+        virtual_id.replace(':', "_")
+    } else {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        virtual_id.hash(&mut hasher);
+        format!("file_{:x}", hasher.finish())
+    };
+
+    let cache_dir = get_cache_dir();
+    let cache_file = cache_dir.join(format!("{}.{:x}.vnm", name, hash));
+    if !cache_file.exists() {
+        return None;
+    }
+    let bytes = std::fs::read(&cache_file).ok()?;
+    let payload = match varn_modules::artifact::read_envelope(
+        varn_modules::artifact::MAGIC_VNM,
+        varn_modules::artifact::TYPE_CACHE_VERSION,
+        &bytes,
+    ) {
+        Ok(p) => p,
+        Err(_) => return None,
+    };
+    match postcard::from_bytes(payload) {
+        Ok(val) => Some(val),
+        Err(_) => None,
+    }
+}
+
+fn save_to_cache(virtual_id: &str, source: &str, exports: &ExportMap, bind: &BindResult) {
+    if virtual_id == "std:types" {
+        return;
+    }
+    let hash = compute_source_hash(source);
+    let cache_dir = get_cache_dir();
+    let _ = std::fs::create_dir_all(&cache_dir);
+    let name = if virtual_id.contains(':') {
+        virtual_id.replace(':', "_")
+    } else {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        virtual_id.hash(&mut hasher);
+        format!("file_{:x}", hasher.finish())
+    };
+
+    let cache_file = cache_dir.join(format!("{}.{:x}.vnm", name, hash));
+    let cached = CachedModule {
+        exports: exports.clone(),
+        bind: bind.clone(),
+    };
+    match postcard::to_allocvec(&cached) {
+        Ok(payload) => {
+            let bytes = varn_modules::artifact::write_envelope(
+                varn_modules::artifact::MAGIC_VNM,
+                varn_modules::artifact::TYPE_CACHE_VERSION,
+                &payload,
+            );
+            let _ = std::fs::write(&cache_file, bytes);
+        }
+        Err(_) => {}
+    }
+}
+
 thread_local! {
+    static PROJECT_ROOT: RefCell<Option<std::path::PathBuf>> = RefCell::new(None);
     static MODULE_BIND_CACHE: RefCell<Option<FxHashMap<String, Rc<BindResult>>>> = RefCell::new(None);
     static MODULE_EXPORT_CACHE: RefCell<Option<FxHashMap<String, Rc<ExportMap>>>> = RefCell::new(None);
     static RESOLVED_PATH_CACHE: RefCell<Option<FxHashMap<(String, String), String>>> = RefCell::new(None);
@@ -98,6 +190,11 @@ pub fn invalidate_module(id: &ModuleId) {
             }
         }
     });
+    RESOLVED_PATH_CACHE.with(|c| {
+        if let Some(cache) = c.borrow_mut().as_mut() {
+            cache.retain(|_, v| !to_clear.contains(v));
+        }
+    });
 }
 
 pub fn invalidate_module_cache() {
@@ -124,19 +221,30 @@ pub fn resolve_stdlib_module_exports_ref(specifier: &str) -> Rc<ExportMap> {
         return cached;
     }
 
+    if specifier == "std:types" {
+        if let Some(provider) = varn_modules::provider::get() {
+            if let Some(source) = provider.embedded_source(specifier) {
+                let mut visiting = vec![];
+                let result = resolve_from_embedded_source(specifier, source, &mut visiting);
+                export_cache_insert(key.to_string(), Rc::clone(&result));
+                return result;
+            }
+        }
+    }
+
     // Prefer embedded source — no filesystem dependency, works in release builds.
     if let Some(provider) = varn_modules::provider::get() {
         if let Some(source) = provider.embedded_source(specifier) {
             let mut visiting = vec![];
             let result = resolve_from_embedded_source(specifier, source, &mut visiting);
-            export_cache_insert(key, Rc::clone(&result));
+            export_cache_insert(key.to_string(), Rc::clone(&result));
             return result;
         }
         if let Some(path) = provider.source_path(specifier) {
             let abs = path.to_string_lossy().into_owned();
             let mut visiting = vec![];
             let result = resolve_module_exports_ref(&abs, &mut visiting);
-            export_cache_insert(key, Rc::clone(&result));
+            export_cache_insert(key.to_string(), Rc::clone(&result));
             return result;
         }
     }
@@ -166,6 +274,15 @@ fn resolve_from_embedded_source(
         return Rc::new(FxHashMap::default());
     }
     visiting.push(virtual_id.to_owned());
+
+    if let Some(cached) = try_load_cache(virtual_id, source) {
+        let bind_rc = Rc::new(cached.bind);
+        let exports_rc = Rc::new(cached.exports);
+        
+        bind_cache_insert(virtual_id.to_owned(), Rc::clone(&bind_rc));
+        visiting.pop();
+        return exports_rc;
+    }
 
     let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(source, virtual_id);
     let program = match varn_parser::parse(tokens, lexeme_buf, virtual_id) {
@@ -202,6 +319,8 @@ fn resolve_from_embedded_source(
     );
     assign_slots(&mut exports);
 
+    save_to_cache(virtual_id, source, &exports, bind.as_ref());
+
     visiting.pop();
     Rc::new(exports)
 }
@@ -209,6 +328,14 @@ fn resolve_from_embedded_source(
 fn bind_from_embedded_source(virtual_id: &str, source: &str) -> Option<Rc<BindResult>> {
     if let Some(cached) = bind_cache_get(virtual_id) {
         return Some(cached);
+    }
+    if let Some(cached) = try_load_cache(virtual_id, source) {
+        let bind_rc = Rc::new(cached.bind);
+        bind_cache_insert(virtual_id.to_owned(), Rc::clone(&bind_rc));
+        let exports_rc = Rc::new(cached.exports);
+        let id = ModuleId::stdlib(virtual_id);
+        export_cache_insert(id.as_str().to_owned(), exports_rc);
+        return Some(bind_rc);
     }
     let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(source, virtual_id);
     let program = Rc::new(varn_parser::parse(tokens, lexeme_buf, virtual_id).ok()?);
@@ -335,6 +462,13 @@ fn cache_get_or_insert_ref(abs_path: &str) -> Option<Rc<BindResult>> {
 
     let canonical_abs = varn_modules::canonical_or_original(Path::new(abs_path));
     let source = read_to_string(&canonical_abs).ok()?;
+    if let Some(cached) = try_load_cache(&canonical_abs, &source) {
+        let bind_rc = Rc::new(cached.bind);
+        bind_cache_insert(canonical_abs.clone(), Rc::clone(&bind_rc));
+        let exports_rc = Rc::new(cached.exports);
+        export_cache_insert(canonical_abs, exports_rc);
+        return Some(bind_rc);
+    }
     let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(&source, &canonical_abs);
     let program = Rc::new(varn_parser::parse(tokens, lexeme_buf, &canonical_abs).ok()?);
     PROGRAM_CACHE.with(|c| {
@@ -349,6 +483,22 @@ fn cache_get_or_insert_ref(abs_path: &str) -> Option<Rc<BindResult>> {
         bind.diagnostics.emit(e);
     }
     let result = Rc::new(bind);
+    
+    // Save to cache for normal filesystem modules
+    let base_dir = Path::new(&canonical_abs).parent().unwrap_or(Path::new("."));
+    let mut exports = ExportMap::default();
+    let mut visiting = vec![];
+    collect_exports(
+        &program.body,
+        &result,
+        &canonical_abs,
+        base_dir,
+        &mut visiting,
+        &mut exports,
+    );
+    assign_slots(&mut exports);
+    save_to_cache(&canonical_abs, &source, &exports, &result);
+
     bind_cache_insert(canonical_abs, Rc::clone(&result));
     Some(result)
 }
@@ -454,6 +604,15 @@ fn collect_exports(
                         let mut s = sym.clone();
                         s.origin_module = Some(abs_path.to_owned().into());
                         out.insert(name.to_string(), s);
+                    }
+                }
+                if let Decl::SumType(st) = declaration.as_ref() {
+                    for variant in &st.variants {
+                        if let Some(sym) = lookup_global(bind, &variant.name) {
+                            let mut s = sym.clone();
+                            s.origin_module = Some(abs_path.to_owned().into());
+                            out.insert(variant.name.to_string(), s);
+                        }
                     }
                 }
             }
@@ -574,6 +733,7 @@ fn decl_primary_name(decl: &Decl) -> Option<Rc<str>> {
         Decl::TypeAlias(t) => Some(t.id.clone()),
         Decl::Namespace(n) => Some(n.id.clone()),
         Decl::Struct(s) => Some(s.id.clone()),
+        Decl::SumType(s) => Some(s.id.clone()),
         _ => None,
     }
 }

@@ -36,7 +36,21 @@ impl DocumentState {
                 if sid < self.db.arena.len() {
                     let sym = self.db.arena.get(sid);
                     
-                    if sym.kind == SymbolKind::Property || sym.kind == SymbolKind::Method || sym.kind == SymbolKind::EnumMember {
+                    let is_member_kind = matches!(
+                        sym.kind,
+                        SymbolKind::Property | SymbolKind::Method | SymbolKind::EnumMember
+                    );
+
+                    // Check whether this token follows a dot (member access position)
+                    let tok_idx_opt = self.tokens.iter().position(|t| t.offset == tok.offset);
+                    let after_dot = tok_idx_opt.map(|i| {
+                        i >= 1 && matches!(
+                            self.tokens[i - 1].kind,
+                            TokenKind::Dot | TokenKind::QuestionDot
+                        )
+                    }).unwrap_or(false);
+
+                    if is_member_kind {
                         // Find the class or interface that contains this member
                         if let Some(s) = self.symbols.iter().find(|s| {
                             s.members.iter().any(|m| m.symbol_id == Some(sid) || (m.line == sym.line && m.col == sym.col))
@@ -80,10 +94,102 @@ impl DocumentState {
                         });
                     }
 
-                    // If it is a top-level symbol (not a member)
+                    // Symbol kind is not a member kind. If we're in a member access (after a
+                    // dot), the symbol_id likely points to the wrong arena entry due to ID
+                    // mismatch with stdlib symbols. Build a DynamicMember from the inferred
+                    // expr type instead of falling through to top-level symbol search.
+                    if after_dot {
+                        if let Some(tok_idx) = tok_idx_opt {
+                            let parent_name = if tok_idx >= 2 {
+                                self.tokens[tok_idx - 2].lexeme.clone()
+                            } else {
+                                "dynamic".to_string()
+                            };
+                            let is_fn = matches!(info.ty.0, varn_core::TypeKind::Fn(_));
+                            let (type_str, params_str) = match &info.ty.0 {
+                                varn_core::TypeKind::Fn(ft) => {
+                                    let mut params = Vec::new();
+                                    for p in &ft.params {
+                                        let name_str = p.name.as_ref().map(|n| n.to_string()).unwrap_or_else(|| "_".to_string());
+                                        params.push(format!("{}: {}{}", name_str, p.ty, if p.optional { "?" } else { "" }));
+                                    }
+                                    (ft.return_type.to_string(), params.join(", "))
+                                }
+                                _ => (info.ty.to_string(), String::new()),
+                            };
+                            return Some(ChainResult::DynamicMember {
+                                member: MemberRecord {
+                                    name: tok.lexeme.clone(),
+                                    type_str,
+                                    params_str,
+                                    is_static: false,
+                                    is_optional: false,
+                                    kind: if is_fn { MemberKind::Method } else { MemberKind::Property },
+                                    is_arrow: false,
+                                    is_async: false,
+                                    is_generator: false,
+                                    line: tok.line,
+                                    col: tok.col,
+                                    init_value: String::new(),
+                                    ty: info.ty.clone(),
+                                    symbol_id: None,
+                                    members: Vec::new(),
+                                },
+                                parent_name,
+                            });
+                        }
+                    }
+
+                    // Not a member access — look up as a top-level symbol
                     if let Some(s) = self.symbols.iter().find(|s| s.symbol_id == Some(sid) || (s.line == sym.line && s.col == sym.col)) {
                         return Some(ChainResult::Symbol(s));
                     }
+                }
+            } else {
+                // The symbol_id is None, but we have an inferred type from the compiler!
+                // Let's dynamically create a Member hover signature.
+                if let Some(tok_idx) = self.tokens.iter().position(|t| t.offset == tok.offset) {
+                    let parent_name = if tok_idx >= 2 
+                        && (self.tokens[tok_idx - 1].kind == TokenKind::Dot || self.tokens[tok_idx - 1].kind == TokenKind::QuestionDot) 
+                    {
+                        self.tokens[tok_idx - 2].lexeme.clone()
+                    } else {
+                        "dynamic".to_string()
+                    };
+
+                    let is_fn = matches!(info.ty.0, varn_core::TypeKind::Fn(_));
+                    let (type_str, params_str) = match &info.ty.0 {
+                        varn_core::TypeKind::Fn(ft) => {
+                            let mut params = Vec::new();
+                            for p in &ft.params {
+                                let name_str = p.name.as_ref().map(|n| n.to_string()).unwrap_or_else(|| "_".to_string());
+                                params.push(format!("{}: {}{}", name_str, p.ty, if p.optional { "?" } else { "" }));
+                            }
+                            (ft.return_type.to_string(), params.join(", "))
+                        }
+                        _ => (info.ty.to_string(), String::new()),
+                    };
+
+                    return Some(ChainResult::DynamicMember {
+                        member: MemberRecord {
+                            name: tok.lexeme.clone(),
+                            type_str,
+                            params_str,
+                            is_static: false,
+                            is_optional: false,
+                            kind: if is_fn { MemberKind::Method } else { MemberKind::Property },
+                            is_arrow: false,
+                            is_async: false,
+                            is_generator: false,
+                            line: tok.line,
+                            col: tok.col,
+                            init_value: String::new(),
+                            ty: info.ty.clone(),
+                            symbol_id: None,
+                            members: Vec::new(),
+                        },
+                        parent_name,
+                    });
                 }
             }
         }

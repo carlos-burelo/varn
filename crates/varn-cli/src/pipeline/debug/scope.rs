@@ -1,13 +1,13 @@
-use crate::pipeline::colors::{footer, header, BLUE, BOLD, C_SCOPE, DIM, RESET};
 use varn_compiler::{FunctionProto, PoolEntry};
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal::Section;
 
 pub fn debug_scope(proto: &FunctionProto, filename: &str) {
-    header(C_SCOPE, "static scope tree", filename);
+    Section::new("static scope tree").subtitle(filename).color(|c| c.magenta()).print();
     let mut count = 0usize;
     print_fn_scope(proto, "", true, &mut count);
-    footer(
-        C_SCOPE,
-        &format!("{count} static function scope(s) indexed"),
+    varn_utilities::terminal::log(
+        chalk(format!("── {count} static function scope(s) indexed ──")).dim(),
     );
 }
 
@@ -15,10 +15,12 @@ fn print_fn_scope(proto: &FunctionProto, indent: &str, is_last: bool, count: &mu
     let marker = if is_last { "└── " } else { "├── " };
     let name = proto.name.as_deref().unwrap_or("<anonymous>");
 
-    eprintln!(
-        "{indent}{marker}{BOLD}{BLUE}fn{RESET} {BOLD}{name}{RESET} {DIM}(upvalues: {}){RESET}",
-        proto.upvalue_count
-    );
+    varn_utilities::terminal::log(format!(
+        "{indent}{marker}{} {} {}",
+        chalk("fn").blue().bold(),
+        chalk(name).bold(),
+        chalk(format!("(upvalues: {})", proto.upvalue_count)).dim(),
+    ));
     *count += 1;
 
     let child_indent = format!("{indent}{}", if is_last { "    " } else { "│   " });
@@ -43,11 +45,11 @@ fn print_fn_scope(proto: &FunctionProto, indent: &str, is_last: bool, count: &mu
         } else {
             ""
         };
-        eprintln!(
-            "{child_indent}{DIM}id: {}{}{RESET}",
-            locals.join(", "),
-            suffix
-        );
+        varn_utilities::terminal::log(format!(
+            "{}{}",
+            child_indent,
+            chalk(format!("id: {}{}", locals.join(", "), suffix)).dim(),
+        ));
     }
 
     let nested_fns: Vec<_> = proto

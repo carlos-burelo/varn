@@ -1,15 +1,18 @@
-use crate::colors::{BLUE, BOLD, C_SCOPE, DIM, RESET};
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal;
+use varn_utilities::terminal::Section;
 use varn_compiler::FunctionProto;
 use varn_types::chunk::Literal;
 use varn_types::chunk::PoolEntry;
 
 pub fn debug_scopes(proto: &FunctionProto, filename: &str) {
-    use crate::colors::{footer, header};
-    header(C_SCOPE, "static scope tree", filename);
+    Section::new("static scope tree").subtitle(filename).color(|c| c.magenta()).print();
 
     print_scope_tree(proto, 0);
 
-    footer(C_SCOPE, "static function scope(s) indexed");
+    Section::new("static scope tree")
+        .subtitle("static function scope(s) indexed")
+        .close();
 }
 
 fn print_scope_tree(proto: &FunctionProto, depth: usize) {
@@ -21,21 +24,14 @@ fn print_scope_tree(proto: &FunctionProto, depth: usize) {
     };
 
     let name = proto.name.as_deref().unwrap_or("<anonymous>");
+    let outer_indent = if depth == 0 { "" } else { &indent[..indent.len() - 4] };
 
-    eprintln!(
-        "{indent}{marker}{BOLD}fn{RESET} {BLUE}{}{RESET} (upvalues: {})",
-        name,
+    terminal::log(format!(
+        "{outer_indent}{marker}{} {} (upvalues: {})",
+        chalk("fn").bold(),
+        chalk(name).blue(),
         proto.upvalue_count,
-        indent = if depth == 0 {
-            ""
-        } else {
-            &indent[..indent.len() - 4]
-        },
-        marker = marker,
-        BOLD = BOLD,
-        RESET = RESET,
-        BLUE = BLUE
-    );
+    ));
 
     let ids: Vec<_> = proto
         .chunk
@@ -51,12 +47,10 @@ fn print_scope_tree(proto: &FunctionProto, depth: usize) {
         .collect();
 
     if !ids.is_empty() {
-        eprintln!(
-            "{indent}    {DIM}const pool strings: {}{RESET}",
-            ids.join(", "),
-            indent = indent,
-            DIM = DIM,
-            RESET = RESET
-        );
+        terminal::log(format!(
+            "{}    {}",
+            indent,
+            chalk(format!("const pool strings: {}", ids.join(", "))).dim()
+        ));
     }
 }

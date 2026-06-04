@@ -42,7 +42,7 @@ impl ExecCtx {
                 *ip += 2;
                 let cond = self.stack[base + first_reg];
                 if std::env::var("VARN_JIT_DEBUG").is_ok() {
-                    eprintln!("DEBUG INTERP JumpIfFalse: cond={:?}, is_truthy={}", cond, cond.is_truthy());
+                    varn_utilities::terminal::tagged("jit:debug", format_args!("JumpIfFalse: cond={:?}, is_truthy={}", cond, cond.is_truthy()));
                 }
                 if !cond.is_truthy() {
                     *ip += offset;
@@ -54,7 +54,7 @@ impl ExecCtx {
                 *ip += 2;
                 let cond = self.stack[base + first_reg];
                 if std::env::var("VARN_JIT_DEBUG").is_ok() {
-                    eprintln!("DEBUG INTERP JumpIfTrue: cond={:?}, is_truthy={}", cond, cond.is_truthy());
+                    varn_utilities::terminal::tagged("jit:debug", format_args!("JumpIfTrue: cond={:?}, is_truthy={}", cond, cond.is_truthy()));
                 }
                 if cond.is_truthy() {
                     *ip += offset;

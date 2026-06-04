@@ -4,7 +4,7 @@ pub type SymbolId = usize;
 use varn_core::ast::TypeNode;
 use varn_core::SourceRange;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SymbolKind {
     Var,
     Let,
@@ -47,7 +47,7 @@ impl SymbolKind {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Symbol {
     pub kind: SymbolKind,
     pub name: Rc<str>,
@@ -61,10 +61,12 @@ pub struct Symbol {
     pub type_params: Vec<Rc<str>>,
     pub type_param_constraints: Vec<Option<Type>>,
     pub offset: u32,
+    #[serde(skip)]
     pub full_range: varn_core::SourceRange,
     pub origin_module: Option<Rc<str>>,
     pub re_export_path: Vec<Rc<str>>,
     pub original_name: Option<Rc<str>>,
+    #[serde(skip)]
     pub alias_node: Option<Box<TypeNode>>,
     pub slot_idx: Option<usize>,
 }
@@ -99,7 +101,7 @@ impl Symbol {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct SymbolArena {
     symbols: Vec<Symbol>,
 }

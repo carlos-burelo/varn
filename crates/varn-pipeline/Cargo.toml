@@ -7,6 +7,7 @@ edition = "2021"
 lsp-debug = ["dep:varn-lsp", "dep:tower-lsp"]
 
 [dependencies]
+varn-utilities = { path = "../varn-utilities" }
 varn-core        = { path = "../varn-core" }
 varn-lexer       = { path = "../varn-lexer" }
 varn-parser      = { path = "../varn-parser", features = ["profiling"] }

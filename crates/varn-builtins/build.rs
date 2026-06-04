@@ -37,8 +37,12 @@ fn collect_registry_entries(dir: &Path, out: &mut impl Write) {
                 let vn_source_rel = vn_rel.trim_start_matches("src/").to_string();
                 let vn_source_field = format!("crates/varn-builtins/src/{vn_source_rel}");
 
+                let source_content = fs::read_to_string(&vn_rel)
+                    .unwrap_or_else(|e| panic!("cannot read .vn source at {vn_rel}: {e}"));
+                let exports = extract_exports_from_source(&source_content);
+
                 // Parse JSON — handle both {"id":...} and {"modules":[...]} forms.
-                emit_entries_from_json(&raw, &vn_source_field, &vn_rel, out);
+                emit_entries_from_json(&raw, &vn_source_field, &vn_rel, &exports, out);
             }
             // Recurse into subdirectories.
             collect_registry_entries(&path, out);
@@ -68,6 +72,7 @@ fn emit_entries_from_json(
     json: &str,
     vn_source_field: &str,
     vn_include_path: &str,
+    exports: &[String],
     out: &mut impl Write,
 ) {
     // Minimal JSON parsing — avoid pulling in serde_json at build time.
@@ -86,6 +91,7 @@ fn emit_entries_from_json(
                     &kind,
                     vn_source_field,
                     vn_include_path,
+                    exports,
                     &capabilities,
                 );
             }
@@ -100,6 +106,7 @@ fn emit_entries_from_json(
                 &kind,
                 vn_source_field,
                 vn_include_path,
+                exports,
                 &capabilities,
             );
         }
@@ -112,6 +119,7 @@ fn emit_spec_entry(
     kind: &str,
     vn_source_field: &str,
     vn_include_path: &str,
+    exports: &[String],
     _capabilities: &[String],
 ) {
     let kind_expr = match kind {
@@ -120,9 +128,19 @@ fn emit_spec_entry(
         "runtime" => "ModuleKind::Runtime",
         other => panic!("unknown module kind: {other}"),
     };
+    let mut exports_formatted = String::new();
+    if !exports.is_empty() {
+        exports_formatted.push_str("&[");
+        for exp in exports {
+            exports_formatted.push_str(&format!(r#""{exp}","#));
+        }
+        exports_formatted.push(']');
+    } else {
+        exports_formatted.push_str("&[]");
+    }
     writeln!(
         out,
-        r#"    ModuleSpec::new("{id}", {kind_expr}, "{vn_source_field}").with_source(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/{vn_include_path}"))),"#,
+        r#"    ModuleSpec::new("{id}", {kind_expr}, "{vn_source_field}").with_source(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/{vn_include_path}"))).with_exports({exports_formatted}),"#,
     ).unwrap();
 }
 
@@ -201,4 +219,162 @@ fn extract_capabilities(json: &str) -> Vec<String> {
         .map(|s| s.trim().trim_matches('"').to_string())
         .filter(|s| !s.is_empty())
         .collect()
+}
+
+fn extract_exports_from_source(source: &str) -> Vec<String> {
+    let mut exports = Vec::new();
+    let mut brace_depth = 0;
+    let mut chars = source.chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '/' => {
+                if chars.peek() == Some(&'/') {
+                    chars.next();
+                    while let Some(next_c) = chars.next() {
+                        if next_c == '\n' {
+                            break;
+                        }
+                    }
+                } else if chars.peek() == Some(&'*') {
+                    chars.next();
+                    while let Some(next_c) = chars.next() {
+                        if next_c == '*' && chars.peek() == Some(&'/') {
+                            chars.next();
+                            break;
+                        }
+                    }
+                }
+            }
+            '"' | '\'' | '`' => {
+                let quote = c;
+                let mut escaped = false;
+                while let Some(next_c) = chars.next() {
+                    if escaped {
+                        escaped = false;
+                    } else if next_c == '\\' {
+                        escaped = true;
+                    } else if next_c == quote {
+                        break;
+                    }
+                }
+            }
+            '{' => {
+                brace_depth += 1;
+            }
+            '}' => {
+                if brace_depth > 0 {
+                    brace_depth -= 1;
+                }
+            }
+            _ => {
+                if brace_depth == 0 && (c.is_alphabetic() || c == '_') {
+                    let mut word = String::new();
+                    word.push(c);
+                    while let Some(&next_c) = chars.peek() {
+                        if next_c.is_alphanumeric() || next_c == '_' {
+                            word.push(next_c);
+                            chars.next();
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if word == "export" {
+                        let mut words = Vec::new();
+                        while words.len() < 5 {
+                            skip_whitespace_and_comments(&mut chars);
+
+                            if let Some(&next_c) = chars.peek() {
+                                if next_c.is_alphanumeric() || next_c == '_' {
+                                    let mut w = String::new();
+                                    while let Some(&nc) = chars.peek() {
+                                        if nc.is_alphanumeric() || nc == '_' {
+                                            w.push(nc);
+                                            chars.next();
+                                        } else {
+                                            break;
+                                        }
+                                    }
+                                    words.push(w);
+                                } else if next_c == '{'
+                                    || next_c == '*'
+                                    || next_c == '='
+                                    || next_c == ';'
+                                {
+                                    break;
+                                } else {
+                                    chars.next();
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        }
+
+                        let mut keyword_idx = 0;
+                        if keyword_idx < words.len() && words[keyword_idx] == "declare" {
+                            keyword_idx += 1;
+                        }
+
+                        if keyword_idx < words.len() {
+                            let kw = &words[keyword_idx];
+                            if [
+                                "function",
+                                "class",
+                                "interface",
+                                "namespace",
+                                "type",
+                                "enum",
+                                "struct",
+                                "const",
+                                "let",
+                            ]
+                            .contains(&kw.as_str())
+                            {
+                                if keyword_idx + 1 < words.len() {
+                                    let name = &words[keyword_idx + 1];
+                                    exports.push(name.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    exports.sort();
+    exports.dedup();
+    exports
+}
+
+fn skip_whitespace_and_comments(chars: &mut std::iter::Peekable<std::str::Chars>) {
+    while let Some(&c) = chars.peek() {
+        if c.is_whitespace() {
+            chars.next();
+        } else if c == '/' {
+            chars.next();
+            if chars.peek() == Some(&'/') {
+                chars.next();
+                while let Some(next_c) = chars.next() {
+                    if next_c == '\n' {
+                        break;
+                    }
+                }
+            } else if chars.peek() == Some(&'*') {
+                chars.next();
+                while let Some(next_c) = chars.next() {
+                    if next_c == '*' && chars.peek() == Some(&'/') {
+                        chars.next();
+                        break;
+                    }
+                }
+            } else {
+                break;
+            }
+        } else {
+            break;
+        }
+    }
 }

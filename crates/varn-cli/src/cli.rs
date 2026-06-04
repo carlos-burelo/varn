@@ -36,6 +36,9 @@ pub enum Commands {
     Init(InitArgs),
     /// Diagnóstico del sistema y configuración
     Doctor,
+    /// Gestión del caché de compilación
+    #[command(subcommand)]
+    Cache(CacheCommands),
     /// Iniciar servidor LSP (comunica por stdio)
     Lsp,
     /// Generar scripts de autocompletado para el shell
@@ -178,6 +181,12 @@ pub enum PkgCommands {
     Install,
     /// Actualizar dependencias del proyecto
     Update,
+}
+
+#[derive(Subcommand)]
+pub enum CacheCommands {
+    /// Eliminar archivos de caché del proyecto actual
+    Clean,
 }
 
 #[derive(ValueEnum, Clone, Debug)]

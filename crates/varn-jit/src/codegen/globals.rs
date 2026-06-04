@@ -114,6 +114,8 @@ pub(crate) fn emit_globals(
             let idx = code[*ip] as usize;
             *ip += 1;
 
+            emit_flush_all(asm, regmap);
+
             // Reload closure pointer from saved stack slot
             asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
 
@@ -150,6 +152,7 @@ pub(crate) fn emit_globals(
             asm.pop(ARG_CTX);
 
             emit_store(asm, Reg::R11, first_reg, regmap);
+            emit_reload_all_except(asm, regmap, Some(first_reg));
         }
         _ => unreachable!("emit_globals called with {:?}", op),
     }

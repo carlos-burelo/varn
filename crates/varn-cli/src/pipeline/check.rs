@@ -4,6 +4,7 @@ use varn_core::ast::Program;
 use crate::error::CliError;
 use varn_debug::colors::{BOLD, C_ERRORS, R};
 use varn_debug::flags::DebugFlags;
+use varn_utilities::terminal;
 
 type PipelineResult<T> = Result<T, CliError>;
 
@@ -47,7 +48,7 @@ pub fn check(
             return Err(CliError::new(3, format!("{}\n{}", msgs.join("\n"), footer)));
         } else {
             for m in msgs {
-                eprintln!("{m}");
+                terminal::log(&m);
             }
         }
     }

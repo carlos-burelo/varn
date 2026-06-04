@@ -138,26 +138,26 @@ fn compile_source_cached(source: &str, path: &str, verbose: bool) -> PipelineRes
     match cache::load_cached_graph(&cache_path, compile::CACHE_FORMAT_VERSION, source) {
         Ok(Some(graph_artifact)) => {
             if verbose {
-                eprintln!("[Varn] compile cache hit");
+                varn_utilities::terminal::tagged("Varn", "compile cache hit");
             }
             return cache::compile_output_from_graph(graph_artifact);
         }
         Ok(None) => {}
         Err(e) => {
             if verbose {
-                eprintln!("[Varn] compile cache read skipped: {e}");
+                varn_utilities::terminal::tagged("Varn", format_args!("compile cache read skipped: {e}"));
             }
         }
     }
 
     if verbose {
-        eprintln!("[Varn] compile cache miss");
+        varn_utilities::terminal::tagged("Varn", "compile cache miss");
     }
 
     let compiled = compile_source(source, path, verbose, &DebugFlags::default(), false)?;
     if let Err(e) = cache::store_cached_graph(&cache_path, &compiled.graph_artifact) {
         if verbose {
-            eprintln!("[Varn] compile cache write skipped: {e}");
+            varn_utilities::terminal::tagged("Varn", format_args!("compile cache write skipped: {e}"));
         }
     }
     Ok(compiled)

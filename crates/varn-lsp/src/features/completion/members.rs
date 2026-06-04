@@ -3,7 +3,11 @@ use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, InsertTextFormat}
 use varn_core::{IntrinsicType, TokenKind};
 
 pub enum ReceiverInfo {
-    Named(String, bool),
+    Named {
+        name: String,
+        is_instance: bool,
+        origin: Option<String>,
+    },
 
     Anonymous(Vec<MemberRecord>),
 }
@@ -14,20 +18,53 @@ pub fn build_member_completions(
     use_snippets: bool,
 ) -> Vec<CompletionItem> {
     match info {
-        ReceiverInfo::Named(name, is_instance) => {
-            let sym = state.symbols.iter().find(|s| s.name == name);
-            let mut items = Vec::new();
-            let mut seen = std::collections::HashSet::new();
+        ReceiverInfo::Named { name, is_instance, origin } => {
+            let mut target_bind = None;
+            if let Some(origin_mod) = origin.as_deref() {
+                if origin_mod.starts_with("std:") || origin_mod.starts_with("runtime:") || origin_mod.starts_with("core:") {
+                    target_bind = varn_checker::module_resolver::resolve_stdlib_module_bind_ref(origin_mod);
+                } else {
+                    target_bind = varn_checker::module_resolver::resolve_module_bind_ref(origin_mod);
+                }
+            }
 
-            for m in sym
-                .map(|s| s.members.as_slice())
-                .unwrap_or_default()
-                .iter()
-                .filter(|m| m.is_static != is_instance)
-                .filter(|m| m.kind != MemberKind::Constructor)
-            {
-                if seen.insert(m.name.clone()) {
-                    items.push(member_to_completion_item(m, use_snippets));
+            let mut seen = std::collections::HashSet::new();
+            let mut items = Vec::new();
+
+            // 1. Try to find the symbol locally in state.symbols
+            if let Some(sym) = state.symbols.iter().find(|s| s.name == name) {
+                for m in sym
+                    .members
+                    .iter()
+                    .filter(|m| m.is_static != is_instance)
+                    .filter(|m| m.kind != MemberKind::Constructor)
+                {
+                    if seen.insert(m.name.clone()) {
+                        items.push(member_to_completion_item(m, use_snippets));
+                    }
+                }
+            } else if let Some(tb) = &target_bind {
+                // 2. Query the origin module's BindResult and map its type members dynamically
+                let mapped = if let Some(class_info) = tb.get_class_entry(&name) {
+                    crate::pipeline::symbols::map_members(&class_info.members, &[])
+                } else if let Some(interface_info) = tb.get_interface_members_local(&name) {
+                    crate::pipeline::symbols::map_members(interface_info, &[])
+                } else if let Some(namespace_info) = tb.get_namespace_members_local(&name) {
+                    crate::pipeline::symbols::map_members(namespace_info, &[])
+                } else if let Some(enum_info) = tb.get_enum_members_local(&name) {
+                    crate::pipeline::symbols::map_enum_members(enum_info, &[])
+                } else {
+                    Vec::new()
+                };
+
+                for m in mapped
+                    .iter()
+                    .filter(|m| m.is_static != is_instance)
+                    .filter(|m| m.kind != MemberKind::Constructor)
+                {
+                    if seen.insert(m.name.clone()) {
+                        items.push(member_to_completion_item(m, use_snippets));
+                    }
                 }
             }
 
@@ -149,22 +186,42 @@ pub fn dot_receiver(
             }
             varn_core::TypeKind::Intrinsic(tag) => {
                 if tag.is_primitive() || tag == &varn_core::TypeTag::Array {
-                    return Some(ReceiverInfo::Named(tag.name().to_owned(), true));
+                    return Some(ReceiverInfo::Named {
+                        name: tag.name().to_owned(),
+                        is_instance: true,
+                        origin: None,
+                    });
                 }
             }
             varn_core::TypeKind::LiteralStr(_) => {
-                return Some(ReceiverInfo::Named("str".to_owned(), true));
+                return Some(ReceiverInfo::Named {
+                    name: "str".to_owned(),
+                    is_instance: true,
+                    origin: None,
+                });
             }
             varn_core::TypeKind::LiteralInt(_) => {
-                return Some(ReceiverInfo::Named("int".to_owned(), true));
+                return Some(ReceiverInfo::Named {
+                    name: "int".to_owned(),
+                    is_instance: true,
+                    origin: None,
+                });
             }
             varn_core::TypeKind::LiteralFloat(_) => {
-                return Some(ReceiverInfo::Named("float".to_owned(), true));
+                return Some(ReceiverInfo::Named {
+                    name: "float".to_owned(),
+                    is_instance: true,
+                    origin: None,
+                });
             }
             varn_core::TypeKind::LiteralBool(_) => {
-                return Some(ReceiverInfo::Named("bool".to_owned(), true));
+                return Some(ReceiverInfo::Named {
+                    name: "bool".to_owned(),
+                    is_instance: true,
+                    origin: None,
+                });
             }
-            varn_core::TypeKind::Named(name, _) | varn_core::TypeKind::Generic(name, ..) => {
+            varn_core::TypeKind::Named(name, origin) | varn_core::TypeKind::Generic(name, _, origin) => {
                 let mut is_instance = true;
                 if let Some(sym) = state
                     .symbols
@@ -181,7 +238,11 @@ pub fn dot_receiver(
                         is_instance = false;
                     }
                 }
-                return Some(ReceiverInfo::Named(name.to_string(), is_instance));
+                return Some(ReceiverInfo::Named {
+                    name: name.to_string(),
+                    is_instance,
+                    origin: origin.as_ref().map(|s| s.to_string()),
+                });
             }
             _ => {}
         }
@@ -201,7 +262,11 @@ pub fn dot_receiver(
         _ => None,
     };
     if let Some(prim) = literal_type {
-        return Some(ReceiverInfo::Named(prim.to_owned(), true));
+        return Some(ReceiverInfo::Named {
+            name: prim.to_owned(),
+            is_instance: true,
+            origin: None,
+        });
     }
 
     None
@@ -303,7 +368,11 @@ fn dot_receiver_source_fallback(
         varn_checker::SymbolKind::Class
         | varn_checker::SymbolKind::Namespace
         | varn_checker::SymbolKind::Interface
-        | varn_checker::SymbolKind::Enum => Some(ReceiverInfo::Named(sym.name.clone(), false)),
+        | varn_checker::SymbolKind::Enum => Some(ReceiverInfo::Named {
+            name: sym.name.clone(),
+            is_instance: false,
+            origin: sym.origin.clone(),
+        }),
 
         varn_checker::SymbolKind::Let
         | varn_checker::SymbolKind::Var
@@ -316,10 +385,11 @@ fn dot_receiver_source_fallback(
                 return None;
             }
             if sym.type_str.ends_with("[]") {
-                return Some(ReceiverInfo::Named(
-                    IntrinsicType::Array.as_str().to_owned(),
-                    true,
-                ));
+                return Some(ReceiverInfo::Named {
+                    name: IntrinsicType::Array.as_str().to_owned(),
+                    is_instance: true,
+                    origin: None,
+                });
             }
             let class_name = sym.type_str.split('<').next()?.trim();
             state
@@ -335,7 +405,11 @@ fn dot_receiver_source_fallback(
                                 | varn_checker::SymbolKind::Namespace
                         )
                 })
-                .map(|s| ReceiverInfo::Named(s.name.clone(), true))
+                .map(|s| ReceiverInfo::Named {
+                    name: s.name.clone(),
+                    is_instance: true,
+                    origin: s.origin.clone(),
+                })
         }
 
         _ => None,
@@ -366,23 +440,47 @@ pub fn pattern_receiver(state: &DocumentState, line: u32, col: u32) -> Option<Re
             }
             varn_core::TypeKind::Intrinsic(tag) => {
                 if tag.is_primitive() || tag == &varn_core::TypeTag::Array {
-                    return Some(ReceiverInfo::Named(tag.name().to_owned(), true));
+                    return Some(ReceiverInfo::Named {
+                        name: tag.name().to_owned(),
+                        is_instance: true,
+                        origin: None,
+                    });
                 }
             }
             varn_core::TypeKind::LiteralStr(_) => {
-                return Some(ReceiverInfo::Named("str".to_owned(), true));
+                return Some(ReceiverInfo::Named {
+                    name: "str".to_owned(),
+                    is_instance: true,
+                    origin: None,
+                });
             }
             varn_core::TypeKind::LiteralInt(_) => {
-                return Some(ReceiverInfo::Named("int".to_owned(), true));
+                return Some(ReceiverInfo::Named {
+                    name: "int".to_owned(),
+                    is_instance: true,
+                    origin: None,
+                });
             }
             varn_core::TypeKind::LiteralFloat(_) => {
-                return Some(ReceiverInfo::Named("float".to_owned(), true));
+                return Some(ReceiverInfo::Named {
+                    name: "float".to_owned(),
+                    is_instance: true,
+                    origin: None,
+                });
             }
             varn_core::TypeKind::LiteralBool(_) => {
-                return Some(ReceiverInfo::Named("bool".to_owned(), true));
+                return Some(ReceiverInfo::Named {
+                    name: "bool".to_owned(),
+                    is_instance: true,
+                    origin: None,
+                });
             }
-            varn_core::TypeKind::Named(name, _) | varn_core::TypeKind::Generic(name, ..) => {
-                return Some(ReceiverInfo::Named(name.to_string(), true));
+            varn_core::TypeKind::Named(name, origin) | varn_core::TypeKind::Generic(name, _, origin) => {
+                return Some(ReceiverInfo::Named {
+                    name: name.to_string(),
+                    is_instance: true,
+                    origin: origin.as_ref().map(|s| s.to_string()),
+                });
             }
             _ => {}
         }

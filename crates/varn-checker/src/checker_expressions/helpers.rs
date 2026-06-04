@@ -128,4 +128,16 @@ impl Checker {
             );
         }
     }
+
+    pub(crate) fn record_member_type(&mut self, offset: u32, ty: Type, symbol_id: SymbolId) {
+        if self.record_expr_types {
+            self.expr_types.insert(
+                offset,
+                ExprInfo {
+                    ty,
+                    symbol_id: Some(symbol_id),
+                },
+            );
+        }
+    }
 }

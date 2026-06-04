@@ -18,7 +18,7 @@ pub fn execute(
     _path: &str,
     _debug: &DebugFlags,
 ) -> PipelineResult<()> {
-    let loader = Rc::new(CompositeLoader::new(vec![
+    let loader = std::sync::Arc::new(CompositeLoader::new(vec![
         Box::new(crate::stdlib_loader::FileLoader),
         Box::new(crate::stdlib_loader::StdlibLoader),
     ]));
@@ -26,13 +26,13 @@ pub fn execute(
     machine.set_trace(_debug.trace);
 
     if _debug.trace {
-        eprintln!("[pipeline:execute] starting builtin initialization");
+        varn_utilities::terminal::tagged("pipeline:execute", "starting builtin initialization");
     }
 
     for builtin_proto in core::core_protos_owned()? {
         if _debug.trace {
             let name = builtin_proto.name.as_deref().unwrap_or("<builtin>");
-            eprintln!("[pipeline:execute] running builtin {}", name);
+            varn_utilities::terminal::tagged("pipeline:execute", format_args!("running builtin {name}"));
         }
         let closure = Rc::new(Closure::new(Rc::new(builtin_proto), Vec::new(), Vec::new()));
         machine
@@ -41,11 +41,22 @@ pub fn execute(
     }
 
     let main_closure = Rc::new(Closure::new(Rc::new(proto), Vec::new(), Vec::new()));
+
+    // Register the main module to support top-level exports in the entry script (needed for Isolates)
+    let main_module_id = ModuleId::local_str(_path);
+    let mut export_map = FxHashMap::default();
+    for (idx, name) in main_closure.proto.export_names.iter().enumerate() {
+        export_map.insert(name.clone(), idx);
+    }
+    let mut module_obj = varn_types::ModuleObj::new(main_module_id.clone(), main_closure.proto.export_names.len());
+    module_obj.export_map = export_map;
+    let module_val = machine.ctx.heap.alloc_module(Rc::new(module_obj));
+    machine.ctx.modules.insert(main_module_id, module_val);
+    machine.ctx.module_exports.insert(0, module_val);
+
     if _debug.trace {
-        eprintln!(
-            "[pipeline:execute] running main {}",
-            main_closure.proto.name.as_deref().unwrap_or("<main>")
-        );
+        let name = main_closure.proto.name.as_deref().unwrap_or("<main>");
+        varn_utilities::terminal::tagged("pipeline:execute", format_args!("running main {name}"));
     }
 
     loop {
@@ -59,12 +70,18 @@ pub fn execute(
                             let handle = machine.ctx.run_lazy_task_sync(lazy.as_ref());
                             match handle.peek_state() {
                                 varn_types::task::TaskState::Resolved(v) => v,
+                                varn_types::task::TaskState::Rejected(e) => {
+                                    return Err(PipelineError::fatal(format!("awaited task failed: {}", e)));
+                                }
                                 _ => varn_types::Value::Null,
                             }
                         }
                         varn_types::Value::TaskHandle(handle) => match handle.peek_state() {
                             varn_types::task::TaskState::Resolved(v) => v,
-                            _ => varn_types::Value::Null,
+                            _ => match varn_vm::exec::ExecCtx::wait_task_handle(handle.clone()) {
+                                Ok(v) => v,
+                                Err(e) => return Err(PipelineError::fatal(format!("awaited task failed: {}", e))),
+                            }
                         },
                         other => other,
                     };

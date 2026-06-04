@@ -142,7 +142,7 @@ impl Scheduler {
 
         static SHARED_RT: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
         let rt = SHARED_RT.get_or_init(|| {
-            tokio::runtime::Builder::new_current_thread()
+            tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
                 .expect("tokio runtime")

@@ -3,6 +3,7 @@ use varn_pm::{
     installer, lockfile,
     manifest::{find_project_manifest, ProjectManifest},
 };
+use varn_utilities::terminal;
 
 pub fn execute() -> Result<(), CliError> {
     let cwd =
@@ -17,31 +18,31 @@ pub fn execute() -> Result<(), CliError> {
     if lock_path.exists() {
         let lock = lockfile::PmLockfile::load(&lock_path).map_err(|e| CliError::fatal(e))?;
         if lock.packages.is_empty() {
-            eprintln!("Nothing to install.");
+            terminal::log("Nothing to install.");
             return Ok(());
         }
-        eprintln!(
+        terminal::log(format!(
             "Installing {} package(s) from lockfile...",
             lock.packages.len()
-        );
+        ));
         installer::install_locked(&project_root, &lock).map_err(|e| CliError::fatal(e))?;
     } else {
         let manifest = ProjectManifest::load(&manifest_path).map_err(|e| CliError::fatal(e))?;
         let deps = manifest.parsed_deps().map_err(|e| CliError::fatal(e))?;
         if deps.is_empty() {
-            eprintln!("No dependencies declared in varn.json.");
+            terminal::log("No dependencies declared in varn.json.");
             return Ok(());
         }
-        eprintln!("Resolving {} dependency(ies)...", deps.len());
+        terminal::log(format!("Resolving {} dependency(ies)...", deps.len()));
         let result = installer::resolve_and_install(&project_root, &deps, None, false)
             .map_err(|e| CliError::fatal(e))?;
         result
             .lock
             .save(&lock_path)
             .map_err(|e| CliError::fatal(e))?;
-        eprintln!("Lockfile written.");
+        terminal::log("Lockfile written.");
     }
 
-    eprintln!("Done.");
+    terminal::log("Done.");
     Ok(())
 }

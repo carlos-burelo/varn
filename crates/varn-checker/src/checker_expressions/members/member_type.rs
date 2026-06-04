@@ -46,6 +46,27 @@ impl Checker {
                 return self.find_member_info_uncached(&Type::named(enum_name.clone()), key, bind);
             }
             TypeKind::Named(name, origin) => {
+                if name.as_ref() == "*" {
+                    if let Some(origin_path) = origin {
+                        let exports = if crate::module_resolver::is_known_module(origin_path) {
+                            Some(crate::module_resolver::resolve_stdlib_module_exports_ref(origin_path))
+                        } else {
+                            let mut visiting = Vec::new();
+                            Some(crate::module_resolver::resolve_module_exports_ref(origin_path, &mut visiting))
+                        };
+                        if let Some(exports) = exports {
+                            if let Some(sym) = exports.get(key) {
+                                let mut sym_ty = sym.ty.clone().unwrap_or(Type::Dynamic);
+                                if let Some(origin) = &sym.origin_module {
+                                    sym_ty = sym_ty.with_origin(origin.clone());
+                                }
+                                return Some((sym_ty, None));
+                            }
+                        }
+                    }
+                    return None;
+                }
+
                 if name.as_ref() == varn_core::IntrinsicType::Str.as_str() && key == "length" {
                     return Some((Type::Int, None));
                 }
@@ -310,7 +331,48 @@ impl Checker {
                 return self.find_member(&Type::named(enum_name.clone()), key, bind);
             }
             TypeKind::Object(members) => members.iter().find(|m| m.name() == key).cloned(),
-            TypeKind::Named(name, _) | TypeKind::Generic(name, _, _) => {
+            TypeKind::Named(name, origin) => {
+                if name.as_ref() == "*" {
+                    if let Some(origin_path) = origin {
+                        let exports = if crate::module_resolver::is_known_module(origin_path) {
+                            Some(crate::module_resolver::resolve_stdlib_module_exports_ref(origin_path))
+                        } else {
+                            let mut visiting = Vec::new();
+                            Some(crate::module_resolver::resolve_module_exports_ref(origin_path, &mut visiting))
+                        };
+                        if let Some(exports) = exports {
+                            if let Some(sym) = exports.get(key) {
+                                let mut sym_ty = sym.ty.clone().unwrap_or(Type::Dynamic);
+                                if let Some(origin) = &sym.origin_module {
+                                    sym_ty = sym_ty.with_origin(origin.clone());
+                                }
+                                return Some(ObjectTypeMember::Property {
+                                    name: Rc::from(key),
+                                    ty: sym_ty,
+                                    optional: false,
+                                    readonly: true,
+                                });
+                            }
+                        }
+                    }
+                    return None;
+                }
+                if let Some(entry) = bind.get_class_entry(name.as_ref()) {
+                    if let Some(m) = entry.members.iter().find(|m| m.name.as_ref() == key) {
+                        return Some(ObjectTypeMember::Property {
+                            name: m.name.clone(),
+                            ty: m.ty.clone(),
+                            optional: m.is_optional,
+                            readonly: m.is_readonly,
+                        });
+                    }
+                }
+                if let Some(parent) = bind.class_parents.get(name.as_ref()) {
+                    return self.find_member(&Type::named(parent.clone()), key, bind);
+                }
+                None
+            }
+            TypeKind::Generic(name, _, _) => {
                 if let Some(entry) = bind.get_class_entry(name.as_ref()) {
                     if let Some(m) = entry.members.iter().find(|m| m.name.as_ref() == key) {
                         return Some(ObjectTypeMember::Property {

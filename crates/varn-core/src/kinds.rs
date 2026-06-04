@@ -1,6 +1,6 @@
 use varn_base::TypeTag;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
 
 pub enum TypeKind<T, N, C, F, O, E = ()> {
     Intrinsic(TypeTag),

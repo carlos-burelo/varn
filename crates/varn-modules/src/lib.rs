@@ -1,3 +1,4 @@
+pub mod artifact;
 pub mod provider;
 pub mod resolver;
 pub mod spec;

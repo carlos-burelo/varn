@@ -199,13 +199,10 @@ impl ExecCtx {
             self.try_handlers.pop();
         }
         if self.trace {
-            eprintln!(
-                "[vm:return] frame={} base={} stack_before={} handlers_before={}",
-                returning_frame_idx,
-                frame.base,
-                self.stack.len(),
-                self.try_handlers.len(),
-            );
+            varn_utilities::terminal::tagged("vm:return", format_args!(
+                "frame={} base={} stack_before={} handlers_before={}",
+                returning_frame_idx, frame.base, self.stack.len(), self.try_handlers.len(),
+            ));
         }
         let mut result = result;
         if let Some(exports_nv) = self.module_exports.remove(&returning_frame_idx) {
@@ -259,13 +256,10 @@ impl ExecCtx {
         } else {
             self.push(result);
             if self.trace {
-                eprintln!(
-                    "[vm:return] frame={} result_type={} stack_after={} handlers_after={}",
-                    returning_frame_idx,
-                    format!("{result:?}"),
-                    self.stack.len(),
-                    self.try_handlers.len(),
-                );
+                varn_utilities::terminal::tagged("vm:return", format_args!(
+                    "frame={} result_type={} stack_after={} handlers_after={}",
+                    returning_frame_idx, format!("{result:?}"), self.stack.len(), self.try_handlers.len(),
+                ));
             }
             Ok(result)
         }
@@ -547,6 +541,121 @@ impl NativeCtx for ExecCtx {
 
     fn register_class(&mut self, name: &str, cls: std::rc::Rc<ClassObj>) {
         self.heap.set_intrinsic_class(name, cls);
+    }
+
+    fn current_source_file(&self) -> Option<String> {
+        for frame in self.frames.iter().rev() {
+            let src = &frame.closure.proto.chunk.source_file;
+            if !src.starts_with("std:") && !src.starts_with("runtime:") && !src.starts_with("core:") {
+                return Some(src.to_string());
+            }
+        }
+        self.frames.last().map(|f| f.closure.proto.chunk.source_file.to_string())
+    }
+
+    fn spawn_isolate(
+        &mut self,
+        module_path: &str,
+        export_name: &str,
+        args: Vec<varn_types::value::SendValue>,
+        port: Box<dyn varn_base::VmValuePayload + Send + Sync>,
+    ) -> Result<(), String> {
+        let loader = self.loader.clone();
+        
+        let module_path_str = module_path.to_string();
+        let export_name_str = export_name.to_string();
+
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            let local = tokio::task::LocalSet::new();
+            local.block_on(&rt, async move {
+                let mut machine = crate::Vm::new(std::rc::Rc::new(rustc_hash::FxHashMap::default()));
+                if let Some(ld) = loader {
+                    machine = machine.with_loader(ld);
+                }
+
+                if let Err(e) = machine.ctx.load_module("std:task") {
+                    varn_utilities::terminal::tagged("isolate worker", format_args!("Failed to load std:task: {:?}", e));
+                    return;
+                }
+
+                let module_val = match machine.ctx.load_module(&module_path_str) {
+                    Ok(m) => m,
+                    Err(e) => {
+                        varn_utilities::terminal::tagged(
+                            "isolate worker",
+                            format_args!("Failed to load module {}: {:?}", module_path_str, e),
+                        );
+                        return;
+                    }
+                };
+
+                let heap_obj = machine.ctx.heap.get(module_val.as_heap_idx());
+
+                let func_nv = match machine.ctx.get_field(module_val, &export_name_str) {
+                    Some(f) => f,
+                    None => {
+                        varn_utilities::terminal::tagged(
+                            "isolate worker",
+                            format_args!("Export '{}' not found in module {}", export_name_str, module_path_str),
+                        );
+                        return;
+                    }
+                };
+
+                let class_obj = match machine.ctx.get_class("IsolatePort") {
+                    Some(cls) => cls,
+                    None => {
+                        varn_utilities::terminal::tagged("isolate worker", format_args!("Class IsolatePort not found"));
+                        return;
+                    }
+                };
+                let instance_nv = machine.ctx.heap.alloc_object();
+                if let Some(crate::heap::HeapObj::Object(o)) = machine.ctx.heap.get_mut(instance_nv.as_heap_idx()) {
+                    o.borrow_mut().set_class(class_obj);
+                }
+                let port_value = varn_types::Value::VmValue(port);
+                let port_nv = machine.ctx.heap.intern(port_value);
+                if let Some(crate::heap::HeapObj::Object(o)) = machine.ctx.heap.get_mut(instance_nv.as_heap_idx()) {
+                    o.borrow_mut().set_field_nv(std::rc::Rc::from("_port"), port_nv);
+                }
+
+                let mut vm_args = vec![instance_nv];
+                for arg in args {
+                    let v = arg.to_value();
+                    vm_args.push(machine.ctx.heap.intern(v));
+                }
+
+                match machine.ctx.call_vm(func_nv, &vm_args) {
+                    Ok(res) => {
+                        let val = machine.ctx.heap.extract(res);
+                        if let varn_types::Value::Task(lazy) = val {
+                            let handle = machine.ctx.run_lazy_task_sync(lazy.as_ref());
+                            if let varn_types::task::TaskState::Rejected(e) = handle.peek_state() {
+                                varn_utilities::terminal::tagged("isolate worker", format_args!("Task failed: {}", e));
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        varn_utilities::terminal::tagged("isolate worker", format_args!("Execution failed: {}", e));
+                    }
+                }
+            });
+        });
+
+        Ok(())
+    }
+
+    fn alloc_instance(&mut self, class_name: &str) -> Option<VmValue> {
+        let class_obj = self.get_class(class_name)?;
+        let instance_nv = self.heap.alloc_object();
+        if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get_mut(instance_nv.as_heap_idx()) {
+            o.borrow_mut().set_class(class_obj);
+        }
+        Some(instance_nv)
     }
 }
 

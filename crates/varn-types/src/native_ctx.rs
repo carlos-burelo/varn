@@ -87,6 +87,24 @@ pub trait NativeCtx {
     }
 
     fn register_class(&mut self, _name: &str, _cls: std::rc::Rc<ClassObj>) {}
+
+    fn current_source_file(&self) -> Option<String> {
+        None
+    }
+
+    fn spawn_isolate(
+        &mut self,
+        _module_path: &str,
+        _export_name: &str,
+        _args: Vec<crate::value::SendValue>,
+        _port: Box<dyn varn_base::VmValuePayload + Send + Sync>,
+    ) -> Result<(), String> {
+        Err("spawn_isolate not supported".to_string())
+    }
+
+    fn alloc_instance(&mut self, _class_name: &str) -> Option<VmValue> {
+        None
+    }
 }
 
 pub type NativeFnResult = Result<VmValue, String>;

@@ -23,10 +23,13 @@ runtime = [
 ]
 
 [dependencies]
+varn-utilities = { path = "../varn-utilities" }
 varn-core      = { path = "../varn-core" }
 varn-types     = { path = "../varn-types" }
 varn-modules   = { path = "../varn-modules" }
 varn-op-macros = { path = "../varn-op-macros" }
+varn-runtime   = { path = "../varn-runtime" }
+tokio          = { version = "1", features = ["rt"] }
 
 parking_lot  = { workspace = true, optional = true }
 rust_decimal = { workspace = true, optional = true }

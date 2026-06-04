@@ -1,6 +1,8 @@
 use tower_lsp::lsp_types::HoverContents;
-use varn_debug::colors::{BLUE, BOLD, C_TYPES, DIM, GREEN, R, YELLOW};
+use varn_debug::colors::{C_TYPES};
 use varn_debug::flags::DebugFlags;
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal;
 
 pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
     use varn_debug::colors::{footer, header};
@@ -11,39 +13,25 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
     let analysis = varn_lsp::pipeline::run_pipeline(source.to_string(), uri);
 
     if flags.lsp_symbols {
-        eprintln!(
-            "  {BOLD}{BLUE}Symbols:{RESET}",
-            BOLD = BOLD,
-            BLUE = BLUE,
-            RESET = R
-        );
+        terminal::log(format!("  {}", chalk("Symbols:").blue().bold()));
         for sym in &analysis.symbols {
             if sym.line == u32::MAX {
                 continue;
             }
             let kind_str = format!("{:?}", sym.kind);
-            eprintln!(
-                "    {DIM}{:<12}{RESET} {BOLD}{:<20}{RESET} : {YELLOW}{:<20}{RESET} {DIM}(ln:{}){RESET}",
-                kind_str,
-                sym.name,
-                sym.type_str,
-                sym.line + 1,
-                DIM = DIM,
-                RESET = R,
-                BOLD = BOLD,
-                YELLOW = YELLOW
-            );
+            terminal::log(format!(
+                "    {}  {}  : {}  {}",
+                chalk(format!("{:<12}", kind_str)).dim(),
+                chalk(format!("{:<20}", sym.name)).bold(),
+                chalk(format!("{:<20}", sym.type_str)).yellow(),
+                chalk(format!("(ln:{})", sym.line + 1)).dim(),
+            ));
         }
-        eprintln!();
+        terminal::blank();
     }
 
     if flags.lsp_hovers {
-        eprintln!(
-            "  {BOLD}{BLUE}Simulated Hovers:{RESET}",
-            BOLD = BOLD,
-            BLUE = BLUE,
-            RESET = R
-        );
+        terminal::log(format!("  {}", chalk("Simulated Hovers:").blue().bold()));
         for tok in &analysis.tokens {
             if tok.kind == varn_core::TokenKind::Identifier || tok.kind.can_be_identifier() {
                 if let Some(hover) =
@@ -58,30 +46,20 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                             .join(" | "),
                         HoverContents::Markup(m) => m.value,
                     };
-                    eprintln!(
-                        "    {DIM}({:>2}:{:>2}){RESET} {YELLOW}{:<15}{RESET} → {BOLD}{}{RESET}",
-                        tok.line + 1,
-                        tok.col + 1,
-                        tok.lexeme,
-                        content.replace('\n', " "),
-                        DIM = DIM,
-                        RESET = R,
-                        YELLOW = YELLOW,
-                        BOLD = BOLD
-                    );
+                    terminal::log(format!(
+                        "    {}  {}  → {}",
+                        chalk(format!("({:>2}:{:>2})", tok.line + 1, tok.col + 1)).dim(),
+                        chalk(format!("{:<15}", tok.lexeme)).yellow(),
+                        chalk(content.replace('\n', " ")).bold(),
+                    ));
                 }
             }
         }
-        eprintln!();
+        terminal::blank();
     }
 
     if flags.lsp_completions {
-        eprintln!(
-            "  {BOLD}{BLUE}Simulated Completions:{RESET}",
-            BOLD = BOLD,
-            BLUE = BLUE,
-            RESET = R
-        );
+        terminal::log(format!("  {}", chalk("Simulated Completions:").blue().bold()));
         for tok in &analysis.tokens {
             if matches!(
                 tok.kind,
@@ -105,53 +83,36 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 if let Some(tower_lsp::lsp_types::CompletionResponse::Array(items)) = resp {
                     let labels: Vec<_> = items.iter().map(|it| it.label.clone()).collect();
                     if !labels.is_empty() {
-                        eprintln!(
-                            "    {DIM}({:>2}:{:>2}){RESET} {BOLD}{}{RESET} → [{}]",
-                            tok.line + 1,
-                            tok.col + 1,
-                            tok.lexeme,
+                        terminal::log(format!(
+                            "    {}  {}  → [{}]",
+                            chalk(format!("({:>2}:{:>2})", tok.line + 1, tok.col + 1)).dim(),
+                            chalk(tok.lexeme.to_string()).bold(),
                             labels.join(", "),
-                            DIM = DIM,
-                            RESET = R,
-                            BOLD = BOLD
-                        );
+                        ));
                     }
                 }
             }
         }
-        eprintln!();
+        terminal::blank();
     }
 
     if flags.lsp_types && !analysis.db.expr_types.is_empty() {
-        eprintln!(
-            "  {BOLD}{BLUE}Expression Types (Detailed Mapping):{RESET}",
-            BOLD = BOLD,
-            BLUE = BLUE,
-            RESET = R
-        );
+        terminal::log(format!("  {}", chalk("Expression Types (Detailed Mapping):").blue().bold()));
         let mut sorted: Vec<_> = analysis.db.expr_types.iter().collect();
         sorted.sort_by_key(|(off, _)| *off);
         for (off, ty) in sorted {
-            eprintln!(
-                "    {DIM}offset {:>4}{RESET} : {YELLOW}{}{RESET}",
-                off,
-                ty,
-                DIM = DIM,
-                RESET = R,
-                YELLOW = YELLOW
-            );
+            terminal::log(format!(
+                "    {}  : {}",
+                chalk(format!("offset {:>4}", off)).dim(),
+                chalk(ty.to_string()).yellow(),
+            ));
         }
-        eprintln!();
+        terminal::blank();
     }
 
     let sem_tokens = varn_lsp::features::semantic_tokens::build_semantic_tokens(&analysis);
     if flags.lsp_semantic {
-        eprintln!(
-            "  {BOLD}{BLUE}Semantic Tokens Mapping:{RESET}",
-            BOLD = BOLD,
-            BLUE = BLUE,
-            RESET = R
-        );
+        terminal::log(format!("  {}", chalk("Semantic Tokens Mapping:").blue().bold()));
         let legend = &varn_lsp::features::semantic_tokens::LEGEND;
         let mut curr_line = 0;
         let mut curr_col = 0;
@@ -168,29 +129,22 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 .map(|t| t.as_str())
                 .unwrap_or("dynamic");
             let lexeme = find_lexeme(&analysis, curr_line, curr_col, chunk[2]);
-            eprintln!(
-                "    {DIM}({:>2}:{:>2}){RESET} {YELLOW}{:<15}{RESET} → {GREEN}{}{RESET}",
-                curr_line + 1,
-                curr_col + 1,
-                lexeme,
-                type_name,
-                DIM = DIM,
-                RESET = R,
-                YELLOW = YELLOW,
-                GREEN = GREEN
-            );
+            terminal::log(format!(
+                "    {}  {}  → {}",
+                chalk(format!("({:>2}:{:>2})", curr_line + 1, curr_col + 1)).dim(),
+                chalk(format!("{:<15}", lexeme)).yellow(),
+                chalk(type_name).green(),
+            ));
         }
-        eprintln!();
+        terminal::blank();
     }
 
     if flags.lsp_colorize {
-        eprintln!(
-            "  {BOLD}{BLUE}Annotated Source:{RESET}  {DIM}(token#tag  tags: kw=keyword  ty=type  fn=function  cls=class  var=variable  param  prop=property  num=number  str=string  em=enum  ns=namespace  iface  tp=type_param){RESET}",
-            BOLD = BOLD,
-            BLUE = BLUE,
-            DIM = DIM,
-            RESET = R
-        );
+        terminal::log(format!(
+            "  {}  {}",
+            chalk("Annotated Source:").blue().bold(),
+            chalk("(token#tag  tags: kw=keyword  ty=type  fn=function  cls=class  var=variable  param  prop=property  num=number  str=string  em=enum  ns=namespace  iface  tp=type_param)").dim(),
+        ));
 
         let mut abs_spans: Vec<(u32, u32, u32, u32)> = Vec::new();
         {
@@ -218,33 +172,40 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
             let mut spans = line_spans.get(&line_num).unwrap_or(&empty).clone();
             spans.sort_by_key(|(col, _, _)| *col);
             let colored = annotate_line(line_text, &spans);
-            eprintln!(
-                "  {DIM}{:>gutter$} │{RESET} {}",
-                line_idx + 1,
+            terminal::log(format!(
+                "  {}  {}",
+                chalk(format!("{:>gutter$} │", line_idx + 1, gutter = gutter)).dim(),
                 colored,
-                DIM = DIM,
-                RESET = R,
-                gutter = gutter
-            );
+            ));
         }
-        eprintln!();
+        terminal::blank();
+    }
+
+    if flags.lsp_hints {
+        terminal::log(format!("  {}", chalk("Simulated Inlay Hints:").blue().bold()));
+        let inlay_hints = varn_lsp::features::inlay_hints::build_inlay_hints(&analysis);
+        for hint in inlay_hints {
+            let label = match hint.label {
+                tower_lsp::lsp_types::InlayHintLabel::String(s) => s,
+                _ => "".to_string(),
+            };
+            terminal::log(format!(
+                "    {}  → {}",
+                chalk(format!("({:>2}:{:>2})", hint.position.line + 1, hint.position.character + 1)).dim(),
+                chalk(label).yellow(),
+            ));
+        }
+        terminal::blank();
     }
 
     if !analysis.diagnostics.is_empty() {
-        eprintln!(
-            "  {BOLD}{BLUE}LSP Diagnostics:{RESET}",
-            BOLD = BOLD,
-            BLUE = BLUE,
-            RESET = R
-        );
+        terminal::log(format!("  {}", chalk("LSP Diagnostics:").blue().bold()));
         for diag in &analysis.diagnostics {
-            eprintln!(
-                "    {BOLD}[line {}]{RESET} {}",
-                diag.line + 1,
+            terminal::log(format!(
+                "    {}  {}",
+                chalk(format!("[line {}]", diag.line + 1)).bold(),
                 diag.message,
-                BOLD = BOLD,
-                RESET = R
-            );
+            ));
         }
     }
 

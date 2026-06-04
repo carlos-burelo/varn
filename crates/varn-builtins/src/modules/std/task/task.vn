@@ -1,6 +1,6 @@
 // std:task - pure Varn facade over runtime concurrency host operations.
 
-import { taskSpawn, taskSleep, taskParallel } from "runtime:task";
+import { taskSpawn, taskSleep, taskParallel, IsolatePort, spawnIsolate as nativeSpawnIsolate } from "runtime:task";
 
 export declare class Generator<T> {
     next(value?: dynamic): { value: T; done: bool; };
@@ -36,6 +36,12 @@ export function spawn<T>(target: Task<T> | ((...args: dynamic[]) => T), ...args:
 
 export function sleep(ms: int): TaskHandle<void> {
     return taskSleep(ms);
+}
+
+export type IsolatePort = IsolatePort;
+
+export function spawnIsolate(modulePath: str, exportName: str, args: Array<dynamic>): Task<IsolatePort> {
+    return nativeSpawnIsolate(modulePath, exportName, args);
 }
 
 async function wrapTask<T>(task: Task<T>, group: TaskGroupImpl<T>): Task<T> {

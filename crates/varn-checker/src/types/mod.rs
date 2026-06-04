@@ -10,7 +10,7 @@ use std::rc::Rc;
 use varn_core::ast::operators::Visibility;
 use varn_core::{TypeKind, TypeTag};
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FunctionParam {
     pub name: Option<Rc<str>>,
     pub ty: Type,
@@ -18,7 +18,7 @@ pub struct FunctionParam {
     pub is_rest: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FunctionType {
     pub params: Vec<FunctionParam>,
     pub return_type: Box<Type>,
@@ -26,7 +26,7 @@ pub struct FunctionType {
     pub type_params: Vec<Rc<str>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Type(
     pub TypeKind<Box<Type>, Rc<str>, Vec<Type>, FunctionType, Vec<ObjectTypeMember>, ()>,
     pub bool,
@@ -60,7 +60,7 @@ impl Default for Type {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum ObjectTypeMember {
     Property {
         name: Rc<str>,
@@ -87,7 +87,7 @@ pub enum ObjectTypeMember {
     },
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Hash, serde::Serialize, serde::Deserialize)]
 pub enum ClassMemberKind {
     Constructor,
     Method,
@@ -104,7 +104,7 @@ pub enum ClassMemberKind {
     Struct,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct ClassMemberInfo {
     pub name: Rc<str>,
     pub kind: ClassMemberKind,

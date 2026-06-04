@@ -1,9 +1,9 @@
-use crate::pipeline::colors::{BLUE, BOLD, C_MODULES, DIM, RESET, YELLOW};
 use varn_core::ast::{Decl, ExportDecl, ExportDefaultDecl, ImportSpecifier, Program, Stmt};
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal::Section;
 
 pub fn debug_modules(program: &Program) {
-    use super::super::colors::{footer, header};
-    header(C_MODULES, "module linkage", &program.filename);
+    Section::new("module linkage").subtitle(&program.filename).color(|c| c.cyan()).print();
 
     let mut imports = Vec::new();
     let mut exports = Vec::new();
@@ -18,38 +18,37 @@ pub fn debug_modules(program: &Program) {
     }
 
     if !imports.is_empty() {
-        eprintln!("  {BOLD}{BLUE}Imports{RESET}");
-        eprintln!("  {DIM}{:<30} │ Symbols{RESET}", "Source");
-        eprintln!("  {}", "─".repeat(70));
+        varn_utilities::terminal::log(format!("  {}", chalk("Imports").blue().bold()));
+        varn_utilities::terminal::log(format!("  {}", chalk(format!("{:<30} │ Symbols", "Source")).dim()));
+        varn_utilities::terminal::log(format!("  {}", "─".repeat(70)));
         for imp in &imports {
             let spec_str = format_import_specifiers(&imp.specifiers);
-            eprintln!(
-                "  {YELLOW}{:<30}{RESET} │ {spec_str}",
-                format!("\"{}\"", imp.source)
-            );
+            varn_utilities::terminal::log(format!(
+                "  {} │ {spec_str}",
+                chalk(format!("{:<30}", format!("\"{}\"", imp.source))).yellow(),
+            ));
         }
-        eprintln!();
+        varn_utilities::terminal::blank();
     }
 
     if !exports.is_empty() {
-        eprintln!("  {BOLD}{BLUE}Exports{RESET}");
-        eprintln!("  {DIM}Kind     │ Description{RESET}");
-        eprintln!("  {}", "─".repeat(70));
+        varn_utilities::terminal::log(format!("  {}", chalk("Exports").blue().bold()));
+        varn_utilities::terminal::log(format!("  {}", chalk("Kind     │ Description").dim()));
+        varn_utilities::terminal::log(format!("  {}", "─".repeat(70)));
         for exp in &exports {
             let (kind, desc) = format_export_parts(exp);
-            eprintln!("  {YELLOW}{:<8}{RESET} │ {desc}", kind);
+            varn_utilities::terminal::log(format!("  {} │ {desc}", chalk(format!("{:<8}", kind)).yellow()));
         }
     }
 
-    footer(
-        C_MODULES,
-        &format!("{} import(s), {} export(s)", imports.len(), exports.len()),
+    varn_utilities::terminal::log(
+        chalk(format!("── {} import(s), {} export(s) ──", imports.len(), exports.len())).dim(),
     );
 }
 
 pub fn format_import_specifiers(specs: &[ImportSpecifier]) -> String {
     if specs.is_empty() {
-        return format!("{DIM}(side-effect){RESET}");
+        return chalk("(side-effect)").dim().to_string();
     }
     let mut named = Vec::new();
     let mut default_name = None;

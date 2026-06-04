@@ -6,6 +6,7 @@ use std::rc::Rc;
 use varn_compiler::FunctionProto;
 use varn_core::ModuleId;
 use varn_types::value::Closure;
+use varn_utilities::terminal;
 use varn_vm::loader::CompositeLoader;
 use varn_vm::Vm;
 
@@ -18,7 +19,7 @@ pub fn execute(
     _path: &str,
     _debug: &DebugFlags,
 ) -> PipelineResult<()> {
-    let loader = Rc::new(CompositeLoader::new(vec![
+    let loader = std::sync::Arc::new(CompositeLoader::new(vec![
         Box::new(crate::stdlib_loader::FileLoader),
         Box::new(crate::stdlib_loader::StdlibLoader),
     ]));
@@ -26,13 +27,13 @@ pub fn execute(
     machine.set_trace(_debug.trace);
 
     if _debug.trace {
-        eprintln!("[cli:execute] starting builtin initialization");
+        terminal::tagged("cli:execute", "starting builtin initialization");
     }
 
     for builtin_proto in core::core_protos_owned()? {
         if _debug.trace {
             let name = builtin_proto.name.as_deref().unwrap_or("<builtin>");
-            eprintln!("[cli:execute] running builtin {}", name);
+            terminal::tagged("cli:execute", format!("running builtin {}", name));
         }
         let closure = Rc::new(Closure::new(Rc::new(builtin_proto), Vec::new(), Vec::new()));
         machine
@@ -42,9 +43,9 @@ pub fn execute(
 
     let main_closure = Rc::new(Closure::new(Rc::new(proto), Vec::new(), Vec::new()));
     if _debug.trace {
-        eprintln!(
-            "[cli:execute] running main {}",
-            main_closure.proto.name.as_deref().unwrap_or("<main>")
+        terminal::tagged(
+            "cli:execute",
+            format!("running main {}", main_closure.proto.name.as_deref().unwrap_or("<main>")),
         );
     }
 
@@ -64,7 +65,10 @@ pub fn execute(
                         }
                         varn_types::Value::TaskHandle(handle) => match handle.peek_state() {
                             varn_types::task::TaskState::Resolved(v) => v,
-                            _ => varn_types::Value::Null,
+                            _ => match varn_vm::exec::ExecCtx::wait_task_handle(handle.clone()) {
+                                Ok(v) => v,
+                                Err(e) => return Err(CliError::fatal(format!("awaited task failed: {}", e))),
+                            }
                         },
                         other => other,
                     };

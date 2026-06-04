@@ -8,9 +8,15 @@ edition = "2021"
 name = "vn"
 path = "src/main.rs"
 
+[[bin]]
+name = "debug_binder"
+path = "src/debug_binder.rs"
+
 [dependencies]
+varn-utilities = { path = "../varn-utilities" }
 varn-pipeline = { path = "../varn-pipeline", features = ["lsp-debug"] }
 varn-core     = { path = "../varn-core" }
+varn-lexer    = { path = "../varn-lexer" }
 varn-parser   = { path = "../varn-parser", features = ["profiling"] }
 varn-checker  = { path = "../varn-checker" }
 varn-compiler = { path = "../varn-compiler" }
@@ -20,6 +26,7 @@ varn-types    = { path = "../varn-types" }
 varn-debug    = { path = "../varn-debug" }
 varn-lsp      = { path = "../varn-lsp" }
 varn-pm       = { path = "../varn-pm" }
+varn-modules  = { path = "../varn-modules" }
 tower-lsp        = { workspace = true }
 postcard         = { version = "1", features = ["alloc"] }
 clap             = { version = "4", features = ["derive"] }

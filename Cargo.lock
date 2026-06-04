@@ -1808,6 +1808,7 @@ name = "varn-base"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.11.0",
+ "serde",
 ]
 
 [[package]]
@@ -1826,6 +1827,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "tiny_http",
+ "tokio",
  "ureq",
  "url",
  "urlencoding",
@@ -1833,14 +1835,18 @@ dependencies = [
  "varn-core",
  "varn-modules",
  "varn-op-macros",
+ "varn-runtime",
  "varn-types",
+ "varn-utilities",
 ]
 
 [[package]]
 name = "varn-checker"
 version = "0.1.0"
 dependencies = [
+ "postcard",
  "rustc-hash",
+ "serde",
  "varn-core",
  "varn-lexer",
  "varn-modules",
@@ -1863,11 +1869,14 @@ dependencies = [
  "varn-compiler",
  "varn-core",
  "varn-debug",
+ "varn-lexer",
  "varn-lsp",
+ "varn-modules",
  "varn-parser",
  "varn-pipeline",
  "varn-pm",
  "varn-types",
+ "varn-utilities",
  "varn-vm",
 ]
 
@@ -1903,6 +1912,7 @@ dependencies = [
  "varn-modules",
  "varn-parser",
  "varn-types",
+ "varn-utilities",
 ]
 
 [[package]]
@@ -1992,6 +2002,7 @@ dependencies = [
  "varn-modules",
  "varn-parser",
  "varn-types",
+ "varn-utilities",
  "varn-vm",
 ]
 
@@ -2008,6 +2019,7 @@ dependencies = [
  "tar",
  "ureq",
  "varn-modules",
+ "varn-utilities",
 ]
 
 [[package]]
@@ -2032,6 +2044,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "varn-utilities"
+version = "0.1.0"
+
+[[package]]
 name = "varn-vm"
 version = "0.1.0"
 dependencies = [
@@ -2046,6 +2062,7 @@ dependencies = [
  "varn-modules",
  "varn-runtime",
  "varn-types",
+ "varn-utilities",
 ]
 
 [[package]]

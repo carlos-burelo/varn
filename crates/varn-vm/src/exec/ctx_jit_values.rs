@@ -116,8 +116,7 @@ pub extern "C" fn jit_load_global(
         let closure_ref = &*closure;
         let name_nv = closure_ref.constants[name_idx];
         let name = ctx_ref.heap.str_val(name_nv).unwrap();
-        let result = ctx_ref.globals.get_by_name(&name).unwrap_or(VmValue::null());
-        result
+        ctx_ref.globals.get_by_name(&name).unwrap_or(VmValue::null())
     }
 }
 
@@ -214,12 +213,13 @@ pub extern "C" fn jit_call(ctx: *mut ExecCtx, args: *const varn_jit::JitCallArgs
 
         // Fast path: plain NativeFn — skips exec_call_reg dispatch + BoundMethod check
         if args.callee.is_heap() {
-            if let Some(crate::heap::HeapObj::NativeFn(_name, f)) =
+            if let Some(crate::heap::HeapObj::NativeFn(name, f)) =
                 ctx_ref.heap.get(args.callee.as_heap_idx())
             {
                 let f = *f;
                 ctx_ref.record_call_native();
                 let arg_base = base + args.arg_start;
+                
                 // stack layout: [callee, arg1, arg2, ...]; actual args start at +1
                 let result = if args.arg_count <= 1 {
                     (f)(ctx_ref as &mut dyn varn_types::NativeCtx, &[])

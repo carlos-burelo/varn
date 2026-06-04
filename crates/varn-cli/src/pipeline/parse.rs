@@ -1,6 +1,7 @@
 use crate::error::CliError;
 use std::rc::Rc;
 use varn_debug::flags::DebugFlags;
+use varn_utilities::terminal;
 
 type PipelineResult<T> = Result<T, CliError>;
 
@@ -30,7 +31,7 @@ pub fn parse(
     })?;
 
     if verbose {
-        eprintln!("[Varn] parsed {} top-level statements", program.body.len());
+        terminal::tagged("Varn", format!("parsed {} top-level statements", program.body.len()));
     }
 
     if debug.ast {

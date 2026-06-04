@@ -39,7 +39,7 @@ impl Vm {
         self.ctx.no_jit = v;
     }
 
-    pub fn with_loader(mut self, loader: Rc<dyn ModuleLoader>) -> Self {
+    pub fn with_loader(mut self, loader: std::sync::Arc<dyn ModuleLoader + Send + Sync>) -> Self {
         self.ctx.loader = Some(loader);
         self
     }

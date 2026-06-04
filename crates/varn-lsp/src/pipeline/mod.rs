@@ -64,7 +64,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
                 kind: t.kind,
                 line: t.range.start.line.saturating_sub(1),
                 col: t.range.start.column,
-                length: lex.chars().count() as u32,
+                length: t.range.end.offset - t.range.start.offset,
                 offset: t.range.start.offset,
                 lexeme: lex.to_string(),
             }

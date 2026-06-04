@@ -115,6 +115,7 @@ impl ProfileCounters {
     }
 }
 
+#[derive(Debug)]
 pub struct VmProfile {
     pub ic_hits: u64,
     pub ic_misses: u64,

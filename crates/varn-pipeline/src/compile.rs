@@ -7,7 +7,7 @@ use varn_core::ast::Program;
 use varn_debug::flags::DebugFlags;
 use varn_types::ModuleGraphArtifact;
 
-pub const CACHE_FORMAT_VERSION: u32 = 10;
+pub const CACHE_FORMAT_VERSION: u32 = varn_modules::artifact::COMPILER_CACHE_VERSION;
 
 type PipelineResult<T> = Result<T, PipelineError>;
 
@@ -25,7 +25,7 @@ pub fn compile(
     debug: &DebugFlags,
 ) -> PipelineResult<CompileOutput> {
     if verbose {
-        eprintln!("[Varn] generating bytecode...");
+        varn_utilities::terminal::tagged("Varn", "generating bytecode...");
     }
 
     let exports =
@@ -45,13 +45,7 @@ pub fn compile(
         export_names,
     )
     .map_err(|e| {
-        PipelineError::fatal(format!(
-            "{}{}error[emit]{}: {}",
-            varn_debug::colors::BOLD,
-            varn_debug::colors::C_ERRORS,
-            varn_debug::colors::R,
-            e
-        ))
+        PipelineError::fatal(format!("{}: {e}", varn_utilities::chalk::chalk("error[emit]").red().bold()))
     })?;
 
     if debug.bytecode {
@@ -75,7 +69,7 @@ pub fn compile(
     }
 
     if verbose {
-        eprintln!("[Varn] resolving module graph...");
+        varn_utilities::terminal::tagged("Varn", "resolving module graph...");
     }
     let graph_build =
         crate::module_precompile::build_module_graph(program, source, &program.filename, &proto)

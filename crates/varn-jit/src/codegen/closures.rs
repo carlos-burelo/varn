@@ -1,7 +1,7 @@
 use varn_core::OpCode;
 
 use crate::assembler::Reg;
-use crate::regalloc::{emit_flush_all, emit_load, emit_reload_all_except, emit_store};
+use crate::regalloc::{emit_flush_all, emit_load, emit_reload_all, emit_reload_all_except, emit_store};
 use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
 
 use super::CodegenCtx;
@@ -31,6 +31,8 @@ fn emit_load_upvalue(ctx: &mut CodegenCtx) {
     *ip += 1;
     let dest = (w1 >> 8) as usize;
     let uv = (w1 & 0xFF) as usize;
+
+    emit_flush_all(asm, regmap);
 
     // Reload closure pointer from saved stack slot
     asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
@@ -68,6 +70,7 @@ fn emit_load_upvalue(ctx: &mut CodegenCtx) {
     asm.pop(ARG_CTX);
 
     emit_store(asm, Reg::R11, dest, regmap);
+    emit_reload_all_except(asm, regmap, Some(dest));
 }
 
 fn emit_store_upvalue(ctx: &mut CodegenCtx) {
@@ -82,10 +85,11 @@ fn emit_store_upvalue(ctx: &mut CodegenCtx) {
     let uv = (w1 >> 8) as usize;
     let src = (w1 & 0xFF) as usize;
 
+    emit_flush_all(asm, regmap);
+    emit_load(asm, Reg::Rax, src, regmap);
+
     // Reload closure pointer from saved stack slot
     asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
-
-    emit_load(asm, Reg::Rax, src, regmap);
 
     asm.push(ARG_CTX);
     asm.push(ARG_CLOSURE);
@@ -117,6 +121,8 @@ fn emit_store_upvalue(ctx: &mut CodegenCtx) {
     asm.pop(ARG_BASE);
     asm.pop(ARG_CLOSURE);
     asm.pop(ARG_CTX);
+
+    emit_reload_all(asm, regmap);
 }
 
 fn emit_make_closure(ctx: &mut CodegenCtx) {
