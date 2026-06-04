@@ -18,6 +18,7 @@ use varn_types::{
     AsyncTask, ClassObj, LazyTask, NativeCtx, NativeFn, ObjData, ResourceStore, RuntimeString,
     Value, VmArray,
 };
+use varn_base::VmValuePayload;
 
 #[derive(Debug, Clone)]
 pub enum HeapObj {
@@ -43,6 +44,7 @@ pub enum HeapObj {
     Generator(GeneratorObj),
     AsyncQueue(AsyncQueue),
     Spread(VmValue),
+    VmValue(Box<dyn VmValuePayload>),
 }
 
 #[derive(Clone)]
@@ -337,7 +339,7 @@ impl HeapInner {
                 } else if let Some(wrapper) = payload.as_any().downcast_ref::<VmClosurePayload>() {
                     VmValue::from_heap_idx(self.alloc(HeapObj::VmClosure(wrapper.0.clone())))
                 } else {
-                    VmValue::null()
+                    VmValue::from_heap_idx(self.alloc(HeapObj::VmValue(payload)))
                 }
             }
             Value::Module(m) => VmValue::from_heap_idx(self.alloc(HeapObj::Module(m))),
@@ -399,7 +401,7 @@ impl HeapInner {
                 HeapObj::Generator(g) => Value::Generator(g.clone()),
                 HeapObj::AsyncQueue(q) => Value::AsyncQueue(q.clone()),
                 HeapObj::Spread(inner) => Value::Spread(Box::new(self.extract(*inner))),
-
+                HeapObj::VmValue(payload) => Value::VmValue(payload.clone_payload()),
                 HeapObj::Module(m) => Value::Module(m.clone()),
             });
         }

@@ -1,12 +1,12 @@
 use varn_compiler::{FunctionProto, PoolEntry};
-use crate::pipeline::colors::{BOLD, DIM, RESET, YELLOW, BLUE, C_BINDS};
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal::{self, Section};
 
 pub fn debug_binds(proto: &FunctionProto, filename: &str) {
-    use super::super::colors::{footer, header};
-    header(C_BINDS, "function hierarchy", filename);
+    Section::new("function hierarchy").subtitle(filename).color(|c| c.blue()).print();
     let mut count = 0usize;
     print_fn_binds(proto, "", true, &mut count);
-    footer(C_BINDS, &format!("{count} function(s) in hierarchy"));
+    varn_utilities::terminal::log(chalk(format!("── {count} function(s) in hierarchy ──")).dim());
 }
 
 fn print_fn_binds(proto: &FunctionProto, indent: &str, is_last: bool, count: &mut usize) {
@@ -15,12 +15,20 @@ fn print_fn_binds(proto: &FunctionProto, indent: &str, is_last: bool, count: &mu
     let mut flags = Vec::new();
     if proto.is_async { flags.push("async"); }
     if proto.is_generator { flags.push("gen"); }
-    let flags_str = if flags.is_empty() { String::new() } else { format!(" {DIM}({}){RESET}", flags.join(", ")) };
+    let flags_str = if flags.is_empty() {
+        String::new()
+    } else {
+        format!(" {}", chalk(format!("({})", flags.join(", "))).dim())
+    };
 
-    eprintln!(
-        "{indent}{marker}{BOLD}{BLUE}fn{RESET} {BOLD}{name}{RESET} {YELLOW}arity:{}{RESET} {DIM}upvalues:{}{RESET}{}",
-        proto.arity, proto.upvalue_count, flags_str
-    );
+    terminal::log(format!(
+        "{indent}{marker}{} {} {} {}{}",
+        chalk("fn").blue().bold(),
+        chalk(name).bold(),
+        chalk(format!("arity:{}", proto.arity)).yellow(),
+        chalk(format!("upvalues:{}", proto.upvalue_count)).dim(),
+        flags_str
+    ));
     *count += 1;
 
     let child_indent = format!("{indent}{}", if is_last { "    " } else { "│   " });

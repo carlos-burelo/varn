@@ -41,7 +41,7 @@ pub enum PendingEnrich {
 unsafe impl Send for PendingEnrich {}
 unsafe impl Sync for PendingEnrich {}
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct TypeMembers {
     pub classes: FxHashMap<Rc<str>, ClassMemberInfo>,
     pub interfaces: FxHashMap<Rc<str>, Vec<ClassMemberInfo>>,
@@ -53,18 +53,19 @@ pub struct TypeMembers {
     pub setters: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Type>>,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Extensions {
     pub methods: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Rc<str>>>,
     pub getters: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Rc<str>>>,
     pub setters: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Rc<str>>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct BindResult {
     pub arena: SymbolArena,
     pub scopes: ScopeArena,
     pub global_scope: ScopeId,
+    #[serde(skip)]
     pub diagnostics: varn_core::DiagnosticBag,
     pub class_methods: FxHashMap<Rc<str>, FxHashMap<Rc<str>, Type>>,
     pub type_members: TypeMembers,
@@ -74,7 +75,9 @@ pub struct BindResult {
     pub sum_variant_parent: FxHashMap<Rc<str>, Rc<str>>,
     pub sum_variant_fields: FxHashMap<Rc<str>, Vec<(Rc<str>, Type)>>,
     pub extensions: Extensions,
+    #[serde(skip)]
     pub core: Option<Rc<CoreMembers>>,
+    #[serde(skip)]
     pub pending_enrich: Vec<PendingEnrich>,
 }
 

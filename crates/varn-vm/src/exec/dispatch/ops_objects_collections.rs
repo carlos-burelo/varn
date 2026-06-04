@@ -365,7 +365,7 @@ impl ExecCtx {
                 let v = self.stack[base + src];
                 let res = VmValue::from_bool(v.is_null());
                 if std::env::var("VARN_JIT_DEBUG").is_ok() {
-                    eprintln!("DEBUG INTERP IsNull: src_val={:?}, res={:?}", v, res);
+                    varn_utilities::terminal::tagged("jit:debug", format_args!("IsNull: src_val={:?}, res={:?}", v, res));
                 }
                 self.stack[base + first_reg] = res;
                 Ok(Some(ObjectFlow::ContinueInstruction))

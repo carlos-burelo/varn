@@ -27,11 +27,11 @@ pub trait ModuleLoader {
 }
 
 pub struct CompositeLoader {
-    loaders: Vec<Box<dyn ModuleLoader>>,
+    loaders: Vec<Box<dyn ModuleLoader + Send + Sync>>,
 }
 
 impl CompositeLoader {
-    pub fn new(loaders: Vec<Box<dyn ModuleLoader>>) -> Self {
+    pub fn new(loaders: Vec<Box<dyn ModuleLoader + Send + Sync>>) -> Self {
         Self { loaders }
     }
 }

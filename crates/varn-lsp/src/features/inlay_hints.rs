@@ -11,6 +11,9 @@ pub fn build_inlay_hints(state: &DocumentState) -> Vec<InlayHint> {
         if s.line == u32::MAX {
             continue;
         }
+        if s.is_from_stdlib {
+            continue;
+        }
 
         match s.kind {
             SymbolKind::Const | SymbolKind::Let | SymbolKind::Var

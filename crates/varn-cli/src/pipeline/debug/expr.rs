@@ -1,15 +1,14 @@
-use crate::pipeline::colors::{BOLD, C_TYPES, DIM, RESET, YELLOW};
 use varn_core::ast::Program;
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal::{self, Section};
 
 pub fn debug_expr(program: &Program, range: Option<(u32, u32)>) {
-    use super::super::colors::{footer, header};
-
     let result = varn_checker::Checker::check(program);
     if result.expr_types.is_empty() {
         return;
     }
 
-    header(C_TYPES, "expression inference map", &program.filename);
+    Section::new("expression inference map").subtitle(&program.filename).color(|c| c.blue()).print();
 
     let src = std::fs::read_to_string(&program.filename).unwrap_or_default();
     let src_bytes = src.as_bytes();
@@ -35,11 +34,11 @@ pub fn debug_expr(program: &Program, range: Option<(u32, u32)>) {
     let mut sorted_exprs: Vec<_> = result.expr_types.iter().collect();
     sorted_exprs.sort_by_key(|(off, _)| *off);
 
-    eprintln!(
-        "  {DIM}{:<8} │ {:<30} │ Inferred Type{RESET}",
-        "Loc", "Snippet"
-    );
-    eprintln!("  {}", "─".repeat(80));
+    terminal::log(format!(
+        "  {}",
+        chalk(format!("{:<8} │ {:<30} │ Inferred Type", "Loc", "Snippet")).dim()
+    ));
+    terminal::log(format!("  {}", "─".repeat(80)));
 
     let mut shown = 0;
     for (offset, info) in sorted_exprs {
@@ -56,15 +55,14 @@ pub fn debug_expr(program: &Program, range: Option<(u32, u32)>) {
             .min(30);
         let snip = String::from_utf8_lossy(&src_bytes[start..start + raw_end]);
 
-        eprintln!(
-            "  {DIM}{:<3}:{:>3}{RESET} │ {YELLOW}{:<30}{RESET} │ {BOLD}{}{RESET}",
-            line,
-            col,
-            snip.trim(),
-            info.ty
-        );
+        terminal::log(format!(
+            "  {} │ {} │ {}",
+            chalk(format!("{:<3}:{:>3}", line, col)).dim(),
+            chalk(format!("{:<30}", snip.trim())).yellow(),
+            chalk(&info.ty).bold(),
+        ));
         shown += 1;
     }
 
-    footer(C_TYPES, &format!("{} expressions analyzed", shown));
+    varn_utilities::terminal::log(chalk(format!("── {shown} expressions analyzed ──")).dim());
 }

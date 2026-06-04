@@ -1,0 +1,20 @@
+import { spawnIsolate } from "std:task";
+
+// Este código correrá en el Isolate hijo
+export async function workerMain(port: dynamic) {
+    const data = await port.receive();
+    assert("msg in child", data.value === 10);
+    
+    // Devolver el doble al padre
+    port.send(data.value * 2);
+}
+
+async function testIsolates() {
+    const port = await spawnIsolate("./47-isolates-multithread.vn", "workerMain", []);
+    port.send({ value: 10 });
+    const response: dynamic = await port.receive();
+    assert("response from child", response === 20);
+    print("[PASSED] 47. Isolates Multi-Thread");
+}
+
+await testIsolates();

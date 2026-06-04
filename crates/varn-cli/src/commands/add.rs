@@ -4,6 +4,7 @@ use varn_pm::{
     installer, lockfile,
     manifest::{find_project_manifest, DepOrigin, ProjectManifest},
 };
+use varn_utilities::terminal;
 
 pub fn execute(args: AddArgs) -> Result<(), CliError> {
     let cwd =
@@ -33,7 +34,7 @@ pub fn execute(args: AddArgs) -> Result<(), CliError> {
         None
     };
 
-    eprintln!("Resolving {}...", args.alias);
+    terminal::log(format!("Resolving {}...", args.alias));
 
     let result =
         installer::resolve_and_install(&project_root, &deps, existing_lock.as_ref(), false)
@@ -44,6 +45,6 @@ pub fn execute(args: AddArgs) -> Result<(), CliError> {
         .save(&lock_path)
         .map_err(|e| CliError::fatal(e))?;
 
-    eprintln!("Added {} → {}", args.alias, args.origin);
+    terminal::log(format!("Added {} → {}", args.alias, args.origin));
     Ok(())
 }

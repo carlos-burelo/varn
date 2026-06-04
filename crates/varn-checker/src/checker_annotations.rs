@@ -481,6 +481,7 @@ fn decl_primary_name(decl: &Decl) -> Option<std::rc::Rc<str>> {
         Decl::TypeAlias(t) => Some(t.id.clone()),
         Decl::Namespace(n) => Some(n.id.clone()),
         Decl::Struct(s) => Some(s.id.clone()),
+        Decl::SumType(s) => Some(s.id.clone()),
         _ => None,
     }
 }

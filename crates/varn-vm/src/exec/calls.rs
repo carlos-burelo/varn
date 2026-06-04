@@ -126,7 +126,8 @@ pub fn prepare_call(
                     let mut gen_ctx = Box::new(ExecCtx::new(GlobalStore::new()));
                     gen_ctx.heap = heap.clone();
                     gen_ctx.trace = false;
-                    gen_ctx.stack = arg_nvs;
+                    gen_ctx.stack.clear();
+                    gen_ctx.stack.extend(arg_nvs);
                     let constants = resolve_constants(&nc.proto, heap);
                     let upvalues = nc
                         .upvalues
@@ -226,6 +227,73 @@ pub fn prepare_call(
                         } else {
                             stack[base] = recv_nv;
                         }
+                        if nc.proto.is_generator {
+                            let args_start = stack.len() - full_arg_count;
+                            let arg_nvs: Vec<VmValue> = stack.drain(args_start..).collect();
+                            let mut gen_ctx = Box::new(ExecCtx::new(GlobalStore::new()));
+                            gen_ctx.heap = heap.clone();
+                            gen_ctx.trace = false;
+                            gen_ctx.stack.clear();
+                            gen_ctx.stack.extend(arg_nvs);
+                            let constants = resolve_constants(&nc.proto, heap);
+                            let upvalues = nc
+                                .upvalues
+                                .iter()
+                                .map(|uv| {
+                                    let nv = uv.read(stack);
+                                    VmUpvalue::closed(nv)
+                                })
+                                .collect();
+                            let closure = Rc::new(VmClosure::with_upvalues(
+                                nc.proto.clone(),
+                                upvalues,
+                                Rc::new(constants),
+                            ));
+                            let required = nc.proto.register_count as usize;
+                            if gen_ctx.stack.len() < required {
+                                gen_ctx.stack.resize(required, VmValue::null());
+                            }
+                            let mut frame = CallFrame::new(closure, 0);
+                            frame.current_class = owner_class;
+                            gen_ctx.frames.push(frame);
+                            let driver = crate::generator::NanSyncGenDriver::new(gen_ctx);
+                            return Ok(PreparedCall::PushValue(
+                                heap.intern(Value::Generator(GeneratorObj(driver))),
+                            ));
+                        }
+                        if nc.proto.is_async {
+                            let args_start = stack.len() - full_arg_count;
+                            let args: Vec<Value> = stack
+                                .drain(args_start..)
+                                .map(|nv| heap.extract(nv))
+                                .collect();
+                            let upvalues: Vec<varn_types::Upvalue> = nc
+                                .upvalues
+                                .iter()
+                                .map(|uv| {
+                                    let nv = uv.read(stack);
+                                    let val = heap.extract(nv);
+                                    varn_types::Upvalue {
+                                        inner: std::rc::Rc::new(std::cell::RefCell::new(
+                                            varn_types::UpvalueInner {
+                                                value: val,
+                                                location: None,
+                                            },
+                                        )),
+                                    }
+                                })
+                                .collect();
+                            let consts: Vec<varn_types::Value> =
+                                nc.constants.iter().map(|&c| heap.extract(c)).collect();
+                            let closure = varn_types::Closure::new(nc.proto.clone(), upvalues, consts);
+                            let task = Value::Task(std::rc::Rc::new(LazyTask {
+                                closure: std::rc::Rc::new(closure),
+                                args,
+                                current_class: owner_class,
+                            }));
+
+                            return Ok(PreparedCall::PushValue(heap.intern(task)));
+                        }
                         if !nc.proto.is_generator && !nc.proto.is_async {
                             bundle_rest_args(&nc.proto, &mut full_arg_count, stack, heap);
                             let final_base = stack.len() - full_arg_count;
@@ -293,12 +361,12 @@ pub fn prepare_call(
                 let payload = if !data.fields.is_empty() {
                     let mut obj_data = varn_types::value::ObjData::new();
                     for (idx, field_name) in data.fields.iter().enumerate() {
-                        let val = if idx < args.len() {
-                            heap.extract(args[idx])
+                        let nv = if idx < args.len() {
+                            args[idx]
                         } else {
-                            Value::Null
+                            VmValue::null()
                         };
-                        obj_data.set_field(field_name.clone(), val);
+                        obj_data.set_field_nv(field_name.clone(), nv);
                     }
                     Value::Object(varn_types::value::ObjRef::new(obj_data))
                 } else if args.len() == 1 {

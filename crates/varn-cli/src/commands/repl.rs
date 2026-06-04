@@ -4,6 +4,7 @@ use crate::{
     opts::{DebugFlags, RunOpts},
 };
 use std::io::{self, Write};
+use varn_utilities::terminal;
 
 pub fn execute(_args: ReplArgs) -> Result<(), CliError> {
     println!("Varn {} — REPL interactivo", env!("CARGO_PKG_VERSION"));
@@ -68,7 +69,7 @@ fn run_snippet(source: &str) {
         strict: false,
     };
     if let Err(e) = crate::pipeline::run(&opts) {
-        eprintln!("{e}");
+        terminal::error(&e);
     }
 }
 

@@ -20,6 +20,8 @@ pub struct ModuleSpec {
     pub vn_source: &'static str,
 
     pub embedded: Option<&'static str>,
+
+    pub exports: &'static [&'static str],
 }
 
 impl ModuleSpec {
@@ -29,11 +31,17 @@ impl ModuleSpec {
             kind,
             vn_source,
             embedded: None,
+            exports: &[],
         }
     }
 
     pub const fn with_source(mut self, src: &'static str) -> Self {
         self.embedded = Some(src);
+        self
+    }
+
+    pub const fn with_exports(mut self, exports: &'static [&'static str]) -> Self {
+        self.exports = exports;
         self
     }
 

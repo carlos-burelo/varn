@@ -695,8 +695,15 @@ fn compile_export<'a>(c: &mut Compiler<'a>, decl: &ExportDecl) {
                 if !c.emit_load_var(&name, val_reg) {
                     c.emit_rc(OpCode::LoadGlobal, val_reg, idx);
                 }
-                if let Some(slot_idx) = c.annotations.get_slot_idx(declaration.range().start.offset)
-                {
+                let slot_idx = c
+                    .export_names
+                    .iter()
+                    .position(|n| **n == *name)
+                    .or_else(|| {
+                        c.annotations
+                            .get_slot_idx(declaration.range().start.offset)
+                    });
+                if let Some(slot_idx) = slot_idx {
                     c.emit_rc(OpCode::StoreModuleSlot, val_reg, slot_idx as u16);
                 }
                 c.free_reg();
@@ -713,7 +720,12 @@ fn compile_export<'a>(c: &mut Compiler<'a>, decl: &ExportDecl) {
                     if !c.emit_load_var(&f.id, val_reg) {
                         c.emit_rc(OpCode::LoadGlobal, val_reg, idx);
                     }
-                    if let Some(slot_idx) = c.annotations.get_slot_idx(range.start.offset) {
+                    let slot_idx = c
+                        .export_names
+                        .iter()
+                        .position(|n| &**n == "default")
+                        .or_else(|| c.annotations.get_slot_idx(range.start.offset));
+                    if let Some(slot_idx) = slot_idx {
                         c.emit_rc(OpCode::StoreModuleSlot, val_reg, slot_idx as u16);
                     }
                     c.free_reg();
@@ -728,7 +740,12 @@ fn compile_export<'a>(c: &mut Compiler<'a>, decl: &ExportDecl) {
                         if !c.emit_load_var(id, val_reg) {
                             c.emit_rc(OpCode::LoadGlobal, val_reg, idx);
                         }
-                        if let Some(slot_idx) = c.annotations.get_slot_idx(range.start.offset) {
+                        let slot_idx = c
+                            .export_names
+                            .iter()
+                            .position(|n| &**n == "default")
+                            .or_else(|| c.annotations.get_slot_idx(range.start.offset));
+                        if let Some(slot_idx) = slot_idx {
                             c.emit_rc(OpCode::StoreModuleSlot, val_reg, slot_idx as u16);
                         }
                         c.free_reg();
@@ -737,7 +754,12 @@ fn compile_export<'a>(c: &mut Compiler<'a>, decl: &ExportDecl) {
             }
             ExportDefaultDecl::Expr(e) => {
                 let r = compile_expr(c, e);
-                if let Some(slot_idx) = c.annotations.get_slot_idx(range.start.offset) {
+                let slot_idx = c
+                    .export_names
+                    .iter()
+                    .position(|n| &**n == "default")
+                    .or_else(|| c.annotations.get_slot_idx(range.start.offset));
+                if let Some(slot_idx) = slot_idx {
                     c.emit_rc(OpCode::StoreModuleSlot, r, slot_idx as u16);
                 }
                 c.free_reg();
@@ -768,8 +790,12 @@ fn compile_export<'a>(c: &mut Compiler<'a>, decl: &ExportDecl) {
                     } else {
                         c.emit_property(OpCode::GetProperty, val_reg, mod_reg, imported_idx);
                     }
-                    if let Some(exported_slot) = c.annotations.get_slot_idx(spec.range.start.offset)
-                    {
+                    let slot_idx = c
+                        .export_names
+                        .iter()
+                        .position(|n| &**n == &*spec.exported)
+                        .or_else(|| c.annotations.get_slot_idx(spec.range.start.offset));
+                    if let Some(exported_slot) = slot_idx {
                         c.emit_rc(OpCode::StoreModuleSlot, val_reg, exported_slot as u16);
                     }
                     c.free_reg();
@@ -784,8 +810,12 @@ fn compile_export<'a>(c: &mut Compiler<'a>, decl: &ExportDecl) {
                     if !c.emit_load_var(&spec.local, val_reg) {
                         c.emit_rc(OpCode::LoadGlobal, val_reg, idx);
                     }
-                    if let Some(exported_slot) = c.annotations.get_slot_idx(spec.range.start.offset)
-                    {
+                    let slot_idx = c
+                        .export_names
+                        .iter()
+                        .position(|n| &**n == &*spec.exported)
+                        .or_else(|| c.annotations.get_slot_idx(spec.range.start.offset));
+                    if let Some(exported_slot) = slot_idx {
                         c.emit_rc(OpCode::StoreModuleSlot, val_reg, exported_slot as u16);
                     }
                     c.free_reg();
@@ -800,10 +830,15 @@ fn compile_export<'a>(c: &mut Compiler<'a>, decl: &ExportDecl) {
         } => {
             let src_idx = c.add_str(source);
             match alias {
-                Some(_alias_name) => {
+                Some(alias_name) => {
                     let mod_reg = c.alloc_reg();
                     c.emit_rc(OpCode::LoadModule, mod_reg, src_idx);
-                    if let Some(slot_idx) = c.annotations.get_slot_idx(range.start.offset) {
+                    let slot_idx = c
+                        .export_names
+                        .iter()
+                        .position(|n| **n == **alias_name)
+                        .or_else(|| c.annotations.get_slot_idx(range.start.offset));
+                    if let Some(slot_idx) = slot_idx {
                         c.emit_rc(OpCode::StoreModuleSlot, mod_reg, slot_idx as u16);
                     }
                     c.free_reg();
@@ -845,7 +880,11 @@ fn runtime_export_names(decl: &Decl) -> Vec<Rc<str>> {
         }
         Decl::Enum(e) => vec![e.id.clone()],
         Decl::Namespace(n) => vec![n.id.clone()],
-        Decl::SumType(st) => st.variants.iter().map(|v| v.name.clone()).collect(),
+        Decl::SumType(st) => {
+            let mut names = vec![st.id.clone()];
+            names.extend(st.variants.iter().map(|v| v.name.clone()));
+            names
+        }
         _ => vec![],
     }
 }

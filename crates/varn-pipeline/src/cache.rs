@@ -11,19 +11,14 @@ pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
     let path = Path::new(file_path);
     let file_dir = path.parent().unwrap_or_else(|| Path::new("."));
 
-    let project_root = file_dir
-        .ancestors()
-        .find(|dir| dir.join("varn.json").exists())
-        .unwrap_or(file_dir);
+    let project_root = varn_modules::artifact::find_project_root(file_dir);
 
     let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let path_hash = crate::hash::fnv1a64(canonical.to_string_lossy().as_bytes());
 
     let stem = path.file_stem().unwrap_or_default().to_string_lossy();
-    project_root
-        .join(".vn")
-        .join("cache")
-        .join(format!("{}.{:x}.bin", stem, path_hash as u32))
+    varn_modules::artifact::get_bytecode_cache_dir(&project_root)
+        .join(format!("{}.{:x}.vnc", stem, path_hash as u32))
 }
 
 pub fn load_cached_graph(
@@ -35,17 +30,23 @@ pub fn load_cached_graph(
         return Ok(None);
     }
     let bytes = std::fs::read(cache_path).map_err(|e| e.to_string())?;
-    let graph: ModuleGraphArtifact = postcard::from_bytes(&bytes).map_err(|e| e.to_string())?;
+    let payload = varn_modules::artifact::read_envelope(
+        varn_modules::artifact::MAGIC_VNC,
+        version,
+        &bytes,
+    )
+    .map_err(|e| e.to_string())?;
 
-    if graph.format_version != version {
-        return Ok(None);
-    }
+    let graph: ModuleGraphArtifact = postcard::from_bytes(payload).map_err(|e| e.to_string())?;
 
-    if let Some(&cached_hash) = graph.source_hashes.get(&graph.entry_path) {
-        let current_hash = crate::hash::fnv1a64(entry_source.as_bytes());
-        if cached_hash != current_hash {
-            return Ok(None);
+    match graph.source_hashes.get(&graph.entry_path) {
+        Some(&cached_hash) => {
+            let current_hash = crate::hash::fnv1a64(entry_source.as_bytes());
+            if cached_hash != current_hash {
+                return Ok(None);
+            }
         }
+        None => return Ok(None),
     }
 
     for (path, &cached_hash) in &graph.source_hashes {
@@ -63,11 +64,14 @@ pub fn load_cached_graph(
             }
             continue;
         }
-        if let Ok(src) = std::fs::read(path) {
-            let current_hash = crate::hash::fnv1a64(&src);
-            if cached_hash != current_hash {
-                return Ok(None);
+        match std::fs::read(path) {
+            Ok(src) => {
+                let current_hash = crate::hash::fnv1a64(&src);
+                if cached_hash != current_hash {
+                    return Ok(None);
+                }
             }
+            Err(_) => return Ok(None),
         }
     }
 
@@ -86,7 +90,7 @@ pub fn store_cached_graph(cache_path: &Path, graph: &ModuleGraphArtifact) -> Pip
             ))
         })?;
     }
-    let bytes = postcard::to_allocvec(graph).map_err(|e| {
+    let payload = postcard::to_allocvec(graph).map_err(|e| {
         PipelineError::fatal(format!(
             "{}{}error[cache]{}: serialize failed: {}",
             varn_debug::colors::BOLD,
@@ -95,6 +99,11 @@ pub fn store_cached_graph(cache_path: &Path, graph: &ModuleGraphArtifact) -> Pip
             e
         ))
     })?;
+    let bytes = varn_modules::artifact::write_envelope(
+        varn_modules::artifact::MAGIC_VNC,
+        crate::compile::CACHE_FORMAT_VERSION,
+        &payload,
+    );
     std::fs::write(cache_path, bytes).map_err(|e| {
         PipelineError::fatal(format!(
             "{}{}error[cache]{}: write failed: {}",

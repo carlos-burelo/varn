@@ -1,0 +1,60 @@
+use std::path::{Path, PathBuf};
+
+pub const ENV_DIR_NAME: &str = ".vn";
+pub const CACHE_DIR_NAME: &str = "cache";
+pub const BYTECODE_DIR_NAME: &str = "bytecode";
+pub const TYPES_DIR_NAME: &str = "types";
+pub const PACKAGE_MANIFEST_FILE: &str = "varn.json";
+
+pub const COMPILER_CACHE_VERSION: u32 = 10;
+pub const TYPE_CACHE_VERSION: u32 = 1;
+
+pub const MAGIC_WRC: &[u8; 4] = b"WRC\0";
+pub const MAGIC_VNC: &[u8; 4] = b"VNC\0"; // Used for cached VM compilations
+pub const MAGIC_VNM: &[u8; 4] = b"VNM\0"; // Used for cached type checker metadata
+
+pub fn find_project_root(start_path: &Path) -> PathBuf {
+    start_path
+        .ancestors()
+        .find(|dir| dir.join(PACKAGE_MANIFEST_FILE).exists())
+        .unwrap_or(start_path)
+        .to_path_buf()
+}
+
+pub fn get_cache_dir(project_root: &Path) -> PathBuf {
+    project_root.join(ENV_DIR_NAME).join(CACHE_DIR_NAME)
+}
+
+pub fn get_bytecode_cache_dir(project_root: &Path) -> PathBuf {
+    get_cache_dir(project_root).join(BYTECODE_DIR_NAME)
+}
+
+pub fn get_types_cache_dir(project_root: &Path) -> PathBuf {
+    get_cache_dir(project_root).join(TYPES_DIR_NAME)
+}
+
+pub fn write_envelope(magic: &[u8; 4], version: u32, payload: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(8 + payload.len());
+    out.extend_from_slice(magic);
+    out.extend_from_slice(&version.to_le_bytes());
+    out.extend_from_slice(payload);
+    out
+}
+
+pub fn read_envelope<'a>(
+    magic: &[u8; 4],
+    expected_version: u32,
+    bytes: &'a [u8],
+) -> Result<&'a [u8], &'static str> {
+    if bytes.len() < 8 {
+        return Err("invalid artifact: file too short");
+    }
+    if &bytes[..4] != magic {
+        return Err("invalid artifact: bad magic header");
+    }
+    let version = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
+    if version != expected_version {
+        return Err("invalid artifact: version mismatch");
+    }
+    Ok(&bytes[8..])
+}

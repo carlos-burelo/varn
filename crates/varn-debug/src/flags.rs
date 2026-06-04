@@ -29,6 +29,7 @@ pub struct DebugFlags {
     pub lsp_completions: bool,
     pub lsp_symbols: bool,
     pub lsp_colorize: bool,
+    pub lsp_hints: bool,
 }
 
 pub fn parse_line_range(s: &str) -> Result<(u32, u32), CliError> {
@@ -92,11 +93,12 @@ impl DebugFlags {
                         "completions" => flags.lsp_completions = true,
                         "symbols" => flags.lsp_symbols = true,
                         "colorize" => flags.lsp_colorize = true,
+                        "hints" => flags.lsp_hints = true,
                         "all" => flags.lsp_all(),
                         unknown => {
                             return Err(CliError::usage(format!(
                                 "unknown lsp debug sub-phase: '{unknown}'\n\
-                                 Valid sub-phases: hovers, semantic, types, completions, symbols, colorize, all"
+                                 Valid sub-phases: hovers, semantic, types, completions, symbols, colorize, hints, all"
                             )));
                         }
                     }
@@ -149,7 +151,7 @@ impl DebugFlags {
                         return Err(CliError::usage(format!(
                             "unknown debug phase: '{unknown}'\n\
                              Valid phases: tokens, ast, check, bytecode, graph, caps, info, all\n\
-                             LSP sub-phases: lsp:hovers, lsp:semantic, lsp:types, lsp:completions, lsp:symbols, lsp:colorize, lsp:all\n\
+                             LSP sub-phases: lsp:hovers, lsp:semantic, lsp:types, lsp:completions, lsp:symbols, lsp:colorize, lsp:hints, lsp:all\n\
                              Line range filter: types:N  types:all  expr:N"
                         )));
                     }
@@ -186,5 +188,6 @@ impl DebugFlags {
         self.lsp_completions = true;
         self.lsp_symbols = true;
         self.lsp_colorize = true;
+        self.lsp_hints = true;
     }
 }

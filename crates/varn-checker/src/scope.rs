@@ -3,7 +3,7 @@ use rustc_hash::FxHashMap;
 use std::rc::Rc;
 pub type ScopeId = usize;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ScopeKind {
     Global,
     Module,
@@ -14,7 +14,7 @@ pub enum ScopeKind {
     Namespace,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CheckerScope {
     pub kind: ScopeKind,
     pub parent: Option<ScopeId>,
@@ -57,7 +57,7 @@ impl CheckerScope {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct ScopeArena {
     scopes: Vec<CheckerScope>,
 }

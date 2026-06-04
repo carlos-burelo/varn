@@ -840,24 +840,40 @@ pub fn compile_extension_decl<'a>(c: &mut Compiler<'a>, decl: &ExtensionDecl) {
 
 pub fn compile_sum_type<'a>(c: &mut Compiler<'a>, st: &SumTypeDecl) {
     let ns_reg = c.alloc_reg();
-    c.define_local(st.id.clone(), ns_reg);
 
     let mut variant_regs: Vec<(Rc<str>, u8)> = Vec::new();
 
-    for (_tag, variant) in st.variants.iter().enumerate() {
+    for (tag, variant) in st.variants.iter().enumerate() {
         let var_reg = c.alloc_reg();
-        if variant.fields.is_empty() {
-            let null_r = c.alloc_reg();
-            c.emit_rr(OpCode::LoadNull, null_r, 0);
-            let name_idx = c.add_str(&variant.name);
-            let line = c.line;
-            c.chunk.emit(OpCode::MakeEnumVariant, line);
-            c.chunk.write(Chunk::pack(var_reg, null_r), line);
-            c.chunk.write(name_idx, line);
-            c.free_reg();
+        let tag_r = c.alloc_reg();
+        c.emit_load_int(tag_r, tag as i64);
+
+        let fields_str = variant
+            .fields
+            .iter()
+            .map(|f| f.name.as_ref())
+            .collect::<Vec<&str>>()
+            .join(",");
+        let variant_meta = if fields_str.is_empty() {
+            format!("{}.{}", st.id, variant.name)
         } else {
-            c.emit_rr(OpCode::LoadNull, var_reg, 0);
+            format!("{}.{}:{}", st.id, variant.name, fields_str)
+        };
+        let name_idx = c.add_str(&variant_meta);
+        let line = c.line;
+        c.chunk.emit(OpCode::MakeEnumVariant, line);
+        c.chunk.write(Chunk::pack(var_reg, tag_r), line);
+        c.chunk.write(name_idx, line);
+        c.free_reg(); // free tag_r
+
+        if c.is_global {
+            let name_idx = c.add_str(&variant.name);
+            c.chunk
+                .emit_rrc(OpCode::DefineGlobal, 0, var_reg, name_idx, line);
+        } else {
+            c.define_local(variant.name.clone(), var_reg);
         }
+
         variant_regs.push((variant.name.clone(), var_reg));
     }
 
@@ -870,13 +886,18 @@ pub fn compile_sum_type<'a>(c: &mut Compiler<'a>, st: &SumTypeDecl) {
         c.chunk.write(key_idx, line);
         c.chunk.write(Chunk::pack(*reg, 0), line);
     }
-    for _ in &variant_regs {
-        c.free_reg();
-    }
 
     if c.is_global {
         let name_idx = c.add_str(&st.id);
         c.chunk
             .emit_rrc(OpCode::DefineGlobal, 0, ns_reg, name_idx, line);
+
+        for _ in &variant_regs {
+            c.free_reg();
+        }
+        c.free_reg();
+    } else {
+        c.define_local(st.id.clone(), ns_reg);
     }
 }
+

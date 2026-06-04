@@ -1,6 +1,7 @@
 use crate::cli::BuildArgs;
 use crate::error::CliError;
 use crate::pipeline;
+use varn_utilities::terminal;
 
 pub fn execute(args: BuildArgs) -> Result<(), CliError> {
     let source = std::fs::read_to_string(&args.file)
@@ -15,12 +16,12 @@ pub fn execute(args: BuildArgs) -> Result<(), CliError> {
 
     let size = std::fs::metadata(&out_path).map(|m| m.len()).unwrap_or(0);
 
-    eprintln!(
+    terminal::log(format!(
         "Built '{}' → '{}' ({} KB)",
         args.file,
         out_path,
         size / 1024
-    );
+    ));
     Ok(())
 }
 

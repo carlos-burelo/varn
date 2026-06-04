@@ -22,6 +22,9 @@ thread_local! {
 
 pub struct AsyncTask(*mut Inner);
 
+unsafe impl Send for AsyncTask {}
+unsafe impl Sync for AsyncTask {}
+
 impl Clone for AsyncTask {
     fn clone(&self) -> Self {
         unsafe {

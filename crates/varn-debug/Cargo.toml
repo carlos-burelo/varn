@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+varn-utilities = { path = "../varn-utilities" }
 varn-core     = { path = "../varn-core" }
 varn-lexer    = { path = "../varn-lexer" }
 varn-parser   = { path = "../varn-parser" }

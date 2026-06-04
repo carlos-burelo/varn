@@ -1,15 +1,18 @@
-use crate::colors::{BLUE, BOLD, C_BYTECODE, DIM, RESET};
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal;
+use varn_utilities::terminal::Section;
 use varn_compiler::FunctionProto;
 use varn_core::OpCode;
 
 pub fn debug_bytecode(proto: &FunctionProto, _flags: &crate::flags::DebugFlags) {
-    use crate::colors::{footer, header};
-    header(C_BYTECODE, "bytecode", "...");
+    Section::new("bytecode").subtitle("...").color(|c| c.yellow()).print();
 
     let mut total_words = 0;
     print_proto(proto, 0, &mut total_words);
 
-    footer(C_BYTECODE, &format!("{} bytecode words", total_words));
+    Section::new("bytecode")
+        .subtitle(format!("{} bytecode words", total_words))
+        .close();
 }
 
 fn hi(w: u16) -> usize {
@@ -23,32 +26,29 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
     let indent = "  ".repeat(depth);
     let name = proto.name.as_deref().unwrap_or("<anonymous>");
 
-    eprintln!(
-        "{indent}{BOLD}fn{RESET} {BLUE}{}{RESET} (arity: {}, regs: {}, upvalues: {})",
-        name,
+    terminal::log(format!(
+        "{indent}{} {} (arity: {}, regs: {}, upvalues: {})",
+        chalk("fn").bold(),
+        chalk(name).blue(),
         proto.arity,
         proto.register_count,
         proto.upvalue_count,
-        indent = indent,
-        BOLD = BOLD,
-        RESET = RESET,
-        BLUE = BLUE
-    );
+    ));
 
     if !proto.chunk.constants.is_empty() {
-        eprintln!("{indent}  constants ({})", proto.chunk.constants.len());
+        terminal::log(format!("{indent}  constants ({})", proto.chunk.constants.len()));
         for (i, c) in proto.chunk.constants.iter().enumerate() {
-            eprintln!("{indent}  [{:03}] {:?}", i, c);
+            terminal::log(format!("{indent}  [{:03}] {:?}", i, c));
         }
     }
-    eprintln!("{indent}  code ({}) words", proto.chunk.code.len());
+    terminal::log(format!("{indent}  code ({}) words", proto.chunk.code.len()));
     *total += proto.chunk.code.len();
 
-    eprintln!(
-        "{indent}  {DIM}{:<4} │ {:<3} │ {:<20} │ Operands / Hint{RESET}",
-        "Off", "Lin", "Opcode"
-    );
-    eprintln!("{indent}  {}", "─".repeat(72));
+    terminal::log(format!(
+        "{indent}  {}",
+        chalk(format!("{:<4} │ {:<3} │ {:<20} │ Operands / Hint", "Off", "Lin", "Opcode")).dim()
+    ));
+    terminal::log(format!("{indent}  {}", "─".repeat(72)));
 
     let code = &proto.chunk.code;
     let mut pc = 0;
@@ -57,10 +57,10 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
         let op_val = code[pc];
         pc += 1;
         let Some(op) = OpCode::from_u16(op_val) else {
-            eprintln!(
+            terminal::log(format!(
                 "{indent}  {:04} │ ??? │ {:<20} │ raw={}",
                 start_pc, "???", op_val
-            );
+            ));
             continue;
         };
         let line = proto.chunk.lines.get_line(start_pc);
@@ -497,29 +497,26 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             }
         };
 
-        eprintln!(
-            "{indent}  {:04} │ {:>3} │ {BOLD}{:<20}{RESET} │ {}{}",
+        terminal::log(format!(
+            "{indent}  {:04} │ {:>3} │ {} │ {}{}",
             start_pc,
             line,
-            format!("{:?}", op),
+            chalk(format!("{:<20}", format!("{:?}", op))).bold(),
             operands,
             if hint.is_empty() {
                 String::new()
             } else {
                 format!("  ; {}", hint)
             },
-            indent = indent,
-            BOLD = BOLD,
-            RESET = RESET,
-        );
+        ));
     }
 
     for entry in &proto.chunk.constants {
         if let varn_types::PoolEntry::Function(nested) = entry {
-            eprintln!();
+            terminal::blank();
             print_proto(nested, depth + 1, total);
         }
     }
 
-    eprintln!();
+    terminal::blank();
 }

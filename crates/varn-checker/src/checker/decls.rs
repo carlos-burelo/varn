@@ -62,11 +62,11 @@ impl Checker {
                     .map(|rt| self.resolve_type_node_cached(rt, bind));
 
                 let saved_scope = self.current_scope;
-                if let Some(fn_scope) = self.next_child_scope(bind) {
+                let next_scope = self.next_child_scope(bind);
+                if let Some(fn_scope) = next_scope {
                     self.current_scope = fn_scope;
                     self.record_scope(f.body.range.start.offset);
                 }
-
                 let is_gen = f.modifiers.is_generator;
                 let old_yields = if is_gen {
                     self.yielded_types.replace(Vec::new())
@@ -429,6 +429,30 @@ impl Checker {
                 self.current_scope = saved_scope;
             }
 
+            Decl::Export(e) => {
+                self.check_export(e, bind);
+            }
+
+            _ => {}
+        }
+    }
+
+    pub(crate) fn check_export(&mut self, e: &varn_core::ast::ExportDecl, bind: &BindResult) {
+        match e {
+            varn_core::ast::ExportDecl::Decl { declaration, .. } => {
+                self.check_decl(declaration, bind);
+            }
+            varn_core::ast::ExportDecl::Default { declaration, .. } => match declaration.as_ref() {
+                varn_core::ast::ExportDefaultDecl::Function(f) => {
+                    self.check_decl(&varn_core::ast::Decl::Function(f.clone()), bind);
+                }
+                varn_core::ast::ExportDefaultDecl::Class(c) => {
+                    self.check_decl(&varn_core::ast::Decl::Class(c.clone()), bind);
+                }
+                varn_core::ast::ExportDefaultDecl::Expr(expr) => {
+                    self.check_expr(expr, bind);
+                }
+            },
             _ => {}
         }
     }

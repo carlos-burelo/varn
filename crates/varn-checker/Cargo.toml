@@ -9,3 +9,5 @@ varn-lexer   = { path = "../varn-lexer" }
 varn-parser  = { path = "../varn-parser" }
 varn-modules = { path = "../varn-modules" }
 rustc-hash   = { workspace = true }
+serde        = { workspace = true, features = ["rc"] }
+postcard     = { version = "1", features = ["alloc"] }

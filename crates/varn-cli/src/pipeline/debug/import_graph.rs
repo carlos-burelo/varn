@@ -1,10 +1,9 @@
 use varn_core::ast::{Decl, ExportDecl, Program, Stmt};
-use crate::pipeline::colors::{BOLD, DIM, RESET, YELLOW, BLUE, C_MODULES};
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal::{self, Section};
 use super::modules::format_import_specifiers;
 
 pub fn debug_import_graph(program: &Program) {
-    use super::super::colors::{footer, header};
-
     struct Edge {
         source: String,
         line: u32,
@@ -41,27 +40,35 @@ pub fn debug_import_graph(program: &Program) {
         }
     }
 
-    header(C_MODULES, "dependency graph", &program.filename);
+    Section::new("dependency graph").subtitle(&program.filename).color(|c| c.cyan()).print();
 
     if edges.is_empty() {
-        eprintln!("  {DIM}(no external dependencies){RESET}");
-        footer(C_MODULES, "0 edges");
+        terminal::log(format!("  {}", chalk("(no external dependencies)").dim()));
+        varn_utilities::terminal::log(chalk("── 0 edges ──").dim());
         return;
     }
 
-    eprintln!("  {BOLD}{BLUE}○ {}{RESET}", program.filename);
-    
+    terminal::log(format!("  {}", chalk(format!("○ {}", program.filename)).blue().bold()));
+
     let total = edges.len();
     for (i, edge) in edges.iter().enumerate() {
         let is_last = i == total - 1;
         let marker = if is_last { "└── " } else { "├── " };
-        let re_flag = if edge.is_reexport { format!(" {YELLOW}[re-export]{RESET}") } else { String::new() };
-        
-        eprintln!(
-            "  {DIM}{marker}{RESET}{BOLD}\"{}\"{RESET} {DIM}ln:{} │ {RESET}{}{}",
-            edge.source, edge.line, edge.specifiers, re_flag
-        );
+        let re_flag = if edge.is_reexport {
+            format!(" {}", chalk("[re-export]").yellow())
+        } else {
+            String::new()
+        };
+
+        terminal::log(format!(
+            "  {}{} {} │ {}{}",
+            chalk(marker).dim(),
+            chalk(format!("\"{}\"", edge.source)).bold(),
+            chalk(format!("ln:{}", edge.line)).dim(),
+            edge.specifiers,
+            re_flag
+        ));
     }
 
-    footer(C_MODULES, &format!("{} dependencies resolved", total));
+    varn_utilities::terminal::log(chalk(format!("── {total} dependencies resolved ──")).dim());
 }

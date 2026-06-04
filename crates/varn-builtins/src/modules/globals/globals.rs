@@ -48,7 +48,7 @@ pub(crate) mod dispatch {
             .map(|&v| ctx.str_repr_borrowed(v))
             .collect::<Vec<_>>()
             .join(" ");
-        eprintln!("[debug] {s}");
+        varn_utilities::terminal::tagged("debug", s);
         Ok(VmValue::null())
     }
 
@@ -74,7 +74,7 @@ pub(crate) mod dispatch {
             Ok(VmValue::null())
         } else {
             crate::modules::testing::inc_failed();
-            eprintln!("ASSERT FAIL: {label}");
+            varn_utilities::terminal::error(format!("ASSERT FAIL: {label}"));
             Err(label)
         }
     }

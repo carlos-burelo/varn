@@ -7,6 +7,7 @@ edition = "2021"
 profiling = []
 
 [dependencies]
+varn-utilities = { path = "../varn-utilities" }
 varn-types    = { path = "../varn-types" }
 varn-core     = { path = "../varn-core" }
 varn-builtins = { path = "../varn-builtins", features = ["runtime"] }

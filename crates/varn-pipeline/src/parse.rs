@@ -30,7 +30,7 @@ pub fn parse(
     })?;
 
     if verbose {
-        eprintln!("[Varn] parsed {} top-level statements", program.body.len());
+        varn_utilities::terminal::tagged("Varn", format_args!("parsed {} top-level statements", program.body.len()));
     }
 
     if debug.ast {

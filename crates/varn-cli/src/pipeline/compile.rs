@@ -6,6 +6,7 @@ use varn_compiler::FunctionProto;
 use varn_core::ast::Program;
 use varn_debug::flags::DebugFlags;
 use varn_types::ModuleGraphArtifact;
+use varn_utilities::terminal;
 
 pub const CACHE_FORMAT_VERSION: u32 = 10;
 
@@ -25,7 +26,7 @@ pub fn compile(
     debug: &DebugFlags,
 ) -> PipelineResult<CompileOutput> {
     if verbose {
-        eprintln!("[Varn] generating bytecode...");
+        terminal::tagged("Varn", "generating bytecode...");
     }
 
     let exports =
@@ -75,7 +76,7 @@ pub fn compile(
     }
 
     if verbose {
-        eprintln!("[Varn] resolving module graph...");
+        terminal::tagged("Varn", "resolving module graph...");
     }
     let graph_build =
         crate::module_precompile::build_module_graph(program, source, &program.filename, &proto)

@@ -1,8 +1,9 @@
-use crate::colors::{C_BINDS, DIM, RESET};
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal;
+use varn_utilities::terminal::Section;
 
 pub fn debug_binds(filename: &str) {
-    use crate::colors::{footer, header};
-    header(C_BINDS, "identifier binding", filename);
-    eprintln!("  {DIM}(Binding trace not implemented){RESET}");
-    footer(C_BINDS, "bind trace complete");
+    Section::new("identifier binding").subtitle(filename).color(|c| c.blue()).print();
+    terminal::log(format!("  {}", chalk("(Binding trace not implemented)").dim()));
+    Section::new("identifier binding").close();
 }

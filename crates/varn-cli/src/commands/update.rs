@@ -3,6 +3,7 @@ use varn_pm::{
     installer, lockfile,
     manifest::{find_project_manifest, ProjectManifest},
 };
+use varn_utilities::terminal;
 
 pub fn execute() -> Result<(), CliError> {
     let cwd =
@@ -16,11 +17,11 @@ pub fn execute() -> Result<(), CliError> {
     let deps = manifest.parsed_deps().map_err(|e| CliError::fatal(e))?;
 
     if deps.is_empty() {
-        eprintln!("No dependencies to update.");
+        terminal::log("No dependencies to update.");
         return Ok(());
     }
 
-    eprintln!("Updating {} dependency(ies)...", deps.len());
+    terminal::log(format!("Updating {} dependency(ies)...", deps.len()));
 
     let result = installer::resolve_and_install(&project_root, &deps, None, true)
         .map_err(|e| CliError::fatal(e))?;
@@ -31,8 +32,8 @@ pub fn execute() -> Result<(), CliError> {
         .map_err(|e| CliError::fatal(e))?;
 
     for pkg in &result.lock.packages {
-        eprintln!("  {} → v{}", pkg.name, pkg.version);
+        terminal::log(format!("  {} → v{}", pkg.name, pkg.version));
     }
-    eprintln!("Lockfile updated.");
+    terminal::log("Lockfile updated.");
     Ok(())
 }

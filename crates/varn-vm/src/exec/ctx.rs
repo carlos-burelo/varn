@@ -51,7 +51,7 @@ pub struct ExecCtx {
     pub try_handlers: Vec<TryHandler>,
     pub modules: FxHashMap<ModuleId, VmValue>,
     pub precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
-    pub loader: Option<Rc<dyn ModuleLoader>>,
+    pub loader: Option<std::sync::Arc<dyn ModuleLoader + Send + Sync>>,
     pub trace: bool,
     pub open_upvalues: Vec<(usize, VmUpvalue)>,
     pub pending_constructors: Vec<(usize, VmValue)>,

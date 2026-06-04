@@ -9,22 +9,15 @@ use varn_checker::Checker;
 use varn_compiler::FunctionProto;
 use varn_core::ModuleId;
 use varn_types::value::Closure;
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal;
 use varn_vm::Vm;
-
-const R: &str = "\x1b[0m";
-const BOLD: &str = "\x1b[1m";
-const DIM: &str = "\x1b[2m";
-const CYAN: &str = "\x1b[96m";
-const YEL: &str = "\x1b[33m";
-const GRN: &str = "\x1b[32m";
-const MAG: &str = "\x1b[35m";
-const BLU: &str = "\x1b[34m";
-const WHT: &str = "\x1b[37m";
-const RED: &str = "\x1b[31m";
+use std::fs::File;
+use std::io::Write;
 
 struct PhaseStats {
     name: &'static str,
-    color: &'static str,
+    color_fn: fn(varn_utilities::chalk::Chalk) -> varn_utilities::chalk::Chalk,
     min: Duration,
     p50: Duration,
     max: Duration,
@@ -34,7 +27,11 @@ struct PhaseStats {
 }
 
 impl PhaseStats {
-    fn from_samples(name: &'static str, color: &'static str, samples: &[Duration]) -> Self {
+    fn from_samples(
+        name: &'static str,
+        color_fn: fn(varn_utilities::chalk::Chalk) -> varn_utilities::chalk::Chalk,
+        samples: &[Duration],
+    ) -> Self {
         let min = *samples.iter().min().expect("samples must not be empty");
         let max = *samples.iter().max().expect("samples must not be empty");
         let total: Duration = samples.iter().sum();
@@ -56,7 +53,7 @@ impl PhaseStats {
 
         PhaseStats {
             name,
-            color,
+            color_fn,
             min,
             p50,
             max,
@@ -129,32 +126,40 @@ fn sep_line() {
     let time_col = SEP.repeat(W_TIME);
     let sig_col = SEP.repeat(W_SIG);
     let pct_col = SEP.repeat(W_PCT);
-    eprintln!(
-        "  {DIM}{name_col}  {time_col}  {time_col}  {time_col}  {time_col}  {sig_col}  {time_col}  {pct_col}{R}"
-    );
+    terminal::log(format!(
+        "  {}",
+        chalk(format!(
+            "{name_col}  {time_col}  {time_col}  {time_col}  {time_col}  {sig_col}  {time_col}  {pct_col}"
+        ))
+        .dim()
+    ));
 }
 
 fn header_line() {
-    eprintln!(
-        "  {}{:<W_NAME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_SIG$}  {:>W_TIME$}  {:>W_PCT$}{}",
-        DIM, "Phase", "min", "p50", "mean", "max", "σ", "total", "%", R
-    );
+    terminal::log(format!(
+        "  {}",
+        chalk(format!(
+            "{:<W_NAME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_SIG$}  {:>W_TIME$}  {:>W_PCT$}",
+            "Phase", "min", "p50", "mean", "max", "σ", "total", "%"
+        ))
+        .dim()
+    ));
 }
 
 fn phase_line(stat: &PhaseStats, share: f64) {
     let pct = format!("{:.1}%", share * 100.0);
+    let name = (stat.color_fn)(chalk(stat.name)).bold();
 
-    eprintln!(
-        "  {}{}{:<W_NAME$}{}  {:>W_TIME$}  {:>W_TIME$}  {}{:>W_TIME$}{}  {:>W_TIME$}  {}{:>W_SIG$}{}  {}{:>W_TIME$}{}  {}{:>W_PCT$}{}",
-        BOLD, stat.color, stat.name, R,
+    terminal::log(format!(
+        "  {name:<W_NAME$}  {:>W_TIME$}  {:>W_TIME$}  {}  {:>W_TIME$}  {}  {}  {}",
         fmt_dur(stat.min),
         fmt_dur(stat.p50),
-        CYAN, fmt_dur(stat.mean()), R,
+        chalk(format!("{:>W_TIME$}", fmt_dur(stat.mean()))).cyan(),
         fmt_dur(stat.max),
-        DIM, fmt_dur(stat.stddev), R,
-        DIM, fmt_dur(stat.total), R,
-        DIM, pct, R,
-    );
+        chalk(format!("{:>W_SIG$}", fmt_dur(stat.stddev))).dim(),
+        chalk(format!("{:>W_TIME$}", fmt_dur(stat.total))).dim(),
+        chalk(format!("{:>W_PCT$}", pct)).dim(),
+    ));
 }
 
 fn total_line(phases: &[PhaseStats]) {
@@ -165,17 +170,17 @@ fn total_line(phases: &[PhaseStats]) {
     let runs = phases[0].runs;
     let mean = total / runs as u32;
 
-    eprintln!(
-        "  {}{}{:<W_NAME$}{}  {:>W_TIME$}  {:>W_TIME$}  {}{:>W_TIME$}{}  {:>W_TIME$}  {:>W_SIG$}  {}{:>W_TIME$}{}  {}{:>W_PCT$}{}",
-        BOLD, GRN, "total", R,
+    terminal::log(format!(
+        "  {}  {:>W_TIME$}  {:>W_TIME$}  {}  {:>W_TIME$}  {:>W_SIG$}  {}  {}",
+        chalk(format!("{:<W_NAME$}", "total")).green().bold(),
         fmt_dur(min),
         fmt_dur(p50),
-        CYAN, fmt_dur(mean), R,
+        chalk(format!("{:>W_TIME$}", fmt_dur(mean))).cyan(),
         fmt_dur(max),
         "",
-        DIM, fmt_dur(total), R,
-        DIM, "100%", R,
-    );
+        chalk(format!("{:>W_TIME$}", fmt_dur(total))).dim(),
+        chalk(format!("{:>W_PCT$}", "100%")).dim(),
+    ));
 }
 
 fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Duration>, CliError> {
@@ -389,6 +394,17 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
             snap_heap_ref.clone(),
             precompiled_ref.clone(),
         );
+        let main_module_id = ModuleId::local_str(path);
+        let mut export_map = FxHashMap::default();
+        for (idx, name) in proto_rc.export_names.iter().enumerate() {
+            export_map.insert(name.clone(), idx);
+        }
+        let mut module_obj = varn_types::ModuleObj::new(main_module_id.clone(), proto_rc.export_names.len());
+        module_obj.export_map = export_map;
+        let module_val = machine.ctx.heap.alloc_module(Rc::new(module_obj));
+        machine.ctx.modules.insert(main_module_id, module_val);
+        machine.ctx.module_exports.insert(0, module_val);
+
         let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
         let result = machine.run(closure).map(|_| ()).map_err(|e| e.to_string());
         varn_builtins::set_print_silent(false);
@@ -406,6 +422,17 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
             snap_heap.clone(),
             optimized_precompiled.clone(),
         );
+        let main_module_id = ModuleId::local_str(path);
+        let mut export_map = FxHashMap::default();
+        for (idx, name) in proto_rc.export_names.iter().enumerate() {
+            export_map.insert(name.clone(), idx);
+        }
+        let mut module_obj = varn_types::ModuleObj::new(main_module_id.clone(), proto_rc.export_names.len());
+        module_obj.export_map = export_map;
+        let module_val = profile_vm.ctx.heap.alloc_module(Rc::new(module_obj));
+        profile_vm.ctx.modules.insert(main_module_id, module_val);
+        profile_vm.ctx.module_exports.insert(0, module_val);
+
         profile_vm.enable_opcode_profiling();
         profile_vm.enable_profiling();
         let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
@@ -420,15 +447,24 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     };
     varn_builtins::set_print_silent(false);
     varn_builtins::set_testing_silent(false);
+    // Write profiling data to files for later analysis
+    if let Some(ref profile) = vm_profile {
+        if let Ok(mut f) = File::create("target/debug/vm_profile.txt") {
+            let _ = write!(f, "{:?}", profile);
+        }
+    }
+    if let Ok(mut f) = File::create("target/debug/opcode_counts.txt") {
+        let _ = write!(f, "{:?}", opcode_counts);
+    }
 
     let stats = vec![
-        PhaseStats::from_samples("read", WHT, &read_samples),
-        PhaseStats::from_samples("lex", YEL, &lex_samples),
-        PhaseStats::from_samples("parse", GRN, &parse_samples),
-        PhaseStats::from_samples("check", RED, &check_samples),
-        PhaseStats::from_samples("compile", MAG, &compile_only_samples),
-        PhaseStats::from_samples("optimize", YEL, &optimize_samples),
-        PhaseStats::from_samples("execute", BLU, &exec_samples),
+        PhaseStats::from_samples("read", |c| c.white(), &read_samples),
+        PhaseStats::from_samples("lex", |c| c.yellow(), &lex_samples),
+        PhaseStats::from_samples("parse", |c| c.green(), &parse_samples),
+        PhaseStats::from_samples("check", |c| c.red(), &check_samples),
+        PhaseStats::from_samples("compile", |c| c.magenta(), &compile_only_samples),
+        PhaseStats::from_samples("optimize", |c| c.yellow(), &optimize_samples),
+        PhaseStats::from_samples("execute", |c| c.blue(), &exec_samples),
     ];
 
     let total_p50: Duration = stats.iter().map(|s| s.p50).sum();
@@ -441,17 +477,24 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     let line_count = source.lines().count();
     let byte_count = source.len();
 
-    eprintln!();
-    eprintln!("  {BOLD}{CYAN}Benchmark{R} · {BOLD}{path}{R}  {DIM}({runs} runs){R}");
-    eprintln!(
-        "  {}Source  {} lines  {}  {} tokens{}",
-        DIM,
-        fmt_num(line_count),
-        fmt_bytes(byte_count),
-        fmt_num(token_count),
-        R
-    );
-    eprintln!();
+    terminal::blank();
+    terminal::log(format!(
+        "  {} · {}  {}",
+        chalk("Benchmark").cyan().bold(),
+        chalk(path).bold(),
+        chalk(format!("({runs} runs)")).dim()
+    ));
+    terminal::log(format!(
+        "  {}",
+        chalk(format!(
+            "Source  {} lines  {}  {} tokens",
+            fmt_num(line_count),
+            fmt_bytes(byte_count),
+            fmt_num(token_count)
+        ))
+        .dim()
+    ));
+    terminal::blank();
     header_line();
     sep_line();
     for s in &stats {
@@ -464,54 +507,42 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     }
     sep_line();
     total_line(&stats);
-    eprintln!();
+    terminal::blank();
     let total_pipeline_dur: Duration = stats.iter().map(|s| s.total).sum();
-    eprintln!(
-        "  {}Throughput:{} {}{:.1} runs/s{}  {}(p50 end-to-end: {}){}",
-        DIM,
-        R,
-        RED,
-        throughput,
-        R,
-        DIM,
-        fmt_dur(total_p50),
-        R
-    );
-    eprintln!(
-        "  {}Total pipeline time:{} {}{}{}",
-        DIM,
-        R,
-        CYAN,
-        fmt_dur(total_pipeline_dur),
-        R
-    );
-    eprintln!(
-        "  {}Module precompilation (cold startup):{} {}{}{}",
-        DIM,
-        R,
-        CYAN,
-        fmt_dur(precompile_dur),
-        R
-    );
+    terminal::log(format!(
+        "  {}Throughput:{} {}  {}",
+        chalk("").dim(),
+        "",
+        chalk(format!("{:.1} runs/s", throughput)).red(),
+        chalk(format!("(p50 end-to-end: {})", fmt_dur(total_p50))).dim()
+    ));
+    terminal::log(format!(
+        "  {}Total pipeline time:{} {}",
+        chalk("").dim(),
+        "",
+        chalk(fmt_dur(total_pipeline_dur)).cyan()
+    ));
+    terminal::log(format!(
+        "  {}Module precompilation (cold startup):{} {}",
+        chalk("").dim(),
+        "",
+        chalk(fmt_dur(precompile_dur)).cyan()
+    ));
     let cold_start = precompile_dur + total_p50;
     let cold_throughput = if cold_start.as_nanos() > 0 {
         1_000_000_000.0 / cold_start.as_nanos() as f64
     } else {
         f64::INFINITY
     };
-    eprintln!(
-        "  {}Cold-start throughput:{} {}{:.1} runs/s{}  {}(precompile + p50: {}){}",
-        DIM,
-        R,
-        YEL,
-        cold_throughput,
-        R,
-        DIM,
-        fmt_dur(cold_start),
-        R
-    );
+    terminal::log(format!(
+        "  {}Cold-start throughput:{} {}  {}",
+        chalk("").dim(),
+        "",
+        chalk(format!("{:.1} runs/s", cold_throughput)).yellow(),
+        chalk(format!("(precompile + p50: {})", fmt_dur(cold_start))).dim()
+    ));
     if !show_output {
-        eprintln!("  {DIM}Execution measured with stdout muted (--show-output to disable){R}");
+        terminal::log(chalk("  Execution measured with stdout muted (--show-output to disable)").dim());
     }
     print_parse_breakdown(&parse_profile);
     print_check_breakdown(&check_result.profile);
@@ -526,7 +557,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         print_vm_profile(profile);
     }
     crate::bench_output::print_jit_stats(&jit_stats);
-    eprintln!();
+    terminal::blank();
 
     Ok(())
 }
@@ -590,6 +621,17 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
             snap_heap_ref.clone(),
             precompiled_ref.clone(),
         );
+        let main_module_id = ModuleId::local_str(path);
+        let mut export_map = FxHashMap::default();
+        for (idx, name) in proto_rc.export_names.iter().enumerate() {
+            export_map.insert(name.clone(), idx);
+        }
+        let mut module_obj = varn_types::ModuleObj::new(main_module_id.clone(), proto_rc.export_names.len());
+        module_obj.export_map = export_map;
+        let module_val = machine.ctx.heap.alloc_module(Rc::new(module_obj));
+        machine.ctx.modules.insert(main_module_id, module_val);
+        machine.ctx.module_exports.insert(0, module_val);
+
         let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
         let result = machine.run(closure).map(|_| ()).map_err(|e| e.to_string());
         varn_builtins::set_print_silent(false);
@@ -607,6 +649,17 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
             snap_heap.clone(),
             optimized_precompiled.clone(),
         );
+        let main_module_id = ModuleId::local_str(path);
+        let mut export_map = FxHashMap::default();
+        for (idx, name) in proto_rc.export_names.iter().enumerate() {
+            export_map.insert(name.clone(), idx);
+        }
+        let mut module_obj = varn_types::ModuleObj::new(main_module_id.clone(), proto_rc.export_names.len());
+        module_obj.export_map = export_map;
+        let module_val = profile_vm.ctx.heap.alloc_module(Rc::new(module_obj));
+        profile_vm.ctx.modules.insert(main_module_id, module_val);
+        profile_vm.ctx.module_exports.insert(0, module_val);
+
         profile_vm.enable_opcode_profiling();
         profile_vm.enable_profiling();
         let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
@@ -623,8 +676,8 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     varn_builtins::set_testing_silent(false);
 
     let stats = vec![
-        PhaseStats::from_samples("load", WHT, &load_samples),
-        PhaseStats::from_samples("execute", BLU, &exec_samples),
+        PhaseStats::from_samples("load", |c| c.white(), &load_samples),
+        PhaseStats::from_samples("execute", |c| c.blue(), &exec_samples),
     ];
 
     let total_p50: Duration = stats.iter().map(|s| s.p50).sum();
@@ -634,15 +687,18 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         f64::INFINITY
     };
 
-    eprintln!();
-    eprintln!(
-        "  {BOLD}{CYAN}Benchmark{R} · {BOLD}{path}{R}  {DIM}({runs} runs)  [.vnc compiled]{R}"
-    );
-    eprintln!(
-        "  {DIM}Binary  {}  (no source phases){R}",
-        fmt_bytes(file_size)
-    );
-    eprintln!();
+    terminal::blank();
+    terminal::log(format!(
+        "  {} · {}  {}",
+        chalk("Benchmark").cyan().bold(),
+        chalk(path).bold(),
+        chalk(format!("({runs} runs)  [.vnc compiled]")).dim()
+    ));
+    terminal::log(format!(
+        "  {}",
+        chalk(format!("Binary  {}  (no source phases)", fmt_bytes(file_size))).dim()
+    ));
+    terminal::blank();
     header_line();
     sep_line();
     for s in &stats {
@@ -655,19 +711,23 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     }
     sep_line();
     total_line(&stats);
-    eprintln!();
+    terminal::blank();
     let total_pipeline_dur: Duration = stats.iter().map(|s| s.total).sum();
-    eprintln!(
-        "  {DIM}Throughput:{R} {RED}{:.1} runs/s{R}  {DIM}(p50 end-to-end: {}){R}",
-        throughput,
-        fmt_dur(total_p50),
-    );
-    eprintln!(
-        "  {DIM}Total pipeline time:{R} {CYAN}{}{R}",
-        fmt_dur(total_pipeline_dur)
-    );
+    terminal::log(format!(
+        "  {}Throughput:{} {}  {}",
+        chalk("").dim(),
+        "",
+        chalk(format!("{:.1} runs/s", throughput)).red(),
+        chalk(format!("(p50 end-to-end: {})", fmt_dur(total_p50))).dim()
+    ));
+    terminal::log(format!(
+        "  {}Total pipeline time:{} {}",
+        chalk("").dim(),
+        "",
+        chalk(fmt_dur(total_pipeline_dur)).cyan()
+    ));
     if !show_output {
-        eprintln!("  {DIM}Execution measured with stdout muted (--show-output to disable){R}");
+        terminal::log(chalk("  Execution measured with stdout muted (--show-output to disable)").dim());
     }
     print_opcode_hotspots(&opcode_counts);
     if let Some(ref mut profile) = vm_profile {
@@ -680,7 +740,7 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         print_vm_profile(profile);
     }
     crate::bench_output::print_jit_stats(&jit_stats);
-    eprintln!();
+    terminal::blank();
 
     Ok(())
 }

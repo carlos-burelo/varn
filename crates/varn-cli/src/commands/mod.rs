@@ -1,4 +1,5 @@
 pub mod bench;
+pub mod cache;
 pub mod build;
 pub mod check;
 pub mod completions;

@@ -75,7 +75,7 @@ impl Checker {
 
         if let Some((ty, maybe_sid)) = self.find_member_info(&check_ty, prop_name.as_ref(), bind) {
             if let Some(sid) = maybe_sid {
-                self.record_type_with_symbol(property.range.start.offset, ty, sid);
+                self.record_member_type(property.range.start.offset, ty, sid);
             } else {
                 self.record_type(property.range.start.offset, ty);
             }

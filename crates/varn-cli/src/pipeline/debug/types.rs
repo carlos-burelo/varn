@@ -1,16 +1,15 @@
 use varn_checker::SymbolKind;
 use varn_core::ast::Program;
 use crate::opts::DebugFlags;
-use crate::pipeline::colors::{BOLD, DIM, RESET, YELLOW, BLUE, C_TYPES};
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal::{Section, Table};
 
 pub fn debug_types(program: &Program, flags: &DebugFlags) {
-    use super::super::colors::{footer, header};
-    
     let source_code = std::fs::read_to_string(&program.filename).unwrap_or_default();
     let uri = varn_modules::resolver::path_to_uri(&program.filename);
 
     let analysis = varn_lsp::pipeline::run_pipeline(source_code, uri);
-    header(C_TYPES, "type inference engine", &program.filename);
+    Section::new("type inference engine").subtitle(&program.filename).color(|c| c.blue()).print();
 
     let in_range = |line: u32| match flags.types_range {
         Some((lo, hi)) => line >= lo && line <= hi,
@@ -30,28 +29,28 @@ pub fn debug_types(program: &Program, flags: &DebugFlags) {
     }
 
     if !entries.is_empty() {
-        eprintln!("  {BOLD}{BLUE}Symbol Types{RESET}");
-        eprintln!("  {DIM}{:<8} │ {:<15} │ {:<20} │ Type Details{RESET}", "Loc", "Kind", "Name");
-        eprintln!("  {}", "─".repeat(80));
+        let mut table = Table::new(["Loc", "Kind", "Name", "Type Details"]);
 
         for s in entries {
             let loc = format!("{}:{}", s.line + 1, s.col + 1);
             let kind = s.kind.label();
             let details = format_sym_details(&s);
-            
+
             let name_prefix = if s.is_from_stdlib {
-                format!("{DIM}[std]{RESET} ")
+                format!("{} ", chalk("[std]").dim())
             } else {
                 String::new()
             };
 
-            eprintln!(
-                "  {DIM}{:<8}{RESET} │ {YELLOW}{:<15}{RESET} │ {BOLD}{name_prefix}{:<20}{RESET} │ {DIM}{details}{RESET}",
-                loc, kind, s.name, name_prefix = name_prefix, details = details,
-                DIM = DIM, RESET = RESET, YELLOW = YELLOW, BOLD = BOLD
-            );
+            table.row([
+                chalk(loc).dim().to_string(),
+                chalk(kind).yellow().to_string(),
+                format!("{}{}", name_prefix, chalk(&s.name).bold()),
+                chalk(details).dim().to_string(),
+            ]);
         }
-        eprintln!();
+        table.print();
+        varn_utilities::terminal::blank();
     }
 
     let footer_msg = if std_hidden > 0 {
@@ -59,7 +58,7 @@ pub fn debug_types(program: &Program, flags: &DebugFlags) {
     } else {
         format!("{} symbols analyzed", analysis.symbols.len())
     };
-    footer(C_TYPES, &footer_msg);
+    varn_utilities::terminal::log(chalk(format!("── {footer_msg} ──")).dim());
 }
 
 fn format_sym_details(s: &varn_lsp::document::SymbolRecord) -> String {

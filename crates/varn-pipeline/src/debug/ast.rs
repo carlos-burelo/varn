@@ -1,16 +1,16 @@
 use varn_core::ast::{Program, Stmt, Decl, Expr, Arg};
-use crate::colors::{BOLD, DIM, RESET, YELLOW, BLUE, C_AST, GREEN};
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal::Section;
 
 pub fn debug_ast(program: &Program) {
-    use super::colors::{footer, header};
-    header(C_AST, "abstract syntax tree", &program.filename);
+    Section::new("abstract syntax tree").subtitle(&program.filename).color(|c| c.cyan()).print();
 
     for (i, stmt) in program.body.iter().enumerate() {
         let is_last = i == program.body.len() - 1;
         print_stmt(stmt, "", is_last);
     }
 
-    footer(C_AST, &format!("{} top-level statements", program.body.len()));
+    varn_utilities::terminal::log(chalk(format!("── {} top-level statements ──", program.body.len())).dim());
 }
 
 fn print_stmt(stmt: &Stmt, indent: &str, is_last: bool) {
@@ -19,24 +19,24 @@ fn print_stmt(stmt: &Stmt, indent: &str, is_last: bool) {
 
     match stmt {
         Stmt::Block { stmts, .. } => {
-            eprintln!("{indent}{marker}{BOLD}BlockStmt{RESET}");
+            varn_utilities::terminal::log(format!("{indent}{marker}{}", chalk("BlockStmt").bold()));
             for (i, s) in stmts.iter().enumerate() {
                 print_stmt(s, &child_indent, i == stmts.len() - 1);
             }
         }
         Stmt::Decl(decl) => print_decl(decl, indent, is_last),
         Stmt::Expr { expression, .. } => {
-            eprintln!("{indent}{marker}{BOLD}ExprStmt{RESET}");
+            varn_utilities::terminal::log(format!("{indent}{marker}{}", chalk("ExprStmt").bold()));
             print_expr(expression, &child_indent, true);
         }
         Stmt::Return { argument, .. } => {
-            eprintln!("{indent}{marker}{BOLD}ReturnStmt{RESET}");
+            varn_utilities::terminal::log(format!("{indent}{marker}{}", chalk("ReturnStmt").bold()));
             if let Some(ref e) = argument {
                 print_expr(e, &child_indent, true);
             }
         }
         Stmt::If { test, consequent, alternate, .. } => {
-            eprintln!("{indent}{marker}{BOLD}IfStmt{RESET}");
+            varn_utilities::terminal::log(format!("{indent}{marker}{}", chalk("IfStmt").bold()));
             print_expr(test, &child_indent, false);
             if let Some(alt) = alternate {
                 print_stmt(consequent, &child_indent, false);
@@ -45,38 +45,38 @@ fn print_stmt(stmt: &Stmt, indent: &str, is_last: bool) {
                 print_stmt(consequent, &child_indent, true);
             }
         }
-        _ => eprintln!("{indent}{marker}{DIM}{:?}{RESET}", stmt),
+        _ => varn_utilities::terminal::log(format!("{indent}{marker}{}", chalk(format!("{:?}", stmt)).dim())),
     }
 }
 
 fn print_decl(decl: &Decl, indent: &str, is_last: bool) {
     let marker = if is_last { "└── " } else { "├── " };
     let child_indent = format!("{indent}{}", if is_last { "    " } else { "│   " });
-    
+
     match decl {
         Decl::Function(f) => {
-            eprintln!("{indent}{marker}{BOLD}{BLUE}FunctionDecl{RESET} {YELLOW}{}{RESET}", f.id);
+            varn_utilities::terminal::log(format!("{indent}{marker}{} {}", chalk("FunctionDecl").blue().bold(), chalk(&f.id).yellow()));
             print_stmt(&f.body, &child_indent, true);
         }
         Decl::Variable(v) => {
-            eprintln!("{indent}{marker}{BOLD}{BLUE}VariableDecl{RESET} {DIM}({:?}){RESET}", v.kind);
+            varn_utilities::terminal::log(format!("{indent}{marker}{} {}", chalk("VariableDecl").blue().bold(), chalk(format!("({:?})", v.kind)).dim()));
             for (i, d) in v.declarators.iter().enumerate() {
                 let d_is_last = i == v.declarators.len() - 1;
                 let d_marker = if d_is_last { "└── " } else { "├── " };
                 let d_indent = format!("{child_indent}{}", if d_is_last { "    " } else { "│   " });
-                
+
                 let id_name = match &d.id {
                     varn_core::ast::Pattern::Identifier { name, .. } => name.as_str(),
                     _ => "pattern",
                 };
-                eprintln!("{child_indent}{d_marker}{BOLD}Var{RESET} {YELLOW}{id_name}{RESET}");
-                
+                varn_utilities::terminal::log(format!("{child_indent}{d_marker}{} {}", chalk("Var").bold(), chalk(id_name).yellow()));
+
                 if let Some(init) = &d.init {
                     print_expr(init, &d_indent, true);
                 }
             }
         }
-        _ => eprintln!("{indent}{marker}{BOLD}{BLUE}Decl{RESET} {DIM}{:?}{RESET}", decl),
+        _ => varn_utilities::terminal::log(format!("{indent}{marker}{} {}", chalk("Decl").blue().bold(), chalk(format!("{:?}", decl)).dim())),
     }
 }
 
@@ -86,34 +86,34 @@ fn print_expr(expr: &Expr, indent: &str, is_last: bool) {
 
     match expr {
         Expr::Identifier { name, .. } => {
-            eprintln!("{indent}{marker}{YELLOW}{name}{RESET} {DIM}(id){RESET}");
+            varn_utilities::terminal::log(format!("{indent}{marker}{} {}", chalk(name).yellow(), chalk("(id)").dim()));
         }
         Expr::IntLiteral { value, .. } => {
-            eprintln!("{indent}{marker}{BLUE}{value}{RESET} {DIM}(int){RESET}");
+            varn_utilities::terminal::log(format!("{indent}{marker}{} {}", chalk(value).blue(), chalk("(int)").dim()));
         }
         Expr::FloatLiteral { value, .. } => {
-            eprintln!("{indent}{marker}{BLUE}{value}{RESET} {DIM}(float){RESET}");
+            varn_utilities::terminal::log(format!("{indent}{marker}{} {}", chalk(value).blue(), chalk("(float)").dim()));
         }
         Expr::StrLiteral { value, .. } => {
-            eprintln!("{indent}{marker}{BLUE}\"{value}\"{RESET} {DIM}(str){RESET}");
+            varn_utilities::terminal::log(format!("{indent}{marker}{} {}", chalk(format!("\"{value}\"")), chalk("(str)").dim()));
         }
         Expr::BoolLiteral { value, .. } => {
-            eprintln!("{indent}{marker}{BLUE}{value}{RESET} {DIM}(bool){RESET}");
+            varn_utilities::terminal::log(format!("{indent}{marker}{} {}", chalk(value).blue(), chalk("(bool)").dim()));
         }
         Expr::NullLiteral { .. } => {
-            eprintln!("{indent}{marker}{BLUE}null{RESET} {DIM}(null){RESET}");
+            varn_utilities::terminal::log(format!("{indent}{marker}{} {}", chalk("null").blue(), chalk("(null)").dim()));
         }
         Expr::Binary { left, op, right, .. } => {
-            eprintln!("{indent}{marker}{GREEN}{:?}{RESET} {DIM}(binary){RESET}", op);
+            varn_utilities::terminal::log(format!("{indent}{marker}{} {}", chalk(format!("{:?}", op)).green(), chalk("(binary)").dim()));
             print_expr(left, &child_indent, false);
             print_expr(right, &child_indent, true);
         }
         Expr::Unary { op, operand, .. } => {
-            eprintln!("{indent}{marker}{GREEN}{:?}{RESET} {DIM}(unary){RESET}", op);
+            varn_utilities::terminal::log(format!("{indent}{marker}{} {}", chalk(format!("{:?}", op)).green(), chalk("(unary)").dim()));
             print_expr(operand, &child_indent, true);
         }
         Expr::Call { callee, args, .. } => {
-            eprintln!("{indent}{marker}{BOLD}Call{RESET}");
+            varn_utilities::terminal::log(format!("{indent}{marker}{}", chalk("Call").bold()));
             print_expr(callee, &child_indent, args.is_empty());
             for (i, arg) in args.iter().enumerate() {
                 let arg_is_last = i == args.len() - 1;
@@ -121,13 +121,13 @@ fn print_expr(expr: &Expr, indent: &str, is_last: bool) {
                     Arg::Positional(e) => print_expr(e, &child_indent, arg_is_last),
                     Arg::Named { label, value } => {
                         let a_marker = if arg_is_last { "└── " } else { "├── " };
-                        eprintln!("{child_indent}{a_marker}{DIM}{label}:{RESET}");
+                        varn_utilities::terminal::log(format!("{child_indent}{a_marker}{}", chalk(format!("{label}:")).dim()));
                         let a_indent = format!("{child_indent}{}", if arg_is_last { "    " } else { "│   " });
                         print_expr(value, &a_indent, true);
                     }
                     Arg::Spread(e) => {
                         let a_marker = if arg_is_last { "└── " } else { "├── " };
-                        eprintln!("{child_indent}{a_marker}{DIM}...{RESET}");
+                        varn_utilities::terminal::log(format!("{child_indent}{a_marker}{}", chalk("...").dim()));
                         let a_indent = format!("{child_indent}{}", if arg_is_last { "    " } else { "│   " });
                         print_expr(e, &a_indent, true);
                     }
@@ -135,12 +135,12 @@ fn print_expr(expr: &Expr, indent: &str, is_last: bool) {
             }
         }
         Expr::Member { object, property, .. } => {
-            eprintln!("{indent}{marker}{BOLD}Member{RESET}");
+            varn_utilities::terminal::log(format!("{indent}{marker}{}", chalk("Member").bold()));
             print_expr(object, &child_indent, false);
             print_expr(property, &child_indent, true);
         }
         _ => {
-            eprintln!("{indent}{marker}{DIM}{:?}{RESET}", expr);
+            varn_utilities::terminal::log(format!("{indent}{marker}{}", chalk(format!("{:?}", expr)).dim()));
         }
     }
 }

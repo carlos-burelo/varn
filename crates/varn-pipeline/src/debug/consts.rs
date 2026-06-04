@@ -1,32 +1,38 @@
 use varn_compiler::{FunctionProto, Literal, PoolEntry};
-use crate::colors::{BOLD, DIM, RESET, YELLOW, BLUE, C_CONSTS};
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal::{Section, Table};
 
 pub fn debug_consts(proto: &FunctionProto, filename: &str) {
-    use super::colors::{footer, header};
-    header(C_CONSTS, "constant pool", filename);
+    Section::new("constant pool").subtitle(filename).color(|c| c.yellow()).print();
     let mut total = 0usize;
     print_fn_consts(proto, "", &mut total);
-    footer(C_CONSTS, &format!("{total} constant(s) total across all functions"));
+    varn_utilities::terminal::log(chalk(format!("── {total} constant(s) total across all functions ──")).dim());
 }
 
 fn print_fn_consts(proto: &FunctionProto, indent: &str, total: &mut usize) {
     let name = proto.name.as_deref().unwrap_or("<anonymous>");
-    eprintln!("{indent}{BOLD}{BLUE}fn{RESET} {BOLD}{name}{RESET} ({DIM}{} constants{RESET})", proto.chunk.constants.len());
-    
-    if !proto.chunk.constants.is_empty() {
-        eprintln!("{indent}  {DIM}{:<5} │ {:<8} │ Value{RESET}", "Idx", "Kind");
-        eprintln!("{indent}  {}", "─".repeat(50));
-    }
+    varn_utilities::terminal::log(format!(
+        "{}{}{} ({} constants)",
+        indent,
+        chalk("fn").blue(),
+        chalk(name).bold(),
+        chalk(proto.chunk.constants.len()).yellow(),
+    ));
 
-    for (i, entry) in proto.chunk.constants.iter().enumerate() {
-        let (kind, val) = pool_const_parts(entry);
-        eprintln!(
-            "{indent}  {DIM}[{:03}]{RESET} │ {YELLOW}{:<8}{RESET} │ {BOLD}{}{RESET}",
-            i, kind, val
-        );
-        *total += 1;
+    if !proto.chunk.constants.is_empty() {
+        let mut table = Table::new(["Idx", "Kind", "Value"]);
+        for (i, entry) in proto.chunk.constants.iter().enumerate() {
+            let (kind, val) = pool_const_parts(entry);
+            table.row([
+                chalk(format!("[{:03}]", i)).dim().to_string(),
+                chalk(kind).yellow().to_string(),
+                chalk(val).bold().to_string(),
+            ]);
+            *total += 1;
+        }
+        table.print();
     }
-    eprintln!();
+    varn_utilities::terminal::blank();
 
     let nested_indent = format!("{indent}  ");
     for entry in &proto.chunk.constants {

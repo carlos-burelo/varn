@@ -2,7 +2,7 @@ use varn_checker::Checker;
 use varn_core::ast::Program;
 
 use crate::PipelineError;
-use varn_debug::colors::{BOLD, C_ERRORS, R};
+use varn_utilities::chalk::chalk;
 use varn_debug::flags::DebugFlags;
 
 type PipelineResult<T> = Result<T, PipelineError>;
@@ -36,10 +36,8 @@ pub fn check(
 
         if error_count > 0 {
             let footer = format!(
-                "\n{}{}error{}: could not compile `{}` due to {} previous error{}",
-                BOLD,
-                C_ERRORS,
-                R,
+                "\n{}: could not compile `{}` due to {} previous error{}",
+                chalk("error").red().bold(),
                 program.filename,
                 error_count,
                 if error_count > 1 { "s" } else { "" }
@@ -50,7 +48,7 @@ pub fn check(
             ));
         } else {
             for m in msgs {
-                eprintln!("{m}");
+                varn_utilities::terminal::log(m);
             }
         }
     }
