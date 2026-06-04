@@ -1,5 +1,6 @@
 use std::rc::Rc;
 use crate::value::{Value, alloc_array, alloc_object, alloc_map, alloc_set, nv_to_value};
+use crate::vm_value::VmValue;
 use rust_decimal::Decimal;
 
 #[derive(Clone, Debug)]
@@ -117,6 +118,55 @@ impl SendValue {
                 }
                 drop(g);
                 Value::Set(set_ref)
+            }
+        }
+    }
+
+    pub fn to_value_ctx(&self, ctx: &mut dyn crate::NativeCtx) -> VmValue {
+        match self {
+            SendValue::Null => ctx.null_val(),
+            SendValue::Bool(b) => ctx.bool_val(*b),
+            SendValue::Int(n) => ctx.int_val(*n),
+            SendValue::Float(bits) => ctx.intern(Value::Float(f64::from_bits(*bits))),
+            SendValue::Str(s) => ctx.alloc_str(s),
+            SendValue::BigInt(b) => ctx.intern(Value::BigInt(Box::new(*b))),
+            SendValue::Decimal(d) => ctx.intern(Value::Decimal(Box::new(*d))),
+            SendValue::Char(c) => ctx.intern(Value::Char(*c)),
+            SendValue::Array(items) => {
+                let mut vm_items = Vec::new();
+                for item in items {
+                    vm_items.push(item.to_value_ctx(ctx));
+                }
+                ctx.alloc_array(vm_items)
+            }
+            SendValue::Object(fields) => {
+                let obj = ctx.alloc_object();
+                for (k, v) in fields {
+                    let val_nv = v.to_value_ctx(ctx);
+                    ctx.set_field(obj, k, val_nv);
+                }
+                obj
+            }
+            SendValue::Map(entries) => {
+                let map_ref = alloc_map();
+                let mut g = map_ref.write();
+                for (k, v) in entries {
+                    let k_nv = k.to_value_ctx(ctx);
+                    let v_nv = v.to_value_ctx(ctx);
+                    g.insert(ctx.extract(k_nv), ctx.extract(v_nv));
+                }
+                drop(g);
+                ctx.intern(Value::Map(map_ref))
+            }
+            SendValue::Set(items) => {
+                let set_ref = alloc_set();
+                let mut g = set_ref.write();
+                for item in items {
+                    let item_nv = item.to_value_ctx(ctx);
+                    g.insert(ctx.extract(item_nv));
+                }
+                drop(g);
+                ctx.intern(Value::Set(set_ref))
             }
         }
     }

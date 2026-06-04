@@ -40,8 +40,11 @@ export function sleep(ms: int): TaskHandle<void> {
 
 export type IsolatePort = IsolatePort;
 
-export function spawnIsolate(modulePath: str, exportName: str, args: Array<dynamic>): Task<IsolatePort> {
-    return nativeSpawnIsolate(modulePath, exportName, args);
+export function spawnIsolate(
+    fn: dynamic,
+    args: Array<dynamic>
+): Task<IsolatePort> {
+    return nativeSpawnIsolate(fn, args);
 }
 
 async function wrapTask<T>(task: Task<T>, group: TaskGroupImpl<T>): Task<T> {

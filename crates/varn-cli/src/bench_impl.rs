@@ -183,6 +183,61 @@ fn total_line(phases: &[PhaseStats]) {
     ));
 }
 
+fn run_vm_to_completion(machine: &mut Vm, closure: Rc<Closure>) -> Result<(), String> {
+    loop {
+        let res = machine.run(closure.clone());
+        match res {
+            Ok(_) => match machine.ctx.vm_suspend.take() {
+                None => break,
+                Some(varn_vm::exec::VmSuspend::Await { value, dest_reg }) => {
+                    let resolved = match value {
+                        varn_types::Value::Task(lazy) => {
+                            let handle = machine.ctx.run_lazy_task_sync(lazy.as_ref());
+                            match handle.peek_state() {
+                                varn_types::TaskState::Resolved(v) => v,
+                                varn_types::TaskState::Rejected(e) => {
+                                    return Err(format!("awaited task failed: {}", e));
+                                }
+                                _ => varn_types::Value::Null,
+                            }
+                        }
+                        varn_types::Value::TaskHandle(handle) => match handle.peek_state() {
+                            varn_types::TaskState::Resolved(v) => v,
+                            _ => match varn_vm::exec::ExecCtx::wait_task_handle(handle.clone()) {
+                                Ok(v) => v,
+                                Err(e) => return Err(format!("awaited task failed: {}", e)),
+                            }
+                        },
+                        other => other,
+                    };
+                    let resolved_nv = machine.ctx.heap.intern(resolved);
+
+                    if let Some(frame) = machine.ctx.frames.last() {
+                        let base = frame.base;
+                        let slot = base + dest_reg as usize;
+                        if slot < machine.ctx.stack.len() {
+                            machine.ctx.stack[slot] = resolved_nv;
+                        }
+                    }
+                }
+                Some(varn_vm::exec::VmSuspend::Task(_task)) => {}
+                Some(varn_vm::exec::VmSuspend::Yield { .. }) => {}
+            },
+            Err(e) => {
+                let mut msg = format!("runtime error: {}", e.message);
+                for frame in &e.frames {
+                    msg.push_str(&format!(
+                        "\n  at {} ({}:{})",
+                        frame.fn_name, frame.file, frame.line
+                    ));
+                }
+                return Err(msg);
+            }
+        }
+    }
+    Ok(())
+}
+
 fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Duration>, CliError> {
     f().map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
 
@@ -199,6 +254,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     if crate::pipeline::wrc::is_wrc(path) {
         return run_bench_wrc(path, runs, show_output);
     }
+
 
     let canonical = crate::pipeline::canonicalize_path(path)?;
     let path = canonical.as_str();
@@ -356,15 +412,21 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
 
     let optimized_precompiled_base = precompiled.clone();
 
-    let mut init_vm = Vm::new(optimized_precompiled_base.clone());
+    let loader = std::sync::Arc::new(varn_vm::loader::CompositeLoader::new(vec![
+        Box::new(varn_pipeline::stdlib_loader::FileLoader),
+        Box::new(varn_pipeline::stdlib_loader::StdlibLoader),
+    ]));
+
+    let mut init_vm = Vm::new(optimized_precompiled_base.clone()).with_loader(loader.clone());
     for bp in &builtin_protos {
         let closure = Rc::new(Closure::new(Rc::new(bp.clone()), Vec::new(), Vec::new()));
         init_vm
             .run(closure)
             .map_err(|e| CliError::fatal(format!("builtin init failed: {e}")))?;
     }
-    varn_builtins::set_print_silent(false);
-    varn_builtins::set_testing_silent(false);
+    varn_builtins::set_print_silent(!show_output);
+    varn_builtins::set_testing_silent(!show_output);
+
 
     let mut optimized_proto = proto.clone();
     init_vm.resolve_globals(&mut optimized_proto);
@@ -380,20 +442,20 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
 
     let (snap_globals, snap_heap) = init_vm.snapshot();
 
+
+
     let proto_rc = Rc::new(optimized_proto);
     let precompiled_ref = &optimized_precompiled;
     let snap_globals_ref = &snap_globals;
     let snap_heap_ref = &snap_heap;
     let exec_samples = time_n(runs, || {
         varn_builtins::reset_testing_counters();
-        varn_builtins::set_print_silent(!show_output);
-        varn_builtins::set_testing_silent(!show_output);
 
         let mut machine = Vm::from_snapshot(
             snap_globals_ref.clone(),
             snap_heap_ref.clone(),
             precompiled_ref.clone(),
-        );
+        ).with_loader(loader.clone());
         let main_module_id = ModuleId::local_str(path);
         let mut export_map = FxHashMap::default();
         for (idx, name) in proto_rc.export_names.iter().enumerate() {
@@ -406,10 +468,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         machine.ctx.module_exports.insert(0, module_val);
 
         let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
-        let result = machine.run(closure).map(|_| ()).map_err(|e| e.to_string());
-        varn_builtins::set_print_silent(false);
-        varn_builtins::set_testing_silent(false);
-        result
+        run_vm_to_completion(&mut machine, closure)
     })?;
 
     varn_vm::varn_jit::JIT_STATS.reset();
@@ -421,7 +480,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
             snap_globals.clone(),
             snap_heap.clone(),
             optimized_precompiled.clone(),
-        );
+        ).with_loader(loader.clone());
         let main_module_id = ModuleId::local_str(path);
         let mut export_map = FxHashMap::default();
         for (idx, name) in proto_rc.export_names.iter().enumerate() {
@@ -436,8 +495,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         profile_vm.enable_opcode_profiling();
         profile_vm.enable_profiling();
         let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
-        profile_vm
-            .run(closure)
+        run_vm_to_completion(&mut profile_vm, closure)
             .map_err(|e| CliError::fatal(format!("profile run failed: {e}")))?;
         profile_vm.collect_gc();
         let counts = profile_vm.take_opcode_counts();
@@ -445,8 +503,9 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         let stats = varn_vm::varn_jit::JIT_STATS.snapshot();
         (counts, profile, stats)
     };
-    varn_builtins::set_print_silent(false);
-    varn_builtins::set_testing_silent(false);
+    varn_builtins::set_print_silent(!show_output);
+    varn_builtins::set_testing_silent(!show_output);
+
     // Write profiling data to files for later analysis
     if let Some(ref profile) = vm_profile {
         if let Ok(mut f) = File::create("target/debug/vm_profile.txt") {
@@ -559,6 +618,9 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     crate::bench_output::print_jit_stats(&jit_stats);
     terminal::blank();
 
+    varn_builtins::set_print_silent(false);
+    varn_builtins::set_testing_silent(false);
+
     Ok(())
 }
 
@@ -583,15 +645,20 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
 
     let precompiled_base = compile_output.precompiled.clone();
 
-    let mut init_vm = Vm::new(precompiled_base.clone());
+    let loader = std::sync::Arc::new(varn_vm::loader::CompositeLoader::new(vec![
+        Box::new(varn_pipeline::stdlib_loader::FileLoader),
+        Box::new(varn_pipeline::stdlib_loader::StdlibLoader),
+    ]));
+
+    let mut init_vm = Vm::new(precompiled_base.clone()).with_loader(loader.clone());
     for bp in &builtin_protos {
         let closure = Rc::new(Closure::new(Rc::new(bp.clone()), Vec::new(), Vec::new()));
         init_vm
             .run(closure)
             .map_err(|e| CliError::fatal(format!("builtin init failed: {e}")))?;
     }
-    varn_builtins::set_print_silent(false);
-    varn_builtins::set_testing_silent(false);
+    varn_builtins::set_print_silent(!show_output);
+    varn_builtins::set_testing_silent(!show_output);
 
     let mut optimized_proto = compile_output.entry_proto.clone();
     init_vm.resolve_globals(&mut optimized_proto);
@@ -614,13 +681,11 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
 
     let exec_samples = time_n(runs, || {
         varn_builtins::reset_testing_counters();
-        varn_builtins::set_print_silent(!show_output);
-        varn_builtins::set_testing_silent(!show_output);
         let mut machine = Vm::from_snapshot(
             snap_globals_ref.clone(),
             snap_heap_ref.clone(),
             precompiled_ref.clone(),
-        );
+        ).with_loader(loader.clone());
         let main_module_id = ModuleId::local_str(path);
         let mut export_map = FxHashMap::default();
         for (idx, name) in proto_rc.export_names.iter().enumerate() {
@@ -633,10 +698,7 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         machine.ctx.module_exports.insert(0, module_val);
 
         let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
-        let result = machine.run(closure).map(|_| ()).map_err(|e| e.to_string());
-        varn_builtins::set_print_silent(false);
-        varn_builtins::set_testing_silent(false);
-        result
+        run_vm_to_completion(&mut machine, closure)
     })?;
 
     varn_vm::varn_jit::JIT_STATS.reset();
@@ -648,7 +710,7 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
             snap_globals.clone(),
             snap_heap.clone(),
             optimized_precompiled.clone(),
-        );
+        ).with_loader(loader.clone());
         let main_module_id = ModuleId::local_str(path);
         let mut export_map = FxHashMap::default();
         for (idx, name) in proto_rc.export_names.iter().enumerate() {
@@ -663,8 +725,7 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         profile_vm.enable_opcode_profiling();
         profile_vm.enable_profiling();
         let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
-        profile_vm
-            .run(closure)
+        run_vm_to_completion(&mut profile_vm, closure)
             .map_err(|e| CliError::fatal(format!("profile run failed: {e}")))?;
         profile_vm.collect_gc();
         let counts = profile_vm.take_opcode_counts();
@@ -672,8 +733,8 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         let stats = varn_vm::varn_jit::JIT_STATS.snapshot();
         (counts, profile, stats)
     };
-    varn_builtins::set_print_silent(false);
-    varn_builtins::set_testing_silent(false);
+    varn_builtins::set_print_silent(!show_output);
+    varn_builtins::set_testing_silent(!show_output);
 
     let stats = vec![
         PhaseStats::from_samples("load", |c| c.white(), &load_samples),
@@ -741,6 +802,9 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     }
     crate::bench_output::print_jit_stats(&jit_stats);
     terminal::blank();
+
+    varn_builtins::set_print_silent(false);
+    varn_builtins::set_testing_silent(false);
 
     Ok(())
 }

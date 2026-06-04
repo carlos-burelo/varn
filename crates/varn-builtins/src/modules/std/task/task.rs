@@ -94,13 +94,42 @@ pub(crate) mod dispatch {
 
     #[varn_fn("spawnIsolate", cap = "async")]
     pub fn spawn_isolate(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        let module_path_nv = args.first().copied().ok_or("spawnIsolate: missing module path")?;
-        let module_path = ctx.str_owned(module_path_nv).ok_or("spawnIsolate: module path must be a string")?;
+        let first = args.first().copied().ok_or("spawnIsolate: missing function reference")?;
         
-        let export_name_nv = args.get(1).copied().ok_or("spawnIsolate: missing export name")?;
-        let export_name = ctx.str_owned(export_name_nv).ok_or("spawnIsolate: export name must be a string")?;
-        
-        let args_nv = args.get(2).copied().ok_or("spawnIsolate: missing arguments")?;
+        let (resolved_path, export_name) = ctx.get_function_location(first)
+            .ok_or_else(|| "spawnIsolate: first argument must be a function reference".to_string())?;
+
+        let module_val = match ctx.load_module(&resolved_path) {
+            Ok(m) => m,
+            Err(e) => {
+                let async_task = varn_types::AsyncTask::pending();
+                let mut obj = varn_types::value::ObjData::new();
+                let err_msg = format!("spawnIsolate: failed to load module '{}': {}", resolved_path, e);
+                let err_msg_nv = ctx.alloc_str(&err_msg);
+                let err_msg_val = varn_types::Value::VmValue(Box::new(varn_types::VmValueRef(err_msg_nv)));
+                obj.set_field(std::rc::Rc::from("message"), err_msg_val);
+                async_task.reject(varn_types::value::new_object(obj));
+                return Ok(ctx.intern(varn_types::Value::TaskHandle(async_task)));
+            }
+        };
+
+        let exported_fn = ctx.get_field(module_val, &export_name);
+        if exported_fn != Some(first) {
+            let async_task = varn_types::AsyncTask::pending();
+            let mut obj = varn_types::value::ObjData::new();
+            let err_msg = if export_name.starts_with('<') {
+                "spawnIsolate: first argument must be a function reference, not an anonymous closure".to_string()
+            } else {
+                format!("spawnIsolate: function '{}' is not a top-level exported function of module '{}'", export_name, resolved_path)
+            };
+            let err_msg_nv = ctx.alloc_str(&err_msg);
+            let err_msg_val = varn_types::Value::VmValue(Box::new(varn_types::VmValueRef(err_msg_nv)));
+            obj.set_field(std::rc::Rc::from("message"), err_msg_val);
+            async_task.reject(varn_types::value::new_object(obj));
+            return Ok(ctx.intern(varn_types::Value::TaskHandle(async_task)));
+        }
+
+        let args_nv = args.get(1).copied().ok_or("spawnIsolate: missing arguments array")?;
         if !ctx.is_array(args_nv) {
             return Err("spawnIsolate: arguments must be an array".to_string());
         }
@@ -109,17 +138,9 @@ pub(crate) mod dispatch {
         let len = ctx.array_len(args_nv);
         for i in 0..len {
             if let Some(item_nv) = ctx.array_get(args_nv, i) {
-                worker_args.push(ctx.extract(item_nv).to_sendable()?);
+                worker_args.push(ctx.to_sendable(item_nv)?);
             }
         }
-
-        let current_file = ctx.current_source_file().unwrap_or_default();
-        let resolved_path = if module_path.starts_with('.') {
-            let parent_dir = std::path::Path::new(&current_file).parent().unwrap_or(std::path::Path::new("."));
-            parent_dir.join(&module_path).to_string_lossy().into_owned()
-        } else {
-            module_path
-        };
 
         let (port_parent, port_child) = varn_runtime::isolate::IsolatePort::new();
 
@@ -155,7 +176,7 @@ pub(crate) mod dispatch {
             args: &[VmValue],
         ) -> Result<VmValue, String> {
             let msg = args.first().copied().ok_or("IsolatePort.send: missing message")?;
-            let send_val = ctx.extract(msg).to_sendable()?;
+            let send_val = ctx.to_sendable(msg)?;
             
             let port_nv = ctx.get_field(this, "_port").ok_or("IsolatePort: internal port not initialized")?;
             let port_val = ctx.extract(port_nv);
@@ -182,7 +203,8 @@ pub(crate) mod dispatch {
                     let async_task = varn_types::AsyncTask::pending();
                     // Directly perform blocking receive on the current thread
                     if let Some(send_val) = port_clone.receive_blocking() {
-                        let val = send_val.to_value();
+                        let val_nv = send_val.to_value_ctx(ctx);
+                        let val = ctx.extract(val_nv);
                         async_task.resolve(val);
                     } else {
                         async_task.resolve(Value::Null);
