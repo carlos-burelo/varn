@@ -22,6 +22,7 @@ export declare class RangeError extends Error {
 
 export declare const NaN: float;
 export declare const Infinity: float;
+export declare const isIsolate: bool;
 
 export declare namespace console {
     declare function log(...args: dynamic[]): void

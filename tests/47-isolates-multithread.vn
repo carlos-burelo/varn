@@ -1,20 +1,119 @@
-import { spawnIsolate } from "std:task";
+import { spawnIsolate, sleep } from "std:task";
 
-// Este código correrá en el Isolate hijo
+// 1. Worker simple (ping-pong)
 export async function workerMain(port: dynamic) {
     const data = await port.receive();
     assert("msg in child", data.value === 10);
-    
-    // Devolver el doble al padre
     port.send(data.value * 2);
 }
 
+// 2. Worker con múltiples argumentos de inicio
+export async function workerArgs(port: dynamic, num: int, text: str, arr: Array<dynamic>, obj: dynamic) {
+    assert("num arg", num === 42);
+    assert("text arg", text === "hello");
+    assert("arr arg length", arr.length === 3);
+    assert("arr arg item", arr[1] === 2);
+    assert("obj arg item", obj.x === "nested");
+    
+    // Mandar confirmación
+    port.send("args_ok");
+}
+
+// 3. Worker con bucle de diálogo (diálogo continuo)
+export async function workerDialog(port: dynamic) {
+    while (true) {
+        const msg = await port.receive();
+        if (msg === "exit") {
+            port.send("bye");
+            break;
+        }
+        port.send({ reply: msg.val + 1 });
+    }
+}
+
+// 4. Worker para prueba paralela
+export async function workerParallel(port: dynamic, id: int, delayMs: int) {
+    await sleep(delayMs);
+    port.send(id * 10);
+}
+
+// Función local no exportada (para probar caso de error de carga en el hijo)
+function localUnexported(port: dynamic) {
+    port.send("should not be called");
+}
+
 async function testIsolates() {
-    const port = await spawnIsolate("./47-isolates-multithread.vn", "workerMain", []);
-    port.send({ value: 10 });
-    const response: dynamic = await port.receive();
-    assert("response from child", response === 20);
+    // ---- CASO 1: Test básico original ----
+    print("Running Caso 1...");
+    const port1 = await spawnIsolate(workerMain, []);
+    port1.send({ value: 10 });
+    const res1: dynamic = await port1.receive();
+    assert("response from basic worker", res1 === 20);
+
+    // ---- CASO 2: Múltiples argumentos complejos ----
+    print("Running Caso 2...");
+    const port2 = await spawnIsolate(workerArgs, [42, "hello", [1, 2, 3], { x: "nested" }]);
+    const res2: dynamic = await port2.receive();
+    assert("response from args worker", res2 === "args_ok");
+
+    // ---- CASO 3: Diálogo continuo de mensajes (Ping-Pong) ----
+    print("Running Caso 3...");
+    const port3 = await spawnIsolate(workerDialog, []);
+    
+    port3.send({ val: 1 });
+    const reply1: dynamic = await port3.receive();
+    assert("dialog 1", reply1.reply === 2);
+
+    port3.send({ val: 100 });
+    const reply2: dynamic = await port3.receive();
+    assert("dialog 2", reply2.reply === 101);
+
+    port3.send("exit");
+    const reply3: dynamic = await port3.receive();
+    assert("dialog exit", reply3 === "bye");
+
+    // ---- CASO 4: Ejecución paralela / concurrente ----
+    print("Running Caso 4...");
+    const w1 = await spawnIsolate(workerParallel, [1, 30]);
+    const w2 = await spawnIsolate(workerParallel, [2, 10]);
+    const w3 = await spawnIsolate(workerParallel, [3, 20]);
+
+    // w2 termina primero (10ms delay), luego w3 (20ms), luego w1 (30ms)
+    const r2: dynamic = await w2.receive();
+    assert("w2 finish first", r2 === 20);
+
+    const r3: dynamic = await w3.receive();
+    assert("w3 finish second", r3 === 30);
+
+    const r1: dynamic = await w1.receive();
+    assert("w1 finish third", r1 === 10);
+
+    // ---- CASO 5: Error al pasar función anónima (clausura local) ----
+    print("Running Caso 5...");
+    let threwAnon = false;
+    try {
+        await spawnIsolate((p: dynamic) => {}, []);
+    } catch (e) {
+        threwAnon = true;
+        assert("error message for anon function", e.message.indexOf("must be a function reference") >= 0);
+    }
+    assert("should throw for anon function", threwAnon);
+
+    // ---- CASO 6: Error al pasar función local no exportada ----
+    print("Running Caso 6...");
+    let threwUnexported = false;
+    try {
+        await spawnIsolate(localUnexported, []);
+    } catch (e) {
+        threwUnexported = true;
+        assert("error message for unexported function", e.message.indexOf("is not a top-level exported function") >= 0);
+    }
+    assert("should throw for unexported function", threwUnexported);
+
     print("[PASSED] 47. Isolates Multi-Thread");
 }
 
-await testIsolates();
+print("--- isIsolate = ", isIsolate);
+if (!isIsolate) {
+    await testIsolates();
+}

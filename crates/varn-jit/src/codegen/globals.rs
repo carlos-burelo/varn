@@ -24,6 +24,24 @@ pub(crate) fn emit_globals(
             let idx = code[*ip] as usize;
             *ip += 1;
 
+            use crate::assembler::Cond;
+
+            // R10 = ExecCtx.globals.values.len (offset 64)
+            asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, 64);
+            asm.cmp_reg_imm32(Reg::R10, idx as i32);
+            let fallback_patch = asm.jmp_cond(Cond::BelowEqual);
+
+            // Fast path: load values ptr (offset 56) and read from it
+            asm.mov_reg_mem(Reg::R11, ARG_EXEC_CTX, 56);
+            asm.mov_reg_mem(Reg::R11, Reg::R11, (idx * 8) as i32);
+            emit_store(asm, Reg::R11, first_reg, regmap);
+            let end_patch = asm.jmp_near();
+
+            // Fallback path:
+            let fallback_pos = asm.current_offset();
+            let relative_fallback = (fallback_pos as i64 - (fallback_patch as i64 + 4)) as i32;
+            asm.patch_u32(fallback_patch, relative_fallback as u32);
+
             emit_flush_all(asm, regmap);
 
             asm.push(ARG_CTX);
@@ -60,6 +78,11 @@ pub(crate) fn emit_globals(
 
             emit_store(asm, Reg::R11, first_reg, regmap);
             emit_reload_all_except(asm, regmap, Some(first_reg));
+
+            // End patch
+            let end_pos = asm.current_offset();
+            let relative_end = (end_pos as i64 - (end_patch as i64 + 4)) as i32;
+            asm.patch_u32(end_patch, relative_end as u32);
         }
         OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx => {
             let w1 = code[*ip];
@@ -67,6 +90,26 @@ pub(crate) fn emit_globals(
             let src = (w1 >> 8) as usize;
             let idx = code[*ip] as usize;
             *ip += 1;
+
+            use crate::assembler::Cond;
+
+            // Load value to store into Rax
+            emit_load(asm, Reg::Rax, src, regmap);
+
+            // R10 = ExecCtx.globals.values.len (offset 64)
+            asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, 64);
+            asm.cmp_reg_imm32(Reg::R10, idx as i32);
+            let fallback_patch = asm.jmp_cond(Cond::BelowEqual);
+
+            // Fast path: load values ptr (offset 56) and write to ptr[idx]
+            asm.mov_reg_mem(Reg::R11, ARG_EXEC_CTX, 56);
+            asm.mov_mem_reg(Reg::R11, (idx * 8) as i32, Reg::Rax);
+            let end_patch = asm.jmp_near();
+
+            // Fallback path:
+            let fallback_pos = asm.current_offset();
+            let relative_fallback = (fallback_pos as i64 - (fallback_patch as i64 + 4)) as i32;
+            asm.patch_u32(fallback_patch, relative_fallback as u32);
 
             emit_flush_all(asm, regmap);
             emit_load(asm, Reg::Rax, src, regmap);
@@ -109,6 +152,11 @@ pub(crate) fn emit_globals(
             asm.pop(ARG_CTX);
 
             emit_reload_all(asm, regmap);
+
+            // End patch
+            let end_pos = asm.current_offset();
+            let relative_end = (end_pos as i64 - (end_patch as i64 + 4)) as i32;
+            asm.patch_u32(end_patch, relative_end as u32);
         }
         OpCode::LoadGlobal => {
             let idx = code[*ip] as usize;

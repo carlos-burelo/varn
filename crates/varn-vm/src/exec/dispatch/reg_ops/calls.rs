@@ -137,7 +137,7 @@ impl ExecCtx {
                 }
             } else {
                 match self.heap.get(callee.as_heap_idx()) {
-                    Some(crate::heap::HeapObj::NativeFn(_name, f)) => {
+                    Some(crate::heap::HeapObj::NativeFn(name, f)) => {
                         let f = *f;
                         self.record_call_native();
                         let result = if arg_count <= 16 {

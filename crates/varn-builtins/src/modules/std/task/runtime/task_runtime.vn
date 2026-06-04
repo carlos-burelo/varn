@@ -9,4 +9,4 @@ export declare class IsolatePort {
     receive(): Task<dynamic>;
 }
 
-export declare function spawnIsolate(modulePath: str, exportName: str, args: Array<dynamic>): Task<IsolatePort>;
+export declare function spawnIsolate(fn: dynamic, args: Array<dynamic>): Task<IsolatePort>;

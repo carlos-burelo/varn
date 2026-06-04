@@ -11,6 +11,10 @@ pub fn set_print_silent(silent: bool) {
     SILENT.store(silent, Ordering::Relaxed);
 }
 
+pub fn is_print_silent() -> bool {
+    SILENT.load(Ordering::Relaxed)
+}
+
 fn init_error(ctx: &mut dyn NativeCtx, this: VmValue, args: &[VmValue], class_name: &'static str) {
     let msg = args.first().copied().unwrap_or(VmValue::null());
     ctx.set_field(this, "message", msg);

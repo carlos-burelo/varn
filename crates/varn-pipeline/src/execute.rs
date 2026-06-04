@@ -23,6 +23,9 @@ pub fn execute(
         Box::new(crate::stdlib_loader::StdlibLoader),
     ]));
     let mut machine = Vm::new(precompiled.clone()).with_loader(loader);
+    if std::env::var("VARN_NO_JIT").is_ok() {
+        machine.set_no_jit(true);
+    }
     machine.set_trace(_debug.trace);
 
     if _debug.trace {
@@ -43,7 +46,7 @@ pub fn execute(
     let main_closure = Rc::new(Closure::new(Rc::new(proto), Vec::new(), Vec::new()));
 
     // Register the main module to support top-level exports in the entry script (needed for Isolates)
-    let main_module_id = ModuleId::local_str(_path);
+    let main_module_id = ModuleId::local_str(&main_closure.proto.chunk.source_file);
     let mut export_map = FxHashMap::default();
     for (idx, name) in main_closure.proto.export_names.iter().enumerate() {
         export_map.insert(name.clone(), idx);

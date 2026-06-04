@@ -187,6 +187,7 @@ pub(crate) fn build_module(id: &str, ctx: &mut dyn NativeCtx) -> Option<VmValue>
 
 pub fn register_globals_vm(ctx: &mut dyn NativeCtx) -> rustc_hash::FxHashMap<Rc<str>, VmValue> {
     let mut out = rustc_hash::FxHashMap::default();
+    out.insert(Rc::from("isIsolate"), VmValue::from_bool(false));
 
     if let Some(globals_nv) = build_module("globals", ctx) {
         collect_module_fields("globals", globals_nv, ctx, &mut out);

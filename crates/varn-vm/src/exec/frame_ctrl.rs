@@ -504,13 +504,17 @@ impl NativeCtx for ExecCtx {
         let output = varn_types::AsyncTask::pending();
         let output_clone = output.clone();
 
-        let spawned = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
-            tokio::task::spawn_local(async move {
-                tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
-                output_clone.resolve(varn_types::Value::Null);
-            });
-        }))
-        .is_ok();
+        let spawned = if tokio::runtime::Handle::try_current().is_ok() {
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+                tokio::task::spawn_local(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+                    output_clone.resolve(varn_types::Value::Null);
+                });
+            }))
+            .is_ok()
+        } else {
+            false
+        };
 
         if !spawned {
             std::thread::sleep(std::time::Duration::from_millis(ms));
@@ -566,84 +570,76 @@ impl NativeCtx for ExecCtx {
         let export_name_str = export_name.to_string();
 
         std::thread::spawn(move || {
-            let rt = tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap();
-            let local = tokio::task::LocalSet::new();
-            local.block_on(&rt, async move {
-                let mut machine = crate::Vm::new(std::rc::Rc::new(rustc_hash::FxHashMap::default()));
-                if let Some(ld) = loader {
-                    machine = machine.with_loader(ld);
-                }
+            let mut machine = crate::Vm::new(std::rc::Rc::new(rustc_hash::FxHashMap::default()));
+            machine.ctx.globals.define("isIsolate", VmValue::from_bool(true));
+            if let Some(ld) = loader {
+                machine = machine.with_loader(ld);
+            }
 
-                if let Err(e) = machine.ctx.load_module("std:task") {
-                    varn_utilities::terminal::tagged("isolate worker", format_args!("Failed to load std:task: {:?}", e));
+            if let Err(e) = machine.ctx.load_module("std:task") {
+                varn_utilities::terminal::tagged("isolate worker", format_args!("Failed to load std:task: {:?}", e));
+                return;
+            }
+
+            let module_val = match machine.ctx.load_module(&module_path_str) {
+                Ok(m) => m,
+                Err(e) => {
+                    varn_utilities::terminal::tagged(
+                        "isolate worker",
+                        format_args!("Failed to load module {}: {:?}", module_path_str, e),
+                    );
                     return;
                 }
+            };
 
-                let module_val = match machine.ctx.load_module(&module_path_str) {
-                    Ok(m) => m,
-                    Err(e) => {
-                        varn_utilities::terminal::tagged(
-                            "isolate worker",
-                            format_args!("Failed to load module {}: {:?}", module_path_str, e),
-                        );
-                        return;
-                    }
-                };
-
-                let heap_obj = machine.ctx.heap.get(module_val.as_heap_idx());
-
-                let func_nv = match machine.ctx.get_field(module_val, &export_name_str) {
-                    Some(f) => f,
-                    None => {
-                        varn_utilities::terminal::tagged(
-                            "isolate worker",
-                            format_args!("Export '{}' not found in module {}", export_name_str, module_path_str),
-                        );
-                        return;
-                    }
-                };
-
-                let class_obj = match machine.ctx.get_class("IsolatePort") {
-                    Some(cls) => cls,
-                    None => {
-                        varn_utilities::terminal::tagged("isolate worker", format_args!("Class IsolatePort not found"));
-                        return;
-                    }
-                };
-                let instance_nv = machine.ctx.heap.alloc_object();
-                if let Some(crate::heap::HeapObj::Object(o)) = machine.ctx.heap.get_mut(instance_nv.as_heap_idx()) {
-                    o.borrow_mut().set_class(class_obj);
+            let func_nv = match machine.ctx.get_field(module_val, &export_name_str) {
+                Some(f) => f,
+                None => {
+                    varn_utilities::terminal::tagged(
+                        "isolate worker",
+                        format_args!("Export '{}' not found in module {}", export_name_str, module_path_str),
+                    );
+                    return;
                 }
-                let port_value = varn_types::Value::VmValue(port);
-                let port_nv = machine.ctx.heap.intern(port_value);
-                if let Some(crate::heap::HeapObj::Object(o)) = machine.ctx.heap.get_mut(instance_nv.as_heap_idx()) {
-                    o.borrow_mut().set_field_nv(std::rc::Rc::from("_port"), port_nv);
-                }
+            };
 
-                let mut vm_args = vec![instance_nv];
-                for arg in args {
-                    let v = arg.to_value();
-                    vm_args.push(machine.ctx.heap.intern(v));
+            let class_obj = match machine.ctx.get_class("IsolatePort") {
+                Some(cls) => cls,
+                None => {
+                    varn_utilities::terminal::tagged("isolate worker", format_args!("Class IsolatePort not found"));
+                    return;
                 }
+            };
+            let instance_nv = machine.ctx.heap.alloc_object();
+            if let Some(crate::heap::HeapObj::Object(o)) = machine.ctx.heap.get_mut(instance_nv.as_heap_idx()) {
+                o.borrow_mut().set_class(class_obj);
+            }
+            let port_value = varn_types::Value::VmValue(port);
+            let port_nv = machine.ctx.heap.intern(port_value);
+            if let Some(crate::heap::HeapObj::Object(o)) = machine.ctx.heap.get_mut(instance_nv.as_heap_idx()) {
+                o.borrow_mut().set_field_nv(std::rc::Rc::from("_port"), port_nv);
+            }
 
-                match machine.ctx.call_vm(func_nv, &vm_args) {
-                    Ok(res) => {
-                        let val = machine.ctx.heap.extract(res);
-                        if let varn_types::Value::Task(lazy) = val {
-                            let handle = machine.ctx.run_lazy_task_sync(lazy.as_ref());
-                            if let varn_types::task::TaskState::Rejected(e) = handle.peek_state() {
-                                varn_utilities::terminal::tagged("isolate worker", format_args!("Task failed: {}", e));
-                            }
+            let mut vm_args = vec![instance_nv];
+            for arg in args {
+                let v_nv = arg.to_value_ctx(&mut machine.ctx);
+                vm_args.push(v_nv);
+            }
+
+            match machine.ctx.call_vm(func_nv, &vm_args) {
+                Ok(res) => {
+                    let val = machine.ctx.heap.extract(res);
+                    if let varn_types::Value::Task(lazy) = val {
+                        let handle = machine.ctx.run_lazy_task_sync(lazy.as_ref());
+                        if let varn_types::task::TaskState::Rejected(e) = handle.peek_state() {
+                            varn_utilities::terminal::tagged("isolate worker", format_args!("Task failed: {}", e));
                         }
                     }
-                    Err(e) => {
-                        varn_utilities::terminal::tagged("isolate worker", format_args!("Execution failed: {}", e));
-                    }
                 }
-            });
+                Err(e) => {
+                    varn_utilities::terminal::tagged("isolate worker", format_args!("Execution failed: {}", e));
+                }
+            }
         });
 
         Ok(())
@@ -657,9 +653,166 @@ impl NativeCtx for ExecCtx {
         }
         Some(instance_nv)
     }
+
+    fn get_function_location(&self, func_val: VmValue) -> Option<(String, String)> {
+        if func_val.is_heap() {
+            match self.heap.get_by_idx(func_val.as_heap_idx()) {
+                Some(HeapObj::VmClosure(c)) => {
+                    let source_file = c.proto.chunk.source_file.to_string();
+                    let name = c.proto.name.as_ref()?.to_string();
+                    Some((source_file, name))
+                }
+                Some(HeapObj::BoundMethod(bm)) => {
+                    match &bm.target {
+                        varn_types::value::BoundMethodTarget::Vm { closure, .. } => {
+                            if let Some(wrapper) = closure.as_any().downcast_ref::<crate::frame::VmClosurePayload>() {
+                                let c = &wrapper.0;
+                                let source_file = c.proto.chunk.source_file.to_string();
+                                let name = c.proto.name.as_ref()?.to_string();
+                                Some((source_file, name))
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    }
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    fn load_module(&mut self, specifier: &str) -> Result<VmValue, String> {
+        self.load_module(specifier).map_err(|e| format!("{:?}", e))
+    }
+
+    fn to_sendable(&self, val: VmValue) -> Result<varn_types::value::SendValue, String> {
+        if val.is_null() {
+            return Ok(varn_types::value::SendValue::Null);
+        }
+        if val.is_bool() {
+            return Ok(varn_types::value::SendValue::Bool(val.as_bool()));
+        }
+        if val.is_int() {
+            return Ok(varn_types::value::SendValue::Int(val.as_int()));
+        }
+        if val.is_f64() {
+            return Ok(varn_types::value::SendValue::Float(val.as_f64().to_bits()));
+        }
+        if val.is_sso() {
+            let mut buf = [0u8; 5];
+            return Ok(varn_types::value::SendValue::Str(val.sso_as_str(&mut buf).to_owned()));
+        }
+        if val.is_heap() {
+            match self.heap.get_by_idx(val.as_heap_idx()) {
+                Some(HeapObj::Str(s)) => Ok(varn_types::value::SendValue::Str(s.to_string())),
+                Some(HeapObj::Array(arr)) => {
+                    let mut items = Vec::new();
+                    for &item in arr.borrow().iter() {
+                        items.push(self.to_sendable(item)?);
+                    }
+                    Ok(varn_types::value::SendValue::Array(items))
+                }
+                Some(HeapObj::Object(obj)) => {
+                    let mut map = std::collections::HashMap::new();
+                    for (k, nv) in obj.borrow().inner.iter() {
+                        map.insert(k.to_string(), self.to_sendable(nv)?);
+                    }
+                    Ok(varn_types::value::SendValue::Object(map))
+                }
+                Some(HeapObj::Map(map_ref)) => {
+                    let mut items = Vec::new();
+                    for (k, v) in map_ref.read().iter() {
+                        items.push((self.value_to_sendable(k)?, self.value_to_sendable(v)?));
+                    }
+                    Ok(varn_types::value::SendValue::Map(items))
+                }
+                Some(HeapObj::Set(set_ref)) => {
+                    let mut items = Vec::new();
+                    for v in set_ref.read().iter() {
+                        items.push(self.value_to_sendable(v)?);
+                    }
+                    Ok(varn_types::value::SendValue::Set(items))
+                }
+                Some(HeapObj::BigInt(b)) => Ok(varn_types::value::SendValue::BigInt(*b)),
+                Some(HeapObj::Decimal(d)) => Ok(varn_types::value::SendValue::Decimal(**d)),
+                Some(HeapObj::Char(c)) => Ok(varn_types::value::SendValue::Char(*c)),
+                Some(HeapObj::Range(r)) => {
+                    let mut fields = std::collections::HashMap::new();
+                    fields.insert("start".to_string(), varn_types::value::SendValue::Int(r.start));
+                    fields.insert("end".to_string(), varn_types::value::SendValue::Int(r.end));
+                    fields.insert("inclusive".to_string(), varn_types::value::SendValue::Bool(r.inclusive));
+                    fields.insert("step".to_string(), varn_types::value::SendValue::Int(r.step));
+                    Ok(varn_types::value::SendValue::Object(fields))
+                }
+                _ => Err("Value cannot be sent to an isolate".to_string()),
+            }
+        } else {
+            Err("Value cannot be sent to an isolate".to_string())
+        }
+    }
 }
 
 impl ExecCtx {
+    fn value_to_sendable(&self, val: &varn_types::Value) -> Result<varn_types::value::SendValue, String> {
+        match val {
+            varn_types::Value::Null => Ok(varn_types::value::SendValue::Null),
+            varn_types::Value::Bool(b) => Ok(varn_types::value::SendValue::Bool(*b)),
+            varn_types::Value::Int(n) => Ok(varn_types::value::SendValue::Int(*n)),
+            varn_types::Value::Float(f) => Ok(varn_types::value::SendValue::Float(f.to_bits())),
+            varn_types::Value::Str(s) => Ok(varn_types::value::SendValue::Str(s.to_string())),
+            varn_types::Value::BigInt(b) => Ok(varn_types::value::SendValue::BigInt(**b)),
+            varn_types::Value::Decimal(d) => Ok(varn_types::value::SendValue::Decimal(**d)),
+            varn_types::Value::Char(c) => Ok(varn_types::value::SendValue::Char(*c)),
+            varn_types::Value::Array(arr) => {
+                let mut items = Vec::new();
+                for item in arr.read().iter() {
+                    items.push(self.value_to_sendable(item)?);
+                }
+                Ok(varn_types::value::SendValue::Array(items))
+            }
+            varn_types::Value::Object(obj) => {
+                let mut map = std::collections::HashMap::new();
+                for (k, nv) in obj.read().inner.iter() {
+                    map.insert(k.to_string(), self.to_sendable(nv)?);
+                }
+                Ok(varn_types::value::SendValue::Object(map))
+            }
+            varn_types::Value::Map(map_ref) => {
+                let mut items = Vec::new();
+                for (k, v) in map_ref.read().iter() {
+                    items.push((self.value_to_sendable(k)?, self.value_to_sendable(v)?));
+                }
+                Ok(varn_types::value::SendValue::Map(items))
+            }
+            varn_types::Value::Set(set_ref) => {
+                let mut items = Vec::new();
+                for v in set_ref.read().iter() {
+                    items.push(self.value_to_sendable(v)?);
+                }
+                Ok(varn_types::value::SendValue::Set(items))
+            }
+            varn_types::Value::Range(r) => {
+                let mut fields = std::collections::HashMap::new();
+                fields.insert("start".to_string(), varn_types::value::SendValue::Int(r.start));
+                fields.insert("end".to_string(), varn_types::value::SendValue::Int(r.end));
+                fields.insert("inclusive".to_string(), varn_types::value::SendValue::Bool(r.inclusive));
+                fields.insert("step".to_string(), varn_types::value::SendValue::Int(r.step));
+                Ok(varn_types::value::SendValue::Object(fields))
+            }
+            varn_types::Value::VmValue(payload) => {
+                if let Some(vr) = payload.as_any().downcast_ref::<varn_types::VmValueRef>() {
+                    self.to_sendable(vr.0)
+                } else {
+                    Err("Value cannot be sent to an isolate".to_string())
+                }
+            }
+            _ => Err("Value cannot be sent to an isolate".to_string()),
+        }
+    }
+
     fn spawn_internal(
         &mut self,
         callee: varn_types::Value,

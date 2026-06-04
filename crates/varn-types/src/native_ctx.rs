@@ -5,6 +5,7 @@ use crate::native::NativeFn;
 use crate::resource::ResourceStore;
 use crate::vm_value::VmValue;
 use crate::ClassObj;
+use crate::value::SendValue;
 
 pub trait NativeCtx {
     fn null_val(&self) -> VmValue {
@@ -104,6 +105,18 @@ pub trait NativeCtx {
 
     fn alloc_instance(&mut self, _class_name: &str) -> Option<VmValue> {
         None
+    }
+
+    fn get_function_location(&self, _func_val: VmValue) -> Option<(String, String)> {
+        None
+    }
+
+    fn load_module(&mut self, _specifier: &str) -> Result<VmValue, String> {
+        Err("load_module not supported".to_string())
+    }
+
+    fn to_sendable(&self, _val: VmValue) -> Result<SendValue, String> {
+        Err("to_sendable not supported".to_string())
     }
 }
 
