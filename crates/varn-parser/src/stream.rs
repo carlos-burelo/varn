@@ -12,6 +12,10 @@ pub struct TokenStream {
 
     pub errors: varn_core::DiagnosticBag,
     pub profile: ParseProfile,
+
+    // Tracks how many synthetic RAngle tokens remain after splitting a >> or >>> token.
+    // Allows `Array<Task<T>>` to parse correctly without the lexer needing context.
+    split_count: u8,
 }
 
 impl TokenStream {
@@ -24,6 +28,7 @@ impl TokenStream {
             pending_doc: None,
             errors: varn_core::DiagnosticBag::new(),
             profile: ParseProfile::default(),
+            split_count: 0,
         }
     }
 
@@ -34,6 +39,9 @@ impl TokenStream {
 
     #[inline]
     pub fn kind(&self) -> TokenKind {
+        if self.split_count > 0 {
+            return TokenKind::RAngle;
+        }
         self.token().kind
     }
 
@@ -113,6 +121,10 @@ impl TokenStream {
     }
 
     pub fn advance(&mut self) {
+        if self.split_count > 0 {
+            self.split_count -= 1;
+            return;
+        }
         if self.pos < self.tokens.len() {
             self.pos += 1;
         }
@@ -238,6 +250,7 @@ impl TokenStream {
 
     pub fn restore(&mut self, p: usize) {
         self.pos = p;
+        self.split_count = 0;
     }
 
     #[inline]
@@ -251,5 +264,56 @@ impl TokenStream {
 
     pub fn take_pending_doc(&mut self) -> Option<Rc<str>> {
         self.pending_doc.take()
+    }
+
+    /// True when current token closes a generic type arg list.
+    /// Handles split `>>` and `>>>` so nested generics like `Array<Task<T>>` parse correctly.
+    #[inline]
+    pub fn check_rangle(&self) -> bool {
+        if self.split_count > 0 {
+            return true;
+        }
+        matches!(
+            self.token().kind,
+            TokenKind::RAngle | TokenKind::GtGt | TokenKind::GtGtGt
+        )
+    }
+
+    /// Consume one closing `>`, splitting `>>` into two virtual tokens.
+    pub fn eat_rangle(&mut self) -> bool {
+        if self.split_count > 0 {
+            self.split_count -= 1;
+            return true;
+        }
+        match self.token().kind {
+            TokenKind::RAngle => {
+                self.pos += 1;
+                true
+            }
+            TokenKind::GtGt => {
+                self.split_count = 1;
+                self.pos += 1;
+                true
+            }
+            TokenKind::GtGtGt => {
+                self.split_count = 2;
+                self.pos += 1;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    pub fn expect_rangle(&mut self) -> Result<(), String> {
+        if self.eat_rangle() {
+            Ok(())
+        } else {
+            let tok = self.token();
+            let lex = tok.get_lexeme(&self.lexeme_buf);
+            Err(format!(
+                "Expected RAngle, got {:?} ({:?}) at {}:{}",
+                tok.kind, lex, tok.range.start.line, tok.range.start.column
+            ))
+        }
     }
 }

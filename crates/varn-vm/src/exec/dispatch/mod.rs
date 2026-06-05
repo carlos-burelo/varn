@@ -515,7 +515,16 @@ impl ExecCtx {
                         let w1 = code[ip];
                         ip += 1;
                         let (dest, src) = (hi(w1), lo(w1));
+                        // Ensure source and destination register slots exist
+                        let src_slot = base + src as usize;
+                        if src_slot >= self.stack.len() {
+                            self.stack.resize(src_slot + 1, crate::value::VmValue::null());
+                        }
                         let task_val = reg![src];
+                        let dest_slot = base + dest as usize;
+                        if dest_slot >= self.stack.len() {
+                            self.stack.resize(dest_slot + 1, crate::value::VmValue::null());
+                        }
                         reg![dest] = self.exec_spawn(task_val)?;
                     }
 
