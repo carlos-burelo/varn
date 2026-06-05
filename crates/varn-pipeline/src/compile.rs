@@ -79,6 +79,15 @@ pub fn compile(
         print_module_graph(&graph_build);
     }
 
+    if debug.bytecode {
+        for (path, module_proto) in graph_build.modules.iter() {
+            if path != &graph_build.entry_path {
+                println!("\n=== MODULE BYTECODE: {} ===", path);
+                varn_debug::bytecode::debug_bytecode(module_proto, debug);
+            }
+        }
+    }
+
     let mut precompiled_map: FxHashMap<varn_core::ModuleId, Rc<FunctionProto>> =
         FxHashMap::default();
     for (path, module_proto) in graph_build.modules.iter() {

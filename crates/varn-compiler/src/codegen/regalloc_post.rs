@@ -92,9 +92,10 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
         | OpCode::ObjectKeys => s(2, Some(dest0), vec![hi1]),
 
         OpCode::ArrayPush | OpCode::Inherit => s(2, None, vec![hi1, lo1]),
-        OpCode::Yield | OpCode::Return | OpCode::Throw => s(2, None, vec![lo1]),
+        OpCode::Yield | OpCode::Return => s(2, None, vec![lo1]),
+        OpCode::Throw => s(2, None, vec![hi1]),
         OpCode::StoreUpvalue => s(2, None, vec![lo1]),
-        OpCode::CloseUpvalue => s(2, None, vec![lo1]),
+        OpCode::CloseUpvalue => s(2, None, vec![hi1]),
 
         OpCode::LoadModule => s(2, Some(dest0), vec![]),
 
@@ -226,11 +227,11 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
         | OpCode::StoreGlobalIdx
         | OpCode::DefineGlobalIdx => s(3, None, vec![hi1]),
 
-        OpCode::AssertNotNull => s(2, None, vec![lo1]),
+        OpCode::AssertNotNull => s(2, None, vec![hi1]),
 
         OpCode::MakeClass => s(3, Some(dest0), vec![hi1]),
 
-        OpCode::Spawn => s(2, Some(hi1), vec![lo1]),
+        OpCode::Spawn => s(3, Some(hi1), vec![lo1]),
 
         OpCode::DeclareField => s(3, None, vec![hi1]),
 
@@ -250,13 +251,10 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
             opaque: false,
         },
 
-        OpCode::GetProperty | OpCode::GetPropertyMaybe => s(3, Some(dest0), vec![hi1]),
-
-        OpCode::SetProperty => s(3, None, vec![dest0, hi1]),
-
-        OpCode::GetFixedField | OpCode::GetSymbol => s(3, Some(dest0), vec![hi1]),
-
-        OpCode::SetFixedField => s(3, None, vec![dest0, hi1]),
+        OpCode::GetProperty | OpCode::GetPropertyMaybe | OpCode::GetFixedField | OpCode::GetSymbol => {
+            s(3, Some(dest0), vec![hi1])
+        }
+        OpCode::SetProperty | OpCode::SetFixedField => s(3, None, vec![dest0, hi1]),
 
         OpCode::GetSuper => s(2, Some(dest0), vec![]),
 
@@ -536,14 +534,17 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                 OpCode::ArrayPush | OpCode::Inherit => {
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
                 }
-                OpCode::Yield | OpCode::Return | OpCode::Throw => {
+                OpCode::Yield | OpCode::Return => {
                     code[offset + 1] = pack(hi1, m(mapping, lo1));
+                }
+                OpCode::Throw => {
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
                 }
                 OpCode::StoreUpvalue => {
                     code[offset + 1] = pack(hi1, m(mapping, lo1));
                 }
                 OpCode::CloseUpvalue => {
-                    code[offset + 1] = pack(hi1, m(mapping, lo1));
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
                 }
                 OpCode::AssertNotNull => {
                     code[offset + 1] = pack(m(mapping, hi1), lo1);
@@ -636,10 +637,13 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                     code[offset + 4] = pack(m(mapping, hi4), lo4);
                 }
 
+                OpCode::LoadModuleSlot => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                }
                 OpCode::GetPropertyMaybe
                 | OpCode::GetFixedField
-                | OpCode::GetSymbol
-                | OpCode::LoadModuleSlot => {
+                | OpCode::GetSymbol => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), lo1);
                 }
@@ -654,7 +658,7 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
 
                 OpCode::SetFixedField => {
                     code[offset] = pack_op(op, m(mapping, dest0));
-                    code[offset + 1] = pack(m(mapping, hi1), 0);
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
                 }
                 OpCode::DeclareField => {
                     code[offset + 1] = pack(m(mapping, hi1), lo1);
@@ -676,7 +680,6 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), lo1);
                 }
-
                 OpCode::SetProperty => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), lo1);
@@ -848,6 +851,8 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
     let fixed_count = proto.arity + if proto.has_this { 1 } else { 0 };
     let base = fixed_count as u8;
 
+    // println of OPTIMIZING FUNCTION removed
+
     if proto.chunk.code.is_empty() {
         return;
     }
@@ -897,6 +902,8 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         .into_iter()
         .filter(|&(old, new)| old != new)
         .collect();
+
+    // println of SPAWN MAPPING removed
 
     if mapping.is_empty() {
         return;

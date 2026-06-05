@@ -49,7 +49,14 @@ impl ExecCtx {
             OpCode::Move => {
                 let w1 = code[*ip];
                 *ip += 1;
-                self.stack[base + first_reg] = self.stack[base + hi(w1)];
+                let dest = base + first_reg;
+                let src = base + hi(w1) as usize;
+                // Ensure destination and source slots exist on the stack
+                let max_idx = dest.max(src);
+                if max_idx >= self.stack.len() {
+                    self.stack.resize(max_idx + 1, crate::value::VmValue::null());
+                }
+                self.stack[dest] = self.stack[src];
             }
             OpCode::LoadGlobalIdx => {
                 let gidx = code[*ip] as usize;

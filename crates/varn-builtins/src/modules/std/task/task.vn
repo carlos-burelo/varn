@@ -26,7 +26,7 @@ export interface TaskHandle<T = dynamic> {
     cancel(): void;
 }
 
-export function parallel<T>(tasks: Array<Task<T> >): Task<Array<T> > {
+export function parallel<T>(tasks: Array<Task<T>>): Task<Array<T>> {
     return taskParallel(tasks);
 }
 
@@ -38,7 +38,6 @@ export function sleep(ms: int): TaskHandle<void> {
     return taskSleep(ms);
 }
 
-export type IsolatePort = IsolatePort;
 
 export function spawnIsolate(
     fn: dynamic,
@@ -47,7 +46,7 @@ export function spawnIsolate(
     return nativeSpawnIsolate(fn, args);
 }
 
-async function wrapTask<T>(task: Task<T>, group: TaskGroupImpl<T>): Task<T> {
+async function wrapTask<T>(task: Task<T>, group: TaskGroupImpl<T>): T {
     try {
         let res = await task;
         if (group.isCancelled) {
@@ -80,22 +79,22 @@ class TaskGroupImpl<T = dynamic> {
         return wrapped;
     }
 
-    async join(): Task<Array<T> > {
+    async join(): Array<T> {
         if (this.isCancelled) {
             throw new Error("TaskGroup is cancelled");
         }
-        return await parallel(this.tasks);
+        return await taskParallel(this.tasks);
+    }
+
+    dispose(): void {
+        this.isCancelled = true;
     }
 
     cancel(): void {
         this.isCancelled = true;
     }
 
-    dispose(): void {
-        this.cancel();
-    }
-
-    async disposeAsync(): Task<void> {
+    async disposeAsync(): void {
         this.cancel();
     }
 }

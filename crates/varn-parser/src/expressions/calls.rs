@@ -332,6 +332,18 @@ fn looks_like_generic_call(s: &TokenStream) -> bool {
                     return s.peek_kind(off + 1) == TokenKind::LParen;
                 }
             }
+            TokenKind::GtGt => {
+                depth -= 2;
+                if depth <= 0 {
+                    return depth == 0 && s.peek_kind(off + 1) == TokenKind::LParen;
+                }
+            }
+            TokenKind::GtGtGt => {
+                depth -= 3;
+                if depth <= 0 {
+                    return depth == 0 && s.peek_kind(off + 1) == TokenKind::LParen;
+                }
+            }
             TokenKind::EOF
             | TokenKind::Semicolon
             | TokenKind::LBrace

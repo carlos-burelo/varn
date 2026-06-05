@@ -37,7 +37,9 @@ function runWith(opts: Options): str {
     return `${opts.tag}:v=${v}:r=${r}`
 }
 
-assert("opts defaults", runWith({ tag: "job1" }) === "job1:v=false:r=3")
+const res = runWith({ tag: "job1" })
+print("DEBUG RES: ", res)
+assert("opts defaults", res === "job1:v=false:r=3")
 assert("opts partial",  runWith({ tag: "job2", verbose: true }) === "job2:v=true:r=3")
 assert("opts full",     runWith({ tag: "job3", verbose: false, maxRetries: 5 }) === "job3:v=false:r=5")
 

@@ -566,20 +566,20 @@ fn parse_template_literal_type(s: &mut TokenStream) -> Result<TypeNode, String> 
 pub fn parse_type_args(s: &mut TokenStream) -> Result<Vec<TypeNode>, String> {
     s.expect(TokenKind::LAngle)?;
     let mut args = vec![];
-    while !s.check(TokenKind::RAngle) && !s.is_eof() {
+    while !s.check_rangle() && !s.is_eof() {
         args.push(parse_type(s)?);
         if !s.eat(TokenKind::Comma) {
             break;
         }
     }
-    s.expect(TokenKind::RAngle)?;
+    s.expect_rangle()?;
     Ok(args)
 }
 
 pub fn parse_type_params(s: &mut TokenStream) -> Result<Vec<TypeParam>, String> {
     s.expect(TokenKind::LAngle)?;
     let mut params = vec![];
-    while !s.check(TokenKind::RAngle) && !s.is_eof() {
+    while !s.check_rangle() && !s.is_eof() {
         let range = s.range();
         let name_str = s.lexeme().to_owned();
         let _name_tok = s.expect_token(TokenKind::Identifier)?;
@@ -605,7 +605,7 @@ pub fn parse_type_params(s: &mut TokenStream) -> Result<Vec<TypeParam>, String> 
             break;
         }
     }
-    s.expect(TokenKind::RAngle)?;
+    s.expect_rangle()?;
     Ok(params)
 }
 

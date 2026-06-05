@@ -309,6 +309,11 @@ impl ExecCtx {
         }
 
         let result = self.stack.pop().unwrap_or(VmValue::null());
+        let caller_frame = &self.frames[frame_idx];
+        let required = base + caller_frame.closure.proto.register_count as usize;
+        if self.stack.len() < required {
+            self.stack.resize(required, VmValue::null());
+        }
         self.stack[base + dest] = result;
         Ok(false)
     }

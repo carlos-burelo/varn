@@ -77,7 +77,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
         let operands = match op {
             OpCode::Move => {
                 let w1 = w!();
-                format!("r{} = r{}", hi(w1), lo(w1))
+                format!("r{} = r{}", hi(op_val), hi(w1))
             }
 
             OpCode::LoadNull | OpCode::LoadTrue | OpCode::LoadFalse => {
@@ -278,7 +278,6 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w1 = w!();
                 let name_idx = w!();
                 let w3 = w!();
-                let w4 = w!();
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
                     hint = format!("{:?}", c);
                 }
@@ -288,14 +287,14 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                     lo(w1),
                     name_idx,
                     hi(w3),
-                    hi(w4)
+                    lo(w3)
                 )
             }
 
             OpCode::GetProperty => {
                 let w1 = w!();
                 let name_idx = w!();
-                let cs_idx = w!();
+                let cs_idx = hi(op_val);
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
                     hint = format!("{:?}", c);
                 }
@@ -304,7 +303,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             OpCode::SetProperty => {
                 let w1 = w!();
                 let name_idx = w!();
-                let cs_idx = w!();
+                let cs_idx = hi(op_val);
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
                     hint = format!("{:?}", c);
                 }
