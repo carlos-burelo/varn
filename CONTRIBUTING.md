@@ -14,7 +14,8 @@ Verificar que todo funciona:
 
 ```bash
 cargo run --bin vn -- tests/main.vn
-# PASSED: 534 / FAILED: 0
+# Modules executed in suite: 48
+# PASSED: 686 / FAILED: 0
 ```
 
 ## Antes de un PR
@@ -56,7 +57,7 @@ La jerarquía de dependencias es estricta: `varn-core` no depende de ningún cra
 **Código Rust:**
 - Sin `unwrap()` en paths que reciben input externo — usa `?` o manejo explícito.
 - Errores como `String` en la interfaz pública de crates de bajo nivel (para evitar dependencias de tipos de error).
-- Tipos `Rc<T>` en el compilador/VM (single-threaded). `Arc<T>` solo donde hay concurrencia real.
+- Tipos `Rc<T>` en el compilador/VM local a cada scheduler/isolate. `Arc<T>` solo en fronteras con concurrencia real.
 
 **Stdlib nativa (`varn-builtins`):**
 - Cada módulo stdlib tiene un archivo `.vn` (interfaz) y una implementación Rust.
@@ -65,7 +66,9 @@ La jerarquía de dependencias es estricta: `varn-core` no depende de ningún cra
 
 **Tests:**
 - Los tests de integración viven en `tests/` como archivos `.vn`.
-- `tests/main.vn` ejecuta la suite completa. Debe pasar al 100% en todo PR.
+- `tests/main.vn` ejecuta la suite por defecto.
+- A fecha `2026-06-05`, `41`, `42` y `47` ya están integrados en `main.vn` y la suite completa pasa.
+- Todo PR debe al menos mantener verde `tests/main.vn`; si toca stdlib/runtime/concurrencia, conviene correr también los tests standalone relevantes.
 - Tests unitarios Rust en `#[cfg(test)]` dentro del crate correspondiente.
 
 **Formato `.vnc` y cache:**

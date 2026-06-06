@@ -23,8 +23,14 @@ vn hola.vn
 
 ```sh
 vn tests/main.vn
-# PASSED: 529 / FAILED: 0
+# Modules executed in suite: 48
+# PASSED: 686 / FAILED: 0
 ```
+
+Importante:
+
+- `tests/main.vn` es la suite por defecto y hoy integra `48` módulos.
+- `41`, `42` y `47` ya no están fuera de la suite principal.
 
 ## Comandos principales
 
@@ -138,7 +144,7 @@ Requiere configuración en `varn.json`:
 ```json
 {
   "name": "mi-proyecto",
-  "deps": {
+  "dependencies": {
     "mylib": "github.com/user/mylib@^1.0.0"
   }
 }
@@ -148,7 +154,7 @@ Instalar: `vn pkg install`
 
 ## Siguiente
 
-1. [varn-SPEC.md](varn-SPEC.md) — referencia del lenguaje
+1. [WARP-SPEC.md](WARP-SPEC.md) — referencia del lenguaje
 2. [ARCHITECTURE.md](ARCHITECTURE.md) — arquitectura interna
 3. [LBI_ARCHITECTURE.md](LBI_ARCHITECTURE.md) — sistema de bindings nativos
 4. [ROADMAP.md](ROADMAP.md) — hoja de ruta

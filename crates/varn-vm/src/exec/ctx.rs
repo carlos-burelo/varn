@@ -187,8 +187,8 @@ impl ExecCtx {
 
     pub fn fork_for_task(&self) -> Self {
         Self {
-            stack: Vec::with_capacity(16384),
-            frames: Vec::with_capacity(512),
+            stack: Vec::with_capacity(1024),
+            frames: Vec::with_capacity(64),
             globals: self.globals.clone(),
             heap: self.heap.clone(),
             try_handlers: Vec::new(),

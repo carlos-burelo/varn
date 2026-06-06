@@ -1,6 +1,6 @@
 # Hoja de Ruta de Varn
 
-Fecha: 2026-05-17
+Fecha: 2026-06-05
 
 ## Estado actual
 
@@ -13,7 +13,8 @@ El lenguaje está completo y funcional:
 - **Caché de bytecode**: `.vn/cache/` invalidado por hash de contenido.
 - **Compilados portables**: `vn build` → `.vnc`, `vn run program.vnc`.
 - **LSP**: servidor en `varn-lsp` con hover, completions, go-to-definition.
-- **Suite de tests**: 529 tests, 100% passing.
+- **Suite de tests por defecto**: `tests/main.vn` ejecuta 48 módulos y hoy reporta `PASSED: 686`, `FAILED: 0`.
+- **Corpus principal en `tests/`**: `41`, `42` y `47` ya fueron reintegrados a la suite por defecto.
 
 ## Inmediato
 
@@ -23,11 +24,13 @@ El lenguaje está completo y funcional:
 
 ## Mediano plazo
 
-- [ ] Decoradores de clase y método (parsing/checker completo, falta codegen completo).
 - [ ] `vn publish` para publicar paquetes al registro.
 - [ ] Registro de paquetes opcional (alternativa a git directo).
 - [ ] Optimizador: constant folding, dead code elimination sobre el IR.
 - [ ] Match guards (`if` dentro de `match`).
+- [ ] Definir benchmarks canónicos públicos y separar cifras de integración vs microbenchmarks.
+- [x] Reintegrar `41`, `42` y `47` a la suite principal.
+- [x] Aislar y corregir el `STATUS_ACCESS_VIOLATION` de `tests/42-stdlib-comprehensive-test.vn`.
 
 ## Largo plazo
 
@@ -35,12 +38,12 @@ El lenguaje está completo y funcional:
 - [ ] FFI con C/Rust nativo (dynamic loading `.dll`/`.so`).
 - [ ] WASM target.
 - [ ] Depurador interactivo.
-- [ ] Multi-hilo real (requiere migrar `Rc<RefCell<T>>` a arena allocation o índices generacionales).
+- [ ] Modelo de paralelismo compartido más allá de isolates, sin degradar el hot path actual de la VM.
 
 ## Documentación
 
 1. [ARCHITECTURE.md](ARCHITECTURE.md)
-2. [varn-SPEC.md](varn-SPEC.md)
+2. [WARP-SPEC.md](WARP-SPEC.md)
 3. [LBI_ARCHITECTURE.md](LBI_ARCHITECTURE.md)
 4. [VM_ARCHITECTURE.md](VM_ARCHITECTURE.md)
 5. [COMPILER_ARCHITECTURE.md](COMPILER_ARCHITECTURE.md)

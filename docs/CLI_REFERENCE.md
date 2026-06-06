@@ -83,12 +83,19 @@ Mide tiempos del pipeline y de la ejecución.
 vn bench archivo.vn
 vn bench --runs 100 archivo.vn
 vn bench --show-output archivo.vn
+vn bench archivo.vnc
 ```
 
 Flags:
 
 - `--runs <N>`: número de ejecuciones, por defecto `10`.
 - `--show-output`: muestra la salida del programa durante el benchmark.
+
+Notas:
+
+- Para fuentes `.vn`, el benchmark actual mide `read`, `lex`, `parse`, `check`, `compile`, `optimize` y `execute`.
+- Para compilados `.vnc`, mide `load` y `execute`.
+- `tests/main.vn` es una suite de integración; para comparar performance usa archivos focalizados y documenta build y runs.
 
 ### `debug`
 
@@ -161,6 +168,18 @@ Ejecuta diagnósticos del sistema y configuración.
 ```bash
 vn doctor
 ```
+
+### `cache`
+
+Gestión del caché local del proyecto.
+
+```bash
+vn cache clean
+```
+
+Subcomandos:
+
+- `clean`: elimina los archivos de caché del proyecto actual.
 
 ### `lsp`
 

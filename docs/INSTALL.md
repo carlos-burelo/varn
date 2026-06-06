@@ -34,8 +34,11 @@ Copy-Item target\release\vn.exe "$env:USERPROFILE\.cargo\bin\vn.exe"
 ```sh
 vn doctor
 vn tests/main.vn
-# PASSED: 529 / FAILED: 0
+# Modules executed in suite: 48
+# PASSED: 686 / FAILED: 0
 ```
+
+Ese comando verifica la suite por defecto, que hoy integra `48` módulos en `tests/main.vn`.
 
 ## Modo desarrollo
 

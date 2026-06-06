@@ -2,6 +2,19 @@ use super::ctx::ExecCtx;
 use crate::value::VmValue;
 
 #[inline(always)]
+unsafe fn jit_propagate_error(ctx: &mut ExecCtx, e: crate::error::RuntimeError) -> ! {
+    let handler = ctx.try_handlers.pop();
+    ctx.jit_panic_exception_handler = handler;
+    ctx.jit_panic_exception_error = Some(e.thrown.unwrap_or(VmValue::null()));
+    ctx.jit_panic_exception_err_obj = Some(e);
+    let buf = ctx.jit_jmp_buf;
+    if !buf.is_null() {
+        crate::exec::ctx::my_longjmp(buf, 1);
+    }
+    panic!("JIT error: no jump buffer");
+}
+
+#[inline(always)]
 fn resolve_constructor_return(ctx: &mut ExecCtx, returning_frame_idx: usize, val: VmValue) -> VmValue {
     let ctor_pos = if !ctx.pending_constructors.is_empty() {
         ctx.pending_constructors
@@ -256,6 +269,7 @@ pub extern "C" fn jit_call(ctx: *mut ExecCtx, args: *const varn_jit::JitCallArgs
                     ctx_ref.close_upvalues_above(callee_base);
                     let final_val = resolve_constructor_return(ctx_ref, returning_frame_idx, res);
                     ctx_ref.stack[base + args.dest] = final_val;
+                    ctx_ref.record_call_vm_fast();
                     return final_val;
                 }
             } else if let Some(crate::heap::HeapObj::NativeFn(name, f)) = heap_obj {
@@ -286,7 +300,10 @@ pub extern "C" fn jit_call(ctx: *mut ExecCtx, args: *const varn_jit::JitCallArgs
                 };
                 let v = match result {
                     Ok(v) => v,
-                    Err(e) => panic!("Runtime error in JIT native call: {:?}", e),
+                    Err(msg) => {
+                        let e = crate::error::RuntimeError::new(msg);
+                        jit_propagate_error(ctx_ref, e);
+                    }
                 };
                 ctx_ref.stack[base + args.dest] = v;
                 return v;
@@ -305,33 +322,12 @@ pub extern "C" fn jit_call(ctx: *mut ExecCtx, args: *const varn_jit::JitCallArgs
 
         match res {
             Ok(true) => {
-                let top_idx = ctx_ref.frames.len() - 1;
-                let top_closure = ctx_ref.frames[top_idx].closure.clone();
-                if let Some(jit_fn) = top_closure.jit_entry {
-                    let callee_base = ctx_ref.frames[top_idx].base;
-                    let required = callee_base + top_closure.proto.register_count as usize + 32;
-                    if ctx_ref.stack.len() < required {
-                        ctx_ref.stack.resize(required, VmValue::null());
-                    }
-                    let res_val = (jit_fn)(
-                        ctx_ref.stack.as_mut_ptr() as *mut std::ffi::c_void,
-                        &*top_closure as *const crate::frame::VmClosure as *const std::ffi::c_void,
-                        callee_base,
-                        ctx_ref as *mut ExecCtx as *mut std::ffi::c_void,
-                    );
-                    let returning_frame_idx = ctx_ref.frames.len() - 1;
-                    ctx_ref.frames.pop();
-                    ctx_ref.close_upvalues_above(callee_base);
-                    let final_val = resolve_constructor_return(ctx_ref, returning_frame_idx, res_val);
-                    ctx_ref.stack[base + args.dest] = final_val;
-                } else {
-                    ctx_ref.run_until_inner(caller_depth).unwrap();
+                if let Err(e) = ctx_ref.run_until_inner(caller_depth) {
+                    jit_propagate_error(ctx_ref, e);
                 }
             }
             Ok(false) => {}
-            Err(e) => {
-                panic!("Runtime error in JIT call: {:?}", e);
-            }
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
 
         ctx_ref.stack[base + args.dest]
@@ -367,33 +363,12 @@ pub extern "C" fn jit_call_method(
 
         match res {
             Ok(true) => {
-                let top_idx = ctx_ref.frames.len() - 1;
-                let top_closure = ctx_ref.frames[top_idx].closure.clone();
-                if let Some(jit_fn) = top_closure.jit_entry {
-                    let callee_base = ctx_ref.frames[top_idx].base;
-                    let required = callee_base + top_closure.proto.register_count as usize + 32;
-                    if ctx_ref.stack.len() < required {
-                        ctx_ref.stack.resize(required, VmValue::null());
-                    }
-                    let res_val = (jit_fn)(
-                        ctx_ref.stack.as_mut_ptr() as *mut std::ffi::c_void,
-                        &*top_closure as *const crate::frame::VmClosure as *const std::ffi::c_void,
-                        callee_base,
-                        ctx_ref as *mut ExecCtx as *mut std::ffi::c_void,
-                    );
-                    let returning_frame_idx = ctx_ref.frames.len() - 1;
-                    ctx_ref.frames.pop();
-                    ctx_ref.close_upvalues_above(callee_base);
-                    let final_val = resolve_constructor_return(ctx_ref, returning_frame_idx, res_val);
-                    ctx_ref.stack[base + args.dest] = final_val;
-                } else {
-                    ctx_ref.run_until_inner(caller_depth).unwrap();
+                if let Err(e) = ctx_ref.run_until_inner(caller_depth) {
+                    jit_propagate_error(ctx_ref, e);
                 }
             }
             Ok(false) => {}
-            Err(e) => {
-                panic!("Runtime error in JIT call_method: {:?}", e);
-            }
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
 
         ctx_ref.stack[base + args.dest]
@@ -427,12 +402,12 @@ pub extern "C" fn jit_get_property(
 
         match res {
             Ok(true) => {
-                ctx_ref.run_until_inner(caller_depth).unwrap();
+                if let Err(e) = ctx_ref.run_until_inner(caller_depth) {
+                    jit_propagate_error(ctx_ref, e);
+                }
             }
             Ok(false) => {}
-            Err(e) => {
-                panic!("Runtime error in JIT get_property: {:?}", e);
-            }
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
 
         ctx_ref.stack[base + args.dest]
@@ -466,12 +441,12 @@ pub extern "C" fn jit_set_property(
 
         match res {
             Ok(true) => {
-                ctx_ref.run_until_inner(caller_depth).unwrap();
+                if let Err(e) = ctx_ref.run_until_inner(caller_depth) {
+                    jit_propagate_error(ctx_ref, e);
+                }
             }
             Ok(false) => {}
-            Err(e) => {
-                panic!("Runtime error in JIT set_property: {:?}", e);
-            }
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -562,6 +537,7 @@ pub extern "C" fn jit_invoke_virtual(
                     ctx_ref.close_upvalues_above(callee_base);
                     let final_val = resolve_constructor_return(ctx_ref, returning_frame_idx, res);
                     ctx_ref.stack[base + args.dest] = final_val;
+                    ctx_ref.record_call_vm_fast();
                     return final_val;
                 }
             }
@@ -578,33 +554,12 @@ pub extern "C" fn jit_invoke_virtual(
 
         match jumped {
             Ok(true) => {
-                let top_idx = ctx_ref.frames.len() - 1;
-                let top_closure = ctx_ref.frames[top_idx].closure.clone();
-                if let Some(jit_fn) = top_closure.jit_entry {
-                    let callee_base = ctx_ref.frames[top_idx].base;
-                    let required = callee_base + top_closure.proto.register_count as usize + 32;
-                    if ctx_ref.stack.len() < required {
-                        ctx_ref.stack.resize(required, VmValue::null());
-                    }
-                    let res_val = (jit_fn)(
-                        ctx_ref.stack.as_mut_ptr() as *mut std::ffi::c_void,
-                        &*top_closure as *const crate::frame::VmClosure as *const std::ffi::c_void,
-                        callee_base,
-                        ctx_ref as *mut ExecCtx as *mut std::ffi::c_void,
-                    );
-                    let returning_frame_idx = ctx_ref.frames.len() - 1;
-                    ctx_ref.frames.pop();
-                    ctx_ref.close_upvalues_above(callee_base);
-                    let final_val = resolve_constructor_return(ctx_ref, returning_frame_idx, res_val);
-                    ctx_ref.stack[base + args.dest] = final_val;
-                } else {
-                    ctx_ref.run_until_inner(caller_depth).unwrap();
+                if let Err(e) = ctx_ref.run_until_inner(caller_depth) {
+                    jit_propagate_error(ctx_ref, e);
                 }
             }
             Ok(false) => {}
-            Err(e) => {
-                panic!("Runtime error in JIT invoke_virtual: {:?}", e);
-            }
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
 
         ctx_ref.stack[base + args.dest]
