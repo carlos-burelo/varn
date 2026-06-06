@@ -73,7 +73,7 @@ Variables capturadas por funciones internas:
 - Primera vez: lookup en la shape del objeto. Guarda `(class_id, slot_index)` en el IC del opcode.
 - Siguiente vez con mismo objeto de misma clase: acceso directo por slot, sin hash lookup.
 
-En benchmark de la suite completa (529 tests): ~0% IC misses en steady state.
+La eficacia del IC depende del workload. En algunos programas pequeños el perfil puede mostrar `0` hits simplemente porque casi no hay sites calientes; en workloads orientados a objetos el beneficio aparece en steady state.
 
 ---
 
@@ -107,17 +107,18 @@ El frame queda "congelado". `varn-runtime` (Tokio) lo reanuda cuando la tarea re
 
 ## 9. Métricas de Performance
 
-En benchmark de la suite completa (529 tests):
+No hay una sola cifra honesta para "la VM de Varn" porque el benchmark actual mide más fases y más métricas que antes, y la mezcla cambia mucho entre workloads.
 
-```
-VM Profile
-  IC hits                         0  (0.0% miss rate en steady state)
-  calls vm-fast                 687  (60.3%)
-  calls slow/prepare             23  (2.0%)
-  calls native                  429  (37.7%)
-  heap allocs                 1 359
-  frame pushes                  133
-  frame pops                    192
+Ejemplos reales del repo actual (`--runs 10`, build `dev`, 2026-06-05):
 
-Throughput: ~475 runs/s  (mean 2.1 ms end-to-end)
-```
+- `tests/45-simple-file-test.vn`: p50 end-to-end `912 µs`
+- `tests/21-async.vn`: p50 end-to-end `1.901 ms`
+- `tests/47-isolates-multithread.vn`: p50 end-to-end `33.16 ms`
+
+El CLI ya imprime además:
+
+- hits/misses de IC por operación
+- distribución `vm-fast` / `slow` / `native`
+- allocations y GC
+- hotspots de opcodes
+- stats de JIT

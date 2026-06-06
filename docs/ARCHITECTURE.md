@@ -23,7 +23,7 @@ Código Fuente (.vn)
 [ varn-vm ]       → VM register-based con NaN-Boxing
       │
       ▼
-[ varn-runtime ]  → Scheduler asíncrono (Tokio LocalSet), I/O, timers
+[ varn-runtime ]  → Scheduler asíncrono, runtime Tokio multi-thread e isolates
 ```
 
 ---
@@ -43,7 +43,7 @@ Código Fuente (.vn)
 ### Backend
 - **`varn-compiler`**: Lowering de AST a bytecode. Slots estáticos, upvalues, constant pool, back-patching.
 - **`varn-vm`**: VM register-based con NaN-boxing, Inline Cache, fast-path calls, upvalues open/closed.
-- **`varn-runtime`**: Tokio LocalSet scheduler. Async/await, generators, timers, I/O host.
+- **`varn-runtime`**: scheduler async sobre runtime Tokio multi-thread. Ejecuta tareas `!Send` en `LocalSet` y isolates en hilos separados con paso de mensajes.
 
 ### Stdlib y Host
 - **`varn-builtins`**: Implementaciones nativas (Rust) de stdlib. Usa LBI (Linker-Bound Interface) para autodescubrimiento. Ver [LBI_ARCHITECTURE.md](LBI_ARCHITECTURE.md).
@@ -98,17 +98,18 @@ Las variables locales son offsets numéricos sobre el registro base del frame ac
 Variables capturadas por closures. **Abiertas**: índice en registros del frame padre. **Cerradas**: copiadas al heap cuando el frame padre termina.
 
 ### Inline Cache
-`GetProp`/`SetProp` y llamadas a métodos se cachean por clase y slot. En benchmark de la suite (529 tests), fast-path calls representan ~60% de todas las llamadas.
+`GetProp`/`SetProp` y llamadas a métodos se cachean por clase y slot. Las tasas de hit y el peso de fast-path dependen del workload; ya no se documentan como una cifra global única.
 
 ---
 
 ## 5. Runtime Asíncrono
 
-`varn-runtime` envuelve la VM síncrona en un `tokio::task::LocalSet` (hilo único, máximo rendimiento, sin locks).
+`varn-runtime` usa un runtime Tokio multi-thread compartido, pero cada VM/closure `!Send` se ejecuta en un `tokio::task::LocalSet`. Para paralelismo entre hilos, Varn expone isolates que cruzan mensajes sendables por `IsolatePort`.
 
 - **`await`**: La VM emite `Suspend::Task`. El scheduler cede al Tokio event-loop hasta que la promesa se resuelve.
 - **`spawn`**: Crea una nueva tarea en el LocalSet.
 - **`parallel([A, B])`**: TaskGroup — resuelve cuando todos los hijos resuelven.
+- **`spawnIsolate(fn, args)`**: crea un worker en otro hilo; `fn` debe ser exportada top-level y los argumentos deben ser sendables.
 - **Generadores**: `Suspend::Yield` envía el valor al `GenChannel`.
 - **Poll budget**: 256 ciclos antes de `yield_now()` para no ahogar el event-loop.
 

@@ -11,7 +11,7 @@
 
 - **VM Register-Based con NaN-Boxing** — valores en 64 bits, sin boxing en el hot path
 - **Tipado estático expresivo** — uniones, genéricos, exhaustividad total en `match`
-- **Async nativo** — `async`/`await`, generadores, `TaskGroup`, `parallel`, `spawn`
+- **Async y concurrencia** — `async`/`await`, generadores, `TaskGroup`, `parallel`, `spawn` e isolates multi-thread
 - **Sistema de paquetes** — `varn.json`, `varn.lock`, resolución semver sobre git
 - **Compilado a `.vnc`** — artefacto portable, sin recompilación
 - **Tooling** — `vn bench`, `vn debug -p bytecode`, `vn debug`, LSP
@@ -347,7 +347,7 @@ async function runAsync(): void {
     using group = TaskGroup<int>()
     group.spawn(asyncAdd(7, 8))
     group.spawn(asyncAdd(9, 10))
-    const joined = await group.join()
+    const joined = group.join()
     assert("group join", joined[0] === 15)
 
     // spawn individual
@@ -357,6 +357,25 @@ async function runAsync(): void {
 
 await runAsync()
 ```
+
+### Isolates y multi-threading
+
+```Varn
+import { spawnIsolate } from "std:task"
+
+export async function workerMain(port: dynamic) {
+    const msg = await port.receive()
+    port.send(msg.value * 2)
+}
+
+const port = await spawnIsolate(workerMain, [])
+port.send({ value: 21 })
+assert("isolate reply", await port.receive() === 42)
+```
+
+- `spawn` y `parallel` corren tareas Varn sobre el scheduler async.
+- `spawnIsolate` lanza un worker en otro hilo con paso de mensajes vía `IsolatePort`.
+- Los isolates no comparten heap mutable; cruzan el boundary solo valores sendables.
 
 ### Decoradores
 
@@ -461,7 +480,7 @@ vn check -v program.vn
 ```bash
 vn eval "print(1 + 2)"
 vn eval "function double(x: int) = x * 2; print(double(21))"
-vn eval --debug all "print('hello')"
+vn debug -e "print('hello')"
 ```
 
 ### Compilar a `.vnc`
@@ -476,30 +495,21 @@ El `.vnc` contiene el grafo completo de bytecode. No incluye stdlib (embedded en
 ### Benchmark
 
 ```bash
-vn bench program.vn              # fases: read/lex/parse/check/compile/execute
+vn bench program.vn              # read + lex + parse + check + compile + optimize + execute
 vn bench program.vn --runs 100
-vn bench program.vnc             # solo load + execute (compara contra .vn)
+vn bench program.vnc             # solo load + execute
 vn bench --show-output program.vn
 ```
 
-Output típico:
-```
-Benchmark · tests/main.vn  (10 runs)
-Source  43 lines  1.1 KB  88 tokens
+Mediciones reales del estado actual del repo (`cargo run --bin vn -- bench ... --runs 10`, 2026-06-05):
 
-Phase        min      p50     mean      max       σ      total
-──────── ──────── ──────── ──────── ──────── ──────── ─────────
-read      26.8 µs  43.4 µs  43.1 µs  87.6 µs  18 µs    431 µs
-lex       15.3 µs  16.4 µs  16.9 µs  21.2 µs  1.67 µs  169 µs
-parse     16.5 µs  23.4 µs  26.8 µs  59.9 µs  12.4 µs  268 µs
-check     74 µs    78.2 µs  81.9 µs  113 µs   10.9 µs  819 µs
-compile   6.6 µs   7 µs     7.38 µs  9.5 µs   821 ns   73.8 µs
-execute   1.723 ms 1.909 ms 1.929 ms 2.101 ms 127 µs   19.29 ms
-──────── ──────── ──────── ──────── ──────── ──────── ─────────
-total     1.862 ms 2.077 ms 2.105 ms 2.393 ms          21.05 ms
+- `tests/45-simple-file-test.vn`: p50 end-to-end `912 µs`, throughput `1096.4 runs/s`
+- `tests/21-async.vn`: p50 end-to-end `1.901 ms`, throughput `525.9 runs/s`
+- `tests/47-isolates-multithread.vn`: p50 end-to-end `33.16 ms`, throughput `30.2 runs/s`
 
-Throughput: 475.1 runs/s
-```
+El benchmark actual también reporta `Module precompilation (cold startup)`, breakdowns de parser/checker, hotspots de opcodes, perfil de VM, GC y JIT. Los números viejos de `<1 ms` ya no representan la realidad general del lenguaje ni del benchmark actual.
+
+`tests/main.vn` es una suite de integración, no un benchmark canónico único. Para comparar rendimiento usa programas focalizados y, si vas a publicar cifras, indica archivo, build (`dev`/`release`) y número de runs.
 
 ### Debug e inspección
 
@@ -536,6 +546,7 @@ vn init                          # directorio actual
 vn init my-project
 vn init my-project --name "Mi App"
 vn doctor                        # diagnóstico del entorno
+vn cache clean                   # limpia cache local del proyecto
 vn lsp                           # servidor LSP por stdio
 vn completions bash              # completions de shell
 ```
@@ -588,7 +599,7 @@ fuente .vn
     └── varn-vm         → register-based VM, NaN-boxing, IC
             │
             ├── varn-builtins   → stdlib nativa en Rust
-            └── varn-runtime    → async runtime
+            └── varn-runtime    → scheduler async + runtime Tokio + isolates
 ```
 
 | Crate | Rol |
@@ -610,10 +621,11 @@ fuente .vn
 ### VM — características
 
 - **NaN-Boxing**: null, bool, int, float, puntero — todo en 64 bits, sin boxing
-- **Inline Cache**: property access cacheado por forma de objeto (~60% hit rate)
-- **Fast-path calls**: 60%+ de llamadas sin overhead de frame completo
+- **Inline Cache**: property access y method dispatch cacheados por clase y slot
+- **Fast-path calls**: rutas rápidas para closures y natives cuando el call-site lo permite
 - **Upvalues**: closures con captura correcta (open/closed)
 - **Async**: VM suspendible, `await` pausa el frame, runtime lo reanuda
+- **Isolates**: ejecución en hilos separados con paso de mensajes
 
 ---
 
@@ -625,10 +637,17 @@ cargo run --bin vn -- tests/main.vn
 
 ```
 ════════════════════════════════════════
-PASSED: 534
+Modules executed in suite: 48
+
+PASSED: 686
 FAILED: 0
 ALL TESTS PASSED
 ```
+
+Panorama real del corpus `tests/` a fecha `2026-06-05`:
+
+- La suite por defecto `tests/main.vn` importa `48` módulos y hoy pasa completa.
+- `tests/41-advanced-enums.vn`, `tests/42-stdlib-comprehensive-test.vn` y `tests/47-isolates-multithread.vn` ya están reintegrados en la suite principal.
 
 ---
 

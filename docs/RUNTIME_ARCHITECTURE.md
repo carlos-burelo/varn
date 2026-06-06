@@ -1,12 +1,16 @@
 # Arquitectura del Runtime Asíncrono (varn-runtime)
 
-`varn-runtime` orquesta la VM síncrona (`varn-vm`) dentro de un event-loop Tokio para concurrencia cooperativa.
+`varn-runtime` orquesta la VM síncrona (`varn-vm`) sobre Tokio para concurrencia cooperativa y paralelismo explícito con isolates.
 
 ## 1. Modelo de Hilos
 
-El runtime usa `tokio::task::LocalSet` — hilo único. Todo el estado de la VM es `!Send` (`Rc<RefCell<T>>` para máximo rendimiento sin locks). Miles de tareas Varn corren concurrentemente en un solo hilo gracias a Tokio's `spawn_local` + multiplexación `epoll`/`kqueue` para I/O.
+El scheduler crea un runtime Tokio multi-thread compartido (`Builder::new_multi_thread()`), pero ejecuta cada raíz Varn en un `tokio::task::LocalSet` porque la VM sigue siendo `!Send` en su hot path.
 
-No hay multi-hilo real actualmente. Ver [ROADMAP.md](ROADMAP.md) para los planes de arena allocation.
+Eso da un modelo híbrido:
+
+- **Concurrencia local**: `spawn`, `parallel`, timers y generators viven dentro del `LocalSet` del isolate/raíz actual.
+- **Paralelismo real**: `spawnIsolate(...)` levanta otro worker con `std::thread::spawn`, su propia VM y un canal bidireccional `IsolatePort`.
+- **Boundary de memoria**: no hay heap mutable compartido entre isolates; solo cruzan valores sendables.
 
 ---
 
@@ -59,8 +63,9 @@ const task = spawn(fetchData())
 const [a, b] = await parallel([fetchA(), fetchB()])
 ```
 
-- `spawn`: crea nueva tarea en el LocalSet, retorna handle `Task<T>`.
-- `parallel([...])`: `TaskGroup` — resuelve solo cuando todos los hijos resuelven. Recoge resultados en array.
+- `spawn`: crea nueva tarea en el `LocalSet`, retorna handle `Task<T>`.
+- `parallel([...])`: dispara varios children sobre el scheduler actual y resuelve un array cuando terminan.
+- `spawnIsolate(fn, args)`: inicia otro hilo, carga el módulo del `fn` exportado y retorna un `IsolatePort` para mensajería.
 
 ---
 
@@ -103,12 +108,17 @@ Sin GC mark-and-sweep. El heap usa `Rc<RefCell<T>>`:
 - Cuando la última referencia desaparece del scope Rust, la memoria se libera inmediatamente (RAII).
 - Ciclos de referencias son teóricamente posibles pero infrecuentes en código Varn típico.
 
+Cada isolate tiene su propio heap/VM. El boundary cross-thread ocurre a través de serialización a `SendValue`.
+
 ---
 
 ## 9. Métricas
 
-El scheduler recopila métricas atómicas (`AtomicU64`) sin impacto en performance:
+El scheduler recopila métricas atómicas (`AtomicU64`) sin tocar el heap de la VM:
+- `root_tasks`: raíces ejecutadas
+- `spawned_tasks`: children creados por `spawn`
+- `spawned_async_gens`: generadores async lanzados
 - `vm_polls`: ciclos de ejecución
 - `cooperative_yields`: veces que el poll budget fue excedido
 - `timer_waits`: esperas en sleep/setTimeout
-- `task_waits`: esperas en await de tareas I/O
+- `task_waits`: esperas en `await`

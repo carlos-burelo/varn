@@ -565,13 +565,11 @@ Varn usa una VM basada en registros (no stack-based) con las siguientes caracter
 
 ### Métricas de Performance
 
-En benchmark de la suite completa (534 tests):
-- **Throughput**: ~475 runs/s
-- **Fast-path calls**: 60.3%
-- **Slow-path calls**: 2.0%
-- **Native calls**: 37.7%
-- **Frame operations**: ~133 pushes, ~192 pops
-- **Heap allocations**: ~1,359 per run
+Las métricas de performance dependen mucho del workload. Como referencia actual del repo (`--runs 10`, build `dev`, 2026-06-05):
+- **`tests/45-simple-file-test.vn`**: p50 `912 µs`
+- **`tests/21-async.vn`**: p50 `1.901 ms`
+- **`tests/47-isolates-multithread.vn`**: p50 `33.16 ms`
+- **Fast-path / IC / JIT**: documentar siempre junto al archivo benchmarkeado; ya no se asume una cifra global única.
 
 ## Testing
 
@@ -584,10 +582,15 @@ vn tests/main.vn
 
 # Debería mostrar:
 # ════════════════════════════════════════
-# PASSED: 534
+# Modules executed in suite: 48
+# PASSED: 686
 # FAILED: 0
 # ALL TESTS PASSED
 ```
+
+Nota de realidad del corpus:
+- `tests/main.vn` es la suite por defecto y hoy integra `48` módulos.
+- `tests/41-advanced-enums.vn`, `tests/42-stdlib-comprehensive-test.vn` y `tests/47-isolates-multithread.vn` ya están reintegrados.
 
 ## Troubleshooting
 

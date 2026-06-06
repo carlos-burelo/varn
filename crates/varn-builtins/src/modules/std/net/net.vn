@@ -115,12 +115,12 @@ export class Url {
     static parse(url: str): Url {
         const parts = netParseUrl(url);
         const out = new Url();
-        out.protocol = parts.protocol;
-        out.host = parts.host;
+        out.protocol = parts.protocol ?? "";
+        out.host = parts.host ?? "";
         out.port = parts.port;
-        out.path = parts.path;
-        out.query = Query.parse(parts.query);
-        out.fragment = parts.fragment;
+        out.path = parts.path ?? "";
+        out.query = Query.parse(parts.query ?? "");
+        out.fragment = parts.fragment ?? "";
         return out;
     }
 

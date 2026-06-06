@@ -33,7 +33,7 @@ graph TD
 
     subgraph Execution["Ejecución"]
         VM["varn-vm (register-based, NaN-boxing, IC)"]
-        Runtime["varn-runtime (Tokio LocalSet, async, I/O)"]
+        Runtime["varn-runtime (Tokio multi-thread + LocalSet + isolates)"]
         Builtins["varn-builtins (stdlib nativa Rust, LBI)"]
         Runtime --> VM
         VM -.usa.-> Types
@@ -77,7 +77,7 @@ Lowering de AST a bytecode. Slots estáticos, upvalues, constant pool, back-patc
 VM register-based con NaN-boxing. Inline Cache (GetProp/SetProp por clase+slot), fast-path calls (~60%), upvalues open/closed.
 
 ### `varn-runtime`
-Scheduler Tokio LocalSet. Async/await, spawn, generators, timers. Single-threaded (`!Send` por `Rc`).
+Scheduler async sobre runtime Tokio multi-thread. Las tareas Varn `!Send` viven en `LocalSet`; `spawnIsolate` levanta workers en hilos separados y se comunica por `IsolatePort`.
 
 ### `varn-builtins`
 Implementaciones nativas de stdlib. LBI: `#[varn_module]` + `#[varn_fn]`/`#[varn_class]` inyectan `NativeOpEntry` en secciones del linker. `build_module()` ensambla el objeto Varn en startup.
@@ -89,7 +89,7 @@ Proc macros: `#[varn_module]`, `#[varn_fn]`, `#[varn_class]`, `#[varn_constructo
 Registro canónico de módulos (`MODULE_REGISTRY`). Resolución topológica. Especificadores `std:*`, `builtin:*`.
 
 ### `varn-cli`
-Binario `vn`. Pipeline completo: `run`, `check`, `eval`, `repl`, `bench`, `debug`, `build`, `pkg`, `init`, `doctor`, `lsp`, `completions`.
+Binario `vn`. Pipeline completo: `run`, `check`, `eval`, `repl`, `bench`, `debug`, `build`, `pkg`, `init`, `doctor`, `cache`, `lsp`, `completions`.
 
 ### `varn-lsp`
 LSP con tower-lsp + tokio. Consulta SemanticDB. Hover, completions, go-to-definition, semantic tokens.
