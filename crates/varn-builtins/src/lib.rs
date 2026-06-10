@@ -25,6 +25,8 @@ pub use modules::globals::set_print_silent;
 #[cfg(feature = "runtime")]
 pub use modules::has_native_builder;
 #[cfg(feature = "runtime")]
+pub use dispatch::all_native_module_ids;
+#[cfg(feature = "runtime")]
 pub use modules::testing::{reset_testing_counters, set_testing_silent};
 #[cfg(feature = "runtime")]
 pub use resource::ResourceStore;

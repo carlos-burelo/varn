@@ -21,4 +21,4 @@ pub use loader::{CompositeLoader, ModuleError, ModuleLoader};
 pub use profile::{CallEntry, HotspotCounters, ProfileCounters, VmProfile};
 pub use value::VmValue;
 pub use varn_jit;
-pub use vm::Vm;
+pub use vm::{prefill_native_modules, Vm};

@@ -283,17 +283,20 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     }
     let optimized_precompiled = Rc::new(optimized_precompiled_map);
 
+    let proto_rc = Rc::new(optimized_proto);
+
     init_vm.ctx.run_minor_gc();
     init_vm.collect_gc();
 
-    let (snap_globals, snap_heap) = init_vm.snapshot();
+    // Pre-load all native runtime modules so each bench run gets them from
+    // the snapshot instead of rebuilding NativeFn objects on every run.
+    varn_vm::prefill_native_modules(&mut init_vm);
 
-
-
-    let proto_rc = Rc::new(optimized_proto);
+    let (snap_globals, snap_heap, snap_modules) = init_vm.snapshot();
     let precompiled_ref = &optimized_precompiled;
     let snap_globals_ref = &snap_globals;
     let snap_heap_ref = &snap_heap;
+    let snap_modules_ref = &snap_modules;
     let exec_samples = time_n(runs, || {
         // start execute timer
         timers.execute.start();
@@ -303,6 +306,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
             snap_globals_ref.clone(),
             snap_heap_ref.clone(),
             precompiled_ref.clone(),
+            snap_modules_ref.clone(),
         ).with_loader(loader.clone());
         let main_module_id = ModuleId::local_str(path);
         let mut export_map = FxHashMap::default();
@@ -332,6 +336,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
             snap_globals.clone(),
             snap_heap.clone(),
             optimized_precompiled.clone(),
+            snap_modules.clone(),
         ).with_loader(loader.clone());
         let main_module_id = ModuleId::local_str(path);
         let mut export_map = FxHashMap::default();
@@ -543,12 +548,15 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     init_vm.ctx.run_minor_gc();
     init_vm.collect_gc();
 
-    let (snap_globals, snap_heap) = init_vm.snapshot();
+    varn_vm::prefill_native_modules(&mut init_vm);
+
+    let (snap_globals, snap_heap, snap_modules) = init_vm.snapshot();
 
     let proto_rc = Rc::new(optimized_proto);
     let precompiled_ref = &optimized_precompiled;
     let snap_globals_ref = &snap_globals;
     let snap_heap_ref = &snap_heap;
+    let snap_modules_ref = &snap_modules;
 
     let exec_samples = time_n(runs, || {
         varn_builtins::reset_testing_counters();
@@ -556,6 +564,7 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
             snap_globals_ref.clone(),
             snap_heap_ref.clone(),
             precompiled_ref.clone(),
+            snap_modules_ref.clone(),
         ).with_loader(loader.clone());
         let main_module_id = ModuleId::local_str(path);
         let mut export_map = FxHashMap::default();
@@ -581,6 +590,7 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
             snap_globals.clone(),
             snap_heap.clone(),
             optimized_precompiled.clone(),
+            snap_modules.clone(),
         ).with_loader(loader.clone());
         let main_module_id = ModuleId::local_str(path);
         let mut export_map = FxHashMap::default();

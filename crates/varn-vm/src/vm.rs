@@ -48,10 +48,12 @@ impl Vm {
         globals: GlobalStore,
         heap: Heap,
         precompiled: Rc<rustc_hash::FxHashMap<ModuleId, Rc<varn_types::FunctionProto>>>,
+        modules: rustc_hash::FxHashMap<ModuleId, VmValue>,
     ) -> Self {
         let mut ctx = ExecCtx::new(globals);
         ctx.heap = heap.deep_clone();
         ctx.precompiled = precompiled;
+        ctx.modules = modules;
         Self { ctx }
     }
 
@@ -84,8 +86,14 @@ impl Vm {
         self.ctx.run()
     }
 
-    pub fn snapshot(&self) -> (GlobalStore, Heap) {
-        (self.ctx.globals.clone(), self.ctx.heap.clone())
+    pub fn snapshot(&self) -> (GlobalStore, Heap, rustc_hash::FxHashMap<ModuleId, VmValue>) {
+        // Only include native (std:/core:/runtime:) modules in the snapshot.
+        // User/local modules are stateful and must re-execute each run.
+        let native_modules = self.ctx.modules.iter()
+            .filter(|(id, _)| matches!(id, ModuleId::Std(_) | ModuleId::Core(_) | ModuleId::Runtime(_)))
+            .map(|(k, v)| (k.clone(), *v))
+            .collect();
+        (self.ctx.globals.clone(), self.ctx.heap.clone(), native_modules)
     }
 
     pub fn enable_opcode_profiling(&mut self) {
@@ -175,6 +183,32 @@ impl Vm {
 
     pub fn resolve_globals(&mut self, proto: &mut FunctionProto) {
         resolve_globals_in_proto(proto, &mut self.ctx.globals);
+    }
+}
+
+/// Pre-load all native (std:/core:/runtime:) modules into `vm` so they are
+/// present when `snapshot()` is called. Each bench run then gets them from the
+/// snapshot instead of calling `build_module()` and allocating fresh NativeFn
+/// objects every time.
+pub fn prefill_native_modules(vm: &mut Vm) {
+    for raw_id in varn_builtins::all_native_module_ids() {
+        // Skip "globals" — those are injected into the global store directly,
+        // not via module imports. ModuleId::from_canonical_str would map them
+        // to Local paths which never match import lookups.
+        if !raw_id.contains(':') {
+            continue;
+        }
+
+        let resolved = varn_core::ModuleId::from_canonical_str(&raw_id);
+        if vm.ctx.modules.contains_key(&resolved) {
+            continue;
+        }
+        // MODULE_OPS keys ARE the full IDs that build_module() expects.
+        if let Some(nv) = varn_builtins::build_module(&raw_id, &mut vm.ctx.heap) {
+            if let Ok(converted) = vm.ctx.convert_to_module_obj(resolved.clone(), nv) {
+                vm.ctx.modules.insert(resolved, converted);
+            }
+        }
     }
 }
 
