@@ -3,7 +3,7 @@ use crate::frame::{CallFrame, TryHandler, VmClosure, VmUpvalue};
 use crate::globals::GlobalStore;
 use crate::heap::{Heap, HeapObj};
 use crate::loader::ModuleLoader;
-use crate::profile::ProfileCounters;
+use crate::profile::{HotspotCounters, ProfileCounters};
 use crate::value::VmValue;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
@@ -63,6 +63,7 @@ pub struct ExecCtx {
     pub module_exports: FxHashMap<usize, VmValue>,
     pub opcode_counts: Option<Rc<Vec<std::sync::atomic::AtomicU64>>>,
     pub profile_counters: Option<Arc<ProfileCounters>>,
+    pub hotspot_counters: Option<Rc<RefCell<HotspotCounters>>>,
     pub proto_constants: FxHashMap<usize, Rc<Vec<VmValue>>>,
     pub no_jit: bool,
     pub linker: Linker,
@@ -102,6 +103,7 @@ impl ExecCtx {
             module_exports: FxHashMap::default(),
             opcode_counts: None,
             profile_counters: None,
+            hotspot_counters: None,
             proto_constants: FxHashMap::default(),
             no_jit: false,
             linker: Linker::new(),
@@ -206,6 +208,7 @@ impl ExecCtx {
             module_exports: FxHashMap::default(),
             opcode_counts: None,
             profile_counters: None,
+            hotspot_counters: None,
             proto_constants: FxHashMap::default(),
             no_jit: self.no_jit,
             linker: self.linker.clone_state(),

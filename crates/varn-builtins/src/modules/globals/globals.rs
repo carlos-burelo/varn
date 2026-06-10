@@ -68,15 +68,15 @@ pub(crate) mod dispatch {
 
     #[varn_fn]
     pub fn assert(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        let label = args
-            .get(0)
-            .map(|&v| ctx.str_repr(v))
-            .unwrap_or_else(|| "assert failed".to_owned());
         let cond = args.get(1).map(|&v| v.is_truthy()).unwrap_or(false);
         if cond {
             crate::modules::testing::inc_passed();
             Ok(VmValue::null())
         } else {
+            let label = args
+                .get(0)
+                .map(|&v| ctx.str_repr(v))
+                .unwrap_or_else(|| "assert failed".to_owned());
             crate::modules::testing::inc_failed();
             varn_utilities::terminal::error(format!("ASSERT FAIL: {label}"));
             Err(label)

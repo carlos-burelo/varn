@@ -4,6 +4,7 @@ use crate::gc::GcCollector;
 use crate::nursery::{
     is_nursery_idx, is_old_idx, old_idx_raw, pack_old_idx, Nursery, OLD_GEN_FLAG,
 };
+use crate::profile::HotspotCounters;
 use crate::value::VmValue;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
@@ -67,6 +68,7 @@ pub struct HeapInner {
     decimal_interner: HashMap<rust_decimal::Decimal, u32>,
     char_interner: HashMap<char, u32>,
     gc_collector: Option<GcCollector>,
+    pub hotspot: Option<Rc<RefCell<HotspotCounters>>>,
 }
 
 #[inline]
@@ -110,6 +112,7 @@ impl HeapInner {
             gc_total_freed: 0,
             gc_alloc_since_collect: 0,
             nursery: Nursery::new(),
+            hotspot: None,
         }
     }
 
@@ -127,6 +130,33 @@ impl HeapInner {
     }
 
     pub fn alloc(&mut self, obj: HeapObj) -> u32 {
+        if let Some(ref h) = self.hotspot.clone() {
+            let type_name: &'static str = match &obj {
+                HeapObj::Str(_) => "String",
+                HeapObj::Array(_) => "Array",
+                HeapObj::Object(_) => "Object",
+                HeapObj::VmClosure(_) => "Closure",
+                HeapObj::BoundMethod(_) => "BoundMethod",
+                HeapObj::EnumVariant(_) => "EnumVariant",
+                HeapObj::Range(_) => "Range",
+                HeapObj::Char(_) => "Char",
+                HeapObj::Symbol(_) => "Symbol",
+                HeapObj::BigInt(_) => "BigInt",
+                HeapObj::Decimal(_) => "Decimal",
+                HeapObj::Map(_) => "Map",
+                HeapObj::Set(_) => "Set",
+                HeapObj::Task(_) => "Task",
+                HeapObj::TaskHandle(_) => "TaskHandle",
+                HeapObj::Generator(_) => "Generator",
+                HeapObj::AsyncQueue(_) => "AsyncQueue",
+                HeapObj::Spread(_) => "Spread",
+                HeapObj::Class(_) => "Class",
+                HeapObj::NativeFn(_, _) => "NativeFn",
+                HeapObj::Module(_) => "Module",
+                HeapObj::VmValue(_) => "VmValue",
+            };
+            h.borrow_mut().record_alloc(type_name);
+        }
         match obj {
             HeapObj::Str(_)
             | HeapObj::Array(_)

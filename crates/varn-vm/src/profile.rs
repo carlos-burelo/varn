@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -167,5 +170,59 @@ impl VmProfile {
             minor_gc_count: 0,
             minor_gc_promoted: 0,
         }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CallEntry {
+    pub calls: u64,
+    pub jit_calls: u64,
+    pub interp_calls: u64,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct HotspotCounters {
+    pub fn_calls: HashMap<String, CallEntry>,
+    pub method_calls: HashMap<String, CallEntry>,
+    pub native_calls: HashMap<String, u64>,
+    pub global_accesses: HashMap<String, u64>,
+    pub alloc_types: HashMap<&'static str, u64>,
+}
+
+impl HotspotCounters {
+    pub fn new() -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Self::default()))
+    }
+
+    pub fn record_fn_call(&mut self, name: &str, jit: bool) {
+        let e = self.fn_calls.entry(name.to_owned()).or_default();
+        e.calls += 1;
+        if jit {
+            e.jit_calls += 1;
+        } else {
+            e.interp_calls += 1;
+        }
+    }
+
+    pub fn record_method_call(&mut self, name: &str, jit: bool) {
+        let e = self.method_calls.entry(name.to_owned()).or_default();
+        e.calls += 1;
+        if jit {
+            e.jit_calls += 1;
+        } else {
+            e.interp_calls += 1;
+        }
+    }
+
+    pub fn record_native_call(&mut self, name: &str) {
+        *self.native_calls.entry(name.to_owned()).or_default() += 1;
+    }
+
+    pub fn record_global_access(&mut self, name: &str) {
+        *self.global_accesses.entry(name.to_owned()).or_default() += 1;
+    }
+
+    pub fn record_alloc(&mut self, type_name: &'static str) {
+        *self.alloc_types.entry(type_name).or_default() += 1;
     }
 }

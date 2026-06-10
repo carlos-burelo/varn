@@ -67,6 +67,7 @@ impl ExecCtx {
                     self.globals.values.len()
                 );
                 self.stack[base + first_reg] = self.globals.values[gidx];
+                self.record_hotspot_global(gidx);
             }
             OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx => {
                 let src = (code[*ip] >> 8) as usize;

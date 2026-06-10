@@ -44,9 +44,10 @@ impl ExecCtx {
                 let receiver = self.heap.intern(bm.receiver.clone());
                 self.stack[base + arg_start] = receiver;
                 match &bm.target {
-                    varn_types::value::BoundMethodTarget::Native { func, .. } => {
+                    varn_types::value::BoundMethodTarget::Native { func, name, .. } => {
                         let f = *func;
                         self.record_call_native();
+                        self.record_hotspot_native(name);
                         let result = if arg_count <= 16 {
                             let mut buf: [MaybeUninit<VmValue>; 16] =
                                 unsafe { MaybeUninit::uninit().assume_init() };
@@ -139,7 +140,9 @@ impl ExecCtx {
                 match self.heap.get(callee.as_heap_idx()) {
                     Some(crate::heap::HeapObj::NativeFn(name, f)) => {
                         let f = *f;
+                        let name_str = *name;
                         self.record_call_native();
+                        self.record_hotspot_native(name_str);
                         let result = if arg_count <= 16 {
                             let mut buf: [MaybeUninit<VmValue>; 16] =
                                 unsafe { MaybeUninit::uninit().assume_init() };
@@ -179,6 +182,9 @@ impl ExecCtx {
 
                             if !nc.proto.has_rest && arg_count <= arity {
                                 let nc = nc.clone();
+                                let fn_name = nc.proto.name.as_deref().unwrap_or("<anon>").to_owned();
+                                let is_jit = nc.jit_entry.is_some();
+                                self.record_hotspot_fn(&fn_name, is_jit);
                                 self.stack.push(callee);
                                 for i in 0..arg_count {
                                     let v = self.stack[base + arg_start + i];
@@ -206,6 +212,9 @@ impl ExecCtx {
                                 return Ok(true);
                             } else if nc.proto.has_rest && arg_count <= arity {
                                 let nc = nc.clone();
+                                let fn_name2 = nc.proto.name.as_deref().unwrap_or("<anon>").to_owned();
+                                let is_jit2 = nc.jit_entry.is_some();
+                                self.record_hotspot_fn(&fn_name2, is_jit2);
                                 let rest_idx = arity.saturating_sub(1);
                                 self.stack.push(callee);
                                 let regular_count = arg_count.min(rest_idx);

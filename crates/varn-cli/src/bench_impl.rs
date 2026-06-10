@@ -1,5 +1,9 @@
+use crate::bench_hotspots::print_hotspots;
 use crate::bench_output::{
     print_check_breakdown, print_opcode_hotspots, print_parse_breakdown, print_vm_profile,
+};
+use crate::bench_phase::{
+    fmt_bytes, fmt_dur, fmt_num, header_line, phase_line, sep_line, total_line, PhaseStats,
 };
 use crate::error::CliError;
 use rustc_hash::FxHashMap;
@@ -15,174 +19,6 @@ use varn_vm::Vm;
 use std::fs::File;
 use std::io::Write;
 use crate::profiling::JitTimers;
-
-struct PhaseStats {
-    name: &'static str,
-    color_fn: fn(varn_utilities::chalk::Chalk) -> varn_utilities::chalk::Chalk,
-    min: Duration,
-    p50: Duration,
-    max: Duration,
-    total: Duration,
-    stddev: Duration,
-    runs: usize,
-}
-
-impl PhaseStats {
-    fn from_samples(
-        name: &'static str,
-        color_fn: fn(varn_utilities::chalk::Chalk) -> varn_utilities::chalk::Chalk,
-        samples: &[Duration],
-    ) -> Self {
-        let min = *samples.iter().min().expect("samples must not be empty");
-        let max = *samples.iter().max().expect("samples must not be empty");
-        let total: Duration = samples.iter().sum();
-        let mean_ns = total.as_nanos() as f64 / samples.len() as f64;
-
-        let mut sorted = samples.to_vec();
-        sorted.sort();
-        let p50 = sorted[sorted.len() / 2];
-
-        let variance = samples
-            .iter()
-            .map(|s| {
-                let d = s.as_nanos() as f64 - mean_ns;
-                d * d
-            })
-            .sum::<f64>()
-            / samples.len() as f64;
-        let stddev = Duration::from_nanos(variance.sqrt() as u64);
-
-        PhaseStats {
-            name,
-            color_fn,
-            min,
-            p50,
-            max,
-            total,
-            stddev,
-            runs: samples.len(),
-        }
-    }
-
-    fn mean(&self) -> Duration {
-        self.total / self.runs as u32
-    }
-}
-
-fn fmt_dur(d: Duration) -> String {
-    let ns = d.as_nanos();
-    if ns < 1_000 {
-        format!("{ns} ns")
-    } else if ns < 1_000_000 {
-        let us = ns as f64 / 1_000.0;
-        if us < 10.0 {
-            fmt_f(us, 2) + " µs"
-        } else if us < 100.0 {
-            fmt_f(us, 1) + " µs"
-        } else {
-            fmt_f(us, 0) + " µs"
-        }
-    } else if ns < 1_000_000_000 {
-        let ms = ns as f64 / 1_000_000.0;
-        if ms < 10.0 {
-            fmt_f(ms, 3) + " ms"
-        } else if ms < 100.0 {
-            fmt_f(ms, 2) + " ms"
-        } else {
-            fmt_f(ms, 1) + " ms"
-        }
-    } else {
-        let s = ns as f64 / 1_000_000_000.0;
-        fmt_f(s, 2) + " s"
-    }
-}
-
-fn fmt_f(f: f64, decimals: usize) -> String {
-    if decimals == 0 {
-        return format!("{f:.0}");
-    }
-    let s = format!("{f:.decimals$}");
-    let s = s.trim_end_matches('0');
-    s.trim_end_matches('.').to_owned()
-}
-
-fn fmt_bytes(n: usize) -> String {
-    if n < 1_024 {
-        format!("{n} B")
-    } else if n < 1_048_576 {
-        format!("{:.1} KB", n as f64 / 1_024.0)
-    } else {
-        format!("{:.2} MB", n as f64 / 1_048_576.0)
-    }
-}
-
-const W_NAME: usize = 10;
-const W_TIME: usize = 9;
-const W_SIG: usize = 8;
-const W_PCT: usize = 6;
-const SEP: &str = "─";
-
-fn sep_line() {
-    let name_col = SEP.repeat(W_NAME);
-    let time_col = SEP.repeat(W_TIME);
-    let sig_col = SEP.repeat(W_SIG);
-    let pct_col = SEP.repeat(W_PCT);
-    terminal::log(format!(
-        "  {}",
-        chalk(format!(
-            "{name_col}  {time_col}  {time_col}  {time_col}  {time_col}  {sig_col}  {time_col}  {pct_col}"
-        ))
-        .dim()
-    ));
-}
-
-fn header_line() {
-    terminal::log(format!(
-        "  {}",
-        chalk(format!(
-            "{:<W_NAME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_SIG$}  {:>W_TIME$}  {:>W_PCT$}",
-            "Phase", "min", "p50", "mean", "max", "σ", "total", "%"
-        ))
-        .dim()
-    ));
-}
-
-fn phase_line(stat: &PhaseStats, share: f64) {
-    let pct = format!("{:.1}%", share * 100.0);
-    let name = (stat.color_fn)(chalk(stat.name)).bold();
-
-    terminal::log(format!(
-        "  {name:<W_NAME$}  {:>W_TIME$}  {:>W_TIME$}  {}  {:>W_TIME$}  {}  {}  {}",
-        fmt_dur(stat.min),
-        fmt_dur(stat.p50),
-        chalk(format!("{:>W_TIME$}", fmt_dur(stat.mean()))).cyan(),
-        fmt_dur(stat.max),
-        chalk(format!("{:>W_SIG$}", fmt_dur(stat.stddev))).dim(),
-        chalk(format!("{:>W_TIME$}", fmt_dur(stat.total))).dim(),
-        chalk(format!("{:>W_PCT$}", pct)).dim(),
-    ));
-}
-
-fn total_line(phases: &[PhaseStats]) {
-    let min: Duration = phases.iter().map(|p| p.min).sum();
-    let max: Duration = phases.iter().map(|p| p.max).sum();
-    let total: Duration = phases.iter().map(|p| p.total).sum();
-    let p50: Duration = phases.iter().map(|p| p.p50).sum();
-    let runs = phases[0].runs;
-    let mean = total / runs as u32;
-
-    terminal::log(format!(
-        "  {}  {:>W_TIME$}  {:>W_TIME$}  {}  {:>W_TIME$}  {:>W_SIG$}  {}  {}",
-        chalk(format!("{:<W_NAME$}", "total")).green().bold(),
-        fmt_dur(min),
-        fmt_dur(p50),
-        chalk(format!("{:>W_TIME$}", fmt_dur(mean))).cyan(),
-        fmt_dur(max),
-        "",
-        chalk(format!("{:>W_TIME$}", fmt_dur(total))).dim(),
-        chalk(format!("{:>W_PCT$}", "100%")).dim(),
-    ));
-}
 
 fn run_vm_to_completion(machine: &mut Vm, closure: Rc<Closure>) -> Result<(), String> {
     loop {
@@ -491,7 +327,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     varn_builtins::set_print_silent(true);
     varn_builtins::set_testing_silent(true);
     // Record execute timer end (already stopped above)
-    let (opcode_counts, mut vm_profile, jit_stats) = {
+    let (opcode_counts, mut vm_profile, jit_stats, hotspots) = {
         let mut profile_vm = Vm::from_snapshot(
             snap_globals.clone(),
             snap_heap.clone(),
@@ -510,6 +346,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
 
         profile_vm.enable_opcode_profiling();
         profile_vm.enable_profiling();
+        profile_vm.enable_hotspot_profiling();
         let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
         run_vm_to_completion(&mut profile_vm, closure)
             .map_err(|e| CliError::fatal(format!("profile run failed: {e}")))?;
@@ -517,7 +354,8 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         let counts = profile_vm.take_opcode_counts();
         let profile = profile_vm.take_profile();
         let stats = varn_vm::varn_jit::JIT_STATS.snapshot();
-        (counts, profile, stats)
+        let hs = profile_vm.take_hotspots();
+        (counts, profile, stats, hs)
     };
     varn_builtins::set_print_silent(!show_output);
     varn_builtins::set_testing_silent(!show_output);
@@ -646,6 +484,9 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         print_vm_profile(profile);
     }
     crate::bench_output::print_jit_stats(&jit_stats);
+    if let Some(ref hs) = hotspots {
+        print_hotspots(hs);
+    }
     terminal::blank();
 
     varn_builtins::set_print_silent(false);
@@ -735,7 +576,7 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     varn_builtins::reset_testing_counters();
     varn_builtins::set_print_silent(true);
     varn_builtins::set_testing_silent(true);
-    let (opcode_counts, mut vm_profile, jit_stats) = {
+    let (opcode_counts, mut vm_profile, jit_stats, hotspots) = {
         let mut profile_vm = Vm::from_snapshot(
             snap_globals.clone(),
             snap_heap.clone(),
@@ -754,6 +595,7 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
 
         profile_vm.enable_opcode_profiling();
         profile_vm.enable_profiling();
+        profile_vm.enable_hotspot_profiling();
         let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
         run_vm_to_completion(&mut profile_vm, closure)
             .map_err(|e| CliError::fatal(format!("profile run failed: {e}")))?;
@@ -761,7 +603,8 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         let counts = profile_vm.take_opcode_counts();
         let profile = profile_vm.take_profile();
         let stats = varn_vm::varn_jit::JIT_STATS.snapshot();
-        (counts, profile, stats)
+        let hs = profile_vm.take_hotspots();
+        (counts, profile, stats, hs)
     };
     varn_builtins::set_print_silent(!show_output);
     varn_builtins::set_testing_silent(!show_output);
@@ -831,6 +674,9 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         print_vm_profile(profile);
     }
     crate::bench_output::print_jit_stats(&jit_stats);
+    if let Some(ref hs) = hotspots {
+        print_hotspots(hs);
+    }
     terminal::blank();
 
     varn_builtins::set_print_silent(false);
@@ -839,14 +685,3 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     Ok(())
 }
 
-fn fmt_num(n: usize) -> String {
-    let s = n.to_string();
-    let mut out = String::new();
-    for (i, c) in s.chars().rev().enumerate() {
-        if i > 0 && i % 3 == 0 {
-            out.push(' ');
-        }
-        out.push(c);
-    }
-    out.chars().rev().collect()
-}

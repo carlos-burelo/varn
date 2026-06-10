@@ -65,6 +65,7 @@ impl ExecCtx {
                 *ip += 1;
                 let val = self.globals.get_by_index(idx).unwrap_or(VmValue::null());
                 self.stack[base + first_reg] = val;
+                self.record_hotspot_global(idx);
             }
             OpCode::StoreGlobalIdx => {
                 let src = (code[*ip] >> 8) as usize;

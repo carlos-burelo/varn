@@ -1,6 +1,8 @@
+mod bench_hotspots;
 mod bench_impl;
-mod profiling;
 mod bench_output;
+mod bench_phase;
+mod profiling;
 mod cli;
 mod commands;
 mod doctor_impl;

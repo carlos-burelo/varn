@@ -3,7 +3,7 @@ use crate::frame::{VmClosure, VmUpvalue, VmUpvalueInner};
 use crate::globals::GlobalStore;
 use crate::heap::Heap;
 use crate::loader::ModuleLoader;
-use crate::profile::{ProfileCounters, VmProfile};
+use crate::profile::{HotspotCounters, ProfileCounters, VmProfile};
 use crate::value::VmValue;
 use exec::calls;
 use exec::ExecCtx;
@@ -98,6 +98,22 @@ impl Vm {
 
     pub fn enable_profiling(&mut self) {
         self.ctx.profile_counters = Some(ProfileCounters::new());
+    }
+
+    pub fn enable_hotspot_profiling(&mut self) {
+        let counters = HotspotCounters::new();
+        self.ctx.hotspot_counters = Some(counters.clone());
+        self.ctx.heap.hotspot = Some(counters);
+    }
+
+    pub fn take_hotspots(&mut self) -> Option<HotspotCounters> {
+        self.ctx.heap.hotspot = None;
+        self.ctx.hotspot_counters.take().map(|rc| {
+            match Rc::try_unwrap(rc) {
+                Ok(cell) => cell.into_inner(),
+                Err(rc) => rc.borrow().clone(),
+            }
+        })
     }
 
     pub fn take_profile(&mut self) -> Option<VmProfile> {

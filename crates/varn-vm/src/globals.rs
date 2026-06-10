@@ -8,6 +8,7 @@ use std::rc::Rc;
 pub struct GlobalStore {
     pub values: Vec<VmValue>,
     names: FxHashMap<Rc<str>, usize>,
+    pub idx_to_name: Vec<Rc<str>>,
 }
 
 impl GlobalStore {
@@ -15,6 +16,7 @@ impl GlobalStore {
         Self {
             values: Vec::new(),
             names: FxHashMap::default(),
+            idx_to_name: Vec::new(),
         }
     }
 
@@ -23,13 +25,16 @@ impl GlobalStore {
 
         let mut values = Vec::new();
         let mut names = FxHashMap::default();
+        let mut idx_to_name: Vec<Rc<str>> = Vec::new();
 
         let prioritized = ["print", "assert"];
         let mut remaining = native_map;
         for &name in &prioritized {
             if let Some(val) = remaining.remove(name) {
                 let idx = values.len();
-                names.insert(Rc::from(name), idx);
+                let rc_name: Rc<str> = Rc::from(name);
+                idx_to_name.push(rc_name.clone());
+                names.insert(rc_name, idx);
                 values.push(val);
             }
         }
@@ -38,11 +43,12 @@ impl GlobalStore {
         entries.sort_by(|(a, _), (b, _)| a.as_ref().cmp(b.as_ref()));
 
         for (name, val) in entries {
+            idx_to_name.push(name.clone());
             names.insert(name, values.len());
             values.push(val);
         }
 
-        Self { values, names }
+        Self { values, names, idx_to_name }
     }
 
     pub fn define(&mut self, name: &str, value: VmValue) -> usize {
@@ -51,8 +57,10 @@ impl GlobalStore {
             return idx;
         }
         let idx = self.values.len();
+        let rc_name: Rc<str> = Rc::from(name);
+        self.idx_to_name.push(rc_name.clone());
         self.values.push(value);
-        self.names.insert(Rc::from(name), idx);
+        self.names.insert(rc_name, idx);
         idx
     }
 
