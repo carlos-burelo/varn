@@ -225,94 +225,93 @@ vn bench --show-output tests/main.vn
 **Output del benchmark:**
 ```
 Benchmark · \\?\C:\Users\x\dev\varn\tests\main.vn  (10 runs)
-  Source  46 lines  1.4 KB  94 tokens
+  Source  50 lines  1.5 KB  102 tokens
 
   Phase             min        p50       mean        max         σ      total       %
   ──────────  ─────────  ─────────  ─────────  ─────────  ────────  ─────────  ──────
-  read          18.2 µs    21.8 µs    21.4 µs      25 µs   2.06 µs     214 µs    3.5%
-  lex           12.2 µs    12.5 µs    12.9 µs    14.9 µs    769 ns     129 µs    2.0%
-  parse          7.9 µs     9.3 µs    12.9 µs    28.7 µs   7.14 µs     129 µs    1.5%
-  check         56.4 µs    63.3 µs    64.2 µs    77.8 µs   6.65 µs     642 µs   10.3%
-  compile       31.3 µs    37.5 µs    37.6 µs    42.2 µs    2.8 µs     376 µs    6.1%
-  optimize       4.2 µs     4.4 µs    5.79 µs    18.6 µs   4.07 µs    63.7 µs    0.7%
-  execute        442 µs     466 µs     477 µs     531 µs   27.1 µs   4.774 ms   75.8%
+  read    64.2 µs    71.8 µs    76.5 µs     102 µs   11.9 µs     765 µs    0.1%
+  lex    63.7 µs    67.2 µs    69.7 µs    90.1 µs   7.47 µs     697 µs    0.1%
+  parse    61.5 µs    82.5 µs    85.4 µs     121 µs   18.6 µs     854 µs    0.2%
+  check    96.6 µs     107 µs     112 µs     141 µs   13.6 µs   1.122 ms    0.2%
+  compile    64.4 µs    74.1 µs    73.8 µs    82.3 µs   4.21 µs     738 µs    0.1%
+  optimize     8.6 µs     9.1 µs    11.3 µs    32.5 µs   6.71 µs     125 µs    0.0%
+  execute   47.73 ms   54.36 ms   54.08 ms   69.65 ms   6.01 ms   540.8 ms   99.2%
   ──────────  ─────────  ─────────  ─────────  ─────────  ────────  ─────────  ──────
-  total          572 µs     614 µs     633 µs     738 µs             6.328 ms    100%
+  total        48.08 ms   54.77 ms   54.51 ms   70.22 ms             545.1 ms    100%
 
-  Throughput: 1627.6 runs/s  (p50 end-to-end: 614 µs)
-  Total pipeline time: 6.328 ms
-  Module precompilation (cold startup): 43.5 ms
-  Cold-start throughput: 22.7 runs/s  (precompile + p50: 44.12 ms)
+  Throughput: 18.3 runs/s  (p50 end-to-end: 54.77 ms)
+  Total pipeline time: 545.1 ms
+  Module precompilation (cold startup): 90.91 ms
+  Cold-start throughput: 6.9 runs/s  (precompile + p50: 145.7 ms)
   Execution measured with stdout muted (--show-output to disable)
 
-  Parser Breakdown
-  program_loop       6.5 µs    59%
-  stmt_or_decl       4.5 µs    41%
+Parser Breakdown
+  program_loop      52.7 µs    62%
+  stmt_or_decl      31.9 µs    38%
   block                0 ns     0%
   recover              0 ns     0%
-  total               11 µs
+  total             84.6 µs
 
 
-  Checker Breakdown
-  load_globals         0 ns     0%
-  bind              14.6 µs    44%
-  merge_core           0 ns     0%
-  enrich_calls         0 ns     0%
-  check_stmts       18.1 µs    55%
-  annotations        300 ns     1%
+Checker Breakdown
+  load_globals       100 ns     0%
+  bind              30.5 µs    50%
+  merge_core         100 ns     0%
+  enrich_calls       100 ns     0%
+  check_stmts       30.2 µs    49%
+  annotations        500 ns     1%
   finalize           100 ns     0%
-  total             33.1 µs
+  total             61.6 µs
 
 
-  VM Opcode Hotspots
-  LoadGlobalIdx               309    16%
-  LoadConst                   205    10%
-  Call                        193    10%
-  LoadNull                    185     9%
-  LoadInt                     109     6%
-  DefineGlobalIdx             106     5%
-  GetProperty                  98     5%
-  Move                         76     4%
-  MakeClosure                  70     4%
-  Eq                           66     3%
-  JumpIfTrue                   36     2%
-  CallMethod                   35     2%
-  total                     1 959
+VM Opcode Hotspots
+  LoadGlobalIdx             2 160    20%
+  LoadConst                 1 247    11%
+  LoadNull                    981     9%
+  Call                        907     8%
+  DefineGlobalIdx             774     7%
+  LoadInt                     563     5%
+  MakeClosure                 399     4%
+  GetProperty                 392     4%
+  Move                        382     4%
+  Eq                          358     3%
+  CallMethod                  297     3%
+  JumpIfFalse                 248     2%
+  total                    10 875
 
 
-  VM Profile
-  IC hits                       185  (93.0% hit rate)
-  IC misses                      14
-    GetProp IC hits              85  (96.6% hit rate)
-    CallMethod IC hits          100  (90.1% hit rate)
-  calls vm-fast                 109  (19.2%)
-  calls slow/prepare             24  (4.2%)
-  calls native                  436  (76.6%)
-  heap allocs                   648
+VM Profile
+  IC hits                       471  (90.8% hit rate)
+  IC misses                      48
+    GetProp IC hits             242  (98.4% hit rate)
+    CallMethod IC hits          229  (83.9% hit rate)
+  calls vm-fast                 734  (39.6%)
+  calls slow/prepare             83  (4.5%)
+  calls native                1 038  (56.0%)
+  heap allocs                 2 112
 
-  GC Stats
-  nursery allocs                357
+GC Stats
+  nursery allocs              1 443
   minor gc runs                   1
   minor gc promoted               0
   gc collections                  2
-  gc freed                      575
-  heap live (post-gc)            73
-  heap total slots              639
+  gc freed                    1 826
+  heap live (post-gc)           286
+  heap total slots            2 103
 
-  Register VM Stats
-  Move opcodes                   76
-  frame pushes                  140
-  frame pops                    199
+Register VM Stats
+  Move opcodes                  382
+  frame pushes                  489
+  frame pops                    550
 
 
-  JIT Compiler & Execution Stats
-  freshly compiled                    0  (success: 0, failed: 0)
-  using cached JIT                   99
-  total compile time               0 ns
-  total machine code                0 B
-  JIT runs                          183  (86.7%)
-  interpreted runs                   28  (13.3%)
-
+JIT Compiler & Execution Stats
+  freshly compiled                  108  (success: 108, failed: 0)
+  using cached JIT                  492
+  total compile time           1.786 ms
+  total machine code           432.0 KB
+  JIT runs                          711  (90.1%)
+  interpreted runs                   78  (9.9%)
 
 ```
 
