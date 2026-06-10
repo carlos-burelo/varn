@@ -56,6 +56,13 @@ impl Linker {
         self.state.insert(id, ModuleLinkState::Done(val));
     }
 
+    /// Remove an in-progress evaluating entry (for rollback after load failure).
+    pub fn cancel_evaluating(&mut self, id: &ModuleId) {
+        if matches!(self.state.get(id), Some(ModuleLinkState::Evaluating)) {
+            self.state.remove(id);
+        }
+    }
+
     pub fn clone_state(&self) -> Self {
         Self {
             state: self.state.clone(),

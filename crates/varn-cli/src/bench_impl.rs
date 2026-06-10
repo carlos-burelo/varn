@@ -285,12 +285,19 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
 
     let proto_rc = Rc::new(optimized_proto);
 
+    // Pre-load all known std:/core:/runtime: modules into init_vm so the
+    // snapshot has them cached. Each bench run finds them in snap_modules and
+    // skips re-evaluation (and the NativeFn/Class/BoundMethod allocs).
+    // We load directly in init_vm (not a warmup VM) so global index layout
+    // matches the resolve_globals pass done above.
+    varn_builtins::set_print_silent(true);
+    varn_builtins::set_testing_silent(true);
+    varn_vm::prefill_native_modules(&mut init_vm);
+    varn_builtins::set_print_silent(!show_output);
+    varn_builtins::set_testing_silent(!show_output);
+
     init_vm.ctx.run_minor_gc();
     init_vm.collect_gc();
-
-    // Pre-load all native runtime modules so each bench run gets them from
-    // the snapshot instead of rebuilding NativeFn objects on every run.
-    varn_vm::prefill_native_modules(&mut init_vm);
 
     let (snap_globals, snap_heap, snap_modules) = init_vm.snapshot();
     let precompiled_ref = &optimized_precompiled;
