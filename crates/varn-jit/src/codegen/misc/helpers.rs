@@ -596,6 +596,13 @@ pub(crate) fn emit_call_spread(ctx: &mut CodegenCtx, _first_reg: usize) {
     asm.pop(ARG_CLOSURE);
     asm.pop(ARG_CTX);
 
+    // Reload ARG_CTX from ExecCtx.stack.ptr (offset 8) in case stack reallocated
+    asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
+    // Recompute REG_FRAME_BASE = ARG_CTX + ARG_BASE * 8
+    asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_BASE);
+    asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
+    asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
+
     emit_store(asm, Reg::R11, dest, regmap);
     emit_reload_all_except(asm, regmap, Some(dest));
 }
@@ -648,6 +655,13 @@ pub(crate) fn emit_load_module(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.pop(ARG_BASE);
     asm.pop(ARG_CLOSURE);
     asm.pop(ARG_CTX);
+
+    // Reload ARG_CTX from ExecCtx.stack.ptr (offset 8) in case stack reallocated
+    asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
+    // Recompute REG_FRAME_BASE = ARG_CTX + ARG_BASE * 8
+    asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_BASE);
+    asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
+    asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
 
     emit_store(asm, Reg::R11, first_reg, regmap);
     emit_reload_all_except(asm, regmap, Some(first_reg));
@@ -757,6 +771,13 @@ pub(crate) fn emit_spawn(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.pop(ARG_BASE);
     asm.pop(ARG_CLOSURE);
     asm.pop(ARG_CTX);
+
+    // Reload ARG_CTX from ExecCtx.stack.ptr (offset 8) in case stack reallocated
+    asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
+    // Recompute REG_FRAME_BASE = ARG_CTX + ARG_BASE * 8
+    asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_BASE);
+    asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
+    asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
 
     emit_store(asm, Reg::R11, dest, regmap);
     emit_reload_all_except(asm, regmap, Some(dest));

@@ -156,122 +156,248 @@ pub extern "C" fn jit_load_global(
 }
 
 pub extern "C" fn jit_load_upvalue(
+
     ctx: *mut ExecCtx,
+
     closure: *const crate::frame::VmClosure,
+
     uv_idx: usize,
+
 ) -> VmValue {
+
     unsafe {
+
         let ctx_ref = &*ctx;
+
         let closure_ref = &*closure;
-        closure_ref.upvalues[uv_idx].read(&ctx_ref.stack)
+
+        let val = closure_ref.upvalues[uv_idx].read(&ctx_ref.stack);
+
+
+        val
+
     }
+
 }
+
+
 
 pub extern "C" fn jit_store_upvalue(
+
     ctx: *mut ExecCtx,
+
     closure: *const crate::frame::VmClosure,
+
     uv_idx: usize,
+
     val: VmValue,
+
 ) {
+
     unsafe {
+
         let ctx_ref = &mut *ctx;
+
         let closure_ref = &*closure;
+
         closure_ref.upvalues[uv_idx].write(val, &mut ctx_ref.stack);
+
     }
+
 }
 
+
+
 pub extern "C" fn jit_make_closure(
+
     ctx: *mut ExecCtx,
+
     closure: *const crate::frame::VmClosure,
+
     ip_offset: usize,
+
     base: usize,
+
 ) -> VmValue {
+
     unsafe {
+
         let ctx_ref = &mut *ctx;
+
         let closure_ref = &*closure;
+
         let code = &closure_ref.proto.chunk.code;
+
         let mut ip = ip_offset;
 
+
+
         let w1 = code[ip];
+
         ip += 1;
+
         let proto_idx = code[ip] as usize;
+
         ip += 1;
+
+
 
         let uv_count = (w1 & 0xFF) as usize;
 
+
+
         let proto = match closure_ref.proto.chunk.constants.get(proto_idx) {
+
             Some(varn_types::PoolEntry::Function(p)) => p.clone(),
+
             _ => panic!("MakeClosure: invalid function proto"),
+
         };
 
+
+
         let mut upvalues = Vec::with_capacity(uv_count);
+
         for uv_i in 0..uv_count {
+
             let uv_desc = code[ip];
+
             ip += 1;
+
             let is_local = (uv_desc >> 8) != 0;
+
             let index = (uv_desc & 0xFF) as usize;
+
             if is_local {
+
                 let slot = base + index;
-                upvalues.push(ctx_ref.capture_upvalue(slot));
+
+                let captured = ctx_ref.capture_upvalue(slot);
+
+
+                upvalues.push(captured);
+
             } else {
-                upvalues.push(closure_ref.upvalues[index].clone());
+
+                let captured = closure_ref.upvalues[index].clone();
+
+
+                upvalues.push(captured);
+
             }
+
         }
 
+
+
         let proto_ptr = std::rc::Rc::as_ptr(&proto) as usize;
+
         let constants = ctx_ref
+
             .proto_constants
+
             .entry(proto_ptr)
+
             .or_insert_with(|| {
+
                 std::rc::Rc::new(crate::exec::calls::resolve_constants(
+
                     &proto,
+
                     &mut ctx_ref.heap,
+
                 ))
+
             })
+
             .clone();
+
+
 
         let new_closure = crate::frame::VmClosure::with_upvalues(proto, upvalues, constants);
 
+
+
         ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(new_closure))
+
     }
+
 }
 
+
+
 pub extern "C" fn jit_call(ctx: *mut ExecCtx, args: *const varn_jit::JitCallArgs) -> VmValue {
+
     unsafe {
+
         let ctx_ref = &mut *ctx;
+
         let args = &*args;
+
         let caller_depth = ctx_ref.frames.len();
+
         let frame_idx = caller_depth - 1;
+
         let base = ctx_ref.frames[frame_idx].base;
+
+
 
         ctx_ref.frames[frame_idx].ip = args.ip;
 
+
+
         // Fast path: plain NativeFn — skips exec_call_reg dispatch + BoundMethod check
+
         if args.callee.is_heap() {
+
             let heap_obj = ctx_ref.heap.get(args.callee.as_heap_idx());
+
             if let Some(crate::heap::HeapObj::VmClosure(closure)) = heap_obj {
+
                 let is_eligible = !closure.proto.is_async && !closure.proto.is_generator;
+
                 if let Some(jit_fn) = closure.jit_entry.filter(|_| is_eligible) {
+
                     let callee_base = base + args.arg_start;
+
                     let required = callee_base + closure.proto.register_count as usize + 32;
+
                     if ctx_ref.stack.len() < required {
+
                         ctx_ref.stack.resize(required, VmValue::null());
+
                     }
+
                     ctx_ref.frames.push(crate::frame::CallFrame::new(closure.clone(), callee_base));
+
                     let res = (jit_fn)(
+
                         ctx_ref.stack.as_mut_ptr() as *mut std::ffi::c_void,
+
                         &**closure as *const crate::frame::VmClosure as *const std::ffi::c_void,
+
                         callee_base,
+
                         ctx_ref as *mut ExecCtx as *mut std::ffi::c_void,
+
                     );
+
                     let returning_frame_idx = ctx_ref.frames.len() - 1;
+
                     ctx_ref.frames.pop();
+
                     ctx_ref.close_upvalues_above(callee_base);
+
                     let final_val = resolve_constructor_return(ctx_ref, returning_frame_idx, res);
+
                     ctx_ref.stack[base + args.dest] = final_val;
+
                     ctx_ref.record_call_vm_fast();
+
                     return final_val;
+
                 }
+
             } else if let Some(crate::heap::HeapObj::NativeFn(name, f)) = heap_obj {
                 let f = *f;
                 ctx_ref.record_call_native();
@@ -605,4 +731,45 @@ pub extern "C" fn jit_get_property_maybe_ic_fast(
     cs_idx: usize,
 ) -> VmValue {
     jit_get_property_ic_fast(ctx, closure, obj, cs_idx)
+}
+
+pub extern "C" fn jit_prepare_call(
+    ctx: *mut ExecCtx,
+    callee: VmValue,
+    callee_base: usize,
+) -> *const crate::frame::VmClosure {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        if !callee.is_heap() {
+            return std::ptr::null();
+        }
+        let heap_obj = ctx_ref.heap.get(callee.as_heap_idx());
+        if let Some(crate::heap::HeapObj::VmClosure(closure)) = heap_obj {
+            let is_eligible = !closure.proto.is_async && !closure.proto.is_generator;
+            if let Some(_jit_fn) = closure.jit_entry.filter(|_| is_eligible) {
+                let required = callee_base + closure.proto.register_count as usize + 32;
+                if ctx_ref.stack.len() < required {
+                    ctx_ref.stack.resize(required, VmValue::null());
+                }
+                ctx_ref.frames.push(crate::frame::CallFrame::new(closure.clone(), callee_base));
+                return &**closure as *const crate::frame::VmClosure;
+            }
+        }
+        std::ptr::null()
+    }
+}
+
+pub extern "C" fn jit_post_call(
+    ctx: *mut ExecCtx,
+    callee_base: usize,
+    val: VmValue,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let returning_frame_idx = ctx_ref.frames.len() - 1;
+        ctx_ref.frames.pop();
+        ctx_ref.close_upvalues_above(callee_base);
+        ctx_ref.record_call_vm_fast();
+        resolve_constructor_return(ctx_ref, returning_frame_idx, val)
+    }
 }
