@@ -47,4 +47,5 @@ pub(crate) struct CodegenCtx<'a> {
     pub ip_to_asm_pos: Vec<usize>,
     pub proto: &'a FunctionProto,
     pub helpers: &'a crate::JitHelpers,
+    pub constants: &'a [varn_types::VmValue],
 }

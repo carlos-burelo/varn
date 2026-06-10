@@ -222,7 +222,7 @@ impl VmClosure {
             get_property_ic_fast: crate::exec::ctx::jit_get_property_ic_fast as usize,
             get_property_maybe_ic_fast: crate::exec::ctx::jit_get_property_maybe_ic_fast as usize,
         };
-        match varn_jit::compile(&self.proto, helpers) {
+        match varn_jit::compile(&self.proto, &self.constants, helpers) {
             Ok((entry, code)) => {
                 self.jit_entry = Some(entry);
                 self.jit_code = Some(code.clone());

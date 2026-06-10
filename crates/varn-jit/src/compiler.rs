@@ -4,7 +4,6 @@ use varn_types::FunctionProto;
 use crate::assembler::Assembler;
 use crate::mem::JitBuffer;
 use crate::regalloc::{emit_prologue, RegMap};
-use crate::safepoint::emit_load_reg;
 
 use crate::codegen::{
     emit_arith, emit_arrays, emit_calls, emit_closures, emit_compare, emit_globals,
@@ -15,6 +14,7 @@ use crate::codegen::{
 #[allow(unreachable_patterns)]
 pub fn compile_proto(
     proto: &FunctionProto,
+    constants: &[varn_types::VmValue],
     helpers: crate::JitHelpers,
 ) -> Result<JitBuffer, String> {
     let code = &proto.chunk.code;
@@ -221,35 +221,27 @@ pub fn compile_proto(
         }
     }
 
+    let mut asm = Assembler::new();
     let regmap = RegMap::from_bytecode(code);
+    emit_prologue(&mut asm, &regmap);
+    crate::regalloc::emit_reload_all(&mut asm, &regmap);
 
-    let asm = Assembler::new();
     let code_len = code.len();
-
-    let ip_to_asm_pos = vec![0usize; code_len + 1];
-    let jump_patches = Vec::new();
-
     let mut cctx = CodegenCtx {
         asm,
         code,
         ip: 0,
         regmap,
-        jump_patches,
-        ip_to_asm_pos,
+        jump_patches: Vec::new(),
+        ip_to_asm_pos: vec![0; code_len + 1],
         proto,
         helpers: &helpers,
+        constants,
     };
 
-    emit_prologue(&mut cctx.asm, &cctx.regmap);
-
-    for (&vreg, &phys) in cctx.regmap.map_iter() {
-        emit_load_reg(&mut cctx.asm, phys, vreg);
-    }
-
     while cctx.ip < code_len {
-        cctx.ip_to_asm_pos[cctx.ip] = cctx.asm.current_offset();
-
         let raw_op = cctx.code[cctx.ip];
+        cctx.ip_to_asm_pos[cctx.ip] = cctx.asm.current_offset();
         cctx.ip += 1;
         let first_reg = (raw_op >> 8) as usize;
         let op = OpCode::from_u8(raw_op as u8).unwrap();
