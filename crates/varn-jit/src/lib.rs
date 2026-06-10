@@ -186,12 +186,16 @@ impl JitStats {
 
 pub static JIT_STATS: JitStats = JitStats::new();
 
-pub fn compile(proto: &FunctionProto, helpers: JitHelpers) -> Result<(JitFn, Rc<dyn Any>), String> {
+pub fn compile(
+    proto: &FunctionProto,
+    constants: &[VmValue],
+    helpers: JitHelpers,
+) -> Result<(JitFn, Rc<dyn Any>), String> {
     if proto.chunk.code.len() > 250 {
         return Err("JIT Bailout: function too large".to_owned());
     }
     let start = std::time::Instant::now();
-    let res = compiler::compile_proto(proto, helpers);
+    let res = compiler::compile_proto(proto, constants, helpers);
     let elapsed = start.elapsed().as_nanos() as u64;
 
     match res {
