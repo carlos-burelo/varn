@@ -27,14 +27,14 @@ pub(crate) mod dispatch {
 
     #[varn_fn("testAssert")]
     pub fn assert(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        let label = args
-            .first()
-            .map(|&v| ctx.str_repr(v))
-            .unwrap_or_else(|| "?".into());
         let cond = args.get(1).map(|&v| v.as_bool()).unwrap_or(false);
         if cond {
             PASSED.fetch_add(1, Ordering::Relaxed);
         } else {
+            let label = args
+                .first()
+                .map(|&v| ctx.str_repr(v))
+                .unwrap_or_else(|| "?".into());
             FAILED.fetch_add(1, Ordering::Relaxed);
             if !SILENT.load(Ordering::Relaxed) {
                 println!("FAIL: {label}");

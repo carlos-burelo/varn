@@ -104,4 +104,42 @@ impl ExecCtx {
             c.record_frame_pop();
         }
     }
+
+    #[inline(always)]
+    pub fn record_hotspot_fn(&self, name: &str, jit: bool) {
+        if let Some(ref h) = self.hotspot_counters {
+            h.borrow_mut().record_fn_call(name, jit);
+        }
+    }
+
+    #[inline(always)]
+    pub fn record_hotspot_method(&self, name: &str, jit: bool) {
+        if let Some(ref h) = self.hotspot_counters {
+            h.borrow_mut().record_method_call(name, jit);
+        }
+    }
+
+    #[inline(always)]
+    pub fn record_hotspot_native(&self, name: &str) {
+        if let Some(ref h) = self.hotspot_counters {
+            h.borrow_mut().record_native_call(name);
+        }
+    }
+
+    #[inline(always)]
+    pub fn record_hotspot_global(&self, idx: usize) {
+        if let Some(ref h) = self.hotspot_counters {
+            if let Some(name) = self.globals.idx_to_name.get(idx) {
+                let name = name.to_string();
+                h.borrow_mut().record_global_access(&name);
+            }
+        }
+    }
+
+    #[inline(always)]
+    pub fn record_hotspot_alloc(&self, type_name: &'static str) {
+        if let Some(ref h) = self.hotspot_counters {
+            h.borrow_mut().record_alloc(type_name);
+        }
+    }
 }

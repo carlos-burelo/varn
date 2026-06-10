@@ -97,6 +97,7 @@ impl ExecCtx {
             if let Some((f, receiver)) = ic_native {
                 self.record_ic_hit_callmethod();
                 self.record_call_native();
+                self.record_hotspot_native(name.as_ref());
                 let result =
                     self.call_native_with_receiver(f, receiver, base, arg_start, arg_count)?;
                 self.stack[base + dest] = result;
@@ -106,6 +107,15 @@ impl ExecCtx {
             if let Some((nc, owner_class)) = ic_vm {
                 self.record_ic_hit_callmethod();
                 self.record_call_vm_fast();
+                {
+                    let method_key = format!(
+                        "{}.{}",
+                        owner_class.as_ref().map(|c| c.name.as_str()).unwrap_or("?"),
+                        name.as_ref()
+                    );
+                    let is_jit = nc.jit_entry.is_some();
+                    self.record_hotspot_method(&method_key, is_jit);
+                }
                 self.stack.push(VmValue::null());
                 if !nc.proto.has_rest {
                     self.stack.push(this_val);
@@ -231,6 +241,7 @@ impl ExecCtx {
         };
         if let Some((f, receiver)) = native_call {
             self.record_call_native();
+            self.record_hotspot_native(name.as_ref());
             let result = self.call_native_with_receiver(f, receiver, base, arg_start, arg_count)?;
             self.stack[base + dest] = result;
             return Ok(false);
