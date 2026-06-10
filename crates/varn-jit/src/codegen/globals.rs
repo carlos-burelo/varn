@@ -2,7 +2,7 @@ use varn_core::OpCode;
 
 use crate::assembler::Reg;
 use crate::regalloc::{
-    emit_flush_all, emit_load, emit_reload_all, emit_reload_all_except, emit_store,
+    emit_load, emit_store,
 };
 use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
 
@@ -41,9 +41,6 @@ pub(crate) fn emit_globals(
             let fallback_pos = asm.current_offset();
             let relative_fallback = (fallback_pos as i64 - (fallback_patch as i64 + 4)) as i32;
             asm.patch_u32(fallback_patch, relative_fallback as u32);
-
-            emit_flush_all(asm, regmap);
-
             asm.push(ARG_CTX);
             asm.push(ARG_CLOSURE);
             asm.push(ARG_BASE);
@@ -77,7 +74,6 @@ pub(crate) fn emit_globals(
             asm.pop(ARG_CTX);
 
             emit_store(asm, Reg::R11, first_reg, regmap);
-            emit_reload_all_except(asm, regmap, Some(first_reg));
 
             // End patch
             let end_pos = asm.current_offset();
@@ -110,8 +106,6 @@ pub(crate) fn emit_globals(
             let fallback_pos = asm.current_offset();
             let relative_fallback = (fallback_pos as i64 - (fallback_patch as i64 + 4)) as i32;
             asm.patch_u32(fallback_patch, relative_fallback as u32);
-
-            emit_flush_all(asm, regmap);
             emit_load(asm, Reg::Rax, src, regmap);
 
             asm.push(ARG_CTX);
@@ -151,8 +145,6 @@ pub(crate) fn emit_globals(
             asm.pop(ARG_CLOSURE);
             asm.pop(ARG_CTX);
 
-            emit_reload_all(asm, regmap);
-
             // End patch
             let end_pos = asm.current_offset();
             let relative_end = (end_pos as i64 - (end_patch as i64 + 4)) as i32;
@@ -161,9 +153,6 @@ pub(crate) fn emit_globals(
         OpCode::LoadGlobal => {
             let idx = code[*ip] as usize;
             *ip += 1;
-
-            emit_flush_all(asm, regmap);
-
             // Reload closure pointer from saved stack slot
             asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
 
@@ -200,7 +189,6 @@ pub(crate) fn emit_globals(
             asm.pop(ARG_CTX);
 
             emit_store(asm, Reg::R11, first_reg, regmap);
-            emit_reload_all_except(asm, regmap, Some(first_reg));
         }
         _ => unreachable!("emit_globals called with {:?}", op),
     }

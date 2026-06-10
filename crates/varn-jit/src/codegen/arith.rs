@@ -162,7 +162,14 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
         asm.patch_u32(p_skip_ffi, disp_skip);
     } else {
         // --- ORIGINAL FFI execution for non-optimized ops ---
-        emit_flush_all(asm, regmap);
+        let is_gc_free = matches!(
+            op,
+            OpCode::BitAnd | OpCode::BitOr | OpCode::BitXor | OpCode::Shl | OpCode::Shr | OpCode::Ushr
+        );
+
+        if !is_gc_free {
+            emit_flush_all(asm, regmap);
+        }
 
         asm.push(ARG_CTX);
         asm.push(ARG_CLOSURE);
@@ -218,7 +225,9 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
 
         emit_store(asm, Reg::R11, first_reg, regmap);
 
-        emit_reload_all_except(asm, regmap, Some(first_reg));
+        if !is_gc_free {
+            emit_reload_all_except(asm, regmap, Some(first_reg));
+        }
     }
 }
 

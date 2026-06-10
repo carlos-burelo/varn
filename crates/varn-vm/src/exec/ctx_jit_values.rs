@@ -565,3 +565,44 @@ pub extern "C" fn jit_invoke_virtual(
         ctx_ref.stack[base + args.dest]
     }
 }
+
+pub extern "C" fn jit_get_property_ic_fast(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    obj: VmValue,
+    cs_idx: usize,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &*ctx;
+        let closure_ref = &*closure;
+        if cs_idx < closure_ref.ic_cache_len() && obj.is_heap() {
+            if let Some(crate::heap::HeapObj::Object(o)) = ctx_ref.heap.get(obj.as_heap_idx()) {
+                if let Ok(guard) = o.0.try_borrow() {
+                    if let Ok(slot_cache) = closure_ref.ic_cache.try_borrow() {
+                        let poly_slot = &slot_cache[cs_idx];
+                        for entry in &poly_slot.entries {
+                            if entry.id != 0 && entry.is_class == 1 {
+                                if guard.inner.shape.id == entry.id {
+                                    let slot = entry.slot as usize;
+                                    if slot < guard.inner.values.len() {
+                                        return guard.inner.values[slot];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        VmValue(0x7FF8_0000_0000_0000) // VM_UNDEFINED sentinel
+    }
+}
+
+pub extern "C" fn jit_get_property_maybe_ic_fast(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    obj: VmValue,
+    cs_idx: usize,
+) -> VmValue {
+    jit_get_property_ic_fast(ctx, closure, obj, cs_idx)
+}
