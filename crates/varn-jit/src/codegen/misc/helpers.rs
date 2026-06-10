@@ -24,7 +24,7 @@ pub(crate) fn emit_assert_not_null(ctx: &mut CodegenCtx, _first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -72,7 +72,7 @@ pub(crate) fn emit_close_upvalue(ctx: &mut CodegenCtx, _first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -121,7 +121,7 @@ pub(crate) fn emit_get_enum_tag(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -173,7 +173,7 @@ pub(crate) fn emit_is_array(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -225,7 +225,7 @@ pub(crate) fn emit_wrap_spread(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -277,7 +277,7 @@ pub(crate) fn emit_object_keys(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -330,7 +330,7 @@ pub(crate) fn emit_op_in(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -384,7 +384,7 @@ pub(crate) fn emit_object_merge(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -441,7 +441,7 @@ pub(crate) fn emit_bind_method(ctx: &mut CodegenCtx, _first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -495,7 +495,7 @@ pub(crate) fn emit_make_enum_variant(ctx: &mut CodegenCtx, _first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -553,7 +553,7 @@ pub(crate) fn emit_call_spread(ctx: &mut CodegenCtx, _first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = (regmap.used_phys.len() + 5) % 2 != 0;
+    let need_dummy = (regmap.used_phys.len() + 5) % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -622,7 +622,7 @@ pub(crate) fn emit_load_module(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -677,7 +677,7 @@ pub(crate) fn emit_store_module_slot(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -731,7 +731,7 @@ pub(crate) fn emit_spawn(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -794,7 +794,7 @@ pub(crate) fn emit_try(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -840,7 +840,7 @@ pub(crate) fn emit_pop_try(ctx: &mut CodegenCtx) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -891,7 +891,7 @@ pub(crate) fn emit_throw(ctx: &mut CodegenCtx) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -944,7 +944,7 @@ pub(crate) fn emit_await(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -1002,7 +1002,7 @@ pub(crate) fn emit_yield(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }

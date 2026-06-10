@@ -49,7 +49,7 @@ fn emit_build_array(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -99,7 +99,7 @@ fn emit_array_length(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -150,7 +150,7 @@ fn emit_array_push(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -200,7 +200,7 @@ fn emit_array_pop(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -251,7 +251,7 @@ fn emit_array_extend(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -311,7 +311,7 @@ fn emit_build_str(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = (regmap.used_phys.len() + count) % 2 != 0;
+    let need_dummy = (regmap.used_phys.len() + count) % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }

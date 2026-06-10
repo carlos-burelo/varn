@@ -14,6 +14,7 @@ use varn_utilities::terminal;
 use varn_vm::Vm;
 use std::fs::File;
 use std::io::Write;
+use crate::profiling::JitTimers;
 
 struct PhaseStats {
     name: &'static str,
@@ -331,7 +332,10 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     let check_result = Checker::check_with_profile(&program);
 
     let optimize_samples = std::cell::RefCell::new(Vec::with_capacity(runs));
+    let timers = JitTimers::new();
     let compile_samples = time_n(runs, || {
+        // start compile timer
+        timers.compile.start();
         varn_compiler::codegen::regalloc_post::OPTIMIZE_TIME.with(|t| t.set(Duration::ZERO));
         varn_compiler::codegen::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(true));
 
@@ -354,6 +358,9 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
             export_names,
         );
 
+        // stop compile timer
+        timers.compile.stop();
+        // record optimize time separately
         varn_compiler::codegen::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(false));
         let opt_dur = varn_compiler::codegen::regalloc_post::OPTIMIZE_TIME.with(|t| t.get());
         optimize_samples.borrow_mut().push(opt_dur);
@@ -368,6 +375,9 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         .zip(&optimize_samples)
         .map(|(c, o)| c.saturating_sub(*o))
         .collect();
+
+    // Record optimize timer
+    timers.optimize.stop();
 
     let exports =
         varn_checker::module_resolver::resolve_module_exports_ref(&program.filename, &mut vec![]);
@@ -449,6 +459,8 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     let snap_globals_ref = &snap_globals;
     let snap_heap_ref = &snap_heap;
     let exec_samples = time_n(runs, || {
+        // start execute timer
+        timers.execute.start();
         varn_builtins::reset_testing_counters();
 
         let mut machine = Vm::from_snapshot(
@@ -468,13 +480,17 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         machine.ctx.module_exports.insert(0, module_val);
 
         let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
-        run_vm_to_completion(&mut machine, closure)
+        let res = run_vm_to_completion(&mut machine, closure);
+        // stop execute timer
+        timers.execute.stop();
+        res
     })?;
 
     varn_vm::varn_jit::JIT_STATS.reset();
     varn_builtins::reset_testing_counters();
     varn_builtins::set_print_silent(true);
     varn_builtins::set_testing_silent(true);
+    // Record execute timer end (already stopped above)
     let (opcode_counts, mut vm_profile, jit_stats) = {
         let mut profile_vm = Vm::from_snapshot(
             snap_globals.clone(),
@@ -514,6 +530,20 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     }
     if let Ok(mut f) = File::create("target/debug/opcode_counts.txt") {
         let _ = write!(f, "{:?}", opcode_counts);
+    }
+    // Write JIT timer CSV
+    if let Ok(mut f) = File::create("target/debug/jit_profile.csv") {
+        let _ = write!(
+            f,
+            "phase,seconds\nread,{}\nlex,{}\nparse,{}\ncheck,{}\ncompile,{}\noptimize,{}\nexecute,{}\n",
+            timers.read.elapsed().as_secs_f64(),
+            timers.lex.elapsed().as_secs_f64(),
+            timers.parse.elapsed().as_secs_f64(),
+            timers.check.elapsed().as_secs_f64(),
+            timers.compile.elapsed().as_secs_f64(),
+            timers.optimize.elapsed().as_secs_f64(),
+            timers.execute.elapsed().as_secs_f64(),
+        );
     }
 
     let stats = vec![

@@ -401,6 +401,8 @@ pub fn compile_proto(
         cctx.asm.patch_u32(patch.patch_pos, displacement as u32);
     }
 
+    // Optimize generated assembly before finalizing
+    crate::codegen::optimizer::optimize(&mut cctx.asm)?;
     let native_bytes = cctx.asm.into_bytes();
     let mut jit_buf = JitBuffer::new(native_bytes.len())?;
     jit_buf.as_mut_slice()[..native_bytes.len()].copy_from_slice(&native_bytes);

@@ -52,7 +52,7 @@ fn emit_float_compare(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }

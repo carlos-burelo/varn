@@ -12,6 +12,7 @@ pub(crate) mod properties;
 pub(crate) mod strings;
 pub(crate) mod unary;
 pub(crate) mod misc;
+pub(crate) mod optimizer;
 
 pub(crate) use arith::emit_arith;
 pub(crate) use arrays::emit_arrays;

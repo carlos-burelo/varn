@@ -63,6 +63,10 @@ impl Assembler {
         self.code.len()
     }
 
+    pub fn code_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.code
+    }
+
     pub fn patch_u32(&mut self, offset: usize, value: u32) {
         let bytes = value.to_le_bytes();
         self.code[offset] = bytes[0];

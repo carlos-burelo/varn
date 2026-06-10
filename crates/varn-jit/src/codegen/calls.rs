@@ -43,7 +43,7 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = (regmap.used_phys.len() + 5) % 2 != 0;
+    let need_dummy = (regmap.used_phys.len() + 5) % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -121,7 +121,7 @@ fn emit_call_method(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = (regmap.used_phys.len() + 7) % 2 != 0;
+    let need_dummy = (regmap.used_phys.len() + 7) % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -204,7 +204,7 @@ fn emit_invoke_virtual(ctx: &mut CodegenCtx) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = (regmap.used_phys.len() + 6) % 2 != 0;
+    let need_dummy = (regmap.used_phys.len() + 6) % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
