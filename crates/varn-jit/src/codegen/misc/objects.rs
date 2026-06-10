@@ -31,7 +31,7 @@ pub(crate) fn emit_build_object(ctx: &mut CodegenCtx, _first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -91,7 +91,7 @@ pub(crate) fn emit_object_rest(ctx: &mut CodegenCtx, _first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -144,7 +144,7 @@ pub(crate) fn emit_get_fixed_field(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -199,7 +199,7 @@ pub(crate) fn emit_set_fixed_field(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -253,7 +253,7 @@ pub(crate) fn emit_get_property_maybe(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -304,7 +304,7 @@ pub(crate) fn emit_get_super(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -357,7 +357,7 @@ pub(crate) fn emit_get_symbol(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }

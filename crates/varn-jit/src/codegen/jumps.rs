@@ -50,8 +50,7 @@ pub(crate) fn emit_jumps(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) -> 
             asm.cmp_reg_reg(Reg::Rax, Reg::R10);
             let p2 = asm.jmp_cond(Cond::Equal);
 
-            asm.mov_reg_imm64(Reg::R10, 0x7FFC_0000_0000_0000u64);
-            asm.cmp_reg_reg(Reg::Rax, Reg::R10);
+            asm.cmp_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
             let p3 = asm.jmp_cond(Cond::Equal);
 
             jump_patches.push(JumpPatch {
@@ -82,8 +81,7 @@ pub(crate) fn emit_jumps(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) -> 
             asm.cmp_reg_reg(Reg::Rax, Reg::R10);
             let p_null = asm.jmp_cond(Cond::Equal);
 
-            asm.mov_reg_imm64(Reg::R10, 0x7FFC_0000_0000_0000u64);
-            asm.cmp_reg_reg(Reg::Rax, Reg::R10);
+            asm.cmp_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
             let p_zero = asm.jmp_cond(Cond::Equal);
 
             let p_target = asm.jmp_near();

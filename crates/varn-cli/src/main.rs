@@ -1,4 +1,5 @@
 mod bench_impl;
+mod profiling;
 mod bench_output;
 mod cli;
 mod commands;

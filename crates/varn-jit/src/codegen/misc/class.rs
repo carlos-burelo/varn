@@ -29,7 +29,7 @@ pub(crate) fn emit_declare_field(ctx: &mut CodegenCtx, _first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -89,7 +89,7 @@ pub(crate) fn emit_make_class(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -147,7 +147,7 @@ pub(crate) fn emit_inherit(ctx: &mut CodegenCtx, _first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -213,7 +213,7 @@ pub(crate) fn emit_class_member_op(ctx: &mut CodegenCtx, _first_reg: usize, kind
 
     // 3 extra pushes for the struct fields beyond the 2 value pushes below
     // Total extra pushes before call: kind(1) + name_idx(1) + fn_val(1) + class_val(1) = 4
-    let need_dummy = (regmap.used_phys.len() + 4) % 2 != 0;
+    let need_dummy = (regmap.used_phys.len() + 4) % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }

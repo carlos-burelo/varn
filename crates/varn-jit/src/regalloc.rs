@@ -3,7 +3,7 @@ use crate::safepoint::{emit_load_reg, emit_store_reg};
 use std::collections::HashMap;
 use varn_core::OpCode;
 
-const ALLOC_REGS: &[Reg] = &[Reg::Rbx, Reg::R12, Reg::R13, Reg::R14, Reg::R15];
+const ALLOC_REGS: &[Reg] = &[Reg::Rbx, Reg::R12, Reg::R13, Reg::R14];
 
 pub struct RegMap {
     map: HashMap<usize, Reg>,
@@ -260,6 +260,9 @@ pub fn emit_prologue(asm: &mut Assembler, regmap: &RegMap) {
     asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
     asm.add_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_CTX);
 
+    // Save R15 (callee-saved, used as dedicated INT_TAG register)
+    asm.push(crate::registers::REG_INT_TAG);
+
     for &phys in &regmap.used_phys {
         asm.push(phys);
     }
@@ -267,6 +270,8 @@ pub fn emit_prologue(asm: &mut Assembler, regmap: &RegMap) {
     // Save closure pointer to avoid clobbering by helper/native calls
     asm.push(crate::registers::ARG_CLOSURE);
     asm.push(Reg::Rax); // Dummy register to maintain 16-byte stack alignment
+
+    asm.mov_reg_imm64(crate::registers::REG_INT_TAG, 0x7FFC_0000_0000_0000u64);
 }
 
 pub fn emit_epilogue(asm: &mut Assembler, regmap: &RegMap) {
@@ -281,6 +286,9 @@ pub fn emit_epilogue(asm: &mut Assembler, regmap: &RegMap) {
     for &phys in regmap.used_phys.iter().rev() {
         asm.pop(phys);
     }
+
+    // Restore R15 (dedicated INT_TAG register)
+    asm.pop(crate::registers::REG_INT_TAG);
 
     asm.pop(crate::registers::REG_FRAME_BASE);
 }

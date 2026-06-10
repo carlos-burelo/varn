@@ -47,7 +47,7 @@ fn emit_get_property(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = (regmap.used_phys.len() + 5) % 2 != 0;
+    let need_dummy = (regmap.used_phys.len() + 5) % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -122,7 +122,7 @@ fn emit_set_property(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = (regmap.used_phys.len() + 5) % 2 != 0;
+    let need_dummy = (regmap.used_phys.len() + 5) % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }

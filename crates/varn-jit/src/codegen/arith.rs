@@ -58,16 +58,14 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
         asm.mov_reg_reg(Reg::R10, Reg::Rax);
         asm.mov_reg_imm64(Reg::Rcx, 0x7FFF_0000_0000_0000u64);
         asm.and_reg_reg(Reg::R10, Reg::Rcx);
-        asm.mov_reg_imm64(Reg::Rcx, 0x7FFC_0000_0000_0000u64);
-        asm.cmp_reg_reg(Reg::R10, Reg::Rcx);
+        asm.cmp_reg_reg(Reg::R10, crate::registers::REG_INT_TAG);
         let p_fallback1 = asm.jmp_cond(crate::assembler::Cond::NotEqual);
 
         // --- 3. Check if src2 (R11) is an integer ---
         asm.mov_reg_reg(Reg::R10, Reg::R11);
         asm.mov_reg_imm64(Reg::Rcx, 0x7FFF_0000_0000_0000u64);
         asm.and_reg_reg(Reg::R10, Reg::Rcx);
-        asm.mov_reg_imm64(Reg::Rcx, 0x7FFC_0000_0000_0000u64);
-        asm.cmp_reg_reg(Reg::R10, Reg::Rcx);
+        asm.cmp_reg_reg(Reg::R10, crate::registers::REG_INT_TAG);
         let p_fallback2 = asm.jmp_cond(crate::assembler::Cond::NotEqual);
 
         // --- 4. FAST PATH (both are integers) ---
@@ -86,10 +84,9 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
         }
 
         // Pack RAX back into VmValue NaN-boxed integer format
-        asm.mov_reg_imm64(Reg::R10, 0x0000_FFFF_FFFF_FFFFu64);
-        asm.and_reg_reg(Reg::Rax, Reg::R10);
-        asm.mov_reg_imm64(Reg::R10, 0x7FFC_0000_0000_0000u64);
-        asm.or_reg_reg(Reg::Rax, Reg::R10);
+        asm.shl_reg_imm8(Reg::Rax, 16);
+        asm.shr_reg_imm8(Reg::Rax, 16);
+        asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
 
         // Store RAX to destination register
         emit_store(asm, Reg::Rax, first_reg, regmap);
@@ -115,7 +112,7 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
         asm.push(ARG_BASE);
         asm.push(ARG_EXEC_CTX);
 
-        let need_dummy = regmap.used_phys.len() % 2 != 0;
+        let need_dummy = regmap.used_phys.len() % 2 == 0;
         if need_dummy {
             asm.push(Reg::Rax);
         }
@@ -170,7 +167,7 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
         asm.push(ARG_BASE);
         asm.push(ARG_EXEC_CTX);
 
-        let need_dummy = regmap.used_phys.len() % 2 != 0;
+        let need_dummy = regmap.used_phys.len() % 2 == 0;
         if need_dummy {
             asm.push(Reg::Rax);
         }
@@ -242,10 +239,9 @@ fn emit_add_sub_imm(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     let adjust = if op == OpCode::SubImm { -imm } else { imm };
     asm.add_reg_imm32(Reg::Rax, adjust);
 
-    asm.mov_reg_imm64(Reg::R10, 0x0000_FFFF_FFFF_FFFFu64);
-    asm.and_reg_reg(Reg::Rax, Reg::R10);
-    asm.mov_reg_imm64(Reg::R10, 0x7FFC_0000_0000_0000u64);
-    asm.or_reg_reg(Reg::Rax, Reg::R10);
+    asm.shl_reg_imm8(Reg::Rax, 16);
+    asm.shr_reg_imm8(Reg::Rax, 16);
+    asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
 
     emit_store(asm, Reg::Rax, first_reg, regmap);
 }
@@ -276,10 +272,9 @@ fn emit_int_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
         _ => unreachable!(),
     }
 
-    asm.mov_reg_imm64(Reg::R10, 0x0000_FFFF_FFFF_FFFFu64);
-    asm.and_reg_reg(Reg::Rax, Reg::R10);
-    asm.mov_reg_imm64(Reg::R10, 0x7FFC_0000_0000_0000u64);
-    asm.or_reg_reg(Reg::Rax, Reg::R10);
+    asm.shl_reg_imm8(Reg::Rax, 16);
+    asm.shr_reg_imm8(Reg::Rax, 16);
+    asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
 
     emit_store(asm, Reg::Rax, first_reg, regmap);
 }

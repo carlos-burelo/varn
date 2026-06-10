@@ -35,7 +35,7 @@ fn emit_to_string(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -134,7 +134,7 @@ fn emit_not(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -196,8 +196,7 @@ fn emit_negate(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.mov_reg_reg(Reg::R11, Reg::Rax);
     asm.mov_reg_imm64(Reg::R10, 0x7FFF_0000_0000_0000u64);
     asm.and_reg_reg(Reg::R11, Reg::R10);
-    asm.mov_reg_imm64(Reg::R10, 0x7FFC_0000_0000_0000u64);
-    asm.cmp_reg_reg(Reg::R11, Reg::R10);
+    asm.cmp_reg_reg(Reg::R11, crate::registers::REG_INT_TAG);
 
     let patch_je = asm.jmp_cond(Cond::Equal);
 
@@ -209,7 +208,7 @@ fn emit_negate(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = regmap.used_phys.len() % 2 != 0;
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
@@ -251,10 +250,9 @@ fn emit_negate(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.mov_reg_imm64(Reg::Rax, 0);
     asm.sub_reg_reg(Reg::Rax, Reg::R10);
 
-    asm.mov_reg_imm64(Reg::R10, 0x0000_FFFF_FFFF_FFFFu64);
-    asm.and_reg_reg(Reg::Rax, Reg::R10);
-    asm.mov_reg_imm64(Reg::R10, 0x7FFC_0000_0000_0000u64);
-    asm.or_reg_reg(Reg::Rax, Reg::R10);
+    asm.shl_reg_imm8(Reg::Rax, 16);
+    asm.shr_reg_imm8(Reg::Rax, 16);
+    asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
     asm.mov_reg_reg(Reg::R11, Reg::Rax);
 
     let end_pos = asm.current_offset();
