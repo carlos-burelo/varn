@@ -152,12 +152,14 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
 
         emit_store(asm, Reg::R11, first_reg, regmap);
 
-        // Patch skip_ffi target to end of block
+        // Reload phys regs after slow-path FFI (flush_all wrote them before call).
+        // Fast path jumps past this reload since phys regs were never flushed.
+        emit_reload_all_except(asm, regmap, Some(first_reg));
+
+        // Patch skip_ffi to here — fast path lands after the reload.
         let end_pos = asm.current_offset();
         let disp_skip = (end_pos as i32 - (p_skip_ffi as i32 + 4)) as u32;
         asm.patch_u32(p_skip_ffi, disp_skip);
-
-        emit_reload_all_except(asm, regmap, Some(first_reg));
     } else {
         // --- ORIGINAL FFI execution for non-optimized ops ---
         emit_flush_all(asm, regmap);
