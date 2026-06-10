@@ -65,7 +65,10 @@ impl ExecCtx {
             return Ok(cached);
         }
 
-        // 2. Native modules (std:/core:/runtime: with a Rust implementation).
+        // 2. Native modules — those with a direct Rust implementation in
+        //    MODULE_OPS (keyed by full ID: "runtime:math", "std:collections").
+        //    std:X modules that are pure Varn wrappers (like "std:math") will
+        //    miss here and fall through to the .vn loader path below.
         let native_name = match &resolved {
             ModuleId::Std(name) | ModuleId::Core(name) | ModuleId::Runtime(name) => {
                 Some(name.as_ref().to_owned())
@@ -138,7 +141,15 @@ impl ExecCtx {
         let frame_idx = self.frames.len() - 1;
         self.module_exports.insert(frame_idx, module_val);
 
-        let res = self.run_until(frame_idx)?;
+        let res = match self.run_until(frame_idx) {
+            Ok(v) => v,
+            Err(e) => {
+                // Clean up linker state so the module isn't stuck Evaluating.
+                self.linker.cancel_evaluating(&resolved);
+                self.modules.remove(&resolved);
+                return Err(e);
+            }
+        };
         if self.vm_suspend.is_some() {
             return Ok(module_val);
         }
