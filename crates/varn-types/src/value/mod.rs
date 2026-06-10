@@ -20,7 +20,7 @@ pub use alloc::{
 pub use class::{find_method_with_owner, ClassObj};
 pub use closure::{Closure, Upvalue, UpvalueInner};
 pub use constructors::{new_array, new_object};
-pub use module::ModuleObj;
+pub use module::{FrozenExport, FrozenModuleObj, ModuleObj};
 pub use object::{nv_to_value, value_to_nv, ObjData};
 use rust_decimal::Decimal;
 pub use shape::{root_shape, RuntimeObject, Shape};

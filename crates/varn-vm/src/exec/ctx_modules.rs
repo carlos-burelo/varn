@@ -1,6 +1,9 @@
 use crate::error::{RuntimeError, VmResult};
+use crate::heap::HeapObj;
 use crate::value::VmValue;
+use std::sync::Arc;
 use varn_core::ModuleId;
+use varn_types::value::{FrozenExport, FrozenModuleObj};
 use varn_types::ModuleObj;
 
 use super::ctx::ExecCtx;
@@ -61,11 +64,24 @@ impl ExecCtx {
         if let Some(cached) = self.linker.cached(&resolved) {
             return Ok(cached);
         }
+
+        // 2. Module cache — check for both live Module and FrozenModule.
         if let Some(&cached) = self.modules.get(&resolved) {
+            // If frozen, thaw into this VM's heap before returning.
+            if cached.is_heap() {
+                if let Some(HeapObj::FrozenModule(frozen)) =
+                    self.heap.get(cached.as_heap_idx())
+                {
+                    let frozen = frozen.clone();
+                    let thawed = thaw_module(&frozen, &mut self.heap);
+                    self.linker.set_done(resolved, thawed);
+                    return Ok(thawed);
+                }
+            }
             return Ok(cached);
         }
 
-        // 2. Native modules — those with a direct Rust implementation in
+        // 3. Native modules — those with a direct Rust implementation in
         //    MODULE_OPS (keyed by full ID: "runtime:math", "std:collections").
         //    std:X modules that are pure Varn wrappers (like "std:math") will
         //    miss here and fall through to the .vn loader path below.
@@ -84,7 +100,7 @@ impl ExecCtx {
             }
         }
 
-        // 3. Cycle detection via linker graph state (replaces frame-scan).
+        // 4. Cycle detection via linker graph state (replaces frame-scan).
         if self.linker.is_evaluating(&resolved) {
             // Circular dependency detected. Return the partial module that was
             // pre-inserted before evaluation started. Accessing an uninitialized
@@ -96,12 +112,12 @@ impl ExecCtx {
             });
         }
 
-        // 4. Precompiled map (ahead-of-time compiled dependencies).
+        // 5. Precompiled map (ahead-of-time compiled dependencies).
         if let Some(proto) = self.precompiled.get(&resolved).cloned() {
             return self.eval_module_proto(resolved, proto);
         }
 
-        // 5. Dynamic loader (FileLoader + StdlibLoader via CompositeLoader).
+        // 6. Dynamic loader (FileLoader + StdlibLoader via CompositeLoader).
         let loader = self.loader.clone();
         if let Some(loader) = loader {
             if let Ok(Some(proto)) = loader.load(&resolved) {
@@ -168,5 +184,104 @@ fn get_cached_exports(module_id: &str) -> Option<Vec<std::rc::Rc<str>>> {
         None
     } else {
         Some(spec.exports.iter().map(|&s| std::rc::Rc::from(s)).collect())
+    }
+}
+
+/// Freeze a live module value into a heap-index-free `FrozenModuleObj`.
+/// Returns `None` if any export is not freezeable (e.g. a VM closure).
+/// Only modules built entirely from NativeFns, primitives, and nested objects
+/// of the same will produce a `Some` result.
+pub fn freeze_module(
+    module_val: VmValue,
+    id: ModuleId,
+    heap: &crate::heap::HeapInner,
+) -> Option<Arc<FrozenModuleObj>> {
+    let raw_idx = module_val.as_heap_idx();
+    let m = match heap.get(raw_idx) {
+        Some(HeapObj::Module(m)) => m.clone(),
+        _ => return None,
+    };
+
+    let mut frozen = FrozenModuleObj::new(id);
+
+    for (key, &slot) in &m.export_map {
+        let export_val = m.get_slot(slot).unwrap_or(VmValue::null());
+        let frozen_export = freeze_value(export_val, heap)?;
+        frozen.push(Arc::from(key.as_ref()), frozen_export);
+    }
+
+    Some(Arc::new(frozen))
+}
+
+/// Returns `None` if the value contains a VM closure or other non-freezeable type.
+fn freeze_value(val: VmValue, heap: &crate::heap::HeapInner) -> Option<FrozenExport> {
+    // Primitives fit in the NaN-boxed VmValue itself — no heap index.
+    if !val.is_heap() {
+        return Some(FrozenExport::Primitive(val));
+    }
+
+    match heap.get(val.as_heap_idx()) {
+        Some(HeapObj::Str(s)) => Some(FrozenExport::Str(Arc::from(s.as_ref()))),
+        Some(HeapObj::NativeFn(name, f)) => Some(FrozenExport::NativeFn(*f, name)),
+        Some(HeapObj::Object(obj_ref)) => {
+            // Nested namespace object — freeze it recursively.
+            // If any child is not freezeable, abort entire module freeze.
+            let guard = obj_ref.borrow();
+            let mut nested = FrozenModuleObj::new(ModuleId::local_str("<nested>"));
+            for (key, nv) in guard.inner.iter() {
+                let child = freeze_value(nv, heap)?;
+                nested.push(Arc::from(key.as_ref()), child);
+            }
+            Some(FrozenExport::Nested(Arc::new(nested)))
+        }
+        _ => {
+            // VM closures, classes, arrays, tasks — not freezeable.
+            None
+        }
+    }
+}
+
+/// Thaw a `FrozenModuleObj` into a live `ModuleObj` in `heap`.
+/// Allocates one heap slot per native function export; primitives are zero-cost.
+pub fn thaw_module(
+    frozen: &FrozenModuleObj,
+    heap: &mut crate::heap::HeapInner,
+) -> VmValue {
+    let n = frozen.exports.len();
+    let mut module_obj = ModuleObj::new(frozen.id.clone(), n);
+
+    for (key, &slot) in &frozen.export_map {
+        let nv = thaw_export(&frozen.exports[slot], heap);
+        module_obj.exports.resize(slot + 1, VmValue::null());
+        module_obj.exports[slot] = nv;
+        module_obj.export_map.insert(std::rc::Rc::from(key.as_ref()), slot);
+    }
+
+    heap.alloc_module(std::rc::Rc::new(module_obj))
+}
+
+fn thaw_export(export: &FrozenExport, heap: &mut crate::heap::HeapInner) -> VmValue {
+    match export {
+        FrozenExport::Primitive(v) => *v,
+        FrozenExport::Str(s) => heap.alloc_str(s),
+        FrozenExport::NativeFn(f, name) => heap.alloc_native_fn(*f, name),
+        FrozenExport::Nested(nested) => {
+            // Thaw nested namespace into a plain Object on the heap.
+            let obj_val = heap.alloc_object();
+            let raw_idx = obj_val.as_heap_idx();
+            // Collect first to avoid borrow conflicts.
+            let fields: Vec<(Arc<str>, FrozenExport)> = nested
+                .export_map
+                .iter()
+                .map(|(k, &slot)| (k.clone(), nested.exports[slot].clone()))
+                .collect();
+            for (key, child_export) in fields {
+                let child_nv = thaw_export(&child_export, heap);
+                if let Some(HeapObj::Object(o)) = heap.get_by_idx_mut(raw_idx) {
+                    o.borrow_mut().set_field_nv(std::rc::Rc::from(key.as_ref()), child_nv);
+                }
+            }
+            obj_val
+        }
     }
 }

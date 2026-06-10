@@ -183,6 +183,7 @@ impl TricolorMarker {
                 | HeapObj::Decimal(_)
                 | HeapObj::Range(_)
                 | HeapObj::NativeFn(_, _)
+                | HeapObj::FrozenModule(_)
                 | HeapObj::VmValue(_) => {}
                 HeapObj::Module(m) => {
                     let exports = m.exports.clone();

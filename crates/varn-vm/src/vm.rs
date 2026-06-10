@@ -191,6 +191,7 @@ impl Vm {
 /// snapshot instead of calling `build_module()` and allocating fresh NativeFn
 /// objects every time.
 pub fn prefill_native_modules(vm: &mut Vm) {
+    // Pass 1: load all directly-native MODULE_OPS entries.
     for raw_id in varn_builtins::all_native_module_ids() {
         // Skip "globals" — those are injected into the global store directly,
         // not via module imports. ModuleId::from_canonical_str would map them
@@ -209,6 +210,82 @@ pub fn prefill_native_modules(vm: &mut Vm) {
                 vm.ctx.modules.insert(resolved, converted);
             }
         }
+    }
+
+    // Pass 2: freeze pure modules (no-op until .vn wrappers export only
+    // NativeFns — currently std:math etc. export VM closures which are not
+    // freezeable; freeze_module returns None for those and they are skipped).
+    freeze_pure_modules(vm);
+}
+
+/// Evaluate all `pure = true` modules from MODULE_REGISTRY in an isolated
+/// scratch VM, freeze the results, and install them into `vm`'s module cache.
+/// The scratch VM is disposable — its globals never touch `vm`'s layout.
+fn freeze_pure_modules(vm: &mut Vm) {
+    let pure_ids: Vec<&'static str> = varn_builtins::MODULE_REGISTRY
+        .iter()
+        .filter(|s| s.pure)
+        .map(|s| s.id)
+        .collect();
+
+    if pure_ids.is_empty() {
+        return;
+    }
+
+    // Build a scratch VM with the same precompiled map and loader.
+    // Its global layout is independent of init_vm — no shared state.
+    let mut scratch = Vm::new(vm.ctx.precompiled.clone());
+    if let Some(loader) = &vm.ctx.loader {
+        scratch.ctx.loader = Some(loader.clone());
+    }
+    // Seed the scratch VM with the already-built native modules from pass 1
+    // so pure wrappers that import runtime:* find them without re-building.
+    for (id, &val) in &vm.ctx.modules {
+        if matches!(id, varn_core::ModuleId::Runtime(_)) {
+            // Re-intern native module object into scratch heap.
+            // NativeFns are function pointers — safe to rebuild cheaply.
+            if let Some(frozen_arc) =
+                crate::exec::ctx_modules::freeze_module(val, id.clone(), &vm.ctx.heap)
+            {
+                let fv = scratch.ctx.heap.alloc_frozen_module(frozen_arc);
+                scratch.ctx.modules.insert(id.clone(), fv);
+                scratch.ctx.linker.set_done(id.clone(), fv);
+            }
+        }
+    }
+
+    for id_str in pure_ids {
+        let resolved = varn_core::ModuleId::from_canonical_str(id_str);
+
+        // Skip core: modules — blocked by resolver from non-stdlib context.
+        if matches!(resolved, varn_core::ModuleId::Core(_)) {
+            continue;
+        }
+
+        // Skip if init_vm already has it cached (shouldn't happen for .vn pure
+        // modules since pass 1 only handles MODULE_OPS entries).
+        if vm.ctx.modules.contains_key(&resolved) {
+            continue;
+        }
+
+        // Evaluate in scratch VM.
+        let load_result = scratch.ctx.load_module(id_str);
+        let module_val = match load_result {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        // Freeze from scratch heap → Arc (no heap indices).
+        let Some(frozen) =
+            crate::exec::ctx_modules::freeze_module(module_val, resolved.clone(), &scratch.ctx.heap)
+        else {
+            continue;
+        };
+
+        // Install frozen handle in init_vm's heap and module cache.
+        let frozen_val = vm.ctx.heap.alloc_frozen_module(frozen);
+        vm.ctx.modules.insert(resolved.clone(), frozen_val);
+        vm.ctx.linker.set_done(resolved, frozen_val);
     }
 }
 

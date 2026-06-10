@@ -1,1 +1,1 @@
-{"modules": [{"id": "std:collections", "kind": "stdlib"}, {"id": "core:collections", "kind": "core"}]}
+{"modules": [{"id": "std:collections", "kind": "stdlib", "pure": true}, {"id": "core:collections", "kind": "core", "pure": true}]}
