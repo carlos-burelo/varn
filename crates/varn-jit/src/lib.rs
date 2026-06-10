@@ -106,6 +106,8 @@ pub struct JitHelpers {
     pub yield_helper: usize,
     pub get_property_ic_fast: usize,
     pub get_property_maybe_ic_fast: usize,
+    pub jit_prepare_call: usize,
+    pub jit_post_call: usize,
 }
 
 #[derive(Debug, Clone, Copy)]

@@ -221,6 +221,8 @@ impl VmClosure {
             yield_helper: crate::exec::ctx::jit_yield as usize,
             get_property_ic_fast: crate::exec::ctx::jit_get_property_ic_fast as usize,
             get_property_maybe_ic_fast: crate::exec::ctx::jit_get_property_maybe_ic_fast as usize,
+            jit_prepare_call: crate::exec::ctx::jit_prepare_call as usize,
+            jit_post_call: crate::exec::ctx::jit_post_call as usize,
         };
         match varn_jit::compile(&self.proto, &self.constants, helpers) {
             Ok((entry, code)) => {

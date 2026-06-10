@@ -40,6 +40,7 @@ pub use super::ctx_jit_values::{
     jit_load_global_idx, jit_load_upvalue, jit_lt, jit_lte, jit_make_closure, jit_mul, jit_neq,
     jit_set_property, jit_store_global_idx, jit_store_upvalue, jit_sub, jit_to_string,
     jit_invoke_virtual, jit_get_property_ic_fast, jit_get_property_maybe_ic_fast,
+    jit_prepare_call, jit_post_call,
 };
 
 #[repr(C)]
