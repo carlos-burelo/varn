@@ -14,7 +14,8 @@ use std::rc::Rc;
 use varn_types::{
     generator::{AsyncQueue, GeneratorObj},
     value::{
-        ArrayRef, EnumVariantData, MapRef, ModuleObj, ObjRef, RangeData, RuntimeSymbol, SetRef,
+        ArrayRef, EnumVariantData, FrozenModuleObj, MapRef, ModuleObj, ObjRef, RangeData,
+        RuntimeSymbol, SetRef,
     },
     AsyncTask, ClassObj, LazyTask, NativeCtx, NativeFn, ObjData, ResourceStore, RuntimeString,
     Value, VmArray,
@@ -28,6 +29,8 @@ pub enum HeapObj {
     Object(ObjRef),
 
     Module(Rc<ModuleObj>),
+    /// Frozen (pure) module — heap-index-free, shared across VM instances.
+    FrozenModule(std::sync::Arc<FrozenModuleObj>),
     VmClosure(Rc<VmClosure>),
     Class(Rc<ClassObj>),
     NativeFn(&'static str, NativeFn),
@@ -153,6 +156,7 @@ impl HeapInner {
                 HeapObj::Class(_) => "Class",
                 HeapObj::NativeFn(_, _) => "NativeFn",
                 HeapObj::Module(_) => "Module",
+                HeapObj::FrozenModule(_) => "FrozenModule",
                 HeapObj::VmValue(_) => "VmValue",
             };
             h.borrow_mut().record_alloc(type_name);
@@ -433,6 +437,8 @@ impl HeapInner {
                 HeapObj::Spread(inner) => Value::Spread(Box::new(self.extract(*inner))),
                 HeapObj::VmValue(payload) => Value::VmValue(payload.clone_payload()),
                 HeapObj::Module(m) => Value::Module(m.clone()),
+                // FrozenModule is never extracted as a Value; it is thawed on import.
+                HeapObj::FrozenModule(_) => Value::Null,
             });
         }
         Ok(Value::Null)
@@ -559,6 +565,10 @@ impl HeapInner {
 
     pub fn alloc_module(&mut self, m: Rc<ModuleObj>) -> VmValue {
         VmValue::from_heap_idx(self.alloc(HeapObj::Module(m)))
+    }
+
+    pub fn alloc_frozen_module(&mut self, m: std::sync::Arc<FrozenModuleObj>) -> VmValue {
+        VmValue::from_heap_idx(self.alloc(HeapObj::FrozenModule(m)))
     }
 
     pub fn str_val(&self, nv: VmValue) -> Option<RuntimeString> {

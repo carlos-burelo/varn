@@ -22,6 +22,12 @@ pub struct ModuleSpec {
     pub embedded: Option<&'static str>,
 
     pub exports: &'static [&'static str],
+
+    /// True when this module has no side effects at init time and contains only
+    /// primitives, native functions, and nested namespaces. Such modules can be
+    /// evaluated once and their exports frozen into `FrozenModuleObj` for reuse
+    /// across VM instances without re-execution.
+    pub pure: bool,
 }
 
 impl ModuleSpec {
@@ -32,6 +38,7 @@ impl ModuleSpec {
             vn_source,
             embedded: None,
             exports: &[],
+            pure: false,
         }
     }
 
@@ -42,6 +49,11 @@ impl ModuleSpec {
 
     pub const fn with_exports(mut self, exports: &'static [&'static str]) -> Self {
         self.exports = exports;
+        self
+    }
+
+    pub const fn pure_module(mut self) -> Self {
+        self.pure = true;
         self
     }
 

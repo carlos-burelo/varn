@@ -85,6 +85,7 @@ fn emit_entries_from_json(
             if let (Some(id), Some(kind)) = (extract_str(&entry, "id"), extract_str(&entry, "kind"))
             {
                 let capabilities = extract_capabilities(&entry);
+                let pure_module = extract_bool(&entry, "pure");
                 emit_spec_entry(
                     out,
                     &id,
@@ -93,6 +94,7 @@ fn emit_entries_from_json(
                     vn_include_path,
                     exports,
                     &capabilities,
+                    pure_module,
                 );
             }
         }
@@ -100,6 +102,7 @@ fn emit_entries_from_json(
         // Single object form: {"id": "...", "kind": "..."}
         if let (Some(id), Some(kind)) = (extract_str(json, "id"), extract_str(json, "kind")) {
             let capabilities = extract_capabilities(json);
+            let pure_module = extract_bool(json, "pure");
             emit_spec_entry(
                 out,
                 &id,
@@ -108,6 +111,7 @@ fn emit_entries_from_json(
                 vn_include_path,
                 exports,
                 &capabilities,
+                pure_module,
             );
         }
     }
@@ -121,6 +125,7 @@ fn emit_spec_entry(
     vn_include_path: &str,
     exports: &[String],
     _capabilities: &[String],
+    pure_module: bool,
 ) {
     let kind_expr = match kind {
         "core" => "ModuleKind::Core",
@@ -138,10 +143,20 @@ fn emit_spec_entry(
     } else {
         exports_formatted.push_str("&[]");
     }
+    let pure_suffix = if pure_module { ".pure_module()" } else { "" };
     writeln!(
         out,
-        r#"    ModuleSpec::new("{id}", {kind_expr}, "{vn_source_field}").with_source(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/{vn_include_path}"))).with_exports({exports_formatted}),"#,
+        r#"    ModuleSpec::new("{id}", {kind_expr}, "{vn_source_field}").with_source(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/{vn_include_path}"))).with_exports({exports_formatted}){pure_suffix},"#,
     ).unwrap();
+}
+
+fn extract_bool(json: &str, key: &str) -> bool {
+    let needle = format!("\"{key}\"");
+    let Some(pos) = json.find(&needle) else { return false; };
+    let after_key = &json[pos + needle.len()..];
+    let Some(colon) = after_key.find(':') else { return false; };
+    let after_colon = after_key[colon + 1..].trim_start();
+    after_colon.starts_with("true")
 }
 
 fn extract_str(json: &str, key: &str) -> Option<String> {

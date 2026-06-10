@@ -78,7 +78,7 @@ pub fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Heap) -> V
         )));
     }
 
-    if matches!(heap.get(obj.as_heap_idx()), Some(HeapObj::Module(_))) {
+    if matches!(heap.get(obj.as_heap_idx()), Some(HeapObj::Module(_)) | Some(HeapObj::FrozenModule(_))) {
         return Ok(());
     }
     let idx = obj.as_heap_idx();

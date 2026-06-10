@@ -30,7 +30,7 @@ pub fn typeof_val(val: VmValue, heap: &Heap) -> &'static str {
             | Some(HeapObj::BoundMethod(..)) => "function",
             Some(HeapObj::Class(_)) => RuntimeTypeName::Class.as_str(),
             Some(HeapObj::Array(_)) => RuntimeTypeName::Array.as_str(),
-            Some(HeapObj::Object(_)) | Some(HeapObj::Module(_)) => RuntimeTypeName::Object.as_str(),
+            Some(HeapObj::Object(_)) | Some(HeapObj::Module(_)) | Some(HeapObj::FrozenModule(_)) => RuntimeTypeName::Object.as_str(),
             Some(HeapObj::Map(_)) => "map",
             Some(HeapObj::Set(_)) => "set",
             Some(HeapObj::BigInt(_)) => IntrinsicType::BigInt.as_str(),

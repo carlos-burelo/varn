@@ -1,1 +1,1 @@
-{"id": "std:json", "kind": "stdlib"}
+{"id": "std:json", "kind": "stdlib", "pure": true}
