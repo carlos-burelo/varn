@@ -42,6 +42,7 @@ pub struct JitHelpers {
     pub load_upvalue: usize,
     pub store_upvalue: usize,
     pub make_closure: usize,
+    pub load_static_fn: usize,
     pub call: usize,
     pub call_method: usize,
     pub get_property: usize,
@@ -108,6 +109,7 @@ pub struct JitHelpers {
     pub get_property_maybe_ic_fast: usize,
     pub jit_prepare_call: usize,
     pub jit_post_call: usize,
+    pub dispatch_intrinsic: usize,
 }
 
 #[derive(Debug, Clone, Copy)]

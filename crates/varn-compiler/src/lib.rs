@@ -1,3 +1,4 @@
+pub mod analysis;
 pub mod chunk;
 pub mod codegen;
 pub mod scope;

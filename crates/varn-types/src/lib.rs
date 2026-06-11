@@ -3,6 +3,7 @@ pub mod generator;
 pub mod module_graph;
 pub mod native;
 pub mod native_ctx;
+pub mod register_meta;
 pub mod resource;
 pub mod task;
 pub mod value;

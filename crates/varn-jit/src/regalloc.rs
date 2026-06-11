@@ -67,6 +67,10 @@ impl RegMap {
                     *freq.entry(first_reg).or_insert(0) += 1;
                     *freq.entry(src).or_insert(0) += 1;
                 }
+                OpCode::LoadStaticFn => {
+                    ip += 1;
+                    *freq.entry(first_reg).or_insert(0) += 1;
+                }
                 OpCode::AddImm | OpCode::SubImm => {
                     let w1 = code[ip];
                     ip += 1;
@@ -125,6 +129,8 @@ impl RegMap {
                 | OpCode::SubInt
                 | OpCode::MulInt
                 | OpCode::DivInt
+                | OpCode::ModInt
+                | OpCode::PowInt
                 | OpCode::LtInt
                 | OpCode::GtInt
                 | OpCode::LteInt
@@ -135,6 +141,8 @@ impl RegMap {
                 | OpCode::SubFloat
                 | OpCode::MulFloat
                 | OpCode::DivFloat
+                | OpCode::ModFloat
+                | OpCode::PowFloat
                 | OpCode::GetIndex
                 | OpCode::Instanceof
                 | OpCode::StrConcat

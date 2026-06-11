@@ -201,14 +201,15 @@ pub(crate) mod dispatch {
                 if let Some(port) = payload.as_any().downcast_ref::<varn_runtime::isolate::IsolatePort>() {
                     let port_clone = port.clone();
                     let async_task = varn_types::AsyncTask::pending();
-                    // Directly perform blocking receive on the current thread
-                    if let Some(send_val) = port_clone.receive_blocking() {
-                        let val_nv = send_val.to_value_ctx(ctx);
-                        let val = ctx.extract(val_nv);
-                        async_task.resolve(val);
-                    } else {
-                        async_task.resolve(Value::Null);
-                    }
+                    let async_task_clone = async_task.clone();
+                    std::thread::spawn(move || {
+                        varn_types::value::init_thread_heap();
+                        if let Some(send_val) = port_clone.receive_blocking() {
+                            async_task_clone.resolve(send_val.to_value());
+                        } else {
+                            async_task_clone.resolve(Value::Null);
+                        }
+                    });
                     return Ok(ctx.intern(Value::TaskHandle(async_task)));
                 }
             }

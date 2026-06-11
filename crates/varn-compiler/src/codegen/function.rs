@@ -109,9 +109,11 @@ pub fn emit_closure<'a>(
     parent: &mut Compiler<'a>,
     proto: FunctionProto,
     upvalues: Vec<UpvalueDesc>,
+    ast_id: u32,
 ) -> u8 {
     let proto_idx = parent.add_const(PoolEntry::Function(Rc::new(proto)));
     let dest = parent.alloc_reg();
+
     let uv_count = upvalues.len() as u8;
 
     let line = parent.line;

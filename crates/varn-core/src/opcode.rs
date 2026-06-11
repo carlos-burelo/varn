@@ -160,12 +160,21 @@ pub enum OpCode {
     SubFloat,
     MulFloat,
     DivFloat,
+    ModFloat,
+    PowFloat,
     LtFloat,
     GtFloat,
     LteFloat,
     GteFloat,
     EqFloat,
     NeqFloat,
+
+    ModInt,
+    PowInt,
+
+    Intrinsic,
+
+    LoadStaticFn,
 
     Nop,
 }

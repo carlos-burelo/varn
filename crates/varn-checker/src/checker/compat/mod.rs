@@ -136,16 +136,16 @@ pub(super) fn types_compatible_impl(
             .iter()
             .all(|m| types_compatible_impl(declared, m, bind, cache, in_progress)),
         (_, TypeKind::Intrinsic(varn_core::TypeTag::Never)) => true,
-        (TypeKind::Named(dn, _), TypeKind::Named(in_, _))
-        | (TypeKind::Named(dn, _), TypeKind::Generic(in_, _, _))
-        | (TypeKind::Generic(dn, _, _), TypeKind::Named(in_, _))
-        | (TypeKind::Generic(dn, _, _), TypeKind::Generic(in_, _, _)) => {
-            compatible_named(dn, in_, bind, cache, in_progress)
+        (TypeKind::Named(dn, origin_d), TypeKind::Named(in_, origin_i))
+        | (TypeKind::Named(dn, origin_d), TypeKind::Generic(in_, _, origin_i))
+        | (TypeKind::Generic(dn, _, origin_d), TypeKind::Named(in_, origin_i))
+        | (TypeKind::Generic(dn, _, origin_d), TypeKind::Generic(in_, _, origin_i)) => {
+            compatible_named(dn, origin_d.as_deref(), in_, origin_i.as_deref(), bind, cache, in_progress)
         }
-        (TypeKind::Named(dn, _), TypeKind::Fn(ft))
-        | (TypeKind::Generic(dn, _, _), TypeKind::Fn(ft)) => {
+        (TypeKind::Named(dn, origin_d), TypeKind::Fn(ft))
+        | (TypeKind::Generic(dn, _, origin_d), TypeKind::Fn(ft)) => {
             let Some(bind) = bind else { return true };
-            if let Some(members) = named_members(bind, dn) {
+            if let Some(members) = named_members(bind, dn, origin_d.as_deref()) {
                 if let Some(callable) = members
                     .iter()
                     .find(|m| m.name.as_ref() == MemberKey::Callable.as_str())
@@ -162,12 +162,12 @@ pub(super) fn types_compatible_impl(
             }
             true
         }
-        (TypeKind::Named(dn, _), TypeKind::Object(inf_fields))
-        | (TypeKind::Generic(dn, _, _), TypeKind::Object(inf_fields)) => {
+        (TypeKind::Named(dn, origin_d), TypeKind::Object(inf_fields))
+        | (TypeKind::Generic(dn, _, origin_d), TypeKind::Object(inf_fields)) => {
             if let Some(bind) = bind {
-                if let Some(decl_members) = named_members(bind, dn) {
+                if let Some(decl_members) = named_members(bind, dn, origin_d.as_deref()) {
                     return class_members_match_object(
-                        decl_members,
+                        &decl_members,
                         inf_fields,
                         bind,
                         cache,
@@ -178,13 +178,13 @@ pub(super) fn types_compatible_impl(
             }
             true
         }
-        (TypeKind::Object(decl_fields), TypeKind::Named(in_, _))
-        | (TypeKind::Object(decl_fields), TypeKind::Generic(in_, _, _)) => {
+        (TypeKind::Object(decl_fields), TypeKind::Named(in_, origin_i))
+        | (TypeKind::Object(decl_fields), TypeKind::Generic(in_, _, origin_i)) => {
             if let Some(bind) = bind {
-                if let Some(inf_members) = named_members(bind, in_) {
+                if let Some(inf_members) = named_members(bind, in_, origin_i.as_deref()) {
                     return object_matches_class_members(
                         decl_fields,
-                        inf_members,
+                        &inf_members,
                         bind,
                         cache,
                         in_progress,

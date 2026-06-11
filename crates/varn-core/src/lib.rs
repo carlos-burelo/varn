@@ -1,6 +1,7 @@
 pub mod ast;
 pub mod doc;
 pub mod error;
+pub mod intrinsic_ops;
 pub mod intrinsics;
 pub mod kinds;
 pub mod module_id;

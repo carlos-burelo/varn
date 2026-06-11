@@ -11,6 +11,7 @@ pub(crate) fn emit_calls(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) -> 
         OpCode::Call => emit_call(ctx, first_reg),
         OpCode::CallMethod => emit_call_method(ctx, first_reg),
         OpCode::InvokeVirtual => emit_invoke_virtual(ctx),
+        OpCode::Intrinsic => emit_intrinsic(ctx, first_reg),
         _ => unreachable!("emit_calls called with {:?}", op),
     }
     Ok(())
@@ -428,5 +429,74 @@ fn emit_invoke_virtual(ctx: &mut CodegenCtx) {
     asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
 
     emit_store(asm, Reg::R11, dest, regmap);
+    emit_reload_all_except(asm, regmap, Some(dest));
+}
+
+/// Emit JIT code for `OpCode::Intrinsic`.
+/// Bytecode layout: [Intrinsic | dest] [wire_byte | arg_count]
+/// Calls `jit_dispatch_intrinsic(exec_ctx, wire_byte, args_start, arg_count) -> VmValue`.
+fn emit_intrinsic(ctx: &mut CodegenCtx, first_reg: usize) {
+    let asm = &mut ctx.asm;
+    let code = ctx.code;
+    let ip = &mut ctx.ip;
+    let regmap = &ctx.regmap;
+    let helpers = ctx.helpers;
+
+    let w1 = code[*ip];
+    *ip += 1;
+    let wire_byte = (w1 >> 8) as usize;
+    let arg_count = (w1 & 0xFF) as usize;
+
+    let dest = first_reg;
+    // dest is also the start of the args slice in the stack (object = arg[0])
+
+    // Flush all live registers so the helper can read args from the stack
+    emit_flush_all(asm, regmap);
+
+    asm.push(ARG_CTX);
+    asm.push(ARG_EXEC_CTX);
+    asm.push(ARG_BASE);
+
+    let need_align = (regmap.used_phys.len() + 4) % 2 != 0;
+    if need_align {
+        asm.push(Reg::Rax);
+    }
+
+    // Set up 4 arguments for jit_dispatch_intrinsic:
+    // 1st (ARG_CTX)    = ExecCtx ptr  (currently in ARG_EXEC_CTX)
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+    // 2nd (ARG_CLOSURE) = wire_byte
+    asm.mov_reg_imm64(ARG_CLOSURE, wire_byte as u64);
+    // 3rd (ARG_BASE)   = absolute stack index of args = ARG_BASE + dest
+    asm.add_reg_imm32(ARG_BASE, dest as i32);
+    // 4th (ARG_EXEC_CTX) = arg_count
+    asm.mov_reg_imm64(ARG_EXEC_CTX, arg_count as u64);
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, -32);
+
+    asm.mov_reg_imm64(Reg::R10, helpers.dispatch_intrinsic as u64);
+    asm.call_reg(Reg::R10);
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, 32);
+
+    if need_align {
+        asm.pop(Reg::R11);
+    }
+
+    asm.pop(ARG_BASE);
+    asm.pop(ARG_EXEC_CTX);
+    asm.pop(ARG_CTX);
+
+    // Reload ARG_CTX (stack pointer) from ExecCtx in case heap reallocated
+    asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
+    // Recompute REG_FRAME_BASE = ARG_CTX + ARG_BASE * 8
+    asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_BASE);
+    asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
+    asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
+
+    // Result is in Rax; store to dest register
+    emit_store(asm, Reg::Rax, dest, regmap);
     emit_reload_all_except(asm, regmap, Some(dest));
 }

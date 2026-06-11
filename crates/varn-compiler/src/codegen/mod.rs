@@ -26,6 +26,7 @@ pub fn compile_direct(
     export_names: Vec<Rc<str>>,
 ) -> Result<FunctionProto, Rc<str>> {
     use std::cell::RefCell;
+    let escape_analysis = Rc::new(crate::analysis::escape::EscapeAnalysis::analyze(program));
     let protos = Rc::new(RefCell::new(Vec::new()));
     let mut c = Compiler::new_module(
         program.filename.clone(),
@@ -35,6 +36,7 @@ pub fn compile_direct(
         extension_set_members,
         protos,
         export_names,
+        escape_analysis,
     );
     c.compile_program(program);
     Ok(c.finish_module())

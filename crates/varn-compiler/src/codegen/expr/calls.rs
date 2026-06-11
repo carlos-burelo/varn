@@ -14,6 +14,12 @@ pub(super) fn compile_call<'a>(
     optional: bool,
     offset: u32,
 ) -> u8 {
+    if let Some(wire_byte) = c.annotations.get_intrinsic(offset) {
+        if let Some(dest) = try_emit_intrinsic(c, callee, args, offset, wire_byte) {
+            return dest;
+        }
+    }
+
     if let Some(mangled) = c.extension_calls.get(&offset).cloned() {
         if let ExprKind::Member {
             object,
@@ -326,4 +332,49 @@ pub fn compile_args_contiguous<'a>(
     }
 
     (start, count, has_spread)
+}
+
+/// Emit `OpCode::Intrinsic` for a stdlib call where the callee is `object.method(args...)`.
+/// Returns `Some(dest)` on success, `None` if the callee shape is unexpected.
+fn try_emit_intrinsic<'a>(
+    c: &mut Compiler<'a>,
+    callee: &Expr,
+    args: &[Arg],
+    _call_offset: u32,
+    wire_byte: u8,
+) -> Option<u8> {
+    let ExprKind::Member { object, computed: false, .. } = &callee.kind else {
+        return None;
+    };
+
+    let obj_reg = compile_expr(c, object);
+    let dest = obj_reg;
+
+    let mut arg_count = 1usize; // object is arg[0]
+
+    for arg in args {
+        let e = match arg {
+            Arg::Positional(e) | Arg::Named { value: e, .. } => e,
+            Arg::Spread(_) => return None,
+        };
+        let expected = dest + arg_count as u8;
+        let r = compile_expr(c, e);
+        if r != expected {
+            while c.regs.next <= expected {
+                c.regs.alloc();
+            }
+            c.chunk.emit_rr(varn_core::OpCode::Move, expected, r, c.line);
+        }
+        arg_count += 1;
+    }
+
+    let line = c.line;
+    c.chunk.write(Chunk::pack_op(varn_core::OpCode::Intrinsic, dest), line);
+    c.chunk.write(((wire_byte as u16) << 8) | (arg_count as u16), line);
+
+    for _ in 1..arg_count {
+        c.free_reg();
+    }
+
+    Some(dest)
 }

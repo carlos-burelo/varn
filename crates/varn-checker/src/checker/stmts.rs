@@ -264,9 +264,16 @@ impl Checker {
                         );
                         continue;
                     }
+                    let ann = d.type_ann.as_ref().or(match &d.id {
+                        varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                        _ => None,
+                    });
+                    let ann_ty_opt = ann.map(|node| self.resolve_type_node_cached(node, bind));
+
                     let init = d.init.as_ref().unwrap();
-                    self.check_expr(init, bind);
+                    self.with_expected(ann_ty_opt.clone(), |c| c.check_expr(init, bind));
                     let init_ty = self.infer_type(init, bind);
+                    
                     if !init_ty.is_dynamic()
                         && !self.member_exists_cached(&init_ty, dispose_method, bind)
                     {
@@ -277,7 +284,20 @@ impl Checker {
                             .with_range(d.range),
                         );
                     }
-                    self.check_pattern(&d.id, &init_ty, bind);
+
+                    if let Some(ann_ty) = &ann_ty_opt {
+                        if !self.types_compatible_cached(ann_ty, &init_ty, Some(bind)) {
+                            self.emit(
+                                Diagnostic::error(ErrorCode::TypeMismatch, format!(
+                                    "type mismatch: declared as '{ann_ty}' but initialised with '{init_ty}'"
+                                ))
+                                .with_range(d.range),
+                            );
+                        }
+                        self.check_pattern(&d.id, ann_ty, bind);
+                    } else {
+                        self.check_pattern(&d.id, &init_ty, bind);
+                    }
                 }
             }
 

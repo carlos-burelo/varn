@@ -12,6 +12,7 @@ pub(super) enum ObjectFlow {
 }
 
 impl ExecCtx {
+    #[inline(always)]
     pub(super) fn exec_objects_collections_op(
         &mut self,
         op: OpCode,
@@ -364,9 +365,6 @@ impl ExecCtx {
                 *ip += 1;
                 let v = self.stack[base + src];
                 let res = VmValue::from_bool(v.is_null());
-                if std::env::var("VARN_JIT_DEBUG").is_ok() {
-                    varn_utilities::terminal::tagged("jit:debug", format_args!("IsNull: src_val={:?}, res={:?}", v, res));
-                }
                 self.stack[base + first_reg] = res;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }

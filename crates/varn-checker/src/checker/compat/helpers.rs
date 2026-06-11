@@ -14,32 +14,38 @@ pub(super) fn is_known_named(bind: &BindResult, name: &str) -> bool {
             .is_some()
 }
 
-pub(super) fn named_members<'a>(bind: &'a BindResult, name: &str) -> Option<&'a [ClassMemberInfo]> {
-    bind.get_interface_members_local(name)
-        .or_else(|| bind.get_class_entry(name).map(|e| &e.members))
-        .or_else(|| bind.get_namespace_members_local(name))
-        .map(|v| v.as_slice())
+pub(super) fn named_members(
+    bind: &BindResult,
+    name: &str,
+    origin: Option<&str>,
+) -> Option<Vec<ClassMemberInfo>> {
+    use crate::types::TypeContext;
+    bind.get_interface_members(name, origin)
+        .or_else(|| bind.get_class_members(name, origin))
+        .or_else(|| bind.get_namespace_members(name, origin))
 }
 
 pub(super) fn compatible_named(
     declared: &str,
+    origin_decl: Option<&str>,
     inferred: &str,
+    origin_inf: Option<&str>,
     bind: Option<&BindResult>,
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
     in_progress: &mut FxHashSet<(Type, Type, usize)>,
 ) -> bool {
-    if declared == inferred {
+    if declared == inferred && origin_decl == origin_inf {
         return true;
     }
     let Some(bind) = bind else {
         return true;
     };
 
-    let decl_members = named_members(bind, declared);
-    let inf_members = named_members(bind, inferred);
+    let decl_members = named_members(bind, declared, origin_decl);
+    let inf_members = named_members(bind, inferred, origin_inf);
 
     match (decl_members, inf_members) {
-        (Some(decl), Some(inf)) => class_members_compatible(decl, inf, bind, cache, in_progress),
+        (Some(decl), Some(inf)) => class_members_compatible(&decl, &inf, bind, cache, in_progress),
         _ => !is_known_named(bind, declared) || !is_known_named(bind, inferred),
     }
 }

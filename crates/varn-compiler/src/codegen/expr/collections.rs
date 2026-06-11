@@ -175,7 +175,7 @@ pub(super) fn compile_object<'a>(c: &mut Compiler<'a>, properties: &[ObjectProp]
                     *is_generator,
                     true,
                 );
-                let closure_reg = emit_closure(c, proto, upvalues);
+                let closure_reg = emit_closure(c, proto, upvalues, 0);
                 pending_pairs.push((key_idx, closure_reg));
             }
             ObjectProp::Spread { argument, .. } => {

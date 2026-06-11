@@ -13,6 +13,7 @@ pub(super) enum ControlCallFlow {
 }
 
 impl ExecCtx {
+    #[inline(always)]
     pub(super) fn exec_control_calls_op(
         &mut self,
         op: OpCode,
@@ -41,9 +42,6 @@ impl ExecCtx {
                 let offset = ((code[*ip] as u32) << 16 | code[*ip + 1] as u32) as usize;
                 *ip += 2;
                 let cond = self.stack[base + first_reg];
-                if std::env::var("VARN_JIT_DEBUG").is_ok() {
-                    varn_utilities::terminal::tagged("jit:debug", format_args!("JumpIfFalse: cond={:?}, is_truthy={}", cond, cond.is_truthy()));
-                }
                 if !cond.is_truthy() {
                     *ip += offset;
                 }
@@ -53,9 +51,6 @@ impl ExecCtx {
                 let offset = ((code[*ip] as u32) << 16 | code[*ip + 1] as u32) as usize;
                 *ip += 2;
                 let cond = self.stack[base + first_reg];
-                if std::env::var("VARN_JIT_DEBUG").is_ok() {
-                    varn_utilities::terminal::tagged("jit:debug", format_args!("JumpIfTrue: cond={:?}, is_truthy={}", cond, cond.is_truthy()));
-                }
                 if cond.is_truthy() {
                     *ip += offset;
                 }

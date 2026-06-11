@@ -305,6 +305,8 @@ impl ExecCtx {
                     | OpCode::SubInt
                     | OpCode::MulInt
                     | OpCode::DivInt
+                    | OpCode::ModInt
+                    | OpCode::PowInt
                     | OpCode::LtInt
                     | OpCode::GtInt
                     | OpCode::LteInt
@@ -315,6 +317,8 @@ impl ExecCtx {
                     | OpCode::SubFloat
                     | OpCode::MulFloat
                     | OpCode::DivFloat
+                    | OpCode::ModFloat
+                    | OpCode::PowFloat
                     | OpCode::LtFloat
                     | OpCode::GtFloat
                     | OpCode::LteFloat
@@ -544,6 +548,47 @@ impl ExecCtx {
                         let frame_idx2 = self.frames.len() - 1;
                         ip = self.frames[frame_idx2].ip;
                     }
+                    OpCode::Intrinsic => {
+                        let w1 = code[ip];
+                        ip += 1;
+                        let wire_byte = (w1 >> 8) as u8;
+                        // arg_count includes object at dest (arg[0]); slice starts at dest
+                        let arg_count = (w1 & 0xFF) as usize;
+                        let args_start = base + first_reg;
+                        let result = crate::exec::intrinsics::dispatch(
+                            wire_byte,
+                            &self.stack[args_start..args_start + arg_count],
+                            &mut self.heap,
+                        )?;
+                        self.stack[base + first_reg] = result;
+                    }
+
+                    OpCode::LoadStaticFn => {
+                        let proto_idx = code[ip] as usize;
+                        ip += 1;
+                        let dest = first_reg;
+                        let proto = match closure.proto.chunk.constants.get(proto_idx) {
+                            Some(varn_types::PoolEntry::Function(p)) => p,
+                            _ => {
+                                return Err(crate::error::RuntimeError::new(format!(
+                                    "LoadStaticFn: const {proto_idx} is not a function"
+                                )))
+                            }
+                        };
+                        let proto_ptr = std::rc::Rc::as_ptr(proto) as usize;
+                        if let Some(&cached) = self.static_closures.get(&proto_ptr) {
+                            self.stack[base + dest] = cached;
+                        } else {
+                            let constants = std::rc::Rc::new(crate::exec::calls::resolve_constants(proto, &mut self.heap));
+                            let vm_closure = std::rc::Rc::new(
+                                crate::frame::VmClosure::with_upvalues(proto.clone(), vec![], constants),
+                            );
+                            let val = self.heap.alloc_vm_closure(vm_closure);
+                            self.static_closures.insert(proto_ptr, val);
+                            self.stack[base + dest] = val;
+                        }
+                    }
+
                     OpCode::Nop => {}
                 }
 

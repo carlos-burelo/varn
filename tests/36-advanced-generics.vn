@@ -153,6 +153,7 @@ const expensiveFib = memoize((n) => {
 expensiveFib(5)
 expensiveFib(5)
 expensiveFib(5)
+print("DEBUG callCount =", callCount)
 assert("memoize called once", callCount === 1)
 
 // ── Generic counter factory ───────────────────────────────────────

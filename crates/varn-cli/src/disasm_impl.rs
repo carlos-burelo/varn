@@ -135,6 +135,8 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
             | OpCode::SubInt
             | OpCode::MulInt
             | OpCode::DivInt
+            | OpCode::ModInt
+            | OpCode::PowInt
             | OpCode::LtInt
             | OpCode::GtInt
             | OpCode::LteInt
@@ -145,6 +147,8 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
             | OpCode::SubFloat
             | OpCode::MulFloat
             | OpCode::DivFloat
+            | OpCode::ModFloat
+            | OpCode::PowFloat
             | OpCode::LtFloat
             | OpCode::GtFloat
             | OpCode::LteFloat
@@ -325,6 +329,10 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
                 let w2 = code.get(offset + 2).copied().unwrap_or(0);
                 println!("{:?} {} {}", op, w1, w2);
                 offset + 3
+            }
+
+            OpCode::Intrinsic | OpCode::LoadStaticFn => {
+                offset + 2
             }
 
             OpCode::AddImm | OpCode::SubImm => {
