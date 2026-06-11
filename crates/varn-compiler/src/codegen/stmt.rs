@@ -616,7 +616,7 @@ fn compile_fn_decl<'a>(c: &mut Compiler<'a>, decl: &FunctionDecl) {
         decl.modifiers.is_generator,
         false,
     );
-    let closure_reg = emit_closure(c, proto, upvalues);
+    let closure_reg = emit_closure(c, proto, upvalues, 0);
 
     if c.is_global {
         let idx = c.add_str(&decl.id);

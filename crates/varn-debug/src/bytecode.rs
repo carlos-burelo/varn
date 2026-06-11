@@ -144,6 +144,8 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             | OpCode::SubInt
             | OpCode::MulInt
             | OpCode::DivInt
+            | OpCode::ModInt
+            | OpCode::PowInt
             | OpCode::LtInt
             | OpCode::GtInt
             | OpCode::LteInt
@@ -154,6 +156,8 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             | OpCode::SubFloat
             | OpCode::MulFloat
             | OpCode::DivFloat
+            | OpCode::ModFloat
+            | OpCode::PowFloat
             | OpCode::LtFloat
             | OpCode::GtFloat
             | OpCode::LteFloat
@@ -493,6 +497,23 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                     reg_list.push(format!("r{}", hi(w!())));
                 }
                 format!("r{dest} = concat({})", reg_list.join(", "))
+            }
+
+            OpCode::Intrinsic => {
+                let dest = hi(op_val);
+                let w1 = w!();
+                let wire_byte = (w1 >> 8) as u8;
+                let arg_count = (w1 & 0xFF) as usize;
+                format!("r{dest} = intrinsic(0x{wire_byte:02x}, {arg_count} args)")
+            }
+
+            OpCode::LoadStaticFn => {
+                let dest = hi(op_val);
+                let proto_idx = w!();
+                if let Some(c) = proto.chunk.constants.get(proto_idx as usize) {
+                    hint = format!("{:?}", c);
+                }
+                format!("r{dest} = static_fn[{proto_idx}]")
             }
         };
 

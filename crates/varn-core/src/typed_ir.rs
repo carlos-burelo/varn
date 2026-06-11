@@ -8,6 +8,7 @@ pub struct ExprAnnotation {
     pub type_only: bool,
     pub call_mapping: Option<Vec<Option<usize>>>,
     pub slot_idx: Option<usize>,
+    pub intrinsic: Option<u8>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -61,6 +62,14 @@ impl TypeAnnotations {
 
     pub fn get_slot_idx(&self, offset: u32) -> Option<usize> {
         self.inner.get(&offset)?.slot_idx
+    }
+
+    pub fn record_intrinsic(&mut self, offset: u32, wire_byte: u8) {
+        self.inner.entry(offset).or_default().intrinsic = Some(wire_byte);
+    }
+
+    pub fn get_intrinsic(&self, offset: u32) -> Option<u8> {
+        self.inner.get(&offset)?.intrinsic
     }
 
     pub fn is_empty(&self) -> bool {

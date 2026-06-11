@@ -6,6 +6,7 @@ use varn_core::OpCode;
 use super::{hi, lo};
 
 impl ExecCtx {
+    #[inline(always)]
     pub(super) fn exec_literals_vars_op(
         &mut self,
         op: OpCode,

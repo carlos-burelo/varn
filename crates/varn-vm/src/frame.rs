@@ -157,6 +157,7 @@ impl VmClosure {
             load_upvalue: crate::exec::ctx::jit_load_upvalue as usize,
             store_upvalue: crate::exec::ctx::jit_store_upvalue as usize,
             make_closure: crate::exec::ctx::jit_make_closure as usize,
+            load_static_fn: crate::exec::ctx::jit_load_static_fn as usize,
             call: crate::exec::ctx::jit_call as usize,
             call_method: crate::exec::ctx::jit_call_method as usize,
             get_property: crate::exec::ctx::jit_get_property as usize,
@@ -223,6 +224,7 @@ impl VmClosure {
             get_property_maybe_ic_fast: crate::exec::ctx::jit_get_property_maybe_ic_fast as usize,
             jit_prepare_call: crate::exec::ctx::jit_prepare_call as usize,
             jit_post_call: crate::exec::ctx::jit_post_call as usize,
+            dispatch_intrinsic: crate::exec::ctx::jit_dispatch_intrinsic as usize,
         };
         match varn_jit::compile(&self.proto, &self.constants, helpers) {
             Ok((entry, code)) => {

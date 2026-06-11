@@ -414,6 +414,8 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
             | OpCode::SubInt
             | OpCode::MulInt
             | OpCode::DivInt
+            | OpCode::ModInt
+            | OpCode::PowInt
             | OpCode::LtInt
             | OpCode::GtInt
             | OpCode::LteInt
@@ -424,6 +426,8 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
             | OpCode::SubFloat
             | OpCode::MulFloat
             | OpCode::DivFloat
+            | OpCode::ModFloat
+            | OpCode::PowFloat
             | OpCode::LtFloat
             | OpCode::GtFloat
             | OpCode::LteFloat
@@ -507,7 +511,7 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
                 }
             }
 
-            OpCode::AddImm | OpCode::SubImm => {
+            OpCode::AddImm | OpCode::SubImm | OpCode::Intrinsic | OpCode::LoadStaticFn => {
                 ip += 2;
             }
 

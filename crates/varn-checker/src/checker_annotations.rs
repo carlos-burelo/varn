@@ -7,7 +7,7 @@ use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::{Arg, ArrayEl, Decl, Expr, ExprKind, ForInit, Program, Stmt, StmtKind};
 use varn_core::ast::{ExportDecl, ImportSpecifier};
 use varn_core::TypeKind;
-use varn_core::{NumericKind, TypeAnnotations};
+use varn_core::{intrinsic_ops::intrinsic_lookup, NumericKind, TypeAnnotations};
 
 #[derive(Clone)]
 struct AnnotateCtx<'a> {
@@ -424,6 +424,18 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                     Arg::Named { value, .. } => value,
                 };
                 annotate_expr(e, ann, ctx);
+            }
+            // Detect calls to stdlib intrinsic functions: module.fn(...)
+            if let ExprKind::Member { object, property, computed: false, .. } = &callee.kind {
+                if let ExprKind::Identifier { name: prop_name } = &property.kind {
+                    let obj_ty = infer_expr_type(object, Some(ctx));
+                    if let TypeKind::Named(_, Some(ref origin_path)) = &obj_ty.non_nullified().0 {
+                        let key = format!("{}/{}", origin_path, prop_name);
+                        if let Some(wire_byte) = intrinsic_lookup(&key) {
+                            ann.record_intrinsic(expr.range.start.offset, wire_byte);
+                        }
+                    }
+                }
             }
         }
         ExprKind::Member {

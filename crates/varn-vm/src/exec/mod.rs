@@ -15,6 +15,7 @@ pub mod ctx_tasks;
 pub mod dispatch;
 pub mod exceptions;
 pub mod frame_ctrl;
+pub mod intrinsics;
 pub mod modules;
 pub mod props;
 pub mod strings;

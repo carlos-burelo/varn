@@ -207,7 +207,7 @@ pub fn compile_class_expr<'a>(c: &mut Compiler<'a>, decl: &ClassDecl) -> u8 {
                 has_constructor = true;
                 let (proto, upvalues) =
                     compile_function(c, "constructor".into(), params, body, false, false, true);
-                let ctor_reg = emit_closure(c, proto, upvalues);
+                let ctor_reg = emit_closure(c, proto, upvalues, 0);
                 let key_idx = c.add_str("constructor");
                 let line = c.line;
                 c.chunk.emit(OpCode::Method, line);
@@ -232,7 +232,7 @@ pub fn compile_class_expr<'a>(c: &mut Compiler<'a>, decl: &ClassDecl) -> u8 {
                     modifiers.is_generator,
                     !modifiers.is_static,
                 );
-                let method_reg = emit_closure(c, proto, upvalues);
+                let method_reg = emit_closure(c, proto, upvalues, 0);
                 apply_method_decorators(c, class_reg, method_reg, key, modifiers, decorators);
                 let key_idx = c.add_str(key);
                 let line = c.line;
@@ -261,7 +261,7 @@ pub fn compile_class_expr<'a>(c: &mut Compiler<'a>, decl: &ClassDecl) -> u8 {
                     false,
                     !modifiers.is_static,
                 );
-                let fn_reg = emit_closure(c, proto, upvalues);
+                let fn_reg = emit_closure(c, proto, upvalues, 0);
                 let key_idx = c.add_str(key);
                 let line = c.line;
                 let op = if modifiers.is_static {
@@ -290,7 +290,7 @@ pub fn compile_class_expr<'a>(c: &mut Compiler<'a>, decl: &ClassDecl) -> u8 {
                     false,
                     !modifiers.is_static,
                 );
-                let fn_reg = emit_closure(c, proto, upvalues);
+                let fn_reg = emit_closure(c, proto, upvalues, 0);
                 let key_idx = c.add_str(key);
                 let line = c.line;
                 let op = if modifiers.is_static {
@@ -313,7 +313,7 @@ pub fn compile_class_expr<'a>(c: &mut Compiler<'a>, decl: &ClassDecl) -> u8 {
                     false,
                     false,
                 );
-                let fn_reg = emit_closure(c, proto, upvalues);
+                let fn_reg = emit_closure(c, proto, upvalues, 0);
                 let result = c.alloc_reg();
                 let line = c.line;
                 c.chunk.emit(OpCode::Call, line);
@@ -325,7 +325,7 @@ pub fn compile_class_expr<'a>(c: &mut Compiler<'a>, decl: &ClassDecl) -> u8 {
             ClassMember::Destructor { body, .. } => {
                 let (proto, upvalues) =
                     compile_function(c, Rc::from("dispose"), &[], body, false, false, true);
-                let fn_reg = emit_closure(c, proto, upvalues);
+                let fn_reg = emit_closure(c, proto, upvalues, 0);
                 let key_idx = c.add_str("dispose");
                 let line = c.line;
                 c.chunk.emit(OpCode::Method, line);
@@ -344,7 +344,7 @@ pub fn compile_class_expr<'a>(c: &mut Compiler<'a>, decl: &ClassDecl) -> u8 {
         );
         let (proto, upvalues) =
             compile_function(c, Rc::from("constructor"), &[], &empty, false, false, true);
-        let ctor_reg = emit_closure(c, proto, upvalues);
+        let ctor_reg = emit_closure(c, proto, upvalues, 0);
         let key_idx = c.add_str("constructor");
         let line = c.line;
         c.chunk.emit(OpCode::Method, line);
@@ -490,7 +490,7 @@ fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
                 has_constructor = true;
                 let (proto, upvalues) =
                     compile_function(c, "constructor".into(), params, body, false, false, true);
-                let ctor_reg = emit_closure(c, proto, upvalues);
+                let ctor_reg = emit_closure(c, proto, upvalues, 0);
                 let key_idx = c.add_str("constructor");
                 let line = c.line;
                 c.chunk.emit(OpCode::Method, line);
@@ -515,7 +515,7 @@ fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
                     modifiers.is_generator,
                     !modifiers.is_static,
                 );
-                let method_reg = emit_closure(c, proto, upvalues);
+                let method_reg = emit_closure(c, proto, upvalues, 0);
                 apply_method_decorators(c, class_reg, method_reg, key, modifiers, decorators);
                 let key_idx = c.add_str(key);
                 let line = c.line;
@@ -544,7 +544,7 @@ fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
                     false,
                     !modifiers.is_static,
                 );
-                let fn_reg = emit_closure(c, proto, upvalues);
+                let fn_reg = emit_closure(c, proto, upvalues, 0);
                 let key_idx = c.add_str(key);
                 let line = c.line;
                 let op = if modifiers.is_static {
@@ -573,7 +573,7 @@ fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
                     false,
                     !modifiers.is_static,
                 );
-                let fn_reg = emit_closure(c, proto, upvalues);
+                let fn_reg = emit_closure(c, proto, upvalues, 0);
                 let key_idx = c.add_str(key);
                 let line = c.line;
                 let op = if modifiers.is_static {
@@ -596,7 +596,7 @@ fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
                     false,
                     false,
                 );
-                let fn_reg = emit_closure(c, proto, upvalues);
+                let fn_reg = emit_closure(c, proto, upvalues, 0);
                 let result = c.alloc_reg();
                 let line = c.line;
                 c.chunk.emit(OpCode::Call, line);
@@ -608,7 +608,7 @@ fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
             ClassMember::Destructor { body, .. } => {
                 let (proto, upvalues) =
                     compile_function(c, Rc::from("dispose"), &[], body, false, false, true);
-                let fn_reg = emit_closure(c, proto, upvalues);
+                let fn_reg = emit_closure(c, proto, upvalues, 0);
                 let key_idx = c.add_str("dispose");
                 let line = c.line;
                 c.chunk.emit(OpCode::Method, line);
@@ -627,7 +627,7 @@ fn compile_enum_expr<'a>(c: &mut Compiler<'a>, en: &EnumDecl) -> u8 {
         );
         let (proto, upvalues) =
             compile_function(c, Rc::from("constructor"), &[], &empty, false, false, true);
-        let ctor_reg = emit_closure(c, proto, upvalues);
+        let ctor_reg = emit_closure(c, proto, upvalues, 0);
         let key_idx = c.add_str("constructor");
         let line = c.line;
         c.chunk.emit(OpCode::Method, line);
@@ -799,7 +799,7 @@ pub fn compile_extension_decl<'a>(c: &mut Compiler<'a>, decl: &ExtensionDecl) {
                     method.modifiers.is_generator,
                     true,
                 );
-                let r = emit_closure(c, proto, upvalues);
+                let r = emit_closure(c, proto, upvalues, 0);
                 let idx = c.add_str(&mangled);
                 let line = c.line;
                 c.chunk.emit_rrc(OpCode::DefineGlobal, 0, r, idx, line);
@@ -809,7 +809,7 @@ pub fn compile_extension_decl<'a>(c: &mut Compiler<'a>, decl: &ExtensionDecl) {
                 let mangled: Rc<str> = Rc::from(format!("__extget_{type_name}_{key}"));
                 let (proto, upvalues) =
                     compile_function(c, mangled.clone(), &[], body, false, false, true);
-                let r = emit_closure(c, proto, upvalues);
+                let r = emit_closure(c, proto, upvalues, 0);
                 let idx = c.add_str(&mangled);
                 let line = c.line;
                 c.chunk.emit_rrc(OpCode::DefineGlobal, 0, r, idx, line);
@@ -828,7 +828,7 @@ pub fn compile_extension_decl<'a>(c: &mut Compiler<'a>, decl: &ExtensionDecl) {
                     false,
                     true,
                 );
-                let r = emit_closure(c, proto, upvalues);
+                let r = emit_closure(c, proto, upvalues, 0);
                 let idx = c.add_str(&mangled);
                 let line = c.line;
                 c.chunk.emit_rrc(OpCode::DefineGlobal, 0, r, idx, line);

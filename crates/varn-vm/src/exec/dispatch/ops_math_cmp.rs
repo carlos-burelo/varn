@@ -7,6 +7,7 @@ use varn_core::OpCode;
 use super::{hi, lo};
 
 impl ExecCtx {
+    #[inline(always)]
     pub(super) fn exec_math_cmp_op(
         &mut self,
         op: OpCode,
@@ -86,7 +87,12 @@ impl ExecCtx {
                         crate::exec::arith::sub(v, VmValue::from_int(imm), &mut self.heap)?;
                 }
             }
-            OpCode::AddInt | OpCode::SubInt | OpCode::MulInt | OpCode::DivInt => {
+            OpCode::AddInt
+            | OpCode::SubInt
+            | OpCode::MulInt
+            | OpCode::DivInt
+            | OpCode::ModInt
+            | OpCode::PowInt => {
                 let w1 = code[*ip];
                 *ip += 1;
                 let (src1, src2) = (hi(w1), lo(w1));
@@ -132,6 +138,26 @@ impl ExecCtx {
                                 VmValue::from_f64(av as f64 / bv as f64)
                             }
                         }
+                        OpCode::ModInt => {
+                            let bv = b.as_int();
+                            if bv == 0 {
+                                return Err(crate::error::RuntimeError::new("modulo by zero"));
+                            }
+                            VmValue::from_int(a.as_int() % bv)
+                        }
+                        OpCode::PowInt => {
+                            let base = a.as_int();
+                            let exp = b.as_int();
+                            if exp >= 0 && exp <= 62 {
+                                if let Some(r) = base.checked_pow(exp as u32) {
+                                    VmValue::from_int(r)
+                                } else {
+                                    VmValue::from_f64((a.as_int() as f64).powf(b.as_int() as f64))
+                                }
+                            } else {
+                                VmValue::from_f64((a.as_int() as f64).powf(b.as_int() as f64))
+                            }
+                        }
                         _ => unreachable!(),
                     }
                 } else {
@@ -140,6 +166,8 @@ impl ExecCtx {
                         OpCode::SubInt => OpCode::Sub,
                         OpCode::MulInt => OpCode::Mul,
                         OpCode::DivInt => OpCode::Div,
+                        OpCode::ModInt => OpCode::Mod,
+                        OpCode::PowInt => OpCode::Pow,
                         _ => unreachable!(),
                     };
                     self.exec_arith(generic_op, a, b)?
@@ -182,7 +210,12 @@ impl ExecCtx {
                 };
                 self.stack[base + first_reg] = res;
             }
-            OpCode::AddFloat | OpCode::SubFloat | OpCode::MulFloat | OpCode::DivFloat => {
+            OpCode::AddFloat
+            | OpCode::SubFloat
+            | OpCode::MulFloat
+            | OpCode::DivFloat
+            | OpCode::ModFloat
+            | OpCode::PowFloat => {
                 let w1 = code[*ip];
                 *ip += 1;
                 let (src1, src2) = (hi(w1), lo(w1));
@@ -200,6 +233,14 @@ impl ExecCtx {
                             }
                             VmValue::from_f64(a.to_f64() / bv)
                         }
+                        OpCode::ModFloat => {
+                            let bv = b.to_f64();
+                            if bv == 0.0 {
+                                return Err(crate::error::RuntimeError::new("modulo by zero"));
+                            }
+                            VmValue::from_f64(a.to_f64() % bv)
+                        }
+                        OpCode::PowFloat => VmValue::from_f64(a.to_f64().powf(b.to_f64())),
                         _ => unreachable!(),
                     }
                 } else {
@@ -208,6 +249,8 @@ impl ExecCtx {
                         OpCode::SubFloat => OpCode::Sub,
                         OpCode::MulFloat => OpCode::Mul,
                         OpCode::DivFloat => OpCode::Div,
+                        OpCode::ModFloat => OpCode::Mod,
+                        OpCode::PowFloat => OpCode::Pow,
                         _ => unreachable!(),
                     };
                     self.exec_arith(generic_op, a, b)?

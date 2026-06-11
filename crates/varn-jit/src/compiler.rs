@@ -44,7 +44,8 @@ pub fn compile_proto(
             | OpCode::LoadGlobalIdx
             | OpCode::LoadGlobal
             | OpCode::LoadUpvalue
-            | OpCode::StoreUpvalue => {
+            | OpCode::StoreUpvalue
+            | OpCode::LoadStaticFn => {
                 ip += 1;
             }
             OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx => {
@@ -115,6 +116,9 @@ pub fn compile_proto(
                 let uv_count = (w1 & 0xFF) as usize;
                 ip += 1;
                 ip += uv_count;
+            }
+            OpCode::Intrinsic => {
+                ip += 1; // wire_byte + arg_count word
             }
             OpCode::AddInt
             | OpCode::SubInt
@@ -272,7 +276,11 @@ pub fn compile_proto(
             | OpCode::SubFloat
             | OpCode::MulFloat
             | OpCode::DivFloat
+            | OpCode::ModFloat
+            | OpCode::PowFloat
             | OpCode::DivInt
+            | OpCode::ModInt
+            | OpCode::PowInt
             | OpCode::BitAnd
             | OpCode::BitOr
             | OpCode::BitXor
@@ -312,7 +320,7 @@ pub fn compile_proto(
                 emit_jumps(&mut cctx, op, first_reg)?
             }
 
-            OpCode::LoadUpvalue | OpCode::StoreUpvalue | OpCode::MakeClosure => {
+            OpCode::LoadUpvalue | OpCode::StoreUpvalue | OpCode::MakeClosure | OpCode::LoadStaticFn => {
                 emit_closures(&mut cctx, op, first_reg)?
             }
 
@@ -328,6 +336,10 @@ pub fn compile_proto(
             | OpCode::ArrayPop
             | OpCode::ArrayExtend
             | OpCode::BuildStr => emit_arrays(&mut cctx, op, first_reg)?,
+
+            OpCode::Intrinsic => {
+                emit_calls(&mut cctx, op, first_reg)?
+            },
 
             OpCode::StrConcat | OpCode::StrSlice | OpCode::StrLength => {
                 emit_strings(&mut cctx, op, first_reg)?

@@ -773,3 +773,56 @@ pub extern "C" fn jit_post_call(
         resolve_constructor_return(ctx_ref, returning_frame_idx, val)
     }
 }
+
+pub extern "C" fn jit_load_static_fn(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    proto_idx: usize,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let closure_ref = &*closure;
+        let proto = match closure_ref.proto.chunk.constants.get(proto_idx) {
+            Some(varn_types::PoolEntry::Function(p)) => p,
+            _ => panic!("LoadStaticFn: invalid function proto"),
+        };
+        let proto_ptr = std::rc::Rc::as_ptr(proto) as usize;
+        if let Some(&cached) = ctx_ref.static_closures.get(&proto_ptr) {
+            return cached;
+        }
+        let constants = ctx_ref
+            .proto_constants
+            .entry(proto_ptr)
+            .or_insert_with(|| {
+                std::rc::Rc::new(crate::exec::calls::resolve_constants(
+                    proto,
+                    &mut ctx_ref.heap,
+                ))
+            })
+            .clone();
+        let new_closure = crate::frame::VmClosure::with_upvalues(proto.clone(), vec![], constants);
+        let val = ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(new_closure));
+        ctx_ref.static_closures.insert(proto_ptr, val);
+        val
+    }
+}
+
+/// JIT helper: dispatch an intrinsic opcode from JIT-compiled code.
+/// Signature matches the `op: u8, args_start: usize, arg_count: usize` calling convention.
+/// The args are read directly from the stack starting at `args_start`.
+/// The result is written back into `stack[args_start]` (the dest register = first arg = object).
+pub extern "C" fn jit_dispatch_intrinsic(
+    ctx: *mut ExecCtx,
+    wire_byte: usize,
+    args_start: usize,
+    arg_count: usize,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let args = &ctx_ref.stack[args_start..args_start + arg_count];
+        match crate::exec::intrinsics::dispatch(wire_byte as u8, args, &mut ctx_ref.heap) {
+            Ok(v) => v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+    }
+}

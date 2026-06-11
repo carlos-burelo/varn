@@ -233,6 +233,7 @@ pub struct Compiler<'a> {
     pub parent: *mut Compiler<'a>,
     pub parent_depth: usize,
     pub export_names: Vec<Rc<str>>,
+    pub escape_analysis: Rc<crate::analysis::escape::EscapeAnalysis>,
 }
 
 impl<'a> Compiler<'a> {
@@ -244,6 +245,7 @@ impl<'a> Compiler<'a> {
         extension_set_members: &'a FxHashMap<u32, Rc<str>>,
         protos: Rc<RefCell<Vec<FunctionProto>>>,
         export_names: Vec<Rc<str>>,
+        escape_analysis: Rc<crate::analysis::escape::EscapeAnalysis>,
     ) -> Self {
         let mut chunk = Chunk::new();
         chunk.source_file = source_file.clone();
@@ -279,6 +281,7 @@ impl<'a> Compiler<'a> {
             parent: null_mut(),
             parent_depth: 0,
             export_names,
+            escape_analysis,
         }
     }
 
@@ -300,6 +303,7 @@ impl<'a> Compiler<'a> {
     ) -> Self {
         let mut chunk = Chunk::new();
         chunk.source_file = source_file.clone();
+        let escape_analysis = unsafe { (*parent).escape_analysis.clone() };
         Self {
             chunk,
             scopes: vec![FxHashMap::default()],
@@ -332,6 +336,7 @@ impl<'a> Compiler<'a> {
             parent,
             parent_depth,
             export_names: Vec::new(),
+            escape_analysis,
         }
     }
 
@@ -646,6 +651,7 @@ impl<'a> Compiler<'a> {
             cache_count,
             chunk: self.chunk,
             required_caps,
+            register_meta: Vec::new(),
             jit_entry: Cell::new(None),
             jit_code: RefCell::new(None),
             jit_failed: Cell::new(false),
@@ -657,8 +663,10 @@ impl<'a> Compiler<'a> {
             feedback: std::rc::Rc::new(std::cell::RefCell::new(
                 varn_types::chunk::FeedbackVector::new(cache_count),
             )),
+            static_closure_val: Cell::new(0),
         };
         super::regalloc_post::optimize_function(&mut proto);
+        crate::analysis::slot_kinds::infer(&mut proto);
         proto
     }
 
@@ -677,6 +685,7 @@ impl<'a> Compiler<'a> {
             cache_count,
             chunk: self.chunk,
             required_caps: Vec::new(),
+            register_meta: Vec::new(),
             jit_entry: Cell::new(None),
             jit_code: RefCell::new(None),
             jit_failed: Cell::new(false),
@@ -688,8 +697,10 @@ impl<'a> Compiler<'a> {
             feedback: std::rc::Rc::new(std::cell::RefCell::new(
                 varn_types::chunk::FeedbackVector::new(cache_count),
             )),
+            static_closure_val: Cell::new(0),
         };
         super::regalloc_post::optimize_function(&mut proto);
+        crate::analysis::slot_kinds::infer(&mut proto);
         (proto, self.upvalues)
     }
 

@@ -475,6 +475,9 @@ pub struct FunctionProto {
     #[serde(default)]
     pub required_caps: Vec<std::rc::Rc<str>>,
 
+    #[serde(skip, default)]
+    pub register_meta: Vec<crate::register_meta::RegisterMeta>,
+
     #[serde(skip)]
     #[serde(default)]
     pub jit_entry: std::cell::Cell<Option<usize>>,
@@ -492,6 +495,13 @@ pub struct FunctionProto {
 
     #[serde(skip, default = "proto_feedback_default")]
     pub feedback: Rc<RefCell<FeedbackVector>>,
+
+    /// Cache for `LoadStaticFn`: stores the heap-allocated VmValue of this
+    /// closure after the first creation, as a raw u64 (NaN-boxed). Zero means
+    /// not yet cached. Avoids a HashMap lookup on every `LoadStaticFn`.
+    #[serde(skip)]
+    #[serde(default)]
+    pub static_closure_val: std::cell::Cell<u64>,
 }
 
 fn proto_ic_default() -> Rc<RefCell<Vec<PolyICSlot>>> {

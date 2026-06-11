@@ -67,6 +67,16 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
     let s = InstrInfo::simple;
     let info = match op {
         OpCode::PopTry | OpCode::Nop => s(1, None, vec![]),
+        OpCode::Intrinsic => {
+            // w1 = (wire_byte << 8) | arg_count; arg_count includes object at dest0
+            let arg_count = lo1 as usize;
+            let mut uses = vec![];
+            for i in 0..arg_count {
+                uses.push(dest0.wrapping_add(i as u8));
+            }
+            InstrInfo { len: 2, def: Some(dest0), uses, call_args: Some((dest0, arg_count as u8)), opaque: false }
+        }
+        OpCode::LoadStaticFn => s(2, Some(dest0), vec![]),
 
         OpCode::LoadNull
         | OpCode::LoadTrue
@@ -199,6 +209,8 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
         | OpCode::SubInt
         | OpCode::MulInt
         | OpCode::DivInt
+        | OpCode::ModInt
+        | OpCode::PowInt
         | OpCode::LtInt
         | OpCode::GtInt
         | OpCode::LteInt
@@ -209,6 +221,8 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
         | OpCode::SubFloat
         | OpCode::MulFloat
         | OpCode::DivFloat
+        | OpCode::ModFloat
+        | OpCode::PowFloat
         | OpCode::LtFloat
         | OpCode::GtFloat
         | OpCode::LteFloat
@@ -605,6 +619,8 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                 | OpCode::SubInt
                 | OpCode::MulInt
                 | OpCode::DivInt
+                | OpCode::ModInt
+                | OpCode::PowInt
                 | OpCode::LtInt
                 | OpCode::GtInt
                 | OpCode::LteInt
@@ -615,6 +631,8 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                 | OpCode::SubFloat
                 | OpCode::MulFloat
                 | OpCode::DivFloat
+                | OpCode::ModFloat
+                | OpCode::PowFloat
                 | OpCode::LtFloat
                 | OpCode::GtFloat
                 | OpCode::LteFloat
@@ -644,8 +662,10 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                 OpCode::GetPropertyMaybe
                 | OpCode::GetFixedField
                 | OpCode::GetSymbol => {
-                    code[offset] = pack_op(op, m(mapping, dest0));
-                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                    let new_dest = m(mapping, dest0);
+                    let new_obj = if dest0 == hi1 { new_dest } else { m(mapping, hi1) };
+                    code[offset] = pack_op(op, new_dest);
+                    code[offset + 1] = pack(new_obj, lo1);
                 }
 
                 OpCode::BindMethod => {
@@ -677,8 +697,11 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                 }
 
                 OpCode::GetProperty => {
-                    code[offset] = pack_op(op, m(mapping, dest0));
-                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                    let new_dest = m(mapping, dest0);
+                    // When dest==src (in-place load), keep them aliased after remapping.
+                    let new_obj = if dest0 == hi1 { new_dest } else { m(mapping, hi1) };
+                    code[offset] = pack_op(op, new_dest);
+                    code[offset + 1] = pack(new_obj, lo1);
                 }
                 OpCode::SetProperty => {
                     code[offset] = pack_op(op, m(mapping, dest0));
@@ -765,6 +788,14 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
                 }
 
+                OpCode::Intrinsic => {
+                    // dest0 is the object/dest register; wire_byte+arg_count in word 1 are not regs
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                }
+                OpCode::LoadStaticFn => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    // word 1 is proto_idx constant — not a register
+                }
                 OpCode::AddImm | OpCode::SubImm => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), lo1);

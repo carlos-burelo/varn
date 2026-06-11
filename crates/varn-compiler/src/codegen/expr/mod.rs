@@ -265,7 +265,7 @@ pub fn compile_expr<'a>(c: &mut Compiler<'a>, expr: &Expr) -> u8 {
             let name = fn_id.clone().unwrap_or_else(|| Rc::from("<anonymous>"));
             let (proto, upvalues) =
                 compile_function(c, name, params, body, *is_async, *is_generator, false);
-            emit_closure(c, proto, upvalues)
+            emit_closure(c, proto, upvalues, expr.id)
         }
         ExprKind::Arrow {
             params,
@@ -291,7 +291,7 @@ pub fn compile_expr<'a>(c: &mut Compiler<'a>, expr: &Expr) -> u8 {
                 false,
                 false,
             );
-            emit_closure(c, proto, upvalues)
+            emit_closure(c, proto, upvalues, expr.id)
         }
         ExprKind::ClassExpr { declaration } => super::class::compile_class_expr(c, declaration),
 

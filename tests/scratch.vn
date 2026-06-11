@@ -1,0 +1,2 @@
+import { Math } from 'std:math';
+print(Math.abs(-10.5));

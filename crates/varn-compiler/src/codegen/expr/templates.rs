@@ -85,7 +85,7 @@ pub(super) fn compile_pipeline<'a>(c: &mut Compiler<'a>, left: &Expr, right: &Ex
         );
         let (proto, upvalues) =
             compile_function(c, Rc::from("<pipe>"), &[param], &body, false, false, false);
-        emit_closure(c, proto, upvalues)
+        emit_closure(c, proto, upvalues, 0)
     } else {
         compile_expr(c, right)
     };

@@ -36,8 +36,8 @@ pub use super::ctx_jit_runtime::{
 };
 pub use super::ctx_jit_values::{
     jit_add, jit_build_array, jit_build_str, jit_call, jit_call_method, jit_define_global_idx,
-    jit_eq, jit_get_property, jit_gt, jit_gte, jit_load_const, jit_load_global,
-    jit_load_global_idx, jit_load_upvalue, jit_lt, jit_lte, jit_make_closure, jit_mul, jit_neq,
+    jit_dispatch_intrinsic, jit_eq, jit_get_property, jit_gt, jit_gte, jit_load_const, jit_load_global,
+    jit_load_global_idx, jit_load_upvalue, jit_lt, jit_lte, jit_make_closure, jit_load_static_fn, jit_mul, jit_neq,
     jit_set_property, jit_store_global_idx, jit_store_upvalue, jit_sub, jit_to_string,
     jit_invoke_virtual, jit_get_property_ic_fast, jit_get_property_maybe_ic_fast,
     jit_prepare_call, jit_post_call,
@@ -65,6 +65,7 @@ pub struct ExecCtx {
     pub profile_counters: Option<Arc<ProfileCounters>>,
     pub hotspot_counters: Option<Rc<RefCell<HotspotCounters>>>,
     pub proto_constants: FxHashMap<usize, Rc<Vec<VmValue>>>,
+    pub static_closures: FxHashMap<usize, VmValue>,
     pub no_jit: bool,
     pub linker: Linker,
     pub jit_jmp_buf: *mut JmpBuf,
@@ -105,6 +106,7 @@ impl ExecCtx {
             profile_counters: None,
             hotspot_counters: None,
             proto_constants: FxHashMap::default(),
+            static_closures: FxHashMap::default(),
             no_jit: false,
             linker: Linker::new(),
             jit_jmp_buf: std::ptr::null_mut(),
@@ -210,6 +212,7 @@ impl ExecCtx {
             profile_counters: None,
             hotspot_counters: None,
             proto_constants: FxHashMap::default(),
+            static_closures: FxHashMap::default(),
             no_jit: self.no_jit,
             linker: self.linker.clone_state(),
             jit_jmp_buf: std::ptr::null_mut(),
@@ -224,7 +227,11 @@ impl ExecCtx {
         let stack_len = self.stack.len();
 
         let mut all_vals: Vec<VmValue> = Vec::with_capacity(
-            stack_len + self.globals.values.len() + self.modules.len() + self.module_exports.len(),
+            stack_len
+                + self.globals.values.len()
+                + self.modules.len()
+                + self.module_exports.len()
+                + self.static_closures.len(),
         );
 
         all_vals.extend_from_slice(&self.stack);
@@ -236,6 +243,10 @@ impl ExecCtx {
         }
         let module_exports_start = all_vals.len();
         for v in self.module_exports.values() {
+            all_vals.push(*v);
+        }
+        let static_closures_start = all_vals.len();
+        for v in self.static_closures.values() {
             all_vals.push(*v);
         }
 
@@ -259,6 +270,14 @@ impl ExecCtx {
             for v in self.module_exports.values_mut() {
                 *v = all_vals[ei];
                 ei += 1;
+            }
+        }
+
+        {
+            let mut si = static_closures_start;
+            for v in self.static_closures.values_mut() {
+                *v = all_vals[si];
+                si += 1;
             }
         }
     }
@@ -286,6 +305,11 @@ impl ExecCtx {
                 if c.is_heap() {
                     roots.push(c.as_heap_idx());
                 }
+            }
+        }
+        for v in self.static_closures.values() {
+            if v.is_heap() {
+                roots.push(v.as_heap_idx());
             }
         }
         let _ = self.heap.collect(&roots);
