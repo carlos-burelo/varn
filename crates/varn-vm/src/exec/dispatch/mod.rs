@@ -82,6 +82,7 @@ impl ExecCtx {
                 } else {
                     0
                 };
+                let jmp_res = std::hint::black_box(jmp_res);
 
                 let res = if jmp_res == 0 {
                     if is_outer {
