@@ -6,7 +6,7 @@ use varn_types::FunctionProto;
 
 thread_local! {
     pub static OPTIMIZE_TIME: Cell<Duration> = Cell::new(Duration::ZERO);
-    pub static OPTIMIZE_ENABLED: Cell<bool> = Cell::new(false);
+    pub static OPTIMIZE_ENABLED: Cell<bool> = Cell::new(true);
 }
 
 use super::liveness::{LiveRange, LivenessAnalyzer};

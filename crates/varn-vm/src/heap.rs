@@ -249,6 +249,19 @@ impl HeapInner {
     }
 
     #[inline(always)]
+    pub fn get_closure(&self, idx: u32) -> Option<&VmClosure> {
+        let obj = if is_nursery_idx(idx) {
+            self.nursery.get(idx)?
+        } else {
+            self.objects.get(old_idx_raw(idx) as usize)?.as_ref()?
+        };
+        match obj {
+            HeapObj::VmClosure(c) => Some(&**c),
+            _ => None,
+        }
+    }
+
+    #[inline(always)]
     pub fn get_or_panic(&self, idx: u32) -> &HeapObj {
         self.get_by_idx(idx).expect("invalid heap index")
     }

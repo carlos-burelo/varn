@@ -1,0 +1,18 @@
+import { now } from "std:sys";
+
+function fib(n: int): int {
+    if (n <= 1) return n;
+    return fib(n - 1) + fib(n - 2);
+}
+
+for (let r = 1; r <= 5; r = r + 1) {
+    let start = now();
+    let result = fib(35);
+    let elapsed = now() - start;
+    print("--- Run ---");
+    print(r);
+    print("Result:");
+    print(result);
+    print("Time (ms):");
+    print(elapsed);
+}
