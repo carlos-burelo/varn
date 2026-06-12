@@ -125,7 +125,7 @@ impl ExecCtx {
                                 if self.stack.len() < required {
                                     self.stack.resize(required, VmValue::null());
                                 }
-                                let mut frame = crate::frame::CallFrame::new(nc, new_base);
+                                let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
                                 frame.return_reg = Some(dest as u16);
                                 frame.current_class = owner;
                                 self.record_call_vm_fast();
@@ -204,7 +204,7 @@ impl ExecCtx {
                                 if self.stack.len() < required {
                                     self.stack.resize(required, VmValue::null());
                                 }
-                                let mut frame = crate::frame::CallFrame::new(nc, new_base);
+                                let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
                                 frame.return_reg = Some(dest as u16);
                                 self.record_call_vm_fast();
                                 self.record_frame_push();
@@ -247,7 +247,7 @@ impl ExecCtx {
                                 if self.stack.len() < required {
                                     self.stack.resize(required, VmValue::null());
                                 }
-                                let mut frame = crate::frame::CallFrame::new(nc, new_base);
+                                let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
                                 frame.return_reg = Some(dest as u16);
                                 self.record_call_vm_fast();
                                 self.record_frame_push();
@@ -273,7 +273,7 @@ impl ExecCtx {
         if self.frames.len() > frame_idx + 1 {
             self.frames.last_mut().unwrap().return_reg = Some(dest as u16);
             let last = self.frames.last().unwrap();
-            let req = last.base + last.closure.proto.register_count as usize;
+            let req = last.base + last.closure().proto.register_count as usize;
             if self.stack.len() < req {
                 self.stack.resize(req, VmValue::null());
             }
@@ -282,7 +282,7 @@ impl ExecCtx {
 
         let result = self.stack.pop().unwrap_or(VmValue::null());
         let caller_frame = &self.frames[frame_idx];
-        let required = base + caller_frame.closure.proto.register_count as usize;
+        let required = base + caller_frame.closure().proto.register_count as usize;
         if self.stack.len() < required {
             self.stack.resize(required, VmValue::null());
         }
@@ -325,7 +325,7 @@ impl ExecCtx {
         if self.frames.len() > frame_idx + 1 {
             self.frames.last_mut().unwrap().return_reg = Some(dest as u16);
             let last = self.frames.last().unwrap();
-            let req = last.base + last.closure.proto.register_count as usize;
+            let req = last.base + last.closure().proto.register_count as usize;
             if self.stack.len() < req {
                 self.stack.resize(req, VmValue::null());
             }
@@ -334,7 +334,7 @@ impl ExecCtx {
 
         let result = self.stack.pop().unwrap_or(VmValue::null());
         let caller_frame = &self.frames[frame_idx];
-        let required = base + caller_frame.closure.proto.register_count as usize;
+        let required = base + caller_frame.closure().proto.register_count as usize;
         if self.stack.len() < required {
             self.stack.resize(required, VmValue::null());
         }

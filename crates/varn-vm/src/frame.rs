@@ -257,17 +257,33 @@ impl VmClosure {
 }
 
 pub struct CallFrame {
-    pub closure: Rc<VmClosure>,
+    pub closure_ptr: *const VmClosure,
+    pub _owned_closure: Option<Rc<VmClosure>>,
     pub ip: usize,
     pub base: usize,
     pub current_class: Option<Rc<varn_types::ClassObj>>,
     pub return_reg: Option<u16>,
 }
 
+unsafe impl Send for CallFrame {}
+unsafe impl Sync for CallFrame {}
+
 impl CallFrame {
-    pub fn new(closure: Rc<VmClosure>, base: usize) -> Self {
+    pub fn new(closure: &VmClosure, base: usize) -> Self {
         Self {
-            closure,
+            closure_ptr: closure as *const VmClosure,
+            _owned_closure: None,
+            ip: 0,
+            base,
+            current_class: None,
+            return_reg: None,
+        }
+    }
+
+    pub fn new_owned(closure: Rc<VmClosure>, base: usize) -> Self {
+        Self {
+            closure_ptr: Rc::as_ptr(&closure),
+            _owned_closure: Some(closure),
             ip: 0,
             base,
             current_class: None,
@@ -276,13 +292,18 @@ impl CallFrame {
     }
 
     #[inline(always)]
+    pub fn closure(&self) -> &VmClosure {
+        unsafe { &*self.closure_ptr }
+    }
+
+    #[inline(always)]
     pub fn proto(&self) -> &FunctionProto {
-        &self.closure.proto
+        &self.closure().proto
     }
 
     #[inline(always)]
     pub fn code(&self) -> &[u16] {
-        &self.closure.proto.chunk.code
+        &self.closure().proto.chunk.code
     }
 
     #[inline(always)]

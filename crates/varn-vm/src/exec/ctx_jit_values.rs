@@ -366,7 +366,7 @@ pub extern "C" fn jit_call(ctx: *mut ExecCtx, args: *const varn_jit::JitCallArgs
 
                     }
 
-                    ctx_ref.frames.push(crate::frame::CallFrame::new(closure.clone(), callee_base));
+                    ctx_ref.frames.push(crate::frame::CallFrame::new(&**closure, callee_base));
 
                     let res = (jit_fn)(
 
@@ -649,7 +649,7 @@ pub extern "C" fn jit_invoke_virtual(
                     if ctx_ref.stack.len() < required {
                         ctx_ref.stack.resize(required, VmValue::null());
                     }
-                    ctx_ref.frames.push(crate::frame::CallFrame::new(closure.clone(), callee_base));
+                    ctx_ref.frames.push(crate::frame::CallFrame::new(&**closure, callee_base));
                     let res = (jit_fn)(
                         ctx_ref.stack.as_mut_ptr() as *mut std::ffi::c_void,
                         &**closure as *const crate::frame::VmClosure as *const std::ffi::c_void,
@@ -771,7 +771,7 @@ pub extern "C" fn jit_prepare_call(
                 if ctx_ref.stack.len() < required {
                     ctx_ref.stack.resize(required, VmValue::null());
                 }
-                ctx_ref.frames.push(crate::frame::CallFrame::new(closure.clone(), callee_base));
+                ctx_ref.frames.push(crate::frame::CallFrame::new(&**closure, callee_base));
                 return &**closure as *const crate::frame::VmClosure;
             }
         }

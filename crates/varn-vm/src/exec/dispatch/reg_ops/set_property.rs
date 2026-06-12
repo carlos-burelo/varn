@@ -220,7 +220,7 @@ impl ExecCtx {
                         ));
                     }
                     frame.return_reg = None;
-                    let required = frame.base + frame.closure.proto.register_count as usize;
+                    let required = frame.base + frame.closure().proto.register_count as usize;
                     if self.stack.len() < required {
                         self.stack.resize(required, VmValue::null());
                     }
@@ -268,7 +268,7 @@ impl ExecCtx {
                             ));
                         }
                         frame.return_reg = Some(dest as u16);
-                        let required = frame.base + frame.closure.proto.register_count as usize;
+                        let required = frame.base + frame.closure().proto.register_count as usize;
                         if self.stack.len() < required {
                             self.stack.resize(required, VmValue::null());
                         }

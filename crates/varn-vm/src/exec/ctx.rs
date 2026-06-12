@@ -301,7 +301,7 @@ impl ExecCtx {
             }
         }
         for frame in &self.frames {
-            for c in frame.closure.constants.iter() {
+            for c in frame.closure().constants.iter() {
                 if c.is_heap() {
                     roots.push(c.as_heap_idx());
                 }

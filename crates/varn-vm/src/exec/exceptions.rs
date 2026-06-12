@@ -31,7 +31,7 @@ pub fn collect_frames(frames: &[CallFrame]) -> Vec<FrameInfo> {
         .iter()
         .rev()
         .filter_map(|f| {
-            let proto = &f.closure.proto;
+            let proto = &f.closure().proto;
             let fn_name = proto
                 .name
                 .as_deref()

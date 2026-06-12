@@ -56,7 +56,7 @@ impl ExecCtx {
         let source_file = self
             .frames
             .last()
-            .map(|f| f.closure.proto.chunk.source_file.clone())
+            .map(|f| f.closure().proto.chunk.source_file.clone())
             .unwrap_or_else(|| "".to_owned().into());
         let resolved = modules::resolve_specifier_from_path(specifier, &source_file.to_string())?;
 

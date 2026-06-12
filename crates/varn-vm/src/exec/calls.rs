@@ -66,8 +66,7 @@ pub fn try_prepare_call_fast(
             if !nc.proto.is_generator && !nc.proto.is_async {
                 if !nc.proto.has_rest || arg_count <= nc.proto.arity {
                     let base = stack.len() - arg_count;
-                    let nc = nc.clone();
-                    return Some((PreparedCall::Frame(CallFrame::new(nc, base)), false));
+                    return Some((PreparedCall::Frame(CallFrame::new(&nc, base)), false));
                 }
             }
             None
@@ -83,7 +82,7 @@ pub fn try_prepare_call_fast(
                     if !nc.proto.is_generator && !nc.proto.is_async {
                         if !nc.proto.has_rest || arg_count <= nc.proto.arity {
                             let base = stack.len() - arg_count;
-                            let mut frame = CallFrame::new(nc.clone(), base);
+                            let mut frame = CallFrame::new(nc, base);
                             frame.current_class = owner_class.clone();
                             return Some((PreparedCall::Frame(frame), true));
                         }
@@ -146,7 +145,7 @@ pub fn prepare_call(
                     if gen_ctx.stack.len() < required {
                         gen_ctx.stack.resize(required, VmValue::null());
                     }
-                    gen_ctx.frames.push(CallFrame::new(closure, 0));
+                    gen_ctx.frames.push(CallFrame::new_owned(closure, 0));
                     let driver = crate::generator::NanSyncGenDriver::new(gen_ctx);
                     return Ok(PreparedCall::PushValue(
                         heap.intern(Value::Generator(GeneratorObj(driver))),
@@ -186,7 +185,7 @@ pub fn prepare_call(
                     return Ok(PreparedCall::PushValue(heap.intern(task)));
                 }
                 let base = stack.len() - arg_count;
-                return Ok(PreparedCall::Frame(CallFrame::new(nc, base)));
+                return Ok(PreparedCall::Frame(CallFrame::new(&nc, base)));
             }
             HeapObj::NativeFn(_name, f) => {
                 let func = *f;
@@ -253,7 +252,7 @@ pub fn prepare_call(
                             if gen_ctx.stack.len() < required {
                                 gen_ctx.stack.resize(required, VmValue::null());
                             }
-                            let mut frame = CallFrame::new(closure, 0);
+                            let mut frame = CallFrame::new_owned(closure, 0);
                             frame.current_class = owner_class;
                             gen_ctx.frames.push(frame);
                             let driver = crate::generator::NanSyncGenDriver::new(gen_ctx);
@@ -297,7 +296,7 @@ pub fn prepare_call(
                         if !nc.proto.is_generator && !nc.proto.is_async {
                             bundle_rest_args(&nc.proto, &mut full_arg_count, stack, heap);
                             let final_base = stack.len() - full_arg_count;
-                            let mut frame = CallFrame::new(nc, final_base);
+                            let mut frame = CallFrame::new(&nc, final_base);
                             frame.current_class = owner_class;
                             return Ok(PreparedCall::Frame(frame));
                         }
@@ -327,7 +326,7 @@ pub fn prepare_call(
                                 let nc = wrapper.0.clone();
                                 bundle_rest_args(&nc.proto, &mut full_arg_count, stack, heap);
                                 let final_base = stack.len() - full_arg_count;
-                                let mut frame = CallFrame::new(nc, final_base);
+                                let mut frame = CallFrame::new_owned(nc, final_base);
                                 frame.current_class = Some(cls.clone());
                                 return Ok(PreparedCall::Constructor(frame, instance_nv));
                             }

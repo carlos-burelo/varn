@@ -18,7 +18,7 @@ impl ExecCtx {
                     ));
                 }
                 self.record_call_vm_fast();
-                let required = frame.base + frame.closure.proto.register_count as usize;
+                let required = frame.base + frame.closure().proto.register_count as usize;
                 if self.stack.len() < required {
                     self.stack.resize(required, VmValue::null());
                 }
@@ -43,7 +43,7 @@ impl ExecCtx {
                     }
 
                     for frame in &self.frames {
-                        for c in frame.closure.constants.iter() {
+                        for c in frame.closure().constants.iter() {
                             if c.is_heap() {
                                 roots.push(c.as_heap_idx());
                             }
@@ -65,7 +65,7 @@ impl ExecCtx {
                 }
                 self.record_call_vm_fast();
                 let ctor_frame_idx = self.frames.len();
-                let required = frame.base + frame.closure.proto.register_count as usize;
+                let required = frame.base + frame.closure().proto.register_count as usize;
                 if self.stack.len() < required {
                     self.stack.resize(required, VmValue::null());
                 }
@@ -160,7 +160,7 @@ impl ExecCtx {
             PreparedCall::Frame(frame) => {
                 self.record_call_vm_fast();
                 let setter_frame_idx = self.frames.len();
-                let required = frame.base + frame.closure.proto.register_count as usize;
+                let required = frame.base + frame.closure().proto.register_count as usize;
                 if self.stack.len() < required {
                     self.stack.resize(required, VmValue::null());
                 }
@@ -441,7 +441,7 @@ impl NativeCtx for ExecCtx {
             }
             PreparedCall::Frame(frame) => {
                 let depth = self.frames.len();
-                let required = frame.base + frame.closure.proto.register_count as usize;
+                let required = frame.base + frame.closure().proto.register_count as usize;
                 if self.stack.len() < required {
                     self.stack.resize(required, VmValue::null());
                 }
@@ -456,7 +456,7 @@ impl NativeCtx for ExecCtx {
             }
             PreparedCall::Constructor(frame, instance_nv) => {
                 let depth = self.frames.len();
-                let required = frame.base + frame.closure.proto.register_count as usize;
+                let required = frame.base + frame.closure().proto.register_count as usize;
                 if self.stack.len() < required {
                     self.stack.resize(required, VmValue::null());
                 }
@@ -549,12 +549,12 @@ impl NativeCtx for ExecCtx {
 
     fn current_source_file(&self) -> Option<String> {
         for frame in self.frames.iter().rev() {
-            let src = &frame.closure.proto.chunk.source_file;
+            let src = &frame.closure().proto.chunk.source_file;
             if !src.starts_with("std:") && !src.starts_with("runtime:") && !src.starts_with("core:") {
                 return Some(src.to_string());
             }
         }
-        self.frames.last().map(|f| f.closure.proto.chunk.source_file.to_string())
+        self.frames.last().map(|f| f.closure().proto.chunk.source_file.to_string())
     }
 
     fn spawn_isolate(

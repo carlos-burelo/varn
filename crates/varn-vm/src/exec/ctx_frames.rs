@@ -74,7 +74,7 @@ impl ExecCtx {
         }
         self.record_frame_push();
         self.frames
-            .push(crate::frame::CallFrame::new(closure, base));
+            .push(crate::frame::CallFrame::new_owned(closure, base));
         Ok(())
     }
 
@@ -85,7 +85,7 @@ impl ExecCtx {
         }
         self.record_frame_push();
         self.frames
-            .push(crate::frame::CallFrame::new(closure, base));
+            .push(crate::frame::CallFrame::new_owned(closure, base));
     }
 
     pub fn read_str_const_at(&self, idx: usize, frame_idx: usize) -> VmResult<Rc<str>> {

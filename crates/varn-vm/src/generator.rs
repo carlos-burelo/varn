@@ -108,10 +108,10 @@ impl GeneratorDriver for NanSyncGenDriver {
         }
 
         for frame in &inner.ctx.frames {
-            for &c in frame.closure.constants.iter() {
+            for &c in frame.closure().constants.iter() {
                 callback(varn_types::VmValue(c.0));
             }
-            for uv in &frame.closure.upvalues {
+            for uv in &frame.closure().upvalues {
                 if let Ok(upval_inner) = uv.inner.try_borrow() {
                     callback(varn_types::VmValue(upval_inner.value.0));
                 }
@@ -135,7 +135,7 @@ impl GeneratorDriver for NanSyncGenDriver {
     fn trace_closures(&self, callback: &mut dyn FnMut(usize)) {
         let inner = self.inner.borrow();
         for frame in &inner.ctx.frames {
-            callback(Rc::as_ptr(&frame.closure) as *const () as usize);
+            callback(frame.closure_ptr as *const () as usize);
         }
     }
 }
