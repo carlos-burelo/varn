@@ -161,6 +161,7 @@ impl HeapInner {
             };
             h.borrow_mut().record_alloc(type_name);
         }
+        let mut obj = obj;
         match obj {
             HeapObj::Str(_)
             | HeapObj::Array(_)
@@ -173,8 +174,11 @@ impl HeapInner {
             | HeapObj::Symbol(_)
             | HeapObj::BigInt(_)
             | HeapObj::Decimal(_) => {
-                if let Some(ni) = self.nursery.try_alloc(obj.clone()) {
-                    return ni;
+                match self.nursery.try_alloc(obj) {
+                    Ok(ni) => return ni,
+                    Err(returned_obj) => {
+                        obj = returned_obj;
+                    }
                 }
             }
             _ => {}
@@ -466,19 +470,20 @@ impl HeapInner {
             self.string_interner.remove(&rs);
         }
 
-        let idx = if let Some(ni) = self.nursery.try_alloc(HeapObj::Str(rs.clone())) {
-            ni
-        } else {
-            let oi = alloc_into(
-                &mut self.objects,
-                &mut self.free,
-                &mut self.alloc_count,
-                &mut self.gc_alloc_since_collect,
-                HeapObj::Str(rs.clone()),
-            );
-            let packed = pack_old_idx(oi);
-            self.string_interner.insert(rs, packed);
-            packed
+        let idx = match self.nursery.try_alloc(HeapObj::Str(rs.clone())) {
+            Ok(ni) => ni,
+            Err(obj) => {
+                let oi = alloc_into(
+                    &mut self.objects,
+                    &mut self.free,
+                    &mut self.alloc_count,
+                    &mut self.gc_alloc_since_collect,
+                    obj,
+                );
+                let packed = pack_old_idx(oi);
+                self.string_interner.insert(rs, packed);
+                packed
+            }
         };
         VmValue::from_heap_idx(idx)
     }

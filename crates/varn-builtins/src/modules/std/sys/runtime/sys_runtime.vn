@@ -6,3 +6,4 @@ export declare function processArgs(): str[];
 export declare function processExit(code?: int): void;
 export declare function processEnv(key: str): str;
 export declare function processSetEnv(key: str, val: str): void;
+export declare function processNow(): float;
