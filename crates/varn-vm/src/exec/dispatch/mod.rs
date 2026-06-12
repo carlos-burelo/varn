@@ -268,9 +268,12 @@ impl ExecCtx {
                                 }
                             }
                             let stack_ptr = std::ptr::addr_of_mut!((*ctx).stack);
-                            let stack_len = (*stack_ptr).len();
-                            assert!(idx < stack_len, "register OOB: idx={idx} len={stack_len}");
-                            (*stack_ptr).as_mut_ptr().add(idx)
+                            #[cfg(debug_assertions)]
+                            {
+                                let stack_len = (*stack_ptr).len();
+                                assert!(idx < stack_len, "register OOB: idx={idx} len={stack_len}");
+                            }
+                            std::hint::black_box((*stack_ptr).as_mut_ptr()).add(idx)
                         })
                     };
                 }

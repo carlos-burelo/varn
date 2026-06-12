@@ -1,9 +1,20 @@
+use std::sync::OnceLock;
+use std::time::Instant;
 use varn_op_macros::varn_module;
 use varn_types::{NativeCtx, VmValue};
+
+static START_TIME: OnceLock<Instant> = OnceLock::new();
 
 #[varn_module("runtime:process")]
 pub(crate) mod dispatch {
     use super::*;
+
+    #[varn_fn("processNow")]
+    pub fn now(_ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, String> {
+        let start = START_TIME.get_or_init(Instant::now);
+        let elapsed = start.elapsed();
+        Ok(VmValue::from_f64(elapsed.as_secs_f64() * 1000.0))
+    }
 
     #[varn_fn("processPlatform")]
     pub fn platform(ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, String> {

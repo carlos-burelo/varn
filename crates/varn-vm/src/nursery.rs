@@ -54,15 +54,15 @@ impl Nursery {
     }
 
     #[inline(always)]
-    pub fn try_alloc(&mut self, obj: HeapObj) -> Option<u32> {
+    pub fn try_alloc(&mut self, obj: HeapObj) -> Result<u32, HeapObj> {
         if self.objects.len() >= NURSERY_CAPACITY {
-            return None;
+            return Err(obj);
         }
         let idx = self.objects.len() as u32;
         self.objects.push(Some(obj));
         self.forwarding.push(None);
         self.alloc_count += 1;
-        Some(idx)
+        Ok(idx)
     }
 
     #[inline(always)]
