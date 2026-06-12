@@ -763,16 +763,22 @@ pub extern "C" fn jit_prepare_call(
         if !callee.is_heap() {
             return std::ptr::null();
         }
-        let heap_obj = ctx_ref.heap.get(callee.as_heap_idx());
-        if let Some(crate::heap::HeapObj::VmClosure(closure)) = heap_obj {
-            let is_eligible = !closure.proto.is_async && !closure.proto.is_generator;
-            if let Some(_jit_fn) = closure.jit_entry.filter(|_| is_eligible) {
-                let required = callee_base + closure.proto.register_count as usize + 32;
-                if ctx_ref.stack.len() < required {
-                    ctx_ref.stack.resize(required, VmValue::null());
+        if let Some(closure) = ctx_ref.heap.get_closure(callee.as_heap_idx()) {
+            if !closure.proto.is_async && !closure.proto.is_generator {
+                if closure.jit_entry.is_some() {
+                    let required = callee_base + closure.proto.register_count as usize + 32;
+                    let stack_len = ctx_ref.stack.len();
+                    if stack_len < required {
+                        ctx_ref.stack.reserve(required - stack_len);
+                        ctx_ref.stack.set_len(required);
+                        let ptr = ctx_ref.stack.as_mut_ptr();
+                        for i in stack_len..required {
+                            std::ptr::write(ptr.add(i), VmValue::null());
+                        }
+                    }
+                    ctx_ref.frames.push(crate::frame::CallFrame::new(closure, callee_base));
+                    return closure as *const crate::frame::VmClosure;
                 }
-                ctx_ref.frames.push(crate::frame::CallFrame::new(&**closure, callee_base));
-                return &**closure as *const crate::frame::VmClosure;
             }
         }
         std::ptr::null()

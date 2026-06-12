@@ -43,7 +43,17 @@ pub fn execute(
             .map_err(|e| PipelineError::fatal(format!("failed to run builtin: {}", e)))?;
     }
 
-    let main_closure = Rc::new(Closure::new(Rc::new(proto), Vec::new(), Vec::new()));
+    // Resolve globals in precompiled modules and entry script to direct array indices
+    let mut optimized_precompiled_map = (*precompiled).clone();
+    for module_proto_rc in optimized_precompiled_map.values_mut() {
+        machine.resolve_globals(Rc::make_mut(module_proto_rc));
+    }
+    machine.ctx.precompiled = Rc::new(optimized_precompiled_map);
+
+    let mut optimized_proto = proto;
+    machine.resolve_globals(&mut optimized_proto);
+
+    let main_closure = Rc::new(Closure::new(Rc::new(optimized_proto), Vec::new(), Vec::new()));
 
     // Register the main module to support top-level exports in the entry script (needed for Isolates)
     let main_module_id = ModuleId::local_str(&main_closure.proto.chunk.source_file);
