@@ -84,6 +84,22 @@ impl ExecCtx {
                 *ip = self.frames[frame_idx2].ip;
                 Ok(Some(ControlCallFlow::ContinueInstruction))
             }
+            OpCode::CallSelf => {
+                let w1 = code[*ip];
+                *ip += 1;
+                let w2 = code[*ip];
+                *ip += 1;
+                let (dest, _) = (hi(w1), lo(w1));
+                let (arg_count, arg_start) = (hi(w2), lo(w2));
+                self.frames[frame_idx].ip = *ip;
+                let jumped = self.exec_call_self(base, arg_start, arg_count, dest, frame_idx)?;
+                if jumped {
+                    return Ok(Some(ControlCallFlow::ContinueFrame));
+                }
+                let frame_idx2 = self.frames.len() - 1;
+                *ip = self.frames[frame_idx2].ip;
+                Ok(Some(ControlCallFlow::ContinueInstruction))
+            }
             OpCode::CallMethod => {
                 let cs = first_reg;
                 let w1 = code[*ip];

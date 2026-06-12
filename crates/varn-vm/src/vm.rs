@@ -443,6 +443,7 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
             | OpCode::JumpIfFalse
             | OpCode::JumpIfTrue
             | OpCode::Call
+            | OpCode::CallSelf
             | OpCode::CallSpread
             | OpCode::MakeClass
             | OpCode::Method

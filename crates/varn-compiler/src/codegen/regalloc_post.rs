@@ -301,12 +301,12 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
             }
         }
 
-        OpCode::Call | OpCode::CallSpread => {
+        OpCode::Call | OpCode::CallSpread | OpCode::CallSelf => {
             let dest = hi1;
             let fn_reg = lo1;
             let argc = hi2;
             let arg_start = lo2;
-            let mut uses = vec![fn_reg];
+            let mut uses = if op == OpCode::CallSelf { Vec::new() } else { vec![fn_reg] };
             for i in 0..argc {
                 uses.push(arg_start.wrapping_add(i));
             }
@@ -712,6 +712,13 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                     let arg_count = hi2;
                     let arg_start = lo2;
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
+                    code[offset + 2] = pack(arg_count, m(mapping, arg_start));
+                }
+
+                OpCode::CallSelf => {
+                    let arg_count = hi2;
+                    let arg_start = lo2;
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
                     code[offset + 2] = pack(arg_count, m(mapping, arg_start));
                 }
 

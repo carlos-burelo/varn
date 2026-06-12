@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub use varn_base::TypeTag as NumericKind;
 
@@ -15,6 +15,7 @@ pub struct ExprAnnotation {
 pub struct TypeAnnotations {
     inner: HashMap<u32, ExprAnnotation>,
     module_caps: Vec<String>,
+    reassigned_names: HashSet<String>,
 }
 
 impl TypeAnnotations {
@@ -30,6 +31,17 @@ impl TypeAnnotations {
 
     pub fn module_caps(&self) -> &[String] {
         &self.module_caps
+    }
+
+    /// Mark `name` as appearing as an assignment target somewhere in the
+    /// module. Used to disable self-call optimizations for rebindable
+    /// function declarations.
+    pub fn record_reassigned_name(&mut self, name: &str) {
+        self.reassigned_names.insert(name.to_owned());
+    }
+
+    pub fn is_reassigned_name(&self, name: &str) -> bool {
+        self.reassigned_names.contains(name)
     }
 
     pub fn record_numeric(&mut self, offset: u32, kind: NumericKind) {

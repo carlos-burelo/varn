@@ -223,6 +223,7 @@ impl VmClosure {
             get_property_ic_fast: crate::exec::ctx::jit_get_property_ic_fast as usize,
             get_property_maybe_ic_fast: crate::exec::ctx::jit_get_property_maybe_ic_fast as usize,
             jit_prepare_call: crate::exec::ctx::jit_prepare_call as usize,
+            jit_push_self_frame: crate::exec::ctx::jit_push_self_frame as usize,
             jit_post_call: crate::exec::ctx::jit_post_call as usize,
             dispatch_intrinsic: crate::exec::ctx::jit_dispatch_intrinsic as usize,
         };
@@ -237,7 +238,6 @@ impl VmClosure {
             }
             Err(e) => {
                 self.proto.jit_failed.set(true);
-                let _ = e;
             }
         }
     }

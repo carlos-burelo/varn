@@ -135,7 +135,7 @@ pub fn compile_proto(
             OpCode::Jump | OpCode::Loop | OpCode::JumpIfFalse | OpCode::JumpIfTrue => {
                 ip += 2;
             }
-            OpCode::GetProperty | OpCode::SetProperty | OpCode::Call | OpCode::BuildArray => {
+            OpCode::GetProperty | OpCode::SetProperty | OpCode::Call | OpCode::CallSelf | OpCode::BuildArray => {
                 ip += 2;
             }
             OpCode::CallMethod | OpCode::InvokeVirtual | OpCode::Try => {
@@ -326,7 +326,7 @@ pub fn compile_proto(
 
             OpCode::GetProperty | OpCode::SetProperty => emit_properties(&mut cctx, op, first_reg)?,
 
-            OpCode::Call | OpCode::CallMethod | OpCode::InvokeVirtual => {
+            OpCode::Call | OpCode::CallSelf | OpCode::CallMethod | OpCode::InvokeVirtual => {
                 emit_calls(&mut cctx, op, first_reg)?
             }
 

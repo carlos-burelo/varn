@@ -108,6 +108,7 @@ pub struct JitHelpers {
     pub get_property_ic_fast: usize,
     pub get_property_maybe_ic_fast: usize,
     pub jit_prepare_call: usize,
+    pub jit_push_self_frame: usize,
     pub jit_post_call: usize,
     pub dispatch_intrinsic: usize,
 }

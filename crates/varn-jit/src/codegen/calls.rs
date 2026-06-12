@@ -9,6 +9,7 @@ use super::CodegenCtx;
 pub(crate) fn emit_calls(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) -> Result<(), String> {
     match op {
         OpCode::Call => emit_call(ctx, first_reg),
+        OpCode::CallSelf => emit_call_self(ctx, first_reg),
         OpCode::CallMethod => emit_call_method(ctx, first_reg),
         OpCode::InvokeVirtual => emit_invoke_virtual(ctx),
         OpCode::Intrinsic => emit_intrinsic(ctx, first_reg),
@@ -262,6 +263,150 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
     let end_pos = asm.current_offset();
     let relative_end = (end_pos as i64 - (end_patch as i64 + 4)) as i32;
     asm.patch_u32(end_patch, relative_end as u32);
+}
+
+fn emit_call_self(ctx: &mut CodegenCtx, first_reg: usize) {
+    let asm = &mut ctx.asm;
+    let code = ctx.code;
+    let ip = &mut ctx.ip;
+    let regmap = &ctx.regmap;
+    let helpers = ctx.helpers;
+
+    let w1 = code[*ip];
+    *ip += 1;
+    let w2 = code[*ip];
+    *ip += 1;
+    let dest = (w1 >> 8) as usize;
+    let callee_dummy = (w1 & 0xFF) as usize;
+    let arg_count = (w2 >> 8) as usize;
+    let arg_start = (w2 & 0xFF) as usize;
+
+    let _ = first_reg;
+    let _ = callee_dummy;
+    let _ = arg_count;
+
+    // 1. Flush caller registers to stack slots in caller so callee can read arguments
+    emit_flush_all(asm, regmap);
+
+    // 2. Save caller JIT registers across the frame push helper call
+    let need_dummy_push = regmap.used_phys.len() % 2 != 0;
+    if need_dummy_push {
+        asm.push(Reg::Rax);
+    }
+    asm.push(ARG_CTX);
+    asm.push(ARG_EXEC_CTX);
+    asm.push(ARG_BASE);
+
+    // Call jit_push_self_frame(ctx, callee_base)
+    // 1st arg: ctx (ARG_CTX = ARG_EXEC_CTX)
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+    // 2nd arg: callee_base (ARG_CLOSURE = ARG_BASE + arg_start)
+    asm.mov_reg_reg(ARG_CLOSURE, ARG_BASE);
+    asm.add_reg_imm32(ARG_CLOSURE, arg_start as i32);
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, -32);
+
+    asm.mov_reg_imm64(Reg::R10, helpers.jit_push_self_frame as u64);
+    asm.call_reg(Reg::R10);
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, 32);
+
+    // Restore caller JIT registers
+    asm.pop(ARG_BASE);
+    asm.pop(ARG_EXEC_CTX);
+    asm.pop(ARG_CTX);
+    if need_dummy_push {
+        asm.pop(Reg::Rax);
+    }
+
+    // jit_push_self_frame may have reallocated the VM stack — reload the stack data pointer.
+    asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
+    // Recompute REG_FRAME_BASE = ARG_CTX + ARG_BASE * 8 with fresh pointer
+    asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, ARG_BASE);
+    asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
+    asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
+
+    // Reload closure pointer from prologue save slot at [rsp+8]
+    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
+
+    // 3. Save caller JIT registers across the JIT-to-JIT call
+    asm.push(ARG_CTX);
+    asm.push(ARG_EXEC_CTX);
+    asm.push(ARG_BASE);
+
+    let need_align = regmap.used_phys.len() % 2 != 0;
+    if need_align {
+        asm.push(Reg::Rax);
+    }
+
+    // Compute callee_base into R11: ARG_BASE + arg_start
+    asm.mov_reg_reg(Reg::R11, ARG_BASE);
+    asm.add_reg_imm32(Reg::R11, arg_start as i32);
+
+    // Set up arguments for JIT function call:
+    // Rcx/Rdi (ARG_CTX): unchanged (values array pointer)
+    // Rdx/Rsi (ARG_CLOSURE): reloaded closure pointer
+    // R8/Rdx (ARG_BASE): callee_base (R11)
+    asm.mov_reg_reg(ARG_BASE, Reg::R11);
+    // R9/Rcx (ARG_EXEC_CTX): unchanged (ExecCtx pointer)
+
+    // Execute direct JIT call to the start of this function! (offset 0)
+    let call_patch = asm.call_near();
+    let displacement = (0 as isize - (call_patch + 4) as isize) as i32;
+    asm.patch_u32(call_patch, displacement as u32);
+
+    if need_align {
+        asm.pop(Reg::R11);
+    }
+
+    // Restore caller JIT registers
+    asm.pop(ARG_BASE);
+    asm.pop(ARG_EXEC_CTX);
+    asm.pop(ARG_CTX);
+
+    // Save ARG_BASE and ARG_EXEC_CTX across the helper call
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
+    if need_dummy {
+        asm.push(Reg::Rax);
+    }
+    asm.push(ARG_BASE);
+    asm.push(ARG_EXEC_CTX);
+
+    // Call jit_post_call(ctx, callee_base, val):
+    // 1st arg: ctx (ARG_CTX = ARG_EXEC_CTX)
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+    // 2nd arg: callee_base (ARG_CLOSURE = ARG_BASE + arg_start)
+    asm.mov_reg_reg(ARG_CLOSURE, ARG_BASE);
+    asm.add_reg_imm32(ARG_CLOSURE, arg_start as i32);
+    // 3rd arg: val (ARG_BASE = Reg::Rax)
+    asm.mov_reg_reg(ARG_BASE, Reg::Rax);
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, -32);
+
+    asm.mov_reg_imm64(Reg::R10, helpers.jit_post_call as u64);
+    asm.call_reg(Reg::R10);
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, 32);
+
+    asm.pop(ARG_EXEC_CTX);
+    asm.pop(ARG_BASE);
+    if need_dummy {
+        asm.pop(Reg::R11);
+    }
+
+    // Reload ARG_CTX from ExecCtx.stack.ptr (offset 8) in case stack reallocated
+    asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
+    // Recompute REG_FRAME_BASE = ARG_CTX + ARG_BASE * 8
+    asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_BASE);
+    asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
+    asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
+
+    emit_store(asm, Reg::Rax, dest, regmap);
+    emit_reload_all_except(asm, regmap, Some(dest));
 }
 
 fn emit_call_method(ctx: &mut CodegenCtx, first_reg: usize) {

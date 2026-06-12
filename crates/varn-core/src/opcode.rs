@@ -176,6 +176,8 @@ pub enum OpCode {
 
     LoadStaticFn,
 
+    CallSelf,
+
     Nop,
 }
 

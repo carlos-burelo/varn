@@ -221,14 +221,9 @@ pub extern "C" fn jit_make_closure(
     unsafe {
 
         let ctx_ref = &mut *ctx;
-
         let closure_ref = &*closure;
-
         let code = &closure_ref.proto.chunk.code;
-
         let mut ip = ip_offset;
-
-
 
         let w1 = code[ip];
 
@@ -782,6 +777,30 @@ pub extern "C" fn jit_prepare_call(
             }
         }
         std::ptr::null()
+    }
+}
+
+pub extern "C" fn jit_push_self_frame(
+    ctx: *mut ExecCtx,
+    callee_base: usize,
+) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let current_closure = ctx_ref.frames.last().unwrap().closure_ptr;
+        let closure = &*current_closure;
+
+        // Reserve stack space
+        let required = callee_base + closure.proto.register_count as usize + 32;
+        let stack_len = ctx_ref.stack.len();
+        if stack_len < required {
+            ctx_ref.stack.reserve(required - stack_len);
+            ctx_ref.stack.set_len(required);
+            let ptr = ctx_ref.stack.as_mut_ptr();
+            for i in stack_len..required {
+                std::ptr::write(ptr.add(i), VmValue::null());
+            }
+        }
+        ctx_ref.frames.push(crate::frame::CallFrame::new(closure, callee_base));
     }
 }
 

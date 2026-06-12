@@ -612,10 +612,10 @@ Para medir la velocidad de ejecución y compararnos contra V8 (Node.js) y JavaSc
 3. **Métricas de Referencia contra JITs Comerciales (`fib(35)`)**:
    * **Bun (JSC)**: ~73.5 ms (Línea base / 1.0x)
    * **Node.js (V8)**: ~78.3 ms (~1.06x)
-   * **Varn (JIT Optimizado)**: ~321.2 ms (~4.3x respecto a Bun)
+   * **Varn (JIT Optimizado con `CallSelf`)**: ~268.6 ms - 279.6 ms (~3.6x - 3.8x respecto a Bun)
    * **Varn (JIT Unoptimizado)**: ~1891.0 ms (~25.7x respecto a Bun)
 
-*Nota: La diferencia actual de 4.3x de Varn JIT respecto a Bun se debe principalmente al paso de control a funciones helper en Rust (`jit_prepare_call` / `jit_post_call`) en llamadas recursivas en lugar de llamadas directas nativas máquina. Se debe buscar eliminar este overhead en futuras iteraciones de la arquitectura.*
+*Nota: La diferencia actual de ~3.6x de Varn JIT respecto a Bun se redujo desde la original de 4.3x gracias a la optimización de llamadas de auto-recursividad estática (`OpCode::CallSelf`), que bypassa los helpers de Rust y el lookup de closures en el JIT.*
 
 ## Troubleshooting
 

@@ -153,9 +153,58 @@ pub(super) fn compile_call<'a>(
         return dest;
     }
 
+    if let ExprKind::Identifier { name } = &callee.kind {
+        if can_emit_self_call(c, name, args) {
+            return emit_self_call(c, offset, args);
+        }
+    }
+
     let callee_reg = compile_expr(c, callee);
 
     emit_plain_call(c, callee_reg, offset, args)
+}
+
+/// A call can compile to `CallSelf` (direct self-recursion, no callee load)
+/// only when the callee is statically guaranteed to be the function being
+/// compiled: a global function declaration, referenced by its own name from
+/// its own body, with no shadowing binding and no reassignment of that
+/// global anywhere in the module.
+fn can_emit_self_call<'a>(c: &Compiler<'a>, name: &str, args: &[Arg]) -> bool {
+    !c.is_global
+        && c.current_class.is_none()
+        && !c.has_this
+        && !c.is_async
+        && !c.is_generator
+        && !c.has_rest
+        && name == &*c.name
+        && !c.name_resolves_locally(name)
+        && !c.annotations.is_reassigned_name(name)
+        && !args.iter().any(|a| matches!(a, Arg::Spread(_)))
+}
+
+fn emit_self_call<'a>(c: &mut Compiler<'a>, offset: u32, args: &[Arg]) -> u8 {
+    let line = c.line;
+    let dest = c.alloc_reg();
+    let recv_reg = c.alloc_reg();
+    c.chunk.emit_rr(OpCode::LoadNull, recv_reg, 0, line);
+
+    let (arg_start, arg_count, has_spread) = compile_args_contiguous(c, offset, args);
+    assert_eq!(
+        arg_start,
+        recv_reg + 1,
+        "contiguous args must start right after receiver register"
+    );
+    debug_assert!(!has_spread, "self-call must not have spread args");
+
+    c.chunk.emit(OpCode::CallSelf, line);
+    c.chunk.write(Chunk::pack(dest, 0), line);
+    c.chunk
+        .write(Chunk::pack((arg_count + 1) as u8, recv_reg), line);
+    for _ in 0..arg_count {
+        c.free_reg();
+    }
+    c.free_reg();
+    dest
 }
 
 pub(super) fn emit_method_call<'a>(
