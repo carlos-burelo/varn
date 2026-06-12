@@ -27,9 +27,8 @@ Este repo es un monorepo Rust. Para moverse rápido, usa estas reglas antes de l
 ## Validación rápida
 
 - CLI: `cargo check -p varn-cli` y `target/release/vn.exe --help`
-- Cambios de parser/checker/compiler/vm: `cargo test --workspace` o el crate más cercano si el cambio es localizado
+- Cambios de parser/checker/compiler/vm: validar ejecutando la suite de integración `target/release/vn.exe tests/main.vn`
 - Integración del lenguaje: `cargo run --bin vn -- tests/main.vn`
-- Solo docs: `git diff --check`
 
 ## Skills disponibles
 
@@ -570,26 +569,53 @@ Las métricas de performance dependen mucho del workload. Como referencia actual
 - **`tests/47-isolates-multithread.vn`**: p50 `33.16 ms`
 - **Fast-path / IC / JIT**: documentar siempre junto al archivo benchmarkeado; ya no se asume una cifra global única.
 
-## Testing
+## Testing y Política de Integridad
+
+El repo no utiliza `cargo test` para tests unitarios del código Rust (se implementarán posteriormente). Toda validación de corrección y rendimiento se realiza mediante la suite de integración en Varn y benchmarks comparativos.
+
+### Ejecución de la Suite de Tests
 
 ```bash
-# Ejecutar suite de tests completa
+# Ejecutar suite de integración completa
 vn run tests/main.vn
 
-# O explícitamente
+# O de manera implícita
 vn tests/main.vn
+```
 
-# Debería mostrar:
-# ════════════════════════════════════════
-# Modules executed in suite: 48
-# PASSED: 686
-# FAILED: 0
-# ALL TESTS PASSED
+Debería mostrar al final:
+```text
+════════════════════════════════════════
+Modules executed in suite: 48
+PASSED: 686
+FAILED: 0
+ALL TESTS PASSED
 ```
 
 Nota de realidad del corpus:
 - `tests/main.vn` es la suite por defecto y hoy integra `48` módulos.
 - `tests/41-advanced-enums.vn`, `tests/42-stdlib-comprehensive-test.vn` y `tests/47-isolates-multithread.vn` ya están reintegrados.
+
+### Política de Benchmarks y Rendimiento JIT
+
+Para medir la velocidad de ejecución y compararnos contra V8 (Node.js) y JavaScriptCore (Bun), se deben seguir las siguientes directrices de integridad:
+
+1. **Uso de la herramienta `bench`**:
+   * Las mediciones de tiempo de ejecución puro deben realizarse usando el comando `vn bench <FILE>` (por ejemplo, `vn bench tests/main.vn`).
+   * El comando `vn bench` utiliza snapshots del heap de la VM para precargar los módulos de la librería estándar, aislando el tiempo de ejecución puro del script de usuario del tiempo de arranque y precompilación.
+
+2. **Diferencia entre `vn run` y `vn bench` (El flag de Optimización)**:
+   * Por defecto, la optimización del asignador de registros (`varn_compiler::codegen::regalloc_post::OPTIMIZE_ENABLED`) está deshabilitada (`false`) en ejecuciones normales (`vn run`) para favorecer la velocidad de compilación inicial de desarrollo.
+   * La optimización del asignador de registros se activa automáticamente como `true` **únicamente** durante `vn bench`.
+   * **Rendimiento Esperado**: La optimización del asignador de registros proporciona un aumento de rendimiento de **~5.5x** (reduciendo el tiempo de ejecución de `fib(35)` de 1891 ms a 321 ms). Por lo tanto, para comparar la velocidad punta de ejecución de Varn contra Node.js o Bun, siempre se debe medir usando el comando `bench` o forzando la optimización.
+
+3. **Métricas de Referencia contra JITs Comerciales (`fib(35)`)**:
+   * **Bun (JSC)**: ~73.5 ms (Línea base / 1.0x)
+   * **Node.js (V8)**: ~78.3 ms (~1.06x)
+   * **Varn (JIT Optimizado)**: ~321.2 ms (~4.3x respecto a Bun)
+   * **Varn (JIT Unoptimizado)**: ~1891.0 ms (~25.7x respecto a Bun)
+
+*Nota: La diferencia actual de 4.3x de Varn JIT respecto a Bun se debe principalmente al paso de control a funciones helper en Rust (`jit_prepare_call` / `jit_post_call`) en llamadas recursivas en lugar de llamadas directas nativas máquina. Se debe buscar eliminar este overhead en futuras iteraciones de la arquitectura.*
 
 ## Troubleshooting
 
