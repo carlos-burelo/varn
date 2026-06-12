@@ -546,6 +546,24 @@ impl<'a> Compiler<'a> {
         None
     }
 
+    /// Read-only check: would `name` resolve to a local or an upvalue (any
+    /// enclosing function scope) instead of a global? Unlike
+    /// `resolve_upvalue`, this never captures anything.
+    pub fn name_resolves_locally(&self, name: &str) -> bool {
+        if self.resolve_local(name).is_some() {
+            return true;
+        }
+        let mut parent = self.parent;
+        while !parent.is_null() {
+            let p = unsafe { &*parent };
+            if p.resolve_local(name).is_some() {
+                return true;
+            }
+            parent = p.parent;
+        }
+        false
+    }
+
     pub fn emit_load_var(&mut self, name: &str, dest: u8) -> bool {
         for scope in self.scopes.iter().rev() {
             if let Some(loc) = scope.get(name) {

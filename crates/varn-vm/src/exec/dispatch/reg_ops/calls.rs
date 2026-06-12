@@ -290,6 +290,127 @@ impl ExecCtx {
         Ok(false)
     }
 
+    pub(crate) fn exec_call_self(
+        &mut self,
+        base: usize,
+        arg_start: usize,
+        arg_count: usize,
+        dest: usize,
+        frame_idx: usize,
+    ) -> VmResult<bool> {
+        let parent_frame = &self.frames[frame_idx];
+        let closure_ptr = parent_frame.closure_ptr;
+        let closure_ref = unsafe { &*closure_ptr };
+
+        let callee = if parent_frame.base > 0 {
+            self.stack[parent_frame.base - 1]
+        } else {
+            VmValue::null()
+        };
+
+        if !closure_ref.proto.is_generator && !closure_ref.proto.is_async {
+            let arity = closure_ref.proto.arity;
+
+            if !closure_ref.proto.has_rest && arg_count <= arity {
+                let fn_name = closure_ref.proto.name.as_deref().unwrap_or("<anon>").to_owned();
+                let is_jit = closure_ref.jit_entry.is_some();
+                self.record_hotspot_fn(&fn_name, is_jit);
+                self.stack.push(callee);
+                for i in 0..arg_count {
+                    let v = self.stack[base + arg_start + i];
+                    self.stack.push(v);
+                }
+                for _ in arg_count..arity {
+                    self.stack.push(VmValue::null());
+                }
+                if self.frames.len() >= 10000 {
+                    return Err(crate::error::RuntimeError::new(
+                        "stack overflow: call depth exceeded 10000",
+                    ));
+                }
+                let new_base = self.stack.len() - arity;
+                let required = new_base + closure_ref.proto.register_count as usize;
+                if self.stack.len() < required {
+                    self.stack.resize(required, VmValue::null());
+                }
+                let mut frame = crate::frame::CallFrame::new(closure_ref, new_base);
+                frame._owned_closure = self.frames[frame_idx]._owned_closure.clone();
+                frame.return_reg = Some(dest as u16);
+                self.record_call_vm_fast();
+                self.record_frame_push();
+                self.frames.push(frame);
+                return Ok(true);
+            } else if closure_ref.proto.has_rest && arg_count <= arity {
+                let fn_name2 = closure_ref.proto.name.as_deref().unwrap_or("<anon>").to_owned();
+                let is_jit2 = closure_ref.jit_entry.is_some();
+                self.record_hotspot_fn(&fn_name2, is_jit2);
+                let rest_idx = arity.saturating_sub(1);
+                self.stack.push(callee);
+                let regular_count = arg_count.min(rest_idx);
+                for i in 0..regular_count {
+                    let v = self.stack[base + arg_start + i];
+                    self.stack.push(v);
+                }
+                for _ in regular_count..rest_idx {
+                    self.stack.push(VmValue::null());
+                }
+                let rest_items: Vec<VmValue> = if arg_count > rest_idx {
+                    (rest_idx..arg_count)
+                        .map(|i| self.stack[base + arg_start + i])
+                        .collect()
+                } else {
+                    vec![]
+                };
+                let rest_nv = VmValue::from_heap_idx(self.heap.alloc(
+                    crate::heap::HeapObj::Array(VmArray::new(rest_items)),
+                ));
+                self.stack.push(rest_nv);
+                if self.frames.len() >= 10000 {
+                    return Err(crate::error::RuntimeError::new(
+                        "stack overflow: call depth exceeded 10000",
+                    ));
+                }
+                let new_base = self.stack.len() - arity;
+                let required = new_base + closure_ref.proto.register_count as usize;
+                if self.stack.len() < required {
+                    self.stack.resize(required, VmValue::null());
+                }
+                let mut frame = crate::frame::CallFrame::new(closure_ref, new_base);
+                frame._owned_closure = self.frames[frame_idx]._owned_closure.clone();
+                frame.return_reg = Some(dest as u16);
+                self.record_call_vm_fast();
+                self.record_frame_push();
+                self.frames.push(frame);
+                return Ok(true);
+            }
+        }
+
+        self.push(callee);
+        for i in 0..arg_count {
+            let v = self.stack[base + arg_start + i];
+            self.push(v);
+        }
+        let prepared = self.prepare_call(callee, arg_count)?;
+        self.dispatch_prepared_call(prepared)?;
+        if self.frames.len() > frame_idx + 1 {
+            self.frames.last_mut().unwrap().return_reg = Some(dest as u16);
+            let last = self.frames.last().unwrap();
+            let req = last.base + last.closure().proto.register_count as usize;
+            if self.stack.len() < req {
+                self.stack.resize(req, VmValue::null());
+            }
+            return Ok(true);
+        }
+        let result = self.stack.pop().unwrap_or(VmValue::null());
+        let caller_frame = &self.frames[frame_idx];
+        let required = base + caller_frame.closure().proto.register_count as usize;
+        if self.stack.len() < required {
+            self.stack.resize(required, VmValue::null());
+        }
+        self.stack[base + dest] = result;
+        Ok(false)
+    }
+
     pub(crate) fn exec_call_spread_reg(
         &mut self,
         callee: VmValue,

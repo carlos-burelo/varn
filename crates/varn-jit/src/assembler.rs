@@ -277,6 +277,13 @@ impl Assembler {
         self.emit_modrm(0b11, 2, reg_val);
     }
 
+    pub fn call_near(&mut self) -> usize {
+        self.emit_byte(0xE8);
+        let patch_pos = self.current_offset();
+        self.emit_u32(0);
+        patch_pos
+    }
+
     pub fn ret(&mut self) {
         self.emit_byte(0xC3);
     }

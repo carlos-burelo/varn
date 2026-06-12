@@ -262,6 +262,16 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                     lo(w2)
                 )
             }
+            OpCode::CallSelf => {
+                let w1 = w!();
+                let w2 = w!();
+                format!(
+                    "r{} = callself ({} args @ r{})",
+                    hi(w1),
+                    hi(w2),
+                    lo(w2)
+                )
+            }
             OpCode::InvokeVirtual => {
                 let w1 = w!();
                 let name_idx = w!();

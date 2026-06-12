@@ -366,6 +366,7 @@ impl ExecCtx {
                     | OpCode::JumpIfTrue
                     | OpCode::Return
                     | OpCode::Call
+                    | OpCode::CallSelf
                     | OpCode::CallMethod
                     | OpCode::InvokeVirtual
                     | OpCode::CallSpread => {

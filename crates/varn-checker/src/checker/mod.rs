@@ -112,6 +112,7 @@ pub struct Checker {
     pub(crate) member_type_cache: FxHashMap<(Type, Rc<str>), Option<(Type, Option<usize>)>>,
     pub(crate) expected_type: Option<Type>,
     pub(crate) call_mappings: FxHashMap<u32, Vec<Option<usize>>>,
+    pub(crate) reassigned_names: rustc_hash::FxHashSet<Rc<str>>,
     pub(crate) record_expr_types: bool,
     pub(crate) node_scopes: FxHashMap<u32, ScopeId>,
     pub(crate) map_generics_cache: FxHashMap<(Type, Vec<Type>), Type>,
@@ -203,6 +204,7 @@ impl Checker {
             warn_implicit_dynamic,
             expected_type: None,
             call_mappings: FxHashMap::default(),
+            reassigned_names: rustc_hash::FxHashSet::default(),
             record_expr_types,
             node_scopes: FxHashMap::default(),
             map_generics_cache: FxHashMap::with_capacity_and_hasher(512, Default::default()),
@@ -221,6 +223,9 @@ impl Checker {
 
         for (k, v) in checker.call_mappings {
             annotations.record_call_mapping(k, v);
+        }
+        for name in &checker.reassigned_names {
+            annotations.record_reassigned_name(name);
         }
         profile.collect_annotations = started.elapsed();
         let flattened = std::mem::take(&mut bind.type_members.flattened);
