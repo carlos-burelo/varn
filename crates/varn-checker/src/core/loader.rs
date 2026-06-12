@@ -1,5 +1,5 @@
 use crate::binder::BindResult;
-use crate::module_resolver::{resolve_stdlib_module_bind, resolve_stdlib_module_exports};
+use crate::module_resolver::{resolve_stdlib_module_bind_ref, resolve_stdlib_module_exports_ref};
 use crate::symbol::Symbol;
 use crate::types::{ClassMemberInfo, Type};
 use rustc_hash::FxHashMap;
@@ -68,8 +68,8 @@ pub fn merge_core_members(bind: &mut BindResult) {
 fn build_core_exports() -> FxHashMap<Rc<str>, Symbol> {
     let mut globals = FxHashMap::default();
     for spec in varn_modules::CORE_MODULES {
-        for (k, v) in resolve_stdlib_module_exports(spec) {
-            globals.insert(Rc::from(k.as_str()), v);
+        for (k, v) in resolve_stdlib_module_exports_ref(spec).as_ref() {
+            globals.insert(Rc::from(k.as_str()), v.clone());
         }
     }
     globals
@@ -78,7 +78,7 @@ fn build_core_exports() -> FxHashMap<Rc<str>, Symbol> {
 fn build_core_members() -> CoreMembers {
     let mut members = CoreMembers::default();
     for spec in varn_modules::CORE_MODULES {
-        if let Some(rb) = resolve_stdlib_module_bind(spec) {
+        if let Some(rb) = resolve_stdlib_module_bind_ref(spec) {
             let scope = rb.scopes.get(rb.global_scope);
             for (name, &sid) in &scope.bindings {
                 let sym = rb.arena.get(sid);
@@ -89,15 +89,27 @@ fn build_core_members() -> CoreMembers {
                 }
             }
 
-            for (k, v) in rb.type_members.classes {
-                members.class_members.insert(k, v);
+            for (k, v) in &rb.type_members.classes {
+                members.class_members.insert(k.clone(), v.clone());
             }
-            members.interface_members.extend(rb.type_members.interfaces);
-            members.enum_members.extend(rb.type_members.enums);
-            members.namespace_members.extend(rb.type_members.namespaces);
-            members.class_methods.extend(rb.class_methods);
-            members.flattened_members.extend(rb.type_members.flattened);
-            members.class_parents.extend(rb.class_parents);
+            for (k, v) in &rb.type_members.interfaces {
+                members.interface_members.insert(k.clone(), v.clone());
+            }
+            for (k, v) in &rb.type_members.enums {
+                members.enum_members.insert(k.clone(), v.clone());
+            }
+            for (k, v) in &rb.type_members.namespaces {
+                members.namespace_members.insert(k.clone(), v.clone());
+            }
+            for (k, v) in &rb.class_methods {
+                members.class_methods.insert(k.clone(), v.clone());
+            }
+            for (k, v) in &rb.type_members.flattened {
+                members.flattened_members.insert(k.clone(), v.clone());
+            }
+            for (k, v) in &rb.class_parents {
+                members.class_parents.insert(k.clone(), v.clone());
+            }
         }
     }
     members

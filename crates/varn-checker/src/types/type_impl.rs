@@ -74,6 +74,22 @@ impl Type {
     }
 
     pub fn union(members: Vec<Type>) -> Self {
+        if members.len() == 1 {
+            if !matches!(members[0].0, TypeKind::Union(_)) {
+                return members.into_iter().next().unwrap();
+            }
+        } else if members.len() == 2 {
+            if !matches!(members[0].0, TypeKind::Union(_)) && !matches!(members[1].0, TypeKind::Union(_)) {
+                if members[0] == members[1] {
+                    return members.into_iter().next().unwrap();
+                } else {
+                    return Type(TypeKind::Union(members), false);
+                }
+            }
+        } else if members.is_empty() {
+            return Type(TypeKind::Union(members), false);
+        }
+
         let mut seen = rustc_hash::FxHashSet::default();
         let mut flat: Vec<Type> = Vec::with_capacity(members.len());
         for m in members {

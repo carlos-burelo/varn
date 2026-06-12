@@ -111,6 +111,8 @@ pub struct JitHelpers {
     pub jit_push_self_frame: usize,
     pub jit_post_call: usize,
     pub dispatch_intrinsic: usize,
+    pub open_upvalues_offset: usize,
+    pub pending_constructors_offset: usize,
 }
 
 #[derive(Debug, Clone, Copy)]

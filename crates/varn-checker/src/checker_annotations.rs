@@ -365,31 +365,33 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
             let r = infer_expr_type(right, Some(ctx));
 
             use varn_core::TypeTag;
+            let is_int = |tk: &TypeKind<_, _, _, _, _, _>| {
+                matches!(tk, TypeKind::Intrinsic(TypeTag::Int) | TypeKind::LiteralInt(_))
+            };
+            let is_float = |tk: &TypeKind<_, _, _, _, _, _>| {
+                matches!(tk, TypeKind::Intrinsic(TypeTag::Float) | TypeKind::LiteralFloat(_))
+            };
+
             let kind = if is_arithmetic {
-                match (op, &l.0, &r.0) {
-                    (
-                        BinaryOp::Div,
-                        TypeKind::Intrinsic(TypeTag::Int),
-                        TypeKind::Intrinsic(TypeTag::Int),
-                    ) => Some(NumericKind::Float),
-                    (_, TypeKind::Intrinsic(TypeTag::Int), TypeKind::Intrinsic(TypeTag::Int)) => {
-                        Some(NumericKind::Int)
-                    }
-                    (_, TypeKind::Intrinsic(TypeTag::Float), _)
-                    | (_, _, TypeKind::Intrinsic(TypeTag::Float)) => Some(NumericKind::Float),
-                    _ => None,
+                if *op == BinaryOp::Div && is_int(&l.0) && is_int(&r.0) {
+                    Some(NumericKind::Float)
+                } else if is_int(&l.0) && is_int(&r.0) {
+                    Some(NumericKind::Int)
+                } else if is_float(&l.0) || is_float(&r.0) {
+                    Some(NumericKind::Float)
+                } else {
+                    None
                 }
             } else {
-                match (&l.0, &r.0) {
-                    (TypeKind::Intrinsic(TypeTag::Int), TypeKind::Intrinsic(TypeTag::Int)) => {
-                        Some(NumericKind::Int)
-                    }
-                    (TypeKind::Intrinsic(TypeTag::Float), TypeKind::Intrinsic(TypeTag::Int))
-                    | (TypeKind::Intrinsic(TypeTag::Int), TypeKind::Intrinsic(TypeTag::Float))
-                    | (TypeKind::Intrinsic(TypeTag::Float), TypeKind::Intrinsic(TypeTag::Float)) => {
-                        Some(NumericKind::Float)
-                    }
-                    _ => None,
+                if is_int(&l.0) && is_int(&r.0) {
+                    Some(NumericKind::Int)
+                } else if (is_float(&l.0) && is_int(&r.0))
+                    || (is_int(&l.0) && is_float(&r.0))
+                    || (is_float(&l.0) && is_float(&r.0))
+                {
+                    Some(NumericKind::Float)
+                } else {
+                    None
                 }
             };
             if let Some(k) = kind {

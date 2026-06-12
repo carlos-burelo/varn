@@ -315,13 +315,33 @@ pub(crate) fn collect_type_inferences(
     }
 }
 
+fn is_generic_possible(ty: &Type) -> bool {
+    !matches!(
+        &ty.0,
+        TypeKind::Intrinsic(_)
+            | TypeKind::LiteralInt(_)
+            | TypeKind::LiteralFloat(_)
+            | TypeKind::LiteralStr(_)
+            | TypeKind::LiteralBool(_)
+            | TypeKind::This
+    )
+}
+
 pub(crate) fn map_generics_cached(
     checker: &mut Checker,
     base: &Type,
     mapping: &FxHashMap<Rc<str>, Type>,
 ) -> Type {
-    if mapping.is_empty() {
+    if mapping.is_empty() || !is_generic_possible(base) {
         return base.clone();
+    }
+
+    if let TypeKind::Named(n, _) = &base.0 {
+        if let Some(t) = mapping.get(n) {
+            return t.clone();
+        } else {
+            return base.clone();
+        }
     }
 
     let sorted_args: Vec<Type> = {
