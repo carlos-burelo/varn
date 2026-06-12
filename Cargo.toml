@@ -37,5 +37,11 @@ lto = true
 codegen-units = 1
 panic = "abort"
 
+[profile.release.package.varn-jit]
+opt-level = 3
+
+[profile.release.package.varn-vm]
+opt-level = 0
+
 [profile.dev]
 opt-level = 1
