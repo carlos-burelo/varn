@@ -761,13 +761,16 @@ pub extern "C" fn jit_prepare_call(
         if let Some(closure) = ctx_ref.heap.get_closure(callee.as_heap_idx()) {
             if !closure.proto.is_async && !closure.proto.is_generator {
                 if closure.jit_entry.is_some() {
-                    let required = callee_base + closure.proto.register_count as usize + 32;
+                    let required_cap = callee_base + closure.proto.register_count as usize + 32;
+                    let required_len = callee_base + closure.proto.register_count as usize;
                     let stack_len = ctx_ref.stack.len();
-                    if stack_len < required {
-                        ctx_ref.stack.reserve(required - stack_len);
-                        ctx_ref.stack.set_len(required);
+                    if ctx_ref.stack.capacity() < required_cap {
+                        ctx_ref.stack.reserve(required_cap - stack_len);
+                    }
+                    if stack_len < required_len {
+                        ctx_ref.stack.set_len(required_len);
                         let ptr = ctx_ref.stack.as_mut_ptr();
-                        for i in stack_len..required {
+                        for i in stack_len..required_len {
                             std::ptr::write(ptr.add(i), VmValue::null());
                         }
                     }
@@ -790,13 +793,16 @@ pub extern "C" fn jit_push_self_frame(
         let closure = &*current_closure;
 
         // Reserve stack space
-        let required = callee_base + closure.proto.register_count as usize + 32;
+        let required_cap = callee_base + closure.proto.register_count as usize + 32;
+        let required_len = callee_base + closure.proto.register_count as usize;
         let stack_len = ctx_ref.stack.len();
-        if stack_len < required {
-            ctx_ref.stack.reserve(required - stack_len);
-            ctx_ref.stack.set_len(required);
+        if ctx_ref.stack.capacity() < required_cap {
+            ctx_ref.stack.reserve(required_cap - stack_len);
+        }
+        if stack_len < required_len {
+            ctx_ref.stack.set_len(required_len);
             let ptr = ctx_ref.stack.as_mut_ptr();
-            for i in stack_len..required {
+            for i in stack_len..required_len {
                 std::ptr::write(ptr.add(i), VmValue::null());
             }
         }
@@ -813,9 +819,15 @@ pub extern "C" fn jit_post_call(
         let ctx_ref = &mut *ctx;
         let returning_frame_idx = ctx_ref.frames.len() - 1;
         ctx_ref.frames.pop();
-        ctx_ref.close_upvalues_above(callee_base);
+        if !ctx_ref.open_upvalues.is_empty() {
+            ctx_ref.close_upvalues_above(callee_base);
+        }
         ctx_ref.record_call_vm_fast();
-        resolve_constructor_return(ctx_ref, returning_frame_idx, val)
+        if !ctx_ref.pending_constructors.is_empty() {
+            resolve_constructor_return(ctx_ref, returning_frame_idx, val)
+        } else {
+            val
+        }
     }
 }
 
