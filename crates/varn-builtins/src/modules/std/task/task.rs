@@ -199,18 +199,25 @@ pub(crate) mod dispatch {
             let port_val = ctx.extract(port_nv);
             if let Value::VmValue(payload) = port_val {
                 if let Some(port) = payload.as_any().downcast_ref::<varn_runtime::isolate::IsolatePort>() {
-                    let port_clone = port.clone();
-                    let async_task = varn_types::AsyncTask::pending();
-                    let async_task_clone = async_task.clone();
-                    std::thread::spawn(move || {
-                        varn_types::value::init_thread_heap();
-                        if let Some(send_val) = port_clone.receive_blocking() {
-                            async_task_clone.resolve(send_val.to_value());
-                        } else {
-                            async_task_clone.resolve(Value::Null);
+                    let rx_guard = port.rx.lock().unwrap();
+                    match rx_guard.try_recv() {
+                        Ok(send_val) => {
+                            let async_task = varn_types::AsyncTask::pending();
+                            let val_nv = send_val.to_value_ctx(ctx);
+                            async_task.resolve(ctx.extract(val_nv));
+                            return Ok(ctx.intern(Value::TaskHandle(async_task)));
                         }
-                    });
-                    return Ok(ctx.intern(Value::TaskHandle(async_task)));
+                        Err(std::sync::mpsc::TryRecvError::Empty) => {
+                            let async_task = varn_types::AsyncTask::pending();
+                            *port.waker.lock().unwrap() = Some(async_task.clone());
+                            return Ok(ctx.intern(Value::TaskHandle(async_task)));
+                        }
+                        Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                            let async_task = varn_types::AsyncTask::pending();
+                            async_task.resolve(Value::Null);
+                            return Ok(ctx.intern(Value::TaskHandle(async_task)));
+                        }
+                    }
                 }
             }
             Err("IsolatePort.receive: invalid internal port".to_string())

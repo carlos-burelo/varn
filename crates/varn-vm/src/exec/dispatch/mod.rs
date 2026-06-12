@@ -51,25 +51,31 @@ impl ExecCtx {
     }
 
     pub(crate) fn run_until_inner(&mut self, depth: usize) -> VmResult<VmValue> {
-        'frame_loop: while self.frames.len() > depth {
-            let frame_idx = self.frames.len() - 1;
+        unsafe { Self::run_until_inner_raw(self as *mut ExecCtx, depth) }
+    }
 
-            let closure_ptr: *const crate::frame::VmClosure = &*self.frames[frame_idx].closure;
+    #[inline(never)]
+    #[allow(dangerous_implicit_autorefs)]
+    unsafe fn run_until_inner_raw(ctx: *mut ExecCtx, depth: usize) -> VmResult<VmValue> {
+        'frame_loop: while (*ctx).frames.len() > depth {
+            let frame_idx = (*ctx).frames.len() - 1;
+
+            let closure_ptr: *const crate::frame::VmClosure = &*(*ctx).frames[frame_idx].closure;
             let closure = unsafe { &*closure_ptr };
 
-            let is_first_entry = self.frames[frame_idx].ip == 0;
+            let is_first_entry = (*ctx).frames[frame_idx].ip == 0;
 
-            if !self.no_jit && closure.jit_entry.is_some() && is_first_entry {
+            if !(*ctx).no_jit && closure.jit_entry.is_some() && is_first_entry {
                 let jit_fn = closure.jit_entry.unwrap();
                 if is_first_entry {
                     varn_jit::JIT_STATS
                         .jit_runs
                         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 }
-                if self.trace {
-                    self.trace_event("JIT ENTRY", frame_idx, closure, 0, None);
+                if (*ctx).trace {
+                    (*ctx).trace_event("JIT ENTRY", frame_idx, closure, 0, None);
                 }
-                let is_outer = self.jit_jmp_buf.is_null();
+                let is_outer = (*ctx).jit_jmp_buf.is_null();
                 let mut jmp_buf = super::ctx::JmpBuf::default();
                 let jmp_res = if is_outer {
                     unsafe { super::ctx::my_setjmp(&mut jmp_buf) }
@@ -79,23 +85,24 @@ impl ExecCtx {
 
                 let res = if jmp_res == 0 {
                     if is_outer {
-                        self.jit_jmp_buf = &mut jmp_buf as *mut super::ctx::JmpBuf;
+                        (*ctx).jit_jmp_buf = &mut jmp_buf as *mut super::ctx::JmpBuf;
                     }
                     let val = unsafe {
                         (jit_fn)(
-                            self.stack.as_mut_ptr() as *mut std::ffi::c_void,
+                            (*ctx).stack.as_mut_ptr() as *mut std::ffi::c_void,
                             closure_ptr as *const std::ffi::c_void,
-                            self.frames[frame_idx].base,
-                            self as *mut ExecCtx as *mut std::ffi::c_void,
+                            (*ctx).frames[frame_idx].base,
+                            ctx as *mut std::ffi::c_void,
                         )
                     };
+                    std::hint::black_box(ctx);
                     if is_outer {
-                        self.jit_jmp_buf = std::ptr::null_mut();
+                        (*ctx).jit_jmp_buf = std::ptr::null_mut();
                     }
                     Ok(val)
                 } else {
                     if is_outer {
-                        self.jit_jmp_buf = std::ptr::null_mut();
+                        (*ctx).jit_jmp_buf = std::ptr::null_mut();
                     }
                     Err(jmp_res)
                 };
@@ -104,66 +111,66 @@ impl ExecCtx {
                     Ok(val) => val,
                     Err(code) => {
                         if code == 1 {
-                            let handler = self.jit_panic_exception_handler.take();
-                            let error = self.jit_panic_exception_error.take().unwrap_or(VmValue::null());
-                            let err_obj = self.jit_panic_exception_err_obj.take();
+                            let handler = (*ctx).jit_panic_exception_handler.take();
+                            let error = (*ctx).jit_panic_exception_error.take().unwrap_or(VmValue::null());
+                            let err_obj = (*ctx).jit_panic_exception_err_obj.take();
                             
                             if let Some(handler) = handler {
-                                while self.frames.len() > handler.frame_depth {
-                                    self.record_frame_pop();
-                                    let f = self.frames.pop().unwrap();
-                                    self.close_upvalues_above(f.base);
+                                while (*ctx).frames.len() > handler.frame_depth {
+                                    (*ctx).record_frame_pop();
+                                    let f = (*ctx).frames.pop().unwrap();
+                                    (*ctx).close_upvalues_above(f.base);
                                 }
 
-                                let f2 = self.frames.len() - 1;
-                                let b2 = self.frames[f2].base;
+                                let f2 = (*ctx).frames.len() - 1;
+                                let b2 = (*ctx).frames[f2].base;
                                 let required_depth =
-                                    b2 + self.frames[f2].closure.proto.register_count as usize;
-                                self.stack.truncate(required_depth);
+                                    b2 + (*ctx).frames[f2].closure.proto.register_count as usize;
+                                (*ctx).stack.truncate(required_depth);
                                 let thrown_val = error;
 
                                 let slot = b2 + handler.err_reg as usize;
-                                if slot < self.stack.len() {
-                                    self.stack[slot] = thrown_val;
+                                if slot < (*ctx).stack.len() {
+                                    (*ctx).stack[slot] = thrown_val;
                                 } else {
-                                    self.stack.resize(slot + 1, VmValue::null());
-                                    self.stack[slot] = thrown_val;
+                                    (*ctx).stack.resize(slot + 1, VmValue::null());
+                                    (*ctx).stack[slot] = thrown_val;
                                 }
-                                let new_frame_idx = self.frames.len() - 1;
-                                self.frames[new_frame_idx].ip = handler.catch_ip;
+                                let new_frame_idx = (*ctx).frames.len() - 1;
+                                (*ctx).frames[new_frame_idx].ip = handler.catch_ip;
                                 continue 'frame_loop;
                             } else {
                                 return Err(err_obj.unwrap());
                             }
                         } else if code == 2 {
-                            let resume_ip = self.jit_panic_suspend_resume_ip.take().unwrap();
-                            let frame_idx2 = self.frames.len() - 1;
-                            self.frames[frame_idx2].ip = resume_ip;
+                            let resume_ip = (*ctx).jit_panic_suspend_resume_ip.take().unwrap();
+                            let frame_idx2 = (*ctx).frames.len() - 1;
+                            (*ctx).frames[frame_idx2].ip = resume_ip;
                             return Ok(VmValue::null());
                         } else {
                             panic!("Unknown longjmp code: {}", code);
                         }
                     }
                 };
-                if self.trace {
-                    self.trace_event("JIT EXIT", frame_idx, closure, 0, None);
+                if (*ctx).trace {
+                    (*ctx).trace_event("JIT EXIT", frame_idx, closure, 0, None);
                 }
 
-                let frame = self.frames.pop().unwrap();
-                self.record_frame_pop();
-                while self
+                let frame = (*ctx).frames.pop().unwrap();
+                (*ctx).record_frame_pop();
+                while (*ctx)
                     .try_handlers
                     .last()
-                    .map(|h| h.frame_depth > self.frames.len())
+                    .map(|h| h.frame_depth > (*ctx).frames.len())
                     .unwrap_or(false)
                 {
-                    self.try_handlers.pop();
+                    (*ctx).try_handlers.pop();
                 }
-                self.close_upvalues_above(frame.base);
-                self.stack.truncate(frame.base);
+                (*ctx).close_upvalues_above(frame.base);
+                (*ctx).stack.truncate(frame.base);
 
-                let ctor_pos = if !self.pending_constructors.is_empty() {
-                    self.pending_constructors
+                let ctor_pos = if !(*ctx).pending_constructors.is_empty() {
+                    (*ctx).pending_constructors
                         .iter()
                         .rposition(|(idx, _)| *idx == frame_idx)
                 } else {
@@ -171,7 +178,7 @@ impl ExecCtx {
                 };
 
                 let final_val = if let Some(pos) = ctor_pos {
-                    let (_, instance_nv) = self.pending_constructors.remove(pos);
+                    let (_, instance_nv) = (*ctx).pending_constructors.remove(pos);
                     if res.is_null() {
                         instance_nv
                     } else {
@@ -182,11 +189,11 @@ impl ExecCtx {
                 };
 
                 if let Some(return_reg) = frame.return_reg {
-                    let caller_base = self.frames.last().map(|f| f.base).unwrap_or(0);
-                    self.stack[caller_base + return_reg as usize] = final_val;
+                    let caller_base = (*ctx).frames.last().map(|f| f.base).unwrap_or(0);
+                    (*ctx).stack[caller_base + return_reg as usize] = final_val;
                 }
 
-                if self.frames.len() == depth {
+                if (*ctx).frames.len() == depth {
                     return Ok(final_val);
                 }
                 continue 'frame_loop;
@@ -198,15 +205,15 @@ impl ExecCtx {
                 }
             }
 
-            let base = self.frames[frame_idx].base;
-            let mut ip = self.frames[frame_idx].ip;
+            let base = (*ctx).frames[frame_idx].base;
+            let mut ip = (*ctx).frames[frame_idx].ip;
             let code_len = closure.proto.chunk.code.len();
 
             loop {
                 if ip >= code_len {
-                    self.frames.last_mut().unwrap().ip = ip;
-                    let res = self.reg_return(base, 0);
-                    if self.frames.len() == depth {
+                    (*ctx).frames.last_mut().unwrap().ip = ip;
+                    let res = (*ctx).reg_return(base, 0);
+                    if (*ctx).frames.len() == depth {
                         return Ok(res);
                     }
                     continue 'frame_loop;
@@ -226,8 +233,13 @@ impl ExecCtx {
                     }
                 };
 
+                // Compiler fence: prevents the optimizer from caching ctx's fields across
+                // iterations. The interpreter may re-enter itself (yield/await), so ctx state
+                // can legitimately change between opcodes.
+                std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
+
                 #[cfg(feature = "profiling")]
-                if let Some(counts) = self.opcode_counts.as_ref() {
+                if let Some(counts) = (*ctx).opcode_counts.as_ref() {
                     counts[(raw_op as u8) as usize]
                         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 }
@@ -235,10 +247,10 @@ impl ExecCtx {
                 macro_rules! reg {
                     ($r:expr) => {
                         *({
+                            let idx = base + $r;
                             #[cfg(debug_assertions)]
                             {
-                                let idx = base + $r;
-                                if idx >= self.stack.len() {
+                                if idx >= (*ctx).stack.len() {
                                     panic!(
                                         "💥 [VM FATAL] Register Access Out Of Bounds!\n\
                                          • Function: {}\n\
@@ -251,11 +263,14 @@ impl ExecCtx {
                                         base,
                                         $r,
                                         idx,
-                                        self.stack.len()
+                                        (*ctx).stack.len()
                                     );
                                 }
                             }
-                            &mut self.stack[base + $r]
+                            let stack_ptr = std::ptr::addr_of_mut!((*ctx).stack);
+                            let stack_len = (*stack_ptr).len();
+                            assert!(idx < stack_len, "register OOB: idx={idx} len={stack_len}");
+                            (*stack_ptr).as_mut_ptr().add(idx)
                         })
                     };
                 }
@@ -279,7 +294,7 @@ impl ExecCtx {
                     | OpCode::LoadIntMinusOne
                     | OpCode::LoadConst
                     | OpCode::Move => {
-                        let handled = self.exec_literals_vars_op(
+                        let handled = (*ctx).exec_literals_vars_op(
                             op, code, &mut ip, base, frame_idx, &closure, first_reg,
                         )?;
                         debug_assert!(handled, "exec_literals_vars_op must handle grouped opcodes");
@@ -336,7 +351,7 @@ impl ExecCtx {
                     | OpCode::BuildStr
                     | OpCode::StrLength
                     | OpCode::StrSlice => {
-                        let handled = self.exec_math_cmp_op(
+                        let handled = (*ctx).exec_math_cmp_op(
                             op, code, &mut ip, base, frame_idx, &closure, first_reg,
                         )?;
                         debug_assert!(handled, "exec_math_cmp_op must handle grouped opcodes");
@@ -351,7 +366,7 @@ impl ExecCtx {
                     | OpCode::CallMethod
                     | OpCode::InvokeVirtual
                     | OpCode::CallSpread => {
-                        if let Some(flow) = self.exec_control_calls_op(
+                        if let Some(flow) = (*ctx).exec_control_calls_op(
                             op, code, &mut ip, base, frame_idx, &closure, first_reg, depth,
                         )? {
                             match flow {
@@ -394,7 +409,7 @@ impl ExecCtx {
                     | OpCode::Typeof
                     | OpCode::IsNull
                     | OpCode::IsArray => {
-                        if let Some(flow) = self.exec_objects_collections_op(
+                        if let Some(flow) = (*ctx).exec_objects_collections_op(
                             op, code, &mut ip, base, frame_idx, &closure, first_reg,
                         )? {
                             match flow {
@@ -415,24 +430,24 @@ impl ExecCtx {
                     | OpCode::DefineStaticGetter
                     | OpCode::DefineStaticSetter
                     | OpCode::BindMethod => {
-                        self.frames[frame_idx].ip = ip;
-                        self.exec_class_op(
+                        (*ctx).frames[frame_idx].ip = ip;
+                        (*ctx).exec_class_op(
                             op, code, &mut ip, base, frame_idx, &closure, first_reg,
                         )?;
-                        let frame_idx2 = self.frames.len() - 1;
-                        ip = self.frames[frame_idx2].ip;
+                        let frame_idx2 = (*ctx).frames.len() - 1;
+                        ip = (*ctx).frames[frame_idx2].ip;
                     }
                     OpCode::MakeEnumVariant => {
-                        self.frames[frame_idx].ip = ip;
-                        self.exec_make_enum_variant_reg(code, &mut ip, base, frame_idx, &closure)?;
-                        let frame_idx2 = self.frames.len() - 1;
-                        ip = self.frames[frame_idx2].ip;
+                        (*ctx).frames[frame_idx].ip = ip;
+                        (*ctx).exec_make_enum_variant_reg(code, &mut ip, base, frame_idx, &closure)?;
+                        let frame_idx2 = (*ctx).frames.len() - 1;
+                        ip = (*ctx).frames[frame_idx2].ip;
                     }
                     OpCode::GetEnumTag => {
                         let src = hi(code[ip]);
                         ip += 1;
                         let v = reg![src];
-                        reg![first_reg] = self.exec_get_enum_tag(v)?;
+                        reg![first_reg] = (*ctx).exec_get_enum_tag(v)?;
                     }
 
                     OpCode::Try => {
@@ -445,14 +460,14 @@ impl ExecCtx {
                         ip += 2;
                         let catch_ip = ip + catch_offset;
                         crate::exec::exceptions::push_try(
-                            &mut self.try_handlers,
+                            &mut (*ctx).try_handlers,
                             catch_ip,
-                            self.frames.len(),
+                            (*ctx).frames.len(),
                             err_reg,
                         );
                     }
                     OpCode::PopTry => {
-                        crate::exec::exceptions::pop_try(&mut self.try_handlers);
+                        crate::exec::exceptions::pop_try(&mut (*ctx).try_handlers);
                     }
                     OpCode::Throw => {
                         let w1 = code[ip];
@@ -460,32 +475,32 @@ impl ExecCtx {
                         let val = reg![src];
                         let err = crate::exec::exceptions::build_thrown_error(
                             val,
-                            &self.heap,
-                            &self.frames,
+                            &(*ctx).heap,
+                            &(*ctx).frames,
                         );
-                        if let Some(handler) = self.try_handlers.pop() {
-                            while self.frames.len() > handler.frame_depth {
-                                self.record_frame_pop();
-                                let f = self.frames.pop().unwrap();
-                                self.close_upvalues_above(f.base);
+                        if let Some(handler) = (*ctx).try_handlers.pop() {
+                            while (*ctx).frames.len() > handler.frame_depth {
+                                (*ctx).record_frame_pop();
+                                let f = (*ctx).frames.pop().unwrap();
+                                (*ctx).close_upvalues_above(f.base);
                             }
 
-                            let f2 = self.frames.len() - 1;
-                            let b2 = self.frames[f2].base;
+                            let f2 = (*ctx).frames.len() - 1;
+                            let b2 = (*ctx).frames[f2].base;
                             let required_depth =
-                                b2 + self.frames[f2].closure.proto.register_count as usize;
-                            self.stack.truncate(required_depth);
+                                b2 + (*ctx).frames[f2].closure.proto.register_count as usize;
+                            (*ctx).stack.truncate(required_depth);
                             let thrown_val = err.thrown.unwrap_or(VmValue::null());
 
                             let slot = b2 + handler.err_reg as usize;
-                            if slot < self.stack.len() {
-                                self.stack[slot] = thrown_val;
+                            if slot < (*ctx).stack.len() {
+                                (*ctx).stack[slot] = thrown_val;
                             } else {
-                                self.stack.resize(slot + 1, VmValue::null());
-                                self.stack[slot] = thrown_val;
+                                (*ctx).stack.resize(slot + 1, VmValue::null());
+                                (*ctx).stack[slot] = thrown_val;
                             }
-                            let new_frame_idx = self.frames.len() - 1;
-                            self.frames[new_frame_idx].ip = handler.catch_ip;
+                            let new_frame_idx = (*ctx).frames.len() - 1;
+                            (*ctx).frames[new_frame_idx].ip = handler.catch_ip;
                             continue 'frame_loop;
                         }
                         return Err(err);
@@ -497,8 +512,8 @@ impl ExecCtx {
                         let dest = hi(w1) as u8;
                         let src = lo(w1);
                         let val = reg![src];
-                        self.frames[frame_idx].ip = ip;
-                        self.vm_suspend = Some(crate::exec::VmSuspend::Yield {
+                        (*ctx).frames[frame_idx].ip = ip;
+                        (*ctx).vm_suspend = Some(crate::exec::VmSuspend::Yield {
                             value: val,
                             dest_reg: dest,
                         });
@@ -508,9 +523,9 @@ impl ExecCtx {
                         let src = hi(code[ip]);
                         ip += 1;
                         let fut = reg![src];
-                        self.frames[frame_idx].ip = ip;
-                        self.vm_suspend = Some(crate::exec::VmSuspend::Await {
-                            value: self.heap.extract(fut),
+                        (*ctx).frames[frame_idx].ip = ip;
+                        (*ctx).vm_suspend = Some(crate::exec::VmSuspend::Await {
+                            value: (*ctx).heap.extract(fut),
                             dest_reg: first_reg as u16,
                         });
                         return Ok(VmValue::null());
@@ -521,32 +536,32 @@ impl ExecCtx {
                         let (dest, src) = (hi(w1), lo(w1));
                         // Ensure source and destination register slots exist
                         let src_slot = base + src as usize;
-                        if src_slot >= self.stack.len() {
-                            self.stack.resize(src_slot + 1, crate::value::VmValue::null());
+                        if src_slot >= (*ctx).stack.len() {
+                            (*ctx).stack.resize(src_slot + 1, crate::value::VmValue::null());
                         }
                         let task_val = reg![src];
                         let dest_slot = base + dest as usize;
-                        if dest_slot >= self.stack.len() {
-                            self.stack.resize(dest_slot + 1, crate::value::VmValue::null());
+                        if dest_slot >= (*ctx).stack.len() {
+                            (*ctx).stack.resize(dest_slot + 1, crate::value::VmValue::null());
                         }
-                        reg![dest] = self.exec_spawn(task_val)?;
+                        reg![dest] = (*ctx).exec_spawn(task_val)?;
                     }
 
                     OpCode::LoadModule | OpCode::LoadModuleSlot | OpCode::StoreModuleSlot => {
-                        self.frames[frame_idx].ip = ip;
-                        self.exec_module_op_reg(
+                        (*ctx).frames[frame_idx].ip = ip;
+                        (*ctx).exec_module_op_reg(
                             op, code, &mut ip, base, frame_idx, &closure, first_reg,
                         )?;
-                        ip = self.frames[frame_idx].ip;
+                        ip = (*ctx).frames[frame_idx].ip;
                     }
 
                     OpCode::InvokeRuntimeStatic => {
-                        self.frames[frame_idx].ip = ip;
-                        self.exec_invoke_runtime_static_reg(
+                        (*ctx).frames[frame_idx].ip = ip;
+                        (*ctx).exec_invoke_runtime_static_reg(
                             code, &mut ip, base, frame_idx, &closure,
                         )?;
-                        let frame_idx2 = self.frames.len() - 1;
-                        ip = self.frames[frame_idx2].ip;
+                        let frame_idx2 = (*ctx).frames.len() - 1;
+                        ip = (*ctx).frames[frame_idx2].ip;
                     }
                     OpCode::Intrinsic => {
                         let w1 = code[ip];
@@ -557,10 +572,10 @@ impl ExecCtx {
                         let args_start = base + first_reg;
                         let result = crate::exec::intrinsics::dispatch(
                             wire_byte,
-                            &self.stack[args_start..args_start + arg_count],
-                            &mut self.heap,
+                            &(*ctx).stack[args_start..args_start + arg_count],
+                            &mut (*ctx).heap,
                         )?;
-                        self.stack[base + first_reg] = result;
+                        (*ctx).stack[base + first_reg] = result;
                     }
 
                     OpCode::LoadStaticFn => {
@@ -575,25 +590,32 @@ impl ExecCtx {
                                 )))
                             }
                         };
-                        let proto_ptr = std::rc::Rc::as_ptr(proto) as usize;
-                        if let Some(&cached) = self.static_closures.get(&proto_ptr) {
-                            self.stack[base + dest] = cached;
+                        let cached = proto.static_closure_val.get();
+                        if cached != 0 {
+                            (*ctx).stack[base + dest] = VmValue(cached);
                         } else {
-                            let constants = std::rc::Rc::new(crate::exec::calls::resolve_constants(proto, &mut self.heap));
-                            let vm_closure = std::rc::Rc::new(
-                                crate::frame::VmClosure::with_upvalues(proto.clone(), vec![], constants),
-                            );
-                            let val = self.heap.alloc_vm_closure(vm_closure);
-                            self.static_closures.insert(proto_ptr, val);
-                            self.stack[base + dest] = val;
+                            let proto_ptr = std::rc::Rc::as_ptr(proto) as usize;
+                            let val = if let Some(&cached_val) = (*ctx).static_closures.get(&proto_ptr) {
+                                cached_val
+                            } else {
+                                let constants = std::rc::Rc::new(crate::exec::calls::resolve_constants(proto, &mut (*ctx).heap));
+                                let vm_closure = std::rc::Rc::new(
+                                    crate::frame::VmClosure::with_upvalues(proto.clone(), vec![], constants),
+                                );
+                                let val = (*ctx).heap.alloc_vm_closure(vm_closure);
+                                (*ctx).static_closures.insert(proto_ptr, val);
+                                val
+                            };
+                            proto.static_closure_val.set(val.0);
+                            (*ctx).stack[base + dest] = val;
                         }
                     }
 
                     OpCode::Nop => {}
                 }
 
-                if self.vm_suspend.is_some() {
-                    self.frames[frame_idx].ip = ip;
+                if (*ctx).vm_suspend.is_some() {
+                    (*ctx).frames[frame_idx].ip = ip;
                     return Ok(VmValue::null());
                 }
             }
