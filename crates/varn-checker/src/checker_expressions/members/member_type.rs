@@ -77,7 +77,7 @@ impl Checker {
                         .core
                         .as_ref()
                         .map_or(false, |b| b.enum_members.contains_key(name.as_ref()))
-                    || crate::module_resolver::find_module_bind_for_type(name, &origin_modules)
+                    || crate::module_resolver::find_module_bind_for_type_ref(name, &origin_modules)
                         .as_ref()
                         .map_or(false, |eb| {
                             eb.get_enum_members_local(name.as_ref()).is_some()
@@ -96,7 +96,7 @@ impl Checker {
                         variants.extend(members.iter().map(|m| m.name.clone()));
                     }
                     if let Some(ext_bind) =
-                        crate::module_resolver::find_module_bind_for_type(name, &origin_modules)
+                        crate::module_resolver::find_module_bind_for_type_ref(name, &origin_modules)
                     {
                         if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
                             variants.extend(members.iter().map(|m| m.name.clone()));
@@ -112,7 +112,7 @@ impl Checker {
                             }
                         }
                         if let Some(ext_bind) =
-                            crate::module_resolver::find_module_bind_for_type(name, &origin_modules)
+                            crate::module_resolver::find_module_bind_for_type_ref(name, &origin_modules)
                         {
                             if let Some(fields) = ext_bind.sum_variant_fields.get(v) {
                                 if let Some((_, ty)) =
@@ -162,13 +162,13 @@ impl Checker {
 
                 let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
                 let ext_bind_opt =
-                    crate::module_resolver::find_module_bind_for_type(name, &origin_modules);
-                let candidates: Box<dyn Iterator<Item = crate::binder::BindResult>> =
+                    crate::module_resolver::find_module_bind_for_type_ref(name, &origin_modules);
+                let candidates: Box<dyn Iterator<Item = Rc<crate::binder::BindResult>>> =
                     if let Some(b) = ext_bind_opt {
                         Box::new(std::iter::once(b))
                     } else if origin.is_none() {
                         Box::new(varn_modules::STD_MODULES.iter().filter_map(|spec| {
-                            crate::module_resolver::resolve_stdlib_module_bind(spec)
+                            crate::module_resolver::resolve_stdlib_module_bind_ref(spec)
                         }))
                     } else {
                         Box::new(std::iter::empty())

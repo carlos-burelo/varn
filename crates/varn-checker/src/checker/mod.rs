@@ -311,13 +311,17 @@ impl Checker {
             return ty.clone();
         }
 
-        let saved_scope = self.current_scope;
-        if let Some(scope) = self.node_scopes.get(&expr.id()) {
-            self.current_scope = *scope;
-        }
-
-        let ty = self.infer_type_internal(expr, bind);
-        self.current_scope = saved_scope;
+        let ty = if self.record_expr_types {
+            let saved_scope = self.current_scope;
+            if let Some(scope) = self.node_scopes.get(&expr.id()) {
+                self.current_scope = *scope;
+            }
+            let ty = self.infer_type_internal(expr, bind);
+            self.current_scope = saved_scope;
+            ty
+        } else {
+            self.infer_type_internal(expr, bind)
+        };
 
         self.infer_cache.insert(key, ty.clone());
         ty

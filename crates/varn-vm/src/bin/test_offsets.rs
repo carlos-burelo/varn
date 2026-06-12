@@ -1,21 +1,12 @@
-use varn_vm::globals::GlobalStore;
+use varn_vm::exec::ctx::ExecCtx;
 
 fn main() {
-    let mut globals = GlobalStore::new();
-    // Push some values to get distinct len and cap
-    globals.set_by_index(0, varn_types::VmValue::null());
-    globals.set_by_index(1, varn_types::VmValue::null());
-    globals.set_by_index(2, varn_types::VmValue::null());
-    
-    let len = globals.values.len();
-    let cap = globals.values.capacity();
-    println!("Logical: len = {}, cap = {}", len, cap);
-    
-    let vec_ref = &globals.values;
-    let ptr = vec_ref as *const _ as *const usize;
+    let dummy = std::mem::MaybeUninit::<ExecCtx>::uninit();
+    let dummy_ptr = dummy.as_ptr();
     unsafe {
-        println!("Word 0 (offset 0): {:#x}", *ptr);
-        println!("Word 1 (offset 8): {}", *ptr.add(1));
-        println!("Word 2 (offset 16): {}", *ptr.add(2));
+        println!("Offset of stack: {}", (std::ptr::addr_of!((*dummy_ptr).stack) as usize) - (dummy_ptr as usize));
+        println!("Offset of frames: {}", (std::ptr::addr_of!((*dummy_ptr).frames) as usize) - (dummy_ptr as usize));
+        println!("Offset of open_upvalues: {}", (std::ptr::addr_of!((*dummy_ptr).open_upvalues) as usize) - (dummy_ptr as usize));
+        println!("Offset of pending_constructors: {}", (std::ptr::addr_of!((*dummy_ptr).pending_constructors) as usize) - (dummy_ptr as usize));
     }
 }

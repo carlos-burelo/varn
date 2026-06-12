@@ -226,6 +226,20 @@ impl VmClosure {
             jit_push_self_frame: crate::exec::ctx::jit_push_self_frame as usize,
             jit_post_call: crate::exec::ctx::jit_post_call as usize,
             dispatch_intrinsic: crate::exec::ctx::jit_dispatch_intrinsic as usize,
+            open_upvalues_offset: {
+                let dummy = std::mem::MaybeUninit::<crate::exec::ctx::ExecCtx>::uninit();
+                let dummy_ptr = dummy.as_ptr();
+                unsafe {
+                    (std::ptr::addr_of!((*dummy_ptr).open_upvalues) as usize) - (dummy_ptr as usize)
+                }
+            },
+            pending_constructors_offset: {
+                let dummy = std::mem::MaybeUninit::<crate::exec::ctx::ExecCtx>::uninit();
+                let dummy_ptr = dummy.as_ptr();
+                unsafe {
+                    (std::ptr::addr_of!((*dummy_ptr).pending_constructors) as usize) - (dummy_ptr as usize)
+                }
+            },
         };
         match varn_jit::compile(&self.proto, &self.constants, helpers) {
             Ok((entry, code)) => {
@@ -256,6 +270,7 @@ impl VmClosure {
     }
 }
 
+#[repr(C)]
 pub struct CallFrame {
     pub closure_ptr: *const VmClosure,
     pub _owned_closure: Option<Rc<VmClosure>>,

@@ -10,6 +10,53 @@ use self::helpers::{
     object_matches_class_members, template_matches_literal, types_compatible_with_fn_signature,
 };
 
+fn is_simple_type(ty: &Type) -> bool {
+    matches!(
+        &ty.0,
+        TypeKind::Intrinsic(_)
+            | TypeKind::LiteralInt(_)
+            | TypeKind::LiteralFloat(_)
+            | TypeKind::LiteralStr(_)
+            | TypeKind::LiteralBool(_)
+    )
+}
+
+fn simple_types_compatible(declared: &Type, inferred: &Type) -> bool {
+    match (&declared.0, &inferred.0) {
+        (TypeKind::Intrinsic(varn_core::TypeTag::Dynamic), _)
+        | (_, TypeKind::Intrinsic(varn_core::TypeTag::Dynamic)) => true,
+
+        (a, b) if a == b => true,
+
+        (TypeKind::Intrinsic(varn_core::TypeTag::Int), TypeKind::LiteralInt(_)) => true,
+        (TypeKind::Intrinsic(varn_core::TypeTag::Float), TypeKind::LiteralFloat(_)) => true,
+        (
+            TypeKind::Intrinsic(varn_core::TypeTag::Float),
+            TypeKind::Intrinsic(varn_core::TypeTag::Int),
+        ) => true,
+        (
+            TypeKind::Intrinsic(varn_core::TypeTag::Decimal),
+            TypeKind::Intrinsic(varn_core::TypeTag::Int),
+        ) => true,
+        (
+            TypeKind::Intrinsic(varn_core::TypeTag::Decimal),
+            TypeKind::Intrinsic(varn_core::TypeTag::Float),
+        ) => true,
+        (
+            TypeKind::Intrinsic(varn_core::TypeTag::BigInt),
+            TypeKind::Intrinsic(varn_core::TypeTag::Int),
+        ) => true,
+        (TypeKind::Intrinsic(varn_core::TypeTag::Str), TypeKind::LiteralStr(_)) => true,
+        (TypeKind::Intrinsic(varn_core::TypeTag::Bool), TypeKind::LiteralBool(_)) => true,
+        (TypeKind::Intrinsic(varn_core::TypeTag::Char), TypeKind::LiteralStr(s))
+            if s.chars().count() == 1 =>
+        {
+            true
+        }
+        _ => false,
+    }
+}
+
 pub(crate) fn types_compatible(
     declared: &Type,
     inferred: &Type,
@@ -25,6 +72,15 @@ pub(crate) fn types_compatible_with_cache(
     bind: Option<&BindResult>,
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
 ) -> bool {
+    if declared.is_dynamic() || inferred.is_dynamic() {
+        return true;
+    }
+    if declared == inferred {
+        return true;
+    }
+    if is_simple_type(declared) && is_simple_type(inferred) {
+        return simple_types_compatible(declared, inferred);
+    }
     let mut in_progress = FxHashSet::default();
     types_compatible_impl(declared, inferred, bind, cache, &mut in_progress)
 }
@@ -36,6 +92,15 @@ pub(super) fn types_compatible_impl(
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
     in_progress: &mut FxHashSet<(Type, Type, usize)>,
 ) -> bool {
+    if declared.is_dynamic() || inferred.is_dynamic() {
+        return true;
+    }
+    if declared == inferred {
+        return true;
+    }
+    if is_simple_type(declared) && is_simple_type(inferred) {
+        return simple_types_compatible(declared, inferred);
+    }
     let key = (
         declared.clone(),
         inferred.clone(),
