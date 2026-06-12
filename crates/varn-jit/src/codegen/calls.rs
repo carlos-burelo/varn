@@ -44,6 +44,10 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
     emit_load(asm, Reg::Rax, callee_reg, regmap);
 
     // 3. Save caller JIT argument/context registers
+    let need_prepare_dummy = regmap.used_phys.len() % 2 != 0;
+    if need_prepare_dummy {
+        asm.push(Reg::Rax);
+    }
     asm.push(ARG_CTX);
     asm.push(ARG_EXEC_CTX);
     asm.push(ARG_BASE);
@@ -76,6 +80,9 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.pop(ARG_BASE);
     asm.pop(ARG_EXEC_CTX);
     asm.pop(ARG_CTX);
+    if need_prepare_dummy {
+        asm.pop(Reg::R11);
+    }
 
     // Reload ARG_CTX from ExecCtx.stack (offset 8 of ARG_EXEC_CTX) in case stack reallocated
     asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
@@ -180,6 +187,9 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.pop(ARG_BASE);
     asm.pop(ARG_EXEC_CTX);
     asm.pop(ARG_CTX);
+    if need_prepare_dummy {
+        asm.pop(Reg::R11);
+    }
 
     // Reload ARG_CTX from ExecCtx.stack (offset 8 of ARG_EXEC_CTX) in case stack reallocated
     asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);

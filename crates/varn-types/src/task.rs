@@ -10,10 +10,13 @@ pub enum TaskState {
 
 type SettleCallback = Box<dyn FnOnce(Result<Value, Value>) + 'static>;
 
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicU32, Ordering};
+
 struct Inner {
-    state: TaskState,
-    on_settle: Vec<SettleCallback>,
-    ref_count: u32,
+    state: Mutex<TaskState>,
+    on_settle: Mutex<Vec<SettleCallback>>,
+    ref_count: AtomicU32,
 }
 
 thread_local! {
@@ -28,7 +31,7 @@ unsafe impl Sync for AsyncTask {}
 impl Clone for AsyncTask {
     fn clone(&self) -> Self {
         unsafe {
-            (*self.0).ref_count += 1;
+            (*self.0).ref_count.fetch_add(1, Ordering::SeqCst);
         }
         AsyncTask(self.0)
     }
@@ -37,13 +40,12 @@ impl Clone for AsyncTask {
 impl Drop for AsyncTask {
     fn drop(&mut self) {
         unsafe {
-            (*self.0).ref_count -= 1;
-            if (*self.0).ref_count == 0 {
+            let old_ref = (*self.0).ref_count.fetch_sub(1, Ordering::SeqCst);
+            if old_ref == 1 {
                 let inner = self.0;
 
-                (*inner).state = TaskState::Pending;
-
-                (*inner).on_settle.clear();
+                *(*inner).state.lock().unwrap() = TaskState::Pending;
+                (*inner).on_settle.lock().unwrap().clear();
 
                 TASK_POOL.with(|pool| {
                     let mut p = pool.borrow_mut();
@@ -82,45 +84,36 @@ impl std::fmt::Debug for AsyncTask {
 }
 
 impl AsyncTask {
-    fn alloc(inner: Inner) -> Self {
+    fn alloc(state: TaskState) -> Self {
         let ptr = TASK_POOL.with(|pool| {
             let mut p = pool.borrow_mut();
             if let Some(ptr) = p.pop() {
                 unsafe {
-                    (*ptr).state = inner.state;
-                    (*ptr).ref_count = 1;
-
+                    *(*ptr).state.lock().unwrap() = state;
+                    (*ptr).ref_count.store(1, Ordering::SeqCst);
                     ptr
                 }
             } else {
-                Box::into_raw(Box::new(inner))
+                Box::into_raw(Box::new(Inner {
+                    state: Mutex::new(state),
+                    on_settle: Mutex::new(Vec::new()),
+                    ref_count: AtomicU32::new(1),
+                }))
             }
         });
         AsyncTask(ptr)
     }
 
     pub fn pending() -> Self {
-        Self::alloc(Inner {
-            state: TaskState::Pending,
-            on_settle: Vec::new(),
-            ref_count: 1,
-        })
+        Self::alloc(TaskState::Pending)
     }
 
     pub fn resolved(v: Value) -> Self {
-        Self::alloc(Inner {
-            state: TaskState::Resolved(v),
-            on_settle: Vec::new(),
-            ref_count: 1,
-        })
+        Self::alloc(TaskState::Resolved(v))
     }
 
     pub fn rejected(v: Value) -> Self {
-        Self::alloc(Inner {
-            state: TaskState::Rejected(v),
-            on_settle: Vec::new(),
-            ref_count: 1,
-        })
+        Self::alloc(TaskState::Rejected(v))
     }
 
     pub fn rejected_msg(msg: impl Into<String>) -> Self {
@@ -129,32 +122,33 @@ impl AsyncTask {
     }
 
     pub fn peek_state(&self) -> TaskState {
-        unsafe { (*self.0).state.clone() }
+        unsafe { (*self.0).state.lock().unwrap().clone() }
     }
 
     pub fn is_pending(&self) -> bool {
-        unsafe { matches!((*self.0).state, TaskState::Pending) }
+        unsafe { matches!(*(*self.0).state.lock().unwrap(), TaskState::Pending) }
     }
 
     pub fn is_resolved(&self) -> bool {
-        unsafe { matches!((*self.0).state, TaskState::Resolved(_)) }
+        unsafe { matches!(*(*self.0).state.lock().unwrap(), TaskState::Resolved(_)) }
     }
 
     pub fn is_rejected(&self) -> bool {
-        unsafe { matches!((*self.0).state, TaskState::Rejected(_)) }
+        unsafe { matches!(*(*self.0).state.lock().unwrap(), TaskState::Rejected(_)) }
     }
 
     pub fn settle(&self, result: Result<Value, Value>) {
         let callbacks = unsafe {
-            let inner = &mut *self.0;
-            if !matches!(inner.state, TaskState::Pending) {
+            let inner = &*self.0;
+            let mut state_guard = inner.state.lock().unwrap();
+            if !matches!(*state_guard, TaskState::Pending) {
                 return;
             }
             match &result {
-                Ok(v) => inner.state = TaskState::Resolved(v.clone()),
-                Err(v) => inner.state = TaskState::Rejected(v.clone()),
+                Ok(v) => *state_guard = TaskState::Resolved(v.clone()),
+                Err(v) => *state_guard = TaskState::Rejected(v.clone()),
             }
-            std::mem::take(&mut inner.on_settle)
+            std::mem::take(&mut *inner.on_settle.lock().unwrap())
         };
         for cb in callbacks {
             cb(result.clone());
@@ -182,10 +176,11 @@ impl AsyncTask {
         F: FnOnce(Result<Value, Value>) + 'static,
     {
         let already = unsafe {
-            let inner = &mut *self.0;
-            match &inner.state {
+            let inner = &*self.0;
+            let state_guard = inner.state.lock().unwrap();
+            match &*state_guard {
                 TaskState::Pending => {
-                    inner.on_settle.push(Box::new(cb));
+                    inner.on_settle.lock().unwrap().push(Box::new(cb));
                     return;
                 }
                 TaskState::Resolved(v) => Ok(v.clone()),

@@ -172,8 +172,6 @@ pub extern "C" fn jit_load_upvalue(
         let closure_ref = &*closure;
 
         let val = closure_ref.upvalues[uv_idx].read(&ctx_ref.stack);
-
-
         val
 
     }
@@ -719,6 +717,28 @@ pub extern "C" fn jit_get_property_ic_fast(
                     }
                 }
             }
+
+            if let Some(cls) = crate::exec::props::get_class(obj, &ctx_ref.heap) {
+                if let Ok(slot_cache) = closure_ref.ic_cache.try_borrow() {
+                    let poly_slot = &slot_cache[cs_idx];
+                    for entry in &poly_slot.entries {
+                        if entry.id == 0 {
+                            continue;
+                        }
+                        if entry.is_class == 8 && cls.id == entry.id {
+                            if let Some(crate::heap::HeapObj::Array(arr)) = ctx_ref.heap.get(obj.as_heap_idx()) {
+                                let len = arr.0.borrow().len();
+                                return VmValue::from_int(len as i64);
+                            }
+                        } else if entry.is_class == 9 && cls.id == entry.id {
+                            if let Some(crate::heap::HeapObj::Str(s)) = ctx_ref.heap.get(obj.as_heap_idx()) {
+                                let len = s.len();
+                                return VmValue::from_int(len as i64);
+                            }
+                        }
+                    }
+                }
+            }
         }
         VmValue(0x7FF8_0000_0000_0000) // VM_UNDEFINED sentinel
     }
@@ -786,23 +806,30 @@ pub extern "C" fn jit_load_static_fn(
             Some(varn_types::PoolEntry::Function(p)) => p,
             _ => panic!("LoadStaticFn: invalid function proto"),
         };
-        let proto_ptr = std::rc::Rc::as_ptr(proto) as usize;
-        if let Some(&cached) = ctx_ref.static_closures.get(&proto_ptr) {
-            return cached;
+        let cached = proto.static_closure_val.get();
+        if cached != 0 {
+            return VmValue(cached);
         }
-        let constants = ctx_ref
-            .proto_constants
-            .entry(proto_ptr)
-            .or_insert_with(|| {
-                std::rc::Rc::new(crate::exec::calls::resolve_constants(
-                    proto,
-                    &mut ctx_ref.heap,
-                ))
-            })
-            .clone();
-        let new_closure = crate::frame::VmClosure::with_upvalues(proto.clone(), vec![], constants);
-        let val = ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(new_closure));
-        ctx_ref.static_closures.insert(proto_ptr, val);
+        let proto_ptr = std::rc::Rc::as_ptr(proto) as usize;
+        let val = if let Some(&cached_val) = ctx_ref.static_closures.get(&proto_ptr) {
+            cached_val
+        } else {
+            let constants = ctx_ref
+                .proto_constants
+                .entry(proto_ptr)
+                .or_insert_with(|| {
+                    std::rc::Rc::new(crate::exec::calls::resolve_constants(
+                        proto,
+                        &mut ctx_ref.heap,
+                    ))
+                })
+                .clone();
+            let new_closure = crate::frame::VmClosure::with_upvalues(proto.clone(), vec![], constants);
+            let val = ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(new_closure));
+            ctx_ref.static_closures.insert(proto_ptr, val);
+            val
+        };
+        proto.static_closure_val.set(val.0);
         val
     }
 }
