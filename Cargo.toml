@@ -41,7 +41,7 @@ panic = "abort"
 opt-level = 3
 
 [profile.release.package.varn-vm]
-opt-level = 0
+opt-level = 3
 
 [profile.dev]
 opt-level = 1

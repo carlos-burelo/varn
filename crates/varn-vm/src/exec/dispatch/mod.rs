@@ -55,6 +55,45 @@ impl ExecCtx {
     }
 
     #[inline(never)]
+    unsafe fn execute_jit_frame(
+        ctx: *mut ExecCtx,
+        jit_fn: varn_jit::JitFn,
+        closure_ptr: *const crate::frame::VmClosure,
+        base: usize,
+    ) -> Result<VmValue, i32> {
+        let is_outer = (*ctx).jit_jmp_buf.is_null();
+        let mut jmp_buf = super::ctx::JmpBuf::default();
+        let jmp_res = if is_outer {
+            super::ctx::my_setjmp(&mut jmp_buf)
+        } else {
+            0
+        };
+        let jmp_res = std::hint::black_box(jmp_res);
+
+        if jmp_res == 0 {
+            if is_outer {
+                (*ctx).jit_jmp_buf = &mut jmp_buf as *mut super::ctx::JmpBuf;
+            }
+            let val = (jit_fn)(
+                (*ctx).stack.as_mut_ptr() as *mut std::ffi::c_void,
+                closure_ptr as *const std::ffi::c_void,
+                base,
+                ctx as *mut std::ffi::c_void,
+            );
+            std::hint::black_box(ctx);
+            if is_outer {
+                (*ctx).jit_jmp_buf = std::ptr::null_mut();
+            }
+            Ok(val)
+        } else {
+            if is_outer {
+                (*ctx).jit_jmp_buf = std::ptr::null_mut();
+            }
+            Err(jmp_res)
+        }
+    }
+
+    #[inline(never)]
     #[allow(dangerous_implicit_autorefs)]
     unsafe fn run_until_inner_raw(ctx: *mut ExecCtx, depth: usize) -> VmResult<VmValue> {
         'frame_loop: while (*ctx).frames.len() > depth {
@@ -75,38 +114,9 @@ impl ExecCtx {
                 if (*ctx).trace {
                     (*ctx).trace_event("JIT ENTRY", frame_idx, closure, 0, None);
                 }
-                let is_outer = (*ctx).jit_jmp_buf.is_null();
-                let mut jmp_buf = super::ctx::JmpBuf::default();
-                let jmp_res = if is_outer {
-                    unsafe { super::ctx::my_setjmp(&mut jmp_buf) }
-                } else {
-                    0
-                };
-                let jmp_res = std::hint::black_box(jmp_res);
-
-                let res = if jmp_res == 0 {
-                    if is_outer {
-                        (*ctx).jit_jmp_buf = &mut jmp_buf as *mut super::ctx::JmpBuf;
-                    }
-                    let val = unsafe {
-                        (jit_fn)(
-                            (*ctx).stack.as_mut_ptr() as *mut std::ffi::c_void,
-                            closure_ptr as *const std::ffi::c_void,
-                            (*ctx).frames[frame_idx].base,
-                            ctx as *mut std::ffi::c_void,
-                        )
-                    };
-                    std::hint::black_box(ctx);
-                    if is_outer {
-                        (*ctx).jit_jmp_buf = std::ptr::null_mut();
-                    }
-                    Ok(val)
-                } else {
-                    if is_outer {
-                        (*ctx).jit_jmp_buf = std::ptr::null_mut();
-                    }
-                    Err(jmp_res)
-                };
+                
+                let base = (*ctx).frames[frame_idx].base;
+                let res = Self::execute_jit_frame(ctx, jit_fn, closure_ptr, base);
 
                 let res = match res {
                     Ok(val) => val,
