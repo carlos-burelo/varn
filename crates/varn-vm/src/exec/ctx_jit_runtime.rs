@@ -513,7 +513,7 @@ pub extern "C" fn jit_get_property_maybe_stub(ctx: *mut ExecCtx, obj: VmValue, n
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let closure_ref = ctx_ref.frames[frame_idx].closure();
         let name_nv = closure_ref.constants[name_idx];
         let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
         crate::exec::props::get_property_maybe(obj, &name, &mut ctx_ref.heap)
@@ -524,7 +524,7 @@ pub extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let closure_ref = ctx_ref.frames[frame_idx].closure();
         let base = ctx_ref.frames[frame_idx].base;
         let this_val = ctx_ref.stack[base];
         let name_nv = closure_ref.constants[name_idx];
@@ -547,7 +547,7 @@ pub extern "C" fn jit_get_symbol(ctx: *mut ExecCtx, obj: VmValue, sym_idx: usize
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let closure_ref = ctx_ref.frames[frame_idx].closure();
         let sym_nv = closure_ref.constants[sym_idx];
         let sym_val = ctx_ref.heap.extract(sym_nv);
         match sym_val {
@@ -566,7 +566,7 @@ pub extern "C" fn jit_bind_method(ctx: *mut ExecCtx, obj: VmValue, name_idx: usi
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let closure_ref = ctx_ref.frames[frame_idx].closure();
         let key_nv = closure_ref.constants[name_idx];
         let key = ctx_ref.heap.str_val(key_nv).expect("non-string const");
         let method = match crate::exec::props::get_property(obj, &key, &mut ctx_ref.heap) {
@@ -584,7 +584,7 @@ pub extern "C" fn jit_define_global(ctx: *mut ExecCtx, src: VmValue, name_idx: u
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let closure_ref = ctx_ref.frames[frame_idx].closure();
         let name_nv = closure_ref.constants[name_idx];
         let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
         ctx_ref.globals.define(&name, src);
@@ -595,7 +595,7 @@ pub extern "C" fn jit_store_global(ctx: *mut ExecCtx, src: VmValue, name_idx: us
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let closure_ref = ctx_ref.frames[frame_idx].closure();
         let name_nv = closure_ref.constants[name_idx];
         let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
         ctx_ref.globals.set_by_name(&name, src);
@@ -606,7 +606,7 @@ pub extern "C" fn jit_declare_field(ctx: *mut ExecCtx, class_val: VmValue, name_
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let closure_ref = ctx_ref.frames[frame_idx].closure();
         let key_nv = closure_ref.constants[name_idx];
         let key = ctx_ref.heap.str_val(key_nv).expect("non-string const");
         if let Err(e) = crate::exec::class::op_declare_field(class_val, &key, &mut ctx_ref.heap) {
@@ -619,7 +619,7 @@ pub extern "C" fn jit_make_class(ctx: *mut ExecCtx, super_val: VmValue, name_idx
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let closure_ref = ctx_ref.frames[frame_idx].closure();
         let name_nv = closure_ref.constants[name_idx];
         let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
         let cls = crate::exec::class::op_class(&name, &mut ctx_ref.heap);
@@ -646,7 +646,7 @@ pub extern "C" fn jit_class_member_op(ctx: *mut ExecCtx, args: *const std::ffi::
         let ctx_ref = &mut *ctx;
         let args = &*(args as *const JitClassMemberArgs);
         let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let closure_ref = ctx_ref.frames[frame_idx].closure();
         let key_nv = closure_ref.constants[args.name_idx];
         let key = ctx_ref.heap.str_val(key_nv).expect("non-string const");
         
@@ -669,7 +669,7 @@ pub extern "C" fn jit_build_object(ctx: *mut ExecCtx, ip_before: usize) -> VmVal
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let closure_ref = ctx_ref.frames[frame_idx].closure();
         let base = ctx_ref.frames[frame_idx].base;
         let code = &closure_ref.proto.chunk.code;
 
@@ -706,7 +706,7 @@ pub extern "C" fn jit_object_rest(ctx: *mut ExecCtx, ip_before: usize) -> VmValu
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let closure_ref = ctx_ref.frames[frame_idx].closure();
         let base = ctx_ref.frames[frame_idx].base;
         let code = &closure_ref.proto.chunk.code;
 
@@ -741,7 +741,7 @@ pub extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usize) -> 
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = &*ctx_ref.frames[frame_idx].closure;
+        let closure_ref = ctx_ref.frames[frame_idx].closure();
         let base = ctx_ref.frames[frame_idx].base;
         let code = &closure_ref.proto.chunk.code;
 

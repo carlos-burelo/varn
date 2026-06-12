@@ -60,7 +60,7 @@ impl ExecCtx {
         'frame_loop: while (*ctx).frames.len() > depth {
             let frame_idx = (*ctx).frames.len() - 1;
 
-            let closure_ptr: *const crate::frame::VmClosure = &*(*ctx).frames[frame_idx].closure;
+            let closure_ptr: *const crate::frame::VmClosure = (*ctx).frames[frame_idx].closure_ptr;
             let closure = unsafe { &*closure_ptr };
 
             let is_first_entry = (*ctx).frames[frame_idx].ip == 0;
@@ -125,7 +125,7 @@ impl ExecCtx {
                                 let f2 = (*ctx).frames.len() - 1;
                                 let b2 = (*ctx).frames[f2].base;
                                 let required_depth =
-                                    b2 + (*ctx).frames[f2].closure.proto.register_count as usize;
+                                    b2 + (*ctx).frames[f2].closure().proto.register_count as usize;
                                 (*ctx).stack.truncate(required_depth);
                                 let thrown_val = error;
 
@@ -488,7 +488,7 @@ impl ExecCtx {
                             let f2 = (*ctx).frames.len() - 1;
                             let b2 = (*ctx).frames[f2].base;
                             let required_depth =
-                                b2 + (*ctx).frames[f2].closure.proto.register_count as usize;
+                                b2 + (*ctx).frames[f2].closure().proto.register_count as usize;
                             (*ctx).stack.truncate(required_depth);
                             let thrown_val = err.thrown.unwrap_or(VmValue::null());
 
@@ -630,8 +630,8 @@ impl ExecCtx {
         let frame = self.frames.pop().unwrap();
         self.close_upvalues_above(frame.base);
 
-        let is_module_frame = frame.closure.proto.name.as_deref() == Some("<module>")
-            && !frame.closure.proto.chunk.source_file.is_empty();
+        let is_module_frame = frame.closure().proto.name.as_deref() == Some("<module>")
+            && !frame.closure().proto.chunk.source_file.is_empty();
 
         self.stack.truncate(frame.base);
 
@@ -655,7 +655,7 @@ impl ExecCtx {
         };
 
         if is_module_frame {
-            let source_file = frame.closure.proto.chunk.source_file.to_string();
+            let source_file = frame.closure().proto.chunk.source_file.to_string();
             let module_exports = self.module_exports.remove(&returning_frame_idx);
             let cached = module_exports.unwrap_or(final_val);
             let module_id = varn_core::ModuleId::from_canonical_str(&source_file);

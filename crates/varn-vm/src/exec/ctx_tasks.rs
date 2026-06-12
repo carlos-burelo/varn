@@ -89,7 +89,7 @@ impl ExecCtx {
         if fork.stack.len() < required {
             fork.stack.resize(required, VmValue::null());
         }
-        let mut frame = CallFrame::new(closure, 0);
+        let mut frame = CallFrame::new_owned(closure, 0);
         frame.current_class = task.current_class.clone();
         fork.frames.push(frame);
 
@@ -149,7 +149,7 @@ impl ExecCtx {
                                     let f2 = fork.frames.len() - 1;
                                     let b2 = fork.frames[f2].base;
                                     let required_depth =
-                                        b2 + fork.frames[f2].closure.proto.register_count as usize;
+                                        b2 + fork.frames[f2].closure().proto.register_count as usize;
                                     fork.stack.truncate(required_depth);
                                     let thrown_val = err.thrown.unwrap_or(VmValue::null());
 

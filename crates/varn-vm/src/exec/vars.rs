@@ -49,7 +49,7 @@ pub fn define_global(name: &str, val: VmValue, globals: &mut GlobalStore) {
 #[inline(always)]
 pub fn get_upvalue(frame: &CallFrame, upv_idx: usize, stack: &[VmValue]) -> VmResult<VmValue> {
     let uv = frame
-        .closure
+        .closure()
         .upvalues
         .get(upv_idx)
         .ok_or_else(|| RuntimeError::new(format!("upvalue {} out of range", upv_idx)))?;
@@ -64,7 +64,7 @@ pub fn set_upvalue(
     stack: &mut Vec<VmValue>,
 ) -> VmResult<()> {
     let uv = frame
-        .closure
+        .closure()
         .upvalues
         .get(upv_idx)
         .ok_or_else(|| RuntimeError::new(format!("upvalue {} out of range", upv_idx)))?;
