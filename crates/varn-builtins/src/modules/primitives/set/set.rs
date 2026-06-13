@@ -1,8 +1,11 @@
 use std::collections::HashSet;
-#[allow(unused_imports)]
-use varn_op_macros::{varn_class, varn_getter, varn_method, varn_module};
+use varn_op_macros::varn_contract;
 use varn_types::value::SetRef;
 use varn_types::{NativeCtx, Value, VmValue};
+
+/// Native implementation backing the `Set` contract
+/// (`src/modules/primitives/set/set.vn`).
+pub struct Set;
 
 fn get_set(ctx: &dyn NativeCtx, this: VmValue) -> Option<SetRef> {
     if let Value::Set(s) = ctx.extract(this) {
@@ -12,120 +15,64 @@ fn get_set(ctx: &dyn NativeCtx, this: VmValue) -> Option<SetRef> {
     }
 }
 
-#[varn_module("globals")]
-pub(crate) mod dispatch {
-    use super::*;
-
-    #[varn_class("Set")]
-    pub mod set_class {
-        use super::*;
-
-        #[varn_method("constructor")]
-        pub fn set_new(
-            ctx: &mut dyn NativeCtx,
-            _this: VmValue,
-            _args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            let set = SetRef::new(HashSet::new());
-            Ok(ctx.intern(Value::Set(set)))
+varn_contract! {
+    module: "globals",
+    class: "Set",
+    contract: "src/modules/primitives/set/set.vn",
+    impl Set {
+        fn constructor(ctx: &mut dyn NativeCtx, _this: VmValue) -> VmValue {
+            ctx.intern(Value::Set(SetRef::new(HashSet::new())))
         }
 
-        #[varn_method("add")]
-        pub fn set_add(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            if let Some(&val_nv) = args.first() {
-                if let Some(s) = get_set(ctx, this) {
-                    let val = ctx.extract(val_nv);
-                    s.borrow_mut().insert(val);
-                    return Ok(this);
-                }
+        fn add(ctx: &mut dyn NativeCtx, this: VmValue, value: VmValue) {
+            if let Some(s) = get_set(ctx, this) {
+                let val = ctx.extract(value);
+                s.borrow_mut().insert(val);
             }
-            Ok(VmValue::null())
         }
-
-        #[varn_method("has")]
-        pub fn set_has(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            if let Some(&val_nv) = args.first() {
-                if let Some(s) = get_set(ctx, this) {
-                    let val = ctx.extract(val_nv);
-                    return Ok(VmValue::from_bool(s.borrow().contains(&val)));
+        fn has(ctx: &mut dyn NativeCtx, this: VmValue, value: VmValue) -> bool {
+            match get_set(ctx, this) {
+                Some(s) => {
+                    let val = ctx.extract(value);
+                    s.borrow().contains(&val)
                 }
+                None => false,
             }
-            Ok(VmValue::from_bool(false))
         }
-
-        #[varn_method("delete")]
-        pub fn set_delete(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            if let Some(&val_nv) = args.first() {
-                if let Some(s) = get_set(ctx, this) {
-                    let val = ctx.extract(val_nv);
-                    let removed = s.borrow_mut().remove(&val);
-                    return Ok(VmValue::from_bool(removed));
+        fn delete(ctx: &mut dyn NativeCtx, this: VmValue, value: VmValue) -> bool {
+            match get_set(ctx, this) {
+                Some(s) => {
+                    let val = ctx.extract(value);
+                    s.borrow_mut().remove(&val)
                 }
+                None => false,
             }
-            Ok(VmValue::from_bool(false))
         }
-
-        #[varn_method("clear")]
-        pub fn set_clear(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            _args: &[VmValue],
-        ) -> Result<VmValue, String> {
+        fn clear(ctx: &mut dyn NativeCtx, this: VmValue) {
             if let Some(s) = get_set(ctx, this) {
                 s.borrow_mut().clear();
             }
-            Ok(VmValue::null())
         }
-
-        #[varn_method("values")]
-        pub fn set_values(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            _args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            if let Some(s) = get_set(ctx, this) {
-                let vals: Vec<VmValue> = s.borrow().iter().map(|v| ctx.intern(v.clone())).collect();
-                return Ok(ctx.alloc_array(vals));
+        fn values(ctx: &mut dyn NativeCtx, this: VmValue) -> Vec<VmValue> {
+            match get_set(ctx, this) {
+                Some(s) => {
+                    let items: Vec<Value> = s.borrow().iter().cloned().collect();
+                    items.into_iter().map(|v| ctx.intern(v)).collect()
+                }
+                None => Vec::new(),
             }
-            Ok(ctx.alloc_array(vec![]))
         }
-
-        #[varn_method("forEach")]
-        pub fn set_for_each(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            if let Some(&cb) = args.first() {
-                if let Some(s) = get_set(ctx, this) {
-                    let vals: Vec<Value> = s.borrow().iter().cloned().collect();
-                    for v in vals {
-                        let v_nv = ctx.intern(v);
-                        ctx.call_vm(cb, &[v_nv, v_nv, this])?;
-                    }
+        fn forEach(ctx: &mut dyn NativeCtx, this: VmValue, callback: VmValue) {
+            if let Some(s) = get_set(ctx, this) {
+                let items: Vec<Value> = s.borrow().iter().cloned().collect();
+                for v in items {
+                    let v_nv = ctx.intern(v);
+                    let _ = ctx.call_vm(callback, &[v_nv, v_nv, this]);
                 }
             }
-            Ok(VmValue::null())
         }
-
-        #[varn_getter("size")]
-        pub fn set_size(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<VmValue, String> {
-            if let Some(s) = get_set(ctx, this) {
-                return Ok(VmValue::from_int(s.borrow().len() as i64));
-            }
-            Ok(VmValue::from_int(0))
+        fn size(ctx: &mut dyn NativeCtx, this: VmValue) -> i64 {
+            get_set(ctx, this).map(|s| s.borrow().len() as i64).unwrap_or(0)
         }
     }
 }
