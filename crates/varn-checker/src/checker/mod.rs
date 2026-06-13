@@ -4,7 +4,7 @@ mod stmts;
 use crate::binder::{BindResult, Binder};
 use crate::scope::ScopeId;
 use crate::symbol::SymbolId;
-use crate::types::Type;
+use crate::types::{Type, ObjectTypeMember};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
@@ -122,6 +122,7 @@ pub struct Checker {
     pub(crate) loop_depth: u32,
     pub(crate) switch_depth: u32,
     pub(crate) in_function: bool,
+    pub(crate) expected_object_members_cache: FxHashMap<Type, Vec<ObjectTypeMember>>,
 }
 
 impl Checker {
@@ -217,6 +218,7 @@ impl Checker {
             loop_depth: 0,
             switch_depth: 0,
             in_function: false,
+            expected_object_members_cache: FxHashMap::with_capacity_and_hasher(512, Default::default()),
         };
 
         let started = Instant::now();
