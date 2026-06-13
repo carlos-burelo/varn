@@ -2,14 +2,13 @@ pub mod revision;
 use crate::document::DocumentState;
 use crate::index::ProjectIndex;
 use crate::pipeline::run_pipeline;
-use dashmap::mapref::one::Ref;
 use dashmap::DashMap;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 
 pub use revision::{Cached, Revision};
 
 pub struct Workspace {
-    files: DashMap<String, DocumentState>,
+    files: DashMap<String, Arc<DocumentState>>,
     pub index: RwLock<ProjectIndex>,
     revision: RwLock<Revision>,
 }
@@ -24,7 +23,7 @@ impl Workspace {
     }
 
     pub fn update_file(&self, uri: String, source: String) {
-        let state = run_pipeline(source, uri.clone());
+        let state = Arc::new(run_pipeline(source, uri.clone()));
 
         let dependents: Vec<(String, String)> = {
             let idx = self.index.read().unwrap();
@@ -44,7 +43,7 @@ impl Workspace {
         self.files.insert(uri, state);
 
         for (dep_uri, dep_source) in dependents {
-            let dep_state = run_pipeline(dep_source, dep_uri.clone());
+            let dep_state = Arc::new(run_pipeline(dep_source, dep_uri.clone()));
             {
                 let mut idx = self.index.write().unwrap();
                 idx.update_file(&dep_uri, &dep_state);
@@ -64,11 +63,11 @@ impl Workspace {
         idx.remove_file(uri);
     }
 
-    pub fn get(&self, uri: &str) -> Option<Ref<'_, String, DocumentState>> {
-        self.files.get(uri)
+    pub fn get(&self, uri: &str) -> Option<Arc<DocumentState>> {
+        self.files.get(uri).map(|r| Arc::clone(r.value()))
     }
 
-    pub fn iter(&self) -> dashmap::iter::Iter<'_, String, DocumentState> {
+    pub fn iter(&self) -> dashmap::iter::Iter<'_, String, Arc<DocumentState>> {
         self.files.iter()
     }
 
