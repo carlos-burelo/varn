@@ -1,0 +1,2 @@
+// expect: error[Varn4005]
+break

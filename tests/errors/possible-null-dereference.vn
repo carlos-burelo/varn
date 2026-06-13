@@ -1,0 +1,4 @@
+// expect: error[Varn3301]
+interface Profile { name: str }
+const p: Profile | null = null
+print(p.name)

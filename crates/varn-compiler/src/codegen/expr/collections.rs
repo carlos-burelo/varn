@@ -15,7 +15,7 @@ pub(super) fn compile_array<'a>(c: &mut Compiler<'a>, elements: &[ArrayEl]) -> u
         let count = elements.len() as u8;
 
         let dest = c.alloc_reg();
-        let start = c.regs.next;
+        let start = c.regs.next as u8;
         for el in elements {
             match el {
                 ArrayEl::Hole => {
@@ -94,7 +94,7 @@ pub(super) fn compile_object<'a>(c: &mut Compiler<'a>, properties: &[ObjectProp]
         let count = properties.len() as u8;
 
         let dest = c.alloc_reg();
-        let start = c.regs.next;
+        let start = c.regs.next as u8;
         for prop in properties {
             if let ObjectProp::Property { value, .. } = prop {
                 let _ = compile_expr(c, value);

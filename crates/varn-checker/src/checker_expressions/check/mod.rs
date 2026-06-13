@@ -20,6 +20,7 @@ impl Checker {
         let end = expr.range.end.offset.saturating_sub(1);
         self.node_scopes.insert(expr.id, self.current_scope);
         let ty = self.infer_type(expr, bind);
+        self.resolved_expr_types.insert(expr.id, ty.clone());
 
 
         let mut symbol_id = None;
@@ -85,6 +86,13 @@ impl Checker {
                     self.apply_contextual_arrow_params(params, &expected_fn, bind);
                 }
 
+                let saved_in_function = self.in_function;
+                let saved_loop_depth = self.loop_depth;
+                let saved_switch_depth = self.switch_depth;
+                self.in_function = true;
+                self.loop_depth = 0;
+                self.switch_depth = 0;
+
                 match body.as_ref() {
                     ArrowBody::Block(stmt) => self.check_stmt(stmt, bind),
                     ArrowBody::Expr(e) => {
@@ -111,6 +119,10 @@ impl Checker {
                     }
                 }
 
+                self.in_function = saved_in_function;
+                self.loop_depth = saved_loop_depth;
+                self.switch_depth = saved_switch_depth;
+
                 self.current_scope = saved_scope;
                 self.expected_return_type = saved_expected;
                 for tp in &injected_type_params {
@@ -131,7 +143,18 @@ impl Checker {
                     self.record_scope(body.range.start.offset);
                 }
 
+                let saved_in_function = self.in_function;
+                let saved_loop_depth = self.loop_depth;
+                let saved_switch_depth = self.switch_depth;
+                self.in_function = true;
+                self.loop_depth = 0;
+                self.switch_depth = 0;
+
                 self.check_stmt(body, bind);
+
+                self.in_function = saved_in_function;
+                self.loop_depth = saved_loop_depth;
+                self.switch_depth = saved_switch_depth;
 
                 self.current_scope = saved_scope;
                 self.expected_return_type = saved_expected;
@@ -265,6 +288,16 @@ impl Checker {
                 self.check_expr(value, bind);
 
                 self.check_extension_assignment(target, bind);
+
+                if !matches!(&target.kind, ExprKind::Identifier { .. } | ExprKind::Member { .. }) {
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::NotAssignable,
+                            "invalid left-hand side in assignment",
+                        )
+                        .with_range(target.range),
+                    );
+                }
 
                 if let ExprKind::Identifier { name } = &target.kind {
                     let scope = bind.scopes.get(self.current_scope);
@@ -463,7 +496,18 @@ impl Checker {
                 self.check_match_exhaustiveness(&subject_ty, cases, &expr.range, bind);
             }
 
-            ExprKind::Update { operand, .. } => self.check_expr(operand, bind),
+            ExprKind::Update { operand, .. } => {
+                self.check_expr(operand, bind);
+                if !matches!(&operand.kind, ExprKind::Identifier { .. } | ExprKind::Member { .. }) {
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::NotAssignable,
+                            "invalid left-hand side in update expression",
+                        )
+                        .with_range(operand.range),
+                    );
+                }
+            }
             ExprKind::Spread { argument } => self.check_expr(argument, bind),
 
             ExprKind::Pipeline { left, right } => {

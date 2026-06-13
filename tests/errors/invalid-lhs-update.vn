@@ -1,0 +1,2 @@
+// expect: error[Varn3005]
+1++

@@ -99,6 +99,7 @@ pub struct Checker {
     pub(crate) type_node_cache: FxHashMap<(u32, usize), Type>,
     pub(crate) symbol_type_params_cache: FxHashMap<(Rc<str>, u8), Vec<Rc<str>>>,
     pub(crate) symbol_types: FxHashMap<SymbolId, Type>,
+    pub(crate) resolved_expr_types: FxHashMap<u32, Type>,
     pub(crate) current_class: Option<Rc<str>>,
     pub(crate) active_type_params: FxHashSet<Rc<str>>,
     pub(crate) abstract_classes: FxHashSet<Rc<str>>,
@@ -118,6 +119,9 @@ pub struct Checker {
     pub(crate) map_generics_cache: FxHashMap<(Type, Vec<Type>), Type>,
     pub(crate) yielded_types: Option<Vec<Type>>,
     pub warn_implicit_dynamic: bool,
+    pub(crate) loop_depth: u32,
+    pub(crate) switch_depth: u32,
+    pub(crate) in_function: bool,
 }
 
 impl Checker {
@@ -190,6 +194,7 @@ impl Checker {
             type_node_cache: FxHashMap::with_capacity_and_hasher(1024, Default::default()),
             symbol_type_params_cache: FxHashMap::with_capacity_and_hasher(256, Default::default()),
             symbol_types: FxHashMap::default(),
+            resolved_expr_types: FxHashMap::default(),
             current_class: None,
             active_type_params: FxHashSet::default(),
             abstract_classes: FxHashSet::default(),
@@ -209,6 +214,9 @@ impl Checker {
             node_scopes: FxHashMap::default(),
             map_generics_cache: FxHashMap::with_capacity_and_hasher(512, Default::default()),
             yielded_types: None,
+            loop_depth: 0,
+            switch_depth: 0,
+            in_function: false,
         };
 
         let started = Instant::now();
@@ -219,7 +227,7 @@ impl Checker {
         final_diagnostics.extend(checker.diagnostics);
 
         let started = Instant::now();
-        let mut annotations = collect_type_annotations(program, &bind);
+        let mut annotations = collect_type_annotations(program, &bind, &checker.resolved_expr_types);
 
         for (k, v) in checker.call_mappings {
             annotations.record_call_mapping(k, v);

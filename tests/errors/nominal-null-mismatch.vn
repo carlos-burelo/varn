@@ -1,0 +1,3 @@
+// expect: error[Varn3001]
+interface Profile { name: str }
+const p: Profile = null

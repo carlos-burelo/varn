@@ -1,6 +1,6 @@
 use crate::binder::{pattern_lead_name, BindResult};
 use crate::checker::Checker;
-use crate::types::{FunctionType, ObjectTypeMember, Type};
+use crate::types::{FunctionType, ObjectTypeMember, Type, TypeContext};
 use varn_core::ast::{ArrayEl, ObjectProp, Param, PropKey};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
@@ -77,10 +77,41 @@ impl Checker {
             .expected_type
             .as_ref()
             .and_then(|t| {
-                if let TypeKind::Object(m) = &t.0 {
-                    Some(m.clone())
-                } else {
-                    None
+                let ty = t.non_nullified();
+                match &ty.0 {
+                    TypeKind::Object(m) => Some(m.clone()),
+                    TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin) => {
+                        let members = bind
+                            .get_class_members(name, origin.as_deref())
+                            .or_else(|| bind.get_interface_members(name, origin.as_deref()))
+                            .or_else(|| bind.get_namespace_members(name, origin.as_deref()))
+                            .or_else(|| bind.get_enum_members(name, origin.as_deref()))
+                            .unwrap_or_default();
+
+                        let mapped = members
+                            .into_iter()
+                            .map(|m| {
+                                if let TypeKind::Fn(ft) = &m.ty.0 {
+                                    ObjectTypeMember::Method {
+                                        name: m.name,
+                                        params: ft.params.clone(),
+                                        return_type: ft.return_type.clone(),
+                                        optional: m.is_optional,
+                                        is_arrow: ft.is_arrow,
+                                    }
+                                } else {
+                                    ObjectTypeMember::Property {
+                                        name: m.name,
+                                        ty: m.ty,
+                                        optional: m.is_optional,
+                                        readonly: m.is_readonly,
+                                    }
+                                }
+                            })
+                            .collect();
+                        Some(mapped)
+                    }
+                    _ => None,
                 }
             })
             .unwrap_or_default();

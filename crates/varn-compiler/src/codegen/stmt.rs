@@ -304,7 +304,7 @@ pub fn compile_stmt<'a>(c: &mut Compiler<'a>, stmt: &Stmt) {
             } else {
                 RuntimeSymbol::Iterator
             };
-            let sym_idx = c.chunk.add_symbol(sym_kind);
+            let sym_idx = c.add_symbol(sym_kind);
 
             let iter_fn = c.alloc_reg();
             let line = c.line;

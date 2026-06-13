@@ -89,24 +89,24 @@ impl Checker {
 
     pub(super) fn infer_arrow_type(
         &mut self,
-        expr: &Expr,
+        _expr: &Expr,
         params: &[Param],
         return_type: &Option<varn_core::ast::TypeNode>,
         body: &varn_core::ast::ArrowBody,
         bind: &BindResult,
     ) -> Type {
-        if return_type.is_some() {
-            return crate::binder::infer_expr_type(expr, Some(bind));
-        }
-
-        let ret_ty = match body {
-            varn_core::ast::ArrowBody::Expr(e) => self.infer_type(e, bind),
-            varn_core::ast::ArrowBody::Block(block) => {
-                let return_tys = collect_checked_return_types(block, self, bind);
-                match return_tys.len() {
-                    0 => Type::Void,
-                    1 => return_tys.into_iter().next().unwrap(),
-                    _ => Type::union(return_tys),
+        let ret_ty = if let Some(rt) = return_type {
+            self.resolve_type_node_cached(rt, bind)
+        } else {
+            match body {
+                varn_core::ast::ArrowBody::Expr(e) => self.infer_type(e, bind),
+                varn_core::ast::ArrowBody::Block(block) => {
+                    let return_tys = collect_checked_return_types(block, self, bind);
+                    match return_tys.len() {
+                        0 => Type::Void,
+                        1 => return_tys.into_iter().next().unwrap(),
+                        _ => Type::union(return_tys),
+                    }
                 }
             }
         };

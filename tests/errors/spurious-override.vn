@@ -1,7 +1,7 @@
-// expect: error[Varn4101]
+// expect: error[Varn4102]
 class Base {
     greet(): str { return "hello" }
 }
 class Child extends Base {
-    greet(): str { return "bye" }
+    override farewell(): str { return "bye" }
 }

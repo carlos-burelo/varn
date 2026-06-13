@@ -309,7 +309,7 @@ pub fn compile_args_contiguous<'a>(
     call_id: u32,
     args: &[Arg],
 ) -> (u8, usize, bool) {
-    let start = c.regs.next;
+    let start = c.regs.next as u8;
     let mut count = 0usize;
     let mut has_spread = false;
 
@@ -323,8 +323,11 @@ pub fn compile_args_contiguous<'a>(
                         let r = compile_expr(c, e);
                         let slot = start + count as u8;
                         if r != slot {
-                            while c.regs.next <= slot {
-                                c.regs.alloc();
+                            while c.regs.next <= slot as u16 {
+                                if c.regs.alloc().is_none() {
+                                    c.set_error("register overflow: function uses more than 255 registers. Split the function into smaller parts.");
+                                    break;
+                                }
                             }
                             c.emit_rr(OpCode::Move, slot, r);
                         }
@@ -333,8 +336,11 @@ pub fn compile_args_contiguous<'a>(
                         let r = compile_expr(c, e);
                         let slot = start + count as u8;
                         if r != slot {
-                            while c.regs.next <= slot {
-                                c.regs.alloc();
+                            while c.regs.next <= slot as u16 {
+                                if c.regs.alloc().is_none() {
+                                    c.set_error("register overflow: function uses more than 255 registers. Split the function into smaller parts.");
+                                    break;
+                                }
                             }
                             c.emit_rr(OpCode::WrapSpread, slot, r);
                         } else {
@@ -356,8 +362,11 @@ pub fn compile_args_contiguous<'a>(
                     let r = compile_expr(c, e);
                     let slot = start + count as u8;
                     if r != slot {
-                        while c.regs.next <= slot {
-                            c.regs.alloc();
+                        while c.regs.next <= slot as u16 {
+                            if c.regs.alloc().is_none() {
+                                c.set_error("register overflow: function uses more than 255 registers. Split the function into smaller parts.");
+                                break;
+                            }
                         }
                         c.emit_rr(OpCode::Move, slot, r);
                     }
@@ -366,8 +375,11 @@ pub fn compile_args_contiguous<'a>(
                     let r = compile_expr(c, e);
                     let slot = start + count as u8;
                     if r != slot {
-                        while c.regs.next <= slot {
-                            c.regs.alloc();
+                        while c.regs.next <= slot as u16 {
+                            if c.regs.alloc().is_none() {
+                                c.set_error("register overflow: function uses more than 255 registers. Split the function into smaller parts.");
+                                break;
+                            }
                         }
                         c.emit_rr(OpCode::WrapSpread, slot, r);
                     } else {
@@ -409,8 +421,11 @@ fn try_emit_intrinsic<'a>(
         let expected = dest + arg_count as u8;
         let r = compile_expr(c, e);
         if r != expected {
-            while c.regs.next <= expected {
-                c.regs.alloc();
+            while c.regs.next <= expected as u16 {
+                if c.regs.alloc().is_none() {
+                    c.set_error("register overflow: function uses more than 255 registers. Split the function into smaller parts.");
+                    break;
+                }
             }
             c.chunk.emit_rr(varn_core::OpCode::Move, expected, r, c.line);
         }

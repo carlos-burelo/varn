@@ -39,5 +39,8 @@ pub fn compile_direct(
         escape_analysis,
     );
     c.compile_program(program);
+    if let Some(err) = c.error {
+        return Err(err);
+    }
     Ok(c.finish_module())
 }

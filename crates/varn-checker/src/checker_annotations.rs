@@ -13,13 +13,15 @@ use varn_core::{intrinsic_ops::intrinsic_lookup, NumericKind, TypeAnnotations};
 struct AnnotateCtx<'a> {
     bind: &'a BindResult,
     locals: rustc_hash::FxHashMap<std::rc::Rc<str>, Type>,
+    resolved_expr_types: &'a rustc_hash::FxHashMap<u32, Type>,
 }
 
 impl<'a> AnnotateCtx<'a> {
-    fn new(bind: &'a BindResult) -> Self {
+    fn new(bind: &'a BindResult, resolved_expr_types: &'a rustc_hash::FxHashMap<u32, Type>) -> Self {
         Self {
             bind,
             locals: rustc_hash::FxHashMap::default(),
+            resolved_expr_types,
         }
     }
 }
@@ -91,9 +93,21 @@ fn extract_caps_from_decorators(decorators: &[varn_core::ast::Decorator]) -> Vec
     caps
 }
 
-pub fn collect_type_annotations(program: &Program, bind: &BindResult) -> TypeAnnotations {
+fn get_expr_type(expr: &Expr, ctx: &AnnotateCtx) -> Type {
+    if let Some(ty) = ctx.resolved_expr_types.get(&expr.id) {
+        ty.clone()
+    } else {
+        infer_expr_type(expr, Some(ctx))
+    }
+}
+
+pub fn collect_type_annotations(
+    program: &Program,
+    bind: &BindResult,
+    resolved_expr_types: &rustc_hash::FxHashMap<u32, Type>,
+) -> TypeAnnotations {
     let mut ann = TypeAnnotations::new();
-    let mut ctx = AnnotateCtx::new(bind);
+    let mut ctx = AnnotateCtx::new(bind, resolved_expr_types);
     for stmt in &program.body {
         annotate_stmt(stmt, &mut ann, &mut ctx);
     }
@@ -173,7 +187,7 @@ fn annotate_stmt(stmt: &Stmt, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                                     let ty = resolve_type_node(ann_node, Some(ctx.bind));
                                     ctx.locals.insert(name, ty);
                                 } else if let Some(init_expr) = &d.init {
-                                    let ty = infer_expr_type(init_expr, Some(ctx));
+                                    let ty = get_expr_type(init_expr, ctx);
                                     ctx.locals.insert(name, ty);
                                 }
                             }
@@ -215,7 +229,7 @@ fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                         let ty = resolve_type_node(ann_node, Some(ctx.bind));
                         ctx.locals.insert(name, ty);
                     } else if let Some(init) = &d.init {
-                        let ty = infer_expr_type(init, Some(ctx));
+                        let ty = get_expr_type(init, ctx);
                         ctx.locals.insert(name, ty);
                     }
                 }
@@ -361,8 +375,8 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                 return;
             }
 
-            let l = infer_expr_type(left, Some(ctx));
-            let r = infer_expr_type(right, Some(ctx));
+            let l = get_expr_type(left, ctx);
+            let r = get_expr_type(right, ctx);
 
             use varn_core::TypeTag;
             let is_int = |tk: &TypeKind<_, _, _, _, _, _>| {
@@ -430,7 +444,7 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
             // Detect calls to stdlib intrinsic functions: module.fn(...)
             if let ExprKind::Member { object, property, computed: false, .. } = &callee.kind {
                 if let ExprKind::Identifier { name: prop_name } = &property.kind {
-                    let obj_ty = infer_expr_type(object, Some(ctx));
+                    let obj_ty = get_expr_type(object, ctx);
                     if let TypeKind::Named(_, Some(ref origin_path)) = &obj_ty.non_nullified().0 {
                         let key = format!("{}/{}", origin_path, prop_name);
                         if let Some(wire_byte) = intrinsic_lookup(&key) {
@@ -449,7 +463,7 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
             annotate_expr(object, ann, ctx);
             if !computed {
                 if let ExprKind::Identifier { name: prop_name } = &property.kind {
-                    let obj_ty = infer_expr_type(object, Some(ctx));
+                    let obj_ty = get_expr_type(object, ctx);
                     if let TypeKind::Named(_, Some(ref origin_path)) = &obj_ty.non_nullified().0 {
                         let exports = if crate::module_resolver::is_known_module(origin_path) {
                             crate::module_resolver::resolve_stdlib_module_exports_ref(origin_path)

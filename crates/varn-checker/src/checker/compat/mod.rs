@@ -259,7 +259,20 @@ pub(super) fn types_compatible_impl(
             }
             true
         }
-        (TypeKind::Named(_, _), _) | (_, TypeKind::Named(_, _)) => true,
+        (TypeKind::Named(dn, _), _) => {
+            if let Some(bind) = bind {
+                !is_known_named(bind, dn)
+            } else {
+                true
+            }
+        }
+        (_, TypeKind::Named(in_, _)) => {
+            if let Some(bind) = bind {
+                !is_known_named(bind, in_)
+            } else {
+                true
+            }
+        }
         (TypeKind::Generic(name, args, _origin), _)
             if name.as_ref() == IntrinsicType::Task.as_str() && args.len() == 1 =>
         {
