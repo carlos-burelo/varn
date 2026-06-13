@@ -73,13 +73,13 @@ impl Checker {
         properties: &[ObjectProp],
         bind: &BindResult,
     ) {
-        let expected_members: Vec<ObjectTypeMember> = self
-            .expected_type
-            .as_ref()
-            .and_then(|t| {
-                let ty = t.non_nullified();
-                match &ty.0 {
-                    TypeKind::Object(m) => Some(m.clone()),
+        let expected_members: Vec<ObjectTypeMember> = if let Some(t) = &self.expected_type {
+            let ty = t.non_nullified();
+            if let Some(cached) = self.expected_object_members_cache.get(&ty) {
+                cached.clone()
+            } else {
+                let resolved = match &ty.0 {
+                    TypeKind::Object(m) => m.clone(),
                     TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin) => {
                         let members = bind
                             .get_class_members(name, origin.as_deref())
@@ -88,7 +88,7 @@ impl Checker {
                             .or_else(|| bind.get_enum_members(name, origin.as_deref()))
                             .unwrap_or_default();
 
-                        let mapped = members
+                        members
                             .into_iter()
                             .map(|m| {
                                 if let TypeKind::Fn(ft) = &m.ty.0 {
@@ -108,13 +108,16 @@ impl Checker {
                                     }
                                 }
                             })
-                            .collect();
-                        Some(mapped)
+                            .collect()
                     }
-                    _ => None,
-                }
-            })
-            .unwrap_or_default();
+                    _ => Vec::new(),
+                };
+                self.expected_object_members_cache.insert(ty, resolved.clone());
+                resolved
+            }
+        } else {
+            Vec::new()
+        };
 
         for prop in properties {
             match prop {
