@@ -11,17 +11,13 @@ export interface Reader {
 }
 
 export namespace io {
-    export function write(...args: dynamic[]): void {
-        ioWrite(...args);
-    }
-
-    export function writeln(...args: dynamic[]): void {
-        ioWriteln(...args);
-    }
-
-    export function print(...args: dynamic[]): void {
-        ioWriteln(...args);
-    }
+    // Direct native aliases: calling these dispatches straight to the host
+    // native (arg slice) instead of a VM forwarder that bundles a rest array
+    // and re-spreads it (`WrapSpread`/`CallSpread`) — one fewer heap alloc per
+    // call.
+    export const write = ioWrite;
+    export const writeln = ioWriteln;
+    export const print = ioWriteln;
 
     export function flush(): void {
         ioFlush();

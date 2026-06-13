@@ -119,9 +119,20 @@ pub fn emit_closure<'a>(
     let proto_idx = parent.add_const(PoolEntry::Function(Rc::new(proto)));
     let dest = parent.alloc_reg();
 
-    let uv_count = upvalues.len() as u8;
-
     let line = parent.line;
+
+    // Closure sin capturas: una sola instancia compartida y cacheada por proto
+    // (reusa el handler `LoadStaticFn` + `static_closures`). Evita un
+    // `heap.alloc_vm_closure` por cada instanciación.
+    if upvalues.is_empty() {
+        parent
+            .chunk
+            .write(Chunk::pack_op(OpCode::LoadStaticFn, dest), line);
+        parent.chunk.write(proto_idx, line);
+        return dest;
+    }
+
+    let uv_count = upvalues.len() as u8;
     parent.chunk.emit(OpCode::MakeClosure, line);
     parent.chunk.write(Chunk::pack(dest, uv_count as u8), line);
     parent.chunk.write(proto_idx, line);
