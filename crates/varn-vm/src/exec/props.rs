@@ -45,7 +45,22 @@ pub fn find_setter(obj: VmValue, key: &str, heap: &Heap) -> Option<Value> {
     }
 }
 
-pub fn get_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult<VmValue> {
+/// Result of resolving a property without interning. Lets hot call sites
+/// (e.g. `CallMethod`) inspect a resolved method and dispatch it directly
+/// instead of paying for a transient `BoundMethod` heap allocation.
+pub enum ResolvedProperty {
+    /// Already a heap value (module export or own-data field). Pass through;
+    /// it must NOT be re-interned (that would duplicate the object).
+    Nv(VmValue),
+    /// A freshly-built `Value` (method bind, intrinsic, "name", null, ...).
+    /// The caller decides whether to dispatch it directly or intern it.
+    Built(Value),
+}
+
+/// Resolve a property to an un-interned form. `get_property` is the interning
+/// wrapper around this; method-call dispatch uses the raw result to avoid
+/// allocating a `BoundMethod` it would immediately unwrap.
+pub fn resolve_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult<ResolvedProperty> {
     if obj.is_heap() {
         if let Some(HeapObj::Module(m)) = heap.get(obj.as_heap_idx()) {
             let val = m
@@ -53,17 +68,24 @@ pub fn get_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult<VmValu
                 .get(key)
                 .and_then(|&s| m.get_slot(s))
                 .unwrap_or(VmValue::null());
-            return Ok(val);
+            return Ok(ResolvedProperty::Nv(val));
         }
     }
 
     if let Some(nv) = resolve_own_data_property(obj, key, heap) {
-        return Ok(nv);
+        return Ok(ResolvedProperty::Nv(nv));
     }
     let val = heap.extract(obj);
     get_property_value(&val, key, heap)
         .map_err(RuntimeError::new)
-        .map(|v| heap.intern(v))
+        .map(ResolvedProperty::Built)
+}
+
+pub fn get_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult<VmValue> {
+    match resolve_property(obj, key, heap)? {
+        ResolvedProperty::Nv(v) => Ok(v),
+        ResolvedProperty::Built(v) => Ok(heap.intern(v)),
+    }
 }
 
 pub fn get_property_maybe(obj: VmValue, key: &str, heap: &mut Heap) -> VmValue {

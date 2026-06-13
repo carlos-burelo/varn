@@ -605,25 +605,23 @@ impl ExecCtx {
                                 )))
                             }
                         };
-                        let cached = proto.static_closure_val.get();
-                        if cached != 0 {
-                            (*ctx).stack[base + dest] = VmValue(cached);
+                        // Cache scope is the per-ExecCtx `static_closures` map
+                        // (GC-rooted and relocated). Do NOT cache the heap index
+                        // on the shared `FunctionProto`: it leaks across heap/VM
+                        // boundaries (snapshot precompile -> benchmarked run).
+                        let proto_ptr = std::rc::Rc::as_ptr(proto) as usize;
+                        let val = if let Some(&cached_val) = (*ctx).static_closures.get(&proto_ptr) {
+                            cached_val
                         } else {
-                            let proto_ptr = std::rc::Rc::as_ptr(proto) as usize;
-                            let val = if let Some(&cached_val) = (*ctx).static_closures.get(&proto_ptr) {
-                                cached_val
-                            } else {
-                                let constants = std::rc::Rc::new(crate::exec::calls::resolve_constants(proto, &mut (*ctx).heap));
-                                let vm_closure = std::rc::Rc::new(
-                                    crate::frame::VmClosure::with_upvalues(proto.clone(), vec![], constants),
-                                );
-                                let val = (*ctx).heap.alloc_vm_closure(vm_closure);
-                                (*ctx).static_closures.insert(proto_ptr, val);
-                                val
-                            };
-                            proto.static_closure_val.set(val.0);
-                            (*ctx).stack[base + dest] = val;
-                        }
+                            let constants = std::rc::Rc::new(crate::exec::calls::resolve_constants(proto, &mut (*ctx).heap));
+                            let vm_closure = std::rc::Rc::new(
+                                crate::frame::VmClosure::with_upvalues(proto.clone(), vec![], constants),
+                            );
+                            let val = (*ctx).heap.alloc_vm_closure(vm_closure);
+                            (*ctx).static_closures.insert(proto_ptr, val);
+                            val
+                        };
+                        (*ctx).stack[base + dest] = val;
                     }
 
                     OpCode::Nop => {}

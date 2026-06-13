@@ -843,30 +843,27 @@ pub extern "C" fn jit_load_static_fn(
             Some(varn_types::PoolEntry::Function(p)) => p,
             _ => panic!("LoadStaticFn: invalid function proto"),
         };
-        let cached = proto.static_closure_val.get();
-        if cached != 0 {
-            return VmValue(cached);
-        }
+        // Cache scope is the per-ExecCtx `static_closures` map (GC-rooted and
+        // relocated). Do NOT cache the heap index on the shared `FunctionProto`
+        // (e.g. `static_closure_val`): that index leaks across heap/VM boundaries
+        // (snapshot precompile -> benchmarked run) and dangles.
         let proto_ptr = std::rc::Rc::as_ptr(proto) as usize;
-        let val = if let Some(&cached_val) = ctx_ref.static_closures.get(&proto_ptr) {
-            cached_val
-        } else {
-            let constants = ctx_ref
-                .proto_constants
-                .entry(proto_ptr)
-                .or_insert_with(|| {
-                    std::rc::Rc::new(crate::exec::calls::resolve_constants(
-                        proto,
-                        &mut ctx_ref.heap,
-                    ))
-                })
-                .clone();
-            let new_closure = crate::frame::VmClosure::with_upvalues(proto.clone(), vec![], constants);
-            let val = ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(new_closure));
-            ctx_ref.static_closures.insert(proto_ptr, val);
-            val
-        };
-        proto.static_closure_val.set(val.0);
+        if let Some(&cached_val) = ctx_ref.static_closures.get(&proto_ptr) {
+            return cached_val;
+        }
+        let constants = ctx_ref
+            .proto_constants
+            .entry(proto_ptr)
+            .or_insert_with(|| {
+                std::rc::Rc::new(crate::exec::calls::resolve_constants(
+                    proto,
+                    &mut ctx_ref.heap,
+                ))
+            })
+            .clone();
+        let new_closure = crate::frame::VmClosure::with_upvalues(proto.clone(), vec![], constants);
+        let val = ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(new_closure));
+        ctx_ref.static_closures.insert(proto_ptr, val);
         val
     }
 }

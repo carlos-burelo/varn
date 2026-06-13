@@ -106,71 +106,59 @@ impl ExecCtx {
 
             if let Some((nc, owner_class)) = ic_vm {
                 self.record_ic_hit_callmethod();
-                self.record_call_vm_fast();
-                {
-                    let method_key = format!(
-                        "{}.{}",
-                        owner_class.as_ref().map(|c| c.name.as_str()).unwrap_or("?"),
-                        name.as_ref()
-                    );
-                    let is_jit = nc.jit_entry.is_some();
-                    self.record_hotspot_method(&method_key, is_jit);
-                }
-                self.stack.push(VmValue::null());
-                if !nc.proto.has_rest {
-                    self.stack.push(this_val);
-                    for i in 0..arg_count {
-                        let v = self.stack[base + arg_start + i];
-                        self.stack.push(v);
-                    }
-                } else {
-                    let arity = nc.proto.arity;
-                    let rest_idx = arity.saturating_sub(1);
-                    self.stack.push(this_val);
-                    let regular_count = arg_count.min(rest_idx);
-                    for i in 0..regular_count {
-                        let v = self.stack[base + arg_start + i];
-                        self.stack.push(v);
-                    }
-                    for _ in regular_count..rest_idx {
-                        self.stack.push(VmValue::null());
-                    }
-                    let rest_items: Vec<VmValue> = if arg_count > rest_idx {
-                        (rest_idx..arg_count)
-                            .map(|i| self.stack[base + arg_start + i])
-                            .collect()
-                    } else {
-                        vec![]
-                    };
-                    let rest_nv = VmValue::from_heap_idx(
-                        self.heap
-                            .alloc(crate::heap::HeapObj::Array(VmArray::new(rest_items))),
-                    );
-                    self.stack.push(rest_nv);
-                }
-                let full_arg_count = nc.proto.arity;
-                if self.frames.len() >= 10000 {
-                    return Err(crate::error::RuntimeError::new(
-                        "stack overflow: call depth exceeded 10000",
-                    ));
-                }
-                let final_base = self.stack.len() - full_arg_count;
-                let required = final_base + nc.proto.register_count as usize;
-                if self.stack.len() < required {
-                    self.stack.resize(required, VmValue::null());
-                }
-                let mut frame = crate::frame::CallFrame::new_owned(nc, final_base);
-                frame.return_reg = Some(dest as u16);
-                frame.current_class = owner_class;
-                self.record_frame_push();
-                self.frames.push(frame);
-                return Ok(true);
+                return self.invoke_vm_method_fast(
+                    nc,
+                    owner_class,
+                    this_val,
+                    base,
+                    arg_start,
+                    arg_count,
+                    dest,
+                    name.as_ref(),
+                );
             }
 
             self.record_ic_miss_callmethod();
         }
 
-        let method_nv = crate::exec::props::get_property(this_val, &name, &mut self.heap)?;
+        // IC miss: resolve the property WITHOUT interning, so a bound method
+        // (the common case) can be dispatched directly instead of allocating a
+        // transient `BoundMethod` on the heap that we immediately unwrap.
+        let resolved = crate::exec::props::resolve_property(this_val, &name, &mut self.heap)?;
+
+        // Native bound methods are dispatched directly with `this_val` as the
+        // receiver — identical to the early native branch below, but without
+        // interning the transient `BoundMethod` first. VM bound methods are NOT
+        // intercepted here: they need the general `prepare_call`/`skip_this`
+        // path (e.g. decorator wrappers are no-`this` rest-param closures), and
+        // repeat calls are served allocation-free by the IC-hit path anyway.
+        if let crate::exec::props::ResolvedProperty::Built(Value::BoundMethod(bm)) = &resolved {
+            if let varn_types::value::BoundMethodTarget::Native { func, .. } = &bm.target {
+                let f = *func;
+                self.populate_method_ic(
+                    closure,
+                    cs,
+                    cache_len,
+                    is_megamorphic,
+                    &receiver_class,
+                    name.as_ref(),
+                    6,
+                );
+                self.record_call_native();
+                self.record_hotspot_native(name.as_ref());
+                let result =
+                    self.call_native_with_receiver(f, this_val, base, arg_start, arg_count)?;
+                self.stack[base + dest] = result;
+                return Ok(false);
+            }
+        }
+
+        // Fallback (modules, own fields, enum variants, namespace natives, all
+        // VM methods): intern and use the general prepare_call path, as before.
+        let method_nv = match resolved {
+            crate::exec::props::ResolvedProperty::Nv(v) => v,
+            crate::exec::props::ResolvedProperty::Built(v) => self.heap.intern(v),
+        };
 
         if let Some(ref cls) = receiver_class {
             if cs < cache_len && method_nv.is_heap() && !is_megamorphic {
@@ -367,5 +355,112 @@ impl ExecCtx {
         }
         .map_err(|e| RuntimeError::new(e))?;
         Ok(result)
+    }
+
+    /// Push args and a frame for a VM method, then return `Ok(true)` to signal
+    /// the dispatcher to enter the new frame. Shared by the IC-hit path and the
+    /// alloc-free IC-miss resolution path.
+    #[allow(clippy::too_many_arguments)]
+    fn invoke_vm_method_fast(
+        &mut self,
+        nc: Rc<VmClosure>,
+        owner_class: Option<Rc<varn_types::value::ClassObj>>,
+        this_val: VmValue,
+        base: usize,
+        arg_start: usize,
+        arg_count: usize,
+        dest: usize,
+        name: &str,
+    ) -> VmResult<bool> {
+        self.record_call_vm_fast();
+        {
+            let method_key = format!(
+                "{}.{}",
+                owner_class.as_ref().map(|c| c.name.as_str()).unwrap_or("?"),
+                name
+            );
+            let is_jit = nc.jit_entry.is_some();
+            self.record_hotspot_method(&method_key, is_jit);
+        }
+        self.stack.push(VmValue::null());
+        if !nc.proto.has_rest {
+            self.stack.push(this_val);
+            for i in 0..arg_count {
+                let v = self.stack[base + arg_start + i];
+                self.stack.push(v);
+            }
+        } else {
+            let arity = nc.proto.arity;
+            let rest_idx = arity.saturating_sub(1);
+            self.stack.push(this_val);
+            let regular_count = arg_count.min(rest_idx);
+            for i in 0..regular_count {
+                let v = self.stack[base + arg_start + i];
+                self.stack.push(v);
+            }
+            for _ in regular_count..rest_idx {
+                self.stack.push(VmValue::null());
+            }
+            let rest_items: Vec<VmValue> = if arg_count > rest_idx {
+                (rest_idx..arg_count)
+                    .map(|i| self.stack[base + arg_start + i])
+                    .collect()
+            } else {
+                vec![]
+            };
+            let rest_nv = VmValue::from_heap_idx(
+                self.heap
+                    .alloc(crate::heap::HeapObj::Array(VmArray::new(rest_items))),
+            );
+            self.stack.push(rest_nv);
+        }
+        let full_arg_count = nc.proto.arity;
+        if self.frames.len() >= 10000 {
+            return Err(crate::error::RuntimeError::new(
+                "stack overflow: call depth exceeded 10000",
+            ));
+        }
+        let final_base = self.stack.len() - full_arg_count;
+        let required = final_base + nc.proto.register_count as usize;
+        if self.stack.len() < required {
+            self.stack.resize(required, VmValue::null());
+        }
+        let mut frame = crate::frame::CallFrame::new_owned(nc, final_base);
+        frame.return_reg = Some(dest as u16);
+        frame.current_class = owner_class;
+        self.record_frame_push();
+        self.frames.push(frame);
+        Ok(true)
+    }
+
+    /// Insert a method IC entry resolved on an IC miss, so the next call to this
+    /// site hits the fast path. `is_class` is 6 (native) or 7 (VM). No-op when
+    /// the site is megamorphic, out of range, or the method is not in the vtable.
+    #[allow(clippy::too_many_arguments)]
+    fn populate_method_ic(
+        &self,
+        closure: &VmClosure,
+        cs: usize,
+        cache_len: usize,
+        is_megamorphic: bool,
+        receiver_class: &Option<Rc<varn_types::value::ClassObj>>,
+        name: &str,
+        is_class: u8,
+    ) {
+        if cs >= cache_len || is_megamorphic {
+            return;
+        }
+        if let Some(cls) = receiver_class {
+            if let Some(&slot) = cls.method_map.borrow().get(name) {
+                let entry = varn_types::chunk::CacheEntry {
+                    id: cls.id,
+                    slot: slot as u16,
+                    is_class,
+                    vtable_ver: (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8,
+                };
+                closure.ic_cache.borrow_mut()[cs].find_or_insert(entry);
+                closure.feedback.borrow_mut().observe(cs, cls.id);
+            }
+        }
     }
 }
