@@ -10,30 +10,33 @@ varn_contract! {
     module: "runtime:io",
     contract: "src/modules/std/io/runtime/io_runtime.vn",
     impl IoRuntime {
-        fn ioWrite(ctx: &mut dyn NativeCtx, args: &[VmValue]) {
+        fn ioWrite(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<(), String> {
             if !crate::modules::globals::is_print_silent() {
                 for &v in args {
                     print!("{}", ctx.str_repr_borrowed(v));
                 }
             }
+            Ok(())
         }
 
-        fn ioWriteln(ctx: &mut dyn NativeCtx, args: &[VmValue]) {
+        fn ioWriteln(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<(), String> {
             if !crate::modules::globals::is_print_silent() {
                 for &v in args {
                     print!("{}", ctx.str_repr_borrowed(v));
                 }
                 println!();
             }
+            Ok(())
         }
 
-        fn ioFlush(_ctx: &mut dyn NativeCtx) {
+        fn ioFlush(_ctx: &mut dyn NativeCtx) -> Result<(), String> {
             if !crate::modules::globals::is_print_silent() {
-                let _ = std::io::stdout().flush();
+                std::io::stdout().flush().map_err(|e| format!("io.flush: {e}"))?;
             }
+            Ok(())
         }
 
-        fn ioReadLine(_ctx: &mut dyn NativeCtx, prompt: Option<&str>) -> String {
+        fn ioReadLine(_ctx: &mut dyn NativeCtx, prompt: Option<&str>) -> Result<String, String> {
             if let Some(p) = prompt {
                 if !crate::modules::globals::is_print_silent() {
                     print!("{p}");
@@ -41,8 +44,10 @@ varn_contract! {
                 }
             }
             let mut line = String::new();
-            let _ = std::io::stdin().read_line(&mut line);
-            line.trim_end_matches(['\r', '\n']).to_string()
+            std::io::stdin()
+                .read_line(&mut line)
+                .map_err(|e| format!("io.read_line: {e}"))?;
+            Ok(line.trim_end_matches(['\r', '\n']).to_string())
         }
     }
 }

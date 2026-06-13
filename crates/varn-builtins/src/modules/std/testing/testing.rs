@@ -49,7 +49,7 @@ varn_contract! {
     module: "runtime:test",
     contract: "src/modules/std/testing/runtime/test_runtime.vn",
     impl TestRuntime {
-        fn testAssert(_ctx: &mut dyn NativeCtx, label: &str, condition: bool) {
+        fn testAssert(_ctx: &mut dyn NativeCtx, label: &str, condition: bool) -> Result<(), String> {
             if condition {
                 PASSED.fetch_add(1, Ordering::Relaxed);
             } else {
@@ -58,8 +58,9 @@ varn_contract! {
                     println!("FAIL: {label}");
                 }
             }
+            Ok(())
         }
-        fn testAssertEqual(ctx: &mut dyn NativeCtx, actual: VmValue, expected: VmValue, message: Option<&str>) {
+        fn testAssertEqual(ctx: &mut dyn NativeCtx, actual: VmValue, expected: VmValue, message: Option<&str>) -> Result<(), String> {
             if actual == expected {
                 PASSED.fetch_add(1, Ordering::Relaxed);
             } else {
@@ -71,9 +72,11 @@ varn_contract! {
                     println!("FAIL: {msg}");
                 }
             }
+            Ok(())
         }
-        fn testSummary(_ctx: &mut dyn NativeCtx) {
+        fn testSummary(_ctx: &mut dyn NativeCtx) -> Result<(), String> {
             print_summary();
+            Ok(())
         }
     }
 }

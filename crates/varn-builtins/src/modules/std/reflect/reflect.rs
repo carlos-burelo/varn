@@ -33,44 +33,46 @@ varn_contract! {
     module: "runtime:reflect",
     contract: "src/modules/std/reflect/runtime/reflect_runtime.vn",
     impl ReflectRuntime {
-        fn reflectDefineMetadata(ctx: &mut dyn NativeCtx, metadataKey: VmValue, metadataValue: VmValue, target: VmValue) {
+        fn reflectDefineMetadata(ctx: &mut dyn NativeCtx, metadataKey: VmValue, metadataValue: VmValue, target: VmValue) -> Result<(), String> {
             let key = ctx.str_repr(metadataKey);
             let target_k = target_key(ctx, target);
             with_metadata(|m| {
                 m.entry(target_k).or_default().insert(key, metadataValue);
             });
+            Ok(())
         }
-        fn reflectGetMetadata(ctx: &mut dyn NativeCtx, metadataKey: VmValue, target: VmValue) -> VmValue {
+        fn reflectGetMetadata(ctx: &mut dyn NativeCtx, metadataKey: VmValue, target: VmValue) -> Result<VmValue, String> {
             let key = ctx.str_repr(metadataKey);
             let target_k = target_key(ctx, target);
-            with_metadata(|m| {
+            Ok(with_metadata(|m| {
                 m.get(&target_k).and_then(|m| m.get(&key)).cloned().unwrap_or(VmValue::null())
-            })
+            }))
         }
-        fn reflectHasMetadata(ctx: &mut dyn NativeCtx, metadataKey: VmValue, target: VmValue) -> bool {
+        fn reflectHasMetadata(ctx: &mut dyn NativeCtx, metadataKey: VmValue, target: VmValue) -> Result<bool, String> {
             let key = ctx.str_repr(metadataKey);
             let target_k = target_key(ctx, target);
-            with_metadata(|m| m.get(&target_k).map(|m| m.contains_key(&key)).unwrap_or(false))
+            Ok(with_metadata(|m| m.get(&target_k).map(|m| m.contains_key(&key)).unwrap_or(false)))
         }
-        fn reflectCreateMetaKey(_ctx: &mut dyn NativeCtx) -> String {
+        fn reflectCreateMetaKey(_ctx: &mut dyn NativeCtx) -> Result<String, String> {
             let id = META_KEY_COUNTER.fetch_add(1, Ordering::Relaxed);
-            format!("meta_{id}")
+            Ok(format!("meta_{id}"))
         }
-        fn reflectSetMetaKey(ctx: &mut dyn NativeCtx, metaId: &str, target: VmValue, value: VmValue) {
+        fn reflectSetMetaKey(ctx: &mut dyn NativeCtx, metaId: &str, target: VmValue, value: VmValue) -> Result<(), String> {
             let target_k = target_key(ctx, target);
             with_metadata(|m| {
                 m.entry(target_k).or_default().insert(metaId.to_string(), value);
             });
+            Ok(())
         }
-        fn reflectGetMetaKey(ctx: &mut dyn NativeCtx, metaId: &str, target: VmValue) -> VmValue {
+        fn reflectGetMetaKey(ctx: &mut dyn NativeCtx, metaId: &str, target: VmValue) -> Result<VmValue, String> {
             let target_k = target_key(ctx, target);
-            with_metadata(|m| {
+            Ok(with_metadata(|m| {
                 m.get(&target_k).and_then(|m| m.get(metaId)).cloned().unwrap_or(VmValue::null())
-            })
+            }))
         }
-        fn reflectHasMetaKey(ctx: &mut dyn NativeCtx, metaId: &str, target: VmValue) -> bool {
+        fn reflectHasMetaKey(ctx: &mut dyn NativeCtx, metaId: &str, target: VmValue) -> Result<bool, String> {
             let target_k = target_key(ctx, target);
-            with_metadata(|m| m.get(&target_k).map(|m| m.contains_key(metaId)).unwrap_or(false))
+            Ok(with_metadata(|m| m.get(&target_k).map(|m| m.contains_key(metaId)).unwrap_or(false)))
         }
     }
 }

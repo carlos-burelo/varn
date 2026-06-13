@@ -9,17 +9,17 @@ varn_contract! {
     module: "runtime:math",
     contract: "src/modules/std/math/runtime/math_runtime.vn",
     impl MathRuntime {
-        fn mathAbs(_ctx: &mut dyn NativeCtx, x: f64) -> f64 { x.abs() }
-        fn mathSqrt(_ctx: &mut dyn NativeCtx, x: f64) -> f64 { x.sqrt() }
-        fn mathSin(_ctx: &mut dyn NativeCtx, x: f64) -> f64 { x.sin() }
-        fn mathCos(_ctx: &mut dyn NativeCtx, x: f64) -> f64 { x.cos() }
-        fn mathTan(_ctx: &mut dyn NativeCtx, x: f64) -> f64 { x.tan() }
-        fn mathFloor(_ctx: &mut dyn NativeCtx, x: f64) -> f64 { x.floor() }
-        fn mathCeil(_ctx: &mut dyn NativeCtx, x: f64) -> f64 { x.ceil() }
-        fn mathRound(_ctx: &mut dyn NativeCtx, x: f64) -> f64 { x.round() }
-        fn mathRandom(_ctx: &mut dyn NativeCtx) -> f64 {
+        fn mathAbs(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.abs()) }
+        fn mathSqrt(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.sqrt()) }
+        fn mathSin(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.sin()) }
+        fn mathCos(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.cos()) }
+        fn mathTan(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.tan()) }
+        fn mathFloor(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.floor()) }
+        fn mathCeil(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.ceil()) }
+        fn mathRound(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.round()) }
+        fn mathRandom(_ctx: &mut dyn NativeCtx) -> Result<f64, String> {
             use rand::Rng;
-            rand::thread_rng().gen()
+            Ok(rand::thread_rng().gen())
         }
     }
 }

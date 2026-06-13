@@ -9,17 +9,16 @@ varn_contract! {
     module: "runtime:json",
     contract: "src/modules/std/json/runtime/json_runtime.vn",
     impl JsonRuntime {
-        fn jsonParse(ctx: &mut dyn NativeCtx, text: &str) -> VmValue {
-            match serde_json::from_str::<serde_json::Value>(text) {
-                Ok(sv) => serde_to_vm(ctx, sv),
-                Err(_) => VmValue::null(),
-            }
+        fn jsonParse(ctx: &mut dyn NativeCtx, text: &str) -> Result<VmValue, String> {
+            let sv: serde_json::Value =
+                serde_json::from_str(text).map_err(|e| format!("JSON.parse: {e}"))?;
+            Ok(serde_to_vm(ctx, sv))
         }
 
-        fn jsonStringify(ctx: &mut dyn NativeCtx, value: VmValue) -> String {
+        fn jsonStringify(ctx: &mut dyn NativeCtx, value: VmValue) -> Result<String, String> {
             let val = ctx.extract(value);
             let json_val = value_to_serde(&val, ctx);
-            serde_json::to_string(&json_val).unwrap_or_else(|_| "null".to_string())
+            Ok(serde_json::to_string(&json_val).unwrap_or_else(|_| "null".to_string()))
         }
     }
 }
