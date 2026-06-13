@@ -58,7 +58,7 @@ pub(crate) mod dispatch {
 
     #[varn_fn]
     pub fn input(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        crate::modules::io::dispatch::read_line(ctx, args)
+        crate::modules::io::read_line(ctx, args)
     }
 
     #[varn_fn("assertSummary")]

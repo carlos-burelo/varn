@@ -1,28 +1,26 @@
-use varn_op_macros::varn_module;
+use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, Value, VmValue};
 
-#[varn_module("runtime:json")]
-pub(crate) mod dispatch {
-    use super::*;
+/// Native implementation backing the `runtime:json` contract
+/// (`src/modules/std/json/runtime/json_runtime.vn`).
+pub struct JsonRuntime;
 
-    #[varn_fn("jsonParse")]
-    pub fn json_parse(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        let input = args.get(0).map(|&v| ctx.str_repr(v)).unwrap_or_default();
-        let sv: serde_json::Value =
-            serde_json::from_str(&input).map_err(|e| format!("JSON.parse: {e}"))?;
-        Ok(serde_to_vm(ctx, sv))
-    }
-
-    #[varn_fn("jsonStringify")]
-    pub fn json_stringify(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        if let Some(v) = args.get(0).copied() {
-            let val = ctx.extract(v);
-            let json_val = value_to_serde(&val, ctx);
-            return Ok(ctx.alloc_str_owned(
-                serde_json::to_string(&json_val).unwrap_or_else(|_| "null".to_string()),
-            ));
+varn_contract! {
+    module: "runtime:json",
+    contract: "src/modules/std/json/runtime/json_runtime.vn",
+    impl JsonRuntime {
+        fn jsonParse(ctx: &mut dyn NativeCtx, text: &str) -> VmValue {
+            match serde_json::from_str::<serde_json::Value>(text) {
+                Ok(sv) => serde_to_vm(ctx, sv),
+                Err(_) => VmValue::null(),
+            }
         }
-        Ok(ctx.alloc_str("null"))
+
+        fn jsonStringify(ctx: &mut dyn NativeCtx, value: VmValue) -> String {
+            let val = ctx.extract(value);
+            let json_val = value_to_serde(&val, ctx);
+            serde_json::to_string(&json_val).unwrap_or_else(|_| "null".to_string())
+        }
     }
 }
 
