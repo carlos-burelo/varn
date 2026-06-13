@@ -1,85 +1,79 @@
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::{AtomicU64, Ordering};
-use varn_op_macros::varn_module;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
-#[varn_module("runtime:test")]
-pub(crate) mod dispatch {
-    use super::*;
+/// Native implementation backing the `runtime:test` contract
+/// (`src/modules/std/testing/runtime/test_runtime.vn`).
+pub struct TestRuntime;
 
-    static PASSED: AtomicU64 = AtomicU64::new(0);
-    static FAILED: AtomicU64 = AtomicU64::new(0);
-    static SILENT: AtomicBool = AtomicBool::new(false);
+static PASSED: AtomicU64 = AtomicU64::new(0);
+static FAILED: AtomicU64 = AtomicU64::new(0);
+static SILENT: AtomicBool = AtomicBool::new(false);
 
-    pub fn set_testing_silent(silent: bool) {
-        SILENT.store(silent, Ordering::Relaxed);
-    }
-    pub fn reset_testing_counters() {
-        PASSED.store(0, Ordering::Relaxed);
-        FAILED.store(0, Ordering::Relaxed);
-    }
-    pub fn inc_passed() {
-        PASSED.fetch_add(1, Ordering::Relaxed);
-    }
-    pub fn inc_failed() {
-        FAILED.fetch_add(1, Ordering::Relaxed);
-    }
+pub fn set_testing_silent(silent: bool) {
+    SILENT.store(silent, Ordering::Relaxed);
+}
+pub fn reset_testing_counters() {
+    PASSED.store(0, Ordering::Relaxed);
+    FAILED.store(0, Ordering::Relaxed);
+}
+pub fn inc_passed() {
+    PASSED.fetch_add(1, Ordering::Relaxed);
+}
+pub fn inc_failed() {
+    FAILED.fetch_add(1, Ordering::Relaxed);
+}
 
-    #[varn_fn("testAssert")]
-    pub fn assert(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        let cond = args.get(1).map(|&v| v.as_bool()).unwrap_or(false);
-        if cond {
-            PASSED.fetch_add(1, Ordering::Relaxed);
+fn print_summary() {
+    let passed = PASSED.load(Ordering::Relaxed);
+    let failed = FAILED.load(Ordering::Relaxed);
+    if !SILENT.load(Ordering::Relaxed) {
+        println!("\n════════════════════════════════════════");
+        println!("PASSED: {passed}");
+        println!("FAILED: {failed}");
+        if failed == 0 {
+            println!("ALL TESTS PASSED");
         } else {
-            let label = args
-                .first()
-                .map(|&v| ctx.str_repr(v))
-                .unwrap_or_else(|| "?".into());
-            FAILED.fetch_add(1, Ordering::Relaxed);
-            if !SILENT.load(Ordering::Relaxed) {
-                println!("FAIL: {label}");
-            }
+            println!("SOME TESTS FAILED");
         }
-        Ok(VmValue::null())
-    }
-
-    #[varn_fn("testAssertEqual")]
-    pub fn assert_equal(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        let actual = args.first().copied().unwrap_or(VmValue::null());
-        let expected = args.get(1).copied().unwrap_or(VmValue::null());
-        if actual == expected {
-            PASSED.fetch_add(1, Ordering::Relaxed);
-        } else {
-            FAILED.fetch_add(1, Ordering::Relaxed);
-            let msg = format!(
-                "expected {} but got {}",
-                ctx.str_repr(expected),
-                ctx.str_repr(actual)
-            );
-            if !SILENT.load(Ordering::Relaxed) {
-                println!("FAIL: {msg}");
-            }
-            return Err(msg);
-        }
-        Ok(VmValue::null())
-    }
-
-    #[varn_fn("testSummary")]
-    pub fn summary(_ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, String> {
-        let passed = PASSED.load(Ordering::Relaxed);
-        let failed = FAILED.load(Ordering::Relaxed);
-        if !SILENT.load(Ordering::Relaxed) {
-            println!("\n════════════════════════════════════════");
-            println!("PASSED: {passed}");
-            println!("FAILED: {failed}");
-            if failed == 0 {
-                println!("ALL TESTS PASSED");
-            } else {
-                println!("SOME TESTS FAILED");
-            }
-        }
-        Ok(VmValue::null())
     }
 }
 
-pub use dispatch::{inc_failed, inc_passed, reset_testing_counters, set_testing_silent};
+/// Stable entrypoint used by the global `assertSummary` builtin.
+pub fn summary(_ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, String> {
+    print_summary();
+    Ok(VmValue::null())
+}
+
+varn_contract! {
+    module: "runtime:test",
+    contract: "src/modules/std/testing/runtime/test_runtime.vn",
+    impl TestRuntime {
+        fn testAssert(_ctx: &mut dyn NativeCtx, label: &str, condition: bool) {
+            if condition {
+                PASSED.fetch_add(1, Ordering::Relaxed);
+            } else {
+                FAILED.fetch_add(1, Ordering::Relaxed);
+                if !SILENT.load(Ordering::Relaxed) {
+                    println!("FAIL: {label}");
+                }
+            }
+        }
+        fn testAssertEqual(ctx: &mut dyn NativeCtx, actual: VmValue, expected: VmValue, message: Option<&str>) {
+            if actual == expected {
+                PASSED.fetch_add(1, Ordering::Relaxed);
+            } else {
+                FAILED.fetch_add(1, Ordering::Relaxed);
+                if !SILENT.load(Ordering::Relaxed) {
+                    let msg = message.map(|m| m.to_string()).unwrap_or_else(|| {
+                        format!("expected {} but got {}", ctx.str_repr(expected), ctx.str_repr(actual))
+                    });
+                    println!("FAIL: {msg}");
+                }
+            }
+        }
+        fn testSummary(_ctx: &mut dyn NativeCtx) {
+            print_summary();
+        }
+    }
+}
