@@ -502,24 +502,41 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
         }
 
         let rty = ret_ty(&m.ret);
+        let is_void = matches!(m.ret, Mapped::Void);
+        let is_fn = m.kind == Kind::Function;
 
-        // Trait signature.
+        // Function-module ops sit on the fallible native boundary, so their
+        // bodies return `Result<T, String>` and the wrapper propagates the
+        // error. Class members are pure and return `T` directly.
+        let trait_ret = if is_fn {
+            let inner = if is_void { quote!(()) } else { rty.clone() };
+            quote!(::core::result::Result<#inner, String>)
+        } else if is_void {
+            quote!(())
+        } else {
+            rty.clone()
+        };
+
         trait_sigs.push(quote! {
             #[allow(non_snake_case)]
-            fn #method_ident(ctx: &mut dyn ::varn_types::NativeCtx, #(#sig_params),*) -> #rty;
+            fn #method_ident(ctx: &mut dyn ::varn_types::NativeCtx, #(#sig_params),*) -> #trait_ret;
         });
 
-        // Wrapper body: encode the return (or null for void).
-        let ret_encode = if matches!(m.ret, Mapped::Void) {
-            quote! {
-                <__T>::#method_ident(ctx, #(#call_args),*);
-                Ok(::varn_types::VmValue::null())
-            }
-        } else {
-            quote! {
-                let __ret = <__T>::#method_ident(ctx, #(#call_args),*);
+        let call = quote!(<__T>::#method_ident(ctx, #(#call_args),*));
+        let ret_encode = match (is_fn, is_void) {
+            (true, true) => quote! { #call?; Ok(::varn_types::VmValue::null()) },
+            (true, false) => quote! {
+                let __ret = #call?;
                 Ok(::varn_types::marshal::IntoVm::into_vm(__ret, ctx))
-            }
+            },
+            (false, true) => quote! {
+                #call;
+                Ok(::varn_types::VmValue::null())
+            },
+            (false, false) => quote! {
+                let __ret = #call;
+                Ok(::varn_types::marshal::IntoVm::into_vm(__ret, ctx))
+            },
         };
 
         wrappers.push(quote! {
