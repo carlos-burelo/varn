@@ -33,7 +33,7 @@ use syn::parse::{Parse, ParseStream};
 use syn::{Ident, LitStr, Token};
 
 use varn_core::ast::{ClassDecl, ClassMember, Decl, ExportDecl, Param, Pattern, Stmt, StmtKind};
-use varn_core::ast::TypeNode;
+use varn_core::ast::{FunctionDecl, TypeNode};
 use varn_core::kinds::TypeKind;
 use varn_core::TypeTag;
 
@@ -43,7 +43,9 @@ use varn_core::TypeTag;
 
 pub(crate) struct ContractInput {
     module: String,
-    class: String,
+    /// `Some` for a `declare class` contract; `None` for a function-module
+    /// contract (top-level `declare function`s).
+    class: Option<String>,
     contract: String,
     self_ty: syn::Type,
     fns: Vec<syn::ImplItemFn>,
@@ -87,7 +89,7 @@ impl Parse for ContractInput {
         let span = input.span();
         Ok(Self {
             module: module.ok_or_else(|| syn::Error::new(span, "missing `module:` key"))?,
-            class: class.ok_or_else(|| syn::Error::new(span, "missing `class:` key"))?,
+            class,
             contract: contract.ok_or_else(|| syn::Error::new(span, "missing `contract:` key"))?,
             self_ty,
             fns,
@@ -214,6 +216,9 @@ enum Kind {
     StaticMethod,
     StaticGetter,
     Constructor,
+    /// A free `declare function` in a function-module contract. Like a static
+    /// method (no receiver) but registered as a standalone module op.
+    Function,
 }
 
 struct ParamInfo {
@@ -311,6 +316,33 @@ fn collect_members(class_name: &str, decl: &ClassDecl) -> Vec<Member> {
     out
 }
 
+/// Collect top-level `export declare function`s for a function-module contract.
+fn collect_functions(body: &[Stmt]) -> Vec<Member> {
+    fn from_decl(decl: &Decl, out: &mut Vec<Member>) {
+        match decl {
+            Decl::Function(f) => out.push(function_member(f)),
+            Decl::Export(ExportDecl::Decl { declaration, .. }) => from_decl(declaration, out),
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    for stmt in body {
+        if let StmtKind::Decl(decl) = &stmt.kind {
+            from_decl(decl, &mut out);
+        }
+    }
+    out
+}
+
+fn function_member(f: &FunctionDecl) -> Member {
+    Member {
+        symbol: f.id.to_string(),
+        kind: Kind::Function,
+        params: map_params(&f.params),
+        ret: f.return_type.as_ref().map(classify).unwrap_or(Mapped::Void),
+    }
+}
+
 /// The parser stores a param's type either on `Param.type_ann` (optional
 /// params) or on the identifier pattern (`name: T`), so check both.
 fn param_type(p: &Param) -> Option<&TypeNode> {
@@ -366,36 +398,44 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
         Err(_) => return err(format!("failed to parse contract `{}`", abs_path_str)),
     };
 
-    let class_decl = match find_class(&program.body, &input.class) {
-        Some(c) => c,
+    let members = match &input.class {
+        Some(class) => match find_class(&program.body, class) {
+            Some(decl) => collect_members(class, &decl),
+            None => {
+                return err(format!(
+                    "class `{class}` not found in contract `{abs_path_str}`"
+                ))
+            }
+        },
         None => {
-            return err(format!(
-                "class `{}` not found in contract `{}`",
-                input.class, abs_path_str
-            ))
+            let fns = collect_functions(&program.body);
+            if fns.is_empty() {
+                return err(format!(
+                    "no `declare function`s found in contract `{abs_path_str}`"
+                ));
+            }
+            fns
         }
     };
 
-    let members = collect_members(&input.class, &class_decl);
-
-    let trait_ident = format_ident!("__VarnContract_{}", sanitize(&input.class));
-    let builder_ident = format_ident!("__varn_build_{}", sanitize(&input.class));
-    let entry_ident = format_ident!("__VARN_OP_{}", sanitize(&input.class).to_uppercase());
+    // Naming prefix: the class name, or the module id for a function-module.
+    let prefix = input.class.clone().unwrap_or_else(|| input.module.clone());
+    let trait_ident = format_ident!("__VarnContract_{}", sanitize(&prefix));
 
     let self_ty = &input.self_ty;
     let user_fns = &input.fns;
     let module = &input.module;
-    let class = &input.class;
     let ns = "";
 
     let mut trait_sigs: Vec<TS2> = Vec::new();
     let mut wrappers: Vec<TS2> = Vec::new();
     let mut setup_calls: Vec<TS2> = Vec::new();
+    let mut fn_entries: Vec<TS2> = Vec::new();
 
     for m in &members {
         let sym = &m.symbol;
         let method_ident = format_ident!("{}", sym);
-        let wrap_ident = format_ident!("__varn_wrap_{}_{}", sanitize(class), sanitize(sym));
+        let wrap_ident = format_ident!("__varn_wrap_{}_{}", sanitize(&prefix), sanitize(sym));
 
         // Build the receiver param (if any), the trait params and the wrapper
         // decode statements + call args.
@@ -408,7 +448,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
 
         match m.kind {
             Kind::Method | Kind::Getter => {
-                let recv = receiver_mapped(class);
+                let recv = receiver_mapped(&prefix);
                 let pty = param_ty(&recv);
                 let oty = owned_ty(&recv);
                 sig_params.push(quote!(this: #pty));
@@ -432,7 +472,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                 call_args.push(quote!(#b));
                 arg_base = 1;
             }
-            Kind::StaticMethod | Kind::StaticGetter => {
+            Kind::StaticMethod | Kind::StaticGetter | Kind::Function => {
                 // positional params start at args[0]
             }
         }
@@ -493,21 +533,86 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
             }
         });
 
-        // Registration onto the ClassObj.
-        let native = quote!(::varn_types::Value::native(#wrap_ident::<#self_ty>, #sym));
-        let setup = match m.kind {
-            Kind::Method => quote!(cls.add_method(#sym, #native);),
-            Kind::Getter => quote!(cls.add_getter(#sym, #native);),
-            Kind::StaticMethod => quote!(cls.add_static(#sym, #native);),
-            Kind::StaticGetter => quote!(cls.add_static_getter(#sym, #native);),
-            Kind::Constructor => {
-                quote!(cls.add_method("constructor", ::varn_types::Value::native(#wrap_ident::<#self_ty>, "constructor"));)
-            }
-        };
-        setup_calls.push(setup);
+        // Registration: a function-module op is a standalone linker entry;
+        // class members are wired onto the ClassObj inside the builder.
+        if m.kind == Kind::Function {
+            let fn_entry_ident = format_ident!(
+                "__VARN_OP_{}_{}",
+                sanitize(&prefix).to_uppercase(),
+                sanitize(sym).to_uppercase()
+            );
+            fn_entries.push(quote! {
+                #[used]
+                #[cfg_attr(target_os = "windows", link_section = ".varn_ops$B")]
+                #[cfg_attr(target_os = "macos", link_section = "__DATA,varn_ops")]
+                #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), link_section = "varn_ops")]
+                static #fn_entry_ident: ::varn_types::NativeOpEntry = ::varn_types::NativeOpEntry {
+                    module_id: #module.as_ptr(),
+                    module_id_len: #module.len() as u32,
+                    namespace_path: #ns.as_ptr(),
+                    namespace_path_len: #ns.len() as u32,
+                    symbol_name: #sym.as_ptr(),
+                    symbol_name_len: #sym.len() as u32,
+                    func_ptr: #wrap_ident::<#self_ty> as *const u8,
+                    capability_mask: 0,
+                    entry_kind: 0x01,
+                    flags: 0,
+                    _reserved: [0; 7],
+                };
+            });
+        } else {
+            let native = quote!(::varn_types::Value::native(#wrap_ident::<#self_ty>, #sym));
+            let setup = match m.kind {
+                Kind::Method => quote!(cls.add_method(#sym, #native);),
+                Kind::Getter => quote!(cls.add_getter(#sym, #native);),
+                Kind::StaticMethod => quote!(cls.add_static(#sym, #native);),
+                Kind::StaticGetter => quote!(cls.add_static_getter(#sym, #native);),
+                Kind::Constructor => {
+                    quote!(cls.add_method("constructor", ::varn_types::Value::native(#wrap_ident::<#self_ty>, "constructor"));)
+                }
+                Kind::Function => unreachable!(),
+            };
+            setup_calls.push(setup);
+        }
     }
 
     let abs_lit = LitStr::new(&abs_path_str, proc_macro2::Span::call_site());
+
+    let registration = if let Some(class) = &input.class {
+        let builder_ident = format_ident!("__varn_build_{}", sanitize(class));
+        let entry_ident = format_ident!("__VARN_OP_{}", sanitize(class).to_uppercase());
+        quote! {
+            pub fn #builder_ident(
+                ctx: &mut dyn ::varn_types::NativeCtx,
+                _args: &[::varn_types::VmValue],
+            ) -> ::core::result::Result<::varn_types::VmValue, String> {
+                let cls = ::varn_types::value::ClassObj::new_native_rc(#class);
+                #(#setup_calls)*
+                ctx.register_class(#class, cls.clone());
+                Ok(ctx.alloc_class(cls))
+            }
+
+            #[used]
+            #[cfg_attr(target_os = "windows", link_section = ".varn_ops$B")]
+            #[cfg_attr(target_os = "macos", link_section = "__DATA,varn_ops")]
+            #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), link_section = "varn_ops")]
+            static #entry_ident: ::varn_types::NativeOpEntry = ::varn_types::NativeOpEntry {
+                module_id: #module.as_ptr(),
+                module_id_len: #module.len() as u32,
+                namespace_path: #ns.as_ptr(),
+                namespace_path_len: #ns.len() as u32,
+                symbol_name: #class.as_ptr(),
+                symbol_name_len: #class.len() as u32,
+                func_ptr: #builder_ident as *const u8,
+                capability_mask: 0,
+                entry_kind: 0x10,
+                flags: 0,
+                _reserved: [0; 7],
+            };
+        }
+    } else {
+        quote! { #(#fn_entries)* }
+    };
 
     let out = quote! {
         // Force a rebuild whenever the contract file changes.
@@ -525,33 +630,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
 
         #(#wrappers)*
 
-        pub fn #builder_ident(
-            ctx: &mut dyn ::varn_types::NativeCtx,
-            _args: &[::varn_types::VmValue],
-        ) -> ::core::result::Result<::varn_types::VmValue, String> {
-            let cls = ::varn_types::value::ClassObj::new_native_rc(#class);
-            #(#setup_calls)*
-            ctx.register_class(#class, cls.clone());
-            Ok(ctx.alloc_class(cls))
-        }
-
-        #[used]
-        #[cfg_attr(target_os = "windows", link_section = ".varn_ops$B")]
-        #[cfg_attr(target_os = "macos", link_section = "__DATA,varn_ops")]
-        #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), link_section = "varn_ops")]
-        static #entry_ident: ::varn_types::NativeOpEntry = ::varn_types::NativeOpEntry {
-            module_id: #module.as_ptr(),
-            module_id_len: #module.len() as u32,
-            namespace_path: #ns.as_ptr(),
-            namespace_path_len: #ns.len() as u32,
-            symbol_name: #class.as_ptr(),
-            symbol_name_len: #class.len() as u32,
-            func_ptr: #builder_ident as *const u8,
-            capability_mask: 0,
-            entry_kind: 0x10,
-            flags: 0,
-            _reserved: [0; 7],
-        };
+        #registration
     };
 
     out.into()
