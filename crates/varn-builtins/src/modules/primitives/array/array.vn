@@ -24,6 +24,9 @@ export declare class Array<T> {
     some(predicate: (item: T, index: int, array: T[]) => bool): bool;
     includes(search: T): bool;
     indexOf(search: T): int;
+    lastIndexOf(search: T): int;
+    toString(): str;
 
     static isArray(obj: dynamic): bool;
+    static from(value: dynamic): T[];
 }

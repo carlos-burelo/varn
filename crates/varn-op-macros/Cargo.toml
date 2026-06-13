@@ -10,3 +10,10 @@ proc-macro = true
 proc-macro2 = "1"
 quote = "1"
 syn = { version = "2", features = ["full"] }
+
+# Used by `varn_contract!` to parse `.vn` contract files into a typed AST at
+# macro-expansion time. The parser/lexer/core crates do not depend on this
+# crate, so there is no dependency cycle.
+varn-core = { path = "../varn-core" }
+varn-lexer = { path = "../varn-lexer" }
+varn-parser = { path = "../varn-parser" }

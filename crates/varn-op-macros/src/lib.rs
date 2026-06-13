@@ -1,3 +1,4 @@
+mod varn_contract;
 mod varn_module;
 
 use proc_macro::TokenStream;
@@ -5,6 +6,12 @@ use proc_macro::TokenStream;
 #[proc_macro_attribute]
 pub fn varn_module(attr: TokenStream, item: TokenStream) -> TokenStream {
     varn_module::expand(attr, item)
+}
+
+/// Contract-driven native bindings. See `varn_contract.rs`.
+#[proc_macro]
+pub fn varn_contract(input: TokenStream) -> TokenStream {
+    varn_contract::expand(input)
 }
 
 #[proc_macro_attribute]
