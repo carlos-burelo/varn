@@ -63,7 +63,7 @@ pub(crate) mod dispatch {
 
     #[varn_fn("assertSummary")]
     pub fn assert_summary(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        crate::modules::testing::dispatch::summary(ctx, args)
+        crate::modules::testing::summary(ctx, args)
     }
 
     #[varn_fn]
