@@ -41,8 +41,8 @@ pub enum VarLoc {
 }
 
 pub struct RegAlloc {
-    pub next: u8,
-    pub max: u8,
+    pub next: u16,
+    pub max: u16,
     pub used: [u64; 4],
     pub alloc_stack: Vec<u8>,
     pub next_vreg: u16,
@@ -67,7 +67,7 @@ impl RegAlloc {
         }
     }
 
-    pub fn alloc(&mut self) -> u8 {
+    pub fn alloc(&mut self) -> Option<u8> {
         let mut r = 0u8;
         'search: loop {
             let word = (r / 64) as usize;
@@ -76,7 +76,7 @@ impl RegAlloc {
                 break 'search;
             }
             if r == 255 {
-                panic!("register overflow: function uses more than 255 registers. Split the function into smaller parts.");
+                return None;
             }
             r += 1;
         }
@@ -86,11 +86,11 @@ impl RegAlloc {
         self.used[word] |= 1 << bit;
         self.alloc_stack.push(r);
 
-        self.next = self.next.max(r + 1);
+        self.next = self.next.max((r as u16) + 1);
         if self.next > self.max {
             self.max = self.next;
         }
-        r
+        Some(r)
     }
 
     pub fn free(&mut self) {
@@ -110,15 +110,15 @@ impl RegAlloc {
                     break;
                 }
             }
-            self.next = if found { highest + 1 } else { 0 };
+            self.next = if found { (highest as u16) + 1 } else { 0 };
         }
     }
 
-    pub fn save(&self) -> u8 {
-        self.alloc_stack.len() as u8
+    pub fn save(&self) -> u16 {
+        self.alloc_stack.len() as u16
     }
 
-    pub fn restore(&mut self, saved: u8) {
+    pub fn restore(&mut self, saved: u16) {
         while self.alloc_stack.len() > saved as usize {
             if let Some(r) = self.alloc_stack.pop() {
                 let word = (r / 64) as usize;
@@ -137,14 +137,14 @@ impl RegAlloc {
                 break;
             }
         }
-        self.next = if found { highest + 1 } else { 0 };
+        self.next = if found { (highest as u16) + 1 } else { 0 };
     }
 
     pub fn mark_used(&mut self, reg: u8) {
         let word = (reg / 64) as usize;
         let bit = reg % 64;
         self.used[word] |= 1 << bit;
-        self.next = self.next.max(reg + 1);
+        self.next = self.next.max((reg as u16) + 1);
         if self.next > self.max {
             self.max = self.next;
         }
@@ -201,7 +201,7 @@ pub struct Compiler<'a> {
     pub chunk: Chunk,
     pub scopes: Vec<FxHashMap<Rc<str>, VarLoc>>,
     pub regs: RegAlloc,
-    pub scope_start_regs: Vec<u8>,
+    pub scope_start_regs: Vec<u16>,
     pub ir_builder: Option<IrBuilder>,
     pub phys_to_vreg: FxHashMap<u8, RegId>,
     pub is_global: bool,
@@ -234,6 +234,7 @@ pub struct Compiler<'a> {
     pub parent_depth: usize,
     pub export_names: Vec<Rc<str>>,
     pub escape_analysis: Rc<crate::analysis::escape::EscapeAnalysis>,
+    pub error: Option<Rc<str>>,
 }
 
 impl<'a> Compiler<'a> {
@@ -282,6 +283,7 @@ impl<'a> Compiler<'a> {
             parent_depth: 0,
             export_names,
             escape_analysis,
+            error: None,
         }
     }
 
@@ -337,6 +339,7 @@ impl<'a> Compiler<'a> {
             parent_depth,
             export_names: Vec::new(),
             escape_analysis,
+            error: None,
         }
     }
 
@@ -452,16 +455,42 @@ impl<'a> Compiler<'a> {
         self.phys_to_vreg.get(&phys).copied()
     }
 
+    pub fn set_error(&mut self, err: impl Into<Rc<str>>) {
+        if self.error.is_none() {
+            self.error = Some(err.into());
+        }
+    }
+
     pub fn add_str(&mut self, s: &str) -> u16 {
-        self.chunk.add_str(s)
+        let idx = self.chunk.add_str(s);
+        if idx == 0xFFFF {
+            self.set_error("constant pool overflow: function or module uses more than 65535 constants.");
+        }
+        idx
     }
 
     pub fn add_const(&mut self, entry: PoolEntry) -> u16 {
-        self.chunk.add_constant(entry)
+        let idx = self.chunk.add_constant(entry);
+        if idx == 0xFFFF {
+            self.set_error("constant pool overflow: function or module uses more than 65535 constants.");
+        }
+        idx
     }
 
     pub fn add_int(&mut self, v: i64) -> u16 {
-        self.chunk.add_int(v)
+        let idx = self.chunk.add_int(v);
+        if idx == 0xFFFF {
+            self.set_error("constant pool overflow: function or module uses more than 65535 constants.");
+        }
+        idx
+    }
+
+    pub fn add_symbol(&mut self, s: varn_types::value::RuntimeSymbol) -> u16 {
+        let idx = self.chunk.add_symbol(s);
+        if idx == 0xFFFF {
+            self.set_error("constant pool overflow: function or module uses more than 65535 constants.");
+        }
+        idx
     }
 
     pub fn alloc_cache(&mut self) -> u16 {
@@ -471,7 +500,13 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn alloc_reg(&mut self) -> u8 {
-        self.regs.alloc()
+        match self.regs.alloc() {
+            Some(r) => r,
+            None => {
+                self.set_error("register overflow: function uses more than 255 registers. Split the function into smaller parts.");
+                0
+            }
+        }
     }
 
     pub fn free_reg(&mut self) {
@@ -726,7 +761,7 @@ impl<'a> Compiler<'a> {
         use super::stmt::compile_stmts;
         compile_stmts(self, &program.body);
         let line = self.line;
-        let ret_reg = self.regs.alloc();
+        let ret_reg = self.alloc_reg();
         self.chunk.emit_rr(OpCode::LoadNull, ret_reg, 0, line);
         self.chunk
             .emit1(OpCode::Return, Chunk::pack(0, ret_reg) as u16, line);

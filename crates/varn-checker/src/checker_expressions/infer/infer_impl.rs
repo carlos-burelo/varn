@@ -31,17 +31,49 @@ impl Checker {
             ExprKind::New {
                 callee, type_args, ..
             } => {
-                if let ExprKind::Identifier { name } = &callee.kind {
-                    if !type_args.is_empty() {
-                        let args: Vec<Type> = type_args
-                            .iter()
-                            .map(|a| self.resolve_type_node_cached(a, bind))
-                            .collect();
-                        return Type::generic(name.to_string(), args);
+                let callee_ty = self.infer_type(callee, bind);
+                match &callee_ty.0 {
+                    TypeKind::Named(name, origin) => {
+                        if !type_args.is_empty() {
+                            let args: Vec<Type> = type_args
+                                .iter()
+                                .map(|a| self.resolve_type_node_cached(a, bind))
+                                .collect();
+                            Type::generic_with_origin(
+                                name.to_string(),
+                                args,
+                                origin.as_ref().map(|s| s.to_string()),
+                            )
+                        } else {
+                            Type::named_with_origin(
+                                name.to_string(),
+                                origin.as_ref().map(|s| s.to_string()),
+                            )
+                        }
                     }
-                    return Type::named(name.to_string());
+                    TypeKind::Generic(name, args, origin) => {
+                        Type::generic_with_origin(
+                            name.to_string(),
+                            args.clone(),
+                            origin.as_ref().map(|s| s.to_string()),
+                        )
+                    }
+                    _ => {
+                        if let ExprKind::Identifier { name } = &callee.kind {
+                            if !type_args.is_empty() {
+                                let args: Vec<Type> = type_args
+                                    .iter()
+                                    .map(|a| self.resolve_type_node_cached(a, bind))
+                                    .collect();
+                                Type::generic(name.to_string(), args)
+                            } else {
+                                Type::named(name.to_string())
+                            }
+                        } else {
+                            Type::Dynamic
+                        }
+                    }
                 }
-                crate::binder::infer_expr_type(expr, Some(bind))
             }
             ExprKind::Call { .. } => self.infer_call_type(expr, bind),
             ExprKind::Conditional {
@@ -206,7 +238,15 @@ impl Checker {
                     }
                 }
                 if elem_tys.is_empty() {
-                    Type::array(Type::Dynamic)
+                    if let Some(expected) = &self.expected_type {
+                        if let TypeKind::Array(expected_inner) = &expected.non_nullified().0 {
+                            Type::array((**expected_inner).clone())
+                        } else {
+                            Type::array(Type::Dynamic)
+                        }
+                    } else {
+                        Type::array(Type::Dynamic)
+                    }
                 } else {
                     let first = elem_tys[0].clone();
                     if elem_tys.iter().all(|t| t == &first) {
@@ -259,7 +299,10 @@ impl Checker {
                 let res = self.infer_type(right, bind);
                 self.in_pipeline_rhs = saved_pipeline;
                 self.pipeline_value_type = saved_pipe_ty;
-                res
+                match &res.0 {
+                    TypeKind::Fn(ft) => *ft.return_type.clone(),
+                    _ => res,
+                }
             }
             _ => Type::Dynamic,
         }
@@ -277,6 +320,14 @@ impl Checker {
         match &obj_ty.0 {
             TypeKind::Array(inner) if matches!(prop_ty.0, TypeKind::Intrinsic(TypeTag::Int)) => {
                 (**inner).clone()
+            }
+            TypeKind::Intrinsic(TypeTag::Str) if matches!(prop_ty.0, TypeKind::Intrinsic(TypeTag::Int)) => {
+                Type::Str
+            }
+            TypeKind::Named(name, _)
+                if name.as_ref() == "str" && matches!(prop_ty.0, TypeKind::Intrinsic(TypeTag::Int)) =>
+            {
+                Type::Str
             }
             _ => Type::Dynamic,
         }

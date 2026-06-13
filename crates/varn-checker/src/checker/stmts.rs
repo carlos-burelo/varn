@@ -86,6 +86,16 @@ impl Checker {
             }
 
             StmtKind::Return { argument } => {
+                if !self.in_function {
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::ReturnOutsideFunction,
+                            "a 'return' statement can only be used within a function body",
+                        )
+                        .with_range(stmt.range),
+                    );
+                }
+
                 let actual = if let Some(arg) = argument {
                     let expected_ret = self.expected_return_type.clone();
                     self.with_expected(expected_ret, |c| c.check_expr(arg, bind));
@@ -106,6 +116,30 @@ impl Checker {
                             .with_range(stmt.range),
                         );
                     }
+                }
+            }
+
+            StmtKind::Break { .. } => {
+                if self.loop_depth == 0 && self.switch_depth == 0 {
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::InvalidBreakTarget,
+                            "a 'break' statement can only be used within an enclosing iteration or switch statement",
+                        )
+                        .with_range(stmt.range),
+                    );
+                }
+            }
+
+            StmtKind::Continue { .. } => {
+                if self.loop_depth == 0 {
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::InvalidContinueTarget,
+                            "a 'continue' statement can only be used within an enclosing iteration statement",
+                        )
+                        .with_range(stmt.range),
+                    );
                 }
             }
 
@@ -137,12 +171,14 @@ impl Checker {
 
             StmtKind::While { test, body } | StmtKind::DoWhile { test, body } => {
                 self.check_expr(test, bind);
+                self.loop_depth += 1;
                 if self.can_extract_narrowings(test) {
                     let narrow_true = self.extract_narrowings(test, bind, true);
                     self.with_narrowings(&narrow_true, |checker| checker.check_stmt(body, bind));
                 } else {
                     self.check_stmt(body, bind);
                 }
+                self.loop_depth -= 1;
             }
 
             StmtKind::For {
@@ -151,6 +187,7 @@ impl Checker {
                 update,
                 body,
             } => {
+                self.loop_depth += 1;
                 self.with_next_child_scope(bind, body.range.start.offset, |checker| {
                     if let Some(i) = init {
                         match i.as_ref() {
@@ -168,6 +205,7 @@ impl Checker {
                     }
                     checker.check_stmt(body, bind);
                 });
+                self.loop_depth -= 1;
             }
 
             StmtKind::ForOf {
@@ -178,27 +216,37 @@ impl Checker {
                 let elem_ty = match &right_ty.0 {
                     TypeKind::Array(inner) => (**inner).clone(),
                     TypeKind::Generic(name, args, _)
-                        if name.as_ref() == IntrinsicType::Array.as_str() && args.len() == 1 =>
+                        if (name.as_ref() == IntrinsicType::Array.as_str()
+                            || name.as_ref() == "Iterator"
+                            || name.as_ref() == "AsyncIterator"
+                            || name.as_ref() == "List"
+                            || name.as_ref() == "Set"
+                            || name.as_ref() == "Generator")
+                            && args.len() == 1 =>
                     {
                         args[0].clone()
                     }
                     TypeKind::Intrinsic(TypeTag::Range) => Type::Int,
                     _ => Type::Dynamic,
                 };
+                self.loop_depth += 1;
                 self.with_next_child_scope(bind, left.range().start.offset, |checker| {
                     checker.check_pattern(left, &elem_ty, bind);
                     checker.check_stmt(body, bind);
                 });
+                self.loop_depth -= 1;
             }
 
             StmtKind::ForIn {
                 left, right, body, ..
             } => {
                 self.check_expr(right, bind);
+                self.loop_depth += 1;
                 self.with_next_child_scope(bind, left.range().start.offset, |checker| {
                     checker.check_pattern(left, &Type::Str, bind);
                     checker.check_stmt(body, bind);
                 });
+                self.loop_depth -= 1;
             }
 
             StmtKind::Switch {
@@ -206,12 +254,26 @@ impl Checker {
                 cases,
             } => {
                 self.check_expr(discriminant, bind);
+                self.switch_depth += 1;
+                let mut seen_cases = rustc_hash::FxHashSet::default();
                 for case in cases {
                     if let Some(t) = &case.test {
                         self.check_expr(t, bind);
+                        if let Some(lit_val) = get_literal_value_key(t) {
+                            if !seen_cases.insert(lit_val.clone()) {
+                                self.emit(
+                                    Diagnostic::error(
+                                        ErrorCode::DuplicateCaseLabel,
+                                        format!("duplicate case label '{}'", lit_val),
+                                    )
+                                    .with_range(t.range),
+                                );
+                            }
+                        }
                     }
                     self.check_stmts(&case.body, bind);
                 }
+                self.switch_depth -= 1;
             }
 
             StmtKind::Try {
@@ -390,5 +452,17 @@ fn stmt_terminates(stmt: &Stmt) -> bool {
         StmtKind::Return { .. } | StmtKind::Throw { .. } => true,
         StmtKind::Block { stmts } => stmts.last().is_some_and(stmt_terminates),
         _ => false,
+    }
+}
+
+fn get_literal_value_key(expr: &varn_core::ast::Expr) -> Option<String> {
+    match &expr.kind {
+        varn_core::ast::ExprKind::IntLiteral { value, .. } => Some(value.to_string()),
+        varn_core::ast::ExprKind::FloatLiteral { value, .. } => Some(value.to_string()),
+        varn_core::ast::ExprKind::StrLiteral { value } => Some(format!("\"{}\"", value)),
+        varn_core::ast::ExprKind::BoolLiteral { value } => Some(value.to_string()),
+        varn_core::ast::ExprKind::CharLiteral { value } => Some(format!("'{}'", value)),
+        varn_core::ast::ExprKind::NullLiteral => Some("null".to_owned()),
+        _ => None,
     }
 }

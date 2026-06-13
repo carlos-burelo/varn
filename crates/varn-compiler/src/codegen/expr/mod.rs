@@ -65,18 +65,21 @@ pub fn compile_expr<'a>(c: &mut Compiler<'a>, expr: &Expr) -> u8 {
         }
         ExprKind::BigIntLiteral { raw } => {
             let s = raw.trim_end_matches('n').replace('_', "");
-            let num: i128 = if let Some(r) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+            let parsed = if let Some(r) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
                 i128::from_str_radix(r, 16)
-                    .unwrap_or_else(|_| panic!("bigint literal overflow: {raw}"))
             } else if let Some(r) = s.strip_prefix("0o").or_else(|| s.strip_prefix("0O")) {
                 i128::from_str_radix(r, 8)
-                    .unwrap_or_else(|_| panic!("bigint literal overflow: {raw}"))
             } else if let Some(r) = s.strip_prefix("0b").or_else(|| s.strip_prefix("0B")) {
                 i128::from_str_radix(r, 2)
-                    .unwrap_or_else(|_| panic!("bigint literal overflow: {raw}"))
             } else {
                 s.parse()
-                    .unwrap_or_else(|_| panic!("bigint literal overflow: {raw}"))
+            };
+            let num = match parsed {
+                Ok(n) => n,
+                Err(_) => {
+                    c.set_error(format!("bigint literal overflow: {raw}"));
+                    0i128
+                }
             };
             let idx = c.add_const(PoolEntry::Literal(Literal::BigInt(num)));
             let r = c.alloc_reg();

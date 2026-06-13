@@ -102,7 +102,12 @@ pub fn compile_function<'a>(
         .chunk
         .emit1(OpCode::Return, Chunk::pack(0, ret) as u16, line);
 
-    child.finish_function()
+    let has_error = child.error.clone();
+    let res = child.finish_function();
+    if let Some(err) = has_error {
+        parent.set_error(err);
+    }
+    res
 }
 
 pub fn emit_closure<'a>(

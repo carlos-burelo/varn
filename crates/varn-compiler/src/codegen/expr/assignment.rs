@@ -41,6 +41,67 @@ pub(super) fn compile_update<'a>(
                 cur
             }
         }
+        ExprKind::Member {
+            object,
+            property,
+            computed,
+            ..
+        } => {
+            let obj = compile_expr(c, object);
+            let cur = c.alloc_reg();
+            if *computed {
+                let key = compile_expr(c, property);
+                c.emit_rrr(OpCode::GetIndex, cur, obj, key);
+
+                let one = c.alloc_reg();
+                c.emit_load_int(one, 1);
+                let next = c.alloc_reg();
+                match op {
+                    UpdateOp::Increment => c.emit_rrr(OpCode::Add, next, cur, one),
+                    UpdateOp::Decrement => c.emit_rrr(OpCode::Sub, next, cur, one),
+                }
+                c.free_reg(); // free one
+
+                c.emit_rrr(OpCode::SetIndex, obj, key, next);
+                c.free_reg(); // free key
+                c.free_reg(); // free obj
+
+                if prefix {
+                    c.free_reg(); // free cur
+                    next
+                } else {
+                    c.free_reg(); // free next
+                    cur
+                }
+            } else {
+                let name = match &property.as_ref().kind {
+                    ExprKind::Identifier { name } => name.clone(),
+                    _ => return compile_expr(c, operand),
+                };
+                let idx = c.add_str(&name);
+                c.emit_property(OpCode::GetProperty, cur, obj, idx);
+
+                let one = c.alloc_reg();
+                c.emit_load_int(one, 1);
+                let next = c.alloc_reg();
+                match op {
+                    UpdateOp::Increment => c.emit_rrr(OpCode::Add, next, cur, one),
+                    UpdateOp::Decrement => c.emit_rrr(OpCode::Sub, next, cur, one),
+                }
+                c.free_reg(); // free one
+
+                c.emit_property(OpCode::SetProperty, obj, next, idx);
+                c.free_reg(); // free obj
+
+                if prefix {
+                    c.free_reg(); // free cur
+                    next
+                } else {
+                    c.free_reg(); // free next
+                    cur
+                }
+            }
+        }
         _ => compile_expr(c, operand),
     }
 }

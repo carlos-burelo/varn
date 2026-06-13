@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::Type;
+use crate::types::{Type, ClassMemberKind, TypeContext};
 use varn_core::ast::{ClassMember, Decl, ExprKind, ExtensionMember};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
@@ -74,7 +74,18 @@ impl Checker {
                     None
                 };
 
+                let saved_in_function = self.in_function;
+                let saved_loop_depth = self.loop_depth;
+                let saved_switch_depth = self.switch_depth;
+                self.in_function = true;
+                self.loop_depth = 0;
+                self.switch_depth = 0;
+
                 self.check_stmt(&f.body, bind);
+
+                self.in_function = saved_in_function;
+                self.loop_depth = saved_loop_depth;
+                self.switch_depth = saved_switch_depth;
 
                 if is_gen {
                     let yields = self.yielded_types.take().unwrap_or_default();
@@ -106,6 +117,46 @@ impl Checker {
                     self.current_scope = cls_scope;
                 }
 
+                let mut superclass_members = Vec::new();
+                let mut parent = c.id.as_ref().and_then(|cls_id| bind.class_parents.get(cls_id));
+                while let Some(parent_name) = parent {
+                    if let Some(m) = bind.get_class_members(parent_name, None) {
+                        superclass_members.extend(m);
+                    }
+                    parent = bind.class_parents.get(parent_name);
+                }
+
+                for member in &c.body {
+                    match member {
+                        ClassMember::Method { key, modifiers, range, .. } |
+                        ClassMember::Getter { key, modifiers, range, .. } |
+                        ClassMember::Setter { key, modifiers, range, .. } => {
+                            let is_override = modifiers.is_override;
+                            let exists_in_superclass = superclass_members.iter().any(|m| m.name.as_ref() == key.as_ref() && m.kind != ClassMemberKind::Constructor);
+                            if exists_in_superclass {
+                                if !is_override {
+                                    self.emit(
+                                        Diagnostic::error(
+                                            ErrorCode::MissingOverride,
+                                            format!("member '{}' overrides a member in the superclass but is missing the 'override' modifier", key),
+                                        )
+                                        .with_range(*range),
+                                    );
+                                }
+                            } else if is_override {
+                                self.emit(
+                                    Diagnostic::error(
+                                        ErrorCode::SpuriousOverride,
+                                        format!("member '{}' is marked as override but does not override any member in the superclass", key),
+                                    )
+                                    .with_range(*range),
+                                );
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
                 for member in &c.body {
                     match member {
                         ClassMember::Property {
@@ -135,6 +186,8 @@ impl Checker {
                             }
                         }
                         ClassMember::Constructor { body, .. } => {
+                            let saved_in_function = self.in_function;
+                            self.in_function = true;
                             let saved_scope = self.current_scope;
                             if let Some(ctor_scope) = self.next_child_scope(bind) {
                                 self.current_scope = ctor_scope;
@@ -142,6 +195,7 @@ impl Checker {
                             }
                             self.check_stmt(body, bind);
                             self.current_scope = saved_scope;
+                            self.in_function = saved_in_function;
                         }
                         ClassMember::Method {
                             return_type,
@@ -153,6 +207,8 @@ impl Checker {
                                 .as_ref()
                                 .map(|rt| self.resolve_type_node_cached(rt, bind));
 
+                            let saved_in_function = self.in_function;
+                            self.in_function = true;
                             let saved_scope = self.current_scope;
                             if let Some(m_scope) = self.next_child_scope(bind) {
                                 self.current_scope = m_scope;
@@ -162,6 +218,7 @@ impl Checker {
                             self.check_stmt(body, bind);
 
                             self.current_scope = saved_scope;
+                            self.in_function = saved_in_function;
                             self.expected_return_type = saved_expected;
                         }
                         ClassMember::Getter {
@@ -174,6 +231,8 @@ impl Checker {
                                 .as_ref()
                                 .map(|rt| self.resolve_type_node_cached(rt, bind));
 
+                            let saved_in_function = self.in_function;
+                            self.in_function = true;
                             let saved_scope = self.current_scope;
                             if let Some(g_scope) = self.next_child_scope(bind) {
                                 self.current_scope = g_scope;
@@ -183,11 +242,14 @@ impl Checker {
                             self.check_stmt(body, bind);
 
                             self.current_scope = saved_scope;
+                            self.in_function = saved_in_function;
                             self.expected_return_type = saved_expected;
                         }
                         ClassMember::Setter {
                             body: Some(body), ..
                         } => {
+                            let saved_in_function = self.in_function;
+                            self.in_function = true;
                             let saved_scope = self.current_scope;
                             if let Some(s_scope) = self.next_child_scope(bind) {
                                 self.current_scope = s_scope;
@@ -197,6 +259,7 @@ impl Checker {
                             self.check_stmt(body, bind);
 
                             self.current_scope = saved_scope;
+                            self.in_function = saved_in_function;
                         }
                         _ => {}
                     }
@@ -264,7 +327,12 @@ impl Checker {
                                     self.active_type_params.insert(Rc::from(tp.name.as_str()));
                                 }
 
+                                let saved_in_function = self.in_function;
+                                self.in_function = true;
+
                                 self.check_stmt(body_stmt, bind);
+
+                                self.in_function = saved_in_function;
 
                                 for tp in type_params {
                                     self.active_type_params.remove(tp.name.as_str());
@@ -292,14 +360,19 @@ impl Checker {
                                     .as_ref()
                                     .map(|rt| self.resolve_type_node_cached(rt, bind));
 
+                                let saved_in_function = self.in_function;
+                                self.in_function = true;
+
                                 self.check_stmt(body_stmt, bind);
+
+                                self.in_function = saved_in_function;
 
                                 self.expected_return_type = saved_expected;
                                 self.current_scope = saved_getter_scope;
                             }
                         }
                         ClassMember::Setter {
-                            param, body, range, ..
+                            key, param, body, range, ..
                         } => {
                             if let Some(body_stmt) = body {
                                 let saved_setter_scope = self.current_scope;
@@ -308,19 +381,37 @@ impl Checker {
                                     self.record_scope(range.start.offset);
                                 }
 
-                                let param_ty = param
+                                let mut param_ty = param
                                     .type_ann
                                     .as_ref()
                                     .map(|node| self.resolve_type_node_cached(node, bind))
                                     .unwrap_or(Type::Dynamic);
 
+                                if param_ty.is_dynamic() {
+                                    if let Some(ref class_name) = self.current_class {
+                                        if let Some(members) = bind.get_class_members(class_name, None) {
+                                            if let Some(m) = members.iter().find(|m| m.name.as_ref() == key.as_ref()) {
+                                                param_ty = m.ty.clone();
+                                            }
+                                        }
+                                    }
+                                }
+
                                 self.check_pattern(&param.pattern, &param_ty, bind);
+
+                                let saved_in_function = self.in_function;
+                                self.in_function = true;
+
                                 self.check_stmt(body_stmt, bind);
+
+                                self.in_function = saved_in_function;
 
                                 self.current_scope = saved_setter_scope;
                             }
                         }
                         ClassMember::Constructor { body, .. } => {
+                            let saved_in_function = self.in_function;
+                            self.in_function = true;
                             let saved_scope = self.current_scope;
                             if let Some(ctor_scope) = self.next_child_scope(bind) {
                                 self.current_scope = ctor_scope;
@@ -328,6 +419,7 @@ impl Checker {
                             }
                             self.check_stmt(body, bind);
                             self.current_scope = saved_scope;
+                            self.in_function = saved_in_function;
                         }
                         ClassMember::StaticBlock { body, range } => {
                             let saved_block_scope = self.current_scope;
@@ -380,6 +472,8 @@ impl Checker {
                                 .return_type
                                 .as_ref()
                                 .map(|rt| self.resolve_type_node_cached(rt, bind));
+                            let saved_in_function = self.in_function;
+                            self.in_function = true;
                             let saved_scope = self.current_scope;
                             if let Some(m_scope) = self.next_child_scope(bind) {
                                 self.current_scope = m_scope;
@@ -387,6 +481,7 @@ impl Checker {
                             }
                             self.check_stmt(&method.body, bind);
                             self.current_scope = saved_scope;
+                            self.in_function = saved_in_function;
                         }
                         ExtensionMember::Getter {
                             return_type, body, ..
@@ -394,6 +489,8 @@ impl Checker {
                             self.expected_return_type = return_type
                                 .as_ref()
                                 .map(|rt| self.resolve_type_node_cached(rt, bind));
+                            let saved_in_function = self.in_function;
+                            self.in_function = true;
                             let saved_scope = self.current_scope;
                             if let Some(m_scope) = self.next_child_scope(bind) {
                                 self.current_scope = m_scope;
@@ -401,9 +498,12 @@ impl Checker {
                             }
                             self.check_stmt(body, bind);
                             self.current_scope = saved_scope;
+                            self.in_function = saved_in_function;
                         }
                         ExtensionMember::Setter { body, .. } => {
                             self.expected_return_type = Some(Type::Void);
+                            let saved_in_function = self.in_function;
+                            self.in_function = true;
                             let saved_scope = self.current_scope;
                             if let Some(m_scope) = self.next_child_scope(bind) {
                                 self.current_scope = m_scope;
@@ -411,6 +511,7 @@ impl Checker {
                             }
                             self.check_stmt(body, bind);
                             self.current_scope = saved_scope;
+                            self.in_function = saved_in_function;
                         }
                     }
                     self.expected_return_type = saved_expected;

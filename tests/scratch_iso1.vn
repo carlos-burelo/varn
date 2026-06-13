@@ -1,0 +1,11 @@
+import { spawnIsolate } from "std:task";
+
+export async function w(port: dynamic) {
+    port.send(1);
+}
+
+if (!isIsolate) {
+    const p = await spawnIsolate(w, []);
+    const r: dynamic = await p.receive();
+    assert("iso1", r === 1);
+}

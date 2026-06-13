@@ -741,7 +741,9 @@ impl Chunk {
             return idx;
         }
         let idx = self.constants.len();
-        assert!(idx < u16::MAX as usize, "constant pool overflow");
+        if idx >= (u16::MAX - 1) as usize {
+            return 0xFFFF;
+        }
         let idx_u16 = idx as u16;
         self.constants.push(entry.clone());
         self.constants_map.insert(entry, idx_u16);

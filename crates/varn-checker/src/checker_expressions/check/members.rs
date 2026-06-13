@@ -67,11 +67,23 @@ impl Checker {
         };
 
         let obj_ty = self.infer_type(object, bind);
-        let check_ty = if optional {
-            obj_ty.non_nullified()
-        } else {
-            obj_ty.clone()
-        };
+        if !optional && obj_ty.is_nullable() {
+            self.emit(
+                Diagnostic::error(
+                    ErrorCode::PossibleNullDereference,
+                    format!(
+                        "object is possibly null: cannot access property '{}' on nullable type '{}'",
+                        prop_name, obj_ty
+                    ),
+                )
+                .with_suggestion(Suggestion::new(
+                    "use optional chaining '?.' to safely access properties on a nullable object",
+                ))
+                .with_range(*range),
+            );
+        }
+
+        let check_ty = obj_ty.non_nullified();
 
         if let Some((ty, maybe_sid)) = self.find_member_info(&check_ty, prop_name.as_ref(), bind) {
             if let Some(sid) = maybe_sid {
@@ -159,7 +171,7 @@ impl Checker {
                 });
                 if !is_authorized {
                     self.emit(
-                        Diagnostic::error(ErrorCode::PrivateMemberAccess, format!(
+                        Diagnostic::error(ErrorCode::ProtectedMemberAccess, format!(
                             "property '{prop_name}' is protected and only accessible within class '{class_name}' and its subclasses"
                         ))
                         .with_range(*range),
