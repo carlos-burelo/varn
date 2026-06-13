@@ -24,10 +24,13 @@ pub fn build_references(
 
     let mut locs: Vec<Location> = Vec::new();
 
-    for entry in workspace.iter() {
-        let file_uri = entry.key().clone();
-        let file_state = entry.value();
-        let url = match Url::parse(&file_uri) {
+    let entries: Vec<(String, std::sync::Arc<DocumentState>)> = workspace
+        .iter()
+        .map(|entry| (entry.key().clone(), std::sync::Arc::clone(entry.value())))
+        .collect();
+
+    for (file_uri, file_state) in &entries {
+        let url = match Url::parse(file_uri) {
             Ok(u) => u,
             Err(_) => continue,
         };
