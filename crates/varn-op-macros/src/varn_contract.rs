@@ -46,6 +46,8 @@ pub(crate) struct ContractInput {
     /// `Some` for a `declare class` contract; `None` for a function-module
     /// contract (top-level `declare function`s).
     class: Option<String>,
+    /// Optional superclass name for a class contract (`extends`).
+    extends: Option<String>,
     contract: String,
     self_ty: syn::Type,
     fns: Vec<syn::ImplItemFn>,
@@ -55,6 +57,7 @@ impl Parse for ContractInput {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let mut module = None;
         let mut class = None;
+        let mut extends = None;
         let mut contract = None;
 
         while !input.peek(Token![impl]) {
@@ -64,6 +67,7 @@ impl Parse for ContractInput {
             match key.to_string().as_str() {
                 "module" => module = Some(val.value()),
                 "class" => class = Some(val.value()),
+                "extends" => extends = Some(val.value()),
                 "contract" => contract = Some(val.value()),
                 other => {
                     return Err(syn::Error::new(
@@ -90,6 +94,7 @@ impl Parse for ContractInput {
         Ok(Self {
             module: module.ok_or_else(|| syn::Error::new(span, "missing `module:` key"))?,
             class,
+            extends,
             contract: contract.ok_or_else(|| syn::Error::new(span, "missing `contract:` key"))?,
             self_ty,
             fns,
@@ -278,14 +283,16 @@ fn collect_members(class_name: &str, decl: &ClassDecl) -> Vec<Member> {
                     ret: return_type.as_ref().map(classify).unwrap_or(Mapped::Dynamic),
                 });
             }
-            // `readonly P: T;` in a declare class is a getter-shaped property.
+            // A `readonly`/`static` property in a declare class is a native
+            // getter/static value. A plain instance property (e.g.
+            // `message: str` on Error) is just a data field — skip it.
             ClassMember::Property {
                 key,
                 type_ann,
                 init: None,
                 modifiers,
                 ..
-            } => {
+            } if modifiers.is_static || modifiers.is_readonly => {
                 let kind = if modifiers.is_static {
                     Kind::StaticGetter
                 } else {
@@ -598,12 +605,24 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     let registration = if let Some(class) = &input.class {
         let builder_ident = format_ident!("__varn_build_{}", sanitize(class));
         let entry_ident = format_ident!("__VARN_OP_{}", sanitize(class).to_uppercase());
+        let superclass_setup = if let Some(parent) = &input.extends {
+            quote! {
+                if let Some(parent) = ctx.get_class(#parent) {
+                    *cls.superclass.borrow_mut() = Some(parent.clone());
+                    *cls.root_shape.borrow_mut() =
+                        parent.root_shape.borrow().with_class(Some(cls.clone()));
+                }
+            }
+        } else {
+            quote! {}
+        };
         quote! {
             pub fn #builder_ident(
                 ctx: &mut dyn ::varn_types::NativeCtx,
                 _args: &[::varn_types::VmValue],
             ) -> ::core::result::Result<::varn_types::VmValue, String> {
                 let cls = ::varn_types::value::ClassObj::new_native_rc(#class);
+                #superclass_setup
                 #(#setup_calls)*
                 ctx.register_class(#class, cls.clone());
                 Ok(ctx.alloc_class(cls))
