@@ -1,5 +1,9 @@
-use varn_op_macros::varn_module;
+use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, Value, VmValue};
+
+/// Native implementation backing the `runtime:time` contract
+/// (`src/modules/std/time/runtime/time_runtime.vn`).
+pub struct TimeRuntime;
 
 fn parse_iso_duration(s: &str) -> i64 {
     let s = s.strip_prefix('P').unwrap_or(s);
@@ -47,91 +51,57 @@ fn set_int(ctx: &mut dyn NativeCtx, obj: VmValue, key: &str, val: i64) {
     ctx.set_field(obj, key, nv);
 }
 
-#[varn_module("runtime:time")]
-pub(crate) mod dispatch {
-    use super::*;
+varn_contract! {
+    module: "runtime:time",
+    contract: "src/modules/std/time/runtime/time_runtime.vn",
+    impl TimeRuntime {
+        fn timeNowMs(_ctx: &mut dyn NativeCtx) -> Result<i64, String> {
+            Ok(std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as i64)
+                .unwrap_or(0))
+        }
+        fn timeParseIsoDuration(_ctx: &mut dyn NativeCtx, s: &str) -> Result<i64, String> {
+            Ok(parse_iso_duration(s))
+        }
+        fn timeMsToParts(ctx: &mut dyn NativeCtx, ms: i64) -> Result<VmValue, String> {
+            use chrono::{Datelike, TimeZone, Timelike, Utc};
+            let dt = Utc
+                .timestamp_millis_opt(ms)
+                .single()
+                .ok_or_else(|| "invalid timestamp".to_string())?;
+            let obj = ctx.alloc_object();
+            set_int(ctx, obj, "year", dt.year() as i64);
+            set_int(ctx, obj, "month", dt.month() as i64);
+            set_int(ctx, obj, "day", dt.day() as i64);
+            set_int(ctx, obj, "hour", dt.hour() as i64);
+            set_int(ctx, obj, "minute", dt.minute() as i64);
+            set_int(ctx, obj, "second", dt.second() as i64);
+            set_int(ctx, obj, "millisecond", ms.rem_euclid(1000));
+            Ok(obj)
+        }
+        fn timePartsToMs(ctx: &mut dyn NativeCtx, parts: VmValue) -> Result<i64, String> {
+            let get_int = |ctx: &mut dyn NativeCtx, key: &str| -> i64 {
+                ctx.get_field(parts, key)
+                    .and_then(|v| if let Value::Int(n) = ctx.extract(v) { Some(n) } else { None })
+                    .unwrap_or(0)
+            };
+            let year = get_int(ctx, "year") as i32;
+            let month = get_int(ctx, "month") as u32;
+            let day = get_int(ctx, "day") as u32;
+            let hour = get_int(ctx, "hour") as u32;
+            let minute = get_int(ctx, "minute") as u32;
+            let second = get_int(ctx, "second") as u32;
+            let millisecond = get_int(ctx, "millisecond") as u32;
 
-    #[varn_fn("timeNowMs", cap = "time.now")]
-    pub fn raw_now_ms(_ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, String> {
-        let ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_millis() as i64)
-            .unwrap_or(0);
-        Ok(VmValue::from_int(ms))
-    }
-
-    #[varn_fn("timeParseIsoDuration")]
-    pub fn raw_parse_iso_duration(
-        ctx: &mut dyn NativeCtx,
-        args: &[VmValue],
-    ) -> Result<VmValue, String> {
-        let s = args.get(0).map(|&v| ctx.str_repr(v)).unwrap_or_default();
-        let ms = parse_iso_duration(&s);
-        Ok(VmValue::from_int(ms))
-    }
-
-    #[varn_fn("timeMsToParts")]
-    pub fn raw_ms_to_parts(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        let ms = args
-            .first()
-            .and_then(|&v| {
-                if let Value::Int(n) = ctx.extract(v) {
-                    Some(n)
-                } else {
-                    None
-                }
-            })
-            .unwrap_or(0);
-
-        use chrono::{Datelike, TimeZone, Timelike, Utc};
-        let dt = Utc.timestamp_millis_opt(ms).unwrap();
-
-        let obj = ctx.alloc_object();
-        set_int(ctx, obj, "year", dt.year() as i64);
-        set_int(ctx, obj, "month", dt.month() as i64);
-        set_int(ctx, obj, "day", dt.day() as i64);
-        set_int(ctx, obj, "hour", dt.hour() as i64);
-        set_int(ctx, obj, "minute", dt.minute() as i64);
-        set_int(ctx, obj, "second", dt.second() as i64);
-        set_int(ctx, obj, "millisecond", (ms % 1000) as i64);
-        Ok(obj)
-    }
-
-    #[varn_fn("timePartsToMs")]
-    pub fn raw_parts_to_ms(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-        let obj = args
-            .first()
-            .copied()
-            .ok_or("timePartsToMs: expected parts object")?;
-
-        let get_int = |key: &str| -> i64 {
-            ctx.get_field(obj, key)
-                .and_then(|v| {
-                    if let Value::Int(n) = ctx.extract(v) {
-                        Some(n)
-                    } else {
-                        None
-                    }
-                })
-                .unwrap_or(0)
-        };
-
-        let year = get_int("year") as i32;
-        let month = get_int("month") as u32;
-        let day = get_int("day") as u32;
-        let hour = get_int("hour") as u32;
-        let minute = get_int("minute") as u32;
-        let second = get_int("second") as u32;
-        let millisecond = get_int("millisecond") as u32;
-
-        use chrono::{TimeZone, Timelike, Utc};
-        let dt = Utc
-            .with_ymd_and_hms(year, month, day, hour, minute, second)
-            .single()
-            .ok_or_else(|| "Invalid date parts".to_string())?
-            .with_nanosecond(millisecond * 1_000_000)
-            .ok_or_else(|| "Invalid millisecond".to_string())?;
-
-        Ok(VmValue::from_int(dt.timestamp_millis()))
+            use chrono::{TimeZone, Timelike, Utc};
+            let dt = Utc
+                .with_ymd_and_hms(year, month, day, hour, minute, second)
+                .single()
+                .ok_or_else(|| "Invalid date parts".to_string())?
+                .with_nanosecond(millisecond * 1_000_000)
+                .ok_or_else(|| "Invalid millisecond".to_string())?;
+            Ok(dt.timestamp_millis())
+        }
     }
 }
