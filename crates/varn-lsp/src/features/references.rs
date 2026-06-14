@@ -15,12 +15,9 @@ pub fn build_references(
             && (t.kind == varn_core::TokenKind::Identifier || t.kind.can_be_identifier())
     })?;
 
-    let target_id: SymbolId = state
-        .db
-        .expr_types
-        .get(&token.offset)
-        .and_then(|info| info.symbol_id)?;
+    let target_id: SymbolId = state.resolve_symbol_id_at_offset(token.offset)?;
     let target_key = symbol_global_key_for_id(state, target_id)?;
+    let target_name = token.lexeme.as_str();
 
     let mut locs: Vec<Location> = Vec::new();
 
@@ -34,8 +31,18 @@ pub fn build_references(
             Ok(u) => u,
             Err(_) => continue,
         };
+        let mut candidate_names = std::collections::HashSet::new();
+        candidate_names.insert(target_name.to_owned());
+        for sym in &file_state.symbols {
+            if sym.global_key == target_key {
+                candidate_names.insert(sym.name.clone());
+            }
+        }
         for t in &file_state.tokens {
             if !(t.kind == varn_core::TokenKind::Identifier || t.kind.can_be_identifier()) {
+                continue;
+            }
+            if !candidate_names.contains(&t.lexeme) {
                 continue;
             }
             if token_global_key(file_state, t.offset).as_deref() != Some(target_key.as_str()) {
@@ -65,27 +72,9 @@ pub fn build_references(
 }
 
 fn symbol_global_key_for_id(state: &DocumentState, id: SymbolId) -> Option<String> {
-    if id >= state.db.arena.len() {
-        return None;
-    }
-    let sym = state.db.arena.get(id);
-    let name = sym.name.as_ref();
-    let kind = sym.kind;
-    let origin = sym.origin_module.as_deref();
-    let original_name = sym.original_name.as_deref();
-
-    if let Some(origin_mod) = origin {
-        let canonical_name = original_name.unwrap_or(name);
-        return Some(format!("m:{origin_mod}#{kind:?}:{canonical_name}"));
-    }
-    Some(format!("u:{}#{kind:?}:{}", state.uri, id))
+    state.symbol_global_key_for_id(id)
 }
 
 fn token_global_key(state: &DocumentState, offset: u32) -> Option<String> {
-    let sid = state
-        .db
-        .expr_types
-        .get(&offset)
-        .and_then(|info| info.symbol_id)?;
-    symbol_global_key_for_id(state, sid)
+    state.token_global_key(offset)
 }

@@ -224,3 +224,73 @@ unsafe impl Send for DocumentState {}
 unsafe impl Sync for DocumentState {}
 
 pub type DocumentAnalysis = DocumentState;
+
+impl DocumentState {
+    pub fn resolve_symbol_id_at_offset(&self, offset: u32) -> Option<varn_checker::SymbolId> {
+        // 1. Try to look up in expr_types
+        if let Some(info) = self.db.expr_types.get(&offset) {
+            if let Some(sid) = info.symbol_id {
+                return Some(sid);
+            }
+        }
+        
+        // 2. Try to find a token at this offset
+        let token = self.tokens.iter().find(|t| t.offset == offset)?;
+        
+        // 3. Try to resolve via scope at the token's offset
+        if let Some((sid, _)) = self.db.resolve_at(&token.lexeme, token.offset) {
+            return Some(sid);
+        }
+
+        // 4. Try to find the symbol declaration by name and line (1-based)
+        if let Some(sid) = self.db.arena.find_id_by_name_and_line(&token.lexeme, token.line + 1) {
+            return Some(sid);
+        }
+
+        None
+    }
+
+    pub fn symbol_global_key_for_id(&self, id: varn_checker::SymbolId) -> Option<String> {
+        if id >= self.db.arena.len() {
+            return None;
+        }
+        let sym = self.db.arena.get(id);
+        let name = sym.name.as_ref();
+        let kind = sym.kind;
+        let origin = sym.origin_module.as_deref();
+        let original_name = sym.original_name.as_deref();
+
+        if let Some(origin_mod) = origin {
+            let canonical_name = original_name.unwrap_or(name);
+            let origin_uri = if origin_mod.starts_with("file://") || origin_mod.starts_with("std:") || origin_mod.starts_with("core:") || origin_mod.starts_with("runtime:") {
+                origin_mod.to_owned()
+            } else {
+                varn_modules::resolver::path_to_uri(origin_mod)
+            };
+            return Some(format!("m:{}#{kind:?}:{}", origin_uri, canonical_name));
+        }
+
+        let is_global = self.db.scopes.get(self.db.global_scope).bindings.values().any(|&sid| sid == id);
+        let norm_uri = if self.uri.starts_with("file://") || self.uri.starts_with("std:") || self.uri.starts_with("core:") || self.uri.starts_with("runtime:") {
+            self.uri.to_owned()
+        } else {
+            varn_modules::resolver::path_to_uri(&self.uri)
+        };
+
+        if is_global {
+            Some(format!("m:{}#{kind:?}:{}", norm_uri, name))
+        } else {
+            Some(format!("u:{}#{kind:?}:{}", norm_uri, id))
+        }
+    }
+
+    pub fn token_global_key(&self, offset: u32) -> Option<String> {
+        if let Some(token) = self.tokens.iter().find(|t| t.offset == offset) {
+            if let Some((parent_name, _, member)) = self.member_at_pos(token.line, token.col) {
+                return Some(format!("member:{}:{}", parent_name, member.name));
+            }
+        }
+        let sid = self.resolve_symbol_id_at_offset(offset)?;
+        self.symbol_global_key_for_id(sid)
+    }
+}

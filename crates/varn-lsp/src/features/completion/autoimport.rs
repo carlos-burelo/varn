@@ -93,7 +93,7 @@ fn import_insert_position(source: &str) -> Position {
 }
 
 fn is_stdlib_uri(uri: &str) -> bool {
-    varn_modules::resolver::is_varn_uri(uri)
+    varn_modules::resolver::is_varn_uri(uri) || uri.contains(crate::constants::STD_LIB_PATH_SEGMENT)
 }
 
 fn uri_to_specifier(from_uri: &str, target_uri: &str) -> String {

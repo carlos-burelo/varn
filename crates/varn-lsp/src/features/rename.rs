@@ -38,6 +38,7 @@ pub fn build_rename(
     let target_id: SymbolId = resolve_symbol_id(state, token.offset)?;
     let target_key = symbol_global_key_for_id(state, target_id)?;
 
+    let target_name = token.lexeme.as_str();
     let mut changes: HashMap<Url, Vec<TextEdit>> = HashMap::new();
 
     for entry in _workspace.iter() {
@@ -48,11 +49,22 @@ pub fn build_rename(
             Err(_) => continue,
         };
 
+        let mut candidate_names = std::collections::HashSet::new();
+        candidate_names.insert(target_name.to_owned());
+        for sym in &file_state.symbols {
+            if sym.global_key == target_key {
+                candidate_names.insert(sym.name.clone());
+            }
+        }
+
         let mut edits: Vec<TextEdit> = file_state
             .tokens
             .iter()
             .filter(|t| {
                 if !matches!(t.kind, TokenKind::Identifier) && !t.kind.can_be_identifier() {
+                    return false;
+                }
+                if !candidate_names.contains(&t.lexeme) {
                     return false;
                 }
                 token_global_key(file_state, t.offset).as_deref() == Some(target_key.as_str())
@@ -89,31 +101,13 @@ fn find_ident_at(state: &DocumentState, line: u32, col: u32) -> Option<&TokenRec
 }
 
 fn resolve_symbol_id(state: &DocumentState, offset: u32) -> Option<SymbolId> {
-    state
-        .db
-        .expr_types
-        .get(&offset)
-        .and_then(|info| info.symbol_id)
+    state.resolve_symbol_id_at_offset(offset)
 }
 
 fn symbol_global_key_for_id(state: &DocumentState, id: SymbolId) -> Option<String> {
-    if id >= state.db.arena.len() {
-        return None;
-    }
-    let sym = state.db.arena.get(id);
-    let name = sym.name.as_ref();
-    let kind = sym.kind;
-    let origin = sym.origin_module.as_deref();
-    let original_name = sym.original_name.as_deref();
-
-    if let Some(origin_mod) = origin {
-        let canonical_name = original_name.unwrap_or(name);
-        return Some(format!("m:{origin_mod}#{kind:?}:{canonical_name}"));
-    }
-    Some(format!("u:{}#{kind:?}:{}", state.uri, id))
+    state.symbol_global_key_for_id(id)
 }
 
 fn token_global_key(state: &DocumentState, offset: u32) -> Option<String> {
-    let sid = resolve_symbol_id(state, offset)?;
-    symbol_global_key_for_id(state, sid)
+    state.token_global_key(offset)
 }

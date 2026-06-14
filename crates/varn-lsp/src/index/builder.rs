@@ -118,13 +118,14 @@ fn member_kind_to_symbol_kind(kind: MemberKind) -> SymbolKind {
 fn resolve_specifier_to_uri(specifier: &str, doc_dir: Option<&std::path::Path>) -> Option<String> {
     if specifier.starts_with(STD_PREFIX) || specifier.starts_with(CORE_PREFIX) {
         let provider = varn_modules::provider::get()?;
+        if let Some(mod_path) = provider.source_path(specifier) {
+            if mod_path.is_file() {
+                let canonical = std::fs::canonicalize(&mod_path).ok()?;
+                return Some(path_to_uri(&canonical.to_string_lossy()));
+            }
+        }
         if provider.embedded_source(specifier).is_some() {
             return Some(varn_modules::resolver::to_varn_uri(specifier));
-        }
-        let mod_path = provider.source_path(specifier)?;
-        if mod_path.is_file() {
-            let canonical = std::fs::canonicalize(&mod_path).ok()?;
-            return Some(path_to_uri(&canonical.to_string_lossy()));
         }
         return None;
     }

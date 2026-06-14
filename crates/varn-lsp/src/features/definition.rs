@@ -28,7 +28,10 @@ pub fn build_goto_definition(
     // 2. Try to resolve via resolve_chain_at
     if let Some(chain) = state.resolve_chain_at(line, col) {
         match chain {
-            ChainResult::Member { member, .. } => {
+            ChainResult::Member { member, parent_name } => {
+                if let Some(loc) = resolve_member_location(index, &parent_name, &member.name) {
+                    return Some(GotoDefinitionResponse::Scalar(loc));
+                }
                 if member.line != u32::MAX {
                     if let Some(sid) = member.symbol_id {
                         if let Some(loc) = resolve_symbol_location(state, sid) {
@@ -43,7 +46,10 @@ pub fn build_goto_definition(
                     return Some(GotoDefinitionResponse::Scalar(Location::new(url, Range::new(pos, pos))));
                 }
             }
-            ChainResult::DynamicMember { member, .. } => {
+            ChainResult::DynamicMember { member, parent_name } => {
+                if let Some(loc) = resolve_member_location(index, &parent_name, &member.name) {
+                    return Some(GotoDefinitionResponse::Scalar(loc));
+                }
                 if member.line != u32::MAX {
                     if let Some(sid) = member.symbol_id {
                         if let Some(loc) = resolve_symbol_location(state, sid) {
@@ -123,13 +129,14 @@ fn resolve_origin_to_url(origin: &str) -> Option<Url> {
     }
     // Embedded standard library or core modules
     let provider = varn_modules::provider::get()?;
+    if let Some(mod_path) = provider.source_path(origin) {
+        if mod_path.is_file() {
+            let canonical = std::fs::canonicalize(&mod_path).ok()?;
+            return Url::from_file_path(canonical).ok();
+        }
+    }
     if provider.embedded_source(origin).is_some() {
         return Url::parse(&varn_modules::resolver::to_varn_uri(origin)).ok();
-    }
-    let mod_path = provider.source_path(origin)?;
-    if mod_path.is_file() {
-        let canonical = std::fs::canonicalize(&mod_path).ok()?;
-        return Url::from_file_path(canonical).ok();
     }
     None
 }
@@ -141,4 +148,24 @@ fn entry_location(uri: &str, line: u32, col: u32) -> Option<Location> {
         character: col,
     };
     Some(Location::new(url, Range::new(pos, pos)))
+}
+
+fn resolve_member_location(
+    index: Option<&ProjectIndex>,
+    parent_name: &str,
+    member_name: &str,
+) -> Option<Location> {
+    let idx = index?;
+    let entries = idx.definitions_of(member_name);
+    let prefix = format!("member:{parent_name}:{member_name}:");
+    let entry_opt = entries.iter().find(|(_, entry)| entry.global_key.starts_with(&prefix));
+    if let Some((uri, entry)) = entry_opt {
+        let url = Url::parse(uri).ok()?;
+        let pos = Position {
+            line: entry.line,
+            character: entry.col,
+        };
+        return Some(Location::new(url, Range::new(pos, pos)));
+    }
+    None
 }

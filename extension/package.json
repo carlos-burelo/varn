@@ -2,7 +2,7 @@
   "name": "varn-language",
   "displayName": "Varn Language Support",
   "description": "Syntax highlighting, diagnostics, hover, go-to-definition, completions, rename, run and debug for the Varn language.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "Varn",
   "license": "MIT",
   "repository": {
@@ -36,6 +36,34 @@
   ],
   "main": "./extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "varn-sidebar",
+          "title": "Varn",
+          "icon": "icons/varn-activity.svg"
+        }
+      ]
+    },
+    "views": {
+      "varn-sidebar": [
+        {
+          "id": "varn-status",
+          "name": "Status & Environment",
+          "contextualTitle": "Varn"
+        },
+        {
+          "id": "varn-actions",
+          "name": "Quick Actions",
+          "contextualTitle": "Varn"
+        },
+        {
+          "id": "varn-ast",
+          "name": "AST Explorer",
+          "contextualTitle": "Varn"
+        }
+      ]
+    },
     "languages": [
       {
         "id": "Varn",
@@ -209,6 +237,24 @@
         "icon": "$(terminal)"
       },
       {
+        "command": "Varn.checkFile",
+        "title": "Check File (Typecheck)",
+        "category": "Varn",
+        "icon": "$(checklist)"
+      },
+      {
+        "command": "Varn.buildFile",
+        "title": "Build File (Compile)",
+        "category": "Varn",
+        "icon": "$(package)"
+      },
+      {
+        "command": "Varn.showBytecode",
+        "title": "Show Bytecode",
+        "category": "Varn",
+        "icon": "$(file-binary)"
+      },
+      {
         "command": "Varn.showAst",
         "title": "Show AST",
         "category": "Varn",
@@ -220,20 +266,56 @@
         "category": "Varn"
       },
       {
-        "command": "Varn.disasmFile",
-        "title": "Show Bytecode Disassembly",
-        "category": "Varn",
-        "icon": "$(symbol-keyword)"
-      },
-      {
         "command": "Varn.benchFile",
         "title": "Benchmark File",
         "category": "Varn",
         "icon": "$(dashboard)"
       },
       {
+        "command": "Varn.runRepl",
+        "title": "Start Interactive REPL",
+        "category": "Varn",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "Varn.pkgInstall",
+        "title": "Pkg: Install Dependencies",
+        "category": "Varn",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "Varn.pkgUpdate",
+        "title": "Pkg: Update Dependencies",
+        "category": "Varn",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "Varn.pkgAdd",
+        "title": "Pkg: Add Dependency",
+        "category": "Varn",
+        "icon": "$(add)"
+      },
+      {
+        "command": "Varn.pkgRemove",
+        "title": "Pkg: Remove Dependency",
+        "category": "Varn",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "Varn.cacheClean",
+        "title": "Clean Cache",
+        "category": "Varn",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "Varn.initProject",
+        "title": "Init Project",
+        "category": "Varn",
+        "icon": "$(new-folder)"
+      },
+      {
         "command": "Varn.doctor",
-        "title": "Doctor (Check Runtime)",
+        "title": "Doctor (Check Setup)",
         "category": "Varn",
         "icon": "$(pulse)"
       },
@@ -253,6 +335,10 @@
         "command": "Varn.toggleBuildMode",
         "title": "Toggle Build Mode (Debug/Release)",
         "category": "Varn"
+      },
+      {
+        "command": "Varn.selectEditorRange",
+        "title": "Select Editor Range"
       }
     ],
     "keybindings": [
@@ -280,9 +366,19 @@
           "group": "navigation@2"
         },
         {
-          "command": "Varn.runWithPhases",
+          "command": "Varn.checkFile",
           "when": "resourceLangId == Varn",
           "group": "navigation@3"
+        },
+        {
+          "command": "Varn.buildFile",
+          "when": "resourceLangId == Varn",
+          "group": "navigation@4"
+        },
+        {
+          "command": "Varn.runWithPhases",
+          "when": "resourceLangId == Varn",
+          "group": "navigation@5"
         }
       ],
       "editor/context": [
@@ -297,19 +393,29 @@
           "group": "Varn@2"
         },
         {
-          "command": "Varn.showAst",
+          "command": "Varn.checkFile",
           "when": "resourceLangId == Varn",
           "group": "Varn@3"
         },
         {
-          "command": "Varn.disasmFile",
+          "command": "Varn.buildFile",
           "when": "resourceLangId == Varn",
           "group": "Varn@4"
         },
         {
-          "command": "Varn.doctor",
+          "command": "Varn.showBytecode",
           "when": "resourceLangId == Varn",
           "group": "Varn@5"
+        },
+        {
+          "command": "Varn.showAst",
+          "when": "resourceLangId == Varn",
+          "group": "Varn@6"
+        },
+        {
+          "command": "Varn.doctor",
+          "when": "resourceLangId == Varn",
+          "group": "Varn@7"
         }
       ],
       "explorer/context": [
@@ -324,19 +430,25 @@
           "group": "Varn@2"
         },
         {
-          "command": "Varn.benchFile",
+          "command": "Varn.checkFile",
           "when": "resourceExtname == .vn",
           "group": "Varn@3"
+        },
+        {
+          "command": "Varn.buildFile",
+          "when": "resourceExtname == .vn",
+          "group": "Varn@4"
+        },
+        {
+          "command": "Varn.benchFile",
+          "when": "resourceExtname == .vn",
+          "group": "Varn@5"
         }
       ],
       "commandPalette": [
         {
-          "command": "Varn.installRuntime",
-          "when": "true"
-        },
-        {
-          "command": "Varn.doctor",
-          "when": "true"
+          "command": "Varn.selectEditorRange",
+          "when": "false"
         }
       ]
     },

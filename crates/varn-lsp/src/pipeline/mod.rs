@@ -21,15 +21,29 @@ fn stable_global_key(
     symbol_id: Option<usize>,
     origin: Option<&str>,
     original_name: Option<&str>,
+    is_global: bool,
 ) -> String {
     if let Some(origin_mod) = origin {
         let canonical_name = original_name.unwrap_or(name);
-        return format!("m:{origin_mod}#{kind:?}:{canonical_name}");
+        let origin_uri = if origin_mod.starts_with("file://") || origin_mod.starts_with("std:") || origin_mod.starts_with("core:") || origin_mod.starts_with("runtime:") {
+            origin_mod.to_owned()
+        } else {
+            varn_modules::resolver::path_to_uri(origin_mod)
+        };
+        return format!("m:{}#{kind:?}:{}", origin_uri, canonical_name);
+    }
+    let norm_uri = if uri.starts_with("file://") || uri.starts_with("std:") || uri.starts_with("core:") || uri.starts_with("runtime:") {
+        uri.to_owned()
+    } else {
+        varn_modules::resolver::path_to_uri(uri)
+    };
+    if is_global {
+        return format!("m:{}#{kind:?}:{}", norm_uri, name);
     }
     if let Some(sid) = symbol_id {
-        return format!("u:{uri}#{kind:?}:{sid}");
+        return format!("u:{}#{kind:?}:{}", norm_uri, sid);
     }
-    format!("u:{uri}#{kind:?}:{name}")
+    format!("u:{}#{kind:?}:{}", norm_uri, name)
 }
 
 pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
@@ -203,6 +217,13 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
                 _ => sym.ty.clone(),
             };
             let symbol_id = Some(id);
+            let is_global = result
+                .bind
+                .scopes
+                .get(result.bind.global_scope)
+                .bindings
+                .values()
+                .any(|&sid| sid == id);
             let global_key = stable_global_key(
                 &uri,
                 sym.name.as_ref(),
@@ -210,6 +231,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
                 symbol_id,
                 sym.origin_module.as_deref(),
                 sym.original_name.as_deref().map(|s| s.as_ref()),
+                is_global,
             );
 
             SymbolRecord {
@@ -320,6 +342,8 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
             .collect(),
         extension_members,
     };
+
+    module_resolver::invalidate_module_cache();
 
     DocumentAnalysis {
         source,

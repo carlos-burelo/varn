@@ -9,6 +9,9 @@ let runStatusBar;
 /** @type {vscode.StatusBarItem | undefined} */
 let buildModeStatusBar;
 
+let currentLspState = "starting";
+let statusProvider = null;
+
 function initStatusBar(context) {
     lspStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 10);
     lspStatusBar.command = "Varn.restartServer";
@@ -33,6 +36,10 @@ function initStatusBar(context) {
  * @param {"starting"|"running"|"stopped"|"error"} state
  */
 function setLspStatus(state) {
+    currentLspState = state;
+    if (statusProvider) {
+        statusProvider.refresh();
+    }
     if (!lspStatusBar) return;
     switch (state) {
         case "starting":
@@ -59,6 +66,9 @@ function setLspStatus(state) {
 }
 
 function updateBuildModeStatusBar() {
+    if (statusProvider) {
+        statusProvider.refresh();
+    }
     if (!buildModeStatusBar) return;
     const mode = vscode.workspace.getConfiguration("Varn").get("buildMode", "debug");
     if (mode === "release") {
@@ -70,8 +80,18 @@ function updateBuildModeStatusBar() {
     }
 }
 
+function getLspStatus() {
+    return currentLspState;
+}
+
+function setStatusProvider(provider) {
+    statusProvider = provider;
+}
+
 module.exports = {
     initStatusBar,
     setLspStatus,
-    updateBuildModeStatusBar
+    updateBuildModeStatusBar,
+    getLspStatus,
+    setStatusProvider
 };

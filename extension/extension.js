@@ -4,20 +4,43 @@
 const vscode = require("vscode");
 const { State } = require("vscode-languageclient/node");
 const { resolveLspPath } = require("./src/binary");
-const { initStatusBar, setLspStatus } = require("./src/status");
+const { initStatusBar, setLspStatus, setStatusProvider } = require("./src/status");
 const { createClient, stopClient, getClient } = require("./src/client");
 const { VarnDebugAdapterFactory, VarnDebugConfigProvider } = require("./src/debug");
-const { 
-    runVarnFile, 
-    runWithDebugPhase, 
-    runDisasm, 
-    runBench, 
-    runWithPhases, 
-    runDoctor, 
-    runInstaller, 
-    toggleBuildMode, 
-    registerVarnCodeLensProvider 
-} = require("./src/commands");
+
+// View Providers
+const { VarnStatusProvider } = require("./src/views/status_view");
+const { VarnActionsProvider } = require("./src/views/actions_view");
+const { VarnAstProvider } = require("./src/views/ast_view");
+
+// Command Handlers
+const {
+    runVarnFile,
+    runCheck,
+    runBuild,
+    runBytecode,
+    runBench,
+    runWithPhases,
+    toggleBuildMode
+} = require("./src/commands/execution");
+
+const {
+    runPkgInstall,
+    runPkgUpdate,
+    runPkgAdd,
+    runPkgRemove
+} = require("./src/commands/packages");
+
+const {
+    runRepl,
+    runDoctor,
+    runCacheClean,
+    runInitProject,
+    runInstaller
+} = require("./src/commands/utilities");
+
+// CodeLens Provider
+const { registerVarnCodeLensProvider } = require("./src/providers/codelens");
 
 /**
  * @param {vscode.ExtensionContext} context
@@ -51,10 +74,34 @@ async function activate(context) {
         vscode.debug.registerDebugConfigurationProvider("Varn", new VarnDebugConfigProvider())
     );
 
-    // ── Commands ─────────────────────────────────────────────────────────────
+    // ── Native Tree Views ────────────────────────────────────────────────────
+    const statusProvider = new VarnStatusProvider(context);
+    setStatusProvider(statusProvider);
+    const actionsProvider = new VarnActionsProvider(context);
+    const astProvider = new VarnAstProvider(context);
+
+    context.subscriptions.push(
+        vscode.window.registerTreeDataProvider("varn-status", statusProvider),
+        vscode.window.registerTreeDataProvider("varn-actions", actionsProvider),
+        vscode.window.registerTreeDataProvider("varn-ast", astProvider)
+    );
+
+    // Sync AST Explorer with active editor changes
+    vscode.window.onDidChangeActiveTextEditor(() => astProvider.refresh(), null, context.subscriptions);
+    vscode.workspace.onDidSaveTextDocument((doc) => {
+        if (doc.fileName.endsWith(".vn")) {
+            astProvider.refresh();
+        }
+    }, null, context.subscriptions);
+
+    // Initial AST population
+    astProvider.refresh();
+
+    // ── Commands Registration ────────────────────────────────────────────────
     context.subscriptions.push(
         registerVarnCodeLensProvider(),
 
+        // LSP Operations
         vscode.commands.registerCommand("Varn.restartServer", async () => {
             await stopClient();
             if (!lspPath) return;
@@ -77,6 +124,7 @@ async function activate(context) {
             getClient()?.outputChannel.show();
         }),
 
+        // File Operations
         vscode.commands.registerCommand("Varn.runFile", (uri) => {
             runVarnFile(context, uri, { terminal: false });
         }),
@@ -85,36 +133,85 @@ async function activate(context) {
             runVarnFile(context, uri, { terminal: true });
         }),
 
+        vscode.commands.registerCommand("Varn.checkFile", (uri) => {
+            runCheck(context, uri);
+        }),
+
+        vscode.commands.registerCommand("Varn.buildFile", (uri) => {
+            runBuild(context, uri);
+        }),
+
+        vscode.commands.registerCommand("Varn.showBytecode", (uri) => {
+            runBytecode(context, uri);
+        }),
+
         vscode.commands.registerCommand("Varn.showAst", (uri) => {
+            // Re-use runWithPhases flow or run direct debug query
+            const { runWithDebugPhase } = require("./src/commands/execution");
             runWithDebugPhase(context, uri, ["ast"], "AST");
         }),
 
         vscode.commands.registerCommand("Varn.showTokens", (uri) => {
+            const { runWithDebugPhase } = require("./src/commands/execution");
             runWithDebugPhase(context, uri, ["tokens"], "Tokens");
-        }),
-
-        vscode.commands.registerCommand("Varn.disasmFile", (uri) => {
-            runDisasm(context, uri);
         }),
 
         vscode.commands.registerCommand("Varn.benchFile", (uri) => {
             runBench(context, uri);
         }),
 
+        vscode.commands.registerCommand("Varn.runWithPhases", (uri) => {
+            runWithPhases(context, uri);
+        }),
+
+        // Dependency Operations
+        vscode.commands.registerCommand("Varn.pkgInstall", () => {
+            runPkgInstall(context);
+        }),
+
+        vscode.commands.registerCommand("Varn.pkgUpdate", () => {
+            runPkgUpdate(context);
+        }),
+
+        vscode.commands.registerCommand("Varn.pkgAdd", () => {
+            runPkgAdd(context);
+        }),
+
+        vscode.commands.registerCommand("Varn.pkgRemove", () => {
+            runPkgRemove(context);
+        }),
+
+        // Utilities
+        vscode.commands.registerCommand("Varn.runRepl", () => {
+            runRepl(context);
+        }),
+
         vscode.commands.registerCommand("Varn.doctor", () => {
             runDoctor(context);
+        }),
+
+        vscode.commands.registerCommand("Varn.cacheClean", () => {
+            runCacheClean(context);
+        }),
+
+        vscode.commands.registerCommand("Varn.initProject", () => {
+            runInitProject(context);
         }),
 
         vscode.commands.registerCommand("Varn.installRuntime", () => {
             runInstaller(context);
         }),
 
-        vscode.commands.registerCommand("Varn.runWithPhases", (uri) => {
-            runWithPhases(context, uri);
-        }),
-
         vscode.commands.registerCommand("Varn.toggleBuildMode", () => {
             toggleBuildMode();
+        }),
+
+        vscode.commands.registerCommand("Varn.selectEditorRange", (line) => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) return;
+            const range = editor.document.lineAt(line).range;
+            editor.selection = new vscode.Selection(range.start, range.start);
+            editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
         }),
 
         { dispose: () => stopClient() }

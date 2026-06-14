@@ -16,7 +16,7 @@ function getBinaryCandidates(context, binName) {
     const candidates = [];
     const mode = vscode.workspace.getConfiguration("Varn").get("buildMode", "debug");
 
-    // 1. warp_HOME
+    // 1. VARN_HOME
     const homeBin = varnHomeBinPath(binName);
     if (homeBin) candidates.push(homeBin);
 
