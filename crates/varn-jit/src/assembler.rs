@@ -248,6 +248,125 @@ impl Assembler {
         self.emit_modrm(0b11, rhs as u8, lhs as u8);
     }
 
+    // --- SSE2 scalar-double (xmm registers addressed by raw index 0..=15) ---
+
+    /// `movq xmm, r64` — reinterpret a 64-bit GPR's bits as a double in xmm.
+    /// Encoding: `66 REX.W 0F 6E /r` (reg = xmm, rm = gpr).
+    pub fn movq_xmm_from_gpr(&mut self, xmm: u8, gpr: Reg) {
+        self.emit_byte(0x66);
+        self.emit_rex(true, xmm, 0, gpr as u8);
+        self.emit_byte(0x0F);
+        self.emit_byte(0x6E);
+        self.emit_modrm(0b11, xmm, gpr as u8);
+    }
+
+    /// `movq r64, xmm` — move a double's raw bits back into a GPR.
+    /// Encoding: `66 REX.W 0F 7E /r` (reg = xmm, rm = gpr).
+    pub fn movq_gpr_from_xmm(&mut self, gpr: Reg, xmm: u8) {
+        self.emit_byte(0x66);
+        self.emit_rex(true, xmm, 0, gpr as u8);
+        self.emit_byte(0x0F);
+        self.emit_byte(0x7E);
+        self.emit_modrm(0b11, xmm, gpr as u8);
+    }
+
+    /// `<op>sd dst, src` — scalar-double arithmetic, `F2 0F <opc> /r`.
+    fn emit_sse_sd(&mut self, opcode: u8, dst: u8, src: u8) {
+        self.emit_byte(0xF2);
+        self.emit_rex(false, dst, 0, src);
+        self.emit_byte(0x0F);
+        self.emit_byte(opcode);
+        self.emit_modrm(0b11, dst, src);
+    }
+
+    pub fn addsd(&mut self, dst: u8, src: u8) {
+        self.emit_sse_sd(0x58, dst, src);
+    }
+
+    pub fn subsd(&mut self, dst: u8, src: u8) {
+        self.emit_sse_sd(0x5C, dst, src);
+    }
+
+    pub fn mulsd(&mut self, dst: u8, src: u8) {
+        self.emit_sse_sd(0x59, dst, src);
+    }
+
+    pub fn divsd(&mut self, dst: u8, src: u8) {
+        self.emit_sse_sd(0x5E, dst, src);
+    }
+
+    pub fn sqrtsd(&mut self, dst: u8, src: u8) {
+        self.emit_sse_sd(0x51, dst, src);
+    }
+
+    /// `roundsd dst, src, mode` — SSE4.1 round scalar-double.
+    /// mode: 0=nearest, 1=floor(-inf), 2=ceil(+inf), 3=trunc. Bit 3 set =
+    /// suppress precision exception. Encoding: `66 0F 3A 0B /r ib`.
+    pub fn roundsd(&mut self, dst: u8, src: u8, mode: u8) {
+        self.emit_byte(0x66);
+        self.emit_rex(false, dst, 0, src);
+        self.emit_byte(0x0F);
+        self.emit_byte(0x3A);
+        self.emit_byte(0x0B);
+        self.emit_modrm(0b11, dst, src);
+        self.emit_byte(mode);
+    }
+
+    /// `ucomisd dst, src` — unordered compare scalar-double, `66 0F 2E /r`.
+    /// Sets PF=1 when either operand is NaN (operands unordered).
+    pub fn ucomisd(&mut self, dst: u8, src: u8) {
+        self.emit_byte(0x66);
+        self.emit_rex(false, dst, 0, src);
+        self.emit_byte(0x0F);
+        self.emit_byte(0x2E);
+        self.emit_modrm(0b11, dst, src);
+    }
+
+    /// `ud2` — guaranteed invalid opcode (`0F 0B`); raises SIGILL.
+    pub fn ud2(&mut self) {
+        self.emit_byte(0x0F);
+        self.emit_byte(0x0B);
+    }
+
+    /// Debug-only invariant guard for the float fast paths: traps (`ud2`) if
+    /// `val` holds an int-tagged NaN-box. `SlotKind::Float` is set *only* by
+    /// float-producing opcodes (see `varn_compiler::analysis::slot_kinds`), so
+    /// a Float slot can never hold an int — this catches any future regression
+    /// in that invariant during development. Emits nothing in release builds
+    /// (`debug_assertions` off), so the fast path stays branch-free. Clobbers
+    /// `Rcx`/`Rdx` and flags (only in debug builds).
+    pub fn emit_debug_assert_not_int(&mut self, val: Reg) {
+        if !cfg!(debug_assertions) {
+            return;
+        }
+        // is_int  ==  (val & (QNAN|MASK_TAG)) == (QNAN|TAG_INT)
+        //          == (val & 0x7FFF_0000_0000_0000) == 0x7FFC_0000_0000_0000
+        self.mov_reg_reg(Reg::Rcx, val);
+        self.mov_reg_imm64(Reg::Rdx, 0x7FFF_0000_0000_0000);
+        self.and_reg_reg(Reg::Rcx, Reg::Rdx);
+        self.mov_reg_imm64(Reg::Rdx, 0x7FFC_0000_0000_0000);
+        self.cmp_reg_reg(Reg::Rcx, Reg::Rdx);
+        let p = self.jmp_cond(Cond::NotEqual); // not int → ok, skip the trap
+        self.ud2();
+        let pos = self.current_offset();
+        let disp = (pos as i32 - (p as i32 + 4)) as u32;
+        self.patch_u32(p, disp);
+    }
+
+    /// If the scalar-double in `xmm` is NaN, overwrite `gpr` with the boxed
+    /// `null` bits (`0x7FF9…`), matching `VmValue::from_f64`'s NaN handling
+    /// (any NaN float result decodes to `null`). `gpr` must already hold the
+    /// raw result bits; it is left untouched for non-NaN results. Clobbers
+    /// flags only.
+    pub fn emit_nan_to_null(&mut self, gpr: Reg, xmm: u8) {
+        self.ucomisd(xmm, xmm); // PF=1 iff the result is NaN
+        let p = self.jmp_cond(Cond::NoParity); // not NaN → skip the fixup
+        self.mov_reg_imm64(gpr, 0x7FF9_0000_0000_0000);
+        let pos = self.current_offset();
+        let disp = (pos as i32 - (p as i32 + 4)) as u32;
+        self.patch_u32(p, disp);
+    }
+
     pub fn cmp_reg_imm32(&mut self, lhs: Reg, imm: i32) {
         self.emit_rex(true, 0, 0, lhs as u8);
         self.emit_byte(0x81);

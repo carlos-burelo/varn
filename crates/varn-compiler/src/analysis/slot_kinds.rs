@@ -2,6 +2,18 @@ use varn_core::OpCode;
 use varn_types::chunk::FunctionProto;
 use varn_types::register_meta::{RegisterMeta, SlotKind};
 
+// INVARIANT (load-bearing for the JIT float fast paths):
+// `SlotKind::Int` / `SlotKind::Float` are assigned *only* from the typed
+// arithmetic opcodes that provably produce that representation (e.g.
+// `AddFloat`/`SubFloat`/`MulFloat` → Float). Untyped writers (`LoadConst`,
+// `Move`, `Call`, `GetIndex`, …) leave the slot `Dynamic`. Because of this,
+// a `Float` slot can only hold a float result (or `null`, from the
+// NaN→null canonicalisation), never a raw int box — which is what lets the
+// JIT (`varn_jit::codegen::arith` / `::calls`) treat a Float operand's bits
+// directly as an IEEE-754 double without a runtime tag check. Do NOT widen
+// the set of opcodes that set `Int`/`Float` to any that can yield a
+// different representation without auditing those fast paths.
+
 pub fn infer(proto: &mut FunctionProto) {
     let n = proto.register_count as usize;
     if n == 0 {

@@ -1,6 +1,7 @@
 use crate::value::VmValue;
 
 use super::ctx::ExecCtx;
+use super::ctx_jit_values::jit_propagate_error;
 
 pub extern "C" fn jit_negate(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
     unsafe {
@@ -18,7 +19,7 @@ pub extern "C" fn jit_div(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue 
         let ctx_ref = &mut *ctx;
         match crate::exec::arith::div(a, b, &mut ctx_ref.heap) {
             Ok(v) => v,
-            Err(e) => panic!("Runtime error in JIT div: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -28,7 +29,7 @@ pub extern "C" fn jit_modulo(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmVal
         let ctx_ref = &mut *ctx;
         match crate::exec::arith::modulo(a, b, &mut ctx_ref.heap) {
             Ok(v) => v,
-            Err(e) => panic!("Runtime error in JIT mod: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -46,7 +47,7 @@ pub extern "C" fn jit_get_index(
         let args = &*args;
         match crate::exec::collections::get_index(args.obj, args.key, &mut ctx_ref.heap) {
             Ok(v) => v,
-            Err(e) => panic!("Runtime error in JIT get_index: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -57,7 +58,7 @@ pub extern "C" fn jit_set_index(ctx: *mut ExecCtx, args: *const varn_jit::JitSet
         let args = &*args;
         match crate::exec::collections::set_index(args.obj, args.key, args.val, &mut ctx_ref.heap) {
             Ok(()) => {}
-            Err(e) => panic!("Runtime error in JIT set_index: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -83,7 +84,7 @@ pub extern "C" fn jit_array_length(ctx: *mut ExecCtx, arr: VmValue) -> VmValue {
         let ctx_ref = &mut *ctx;
         match ctx_ref.exec_array_length(arr) {
             Ok(v) => v,
-            Err(e) => panic!("Runtime error in JIT array_length: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -93,7 +94,7 @@ pub extern "C" fn jit_array_push(ctx: *mut ExecCtx, arr: VmValue, val: VmValue) 
         let ctx_ref = &mut *ctx;
         match ctx_ref.exec_array_push(arr, val) {
             Ok(()) => {}
-            Err(e) => panic!("Runtime error in JIT array_push: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -103,7 +104,7 @@ pub extern "C" fn jit_array_pop(ctx: *mut ExecCtx, arr: VmValue) -> VmValue {
         let ctx_ref = &mut *ctx;
         match ctx_ref.exec_array_pop(arr) {
             Ok(v) => v,
-            Err(e) => panic!("Runtime error in JIT array_pop: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -113,7 +114,7 @@ pub extern "C" fn jit_array_extend(ctx: *mut ExecCtx, arr: VmValue, src: VmValue
         let ctx_ref = &mut *ctx;
         match ctx_ref.exec_array_extend(arr, src) {
             Ok(()) => {}
-            Err(e) => panic!("Runtime error in JIT array_extend: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -133,7 +134,7 @@ pub extern "C" fn jit_str_slice(ctx: *mut ExecCtx, s: VmValue, idx: VmValue) -> 
         let ctx_ref = &mut *ctx;
         match ctx_ref.exec_str_slice(s, idx) {
             Ok(v) => v,
-            Err(e) => panic!("Runtime error in JIT str_slice: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -143,7 +144,7 @@ pub extern "C" fn jit_str_length(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
         let ctx_ref = &mut *ctx;
         match ctx_ref.exec_str_length(v) {
             Ok(len) => len,
-            Err(e) => panic!("Runtime error in JIT str_length: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -423,9 +424,14 @@ pub struct JitClassMemberArgs {
     pub kind: u8,
 }
 
-pub extern "C" fn jit_assert_not_null(_ctx: *mut ExecCtx, val: VmValue) {
-    if val.is_null() {
-        panic!("Runtime error in JIT assert_not_null: value is null");
+pub extern "C" fn jit_assert_not_null(ctx: *mut ExecCtx, val: VmValue) {
+    // Reuse the interpreter's fallible check so the JIT raises the identical
+    // catchable error ("assertion failed: value is null") instead of panicking.
+    if let Err(e) = crate::exec::advanced::assert_not_null(val) {
+        unsafe {
+            let ctx_ref = &mut *ctx;
+            jit_propagate_error(ctx_ref, e);
+        }
     }
 }
 
@@ -443,7 +449,7 @@ pub extern "C" fn jit_get_enum_tag(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
         let ctx_ref = &mut *ctx;
         match crate::exec::advanced::get_enum_tag(val, &ctx_ref.heap) {
             Ok(tag_val) => tag_val,
-            Err(e) => panic!("Runtime error in JIT get_enum_tag: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -468,7 +474,7 @@ pub extern "C" fn jit_object_keys_stub(ctx: *mut ExecCtx, val: VmValue) -> VmVal
         let ctx_ref = &mut *ctx;
         match crate::exec::collections::object_keys(val, &mut ctx_ref.heap) {
             Ok(keys_val) => keys_val,
-            Err(e) => panic!("Runtime error in JIT object_keys: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -485,7 +491,7 @@ pub extern "C" fn jit_object_merge_stub(ctx: *mut ExecCtx, a: VmValue, b: VmValu
         let ctx_ref = &mut *ctx;
         match crate::exec::collections::object_merge(a, b, &mut ctx_ref.heap) {
             Ok(res) => res,
-            Err(e) => panic!("Runtime error in JIT object_merge: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -495,7 +501,7 @@ pub extern "C" fn jit_get_fixed_field(ctx: *mut ExecCtx, obj: VmValue, slot: usi
         let ctx_ref = &mut *ctx;
         match crate::exec::props::get_fixed_field(obj, slot, &mut ctx_ref.heap) {
             Ok(val) => val,
-            Err(e) => panic!("Runtime error in JIT get_fixed_field: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -504,7 +510,7 @@ pub extern "C" fn jit_set_fixed_field(ctx: *mut ExecCtx, obj: VmValue, slot: usi
     unsafe {
         let ctx_ref = &mut *ctx;
         if let Err(e) = crate::exec::props::set_fixed_field(obj, slot, val, &mut ctx_ref.heap) {
-            panic!("Runtime error in JIT set_fixed_field: {:?}", e);
+            jit_propagate_error(ctx_ref, e);
         }
     }
 }
@@ -538,7 +544,7 @@ pub extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) -> VmValue {
         let class_nv = ctx_ref.heap.intern(varn_types::Value::Class(cls));
         match crate::exec::class::op_get_super(class_nv, &name, this_val, &mut ctx_ref.heap) {
             Ok(v) => v,
-            Err(e) => panic!("Runtime error in JIT get_super: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -554,7 +560,7 @@ pub extern "C" fn jit_get_symbol(ctx: *mut ExecCtx, obj: VmValue, sym_idx: usize
             varn_types::Value::Symbol(s) => {
                 match crate::exec::advanced::get_symbol_property(obj, s, &mut ctx_ref.heap) {
                     Ok(v) => v,
-                    Err(e) => panic!("Runtime error in JIT get_symbol: {:?}", e),
+                    Err(e) => jit_propagate_error(ctx_ref, e),
                 }
             }
             _ => panic!("GetSymbol: non-symbol constant"),
@@ -571,11 +577,11 @@ pub extern "C" fn jit_bind_method(ctx: *mut ExecCtx, obj: VmValue, name_idx: usi
         let key = ctx_ref.heap.str_val(key_nv).expect("non-string const");
         let method = match crate::exec::props::get_property(obj, &key, &mut ctx_ref.heap) {
             Ok(m) => m,
-            Err(e) => panic!("Runtime error in JIT bind_method: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         };
         match crate::exec::advanced::bind_method(obj, method, &mut ctx_ref.heap) {
             Ok(v) => v,
-            Err(e) => panic!("Runtime error in JIT bind_method: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -610,7 +616,7 @@ pub extern "C" fn jit_declare_field(ctx: *mut ExecCtx, class_val: VmValue, name_
         let key_nv = closure_ref.constants[name_idx];
         let key = ctx_ref.heap.str_val(key_nv).expect("non-string const");
         if let Err(e) = crate::exec::class::op_declare_field(class_val, &key, &mut ctx_ref.heap) {
-            panic!("Runtime error in JIT declare_field: {:?}", e);
+            jit_propagate_error(ctx_ref, e);
         }
     }
 }
@@ -625,7 +631,7 @@ pub extern "C" fn jit_make_class(ctx: *mut ExecCtx, super_val: VmValue, name_idx
         let cls = crate::exec::class::op_class(&name, &mut ctx_ref.heap);
         if !super_val.is_null() {
             if let Err(e) = crate::exec::class::op_inherit(cls, super_val, &mut ctx_ref.heap) {
-                panic!("Runtime error in JIT make_class: {:?}", e);
+                jit_propagate_error(ctx_ref, e);
             }
         }
         cls
@@ -636,7 +642,7 @@ pub extern "C" fn jit_inherit(ctx: *mut ExecCtx, class_val: VmValue, super_val: 
     unsafe {
         let ctx_ref = &mut *ctx;
         if let Err(e) = crate::exec::class::op_inherit(class_val, super_val, &mut ctx_ref.heap) {
-            panic!("Runtime error in JIT inherit: {:?}", e);
+            jit_propagate_error(ctx_ref, e);
         }
     }
 }
@@ -660,7 +666,7 @@ pub extern "C" fn jit_class_member_op(ctx: *mut ExecCtx, args: *const std::ffi::
             _ => panic!("Unknown class member op kind: {}", args.kind),
         };
         if let Err(e) = res {
-            panic!("Runtime error in JIT class_member_op: {:?}", e);
+            jit_propagate_error(ctx_ref, e);
         }
     }
 }
@@ -695,7 +701,7 @@ pub extern "C" fn jit_build_object(ctx: *mut ExecCtx, ip_before: usize) -> VmVal
                 });
             let val = ctx_ref.stack[base + val_reg];
             if let Err(e) = crate::exec::props::set_property(obj_nv, &key, val, &mut ctx_ref.heap) {
-                panic!("Runtime error in JIT build_object: {:?}", e);
+                jit_propagate_error(ctx_ref, e);
             }
         }
         obj_nv
@@ -732,7 +738,7 @@ pub extern "C" fn jit_object_rest(ctx: *mut ExecCtx, ip_before: usize) -> VmValu
         let obj = ctx_ref.stack[base + src];
         match ctx_ref.exec_object_rest(obj, &skip_keys) {
             Ok(v) => v,
-            Err(e) => panic!("Runtime error in JIT object_rest: {:?}", e),
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
@@ -808,7 +814,7 @@ pub extern "C" fn jit_call_spread(ctx: *mut ExecCtx, args: *const std::ffi::c_vo
             }
             Ok(false) => {}
             Err(e) => {
-                panic!("Runtime error in JIT call_spread: {:?}", e);
+                jit_propagate_error(ctx_ref, e);
             }
         }
 
