@@ -1,0 +1,5 @@
+// runtime:test — low-level host testing operations.
+
+export declare function testAssert(label: str, condition: bool): void;
+export declare function testAssertEqual<T>(actual: T, expected: T, message?: str): void;
+export declare function testSummary(): void;

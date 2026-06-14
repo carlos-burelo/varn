@@ -24,6 +24,8 @@ dist/
 warp.lock
 test_*.vn
 tmp*.vn
+# ...but builtin module sources named test_*.vn are real, required by build.rs
+!crates/varn-builtins/src/modules/**/test_*.vn
 
 .agents/
 .claude/
