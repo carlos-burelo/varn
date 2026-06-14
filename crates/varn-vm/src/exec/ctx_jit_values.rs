@@ -398,7 +398,7 @@ pub extern "C" fn jit_call(ctx: *mut ExecCtx, args: *const varn_jit::JitCallArgs
                 
                 // stack layout: [callee, arg1, arg2, ...]; actual args start at +1
                 let result = if args.arg_count <= 1 {
-                    (f)(ctx_ref as &mut dyn varn_types::NativeCtx, &[])
+                    ctx_ref.invoke_native(f, &[])
                 } else {
                     let actual_count = args.arg_count - 1;
                     if actual_count <= 8 {
@@ -406,15 +406,12 @@ pub extern "C" fn jit_call(ctx: *mut ExecCtx, args: *const varn_jit::JitCallArgs
                         for i in 0..actual_count {
                             buf[i] = ctx_ref.stack[arg_base + 1 + i];
                         }
-                        (f)(
-                            ctx_ref as &mut dyn varn_types::NativeCtx,
-                            &buf[..actual_count],
-                        )
+                        ctx_ref.invoke_native(f, &buf[..actual_count])
                     } else {
                         let vargs: Vec<VmValue> = (1..=actual_count)
                             .map(|i| ctx_ref.stack[arg_base + i])
                             .collect();
-                        (f)(ctx_ref as &mut dyn varn_types::NativeCtx, &vargs)
+                        ctx_ref.invoke_native(f, &vargs)
                     }
                 };
                 let v = match result {

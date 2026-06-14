@@ -338,10 +338,7 @@ impl ExecCtx {
                     std::ptr::copy_nonoverlapping(src_ptr, dest_ptr, arg_count);
                 }
             }
-            (f)(
-                self as &mut dyn varn_types::NativeCtx,
-                &buf[..arg_count + 1],
-            )
+            self.invoke_native(f, &buf[..arg_count + 1])
         } else {
             let mut args = Vec::with_capacity(arg_count + 1);
             args.push(receiver);
@@ -353,7 +350,7 @@ impl ExecCtx {
                     args.set_len(arg_count + 1);
                 }
             }
-            (f)(self as &mut dyn varn_types::NativeCtx, &args)
+            self.invoke_native(f, &args)
         }
         .map_err(|e| RuntimeError::new(e))?;
         Ok(result)

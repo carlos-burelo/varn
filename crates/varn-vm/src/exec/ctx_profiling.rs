@@ -126,6 +126,29 @@ impl ExecCtx {
         }
     }
 
+    /// Invoke a native builtin, timing its wall-clock cost when profiling is on.
+    /// In normal `run` mode (no hotspot counters) this is just the bare call —
+    /// one predictable-not-taken branch, no `Instant::now()` overhead. Borrow
+    /// profile is identical to a direct `(f)(self, args)`, so it drops in at
+    /// every native-invocation site.
+    #[inline(always)]
+    pub fn invoke_native(
+        &mut self,
+        f: varn_types::NativeFn,
+        args: &[VmValue],
+    ) -> Result<VmValue, String> {
+        if self.hotspot_counters.is_none() {
+            return (f)(self as &mut dyn varn_types::NativeCtx, args);
+        }
+        let start = std::time::Instant::now();
+        let r = (f)(self as &mut dyn varn_types::NativeCtx, args);
+        let ns = start.elapsed().as_nanos() as u64;
+        if let Some(ref h) = self.hotspot_counters {
+            h.borrow_mut().total_native_ns += ns;
+        }
+        r
+    }
+
     #[inline(always)]
     pub fn record_hotspot_global(&self, idx: usize) {
         if let Some(ref h) = self.hotspot_counters {
