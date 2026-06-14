@@ -1,5 +1,5 @@
 use varn_core::OpCode;
-use varn_types::chunk::{FunctionProto, Literal, PoolEntry};
+use varn_types::chunk::FunctionProto;
 use varn_types::register_meta::{RegisterMeta, SlotKind};
 
 // INVARIANT (load-bearing for the JIT float fast paths):
@@ -40,21 +40,6 @@ pub fn infer(proto: &mut FunctionProto) {
             OpCode::LoadInt => {
                 set_if_dominant(&mut kinds, dst, SlotKind::Int);
                 ip += 1;
-            }
-            OpCode::LoadConst => {
-                // A float/int literal constant holds that exact representation,
-                // so the destination slot can carry the kind — this lets the JIT
-                // float fast paths fire on constant operands (e.g. `x * 10.0`),
-                // which would otherwise stay Dynamic and fall back to the helper.
-                let cidx = code[ip] as usize;
-                ip += 1;
-                if let Some(PoolEntry::Literal(lit)) = proto.chunk.constants.get(cidx) {
-                    match lit {
-                        Literal::Float(_) => set_if_dominant(&mut kinds, dst, SlotKind::Float),
-                        Literal::Int(_) => set_if_dominant(&mut kinds, dst, SlotKind::Int),
-                        _ => {}
-                    }
-                }
             }
             OpCode::LoadTrue | OpCode::LoadFalse => {
                 set_if_dominant(&mut kinds, dst, SlotKind::Bool);
