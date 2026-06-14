@@ -88,6 +88,15 @@ pub fn print_hotspots(h: &HotspotCounters) {
                 fmt_num(**count),
             ));
         }
+        // Total wall-time spent inside native builtins (self-time): the actual
+        // cost, vs the call counts above. Compare against the `execute` phase.
+        if h.total_native_ns > 0 {
+            terminal::log(format!(
+                "  {:<W_NAME$}  {:>W_COUNT$}",
+                "── total native time",
+                format!("{:.3} ms", h.total_native_ns as f64 / 1_000_000.0),
+            ));
+        }
     }
 
     // Globals

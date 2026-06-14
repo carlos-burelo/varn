@@ -185,6 +185,10 @@ pub struct HotspotCounters {
     pub fn_calls: FxHashMap<Rc<str>, CallEntry>,
     pub method_calls: FxHashMap<Rc<str>, CallEntry>,
     pub native_calls: FxHashMap<Rc<str>, u64>,
+    /// Cumulative wall-time (ns) spent inside native builtins — the actual cost,
+    /// which call counts alone don't reveal. Only populated in profiling mode
+    /// (hotspot counters enabled, i.e. `vn bench`).
+    pub total_native_ns: u64,
     pub global_accesses: FxHashMap<Rc<str>, u64>,
     pub alloc_types: FxHashMap<&'static str, u64>,
 }

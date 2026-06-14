@@ -57,12 +57,12 @@ impl ExecCtx {
                             let slice = unsafe {
                                 std::slice::from_raw_parts(buf.as_ptr().cast::<VmValue>(), n)
                             };
-                            (f)(self as &mut dyn varn_types::NativeCtx, slice)
+                            self.invoke_native(f, slice)
                         } else {
                             let varn_args: Vec<VmValue> = (0..arg_count)
                                 .map(|i| self.stack[base + arg_start + i])
                                 .collect();
-                            (f)(self as &mut dyn varn_types::NativeCtx, &varn_args)
+                            self.invoke_native(f, &varn_args)
                         }
                         .map_err(|e| crate::error::RuntimeError::new(e))?;
                         self.stack[base + dest] = result;
@@ -160,7 +160,7 @@ impl ExecCtx {
                             } else {
                                 &[]
                             };
-                            (f)(self as &mut dyn varn_types::NativeCtx, slice)
+                            self.invoke_native(f, slice)
                         } else {
                             let varn_args: Vec<VmValue> = (0..arg_count)
                                 .map(|i| self.stack[base + arg_start + i])
@@ -170,7 +170,7 @@ impl ExecCtx {
                             } else {
                                 &varn_args[..]
                             };
-                            (f)(self as &mut dyn varn_types::NativeCtx, slice)
+                            self.invoke_native(f, slice)
                         }
                         .map_err(|e| crate::error::RuntimeError::new(e))?;
                         self.stack[base + dest] = result;
