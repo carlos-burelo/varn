@@ -167,7 +167,7 @@ impl Checker {
                     if let Some(b) = ext_bind_opt {
                         Box::new(std::iter::once(b))
                     } else if origin.is_none() {
-                        Box::new(varn_modules::STD_MODULES.iter().filter_map(|spec| {
+                        Box::new(varn_modules::std_module_ids().into_iter().filter_map(|spec| {
                             crate::module_resolver::resolve_stdlib_module_bind_ref(spec)
                         }))
                     } else {
