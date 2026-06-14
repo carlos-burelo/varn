@@ -203,6 +203,7 @@ pub fn invalidate_module_cache() {
     RESOLVED_PATH_CACHE.with(|c| *c.borrow_mut() = None);
     PROGRAM_CACHE.with(|c| *c.borrow_mut() = None);
     REVERSE_DEPS.with(|r| r.borrow_mut().clear());
+    varn_core::clear_interner();
 }
 
 pub type ExportMap = FxHashMap<String, Symbol>;

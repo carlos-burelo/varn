@@ -51,3 +51,10 @@ pub fn intern_string(s: &str) -> Rc<str> {
         rc
     })
 }
+
+pub fn clear_interner() {
+    INTERNER.with(|interner| {
+        interner.borrow_mut().clear();
+    });
+}
+

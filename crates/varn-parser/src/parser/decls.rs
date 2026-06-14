@@ -33,7 +33,13 @@ pub(super) fn parse_var_decl_with_declare(
             s.advance();
             VarKind::Const
         }
-        _ => return Err("`var` is not supported; use `let` or `const`".to_owned()),
+        TokenKind::Var => {
+            let err_range = s.range();
+            s.push_error("`var` is not supported; use `let` or `const`".to_owned(), err_range);
+            s.advance();
+            VarKind::Let
+        }
+        _ => return Err("Expected `let` or `const`".to_owned()),
     };
 
     let dec_range = s.range();

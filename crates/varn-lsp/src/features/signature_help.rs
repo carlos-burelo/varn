@@ -52,6 +52,22 @@ pub fn build_signature_help(state: &DocumentState, line: u32, col: u32) -> Optio
         return Some(resolved);
     }
 
+    if let Some(chain) = state.resolve_chain_at(fn_tok.line, fn_tok.col) {
+        use crate::document::ChainResult;
+        let (params_str, ret_str) = match chain {
+            ChainResult::Symbol(sym) => {
+                split_arrow_type(&sym.type_str)?
+            }
+            ChainResult::Member { member, .. } => {
+                (member.params_str.clone(), member.type_str.clone())
+            }
+            ChainResult::DynamicMember { member, .. } => {
+                (member.params_str.clone(), member.type_str.clone())
+            }
+        };
+        return build_signature_response(&fn_tok.lexeme, &params_str, &ret_str, active_param);
+    }
+
     if fn_tok.kind != TokenKind::Identifier {
         return None;
     }

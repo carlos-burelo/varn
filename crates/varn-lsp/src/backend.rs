@@ -144,6 +144,45 @@ impl LanguageServer for Backend {
         self.client
             .log_message(MessageType::INFO, "Varn Language Server initialized")
             .await;
+
+        let workspace = Arc::clone(&self.workspace);
+        let client = self.client.clone();
+        tokio::task::spawn_blocking(move || {
+            let current_dir = match std::env::current_dir() {
+                Ok(d) => d,
+                Err(_) => return,
+            };
+            let rt = tokio::runtime::Handle::current();
+            let _ = rt.block_on(client.log_message(
+                MessageType::INFO,
+                format!("Indexing workspace: scanning {:?}", current_dir),
+            ));
+            let start = std::time::Instant::now();
+            let mut files = Vec::new();
+            walk_dir(&current_dir, &mut files);
+            let _ = rt.block_on(client.log_message(
+                MessageType::INFO,
+                format!("Indexing workspace: found {} files to index", files.len()),
+            ));
+            let total = files.len();
+            for (idx, path) in files.iter().enumerate() {
+                if let Ok(abs_path) = std::fs::canonicalize(&path) {
+                    if let Ok(uri) = Url::from_file_path(&abs_path) {
+                        if let Ok(source) = std::fs::read_to_string(&abs_path) {
+                            let _ = rt.block_on(client.log_message(
+                                MessageType::LOG,
+                                format!("[{}/{}] Indexing {}", idx + 1, total, abs_path.display()),
+                            ));
+                            workspace.update_file(uri.to_string(), source);
+                        }
+                    }
+                }
+            }
+            let _ = rt.block_on(client.log_message(
+                MessageType::INFO,
+                format!("Workspace indexed successfully in {:?}", start.elapsed()),
+            ));
+        });
     }
 
     async fn shutdown(&self) -> LspResult<()> {
@@ -185,6 +224,7 @@ impl LanguageServer for Backend {
             .workspace
             .get(&uri)
             .and_then(|a| build_hover(&a, pos.line, pos.character));
+        varn_checker::module_resolver::invalidate_module_cache();
         Ok(result)
     }
 
@@ -212,6 +252,7 @@ impl LanguageServer for Backend {
                 index.as_deref(),
             )
         };
+        varn_checker::module_resolver::invalidate_module_cache();
         if let Some(msg) = log {
             self.client.log_message(MessageType::LOG, msg).await;
         }
@@ -232,6 +273,7 @@ impl LanguageServer for Backend {
             .workspace
             .get(&uri)
             .and_then(|a| build_signature_help(&a, pos.line, pos.character));
+        varn_checker::module_resolver::invalidate_module_cache();
         Ok(result)
     }
 
@@ -250,6 +292,7 @@ impl LanguageServer for Backend {
         let result = state
             .as_deref()
             .and_then(|a| build_goto_definition(a, index.as_deref(), pos.line, pos.character));
+        varn_checker::module_resolver::invalidate_module_cache();
         Ok(result)
     }
 
@@ -260,6 +303,7 @@ impl LanguageServer for Backend {
             .workspace
             .get(&uri)
             .and_then(|a| build_references(&a, &self.workspace, pos.line, pos.character));
+        varn_checker::module_resolver::invalidate_module_cache();
         Ok(result)
     }
 
@@ -271,6 +315,7 @@ impl LanguageServer for Backend {
         let result = self.workspace.get(&uri).and_then(|a| {
             build_prepare_rename(&a, params.position.line, params.position.character)
         });
+        varn_checker::module_resolver::invalidate_module_cache();
         Ok(result)
     }
 
@@ -288,6 +333,7 @@ impl LanguageServer for Backend {
                 params.new_name,
             )
         });
+        varn_checker::module_resolver::invalidate_module_cache();
         Ok(result)
     }
 
@@ -297,6 +343,7 @@ impl LanguageServer for Backend {
     ) -> LspResult<Option<DocumentSymbolResponse>> {
         let uri = params.text_document.uri.to_string();
         let result = self.workspace.get(&uri).map(|a| build_document_symbols(&a));
+        varn_checker::module_resolver::invalidate_module_cache();
         Ok(result)
     }
 
@@ -326,6 +373,7 @@ impl LanguageServer for Backend {
                 data: tokens,
             }
         });
+        varn_checker::module_resolver::invalidate_module_cache();
         Ok(result.map(SemanticTokensResult::Tokens))
     }
 
@@ -343,6 +391,7 @@ impl LanguageServer for Backend {
             .workspace
             .get(&uri)
             .map(|a| build_document_highlights(&a, pos.line, pos.character));
+        varn_checker::module_resolver::invalidate_module_cache();
         Ok(result)
     }
 
@@ -352,6 +401,7 @@ impl LanguageServer for Backend {
     ) -> LspResult<Option<Vec<FoldingRange>>> {
         let uri = params.text_document.uri.to_string();
         let result = self.workspace.get(&uri).map(|a| build_folding_ranges(&a));
+        varn_checker::module_resolver::invalidate_module_cache();
         Ok(result)
     }
 
@@ -366,6 +416,7 @@ impl LanguageServer for Backend {
             .ok()
             .map(|idx| build_workspace_symbols(&idx, &params.query))
             .unwrap_or_default();
+        varn_checker::module_resolver::invalidate_module_cache();
         Ok(if results.is_empty() {
             None
         } else {
@@ -376,6 +427,33 @@ impl LanguageServer for Backend {
     async fn inlay_hint(&self, params: InlayHintParams) -> LspResult<Option<Vec<InlayHint>>> {
         let uri = params.text_document.uri.to_string();
         let result = self.workspace.get(&uri).map(|a| build_inlay_hints(&a));
+        varn_checker::module_resolver::invalidate_module_cache();
         Ok(result)
+    }
+}
+
+fn walk_dir(dir: &std::path::Path, files: &mut Vec<std::path::PathBuf>) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            if let Ok(ft) = entry.file_type() {
+                if ft.is_symlink() {
+                    continue;
+                }
+                let path = entry.path();
+                if ft.is_dir() {
+                    let name = path.file_name().and_then(|n| n.to_str());
+                    if let Some(n) = name {
+                        if n == ".git" || n == "target" || n == ".vn" || n == "node_modules" || n == ".vscode" || n == ".claude" {
+                            continue;
+                        }
+                    }
+                    walk_dir(&path, files);
+                } else if ft.is_file() {
+                    if path.extension().and_then(|e| e.to_str()) == Some("vn") {
+                        files.push(path);
+                    }
+                }
+            }
+        }
     }
 }

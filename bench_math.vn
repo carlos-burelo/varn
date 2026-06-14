@@ -1,8 +1,8 @@
 import { Math } from 'std:math'
 
 function benchMath(iterations: int): float {
-    let mut r: float = 1.0
-    let mut i = 0
+    let r: float = 1.0
+    let i = 0
     while (i < iterations) {
         r = Math.abs(r - i as float)
         r = Math.sqrt(r + 1.0)
