@@ -681,7 +681,60 @@ fn emit_intrinsic(ctx: &mut CodegenCtx, first_reg: usize) {
     let arg_count = (w1 & 0xFF) as usize;
 
     let dest = first_reg;
-    // dest is also the start of the args slice in the stack (object = arg[0])
+    // dest is also the start of the args slice in the stack (object = arg[0]);
+    // the real numeric argument is args[1] == register slot `dest + 1`.
+
+    // --- Inline fast path: Math.abs / sqrt / floor on a statically-float arg.
+    // Skips the whole flush_all + helper-call + reload_all sequence: the value
+    // moves into a scalar register / xmm, the SSE op runs, the result moves
+    // back. Guarded on SlotKind::Float (same trust model as the float-arith
+    // path) so the runtime value is a raw IEEE-754 double, matching the
+    // intrinsic's `from_f64` result branch. abs/floor of a finite/inf input
+    // never yield NaN; sqrt(negative) can, so it canonicalises to `null` via
+    // `emit_nan_to_null` to match the helper's `from_f64`.
+    let value_reg = dest + 1;
+    if arg_count == 2
+        && value_reg < ctx.proto.register_meta.len()
+        && ctx.proto.register_meta[value_reg].kind
+            == varn_types::register_meta::SlotKind::Float
+    {
+        // Math domain (high nibble 0): Abs=0x00, Sqrt=0x01, Floor=0x02.
+        match wire_byte as u8 {
+            0x00 => {
+                // fabs = clear the sign bit of the raw double bits. Safe for
+                // every Float-slot value: finite/inf → finite/inf, and the only
+                // non-double a Float slot can hold (null, a NaN bit-pattern) has
+                // its sign bit already clear, so it stays null.
+                emit_load(asm, Reg::Rax, value_reg, regmap);
+                asm.emit_debug_assert_not_int(Reg::Rax); // invariant: Float slot ≠ int
+                asm.mov_reg_imm64(Reg::Rcx, 0x7FFF_FFFF_FFFF_FFFF);
+                asm.and_reg_reg(Reg::Rax, Reg::Rcx);
+                emit_store(asm, Reg::Rax, dest, regmap);
+                return;
+            }
+            0x01 => {
+                emit_load(asm, Reg::Rax, value_reg, regmap);
+                asm.emit_debug_assert_not_int(Reg::Rax); // invariant: Float slot ≠ int
+                asm.movq_xmm_from_gpr(0, Reg::Rax);
+                asm.sqrtsd(0, 0);
+                asm.movq_gpr_from_xmm(Reg::Rax, 0);
+                asm.emit_nan_to_null(Reg::Rax, 0); // sqrt(neg) → null, per from_f64
+                emit_store(asm, Reg::Rax, dest, regmap);
+                return;
+            }
+            0x02 => {
+                emit_load(asm, Reg::Rax, value_reg, regmap);
+                asm.emit_debug_assert_not_int(Reg::Rax); // invariant: Float slot ≠ int
+                asm.movq_xmm_from_gpr(0, Reg::Rax);
+                asm.roundsd(0, 0, 0x09); // floor (-inf) + suppress precision exc.
+                asm.movq_gpr_from_xmm(Reg::Rax, 0);
+                asm.emit_nan_to_null(Reg::Rax, 0); // floor(NaN) → null, per from_f64
+                emit_store(asm, Reg::Rax, dest, regmap);
+                return;
+            }
+            _ => {}
+        }
+    }
 
     // Flush all live registers so the helper can read args from the stack
     emit_flush_all(asm, regmap);

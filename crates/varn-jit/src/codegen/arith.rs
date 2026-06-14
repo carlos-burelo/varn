@@ -11,6 +11,10 @@ fn slot_is_int(meta: &[varn_types::register_meta::RegisterMeta], reg: usize) -> 
     meta.get(reg).map_or(false, |m| m.kind == SlotKind::Int)
 }
 
+fn slot_is_float(meta: &[varn_types::register_meta::RegisterMeta], reg: usize) -> bool {
+    meta.get(reg).map_or(false, |m| m.kind == SlotKind::Float)
+}
+
 pub(crate) fn emit_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) -> Result<(), String> {
     match op {
         OpCode::Add
@@ -49,6 +53,43 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     ctx.ip += 1;
     let src1 = (w1 >> 8) as usize;
     let src2 = (w1 & 0xFF) as usize;
+
+    // --- Float fast path: inline SSE2 scalar-double, no FFI helper call ---
+    // Floats are NaN-boxed as their raw IEEE-754 bits (`as_f64 = from_bits`),
+    // so a boxed operand moves straight into xmm and the result moves back
+    // unchanged. Only taken when the checker statically proved both slots Float
+    // (same trust model as the `both_int` path below). A NaN result (e.g.
+    // inf - inf) is canonicalised to `null` via `emit_nan_to_null`, matching
+    // the `from_f64` helper semantics. DivFloat is deliberately excluded: the
+    // helper raises a "division by zero" runtime error that `divsd` cannot
+    // reproduce, so division stays on the slow path.
+    let is_float_op = matches!(
+        op,
+        OpCode::AddFloat | OpCode::SubFloat | OpCode::MulFloat
+    );
+    if is_float_op
+        && slot_is_float(&ctx.proto.register_meta, src1)
+        && slot_is_float(&ctx.proto.register_meta, src2)
+    {
+        let asm = &mut ctx.asm;
+        let regmap = &ctx.regmap;
+        emit_load(asm, Reg::Rax, src1, regmap);
+        emit_load(asm, Reg::R11, src2, regmap);
+        asm.emit_debug_assert_not_int(Reg::Rax); // invariant: Float slot ≠ int
+        asm.emit_debug_assert_not_int(Reg::R11);
+        asm.movq_xmm_from_gpr(0, Reg::Rax); // xmm0 = src1
+        asm.movq_xmm_from_gpr(1, Reg::R11); // xmm1 = src2
+        match op {
+            OpCode::AddFloat => asm.addsd(0, 1),
+            OpCode::SubFloat => asm.subsd(0, 1),
+            OpCode::MulFloat => asm.mulsd(0, 1),
+            _ => unreachable!(),
+        }
+        asm.movq_gpr_from_xmm(Reg::Rax, 0);
+        asm.emit_nan_to_null(Reg::Rax, 0); // NaN result → null, per from_f64
+        emit_store(asm, Reg::Rax, first_reg, regmap);
+        return;
+    }
 
     let is_fast_math = matches!(op, OpCode::Add | OpCode::Sub | OpCode::Mul);
 
