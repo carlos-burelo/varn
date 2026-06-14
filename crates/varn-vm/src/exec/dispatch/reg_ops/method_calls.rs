@@ -42,6 +42,8 @@ impl ExecCtx {
             let ic_native: Option<(NativeFnPtr, VmValue)>;
             let ic_vm: Option<(Rc<VmClosure>, Option<Rc<varn_types::value::ClassObj>>)>;
             {
+                // SAFETY: raw IC read (see get_property.rs) — short-lived, no live
+                // `&mut` to these cells; single-threaded, non-reentrant VM.
                 let ic = unsafe { &*closure.ic_cache.as_ptr() };
                 let poly = &ic[cs];
                 let mut found_nat: Option<(NativeFnPtr, VmValue)> = None;

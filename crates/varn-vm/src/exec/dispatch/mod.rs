@@ -293,12 +293,19 @@ impl ExecCtx {
                     OpCode::LoadGlobalIdx => {
                         let gidx = code[ip] as usize;
                         ip += 1;
-                        reg!(first_reg) = unsafe { *(*ctx).globals.values.get_unchecked(gidx) };
+                        // Routed through the guarded accessor (debug_assert bounds check).
+                        reg!(first_reg) = (*ctx).globals.get_by_index_unchecked(gidx);
                         (*ctx).record_hotspot_global(gidx);
                     }
                     OpCode::LoadConst => {
                         let cidx = code[ip] as usize;
                         ip += 1;
+                        // cidx is a compiler-emitted constant-pool index, always in range.
+                        debug_assert!(
+                            cidx < closure.constants.len(),
+                            "const index OOB: {cidx} >= {}",
+                            closure.constants.len()
+                        );
                         let nv = unsafe { *closure.constants.get_unchecked(cidx) };
                         reg!(first_reg) = nv;
                     }

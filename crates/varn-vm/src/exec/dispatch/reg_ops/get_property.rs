@@ -44,6 +44,12 @@ impl ExecCtx {
             let mut hit_found = false;
 
             {
+                // SAFETY: raw IC read instead of RefCell::borrow() to skip the
+                // borrow-flag overhead on this hot path. Sound because the VM is
+                // single-threaded and non-reentrant: these `&*as_ptr()` reads are
+                // short-lived (values are cloned/copied out before any code that
+                // could re-borrow the same cell runs). No `&mut` to these cells is
+                // live during the read.
                 let slot_cache = unsafe { &*closure.ic_cache.as_ptr() };
                 let poly_slot = &slot_cache[cs_idx];
 
