@@ -1,286 +1,154 @@
-#![allow(non_upper_case_globals)]
 use std::collections::HashMap;
-#[allow(unused_imports)]
-use varn_op_macros::{varn_class, varn_constructor, varn_getter, varn_method, varn_module};
+use varn_op_macros::varn_contract;
 use varn_types::value::{MapRef, Value};
-use varn_types::{NativeCtx, VmValue};
+use varn_types::{NativeCtx, VmValue, VnArray};
 
-#[varn_module("std:collections")]
-pub(crate) mod dispatch {
-    use super::*;
+// `List`/`Stack`/`Queue`/`Record` of `std:collections`. The `.vn` carries the
+// declarations (and Varn-visible bodies); these native impls back the runtime.
 
-    fn get_items(ctx: &dyn NativeCtx, this: VmValue) -> VmValue {
-        ctx.get_field(this, "items").unwrap_or(VmValue::null())
+pub struct List;
+pub struct Stack;
+pub struct Queue;
+pub struct Record;
+
+fn get_items(ctx: &dyn NativeCtx, this: VmValue) -> VmValue {
+    ctx.get_field(this, "items").unwrap_or(VmValue::null())
+}
+
+fn ensure_items(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
+    if let Some(items) = ctx.get_field(this, "items") {
+        items
+    } else {
+        let items = ctx.alloc_array(vec![]);
+        ctx.set_field(this, "items", items);
+        items
     }
+}
 
-    fn ensure_items(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
-        if let Some(items) = ctx.get_field(this, "items") {
-            items
-        } else {
+fn items_to_vec(ctx: &dyn NativeCtx, items: VmValue) -> Vec<VmValue> {
+    let len = ctx.array_len(items);
+    (0..len).map(|i| ctx.array_get(items, i).unwrap_or_else(VmValue::null)).collect()
+}
+
+fn get_record_entries(ctx: &dyn NativeCtx, this: VmValue) -> Option<MapRef> {
+    ctx.get_field(this, "entries").and_then(|v| match ctx.extract(v) {
+        Value::Map(map) => Some(map),
+        _ => None,
+    })
+}
+
+fn ensure_record_entries(ctx: &mut dyn NativeCtx, this: VmValue) -> MapRef {
+    if let Some(map) = get_record_entries(ctx, this) {
+        map
+    } else {
+        let map = MapRef::new(HashMap::new());
+        let entries = ctx.intern(Value::Map(map.clone()));
+        ctx.set_field(this, "entries", entries);
+        map
+    }
+}
+
+varn_contract! {
+    module: "std:collections",
+    class: "List",
+    contract: "src/modules/std/collections/collections.vn",
+    impl List {
+        fn constructor(ctx: &mut dyn NativeCtx, this: VmValue, initial: Option<VnArray>) -> VmValue {
+            let items = match initial {
+                Some(a) => a.raw(),
+                None => ctx.alloc_array(vec![]),
+            };
+            ctx.set_field(this, "items", items);
+            this
+        }
+        fn length(ctx: &mut dyn NativeCtx, this: VmValue) -> i64 {
+            ctx.array_len(get_items(ctx, this)) as i64
+        }
+        fn add(ctx: &mut dyn NativeCtx, this: VmValue, item: VmValue) {
+            let items = ensure_items(ctx, this);
+            ctx.array_push(items, item);
+        }
+        fn push(ctx: &mut dyn NativeCtx, this: VmValue, item: VmValue) {
+            let items = ensure_items(ctx, this);
+            ctx.array_push(items, item);
+        }
+        fn pop(ctx: &mut dyn NativeCtx, this: VmValue) -> Option<VmValue> {
+            let items = ensure_items(ctx, this);
+            ctx.array_pop(items)
+        }
+        fn get(ctx: &mut dyn NativeCtx, this: VmValue, index: i64) -> VmValue {
+            ctx.array_get(get_items(ctx, this), index.max(0) as usize).unwrap_or_else(VmValue::null)
+        }
+        fn set(ctx: &mut dyn NativeCtx, this: VmValue, index: i64, val: VmValue) {
+            let items = ensure_items(ctx, this);
+            ctx.array_set(items, index.max(0) as usize, val);
+        }
+        fn clear(ctx: &mut dyn NativeCtx, this: VmValue) {
             let items = ctx.alloc_array(vec![]);
             ctx.set_field(this, "items", items);
-            items
         }
-    }
-
-    fn get_record_entries(ctx: &dyn NativeCtx, this: VmValue) -> Option<MapRef> {
-        ctx.get_field(this, "entries")
-            .and_then(|v| match ctx.extract(v) {
-                Value::Map(map) => Some(map),
-                _ => None,
-            })
-    }
-
-    fn ensure_record_entries(ctx: &mut dyn NativeCtx, this: VmValue) -> MapRef {
-        if let Some(map) = get_record_entries(ctx, this) {
-            map
-        } else {
-            let map = MapRef::new(HashMap::new());
-            let entries = ctx.intern(Value::Map(map.clone()));
-            ctx.set_field(this, "entries", entries);
-            map
-        }
-    }
-
-    #[varn_class("List")]
-    #[allow(non_upper_case_globals)]
-    pub mod list_class {
-        use super::*;
-
-        #[varn_constructor]
-        pub fn constructor(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<(), String> {
-            let items = args
-                .first()
-                .copied()
-                .filter(|v| ctx.is_array(*v))
-                .unwrap_or_else(|| ctx.alloc_array(vec![]));
-            ctx.set_field(this, "items", items);
-            Ok(())
-        }
-
-        #[varn_getter("length")]
-        pub fn length(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<VmValue, String> {
-            Ok(VmValue::from_int(ctx.array_len(get_items(ctx, this)) as i64))
-        }
-
-        #[varn_method("add")]
-        pub fn add(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            if let Some(&item) = args.first() {
-                let items = ensure_items(ctx, this);
-                ctx.array_push(items, item);
-            }
-            Ok(VmValue::null())
-        }
-
-        #[varn_method("push")]
-        pub fn push(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            if let Some(&item) = args.first() {
-                let items = ensure_items(ctx, this);
-                ctx.array_push(items, item);
-            }
-            Ok(VmValue::null())
-        }
-
-        #[varn_method("pop")]
-        pub fn pop(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            _args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            let items = ensure_items(ctx, this);
-            Ok(ctx.array_pop(items).unwrap_or(VmValue::null()))
-        }
-
-        #[varn_method("get")]
-        pub fn get(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            let idx = args.first().copied().unwrap_or(VmValue::null());
-            let idx = if let varn_types::Value::Int(n) = ctx.extract(idx) {
-                n
-            } else {
-                0
-            };
-            Ok(ctx
-                .array_get(get_items(ctx, this), idx.max(0) as usize)
-                .unwrap_or(VmValue::null()))
-        }
-
-        #[varn_method("set")]
-        pub fn set(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            let idx = args.first().copied().unwrap_or(VmValue::null());
-            let val = args.get(1).copied().unwrap_or(VmValue::null());
-            let idx = if let varn_types::Value::Int(n) = ctx.extract(idx) {
-                n
-            } else {
-                0
-            };
-            let items = ensure_items(ctx, this);
-            ctx.array_set(items, idx.max(0) as usize, val);
-            Ok(VmValue::null())
-        }
-
-        #[varn_method("clear")]
-        pub fn clear(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            _args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            let items = ctx.alloc_array(vec![]);
-            ctx.set_field(this, "items", items);
-            Ok(VmValue::null())
-        }
-
-        #[varn_method("contains")]
-        pub fn contains(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            let target = args.first().copied().unwrap_or(VmValue::null());
+        fn contains(ctx: &mut dyn NativeCtx, this: VmValue, item: VmValue) -> bool {
             let mut found = false;
-            ctx.array_for_each(get_items(ctx, this), &mut |item, _| {
-                if item == target {
+            ctx.array_for_each(get_items(ctx, this), &mut |v, _| {
+                if v == item {
                     found = true;
                 }
             });
-            Ok(VmValue::from_bool(found))
+            found
         }
-
-        #[varn_method("toArray")]
-        pub fn to_array(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            _args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            Ok(get_items(ctx, this))
+        fn toArray(ctx: &mut dyn NativeCtx, this: VmValue) -> Vec<VmValue> {
+            items_to_vec(ctx, get_items(ctx, this))
         }
     }
+}
 
-    #[varn_class("Stack")]
-    #[allow(non_upper_case_globals)]
-    pub mod stack_class {
-        use super::*;
-
-        #[varn_constructor]
-        pub fn constructor(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            _args: &[VmValue],
-        ) -> Result<(), String> {
-            let items = ctx.alloc_array(vec![]);
-            ctx.set_field(this, "items", items);
-            Ok(())
-        }
-
-        #[varn_method("push")]
-        pub fn push(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            if let Some(&item) = args.first() {
-                let items = ensure_items(ctx, this);
-                ctx.array_push(items, item);
-            }
-            Ok(VmValue::null())
-        }
-
-        #[varn_method("pop")]
-        pub fn pop(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            _args: &[VmValue],
-        ) -> Result<VmValue, String> {
+varn_contract! {
+    module: "std:collections",
+    class: "Stack",
+    contract: "src/modules/std/collections/collections.vn",
+    impl Stack {
+        fn push(ctx: &mut dyn NativeCtx, this: VmValue, item: VmValue) {
             let items = ensure_items(ctx, this);
-            Ok(ctx.array_pop(items).unwrap_or(VmValue::null()))
+            ctx.array_push(items, item);
         }
-
-        #[varn_method("peek")]
-        pub fn peek(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            _args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            let items = get_items(ctx, this);
-            let len = ctx.array_len(items);
-            Ok(if len == 0 {
-                VmValue::null()
-            } else {
-                ctx.array_get(items, len - 1).unwrap_or(VmValue::null())
-            })
+        fn pop(ctx: &mut dyn NativeCtx, this: VmValue) -> Option<VmValue> {
+            let items = ensure_items(ctx, this);
+            ctx.array_pop(items)
         }
-
-        #[varn_getter("size")]
-        pub fn size(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<VmValue, String> {
-            Ok(VmValue::from_int(ctx.array_len(get_items(ctx, this)) as i64))
-        }
-
-        #[varn_getter("isEmpty")]
-        pub fn is_empty(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<VmValue, String> {
-            Ok(VmValue::from_bool(ctx.array_len(get_items(ctx, this)) == 0))
-        }
-    }
-
-    #[varn_class("Queue")]
-    #[allow(non_upper_case_globals)]
-    pub mod queue_class {
-        use super::*;
-
-        #[varn_constructor]
-        pub fn constructor(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            _args: &[VmValue],
-        ) -> Result<(), String> {
-            let items = ctx.alloc_array(vec![]);
-            ctx.set_field(this, "items", items);
-            Ok(())
-        }
-
-        #[varn_method("enqueue")]
-        pub fn enqueue(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            if let Some(&item) = args.first() {
-                let items = ensure_items(ctx, this);
-                ctx.array_push(items, item);
-            }
-            Ok(VmValue::null())
-        }
-
-        #[varn_method("dequeue")]
-        pub fn dequeue(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            _args: &[VmValue],
-        ) -> Result<VmValue, String> {
+        fn peek(ctx: &mut dyn NativeCtx, this: VmValue) -> Option<VmValue> {
             let items = get_items(ctx, this);
             let len = ctx.array_len(items);
             if len == 0 {
-                return Ok(VmValue::null());
+                None
+            } else {
+                ctx.array_get(items, len - 1)
             }
-            let first = ctx.array_get(items, 0).unwrap_or(VmValue::null());
+        }
+        fn size(ctx: &mut dyn NativeCtx, this: VmValue) -> i64 {
+            ctx.array_len(get_items(ctx, this)) as i64
+        }
+        fn isEmpty(ctx: &mut dyn NativeCtx, this: VmValue) -> bool {
+            ctx.array_len(get_items(ctx, this)) == 0
+        }
+    }
+}
+
+varn_contract! {
+    module: "std:collections",
+    class: "Queue",
+    contract: "src/modules/std/collections/collections.vn",
+    impl Queue {
+        fn enqueue(ctx: &mut dyn NativeCtx, this: VmValue, item: VmValue) {
+            let items = ensure_items(ctx, this);
+            ctx.array_push(items, item);
+        }
+        fn dequeue(ctx: &mut dyn NativeCtx, this: VmValue) -> Option<VmValue> {
+            let items = get_items(ctx, this);
+            let len = ctx.array_len(items);
+            if len == 0 {
+                return None;
+            }
+            let first = ctx.array_get(items, 0);
             let mut tail = Vec::with_capacity(len.saturating_sub(1));
             for i in 1..len {
                 if let Some(v) = ctx.array_get(items, i) {
@@ -289,143 +157,69 @@ pub(crate) mod dispatch {
             }
             let next = ctx.alloc_array(tail);
             ctx.set_field(this, "items", next);
-            Ok(first)
+            first
         }
-
-        #[varn_method("peek")]
-        pub fn peek(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            _args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            Ok(ctx
-                .array_get(get_items(ctx, this), 0)
-                .unwrap_or(VmValue::null()))
+        fn peek(ctx: &mut dyn NativeCtx, this: VmValue) -> Option<VmValue> {
+            ctx.array_get(get_items(ctx, this), 0)
         }
-
-        #[varn_getter("size")]
-        pub fn size(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<VmValue, String> {
-            Ok(VmValue::from_int(ctx.array_len(get_items(ctx, this)) as i64))
+        fn size(ctx: &mut dyn NativeCtx, this: VmValue) -> i64 {
+            ctx.array_len(get_items(ctx, this)) as i64
         }
-
-        #[varn_getter("isEmpty")]
-        pub fn is_empty(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<VmValue, String> {
-            Ok(VmValue::from_bool(ctx.array_len(get_items(ctx, this)) == 0))
+        fn isEmpty(ctx: &mut dyn NativeCtx, this: VmValue) -> bool {
+            ctx.array_len(get_items(ctx, this)) == 0
         }
     }
+}
 
-    #[varn_class("Record")]
-    #[allow(non_upper_case_globals)]
-    pub mod record_class {
-        use super::*;
-
-        #[varn_constructor]
-        pub fn constructor(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            _args: &[VmValue],
-        ) -> Result<(), String> {
+varn_contract! {
+    module: "std:collections",
+    class: "Record",
+    contract: "src/modules/std/collections/collections.vn",
+    impl Record {
+        fn constructor(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
             let map = MapRef::new(HashMap::new());
             let entries = ctx.intern(Value::Map(map));
             ctx.set_field(this, "entries", entries);
-            Ok(())
+            this
         }
-
-        #[varn_method("get")]
-        pub fn get(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            let key = args.first().copied().unwrap_or(VmValue::null());
-            let key = ctx.extract(key);
-            Ok(get_record_entries(ctx, this)
-                .and_then(|m| m.borrow().get(&key).cloned())
-                .map(|v| ctx.intern(v))
-                .unwrap_or(VmValue::null()))
+        fn get(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue) -> Option<VmValue> {
+            let k = ctx.extract(key);
+            let found = get_record_entries(ctx, this).and_then(|m| m.borrow().get(&k).cloned());
+            found.map(|v| ctx.intern(v))
         }
-
-        #[varn_method("set")]
-        pub fn set(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            if let (Some(&key_nv), Some(&value_nv)) = (args.first(), args.get(1)) {
-                let key = ctx.extract(key_nv);
-                let value = ctx.extract(value_nv);
-                ensure_record_entries(ctx, this)
-                    .borrow_mut()
-                    .insert(key, value);
+        fn set(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue, value: VmValue) {
+            let k = ctx.extract(key);
+            let v = ctx.extract(value);
+            ensure_record_entries(ctx, this).borrow_mut().insert(k, v);
+        }
+        fn has(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue) -> bool {
+            let k = ctx.extract(key);
+            get_record_entries(ctx, this).map(|m| m.borrow().contains_key(&k)).unwrap_or(false)
+        }
+        fn delete(ctx: &mut dyn NativeCtx, this: VmValue, key: VmValue) -> bool {
+            let k = ctx.extract(key);
+            get_record_entries(ctx, this).map(|m| m.borrow_mut().remove(&k).is_some()).unwrap_or(false)
+        }
+        fn keys(ctx: &mut dyn NativeCtx, this: VmValue) -> Vec<VmValue> {
+            match get_record_entries(ctx, this) {
+                Some(m) => {
+                    let ks: Vec<Value> = m.borrow().keys().cloned().collect();
+                    ks.into_iter().map(|k| ctx.intern(k)).collect()
+                }
+                None => Vec::new(),
             }
-            Ok(VmValue::null())
         }
-
-        #[varn_method("has")]
-        pub fn has(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            let key = args.first().copied().unwrap_or(VmValue::null());
-            let key = ctx.extract(key);
-            Ok(VmValue::from_bool(
-                get_record_entries(ctx, this)
-                    .map(|m| m.borrow().contains_key(&key))
-                    .unwrap_or(false),
-            ))
-        }
-
-        #[varn_method("delete")]
-        pub fn delete(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            let key = args.first().copied().unwrap_or(VmValue::null());
-            let key = ctx.extract(key);
-            Ok(VmValue::from_bool(
-                get_record_entries(ctx, this)
-                    .map(|m| m.borrow_mut().remove(&key).is_some())
-                    .unwrap_or(false),
-            ))
-        }
-
-        #[varn_method("keys")]
-        pub fn keys(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            _args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            if let Some(m) = get_record_entries(ctx, this) {
-                let keys: Vec<_> = m.borrow().keys().cloned().collect();
-                let items = keys.into_iter().map(|k| ctx.intern(k)).collect();
-                return Ok(ctx.alloc_array(items));
+        fn values(ctx: &mut dyn NativeCtx, this: VmValue) -> Vec<VmValue> {
+            match get_record_entries(ctx, this) {
+                Some(m) => {
+                    let vs: Vec<Value> = m.borrow().values().cloned().collect();
+                    vs.into_iter().map(|v| ctx.intern(v)).collect()
+                }
+                None => Vec::new(),
             }
-            Ok(ctx.alloc_array(vec![]))
         }
-
-        #[varn_method("values")]
-        pub fn values(
-            ctx: &mut dyn NativeCtx,
-            this: VmValue,
-            _args: &[VmValue],
-        ) -> Result<VmValue, String> {
-            if let Some(m) = get_record_entries(ctx, this) {
-                let values: Vec<_> = m.borrow().values().cloned().collect();
-                let items = values.into_iter().map(|v| ctx.intern(v)).collect();
-                return Ok(ctx.alloc_array(items));
-            }
-            Ok(ctx.alloc_array(vec![]))
-        }
-
-        #[varn_getter("size")]
-        pub fn size(ctx: &mut dyn NativeCtx, this: VmValue) -> Result<VmValue, String> {
-            Ok(VmValue::from_int(
-                get_record_entries(ctx, this)
-                    .map(|m| m.borrow().len() as i64)
-                    .unwrap_or(0),
-            ))
+        fn size(ctx: &mut dyn NativeCtx, this: VmValue) -> i64 {
+            get_record_entries(ctx, this).map(|m| m.borrow().len() as i64).unwrap_or(0)
         }
     }
 }
