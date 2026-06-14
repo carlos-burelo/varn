@@ -42,6 +42,9 @@ impl ExecCtx {
             let mut hit_found = false;
 
             {
+                // SAFETY: raw IC read (see get_property.rs). Single-threaded,
+                // non-reentrant VM; reads are short-lived and end before the
+                // disjoint write block below takes its `&mut`.
                 let slot_cache = unsafe { &*closure.ic_cache.as_ptr() };
                 let poly_slot = &slot_cache[cs_idx];
 
@@ -99,6 +102,11 @@ impl ExecCtx {
                 if obj.is_heap() {
                     if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx())
                     {
+                        // SAFETY: exclusive `&mut` into the object cell, replacing
+                        // borrow_mut(). The read block above has ended (its `&` is
+                        // dropped), and `name`/`val` are owned independently of this
+                        // cell, so `insert`'s possible realloc cannot dangle them.
+                        // Sound only under the single-threaded, non-reentrant VM.
                         let guard = unsafe { &mut *o.0.as_ptr() };
                         if kind == 5 {
                             guard.inner.insert(Rc::from(name.as_ref()), val);
