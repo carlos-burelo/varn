@@ -27,6 +27,7 @@ pub fn compile_direct(
 ) -> Result<FunctionProto, Rc<str>> {
     use std::cell::RefCell;
     let escape_analysis = Rc::new(crate::analysis::escape::EscapeAnalysis::analyze(program));
+    let inline_registry = Rc::new(crate::analysis::inline::InlineRegistry::analyze(program));
     let protos = Rc::new(RefCell::new(Vec::new()));
     let mut c = Compiler::new_module(
         program.filename.clone(),
@@ -37,6 +38,7 @@ pub fn compile_direct(
         protos,
         export_names,
         escape_analysis,
+        inline_registry,
     );
     c.compile_program(program);
     if let Some(err) = c.error {

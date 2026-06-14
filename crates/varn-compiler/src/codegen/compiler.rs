@@ -234,6 +234,10 @@ pub struct Compiler<'a> {
     pub parent_depth: usize,
     pub export_names: Vec<Rc<str>>,
     pub escape_analysis: Rc<crate::analysis::escape::EscapeAnalysis>,
+    /// Registry of trivial functions eligible for inlining at call sites.
+    pub inline_fns: Rc<crate::analysis::inline::InlineRegistry>,
+    /// Current inline nesting depth; caps recursive/mutual inlining.
+    pub inline_depth: u32,
     pub error: Option<Rc<str>>,
 }
 
@@ -247,6 +251,7 @@ impl<'a> Compiler<'a> {
         protos: Rc<RefCell<Vec<FunctionProto>>>,
         export_names: Vec<Rc<str>>,
         escape_analysis: Rc<crate::analysis::escape::EscapeAnalysis>,
+        inline_fns: Rc<crate::analysis::inline::InlineRegistry>,
     ) -> Self {
         let mut chunk = Chunk::new();
         chunk.source_file = source_file.clone();
@@ -283,6 +288,8 @@ impl<'a> Compiler<'a> {
             parent_depth: 0,
             export_names,
             escape_analysis,
+            inline_fns,
+            inline_depth: 0,
             error: None,
         }
     }
@@ -306,6 +313,7 @@ impl<'a> Compiler<'a> {
         let mut chunk = Chunk::new();
         chunk.source_file = source_file.clone();
         let escape_analysis = unsafe { (*parent).escape_analysis.clone() };
+        let inline_fns = unsafe { (*parent).inline_fns.clone() };
         Self {
             chunk,
             scopes: vec![FxHashMap::default()],
@@ -339,6 +347,8 @@ impl<'a> Compiler<'a> {
             parent_depth,
             export_names: Vec::new(),
             escape_analysis,
+            inline_fns,
+            inline_depth: 0,
             error: None,
         }
     }
