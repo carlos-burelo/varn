@@ -696,17 +696,15 @@ pub extern "C" fn jit_get_property_ic_fast(
         let closure_ref = &*closure;
         if cs_idx < closure_ref.ic_cache_len() && obj.is_heap() {
             if let Some(crate::heap::HeapObj::Object(o)) = ctx_ref.heap.get(obj.as_heap_idx()) {
-                if let Ok(guard) = o.0.try_borrow() {
-                    if let Ok(slot_cache) = closure_ref.ic_cache.try_borrow() {
-                        let poly_slot = &slot_cache[cs_idx];
-                        for entry in &poly_slot.entries {
-                            if entry.id != 0 && entry.is_class == 1 {
-                                if guard.inner.shape.id == entry.id {
-                                    let slot = entry.slot as usize;
-                                    if slot < guard.inner.values.len() {
-                                        return guard.inner.values[slot];
-                                    }
-                                }
+                let guard = &*o.0.as_ptr();
+                let slot_cache = &*closure_ref.ic_cache.as_ptr();
+                let poly_slot = &slot_cache[cs_idx];
+                for entry in &poly_slot.entries {
+                    if entry.id != 0 && entry.is_class == 1 {
+                        if guard.inner.shape.id == entry.id {
+                            let slot = entry.slot as usize;
+                            if slot < guard.inner.values.len() {
+                                return guard.inner.values[slot];
                             }
                         }
                     }
@@ -714,22 +712,21 @@ pub extern "C" fn jit_get_property_ic_fast(
             }
 
             if let Some(cls) = crate::exec::props::get_class(obj, &ctx_ref.heap) {
-                if let Ok(slot_cache) = closure_ref.ic_cache.try_borrow() {
-                    let poly_slot = &slot_cache[cs_idx];
-                    for entry in &poly_slot.entries {
-                        if entry.id == 0 {
-                            continue;
+                let slot_cache = &*closure_ref.ic_cache.as_ptr();
+                let poly_slot = &slot_cache[cs_idx];
+                for entry in &poly_slot.entries {
+                    if entry.id == 0 {
+                        continue;
+                    }
+                    if entry.is_class == 8 && cls.id == entry.id {
+                        if let Some(crate::heap::HeapObj::Array(arr)) = ctx_ref.heap.get(obj.as_heap_idx()) {
+                            let len = (&*arr.0.as_ptr()).len();
+                            return VmValue::from_int(len as i64);
                         }
-                        if entry.is_class == 8 && cls.id == entry.id {
-                            if let Some(crate::heap::HeapObj::Array(arr)) = ctx_ref.heap.get(obj.as_heap_idx()) {
-                                let len = arr.0.borrow().len();
-                                return VmValue::from_int(len as i64);
-                            }
-                        } else if entry.is_class == 9 && cls.id == entry.id {
-                            if let Some(crate::heap::HeapObj::Str(s)) = ctx_ref.heap.get(obj.as_heap_idx()) {
-                                let len = s.len();
-                                return VmValue::from_int(len as i64);
-                            }
+                    } else if entry.is_class == 9 && cls.id == entry.id {
+                        if let Some(crate::heap::HeapObj::Str(s)) = ctx_ref.heap.get(obj.as_heap_idx()) {
+                            let len = s.len();
+                            return VmValue::from_int(len as i64);
                         }
                     }
                 }

@@ -44,7 +44,7 @@ impl ExecCtx {
             let mut hit_found = false;
 
             {
-                let slot_cache = closure.ic_cache.borrow();
+                let slot_cache = unsafe { &*closure.ic_cache.as_ptr() };
                 let poly_slot = &slot_cache[cs_idx];
 
                 'entries: for entry in &poly_slot.entries {
@@ -57,7 +57,7 @@ impl ExecCtx {
                             if let Some(crate::heap::HeapObj::Object(o)) =
                                 self.heap.get(obj.as_heap_idx())
                             {
-                                let guard = o.borrow();
+                                let guard = unsafe { &*o.0.as_ptr() };
                                 if guard.inner.shape.id == entry.id {
                                     let slot = entry.slot as usize;
                                     if slot < guard.inner.values.len() {
@@ -72,7 +72,7 @@ impl ExecCtx {
                         if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
                             if cls.id == entry.id {
                                 if let Some(crate::heap::HeapObj::Array(arr)) = self.heap.get(obj.as_heap_idx()) {
-                                    let len = arr.0.borrow().len();
+                                    let len = unsafe { &*arr.0.as_ptr() }.len();
                                     found_slot_val = Some(VmValue::from_int(len as i64));
                                     hit_found = true;
                                     break 'entries;
@@ -97,8 +97,8 @@ impl ExecCtx {
                             && entry.vtable_ver
                                 == (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8
                         {
-                            let vtable = cls.vtable.borrow();
-                            let vtable_owners = cls.vtable_owners.borrow();
+                            let vtable = unsafe { &*cls.vtable.as_ptr() };
+                            let vtable_owners = unsafe { &*cls.vtable_owners.as_ptr() };
                             if slot < vtable.len() {
                                 found_method =
                                     Some((vtable[slot].clone(), vtable_owners[slot].clone()));
@@ -110,7 +110,7 @@ impl ExecCtx {
                             && entry.vtable_ver
                                 == (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8
                         {
-                            let vtable = cls.getter_vtable.borrow();
+                            let vtable = unsafe { &*cls.getter_vtable.as_ptr() };
                             if slot < vtable.len() {
                                 found_getter = Some(vtable[slot].clone());
                                 hit_found = true;

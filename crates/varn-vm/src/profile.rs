@@ -1,8 +1,8 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use rustc_hash::FxHashMap;
 
 pub struct ProfileCounters {
     pub ic_hits: AtomicU64,
@@ -182,11 +182,11 @@ pub struct CallEntry {
 
 #[derive(Debug, Clone, Default)]
 pub struct HotspotCounters {
-    pub fn_calls: HashMap<String, CallEntry>,
-    pub method_calls: HashMap<String, CallEntry>,
-    pub native_calls: HashMap<String, u64>,
-    pub global_accesses: HashMap<String, u64>,
-    pub alloc_types: HashMap<&'static str, u64>,
+    pub fn_calls: FxHashMap<Rc<str>, CallEntry>,
+    pub method_calls: FxHashMap<Rc<str>, CallEntry>,
+    pub native_calls: FxHashMap<Rc<str>, u64>,
+    pub global_accesses: FxHashMap<Rc<str>, u64>,
+    pub alloc_types: FxHashMap<&'static str, u64>,
 }
 
 impl HotspotCounters {
@@ -195,7 +195,7 @@ impl HotspotCounters {
     }
 
     pub fn record_fn_call(&mut self, name: &str, jit: bool) {
-        let e = self.fn_calls.entry(name.to_owned()).or_default();
+        let e = self.fn_calls.entry(Rc::from(name)).or_default();
         e.calls += 1;
         if jit {
             e.jit_calls += 1;
@@ -205,7 +205,7 @@ impl HotspotCounters {
     }
 
     pub fn record_method_call(&mut self, name: &str, jit: bool) {
-        let e = self.method_calls.entry(name.to_owned()).or_default();
+        let e = self.method_calls.entry(Rc::from(name)).or_default();
         e.calls += 1;
         if jit {
             e.jit_calls += 1;
@@ -215,11 +215,11 @@ impl HotspotCounters {
     }
 
     pub fn record_native_call(&mut self, name: &str) {
-        *self.native_calls.entry(name.to_owned()).or_default() += 1;
+        *self.native_calls.entry(Rc::from(name)).or_default() += 1;
     }
 
-    pub fn record_global_access(&mut self, name: &str) {
-        *self.global_accesses.entry(name.to_owned()).or_default() += 1;
+    pub fn record_global_access(&mut self, name: Rc<str>) {
+        *self.global_accesses.entry(name).or_default() += 1;
     }
 
     pub fn record_alloc(&mut self, type_name: &'static str) {

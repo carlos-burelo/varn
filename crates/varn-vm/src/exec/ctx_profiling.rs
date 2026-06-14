@@ -130,8 +130,7 @@ impl ExecCtx {
     pub fn record_hotspot_global(&self, idx: usize) {
         if let Some(ref h) = self.hotspot_counters {
             if let Some(name) = self.globals.idx_to_name.get(idx) {
-                let name = name.to_string();
-                h.borrow_mut().record_global_access(&name);
+                h.borrow_mut().record_global_access(name.clone());
             }
         }
     }

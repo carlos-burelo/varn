@@ -284,30 +284,61 @@ impl ExecCtx {
                                 let stack_len = (*stack_ptr).len();
                                 assert!(idx < stack_len, "register OOB: idx={idx} len={stack_len}");
                             }
-                            std::hint::black_box((*stack_ptr).as_mut_ptr()).add(idx)
+                            (*stack_ptr).as_mut_ptr().add(idx)
                         })
                     };
                 }
 
                 match op {
+                    OpCode::LoadGlobalIdx => {
+                        let gidx = code[ip] as usize;
+                        ip += 1;
+                        reg!(first_reg) = unsafe { *(*ctx).globals.values.get_unchecked(gidx) };
+                        (*ctx).record_hotspot_global(gidx);
+                    }
+                    OpCode::LoadConst => {
+                        let cidx = code[ip] as usize;
+                        ip += 1;
+                        let nv = unsafe { *closure.constants.get_unchecked(cidx) };
+                        reg!(first_reg) = nv;
+                    }
+                    OpCode::LoadNull => {
+                        reg!(first_reg) = crate::value::VmValue::null();
+                    }
+                    OpCode::DefineGlobalIdx | OpCode::StoreGlobalIdx => {
+                        let src = hi(code[ip]);
+                        let gidx = code[ip + 1] as usize;
+                        ip += 2;
+                        let val = reg!(src);
+                        (*ctx).globals.set_by_index_unchecked(gidx, val);
+                    }
+                    OpCode::LoadInt => {
+                        let val = code[ip] as i16;
+                        ip += 1;
+                        reg!(first_reg) = crate::value::VmValue::from_int(val as i64);
+                    }
+                    OpCode::Move => {
+                        let w1 = code[ip];
+                        ip += 1;
+                        let dest = base + first_reg;
+                        let src = base + hi(w1) as usize;
+                        let max_idx = dest.max(src);
+                        if max_idx >= (*ctx).stack.len() {
+                            (*ctx).stack.resize(max_idx + 1, crate::value::VmValue::null());
+                        }
+                        (*ctx).stack[dest] = (*ctx).stack[src];
+                    }
                     OpCode::LoadGlobal
-                    | OpCode::LoadGlobalIdx
                     | OpCode::StoreGlobal
-                    | OpCode::StoreGlobalIdx
                     | OpCode::DefineGlobal
-                    | OpCode::DefineGlobalIdx
                     | OpCode::LoadUpvalue
                     | OpCode::StoreUpvalue
                     | OpCode::CloseUpvalue
-                    | OpCode::LoadNull
                     | OpCode::LoadTrue
                     | OpCode::LoadFalse
-                    | OpCode::LoadInt
                     | OpCode::LoadIntZero
                     | OpCode::LoadIntOne
-                    | OpCode::LoadIntMinusOne
-                    | OpCode::LoadConst
-                    | OpCode::Move => {
+                    | OpCode::LoadIntMinusOne => {
                         let handled = (*ctx).exec_literals_vars_op(
                             op, code, &mut ip, base, frame_idx, &closure, first_reg,
                         )?;
