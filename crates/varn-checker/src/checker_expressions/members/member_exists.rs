@@ -38,7 +38,7 @@ fn check_origin_module(name: &Rc<str>, origin: &Option<Rc<str>>, key: &str) -> b
     }
 
     if origin.is_none() {
-        for spec in varn_modules::STD_MODULES {
+        for spec in varn_modules::std_module_ids() {
             if let Some(bind) = crate::module_resolver::resolve_stdlib_module_bind_ref(spec) {
                 if check_in_bind(name, key, &bind) {
                     return true;

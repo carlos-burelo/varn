@@ -120,9 +120,7 @@ pub fn relative_import_path(from_file: &str, to_file: &str) -> String {
 }
 
 pub fn is_known_module(specifier: &str) -> bool {
-    super::CORE_MODULES.contains(&specifier)
-        || super::STD_MODULES.contains(&specifier)
-        || super::RUNTIME_MODULES.contains(&specifier)
+    super::is_known_stdlib_module(specifier)
 }
 
 pub const VARN_SCHEME: &str = "varn://";

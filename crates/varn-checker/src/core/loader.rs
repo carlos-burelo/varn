@@ -67,7 +67,7 @@ pub fn merge_core_members(bind: &mut BindResult) {
 
 fn build_core_exports() -> FxHashMap<Rc<str>, Symbol> {
     let mut globals = FxHashMap::default();
-    for spec in varn_modules::CORE_MODULES {
+    for spec in varn_modules::core_module_ids() {
         for (k, v) in resolve_stdlib_module_exports_ref(spec).as_ref() {
             globals.insert(Rc::from(k.as_str()), v.clone());
         }
@@ -77,7 +77,7 @@ fn build_core_exports() -> FxHashMap<Rc<str>, Symbol> {
 
 fn build_core_members() -> CoreMembers {
     let mut members = CoreMembers::default();
-    for spec in varn_modules::CORE_MODULES {
+    for spec in varn_modules::core_module_ids() {
         if let Some(rb) = resolve_stdlib_module_bind_ref(spec) {
             let scope = rb.scopes.get(rb.global_scope);
             for (name, &sid) in &scope.bindings {

@@ -67,59 +67,39 @@ pub const RUNTIME_JSON: &str = "runtime:json";
 pub const RUNTIME_PATH: &str = "runtime:path";
 pub const RUNTIME_TEST: &str = "runtime:test";
 
-pub const RUNTIME_MODULES: &[&str] = &[
-    RUNTIME_FS,
-    RUNTIME_IO,
-    RUNTIME_TIME,
-    RUNTIME_NET,
-    RUNTIME_PROCESS,
-    RUNTIME_CRYPTO,
-    RUNTIME_TASK,
-    RUNTIME_HTTP,
-    RUNTIME_REFLECT,
-    RUNTIME_JSON,
-    RUNTIME_PATH,
-    RUNTIME_TEST,
-];
+// The set of core/std/runtime modules is derived at runtime from the embedded
+// module registry (each `ModuleSpec` carries its `ModuleKind`), so there is a
+// single source of truth — the `module.json` files scanned at build time — and
+// no hand-maintained list to drift out of sync.
 
-pub const CORE_MODULES: &[&str] = &[
-    CORE_GLOBAL,
-    CORE_BIGINT,
-    CORE_MAP,
-    CORE_SET,
-    CORE_SYMBOL,
-    CORE_COLLECTIONS,
-    CORE_ASYNC,
-    CORE_ITERATORS,
-    CORE_REFLECT,
-    CORE_STR,
-    CORE_INT,
-    CORE_FLOAT,
-    CORE_BOOL,
-    CORE_CHAR,
-    CORE_DECIMAL,
-    CORE_RANGE,
-    CORE_ARRAY,
-];
+fn module_ids_of_kind(kind: ModuleKind) -> Vec<&'static str> {
+    provider::get()
+        .map(|p| {
+            p.all_specs()
+                .iter()
+                .filter(|m| m.kind == kind)
+                .map(|m| m.id)
+                .collect()
+        })
+        .unwrap_or_default()
+}
 
-pub const STD_MODULES: &[&str] = &[
-    STD_TASK,
-    STD_COLLECTIONS,
-    STD_CRYPTO,
-    STD_DISPOSE,
-    STD_FS,
-    STD_HTTP,
-    STD_IO,
-    STD_JSON,
-    STD_MATH,
-    STD_NET,
-    STD_PATH,
-    STD_REFLECT,
-    STD_SYS,
-    STD_TEST,
-    STD_TIME,
-    STD_TYPES,
-];
+pub fn core_module_ids() -> Vec<&'static str> {
+    module_ids_of_kind(ModuleKind::Core)
+}
+
+pub fn std_module_ids() -> Vec<&'static str> {
+    module_ids_of_kind(ModuleKind::Stdlib)
+}
+
+pub fn runtime_module_ids() -> Vec<&'static str> {
+    module_ids_of_kind(ModuleKind::Runtime)
+}
+
+/// True for any registered core/std/runtime module specifier.
+pub fn is_known_stdlib_module(specifier: &str) -> bool {
+    provider::get().and_then(|p| p.spec_for(specifier)).is_some()
+}
 
 pub use spec::{ModuleKind, ModuleSpec};
 
