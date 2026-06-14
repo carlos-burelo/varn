@@ -42,7 +42,7 @@ impl ExecCtx {
             let mut hit_found = false;
 
             {
-                let slot_cache = closure.ic_cache.borrow();
+                let slot_cache = unsafe { &*closure.ic_cache.as_ptr() };
                 let poly_slot = &slot_cache[cs_idx];
 
                 'entries: for entry in &poly_slot.entries {
@@ -55,7 +55,7 @@ impl ExecCtx {
                         if let Some(crate::heap::HeapObj::Object(o)) =
                             self.heap.get(obj.as_heap_idx())
                         {
-                            let guard = o.borrow();
+                            let guard = unsafe { &*o.0.as_ptr() };
                             if entry.is_class == 1
                                 && guard.inner.shape.id == entry.id
                                 && slot < guard.inner.values.len()
@@ -78,7 +78,7 @@ impl ExecCtx {
                                 && entry.vtable_ver
                                     == (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8
                             {
-                                let vtable = cls.setter_vtable.borrow();
+                                let vtable = unsafe { &*cls.setter_vtable.as_ptr() };
                                 if slot < vtable.len() {
                                     found_setter = Some(vtable[slot].clone());
                                     hit_found = true;
@@ -99,7 +99,7 @@ impl ExecCtx {
                 if obj.is_heap() {
                     if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx())
                     {
-                        let mut guard = o.borrow_mut();
+                        let guard = unsafe { &mut *o.0.as_ptr() };
                         if kind == 5 {
                             guard.inner.insert(Rc::from(name.as_ref()), val);
                         } else {

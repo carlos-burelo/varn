@@ -42,7 +42,7 @@ impl ExecCtx {
             let ic_native: Option<(NativeFnPtr, VmValue)>;
             let ic_vm: Option<(Rc<VmClosure>, Option<Rc<varn_types::value::ClassObj>>)>;
             {
-                let ic = closure.ic_cache.borrow();
+                let ic = unsafe { &*closure.ic_cache.as_ptr() };
                 let poly = &ic[cs];
                 let mut found_nat: Option<(NativeFnPtr, VmValue)> = None;
                 let mut found_vm: Option<(Rc<VmClosure>, Option<Rc<varn_types::value::ClassObj>>)> =
@@ -58,7 +58,7 @@ impl ExecCtx {
                                     == (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8
                             {
                                 let slot = entry.slot as usize;
-                                let vtable = cls.vtable.borrow();
+                                let vtable = unsafe { &*cls.vtable.as_ptr() };
                                 if let Some(Value::NativeFn(b)) = vtable.get(slot) {
                                     let f = b.0;
                                     found_nat = Some((f, this_val));
@@ -71,7 +71,7 @@ impl ExecCtx {
                             let cls_ver = (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8;
                             if cls.id == entry.id && cls_ver == entry.vtable_ver {
                                 let slot = entry.slot as usize;
-                                let method_val = cls.vtable.borrow().get(slot).cloned();
+                                let method_val = unsafe { &*cls.vtable.as_ptr() }.get(slot).cloned();
                                 if let Some(Value::VmValue(payload)) = method_val {
                                     if let Some(nc_w) =
                                         payload.as_any().downcast_ref::<VmClosurePayload>()

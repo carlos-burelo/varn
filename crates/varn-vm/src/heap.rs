@@ -8,7 +8,7 @@ use crate::profile::HotspotCounters;
 use crate::value::VmValue;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap as HashMap;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use varn_types::{
@@ -100,16 +100,16 @@ impl HeapInner {
             objects: Vec::with_capacity(4096),
             free: Vec::new(),
             alloc_count: 0,
-            intrinsic_classes: HashMap::new(),
-            string_interner: HashMap::new(),
-            symbol_interner: HashMap::new(),
-            array_interner: HashMap::new(),
-            object_interner: HashMap::new(),
-            map_interner: HashMap::new(),
-            set_interner: HashMap::new(),
-            bigint_interner: HashMap::new(),
-            decimal_interner: HashMap::new(),
-            char_interner: HashMap::new(),
+            intrinsic_classes: HashMap::default(),
+            string_interner: HashMap::default(),
+            symbol_interner: HashMap::default(),
+            array_interner: HashMap::default(),
+            object_interner: HashMap::default(),
+            map_interner: HashMap::default(),
+            set_interner: HashMap::default(),
+            bigint_interner: HashMap::default(),
+            decimal_interner: HashMap::default(),
+            char_interner: HashMap::default(),
             gc_collector: Some(GcCollector::new(4096)),
             gc_collections: 0,
             gc_total_freed: 0,
