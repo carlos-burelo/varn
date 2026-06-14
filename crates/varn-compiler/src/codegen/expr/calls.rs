@@ -157,11 +157,63 @@ pub(super) fn compile_call<'a>(
         if can_emit_self_call(c, name, args) {
             return emit_self_call(c, offset, args);
         }
+        if let Some(dest) = try_emit_inline(c, name, args) {
+            return dest;
+        }
     }
 
     let callee_reg = compile_expr(c, callee);
 
     emit_plain_call(c, callee_reg, offset, args)
+}
+
+/// Inline a call to a trivial registered function (see
+/// `analysis::inline`): evaluate the arguments into registers, bind the params
+/// to them, and compile the body expression in place — no real `Call`, no
+/// frame. Returns `None` when ineligible (callee shadowed locally or reassigned,
+/// arity mismatch, spread/named args, or the inline-depth limit is hit).
+///
+/// Register discipline: `dest` is allocated *before* the scope so it survives
+/// `pop_scope`; the argument registers and every body temporary live inside the
+/// scope and are released by `pop_scope`'s register-mark restore. The body
+/// result is moved down into `dest` before the scope is popped. Arguments are
+/// evaluated exactly once, left-to-right, matching normal call semantics.
+fn try_emit_inline<'a>(c: &mut Compiler<'a>, name: &str, args: &[Arg]) -> Option<u8> {
+    const MAX_INLINE_DEPTH: u32 = 2;
+    if c.inline_depth >= MAX_INLINE_DEPTH {
+        return None;
+    }
+    if c.name_resolves_locally(name) || c.annotations.is_reassigned_name(name) {
+        return None;
+    }
+    if !args.iter().all(|a| matches!(a, Arg::Positional(_))) {
+        return None;
+    }
+    // Clone the Rc so the borrow of the registry is independent of `c`, leaving
+    // `c` free to mutate while we read the inlined body.
+    let registry = c.inline_fns.clone();
+    let inl = registry.get(name)?;
+    if inl.params.len() != args.len() {
+        return None;
+    }
+
+    let dest = c.alloc_reg();
+    c.push_scope();
+    let mut arg_regs = Vec::with_capacity(args.len());
+    for a in args {
+        if let Arg::Positional(e) = a {
+            arg_regs.push(compile_expr(c, e));
+        }
+    }
+    for (p, r) in inl.params.iter().zip(&arg_regs) {
+        c.define_local(p.clone(), *r);
+    }
+    c.inline_depth += 1;
+    let body_result = compile_expr(c, &inl.body);
+    c.inline_depth -= 1;
+    c.emit_rr(OpCode::Move, dest, body_result);
+    c.pop_scope();
+    Some(dest)
 }
 
 /// A call can compile to `CallSelf` (direct self-recursion, no callee load)
