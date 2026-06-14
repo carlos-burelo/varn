@@ -19,8 +19,16 @@ impl ExecCtx {
             Some(crate::heap::HeapObj::Object(obj)) => {
                 let obj_ref = obj.borrow();
 
-                let mut keys: Vec<std::rc::Rc<str>> = obj_ref.inner.keys().collect();
-                keys.sort();
+                let id_str = id.as_str();
+                let expected_keys = get_cached_exports(&id_str);
+
+                let keys: Vec<std::rc::Rc<str>> = if let Some(parsed) = expected_keys {
+                    parsed
+                } else {
+                    let mut k: Vec<std::rc::Rc<str>> = obj_ref.inner.keys().collect();
+                    k.sort();
+                    k
+                };
 
                 let mut export_map = rustc_hash::FxHashMap::default();
                 let mut exports = Vec::with_capacity(keys.len());
@@ -167,6 +175,15 @@ impl ExecCtx {
         // Mark as done in the linker graph.
         self.linker.set_done(resolved, final_val);
         Ok(final_val)
+    }
+}
+
+fn get_cached_exports(module_id: &str) -> Option<Vec<std::rc::Rc<str>>> {
+    let spec = varn_builtins::spec_for(module_id)?;
+    if spec.exports.is_empty() {
+        None
+    } else {
+        Some(spec.exports.iter().map(|&s| std::rc::Rc::from(s)).collect())
     }
 }
 
