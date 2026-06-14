@@ -21,6 +21,8 @@ pub struct ModuleSpec {
 
     pub embedded: Option<&'static str>,
 
+    pub exports: &'static [&'static str],
+
     /// True when this module has no side effects at init time and contains only
     /// primitives, native functions, and nested namespaces. Such modules can be
     /// evaluated once and their exports frozen into `FrozenModuleObj` for reuse
@@ -35,12 +37,18 @@ impl ModuleSpec {
             kind,
             vn_source,
             embedded: None,
+            exports: &[],
             pure: false,
         }
     }
 
     pub const fn with_source(mut self, src: &'static str) -> Self {
         self.embedded = Some(src);
+        self
+    }
+
+    pub const fn with_exports(mut self, exports: &'static [&'static str]) -> Self {
+        self.exports = exports;
         self
     }
 
