@@ -120,6 +120,15 @@ pub enum HirExpr {
         index: Box<HirExpr>,
         ty: HirType,
     },
+    /// `recv.name(args)` — a method call on a non-computed property. Lowers to
+    /// `CallMethod` with an inline-cache slot, distinct from `Call` because the
+    /// receiver is bound as `this` without a separate callee load.
+    MethodCall {
+        recv: Box<HirExpr>,
+        name: Rc<str>,
+        args: Vec<HirExpr>,
+        ty: HirType,
+    },
 }
 
 #[derive(Debug, Clone)]

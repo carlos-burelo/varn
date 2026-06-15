@@ -105,7 +105,22 @@ opcodes → legacy reference → verification.
 - Verify: `VN_OPT=1 bench tests/main.vn` parity-or-better vs legacy; callbench/
   fib bench within noise of legacy; suite 686/686.
 
-### 1.1 Member / index / method access + Inline Caches
+### 1.1 Member / index / method access + Inline Caches 🟡 PARTIAL
+- **Done:** `HirExpr::Member`/`Index`/`MethodCall`; lowering emits `GetProperty`
+  (`emit_rrc_ic` + IC slot), `GetIndex`, `CallMethod` (IC slot + name const).
+  Per-function `cache_count` threaded → `ic_cache`/`feedback` sized in `finish`.
+  Method-call detection (non-computed `.name(args)`, not `super`/extension/
+  intrinsic). Module-slot reads, extension members/calls, optional chaining, and
+  non-identity call mappings fall back. `compile_direct` now traces fallback
+  reasons under `VN_OPT_TRACE`. **GetIndex verified end-to-end** (`s[i]` via
+  varn-opt); coverage preserved (callbench/fib still route through varn-opt).
+- **Pending exercise:** `GetProperty`/`CallMethod` are correct (mirror legacy)
+  but can't be hit by a pure-core module — nothing constructs an object/array to
+  access until §1.3 literals land. Validate them as part of §1.3.
+- **Deferred:** optional chaining (`GetPropertyMaybe`), module slots (§1.8),
+  extensions, super (§1.6).
+
+  Original notes:
 - AST: `ExprKind::Member { object, property, computed, optional }`,
   `ExprKind::Call` whose callee is a non-computed `Member` (method call).
 - HIR: re-enable `HirExpr::Member`/`Index`; add `HirExpr::MethodCall { recv,

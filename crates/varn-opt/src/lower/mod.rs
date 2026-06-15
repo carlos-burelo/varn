@@ -82,6 +82,9 @@ struct FnLower {
     high: u32,
     line: u32,
     loops: Vec<LoopCtx>,
+    /// Number of inline-cache slots allocated for this function. Mirrors the
+    /// legacy `Compiler::cache_count`; sizes `ic_cache`/`feedback` in `finish`.
+    cache_count: u16,
 }
 
 impl FnLower {
@@ -99,7 +102,24 @@ impl FnLower {
             high: temp_start.max(1),
             line: 0,
             loops: Vec::new(),
+            cache_count: 0,
         }
+    }
+
+    /// Reserve an inline-cache slot (used by GetProperty/CallMethod, etc.).
+    fn alloc_cache(&mut self) -> u16 {
+        let c = self.cache_count;
+        self.cache_count += 1;
+        c
+    }
+
+    /// Emit a property opcode with an inline-cache slot, mirroring legacy
+    /// `Compiler::emit_property` (`emit_rrc_ic`).
+    fn emit_property(&mut self, op: OpCode, dest: u8, src: u8, name_idx: u16) {
+        let cs = self.alloc_cache();
+        debug_assert!(cs <= 255, "IC cache slot overflow (>255)");
+        self.chunk
+            .emit_rrc_ic(op, dest, src, name_idx, cs as u8, self.line);
     }
 
     fn param_reg(&self, i: u32) -> u8 {
@@ -124,6 +144,7 @@ impl FnLower {
     }
 
     fn finish(self, name: Option<Rc<str>>, nparams: u32, export_names: Vec<Rc<str>>) -> FunctionProto {
+        let cache_count = self.cache_count as usize;
         let mut chunk = self.chunk;
         // Implicit `return null` (matches legacy codegen's epilogue).
         let ret = self.high as u8; // a fresh register above everything used
@@ -141,15 +162,17 @@ impl FnLower {
             is_generator: false,
             has_this: false,
             upvalue_count: 0,
-            cache_count: 0,
+            cache_count,
             chunk,
             required_caps: Vec::new(),
             register_meta: Vec::new(),
             jit_entry: Cell::new(None),
             jit_code: RefCell::new(None),
             jit_failed: Cell::new(false),
-            ic_cache: Rc::new(RefCell::new(Vec::<PolyICSlot>::new())),
-            feedback: Rc::new(RefCell::new(FeedbackVector::new(0))),
+            ic_cache: Rc::new(RefCell::new(
+                (0..cache_count).map(|_| PolyICSlot::new()).collect(),
+            )),
+            feedback: Rc::new(RefCell::new(FeedbackVector::new(cache_count))),
             static_closure_val: Cell::new(0),
         }
     }
@@ -318,8 +341,23 @@ impl FnLower {
             }
             HirExpr::Call { callee, args, .. } => self.lower_call(callee, args),
             HirExpr::SelfCall { args, .. } => self.lower_self_call(args),
-            HirExpr::Member { .. } | HirExpr::Index { .. } => {
-                unreachable!("member/index unsupported in core lowering")
+            HirExpr::MethodCall {
+                recv, name, args, ..
+            } => self.lower_method_call(recv, name, args),
+            HirExpr::Member { object, name, .. } => {
+                // `object.name` → GetProperty with an inline-cache slot.
+                let obj = self.lower_expr(object);
+                let name_idx = self.chunk.add_str(name);
+                self.emit_property(OpCode::GetProperty, obj, obj, name_idx);
+                obj
+            }
+            HirExpr::Index { object, index, .. } => {
+                // `object[index]` → GetIndex (no IC).
+                let obj = self.lower_expr(object);
+                let idx = self.lower_expr(index);
+                self.chunk.emit_rrr(OpCode::GetIndex, obj, obj, idx, self.line);
+                self.free(); // free idx; result stays in obj
+                obj
             }
         }
     }
@@ -394,6 +432,36 @@ impl FnLower {
         self.chunk.write(Chunk::pack(total, recv), self.line);
         // Result lands in dest; free the receiver/args temporaries above it.
         self.free_to(dest as u32 + 1);
+        dest
+    }
+
+    /// Method-call ABI: receiver in `obj`, args contiguous right after it, then
+    /// `CallMethod` with an IC slot (in the opcode's dest field) and the method
+    /// name as a constant. Mirrors legacy `emit_method_call`.
+    fn lower_method_call(&mut self, recv: &HirExpr, name: &str, args: &[HirExpr]) -> u8 {
+        let obj = self.lower_expr(recv);
+        let arg_start = self.next_temp as u8;
+        for (i, a) in args.iter().enumerate() {
+            let slot = arg_start + i as u8;
+            let r = self.lower_expr(a);
+            if r != slot {
+                while (self.next_temp as u8) <= slot {
+                    self.alloc();
+                }
+                self.chunk.emit_rr(OpCode::Move, slot, r, self.line);
+            }
+        }
+        let dest = obj;
+        let name_idx = self.chunk.add_str(name);
+        let cs = self.alloc_cache() as u8;
+        self.chunk
+            .write(Chunk::pack_op(OpCode::CallMethod, cs), self.line);
+        self.chunk.write(Chunk::pack(dest, obj), self.line);
+        self.chunk.write(name_idx, self.line);
+        self.chunk
+            .write(Chunk::pack(args.len() as u8, arg_start), self.line);
+        // Result lands in dest = obj; free the args temporaries above it.
+        self.free_to(obj as u32 + 1);
         dest
     }
 }

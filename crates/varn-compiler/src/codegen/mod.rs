@@ -40,16 +40,27 @@ pub fn compile_direct(
             extension_set_members,
             export_names: export_names.clone(),
         };
-        if let Ok(mut proto) = varn_opt::compile(input) {
-            // §1.0: the backend post-passes (`regalloc_post`, `slot_kinds`) live
-            // in this crate, so `varn-opt` cannot run them itself without a dep
-            // cycle. Run them here over the whole proto tree (top level + every
-            // nested function proto in the constant pools), exactly as
-            // `finish_module`/`finish_function` do for the legacy path. Without
-            // this, varn-opt code skips register compression and leaves
-            // `register_meta` empty, disabling the JIT's typed fast paths.
-            run_backend_post_passes(&mut proto);
-            return Ok(proto);
+        match varn_opt::compile(input) {
+            Ok(mut proto) => {
+                // §1.0: the backend post-passes (`regalloc_post`, `slot_kinds`)
+                // live in this crate, so `varn-opt` cannot run them itself
+                // without a dep cycle. Run them here over the whole proto tree
+                // (top level + every nested function proto in the constant
+                // pools), exactly as `finish_module`/`finish_function` do for
+                // the legacy path. Without this, varn-opt code skips register
+                // compression and leaves `register_meta` empty, disabling the
+                // JIT's typed fast paths.
+                run_backend_post_passes(&mut proto);
+                return Ok(proto);
+            }
+            Err(e) => {
+                if std::env::var_os("VN_OPT_TRACE").is_some() {
+                    eprintln!(
+                        "[varn-opt] fallback ({}): {:?}",
+                        program.filename, e
+                    );
+                }
+            }
         }
     }
 
