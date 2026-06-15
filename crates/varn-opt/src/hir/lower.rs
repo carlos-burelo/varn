@@ -9,9 +9,10 @@
 
 use std::rc::Rc;
 
-use varn_core::ast::expr::{ArrayEl, ArrowBody, ObjectProp, PropKey};
+use varn_core::ast::decl::{ClassDecl, ClassMember, EnumDecl};
+use varn_core::ast::expr::{ArrayEl, ArrowBody, MatchBody, ObjectProp, PropKey};
 use varn_core::ast::operators::{AssignOp, BinaryOp, LogicalOp, UnaryOp, UpdateOp};
-use varn_core::ast::decl::{ClassDecl, ClassMember};
+use varn_core::ast::pattern::MatchPattern;
 use varn_core::ast::{
     Arg, Decl, Expr, ExprKind, ForInit, FunctionDecl, Param, Pattern, Stmt, StmtKind,
 };
@@ -224,10 +225,13 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                         return unsupported("anonymous top-level class");
                     }
                 }
+                Decl::Enum(e) => {
+                    globals.insert(e.id.clone(), ());
+                }
                 // Type-only declarations are erased at codegen (no bytecode),
                 // exactly as legacy `stmt.rs` does.
                 Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
-                _ => return unsupported("top-level enum/namespace decl"),
+                _ => return unsupported("top-level namespace decl"),
             }
         }
     }
@@ -282,6 +286,13 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                     top_body.push(HirStmt::Assign {
                         target: HirBinding::Global(name),
                         value: HirExpr::Class(Box::new(hir_class)),
+                    });
+                }
+                Decl::Enum(en) => {
+                    let hir_enum = lo.lower_enum(en, &mut module_scope)?;
+                    top_body.push(HirStmt::Assign {
+                        target: HirBinding::Global(en.id.clone()),
+                        value: HirExpr::Enum(Box::new(hir_enum)),
                     });
                 }
                 Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
@@ -465,6 +476,184 @@ impl<'a> Lowerer<'a> {
                 upvalues: ctor_ups,
             },
             methods,
+        })
+    }
+
+    /// Lower an enum declaration. Variants become `MakeEnumVariant` statics on
+    /// a class; instance fields/methods mirror the class core. (Core subset: no
+    /// static members, field initializers, or accessors.)
+    fn lower_enum(&mut self, decl: &EnumDecl, scope: &mut Scope) -> R<HirEnum> {
+        if !decl.type_params.is_empty() {
+            return unsupported("generic enum");
+        }
+        let name = decl.id.clone();
+        let mut variants = Vec::new();
+        let mut tag = 0i64;
+        for member in &decl.members {
+            if let Some(init) = &member.init {
+                match &init.kind {
+                    ExprKind::IntLiteral { value, .. } => tag = *value,
+                    _ => return unsupported("non-integer enum discriminant"),
+                }
+            }
+            let fields_str = member
+                .payload_fields
+                .iter()
+                .map(|f| f.name.as_ref())
+                .collect::<Vec<&str>>()
+                .join(",");
+            let meta = if fields_str.is_empty() {
+                format!("{}.{}", name, member.id)
+            } else {
+                format!("{}.{}:{}", name, member.id, fields_str)
+            };
+            variants.push(HirEnumVariant {
+                name: member.id.clone(),
+                tag,
+                meta: Rc::from(meta.as_str()),
+            });
+            tag += 1;
+        }
+
+        let mut fields = Vec::new();
+        let mut methods = Vec::new();
+        for member in &decl.body {
+            match member {
+                ClassMember::Property {
+                    key,
+                    init,
+                    modifiers,
+                    ..
+                } => {
+                    if modifiers.is_static {
+                        return unsupported("static enum field");
+                    }
+                    if init.is_some() {
+                        return unsupported("enum field initializer");
+                    }
+                    fields.push(key.clone());
+                }
+                ClassMember::Method {
+                    key,
+                    params,
+                    body: Some(body),
+                    modifiers,
+                    decorators,
+                    ..
+                } => {
+                    if modifiers.is_static {
+                        return unsupported("static enum method");
+                    }
+                    if modifiers.is_async || modifiers.is_generator {
+                        return unsupported("async/generator enum method");
+                    }
+                    if !decorators.is_empty() {
+                        return unsupported("enum method decorators");
+                    }
+                    let (func, upvalues) = self.lower_function_like(
+                        key.clone(),
+                        params,
+                        false,
+                        false,
+                        false,
+                        true,
+                        BodyRef::Block(body),
+                        &[],
+                        scope,
+                    )?;
+                    methods.push(HirMethod {
+                        key: key.clone(),
+                        func,
+                        upvalues,
+                    });
+                }
+                _ => return unsupported("enum member kind"),
+            }
+        }
+
+        Ok(HirEnum {
+            name,
+            variants,
+            fields,
+            methods,
+        })
+    }
+
+    /// Lower a `match` expression to a `HirExpr::Match`. Each case allocates its
+    /// pattern bindings as locals in a per-case block scope, then lowers the arm
+    /// body. Guards and record/sequence/type patterns fall back to legacy.
+    fn lower_match(
+        &mut self,
+        subject: &Expr,
+        cases: &[varn_core::ast::expr::MatchCase],
+        scope: &mut Scope,
+    ) -> R<HirExpr> {
+        let subject = Box::new(self.lower_expr(subject, scope)?);
+        let mut hcases = Vec::with_capacity(cases.len());
+        for case in cases {
+            if case.guard.is_some() {
+                return unsupported("match guard");
+            }
+            scope.push_block();
+            let test_res = self.lower_case_test(&case.pattern, scope);
+            let test = match test_res {
+                Ok(t) => t,
+                Err(e) => {
+                    scope.pop_block();
+                    return Err(e);
+                }
+            };
+            let mut body = Vec::new();
+            let result = match &case.body {
+                MatchBody::Block(s) => {
+                    match &s.kind {
+                        StmtKind::Block { stmts } => {
+                            for st in stmts {
+                                self.lower_stmt(st, scope, &mut body)?;
+                            }
+                        }
+                        _ => self.lower_stmt(s, scope, &mut body)?,
+                    }
+                    None
+                }
+                MatchBody::Expr(e) => Some(self.lower_expr(e, scope)?),
+            };
+            let captured = scope.pop_block();
+            if !captured.is_empty() {
+                body.push(HirStmt::CloseUpvalues(captured));
+            }
+            hcases.push(HirMatchCase { test, body, result });
+        }
+        Ok(HirExpr::Match {
+            subject,
+            cases: hcases,
+        })
+    }
+
+    fn lower_case_test(&mut self, pat: &MatchPattern, scope: &mut Scope) -> R<HirCaseTest> {
+        Ok(match pat {
+            MatchPattern::Wildcard => HirCaseTest::Wildcard,
+            MatchPattern::Literal(lit) => HirCaseTest::Literal(self.lower_expr(lit, scope)?),
+            MatchPattern::Identifier(name) => HirCaseTest::Bind(scope.alloc_local(name.clone())),
+            MatchPattern::EnumVariant {
+                variant_name,
+                bindings,
+                ..
+            } => {
+                let mut binds = Vec::with_capacity(bindings.len());
+                for b in bindings {
+                    if &*b.name == "_" {
+                        binds.push(None);
+                    } else {
+                        binds.push(Some(scope.alloc_local(b.name.clone())));
+                    }
+                }
+                HirCaseTest::EnumVariant {
+                    name: variant_name.clone(),
+                    binds,
+                }
+            }
+            _ => return unsupported("match pattern kind"),
         })
     }
 
@@ -726,8 +915,17 @@ impl<'a> Lowerer<'a> {
                         ty: HirType::Dynamic,
                     });
                 }
+                Decl::Enum(en) => {
+                    let hir_enum = self.lower_enum(en, scope)?;
+                    let local = scope.alloc_local(en.id.clone());
+                    out.push(HirStmt::Let {
+                        local,
+                        value: HirExpr::Enum(Box::new(hir_enum)),
+                        ty: HirType::Dynamic,
+                    });
+                }
                 Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
-                _ => return unsupported("nested enum decl"),
+                _ => return unsupported("nested namespace decl"),
             },
             StmtKind::Return { argument } => {
                 let v = match argument {
@@ -1117,6 +1315,7 @@ impl<'a> Lowerer<'a> {
                     upvalues,
                 })
             }
+            ExprKind::Match { subject, cases } => self.lower_match(subject, cases, scope),
             _ => unsupported("expression kind"),
         }
     }
