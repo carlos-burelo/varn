@@ -45,9 +45,14 @@ pub enum OptError {
 /// `FunctionProto`. Returns `Err(OptError::Unsupported(..))` for anything the
 /// current stage cannot lower, signalling the caller to use legacy codegen.
 pub fn compile(input: OptInput<'_>) -> Result<FunctionProto, OptError> {
-    // Stage 0: the pipeline is scaffolded but no lowering is wired yet. Lower
-    // AST -> HIR, then HIR -> bytecode, growing the supported subset stage by
-    // stage. For now, decline everything so the gate is a safe no-op.
-    let _hir = hir::lower::lower_program(&input)?;
-    Err(OptError::Unsupported("varn-opt lowering not yet implemented"))
+    let source_file = input.program.filename.clone();
+    let export_names = input.export_names.clone();
+    let module = hir::lower::lower_program(&input)?;
+    if std::env::var_os("VN_OPT_TRACE").is_some() {
+        eprintln!(
+            "[varn-opt] compiled module: {} fn(s) + top-level",
+            module.functions.len()
+        );
+    }
+    lower::lower(&module, source_file, export_names)
 }
