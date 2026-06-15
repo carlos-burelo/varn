@@ -216,7 +216,22 @@ opcodes → legacy reference → verification.
 - `do-while`; labeled `break`/`continue` (label → target resolution).
 - `using`/disposables → `dispose`/`disposeAsync` on scope pop (`pop_scope`).
 
-### 1.6 Classes
+### 1.6 Classes 🟡 CORE DONE
+- **Done (core):** `HirExpr::This` (reg 0), `HirExpr::Class` (+`HirClass`/
+  `HirMethod`), `HirFunction.has_this`. A class lowers to `MakeClass` +
+  `DeclareField`(s) + `Method`(s); constructor and methods are `has_this`
+  closures (`LoadStaticFn`/`MakeClosure` then `Method`). Constructor is
+  synthesised when absent; field initializers run after the body as
+  `this.name = expr` (legacy order — verified to match, incl. the field-reset
+  quirk). `new C(args)` reuses the `Call` path (VM constructs on a class
+  callee). Member/index assignment targets landed too (`SetProperty`/`SetIndex`
+  = §1.4 partial). Verified end-to-end via varn-opt: fields, constructor, `this`,
+  methods, `new`, field read/write match legacy (`7 70 30`). Suite 686/686.
+- **Deferred → fallback:** inheritance (`extends`/`super`/`GetSuper`), static
+  members, getters/setters, decorators, abstract, destructor, static blocks,
+  `instanceof`, compound member assignment, module-slot/extension setters.
+
+  Original notes:
 - `Decl::Class`: fields (init exprs run in constructor), methods (→ protos in a
   vtable), constructor (receiver = `this` at reg 0; `pending_field_inits`),
   inheritance (`extends`, `super` calls, `GetSuper`), static members, getters/

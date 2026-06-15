@@ -202,6 +202,31 @@ pub enum HirExpr {
         func: Box<HirFunction>,
         upvalues: Vec<HirUpvalueSrc>,
     },
+    /// The method receiver, register 0 in a `has_this` function.
+    This,
+    /// A class value: `MakeClass` + `DeclareField`(s) + `Method`(s). Bound to a
+    /// global or local by the caller. Core subset: no inheritance/static/
+    /// accessors/decorators.
+    Class(Box<HirClass>),
+}
+
+/// A class method (or constructor) plus the upvalues its closure captures.
+#[derive(Debug, Clone)]
+pub struct HirMethod {
+    pub key: Rc<str>,
+    pub func: HirFunction,
+    pub upvalues: Vec<HirUpvalueSrc>,
+}
+
+#[derive(Debug, Clone)]
+pub struct HirClass {
+    pub name: Rc<str>,
+    /// Instance field names (`DeclareField`); initializers live in `ctor`.
+    pub fields: Vec<Rc<str>>,
+    /// The constructor (synthesised if the source omits one). Runs field
+    /// initializers after its body, matching legacy.
+    pub ctor: HirMethod,
+    pub methods: Vec<HirMethod>,
 }
 
 #[derive(Debug, Clone)]
@@ -216,6 +241,18 @@ pub enum HirStmt {
     /// Assign to an existing binding.
     Assign {
         target: HirBinding,
+        value: HirExpr,
+    },
+    /// `object.name = value` → `SetProperty` (with an IC slot).
+    SetMember {
+        object: HirExpr,
+        name: Rc<str>,
+        value: HirExpr,
+    },
+    /// `object[index] = value` → `SetIndex`.
+    SetIndex {
+        object: HirExpr,
+        index: HirExpr,
         value: HirExpr,
     },
     Return(Option<HirExpr>),
@@ -253,6 +290,9 @@ pub struct HirFunction {
     /// Number of upvalues this function captures (sets `FunctionProto.
     /// upvalue_count`). Zero for top-level/module functions.
     pub upvalue_count: u32,
+    /// Whether register 0 is a meaningful receiver (`this`) — true for methods
+    /// and constructors. Sets `FunctionProto.has_this`.
+    pub has_this: bool,
 }
 
 /// A whole module: the synthetic top-level function plus the functions it

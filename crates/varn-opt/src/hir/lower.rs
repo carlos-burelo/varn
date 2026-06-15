@@ -11,6 +11,7 @@ use std::rc::Rc;
 
 use varn_core::ast::expr::{ArrayEl, ArrowBody, ObjectProp, PropKey};
 use varn_core::ast::operators::{AssignOp, BinaryOp, LogicalOp, UnaryOp, UpdateOp};
+use varn_core::ast::decl::{ClassDecl, ClassMember};
 use varn_core::ast::{
     Arg, Decl, Expr, ExprKind, ForInit, FunctionDecl, Param, Pattern, Stmt, StmtKind,
 };
@@ -216,10 +217,17 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                         }
                     }
                 }
+                Decl::Class(c) => {
+                    if let Some(id) = &c.id {
+                        globals.insert(id.clone(), ());
+                    } else {
+                        return unsupported("anonymous top-level class");
+                    }
+                }
                 // Type-only declarations are erased at codegen (no bytecode),
                 // exactly as legacy `stmt.rs` does.
                 Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
-                _ => return unsupported("top-level class/enum/interface decl"),
+                _ => return unsupported("top-level enum/namespace decl"),
             }
         }
     }
@@ -265,6 +273,17 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                         });
                     }
                 }
+                Decl::Class(cl) => {
+                    let name = match &cl.id {
+                        Some(id) => id.clone(),
+                        None => return unsupported("anonymous top-level class"),
+                    };
+                    let hir_class = lo.lower_class(cl, &mut module_scope)?;
+                    top_body.push(HirStmt::Assign {
+                        target: HirBinding::Global(name),
+                        value: HirExpr::Class(Box::new(hir_class)),
+                    });
+                }
                 Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
                 _ => return unsupported("top-level decl"),
             },
@@ -281,6 +300,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
         body: top_body,
         return_ty: HirType::Dynamic,
         upvalue_count: 0,
+        has_this: false,
     };
 
     Ok(HirModule {
@@ -294,6 +314,8 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
 enum BodyRef<'b> {
     Block(&'b Stmt),
     ExprBody(&'b Expr),
+    /// No source body (a synthesised constructor that only runs field inits).
+    Empty,
 }
 
 impl<'a> Lowerer<'a> {
@@ -312,12 +334,146 @@ impl<'a> Lowerer<'a> {
             f.modifiers.is_async,
             f.modifiers.is_generator,
             !f.type_params.is_empty(),
+            false,
             BodyRef::Block(&f.body),
+            &[],
             scope,
         )
     }
 
-    /// Shared lowering for declarations, function expressions, and arrows.
+    /// Lower a class declaration to a `HirClass` (core subset: no inheritance,
+    /// static members, accessors, or decorators — those fall back to legacy).
+    fn lower_class(&mut self, decl: &ClassDecl, scope: &mut Scope) -> R<HirClass> {
+        let name = decl.id.clone().unwrap_or_else(|| Rc::from("anonymous"));
+        if decl.super_class.is_some() {
+            return unsupported("class inheritance");
+        }
+        if !decl.decorators.is_empty() {
+            return unsupported("class decorators");
+        }
+        if !decl.type_params.is_empty() {
+            return unsupported("generic class");
+        }
+        if decl.modifiers.is_abstract {
+            return unsupported("abstract class");
+        }
+
+        let mut fields: Vec<Rc<str>> = Vec::new();
+        let mut field_inits: Vec<(Rc<str>, &Expr)> = Vec::new();
+        let mut ctor_member: Option<(&[Param], &Stmt)> = None;
+        let mut methods_ast: Vec<(Rc<str>, &[Param], &Stmt)> = Vec::new();
+
+        for member in &decl.body {
+            match member {
+                ClassMember::Property {
+                    key,
+                    init,
+                    modifiers,
+                    ..
+                } => {
+                    if modifiers.is_static {
+                        return unsupported("static field");
+                    }
+                    fields.push(key.clone());
+                    if let Some(e) = init {
+                        field_inits.push((key.clone(), e));
+                    }
+                }
+                ClassMember::Constructor { params, body, .. } => {
+                    ctor_member = Some((params, body));
+                }
+                ClassMember::Method {
+                    key,
+                    params,
+                    body: Some(body),
+                    modifiers,
+                    decorators,
+                    ..
+                } => {
+                    if modifiers.is_static {
+                        return unsupported("static method");
+                    }
+                    if modifiers.is_async || modifiers.is_generator {
+                        return unsupported("async/generator method");
+                    }
+                    if !decorators.is_empty() {
+                        return unsupported("method decorators");
+                    }
+                    methods_ast.push((key.clone(), params, body));
+                }
+                ClassMember::Method { body: None, .. } => return unsupported("abstract method"),
+                ClassMember::Getter { .. } | ClassMember::Setter { .. } => {
+                    return unsupported("class accessor")
+                }
+                ClassMember::StaticBlock { .. } => return unsupported("static block"),
+                ClassMember::Destructor { .. } => return unsupported("class destructor"),
+            }
+        }
+
+        // Constructor (synthesised when absent); field inits run after its body.
+        let (ctor_func, ctor_ups) = match ctor_member {
+            Some((params, body)) => self.lower_function_like(
+                Rc::from("constructor"),
+                params,
+                false,
+                false,
+                false,
+                true,
+                BodyRef::Block(body),
+                &field_inits,
+                scope,
+            )?,
+            None => self.lower_function_like(
+                Rc::from("constructor"),
+                &[],
+                false,
+                false,
+                false,
+                true,
+                BodyRef::Empty,
+                &field_inits,
+                scope,
+            )?,
+        };
+
+        let mut methods = Vec::new();
+        for (key, params, body) in methods_ast {
+            let (func, upvalues) = self.lower_function_like(
+                key.clone(),
+                params,
+                false,
+                false,
+                false,
+                true,
+                BodyRef::Block(body),
+                &[],
+                scope,
+            )?;
+            methods.push(HirMethod {
+                key,
+                func,
+                upvalues,
+            });
+        }
+
+        Ok(HirClass {
+            name,
+            fields,
+            ctor: HirMethod {
+                key: Rc::from("constructor"),
+                func: ctor_func,
+                upvalues: ctor_ups,
+            },
+            methods,
+        })
+    }
+
+    /// Shared lowering for declarations, function expressions, arrows, and class
+    /// methods/constructors. `has_this` marks register 0 as the receiver;
+    /// `field_inits` are `this.name = expr` assignments appended after the body
+    /// (constructor field initializers, lowered in the constructor's frame —
+    /// matching legacy ordering).
+    #[allow(clippy::too_many_arguments)]
     fn lower_function_like(
         &mut self,
         name: Rc<str>,
@@ -325,7 +481,9 @@ impl<'a> Lowerer<'a> {
         is_async: bool,
         is_generator: bool,
         generic: bool,
+        has_this: bool,
         body: BodyRef<'_>,
+        field_inits: &[(Rc<str>, &Expr)],
         scope: &mut Scope,
     ) -> R<(HirFunction, Vec<HirUpvalueSrc>)> {
         if is_async || is_generator {
@@ -338,7 +496,7 @@ impl<'a> Lowerer<'a> {
         let prev_fn = self.current_fn.take();
         self.current_fn = Some(name.clone());
 
-        let built = self.lower_function_body(params_ast, body, scope);
+        let built = self.lower_function_body(params_ast, body, field_inits, scope);
 
         self.current_fn = prev_fn;
         let (params, body) = match built {
@@ -359,6 +517,7 @@ impl<'a> Lowerer<'a> {
             body,
             return_ty: HirType::Dynamic,
             upvalue_count: upvalues.len() as u32,
+            has_this,
         };
         Ok((func, upvalues))
     }
@@ -367,6 +526,7 @@ impl<'a> Lowerer<'a> {
         &mut self,
         params_ast: &[Param],
         body: BodyRef<'_>,
+        field_inits: &[(Rc<str>, &Expr)],
         scope: &mut Scope,
     ) -> R<(Vec<HirParam>, Vec<HirStmt>)> {
         let mut params = Vec::new();
@@ -398,6 +558,16 @@ impl<'a> Lowerer<'a> {
                 let v = self.lower_expr(e, scope)?;
                 out.push(HirStmt::Return(Some(v)));
             }
+            BodyRef::Empty => {}
+        }
+        // Constructor field initializers run after the body (legacy order).
+        for (fname, fexpr) in field_inits {
+            let value = self.lower_expr(fexpr, scope)?;
+            out.push(HirStmt::SetMember {
+                object: HirExpr::This,
+                name: fname.clone(),
+                value,
+            });
         }
         Ok((params, out))
     }
@@ -435,6 +605,53 @@ impl<'a> Lowerer<'a> {
             }
             StmtKind::Expr { expression } => {
                 if let ExprKind::Assign { op, target, value } = &expression.kind {
+                    // Member/index assignment target (simple `=` only).
+                    if let ExprKind::Member {
+                        object,
+                        property,
+                        computed,
+                        optional,
+                    } = &target.kind
+                    {
+                        if *optional {
+                            return unsupported("optional assignment target");
+                        }
+                        if !matches!(op, AssignOp::Assign) {
+                            return unsupported("compound member assignment");
+                        }
+                        let off = target.range.start.offset;
+                        if self.ann.get_slot_idx(off).is_some() {
+                            return unsupported("module-slot assignment");
+                        }
+                        if self.extension_set_members.contains_key(&off) {
+                            return unsupported("extension setter");
+                        }
+                        if matches!(object.kind, ExprKind::Super) {
+                            return unsupported("super assignment");
+                        }
+                        let object_hir = self.lower_expr(object, scope)?;
+                        if *computed {
+                            let index = self.lower_expr(property, scope)?;
+                            let value = self.lower_expr(value, scope)?;
+                            out.push(HirStmt::SetIndex {
+                                object: object_hir,
+                                index,
+                                value,
+                            });
+                        } else {
+                            let name = match &property.kind {
+                                ExprKind::Identifier { name } => name.clone(),
+                                _ => return unsupported("non-identifier property assign"),
+                            };
+                            let value = self.lower_expr(value, scope)?;
+                            out.push(HirStmt::SetMember {
+                                object: object_hir,
+                                name,
+                                value,
+                            });
+                        }
+                        return Ok(());
+                    }
                     let binding = match &target.kind {
                         ExprKind::Identifier { name } => self.resolve(name, scope),
                         _ => return unsupported("non-identifier assign target"),
@@ -496,8 +713,21 @@ impl<'a> Lowerer<'a> {
                         ty: HirType::Dynamic,
                     });
                 }
+                Decl::Class(cl) => {
+                    let cname = match &cl.id {
+                        Some(id) => id.clone(),
+                        None => return unsupported("anonymous nested class"),
+                    };
+                    let hir_class = self.lower_class(cl, scope)?;
+                    let local = scope.alloc_local(cname);
+                    out.push(HirStmt::Let {
+                        local,
+                        value: HirExpr::Class(Box::new(hir_class)),
+                        ty: HirType::Dynamic,
+                    });
+                }
                 Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
-                _ => return unsupported("nested class/enum decl"),
+                _ => return unsupported("nested enum decl"),
             },
             StmtKind::Return { argument } => {
                 let v = match argument {
@@ -596,6 +826,31 @@ impl<'a> Lowerer<'a> {
             ExprKind::StrLiteral { value } => Ok(HirExpr::Str(Rc::from(value.as_str()))),
             ExprKind::BoolLiteral { value } => Ok(HirExpr::Bool(*value)),
             ExprKind::NullLiteral => Ok(HirExpr::Null),
+            ExprKind::This => Ok(HirExpr::This),
+            ExprKind::New { callee, args, .. } => {
+                // `new C(args)` compiles to a plain Call; the VM constructs an
+                // instance when the callee is a class (legacy `expr/mod.rs`).
+                if let Some(mapping) = self.ann.get_call_mapping(offset) {
+                    let identity = mapping.len() == args.len()
+                        && mapping.iter().enumerate().all(|(i, m)| *m == Some(i));
+                    if !identity {
+                        return unsupported("new with non-trivial arg mapping");
+                    }
+                }
+                let mut hargs = Vec::with_capacity(args.len());
+                for a in args {
+                    match a {
+                        Arg::Positional(e) => hargs.push(self.lower_expr(e, scope)?),
+                        _ => return unsupported("new with named/spread arg"),
+                    }
+                }
+                let callee = Box::new(self.lower_expr(callee, scope)?);
+                Ok(HirExpr::Call {
+                    callee,
+                    args: hargs,
+                    ty: HirType::Dynamic,
+                })
+            }
             ExprKind::Paren { expression } => self.lower_expr(expression, scope),
             ExprKind::Identifier { name } => Ok(HirExpr::Var(self.resolve(name, scope))),
             ExprKind::Binary { op, left, right } => {
@@ -826,7 +1081,9 @@ impl<'a> Lowerer<'a> {
                     *is_async,
                     *is_generator,
                     false,
+                    false,
                     BodyRef::Block(body),
+                    &[],
                     scope,
                 )?;
                 Ok(HirExpr::Closure {
@@ -850,7 +1107,9 @@ impl<'a> Lowerer<'a> {
                     *is_async,
                     false,
                     false,
+                    false,
                     body_ref,
+                    &[],
                     scope,
                 )?;
                 Ok(HirExpr::Closure {

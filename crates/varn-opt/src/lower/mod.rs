@@ -51,7 +51,7 @@ pub fn lower_module(module: &HirModule, source_file: Rc<str>, export_names: Vec<
     for stmt in &module.top_level.body {
         fl.lower_stmt(stmt);
     }
-    fl.finish(Some(Rc::from("<module>")), 0, 0, export_names)
+    fl.finish(Some(Rc::from("<module>")), 0, 0, false, export_names)
 }
 
 fn lower_function(f: &HirFunction, source_file: Rc<str>) -> FunctionProto {
@@ -60,7 +60,13 @@ fn lower_function(f: &HirFunction, source_file: Rc<str>) -> FunctionProto {
     for stmt in &f.body {
         fl.lower_stmt(stmt);
     }
-    fl.finish(Some(f.name.clone()), nparams, f.upvalue_count, Vec::new())
+    fl.finish(
+        Some(f.name.clone()),
+        nparams,
+        f.upvalue_count,
+        f.has_this,
+        Vec::new(),
+    )
 }
 
 struct LoopCtx {
@@ -148,6 +154,7 @@ impl FnLower {
         name: Option<Rc<str>>,
         nparams: u32,
         upvalue_count: u32,
+        has_this: bool,
         export_names: Vec<Rc<str>>,
     ) -> FunctionProto {
         let cache_count = self.cache_count as usize;
@@ -166,7 +173,7 @@ impl FnLower {
             has_rest: false,
             is_async: false,
             is_generator: false,
-            has_this: false,
+            has_this,
             upvalue_count: upvalue_count as usize,
             cache_count,
             chunk,
@@ -201,6 +208,32 @@ impl FnLower {
                 let mark = self.next_temp;
                 let v = self.lower_expr(value);
                 self.store_binding(target, v);
+                self.free_to(mark);
+            }
+            HirStmt::SetMember {
+                object,
+                name,
+                value,
+            } => {
+                let mark = self.next_temp;
+                let obj = self.lower_expr(object);
+                let val = self.lower_expr(value);
+                let key_idx = self.chunk.add_str(name);
+                // SetProperty obj.key = val (with an IC slot).
+                self.emit_property(OpCode::SetProperty, obj, val, key_idx);
+                self.free_to(mark);
+            }
+            HirStmt::SetIndex {
+                object,
+                index,
+                value,
+            } => {
+                let mark = self.next_temp;
+                let obj = self.lower_expr(object);
+                let idx = self.lower_expr(index);
+                let val = self.lower_expr(value);
+                self.chunk
+                    .emit_rrr(OpCode::SetIndex, obj, idx, val, self.line);
                 self.free_to(mark);
             }
             HirStmt::Return(v) => {
@@ -392,7 +425,45 @@ impl FnLower {
             HirExpr::Array(elements) => self.lower_array(elements),
             HirExpr::Object { keys, values } => self.lower_object(keys, values),
             HirExpr::Closure { func, upvalues } => self.lower_closure(func, upvalues),
+            HirExpr::This => {
+                // The receiver lives in register 0; copy it into a temp.
+                let r = self.alloc();
+                self.chunk.emit_rr(OpCode::Move, r, 0, self.line);
+                r
+            }
+            HirExpr::Class(cls) => self.lower_class_value(cls),
         }
+    }
+
+    /// Build a class value: `MakeClass` + `DeclareField`(s) + `Method`(s).
+    fn lower_class_value(&mut self, cls: &HirClass) -> u8 {
+        let name_idx = self.chunk.add_str(&cls.name);
+        let class_reg = self.alloc();
+        self.chunk
+            .emit_rrc(OpCode::MakeClass, class_reg, 0, name_idx, self.line);
+        for field in &cls.fields {
+            let key_idx = self.chunk.add_str(field);
+            self.chunk.emit(OpCode::DeclareField, self.line);
+            self.chunk.write(Chunk::pack(class_reg, 0), self.line);
+            self.chunk.write(key_idx, self.line);
+        }
+        self.bind_method(class_reg, &cls.ctor);
+        for m in &cls.methods {
+            self.bind_method(class_reg, m);
+        }
+        class_reg
+    }
+
+    /// Lower a method/constructor closure and bind it on the class with the
+    /// `Method` opcode (legacy `class.rs`).
+    fn bind_method(&mut self, class_reg: u8, m: &HirMethod) {
+        let mark = self.next_temp;
+        let method_reg = self.lower_closure(&m.func, &m.upvalues);
+        let key_idx = self.chunk.add_str(&m.key);
+        self.chunk.emit(OpCode::Method, self.line);
+        self.chunk.write(Chunk::pack(class_reg, method_reg), self.line);
+        self.chunk.write(key_idx, self.line);
+        self.free_to(mark);
     }
 
     fn load_binding(&mut self, binding: &HirBinding) -> u8 {
