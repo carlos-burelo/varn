@@ -40,7 +40,15 @@ pub fn compile_direct(
             extension_set_members,
             export_names: export_names.clone(),
         };
-        if let Ok(proto) = varn_opt::compile(input) {
+        if let Ok(mut proto) = varn_opt::compile(input) {
+            // §1.0: the backend post-passes (`regalloc_post`, `slot_kinds`) live
+            // in this crate, so `varn-opt` cannot run them itself without a dep
+            // cycle. Run them here over the whole proto tree (top level + every
+            // nested function proto in the constant pools), exactly as
+            // `finish_module`/`finish_function` do for the legacy path. Without
+            // this, varn-opt code skips register compression and leaves
+            // `register_meta` empty, disabling the JIT's typed fast paths.
+            run_backend_post_passes(&mut proto);
             return Ok(proto);
         }
     }
@@ -64,4 +72,32 @@ pub fn compile_direct(
         return Err(err);
     }
     Ok(c.finish_module())
+}
+
+/// Apply the register-allocation post-pass and slot-kind inference to a proto
+/// produced by `varn-opt`, recursing into every nested function proto embedded
+/// in the constant pools. Mirrors `Compiler::finish_module`/`finish_function`,
+/// which run these two passes per emitted proto in the legacy path.
+///
+/// Nested protos sit in the constant pool behind `Rc`. They are freshly built
+/// (refcount 1) so `Rc::get_mut` succeeds; the clone-and-replace branch is a
+/// defensive fallback should a proto ever be shared.
+fn run_backend_post_passes(proto: &mut FunctionProto) {
+    use varn_types::chunk::PoolEntry;
+
+    for entry in proto.chunk.constants.iter_mut() {
+        if let PoolEntry::Function(rc) = entry {
+            match Rc::get_mut(rc) {
+                Some(inner) => run_backend_post_passes(inner),
+                None => {
+                    let mut cloned = (**rc).clone();
+                    run_backend_post_passes(&mut cloned);
+                    *rc = Rc::new(cloned);
+                }
+            }
+        }
+    }
+
+    regalloc_post::optimize_function(proto);
+    crate::analysis::slot_kinds::infer(proto);
 }
