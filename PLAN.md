@@ -137,7 +137,26 @@ opcodes → legacy reference → verification.
 - Verify: a module using objects/arrays/method calls compiles via varn-opt and
   passes (e.g. `tests/` collection/string modules).
 
-### 1.2 Closures + upvalues + nested functions
+### 1.2 Closures + upvalues + nested functions ✅ DONE
+- Replaced the single-function `Scope` with a **frame stack**: name resolution
+  walks outward across frames, capturing enclosing bindings as upvalues
+  (`HirUpvalueSrc::ParentLocal/ParentParam/ParentUpvalue`, dedup) — the legacy
+  `resolve_upvalue`/`add_upvalue` chain, but symbolic since registers aren't
+  assigned until lowering. Function exprs, arrows (expr + block body), and
+  nested function decls lower to `HirExpr::Closure { func, upvalues }` →
+  `MakeClosure` (or `LoadStaticFn` when capture-free), resolving upvalue sources
+  to `(is_local, index)` against the parent frame's registers. `LoadUpvalue`/
+  `StoreUpvalue` for upvalue read/write; `CloseUpvalue` (`HirStmt::CloseUpvalues`)
+  on inner-block pop (function-level captures are closed by the VM's `Return`).
+- **Nested self-recursion uses `CallSelf`**, not self-capture: `is_self_call`
+  checks only the current frame (legacy `name_resolves_locally`), so a recursive
+  nested function stays capture-free (`LoadStaticFn`) and avoids a use-before-def
+  on its own slot that the register allocator can't model.
+- Verified end-to-end via varn-opt: higher-order calls, escaping closures
+  capturing a param, a mutating counter (independent instances), and nested
+  recursion all match (`42 15 1 2 1 3 120`). Suite 686/686.
+
+  Original notes:
 - AST: `ExprKind::Function`/`Arrow`; function decls **inside** functions.
 - HIR: `HirExpr::Closure { fn_index, captures: Vec<Upvalue> }`;
   `HirBinding::Upvalue`. Capture analysis: a name resolved in an enclosing

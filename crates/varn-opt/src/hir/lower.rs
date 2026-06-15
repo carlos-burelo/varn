@@ -9,7 +9,7 @@
 
 use std::rc::Rc;
 
-use varn_core::ast::expr::{ArrayEl, ObjectProp, PropKey};
+use varn_core::ast::expr::{ArrayEl, ArrowBody, ObjectProp, PropKey};
 use varn_core::ast::operators::{AssignOp, BinaryOp, LogicalOp, UnaryOp, UpdateOp};
 use varn_core::ast::{
     Arg, Decl, Expr, ExprKind, ForInit, FunctionDecl, Param, Pattern, Stmt, StmtKind,
@@ -25,44 +25,156 @@ fn unsupported<T>(what: &'static str) -> R<T> {
     Err(OptError::Unsupported(what))
 }
 
-/// Lexical scope chain mapping names to resolved HIR bindings within one
-/// function (plus the module-global set, shared across functions).
-struct Scope {
-    /// One map per nested block; innermost last.
+/// One function's lexical state: a stack of block scopes, its local counter,
+/// the upvalues it captures from enclosing frames, and — per block — the
+/// capture targets that were closed over (so a block pop knows what to
+/// `CloseUpvalue`).
+struct Frame {
     blocks: Vec<rustc_hash::FxHashMap<Rc<str>, HirBinding>>,
+    captured: Vec<Vec<CaptureTarget>>,
     next_local: u32,
+    upvalues: Vec<HirUpvalueSrc>,
+}
+
+impl Frame {
+    fn new() -> Self {
+        Self {
+            blocks: vec![rustc_hash::FxHashMap::default()],
+            captured: vec![Vec::new()],
+            next_local: 0,
+            upvalues: Vec::new(),
+        }
+    }
+}
+
+/// A stack of function frames (innermost last). Name resolution walks outward
+/// across frames, capturing enclosing-function bindings as upvalues — mirroring
+/// the legacy `Compiler`'s `resolve_upvalue`/`add_upvalue` chain, but in terms
+/// of symbolic capture sources since registers are assigned later.
+struct Scope {
+    frames: Vec<Frame>,
 }
 
 impl Scope {
     fn new() -> Self {
         Self {
-            blocks: vec![rustc_hash::FxHashMap::default()],
-            next_local: 0,
+            frames: vec![Frame::new()],
         }
     }
-    fn push(&mut self) {
-        self.blocks.push(rustc_hash::FxHashMap::default());
+
+    fn push_frame(&mut self) {
+        self.frames.push(Frame::new());
     }
-    fn pop(&mut self) {
-        self.blocks.pop();
+
+    /// Pop the innermost frame, returning its local count, captured upvalues,
+    /// and the capture targets left in its outermost block (params + top-level
+    /// locals to close at function end).
+    fn pop_frame(&mut self) -> (u32, Vec<HirUpvalueSrc>, Vec<CaptureTarget>) {
+        let mut f = self.frames.pop().expect("frame underflow");
+        let block0 = f.captured.pop().unwrap_or_default();
+        (f.next_local, f.upvalues, block0)
     }
+
+    fn push_block(&mut self) {
+        let f = self.frames.last_mut().unwrap();
+        f.blocks.push(rustc_hash::FxHashMap::default());
+        f.captured.push(Vec::new());
+    }
+
+    /// Pop the innermost block of the current frame, returning the capture
+    /// targets recorded for it.
+    fn pop_block(&mut self) -> Vec<CaptureTarget> {
+        let f = self.frames.last_mut().unwrap();
+        f.blocks.pop();
+        f.captured.pop().unwrap_or_default()
+    }
+
     fn define(&mut self, name: Rc<str>, binding: HirBinding) {
-        self.blocks.last_mut().unwrap().insert(name, binding);
+        let f = self.frames.last_mut().unwrap();
+        f.blocks.last_mut().unwrap().insert(name, binding);
     }
+
     fn alloc_local(&mut self, name: Rc<str>) -> LocalId {
-        let id = LocalId(self.next_local);
-        self.next_local += 1;
-        self.define(name, HirBinding::Local(id));
+        let f = self.frames.last_mut().unwrap();
+        let id = LocalId(f.next_local);
+        f.next_local += 1;
+        f.blocks.last_mut().unwrap().insert(name, HirBinding::Local(id));
         id
     }
-    fn resolve(&self, name: &str) -> Option<HirBinding> {
-        for block in self.blocks.iter().rev() {
+
+    /// Look up a name in the current frame only (no upvalue capture). Used to
+    /// decide static self-recursion, mirroring legacy `name_resolves_locally`.
+    fn resolve_in_current_frame(&self, name: &str) -> Option<HirBinding> {
+        lookup_in_frame(self.frames.last().unwrap(), name)
+    }
+
+    /// Resolve a name to a binding in the current frame, or capture it as an
+    /// upvalue from an enclosing frame. `None` ⇒ the caller treats it as a
+    /// module global.
+    fn resolve(&mut self, name: &str) -> Option<HirBinding> {
+        let top = self.frames.len() - 1;
+        if let Some(b) = lookup_in_frame(&self.frames[top], name) {
+            return Some(b);
+        }
+        self.resolve_upvalue(top, name)
+    }
+
+    fn resolve_upvalue(&mut self, frame_idx: usize, name: &str) -> Option<HirBinding> {
+        if frame_idx == 0 {
+            return None;
+        }
+        let parent_idx = frame_idx - 1;
+        // Look for a direct binding in the parent frame's blocks.
+        let mut found: Option<(usize, HirBinding)> = None;
+        for (bi, block) in self.frames[parent_idx].blocks.iter().enumerate().rev() {
             if let Some(b) = block.get(name) {
-                return Some(b.clone());
+                found = Some((bi, b.clone()));
+                break;
             }
+        }
+        if let Some((bi, binding)) = found {
+            let src = match binding {
+                HirBinding::Param(i) => {
+                    self.frames[parent_idx].captured[bi].push(CaptureTarget::Param(i));
+                    HirUpvalueSrc::ParentParam(i)
+                }
+                HirBinding::Local(id) => {
+                    self.frames[parent_idx].captured[bi].push(CaptureTarget::Local(id));
+                    HirUpvalueSrc::ParentLocal(id)
+                }
+                HirBinding::Upvalue(uv) => HirUpvalueSrc::ParentUpvalue(uv),
+                HirBinding::Global(_) => return None,
+            };
+            let idx = self.add_upvalue(frame_idx, src);
+            return Some(HirBinding::Upvalue(idx));
+        }
+        // Not in the parent directly: have the parent capture it first, then
+        // chain a parent-upvalue capture into this frame.
+        if let Some(HirBinding::Upvalue(parent_uv)) = self.resolve_upvalue(parent_idx, name) {
+            let idx = self.add_upvalue(frame_idx, HirUpvalueSrc::ParentUpvalue(parent_uv));
+            return Some(HirBinding::Upvalue(idx));
         }
         None
     }
+
+    fn add_upvalue(&mut self, frame_idx: usize, src: HirUpvalueSrc) -> u32 {
+        let ups = &mut self.frames[frame_idx].upvalues;
+        if let Some(i) = ups.iter().position(|u| *u == src) {
+            return i as u32;
+        }
+        let i = ups.len() as u32;
+        ups.push(src);
+        i
+    }
+}
+
+fn lookup_in_frame(frame: &Frame, name: &str) -> Option<HirBinding> {
+    for block in frame.blocks.iter().rev() {
+        if let Some(b) = block.get(name) {
+            return Some(b.clone());
+        }
+    }
+    None
 }
 
 pub struct Lowerer<'a> {
@@ -121,13 +233,21 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
         extension_set_members: input.extension_set_members,
     };
 
-    // Pass 2: lower each declared function and the module top level.
+    // Pass 2: lower each declared function and the module top level. The
+    // module's own statements share one persistent `module_scope` (so block
+    // locals across top-level statements get distinct slots); each top-level
+    // function gets a fresh scope (module names are globals, not upvalues).
     let mut functions = Vec::new();
     let mut top_body = Vec::new();
+    let mut module_scope = Scope::new();
     for stmt in &program.body {
         match &stmt.kind {
             StmtKind::Decl(decl) => match decl.as_ref() {
-                Decl::Function(f) => functions.push(lo.lower_function(f)?),
+                Decl::Function(f) => {
+                    let mut fscope = Scope::new();
+                    let (func, _ups) = lo.lower_function(f, &mut fscope)?;
+                    functions.push(func);
+                }
                 Decl::Variable(v) => {
                     // Top-level `let x = e` -> assign module global x.
                     for d in &v.declarators {
@@ -136,7 +256,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                             _ => return unsupported("top-level destructuring"),
                         };
                         let value = match &d.init {
-                            Some(e) => lo.lower_expr(e, &mut Scope::new())?,
+                            Some(e) => lo.lower_expr(e, &mut module_scope)?,
                             None => HirExpr::Null,
                         };
                         top_body.push(HirStmt::Assign {
@@ -149,8 +269,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                 _ => return unsupported("top-level decl"),
             },
             _ => {
-                let mut scope = Scope::new();
-                lo.lower_stmt(stmt, &mut scope, &mut top_body)?;
+                lo.lower_stmt(stmt, &mut module_scope, &mut top_body)?;
             }
         }
     }
@@ -158,9 +277,10 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
     let top_level = HirFunction {
         name: Rc::from("<module>"),
         params: Vec::new(),
-        locals: 0,
+        locals: module_scope.frames[0].next_local,
         body: top_body,
         return_ty: HirType::Dynamic,
+        upvalue_count: 0,
     };
 
     Ok(HirModule {
@@ -169,58 +289,122 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
     })
 }
 
+/// A function-like body to lower: a statement block (decl/function-expr) or a
+/// bare expression (arrow shorthand `x => expr`).
+enum BodyRef<'b> {
+    Block(&'b Stmt),
+    ExprBody(&'b Expr),
+}
+
 impl<'a> Lowerer<'a> {
-    fn lower_function(&mut self, f: &FunctionDecl) -> R<HirFunction> {
-        if f.modifiers.is_async || f.modifiers.is_generator {
+    /// Lower a function declaration into its `HirFunction` plus the upvalues it
+    /// captures from enclosing frames. `scope` carries the enclosing frame
+    /// stack so nested functions can capture; top-level callers pass a fresh
+    /// `Scope` (its empty frame 0 yields no captures → globals).
+    fn lower_function(
+        &mut self,
+        f: &FunctionDecl,
+        scope: &mut Scope,
+    ) -> R<(HirFunction, Vec<HirUpvalueSrc>)> {
+        self.lower_function_like(
+            f.id.clone(),
+            &f.params,
+            f.modifiers.is_async,
+            f.modifiers.is_generator,
+            !f.type_params.is_empty(),
+            BodyRef::Block(&f.body),
+            scope,
+        )
+    }
+
+    /// Shared lowering for declarations, function expressions, and arrows.
+    fn lower_function_like(
+        &mut self,
+        name: Rc<str>,
+        params_ast: &[Param],
+        is_async: bool,
+        is_generator: bool,
+        generic: bool,
+        body: BodyRef<'_>,
+        scope: &mut Scope,
+    ) -> R<(HirFunction, Vec<HirUpvalueSrc>)> {
+        if is_async || is_generator {
             return unsupported("async/generator function");
         }
-        if !f.type_params.is_empty() {
+        if generic {
             return unsupported("generic function");
         }
-        let mut scope = Scope::new();
+        scope.push_frame();
+        let prev_fn = self.current_fn.take();
+        self.current_fn = Some(name.clone());
+
+        let built = self.lower_function_body(params_ast, body, scope);
+
+        self.current_fn = prev_fn;
+        let (params, body) = match built {
+            Ok(v) => v,
+            Err(e) => {
+                scope.pop_frame(); // keep the frame stack balanced on error
+                return Err(e);
+            }
+        };
+        // Function-level captures (params + top-level locals) are closed by the
+        // VM's `Return` (close_upvalues_above base); only inner blocks need an
+        // explicit `CloseUpvalue`, emitted in `lower_block`/`Block`/`For`.
+        let (locals, upvalues, _captured0) = scope.pop_frame();
+        let func = HirFunction {
+            name,
+            params,
+            locals,
+            body,
+            return_ty: HirType::Dynamic,
+            upvalue_count: upvalues.len() as u32,
+        };
+        Ok((func, upvalues))
+    }
+
+    fn lower_function_body(
+        &mut self,
+        params_ast: &[Param],
+        body: BodyRef<'_>,
+        scope: &mut Scope,
+    ) -> R<(Vec<HirParam>, Vec<HirStmt>)> {
         let mut params = Vec::new();
-        for (i, p) in f.params.iter().enumerate() {
+        for (i, p) in params_ast.iter().enumerate() {
             if p.is_rest || p.is_optional || p.default.is_some() {
                 return unsupported("rest/optional/default param");
             }
-            let name = match &p.pattern {
+            let pname = match &p.pattern {
                 Pattern::Identifier { name, .. } => name.clone(),
                 _ => return unsupported("destructuring param"),
             };
-            scope.define(name.clone(), HirBinding::Param(i as u32));
+            scope.define(pname.clone(), HirBinding::Param(i as u32));
             params.push(HirParam {
-                name,
+                name: pname,
                 ty: param_ty(p),
             });
         }
-        let mut body = Vec::new();
-        let prev_fn = self.current_fn.take();
-        self.current_fn = Some(f.id.clone());
-        let lowered = (|| {
-            match &f.body.kind {
+        let mut out = Vec::new();
+        match body {
+            BodyRef::Block(stmt) => match &stmt.kind {
                 StmtKind::Block { stmts } => {
                     for s in stmts {
-                        self.lower_stmt(s, &mut scope, &mut body)?;
+                        self.lower_stmt(s, scope, &mut out)?;
                     }
                 }
-                _ => self.lower_stmt(&f.body, &mut scope, &mut body)?,
+                _ => self.lower_stmt(stmt, scope, &mut out)?,
+            },
+            BodyRef::ExprBody(e) => {
+                let v = self.lower_expr(e, scope)?;
+                out.push(HirStmt::Return(Some(v)));
             }
-            Ok(())
-        })();
-        self.current_fn = prev_fn;
-        lowered?;
-        Ok(HirFunction {
-            name: f.id.clone(),
-            params,
-            locals: scope.next_local,
-            body,
-            return_ty: HirType::Dynamic,
-        })
+        }
+        Ok((params, out))
     }
 
     fn lower_block(&mut self, stmt: &Stmt, scope: &mut Scope) -> R<Vec<HirStmt>> {
         let mut out = Vec::new();
-        scope.push();
+        scope.push_block();
         match &stmt.kind {
             StmtKind::Block { stmts } => {
                 for s in stmts {
@@ -229,7 +413,10 @@ impl<'a> Lowerer<'a> {
             }
             _ => self.lower_stmt(stmt, scope, &mut out)?,
         }
-        scope.pop();
+        let captured = scope.pop_block();
+        if !captured.is_empty() {
+            out.push(HirStmt::CloseUpvalues(captured));
+        }
         Ok(out)
     }
 
@@ -237,11 +424,14 @@ impl<'a> Lowerer<'a> {
         match &stmt.kind {
             StmtKind::Empty => {}
             StmtKind::Block { stmts } => {
-                scope.push();
+                scope.push_block();
                 for s in stmts {
                     self.lower_stmt(s, scope, out)?;
                 }
-                scope.pop();
+                let captured = scope.pop_block();
+                if !captured.is_empty() {
+                    out.push(HirStmt::CloseUpvalues(captured));
+                }
             }
             StmtKind::Expr { expression } => {
                 if let ExprKind::Assign { op, target, value } = &expression.kind {
@@ -291,8 +481,23 @@ impl<'a> Lowerer<'a> {
                         });
                     }
                 }
+                // Nested function declaration → closure bound to a local. Bind
+                // the name *before* lowering the body so the body can capture
+                // itself (recursion via an open upvalue on this local slot).
+                Decl::Function(f) => {
+                    let local = scope.alloc_local(f.id.clone());
+                    let (func, upvalues) = self.lower_function(f, scope)?;
+                    out.push(HirStmt::Let {
+                        local,
+                        value: HirExpr::Closure {
+                            func: Box::new(func),
+                            upvalues,
+                        },
+                        ty: HirType::Dynamic,
+                    });
+                }
                 Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
-                _ => return unsupported("nested function/class decl"),
+                _ => return unsupported("nested class/enum decl"),
             },
             StmtKind::Return { argument } => {
                 let v = match argument {
@@ -331,7 +536,7 @@ impl<'a> Lowerer<'a> {
             } => {
                 // Desugar `for (init; test; update) body`
                 //   -> init; while (test) { body; update }
-                scope.push();
+                scope.push_block();
                 if let Some(init) = init {
                     match init.as_ref() {
                         ForInit::Expr(e) => {
@@ -371,7 +576,10 @@ impl<'a> Lowerer<'a> {
                     test,
                     body: loop_body,
                 });
-                scope.pop();
+                let captured = scope.pop_block();
+                if !captured.is_empty() {
+                    out.push(HirStmt::CloseUpvalues(captured));
+                }
             }
             StmtKind::Break { label: None } => out.push(HirStmt::Break),
             StmtKind::Continue { label: None } => out.push(HirStmt::Continue),
@@ -599,6 +807,57 @@ impl<'a> Lowerer<'a> {
                 }
                 Ok(HirExpr::Object { keys, values })
             }
+            ExprKind::Function {
+                fn_id,
+                params,
+                body,
+                is_async,
+                is_generator,
+                ..
+            } => {
+                // A named function expression can reference itself; resolving
+                // that correctly needs a self-binding we don't model yet.
+                if fn_id.is_some() {
+                    return unsupported("named function expression");
+                }
+                let (func, upvalues) = self.lower_function_like(
+                    Rc::from("<anon>"),
+                    params,
+                    *is_async,
+                    *is_generator,
+                    false,
+                    BodyRef::Block(body),
+                    scope,
+                )?;
+                Ok(HirExpr::Closure {
+                    func: Box::new(func),
+                    upvalues,
+                })
+            }
+            ExprKind::Arrow {
+                params,
+                body,
+                is_async,
+                ..
+            } => {
+                let body_ref = match body.as_ref() {
+                    ArrowBody::Expr(e) => BodyRef::ExprBody(e),
+                    ArrowBody::Block(s) => BodyRef::Block(s),
+                };
+                let (func, upvalues) = self.lower_function_like(
+                    Rc::from("<arrow>"),
+                    params,
+                    *is_async,
+                    false,
+                    false,
+                    body_ref,
+                    scope,
+                )?;
+                Ok(HirExpr::Closure {
+                    func: Box::new(func),
+                    upvalues,
+                })
+            }
             _ => unsupported("expression kind"),
         }
     }
@@ -616,12 +875,16 @@ impl<'a> Lowerer<'a> {
             Some(cur) if cur == name => {}
             _ => return false,
         }
-        // Must resolve to the module global (the function itself), not a
-        // local/param binding that shadows the name.
-        scope.resolve(name).is_none() && !self.ann.is_reassigned_name(name)
+        // Self-recursion is `CallSelf` (direct, no closure lookup) when the name
+        // is not shadowed by a param/local of *this* function and is not
+        // reassigned. Checking only the current frame — not capturing from a
+        // parent — matches legacy `name_resolves_locally`, so a nested function
+        // recurses via `CallSelf` instead of an upvalue to its own slot (which
+        // would be a use-before-def the register allocator can't model).
+        scope.resolve_in_current_frame(name).is_none() && !self.ann.is_reassigned_name(name)
     }
 
-    fn resolve(&self, name: &Rc<str>, scope: &Scope) -> HirBinding {
+    fn resolve(&self, name: &Rc<str>, scope: &mut Scope) -> HirBinding {
         if let Some(b) = scope.resolve(name) {
             b
         } else {
