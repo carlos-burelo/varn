@@ -45,6 +45,30 @@ pub enum HirBinding {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct LocalId(pub u32);
 
+/// Where an upvalue captured by a closure comes from, in terms of the *parent*
+/// function's bindings. Registers are not assigned until bytecode lowering, so
+/// the capture is described symbolically here and resolved to a `(is_local,
+/// index)` pair (the `MakeClosure` encoding) by the lowerer, which knows the
+/// parent's register layout.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HirUpvalueSrc {
+    /// A local in the immediate parent (is_local = true).
+    ParentLocal(LocalId),
+    /// A parameter of the immediate parent (is_local = true).
+    ParentParam(u32),
+    /// An upvalue of the immediate parent, by parent-upvalue index
+    /// (is_local = false).
+    ParentUpvalue(u32),
+}
+
+/// A binding target whose register is only known at bytecode-lowering time;
+/// used to compute the lowest captured register for `CloseUpvalue`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CaptureTarget {
+    Param(u32),
+    Local(LocalId),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HirBinOp {
     Add,
@@ -171,6 +195,13 @@ pub enum HirExpr {
         keys: Vec<Rc<str>>,
         values: Vec<HirExpr>,
     },
+    /// A function/arrow expression or a nested function declaration captured as
+    /// a first-class value. Lowers to `MakeClosure` (or `LoadStaticFn` when
+    /// `upvalues` is empty). The nested function is owned inline.
+    Closure {
+        func: Box<HirFunction>,
+        upvalues: Vec<HirUpvalueSrc>,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -200,6 +231,10 @@ pub enum HirStmt {
     },
     Break,
     Continue,
+    /// Close any open upvalues that point at the given capture targets' slots,
+    /// emitted when a block/function that declared captured bindings is about
+    /// to go out of scope. Lowers to `CloseUpvalue` at the lowest such register.
+    CloseUpvalues(Vec<CaptureTarget>),
 }
 
 #[derive(Debug, Clone)]
@@ -215,6 +250,9 @@ pub struct HirFunction {
     pub locals: u32,
     pub body: Vec<HirStmt>,
     pub return_ty: HirType,
+    /// Number of upvalues this function captures (sets `FunctionProto.
+    /// upvalue_count`). Zero for top-level/module functions.
+    pub upvalue_count: u32,
 }
 
 /// A whole module: the synthetic top-level function plus the functions it

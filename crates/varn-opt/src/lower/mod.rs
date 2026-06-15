@@ -51,7 +51,7 @@ pub fn lower_module(module: &HirModule, source_file: Rc<str>, export_names: Vec<
     for stmt in &module.top_level.body {
         fl.lower_stmt(stmt);
     }
-    fl.finish(Some(Rc::from("<module>")), 0, export_names)
+    fl.finish(Some(Rc::from("<module>")), 0, 0, export_names)
 }
 
 fn lower_function(f: &HirFunction, source_file: Rc<str>) -> FunctionProto {
@@ -60,7 +60,7 @@ fn lower_function(f: &HirFunction, source_file: Rc<str>) -> FunctionProto {
     for stmt in &f.body {
         fl.lower_stmt(stmt);
     }
-    fl.finish(Some(f.name.clone()), nparams, Vec::new())
+    fl.finish(Some(f.name.clone()), nparams, f.upvalue_count, Vec::new())
 }
 
 struct LoopCtx {
@@ -143,7 +143,13 @@ impl FnLower {
         self.next_temp = mark;
     }
 
-    fn finish(self, name: Option<Rc<str>>, nparams: u32, export_names: Vec<Rc<str>>) -> FunctionProto {
+    fn finish(
+        self,
+        name: Option<Rc<str>>,
+        nparams: u32,
+        upvalue_count: u32,
+        export_names: Vec<Rc<str>>,
+    ) -> FunctionProto {
         let cache_count = self.cache_count as usize;
         let mut chunk = self.chunk;
         // Implicit `return null` (matches legacy codegen's epilogue).
@@ -161,7 +167,7 @@ impl FnLower {
             is_async: false,
             is_generator: false,
             has_this: false,
-            upvalue_count: 0,
+            upvalue_count: upvalue_count as usize,
             cache_count,
             chunk,
             required_caps: Vec::new(),
@@ -266,6 +272,20 @@ impl FnLower {
                     self.chunk.emit_loop(target, self.line);
                 }
             }
+            HirStmt::CloseUpvalues(targets) => {
+                // Close open upvalues over the lowest captured slot, matching
+                // legacy `pop_scope`. The VM closes everything at or above it.
+                let lowest = targets
+                    .iter()
+                    .map(|t| match t {
+                        CaptureTarget::Param(i) => self.param_reg(*i),
+                        CaptureTarget::Local(id) => self.local_reg(*id),
+                    })
+                    .min()
+                    .unwrap_or(0);
+                self.chunk
+                    .emit1(OpCode::CloseUpvalue, lowest as u16, self.line);
+            }
         }
     }
 
@@ -284,7 +304,14 @@ impl FnLower {
                 self.chunk
                     .emit_rrc(OpCode::DefineGlobal, 0, value_reg, idx, self.line);
             }
-            HirBinding::Upvalue(_) => unreachable!("upvalues are unsupported in core lowering"),
+            HirBinding::Upvalue(uv) => {
+                // StoreUpvalue: uv in hi byte, src in lo (legacy `emit_store_var`).
+                self.chunk.emit1(
+                    OpCode::StoreUpvalue,
+                    Chunk::pack(*uv as u8, value_reg),
+                    self.line,
+                );
+            }
         }
     }
 
@@ -364,6 +391,7 @@ impl FnLower {
             HirExpr::Update { target, op, prefix } => self.lower_update(target, *op, *prefix),
             HirExpr::Array(elements) => self.lower_array(elements),
             HirExpr::Object { keys, values } => self.lower_object(keys, values),
+            HirExpr::Closure { func, upvalues } => self.lower_closure(func, upvalues),
         }
     }
 
@@ -382,7 +410,11 @@ impl FnLower {
                 let idx = self.chunk.add_str(name);
                 self.chunk.emit_rc(OpCode::LoadGlobal, r, idx, self.line);
             }
-            HirBinding::Upvalue(_) => unreachable!("upvalues unsupported in core lowering"),
+            HirBinding::Upvalue(uv) => {
+                // LoadUpvalue: dest in hi byte, uv index in lo (legacy `emit_load_var`).
+                self.chunk
+                    .emit1(OpCode::LoadUpvalue, Chunk::pack(r, *uv as u8), self.line);
+            }
         }
         r
     }
@@ -584,6 +616,37 @@ impl FnLower {
         self.chunk.write(Chunk::pack(dest, start), self.line);
         self.chunk.write(shape_idx, self.line);
         self.free_to(dest as u32 + 1);
+        dest
+    }
+
+    /// Closure value: lower the nested function to a proto constant, then emit
+    /// `MakeClosure` (or `LoadStaticFn` when it captures nothing). Upvalue
+    /// sources are resolved to `(is_local, index)` against this (parent) frame's
+    /// register layout. Mirrors legacy `emit_closure`.
+    fn lower_closure(&mut self, func: &HirFunction, upvalues: &[HirUpvalueSrc]) -> u8 {
+        let proto = lower_function(func, self.chunk.source_file.clone());
+        let proto_idx = self
+            .chunk
+            .add_constant(PoolEntry::Function(Rc::new(proto)));
+        let dest = self.alloc();
+        if upvalues.is_empty() {
+            self.chunk
+                .write(Chunk::pack_op(OpCode::LoadStaticFn, dest), self.line);
+            self.chunk.write(proto_idx, self.line);
+            return dest;
+        }
+        let uv_count = upvalues.len() as u8;
+        self.chunk.emit(OpCode::MakeClosure, self.line);
+        self.chunk.write(Chunk::pack(dest, uv_count), self.line);
+        self.chunk.write(proto_idx, self.line);
+        for uv in upvalues {
+            let (is_local, index) = match uv {
+                HirUpvalueSrc::ParentLocal(id) => (1u8, self.local_reg(*id)),
+                HirUpvalueSrc::ParentParam(i) => (1u8, self.param_reg(*i)),
+                HirUpvalueSrc::ParentUpvalue(uv) => (0u8, *uv as u8),
+            };
+            self.chunk.write(Chunk::pack(is_local, index), self.line);
+        }
         dest
     }
 }
