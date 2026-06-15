@@ -384,7 +384,8 @@ impl<'a> Lowerer<'a> {
             &f.params,
             f.modifiers.is_async,
             f.modifiers.is_generator,
-            !f.type_params.is_empty(),
+            // Type parameters are erased at codegen — they don't block lowering.
+            false,
             false,
             BodyRef::Block(&f.body),
             &[],
@@ -402,9 +403,7 @@ impl<'a> Lowerer<'a> {
         if !decl.decorators.is_empty() {
             return unsupported("class decorators");
         }
-        if !decl.type_params.is_empty() {
-            return unsupported("generic class");
-        }
+        // Type parameters are erased at codegen — they don't block lowering.
         if decl.modifiers.is_abstract {
             return unsupported("abstract class");
         }
@@ -648,9 +647,7 @@ impl<'a> Lowerer<'a> {
     /// a class; instance fields/methods mirror the class core. (Core subset: no
     /// static members, field initializers, or accessors.)
     fn lower_enum(&mut self, decl: &EnumDecl, scope: &mut Scope) -> R<HirEnum> {
-        if !decl.type_params.is_empty() {
-            return unsupported("generic enum");
-        }
+        // Type parameters are erased at codegen — they don't block lowering.
         let name = decl.id.clone();
         let mut variants = Vec::new();
         let mut tag = 0i64;
