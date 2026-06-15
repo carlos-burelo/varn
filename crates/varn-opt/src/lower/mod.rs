@@ -359,6 +359,11 @@ impl FnLower {
                 self.free(); // free idx; result stays in obj
                 obj
             }
+            HirExpr::Logical { op, lhs, rhs } => self.lower_logical(*op, lhs, rhs),
+            HirExpr::Conditional { test, cons, alt } => self.lower_conditional(test, cons, alt),
+            HirExpr::Update { target, op, prefix } => self.lower_update(target, *op, *prefix),
+            HirExpr::Array(elements) => self.lower_array(elements),
+            HirExpr::Object { keys, values } => self.lower_object(keys, values),
         }
     }
 
@@ -462,6 +467,123 @@ impl FnLower {
             .write(Chunk::pack(args.len() as u8, arg_start), self.line);
         // Result lands in dest = obj; free the args temporaries above it.
         self.free_to(obj as u32 + 1);
+        dest
+    }
+
+    /// Short-circuiting `&&`/`||`/`??` → branch + `Move` into `dest`. `dest` is
+    /// the first temp allocated so the result lands where the caller expects
+    /// (the `lower_expr` net-`+1` contract). Mirrors legacy `compile_logical`.
+    fn lower_logical(&mut self, op: HirLogicalOp, lhs: &HirExpr, rhs: &HirExpr) -> u8 {
+        let dest = self.alloc();
+        let l = self.lower_expr(lhs);
+        self.chunk.emit_rr(OpCode::Move, dest, l, self.line);
+        self.free_to(dest as u32 + 1);
+        match op {
+            HirLogicalOp::And => {
+                let skip = self.chunk.emit_cond_jump(OpCode::JumpIfFalse, dest, self.line);
+                let r = self.lower_expr(rhs);
+                self.chunk.emit_rr(OpCode::Move, dest, r, self.line);
+                self.free_to(dest as u32 + 1);
+                self.chunk.patch_jump(skip);
+            }
+            HirLogicalOp::Or => {
+                let skip = self.chunk.emit_cond_jump(OpCode::JumpIfTrue, dest, self.line);
+                let r = self.lower_expr(rhs);
+                self.chunk.emit_rr(OpCode::Move, dest, r, self.line);
+                self.free_to(dest as u32 + 1);
+                self.chunk.patch_jump(skip);
+            }
+            HirLogicalOp::Nullish => {
+                let is_null = self.alloc();
+                self.chunk.emit_rr(OpCode::IsNull, is_null, dest, self.line);
+                let not_null = self
+                    .chunk
+                    .emit_cond_jump(OpCode::JumpIfFalse, is_null, self.line);
+                self.free_to(dest as u32 + 1);
+                let r = self.lower_expr(rhs);
+                self.chunk.emit_rr(OpCode::Move, dest, r, self.line);
+                self.free_to(dest as u32 + 1);
+                self.chunk.patch_jump(not_null);
+            }
+        }
+        dest
+    }
+
+    /// Ternary `test ? cons : alt`. The condition register is freed before
+    /// `dest` is allocated so `dest` reuses the lowest free slot, keeping the
+    /// `lower_expr` net-`+1` contract. Mirrors legacy `compile_conditional`.
+    fn lower_conditional(&mut self, test: &HirExpr, cons: &HirExpr, alt: &HirExpr) -> u8 {
+        let mark = self.next_temp;
+        let cond = self.lower_expr(test);
+        let else_j = self.chunk.emit_cond_jump(OpCode::JumpIfFalse, cond, self.line);
+        // The jump has captured `cond`'s register; reclaim it for `dest` so the
+        // result lands at `mark` (the branches overwrite it only after the jump).
+        self.free_to(mark);
+        let dest = self.alloc();
+        let c = self.lower_expr(cons);
+        self.chunk.emit_rr(OpCode::Move, dest, c, self.line);
+        self.free_to(dest as u32 + 1);
+        let end_j = self.chunk.emit_jump(OpCode::Jump, self.line);
+        self.chunk.patch_jump(else_j);
+        let a = self.lower_expr(alt);
+        self.chunk.emit_rr(OpCode::Move, dest, a, self.line);
+        self.free_to(dest as u32 + 1);
+        self.chunk.patch_jump(end_j);
+        dest
+    }
+
+    /// `++`/`--` on a binding. Postfix yields the old value (already in `cur`);
+    /// prefix moves the new value back into `cur`. Mirrors legacy
+    /// `compile_update` for the identifier case.
+    fn lower_update(&mut self, target: &HirBinding, op: HirUpdateOp, prefix: bool) -> u8 {
+        let cur = self.load_binding(target);
+        let one = self.alloc();
+        self.chunk.emit_load_int(one, 1, self.line);
+        let next = self.alloc();
+        let opcode = match op {
+            HirUpdateOp::Inc => OpCode::Add,
+            HirUpdateOp::Dec => OpCode::Sub,
+        };
+        self.chunk.emit_rrr(opcode, next, cur, one, self.line);
+        self.store_binding(target, next);
+        if prefix {
+            self.chunk.emit_rr(OpCode::Move, cur, next, self.line);
+        }
+        self.free_to(cur as u32 + 1);
+        cur
+    }
+
+    /// Array literal (no spread/holes): elements lowered contiguously above
+    /// `dest`, then `BuildArray dest, start, count`. Mirrors legacy
+    /// `compile_array`'s simple path.
+    fn lower_array(&mut self, elements: &[HirExpr]) -> u8 {
+        let dest = self.alloc();
+        let start = self.next_temp as u8;
+        for el in elements {
+            let _ = self.lower_expr(el);
+        }
+        let count = elements.len() as u8;
+        self.chunk.emit(OpCode::BuildArray, self.line);
+        self.chunk.write(Chunk::pack(dest, start), self.line);
+        self.chunk.write(Chunk::pack(count, 0), self.line);
+        self.free_to(dest as u32 + 1);
+        dest
+    }
+
+    /// Fixed-shape object literal: values lowered contiguously above `dest`,
+    /// then `BuildObjectWithShape dest, start, shape`. Mirrors legacy
+    /// `compile_object`'s `is_simple` path.
+    fn lower_object(&mut self, keys: &[Rc<str>], values: &[HirExpr]) -> u8 {
+        let shape_idx = self.chunk.add_constant(PoolEntry::Shape(keys.to_vec()));
+        let dest = self.alloc();
+        let start = self.next_temp as u8;
+        for v in values {
+            let _ = self.lower_expr(v);
+        }
+        self.chunk.emit(OpCode::BuildObjectWithShape, self.line);
+        self.chunk.write(Chunk::pack(dest, start), self.line);
+        self.chunk.write(shape_idx, self.line);
+        self.free_to(dest as u32 + 1);
         dest
     }
 }
