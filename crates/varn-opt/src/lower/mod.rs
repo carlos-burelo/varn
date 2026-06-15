@@ -317,6 +317,7 @@ impl FnLower {
                 s
             }
             HirExpr::Call { callee, args, .. } => self.lower_call(callee, args),
+            HirExpr::SelfCall { args, .. } => self.lower_self_call(args),
             HirExpr::Member { .. } | HirExpr::Index { .. } => {
                 unreachable!("member/index unsupported in core lowering")
             }
@@ -367,6 +368,33 @@ impl FnLower {
         // Result lands in dest = callee_reg; free everything above it.
         self.free_to(callee_reg as u32 + 1);
         callee_reg
+    }
+
+    /// Self-recursion ABI: no callee load. `LoadNull` receiver, contiguous
+    /// args, then `CallSelf dest`. Mirrors legacy `emit_self_call`; the JIT
+    /// compiles this to a direct recursive machine call (no VM re-entry).
+    fn lower_self_call(&mut self, args: &[HirExpr]) -> u8 {
+        let dest = self.alloc();
+        let recv = self.alloc();
+        self.chunk.emit_rr(OpCode::LoadNull, recv, 0, self.line);
+        let arg_start = recv + 1;
+        for (i, a) in args.iter().enumerate() {
+            let slot = arg_start + i as u8;
+            let r = self.lower_expr(a);
+            if r != slot {
+                while (self.next_temp as u8) <= slot {
+                    self.alloc();
+                }
+                self.chunk.emit_rr(OpCode::Move, slot, r, self.line);
+            }
+        }
+        let total = (args.len() + 1) as u8; // receiver + args
+        self.chunk.emit(OpCode::CallSelf, self.line);
+        self.chunk.write(Chunk::pack(dest, 0), self.line);
+        self.chunk.write(Chunk::pack(total, recv), self.line);
+        // Result lands in dest; free the receiver/args temporaries above it.
+        self.free_to(dest as u32 + 1);
+        dest
     }
 }
 

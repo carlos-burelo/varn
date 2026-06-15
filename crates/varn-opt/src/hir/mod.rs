@@ -100,6 +100,14 @@ pub enum HirExpr {
         args: Vec<HirExpr>,
         ty: HirType,
     },
+    /// Statically-resolved self-recursion: a call of the enclosing function by
+    /// its own (non-reassigned, non-shadowed) name. Lowers to `CallSelf`, which
+    /// the JIT turns into a direct in-machine-code recursive call instead of a
+    /// VM re-entry. Mirrors legacy `can_emit_self_call`/`emit_self_call`.
+    SelfCall {
+        args: Vec<HirExpr>,
+        ty: HirType,
+    },
     /// `object.name` (non-computed member access).
     Member {
         object: Box<HirExpr>,

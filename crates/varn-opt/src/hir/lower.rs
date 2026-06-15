@@ -69,6 +69,9 @@ pub struct Lowerer<'a> {
     /// Names declared as module globals (top-level functions and `let`s), so
     /// identifiers that don't resolve locally can be classified as globals.
     globals: rustc_hash::FxHashMap<Rc<str>, ()>,
+    /// Name of the function currently being lowered (`None` at the module top
+    /// level), used to recognise statically-resolved self-recursion.
+    current_fn: Option<Rc<str>>,
 }
 
 /// Lower a whole program to HIR. Top-level function declarations become module
@@ -102,6 +105,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
     let mut lo = Lowerer {
         ann: input.annotations,
         globals,
+        current_fn: None,
     };
 
     // Pass 2: lower each declared function and the module top level.
@@ -176,14 +180,21 @@ impl<'a> Lowerer<'a> {
             });
         }
         let mut body = Vec::new();
-        match &f.body.kind {
-            StmtKind::Block { stmts } => {
-                for s in stmts {
-                    self.lower_stmt(s, &mut scope, &mut body)?;
+        let prev_fn = self.current_fn.take();
+        self.current_fn = Some(f.id.clone());
+        let lowered = (|| {
+            match &f.body.kind {
+                StmtKind::Block { stmts } => {
+                    for s in stmts {
+                        self.lower_stmt(s, &mut scope, &mut body)?;
+                    }
                 }
+                _ => self.lower_stmt(&f.body, &mut scope, &mut body)?,
             }
-            _ => self.lower_stmt(&f.body, &mut scope, &mut body)?,
-        }
+            Ok(())
+        })();
+        self.current_fn = prev_fn;
+        lowered?;
         Ok(HirFunction {
             name: f.id.clone(),
             params,
@@ -403,6 +414,13 @@ impl<'a> Lowerer<'a> {
                         _ => return unsupported("named/spread arg"),
                     }
                 }
+                // Statically-resolved self-recursion → `CallSelf` (see HIR doc).
+                if self.is_self_call(callee, scope) {
+                    return Ok(HirExpr::SelfCall {
+                        args: hargs,
+                        ty: HirType::Dynamic,
+                    });
+                }
                 let callee = Box::new(self.lower_expr(callee, scope)?);
                 Ok(HirExpr::Call {
                     callee,
@@ -415,6 +433,24 @@ impl<'a> Lowerer<'a> {
             ExprKind::Member { .. } => unsupported("member access"),
             _ => unsupported("expression kind"),
         }
+    }
+
+    /// Whether `callee` is a statically-guaranteed reference to the enclosing
+    /// function: a bare identifier equal to the current function's name, not
+    /// shadowed by a local/param, and never reassigned in the module. Mirrors
+    /// legacy `can_emit_self_call` (async/generator/rest/`this` cases are
+    /// already excluded upstream because such functions fall back to legacy).
+    fn is_self_call(&self, callee: &Expr, scope: &Scope) -> bool {
+        let ExprKind::Identifier { name } = &callee.kind else {
+            return false;
+        };
+        match &self.current_fn {
+            Some(cur) if cur == name => {}
+            _ => return false,
+        }
+        // Must resolve to the module global (the function itself), not a
+        // local/param binding that shadows the name.
+        scope.resolve(name).is_none() && !self.ann.is_reassigned_name(name)
     }
 
     fn resolve(&self, name: &Rc<str>, scope: &Scope) -> HirBinding {
