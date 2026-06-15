@@ -457,11 +457,21 @@ impl FnLower {
             }
             HirExpr::Unary { op, operand, .. } => {
                 let s = self.lower_expr(operand);
-                let opcode = match op {
-                    HirUnOp::Neg => OpCode::Negate,
-                    HirUnOp::Not => OpCode::Not,
-                };
-                self.chunk.emit_rr(opcode, s, s, self.line);
+                match op {
+                    HirUnOp::Neg => self.chunk.emit_rr(OpCode::Negate, s, s, self.line),
+                    HirUnOp::Not => self.chunk.emit_rr(OpCode::Not, s, s, self.line),
+                    HirUnOp::Typeof => self.chunk.emit_rr(OpCode::Typeof, s, s, self.line),
+                    HirUnOp::BitNot => {
+                        // `~x` == `x ^ -1` (legacy `compile_unary`).
+                        let idx = self
+                            .chunk
+                            .add_constant(PoolEntry::Literal(Literal::Int(-1)));
+                        let neg1 = self.alloc();
+                        self.chunk.emit_rc(OpCode::LoadConst, neg1, idx, self.line);
+                        self.chunk.emit_rrr(OpCode::BitXor, s, s, neg1, self.line);
+                        self.free(); // free neg1; result stays in s
+                    }
+                }
                 s
             }
             HirExpr::Call { callee, args, .. } => self.lower_call(callee, args),

@@ -1228,6 +1228,10 @@ impl<'a> Lowerer<'a> {
                 })
             }
             ExprKind::Unary { op, operand, .. } => {
+                // Unary `+` is a transparent no-op.
+                if matches!(op, UnaryOp::Plus) {
+                    return self.lower_expr(operand, scope);
+                }
                 let operand = Box::new(self.lower_expr(operand, scope)?);
                 Ok(HirExpr::Unary {
                     op: un_op(*op)?,
@@ -1573,6 +1577,9 @@ fn un_op(op: UnaryOp) -> R<HirUnOp> {
     Ok(match op {
         UnaryOp::Minus => HirUnOp::Neg,
         UnaryOp::Not => HirUnOp::Not,
+        UnaryOp::BitNot => HirUnOp::BitNot,
+        UnaryOp::Typeof => HirUnOp::Typeof,
+        // `Plus` is handled transparently in `lower_expr`.
         _ => return unsupported("unary op"),
     })
 }

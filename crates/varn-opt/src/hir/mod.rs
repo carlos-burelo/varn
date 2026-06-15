@@ -96,6 +96,8 @@ pub enum HirBinOp {
 pub enum HirUnOp {
     Neg,
     Not,
+    BitNot,
+    Typeof,
 }
 
 /// Short-circuiting logical operators (lowered with branches, not as `Binary`).
