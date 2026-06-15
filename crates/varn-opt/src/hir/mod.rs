@@ -208,6 +208,55 @@ pub enum HirExpr {
     /// global or local by the caller. Core subset: no inheritance/static/
     /// accessors/decorators.
     Class(Box<HirClass>),
+    /// An enum value: `MakeClass` + per-variant `MakeEnumVariant`/`DefineStatic`
+    /// + instance fields/methods.
+    Enum(Box<HirEnum>),
+    /// `match subject { cases }` lowered to a branch chain (legacy
+    /// `compile_match`).
+    Match {
+        subject: Box<HirExpr>,
+        cases: Vec<HirMatchCase>,
+    },
+}
+
+/// An enum variant: a tag, a metadata string (`Enum.Variant[:fields]`), and
+/// whether it carries a payload.
+#[derive(Debug, Clone)]
+pub struct HirEnumVariant {
+    pub name: Rc<str>,
+    pub tag: i64,
+    pub meta: Rc<str>,
+}
+
+#[derive(Debug, Clone)]
+pub struct HirEnum {
+    pub name: Rc<str>,
+    pub variants: Vec<HirEnumVariant>,
+    pub fields: Vec<Rc<str>>,
+    pub methods: Vec<HirMethod>,
+}
+
+#[derive(Debug, Clone)]
+pub struct HirMatchCase {
+    pub test: HirCaseTest,
+    pub body: Vec<HirStmt>,
+    /// The arm's value (expression body, or `None` for a block arm → null).
+    pub result: Option<HirExpr>,
+}
+
+#[derive(Debug, Clone)]
+pub enum HirCaseTest {
+    /// `_` — always matches, no binding.
+    Wildcard,
+    /// `subject == literal`.
+    Literal(HirExpr),
+    /// Bind the subject to a local; always matches.
+    Bind(LocalId),
+    /// Match an enum variant by name, binding its `value{i}` payloads.
+    EnumVariant {
+        name: Rc<str>,
+        binds: Vec<Option<LocalId>>,
+    },
 }
 
 /// A class method (or constructor) plus the upvalues its closure captures.

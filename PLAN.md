@@ -242,7 +242,20 @@ opcodes → legacy reference → verification.
 - Largest single chunk. `this` handling, field offsets, vtable versions.
 - Verify: class-heavy suite modules.
 
-### 1.7 Enums
+### 1.7 Enums ✅ CORE DONE
+- **Done:** `Decl::Enum` → `HirExpr::Enum` (`MakeClass` + per-variant
+  `MakeEnumVariant`/`DefineStatic` with the `Enum.Variant[:fields]` meta string,
+  incrementing tags, integer discriminants) + instance fields/methods (class
+  core). `match` expr → `HirExpr::Match` (legacy `compile_match` branch chain):
+  wildcard, literal (`Eq`), identifier-bind, and enum-variant patterns
+  (`__variant_name__` compare + `value{i}` payload binds). Verified end-to-end
+  via varn-opt: enum decls, payload variant construction (`Shape.Circle(10)`),
+  and variant matching (`Circle(r) => …`) match legacy exactly (`300 20 red
+  red`). Suite 686/686.
+- **Deferred → fallback:** match guards, record/sequence/type patterns,
+  static/non-int-discriminant enum members, enum field initializers.
+
+  Original notes:
 - `Decl::Enum`: variants (tags), payloads, `MakeEnumVariant`, `GetEnumTag`,
   pattern matching over variants (`match` expr). Ref legacy enum codegen +
   `tests/41-advanced-enums.vn`.
