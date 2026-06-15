@@ -26,6 +26,25 @@ pub fn compile_direct(
     export_names: Vec<Rc<str>>,
 ) -> Result<FunctionProto, Rc<str>> {
     use std::cell::RefCell;
+
+    // Optimizer tier (temporary `VN_OPT` dev gate). When set, route through the
+    // `varn-opt` pipeline (AST -> HIR -> SSA -> opt -> bytecode); any construct
+    // it doesn't yet lower returns Err and we fall back to the legacy codegen
+    // below, so the compiler stays functional while varn-opt is brought up.
+    if std::env::var_os("VN_OPT").is_some() {
+        let input = varn_opt::OptInput {
+            program,
+            annotations,
+            extension_calls,
+            extension_members,
+            extension_set_members,
+            export_names: export_names.clone(),
+        };
+        if let Ok(proto) = varn_opt::compile(input) {
+            return Ok(proto);
+        }
+    }
+
     let escape_analysis = Rc::new(crate::analysis::escape::EscapeAnalysis::analyze(program));
     let inline_registry = Rc::new(crate::analysis::inline::InlineRegistry::analyze(program));
     let protos = Rc::new(RefCell::new(Vec::new()));

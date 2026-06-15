@@ -7,5 +7,6 @@ edition = "2021"
 varn-core        = { path = "../varn-core" }
 varn-diagnostics = { path = "../varn-diagnostics" }
 varn-types       = { path = "../varn-types" }
+varn-opt         = { path = "../varn-opt" }
 rustc-hash       = { workspace = true }
 rust_decimal     = { workspace = true }
