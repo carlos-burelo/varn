@@ -72,6 +72,12 @@ pub struct Lowerer<'a> {
     /// Name of the function currently being lowered (`None` at the module top
     /// level), used to recognise statically-resolved self-recursion.
     current_fn: Option<Rc<str>>,
+    /// Extension-method call/member maps keyed by AST offset. Sites present in
+    /// these are desugared by the legacy codegen into mangled global calls; we
+    /// fall back for them until that path is reimplemented.
+    extension_calls: &'a rustc_hash::FxHashMap<u32, Rc<str>>,
+    extension_members: &'a rustc_hash::FxHashMap<u32, Rc<str>>,
+    extension_set_members: &'a rustc_hash::FxHashMap<u32, Rc<str>>,
 }
 
 /// Lower a whole program to HIR. Top-level function declarations become module
@@ -106,6 +112,9 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
         ann: input.annotations,
         globals,
         current_fn: None,
+        extension_calls: input.extension_calls,
+        extension_members: input.extension_members,
+        extension_set_members: input.extension_set_members,
     };
 
     // Pass 2: lower each declared function and the module top level.
@@ -403,15 +412,52 @@ impl<'a> Lowerer<'a> {
                 if *optional {
                     return unsupported("optional call");
                 }
-                // Only simple positional calls (no named/spread/defaults).
+                // Intrinsics, extension calls, and calls whose arguments need
+                // reordering/default-filling (`get_call_mapping`) are desugared
+                // by the legacy codegen → fall back until those land.
                 if self.ann.get_intrinsic(offset).is_some() {
                     return unsupported("intrinsic call");
                 }
+                // A non-trivial call mapping reorders args or fills defaults —
+                // replicating that is §1.10. An *identity* mapping (param i ← arg
+                // i, no gaps) is just plain positional, so let those through.
+                if let Some(mapping) = self.ann.get_call_mapping(offset) {
+                    let identity = mapping.len() == args.len()
+                        && mapping.iter().enumerate().all(|(i, m)| *m == Some(i));
+                    if !identity {
+                        return unsupported("call with non-trivial arg mapping");
+                    }
+                }
+                if self.extension_calls.contains_key(&offset) {
+                    return unsupported("extension call");
+                }
+                // Only simple positional calls (no named/spread/defaults).
                 let mut hargs = Vec::with_capacity(args.len());
                 for a in args {
                     match a {
                         Arg::Positional(e) => hargs.push(self.lower_expr(e, scope)?),
                         _ => return unsupported("named/spread arg"),
+                    }
+                }
+                // Method call: callee is a non-computed, non-optional `.name`
+                // member (and not a `super.` call) → `CallMethod` with an IC.
+                if let ExprKind::Member {
+                    object,
+                    property,
+                    computed: false,
+                    optional: false,
+                } = &callee.kind
+                {
+                    if !matches!(object.kind, ExprKind::Super) {
+                        if let ExprKind::Identifier { name } = &property.kind {
+                            let recv = Box::new(self.lower_expr(object, scope)?);
+                            return Ok(HirExpr::MethodCall {
+                                recv,
+                                name: name.clone(),
+                                args: hargs,
+                                ty: HirType::Dynamic,
+                            });
+                        }
                     }
                 }
                 // Statically-resolved self-recursion → `CallSelf` (see HIR doc).
@@ -428,9 +474,49 @@ impl<'a> Lowerer<'a> {
                     ty: HirType::Dynamic,
                 })
             }
-            // Member/index access compiles to GetProperty/GetIndex, which need
-            // IC cache slots — deferred to a later stage; fall back for now.
-            ExprKind::Member { .. } => unsupported("member access"),
+            ExprKind::Member {
+                object,
+                property,
+                computed,
+                optional,
+            } => {
+                if *optional {
+                    // Optional chaining needs IsNull + jump; deferred.
+                    return unsupported("optional member access");
+                }
+                if *computed {
+                    // `object[index]` → GetIndex.
+                    let object = Box::new(self.lower_expr(object, scope)?);
+                    let index = Box::new(self.lower_expr(property, scope)?);
+                    return Ok(HirExpr::Index {
+                        object,
+                        index,
+                        ty: HirType::Dynamic,
+                    });
+                }
+                // Non-computed `object.name` property read. Module-slot reads
+                // (`LoadModuleSlot`) and extension members are desugared
+                // differently by the legacy codegen → fall back for now.
+                if self.ann.get_slot_idx(offset).is_some() {
+                    return unsupported("module-slot member access");
+                }
+                if self.extension_members.contains_key(&offset) {
+                    return unsupported("extension member access");
+                }
+                if matches!(object.kind, ExprKind::Super) {
+                    return unsupported("super member access");
+                }
+                let name = match &property.kind {
+                    ExprKind::Identifier { name } => name.clone(),
+                    _ => return unsupported("non-identifier property"),
+                };
+                let object = Box::new(self.lower_expr(object, scope)?);
+                Ok(HirExpr::Member {
+                    object,
+                    name,
+                    ty: HirType::Dynamic,
+                })
+            }
             _ => unsupported("expression kind"),
         }
     }
