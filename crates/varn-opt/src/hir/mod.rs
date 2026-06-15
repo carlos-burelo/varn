@@ -321,6 +321,36 @@ pub enum HirStmt {
     /// emitted when a block/function that declared captured bindings is about
     /// to go out of scope. Lowers to `CloseUpvalue` at the lowest such register.
     CloseUpvalues(Vec<CaptureTarget>),
+    /// `import … from "source"` → `LoadModule` (+ per-specifier binding). A bare
+    /// or type-only import has no specifiers (side-effect load only).
+    Import {
+        source: Rc<str>,
+        is_type: bool,
+        specs: Vec<HirImportSpec>,
+    },
+    /// Publish a module export: load the global `name` and `StoreModuleSlot`.
+    StoreExport {
+        name: Rc<str>,
+        slot: u16,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct HirImportSpec {
+    pub local: Rc<str>,
+    pub kind: HirImportKind,
+    /// Pre-resolved module slot, else the value is fetched by property.
+    pub slot: Option<u16>,
+}
+
+#[derive(Debug, Clone)]
+pub enum HirImportKind {
+    /// `import x from …` → property `default`.
+    Default,
+    /// `import { a as x } …` → property `a`.
+    Named(Rc<str>),
+    /// `import * as x …` → the module object itself.
+    Namespace,
 }
 
 #[derive(Debug, Clone)]
