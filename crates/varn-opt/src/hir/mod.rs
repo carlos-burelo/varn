@@ -74,6 +74,20 @@ pub enum HirUnOp {
     Not,
 }
 
+/// Short-circuiting logical operators (lowered with branches, not as `Binary`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HirLogicalOp {
+    And,
+    Or,
+    Nullish,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HirUpdateOp {
+    Inc,
+    Dec,
+}
+
 #[derive(Debug, Clone)]
 pub enum HirExpr {
     Int(i64),
@@ -128,6 +142,34 @@ pub enum HirExpr {
         name: Rc<str>,
         args: Vec<HirExpr>,
         ty: HirType,
+    },
+    /// Short-circuiting `&&`/`||`/`??`. Lowered with branches + `Move`, so it
+    /// cannot be a `Binary`.
+    Logical {
+        op: HirLogicalOp,
+        lhs: Box<HirExpr>,
+        rhs: Box<HirExpr>,
+    },
+    /// Ternary `test ? cons : alt`.
+    Conditional {
+        test: Box<HirExpr>,
+        cons: Box<HirExpr>,
+        alt: Box<HirExpr>,
+    },
+    /// `++`/`--` on a simple binding. `prefix` selects whether the expression
+    /// yields the new (prefix) or old (postfix) value.
+    Update {
+        target: HirBinding,
+        op: HirUpdateOp,
+        prefix: bool,
+    },
+    /// Array literal with only plain element expressions (no spread/holes).
+    Array(Vec<HirExpr>),
+    /// Object literal with a fixed shape: all-static keys, plain value props
+    /// (no computed keys, methods, getters/setters, or spreads).
+    Object {
+        keys: Vec<Rc<str>>,
+        values: Vec<HirExpr>,
     },
 }
 

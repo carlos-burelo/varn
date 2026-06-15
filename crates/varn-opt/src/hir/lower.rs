@@ -9,7 +9,8 @@
 
 use std::rc::Rc;
 
-use varn_core::ast::operators::{AssignOp, BinaryOp, UnaryOp};
+use varn_core::ast::expr::{ArrayEl, ObjectProp, PropKey};
+use varn_core::ast::operators::{AssignOp, BinaryOp, LogicalOp, UnaryOp, UpdateOp};
 use varn_core::ast::{
     Arg, Decl, Expr, ExprKind, ForInit, FunctionDecl, Param, Pattern, Stmt, StmtKind,
 };
@@ -103,6 +104,9 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                         }
                     }
                 }
+                // Type-only declarations are erased at codegen (no bytecode),
+                // exactly as legacy `stmt.rs` does.
+                Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
                 _ => return unsupported("top-level class/enum/interface decl"),
             }
         }
@@ -141,6 +145,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                         });
                     }
                 }
+                Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
                 _ => return unsupported("top-level decl"),
             },
             _ => {
@@ -286,6 +291,7 @@ impl<'a> Lowerer<'a> {
                         });
                     }
                 }
+                Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
                 _ => return unsupported("nested function/class decl"),
             },
             StmtKind::Return { argument } => {
@@ -517,6 +523,82 @@ impl<'a> Lowerer<'a> {
                     ty: HirType::Dynamic,
                 })
             }
+            ExprKind::Logical { op, left, right } => {
+                let lhs = Box::new(self.lower_expr(left, scope)?);
+                let rhs = Box::new(self.lower_expr(right, scope)?);
+                Ok(HirExpr::Logical {
+                    op: logical_op(*op),
+                    lhs,
+                    rhs,
+                })
+            }
+            ExprKind::Conditional {
+                test,
+                consequent,
+                alternate,
+            } => {
+                let test = Box::new(self.lower_expr(test, scope)?);
+                let cons = Box::new(self.lower_expr(consequent, scope)?);
+                let alt = Box::new(self.lower_expr(alternate, scope)?);
+                Ok(HirExpr::Conditional { test, cons, alt })
+            }
+            ExprKind::Update {
+                op,
+                prefix,
+                operand,
+            } => {
+                // Member/index update targets are §1.4; identifiers only here.
+                let ExprKind::Identifier { name } = &operand.kind else {
+                    return unsupported("update on non-identifier target");
+                };
+                let target = self.resolve(name, scope);
+                Ok(HirExpr::Update {
+                    target,
+                    op: update_op(*op),
+                    prefix: *prefix,
+                })
+            }
+            ExprKind::Array { elements } => {
+                // Simple array literal: plain element exprs, no spread/holes.
+                let mut out = Vec::with_capacity(elements.len());
+                for el in elements {
+                    match el {
+                        ArrayEl::Expr(e) => out.push(self.lower_expr(e, scope)?),
+                        ArrayEl::Spread(_) => return unsupported("array spread element"),
+                        ArrayEl::Hole => return unsupported("array hole"),
+                    }
+                }
+                Ok(HirExpr::Array(out))
+            }
+            ExprKind::Object { properties } => {
+                // Fixed-shape object: all-static keys, plain value props only.
+                let mut keys = Vec::with_capacity(properties.len());
+                let mut values = Vec::with_capacity(properties.len());
+                for prop in properties {
+                    match prop {
+                        ObjectProp::Property {
+                            key,
+                            value,
+                            computed: false,
+                            ..
+                        } => {
+                            let k: Rc<str> = match key {
+                                PropKey::Identifier(s) | PropKey::Str(s) => Rc::from(s.as_str()),
+                                PropKey::Int(n) => Rc::from(n.to_string().as_str()),
+                                PropKey::Computed(_) => return unsupported("computed object key"),
+                            };
+                            keys.push(k);
+                            values.push(self.lower_expr(value, scope)?);
+                        }
+                        _ => return unsupported("object method/getter/setter/spread/computed"),
+                    }
+                }
+                // Empty `{}` uses the legacy BuildObject path; defer.
+                if keys.is_empty() {
+                    return unsupported("empty object literal");
+                }
+                Ok(HirExpr::Object { keys, values })
+            }
             _ => unsupported("expression kind"),
         }
     }
@@ -607,4 +689,19 @@ fn un_op(op: UnaryOp) -> R<HirUnOp> {
         UnaryOp::Not => HirUnOp::Not,
         _ => return unsupported("unary op"),
     })
+}
+
+fn logical_op(op: LogicalOp) -> HirLogicalOp {
+    match op {
+        LogicalOp::And => HirLogicalOp::And,
+        LogicalOp::Or => HirLogicalOp::Or,
+        LogicalOp::Nullish => HirLogicalOp::Nullish,
+    }
+}
+
+fn update_op(op: UpdateOp) -> HirUpdateOp {
+    match op {
+        UpdateOp::Increment => HirUpdateOp::Inc,
+        UpdateOp::Decrement => HirUpdateOp::Dec,
+    }
 }

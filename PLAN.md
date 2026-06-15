@@ -150,7 +150,21 @@ opcodes → legacy reference → verification.
 - Ref: `codegen/function.rs`, `compiler.rs` upvalue machinery, `scope.rs`.
 - Verify: closures/arrows in suite modules (map/filter callbacks, etc.).
 
-### 1.3 Remaining expressions
+### 1.3 Remaining expressions 🟡 PARTIAL
+- **Done:** `Logical` (`&&`/`||`/`??`), `Conditional` ternary, `Update`
+  (`++`/`--` on identifier bindings, prefix/postfix), simple `Array` literals
+  (no spread/holes), fixed-shape `Object` literals (`BuildObjectWithShape`, all
+  static keys, value props only). Also: type-only top-level decls (`interface`,
+  `type`, `struct`) are now erased instead of forcing fallback (mirrors legacy
+  `stmt.rs`). Verified end-to-end via varn-opt (array/object/property/logical/
+  ternary/update/nullish → correct), which also exercises §1.1 `GetProperty`.
+  Suite 686/686.
+- **Deferred:** `New` (§1.6), `Template`/`TaggedTemplate`, `Range`, `Pipeline`,
+  `Sequence`, `Spread` (§1.10), intrinsics, `As`/`Satisfies`/`NonNull`,
+  `Try`-expr, char/bigint/decimal/regex literals, array spread/holes, computed/
+  method/getter/setter object props, member/index update targets (§1.4).
+
+  Original notes:
 - `Logical` (`&&`/`||`/`??`) → branch + `Move` (legacy `operators.rs::
   compile_logical`).
 - `Conditional` ternary → branch + `Move` (`compile_conditional`).
