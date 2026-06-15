@@ -9,7 +9,7 @@
 
 use std::rc::Rc;
 
-use varn_core::ast::decl::{ClassDecl, ClassMember, EnumDecl};
+use varn_core::ast::decl::{ClassDecl, ClassMember, EnumDecl, ExportDecl, ImportDecl, ImportSpecifier};
 use varn_core::ast::expr::{ArrayEl, ArrowBody, MatchBody, ObjectProp, PropKey};
 use varn_core::ast::operators::{AssignOp, BinaryOp, LogicalOp, UnaryOp, UpdateOp};
 use varn_core::ast::pattern::MatchPattern;
@@ -193,6 +193,8 @@ pub struct Lowerer<'a> {
     extension_calls: &'a rustc_hash::FxHashMap<u32, Rc<str>>,
     extension_members: &'a rustc_hash::FxHashMap<u32, Rc<str>>,
     extension_set_members: &'a rustc_hash::FxHashMap<u32, Rc<str>>,
+    /// Module export ordering; an export's name position is its module slot.
+    export_names: &'a [Rc<str>],
 }
 
 /// Lower a whole program to HIR. Top-level function declarations become module
@@ -228,10 +230,41 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                 Decl::Enum(e) => {
                     globals.insert(e.id.clone(), ());
                 }
+                Decl::Import(i) => {
+                    for spec in &i.specifiers {
+                        let local = match spec {
+                            ImportSpecifier::Default { local, .. }
+                            | ImportSpecifier::Named { local, .. }
+                            | ImportSpecifier::Namespace { local, .. } => local.clone(),
+                        };
+                        globals.insert(local, ());
+                    }
+                }
+                Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
+                    Decl::Function(f) => {
+                        globals.insert(f.id.clone(), ());
+                    }
+                    Decl::Class(c) => {
+                        if let Some(id) = &c.id {
+                            globals.insert(id.clone(), ());
+                        }
+                    }
+                    Decl::Enum(en) => {
+                        globals.insert(en.id.clone(), ());
+                    }
+                    Decl::Variable(v) => {
+                        for d in &v.declarators {
+                            if let Pattern::Identifier { name, .. } = &d.id {
+                                globals.insert(name.clone(), ());
+                            }
+                        }
+                    }
+                    _ => {}
+                },
                 // Type-only declarations are erased at codegen (no bytecode),
                 // exactly as legacy `stmt.rs` does.
                 Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
-                _ => return unsupported("top-level namespace decl"),
+                _ => return unsupported("top-level namespace/extension decl"),
             }
         }
     }
@@ -243,6 +276,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
         extension_calls: input.extension_calls,
         extension_members: input.extension_members,
         extension_set_members: input.extension_set_members,
+        export_names: &input.export_names,
     };
 
     // Pass 2: lower each declared function and the module top level. The
@@ -294,6 +328,12 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                         target: HirBinding::Global(en.id.clone()),
                         value: HirExpr::Enum(Box::new(hir_enum)),
                     });
+                }
+                Decl::Import(i) => {
+                    top_body.push(lo.lower_import(i)?);
+                }
+                Decl::Export(e) => {
+                    lo.lower_export(e, &mut module_scope, &mut top_body)?;
                 }
                 Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
                 _ => return unsupported("top-level decl"),
@@ -477,6 +517,131 @@ impl<'a> Lowerer<'a> {
             },
             methods,
         })
+    }
+
+    /// Lower a declaration that defines module global(s) inline, emitting the
+    /// defining statements into `out` and returning the names it bound. Used for
+    /// `export <decl>` and namespace members.
+    fn lower_decl_inline(
+        &mut self,
+        decl: &Decl,
+        scope: &mut Scope,
+        out: &mut Vec<HirStmt>,
+    ) -> R<Vec<Rc<str>>> {
+        match decl {
+            Decl::Function(f) => {
+                let mut fscope = Scope::new();
+                let (func, _ups) = self.lower_function(f, &mut fscope)?;
+                out.push(HirStmt::Assign {
+                    target: HirBinding::Global(f.id.clone()),
+                    value: HirExpr::Closure {
+                        func: Box::new(func),
+                        upvalues: Vec::new(),
+                    },
+                });
+                Ok(vec![f.id.clone()])
+            }
+            Decl::Class(cl) => {
+                let name = match &cl.id {
+                    Some(id) => id.clone(),
+                    None => return unsupported("anonymous exported class"),
+                };
+                let hir_class = self.lower_class(cl, scope)?;
+                out.push(HirStmt::Assign {
+                    target: HirBinding::Global(name.clone()),
+                    value: HirExpr::Class(Box::new(hir_class)),
+                });
+                Ok(vec![name])
+            }
+            Decl::Enum(en) => {
+                let hir_enum = self.lower_enum(en, scope)?;
+                out.push(HirStmt::Assign {
+                    target: HirBinding::Global(en.id.clone()),
+                    value: HirExpr::Enum(Box::new(hir_enum)),
+                });
+                Ok(vec![en.id.clone()])
+            }
+            Decl::Variable(v) => {
+                let mut names = Vec::new();
+                for d in &v.declarators {
+                    let name = match &d.id {
+                        Pattern::Identifier { name, .. } => name.clone(),
+                        _ => return unsupported("destructuring export/member"),
+                    };
+                    let value = match &d.init {
+                        Some(e) => self.lower_expr(e, scope)?,
+                        None => HirExpr::Null,
+                    };
+                    out.push(HirStmt::Assign {
+                        target: HirBinding::Global(name.clone()),
+                        value,
+                    });
+                    names.push(name);
+                }
+                Ok(names)
+            }
+            Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => Ok(Vec::new()),
+            _ => unsupported("inline decl kind"),
+        }
+    }
+
+    fn lower_import(&self, decl: &ImportDecl) -> R<HirStmt> {
+        let mut specs = Vec::new();
+        for spec in &decl.specifiers {
+            let (local, kind, off) = match spec {
+                ImportSpecifier::Default { local, range } => {
+                    (local.clone(), HirImportKind::Default, range.start.offset)
+                }
+                ImportSpecifier::Named {
+                    local,
+                    imported,
+                    range,
+                } => (
+                    local.clone(),
+                    HirImportKind::Named(imported.clone()),
+                    range.start.offset,
+                ),
+                ImportSpecifier::Namespace { local, range } => {
+                    (local.clone(), HirImportKind::Namespace, range.start.offset)
+                }
+            };
+            let slot = self.ann.get_slot_idx(off).map(|s| s as u16);
+            specs.push(HirImportSpec { local, kind, slot });
+        }
+        Ok(HirStmt::Import {
+            source: decl.source.clone(),
+            is_type: decl.is_type,
+            specs,
+        })
+    }
+
+    fn lower_export(
+        &mut self,
+        decl: &ExportDecl,
+        scope: &mut Scope,
+        out: &mut Vec<HirStmt>,
+    ) -> R<()> {
+        match decl {
+            ExportDecl::Decl { declaration, .. } => {
+                let off = declaration.range().start.offset;
+                let names = self.lower_decl_inline(declaration, scope, out)?;
+                for name in names {
+                    if let Some(slot) = self.export_slot(&name, off) {
+                        out.push(HirStmt::StoreExport { name, slot });
+                    }
+                }
+                Ok(())
+            }
+            _ => unsupported("export default/named/all"),
+        }
+    }
+
+    fn export_slot(&self, name: &str, offset: u32) -> Option<u16> {
+        self.export_names
+            .iter()
+            .position(|n| **n == *name)
+            .map(|p| p as u16)
+            .or_else(|| self.ann.get_slot_idx(offset).map(|s| s as u16))
     }
 
     /// Lower an enum declaration. Variants become `MakeEnumVariant` statics on

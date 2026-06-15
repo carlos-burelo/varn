@@ -305,6 +305,71 @@ impl FnLower {
                     self.chunk.emit_loop(target, self.line);
                 }
             }
+            HirStmt::Import {
+                source,
+                is_type,
+                specs,
+            } => {
+                let mark = self.next_temp;
+                let src_idx = self.chunk.add_str(source);
+                let mod_reg = self.alloc();
+                self.chunk
+                    .emit_rc(OpCode::LoadModule, mod_reg, src_idx, self.line);
+                if !*is_type {
+                    for spec in specs {
+                        match &spec.kind {
+                            HirImportKind::Namespace => {
+                                let local_idx = self.chunk.add_str(&spec.local);
+                                self.chunk.emit_rrc(
+                                    OpCode::DefineGlobal,
+                                    0,
+                                    mod_reg,
+                                    local_idx,
+                                    self.line,
+                                );
+                            }
+                            HirImportKind::Default | HirImportKind::Named(_) => {
+                                let dest = self.alloc();
+                                if let Some(slot) = spec.slot {
+                                    self.chunk.emit_rrc(
+                                        OpCode::LoadModuleSlot,
+                                        dest,
+                                        mod_reg,
+                                        slot,
+                                        self.line,
+                                    );
+                                } else {
+                                    let key = match &spec.kind {
+                                        HirImportKind::Named(n) => n.as_ref(),
+                                        _ => "default",
+                                    };
+                                    let key_idx = self.chunk.add_str(key);
+                                    self.emit_property(OpCode::GetProperty, dest, mod_reg, key_idx);
+                                }
+                                let local_idx = self.chunk.add_str(&spec.local);
+                                self.chunk.emit_rrc(
+                                    OpCode::DefineGlobal,
+                                    0,
+                                    dest,
+                                    local_idx,
+                                    self.line,
+                                );
+                                self.free_to(mod_reg as u32 + 1);
+                            }
+                        }
+                    }
+                }
+                self.free_to(mark);
+            }
+            HirStmt::StoreExport { name, slot } => {
+                let mark = self.next_temp;
+                let r = self.alloc();
+                let idx = self.chunk.add_str(name);
+                self.chunk.emit_rc(OpCode::LoadGlobal, r, idx, self.line);
+                self.chunk
+                    .emit_rc(OpCode::StoreModuleSlot, r, *slot, self.line);
+                self.free_to(mark);
+            }
             HirStmt::CloseUpvalues(targets) => {
                 // Close open upvalues over the lowest captured slot, matching
                 // legacy `pop_scope`. The VM closes everything at or above it.

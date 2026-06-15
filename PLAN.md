@@ -260,7 +260,21 @@ opcodes → legacy reference → verification.
   pattern matching over variants (`match` expr). Ref legacy enum codegen +
   `tests/41-advanced-enums.vn`.
 
-### 1.8 Modules (import/export)
+### 1.8 Modules (import/export) ✅ CORE DONE
+- **Done:** `import` → `HirStmt::Import` (`LoadModule`; per specifier
+  `LoadModuleSlot`/`GetProperty` + `DefineGlobal`; bare/type-only = side-effect
+  load). `export <decl>` → lower the inner decl as a module global (`Closure`/
+  `Class`/`Enum`/`Assign`) then `StoreModuleSlot` per export name (slot =
+  `export_names` position or `get_slot_idx`). `export_names` threaded into the
+  lowerer. Verified end-to-end: a two-module program (bare + named import,
+  `export function`, cross-module call) compiles **both** modules via varn-opt
+  and matches legacy (`21`). Suite 686/686; the gate has moved past imports —
+  remaining suite fallbacks are now `~`/`typeof` unary (§1.3-rest), async/
+  generator (§1.9), and generic classes (§1.10).
+- **Deferred → fallback:** `export default`/`export { … }`/`export *`,
+  nested namespaces (`namespace` decl), re-exports.
+
+  Original notes:
 - `import`/`export` decls → `LoadModule`/`LoadModuleSlot`/`StoreModuleSlot`,
   module object, export ordering. `export_names`. Ref VM `exec/modules.rs`,
   `ctx_modules.rs`; `varn-modules` resolver. Needed for multi-module programs
