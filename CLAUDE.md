@@ -134,13 +134,14 @@ Evitar god files.
 
 Umbrales:
 
-* 500 líneas → advertencia
-* 800 líneas → revisar modularización
-* 1000 líneas → división obligatoria
+300 líneas  -> ideal
+500 líneas  -> advertencia
+700 líneas  -> refactor recomendado
+1000 líneas -> refactor obligatorio
 
 Reglas:
 
-Antes de modificar un archivo superior a 800 líneas:
+Antes de modificar un archivo superior a 700 líneas:
 
 * evaluar extracción de módulos
 * evaluar separación por dominio
