@@ -114,70 +114,49 @@ pub fn fmt_num(n: usize) -> String {
     out.chars().rev().collect()
 }
 
-const W_NAME: usize = 10;
-const W_TIME: usize = 9;
-const W_SIG: usize = 8;
-const W_PCT: usize = 6;
-const SEP: &str = "─";
+/// Render the per-phase timing table: header, one row per phase, a rule, then a
+/// `total` summary row. `total_p50` drives each phase's `%` share.
+pub fn print_table(phases: &[PhaseStats], total_p50: Duration) {
+    use terminal::Align::{Left, Right};
 
-pub fn sep_line() {
-    let name_col = SEP.repeat(W_NAME);
-    let time_col = SEP.repeat(W_TIME);
-    let sig_col = SEP.repeat(W_SIG);
-    let pct_col = SEP.repeat(W_PCT);
-    terminal::log(format!(
-        "  {}",
-        chalk(format!(
-            "{name_col}  {time_col}  {time_col}  {time_col}  {time_col}  {sig_col}  {time_col}  {pct_col}"
-        ))
-        .dim()
-    ));
-}
+    let mut table = terminal::Table::new(["Phase", "min", "p50", "mean", "max", "σ", "total", "%"])
+        .align([Left, Right, Right, Right, Right, Right, Right, Right]);
 
-pub fn header_line() {
-    terminal::log(format!(
-        "  {}",
-        chalk(format!(
-            "{:<W_NAME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_TIME$}  {:>W_SIG$}  {:>W_TIME$}  {:>W_PCT$}",
-            "Phase", "min", "p50", "mean", "max", "σ", "total", "%"
-        ))
-        .dim()
-    ));
-}
+    for s in phases {
+        let share = if total_p50.as_nanos() > 0 {
+            s.p50.as_nanos() as f64 / total_p50.as_nanos() as f64
+        } else {
+            0.0
+        };
+        table.row([
+            (s.color_fn)(chalk(s.name)).bold().to_string(),
+            fmt_dur(s.min),
+            fmt_dur(s.p50),
+            chalk(fmt_dur(s.mean())).cyan().to_string(),
+            fmt_dur(s.max),
+            chalk(fmt_dur(s.stddev)).dim().to_string(),
+            chalk(fmt_dur(s.total)).dim().to_string(),
+            chalk(format!("{:.1}%", share * 100.0)).dim().to_string(),
+        ]);
+    }
 
-pub fn phase_line(stat: &PhaseStats, share: f64) {
-    let pct = format!("{:.1}%", share * 100.0);
-    let name = (stat.color_fn)(chalk(stat.name)).bold();
-
-    terminal::log(format!(
-        "  {name:<W_NAME$}  {:>W_TIME$}  {:>W_TIME$}  {}  {:>W_TIME$}  {}  {}  {}",
-        fmt_dur(stat.min),
-        fmt_dur(stat.p50),
-        chalk(format!("{:>W_TIME$}", fmt_dur(stat.mean()))).cyan(),
-        fmt_dur(stat.max),
-        chalk(format!("{:>W_SIG$}", fmt_dur(stat.stddev))).dim(),
-        chalk(format!("{:>W_TIME$}", fmt_dur(stat.total))).dim(),
-        chalk(format!("{:>W_PCT$}", pct)).dim(),
-    ));
-}
-
-pub fn total_line(phases: &[PhaseStats]) {
     let min: Duration = phases.iter().map(|p| p.min).sum();
     let max: Duration = phases.iter().map(|p| p.max).sum();
     let total: Duration = phases.iter().map(|p| p.total).sum();
     let p50: Duration = phases.iter().map(|p| p.p50).sum();
-    let runs = phases[0].runs;
-    let mean = total / runs as u32;
+    let mean = total / phases[0].runs as u32;
 
-    terminal::log(format!(
-        "  {}  {:>W_TIME$}  {:>W_TIME$}  {}  {:>W_TIME$}  {:>W_SIG$}  {}  {}",
-        chalk(format!("{:<W_NAME$}", "total")).green().bold(),
+    table.rule();
+    table.row([
+        chalk("total").green().bold().to_string(),
         fmt_dur(min),
         fmt_dur(p50),
-        chalk(format!("{:>W_TIME$}", fmt_dur(mean))).cyan(),
+        chalk(fmt_dur(mean)).cyan().to_string(),
         fmt_dur(max),
-        "",
-        chalk(format!("{:>W_TIME$}", fmt_dur(total))).dim(),
-        chalk(format!("{:>W_PCT$}", "100%")).dim(),
-    ));
+        String::new(),
+        chalk(fmt_dur(total)).dim().to_string(),
+        chalk("100%").dim().to_string(),
+    ]);
+
+    table.print();
 }

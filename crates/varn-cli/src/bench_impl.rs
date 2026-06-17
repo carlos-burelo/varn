@@ -2,9 +2,7 @@ use crate::bench_hotspots::print_hotspots;
 use crate::bench_output::{
     print_check_breakdown, print_opcode_hotspots, print_parse_breakdown, print_vm_profile,
 };
-use crate::bench_phase::{
-    fmt_bytes, fmt_dur, fmt_num, header_line, phase_line, sep_line, total_line, PhaseStats,
-};
+use crate::bench_phase::{fmt_bytes, fmt_dur, fmt_num, print_table, PhaseStats};
 use crate::error::CliError;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
@@ -434,18 +432,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         .dim()
     ));
     terminal::blank();
-    header_line();
-    sep_line();
-    for s in &stats {
-        let share = if total_p50.as_nanos() > 0 {
-            s.p50.as_nanos() as f64 / total_p50.as_nanos() as f64
-        } else {
-            0.0
-        };
-        phase_line(s, share);
-    }
-    sep_line();
-    total_line(&stats);
+    print_table(&stats, total_p50);
     terminal::blank();
     let total_pipeline_dur: Duration = stats.iter().map(|s| s.total).sum();
     terminal::log(format!(
@@ -650,18 +637,7 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         chalk(format!("Binary  {}  (no source phases)", fmt_bytes(file_size))).dim()
     ));
     terminal::blank();
-    header_line();
-    sep_line();
-    for s in &stats {
-        let share = if total_p50.as_nanos() > 0 {
-            s.p50.as_nanos() as f64 / total_p50.as_nanos() as f64
-        } else {
-            0.0
-        };
-        phase_line(s, share);
-    }
-    sep_line();
-    total_line(&stats);
+    print_table(&stats, total_p50);
     terminal::blank();
     let total_pipeline_dur: Duration = stats.iter().map(|s| s.total).sum();
     terminal::log(format!(
