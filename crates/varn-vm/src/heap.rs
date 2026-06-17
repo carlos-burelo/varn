@@ -8,19 +8,21 @@ use crate::profile::HotspotCounters;
 use crate::value::VmValue;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
-use rustc_hash::FxHashMap as HashMap;
+use rustc_hash::FxHashMap;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use varn_types::{
     generator::{AsyncQueue, GeneratorObj},
     value::{
         ArrayRef, EnumVariantData, FrozenModuleObj, MapRef, ModuleObj, ObjRef, RangeData,
-        RuntimeSymbol, SetRef,
+        RuntimeSymbol, SetRef, BoundMethod
     },
     AsyncTask, ClassObj, LazyTask, NativeCtx, NativeFn, ObjData, ResourceStore, RuntimeString,
     Value, VmArray,
 };
 use varn_base::VmValuePayload;
+use std::sync::Arc;
+
 
 #[derive(Debug, Clone)]
 pub enum HeapObj {
@@ -30,11 +32,11 @@ pub enum HeapObj {
 
     Module(Rc<ModuleObj>),
     /// Frozen (pure) module — heap-index-free, shared across VM instances.
-    FrozenModule(std::sync::Arc<FrozenModuleObj>),
+    FrozenModule(Arc<FrozenModuleObj>),
     VmClosure(Rc<VmClosure>),
     Class(Rc<ClassObj>),
     NativeFn(&'static str, NativeFn),
-    BoundMethod(Box<varn_types::value::BoundMethod>),
+    BoundMethod(Box<BoundMethod>),
     Map(MapRef),
     Set(SetRef),
     Task(Rc<LazyTask>),
@@ -54,22 +56,22 @@ pub enum HeapObj {
 #[derive(Clone)]
 pub struct HeapInner {
     pub alloc_count: u64,
-    pub intrinsic_classes: HashMap<String, Rc<ClassObj>>,
+    pub intrinsic_classes: FxHashMap<String, Rc<ClassObj>>,
     pub gc_collections: u64,
     pub gc_total_freed: u64,
     pub gc_alloc_since_collect: u64,
     pub nursery: Nursery,
     free: Vec<u32>,
     objects: Vec<Option<HeapObj>>,
-    string_interner: HashMap<RuntimeString, u32>,
-    symbol_interner: HashMap<RuntimeSymbol, u32>,
-    array_interner: HashMap<ArrayRef, u32>,
-    object_interner: HashMap<ObjRef, u32>,
-    map_interner: HashMap<MapRef, u32>,
-    set_interner: HashMap<SetRef, u32>,
-    bigint_interner: HashMap<i128, u32>,
-    decimal_interner: HashMap<rust_decimal::Decimal, u32>,
-    char_interner: HashMap<char, u32>,
+    string_interner: FxHashMap<RuntimeString, u32>,
+    symbol_interner: FxHashMap<RuntimeSymbol, u32>,
+    array_interner: FxHashMap<ArrayRef, u32>,
+    object_interner: FxHashMap<ObjRef, u32>,
+    map_interner: FxHashMap<MapRef, u32>,
+    set_interner: FxHashMap<SetRef, u32>,
+    bigint_interner: FxHashMap<i128, u32>,
+    decimal_interner: FxHashMap<rust_decimal::Decimal, u32>,
+    char_interner: FxHashMap<char, u32>,
     gc_collector: Option<GcCollector>,
     pub hotspot: Option<Rc<RefCell<HotspotCounters>>>,
 }
@@ -100,16 +102,16 @@ impl HeapInner {
             objects: Vec::with_capacity(4096),
             free: Vec::new(),
             alloc_count: 0,
-            intrinsic_classes: HashMap::default(),
-            string_interner: HashMap::default(),
-            symbol_interner: HashMap::default(),
-            array_interner: HashMap::default(),
-            object_interner: HashMap::default(),
-            map_interner: HashMap::default(),
-            set_interner: HashMap::default(),
-            bigint_interner: HashMap::default(),
-            decimal_interner: HashMap::default(),
-            char_interner: HashMap::default(),
+            intrinsic_classes: FxHashMap::default(),
+            string_interner: FxHashMap::default(),
+            symbol_interner: FxHashMap::default(),
+            array_interner: FxHashMap::default(),
+            object_interner: FxHashMap::default(),
+            map_interner: FxHashMap::default(),
+            set_interner: FxHashMap::default(),
+            bigint_interner: FxHashMap::default(),
+            decimal_interner: FxHashMap::default(),
+            char_interner: FxHashMap::default(),
             gc_collector: Some(GcCollector::new(4096)),
             gc_collections: 0,
             gc_total_freed: 0,
@@ -585,7 +587,7 @@ impl HeapInner {
         VmValue::from_heap_idx(self.alloc(HeapObj::Module(m)))
     }
 
-    pub fn alloc_frozen_module(&mut self, m: std::sync::Arc<FrozenModuleObj>) -> VmValue {
+    pub fn alloc_frozen_module(&mut self, m: Arc<FrozenModuleObj>) -> VmValue {
         VmValue::from_heap_idx(self.alloc(HeapObj::FrozenModule(m)))
     }
 
