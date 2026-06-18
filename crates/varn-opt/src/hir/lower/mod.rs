@@ -392,6 +392,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
         return_ty: HirType::Dynamic,
         upvalue_count: 0,
         has_this: false,
+        has_rest: false,
     };
 
     Ok(HirModule {

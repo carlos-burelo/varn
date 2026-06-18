@@ -491,6 +491,12 @@ pub enum HirImportKind {
 pub struct HirParam {
     pub name: Rc<str>,
     pub ty: HirType,
+    /// Default value (`fn(x = expr)`), lowered in the function's own scope. The
+    /// emitter guards it with `IsNull`: if the slot is null at entry, the
+    /// default is evaluated and moved in (legacy `function.rs` param prologue).
+    /// Optional params (`x?`) without a default need no codegen — the VM passes
+    /// null when the argument is absent.
+    pub default: Option<HirExpr>,
 }
 
 #[derive(Debug, Clone)]
@@ -506,6 +512,10 @@ pub struct HirFunction {
     /// Whether register 0 is a meaningful receiver (`this`) — true for methods
     /// and constructors. Sets `FunctionProto.has_this`.
     pub has_this: bool,
+    /// Whether the last parameter is a rest param (`...args`). Sets
+    /// `FunctionProto.has_rest`; the VM collects surplus arguments into an array
+    /// in that slot. No extra bytecode is emitted.
+    pub has_rest: bool,
 }
 
 /// A whole module: the synthetic top-level function plus the functions it

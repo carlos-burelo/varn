@@ -63,12 +63,14 @@ pub fn lower_module(module: &HirModule, source_file: Rc<str>, export_names: Vec<
     for stmt in &module.top_level.body {
         fl.lower_stmt(stmt);
     }
-    fl.finish(Some(Rc::from("<module>")), 0, 0, false, export_names)
+    fl.finish(Some(Rc::from("<module>")), 0, 0, false, false, export_names)
 }
 
 fn lower_function(f: &HirFunction, source_file: Rc<str>) -> FunctionProto {
     let nparams = f.params.len() as u32;
     let mut fl = FnLower::new(nparams, f.locals, source_file);
+    // Param-default prologue runs before the body (legacy `function.rs`).
+    fl.emit_param_prologue(&f.params);
     for stmt in &f.body {
         fl.lower_stmt(stmt);
     }
@@ -77,6 +79,7 @@ fn lower_function(f: &HirFunction, source_file: Rc<str>) -> FunctionProto {
         nparams,
         f.upvalue_count,
         f.has_this,
+        f.has_rest,
         Vec::new(),
     )
 }
@@ -185,12 +188,34 @@ impl FnLower {
         self.next_temp = mark;
     }
 
+    /// Emit the parameter-default prologue: for each `x = default` param, if the
+    /// slot is null at entry, evaluate the default and move it in. Mirrors the
+    /// legacy `function.rs` param loop (`IsNull` + `JumpIfFalse` + `Move`).
+    fn emit_param_prologue(&mut self, params: &[HirParam]) {
+        for (i, p) in params.iter().enumerate() {
+            let Some(default) = &p.default else { continue };
+            let preg = self.param_reg(i as u32);
+            let mark = self.next_temp;
+            let is_null = self.alloc();
+            self.chunk.emit_rr(OpCode::IsNull, is_null, preg, self.line);
+            let skip = self
+                .chunk
+                .emit_cond_jump(OpCode::JumpIfFalse, is_null, self.line);
+            self.free(); // is_null consumed by the branch
+            let dreg = self.lower_expr(default);
+            self.chunk.emit_rr(OpCode::Move, preg, dreg, self.line);
+            self.free_to(mark);
+            self.chunk.patch_jump(skip);
+        }
+    }
+
     fn finish(
         self,
         name: Option<Rc<str>>,
         nparams: u32,
         upvalue_count: u32,
         has_this: bool,
+        has_rest: bool,
         export_names: Vec<Rc<str>>,
     ) -> FunctionProto {
         let cache_count = self.cache_count as usize;
@@ -206,7 +231,7 @@ impl FnLower {
             arity: (1 + nparams) as usize,
             export_names,
             register_count,
-            has_rest: false,
+            has_rest,
             is_async: false,
             is_generator: false,
             has_this,
