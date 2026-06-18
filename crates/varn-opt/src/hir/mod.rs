@@ -120,7 +120,25 @@ pub enum HirExpr {
     Float(f64),
     Str(Rc<str>),
     Bool(bool),
+    Char(char),
     Null,
+    /// `expr!` non-null assertion → `AssertNotNull` (value passes through).
+    NonNull(Box<HirExpr>),
+    /// Comma expression: evaluate all, yield the last.
+    Sequence(Vec<HirExpr>),
+    /// `start..end` / `start..=end` → runtime range object.
+    Range {
+        start: Box<HirExpr>,
+        end: Box<HirExpr>,
+        inclusive: bool,
+    },
+    /// Template literal `` `a${x}b` `` → `BuildStr` over literal/interpolated parts.
+    Template(Vec<HirTemplatePart>),
+    /// Assignment used as an expression (yields the assigned value).
+    Assign {
+        target: Box<HirAssignTarget>,
+        value: Box<HirExpr>,
+    },
     /// Reference to a resolved binding.
     Var(HirBinding),
     Binary {
@@ -221,6 +239,24 @@ pub enum HirExpr {
     },
 }
 
+/// One piece of a template literal.
+#[derive(Debug, Clone)]
+pub enum HirTemplatePart {
+    Str(Rc<str>),
+    Expr(HirExpr),
+}
+
+/// The target of an assignment-expression.
+#[derive(Debug, Clone)]
+pub enum HirAssignTarget {
+    /// `name = value`.
+    Var(HirBinding),
+    /// `object.name = value` → `SetProperty`.
+    Member { object: HirExpr, name: Rc<str> },
+    /// `object[index] = value` → `SetIndex`.
+    Index { object: HirExpr, index: HirExpr },
+}
+
 /// An enum variant: a tag, a metadata string (`Enum.Variant[:fields]`), and
 /// whether it carries a payload.
 #[derive(Debug, Clone)]
@@ -312,13 +348,55 @@ pub enum HirStmt {
         then_body: Vec<HirStmt>,
         else_body: Vec<HirStmt>,
     },
-    /// Pre-tested loop (`while`, and the desugaring target of `for`).
+    /// Pre-tested loop (`while`).
     While {
         test: HirExpr,
         body: Vec<HirStmt>,
     },
+    /// C-style `for`: `test` is checked at the top, `update` runs after the body
+    /// (and is where `continue` lands, so it is not skipped). `init` is lowered
+    /// as ordinary statements before this node.
+    ForClassic {
+        test: HirExpr,
+        update: Vec<HirStmt>,
+        body: Vec<HirStmt>,
+    },
+    /// `for (var of iterable) body` — iterator protocol (`Symbol.iterator`/
+    /// `next`/`done`/`value`). `var` is bound each iteration.
+    ForOf {
+        var: LocalId,
+        iterable: HirExpr,
+        body: Vec<HirStmt>,
+    },
+    /// `for (var in object) body` — `ObjectKeys` + index loop. `var` is bound to
+    /// each key each iteration.
+    ForIn {
+        var: LocalId,
+        object: HirExpr,
+        body: Vec<HirStmt>,
+    },
+    /// `do body while (test)` — body runs once before the test.
+    DoWhile {
+        body: Vec<HirStmt>,
+        test: HirExpr,
+    },
+    /// `switch (disc) { cases }` — a sequential `Eq` test chain with fall-through
+    /// (legacy `stmt.rs`). All cases share one block scope.
+    Switch {
+        disc: HirExpr,
+        cases: Vec<HirSwitchCase>,
+    },
     Break,
     Continue,
+    /// `throw expr` → `Throw`.
+    Throw(HirExpr),
+    /// `try { block } [catch] [finally]`. Lowered with `Try`/`PopTry`/`Throw`
+    /// (legacy `stmt.rs`): the thrown value is bound to the optional catch local.
+    Try {
+        block: Vec<HirStmt>,
+        catch: Option<HirCatch>,
+        finally: Option<Vec<HirStmt>>,
+    },
     /// Close any open upvalues that point at the given capture targets' slots,
     /// emitted when a block/function that declared captured bindings is about
     /// to go out of scope. Lowers to `CloseUpvalue` at the lowest such register.
@@ -335,6 +413,28 @@ pub enum HirStmt {
         name: Rc<str>,
         slot: u16,
     },
+    /// Dispose a `using` resource at block exit: `target.dispose()` (or
+    /// `disposeAsync()`). Lowers to a no-arg `CallMethod`.
+    Dispose {
+        target: LocalId,
+        is_await: bool,
+    },
+}
+
+/// A `switch` case: `test` is `None` for the `default` clause. Bodies fall
+/// through to the next case (no implicit `break`), matching legacy.
+#[derive(Debug, Clone)]
+pub struct HirSwitchCase {
+    pub test: Option<HirExpr>,
+    pub body: Vec<HirStmt>,
+}
+
+/// A `catch` clause: an optional bound error local and the handler body.
+#[derive(Debug, Clone)]
+pub struct HirCatch {
+    /// The bound error local (identifier catch param), or `None` for `catch {}`.
+    pub param: Option<LocalId>,
+    pub body: Vec<HirStmt>,
 }
 
 #[derive(Debug, Clone)]
