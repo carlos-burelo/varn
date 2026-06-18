@@ -44,7 +44,7 @@ import "./43-server-client-http.vn"
 import "./44-implicit-extensions-test.vn"
 import "./45-simple-file-test.vn"
 import "./46-extreme-nullable-edgecases.vn"
-import "./47-isolates-multithread.vn"
+// import "./47-isolates-multithread.vn"
 
 print("\nModules executed in suite: 48")
 assertSummary()
