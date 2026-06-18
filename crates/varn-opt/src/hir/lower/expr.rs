@@ -328,10 +328,9 @@ impl<'a> Lowerer<'a> {
                         _ => return unsupported("object method/getter/setter/spread/computed"),
                     }
                 }
-                // Empty `{}` uses the legacy BuildObject path; defer.
-                if keys.is_empty() {
-                    return unsupported("empty object literal");
-                }
+                // Empty `{}` is fine: `lower_object` emits `BuildObject` with a
+                // zero pair count (mirrors legacy `compile_object`'s flush of an
+                // empty segment).
                 Ok(HirExpr::Object { keys, values })
             }
             ExprKind::Function {
@@ -502,6 +501,38 @@ impl<'a> Lowerer<'a> {
                     value: Box::new(value),
                 })
             }
+            ExprKind::Try { expression } => {
+                // `expr?` try operator. Emits `GetEnumTag` + `JumpIfTrue` +
+                // early `Return` in the emitter (legacy `compile_try_expr`).
+                let inner = self.lower_expr(expression, scope)?;
+                Ok(HirExpr::TryOp(Box::new(inner)))
+            }
+            ExprKind::Is {
+                expression,
+                type_ann,
+            } => {
+                let value = Box::new(self.lower_expr(expression, scope)?);
+                Ok(HirExpr::TypeTest {
+                    value,
+                    kind: type_test_of(type_ann),
+                })
+            }
+            ExprKind::Pipeline { left, right } => {
+                // `left |> right`. Non-placeholder form is a plain call
+                // `right(left)` (legacy `compile_pipeline`'s `else` branch). The
+                // placeholder form `left |> f(_)` builds a synthetic closure —
+                // defer that to keep this transparent.
+                if pipeline_has_placeholder(right) {
+                    return unsupported("pipeline placeholder");
+                }
+                let callee = Box::new(self.lower_expr(right, scope)?);
+                let arg = self.lower_expr(left, scope)?;
+                Ok(HirExpr::Call {
+                    callee,
+                    args: vec![arg],
+                    ty: HirType::Dynamic,
+                })
+            }
             _ => unsupported("expression kind"),
         }
     }
@@ -536,5 +567,60 @@ impl<'a> Lowerer<'a> {
             // too, which the VM resolves by name).
             HirBinding::Global(name.clone())
         }
+    }
+}
+
+/// Reduce an `expr is Type` `TypeNode` to one concrete runtime check. Mirrors
+/// legacy `member::compile_is`'s match over `TypeKind`.
+fn type_test_of(type_ann: &varn_core::ast::types::TypeNode) -> HirTypeTest {
+    use varn_core::{IntrinsicType, TypeKind, TypeTag};
+    match &type_ann.kind {
+        TypeKind::Intrinsic(TypeTag::Null) => HirTypeTest::IsNull,
+        TypeKind::Intrinsic(TypeTag::Array) | TypeKind::Array(_) => HirTypeTest::IsArray,
+        TypeKind::Generic(n, _, _) if n.as_str() == IntrinsicType::Array.as_str() => {
+            HirTypeTest::IsArray
+        }
+        TypeKind::Intrinsic(tt) => HirTypeTest::TypeofEq(Rc::from(IntrinsicType::from(*tt).as_str())),
+        TypeKind::Named(name, _) => match IntrinsicType::from_str(name) {
+            Some(it) if it.is_scalar_primitive() => HirTypeTest::TypeofEq(Rc::from(it.as_str())),
+            _ => HirTypeTest::Instanceof(Rc::from(name.as_str())),
+        },
+        _ => HirTypeTest::AlwaysFalse,
+    }
+}
+
+/// Whether a `|>` right-hand side uses the `_` placeholder (`x |> f(_)`), which
+/// legacy desugars into a synthetic closure. Mirrors legacy
+/// `templates::pipeline_has_placeholder`; varn-opt defers that form.
+fn pipeline_has_placeholder(expr: &Expr) -> bool {
+    match &expr.kind {
+        ExprKind::Identifier { name } => &**name == "_",
+        ExprKind::Call { callee, args, .. } => {
+            pipeline_has_placeholder(callee)
+                || args.iter().any(|a| match a {
+                    Arg::Positional(e) | Arg::Spread(e) => pipeline_has_placeholder(e),
+                    Arg::Named { value, .. } => pipeline_has_placeholder(value),
+                })
+        }
+        ExprKind::Member { object, .. } => pipeline_has_placeholder(object),
+        ExprKind::Paren { expression } => pipeline_has_placeholder(expression),
+        ExprKind::Binary { left, right, .. } | ExprKind::Logical { left, right, .. } => {
+            pipeline_has_placeholder(left) || pipeline_has_placeholder(right)
+        }
+        ExprKind::Unary { operand, .. } => pipeline_has_placeholder(operand),
+        ExprKind::Conditional {
+            test,
+            consequent,
+            alternate,
+        } => {
+            pipeline_has_placeholder(test)
+                || pipeline_has_placeholder(consequent)
+                || pipeline_has_placeholder(alternate)
+        }
+        ExprKind::Array { elements, .. } => elements.iter().any(|el| match el {
+            ArrayEl::Expr(e) | ArrayEl::Spread(e) => pipeline_has_placeholder(e),
+            ArrayEl::Hole => false,
+        }),
+        _ => false,
     }
 }

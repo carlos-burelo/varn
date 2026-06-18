@@ -90,6 +90,12 @@ pub enum HirBinOp {
     BitXor,
     Shl,
     Shr,
+    /// `>>>` unsigned right shift.
+    Ushr,
+    /// `x instanceof C` — class membership test.
+    Instanceof,
+    /// `k in obj` — property presence test.
+    In,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,6 +120,22 @@ pub enum HirUpdateOp {
     Dec,
 }
 
+/// A resolved `expr is Type` test. The AST `TypeNode` is reduced at lowering to
+/// one concrete runtime check, mirroring legacy `member::compile_is`.
+#[derive(Debug, Clone)]
+pub enum HirTypeTest {
+    /// `IsNull`.
+    IsNull,
+    /// `IsArray`.
+    IsArray,
+    /// `typeof value === <intrinsic name>` (scalar primitives).
+    TypeofEq(Rc<str>),
+    /// `value instanceof <global class>` (looked up by name).
+    Instanceof(Rc<str>),
+    /// Unsupported type form → constant `false` (`LoadFalse`).
+    AlwaysFalse,
+}
+
 #[derive(Debug, Clone)]
 pub enum HirExpr {
     Int(i64),
@@ -124,6 +146,16 @@ pub enum HirExpr {
     Null,
     /// `expr!` non-null assertion → `AssertNotNull` (value passes through).
     NonNull(Box<HirExpr>),
+    /// `expr?` try operator: if the operand is a non-ok enum (Result.Err /
+    /// Option.None) early-return it from the enclosing function, else yield it.
+    /// Mirrors legacy `compile_try_expr` (`GetEnumTag` + `JumpIfTrue` + `Return`).
+    TryOp(Box<HirExpr>),
+    /// `expr is Type` runtime type test, resolved at lowering to a concrete
+    /// check (`IsNull`/`IsArray`/`Typeof`-compare/`Instanceof`/constant false).
+    TypeTest {
+        value: Box<HirExpr>,
+        kind: HirTypeTest,
+    },
     /// Comma expression: evaluate all, yield the last.
     Sequence(Vec<HirExpr>),
     /// `start..end` / `start..=end` → runtime range object.

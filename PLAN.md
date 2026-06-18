@@ -203,8 +203,20 @@ opcodes → legacy reference → verification.
      independently). Both fixes are correct for legacy too (legacy rarely
      compresses, so it never hit them). Shape-sharing via `BuildObjectWithShape`
      is a deferred optimisation.
-- **Deferred:** `New` (§1.6), `TaggedTemplate`, `Pipeline`, `Is`, intrinsics,
-  `Try`-expr, bigint/decimal/regex literals (decimal/bigint need `rust_decimal`),
+- **Done (batch 3 — expression/binary-op cleanup, 30→33 modules via varn-opt):**
+  `>>>`/`instanceof`/`in` binary ops (`HirBinOp::Ushr/Instanceof/In` → same
+  opcodes as legacy, numeric-kind-independent); **empty object literal** `{}`
+  (`lower_object` already emits `BuildObject` count-0 — dropped the guard);
+  `Pipeline` non-placeholder (`x |> f` desugars to a plain `Call f(x)`;
+  placeholder form `f(_)` still falls back); `Try`-expr `expr?`
+  (`HirExpr::TryOp` → `GetEnumTag` + `JumpIfTrue` + early `Return`, mirroring
+  `compile_try_expr`); `Is` type-test `expr is T` (`HirExpr::TypeTest` +
+  `HirTypeTest` resolved at lowering to `IsNull`/`IsArray`/`Typeof`-compare/
+  `Instanceof`/const-false, mirroring `member::compile_is`). Verified
+  differential vs legacy (instanceof/in/ushr/empty-obj/pipeline/try/is all
+  identical); suite 668/668; `VN_OPT bench` (regalloc ON) clean.
+- **Deferred:** `New` (§1.6), `TaggedTemplate`, pipeline `_` placeholder,
+  intrinsics, bigint/decimal/regex literals (decimal/bigint need `rust_decimal`),
   array spread/holes, computed/method/getter/setter object props, member/index
   update targets (§1.4), `Await`/`Spawn`/`Yield` (§1.9).
 
