@@ -370,6 +370,13 @@ fn scan_bytecode(code: &[u16]) -> ScanResult {
     let mut uses: HashMap<u8, Vec<usize>> = HashMap::new();
     let mut call_arg_ranges: Vec<(u8, u8)> = Vec::new();
     let pinned: std::collections::HashSet<u8> = std::collections::HashSet::new();
+    // Locals captured by a `MakeClosure` as an *open* upvalue: the upvalue keeps
+    // pointing at the local's register slot until it is closed (`CloseUpvalue`)
+    // or the frame returns, so the slot must stay live until then — otherwise a
+    // later def (e.g. the closure's own dest) could be coloured onto it and
+    // corrupt the captured value. Their liveness is extended to the function end
+    // below (conservative; `CloseUpvalue` already records its own use earlier).
+    let mut open_captures: Vec<u8> = Vec::new();
 
     let mut offset = 0;
     let mut instr_idx = 0usize;
@@ -379,6 +386,17 @@ fn scan_bytecode(code: &[u16]) -> ScanResult {
             Some(i) => i,
             None => break,
         };
+
+        if let Some(OpCode::MakeClosure) = OpCode::from_u16(code[offset]) {
+            let uv_count = (code[offset + 1] & 0xff) as usize;
+            for i in 0..uv_count {
+                let desc = code.get(offset + 3 + i).copied().unwrap_or(0);
+                let is_local = (desc >> 8) as u8;
+                if is_local == 1 {
+                    open_captures.push((desc & 0xff) as u8);
+                }
+            }
+        }
 
         if info.opaque {
             offset += info.len;
@@ -398,6 +416,12 @@ fn scan_bytecode(code: &[u16]) -> ScanResult {
 
         offset += info.len;
         instr_idx += 1;
+    }
+
+    // Keep captured locals live to the last instruction.
+    let last = instr_idx.saturating_sub(1);
+    for reg in open_captures {
+        uses.entry(reg).or_insert_with(Vec::new).push(last);
     }
 
     ScanResult {
