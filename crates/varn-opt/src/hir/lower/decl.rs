@@ -435,6 +435,7 @@ impl<'a> Lowerer<'a> {
             return_ty: HirType::Dynamic,
             upvalue_count: upvalues.len() as u32,
             has_this,
+            has_rest: params_ast.iter().any(|p| p.is_rest),
         };
         Ok((func, upvalues))
     }
@@ -446,11 +447,11 @@ impl<'a> Lowerer<'a> {
         field_inits: &[(Rc<str>, &Expr)],
         scope: &mut Scope,
     ) -> R<(Vec<HirParam>, Vec<HirStmt>)> {
+        // Pass 1: bind every param name so defaults (lowered below) can refer to
+        // earlier params, exactly like the legacy child compiler which collects
+        // `param_regs` before running the default prologue.
         let mut params = Vec::new();
         for (i, p) in params_ast.iter().enumerate() {
-            if p.is_rest || p.is_optional || p.default.is_some() {
-                return unsupported("rest/optional/default param");
-            }
             let pname = match &p.pattern {
                 Pattern::Identifier { name, .. } => name.clone(),
                 _ => return unsupported("destructuring param"),
@@ -459,7 +460,16 @@ impl<'a> Lowerer<'a> {
             params.push(HirParam {
                 name: pname,
                 ty: param_ty(p),
+                default: None,
             });
+        }
+        // Pass 2: lower default expressions (`x = expr`). `is_optional` without a
+        // default needs nothing — the VM passes null when the arg is absent; rest
+        // params are handled via `HirFunction.has_rest`.
+        for (i, p) in params_ast.iter().enumerate() {
+            if let Some(default) = &p.default {
+                params[i].default = Some(self.lower_expr(default, scope)?);
+            }
         }
         let mut out = Vec::new();
         match body {

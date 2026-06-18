@@ -362,14 +362,24 @@ opcodes → legacy reference → verification.
 - `is_async`/`is_generator` functions; `await`/`yield`/`spawn`; Task/Isolate
   runtime. Defer (lowest frequency, highest complexity). Until done → fallback.
 
-### 1.10 Patterns / params / generics
-- Destructuring (array/object/rest/default/assignment patterns) in
-  params/`let`/for — mirror `function.rs::declare_pattern_into`/`_global`.
-- Default/rest/optional params (`IsNull` + default expr; rest collection).
+### 1.10 Patterns / params / generics 🟡 PARTIAL
+- **Done (simple default/optional/rest params — fallback 39→0 for that reason,
+  33→39 modules via varn-opt, unblocking all `runtime:*` + `std:test`):**
+  - **Default** `x = expr`: `HirParam.default` (lowered in the function's own
+    scope, two-pass so defaults can see earlier params) → emitter prologue
+    `IsNull`/`JumpIfFalse`/`Move` before the body (legacy `function.rs` loop).
+  - **Optional** `x?`: no codegen — the VM passes null when the arg is absent.
+  - **Rest** `...args`: `HirFunction.has_rest` → `FunctionProto.has_rest`; the VM
+    collects surplus args into the slot's array. `arity` already counts it.
+  - Verified differential vs legacy (default/rest identical); suite 668/668;
+    `VN_OPT bench` (regalloc ON) clean.
+- **Deferred → fallback:** destructuring params (array/object/rest/assignment
+  patterns; the `Pattern::Identifier`-only guard remains) in params/`let`/for —
+  mirror `function.rs::declare_pattern_into`/`_global`; named/spread args +
+  non-identity `get_call_mapping` (arg reordering/defaults — `compile_args_
+  contiguous`); generics monomorphization.
 - Generics: type-erased at codegen (monomorphization is a later opt); ensure
   `type_params` don't block lowering once bodies are type-erased.
-- Named/spread args + `get_call_mapping` (arg reordering/defaults) — replicate
-  `compile_args_contiguous`'s mapping path.
 
 ### 1.11 Differential testing harness (build alongside §1)
 - Add `vn debug -p hir` (dump HIR) and a **bytecode differ**: compile a program
