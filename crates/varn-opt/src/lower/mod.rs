@@ -248,6 +248,9 @@ fn bin_opcode(op: HirBinOp, ty: HirType) -> OpCode {
             BitXor => OpCode::BitXor,
             Shl => OpCode::Shl,
             Shr => OpCode::Shr,
+            Ushr => OpCode::Ushr,
+            Instanceof => OpCode::Instanceof,
+            In => OpCode::In,
             And | Or => OpCode::Add, // unreachable: And/Or are Logical
         },
         HirType::Float => match op {
@@ -268,6 +271,9 @@ fn bin_opcode(op: HirBinOp, ty: HirType) -> OpCode {
             BitXor => OpCode::BitXor,
             Shl => OpCode::Shl,
             Shr => OpCode::Shr,
+            Ushr => OpCode::Ushr,
+            Instanceof => OpCode::Instanceof,
+            In => OpCode::In,
             And | Or => OpCode::Add,
         },
         _ => match op {
@@ -288,6 +294,9 @@ fn bin_opcode(op: HirBinOp, ty: HirType) -> OpCode {
             BitXor => OpCode::BitXor,
             Shl => OpCode::Shl,
             Shr => OpCode::Shr,
+            Ushr => OpCode::Ushr,
+            Instanceof => OpCode::Instanceof,
+            In => OpCode::In,
             And | Or => OpCode::Add,
         },
     }

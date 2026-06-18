@@ -63,6 +63,51 @@ impl FnLower {
                     .emit1(OpCode::AssertNotNull, Chunk::pack(r, 0), self.line);
                 r
             }
+            HirExpr::TryOp(operand) => {
+                // `expr?`: early-return the value if it is a non-ok enum, else
+                // fall through with it (legacy `compile_try_expr`). The operand
+                // reg is a fresh temp (`load_binding` copies), so it survives as
+                // the result.
+                let r = self.lower_expr(operand);
+                let tag = self.alloc();
+                self.chunk.emit_rr(OpCode::GetEnumTag, tag, r, self.line);
+                let ok = self.chunk.emit_cond_jump(OpCode::JumpIfTrue, tag, self.line);
+                self.free_to(tag as u32); // tag consumed by the branch; keep r
+                self.chunk
+                    .emit1(OpCode::Return, Chunk::pack(0, r), self.line);
+                self.chunk.patch_jump(ok);
+                r
+            }
+            HirExpr::TypeTest { value, kind } => {
+                // `expr is Type` → a concrete check, result reused into the
+                // operand's (fresh-temp) reg. Mirrors legacy `compile_is`.
+                let src = self.lower_expr(value);
+                match kind {
+                    HirTypeTest::IsNull => self.chunk.emit_rr(OpCode::IsNull, src, src, self.line),
+                    HirTypeTest::IsArray => self.chunk.emit_rr(OpCode::IsArray, src, src, self.line),
+                    HirTypeTest::TypeofEq(name) => {
+                        let type_str = self.alloc();
+                        self.chunk.emit_rr(OpCode::Typeof, type_str, src, self.line);
+                        let s_idx = self.chunk.add_str(name);
+                        let s_reg = self.alloc();
+                        self.chunk.emit_rc(OpCode::LoadConst, s_reg, s_idx, self.line);
+                        self.chunk.emit_rrr(OpCode::Eq, src, type_str, s_reg, self.line);
+                        self.free_to(src as u32 + 1); // free type_str + s_reg
+                    }
+                    HirTypeTest::Instanceof(name) => {
+                        let cls = self.alloc();
+                        let idx = self.chunk.add_str(name);
+                        self.chunk.emit_rc(OpCode::LoadGlobal, cls, idx, self.line);
+                        self.chunk
+                            .emit_rrr(OpCode::Instanceof, src, src, cls, self.line);
+                        self.free_to(src as u32 + 1); // free cls
+                    }
+                    HirTypeTest::AlwaysFalse => {
+                        self.chunk.emit_rr(OpCode::LoadFalse, src, 0, self.line)
+                    }
+                }
+                src
+            }
             HirExpr::Sequence(exprs) => {
                 let mark = self.next_temp;
                 let mut last = None;

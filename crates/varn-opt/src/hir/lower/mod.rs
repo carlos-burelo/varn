@@ -431,7 +431,9 @@ fn bin_op(op: BinaryOp) -> R<HirBinOp> {
         BinaryOp::BitXor => HirBinOp::BitXor,
         BinaryOp::Shl => HirBinOp::Shl,
         BinaryOp::Shr => HirBinOp::Shr,
-        _ => return unsupported("binary op"),
+        BinaryOp::UShr => HirBinOp::Ushr,
+        BinaryOp::Instanceof => HirBinOp::Instanceof,
+        BinaryOp::In => HirBinOp::In,
     })
 }
 
