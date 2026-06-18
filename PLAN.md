@@ -178,10 +178,35 @@ opcodes → legacy reference → verification.
   `stmt.rs`). Verified end-to-end via varn-opt (array/object/property/logical/
   ternary/update/nullish → correct), which also exercises §1.1 `GetProperty`.
   Suite 686/686.
-- **Deferred:** `New` (§1.6), `Template`/`TaggedTemplate`, `Range`, `Pipeline`,
-  `Sequence`, `Spread` (§1.10), intrinsics, `As`/`Satisfies`/`NonNull`,
-  `Try`-expr, char/bigint/decimal/regex literals, array spread/holes, computed/
-  method/getter/setter object props, member/index update targets (§1.4).
+- **Done (batch 2 — expression-kind fallback 12→5):** `Template` (`BuildStr`
+  chain + `ToString`), `Range` (`InvokeRuntimeStatic __range__`), `Sequence`
+  (eval-all, yield-last), `As`/`Satisfies` (transparent), `NonNull` (`!` →
+  `AssertNotNull`), char literals, and **assignment-as-expression** (identifier/
+  member/index + compound-identifier, yields the value). Verified differential vs
+  legacy (template/char/`as`/`!`/sequence/range/assign-expr all identical); suite
+  668/668 both paths.
+- **Three cross-cutting bugs found + fixed** (each pre-existing, exposed once more
+  modules routed through varn-opt — all verified differential-clean):
+  1. **C-style `for` + `continue`:** `for` desugared to `while(test){body;update}`
+     made `continue` skip `update` → infinite loop. Now a dedicated
+     `HirStmt::ForClassic` whose `continue` (`Forward`) lands on the `update`.
+  2. **`AssertNotNull` operand byte:** the VM reads the reg from the *high* byte;
+     legacy emits `pack(0,r)` (low) but survives via its IR-regalloc. varn-opt has
+     no IR, so it now emits `pack(r,0)`.
+  3. **`regalloc_post` captured-local liveness + `BuildObjectWithShape`:** (a) a
+     `MakeClosure`-captured *local*'s slot was reused as the closure's own dest
+     (the open upvalue then read the closure) — fixed by extending captured
+     locals' liveness to function end in `scan_bytecode`; (b) `BuildObjectWithShape`'s
+     value block must stay register-contiguous but its count lives in the shape
+     constant (invisible to the bytecode-only `regalloc_post`), so varn-opt now
+     emits `BuildObject` (explicit key/value pairs, each reg tracked/remapped
+     independently). Both fixes are correct for legacy too (legacy rarely
+     compresses, so it never hit them). Shape-sharing via `BuildObjectWithShape`
+     is a deferred optimisation.
+- **Deferred:** `New` (§1.6), `TaggedTemplate`, `Pipeline`, `Is`, intrinsics,
+  `Try`-expr, bigint/decimal/regex literals (decimal/bigint need `rust_decimal`),
+  array spread/holes, computed/method/getter/setter object props, member/index
+  update targets (§1.4), `Await`/`Spawn`/`Yield` (§1.9).
 
   Original notes:
 - `Logical` (`&&`/`||`/`??`) → branch + `Move` (legacy `operators.rs::
@@ -207,14 +232,55 @@ opcodes → legacy reference → verification.
   assignment. Reassign-global → confirm `DefineGlobal` vs `StoreGlobal`
   semantics (legacy `expr/assignment.rs`).
 
-### 1.5 Remaining statements
-- `for-in` / `for-of` → iterator protocol (`[Symbol.iterator]`/`next`), `GetEnumTag`
-  loop (legacy `stmt.rs`). Heavy: drives much of the suite.
-- `switch` → jump table / branch chain.
-- `try/catch/finally` + `throw` → `Try`/`PopTry`/`Throw` opcodes, finally
-  duplication (`stmt.rs`, VM `exec/dispatch` try handlers).
-- `do-while`; labeled `break`/`continue` (label → target resolution).
-- `using`/disposables → `dispose`/`disposeAsync` on scope pop (`pop_scope`).
+### 1.5 Remaining statements ✅ DONE
+- **Done (all mirror legacy `stmt.rs` byte-behaviourally):**
+  - `throw` → `Throw`; `try/catch/finally` → `Try`/`PopTry`/`Throw` with the
+    nested-`Try`-around-`catch` finally dance. A per-function `finally_stack`
+    threads pending `finally` bodies into `return`/`break`/`continue` (re-lowered
+    + `PopTry` before the transfer). Catch param = a local copied from `err_reg`.
+  - `for-of` → iterator protocol (`Symbol.iterator`/`next`/`done`/`value`);
+    `for-in` → `ObjectKeys` + index loop. (`for-await-of` → fallback, async only.)
+  - `switch` → sequential `Eq` chain with fall-through; a `break`-only scope so
+    `continue` targets the enclosing loop.
+  - `do-while`.
+  - `using`/disposables → `dispose`/`disposeAsync` (no-arg `CallMethod`) at block
+    exit (reverse decl order), tracked per block in the HIR `Scope` and emitted
+    via `block_epilogue` (alongside `CloseUpvalues`); also at frame exit.
+  - Labels are **ignored** (matches legacy: `break`/`continue` always target the
+    innermost loop; `Labeled` just lowers its body). Proper label resolution is
+    deferred to §4 when legacy is replaced.
+- **Emitter infra added** (`lower/`): `LoopCtx` now carries a `ContinueMode`
+  (`Backward(off)` for while/for-of, `Forward` for for-in/do-while increment,
+  `Skip` for switch) + `continue_jumps` + `finally_depth`; `FnLower.finally_stack`.
+- **Bug fixed:** `lower_module` passed `nlocals = 0`, so module-level block locals
+  (`using`/block `let`) collided with temporaries and got clobbered by intervening
+  calls. Now passes `module.top_level.locals` (mirroring `lower_function`).
+- **Verified:** suite **668/668** via varn-opt (the `"statement kind"` fallback is
+  gone); focused differential tests for try/catch/finally (incl. `break`/`continue`
+  running `finally`), for-of/for-in, switch/do-while, and `using` all match legacy
+  exactly. `VN_OPT bench` (regalloc/JIT) exits clean. Module `45-simple-file-test`
+  now compiles via varn-opt.
+- **Four pre-existing legacy control-flow bugs fixed (in BOTH legacy `stmt.rs`
+  and varn-opt — surfaced by §1.5; verified on both paths):**
+  1. **`switch` fall-through:** a matched empty/grouped case fell into the next
+     *test* instead of the next *body* (`case 2: case 3: …` mis-classified `2`).
+     Both emitters now emit all case tests first (`Eq`→`JumpIfTrue` to the body),
+     then the bodies in order, so they fall through correctly.
+  2. **`switch` + `continue` (a crash):** legacy dropped the switch's
+     `continue_jumps`, leaving an unpatched jump (0xFFFF…) → VM/JIT crash
+     (`varn-jit/compiler.rs:403` out-of-bounds). `continue` in a `switch` now
+     targets the enclosing loop (varn-opt: `ContinueMode::Skip`; legacy: forward
+     the jumps to the outer loop ctx). Fixed at the source, so no JIT change needed.
+  3. **`finally` skipped on `return` inside `catch`:** the `finally` was popped
+     from `finally_stack` before the `catch` body. `try/catch/finally` is now
+     lowered in three explicit shapes so `finally` runs on every exit path.
+  4. **`finally`-only `try` swallowed exceptions:** `try { throw } finally {}`
+     ran `finally` but never rethrew. The handler now rethrows after `finally`.
+- **Refactor (file-size governance):** the two god-files were split by domain —
+  `hir/lower.rs` (1597) → `hir/lower/{mod,decl,stmt,expr}.rs`; the emitter
+  `lower/mod.rs` (988) → `lower/{mod,stmt,expr,class,control}.rs`. All ≤ ~490 lines.
+- **Deferred → fallback:** `for-await-of`; destructuring `using`/catch params;
+  proper labeled `break`/`continue`.
 
 ### 1.6 Classes 🟡 CORE DONE
 - **Done (core):** `HirExpr::This` (reg 0), `HirExpr::Class` (+`HirClass`/
