@@ -387,41 +387,65 @@ pub fn compile_stmt<'a>(c: &mut Compiler<'a>, stmt: &Stmt) {
         } => {
             c.push_scope();
             let disc = compile_expr(c, discriminant);
-            let mut next_jumps: Vec<usize> = vec![];
-            let mut break_jumps: Vec<usize> = vec![];
 
-            for case in cases {
-                for p in next_jumps.drain(..) {
-                    c.patch_jump(p);
-                }
+            // Phase 1: emit every case test (`disc == val` → `JumpIfTrue` to that
+            // case's body, patched in phase 2); remember the `default` index.
+            // Emitting all tests before any body makes fall-through correct: a
+            // matched empty case falls into the *next body*, not the next test.
+            let mut test_jumps: Vec<Option<usize>> = Vec::with_capacity(cases.len());
+            let mut default_idx: Option<usize> = None;
+            for (i, case) in cases.iter().enumerate() {
                 if let Some(test) = &case.test {
                     let test_r = compile_expr(c, test);
                     let eq_r = c.alloc_reg();
                     c.emit_rrr(OpCode::Eq, eq_r, disc, test_r);
-                    c.free_reg();
-                    let skip = c.emit_cond_jump(OpCode::JumpIfFalse, eq_r);
-                    c.free_reg();
-                    next_jumps.push(skip);
+                    let j = c.emit_cond_jump(OpCode::JumpIfTrue, eq_r);
+                    c.free_reg(); // eq_r
+                    c.free_reg(); // test_r
+                    test_jumps.push(Some(j));
+                } else {
+                    default_idx = Some(i);
+                    test_jumps.push(None);
                 }
-                c.loop_stack.push(LoopCtx {
-                    start: 0,
-                    break_jumps: vec![],
-                    continue_jumps: vec![],
-                    finally_depth: c.finally_stack.len(),
-                });
+            }
+            // No test matched → jump to the `default` body (patched when reached)
+            // or past the switch.
+            let no_match = c.emit_jump(OpCode::Jump);
+
+            // Phase 2: bodies (source order, falling through). A `break`-only
+            // scope: `continue` must target the *enclosing* loop, so its jumps
+            // are forwarded to the outer loop ctx rather than dropped (dropping
+            // them left an unpatched jump → VM/JIT crash).
+            c.loop_stack.push(LoopCtx {
+                start: 0,
+                break_jumps: vec![],
+                continue_jumps: vec![],
+                finally_depth: c.finally_stack.len(),
+            });
+            let mut default_patched = false;
+            for (i, case) in cases.iter().enumerate() {
+                if let Some(j) = test_jumps[i] {
+                    c.patch_jump(j);
+                }
+                if default_idx == Some(i) {
+                    c.patch_jump(no_match);
+                    default_patched = true;
+                }
                 for s in &case.body {
                     compile_stmt(c, s);
                 }
-                let ctx = c.loop_stack.pop().unwrap();
-                break_jumps.extend(ctx.break_jumps);
             }
-            for p in next_jumps {
+            if !default_patched {
+                c.patch_jump(no_match);
+            }
+            let ctx = c.loop_stack.pop().unwrap();
+            for p in ctx.break_jumps {
                 c.patch_jump(p);
             }
-            c.free_reg();
-            for p in break_jumps {
-                c.patch_jump(p);
+            if let Some(outer) = c.loop_stack.last_mut() {
+                outer.continue_jumps.extend(ctx.continue_jumps);
             }
+            c.free_reg(); // disc
             c.pop_scope();
         }
 
@@ -430,72 +454,112 @@ pub fn compile_stmt<'a>(c: &mut Compiler<'a>, stmt: &Stmt) {
             catch,
             finally,
         } => {
-            if let Some(fin) = finally {
-                c.finally_stack.push(fin.as_ref().clone());
-            }
-
-            let err_reg = c.alloc_reg();
             let line = c.line;
-            c.chunk.emit(OpCode::Try, line);
-            c.chunk.write(crate::chunk::Chunk::pack(err_reg, 0), line);
-            let try_patch = c.chunk.code.len();
-            c.chunk.write(0xFFFF, line);
-            c.chunk.write(0xFFFF, line);
-
-            compile_stmt(c, block);
-
-            c.emit(OpCode::PopTry);
-            let after_try_j = c.emit_jump(OpCode::Jump);
-            c.patch_jump(try_patch);
-
-            if let Some(catch_clause) = catch {
-                if finally.is_some() {
-                    c.finally_stack.pop();
-                }
-
-                if let Some(fin) = finally {
-                    let catch_err_reg = c.alloc_reg();
+            match (catch, finally) {
+                // `try { block } finally { fin }` — run `fin` on normal
+                // completion AND rethrow after it on a thrown exception (the old
+                // code swallowed the exception).
+                (None, Some(fin)) => {
+                    c.finally_stack.push(fin.as_ref().clone());
+                    let err_reg = c.alloc_reg();
                     c.chunk.emit(OpCode::Try, line);
-                    c.chunk.write(Chunk::pack(catch_err_reg, 0), line);
-                    let catch_try_patch = c.chunk.code.len();
+                    c.chunk.write(Chunk::pack(err_reg, 0), line);
+                    let patch = c.chunk.code.len();
                     c.chunk.write(0xFFFF, line);
                     c.chunk.write(0xFFFF, line);
 
-                    c.push_scope();
-                    if let Some(param) = &catch_clause.param {
-                        declare_pattern_local(c, param, err_reg);
-                    }
-                    compile_stmt(c, &catch_clause.body);
-                    c.pop_scope();
-
+                    compile_stmt(c, block);
                     c.emit(OpCode::PopTry);
-                    let catch_finally_j = c.emit_jump(OpCode::Jump);
-                    c.patch_jump(catch_try_patch);
+                    c.finally_stack.pop();
+                    compile_stmt(c, fin); // normal completion
+                    let end = c.emit_jump(OpCode::Jump);
 
+                    c.patch_jump(patch); // handler: run finally, rethrow
                     compile_stmt(c, fin);
                     c.chunk.emit(OpCode::Throw, line);
-                    c.chunk
-                        .write(Chunk::pack(catch_err_reg, catch_err_reg), line);
+                    c.chunk.write(Chunk::pack(err_reg, err_reg), line);
 
-                    c.patch_jump(catch_finally_j);
+                    c.patch_jump(end);
                     c.free_reg();
-                } else {
+                }
+                // `try { block } catch (e) { body }`.
+                (Some(catch_clause), None) => {
+                    let err_reg = c.alloc_reg();
+                    c.chunk.emit(OpCode::Try, line);
+                    c.chunk.write(Chunk::pack(err_reg, 0), line);
+                    let patch = c.chunk.code.len();
+                    c.chunk.write(0xFFFF, line);
+                    c.chunk.write(0xFFFF, line);
+
+                    compile_stmt(c, block);
+                    c.emit(OpCode::PopTry);
+                    let end = c.emit_jump(OpCode::Jump);
+
+                    c.patch_jump(patch);
                     c.push_scope();
                     if let Some(param) = &catch_clause.param {
                         declare_pattern_local(c, param, err_reg);
                     }
                     compile_stmt(c, &catch_clause.body);
                     c.pop_scope();
+                    c.patch_jump(end);
+                    c.free_reg();
                 }
-            } else if finally.is_some() {
-                c.finally_stack.pop();
-            }
+                // `try { block } catch (e) { body } finally { fin }`. `finally`
+                // runs on the normal completion of both bodies, on a throw in
+                // `catch` (then rethrow), and via `finally_stack` on a
+                // `return`/`break`/`continue` inside either (the old code popped
+                // the finally before `catch`, so a `return` in `catch` skipped it).
+                (Some(catch_clause), Some(fin)) => {
+                    c.finally_stack.push(fin.as_ref().clone());
+                    let err_reg = c.alloc_reg();
+                    c.chunk.emit(OpCode::Try, line);
+                    c.chunk.write(Chunk::pack(err_reg, 0), line);
+                    let patch = c.chunk.code.len();
+                    c.chunk.write(0xFFFF, line);
+                    c.chunk.write(0xFFFF, line);
 
-            c.free_reg();
+                    compile_stmt(c, block);
+                    c.emit(OpCode::PopTry);
+                    c.finally_stack.pop();
+                    compile_stmt(c, fin); // block normal completion
+                    let end_b = c.emit_jump(OpCode::Jump);
 
-            c.patch_jump(after_try_j);
-            if let Some(fin) = finally {
-                compile_stmt(c, fin);
+                    // Handler: run `catch` inside its own `Try` so a throw there
+                    // still runs `finally` and rethrows.
+                    c.patch_jump(patch);
+                    c.finally_stack.push(fin.as_ref().clone());
+                    let err_reg2 = c.alloc_reg();
+                    c.chunk.emit(OpCode::Try, line);
+                    c.chunk.write(Chunk::pack(err_reg2, 0), line);
+                    let patch2 = c.chunk.code.len();
+                    c.chunk.write(0xFFFF, line);
+                    c.chunk.write(0xFFFF, line);
+
+                    c.push_scope();
+                    if let Some(param) = &catch_clause.param {
+                        declare_pattern_local(c, param, err_reg);
+                    }
+                    compile_stmt(c, &catch_clause.body);
+                    c.pop_scope();
+                    c.emit(OpCode::PopTry);
+                    c.finally_stack.pop();
+                    compile_stmt(c, fin); // catch normal completion
+                    let end_c = c.emit_jump(OpCode::Jump);
+
+                    c.patch_jump(patch2); // catch threw: run finally, rethrow
+                    compile_stmt(c, fin);
+                    c.chunk.emit(OpCode::Throw, line);
+                    c.chunk.write(Chunk::pack(err_reg2, err_reg2), line);
+
+                    c.patch_jump(end_b);
+                    c.patch_jump(end_c);
+                    c.free_reg(); // err_reg2
+                    c.free_reg(); // err_reg
+                }
+                (None, None) => {
+                    compile_stmt(c, block);
+                }
             }
         }
 
