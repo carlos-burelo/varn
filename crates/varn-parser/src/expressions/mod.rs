@@ -33,11 +33,11 @@ pub(super) enum Prec {
 
 fn binary_prec(kind: TokenKind) -> Option<(Prec, bool)> {
     let (p, r) = match kind {
-        TokenKind::PipePipe | TokenKind::PipePipeEq => (Prec::LogicalOr, false),
-        TokenKind::AmpAmp | TokenKind::AmpAmpEq => (Prec::LogicalAnd, false),
-        TokenKind::Pipe | TokenKind::PipeEq => (Prec::BitwiseOr, false),
-        TokenKind::Caret | TokenKind::CaretEq => (Prec::BitwiseXor, false),
-        TokenKind::Amp | TokenKind::AmpEq => (Prec::BitwiseAnd, false),
+        TokenKind::PipePipe => (Prec::LogicalOr, false),
+        TokenKind::AmpAmp => (Prec::LogicalAnd, false),
+        TokenKind::Pipe => (Prec::BitwiseOr, false),
+        TokenKind::Caret => (Prec::BitwiseXor, false),
+        TokenKind::Amp => (Prec::BitwiseAnd, false),
         TokenKind::EqEq | TokenKind::EqEqEq | TokenKind::BangEq | TokenKind::BangEqEq => {
             (Prec::Equality, false)
         }

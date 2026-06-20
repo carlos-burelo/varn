@@ -30,6 +30,10 @@ pub struct DebugFlags {
     pub lsp_symbols: bool,
     pub lsp_colorize: bool,
     pub lsp_hints: bool,
+    /// `vn debug -p hir` — dump del HIR producido por varn-opt.
+    pub hir: bool,
+    /// `vn debug -p ssa` — dump del SSA CFG (construcción Braun).
+    pub ssa: bool,
 }
 
 pub fn parse_line_range(s: &str) -> Result<(u32, u32), CliError> {
@@ -130,6 +134,8 @@ impl DebugFlags {
                     }
                     "info" => flags.info = true,
                     "lsp" => flags.lsp = true,
+                    "hir" => flags.hir = true,
+                    "ssa" => flags.ssa = true,
                     "all" => {
                         flags.tokens = true;
                         flags.ast = true;
@@ -146,11 +152,13 @@ impl DebugFlags {
                         flags.cap_trace = true;
                         flags.lsp = true;
                         flags.lsp_all();
+                        flags.hir = true;
+                        flags.ssa = true;
                     }
                     unknown => {
                         return Err(CliError::usage(format!(
                             "unknown debug phase: '{unknown}'\n\
-                             Valid phases: tokens, ast, check, bytecode, graph, caps, info, all\n\
+                             Valid phases: tokens, ast, check, bytecode, graph, caps, info, hir, ssa, all\n\
                              LSP sub-phases: lsp:hovers, lsp:semantic, lsp:types, lsp:completions, lsp:symbols, lsp:colorize, lsp:hints, lsp:all\n\
                              Line range filter: types:N  types:all  expr:N"
                         )));
@@ -179,6 +187,8 @@ impl DebugFlags {
             || self.cap_trace
             || self.info
             || self.lsp
+            || self.hir
+            || self.ssa
     }
 
     pub fn lsp_all(&mut self) {

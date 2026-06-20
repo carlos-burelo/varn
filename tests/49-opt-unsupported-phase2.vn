@@ -1,0 +1,77 @@
+// Tests for Phase 2: Updates on Members and Indices
+
+// 1. Member updates
+let obj = { x: 10, y: 20 };
+let r1 = obj.x++;
+assert("member update postfix inc val", r1 === 10);
+assert("member update postfix inc storage", obj.x === 11);
+
+let r2 = ++obj.x;
+assert("member update prefix inc val", r2 === 12);
+assert("member update prefix inc storage", obj.x === 12);
+
+let r3 = obj.y--;
+assert("member update postfix dec val", r3 === 20);
+assert("member update postfix dec storage", obj.y === 19);
+
+let r4 = --obj.y;
+assert("member update prefix dec val", r4 === 18);
+assert("member update prefix dec storage", obj.y === 18);
+
+// 2. Index updates
+let arr = [100, 200];
+let r5 = arr[0]++;
+assert("index update postfix inc val", r5 === 100);
+assert("index update postfix inc storage", arr[0] === 101);
+
+let r6 = ++arr[0];
+assert("index update prefix inc val", r6 === 102);
+assert("index update prefix inc storage", arr[0] === 102);
+
+let r7 = arr[1]--;
+assert("index update postfix dec val", r7 === 200);
+assert("index update postfix dec storage", arr[1] === 199);
+
+let r8 = --arr[1];
+assert("index update prefix dec val", r8 === 198);
+assert("index update prefix dec storage", arr[1] === 198);
+
+// 3. Nested updates
+let complex = { arr: [{ val: 5 }] };
+let r9 = complex.arr[0].val++;
+assert("nested update postfix inc val", r9 === 5);
+assert("nested update postfix inc storage", complex.arr[0].val === 6);
+
+// 4. Updates on instance fields in subclass (via `this`)
+class ParentClass {
+    prop: int;
+    arr: int[];
+    constructor() {
+        this.prop = 50;
+        this.arr = [500];
+    }
+}
+
+class ChildClass extends ParentClass {
+    constructor() {
+        super();
+    }
+    testInstanceUpdates(): void {
+        let r10 = this.prop++;
+        assert("instance member update postfix inc val", r10 === 50);
+        assert("instance member update postfix inc storage", this.prop === 51);
+
+        let r11 = ++this.prop;
+        assert("instance member update prefix inc val", r11 === 52);
+        assert("instance member update prefix inc storage", this.prop === 52);
+
+        let r12 = this.arr[0]++;
+        assert("instance index update postfix inc val", r12 === 500);
+        assert("instance index update postfix inc storage", this.arr[0] === 501);
+    }
+}
+
+let c = new ChildClass();
+c.testInstanceUpdates();
+
+print("[PASSED] 49. Phase 2 Unsupported Features Parity");

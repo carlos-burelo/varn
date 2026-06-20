@@ -26,7 +26,15 @@ impl Checker {
             ExprKind::This => self
                 .current_class
                 .as_ref()
-                .map(|cn| Type::named(cn.to_string()))
+                .map(|cn| match IntrinsicType::from_str(cn) {
+                    // Extensions on a primitive set `current_class` to the
+                    // primitive's name; `this` is then that intrinsic type, not
+                    // a named type, so `return this` stays compatible with the
+                    // primitive's declared return type (fixes WR3001 on e.g.
+                    // `extension X on int { f(): int { return this } }`).
+                    Some(it) if it.is_scalar_primitive() => Type::intrinsic(it.0),
+                    _ => Type::named(cn.to_string()),
+                })
                 .unwrap_or(Type::Dynamic),
             ExprKind::New {
                 callee, type_args, ..

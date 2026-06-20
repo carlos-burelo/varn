@@ -11,7 +11,9 @@
 #![allow(dead_code)]
 
 use std::rc::Rc;
+use rust_decimal::Decimal;
 
+pub mod dump;
 pub mod lower;
 
 /// Static representation class for a value, carried from the checker so opt
@@ -143,6 +145,9 @@ pub enum HirExpr {
     Str(Rc<str>),
     Bool(bool),
     Char(char),
+    Decimal(Decimal),
+    BigInt(i128),
+    Regex { pattern: Rc<str>, flags: Rc<str> },
     Null,
     /// `expr!` non-null assertion → `AssertNotNull` (value passes through).
     NonNull(Box<HirExpr>),
@@ -235,17 +240,32 @@ pub enum HirExpr {
     /// `++`/`--` on a simple binding. `prefix` selects whether the expression
     /// yields the new (prefix) or old (postfix) value.
     Update {
-        target: HirBinding,
+        target: Box<HirAssignTarget>,
         op: HirUpdateOp,
         prefix: bool,
     },
-    /// Array literal with only plain element expressions (no spread/holes).
-    Array(Vec<HirExpr>),
+    /// Array literal supporting spreads and holes.
+    Array(Vec<HirArrayEl>),
+    /// `object?.name` maybe member access / GetPropertyMaybe.
+    MemberMaybe {
+        object: Box<HirExpr>,
+        name: Rc<str>,
+        ty: HirType,
+    },
+    /// `ObjectRest` for object destructuring: `{ ...rest } = obj`.
+    ObjectRest {
+        object: Box<HirExpr>,
+        skip_keys: Vec<Rc<str>>,
+    },
+    /// `object?.name` / `object?.[index]` optional chaining.
+    OptionalChain {
+        object: Box<HirExpr>,
+        property: HirOptionalProperty,
+    },
     /// Object literal with a fixed shape: all-static keys, plain value props
     /// (no computed keys, methods, getters/setters, or spreads).
     Object {
-        keys: Vec<Rc<str>>,
-        values: Vec<HirExpr>,
+        properties: Vec<HirObjectProp>,
     },
     /// A function/arrow expression or a nested function declaration captured as
     /// a first-class value. Lowers to `MakeClosure` (or `LoadStaticFn` when
@@ -256,6 +276,24 @@ pub enum HirExpr {
     },
     /// The method receiver, register 0 in a `has_this` function.
     This,
+    /// Standalone super expression.
+    Super,
+    /// `super(args)` — superclass constructor call (`GetSuper "constructor"` +
+    /// call with `this` as receiver).
+    SuperCall { args: Vec<HirExpr> },
+    /// `super.name(args)` — superclass method call (`GetSuper name` + call).
+    SuperMethodCall { name: Rc<str>, args: Vec<HirExpr> },
+    /// `super.name` — superclass member read (`GetSuper name`).
+    SuperMember { name: Rc<str> },
+    /// An extension call `recv.m(args)` / getter `recv.k` / setter `recv.k = v`,
+    /// lowered to the mangled global `func` invoked with `recv` as the **receiver**
+    /// (`this`, register 0 of the callee), args following. Distinct from `Call`
+    /// because the receiver occupies the receiver slot, not an argument slot.
+    ExtensionCall {
+        func: Rc<str>,
+        recv: Box<HirExpr>,
+        args: Vec<HirExpr>,
+    },
     /// A class value: `MakeClass` + `DeclareField`(s) + `Method`(s). Bound to a
     /// global or local by the caller. Core subset: no inheritance/static/
     /// accessors/decorators.
@@ -269,6 +307,70 @@ pub enum HirExpr {
         subject: Box<HirExpr>,
         cases: Vec<HirMatchCase>,
     },
+    /// A spread argument: `...expr`.
+    Spread(Box<HirExpr>),
+    /// `await expr`
+    Await(Box<HirExpr>),
+    /// `spawn expr`
+    Spawn(Box<HirExpr>),
+    /// `yield expr`
+    Yield(Box<HirExpr>),
+    /// Tagged template: `tag`template``
+    TaggedTemplate {
+        tag: Box<HirExpr>,
+        template: Box<HirExpr>,
+    },
+    /// Intrinsic call on a member: `obj.intrinsic(args)`
+    IntrinsicCall {
+        object: Box<HirExpr>,
+        args: Vec<HirExpr>,
+        wire_byte: u8,
+        ty: HirType,
+    },
+    /// Module slot read: `obj` is the module object
+    ModuleSlot {
+        object: Box<HirExpr>,
+        slot: u16,
+        ty: HirType,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub enum HirArrayEl {
+    Expr(HirExpr),
+    Spread(HirExpr),
+    Hole,
+}
+
+#[derive(Debug, Clone)]
+pub enum HirObjectProp {
+    Property {
+        key: HirPropKey,
+        value: HirExpr,
+    },
+    Method {
+        key: HirPropKey,
+        func: HirFunction,
+        upvalues: Vec<HirUpvalueSrc>,
+    },
+    Spread(HirExpr),
+}
+
+#[derive(Debug, Clone)]
+pub enum HirPropKey {
+    Static(Rc<str>),
+    Computed(HirExpr),
+}
+
+#[derive(Debug, Clone)]
+pub enum HirOptionalProperty {
+    Member(Rc<str>),
+    Index(Box<HirExpr>),
+    ModuleSlot(u16),
+    Extension(Rc<str>),
+    Call(Vec<HirExpr>),
+    MethodCall(Rc<str>, Vec<HirExpr>),
+    ExtensionCall(Rc<str>, Vec<HirExpr>),
 }
 
 /// One piece of a template literal.
@@ -287,6 +389,12 @@ pub enum HirAssignTarget {
     Member { object: HirExpr, name: Rc<str> },
     /// `object[index] = value` → `SetIndex`.
     Index { object: HirExpr, index: HirExpr },
+    /// `ModuleSlot = value` → `StoreModuleSlot`.
+    ModuleSlot { slot: u16 },
+    /// `super.name = value`.
+    SuperMember { name: Rc<str> },
+    /// `super[index] = value`.
+    SuperIndex { index: HirExpr },
 }
 
 /// An enum variant: a tag, a metadata string (`Enum.Variant[:fields]`), and
@@ -296,6 +404,7 @@ pub struct HirEnumVariant {
     pub name: Rc<str>,
     pub tag: i64,
     pub meta: Rc<str>,
+    pub const_args: Vec<HirExpr>,
 }
 
 #[derive(Debug, Clone)]
@@ -303,7 +412,13 @@ pub struct HirEnum {
     pub name: Rc<str>,
     pub variants: Vec<HirEnumVariant>,
     pub fields: Vec<Rc<str>>,
+    pub static_fields: Vec<(Rc<str>, Option<HirExpr>)>,
+    pub ctor: HirMethod,
     pub methods: Vec<HirMethod>,
+    pub static_methods: Vec<HirMethod>,
+    pub getters: Vec<HirAccessor>,
+    pub setters: Vec<HirAccessor>,
+    pub static_blocks: Vec<HirMethod>,
 }
 
 #[derive(Debug, Clone)]
@@ -327,6 +442,10 @@ pub enum HirCaseTest {
         name: Rc<str>,
         binds: Vec<Option<LocalId>>,
     },
+    /// Match a record pattern, binding properties.
+    Record {
+        fields: Vec<(Rc<str>, Option<LocalId>)>,
+    },
 }
 
 /// A class method (or constructor) plus the upvalues its closure captures.
@@ -335,17 +454,44 @@ pub struct HirMethod {
     pub key: Rc<str>,
     pub func: HirFunction,
     pub upvalues: Vec<HirUpvalueSrc>,
+    pub decorators: Vec<HirExpr>,
+    pub is_private: bool,
+}
+
+/// A class accessor (getter or setter), instance or static. Lowers to
+/// `DefineGetter`/`DefineSetter` (or the `DefineStatic*` variants).
+#[derive(Debug, Clone)]
+pub struct HirAccessor {
+    pub key: Rc<str>,
+    pub func: HirFunction,
+    pub upvalues: Vec<HirUpvalueSrc>,
+    pub is_static: bool,
 }
 
 #[derive(Debug, Clone)]
 pub struct HirClass {
     pub name: Rc<str>,
+    /// Superclass value (`extends`), lowered as an expression; `MakeClass`
+    /// takes its register so the VM links the prototype chain. `None` = no base.
+    pub super_class: Option<HirExpr>,
     /// Instance field names (`DeclareField`); initializers live in `ctor`.
     pub fields: Vec<Rc<str>>,
+    /// Static fields (`DefineStatic`): the initializer is evaluated at class
+    /// build time (or `null` when absent).
+    pub static_fields: Vec<(Rc<str>, Option<HirExpr>)>,
     /// The constructor (synthesised if the source omits one). Runs field
     /// initializers after its body, matching legacy.
     pub ctor: HirMethod,
+    /// Instance methods (`Method`); a `destructor` is lowered here as `dispose`.
     pub methods: Vec<HirMethod>,
+    /// Static methods (`DefineStatic` with the closure as value).
+    pub static_methods: Vec<HirMethod>,
+    /// Getters/setters (instance + static).
+    pub getters: Vec<HirAccessor>,
+    pub setters: Vec<HirAccessor>,
+    /// Static initializer blocks, invoked (`Call`) immediately at build time.
+    pub static_blocks: Vec<HirMethod>,
+    pub decorators: Vec<HirExpr>,
 }
 
 #[derive(Debug, Clone)]
@@ -399,6 +545,7 @@ pub enum HirStmt {
         var: LocalId,
         iterable: HirExpr,
         body: Vec<HirStmt>,
+        is_await: bool,
     },
     /// `for (var in object) body` — `ObjectKeys` + index loop. `var` is bound to
     /// each key each iteration.
@@ -445,12 +592,37 @@ pub enum HirStmt {
         name: Rc<str>,
         slot: u16,
     },
+    /// Publish a named module export or re-export from a source.
+    ExportNamed {
+        specifiers: Vec<HirExportSpec>,
+        source: Option<Rc<str>>,
+    },
+    /// Re-export all members from a module: `export * from "source"`.
+    ExportAll {
+        source: Rc<str>,
+        alias: Option<Rc<str>>,
+        slot: Option<u16>,
+    },
+    /// Default expression export: `export default expr;`.
+    ExportDefaultExpr {
+        value: HirExpr,
+        slot: Option<u16>,
+    },
     /// Dispose a `using` resource at block exit: `target.dispose()` (or
     /// `disposeAsync()`). Lowers to a no-arg `CallMethod`.
     Dispose {
         target: LocalId,
         is_await: bool,
     },
+}
+
+#[derive(Debug, Clone)]
+pub struct HirExportSpec {
+    pub binding: HirBinding,
+    pub local: Rc<str>,
+    pub exported: Rc<str>,
+    pub local_slot: Option<u16>,
+    pub exported_slot: Option<u16>,
 }
 
 /// A `switch` case: `test` is `None` for the `default` clause. Bodies fall
@@ -516,6 +688,8 @@ pub struct HirFunction {
     /// `FunctionProto.has_rest`; the VM collects surplus arguments into an array
     /// in that slot. No extra bytecode is emitted.
     pub has_rest: bool,
+    pub is_async: bool,
+    pub is_generator: bool,
 }
 
 /// A whole module: the synthetic top-level function plus the functions it

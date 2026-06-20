@@ -3,6 +3,83 @@ use varn_utilities::terminal;
 use varn_utilities::terminal::Section;
 use varn_compiler::FunctionProto;
 use varn_core::OpCode;
+use varn_types::PoolEntry;
+
+// ── ANSI colour constants ──────────────────────────────────────────────────────
+const R:     &str = "\x1b[0m";
+const DIM:   &str = "\x1b[2m";
+const YELLOW: &str = "\x1b[33m"; // control-flow
+const BLUE:  &str = "\x1b[34m";  // constructors
+const MAGENTA: &str = "\x1b[35m"; // calls
+const CYAN:  &str = "\x1b[36m";  // loads / globals / modules
+const GREEN: &str = "\x1b[32m";  // arithmetic / comparisons
+
+/// Return the ANSI colour prefix for a given opcode category.
+fn op_color(op: OpCode) -> &'static str {
+    use OpCode::*;
+    match op {
+        // Control flow
+        Jump | JumpIfFalse | JumpIfTrue | Loop | Return | Throw | Try | PopTry => YELLOW,
+        // Calls
+        Call | CallSpread | CallSelf | CallMethod | InvokeVirtual | Spawn => MAGENTA,
+        // Loads / stores / globals / modules
+        LoadConst | LoadInt | LoadIntZero | LoadIntOne | LoadIntMinusOne
+        | LoadGlobal | LoadGlobalIdx | StoreGlobal | StoreGlobalIdx
+        | DefineGlobal | DefineGlobalIdx
+        | LoadModule | LoadModuleSlot | StoreModuleSlot
+        | LoadUpvalue | StoreUpvalue => CYAN,
+        // Constructors / class / closure
+        MakeClass | MakeClosure | LoadStaticFn | BuildArray | BuildObject
+        | BuildObjectWithShape | BuildStr | Method | DefineStatic
+        | DefineGetter | DefineSetter | DefineStaticGetter | DefineStaticSetter
+        | DeclareField | Inherit | BindMethod | MakeEnumVariant => BLUE,
+        // Arithmetic / logical / comparisons
+        Add | Sub | Mul | Div | Mod | Pow | Eq | Neq | Lt | Lte | Gt | Gte
+        | BitAnd | BitOr | BitXor | Shl | Shr | Ushr | In | Instanceof
+        | AddInt | SubInt | MulInt | DivInt | ModInt | PowInt
+        | LtInt | GtInt | LteInt | GteInt | EqInt | NeqInt
+        | AddFloat | SubFloat | MulFloat | DivFloat | ModFloat | PowFloat
+        | LtFloat | GtFloat | LteFloat | GteFloat | EqFloat | NeqFloat
+        | StrConcat | StrSlice | AddImm | SubImm => GREEN,
+        _ => "",
+    }
+}
+
+/// Render a pool constant as a human-readable hint (no Rust `{:?}` syntax).
+fn const_hint(entry: &PoolEntry) -> String {
+    use varn_types::chunk::Literal;
+    match entry {
+        PoolEntry::Literal(lit) => match lit {
+            Literal::Null       => format!("{DIM}null{R}"),
+            Literal::Bool(b)    => format!("{GREEN}{b}{R}"),
+            Literal::Int(n)     => format!("{GREEN}{n}{R}"),
+            Literal::Float(f)   => format!("{GREEN}{f}{R}"),
+            Literal::Str(s)     => format!("{GREEN}\"{s}\"{R}"),
+            Literal::BigInt(n)  => format!("{GREEN}{n}n{R}"),
+            Literal::Decimal(d) => format!("{GREEN}{d}d{R}"),
+            Literal::Char(c)    => format!("{GREEN}'{c}'{R}"),
+            Literal::Symbol(s)  => format!("{DIM}Symbol({s:?}){R}"),
+        },
+        PoolEntry::Function(f) => {
+            let fname = f.name.as_deref().unwrap_or("<anon>");
+            format!("{BLUE}fn {fname}{R}(arity={})", f.arity)
+        }
+        PoolEntry::Shape(keys) => format!("{DIM}shape[{}]{R}", keys.len()),
+    }
+}
+
+
+/// Build a map from pool index → nested-function name for cross-references.
+fn build_fn_index(proto: &FunctionProto) -> std::collections::HashMap<u16, String> {
+    let mut map = std::collections::HashMap::new();
+    for (i, entry) in proto.chunk.constants.iter().enumerate() {
+        if let PoolEntry::Function(f) = entry {
+            let name = f.name.as_deref().unwrap_or("<anon>").to_owned();
+            map.insert(i as u16, name);
+        }
+    }
+    map
+}
 
 pub fn debug_bytecode(proto: &FunctionProto, _flags: &crate::flags::DebugFlags) {
     Section::new("bytecode").subtitle("...").color(|c| c.yellow()).print();
@@ -25,9 +102,23 @@ fn lo(w: u16) -> usize {
 fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
     let indent = "  ".repeat(depth);
     let name = proto.name.as_deref().unwrap_or("<anonymous>");
+    let flags: Vec<&str> = [
+        proto.is_async.then_some("async"),
+        proto.is_generator.then_some("gen"),
+        proto.has_this.then_some("has_this"),
+        proto.has_rest.then_some("has_rest"),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
+    let flags_str = if flags.is_empty() {
+        String::new()
+    } else {
+        format!("  {DIM}[{}]{R}", flags.join(", "))
+    };
 
     terminal::log(format!(
-        "{indent}{} {} (arity: {}, regs: {}, upvalues: {})",
+        "{indent}{} {} (arity: {}, regs: {}, upvalues: {}){flags_str}",
         chalk("fn").bold(),
         chalk(name).blue(),
         proto.arity,
@@ -35,13 +126,14 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
         proto.upvalue_count,
     ));
 
+    // Constants pool — human-readable
     if !proto.chunk.constants.is_empty() {
-        terminal::log(format!("{indent}  constants ({})", proto.chunk.constants.len()));
+        terminal::log(format!("{indent}  {DIM}constants ({}){R}", proto.chunk.constants.len()));
         for (i, c) in proto.chunk.constants.iter().enumerate() {
-            terminal::log(format!("{indent}  [{:03}] {:?}", i, c));
+            terminal::log(format!("{indent}  {DIM}[{:03}]{R} {}", i, const_hint(c)));
         }
     }
-    terminal::log(format!("{indent}  code ({}) words", proto.chunk.code.len()));
+    terminal::log(format!("{indent}  {DIM}code ({}) words{R}", proto.chunk.code.len()));
     *total += proto.chunk.code.len();
 
     terminal::log(format!(
@@ -49,6 +141,9 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
         chalk(format!("{:<4} │ {:<3} │ {:<20} │ Operands / Hint", "Off", "Lin", "Opcode")).dim()
     ));
     terminal::log(format!("{indent}  {}", "─".repeat(72)));
+
+    // Build fn-index for cross-reference hints on MakeClosure/LoadStaticFn
+    let fn_index = build_fn_index(proto);
 
     let code = &proto.chunk.code;
     let mut pc = 0;
@@ -200,7 +295,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             OpCode::LoadConst => {
                 let idx = w!();
                 if let Some(c) = proto.chunk.constants.get(idx as usize) {
-                    hint = format!("{:?}", c);
+                    hint = const_hint(c);
                 }
                 format!("r{} = const[{}]", hi(op_val), idx)
             }
@@ -216,7 +311,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             OpCode::LoadGlobal | OpCode::LoadGlobalIdx => {
                 let idx = w!();
                 if let Some(c) = proto.chunk.constants.get(idx as usize) {
-                    hint = format!("{:?}", c);
+                    hint = const_hint(c);
                 }
                 format!("r{} = global[{}]", hi(op_val), idx)
             }
@@ -224,7 +319,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w1 = w!();
                 let idx = w!();
                 if let Some(c) = proto.chunk.constants.get(idx as usize) {
-                    hint = format!("{:?}", c);
+                    hint = const_hint(c);
                 }
                 format!("global[{}] = r{}", idx, hi(w1))
             }
@@ -232,7 +327,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w1 = w!();
                 let idx = w!();
                 if let Some(c) = proto.chunk.constants.get(idx as usize) {
-                    hint = format!("{:?}", c);
+                    hint = const_hint(c);
                 }
                 format!("def global[{}] = r{}", idx, hi(w1))
             }
@@ -391,8 +486,11 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w1 = w!();
                 let proto_idx = w!();
                 let uv_count = lo(w1);
-                if let Some(c) = proto.chunk.constants.get(proto_idx as usize) {
-                    hint = format!("{:?}", c);
+                // Cross-reference: show the name of the nested function
+                if let Some(fn_name) = fn_index.get(&proto_idx) {
+                    hint = format!("{BLUE}→ fn {fn_name}{R}");
+                } else if let Some(c) = proto.chunk.constants.get(proto_idx as usize) {
+                    hint = const_hint(c);
                 }
                 let dest = hi(w1);
                 for _ in 0..uv_count {
@@ -405,7 +503,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w1 = w!();
                 let name_idx = w!();
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
-                    hint = format!("{:?}", c);
+                    hint = const_hint(c);
                 }
                 format!("r{} = class[{}]", hi(w1), name_idx)
             }
@@ -423,7 +521,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let name_idx = w!();
                 let w3 = w!();
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
-                    hint = format!("{:?}", c);
+                    hint = const_hint(c);
                 }
                 format!("r{}[{}] = r{}", hi(w1), name_idx, hi(w3))
             }
@@ -431,7 +529,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w1 = w!();
                 let name_idx = w!();
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
-                    hint = format!("{:?}", c);
+                    hint = const_hint(c);
                 }
                 format!("r{} field[{}]", hi(w1), name_idx)
             }
@@ -455,7 +553,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let dest = hi(op_val);
                 let const_idx = w!();
                 if let Some(c) = proto.chunk.constants.get(const_idx as usize) {
-                    hint = format!("{:?}", c);
+                    hint = const_hint(c);
                 }
                 format!("r{} = load module[{}]", dest, const_idx)
             }
@@ -480,7 +578,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let _w4 = w!();
                 let arg_count = hi(w3);
                 if let Some(c) = proto.chunk.constants.get(fn_idx as usize) {
-                    hint = format!("{:?}", c);
+                    hint = const_hint(c);
                 }
                 format!("r{} = runtime[{}]({} args @ r{})", hi(w1), fn_idx, arg_count, lo(w3))
             }
@@ -520,23 +618,29 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             OpCode::LoadStaticFn => {
                 let dest = hi(op_val);
                 let proto_idx = w!();
-                if let Some(c) = proto.chunk.constants.get(proto_idx as usize) {
-                    hint = format!("{:?}", c);
+                // Cross-reference: show the name of the nested function
+                if let Some(fn_name) = fn_index.get(&proto_idx) {
+                    hint = format!("{BLUE}→ fn {fn_name}{R}");
+                } else if let Some(c) = proto.chunk.constants.get(proto_idx as usize) {
+                    hint = const_hint(c);
                 }
                 format!("r{dest} = static_fn[{proto_idx}]")
             }
         };
 
+        // Colour the opcode name by category
+        let color = op_color(op);
+        let op_name = format!("{color}{:<20}{R}", format!("{:?}", op));
         terminal::log(format!(
             "{indent}  {:04} │ {:>3} │ {} │ {}{}",
             start_pc,
             line,
-            chalk(format!("{:<20}", format!("{:?}", op))).bold(),
+            op_name,
             operands,
             if hint.is_empty() {
                 String::new()
             } else {
-                format!("  ; {}", hint)
+                format!("  {DIM};{R} {}", hint)
             },
         ));
     }

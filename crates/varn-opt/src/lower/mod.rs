@@ -63,7 +63,7 @@ pub fn lower_module(module: &HirModule, source_file: Rc<str>, export_names: Vec<
     for stmt in &module.top_level.body {
         fl.lower_stmt(stmt);
     }
-    fl.finish(Some(Rc::from("<module>")), 0, 0, false, false, export_names)
+    fl.finish(Some(Rc::from("<module>")), 0, 0, false, false, false, false, export_names)
 }
 
 fn lower_function(f: &HirFunction, source_file: Rc<str>) -> FunctionProto {
@@ -80,6 +80,8 @@ fn lower_function(f: &HirFunction, source_file: Rc<str>) -> FunctionProto {
         f.upvalue_count,
         f.has_this,
         f.has_rest,
+        f.is_async,
+        f.is_generator,
         Vec::new(),
     )
 }
@@ -216,6 +218,8 @@ impl FnLower {
         upvalue_count: u32,
         has_this: bool,
         has_rest: bool,
+        is_async: bool,
+        is_generator: bool,
         export_names: Vec<Rc<str>>,
     ) -> FunctionProto {
         let cache_count = self.cache_count as usize;
@@ -232,8 +236,8 @@ impl FnLower {
             export_names,
             register_count,
             has_rest,
-            is_async: false,
-            is_generator: false,
+            is_async,
+            is_generator,
             has_this,
             upvalue_count: upvalue_count as usize,
             cache_count,

@@ -172,10 +172,15 @@ impl FnLower {
     /// `iterator.next()`, exit when `.done`, bind `.value` to `var`. `iterator`
     /// and the reused `iter_fn` slot persist below the loop body's temporaries.
     /// `continue` re-runs the header (`Backward`).
-    pub(super) fn lower_for_of(&mut self, var: LocalId, iterable: &HirExpr, body: &[HirStmt]) {
+    pub(super) fn lower_for_of(&mut self, var: LocalId, iterable: &HirExpr, body: &[HirStmt], is_await: bool) {
         let mark = self.next_temp;
         let iterable_reg = self.lower_expr(iterable);
-        let sym_idx = self.chunk.add_symbol(RuntimeSymbol::Iterator);
+        let sym_kind = if is_await {
+            RuntimeSymbol::AsyncIterator
+        } else {
+            RuntimeSymbol::Iterator
+        };
+        let sym_idx = self.chunk.add_symbol(sym_kind);
         let iter_fn = self.alloc();
         self.chunk
             .emit_rrc(OpCode::GetSymbol, iter_fn, iterable_reg, sym_idx, self.line);
@@ -192,14 +197,22 @@ impl FnLower {
         self.chunk.write(Chunk::pack(result_obj, iter_fn), self.line);
         self.chunk.write(Chunk::pack(1, iterator), self.line);
 
+        let result_for_await = if is_await {
+            let awaited = self.alloc();
+            self.chunk.emit_rr(OpCode::Await, awaited, result_obj, self.line);
+            awaited
+        } else {
+            result_obj
+        };
+
         let done_key = self.chunk.add_str("done"); // MemberKey::IterDone
         let done_reg = self.alloc();
-        self.emit_property(OpCode::GetProperty, done_reg, result_obj, done_key);
+        self.emit_property(OpCode::GetProperty, done_reg, result_for_await, done_key);
         let exit = self.chunk.emit_cond_jump(OpCode::JumpIfTrue, done_reg, self.line);
 
         let value_key = self.chunk.add_str("value"); // MemberKey::IterValue
         let value_reg = self.alloc();
-        self.emit_property(OpCode::GetProperty, value_reg, result_obj, value_key);
+        self.emit_property(OpCode::GetProperty, value_reg, result_for_await, value_key);
         self.chunk
             .emit_rr(OpCode::Move, self.local_reg(var), value_reg, self.line);
         // Free the per-iteration temps (result/done/value); keep iterator + the

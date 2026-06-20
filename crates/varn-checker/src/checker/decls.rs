@@ -446,17 +446,11 @@ impl Checker {
                 let ext_self_ty = self.resolve_type_node_cached(&ext.target, bind);
                 let ext_class_name = match &ext_self_ty.0 {
                     TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(n.clone()),
-                    TypeKind::Intrinsic(varn_core::TypeTag::Str) => {
-                        Some(varn_core::IntrinsicType::Str.as_str().into())
-                    }
-                    TypeKind::Intrinsic(varn_core::TypeTag::Int) => {
-                        Some(varn_core::IntrinsicType::Int.as_str().into())
-                    }
-                    TypeKind::Intrinsic(varn_core::TypeTag::Float) => {
-                        Some(varn_core::IntrinsicType::Float.as_str().into())
-                    }
-                    TypeKind::Intrinsic(varn_core::TypeTag::Bool) => {
-                        Some(varn_core::IntrinsicType::Bool.as_str().into())
+                    // Every scalar primitive target (int/float/bool/str/char/
+                    // decimal/bigint/symbol) names `this` by its intrinsic name,
+                    // kept in sync with the `ExprKind::This` inference.
+                    TypeKind::Intrinsic(tag) if varn_core::IntrinsicType(*tag).is_scalar_primitive() => {
+                        Some(varn_core::IntrinsicType(*tag).as_str().into())
                     }
                     _ => None,
                 };

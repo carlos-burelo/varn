@@ -63,7 +63,17 @@ impl<'a> Lowerer<'a> {
             }
             StmtKind::Expr { expression } => {
                 if let ExprKind::Assign { op, target, value } = &expression.kind {
-                    // Member/index assignment target (simple `=` only).
+                    let is_super = if let ExprKind::Member { object, .. } = &target.kind {
+                        matches!(object.kind, ExprKind::Super)
+                    } else {
+                        false
+                    };
+                    if matches!(op, AssignOp::AndAssign | AssignOp::OrAssign | AssignOp::NullishAssign) || is_super {
+                        let expr = self.lower_expr(expression.as_ref(), scope)?;
+                        out.push(HirStmt::Expr(expr));
+                        return Ok(());
+                    }
+
                     if let ExprKind::Member {
                         object,
                         property,
@@ -72,25 +82,72 @@ impl<'a> Lowerer<'a> {
                     } = &target.kind
                     {
                         if *optional {
-                            return unsupported("optional assignment target");
-                        }
-                        if !matches!(op, AssignOp::Assign) {
-                            return unsupported("compound member assignment");
+                            panic!("optional assignment target");
                         }
                         let off = target.range.start.offset;
-                        if self.ann.get_slot_idx(off).is_some() {
-                            return unsupported("module-slot assignment");
+                        // Extension setter `x.k = v` → `__extset_T_k(x, v)`.
+                        if let Some(mangled) = self.extension_set_members.get(&off).cloned() {
+                            let recv = self.lower_expr(object.as_ref(), scope)?;
+                            let val = self.lower_expr(value.as_ref(), scope)?;
+                            out.push(HirStmt::Expr(self.ext_global_call(
+                                mangled,
+                                recv,
+                                vec![val],
+                            )));
+                            return Ok(());
                         }
-                        if self.extension_set_members.contains_key(&off) {
-                            return unsupported("extension setter");
+                        if !matches!(op, AssignOp::Assign) {
+                            let bop = compound_to_bin(*op)?;
+                            let ty = numeric_ty(self.ann, target.range.start.offset);
+                            let object_hir = self.lower_expr(object.as_ref(), scope)?;
+                            if *computed {
+                                let index = self.lower_expr(property.as_ref(), scope)?;
+                                let value = self.lower_expr(value.as_ref(), scope)?;
+                                let current_val = HirExpr::Index {
+                                    object: Box::new(object_hir.clone()),
+                                    index: Box::new(index.clone()),
+                                    ty,
+                                };
+                                let new_val = HirExpr::Binary {
+                                    op: bop,
+                                    lhs: Box::new(current_val),
+                                    rhs: Box::new(value),
+                                    ty,
+                                };
+                                out.push(HirStmt::SetIndex {
+                                    object: object_hir,
+                                    index,
+                                    value: new_val,
+                                });
+                            } else {
+                                let name = match &property.kind {
+                                    ExprKind::Identifier { name } => name.clone(),
+                                    _ => panic!("non-identifier property assign"),
+                                };
+                                let value = self.lower_expr(value.as_ref(), scope)?;
+                                let current_val = HirExpr::Member {
+                                    object: Box::new(object_hir.clone()),
+                                    name: name.clone(),
+                                    ty,
+                                };
+                                let new_val = HirExpr::Binary {
+                                    op: bop,
+                                    lhs: Box::new(current_val),
+                                    rhs: Box::new(value),
+                                    ty,
+                                };
+                                out.push(HirStmt::SetMember {
+                                    object: object_hir,
+                                    name,
+                                    value: new_val,
+                                });
+                            }
+                            return Ok(());
                         }
-                        if matches!(object.kind, ExprKind::Super) {
-                            return unsupported("super assignment");
-                        }
-                        let object_hir = self.lower_expr(object, scope)?;
+                        let object_hir = self.lower_expr(object.as_ref(), scope)?;
                         if *computed {
-                            let index = self.lower_expr(property, scope)?;
-                            let value = self.lower_expr(value, scope)?;
+                            let index = self.lower_expr(property.as_ref(), scope)?;
+                            let value = self.lower_expr(value.as_ref(), scope)?;
                             out.push(HirStmt::SetIndex {
                                 object: object_hir,
                                 index,
@@ -99,9 +156,9 @@ impl<'a> Lowerer<'a> {
                         } else {
                             let name = match &property.kind {
                                 ExprKind::Identifier { name } => name.clone(),
-                                _ => return unsupported("non-identifier property assign"),
+                                _ => panic!("non-identifier property assign"),
                             };
-                            let value = self.lower_expr(value, scope)?;
+                            let value = self.lower_expr(value.as_ref(), scope)?;
                             out.push(HirStmt::SetMember {
                                 object: object_hir,
                                 name,
@@ -112,14 +169,14 @@ impl<'a> Lowerer<'a> {
                     }
                     let binding = match &target.kind {
                         ExprKind::Identifier { name } => self.resolve(name, scope),
-                        _ => return unsupported("non-identifier assign target"),
+                        _ => panic!("non-identifier assign target"),
                     };
-                    let val_expr = self.lower_expr(value, scope)?;
+                    let val_expr = self.lower_expr(value.as_ref(), scope)?;
                     let value = match op {
                         AssignOp::Assign => val_expr,
                         _ => {
                             let bop = compound_to_bin(*op)?;
-                            let ty = numeric_ty(self.ann, expression.range.start.offset);
+                            let ty = numeric_ty(self.ann, target.range.start.offset);
                             HirExpr::Binary {
                                 op: bop,
                                 lhs: Box::new(HirExpr::Var(binding.clone())),
@@ -133,27 +190,18 @@ impl<'a> Lowerer<'a> {
                         value,
                     });
                 } else {
-                    let e = self.lower_expr(expression, scope)?;
+                    let e = self.lower_expr(expression.as_ref(), scope)?;
                     out.push(HirStmt::Expr(e));
                 }
             }
             StmtKind::Decl(decl) => match decl.as_ref() {
                 Decl::Variable(v) => {
                     for d in &v.declarators {
-                        let name = match &d.id {
-                            Pattern::Identifier { name, .. } => name.clone(),
-                            _ => return unsupported("destructuring let"),
-                        };
                         let value = match &d.init {
                             Some(e) => self.lower_expr(e, scope)?,
                             None => HirExpr::Null,
                         };
-                        let local = scope.alloc_local(name);
-                        out.push(HirStmt::Let {
-                            local,
-                            value,
-                            ty: HirType::Dynamic,
-                        });
+                        self.desugar_pattern_local(&d.id, value, scope, out)?;
                     }
                 }
                 // Nested function declaration → closure bound to a local. Bind
@@ -172,10 +220,7 @@ impl<'a> Lowerer<'a> {
                     });
                 }
                 Decl::Class(cl) => {
-                    let cname = match &cl.id {
-                        Some(id) => id.clone(),
-                        None => return unsupported("anonymous nested class"),
-                    };
+                    let cname = cl.id.clone().unwrap_or_else(|| Rc::from("anonymous"));
                     let hir_class = self.lower_class(cl, scope)?;
                     let local = scope.alloc_local(cname);
                     out.push(HirStmt::Let {
@@ -193,8 +238,32 @@ impl<'a> Lowerer<'a> {
                         ty: HirType::Dynamic,
                     });
                 }
+                Decl::SumType(st) => {
+                    let hir_enum = self.lower_sum_type(st, scope)?;
+                    let local = scope.alloc_local(st.id.clone());
+                    out.push(HirStmt::Let {
+                        local,
+                        value: HirExpr::Enum(Box::new(hir_enum)),
+                        ty: HirType::Dynamic,
+                    });
+                    for v in &st.variants {
+                        let vlocal = scope.alloc_local(v.name.clone());
+                        out.push(HirStmt::Let {
+                            local: vlocal,
+                            value: HirExpr::Member {
+                                object: Box::new(HirExpr::Var(HirBinding::Local(local))),
+                                name: v.name.clone(),
+                                ty: HirType::Dynamic,
+                            },
+                            ty: HirType::Dynamic,
+                        });
+                    }
+                }
                 Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
-                _ => return unsupported("nested namespace decl"),
+                Decl::Namespace(ns) => {
+                    self.lower_namespace(ns, scope, out)?;
+                }
+                _ => panic!("invalid nested declaration kind"),
             },
             StmtKind::Return { argument } => {
                 let v = match argument {
@@ -242,20 +311,11 @@ impl<'a> Lowerer<'a> {
                         }
                         ForInit::Var { declarators, .. } => {
                             for d in declarators {
-                                let name = match &d.id {
-                                    Pattern::Identifier { name, .. } => name.clone(),
-                                    _ => return unsupported("for-init destructuring"),
-                                };
                                 let value = match &d.init {
                                     Some(e) => self.lower_expr(e, scope)?,
                                     None => HirExpr::Null,
                                 };
-                                let local = scope.alloc_local(name);
-                                out.push(HirStmt::Let {
-                                    local,
-                                    value,
-                                    ty: HirType::Dynamic,
-                                });
+                                self.desugar_pattern_local(&d.id, value, scope, out)?;
                             }
                         }
                     }
@@ -282,20 +342,19 @@ impl<'a> Lowerer<'a> {
                 is_await,
                 ..
             } => {
-                if *is_await {
-                    return unsupported("for-await-of");
-                }
                 // The iterable is evaluated in the enclosing scope (it cannot
                 // reference the loop variable), which is then bound per-iteration
                 // in the body's block.
                 let iterable = self.lower_expr(right, scope)?;
-                let name = match left {
-                    Pattern::Identifier { name, .. } => name.clone(),
-                    _ => return unsupported("for-of destructuring binding"),
-                };
                 scope.push_block();
-                let var = scope.alloc_local(name);
+                let (loop_var, must_desugar) = match left {
+                    Pattern::Identifier { name, .. } => (scope.alloc_local(name.clone()), false),
+                    _ => (scope.alloc_temp(), true),
+                };
                 let mut hbody = Vec::new();
+                if must_desugar {
+                    self.desugar_pattern_local(left, HirExpr::Var(HirBinding::Local(loop_var)), scope, &mut hbody)?;
+                }
                 if let Err(e) = self.lower_body_into(body, scope, &mut hbody) {
                     scope.pop_block();
                     return Err(e);
@@ -303,22 +362,25 @@ impl<'a> Lowerer<'a> {
                 let (captured, disposables) = scope.pop_block();
                 block_epilogue(&mut hbody, captured, disposables);
                 out.push(HirStmt::ForOf {
-                    var,
+                    var: loop_var,
                     iterable,
                     body: hbody,
+                    is_await: *is_await,
                 });
             }
             StmtKind::ForIn {
                 left, right, body, ..
             } => {
                 let object = self.lower_expr(right, scope)?;
-                let name = match left {
-                    Pattern::Identifier { name, .. } => name.clone(),
-                    _ => return unsupported("for-in destructuring binding"),
-                };
                 scope.push_block();
-                let var = scope.alloc_local(name);
+                let (loop_var, must_desugar) = match left {
+                    Pattern::Identifier { name, .. } => (scope.alloc_local(name.clone()), false),
+                    _ => (scope.alloc_temp(), true),
+                };
                 let mut hbody = Vec::new();
+                if must_desugar {
+                    self.desugar_pattern_local(left, HirExpr::Var(HirBinding::Local(loop_var)), scope, &mut hbody)?;
+                }
                 if let Err(e) = self.lower_body_into(body, scope, &mut hbody) {
                     scope.pop_block();
                     return Err(e);
@@ -326,7 +388,7 @@ impl<'a> Lowerer<'a> {
                 let (captured, disposables) = scope.pop_block();
                 block_epilogue(&mut hbody, captured, disposables);
                 out.push(HirStmt::ForIn {
-                    var,
+                    var: loop_var,
                     object,
                     body: hbody,
                 });
@@ -386,21 +448,36 @@ impl<'a> Lowerer<'a> {
                 is_await,
             } => {
                 for d in declarations {
-                    let name = match &d.id {
-                        Pattern::Identifier { name, .. } => name.clone(),
-                        _ => return unsupported("destructuring using"),
-                    };
                     let value = match &d.init {
                         Some(e) => self.lower_expr(e, scope)?,
                         None => HirExpr::Null,
                     };
-                    let local = scope.alloc_local(name);
-                    out.push(HirStmt::Let {
-                        local,
-                        value,
-                        ty: HirType::Dynamic,
-                    });
-                    scope.record_disposable(local, *is_await);
+                    match &d.id {
+                        Pattern::Identifier { name, .. } => {
+                            let local = scope.alloc_local(name.clone());
+                            out.push(HirStmt::Let {
+                                local,
+                                value,
+                                ty: HirType::Dynamic,
+                            });
+                            scope.record_disposable(local, *is_await);
+                        }
+                        _ => {
+                            let temp_local = scope.alloc_temp();
+                            out.push(HirStmt::Let {
+                                local: temp_local,
+                                value,
+                                ty: HirType::Dynamic,
+                            });
+                            scope.record_disposable(temp_local, *is_await);
+                            self.desugar_pattern_local(
+                                &d.id,
+                                HirExpr::Var(HirBinding::Local(temp_local)),
+                                scope,
+                                out,
+                            )?;
+                        }
+                    }
                 }
             }
             StmtKind::Throw { argument } => {
@@ -422,11 +499,22 @@ impl<'a> Lowerer<'a> {
                                 Some(scope.alloc_local(name.clone()))
                             }
                             Some(_) => {
-                                scope.pop_block();
-                                return unsupported("destructuring catch param");
+                                Some(scope.alloc_temp())
                             }
                         };
                         let mut body = Vec::new();
+                        if let Some(param_local) = param {
+                            if let Some(pat) = &cc.param {
+                                if !matches!(pat, Pattern::Identifier { .. }) {
+                                    self.desugar_pattern_local(
+                                        pat,
+                                        HirExpr::Var(HirBinding::Local(param_local)),
+                                        scope,
+                                        &mut body,
+                                    )?;
+                                }
+                            }
+                        }
                         let mut err = None;
                         match &cc.body.kind {
                             StmtKind::Block { stmts } => {
@@ -463,7 +551,7 @@ impl<'a> Lowerer<'a> {
                     finally: hfinally,
                 });
             }
-            _ => return unsupported("statement kind"),
+            _ => panic!("unsupported statement kind: {:?}", stmt.kind),
         }
         Ok(())
     }

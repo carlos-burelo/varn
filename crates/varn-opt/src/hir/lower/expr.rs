@@ -1,6 +1,8 @@
 //! Expression AST→HIR lowering, plus `match` lowering and name resolution.
 
 use std::rc::Rc;
+use std::str::FromStr;
+use rust_decimal::Decimal;
 
 use varn_core::ast::expr::{ArrayEl, ArrowBody, MatchBody, ObjectProp, PropKey, TemplatePart};
 use varn_core::ast::operators::{AssignOp, UnaryOp};
@@ -23,7 +25,7 @@ impl<'a> Lowerer<'a> {
         let mut hcases = Vec::with_capacity(cases.len());
         for case in cases {
             if case.guard.is_some() {
-                return unsupported("match guard");
+                panic!("match guard is unsupported");
             }
             scope.push_block();
             let test_res = self.lower_case_test(&case.pattern, scope);
@@ -64,6 +66,21 @@ impl<'a> Lowerer<'a> {
             MatchPattern::Wildcard => HirCaseTest::Wildcard,
             MatchPattern::Literal(lit) => HirCaseTest::Literal(self.lower_expr(lit, scope)?),
             MatchPattern::Identifier(name) => HirCaseTest::Bind(scope.alloc_local(name.clone())),
+            MatchPattern::Record { fields, .. } => {
+                let mut binds = Vec::with_capacity(fields.len());
+                for (field_name, sub_pat) in fields {
+                    let binding = match sub_pat {
+                        Some(MatchPattern::Identifier(n)) => n.clone(),
+                        _ => field_name.clone(),
+                    };
+                    if &*binding == "_" {
+                        binds.push((field_name.clone(), None));
+                    } else {
+                        binds.push((field_name.clone(), Some(scope.alloc_local(binding))));
+                    }
+                }
+                HirCaseTest::Record { fields: binds }
+            }
             MatchPattern::EnumVariant {
                 variant_name,
                 bindings,
@@ -82,8 +99,57 @@ impl<'a> Lowerer<'a> {
                     binds,
                 }
             }
-            _ => return unsupported("match pattern kind"),
+            _ => panic!("unsupported match pattern kind: {:?}", pat),
         })
+    }
+
+    fn lower_assign_target(&mut self, expr: &Expr, scope: &mut Scope) -> R<HirAssignTarget> {
+        match &expr.kind {
+            ExprKind::Identifier { name } => {
+                Ok(HirAssignTarget::Var(self.resolve(name, scope)))
+            }
+            ExprKind::Member {
+                object,
+                property,
+                computed,
+                optional,
+            } => {
+                if *optional {
+                    panic!("optional assignment target");
+                }
+                if matches!(object.kind, ExprKind::Super) {
+                    if *computed {
+                        let index = self.lower_expr(property, scope)?;
+                        Ok(HirAssignTarget::SuperIndex { index })
+                    } else {
+                        let name = match &property.kind {
+                            ExprKind::Identifier { name } => name.clone(),
+                            _ => panic!("non-identifier super property assign"),
+                        };
+                        Ok(HirAssignTarget::SuperMember { name })
+                    }
+                } else {
+                    let object_hir = self.lower_expr(object, scope)?;
+                    if *computed {
+                        let index = self.lower_expr(property, scope)?;
+                        Ok(HirAssignTarget::Index {
+                            object: object_hir,
+                            index,
+                        })
+                    } else {
+                        let name = match &property.kind {
+                            ExprKind::Identifier { name } => name.clone(),
+                            _ => panic!("non-identifier property assign"),
+                        };
+                        Ok(HirAssignTarget::Member {
+                            object: object_hir,
+                            name,
+                        })
+                    }
+                }
+            }
+            _ => panic!("non-identifier assign target"),
+        }
     }
 
     pub(super) fn lower_expr(&mut self, expr: &Expr, scope: &mut Scope) -> R<HirExpr> {
@@ -98,20 +164,8 @@ impl<'a> Lowerer<'a> {
             ExprKind::New { callee, args, .. } => {
                 // `new C(args)` compiles to a plain Call; the VM constructs an
                 // instance when the callee is a class (legacy `expr/mod.rs`).
-                if let Some(mapping) = self.ann.get_call_mapping(offset) {
-                    let identity = mapping.len() == args.len()
-                        && mapping.iter().enumerate().all(|(i, m)| *m == Some(i));
-                    if !identity {
-                        return unsupported("new with non-trivial arg mapping");
-                    }
-                }
-                let mut hargs = Vec::with_capacity(args.len());
-                for a in args {
-                    match a {
-                        Arg::Positional(e) => hargs.push(self.lower_expr(e, scope)?),
-                        _ => return unsupported("new with named/spread arg"),
-                    }
-                }
+                // Named-arg/default mapping resolved here; spread falls back.
+                let hargs = self.lower_call_args(args, offset, scope)?;
                 let callee = Box::new(self.lower_expr(callee, scope)?);
                 Ok(HirExpr::Call {
                     callee,
@@ -150,38 +204,54 @@ impl<'a> Lowerer<'a> {
                 optional,
                 ..
             } => {
+                // If it is an optional call (callee?.(args)), lower to OptionalChain.
                 if *optional {
-                    return unsupported("optional call");
+                    let hargs = self.lower_call_args(args, offset, scope)?;
+                    let callee_hir = self.lower_expr(callee, scope)?;
+                    return Ok(HirExpr::OptionalChain {
+                        object: Box::new(callee_hir),
+                        property: HirOptionalProperty::Call(hargs),
+                    });
                 }
-                // Intrinsics, extension calls, and calls whose arguments need
-                // reordering/default-filling (`get_call_mapping`) are desugared
-                // by the legacy codegen → fall back until those land.
-                if self.ann.get_intrinsic(offset).is_some() {
-                    return unsupported("intrinsic call");
-                }
-                // A non-trivial call mapping reorders args or fills defaults —
-                // replicating that is §1.10. An *identity* mapping (param i ← arg
-                // i, no gaps) is just plain positional, so let those through.
-                if let Some(mapping) = self.ann.get_call_mapping(offset) {
-                    let identity = mapping.len() == args.len()
-                        && mapping.iter().enumerate().all(|(i, m)| *m == Some(i));
-                    if !identity {
-                        return unsupported("call with non-trivial arg mapping");
+                if let Some(wire_byte) = self.ann.get_intrinsic(offset) {
+                    if let ExprKind::Member { object, computed: false, .. } = &callee.kind {
+                        let has_spread = args.iter().any(|a| matches!(a, Arg::Spread(_)));
+                        if !has_spread {
+                            let hobj = self.lower_expr(object, scope)?;
+                            let hargs = self.lower_call_args(args, offset, scope)?;
+                            return Ok(HirExpr::IntrinsicCall {
+                                object: Box::new(hobj),
+                                args: hargs,
+                                wire_byte,
+                                ty: HirType::Dynamic,
+                            });
+                        }
                     }
                 }
-                if self.extension_calls.contains_key(&offset) {
-                    return unsupported("extension call");
-                }
-                // Only simple positional calls (no named/spread/defaults).
-                let mut hargs = Vec::with_capacity(args.len());
-                for a in args {
-                    match a {
-                        Arg::Positional(e) => hargs.push(self.lower_expr(e, scope)?),
-                        _ => return unsupported("named/spread arg"),
+
+                // Extension method call: `x.m(args)` → `__ext_T_m(x, args)`
+                // (receiver lowered first, matching legacy evaluation order).
+                if let Some(mangled) = self.extension_calls.get(&offset).cloned() {
+                    if let ExprKind::Member { object, optional: mem_opt, .. } = &callee.kind {
+                        let recv = self.lower_expr(object, scope)?;
+                        let call_args = self.lower_call_args(args, offset, scope)?;
+                        if *mem_opt {
+                            return Ok(HirExpr::OptionalChain {
+                                object: Box::new(recv),
+                                property: HirOptionalProperty::ExtensionCall(mangled, call_args),
+                            });
+                        }
+                        return Ok(self.ext_global_call(mangled, recv, call_args));
                     }
                 }
-                // Method call: callee is a non-computed, non-optional `.name`
-                // member (and not a `super.` call) → `CallMethod` with an IC.
+                // Args in callee parameter order (named-arg + default mapping
+                // resolved here); spread still falls back.
+                let hargs = self.lower_call_args(args, offset, scope)?;
+                // `super(args)` — superclass constructor call.
+                if matches!(callee.kind, ExprKind::Super) {
+                    return Ok(HirExpr::SuperCall { args: hargs });
+                }
+                // `super.name(args)` — superclass method call.
                 if let ExprKind::Member {
                     object,
                     property,
@@ -189,9 +259,32 @@ impl<'a> Lowerer<'a> {
                     optional: false,
                 } = &callee.kind
                 {
+                    if matches!(object.kind, ExprKind::Super) {
+                        if let ExprKind::Identifier { name } = &property.kind {
+                            return Ok(HirExpr::SuperMethodCall {
+                                name: name.clone(),
+                                args: hargs,
+                            });
+                        }
+                    }
+                }
+                // Method call: callee is a non-computed `.name` member (optional or not)
+                if let ExprKind::Member {
+                    object,
+                    property,
+                    computed: false,
+                    optional: mem_opt,
+                } = &callee.kind
+                {
                     if !matches!(object.kind, ExprKind::Super) {
                         if let ExprKind::Identifier { name } = &property.kind {
                             let recv = Box::new(self.lower_expr(object, scope)?);
+                            if *mem_opt {
+                                return Ok(HirExpr::OptionalChain {
+                                    object: recv,
+                                    property: HirOptionalProperty::MethodCall(name.clone(), hargs),
+                                });
+                            }
                             return Ok(HirExpr::MethodCall {
                                 recv,
                                 name: name.clone(),
@@ -202,7 +295,8 @@ impl<'a> Lowerer<'a> {
                     }
                 }
                 // Statically-resolved self-recursion → `CallSelf` (see HIR doc).
-                if self.is_self_call(callee, scope) {
+                let has_spread = args.iter().any(|a| matches!(a, Arg::Spread(_)));
+                if !has_spread && self.is_self_call(callee, scope) {
                     return Ok(HirExpr::SelfCall {
                         args: hargs,
                         ty: HirType::Dynamic,
@@ -222,8 +316,28 @@ impl<'a> Lowerer<'a> {
                 optional,
             } => {
                 if *optional {
-                    // Optional chaining needs IsNull + jump; deferred.
-                    return unsupported("optional member access");
+                    let object_hir = self.lower_expr(object, scope)?;
+                    let opt_prop = if *computed {
+                        let idx = self.lower_expr(property, scope)?;
+                        HirOptionalProperty::Index(Box::new(idx))
+                    } else {
+                        let name = match &property.kind {
+                            ExprKind::Identifier { name } => name.clone(),
+                            _ => panic!("non-identifier property"),
+                        };
+                        if self.ann.get_slot_idx(offset).is_some() {
+                            let slot_idx = self.ann.get_slot_idx(offset).unwrap() as u16;
+                            HirOptionalProperty::ModuleSlot(slot_idx)
+                        } else if let Some(mangled) = self.extension_members.get(&offset).cloned() {
+                            HirOptionalProperty::Extension(mangled)
+                        } else {
+                            HirOptionalProperty::Member(name)
+                        }
+                    };
+                    return Ok(HirExpr::OptionalChain {
+                        object: Box::new(object_hir),
+                        property: opt_prop,
+                    });
                 }
                 if *computed {
                     // `object[index]` → GetIndex.
@@ -238,18 +352,29 @@ impl<'a> Lowerer<'a> {
                 // Non-computed `object.name` property read. Module-slot reads
                 // (`LoadModuleSlot`) and extension members are desugared
                 // differently by the legacy codegen → fall back for now.
-                if self.ann.get_slot_idx(offset).is_some() {
-                    return unsupported("module-slot member access");
+                if let Some(slot_idx) = self.ann.get_slot_idx(offset) {
+                    let object_hir = self.lower_expr(object, scope)?;
+                    return Ok(HirExpr::ModuleSlot {
+                        object: Box::new(object_hir),
+                        slot: slot_idx as u16,
+                        ty: HirType::Dynamic,
+                    });
                 }
-                if self.extension_members.contains_key(&offset) {
-                    return unsupported("extension member access");
+                // Extension getter `x.k` → `__extget_T_k(x)`.
+                if let Some(mangled) = self.extension_members.get(&offset).cloned() {
+                    let recv = self.lower_expr(object, scope)?;
+                    return Ok(self.ext_global_call(mangled, recv, vec![]));
                 }
                 if matches!(object.kind, ExprKind::Super) {
-                    return unsupported("super member access");
+                    let name = match &property.kind {
+                        ExprKind::Identifier { name } => name.clone(),
+                        _ => panic!("non-identifier super property"),
+                    };
+                    return Ok(HirExpr::SuperMember { name });
                 }
                 let name = match &property.kind {
                     ExprKind::Identifier { name } => name.clone(),
-                    _ => return unsupported("non-identifier property"),
+                    _ => panic!("non-identifier property"),
                 };
                 let object = Box::new(self.lower_expr(object, scope)?);
                 Ok(HirExpr::Member {
@@ -282,56 +407,80 @@ impl<'a> Lowerer<'a> {
                 prefix,
                 operand,
             } => {
-                // Member/index update targets are §1.4; identifiers only here.
-                let ExprKind::Identifier { name } = &operand.kind else {
-                    return unsupported("update on non-identifier target");
-                };
-                let target = self.resolve(name, scope);
+                let target = self.lower_assign_target(operand, scope)?;
                 Ok(HirExpr::Update {
-                    target,
+                    target: Box::new(target),
                     op: update_op(*op),
                     prefix: *prefix,
                 })
             }
             ExprKind::Array { elements } => {
-                // Simple array literal: plain element exprs, no spread/holes.
                 let mut out = Vec::with_capacity(elements.len());
                 for el in elements {
                     match el {
-                        ArrayEl::Expr(e) => out.push(self.lower_expr(e, scope)?),
-                        ArrayEl::Spread(_) => return unsupported("array spread element"),
-                        ArrayEl::Hole => return unsupported("array hole"),
+                        ArrayEl::Expr(e) => out.push(HirArrayEl::Expr(self.lower_expr(e, scope)?)),
+                        ArrayEl::Spread(e) => out.push(HirArrayEl::Spread(self.lower_expr(e, scope)?)),
+                        ArrayEl::Hole => out.push(HirArrayEl::Hole),
                     }
                 }
                 Ok(HirExpr::Array(out))
             }
             ExprKind::Object { properties } => {
-                // Fixed-shape object: all-static keys, plain value props only.
-                let mut keys = Vec::with_capacity(properties.len());
-                let mut values = Vec::with_capacity(properties.len());
+                let mut props = Vec::with_capacity(properties.len());
                 for prop in properties {
                     match prop {
                         ObjectProp::Property {
                             key,
                             value,
-                            computed: false,
                             ..
                         } => {
-                            let k: Rc<str> = match key {
-                                PropKey::Identifier(s) | PropKey::Str(s) => Rc::from(s.as_str()),
-                                PropKey::Int(n) => Rc::from(n.to_string().as_str()),
-                                PropKey::Computed(_) => return unsupported("computed object key"),
+                            let k = match key {
+                                PropKey::Computed(e) => HirPropKey::Computed(self.lower_expr(e, scope)?),
+                                PropKey::Identifier(s) | PropKey::Str(s) => HirPropKey::Static(Rc::from(s.as_str())),
+                                PropKey::Int(n) => HirPropKey::Static(Rc::from(n.to_string().as_str())),
                             };
-                            keys.push(k);
-                            values.push(self.lower_expr(value, scope)?);
+                            let val = self.lower_expr(value, scope)?;
+                            props.push(HirObjectProp::Property { key: k, value: val });
                         }
-                        _ => return unsupported("object method/getter/setter/spread/computed"),
+                        ObjectProp::Method {
+                            key,
+                            params,
+                            body,
+                            is_async,
+                            is_generator,
+                            ..
+                        } => {
+                            let k = match key {
+                                PropKey::Computed(e) => HirPropKey::Computed(self.lower_expr(e, scope)?),
+                                PropKey::Identifier(s) | PropKey::Str(s) => HirPropKey::Static(Rc::from(s.as_str())),
+                                PropKey::Int(n) => HirPropKey::Static(Rc::from(n.to_string().as_str())),
+                            };
+                            let method_name = match key {
+                                PropKey::Identifier(s) | PropKey::Str(s) => s.clone(),
+                                PropKey::Int(n) => n.to_string(),
+                                PropKey::Computed(_) => "<computed>".to_owned(),
+                            };
+                            let (func, upvalues) = self.lower_function_like(
+                                Rc::from(method_name.as_str()),
+                                params,
+                                *is_async,
+                                *is_generator,
+                                false, // generic
+                                true, // has_this
+                                BodyRef::Block(body),
+                                &[],
+                                scope,
+                            )?;
+                            props.push(HirObjectProp::Method { key: k, func, upvalues });
+                        }
+                        ObjectProp::Spread { argument, .. } => {
+                            let arg = self.lower_expr(argument, scope)?;
+                            props.push(HirObjectProp::Spread(arg));
+                        }
+                        _ => {} // Ignore Getter and Setter matching legacy ignore.
                     }
                 }
-                // Empty `{}` is fine: `lower_object` emits `BuildObject` with a
-                // zero pair count (mirrors legacy `compile_object`'s flush of an
-                // empty segment).
-                Ok(HirExpr::Object { keys, values })
+                Ok(HirExpr::Object { properties: props })
             }
             ExprKind::Function {
                 fn_id,
@@ -341,13 +490,9 @@ impl<'a> Lowerer<'a> {
                 is_generator,
                 ..
             } => {
-                // A named function expression can reference itself; resolving
-                // that correctly needs a self-binding we don't model yet.
-                if fn_id.is_some() {
-                    return unsupported("named function expression");
-                }
+                let name = fn_id.clone().unwrap_or_else(|| Rc::from("<anon>"));
                 let (func, upvalues) = self.lower_function_like(
-                    Rc::from("<anon>"),
+                    name,
                     params,
                     *is_async,
                     *is_generator,
@@ -390,8 +535,52 @@ impl<'a> Lowerer<'a> {
             }
             ExprKind::Match { subject, cases } => self.lower_match(subject, cases, scope),
             ExprKind::CharLiteral { value } => Ok(HirExpr::Char(*value)),
-            // (Remaining unsupported exprs that still fall back: DecimalLiteral/
-            // BigIntLiteral — need `rust_decimal`; `Pipeline`, `Is`, `Await`.)
+            ExprKind::DecimalLiteral { raw } => {
+                let d = Decimal::from_str(raw.trim_end_matches('d'))
+                    .unwrap_or(Decimal::ZERO);
+                Ok(HirExpr::Decimal(d))
+            }
+            ExprKind::BigIntLiteral { raw } => {
+                let s = raw.trim_end_matches('n').replace('_', "");
+                let parsed = if let Some(r) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+                    i128::from_str_radix(r, 16)
+                } else if let Some(r) = s.strip_prefix("0o").or_else(|| s.strip_prefix("0O")) {
+                    i128::from_str_radix(r, 8)
+                } else if let Some(r) = s.strip_prefix("0b").or_else(|| s.strip_prefix("0B")) {
+                    i128::from_str_radix(r, 2)
+                } else {
+                    s.parse()
+                };
+                let num = match parsed {
+                    Ok(n) => n,
+                    Err(_) => {
+                        return Err(OptError::Unsupported("bigint literal overflow"));
+                    }
+                };
+                Ok(HirExpr::BigInt(num))
+            }
+            ExprKind::RegexLiteral { pattern, flags } => {
+                Ok(HirExpr::Regex {
+                    pattern: Rc::from(pattern.as_str()),
+                    flags: Rc::from(flags.as_str()),
+                })
+            }
+            ExprKind::Await { argument } => {
+                let inner = self.lower_expr(argument, scope)?;
+                Ok(HirExpr::Await(Box::new(inner)))
+            }
+            ExprKind::Spawn { argument } => {
+                let inner = self.lower_expr(argument, scope)?;
+                Ok(HirExpr::Spawn(Box::new(inner)))
+            }
+            ExprKind::Yield { argument, .. } => {
+                let inner = if let Some(arg) = argument {
+                    self.lower_expr(arg, scope)?
+                } else {
+                    HirExpr::Null
+                };
+                Ok(HirExpr::Yield(Box::new(inner)))
+            }
             // `as` / `satisfies` are type-only — transparent at codegen.
             ExprKind::As { expression, .. } | ExprKind::Satisfies { expression, .. } => {
                 self.lower_expr(expression, scope)
@@ -440,20 +629,184 @@ impl<'a> Lowerer<'a> {
                 } = &target.kind
                 {
                     if *optional {
-                        return unsupported("optional assignment target");
-                    }
-                    if !matches!(op, AssignOp::Assign) {
-                        return unsupported("compound member assignment");
+                        panic!("optional assignment target");
                     }
                     let off = target.range.start.offset;
-                    if self.ann.get_slot_idx(off).is_some() {
-                        return unsupported("module-slot assignment");
-                    }
-                    if self.extension_set_members.contains_key(&off) {
-                        return unsupported("extension setter");
+                    // Extension setter `x.k = v` (as expression) → the setter
+                    // call, which yields its return value.
+                    if let Some(mangled) = self.extension_set_members.get(&off).cloned() {
+                        let recv = self.lower_expr(object, scope)?;
+                        let val = self.lower_expr(value, scope)?;
+                        return Ok(self.ext_global_call(mangled, recv, vec![val]));
                     }
                     if matches!(object.kind, ExprKind::Super) {
-                        return unsupported("super assignment");
+                        if *computed {
+                            let index = self.lower_expr(property, scope)?;
+                            let value = self.lower_expr(value, scope)?;
+                            if matches!(op, AssignOp::Assign) {
+                                let tgt = HirAssignTarget::SuperIndex { index };
+                                return Ok(HirExpr::Assign {
+                                    target: Box::new(tgt),
+                                    value: Box::new(value),
+                                });
+                            } else {
+                                let bop = compound_to_bin(*op)?;
+                                let ty = numeric_ty(self.ann, target.range.start.offset);
+                                let current_val = HirExpr::Index {
+                                    object: Box::new(HirExpr::Super),
+                                    index: Box::new(index.clone()),
+                                    ty: HirType::Dynamic,
+                                };
+                                let new_val = HirExpr::Binary {
+                                    op: bop,
+                                    lhs: Box::new(current_val),
+                                    rhs: Box::new(value),
+                                    ty,
+                                };
+                                let tgt = HirAssignTarget::SuperIndex { index };
+                                return Ok(HirExpr::Assign {
+                                    target: Box::new(tgt),
+                                    value: Box::new(new_val),
+                                });
+                            }
+                        } else {
+                            let name = match &property.kind {
+                                ExprKind::Identifier { name } => name.clone(),
+                                _ => panic!("non-identifier super property assign"),
+                            };
+                            let value = self.lower_expr(value, scope)?;
+                            if matches!(op, AssignOp::Assign) {
+                                let tgt = HirAssignTarget::SuperMember { name };
+                                return Ok(HirExpr::Assign {
+                                    target: Box::new(tgt),
+                                    value: Box::new(value),
+                                });
+                            } else {
+                                let bop = compound_to_bin(*op)?;
+                                let ty = numeric_ty(self.ann, target.range.start.offset);
+                                let current_val = HirExpr::SuperMember { name: name.clone() };
+                                let new_val = HirExpr::Binary {
+                                    op: bop,
+                                    lhs: Box::new(current_val),
+                                    rhs: Box::new(value),
+                                    ty,
+                                };
+                                let tgt = HirAssignTarget::SuperMember { name };
+                                return Ok(HirExpr::Assign {
+                                    target: Box::new(tgt),
+                                    value: Box::new(new_val),
+                                });
+                            }
+                        }
+                    }
+                    if matches!(op, AssignOp::AndAssign | AssignOp::OrAssign | AssignOp::NullishAssign) {
+                        let lop = match op {
+                            AssignOp::AndAssign => HirLogicalOp::And,
+                            AssignOp::OrAssign => HirLogicalOp::Or,
+                            AssignOp::NullishAssign => HirLogicalOp::Nullish,
+                            _ => unreachable!(),
+                        };
+                        let ty = numeric_ty(self.ann, target.range.start.offset);
+                        let object_hir = self.lower_expr(object, scope)?;
+                        if *computed {
+                            let index = self.lower_expr(property, scope)?;
+                            let value = self.lower_expr(value, scope)?;
+                            let current_val = HirExpr::Index {
+                                object: Box::new(object_hir.clone()),
+                                index: Box::new(index.clone()),
+                                ty,
+                            };
+                            let tgt = HirAssignTarget::Index {
+                                object: object_hir,
+                                index,
+                            };
+                            let assign = HirExpr::Assign {
+                                target: Box::new(tgt),
+                                value: Box::new(value),
+                            };
+                            return Ok(HirExpr::Logical {
+                                op: lop,
+                                lhs: Box::new(current_val),
+                                rhs: Box::new(assign),
+                            });
+                        } else {
+                            let name = match &property.kind {
+                                ExprKind::Identifier { name } => name.clone(),
+                                _ => panic!("non-identifier property assign"),
+                            };
+                            let value = self.lower_expr(value, scope)?;
+                            let current_val = HirExpr::Member {
+                                object: Box::new(object_hir.clone()),
+                                name: name.clone(),
+                                ty,
+                            };
+                            let tgt = HirAssignTarget::Member {
+                                object: object_hir,
+                                name,
+                            };
+                            let assign = HirExpr::Assign {
+                                target: Box::new(tgt),
+                                value: Box::new(value),
+                            };
+                            return Ok(HirExpr::Logical {
+                                op: lop,
+                                lhs: Box::new(current_val),
+                                rhs: Box::new(assign),
+                            });
+                        }
+                    }
+                    if !matches!(op, AssignOp::Assign) {
+                        let bop = compound_to_bin(*op)?;
+                        let ty = numeric_ty(self.ann, target.range.start.offset);
+                        let object_hir = self.lower_expr(object, scope)?;
+                        if *computed {
+                            let index = self.lower_expr(property, scope)?;
+                            let value = self.lower_expr(value, scope)?;
+                            let current_val = HirExpr::Index {
+                                object: Box::new(object_hir.clone()),
+                                index: Box::new(index.clone()),
+                                ty,
+                            };
+                            let new_val = HirExpr::Binary {
+                                op: bop,
+                                lhs: Box::new(current_val),
+                                rhs: Box::new(value),
+                                ty,
+                            };
+                            let tgt = HirAssignTarget::Index {
+                                object: object_hir,
+                                index,
+                            };
+                            return Ok(HirExpr::Assign {
+                                target: Box::new(tgt),
+                                value: Box::new(new_val),
+                            });
+                        } else {
+                            let name = match &property.kind {
+                                ExprKind::Identifier { name } => name.clone(),
+                                _ => panic!("non-identifier property assign"),
+                            };
+                            let value = self.lower_expr(value, scope)?;
+                            let current_val = HirExpr::Member {
+                                object: Box::new(object_hir.clone()),
+                                name: name.clone(),
+                                ty,
+                            };
+                            let new_val = HirExpr::Binary {
+                                op: bop,
+                                lhs: Box::new(current_val),
+                                rhs: Box::new(value),
+                                ty,
+                            };
+                            let tgt = HirAssignTarget::Member {
+                                object: object_hir,
+                                name,
+                            };
+                            return Ok(HirExpr::Assign {
+                                target: Box::new(tgt),
+                                value: Box::new(new_val),
+                            });
+                        }
                     }
                     let object_hir = self.lower_expr(object, scope)?;
                     let tgt = if *computed {
@@ -465,7 +818,7 @@ impl<'a> Lowerer<'a> {
                     } else {
                         let name = match &property.kind {
                             ExprKind::Identifier { name } => name.clone(),
-                            _ => return unsupported("non-identifier property assign"),
+                            _ => panic!("non-identifier property assign"),
                         };
                         HirAssignTarget::Member {
                             object: object_hir,
@@ -480,9 +833,27 @@ impl<'a> Lowerer<'a> {
                 }
                 let binding = match &target.kind {
                     ExprKind::Identifier { name } => self.resolve(name, scope),
-                    _ => return unsupported("non-identifier assign target"),
+                    _ => panic!("non-identifier assign target"),
                 };
                 let val_expr = self.lower_expr(value, scope)?;
+                if matches!(op, AssignOp::AndAssign | AssignOp::OrAssign | AssignOp::NullishAssign) {
+                    let lop = match op {
+                        AssignOp::AndAssign => HirLogicalOp::And,
+                        AssignOp::OrAssign => HirLogicalOp::Or,
+                        AssignOp::NullishAssign => HirLogicalOp::Nullish,
+                        _ => unreachable!(),
+                    };
+                    let lhs = HirExpr::Var(binding.clone());
+                    let assign = HirExpr::Assign {
+                        target: Box::new(HirAssignTarget::Var(binding)),
+                        value: Box::new(val_expr),
+                    };
+                    return Ok(HirExpr::Logical {
+                        op: lop,
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(assign),
+                    });
+                }
                 let value = match op {
                     AssignOp::Assign => val_expr,
                     _ => {
@@ -518,22 +889,68 @@ impl<'a> Lowerer<'a> {
                 })
             }
             ExprKind::Pipeline { left, right } => {
-                // `left |> right`. Non-placeholder form is a plain call
-                // `right(left)` (legacy `compile_pipeline`'s `else` branch). The
-                // placeholder form `left |> f(_)` builds a synthetic closure —
-                // defer that to keep this transparent.
                 if pipeline_has_placeholder(right) {
-                    return unsupported("pipeline placeholder");
+                    let range = varn_core::SourceRange::default();
+                    let param = varn_core::ast::Param {
+                        pattern: varn_core::ast::Pattern::Identifier {
+                            name: Rc::from("_"),
+                            type_ann: None,
+                            range,
+                        },
+                        type_ann: None,
+                        default: None,
+                        is_rest: false,
+                        is_optional: false,
+                        modifiers: varn_core::ast::operators::Modifiers::default(),
+                        range,
+                    };
+                    let body_expr = right.clone();
+                    let body_ref = BodyRef::ExprBody(&body_expr);
+                    let (func, upvalues) = self.lower_function_like(
+                        Rc::from("<pipe>"),
+                        &[param],
+                        false,
+                        false,
+                        false,
+                        false,
+                        body_ref,
+                        &[],
+                        scope,
+                    )?;
+                    let callee = HirExpr::Closure {
+                        func: Box::new(func),
+                        upvalues,
+                    };
+                    let arg = self.lower_expr(left, scope)?;
+                    Ok(HirExpr::Call {
+                        callee: Box::new(callee),
+                        args: vec![arg],
+                        ty: HirType::Dynamic,
+                    })
+                } else {
+                    let callee = Box::new(self.lower_expr(right, scope)?);
+                    let arg = self.lower_expr(left, scope)?;
+                    Ok(HirExpr::Call {
+                        callee,
+                        args: vec![arg],
+                        ty: HirType::Dynamic,
+                    })
                 }
-                let callee = Box::new(self.lower_expr(right, scope)?);
-                let arg = self.lower_expr(left, scope)?;
-                Ok(HirExpr::Call {
-                    callee,
-                    args: vec![arg],
-                    ty: HirType::Dynamic,
+            }
+            ExprKind::TaggedTemplate { tag, template, .. } => {
+                let htag = self.lower_expr(tag, scope)?;
+                let htpl = self.lower_expr(template, scope)?;
+                Ok(HirExpr::TaggedTemplate {
+                    tag: Box::new(htag),
+                    template: Box::new(htpl),
                 })
             }
-            _ => unsupported("expression kind"),
+            ExprKind::Super => Ok(HirExpr::Super),
+            ExprKind::ClassExpr { declaration } => {
+                let hir_class = self.lower_class(declaration, scope)?;
+                Ok(HirExpr::Class(Box::new(hir_class)))
+            }
+            _ => panic!("unsupported expression kind: {:?}", expr.kind),
         }
     }
 
@@ -557,6 +974,68 @@ impl<'a> Lowerer<'a> {
         // recurses via `CallSelf` instead of an upvalue to its own slot (which
         // would be a use-before-def the register allocator can't model).
         scope.resolve_in_current_frame(name).is_none() && !self.ann.is_reassigned_name(name)
+    }
+
+    /// Lower a call's arguments into the callee's **parameter order**, honouring
+    /// the checker's `get_call_mapping` (named-arg reordering + default fills,
+    /// where a `None` slot becomes `null` and the callee's default prologue
+    /// supplies the value). Evaluation order matches legacy (param order). Spread
+    /// args still fall back. Used by plain/method/extension/`new` calls.
+    fn lower_call_args(
+        &mut self,
+        args: &[Arg],
+        offset: u32,
+        scope: &mut Scope,
+    ) -> R<Vec<HirExpr>> {
+        if let Some(mapping) = self.ann.get_call_mapping(offset).cloned() {
+            let mut out = Vec::with_capacity(mapping.len());
+            for opt in &mapping {
+                match opt {
+                    Some(i) => {
+                        match &args[*i] {
+                            Arg::Positional(e) | Arg::Named { value: e, .. } => {
+                                out.push(self.lower_expr(e, scope)?);
+                            }
+                            Arg::Spread(e) => {
+                                let h = self.lower_expr(e, scope)?;
+                                out.push(HirExpr::Spread(Box::new(h)));
+                            }
+                        }
+                    }
+                    None => out.push(HirExpr::Null),
+                }
+            }
+            Ok(out)
+        } else {
+            let mut out = Vec::with_capacity(args.len());
+            for a in args {
+                match a {
+                    Arg::Positional(e) | Arg::Named { value: e, .. } => {
+                        out.push(self.lower_expr(e, scope)?)
+                    }
+                    Arg::Spread(e) => {
+                        let h = self.lower_expr(e, scope)?;
+                        out.push(HirExpr::Spread(Box::new(h)));
+                    }
+                }
+            }
+            Ok(out)
+        }
+    }
+
+    /// Build a call of a mangled extension global (`__ext*_T_k`): `recv` is the
+    /// receiver (`this`), `args` follow.
+    pub(super) fn ext_global_call(
+        &self,
+        mangled: Rc<str>,
+        recv: HirExpr,
+        args: Vec<HirExpr>,
+    ) -> HirExpr {
+        HirExpr::ExtensionCall {
+            func: mangled,
+            recv: Box::new(recv),
+            args,
+        }
     }
 
     pub(super) fn resolve(&self, name: &Rc<str>, scope: &mut Scope) -> HirBinding {

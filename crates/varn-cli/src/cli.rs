@@ -76,7 +76,7 @@ pub struct DebugArgs {
     #[arg(short, long, value_name = "CODE")]
     pub eval: Option<String>,
 
-    /// Fase a mostrar: tokens, ast, check, bytecode, symbols, binds, types[:N],
+    /// Fase a mostrar: tokens, ast, check, bytecode, hir, ssa, symbols, binds, types[:N],
     /// expr, modules, graph, caps, scope, errors, trace, info, lsp[:sub], all
     #[arg(short, long, value_name = "PHASE", default_value = "all")]
     pub phase: String,

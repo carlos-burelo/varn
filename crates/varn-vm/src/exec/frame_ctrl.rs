@@ -830,16 +830,18 @@ impl ExecCtx {
         }
         let callee_nv = self.heap.intern(callee);
         let arg_nvs: Vec<_> = args.iter().cloned().map(|a| self.heap.intern(a)).collect();
-        self.stack.push(callee_nv);
-        self.stack.push(VmValue::null());
-        self.stack.extend(arg_nvs);
-        let prepared = self
-            .prepare_call(callee_nv, args.len() + 1)
-            .map_err(|e| e.message)?;
-        self.dispatch_prepared_call(prepared)
-            .map_err(|e| e.message)?;
-        let result = self.stack.pop().unwrap_or(VmValue::null());
+        let result = self.call_vm(callee_nv, &arg_nvs)?;
         let value = self.heap.extract(result);
+        match value {
+            varn_types::Value::Task(t) => {
+                let handle = self.run_lazy_task_sync(t.as_ref());
+                return Ok(varn_types::Value::TaskHandle(handle));
+            }
+            varn_types::Value::TaskHandle(f) => {
+                return Ok(varn_types::Value::TaskHandle(f));
+            }
+            _ => {}
+        }
         let output = varn_types::AsyncTask::pending();
         output.resolve(value);
         Ok(varn_types::Value::TaskHandle(output))
