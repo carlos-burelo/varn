@@ -694,6 +694,38 @@ fn f:
 }
 
 #[test]
+fn ternary_lowers_to_branch_and_result_phi() {
+    // f(n) { return n > 0 ? 1 : 2 }
+    let f = func(
+        vec![HirType::Int],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::Conditional {
+            test: Box::new(cmp(HirBinOp::Gt, param(0), int(0))),
+            cons: Box::new(int(1)),
+            alt: Box::new(int(2)),
+        }))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: int):
+    v1 = int 0
+    v2 = gt.bool v0, v1
+    branch v2, b1, b2
+  b1():
+    v3 = int 1
+    jump b3(v3)
+  b2():
+    v4 = int 2
+    jump b3(v4)
+  b3(v5: dyn):
+    return v5
+"
+    );
+}
+
+#[test]
 fn verifier_accepts_constructed_ssa() {
     // The verifier must not reject any well-formed function the builder emits.
     let while_loop = func(

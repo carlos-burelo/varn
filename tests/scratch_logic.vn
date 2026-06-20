@@ -1,0 +1,19 @@
+function andTest(a: int, b: int): int { return (a > 0) && (b > 0) ? 1 : 0 }
+function orDefault(x: int): int { return (x > 5 || x < 0) ? 100 : 200 }
+function nullish(o: dynamic): int { return o.maybe ?? 7 }
+function ternary(n: int): int { return n > 0 ? n * 2 : 0 - n }
+function chain(a: int): int {
+  let r = a > 10 ? 3 : (a > 5 ? 2 : 1)
+  return r
+}
+print(andTest(1, 1))
+print(andTest(1, 0))
+print(orDefault(7))
+print(orDefault(3))
+print(nullish({ maybe: null }))
+print(nullish({ maybe: 42 }))
+print(ternary(5))
+print(ternary(0 - 4))
+print(chain(20))
+print(chain(7))
+print(chain(2))

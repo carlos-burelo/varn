@@ -136,20 +136,25 @@ Done (`ssa/build.rs`, `ssa/ir.rs`):
   (contiguity check is a no-op there). Verified: `slice`/`push`/`length`, two
   method results in one expr → identical with/without `VN_OPT_SSA`; the
   method-call-heavy suite stays 728/728.
+- **Logical + conditional** — `&&`/`||`/`??` and the ternary `?:` via a
+  `lower_branch_value` helper (branch on the condition, evaluate one arm per
+  successor, merge through a single block-param result phi). `??` uses a new
+  `IsNull` instruction. Verified: `&&`/`||`/`??`, ternary, and nested ternary
+  identical with/without `VN_OPT_SSA`.
 - **Trivial-phi removal** (`simplify_phis`): Braun's `tryRemoveTrivialPhi` as a
   fixpoint post-pass.
-- Tests (`ssa/tests.rs`, 20 — golden dumps + verifier): identity, const+binary,
+- Tests (`ssa/tests.rs`, 21 — golden dumps + verifier): identity, const+binary,
   reassign, one-/two-sided `if` phi, no-phi trivial removal, `while`/`for`/
   `do-while` carry, `break`/`continue`, nested-`if` merge, global call, self-call,
-  member/index read, member/index write, method call.
+  member/index read, member/index write, method call, ternary.
 
-**Pending** (the rest of §2's **effectful instruction set**): `Super*`/intrinsic
-calls, closures, classes, enums, `match`, `try`, modules, upvalues,
-await/spawn/yield — plus `switch`/`for-of`/`for-in` control flow, so every §1
-construct lowers to SSA. These are ordinary (effectful) instructions threaded in
-program order. Until then `build_function` returns `Err(Unsupported)` and that
-function uses the `lower/` path. (Scalar exprs, control flow, loops, plain/self/
-method calls, and member/index read+write are done.)
+**Pending** (the rest of §2's instruction set): array/object literals, closures,
+`Super*`/intrinsic calls, classes, enums, `match`, `try`, modules, upvalues,
+templates, await/spawn/yield — plus `switch`/`for-of`/`for-in` control flow, so
+every §1 construct lowers to SSA. Until then `build_function` returns
+`Err(Unsupported)` and that function uses the `lower/` path. (Done: scalar exprs,
+control flow, loops, plain/self/method calls, member/index read+write, logical +
+conditional.)
 
 > **`regalloc_post` callee-frame constraint ✅ RESOLVED.** SSA calls were correct
 > pre-regalloc but `regalloc_post` miscompiled multi-call expressions: a call

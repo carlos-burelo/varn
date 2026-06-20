@@ -107,6 +107,8 @@ pub enum InstKind {
     /// `recv.name(args)` method call (`CallMethod` + IC slot). Receiver passed
     /// separately (not in the args block); args contiguous from `call_base`.
     MethodCall { recv: Value, name: Rc<str>, args: Vec<Value> },
+    /// `IsNull` — truthy-bool of whether the operand is null (for `??`).
+    IsNull { operand: Value },
 }
 
 /// How a block ends and transfers control. Branch/jump carry the block-argument
