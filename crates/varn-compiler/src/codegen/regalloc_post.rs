@@ -362,6 +362,11 @@ struct ScanResult {
 
     call_arg_ranges: Vec<(u8, u8)>,
 
+    /// Call sites as `(instr_idx, arg_start, arg_count)` — for the callee-frame
+    /// constraint (a value live across a call must not colour into the callee's
+    /// frame, i.e. at `>= arg_start`).
+    call_sites: Vec<(usize, u8, u8)>,
+
     pinned: std::collections::HashSet<u8>,
 }
 
@@ -369,6 +374,7 @@ fn scan_bytecode(code: &[u16]) -> ScanResult {
     let mut defs: HashMap<u8, usize> = HashMap::new();
     let mut uses: HashMap<u8, Vec<usize>> = HashMap::new();
     let mut call_arg_ranges: Vec<(u8, u8)> = Vec::new();
+    let mut call_sites: Vec<(usize, u8, u8)> = Vec::new();
     let pinned: std::collections::HashSet<u8> = std::collections::HashSet::new();
     // Locals captured by a `MakeClosure` as an *open* upvalue: the upvalue keeps
     // pointing at the local's register slot until it is closed (`CloseUpvalue`)
@@ -410,8 +416,9 @@ fn scan_bytecode(code: &[u16]) -> ScanResult {
         for &use_reg in &info.uses {
             uses.entry(use_reg).or_insert_with(Vec::new).push(instr_idx);
         }
-        if let Some(args) = info.call_args {
-            call_arg_ranges.push(args);
+        if let Some((arg_start, arg_count)) = info.call_args {
+            call_arg_ranges.push((arg_start, arg_count));
+            call_sites.push((instr_idx, arg_start, arg_count));
         }
 
         offset += info.len;
@@ -428,6 +435,7 @@ fn scan_bytecode(code: &[u16]) -> ScanResult {
         defs,
         uses,
         call_arg_ranges,
+        call_sites,
         pinned,
     }
 }
@@ -476,6 +484,40 @@ fn verify_call_constraints(code: &[u16], mapping: &HashMap<u8, u8>) -> bool {
             }
         }
         offset += info.len;
+    }
+    true
+}
+
+/// A call's callee frame occupies `[arg_start, arg_start + callee_register_count)`
+/// — which extends past `arg_count`. A register live across the call (defined
+/// before it, used after it) that colours into that region would be clobbered by
+/// the callee. We can't know `callee_register_count`, so conservatively require
+/// every live-across register to colour **below** the call's `arg_start`. If the
+/// proposed `mapping` would violate this, bail (the caller keeps the original,
+/// already-correct registers). Never triggers on the legacy-shaped emission
+/// (results sit below `arg_start` and colouring preserves it); catches the
+/// SSA emitter's pattern where a call result is live across a later call.
+fn verify_callee_frame_constraints(scan: &ScanResult, mapping: &HashMap<u8, u8>) -> bool {
+    let m = |r: u8| mapping.get(&r).copied().unwrap_or(r);
+    for &(call_idx, arg_start, arg_count) in &scan.call_sites {
+        let mapped_start = m(arg_start);
+        let arg_end = arg_start.wrapping_add(arg_count);
+        for (&reg, &def_idx) in &scan.defs {
+            if def_idx >= call_idx {
+                continue; // not defined before the call (incl. the call's own dest)
+            }
+            // The call's own receiver/arg registers are not "live across".
+            if reg >= arg_start && reg < arg_end {
+                continue;
+            }
+            let live_across = scan
+                .uses
+                .get(&reg)
+                .is_some_and(|us| us.iter().any(|&u| u > call_idx));
+            if live_across && m(reg) >= mapped_start {
+                return false;
+            }
+        }
     }
     true
 }
@@ -972,6 +1014,10 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
     }
 
     if !verify_call_constraints(&proto.chunk.code, &mapping) {
+        return;
+    }
+
+    if !verify_callee_frame_constraints(&scan, &mapping) {
         return;
     }
 

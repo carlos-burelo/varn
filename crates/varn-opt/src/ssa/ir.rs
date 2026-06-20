@@ -89,6 +89,12 @@ pub enum InstKind {
         operand: Value,
         ty: HirType,
     },
+    /// Read a module global by name (`LoadGlobal`).
+    LoadGlobal(Rc<str>),
+    /// Plain call `callee(args)` — plain-call ABI (null receiver, contiguous args).
+    Call { callee: Value, args: Vec<Value> },
+    /// Statically-resolved self-recursion (`CallSelf`).
+    SelfCall { args: Vec<Value> },
 }
 
 /// How a block ends and transfers control. Branch/jump carry the block-argument

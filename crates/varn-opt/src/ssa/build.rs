@@ -536,9 +536,27 @@ impl Builder {
             HirExpr::Str(s) => Ok(self.emit(InstKind::ConstStr(s.clone()), HirType::Str)),
             HirExpr::Char(c) => Ok(self.emit(InstKind::ConstChar(*c), HirType::Int)),
             HirExpr::Null => Ok(self.emit(InstKind::ConstNull, HirType::Dynamic)),
+            HirExpr::Var(HirBinding::Global(name)) => {
+                Ok(self.emit(InstKind::LoadGlobal(name.clone()), HirType::Dynamic))
+            }
             HirExpr::Var(binding) => {
                 let var = binding_var(binding)?;
                 self.read_var(var, self.current)
+            }
+            HirExpr::Call { callee, args, ty } => {
+                let c = self.lower_expr(callee)?;
+                let mut avs = Vec::with_capacity(args.len());
+                for a in args {
+                    avs.push(self.lower_expr(a)?);
+                }
+                Ok(self.emit(InstKind::Call { callee: c, args: avs }, *ty))
+            }
+            HirExpr::SelfCall { args, ty } => {
+                let mut avs = Vec::with_capacity(args.len());
+                for a in args {
+                    avs.push(self.lower_expr(a)?);
+                }
+                Ok(self.emit(InstKind::SelfCall { args: avs }, *ty))
             }
             HirExpr::Binary { op, lhs, rhs, ty } => {
                 let l = self.lower_expr(lhs)?;
@@ -752,12 +770,18 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                     sub(rhs);
                 }
                 InstKind::Unary { operand, .. } => sub(operand),
+                InstKind::Call { callee, args } => {
+                    sub(callee);
+                    args.iter_mut().for_each(sub);
+                }
+                InstKind::SelfCall { args } => args.iter_mut().for_each(sub),
                 InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
                 | InstKind::ConstBool(_)
                 | InstKind::ConstStr(_)
                 | InstKind::ConstChar(_)
-                | InstKind::ConstNull => {}
+                | InstKind::ConstNull
+                | InstKind::LoadGlobal(_) => {}
             }
         }
         match &mut block.term {

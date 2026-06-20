@@ -1,0 +1,14 @@
+function fib(n: int): int {
+  if (n < 2) { return n }
+  return fib(n - 1) + fib(n - 2)
+}
+function addOne(x: int): int { return x + 1 }
+function useAdd(x: int): int { return addOne(x) + addOne(x) }
+function sumCalls(n: int): int {
+  let total = 0
+  for (let i = 0; i < n; i = i + 1) { total = total + addOne(i) }
+  return total
+}
+print(fib(10))
+print(useAdd(20))
+print(sumCalls(5))

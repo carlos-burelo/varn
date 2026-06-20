@@ -515,6 +515,52 @@ fn f:
 }
 
 #[test]
+fn call_global_lowers_to_call_inst() {
+    // f(n) { return g(n) }  — g is a module global.
+    let f = func(
+        vec![HirType::Int],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::Call {
+            callee: Box::new(HirExpr::Var(HirBinding::Global("g".into()))),
+            args: vec![param(0)],
+            ty: HirType::Int,
+        }))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: int):
+    v1 = global g
+    v2 = call v1(v0)
+    return v2
+"
+    );
+}
+
+#[test]
+fn self_call_lowers_to_callself_inst() {
+    // f(n) { return f(n) }  via SelfCall (statically-resolved self recursion).
+    let f = func(
+        vec![HirType::Int],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::SelfCall {
+            args: vec![param(0)],
+            ty: HirType::Int,
+        }))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: int):
+    v1 = callself(v0)
+    return v1
+"
+    );
+}
+
+#[test]
 fn verifier_accepts_constructed_ssa() {
     // The verifier must not reject any well-formed function the builder emits.
     let while_loop = func(

@@ -34,7 +34,7 @@ pub fn emit_function(mut ssa: SsaFunc, f: &HirFunction, source_file: Rc<str>) ->
     split_phi_edges(&mut ssa);
 
     let nparams = f.params.len();
-    let (reg, scratch, null_reg, register_count) = assign_registers(&ssa, nparams)?;
+    let (reg, scratch, null_reg, call_base, register_count) = assign_registers(&ssa, nparams)?;
 
     let n = ssa.blocks.len();
     let mut chunk = Chunk::new();
@@ -48,7 +48,7 @@ pub fn emit_function(mut ssa: SsaFunc, f: &HirFunction, source_file: Rc<str>) ->
         block_offset[b] = chunk.code.len();
         let insts = std::mem::take(&mut ssa.blocks[b].insts);
         for inst in &insts {
-            emit_inst(&mut chunk, inst, &reg, scratch)?;
+            emit_inst(&mut chunk, inst, &reg, scratch, call_base)?;
         }
         let term = ssa.blocks[b].term.clone();
         emit_terminator(&mut chunk, &ssa, &reg, b, &term, null_reg, scratch, &block_offset, &mut fixups)?;
@@ -150,8 +150,10 @@ fn split_one(ssa: &mut SsaFunc, br: BlockId, is_then: bool) {
 
 /// Assign one physical register per defined SSA value. Entry-block parameters
 /// are the function parameters → registers `1..=nparams` (register 0 is the
-/// receiver). Returns `(reg_of_value, scratch, null_reg, register_count)`.
-fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u16)> {
+/// receiver). Returns `(reg_of_value, scratch, null_reg, call_base, register_count)`.
+/// `call_base` starts a contiguous block (sized to the widest call) for the
+/// plain-call ABI's receiver+args, above every value register.
+fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u8, u16)> {
     let mut reg = vec![0u8; ssa.values.len()];
     let mut assigned = vec![false; ssa.values.len()];
 
@@ -186,18 +188,32 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
             }
         }
     }
-    // Two reserved registers: a scratch for copy-cycle breaking and a null slot
-    // for the `return null` epilogue / valueless returns.
-    if next > 253 {
+    // Widest call (receiver + args) → the contiguous call-ABI scratch block.
+    let mut max_call = 0u32;
+    for block in &ssa.blocks {
+        for inst in &block.insts {
+            let t = match &inst.kind {
+                InstKind::Call { args, .. } => args.len() as u32 + 1,
+                InstKind::SelfCall { args } => args.len() as u32 + 1,
+                _ => 0,
+            };
+            max_call = max_call.max(t);
+        }
+    }
+    // Reserved: scratch (copy-cycle / `~`), null slot (return null), then the call
+    // block. All registers are `u8`, so the top must stay within 0..=255.
+    let total = next + 2 + max_call;
+    if total > 256 {
         return Err(OptError::Unsupported("ssa-emit: register count exceeds 255"));
     }
     let scratch = next as u8;
     let null_reg = (next + 1) as u8;
-    let register_count = (next + 2).max(1) as u16;
-    Ok((reg, scratch, null_reg, register_count))
+    let call_base = (next + 2) as u8;
+    let register_count = total.max(1) as u16;
+    Ok((reg, scratch, null_reg, call_base, register_count))
 }
 
-fn emit_inst(chunk: &mut Chunk, inst: &Inst, reg: &[u8], scratch: u8) -> Result<()> {
+fn emit_inst(chunk: &mut Chunk, inst: &Inst, reg: &[u8], scratch: u8, call_base: u8) -> Result<()> {
     let Some(dest) = inst.dest else { return Ok(()) };
     let d = reg[dest.0 as usize];
     match &inst.kind {
@@ -237,8 +253,38 @@ fn emit_inst(chunk: &mut Chunk, inst: &Inst, reg: &[u8], scratch: u8) -> Result<
                 }
             }
         }
+        InstKind::LoadGlobal(name) => {
+            let idx = chunk.add_str(name);
+            chunk.emit_rc(OpCode::LoadGlobal, d, idx, LINE);
+        }
+        // Plain-call ABI: null receiver at `call_base`, args contiguous after it,
+        // then `Call dest=d, callee` over `[receiver, args]`.
+        InstKind::Call { callee, args } => {
+            emit_call_args(chunk, reg, call_base, args);
+            let total = (args.len() + 1) as u8;
+            chunk.emit(OpCode::Call, LINE);
+            chunk.write(Chunk::pack(d, reg[callee.0 as usize]), LINE);
+            chunk.write(Chunk::pack(total, call_base), LINE);
+        }
+        // Self-recursion ABI: no callee load; `CallSelf dest=d` over the same block.
+        InstKind::SelfCall { args } => {
+            emit_call_args(chunk, reg, call_base, args);
+            let total = (args.len() + 1) as u8;
+            chunk.emit(OpCode::CallSelf, LINE);
+            chunk.write(Chunk::pack(d, 0), LINE);
+            chunk.write(Chunk::pack(total, call_base), LINE);
+        }
     }
     Ok(())
+}
+
+/// Lay out a call's receiver (null) + argument registers contiguously from
+/// `call_base`, copying each argument value into its slot.
+fn emit_call_args(chunk: &mut Chunk, reg: &[u8], call_base: u8, args: &[Value]) {
+    chunk.emit_rr(OpCode::LoadNull, call_base, 0, LINE);
+    for (i, a) in args.iter().enumerate() {
+        chunk.emit_rr(OpCode::Move, call_base + 1 + i as u8, reg[a.0 as usize], LINE);
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
