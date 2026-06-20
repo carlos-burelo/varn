@@ -79,6 +79,7 @@ fn inst_kind(kind: &InstKind) -> String {
         }
         InstKind::ToString { operand } => format!("tostring {}", val(*operand)),
         InstKind::BuildStr { parts } => format!("buildstr{}", args_list(parts)),
+        InstKind::MakeClosure { func } => format!("closure {}", func.name),
     }
 }
 

@@ -66,7 +66,7 @@ pub fn lower_module(module: &HirModule, source_file: Rc<str>, export_names: Vec<
     fl.finish(Some(Rc::from("<module>")), 0, 0, false, false, false, false, export_names)
 }
 
-fn lower_function(f: &HirFunction, source_file: Rc<str>) -> FunctionProto {
+pub(crate) fn lower_function(f: &HirFunction, source_file: Rc<str>) -> FunctionProto {
     // Experimental SSA backend (AST→HIR→SSA→bytecode). Per-function: try the
     // SSA pipeline, fall back to the naive emitter for anything it can't lower.
     // Gated by `VN_OPT_SSA` until §2 covers the full instruction set.

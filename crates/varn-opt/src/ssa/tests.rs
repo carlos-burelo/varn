@@ -797,6 +797,29 @@ fn f:
 }
 
 #[test]
+fn capture_free_closure_lowers_to_makeclosure() {
+    // f() { return <inner fn> }  — capture-free → LoadStaticFn.
+    let inner = func(vec![], 0, vec![HirStmt::Return(Some(int(0)))]);
+    let f = func(
+        vec![],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::Closure {
+            func: Box::new(inner),
+            upvalues: vec![],
+        }))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0():
+    v0 = closure f
+    return v0
+"
+    );
+}
+
+#[test]
 fn verifier_accepts_constructed_ssa() {
     // The verifier must not reject any well-formed function the builder emits.
     let while_loop = func(

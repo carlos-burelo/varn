@@ -1,0 +1,15 @@
+function apply(f: dynamic, x: int): int { return f(x) }
+function makeDouble(): dynamic { return (n: int) => n * 2 }
+function useMap(): int {
+  let arr = [1, 2, 3]
+  let d = arr.map((n: int) => n + 10)
+  return d[0] + d[1] + d[2]
+}
+function callArrow(x: int): int {
+  let inc = (n: int) => n + 1
+  return inc(x)
+}
+let dbl = makeDouble()
+print(apply(dbl, 21))
+print(useMap())
+print(callArrow(5))
