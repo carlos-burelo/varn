@@ -337,6 +337,9 @@ fn emit_inst(
             chunk.write(name_idx, LINE);
             chunk.write(Chunk::pack(argc, call_base), LINE);
         }
+        InstKind::IsNull { operand } => {
+            chunk.emit_rr(OpCode::IsNull, d, reg[operand.0 as usize], LINE);
+        }
         // Dest-less side effects handled before the dest guard above.
         InstKind::SetProperty { .. } | InstKind::SetIndex { .. } => unreachable!(),
     }

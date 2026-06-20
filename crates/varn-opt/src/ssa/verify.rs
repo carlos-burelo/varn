@@ -179,6 +179,7 @@ fn inst_uses(kind: &InstKind) -> Vec<Value> {
             v.extend_from_slice(args);
             v
         }
+        InstKind::IsNull { operand } => vec![*operand],
         _ => Vec::new(),
     }
 }

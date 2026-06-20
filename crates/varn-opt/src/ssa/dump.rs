@@ -67,6 +67,7 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::MethodCall { recv, name, args } => {
             format!("callmethod {}.{name}{}", val(*recv), args_list(args))
         }
+        InstKind::IsNull { operand } => format!("isnull {}", val(*operand)),
     }
 }
 

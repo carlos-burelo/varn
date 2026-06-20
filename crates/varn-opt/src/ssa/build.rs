@@ -17,8 +17,8 @@
 use rustc_hash::FxHashMap;
 
 use crate::hir::{
-    HirAssignTarget, HirBinOp, HirBinding, HirExpr, HirFunction, HirStmt, HirType, HirUpdateOp,
-    LocalId,
+    HirAssignTarget, HirBinOp, HirBinding, HirExpr, HirFunction, HirLogicalOp, HirStmt, HirType,
+    HirUpdateOp, LocalId,
 };
 use crate::OptError;
 
@@ -378,6 +378,52 @@ impl Builder {
         Ok(())
     }
 
+    /// Branch on `cond` (truthy), evaluate one arm in each successor, and merge
+    /// their values through a single block parameter (the result phi). Used for
+    /// short-circuiting logicals and the ternary. The arm closures must not
+    /// terminate the block (pure expressions; any unsupported sub-expr makes the
+    /// whole function fall back before reaching here).
+    fn lower_branch_value(
+        &mut self,
+        cond: Value,
+        then_fn: impl FnOnce(&mut Self) -> Result<Value>,
+        else_fn: impl FnOnce(&mut Self) -> Result<Value>,
+        ty: HirType,
+    ) -> Result<Value> {
+        let entry = self.current;
+        let then_b = self.new_block();
+        let else_b = self.new_block();
+        let merge = self.new_block();
+        self.set_term(Terminator::Branch {
+            cond,
+            then_blk: then_b,
+            then_args: Vec::new(),
+            else_blk: else_b,
+            else_args: Vec::new(),
+        });
+        self.add_pred(then_b, entry);
+        self.add_pred(else_b, entry);
+        self.seal_block(then_b);
+        self.seal_block(else_b);
+
+        self.current = then_b;
+        let vt = then_fn(self)?;
+        let t_end = self.current;
+        self.set_term(Terminator::Jump { target: merge, args: vec![vt] });
+        self.add_pred(merge, t_end);
+
+        self.current = else_b;
+        let ve = else_fn(self)?;
+        let e_end = self.current;
+        self.set_term(Terminator::Jump { target: merge, args: vec![ve] });
+        self.add_pred(merge, e_end);
+
+        self.seal_block(merge);
+        self.current = merge;
+        // The result phi: a single block param fed by the two edge args above.
+        Ok(self.add_block_param(merge, ty))
+    }
+
     /// `while (test) body` — a pre-tested loop. The header is left unsealed while
     /// the body is lowered so reads of variables modified in the loop spawn
     /// incomplete phis (Braun); the back-edge supplies their loop-carried
@@ -598,6 +644,35 @@ impl Builder {
                     InstKind::MethodCall { recv: r, name: name.clone(), args: avs },
                     *ty,
                 ))
+            }
+            // Short-circuiting `&&`/`||`/`??` → branch + result phi.
+            HirExpr::Logical { op, lhs, rhs } => {
+                let l = self.lower_expr(lhs)?;
+                match op {
+                    // `a && b`: a truthy → b, else a.
+                    HirLogicalOp::And => {
+                        self.lower_branch_value(l, |s| s.lower_expr(rhs), |_| Ok(l), HirType::Dynamic)
+                    }
+                    // `a || b`: a truthy → a, else b.
+                    HirLogicalOp::Or => {
+                        self.lower_branch_value(l, |_| Ok(l), |s| s.lower_expr(rhs), HirType::Dynamic)
+                    }
+                    // `a ?? b`: a null → b, else a.
+                    HirLogicalOp::Nullish => {
+                        let isnull = self.emit(InstKind::IsNull { operand: l }, HirType::Bool);
+                        self.lower_branch_value(isnull, |s| s.lower_expr(rhs), |_| Ok(l), HirType::Dynamic)
+                    }
+                }
+            }
+            // Ternary `test ? cons : alt` → branch + result phi.
+            HirExpr::Conditional { test, cons, alt } => {
+                let t = self.lower_expr(test)?;
+                self.lower_branch_value(
+                    t,
+                    |s| s.lower_expr(cons),
+                    |s| s.lower_expr(alt),
+                    HirType::Dynamic,
+                )
             }
             HirExpr::Binary { op, lhs, rhs, ty } => {
                 let l = self.lower_expr(lhs)?;
@@ -847,6 +922,7 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                     sub(recv);
                     args.iter_mut().for_each(sub);
                 }
+                InstKind::IsNull { operand } => sub(operand),
                 InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
                 | InstKind::ConstBool(_)
