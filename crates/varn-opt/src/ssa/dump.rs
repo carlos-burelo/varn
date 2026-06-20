@@ -44,6 +44,8 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::ConstBool(b) => format!("bool {b}"),
         InstKind::ConstStr(s) => format!("str {s:?}"),
         InstKind::ConstChar(c) => format!("char {c:?}"),
+        InstKind::ConstDecimal(d) => format!("decimal {d}"),
+        InstKind::ConstBigInt(n) => format!("bigint {n}"),
         InstKind::ConstNull => "null".to_owned(),
         InstKind::Binary { op, lhs, rhs, ty: t } => {
             format!("{}.{} {}, {}", binop(*op), ty(*t), val(*lhs), val(*rhs))
@@ -83,6 +85,11 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::IntrinsicCall { object, args, wire_byte } => {
             format!("intrinsic#{wire_byte} {}{}", val(*object), args_list(args))
         }
+        InstKind::AssertNotNull { operand } => format!("assertnotnull {}", val(*operand)),
+        InstKind::GetPropertyMaybe { object, name } => {
+            format!("getpropmaybe {}.{name}", val(*object))
+        }
+        InstKind::ModuleSlot { object, slot } => format!("moduleslot {}[{slot}]", val(*object)),
     }
 }
 

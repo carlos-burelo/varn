@@ -249,6 +249,12 @@ fn emit_inst(
             chunk.emit_rrr(OpCode::SetIndex, reg[object.0 as usize], reg[index.0 as usize], reg[value.0 as usize], LINE);
             return Ok(());
         }
+        // `expr!`: assert the operand is non-null in place (operand reg in the
+        // high byte; the value passes through). No dest.
+        InstKind::AssertNotNull { operand } => {
+            chunk.emit1(OpCode::AssertNotNull, Chunk::pack(reg[operand.0 as usize], 0), LINE);
+            return Ok(());
+        }
         _ => {}
     }
 
@@ -270,6 +276,14 @@ fn emit_inst(
         }
         InstKind::ConstChar(c) => {
             let idx = chunk.add_constant(PoolEntry::Literal(Literal::Char(*c)));
+            chunk.emit_rc(OpCode::LoadConst, d, idx, LINE);
+        }
+        InstKind::ConstDecimal(dec) => {
+            let idx = chunk.add_constant(PoolEntry::Literal(Literal::Decimal(*dec)));
+            chunk.emit_rc(OpCode::LoadConst, d, idx, LINE);
+        }
+        InstKind::ConstBigInt(n) => {
+            let idx = chunk.add_constant(PoolEntry::Literal(Literal::BigInt(*n)));
             chunk.emit_rc(OpCode::LoadConst, d, idx, LINE);
         }
         InstKind::ConstNull => chunk.emit_rr(OpCode::LoadNull, d, 0, LINE),
@@ -395,8 +409,17 @@ fn emit_inst(
                 chunk.write(Chunk::pack(reg[p.0 as usize], 0), LINE);
             }
         }
+        InstKind::GetPropertyMaybe { object, name } => {
+            let idx = chunk.add_str(name);
+            chunk.emit_rrc(OpCode::GetPropertyMaybe, d, reg[object.0 as usize], idx, LINE);
+        }
+        InstKind::ModuleSlot { object, slot } => {
+            chunk.emit_rrc(OpCode::LoadModuleSlot, d, reg[object.0 as usize], *slot, LINE);
+        }
         // Dest-less side effects handled before the dest guard above.
-        InstKind::SetProperty { .. } | InstKind::SetIndex { .. } => unreachable!(),
+        InstKind::SetProperty { .. } | InstKind::SetIndex { .. } | InstKind::AssertNotNull { .. } => {
+            unreachable!()
+        }
     }
     Ok(())
 }

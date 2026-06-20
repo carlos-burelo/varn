@@ -190,6 +190,9 @@ fn inst_uses(kind: &InstKind) -> Vec<Value> {
             v.extend_from_slice(args);
             v
         }
+        InstKind::AssertNotNull { operand } => vec![*operand],
+        InstKind::GetPropertyMaybe { object, .. } => vec![*object],
+        InstKind::ModuleSlot { object, .. } => vec![*object],
         _ => Vec::new(),
     }
 }

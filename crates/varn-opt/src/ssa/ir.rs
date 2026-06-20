@@ -12,6 +12,8 @@
 
 use std::rc::Rc;
 
+use rust_decimal::Decimal;
+
 use crate::hir::{HirBinOp, HirFunction, HirType, HirUnOp};
 
 /// An SSA value: defined exactly once, by an instruction or a block parameter.
@@ -77,6 +79,8 @@ pub enum InstKind {
     ConstBool(bool),
     ConstStr(Rc<str>),
     ConstChar(char),
+    ConstDecimal(Decimal),
+    ConstBigInt(i128),
     ConstNull,
     Binary {
         op: HirBinOp,
@@ -126,6 +130,13 @@ pub enum InstKind {
     /// VM intrinsic (`Math.*` etc.) → `Intrinsic` opcode. Operands are
     /// `[object, args…]` contiguous; `wire_byte` selects the operation.
     IntrinsicCall { object: Value, args: Vec<Value>, wire_byte: u8 },
+    /// `expr!` non-null assertion (`AssertNotNull`). Side effect; the value
+    /// passes through (no `dest` — the asserted value is `operand`).
+    AssertNotNull { operand: Value },
+    /// `object?.name` optional member read (`GetPropertyMaybe`).
+    GetPropertyMaybe { object: Value, name: Rc<str> },
+    /// Module-slot read (`LoadModuleSlot`).
+    ModuleSlot { object: Value, slot: u16 },
 }
 
 /// How a block ends and transfers control. Branch/jump carry the block-argument
