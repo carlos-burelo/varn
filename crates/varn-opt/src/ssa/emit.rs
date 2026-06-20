@@ -202,6 +202,8 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
                 InstKind::Call { args, .. } => args.len() as u32 + 1,
                 InstKind::SelfCall { args } => args.len() as u32 + 1,
                 InstKind::MethodCall { args, .. } => args.len() as u32,
+                // Array elements share the contiguous `call_base` block.
+                InstKind::BuildArray { elements } => elements.len() as u32,
                 _ => 0,
             };
             max_call = max_call.max(t);
@@ -339,6 +341,25 @@ fn emit_inst(
         }
         InstKind::IsNull { operand } => {
             chunk.emit_rr(OpCode::IsNull, d, reg[operand.0 as usize], LINE);
+        }
+        // `[…]`: elements contiguous from `call_base`, then `BuildArray d, start, count`.
+        InstKind::BuildArray { elements } => {
+            for (i, e) in elements.iter().enumerate() {
+                chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[e.0 as usize], LINE);
+            }
+            chunk.emit(OpCode::BuildArray, LINE);
+            chunk.write(Chunk::pack(d, call_base), LINE);
+            chunk.write(Chunk::pack(elements.len() as u8, 0), LINE);
+        }
+        // `{…}`: explicit (key const, value reg) pairs — no contiguity needed.
+        InstKind::BuildObject { pairs } => {
+            chunk.emit(OpCode::BuildObject, LINE);
+            chunk.write(Chunk::pack(d, pairs.len() as u8), LINE);
+            for (k, v) in pairs {
+                let key_idx = chunk.add_str(k);
+                chunk.write(key_idx, LINE);
+                chunk.write(Chunk::pack(reg[v.0 as usize], 0), LINE);
+            }
         }
         // Dest-less side effects handled before the dest guard above.
         InstKind::SetProperty { .. } | InstKind::SetIndex { .. } => unreachable!(),

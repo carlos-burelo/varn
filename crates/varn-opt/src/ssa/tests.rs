@@ -1,7 +1,8 @@
 //! SSA construction tests: build from hand-written HIR, assert the dump.
 
 use crate::hir::{
-    HirBinOp, HirBinding, HirExpr, HirFunction, HirParam, HirStmt, HirType, LocalId,
+    HirArrayEl, HirBinOp, HirBinding, HirExpr, HirFunction, HirObjectProp, HirParam, HirPropKey,
+    HirStmt, HirType, LocalId,
 };
 
 use super::build::build_function;
@@ -721,6 +722,52 @@ fn f:
     jump b3(v4)
   b3(v5: dyn):
     return v5
+"
+    );
+}
+
+#[test]
+fn array_literal_lowers_to_buildarray() {
+    // f(a, b) { return [a, b] }
+    let f = func(
+        vec![HirType::Int, HirType::Int],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::Array(vec![
+            HirArrayEl::Expr(param(0)),
+            HirArrayEl::Expr(param(1)),
+        ])))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: int, v1: int):
+    v2 = array(v0, v1)
+    return v2
+"
+    );
+}
+
+#[test]
+fn object_literal_lowers_to_buildobject() {
+    // f(x) { return { k: x } }
+    let f = func(
+        vec![HirType::Int],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::Object {
+            properties: vec![HirObjectProp::Property {
+                key: HirPropKey::Static("k".into()),
+                value: param(0),
+            }],
+        }))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: int):
+    v1 = object {k: v0}
+    return v1
 "
     );
 }

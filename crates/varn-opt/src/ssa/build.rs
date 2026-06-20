@@ -17,8 +17,8 @@
 use rustc_hash::FxHashMap;
 
 use crate::hir::{
-    HirAssignTarget, HirBinOp, HirBinding, HirExpr, HirFunction, HirLogicalOp, HirStmt, HirType,
-    HirUpdateOp, LocalId,
+    HirArrayEl, HirAssignTarget, HirBinOp, HirBinding, HirExpr, HirFunction, HirLogicalOp,
+    HirObjectProp, HirPropKey, HirStmt, HirType, HirUpdateOp, LocalId,
 };
 use crate::OptError;
 
@@ -664,6 +664,35 @@ impl Builder {
                     }
                 }
             }
+            // `[a, b, …]` array literal (no spread/holes) → `BuildArray`.
+            HirExpr::Array(els) => {
+                let mut vals = Vec::with_capacity(els.len());
+                for el in els {
+                    match el {
+                        HirArrayEl::Expr(e) => vals.push(self.lower_expr(e)?),
+                        _ => return Err(OptError::Unsupported("ssa: array spread/hole")),
+                    }
+                }
+                Ok(self.emit(InstKind::BuildArray { elements: vals }, HirType::Ref))
+            }
+            // `{ k: v, … }` object literal (static keys, value props) → `BuildObject`.
+            HirExpr::Object { properties } => {
+                let mut pairs = Vec::with_capacity(properties.len());
+                for prop in properties {
+                    match prop {
+                        HirObjectProp::Property { key: HirPropKey::Static(k), value } => {
+                            let v = self.lower_expr(value)?;
+                            pairs.push((k.clone(), v));
+                        }
+                        _ => {
+                            return Err(OptError::Unsupported(
+                                "ssa: object computed/method/spread",
+                            ))
+                        }
+                    }
+                }
+                Ok(self.emit(InstKind::BuildObject { pairs }, HirType::Ref))
+            }
             // Ternary `test ? cons : alt` → branch + result phi.
             HirExpr::Conditional { test, cons, alt } => {
                 let t = self.lower_expr(test)?;
@@ -923,6 +952,8 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                     args.iter_mut().for_each(sub);
                 }
                 InstKind::IsNull { operand } => sub(operand),
+                InstKind::BuildArray { elements } => elements.iter_mut().for_each(sub),
+                InstKind::BuildObject { pairs } => pairs.iter_mut().for_each(|(_, v)| sub(v)),
                 InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
                 | InstKind::ConstBool(_)
