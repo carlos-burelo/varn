@@ -140,13 +140,23 @@ uses the `lower/` path.
 > assigns the result a fresh value whose range starts *at* the call (after the
 > args) → colours above.
 >
-> **Fix (do first, before SSA calls):** make `regalloc_post` model a call as
-> clobbering `[arg_start, frame_top)` so any value live across the call is forced
-> below `arg_start` (add interference, or treat the call as defining the upper
-> region). Legacy-path output already satisfies this, so it should be a no-op
-> there — but validate suite **728/728** + `bench` clean on the default path
-> before re-adding SSA calls. (The SSA-calls attempt was reverted to keep the
-> tree green; re-apply once the regalloc model lands.)
+> **Fix (do first, before SSA calls) — bail-only, low-risk.** `optimize_function_inner`
+> already *skips the remap and keeps the original registers* when
+> `verify_call_constraints` fails. The original (pre-regalloc) emission is correct
+> for **both** backends (legacy: result reg < `arg_start`; SSA: `call_base` above
+> every value). So add a `verify_callee_frame_constraints(code, mapping, scan)`:
+> for each call at instr `i` with mapped `arg_start` `S'`, if any register live
+> across the call (`def < i` and some `use > i`, excluding the call's own arg
+> block) maps to `>= S'`, return `false` → `optimize_function_inner` bails and
+> keeps the correct original layout. This **cannot miscompile** (bail = keep
+> correct original) and **never triggers on legacy** (its colouring already keeps
+> live-across values below `arg_start`, which is why legacy works today without
+> the check). Requires threading call sites `(instr_idx, arg_start, arg_count)`
+> into `ScanResult`. Validate default suite **728/728** + `bench` unchanged, then
+> re-add SSA `Call`/`SelfCall`/`LoadGlobal` (reverted) and validate under
+> `VN_OPT_SSA`. (SSA call functions will then keep uncompressed registers when the
+> check bails — correct but denser; a later refinement can emit results below
+> `arg_start` to let regalloc compress them.)
 
 ### 2.3 Verifier ✅ DONE
 `ssa/verify.rs`: (1) each `Value` defined once; (2) every predecessor edge carries
