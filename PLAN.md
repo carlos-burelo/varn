@@ -127,6 +127,27 @@ lowers to SSA. These are ordinary (effectful) instructions threaded in program
 order. Until then `build_function` returns `Err(Unsupported)` and that function
 uses the `lower/` path.
 
+> **BLOCKER for calls — `regalloc_post` callee-frame model.** A first attempt at
+> SSA `Call`/`SelfCall`/`LoadGlobal` (built, lowered, emitted) was correct
+> *pre-regalloc* but `regalloc_post` miscompiled it: a call result that is **live
+> across a later call** got coloured *above* that call's `arg_start`, so the
+> callee's frame (`[arg_start, arg_start+callee_register_count)`, which extends
+> past `arg_count`) overwrote it. Example: `addOne(x) + addOne(x)` → `1 + 21 = 22`
+> instead of `42`. Root cause: `regalloc_post` only enforces call-arg
+> **contiguity** (`verify_call_constraints`), not the callee-frame footprint; the
+> deleted legacy emitter dodged this by construction (result reg = callee reg, so
+> its live range starts *before* the args and colours *below* `arg_start`). SSA
+> assigns the result a fresh value whose range starts *at* the call (after the
+> args) → colours above.
+>
+> **Fix (do first, before SSA calls):** make `regalloc_post` model a call as
+> clobbering `[arg_start, frame_top)` so any value live across the call is forced
+> below `arg_start` (add interference, or treat the call as defining the upper
+> region). Legacy-path output already satisfies this, so it should be a no-op
+> there — but validate suite **728/728** + `bench` clean on the default path
+> before re-adding SSA calls. (The SSA-calls attempt was reverted to keep the
+> tree green; re-apply once the regalloc model lands.)
+
 ### 2.3 Verifier ✅ DONE
 `ssa/verify.rs`: (1) each `Value` defined once; (2) every predecessor edge carries
 exactly as many block-args as the target has params; (3) terminator targets in
