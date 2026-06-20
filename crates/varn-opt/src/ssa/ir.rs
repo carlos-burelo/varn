@@ -104,6 +104,9 @@ pub enum InstKind {
     SetProperty { object: Value, name: Rc<str>, value: Value },
     /// `object[index] = value` write (`SetIndex`). Side effect, no `dest`.
     SetIndex { object: Value, index: Value, value: Value },
+    /// `recv.name(args)` method call (`CallMethod` + IC slot). Receiver passed
+    /// separately (not in the args block); args contiguous from `call_base`.
+    MethodCall { recv: Value, name: Rc<str>, args: Vec<Value> },
 }
 
 /// How a block ends and transfers control. Branch/jump carry the block-argument

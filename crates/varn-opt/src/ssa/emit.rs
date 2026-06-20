@@ -197,8 +197,11 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
     for block in &ssa.blocks {
         for inst in &block.insts {
             let t = match &inst.kind {
+                // Call/SelfCall: null receiver + args. MethodCall: args only
+                // (receiver passed separately).
                 InstKind::Call { args, .. } => args.len() as u32 + 1,
                 InstKind::SelfCall { args } => args.len() as u32 + 1,
+                InstKind::MethodCall { args, .. } => args.len() as u32,
                 _ => 0,
             };
             max_call = max_call.max(t);
@@ -315,6 +318,24 @@ fn emit_inst(
         }
         InstKind::GetIndex { object, index } => {
             chunk.emit_rrr(OpCode::GetIndex, d, reg[object.0 as usize], reg[index.0 as usize], LINE);
+        }
+        // `recv.name(args)`: args at `call_base` (no null receiver — the receiver
+        // is passed separately in the opcode), then `CallMethod` with an IC slot.
+        InstKind::MethodCall { recv, name, args } => {
+            let name_idx = chunk.add_str(name);
+            if *cache_count > 255 {
+                return Err(OptError::Unsupported("ssa-emit: too many inline-cache sites"));
+            }
+            let cs = *cache_count as u8;
+            *cache_count += 1;
+            for (i, a) in args.iter().enumerate() {
+                chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[a.0 as usize], LINE);
+            }
+            let argc = args.len() as u8;
+            chunk.write(Chunk::pack_op(OpCode::CallMethod, cs), LINE);
+            chunk.write(Chunk::pack(d, reg[recv.0 as usize]), LINE);
+            chunk.write(name_idx, LINE);
+            chunk.write(Chunk::pack(argc, call_base), LINE);
         }
         // Dest-less side effects handled before the dest guard above.
         InstKind::SetProperty { .. } | InstKind::SetIndex { .. } => unreachable!(),

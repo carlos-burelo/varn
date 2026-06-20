@@ -670,6 +670,30 @@ fn f:
 }
 
 #[test]
+fn method_call_lowers_to_callmethod() {
+    // f(o, p) { return o.m(p) }
+    let f = func(
+        vec![HirType::Ref, HirType::Int],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::MethodCall {
+            recv: Box::new(param(0)),
+            name: "m".into(),
+            args: vec![param(1)],
+            ty: HirType::Int,
+        }))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: ref, v1: int):
+    v2 = callmethod v0.m(v1)
+    return v2
+"
+    );
+}
+
+#[test]
 fn verifier_accepts_constructed_ssa() {
     // The verifier must not reject any well-formed function the builder emits.
     let while_loop = func(
