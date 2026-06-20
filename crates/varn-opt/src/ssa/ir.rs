@@ -99,6 +99,11 @@ pub enum InstKind {
     GetProperty { object: Value, name: Rc<str> },
     /// `object[index]` computed read (`GetIndex`).
     GetIndex { object: Value, index: Value },
+    /// `object.name = value` write (`SetProperty` + IC slot). Side effect; the
+    /// defining inst has no `dest` (the assigned value is the `value` operand).
+    SetProperty { object: Value, name: Rc<str>, value: Value },
+    /// `object[index] = value` write (`SetIndex`). Side effect, no `dest`.
+    SetIndex { object: Value, index: Value, value: Value },
 }
 
 /// How a block ends and transfers control. Branch/jump carry the block-argument

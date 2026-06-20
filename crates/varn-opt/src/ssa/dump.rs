@@ -58,6 +58,12 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::GetIndex { object, index } => {
             format!("getindex {}[{}]", val(*object), val(*index))
         }
+        InstKind::SetProperty { object, name, value } => {
+            format!("setprop {}.{name} = {}", val(*object), val(*value))
+        }
+        InstKind::SetIndex { object, index, value } => {
+            format!("setindex {}[{}] = {}", val(*object), val(*index), val(*value))
+        }
     }
 }
 

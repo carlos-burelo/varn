@@ -225,6 +225,25 @@ fn emit_inst(
     call_base: u8,
     cache_count: &mut u16,
 ) -> Result<()> {
+    // Side-effecting writes have no `dest`; handle them before the dest guard.
+    match &inst.kind {
+        InstKind::SetProperty { object, name, value } => {
+            let idx = chunk.add_str(name);
+            if *cache_count > 255 {
+                return Err(OptError::Unsupported("ssa-emit: too many inline-cache sites"));
+            }
+            let cs = *cache_count as u8;
+            *cache_count += 1;
+            chunk.emit_rrc_ic(OpCode::SetProperty, reg[object.0 as usize], reg[value.0 as usize], idx, cs, LINE);
+            return Ok(());
+        }
+        InstKind::SetIndex { object, index, value } => {
+            chunk.emit_rrr(OpCode::SetIndex, reg[object.0 as usize], reg[index.0 as usize], reg[value.0 as usize], LINE);
+            return Ok(());
+        }
+        _ => {}
+    }
+
     let Some(dest) = inst.dest else { return Ok(()) };
     let d = reg[dest.0 as usize];
     match &inst.kind {
@@ -297,6 +316,8 @@ fn emit_inst(
         InstKind::GetIndex { object, index } => {
             chunk.emit_rrr(OpCode::GetIndex, d, reg[object.0 as usize], reg[index.0 as usize], LINE);
         }
+        // Dest-less side effects handled before the dest guard above.
+        InstKind::SetProperty { .. } | InstKind::SetIndex { .. } => unreachable!(),
     }
     Ok(())
 }

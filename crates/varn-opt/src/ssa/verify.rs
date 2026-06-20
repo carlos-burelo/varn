@@ -171,6 +171,8 @@ fn inst_uses(kind: &InstKind) -> Vec<Value> {
         InstKind::SelfCall { args } => args.clone(),
         InstKind::GetProperty { object, .. } => vec![*object],
         InstKind::GetIndex { object, index } => vec![*object, *index],
+        InstKind::SetProperty { object, value, .. } => vec![*object, *value],
+        InstKind::SetIndex { object, index, value } => vec![*object, *index, *value],
         _ => Vec::new(),
     }
 }

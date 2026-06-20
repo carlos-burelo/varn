@@ -123,21 +123,27 @@ Done (`ssa/build.rs`, `ssa/ir.rs`):
   slot; `cache_count`/`ic_cache`/`feedback` sized in `emit`), `object[index]` →
   `GetIndex`. Verified: field read, element read, and `a[i]` summed in a loop run
   identically with/without `VN_OPT_SSA`.
+- **Member / index writes** — `object.name = v` → `SetProperty` (IC slot),
+  `object[index] = v` → `SetIndex`, as statements (`HirStmt::SetMember/SetIndex`)
+  and assignment-expressions (`HirAssignTarget::Member/Index`, yields the value).
+  Dest-less side-effect insts (`emit_effect`). Compound member assignment
+  (`o.c = o.c + 1`) works via read+write. Verified: field/elem writes, compound
+  bump, array fill-then-sum in a loop → identical with/without `VN_OPT_SSA`.
 - **Trivial-phi removal** (`simplify_phis`): Braun's `tryRemoveTrivialPhi` as a
   fixpoint post-pass.
-- Tests (`ssa/tests.rs`, 17 — golden dumps + verifier): identity, const+binary,
+- Tests (`ssa/tests.rs`, 19 — golden dumps + verifier): identity, const+binary,
   reassign, one-/two-sided `if` phi, no-phi trivial removal, `while`/`for`/
   `do-while` carry, `break`/`continue`, nested-`if` merge, global call, self-call,
-  member read, index read.
+  member/index read, member/index write.
 
 **Pending** (the bulk of remaining §2): the rest of the **effectful instruction
-set** in SSA — method calls (`MethodCall`/`Super*`/`IntrinsicCall`), property/index
-*writes* (`SetProperty`/`SetIndex`), closures, classes, enums, `match`, `try`,
-modules, upvalues, await/spawn/yield — plus `switch`/`for-of`/`for-in` control
-flow, so every §1 construct lowers to SSA. These are ordinary (effectful)
-instructions threaded in program order. Until then `build_function` returns
-`Err(Unsupported)` and that function uses the `lower/` path. (Scalar exprs,
-control flow, loops, plain/self calls, and member/index reads are done.)
+set** in SSA — method calls (`MethodCall`/`Super*`/`IntrinsicCall`), closures,
+classes, enums, `match`, `try`, modules, upvalues, await/spawn/yield — plus
+`switch`/`for-of`/`for-in` control flow, so every §1 construct lowers to SSA.
+These are ordinary (effectful) instructions threaded in program order. Until then
+`build_function` returns `Err(Unsupported)` and that function uses the `lower/`
+path. (Scalar exprs, control flow, loops, plain/self calls, and member/index
+read+write are done.)
 
 > **`regalloc_post` callee-frame constraint ✅ RESOLVED.** SSA calls were correct
 > pre-regalloc but `regalloc_post` miscompiled multi-call expressions: a call
