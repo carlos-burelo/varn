@@ -18,7 +18,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use varn_core::OpCode;
-use varn_types::chunk::{Chunk, FeedbackVector, FunctionProto, Literal, PoolEntry};
+use varn_types::chunk::{Chunk, FeedbackVector, FunctionProto, Literal, PolyICSlot, PoolEntry};
 
 use crate::hir::{HirFunction, HirUnOp};
 use crate::lower::bin_opcode;
@@ -43,12 +43,14 @@ pub fn emit_function(mut ssa: SsaFunc, f: &HirFunction, source_file: Rc<str>) ->
     // Forward jumps recorded as `(operand_pos, target)`, patched once every
     // block's offset is known.
     let mut fixups: Vec<(usize, BlockId)> = Vec::new();
+    // Inline-cache slots consumed by `GetProperty`/method sites, in emit order.
+    let mut cache_count: u16 = 0;
 
     for b in 0..n {
         block_offset[b] = chunk.code.len();
         let insts = std::mem::take(&mut ssa.blocks[b].insts);
         for inst in &insts {
-            emit_inst(&mut chunk, inst, &reg, scratch, call_base)?;
+            emit_inst(&mut chunk, inst, &reg, scratch, call_base, &mut cache_count)?;
         }
         let term = ssa.blocks[b].term.clone();
         emit_terminator(&mut chunk, &ssa, &reg, b, &term, null_reg, scratch, &block_offset, &mut fixups)?;
@@ -79,15 +81,17 @@ pub fn emit_function(mut ssa: SsaFunc, f: &HirFunction, source_file: Rc<str>) ->
         is_generator: f.is_generator,
         has_this: f.has_this,
         upvalue_count: f.upvalue_count as usize,
-        cache_count: 0,
+        cache_count: cache_count as usize,
         chunk,
         required_caps: Vec::new(),
         register_meta: Vec::new(),
         jit_entry: Cell::new(None),
         jit_code: RefCell::new(None),
         jit_failed: Cell::new(false),
-        ic_cache: Rc::new(RefCell::new(Vec::new())),
-        feedback: Rc::new(RefCell::new(FeedbackVector::new(0))),
+        ic_cache: Rc::new(RefCell::new(
+            (0..cache_count).map(|_| PolyICSlot::new()).collect(),
+        )),
+        feedback: Rc::new(RefCell::new(FeedbackVector::new(cache_count as usize))),
         static_closure_val: Cell::new(0),
     })
 }
@@ -213,7 +217,14 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
     Ok((reg, scratch, null_reg, call_base, register_count))
 }
 
-fn emit_inst(chunk: &mut Chunk, inst: &Inst, reg: &[u8], scratch: u8, call_base: u8) -> Result<()> {
+fn emit_inst(
+    chunk: &mut Chunk,
+    inst: &Inst,
+    reg: &[u8],
+    scratch: u8,
+    call_base: u8,
+    cache_count: &mut u16,
+) -> Result<()> {
     let Some(dest) = inst.dest else { return Ok(()) };
     let d = reg[dest.0 as usize];
     match &inst.kind {
@@ -273,6 +284,18 @@ fn emit_inst(chunk: &mut Chunk, inst: &Inst, reg: &[u8], scratch: u8, call_base:
             chunk.emit(OpCode::CallSelf, LINE);
             chunk.write(Chunk::pack(d, 0), LINE);
             chunk.write(Chunk::pack(total, call_base), LINE);
+        }
+        InstKind::GetProperty { object, name } => {
+            let idx = chunk.add_str(name);
+            if *cache_count > 255 {
+                return Err(OptError::Unsupported("ssa-emit: too many inline-cache sites"));
+            }
+            let cs = *cache_count as u8;
+            *cache_count += 1;
+            chunk.emit_rrc_ic(OpCode::GetProperty, d, reg[object.0 as usize], idx, cs, LINE);
+        }
+        InstKind::GetIndex { object, index } => {
+            chunk.emit_rrr(OpCode::GetIndex, d, reg[object.0 as usize], reg[index.0 as usize], LINE);
         }
     }
     Ok(())

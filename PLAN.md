@@ -119,19 +119,25 @@ Done (`ssa/build.rs`, `ssa/ir.rs`):
   callee-frame bail (below) keeps it correct. Verified end-to-end: `fib` (self
   recursion), `addOne(x)+addOne(x)` (two calls in one expr → 42), and a call in a
   loop all run identically with/without `VN_OPT_SSA`.
+- **Member / index reads** — `object.name` → `GetProperty` (with an inline-cache
+  slot; `cache_count`/`ic_cache`/`feedback` sized in `emit`), `object[index]` →
+  `GetIndex`. Verified: field read, element read, and `a[i]` summed in a loop run
+  identically with/without `VN_OPT_SSA`.
 - **Trivial-phi removal** (`simplify_phis`): Braun's `tryRemoveTrivialPhi` as a
   fixpoint post-pass.
-- Tests (`ssa/tests.rs`, 15 — golden dumps + verifier): identity, const+binary,
+- Tests (`ssa/tests.rs`, 17 — golden dumps + verifier): identity, const+binary,
   reassign, one-/two-sided `if` phi, no-phi trivial removal, `while`/`for`/
-  `do-while` carry, `break`/`continue`, nested-`if` merge, global call, self-call.
+  `do-while` carry, `break`/`continue`, nested-`if` merge, global call, self-call,
+  member read, index read.
 
 **Pending** (the bulk of remaining §2): the rest of the **effectful instruction
-set** in SSA — method calls (`MethodCall`/`Super*`/`IntrinsicCall`), member/index,
-closures, classes, enums, `match`, `try`, modules, upvalues, await/spawn/yield —
-plus `switch`/`for-of`/`for-in` control flow, so every §1 construct lowers to SSA.
-These are ordinary (effectful) instructions threaded in program order. Until then
-`build_function` returns `Err(Unsupported)` and that function uses the `lower/`
-path. (Scalar exprs, control flow, loops, and plain/self calls are done.)
+set** in SSA — method calls (`MethodCall`/`Super*`/`IntrinsicCall`), property/index
+*writes* (`SetProperty`/`SetIndex`), closures, classes, enums, `match`, `try`,
+modules, upvalues, await/spawn/yield — plus `switch`/`for-of`/`for-in` control
+flow, so every §1 construct lowers to SSA. These are ordinary (effectful)
+instructions threaded in program order. Until then `build_function` returns
+`Err(Unsupported)` and that function uses the `lower/` path. (Scalar exprs,
+control flow, loops, plain/self calls, and member/index reads are done.)
 
 > **`regalloc_post` callee-frame constraint ✅ RESOLVED.** SSA calls were correct
 > pre-regalloc but `regalloc_post` miscompiled multi-call expressions: a call

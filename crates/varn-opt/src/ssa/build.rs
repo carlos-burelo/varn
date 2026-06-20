@@ -558,6 +558,18 @@ impl Builder {
                 }
                 Ok(self.emit(InstKind::SelfCall { args: avs }, *ty))
             }
+            HirExpr::Member { object, name, ty } => {
+                let o = self.lower_expr(object)?;
+                Ok(self.emit(
+                    InstKind::GetProperty { object: o, name: name.clone() },
+                    *ty,
+                ))
+            }
+            HirExpr::Index { object, index, ty } => {
+                let o = self.lower_expr(object)?;
+                let i = self.lower_expr(index)?;
+                Ok(self.emit(InstKind::GetIndex { object: o, index: i }, *ty))
+            }
             HirExpr::Binary { op, lhs, rhs, ty } => {
                 let l = self.lower_expr(lhs)?;
                 let r = self.lower_expr(rhs)?;
@@ -775,6 +787,11 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                     args.iter_mut().for_each(sub);
                 }
                 InstKind::SelfCall { args } => args.iter_mut().for_each(sub),
+                InstKind::GetProperty { object, .. } => sub(object),
+                InstKind::GetIndex { object, index } => {
+                    sub(object);
+                    sub(index);
+                }
                 InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
                 | InstKind::ConstBool(_)
