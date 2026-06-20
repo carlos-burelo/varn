@@ -121,6 +121,11 @@ impl Builder {
         dest
     }
 
+    /// Append a side-effecting instruction that produces no value (`dest: None`).
+    fn emit_effect(&mut self, kind: InstKind) {
+        self.block_mut(self.current).insts.push(Inst { dest: None, kind });
+    }
+
     // ----- variable read/write (Braun) -----------------------------------
 
     fn write_var(&mut self, var: VarId, block: BlockId, value: Value) {
@@ -247,6 +252,19 @@ impl Builder {
                 let var = binding_var(target)?;
                 let v = self.lower_expr(value)?;
                 self.write_var(var, self.current, v);
+                Ok(())
+            }
+            HirStmt::SetMember { object, name, value } => {
+                let o = self.lower_expr(object)?;
+                let v = self.lower_expr(value)?;
+                self.emit_effect(InstKind::SetProperty { object: o, name: name.clone(), value: v });
+                Ok(())
+            }
+            HirStmt::SetIndex { object, index, value } => {
+                let o = self.lower_expr(object)?;
+                let i = self.lower_expr(index)?;
+                let v = self.lower_expr(value)?;
+                self.emit_effect(InstKind::SetIndex { object: o, index: i, value: v });
                 Ok(())
             }
             HirStmt::Return(value) => {
@@ -603,6 +621,19 @@ impl Builder {
                     self.write_var(var, self.current, v);
                     Ok(v)
                 }
+                HirAssignTarget::Member { object, name } => {
+                    let o = self.lower_expr(object)?;
+                    let v = self.lower_expr(value)?;
+                    self.emit_effect(InstKind::SetProperty { object: o, name: name.clone(), value: v });
+                    Ok(v)
+                }
+                HirAssignTarget::Index { object, index } => {
+                    let o = self.lower_expr(object)?;
+                    let i = self.lower_expr(index)?;
+                    let v = self.lower_expr(value)?;
+                    self.emit_effect(InstKind::SetIndex { object: o, index: i, value: v });
+                    Ok(v)
+                }
                 _ => Err(OptError::Unsupported("ssa: assign target")),
             },
             // `++`/`--` on a scalar binding (prefix yields the new value, postfix
@@ -791,6 +822,15 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                 InstKind::GetIndex { object, index } => {
                     sub(object);
                     sub(index);
+                }
+                InstKind::SetProperty { object, value, .. } => {
+                    sub(object);
+                    sub(value);
+                }
+                InstKind::SetIndex { object, index, value } => {
+                    sub(object);
+                    sub(index);
+                    sub(value);
                 }
                 InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
