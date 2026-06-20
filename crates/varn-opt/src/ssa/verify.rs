@@ -162,6 +162,13 @@ fn inst_uses(kind: &InstKind) -> Vec<Value> {
     match kind {
         InstKind::Binary { lhs, rhs, .. } => vec![*lhs, *rhs],
         InstKind::Unary { operand, .. } => vec![*operand],
+        InstKind::Call { callee, args } => {
+            let mut v = Vec::with_capacity(args.len() + 1);
+            v.push(*callee);
+            v.extend_from_slice(args);
+            v
+        }
+        InstKind::SelfCall { args } => args.clone(),
         _ => Vec::new(),
     }
 }

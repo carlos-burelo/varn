@@ -87,7 +87,7 @@ is ever hit, `compile_direct` returns a compile error instead of crashing.
 
 ---
 
-## 2. Stage 2 — SSA (60% — ACTIVE)
+## 2. Stage 2 — SSA (65% — ACTIVE)
 
 Build the real optimizer IR from HIR, per function, then lower back to bytecode.
 Gated behind `VN_OPT_SSA` with per-function fallback to the `lower/` emitter, so
@@ -113,50 +113,41 @@ Done (`ssa/build.rs`, `ssa/ir.rs`):
 - **Loops** — `while`, C-style `for` (`update` in its own block so `continue`
   runs it), `do-while`, plus `break`/`continue` via a `LoopCtx` target stack.
   Exercises the incomplete-phi / unsealed-header seal path.
+- **Calls** — global reads (`LoadGlobal`), plain `Call`, and `SelfCall`
+  (self-recursion). Out-of-SSA emits the plain-call ABI (null receiver + args
+  contiguous from `call_base`, above every value register); the regalloc
+  callee-frame bail (below) keeps it correct. Verified end-to-end: `fib` (self
+  recursion), `addOne(x)+addOne(x)` (two calls in one expr → 42), and a call in a
+  loop all run identically with/without `VN_OPT_SSA`.
 - **Trivial-phi removal** (`simplify_phis`): Braun's `tryRemoveTrivialPhi` as a
   fixpoint post-pass.
-- Tests (`ssa/tests.rs`, 13 — golden dumps + verifier): identity, const+binary,
+- Tests (`ssa/tests.rs`, 15 — golden dumps + verifier): identity, const+binary,
   reassign, one-/two-sided `if` phi, no-phi trivial removal, `while`/`for`/
-  `do-while` carry, `break`/`continue`, nested-`if` merge.
+  `do-while` carry, `break`/`continue`, nested-`if` merge, global call, self-call.
 
-**Pending** (the bulk of remaining §2): the **effectful instruction set** in SSA
-— calls (`Call`/`SelfCall`/`MethodCall`/`Super*`/`IntrinsicCall`), member/index,
-closures, classes, enums, `match`, `try`, modules, globals/upvalues, await/
-spawn/yield — plus `switch`/`for-of`/`for-in` control flow, so every §1 construct
-lowers to SSA. These are ordinary (effectful) instructions threaded in program
-order. Until then `build_function` returns `Err(Unsupported)` and that function
-uses the `lower/` path.
+**Pending** (the bulk of remaining §2): the rest of the **effectful instruction
+set** in SSA — method calls (`MethodCall`/`Super*`/`IntrinsicCall`), member/index,
+closures, classes, enums, `match`, `try`, modules, upvalues, await/spawn/yield —
+plus `switch`/`for-of`/`for-in` control flow, so every §1 construct lowers to SSA.
+These are ordinary (effectful) instructions threaded in program order. Until then
+`build_function` returns `Err(Unsupported)` and that function uses the `lower/`
+path. (Scalar exprs, control flow, loops, and plain/self calls are done.)
 
-> **BLOCKER for calls — `regalloc_post` callee-frame model.** A first attempt at
-> SSA `Call`/`SelfCall`/`LoadGlobal` (built, lowered, emitted) was correct
-> *pre-regalloc* but `regalloc_post` miscompiled it: a call result that is **live
-> across a later call** got coloured *above* that call's `arg_start`, so the
-> callee's frame (`[arg_start, arg_start+callee_register_count)`, which extends
-> past `arg_count`) overwrote it. Example: `addOne(x) + addOne(x)` → `1 + 21 = 22`
-> instead of `42`. Root cause: `regalloc_post` only enforces call-arg
-> **contiguity** (`verify_call_constraints`), not the callee-frame footprint; the
-> deleted legacy emitter dodged this by construction (result reg = callee reg, so
-> its live range starts *before* the args and colours *below* `arg_start`). SSA
-> assigns the result a fresh value whose range starts *at* the call (after the
-> args) → colours above.
->
-> **Fix (do first, before SSA calls) — bail-only, low-risk.** `optimize_function_inner`
-> already *skips the remap and keeps the original registers* when
-> `verify_call_constraints` fails. The original (pre-regalloc) emission is correct
-> for **both** backends (legacy: result reg < `arg_start`; SSA: `call_base` above
-> every value). So add a `verify_callee_frame_constraints(code, mapping, scan)`:
-> for each call at instr `i` with mapped `arg_start` `S'`, if any register live
-> across the call (`def < i` and some `use > i`, excluding the call's own arg
-> block) maps to `>= S'`, return `false` → `optimize_function_inner` bails and
-> keeps the correct original layout. This **cannot miscompile** (bail = keep
-> correct original) and **never triggers on legacy** (its colouring already keeps
-> live-across values below `arg_start`, which is why legacy works today without
-> the check). Requires threading call sites `(instr_idx, arg_start, arg_count)`
-> into `ScanResult`. Validate default suite **728/728** + `bench` unchanged, then
-> re-add SSA `Call`/`SelfCall`/`LoadGlobal` (reverted) and validate under
-> `VN_OPT_SSA`. (SSA call functions will then keep uncompressed registers when the
-> check bails — correct but denser; a later refinement can emit results below
-> `arg_start` to let regalloc compress them.)
+> **`regalloc_post` callee-frame constraint ✅ RESOLVED.** SSA calls were correct
+> pre-regalloc but `regalloc_post` miscompiled multi-call expressions: a call
+> result live across a later call coloured *above* that call's `arg_start`, so the
+> callee frame (`[arg_start, arg_start+callee_register_count)`, which extends past
+> `arg_count`) overwrote it (`addOne(x)+addOne(x)` → `22` instead of `42`).
+> `regalloc_post` only enforced call-arg **contiguity**, not the callee-frame
+> footprint. **Fix:** `verify_callee_frame_constraints` (bail-only) — for each
+> call, if any register live across it (`def < call_idx` and a `use > call_idx`,
+> excluding the call's own arg block) maps to `>= arg_start`, skip the remap and
+> keep the already-correct emitter layout. Cannot miscompile (bail = keep correct
+> original); never triggers on the legacy-shaped `lower/` emission (results sit
+> below `arg_start`). Validated: default suite **728/728** + `bench` unchanged
+> (p50 ~16 ms); SSA suite **728/728**; the `addOne(x)+addOne(x)` probe → `42`.
+> Refinement (later): emit SSA call results below `arg_start` so regalloc can
+> compress them instead of bailing.
 
 ### 2.3 Verifier ✅ DONE
 `ssa/verify.rs`: (1) each `Value` defined once; (2) every predecessor edge carries
@@ -176,7 +167,9 @@ fall-through to the next block, `Loop` for back-edges, forward `Jump`/`JumpIf*`
 with deferred offset fixups; a conditional with a backward target is reshaped so
 the forward exit is the conditional and the back-edge an unconditional `Loop`.
 `regalloc_post` + `slot_kinds` run downstream, so this emits naive one-reg-per-
-value bytecode and lets them compress + type it.
+value bytecode and lets them compress + type it. Calls use a contiguous
+`call_base` block (receiver + args) above all value registers; `regalloc_post`'s
+callee-frame bail (§2.1) keeps that correct after compression.
 
 Verified end-to-end: `VN_OPT_SSA=1` runs the suite **728/728** + `bench` clean,
 with SSA actually compiling every function it covers (rest fall back);
