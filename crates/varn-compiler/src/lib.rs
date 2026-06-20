@@ -1,10 +1,8 @@
 pub mod analysis;
 pub mod chunk;
 pub mod codegen;
-pub mod scope;
 
 pub use chunk::{Chunk, FunctionProto, LineMapping, Literal, PoolEntry};
-pub use codegen::Compiler;
 
 use std::rc::Rc;
 pub type GlobalLayout = FxHashMap<Rc<str>, usize>;
