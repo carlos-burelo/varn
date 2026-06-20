@@ -204,6 +204,8 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
                 InstKind::MethodCall { args, .. } => args.len() as u32,
                 // Array elements share the contiguous `call_base` block.
                 InstKind::BuildArray { elements } => elements.len() as u32,
+                // Intrinsic operands: object + args, contiguous in `call_base`.
+                InstKind::IntrinsicCall { args, .. } => args.len() as u32 + 1,
                 _ => 0,
             };
             max_call = max_call.max(t);
@@ -372,6 +374,18 @@ fn emit_inst(
             let idx = chunk.add_constant(PoolEntry::Function(Rc::new(proto)));
             chunk.write(Chunk::pack_op(OpCode::LoadStaticFn, d), LINE);
             chunk.write(idx, LINE);
+        }
+        // `Intrinsic`: object + args contiguous from `call_base`, result lands in
+        // `call_base`, then copied down to the value's register.
+        InstKind::IntrinsicCall { object, args, wire_byte } => {
+            chunk.emit_rr(OpCode::Move, call_base, reg[object.0 as usize], LINE);
+            for (i, a) in args.iter().enumerate() {
+                chunk.emit_rr(OpCode::Move, call_base + 1 + i as u8, reg[a.0 as usize], LINE);
+            }
+            let arg_count = (args.len() + 1) as u16;
+            chunk.write(Chunk::pack_op(OpCode::Intrinsic, call_base), LINE);
+            chunk.write(((*wire_byte as u16) << 8) | arg_count, LINE);
+            chunk.emit_rr(OpCode::Move, d, call_base, LINE);
         }
         // `BuildStr d, count` followed by one packed reg per part.
         InstKind::BuildStr { parts } => {

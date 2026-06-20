@@ -727,6 +727,18 @@ impl Builder {
                     Err(OptError::Unsupported("ssa: closure with upvalues"))
                 }
             }
+            // VM intrinsic `obj.fn(args)` (`Math.*`, etc.) → `Intrinsic` opcode.
+            HirExpr::IntrinsicCall { object, args, wire_byte, ty } => {
+                let o = self.lower_expr(object)?;
+                let mut avs = Vec::with_capacity(args.len());
+                for a in args {
+                    avs.push(self.lower_expr(a)?);
+                }
+                Ok(self.emit(
+                    InstKind::IntrinsicCall { object: o, args: avs, wire_byte: *wire_byte },
+                    *ty,
+                ))
+            }
             // Ternary `test ? cons : alt` → branch + result phi.
             HirExpr::Conditional { test, cons, alt } => {
                 let t = self.lower_expr(test)?;
@@ -991,6 +1003,10 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                 InstKind::ToString { operand } => sub(operand),
                 InstKind::BuildStr { parts } => parts.iter_mut().for_each(sub),
                 InstKind::MakeClosure { .. } => {}
+                InstKind::IntrinsicCall { object, args, .. } => {
+                    sub(object);
+                    args.iter_mut().for_each(sub);
+                }
                 InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
                 | InstKind::ConstBool(_)

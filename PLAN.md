@@ -155,21 +155,25 @@ Done (`ssa/build.rs`, `ssa/ir.rs`):
   Closures that capture upvalues are **deferred** (the captured local needs a
   stable slot, which SSA renaming breaks) → fall back. Verified: `(n) => n*2`,
   `arr.map(n => n+10)`, a stored arrow → identical with/without `VN_OPT_SSA`.
+- **Intrinsics** — `Math.*` etc. (`IntrinsicCall`) → `Intrinsic` opcode; operands
+  `[object, args…]` laid out contiguously in the `call_base` block, result copied
+  to the value's reg. Verified: `Math.abs`/`sqrt`/`floor` lower to `intrinsic#N`
+  (SSA dump) and run identically with/without `VN_OPT_SSA`.
 - **Trivial-phi removal** (`simplify_phis`): Braun's `tryRemoveTrivialPhi` as a
   fixpoint post-pass.
-- Tests (`ssa/tests.rs`, 25 — golden dumps + verifier): identity, const+binary,
+- Tests (`ssa/tests.rs`, 26 — golden dumps + verifier): identity, const+binary,
   reassign, one-/two-sided `if` phi, no-phi trivial removal, `while`/`for`/
   `do-while` carry, `break`/`continue`, nested-`if` merge, global call, self-call,
   member/index read, member/index write, method call, ternary, array/object
-  literal, template, capture-free closure.
+  literal, template, capture-free closure, intrinsic.
 
 **Pending** (the rest of §2's instruction set): closures **with upvalues**,
-`Super*`/intrinsic calls, classes, enums, `match`, `try`, modules,
-await/spawn/yield — plus `switch`/`for-of`/`for-in` control flow, so every §1
-construct lowers to SSA. Until then `build_function` returns `Err(Unsupported)`
-and that function uses the `lower/` path. (Done: scalar exprs, control flow,
-loops, plain/self/method calls, member/index read+write, logical + conditional,
-array/object literals, templates, capture-free closures.)
+`Super*` calls, classes, enums, `match`, `try`, modules, await/spawn/yield — plus
+`switch`/`for-of`/`for-in` control flow, so every §1 construct lowers to SSA.
+Until then `build_function` returns `Err(Unsupported)` and that function uses the
+`lower/` path. (Done: scalar exprs, control flow, loops, plain/self/method calls,
+member/index read+write, logical + conditional, array/object literals, templates,
+capture-free closures, intrinsics.)
 
 > Closures with upvalues need captured locals to keep a stable register across
 > the function (the VM upvalue points at the slot). SSA renaming spreads a local
