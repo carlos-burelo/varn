@@ -68,6 +68,15 @@ fn inst_kind(kind: &InstKind) -> String {
             format!("callmethod {}.{name}{}", val(*recv), args_list(args))
         }
         InstKind::IsNull { operand } => format!("isnull {}", val(*operand)),
+        InstKind::BuildArray { elements } => format!("array{}", args_list(elements)),
+        InstKind::BuildObject { pairs } => {
+            let inner = pairs
+                .iter()
+                .map(|(k, v)| format!("{k}: {}", val(*v)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("object {{{inner}}}")
+        }
     }
 }
 

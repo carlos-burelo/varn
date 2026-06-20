@@ -180,6 +180,8 @@ fn inst_uses(kind: &InstKind) -> Vec<Value> {
             v
         }
         InstKind::IsNull { operand } => vec![*operand],
+        InstKind::BuildArray { elements } => elements.clone(),
+        InstKind::BuildObject { pairs } => pairs.iter().map(|(_, v)| *v).collect(),
         _ => Vec::new(),
     }
 }

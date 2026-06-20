@@ -109,6 +109,11 @@ pub enum InstKind {
     MethodCall { recv: Value, name: Rc<str>, args: Vec<Value> },
     /// `IsNull` — truthy-bool of whether the operand is null (for `??`).
     IsNull { operand: Value },
+    /// `[a, b, …]` array literal (`BuildArray`); elements emitted contiguously.
+    BuildArray { elements: Vec<Value> },
+    /// `{ k: v, … }` object literal (`BuildObject`); static keys + value props,
+    /// each value register listed individually (no contiguity requirement).
+    BuildObject { pairs: Vec<(Rc<str>, Value)> },
 }
 
 /// How a block ends and transfers control. Branch/jump carry the block-argument
