@@ -182,6 +182,8 @@ fn inst_uses(kind: &InstKind) -> Vec<Value> {
         InstKind::IsNull { operand } => vec![*operand],
         InstKind::BuildArray { elements } => elements.clone(),
         InstKind::BuildObject { pairs } => pairs.iter().map(|(_, v)| *v).collect(),
+        InstKind::ToString { operand } => vec![*operand],
+        InstKind::BuildStr { parts } => parts.clone(),
         _ => Vec::new(),
     }
 }

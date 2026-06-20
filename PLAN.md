@@ -146,20 +146,23 @@ Done (`ssa/build.rs`, `ssa/ir.rs`):
   (static keys, value props; each value reg listed individually — no contiguity).
   Verified: array/object build, index/field read-back, nested
   `{ list: [x, x+1] }` → identical with/without `VN_OPT_SSA`.
+- **Template literals** — `` `a${x}b` `` → `ToString` per interpolation + `BuildStr`
+  over the parts (literal chunks are `ConstStr`). Verified: interpolation,
+  arithmetic + ternary inside `${…}`, plain (no-interp) → identical both paths.
 - **Trivial-phi removal** (`simplify_phis`): Braun's `tryRemoveTrivialPhi` as a
   fixpoint post-pass.
-- Tests (`ssa/tests.rs`, 23 — golden dumps + verifier): identity, const+binary,
+- Tests (`ssa/tests.rs`, 24 — golden dumps + verifier): identity, const+binary,
   reassign, one-/two-sided `if` phi, no-phi trivial removal, `while`/`for`/
   `do-while` carry, `break`/`continue`, nested-`if` merge, global call, self-call,
-  member/index read, member/index write, method call, ternary, array/object literal.
+  member/index read, member/index write, method call, ternary, array/object
+  literal, template.
 
 **Pending** (the rest of §2's instruction set): closures, `Super*`/intrinsic
-calls, classes, enums, `match`, `try`, modules, upvalues, templates,
-await/spawn/yield — plus `switch`/`for-of`/`for-in` control flow, so every §1
-construct lowers to SSA. Until then `build_function` returns `Err(Unsupported)`
-and that function uses the `lower/` path. (Done: scalar exprs, control flow,
-loops, plain/self/method calls, member/index read+write, logical + conditional,
-array/object literals.)
+calls, classes, enums, `match`, `try`, modules, upvalues, await/spawn/yield —
+plus `switch`/`for-of`/`for-in` control flow, so every §1 construct lowers to SSA.
+Until then `build_function` returns `Err(Unsupported)` and that function uses the
+`lower/` path. (Done: scalar exprs, control flow, loops, plain/self/method calls,
+member/index read+write, logical + conditional, array/object literals, templates.)
 
 > **`regalloc_post` callee-frame constraint ✅ RESOLVED.** SSA calls were correct
 > pre-regalloc but `regalloc_post` miscompiled multi-call expressions: a call

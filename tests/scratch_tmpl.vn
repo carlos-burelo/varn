@@ -1,0 +1,9 @@
+function greet(name: str): str { return `Hello, ${name}!` }
+function calc(a: int, b: int): str { return `${a} + ${b} = ${a + b}` }
+function plain(): str { return `no interp` }
+function nested(x: int): str { return `val=${x > 0 ? "pos" : "neg"}` }
+print(greet("World"))
+print(calc(2, 3))
+print(plain())
+print(nested(5))
+print(nested(0 - 1))

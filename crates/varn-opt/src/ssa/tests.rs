@@ -2,7 +2,7 @@
 
 use crate::hir::{
     HirArrayEl, HirBinOp, HirBinding, HirExpr, HirFunction, HirObjectProp, HirParam, HirPropKey,
-    HirStmt, HirType, LocalId,
+    HirStmt, HirTemplatePart, HirType, LocalId,
 };
 
 use super::build::build_function;
@@ -768,6 +768,30 @@ fn f:
   b0(v0: int):
     v1 = object {k: v0}
     return v1
+"
+    );
+}
+
+#[test]
+fn template_lowers_to_buildstr() {
+    // f(x) { return `a${x}` }
+    let f = func(
+        vec![HirType::Int],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::Template(vec![
+            HirTemplatePart::Str("a".into()),
+            HirTemplatePart::Expr(param(0)),
+        ])))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: int):
+    v1 = str \"a\"
+    v2 = tostring v0
+    v3 = buildstr(v1, v2)
+    return v3
 "
     );
 }
