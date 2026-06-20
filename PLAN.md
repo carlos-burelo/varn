@@ -543,7 +543,7 @@ then GVN; then inline + re-run; then escape.
 
 ---
 
-## 4. Stage 4 — replace legacy (Hito A) (70% Complete)
+## 4. Stage 4 — replace legacy (Hito A) ✅ DONE
 
 **Goal: delete legacy codegen and make varn-opt's §1 HIR→bytecode path the only
 backend.** SSA (§2/§3) is *not* required for this — it's an optimization layer
@@ -593,19 +593,26 @@ Crucially these are now `Err` (graceful fallback) not `panic!` (crash).
 varn-opt unit tests 13/13; targeted probes (guards, `o?.x=`) correct with no
 fallback trace.
 
-### Then the mechanical replacement
-- Route `compile_direct` through `varn-opt` unconditionally (all 3 `lib.rs`
-  entries).
-- Move `regalloc_post`/`liveness`/`ir`/`slot_kinds` into a shared backend crate
-  (or keep in varn-compiler and have varn-opt depend on a thin `varn-backend`).
-- **Delete** legacy AST→bytecode: `codegen/compiler.rs`, `codegen/expr/`,
-  `codegen/stmt.rs`, `codegen/function.rs`, `codegen/class.rs`,
-  `analysis/inline.rs` (superseded by SSA inlining). Keep `regalloc_post`,
-  `liveness`, `ir`.
-- Remove `VN_OPT`/`VN_OPT_TRACE` (keep `VN_OPT_SSA` for the §2 layer until §2 is
-  complete, then remove it too).
-- Full suite + bench parity-or-better; update docs
-  (`docs/COMPILER_ARCHITECTURE.md`, `CLAUDE.md`).
+### Mechanical replacement ✅ DONE
+- `compile_direct` now routes through `varn-opt` **unconditionally** and
+  propagates `Err` (no fallback) — `varn-opt` is the sole backend.
+- **Deleted** legacy AST→bytecode: `codegen/compiler.rs`, `codegen/expr/` (8
+  files), `codegen/stmt.rs`, `codegen/function.rs`, `codegen/class.rs`,
+  `analysis/escape.rs`, `analysis/inline.rs`, and the now-dead `codegen/scope.rs`
+  + `pub use codegen::Compiler`. Kept `codegen/{ir,liveness,regalloc_post}` +
+  `analysis/slot_kinds` (the backend post-passes `run_backend_post_passes` runs).
+- Removed the `VN_OPT` gate (`codegen/mod.rs`) and the `.opt` cache tier tag
+  (`pipeline/cache.rs`). `VN_OPT_SSA`/`VN_OPT_TRACE` remain for the §2 SSA layer
+  (removed when §2 lands as the default).
+- **Validation:** suite **728/728** with *no env var* (varn-opt is the only
+  path); `bench` clean (execute p50 ~16.8 ms); `varn-opt` unit tests 13/13;
+  `varn-compiler`/`varn-opt` build + test clean (no dangling refs).
+- Backend crate extraction (move `regalloc_post`/`liveness`/`ir`/`slot_kinds`
+  into a shared `varn-backend` so `varn-opt` runs them itself) is **deferred** —
+  optional cleanup; the current `run_backend_post_passes` shim works.
+
+> Pending doc refresh: `docs/COMPILER_ARCHITECTURE.md` still describes the legacy
+> AST→bytecode codegen.
 
 ---
 

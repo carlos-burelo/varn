@@ -1,13 +1,9 @@
-pub mod class;
-pub mod expr;
-pub mod function;
+// Backend (shared with the deleted legacy path): SSA-free register allocation
+// and liveness over emitted `FunctionProto`s. `varn-opt` produces the protos;
+// these compress registers and feed the JIT.
 pub mod ir;
 pub mod liveness;
 pub mod regalloc_post;
-pub mod stmt;
-
-pub use compiler::Compiler;
-mod compiler;
 
 use rustc_hash::FxHashMap;
 use varn_core::ast::Program;
@@ -25,70 +21,30 @@ pub fn compile_direct(
     extension_set_members: &FxHashMap<u32, Rc<str>>,
     export_names: Vec<Rc<str>>,
 ) -> Result<FunctionProto, Rc<str>> {
-    use std::cell::RefCell;
-
-    // Optimizer tier (temporary `VN_OPT` dev gate). When set, route through the
-    // `varn-opt` pipeline (AST -> HIR -> SSA -> opt -> bytecode); any construct
-    // it doesn't yet lower returns Err and we fall back to the legacy codegen
-    // below, so the compiler stays functional while varn-opt is brought up.
-    if std::env::var_os("VN_OPT").is_some() {
-        let input = varn_opt::OptInput {
-            program,
-            annotations,
-            extension_calls,
-            extension_members,
-            extension_set_members,
-            export_names: export_names.clone(),
-        };
-        match varn_opt::compile(input) {
-            Ok(mut proto) => {
-                // §1.0: the backend post-passes (`regalloc_post`, `slot_kinds`)
-                // live in this crate, so `varn-opt` cannot run them itself
-                // without a dep cycle. Run them here over the whole proto tree
-                // (top level + every nested function proto in the constant
-                // pools), exactly as `finish_module`/`finish_function` do for
-                // the legacy path. Without this, varn-opt code skips register
-                // compression and leaves `register_meta` empty, disabling the
-                // JIT's typed fast paths.
-                run_backend_post_passes(&mut proto);
-                return Ok(proto);
-            }
-            Err(e) => {
-                if std::env::var_os("VN_OPT_TRACE").is_some() {
-                    eprintln!(
-                        "[varn-opt] fallback ({}): {:?}",
-                        program.filename, e
-                    );
-                }
-            }
-        }
-    }
-
-    let escape_analysis = Rc::new(crate::analysis::escape::EscapeAnalysis::analyze(program));
-    let inline_registry = Rc::new(crate::analysis::inline::InlineRegistry::analyze(program));
-    let protos = Rc::new(RefCell::new(Vec::new()));
-    let mut c = Compiler::new_module(
-        program.filename.clone(),
+    // `varn-opt` is the sole backend: AST -> HIR -> SSA -> bytecode. The legacy
+    // direct codegen has been deleted (Hito A).
+    let input = varn_opt::OptInput {
+        program,
         annotations,
         extension_calls,
         extension_members,
         extension_set_members,
-        protos,
         export_names,
-        escape_analysis,
-        inline_registry,
-    );
-    c.compile_program(program);
-    if let Some(err) = c.error {
-        return Err(err);
-    }
-    Ok(c.finish_module())
+    };
+    let mut proto = varn_opt::compile(input)
+        .map_err(|e| -> Rc<str> { Rc::from(format!("varn-opt could not lower module: {e:?}")) })?;
+    // The backend post-passes (`regalloc_post`, `slot_kinds`) live in this crate,
+    // so `varn-opt` cannot run them itself without a dep cycle. Run them over the
+    // whole proto tree (top level + every nested function proto in the constant
+    // pools); without this, registers are uncompressed and `register_meta` is
+    // empty, disabling the JIT's typed fast paths.
+    run_backend_post_passes(&mut proto);
+    Ok(proto)
 }
 
 /// Apply the register-allocation post-pass and slot-kind inference to a proto
 /// produced by `varn-opt`, recursing into every nested function proto embedded
-/// in the constant pools. Mirrors `Compiler::finish_module`/`finish_function`,
-/// which run these two passes per emitted proto in the legacy path.
+/// in the constant pools.
 ///
 /// Nested protos sit in the constant pool behind `Rc`. They are freshly built
 /// (refcount 1) so `Rc::get_mut` succeeds; the clone-and-replace branch is a
