@@ -424,6 +424,10 @@ pub struct HirEnum {
 #[derive(Debug, Clone)]
 pub struct HirMatchCase {
     pub test: HirCaseTest,
+    /// Optional `if`-guard: the arm matches only when the pattern matches **and**
+    /// the guard is truthy (else falls through to the next case). Lowered in the
+    /// case's scope so it sees the pattern bindings.
+    pub guard: Option<HirExpr>,
     pub body: Vec<HirStmt>,
     /// The arm's value (expression body, or `None` for a block arm → null).
     pub result: Option<HirExpr>,

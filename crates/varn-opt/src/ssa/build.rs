@@ -16,7 +16,10 @@
 
 use rustc_hash::FxHashMap;
 
-use crate::hir::{HirBinding, HirExpr, HirFunction, HirStmt, HirType, LocalId};
+use crate::hir::{
+    HirAssignTarget, HirBinOp, HirBinding, HirExpr, HirFunction, HirStmt, HirType, HirUpdateOp,
+    LocalId,
+};
 use crate::OptError;
 
 use super::ir::{Block, BlockId, Inst, InstKind, SsaFunc, Terminator, Value, ValueDef};
@@ -561,6 +564,38 @@ impl Builder {
                     *ty,
                 ))
             }
+            // Assignment-as-expression on a scalar binding (e.g. a `for` update
+            // clause `i = i + 1`): write the new SSA value and yield it.
+            HirExpr::Assign { target, value } => match &**target {
+                HirAssignTarget::Var(binding) => {
+                    let var = binding_var(binding)?;
+                    let v = self.lower_expr(value)?;
+                    self.write_var(var, self.current, v);
+                    Ok(v)
+                }
+                _ => Err(OptError::Unsupported("ssa: assign target")),
+            },
+            // `++`/`--` on a scalar binding (prefix yields the new value, postfix
+            // the old).
+            HirExpr::Update { target, op, prefix } => match &**target {
+                HirAssignTarget::Var(binding) => {
+                    let var = binding_var(binding)?;
+                    let old = self.read_var(var, self.current)?;
+                    let ty = self.values[old.0 as usize].ty;
+                    let one = self.emit(InstKind::ConstInt(1), HirType::Int);
+                    let bop = match op {
+                        HirUpdateOp::Inc => HirBinOp::Add,
+                        HirUpdateOp::Dec => HirBinOp::Sub,
+                    };
+                    let new = self.emit(
+                        InstKind::Binary { op: bop, lhs: old, rhs: one, ty },
+                        ty,
+                    );
+                    self.write_var(var, self.current, new);
+                    Ok(if *prefix { new } else { old })
+                }
+                _ => Err(OptError::Unsupported("ssa: update target")),
+            },
             _ => Err(OptError::Unsupported("ssa: expression kind")),
         }
     }
@@ -576,6 +611,12 @@ fn binding_var(binding: &HirBinding) -> Result<VarId> {
 }
 
 pub fn build_function(func: &HirFunction) -> Result<SsaFunc> {
+    // Default-valued params need the `IsNull`/`Move` prologue the naive emitter
+    // produces; SSA construction does not model it yet, so decline them.
+    if func.params.iter().any(|p| p.default.is_some()) {
+        return Err(OptError::Unsupported("ssa: default param"));
+    }
+
     let mut b = Builder::new();
     let entry = b.current;
 

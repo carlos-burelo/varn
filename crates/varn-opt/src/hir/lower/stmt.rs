@@ -78,12 +78,10 @@ impl<'a> Lowerer<'a> {
                         object,
                         property,
                         computed,
-                        optional,
+                        // `optional` (`o?.x = v`) ignored — matches legacy store.
+                        ..
                     } = &target.kind
                     {
-                        if *optional {
-                            panic!("optional assignment target");
-                        }
                         let off = target.range.start.offset;
                         // Extension setter `x.k = v` → `__extset_T_k(x, v)`.
                         if let Some(mangled) = self.extension_set_members.get(&off).cloned() {
@@ -122,7 +120,7 @@ impl<'a> Lowerer<'a> {
                             } else {
                                 let name = match &property.kind {
                                     ExprKind::Identifier { name } => name.clone(),
-                                    _ => panic!("non-identifier property assign"),
+                                    _ => return Err(OptError::Unsupported("hir: non-identifier property assign")),
                                 };
                                 let value = self.lower_expr(value.as_ref(), scope)?;
                                 let current_val = HirExpr::Member {
@@ -156,7 +154,7 @@ impl<'a> Lowerer<'a> {
                         } else {
                             let name = match &property.kind {
                                 ExprKind::Identifier { name } => name.clone(),
-                                _ => panic!("non-identifier property assign"),
+                                _ => return Err(OptError::Unsupported("hir: non-identifier property assign")),
                             };
                             let value = self.lower_expr(value.as_ref(), scope)?;
                             out.push(HirStmt::SetMember {
@@ -169,7 +167,7 @@ impl<'a> Lowerer<'a> {
                     }
                     let binding = match &target.kind {
                         ExprKind::Identifier { name } => self.resolve(name, scope),
-                        _ => panic!("non-identifier assign target"),
+                        _ => return Err(OptError::Unsupported("hir: non-identifier assign target")),
                     };
                     let val_expr = self.lower_expr(value.as_ref(), scope)?;
                     let value = match op {
@@ -263,7 +261,7 @@ impl<'a> Lowerer<'a> {
                 Decl::Namespace(ns) => {
                     self.lower_namespace(ns, scope, out)?;
                 }
-                _ => panic!("invalid nested declaration kind"),
+                _ => return Err(OptError::Unsupported("hir: nested declaration kind")),
             },
             StmtKind::Return { argument } => {
                 let v = match argument {
@@ -551,7 +549,7 @@ impl<'a> Lowerer<'a> {
                     finally: hfinally,
                 });
             }
-            _ => panic!("unsupported statement kind: {:?}", stmt.kind),
+            _ => return Err(OptError::Unsupported("hir: statement kind")),
         }
         Ok(())
     }

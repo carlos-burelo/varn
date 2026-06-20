@@ -414,7 +414,17 @@ Remaining corpus fallbacks (to close): TaggedTemplate, pipeline `_` placeholders
 
 ---
 
-## 2. Stage 2 — SSA (30% Complete)
+## 2. Stage 2 — SSA (60% Complete)
+
+**Backbone complete + wired end-to-end.** SSA construction (CFG + loops),
+verifier, and out-of-SSA → bytecode all land for the scalar / control-flow
+subset, gated behind `VN_OPT_SSA` (per-function: try SSA, fall back to the §1
+emitter on `Unsupported`). Validated: `VN_OPT=1 VN_OPT_SSA=1` runs the suite
+**728/728** and `bench` clean (regalloc/JIT trap), with SSA actually compiling
+every function in the suite it covers (the rest fall back). Remaining for 100%
+is the **effectful instruction set** in SSA (calls, member/index, closures,
+classes, enums, match, try) + `switch`/`for-of`/`for-in` control flow — the bulk
+of re-expressing §1 through SSA so the path can be made unconditional (§4).
 
 Build the real optimizer IR from HIR. Per-function.
 
@@ -433,7 +443,7 @@ original notes sketched. Rationale (perf + KISS):
 - A **dominator tree is computed separately** only where needed (the §2.3
   verifier, and any §3 pass that wants it), not for construction.
 
-### 2.1 CFG construction 🟡 PARTIAL (straight-line & if/else core done)
+### 2.1 CFG construction 🟡 PARTIAL (straight-line, if/else & loops done)
 - SSA IR in `crates/varn-opt/src/ssa/`: `ir.rs` (`SsaFunc`/`Block`/`BlockId`/
   `Value`/`ValueDef`/`Inst`/`InstKind`/`Terminator`); `build.rs` (HIR→SSA);
   `dump.rs` (text form for tests + future `vn debug -p ssa`).
@@ -442,8 +452,16 @@ original notes sketched. Rationale (perf + KISS):
   order. `Terminator` = `Return`/`Jump{args}`/`Branch{cond,then/else+args}`/
   `Unreachable` (construction placeholder).
 - Coverage so far: straight-line bodies (scalar literals, param/local read &
-  reassign, typed `Binary`/`Unary`, `Return`) + **`if`/`else`** (branch + merge
-  block params). Anything else → `Err(Unsupported)`.
+  reassign, typed `Binary`/`Unary`, assignment-as-expression + `++`/`--` on
+  scalar bindings, `Return`), **`if`/`else`** (branch + merge block params), and
+  **loops** — `while`, C-style `for` (`update` in its own block so `continue`
+  runs it), `do-while`, plus `break`/`continue` via a `LoopCtx` target stack.
+  Anything else → `Err(Unsupported)`.
+- **Bug fixed:** the `if` merge recorded `then_b`/`else_b` as its predecessor
+  instead of the *current* block after the body — wrong (and a panic at
+  seal/phi time) once a branch body contains nested control flow. Now uses the
+  actual current block. Only reachable from SSA construction (not the run/bench
+  path), so it never affected the suite; guarded by a new nested-`if` test.
 
 ### 2.2 SSA form 🟡 PARTIAL (Braun construction core done)
 - `write_var`/`read_var`/`read_var_recursive` + `seal_block`/`add_phi_operands`
@@ -454,23 +472,49 @@ original notes sketched. Rationale (perf + KISS):
   with the unique operand (Braun's `tryRemoveTrivialPhi`, run as a post-pass
   rather than interleaved — uniform use-replacement, no spurious phis for vars
   unmodified across a merge). Skips the entry block (its params are real args).
-- Tests (`ssa/tests.rs`, 6): identity, const+binary, local reassign, one-sided
-  `if` phi, two-sided `if/else` phi, unmodified-var-no-phi (trivial removal).
-- **Pending in §2.1/2.2**: loops (back-edge + unsealed-header sealing — the
-  incomplete-phi path is implemented but untested), `while`/`for`/`do`/`switch`/
-  `match`/`try`, and the full effectful instruction set (calls, member/index,
-  closures, classes, etc.) so every §1-covered construct lowers to SSA.
+- Tests (`ssa/tests.rs`, 12): identity, const+binary, local reassign, one-sided
+  `if` phi, two-sided `if/else` phi, unmodified-var-no-phi (trivial removal),
+  `while` header phi, `for` update-block increment, `do-while` latch, `break`
+  to exit, `continue` to update, nested-`if` fall-through merge. The
+  incomplete-phi / unsealed-header seal path is now exercised by the loop tests.
+- **Pending in §2.1/2.2**: `switch`/`match`/`try` control flow, and the full
+  effectful instruction set (calls, member/index, closures, classes, etc.) so
+  every §1-covered construct lowers to SSA. Until then `build_function` returns
+  `Err(Unsupported)` for those and the pipeline keeps using the §1 HIR→bytecode
+  path.
 
-### 2.3 Verifier 🔲 PENDING
-- Each value defined once; uses dominated by defs; phi arg count = pred count;
-  types consistent. Run in debug builds + a `vn debug -p ssa` dump.
+### 2.3 Verifier ✅ DONE
+- `ssa/verify.rs`: (1) each `Value` defined once (param or inst dest); (2) every
+  predecessor edge carries exactly as many block-args as the target has params;
+  (3) terminator targets in range; (4) every use is defined and **dominated** by
+  its def (phi operands checked against the predecessor edge they flow in on).
+  Dominators via Cooper-Harvey-Kennedy over reverse-postorder. Runs inside
+  `try_compile_function` as a safety net — a violation forces fallback to the §1
+  path rather than emitting wrong code. Tested (`verifier_accepts_constructed_ssa`).
 
-### 2.4 Out-of-SSA + lowering to bytecode 🔲 PENDING
-- Phi elimination → parallel copies on edges (handle swaps via temp).
-- Instruction selection SSA → `Chunk` (reuse the §1 emitter as the target, or a
-  dedicated `ssa->bytecode`). Then `regalloc_post` as today.
-- Verify: suite 686/686 + bench parity with the no-SSA path (SSA with zero opts
-  must match).
+### 2.4 Out-of-SSA + lowering to bytecode ✅ DONE (for the §2.1 subset)
+- `ssa/emit.rs`: **critical/phi-edge splitting** (a pad block on every branch
+  edge whose target has params, so phis are fed only from single-successor
+  `Jump` edges) → **register-per-value** assignment (entry params = `r1..=P`,
+  receiver `r0`; +scratch +null reg; `Unsupported` past 255) → block emission in
+  index order. Phi operands become **parallel `Move`s** on each edge (cycles
+  broken via the scratch reg). Jumps: fall-through when the target is the next
+  block, `Loop` for back-edges, forward `Jump`/`JumpIf*` with deferred offset
+  fixups; a conditional with a backward target is reshaped so the forward exit is
+  the conditional and the back-edge an unconditional `Loop`. `regalloc_post` +
+  `slot_kinds::infer` run downstream via the `VN_OPT` gate, so this emits naive
+  one-reg-per-value bytecode and lets them compress + type it.
+- Wired: `ssa::try_compile_function` (build → verify → emit), called from
+  `lower::lower_function` under `VN_OPT_SSA` with per-function fallback
+  (`VN_OPT_TRACE` reports which functions SSA compiled vs fell back).
+- Verified: `VN_OPT=1 VN_OPT_SSA=1` → suite **728/728** + `bench` clean (execute
+  p50 ~20 ms, no regression vs the no-SSA path); `tests/scratch_ssa.vn` (while/
+  for/do/if/break/continue functions) prints identically under legacy, `VN_OPT`,
+  and `VN_OPT+VN_OPT_SSA`.
+- **Pending (the §2.1/2.2 instruction-set gap):** once calls/heap/closures/
+  classes/etc. lower to SSA, the gate can be made unconditional and the no-SSA
+  path retired (§4). Until then SSA compiles the subset it covers and the rest
+  fall back, both paths green.
 
 ---
 
@@ -499,8 +543,57 @@ then GVN; then inline + re-run; then escape.
 
 ---
 
-## 4. Stage 4 — replace legacy (0% Complete)
+## 4. Stage 4 — replace legacy (Hito A) (70% Complete)
 
+**Goal: delete legacy codegen and make varn-opt's §1 HIR→bytecode path the only
+backend.** SSA (§2/§3) is *not* required for this — it's an optimization layer
+that grows on top afterwards.
+
+### Audit (2026-06-20): varn-opt §1 is ~99% complete
+The full suite — **51 comprehensive feature files** (destructuring, generics,
+named args, match, decorators, enums, modules, classes, async, exports …) all
+imported by `tests/main.vn` — compiles through varn-opt with **zero fallback**
+(`VN_OPT=1 VN_OPT_TRACE=1` shows no `fallback` lines). The plan's old
+"deferred → fallback" notes were stale: those features are implemented. Suite
+**728/728** on the varn-opt path.
+
+### Crash-safety fix ✅ DONE
+The HIR lowering previously **`panic!`'d** on unsupported constructs instead of
+returning `Err`, so anything varn-opt couldn't lower *crashed* `vn` under
+`VN_OPT` rather than falling back. All ~18 such panics across
+`hir/lower/{expr,stmt,decl,mod}.rs` are now `Err(OptError::Unsupported(..))`, so
+unsupported constructs degrade to legacy gracefully. Verified: a `match` guard
+now prints the correct result via fallback (`Unsupported("hir: match guard")`)
+instead of aborting; suite still 728/728.
+
+### Residual constructs ✅ DONE (0 fallback for valid programs)
+All reachable fallbacks closed; each mirrors or improves on legacy:
+- **match guards** (`n if cond => …`) — implemented *correctly* (HIR
+  `HirMatchCase.guard` + emitter branch). Legacy `compile_match` silently
+  **ignored** guards (`_ => None`), so this is a strict improvement; verified
+  `match v { n if n>10 => 1, n if n>3 => 2, _ => 0 }` yields `2` (legacy: `1`).
+- **match `Sequence` / `Type` patterns** → lowered as wildcard, exactly matching
+  legacy's `_ => None` (real nested destructuring is a future feature for both).
+- **async/generator extension methods** — `is_async`/`is_generator` threaded
+  through `push_global_closure`.
+- **anonymous class declarations** — synthesise `"anonymous"` (mirrors top-level).
+- **optional assignment targets** (`o?.x = v`) — `optional` ignored = plain member
+  store, mirroring legacy `store_to_target` (verified prints `5`, no fallback).
+- **bigint literal overflow** (> i128) → defaults to `0`, mirroring legacy
+  `codegen/expr/mod.rs` (legacy also caps at i128 and uses `0` on overflow).
+- `debugger` is rejected by the checker (not a real construct).
+
+The only remaining `Err` sites in HIR lowering are **parser/checker-unreachable**
+defensive cases (non-identifier property/super/assign targets — the parser only
+produces identifiers in non-computed members and the checker rejects non-lvalue
+assigns; decl/op catch-alls where every variant already has an explicit arm).
+Crucially these are now `Err` (graceful fallback) not `panic!` (crash).
+
+**Validation:** suite **728/728** on both `VN_OPT=1` and `VN_OPT=1 VN_OPT_SSA=1`;
+varn-opt unit tests 13/13; targeted probes (guards, `o?.x=`) correct with no
+fallback trace.
+
+### Then the mechanical replacement
 - Route `compile_direct` through `varn-opt` unconditionally (all 3 `lib.rs`
   entries).
 - Move `regalloc_post`/`liveness`/`ir`/`slot_kinds` into a shared backend crate
@@ -509,7 +602,8 @@ then GVN; then inline + re-run; then escape.
   `codegen/stmt.rs`, `codegen/function.rs`, `codegen/class.rs`,
   `analysis/inline.rs` (superseded by SSA inlining). Keep `regalloc_post`,
   `liveness`, `ir`.
-- Remove `VN_OPT`/`VN_OPT_TRACE`.
+- Remove `VN_OPT`/`VN_OPT_TRACE` (keep `VN_OPT_SSA` for the §2 layer until §2 is
+  complete, then remove it too).
 - Full suite + bench parity-or-better; update docs
   (`docs/COMPILER_ARCHITECTURE.md`, `CLAUDE.md`).
 

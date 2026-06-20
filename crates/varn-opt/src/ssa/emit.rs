@@ -1,0 +1,367 @@
+//! Out-of-SSA: lower an [`SsaFunc`] to a [`FunctionProto`] (bytecode).
+//!
+//! Pipeline: split phi-carrying branch edges (so every block parameter is fed
+//! only from single-successor `Jump` edges), assign one register per SSA value,
+//! then emit blocks in index order. Block parameters become physical registers;
+//! the phi operands on each edge are materialised as parallel `Move`s before the
+//! edge's jump (cycles broken with a scratch register).
+//!
+//! Jumps: forward edges use `Jump`/`JumpIf*` with a deferred offset fixup;
+//! backward edges (loop back-edges, merge-from-later-block) use `Loop`. A
+//! conditional whose taken target is backward is reshaped so the *forward* exit
+//! is the conditional and the backward edge is an unconditional `Loop` (mirrors
+//! the §1 loop shape). The register-allocation post-pass (`regalloc_post`) and
+//! `slot_kinds::infer` run downstream via the `VN_OPT` gate, so this emits naive
+//! one-reg-per-value bytecode and lets them compress + type it.
+
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
+
+use varn_core::OpCode;
+use varn_types::chunk::{Chunk, FeedbackVector, FunctionProto, Literal, PoolEntry};
+
+use crate::hir::{HirFunction, HirUnOp};
+use crate::lower::bin_opcode;
+use crate::OptError;
+
+use super::ir::{Block, BlockId, Inst, InstKind, SsaFunc, Terminator, Value};
+
+type Result<T> = std::result::Result<T, OptError>;
+
+const LINE: u32 = 0;
+
+pub fn emit_function(mut ssa: SsaFunc, f: &HirFunction, source_file: Rc<str>) -> Result<FunctionProto> {
+    split_phi_edges(&mut ssa);
+
+    let nparams = f.params.len();
+    let (reg, scratch, null_reg, register_count) = assign_registers(&ssa, nparams)?;
+
+    let n = ssa.blocks.len();
+    let mut chunk = Chunk::new();
+    chunk.source_file = source_file;
+    let mut block_offset = vec![usize::MAX; n];
+    // Forward jumps recorded as `(operand_pos, target)`, patched once every
+    // block's offset is known.
+    let mut fixups: Vec<(usize, BlockId)> = Vec::new();
+
+    for b in 0..n {
+        block_offset[b] = chunk.code.len();
+        let insts = std::mem::take(&mut ssa.blocks[b].insts);
+        for inst in &insts {
+            emit_inst(&mut chunk, inst, &reg, scratch)?;
+        }
+        let term = ssa.blocks[b].term.clone();
+        emit_terminator(&mut chunk, &ssa, &reg, b, &term, null_reg, scratch, &block_offset, &mut fixups)?;
+    }
+
+    // Implicit `return null` epilogue (matches the naive `FnLower::finish`).
+    chunk.write(Chunk::pack_op(OpCode::LoadNull, null_reg), LINE);
+    chunk.emit1(OpCode::Return, Chunk::pack(0, null_reg), LINE);
+
+    for (pos, target) in fixups {
+        let target_off = block_offset[target.0 as usize];
+        let rel = target_off as isize - pos as isize - 2;
+        if rel < 0 {
+            return Err(OptError::Unsupported("ssa-emit: forward jump resolved backward"));
+        }
+        let off = rel as u32;
+        chunk.code[pos] = (off >> 16) as u16;
+        chunk.code[pos + 1] = (off & 0xFFFF) as u16;
+    }
+
+    Ok(FunctionProto {
+        name: Some(f.name.clone()),
+        arity: 1 + nparams,
+        export_names: Vec::new(),
+        register_count,
+        has_rest: f.has_rest,
+        is_async: f.is_async,
+        is_generator: f.is_generator,
+        has_this: f.has_this,
+        upvalue_count: f.upvalue_count as usize,
+        cache_count: 0,
+        chunk,
+        required_caps: Vec::new(),
+        register_meta: Vec::new(),
+        jit_entry: Cell::new(None),
+        jit_code: RefCell::new(None),
+        jit_failed: Cell::new(false),
+        ic_cache: Rc::new(RefCell::new(Vec::new())),
+        feedback: Rc::new(RefCell::new(FeedbackVector::new(0))),
+        static_closure_val: Cell::new(0),
+    })
+}
+
+/// Insert a pad block on every branch edge whose target has block parameters,
+/// so all phi operands are subsequently fed from single-successor `Jump` edges
+/// (no critical edges). The pad carries the edge's arguments and jumps to the
+/// real target.
+fn split_phi_edges(ssa: &mut SsaFunc) {
+    let original = ssa.blocks.len();
+    for b in 0..original {
+        let (then_has, else_has) = match &ssa.blocks[b].term {
+            Terminator::Branch { then_blk, else_blk, .. } => (
+                !ssa.blocks[then_blk.0 as usize].params.is_empty(),
+                !ssa.blocks[else_blk.0 as usize].params.is_empty(),
+            ),
+            _ => continue,
+        };
+        if then_has {
+            split_one(ssa, BlockId(b as u32), true);
+        }
+        if else_has {
+            split_one(ssa, BlockId(b as u32), false);
+        }
+    }
+}
+
+fn split_one(ssa: &mut SsaFunc, br: BlockId, is_then: bool) {
+    let (target, args) = match &mut ssa.blocks[br.0 as usize].term {
+        Terminator::Branch { then_blk, then_args, else_blk, else_args, .. } => {
+            if is_then {
+                (*then_blk, std::mem::take(then_args))
+            } else {
+                (*else_blk, std::mem::take(else_args))
+            }
+        }
+        _ => return,
+    };
+    let pad = BlockId(ssa.blocks.len() as u32);
+    ssa.blocks.push(Block {
+        params: Vec::new(),
+        insts: Vec::new(),
+        term: Terminator::Jump { target, args },
+        preds: vec![br],
+    });
+    if let Terminator::Branch { then_blk, else_blk, .. } = &mut ssa.blocks[br.0 as usize].term {
+        if is_then {
+            *then_blk = pad;
+        } else {
+            *else_blk = pad;
+        }
+    }
+    for p in ssa.blocks[target.0 as usize].preds.iter_mut() {
+        if *p == br {
+            *p = pad;
+            break;
+        }
+    }
+}
+
+/// Assign one physical register per defined SSA value. Entry-block parameters
+/// are the function parameters → registers `1..=nparams` (register 0 is the
+/// receiver). Returns `(reg_of_value, scratch, null_reg, register_count)`.
+fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u16)> {
+    let mut reg = vec![0u8; ssa.values.len()];
+    let mut assigned = vec![false; ssa.values.len()];
+
+    let entry_params = &ssa.blocks[ssa.entry.0 as usize].params;
+    if entry_params.len() != nparams {
+        return Err(OptError::Unsupported("ssa-emit: entry params != arity"));
+    }
+    for (i, p) in entry_params.iter().enumerate() {
+        reg[p.0 as usize] = (1 + i) as u8;
+        assigned[p.0 as usize] = true;
+    }
+
+    let mut next: u32 = 1 + nparams as u32;
+    let alloc = |v: Value, reg: &mut [u8], assigned: &mut [bool], next: &mut u32| -> Result<()> {
+        if !assigned[v.0 as usize] {
+            if *next > 255 {
+                return Err(OptError::Unsupported("ssa-emit: register count exceeds 255"));
+            }
+            reg[v.0 as usize] = *next as u8;
+            assigned[v.0 as usize] = true;
+            *next += 1;
+        }
+        Ok(())
+    };
+    for block in &ssa.blocks {
+        for p in &block.params {
+            alloc(*p, &mut reg, &mut assigned, &mut next)?;
+        }
+        for inst in &block.insts {
+            if let Some(d) = inst.dest {
+                alloc(d, &mut reg, &mut assigned, &mut next)?;
+            }
+        }
+    }
+    // Two reserved registers: a scratch for copy-cycle breaking and a null slot
+    // for the `return null` epilogue / valueless returns.
+    if next > 253 {
+        return Err(OptError::Unsupported("ssa-emit: register count exceeds 255"));
+    }
+    let scratch = next as u8;
+    let null_reg = (next + 1) as u8;
+    let register_count = (next + 2).max(1) as u16;
+    Ok((reg, scratch, null_reg, register_count))
+}
+
+fn emit_inst(chunk: &mut Chunk, inst: &Inst, reg: &[u8], scratch: u8) -> Result<()> {
+    let Some(dest) = inst.dest else { return Ok(()) };
+    let d = reg[dest.0 as usize];
+    match &inst.kind {
+        InstKind::ConstInt(n) => chunk.emit_load_int(d, *n, LINE),
+        InstKind::ConstFloat(f) => {
+            let idx = chunk.add_constant(PoolEntry::Literal(Literal::Float(*f)));
+            chunk.emit_rc(OpCode::LoadConst, d, idx, LINE);
+        }
+        InstKind::ConstBool(b) => {
+            let op = if *b { OpCode::LoadTrue } else { OpCode::LoadFalse };
+            chunk.emit_rr(op, d, 0, LINE);
+        }
+        InstKind::ConstStr(s) => {
+            let idx = chunk.add_str(s);
+            chunk.emit_rc(OpCode::LoadConst, d, idx, LINE);
+        }
+        InstKind::ConstChar(c) => {
+            let idx = chunk.add_constant(PoolEntry::Literal(Literal::Char(*c)));
+            chunk.emit_rc(OpCode::LoadConst, d, idx, LINE);
+        }
+        InstKind::ConstNull => chunk.emit_rr(OpCode::LoadNull, d, 0, LINE),
+        InstKind::Binary { op, lhs, rhs, ty } => {
+            let opcode = bin_opcode(*op, *ty);
+            chunk.emit_rrr(opcode, d, reg[lhs.0 as usize], reg[rhs.0 as usize], LINE);
+        }
+        InstKind::Unary { op, operand, .. } => {
+            let s = reg[operand.0 as usize];
+            match op {
+                HirUnOp::Neg => chunk.emit_rr(OpCode::Negate, d, s, LINE),
+                HirUnOp::Not => chunk.emit_rr(OpCode::Not, d, s, LINE),
+                HirUnOp::Typeof => chunk.emit_rr(OpCode::Typeof, d, s, LINE),
+                HirUnOp::BitNot => {
+                    // `~x` == `x ^ -1` (mirrors the §1 emitter).
+                    let idx = chunk.add_constant(PoolEntry::Literal(Literal::Int(-1)));
+                    chunk.emit_rc(OpCode::LoadConst, scratch, idx, LINE);
+                    chunk.emit_rrr(OpCode::BitXor, d, s, scratch, LINE);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn emit_terminator(
+    chunk: &mut Chunk,
+    ssa: &SsaFunc,
+    reg: &[u8],
+    b: usize,
+    term: &Terminator,
+    null_reg: u8,
+    scratch: u8,
+    block_offset: &[usize],
+    fixups: &mut Vec<(usize, BlockId)>,
+) -> Result<()> {
+    match term {
+        Terminator::Return(Some(v)) => {
+            chunk.emit1(OpCode::Return, Chunk::pack(0, reg[v.0 as usize]), LINE);
+        }
+        Terminator::Return(None) | Terminator::Unreachable => {
+            chunk.write(Chunk::pack_op(OpCode::LoadNull, null_reg), LINE);
+            chunk.emit1(OpCode::Return, Chunk::pack(0, null_reg), LINE);
+        }
+        Terminator::Jump { target, args } => {
+            emit_edge_copies(chunk, ssa, reg, *target, args, scratch);
+            emit_goto(chunk, b, *target, block_offset, fixups);
+        }
+        Terminator::Branch { cond, then_blk, then_args, else_blk, else_args } => {
+            if !then_args.is_empty() || !else_args.is_empty() {
+                return Err(OptError::Unsupported("ssa-emit: branch edge carries args after split"));
+            }
+            emit_branch(chunk, b, reg[cond.0 as usize], *then_blk, *else_blk, block_offset, fixups)?;
+        }
+    }
+    Ok(())
+}
+
+/// Materialise phi operands for a `Jump` edge as parallel `Move`s (param reg <-
+/// arg reg), breaking cycles via the scratch register.
+fn emit_edge_copies(chunk: &mut Chunk, ssa: &SsaFunc, reg: &[u8], target: BlockId, args: &[Value], scratch: u8) {
+    let params = &ssa.blocks[target.0 as usize].params;
+    let mut copies: Vec<(u8, u8)> = params
+        .iter()
+        .zip(args)
+        .map(|(p, a)| (reg[p.0 as usize], reg[a.0 as usize]))
+        .filter(|(d, s)| d != s)
+        .collect();
+
+    while !copies.is_empty() {
+        if let Some(pos) = copies.iter().position(|(d, _)| !copies.iter().any(|(_, s)| s == d)) {
+            let (d, s) = copies.remove(pos);
+            chunk.emit_rr(OpCode::Move, d, s, LINE);
+        } else {
+            // Every remaining destination is also a source → a cycle. Spill one
+            // source to scratch, then it is no longer blocked.
+            let s0 = copies[0].1;
+            chunk.emit_rr(OpCode::Move, scratch, s0, LINE);
+            for c in copies.iter_mut() {
+                if c.1 == s0 {
+                    c.1 = scratch;
+                }
+            }
+        }
+    }
+}
+
+/// Unconditional transfer to `target`: fall through when it is the next block,
+/// `Loop` when already emitted (backward), else a forward `Jump` + fixup.
+fn emit_goto(chunk: &mut Chunk, b: usize, target: BlockId, block_offset: &[usize], fixups: &mut Vec<(usize, BlockId)>) {
+    let tb = target.0 as usize;
+    if tb == b + 1 {
+        return; // fall through
+    }
+    if tb <= b {
+        chunk.emit_loop(block_offset[tb], LINE);
+    } else {
+        let pos = chunk.emit_jump(OpCode::Jump, LINE);
+        fixups.push((pos, target));
+    }
+}
+
+fn emit_branch(
+    chunk: &mut Chunk,
+    b: usize,
+    cond: u8,
+    then_blk: BlockId,
+    else_blk: BlockId,
+    block_offset: &[usize],
+    fixups: &mut Vec<(usize, BlockId)>,
+) -> Result<()> {
+    let tb = then_blk.0 as usize;
+    let eb = else_blk.0 as usize;
+    let then_fwd = tb > b;
+    let else_fwd = eb > b;
+
+    match (then_fwd, else_fwd) {
+        (true, true) => {
+            if tb == b + 1 {
+                let pos = chunk.emit_cond_jump(OpCode::JumpIfFalse, cond, LINE);
+                fixups.push((pos, else_blk));
+            } else if eb == b + 1 {
+                let pos = chunk.emit_cond_jump(OpCode::JumpIfTrue, cond, LINE);
+                fixups.push((pos, then_blk));
+            } else {
+                let p1 = chunk.emit_cond_jump(OpCode::JumpIfFalse, cond, LINE);
+                fixups.push((p1, else_blk));
+                let p2 = chunk.emit_jump(OpCode::Jump, LINE);
+                fixups.push((p2, then_blk));
+            }
+        }
+        (true, false) => {
+            // else is backward → forward conditional to `then`, unconditional Loop to `else`.
+            let pos = chunk.emit_cond_jump(OpCode::JumpIfTrue, cond, LINE);
+            fixups.push((pos, then_blk));
+            chunk.emit_loop(block_offset[eb], LINE);
+        }
+        (false, true) => {
+            let pos = chunk.emit_cond_jump(OpCode::JumpIfFalse, cond, LINE);
+            fixups.push((pos, else_blk));
+            chunk.emit_loop(block_offset[tb], LINE);
+        }
+        (false, false) => {
+            return Err(OptError::Unsupported("ssa-emit: branch with both targets backward"));
+        }
+    }
+    Ok(())
+}
