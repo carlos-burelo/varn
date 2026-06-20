@@ -123,6 +123,9 @@ pub enum InstKind {
     /// capture upvalues are not yet supported in SSA (the captured local needs a
     /// stable slot, which SSA renaming breaks).
     MakeClosure { func: Rc<HirFunction> },
+    /// VM intrinsic (`Math.*` etc.) → `Intrinsic` opcode. Operands are
+    /// `[object, args…]` contiguous; `wire_byte` selects the operation.
+    IntrinsicCall { object: Value, args: Vec<Value>, wire_byte: u8 },
 }
 
 /// How a block ends and transfers control. Branch/jump carry the block-argument

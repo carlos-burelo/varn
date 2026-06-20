@@ -1,0 +1,7 @@
+import { Math } from 'std:math'
+function absF(): float { return Math.abs(0.0 - 5.5) }
+function sqrtF(): float { return Math.sqrt(16.0) }
+function floorF(): float { return Math.floor(3.9) }
+print(absF())
+print(sqrtF())
+print(floorF())

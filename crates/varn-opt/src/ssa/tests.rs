@@ -820,6 +820,30 @@ fn f:
 }
 
 #[test]
+fn intrinsic_call_lowers_to_intrinsic() {
+    // f(x) { return <intrinsic #5>(x) }
+    let f = func(
+        vec![HirType::Int],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::IntrinsicCall {
+            object: Box::new(param(0)),
+            args: vec![],
+            wire_byte: 5,
+            ty: HirType::Int,
+        }))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: int):
+    v1 = intrinsic#5 v0
+    return v1
+"
+    );
+}
+
+#[test]
 fn verifier_accepts_constructed_ssa() {
     // The verifier must not reject any well-formed function the builder emits.
     let while_loop = func(

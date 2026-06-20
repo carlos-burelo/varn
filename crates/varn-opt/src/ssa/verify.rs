@@ -184,6 +184,12 @@ fn inst_uses(kind: &InstKind) -> Vec<Value> {
         InstKind::BuildObject { pairs } => pairs.iter().map(|(_, v)| *v).collect(),
         InstKind::ToString { operand } => vec![*operand],
         InstKind::BuildStr { parts } => parts.clone(),
+        InstKind::IntrinsicCall { object, args, .. } => {
+            let mut v = Vec::with_capacity(args.len() + 1);
+            v.push(*object);
+            v.extend_from_slice(args);
+            v
+        }
         _ => Vec::new(),
     }
 }
