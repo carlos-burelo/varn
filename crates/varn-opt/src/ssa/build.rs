@@ -14,11 +14,13 @@
 //! [`simplify_phis`] post-pass, which keeps the SSA minimal without interleaving
 //! use-replacement with construction.
 
+use std::rc::Rc;
+
 use rustc_hash::FxHashMap;
 
 use crate::hir::{
     HirArrayEl, HirAssignTarget, HirBinOp, HirBinding, HirExpr, HirFunction, HirLogicalOp,
-    HirObjectProp, HirPropKey, HirStmt, HirType, HirUpdateOp, LocalId,
+    HirObjectProp, HirPropKey, HirStmt, HirTemplatePart, HirType, HirUpdateOp, LocalId,
 };
 use crate::OptError;
 
@@ -693,6 +695,26 @@ impl Builder {
                 }
                 Ok(self.emit(InstKind::BuildObject { pairs }, HirType::Ref))
             }
+            // Template literal `` `a${x}b` `` → `BuildStr` over stringified parts.
+            HirExpr::Template(parts) => {
+                let mut pvals = Vec::with_capacity(parts.len());
+                for part in parts {
+                    match part {
+                        HirTemplatePart::Str(s) => {
+                            pvals.push(self.emit(InstKind::ConstStr(s.clone()), HirType::Str))
+                        }
+                        HirTemplatePart::Expr(e) => {
+                            let v = self.lower_expr(e)?;
+                            pvals.push(self.emit(InstKind::ToString { operand: v }, HirType::Str));
+                        }
+                    }
+                }
+                if pvals.is_empty() {
+                    Ok(self.emit(InstKind::ConstStr(Rc::from("")), HirType::Str))
+                } else {
+                    Ok(self.emit(InstKind::BuildStr { parts: pvals }, HirType::Str))
+                }
+            }
             // Ternary `test ? cons : alt` → branch + result phi.
             HirExpr::Conditional { test, cons, alt } => {
                 let t = self.lower_expr(test)?;
@@ -954,6 +976,8 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                 InstKind::IsNull { operand } => sub(operand),
                 InstKind::BuildArray { elements } => elements.iter_mut().for_each(sub),
                 InstKind::BuildObject { pairs } => pairs.iter_mut().for_each(|(_, v)| sub(v)),
+                InstKind::ToString { operand } => sub(operand),
+                InstKind::BuildStr { parts } => parts.iter_mut().for_each(sub),
                 InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
                 | InstKind::ConstBool(_)

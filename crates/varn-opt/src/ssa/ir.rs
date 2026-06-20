@@ -114,6 +114,10 @@ pub enum InstKind {
     /// `{ k: v, … }` object literal (`BuildObject`); static keys + value props,
     /// each value register listed individually (no contiguity requirement).
     BuildObject { pairs: Vec<(Rc<str>, Value)> },
+    /// `ToString` — stringify an interpolated template part.
+    ToString { operand: Value },
+    /// Template literal (`BuildStr`) over already-stringified parts.
+    BuildStr { parts: Vec<Value> },
 }
 
 /// How a block ends and transfers control. Branch/jump carry the block-argument

@@ -77,6 +77,8 @@ fn inst_kind(kind: &InstKind) -> String {
                 .join(", ");
             format!("object {{{inner}}}")
         }
+        InstKind::ToString { operand } => format!("tostring {}", val(*operand)),
+        InstKind::BuildStr { parts } => format!("buildstr{}", args_list(parts)),
     }
 }
 

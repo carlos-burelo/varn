@@ -361,6 +361,17 @@ fn emit_inst(
                 chunk.write(Chunk::pack(reg[v.0 as usize], 0), LINE);
             }
         }
+        InstKind::ToString { operand } => {
+            chunk.emit_rr(OpCode::ToString, d, reg[operand.0 as usize], LINE);
+        }
+        // `BuildStr d, count` followed by one packed reg per part.
+        InstKind::BuildStr { parts } => {
+            chunk.write(Chunk::pack_op(OpCode::BuildStr, d), LINE);
+            chunk.write(Chunk::pack(parts.len() as u8, 0), LINE);
+            for p in parts {
+                chunk.write(Chunk::pack(reg[p.0 as usize], 0), LINE);
+            }
+        }
         // Dest-less side effects handled before the dest guard above.
         InstKind::SetProperty { .. } | InstKind::SetIndex { .. } => unreachable!(),
     }
