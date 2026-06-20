@@ -715,6 +715,18 @@ impl Builder {
                     Ok(self.emit(InstKind::BuildStr { parts: pvals }, HirType::Str))
                 }
             }
+            // Capture-free closure/arrow/nested fn → `LoadStaticFn`. Closures
+            // that capture upvalues are deferred (SSA renaming vs. slot capture).
+            HirExpr::Closure { func, upvalues } => {
+                if upvalues.is_empty() {
+                    Ok(self.emit(
+                        InstKind::MakeClosure { func: Rc::new((**func).clone()) },
+                        HirType::Ref,
+                    ))
+                } else {
+                    Err(OptError::Unsupported("ssa: closure with upvalues"))
+                }
+            }
             // Ternary `test ? cons : alt` → branch + result phi.
             HirExpr::Conditional { test, cons, alt } => {
                 let t = self.lower_expr(test)?;
@@ -978,6 +990,7 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                 InstKind::BuildObject { pairs } => pairs.iter_mut().for_each(|(_, v)| sub(v)),
                 InstKind::ToString { operand } => sub(operand),
                 InstKind::BuildStr { parts } => parts.iter_mut().for_each(sub),
+                InstKind::MakeClosure { .. } => {}
                 InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
                 | InstKind::ConstBool(_)

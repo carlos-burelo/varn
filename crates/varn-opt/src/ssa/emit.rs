@@ -38,7 +38,7 @@ pub fn emit_function(mut ssa: SsaFunc, f: &HirFunction, source_file: Rc<str>) ->
 
     let n = ssa.blocks.len();
     let mut chunk = Chunk::new();
-    chunk.source_file = source_file;
+    chunk.source_file = source_file.clone();
     let mut block_offset = vec![usize::MAX; n];
     // Forward jumps recorded as `(operand_pos, target)`, patched once every
     // block's offset is known.
@@ -50,7 +50,7 @@ pub fn emit_function(mut ssa: SsaFunc, f: &HirFunction, source_file: Rc<str>) ->
         block_offset[b] = chunk.code.len();
         let insts = std::mem::take(&mut ssa.blocks[b].insts);
         for inst in &insts {
-            emit_inst(&mut chunk, inst, &reg, scratch, call_base, &mut cache_count)?;
+            emit_inst(&mut chunk, inst, &reg, scratch, call_base, &mut cache_count, &source_file)?;
         }
         let term = ssa.blocks[b].term.clone();
         emit_terminator(&mut chunk, &ssa, &reg, b, &term, null_reg, scratch, &block_offset, &mut fixups)?;
@@ -229,6 +229,7 @@ fn emit_inst(
     scratch: u8,
     call_base: u8,
     cache_count: &mut u16,
+    source_file: &Rc<str>,
 ) -> Result<()> {
     // Side-effecting writes have no `dest`; handle them before the dest guard.
     match &inst.kind {
@@ -363,6 +364,14 @@ fn emit_inst(
         }
         InstKind::ToString { operand } => {
             chunk.emit_rr(OpCode::ToString, d, reg[operand.0 as usize], LINE);
+        }
+        // Capture-free closure → compile the nested fn to a proto constant
+        // (`lower_function` re-enters the SSA gate per-function), then LoadStaticFn.
+        InstKind::MakeClosure { func } => {
+            let proto = crate::lower::lower_function(func, source_file.clone());
+            let idx = chunk.add_constant(PoolEntry::Function(Rc::new(proto)));
+            chunk.write(Chunk::pack_op(OpCode::LoadStaticFn, d), LINE);
+            chunk.write(idx, LINE);
         }
         // `BuildStr d, count` followed by one packed reg per part.
         InstKind::BuildStr { parts } => {

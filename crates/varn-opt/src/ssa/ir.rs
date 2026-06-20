@@ -12,7 +12,7 @@
 
 use std::rc::Rc;
 
-use crate::hir::{HirBinOp, HirType, HirUnOp};
+use crate::hir::{HirBinOp, HirFunction, HirType, HirUnOp};
 
 /// An SSA value: defined exactly once, by an instruction or a block parameter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -118,6 +118,11 @@ pub enum InstKind {
     ToString { operand: Value },
     /// Template literal (`BuildStr`) over already-stringified parts.
     BuildStr { parts: Vec<Value> },
+    /// A capture-free closure/arrow/nested fn → `LoadStaticFn` (the nested
+    /// function is compiled to a proto constant at emit time). Closures that
+    /// capture upvalues are not yet supported in SSA (the captured local needs a
+    /// stable slot, which SSA renaming breaks).
+    MakeClosure { func: Rc<HirFunction> },
 }
 
 /// How a block ends and transfers control. Branch/jump carry the block-argument
