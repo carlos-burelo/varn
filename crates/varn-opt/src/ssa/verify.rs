@@ -173,6 +173,12 @@ fn inst_uses(kind: &InstKind) -> Vec<Value> {
         InstKind::GetIndex { object, index } => vec![*object, *index],
         InstKind::SetProperty { object, value, .. } => vec![*object, *value],
         InstKind::SetIndex { object, index, value } => vec![*object, *index, *value],
+        InstKind::MethodCall { recv, args, .. } => {
+            let mut v = Vec::with_capacity(args.len() + 1);
+            v.push(*recv);
+            v.extend_from_slice(args);
+            v
+        }
         _ => Vec::new(),
     }
 }

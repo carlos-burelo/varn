@@ -64,6 +64,9 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::SetIndex { object, index, value } => {
             format!("setindex {}[{}] = {}", val(*object), val(*index), val(*value))
         }
+        InstKind::MethodCall { recv, name, args } => {
+            format!("callmethod {}.{name}{}", val(*recv), args_list(args))
+        }
     }
 }
 

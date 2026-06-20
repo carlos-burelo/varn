@@ -345,7 +345,10 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
                 len: 4,
                 def: Some(hi1),
                 uses,
-                call_args: if hi3 > 1 { Some((lo3, hi3)) } else { None },
+                // Always record the arg block (even for 0/1 args) so the
+                // callee-frame constraint covers every method call. The
+                // contiguity check is a no-op for `arg_count <= 1`.
+                call_args: Some((lo3, hi3)),
                 opaque: false,
             }
         }

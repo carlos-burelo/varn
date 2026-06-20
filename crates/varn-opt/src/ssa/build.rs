@@ -588,6 +588,17 @@ impl Builder {
                 let i = self.lower_expr(index)?;
                 Ok(self.emit(InstKind::GetIndex { object: o, index: i }, *ty))
             }
+            HirExpr::MethodCall { recv, name, args, ty } => {
+                let r = self.lower_expr(recv)?;
+                let mut avs = Vec::with_capacity(args.len());
+                for a in args {
+                    avs.push(self.lower_expr(a)?);
+                }
+                Ok(self.emit(
+                    InstKind::MethodCall { recv: r, name: name.clone(), args: avs },
+                    *ty,
+                ))
+            }
             HirExpr::Binary { op, lhs, rhs, ty } => {
                 let l = self.lower_expr(lhs)?;
                 let r = self.lower_expr(rhs)?;
@@ -831,6 +842,10 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                     sub(object);
                     sub(index);
                     sub(value);
+                }
+                InstKind::MethodCall { recv, args, .. } => {
+                    sub(recv);
+                    args.iter_mut().for_each(sub);
                 }
                 InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
