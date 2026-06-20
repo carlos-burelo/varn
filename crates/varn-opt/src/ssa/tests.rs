@@ -561,6 +561,52 @@ fn f:
 }
 
 #[test]
+fn member_read_lowers_to_getproperty() {
+    // f(o) { return o.x }
+    let f = func(
+        vec![HirType::Ref],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::Member {
+            object: Box::new(param(0)),
+            name: "x".into(),
+            ty: HirType::Int,
+        }))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: ref):
+    v1 = getprop v0.x
+    return v1
+"
+    );
+}
+
+#[test]
+fn index_read_lowers_to_getindex() {
+    // f(a, i) { return a[i] }
+    let f = func(
+        vec![HirType::Ref, HirType::Int],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::Index {
+            object: Box::new(param(0)),
+            index: Box::new(param(1)),
+            ty: HirType::Int,
+        }))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: ref, v1: int):
+    v2 = getindex v0[v1]
+    return v2
+"
+    );
+}
+
+#[test]
 fn verifier_accepts_constructed_ssa() {
     // The verifier must not reject any well-formed function the builder emits.
     let while_loop = func(

@@ -95,6 +95,10 @@ pub enum InstKind {
     Call { callee: Value, args: Vec<Value> },
     /// Statically-resolved self-recursion (`CallSelf`).
     SelfCall { args: Vec<Value> },
+    /// `object.name` member read (`GetProperty` with an inline-cache slot).
+    GetProperty { object: Value, name: Rc<str> },
+    /// `object[index]` computed read (`GetIndex`).
+    GetIndex { object: Value, index: Value },
 }
 
 /// How a block ends and transfers control. Branch/jump carry the block-argument
