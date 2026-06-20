@@ -1906,11 +1906,13 @@ dependencies = [
 name = "varn-debug"
 version = "0.1.0"
 dependencies = [
+ "rustc-hash",
  "varn-checker",
  "varn-compiler",
  "varn-core",
  "varn-lexer",
  "varn-modules",
+ "varn-opt",
  "varn-parser",
  "varn-types",
  "varn-utilities",
@@ -1981,6 +1983,7 @@ dependencies = [
 name = "varn-opt"
 version = "0.1.0"
 dependencies = [
+ "rust_decimal",
  "rustc-hash",
  "varn-core",
  "varn-types",

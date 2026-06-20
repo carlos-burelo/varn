@@ -12,3 +12,4 @@ edition = "2021"
 varn-core  = { path = "../varn-core" }
 varn-types = { path = "../varn-types" }
 rustc-hash = { workspace = true }
+rust_decimal = { workspace = true }

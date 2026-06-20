@@ -45,6 +45,10 @@ import "./44-implicit-extensions-test.vn"
 import "./45-simple-file-test.vn"
 import "./46-extreme-nullable-edgecases.vn"
 // import "./47-isolates-multithread.vn"
+import "./48-opt-unsupported-phase1.vn"
+import "./49-opt-unsupported-phase2.vn"
+import "./50-opt-unsupported-phase3.vn"
+import "./51-opt-unsupported-phase4.vn"
 
-print("\nModules executed in suite: 48")
+print("\nModules executed in suite: 52")
 assertSummary()

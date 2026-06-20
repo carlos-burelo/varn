@@ -21,6 +21,15 @@ pub fn infer(proto: &mut FunctionProto) {
     }
 
     let mut kinds: Vec<SlotKind> = vec![SlotKind::Dynamic; n];
+    // Slots written by an *untyped* representation-producing opcode (untyped
+    // arithmetic — which dispatches on dynamic operands and can yield a string,
+    // e.g. `"a" + "b"` — or `StrConcat`). Such a slot is genuinely `Dynamic`;
+    // force it so even if a *typed* writer (e.g. `LoadIntZero` for a reused
+    // loop counter) also targets it. Without this, a register the optimizer
+    // reuses for both an int and a heap value (str) is mistagged `Int`, and the
+    // JIT returns the heap pointer as an unboxed int. Does not touch `Move`/
+    // `LoadConst` writers, so int/float accumulators keep their fast-path kind.
+    let mut tainted: Vec<bool> = vec![false; n];
     let code = &proto.chunk.code;
     let mut ip = 0;
 
@@ -34,6 +43,18 @@ pub fn infer(proto: &mut FunctionProto) {
         };
 
         match op {
+            OpCode::Add
+            | OpCode::Sub
+            | OpCode::Mul
+            | OpCode::Div
+            | OpCode::Mod
+            | OpCode::Pow
+            | OpCode::StrConcat => {
+                if dst < n {
+                    tainted[dst] = true;
+                }
+                ip += 1;
+            }
             OpCode::LoadIntZero | OpCode::LoadIntOne | OpCode::LoadIntMinusOne => {
                 set_if_dominant(&mut kinds, dst, SlotKind::Int);
             }
@@ -83,6 +104,12 @@ pub fn infer(proto: &mut FunctionProto) {
             _ => {
                 ip += instruction_extra_words(op, code, ip);
             }
+        }
+    }
+
+    for (i, kind) in kinds.iter_mut().enumerate() {
+        if tainted[i] {
+            *kind = SlotKind::Dynamic;
         }
     }
 

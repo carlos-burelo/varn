@@ -52,6 +52,26 @@ pub fn compile(
         varn_debug::bytecode::debug_bytecode(&proto, debug);
     }
 
+    if debug.hir {
+        varn_debug::hir::debug_hir(
+            program,
+            &check_result.checker_result.type_annotations,
+            &check_result.checker_result.extension_calls,
+            &check_result.checker_result.extension_members,
+            &check_result.checker_result.extension_set_members,
+        );
+    }
+
+    if debug.ssa {
+        varn_debug::ssa::debug_ssa(
+            program,
+            &check_result.checker_result.type_annotations,
+            &check_result.checker_result.extension_calls,
+            &check_result.checker_result.extension_members,
+            &check_result.checker_result.extension_set_members,
+        );
+    }
+
     if debug.cap_trace {
         varn_debug::debug_cap_trace(&proto, &program.filename);
     }

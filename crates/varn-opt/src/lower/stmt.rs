@@ -135,7 +135,8 @@ impl FnLower {
                 var,
                 iterable,
                 body,
-            } => self.lower_for_of(*var, iterable, body),
+                is_await,
+            } => self.lower_for_of(*var, iterable, body, *is_await),
             HirStmt::ForIn { var, object, body } => self.lower_for_in(*var, object, body),
             HirStmt::DoWhile { body, test } => self.lower_do_while(body, test),
             HirStmt::Switch { disc, cases } => self.lower_switch(disc, cases),
@@ -234,6 +235,71 @@ impl FnLower {
                 self.chunk.emit_rc(OpCode::LoadGlobal, r, idx, self.line);
                 self.chunk
                     .emit_rc(OpCode::StoreModuleSlot, r, *slot, self.line);
+                self.free_to(mark);
+            }
+            HirStmt::ExportNamed { specifiers, source } => {
+                let mark = self.next_temp;
+                match source {
+                    Some(src) => {
+                        let src_idx = self.chunk.add_str(src);
+                        let mod_reg = self.alloc();
+                        self.chunk.emit_rc(OpCode::LoadModule, mod_reg, src_idx, self.line);
+                        for spec in specifiers {
+                            let val_reg = self.alloc();
+                            if let Some(imported_slot) = spec.local_slot {
+                                self.chunk.emit_rrc(
+                                    OpCode::LoadModuleSlot,
+                                    val_reg,
+                                    mod_reg,
+                                    imported_slot,
+                                    self.line,
+                                );
+                            } else {
+                                let imported_idx = self.chunk.add_str(&spec.local);
+                                self.emit_property(OpCode::GetProperty, val_reg, mod_reg, imported_idx);
+                            }
+                            if let Some(exported_slot) = spec.exported_slot {
+                                self.chunk.emit_rc(OpCode::StoreModuleSlot, val_reg, exported_slot, self.line);
+                            }
+                            self.free_to(val_reg as u32);
+                        }
+                    }
+                    None => {
+                        for spec in specifiers {
+                            let val_reg = self.load_binding(&spec.binding);
+                            if let Some(exported_slot) = spec.exported_slot {
+                                self.chunk.emit_rc(OpCode::StoreModuleSlot, val_reg, exported_slot, self.line);
+                            }
+                            self.free_to(val_reg as u32);
+                        }
+                    }
+                }
+                self.free_to(mark);
+            }
+            HirStmt::ExportAll { source, alias, slot } => {
+                let mark = self.next_temp;
+                let src_idx = self.chunk.add_str(source);
+                match alias {
+                    Some(_) => {
+                        let mod_reg = self.alloc();
+                        self.chunk.emit_rc(OpCode::LoadModule, mod_reg, src_idx, self.line);
+                        if let Some(slot_idx) = slot {
+                            self.chunk.emit_rc(OpCode::StoreModuleSlot, mod_reg, *slot_idx, self.line);
+                        }
+                    }
+                    None => {
+                        let mod_reg = self.alloc();
+                        self.chunk.emit_rc(OpCode::LoadModule, mod_reg, src_idx, self.line);
+                    }
+                }
+                self.free_to(mark);
+            }
+            HirStmt::ExportDefaultExpr { value, slot } => {
+                let mark = self.next_temp;
+                let r = self.lower_expr(value);
+                if let Some(slot_idx) = slot {
+                    self.chunk.emit_rc(OpCode::StoreModuleSlot, r, *slot_idx, self.line);
+                }
                 self.free_to(mark);
             }
             HirStmt::Dispose { target, is_await } => {

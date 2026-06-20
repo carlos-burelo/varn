@@ -42,26 +42,36 @@ impl ExecCtx {
 
             if let Some(bm) = bound_method {
                 let receiver = self.heap.intern(bm.receiver.clone());
-                self.stack[base + arg_start] = receiver;
                 match &bm.target {
                     varn_types::value::BoundMethodTarget::Native { func, name, .. } => {
                         let f = *func;
                         self.record_call_native();
                         self.record_hotspot_native(name);
-                        let result = if arg_count <= 16 {
-                            let mut buf: [MaybeUninit<VmValue>; 16] =
-                                unsafe { MaybeUninit::uninit().assume_init() };
-                            let n = unsafe {
-                                copy_args_to_buf(&self.stack, base, arg_start, arg_count, &mut buf)
-                            };
-                            let slice = unsafe {
-                                std::slice::from_raw_parts(buf.as_ptr().cast::<VmValue>(), n)
-                            };
-                            self.invoke_native(f, slice)
+                        let has_placeholder = base + arg_start < self.stack.len();
+                        let result = if has_placeholder {
+                            self.stack[base + arg_start] = receiver;
+                            if arg_count <= 16 {
+                                let mut buf: [MaybeUninit<VmValue>; 16] =
+                                    unsafe { MaybeUninit::uninit().assume_init() };
+                                let n = unsafe {
+                                    copy_args_to_buf(&self.stack, base, arg_start, arg_count, &mut buf)
+                                };
+                                let slice = unsafe {
+                                    std::slice::from_raw_parts(buf.as_ptr().cast::<VmValue>(), n)
+                                };
+                                self.invoke_native(f, slice)
+                            } else {
+                                let varn_args: Vec<VmValue> = (0..arg_count)
+                                    .map(|i| self.stack[base + arg_start + i])
+                                    .collect();
+                                self.invoke_native(f, &varn_args)
+                            }
                         } else {
-                            let varn_args: Vec<VmValue> = (0..arg_count)
-                                .map(|i| self.stack[base + arg_start + i])
-                                .collect();
+                            let mut varn_args = Vec::with_capacity(arg_count + 1);
+                            varn_args.push(receiver);
+                            for i in 0..arg_count {
+                                varn_args.push(self.stack[base + arg_start + i]);
+                            }
                             self.invoke_native(f, &varn_args)
                         }
                         .map_err(|e| crate::error::RuntimeError::new(e))?;
@@ -77,44 +87,29 @@ impl ExecCtx {
                             .downcast_ref::<crate::frame::VmClosurePayload>()
                         {
                             let nc = &nc_w.0;
+                            let arity = nc.proto.arity;
                             if !nc.proto.is_generator
                                 && !nc.proto.is_async
-                                && arg_count <= nc.proto.arity
+                                && (arg_count == arity || arg_count == arity - 1)
                             {
                                 let nc = nc.clone();
                                 let owner = owner_class.clone();
-                                let arity = nc.proto.arity;
                                 self.stack.push(VmValue::null());
-                                if !nc.proto.has_rest {
+
+                                if arg_count == arity - 1 {
+                                    self.stack.push(receiver);
                                     for i in 0..arg_count {
                                         let v = self.stack[base + arg_start + i];
                                         self.stack.push(v);
                                     }
-                                    for _ in arg_count..arity {
-                                        self.stack.push(VmValue::null());
-                                    }
                                 } else {
-                                    let rest_idx = arity.saturating_sub(1);
-                                    let regular_count = arg_count.min(rest_idx);
-                                    for i in 0..regular_count {
+                                    self.stack.push(receiver);
+                                    for i in 1..arg_count {
                                         let v = self.stack[base + arg_start + i];
                                         self.stack.push(v);
                                     }
-                                    for _ in regular_count..rest_idx {
-                                        self.stack.push(VmValue::null());
-                                    }
-                                    let rest_items: Vec<VmValue> = if arg_count > rest_idx {
-                                        (rest_idx..arg_count)
-                                            .map(|i| self.stack[base + arg_start + i])
-                                            .collect()
-                                    } else {
-                                        vec![]
-                                    };
-                                    let rest_nv = VmValue::from_heap_idx(self.heap.alloc(
-                                        crate::heap::HeapObj::Array(VmArray::new(rest_items)),
-                                    ));
-                                    self.stack.push(rest_nv);
                                 }
+
                                 if self.frames.len() >= 10000 {
                                     return Err(crate::error::RuntimeError::new(
                                         "stack overflow: call depth exceeded 10000",
@@ -135,6 +130,22 @@ impl ExecCtx {
                             }
                         }
                     }
+                }
+
+                let has_placeholder = match &bm.target {
+                    varn_types::value::BoundMethodTarget::Vm { closure, .. } => {
+                        if let Some(nc_w) = closure.as_any().downcast_ref::<crate::frame::VmClosurePayload>() {
+                            arg_count == nc_w.0.proto.arity
+                        } else {
+                            false
+                        }
+                    }
+                    varn_types::value::BoundMethodTarget::Native { .. } => {
+                        base + arg_start < self.stack.len()
+                    }
+                };
+                if has_placeholder {
+                    self.stack[base + arg_start] = receiver;
                 }
             } else {
                 match self.heap.get(callee.as_heap_idx()) {

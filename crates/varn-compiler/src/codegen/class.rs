@@ -747,6 +747,30 @@ pub fn compile_namespace_decl<'a>(c: &mut Compiler<'a>, ns: &NamespaceDecl) {
                     members.push((name.clone(), r));
                 }
             }
+            Decl::Namespace(sub_ns) => {
+                let r = c.alloc_reg();
+                if !c.emit_load_var(&sub_ns.id, r) {
+                    let idx = c.add_str(&sub_ns.id);
+                    c.emit_rc(OpCode::LoadGlobal, r, idx);
+                }
+                members.push((sub_ns.id.clone(), r));
+            }
+            Decl::Enum(en) => {
+                let r = c.alloc_reg();
+                if !c.emit_load_var(&en.id, r) {
+                    let idx = c.add_str(&en.id);
+                    c.emit_rc(OpCode::LoadGlobal, r, idx);
+                }
+                members.push((en.id.clone(), r));
+            }
+            Decl::SumType(st) => {
+                let r = c.alloc_reg();
+                if !c.emit_load_var(&st.id, r) {
+                    let idx = c.add_str(&st.id);
+                    c.emit_rc(OpCode::LoadGlobal, r, idx);
+                }
+                members.push((st.id.clone(), r));
+            }
             _ => {}
         }
     }

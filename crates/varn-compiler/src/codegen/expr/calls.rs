@@ -456,7 +456,12 @@ fn try_emit_intrinsic<'a>(
     _call_offset: u32,
     wire_byte: u8,
 ) -> Option<u8> {
-    let ExprKind::Member { object, computed: false, .. } = &callee.kind else {
+    let ExprKind::Member {
+        object,
+        computed: false,
+        ..
+    } = &callee.kind
+    else {
         return None;
     };
 
@@ -479,14 +484,17 @@ fn try_emit_intrinsic<'a>(
                     break;
                 }
             }
-            c.chunk.emit_rr(varn_core::OpCode::Move, expected, r, c.line);
+            c.chunk
+                .emit_rr(varn_core::OpCode::Move, expected, r, c.line);
         }
         arg_count += 1;
     }
 
     let line = c.line;
-    c.chunk.write(Chunk::pack_op(varn_core::OpCode::Intrinsic, dest), line);
-    c.chunk.write(((wire_byte as u16) << 8) | (arg_count as u16), line);
+    c.chunk
+        .write(Chunk::pack_op(varn_core::OpCode::Intrinsic, dest), line);
+    c.chunk
+        .write(((wire_byte as u16) << 8) | (arg_count as u16), line);
 
     for _ in 1..arg_count {
         c.free_reg();

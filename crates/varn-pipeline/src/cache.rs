@@ -17,8 +17,16 @@ pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
     let path_hash = crate::hash::fnv1a64(canonical.to_string_lossy().as_bytes());
 
     let stem = path.file_stem().unwrap_or_default().to_string_lossy();
+    // During the temporary `VN_OPT` dev gate, the optimizer and legacy codegen
+    // produce different bytecode for the same source; tag the cache so the two
+    // tiers don't poison each other's artifacts. Removed with the gate (Stage 4).
+    let tier = if std::env::var_os("VN_OPT").is_some() {
+        ".opt"
+    } else {
+        ""
+    };
     varn_modules::artifact::get_bytecode_cache_dir(&project_root)
-        .join(format!("{}.{:x}.vnc", stem, path_hash as u32))
+        .join(format!("{}{}.{:x}.vnc", stem, tier, path_hash as u32))
 }
 
 pub fn load_cached_graph(

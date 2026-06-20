@@ -56,3 +56,41 @@ pub fn compile(input: OptInput<'_>) -> Result<FunctionProto, OptError> {
     }
     lower::lower(&module, source_file, export_names)
 }
+
+/// Lower AST → HIR only (for `vn debug -p hir`).
+/// Returns `Err` if any construct is unsupported.
+pub fn lower_to_hir(input: OptInput<'_>) -> Result<hir::HirModule, OptError> {
+    hir::lower::lower_program(&input)
+}
+
+/// Lower AST → HIR → SSA for each function that succeeds (for `vn debug -p ssa`).
+/// Functions that fail SSA construction are silently skipped; their name is
+/// returned in the errors list so the caller can warn the user.
+pub fn lower_to_ssa(
+    input: OptInput<'_>,
+) -> Result<(Vec<ssa::ir::SsaFunc>, Vec<(Rc<str>, &'static str)>), OptError> {
+    let module = hir::lower::lower_program(&input)?;
+    let mut funcs = Vec::new();
+    let mut errors: Vec<(Rc<str>, &'static str)> = Vec::new();
+
+    // Try top-level
+    match ssa::build::build_function(&module.top_level) {
+        Ok(f) => funcs.push(f),
+        Err(OptError::Unsupported(msg)) => {
+            errors.push((module.top_level.name.clone(), msg));
+        }
+    }
+
+    // Try each declared function
+    for f in &module.functions {
+        match ssa::build::build_function(f) {
+            Ok(sf) => funcs.push(sf),
+            Err(OptError::Unsupported(msg)) => {
+                errors.push((f.name.clone(), msg));
+            }
+        }
+    }
+
+    Ok((funcs, errors))
+}
+

@@ -1,0 +1,113 @@
+// Tests for Phase 3 of varn-opt unsupported features parity
+
+// 1. for-await-of loops (asynchronous iteration)
+class AsyncCounter {
+    i: int;
+    constructor() {
+        this.i = 0;
+    }
+    async next(): dynamic {
+        if (this.i < 3) {
+            let val = this.i;
+            this.i = this.i + 1;
+            return { value: val, done: false };
+        } else {
+            return { value: null, done: true };
+        }
+    }
+}
+
+const myAsyncIterable = {
+    "Symbol.asyncIterator": function(): dynamic {
+        return new AsyncCounter();
+    }
+};
+
+async function testForAwait(): int {
+    let sum = 0;
+    for await (let x of myAsyncIterable) {
+        sum = sum + x;
+    }
+    return sum;
+}
+
+// 2. using statement destructuring
+class PremiumDisposable {
+    res1: int;
+    res2: int;
+    disposed: bool;
+    constructor() {
+        this.res1 = 100;
+        this.res2 = 200;
+        this.disposed = false;
+    }
+    dispose(): void {
+        this.disposed = true;
+    }
+}
+
+function testUsingDestructure(): void {
+    let resource = new PremiumDisposable();
+    {
+        using { res1, res2 } = resource;
+        assert("using destructure res1", res1 === 100);
+        assert("using destructure res2", res2 === 200);
+    }
+    assert("disposable disposed", resource.disposed);
+}
+
+// 3. catch block parameter destructuring
+class CustomError {
+    message: str;
+    code: int;
+    constructor(message: str, code: int) {
+        this.message = message;
+        this.code = code;
+    }
+}
+
+function testCatchDestructure(): void {
+    try {
+        throw new CustomError("process failed", 500);
+    } catch ({ message, code }) {
+        assert("catch destructure message", message === "process failed");
+        assert("catch destructure code", code === 500);
+    }
+}
+
+// 4. Nested namespaces
+namespace OuterNS {
+    export namespace InnerNS {
+        export function getVal(): int {
+            return 42;
+        }
+    }
+}
+
+function testNestedNamespace(): void {
+    assert("nested namespace call", OuterNS.InnerNS.getVal() === 42);
+}
+
+function testLocalNamespace(): void {
+    namespace LocalNS {
+        export function nested(): str {
+            return "local";
+        }
+    }
+    assert("local namespace call", LocalNS.nested() === "local");
+}
+
+// Execution block
+async function runAll(): void {
+    let sum = await testForAwait();
+    assert("for-await-of sum", sum === 3);
+
+    testUsingDestructure();
+    testCatchDestructure();
+    testNestedNamespace();
+    testLocalNamespace();
+}
+
+await runAll();
+
+print("[PASSED] 50. Phase 3 Unsupported Features Parity");

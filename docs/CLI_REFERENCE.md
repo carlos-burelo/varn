@@ -105,6 +105,8 @@ Inspecciona el pipeline sin ejecutar la VM.
 vn debug archivo.vn
 vn debug -p ast archivo.vn
 vn debug -p check archivo.vn
+vn debug -p hir archivo.vn
+vn debug -p ssa archivo.vn
 vn debug -p bytecode archivo.vn
 vn debug -e "function add(a: int, b: int) = a + b"
 ```
@@ -112,7 +114,12 @@ vn debug -e "function add(a: int, b: int) = a + b"
 Flags:
 
 - `-e, --eval <CODE>`: evalúa código inline en vez de archivo.
-- `-p, --phase <PHASE>`: fase a mostrar. Valores: `tokens`, `ast`, `check`, `bytecode`, `symbols`, `binds`, `types[:N]`, `expr`, `modules`, `graph`, `caps`, `scope`, `errors`, `trace`, `info`, `lsp[:sub]`, `all`.
+- `-p, --phase <PHASE>`: fase a mostrar. Valores: `tokens`, `ast`, `check`, `bytecode`, `hir`, `ssa`, `symbols`, `binds`, `types[:N]`, `expr`, `modules`, `graph`, `caps`, `scope`, `errors`, `trace`, `info`, `lsp[:sub]`, `all`.
+
+Fases del optimizer:
+
+- `hir`: dump del HIR (High-level IR) con colores ANSI. Muestra la estructura de cada función tras el lowering del AST: bindings resueltos, azúcar expandido, tipos anotados por el checker.
+- `ssa`: dump del SSA CFG (Braun). Muestra basic blocks, valores SSA, parámetros de bloque y terminators. Funciones con construcciones fuera de la cobertura actual aparecen con un aviso detallado.
 
 ### `build`
 

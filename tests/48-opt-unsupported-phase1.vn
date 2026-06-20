@@ -1,0 +1,84 @@
+// Tests for Phase 1 of varn-opt unsupported features parity
+// 1. Compound assignment operators (**=, >>>=)
+let x = 2;
+x **= 3;
+assert("compound **=", x === 8);
+
+let y = 16;
+y >>>= 2;
+assert("compound >>>=", y === 4);
+
+// 2. Logical compound assignments (&&=, ||=, ??=) on variables
+let a = true;
+a &&= false;
+print("a after &&= false is:", a);
+assert("variable &&=", a === false);
+
+let b = false;
+b ||= true;
+print("b after ||= true is:", b);
+assert("variable ||=", b === true);
+
+let c: dynamic = null;
+c ??= 42;
+print("c after ??= 42 is:", c);
+assert("variable ??=", c === 42);
+
+// 3. Compound member and index assignments
+let obj = { prop: 10, arr: [20] };
+obj.prop += 5;
+assert("member compound +=", obj.prop === 15);
+
+obj.arr[0] *= 2;
+assert("index compound *=", obj.arr[0] === 40);
+
+// 4. Logical compound assignments on members and index targets
+let obj2 = { a: true, b: false, c: null as dynamic, arr: [true, false, null as dynamic] };
+obj2.a &&= false;
+assert("member &&=", obj2.a === false);
+
+obj2.b ||= true;
+assert("member ||=", obj2.b === true);
+
+obj2.c ??= 42;
+assert("member ??=", obj2.c === 42);
+
+obj2.arr[0] &&= false;
+assert("index &&=", obj2.arr[0] === false);
+
+obj2.arr[1] ||= true;
+assert("index ||=", obj2.arr[1] === true);
+
+obj2.arr[2] ??= true;
+assert("index ??=", obj2.arr[2] === true);
+
+// 5. Module-slot reads and assignments
+let topLevelVar = 100;
+topLevelVar = 200;
+assert("module slot assignment", topLevelVar === 200);
+
+topLevelVar += 50;
+assert("module slot compound assignment", topLevelVar === 250);
+
+// 6. Super property reads, method calls, and assignments
+class Parent {
+    val: int
+    constructor() { this.val = 10; }
+    getVal(): int { return this.val; }
+    setVal(v: int): void { this.val = v; }
+    speak(): str { return "hello"; }
+}
+
+class Child extends Parent {
+    constructor() { super(); }
+    testSuper(): void {
+        assert("super method call", super.speak() === "hello");
+        super.setVal(30);
+        assert("super write via method", super.getVal() === 30);
+    }
+}
+
+const child = new Child();
+child.testSuper();
+
+print("[PASSED] 48. Phase 1 Unsupported Features Parity");

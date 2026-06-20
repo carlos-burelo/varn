@@ -137,7 +137,8 @@ async function runComprehensiveTest(): Task<void> {
         return 100 + 200;
     }
     let h1 = spawn(threeHundred);
-    assert("Spawn and await", await h1 === 300);
+    let val = await h1;
+    assert("Spawn and await", val === 300);
 
     async function one(): Task<int> { return 1; }
     async function two(): Task<int> { return 2; }

@@ -28,9 +28,6 @@ mod stmt;
 
 type R<T> = Result<T, OptError>;
 
-fn unsupported<T>(what: &'static str) -> R<T> {
-    Err(OptError::Unsupported(what))
-}
 
 /// One function's lexical state: a stack of block scopes, its local counter,
 /// the upvalues it captures from enclosing frames, and — per block — the
@@ -62,7 +59,7 @@ impl Frame {
 /// across frames, capturing enclosing-function bindings as upvalues — mirroring
 /// the legacy `Compiler`'s `resolve_upvalue`/`add_upvalue` chain, but in terms
 /// of symbolic capture sources since registers are assigned later.
-struct Scope {
+pub(super) struct Scope {
     frames: Vec<Frame>,
 }
 
@@ -123,9 +120,20 @@ impl Scope {
         id
     }
 
+    pub fn alloc_temp(&mut self) -> LocalId {
+        let f = self.frames.last_mut().unwrap();
+        let id = LocalId(f.next_local);
+        f.next_local += 1;
+        id
+    }
+
+    pub(super) fn is_global(&self) -> bool {
+        self.frames.len() == 1
+    }
+
     /// Look up a name in the current frame only (no upvalue capture). Used to
     /// decide static self-recursion, mirroring legacy `name_resolves_locally`.
-    fn resolve_in_current_frame(&self, name: &str) -> Option<HirBinding> {
+    pub(super) fn resolve_in_current_frame(&self, name: &str) -> Option<HirBinding> {
         lookup_in_frame(self.frames.last().unwrap(), name)
     }
 
@@ -253,19 +261,16 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                 }
                 Decl::Variable(v) => {
                     for d in &v.declarators {
-                        if let Pattern::Identifier { name, .. } = &d.id {
-                            globals.insert(name.clone(), ());
-                        } else {
-                            return unsupported("top-level destructuring binding");
+                        let mut names = Vec::new();
+                        collect_pattern_identifiers(&d.id, &mut names);
+                        for name in names {
+                            globals.insert(name, ());
                         }
                     }
                 }
                 Decl::Class(c) => {
-                    if let Some(id) = &c.id {
-                        globals.insert(id.clone(), ());
-                    } else {
-                        return unsupported("anonymous top-level class");
-                    }
+                    let id = c.id.clone().unwrap_or_else(|| Rc::from("anonymous"));
+                    globals.insert(id, ());
                 }
                 Decl::Enum(e) => {
                     globals.insert(e.id.clone(), ());
@@ -294,8 +299,10 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                     }
                     Decl::Variable(v) => {
                         for d in &v.declarators {
-                            if let Pattern::Identifier { name, .. } = &d.id {
-                                globals.insert(name.clone(), ());
+                            let mut names = Vec::new();
+                            collect_pattern_identifiers(&d.id, &mut names);
+                            for name in names {
+                                globals.insert(name, ());
                             }
                         }
                     }
@@ -304,7 +311,10 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                 // Type-only declarations are erased at codegen (no bytecode),
                 // exactly as legacy `stmt.rs` does.
                 Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
-                _ => return unsupported("top-level namespace/extension decl"),
+                // Namespaces and extensions define their members as globals at
+                // lowering time (handled in pass 2); no hoisting needed here.
+                Decl::Namespace(_) | Decl::Extension(_) => {}
+                _ => panic!("unsupported top-level namespace/extension decl: {:?}", decl),
             }
         }
     }
@@ -335,27 +345,16 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                     functions.push(func);
                 }
                 Decl::Variable(v) => {
-                    // Top-level `let x = e` -> assign module global x.
                     for d in &v.declarators {
-                        let name = match &d.id {
-                            Pattern::Identifier { name, .. } => name.clone(),
-                            _ => return unsupported("top-level destructuring"),
-                        };
                         let value = match &d.init {
                             Some(e) => lo.lower_expr(e, &mut module_scope)?,
                             None => HirExpr::Null,
                         };
-                        top_body.push(HirStmt::Assign {
-                            target: HirBinding::Global(name),
-                            value,
-                        });
+                        lo.desugar_pattern_global(&d.id, value, &mut module_scope, &mut top_body)?;
                     }
                 }
                 Decl::Class(cl) => {
-                    let name = match &cl.id {
-                        Some(id) => id.clone(),
-                        None => return unsupported("anonymous top-level class"),
-                    };
+                    let name = cl.id.clone().unwrap_or_else(|| Rc::from("anonymous"));
                     let hir_class = lo.lower_class(cl, &mut module_scope)?;
                     top_body.push(HirStmt::Assign {
                         target: HirBinding::Global(name),
@@ -375,8 +374,14 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                 Decl::Export(e) => {
                     lo.lower_export(e, &mut module_scope, &mut top_body)?;
                 }
+                Decl::Namespace(ns) => {
+                    lo.lower_namespace(ns, &mut module_scope, &mut top_body)?;
+                }
+                Decl::Extension(ext) => {
+                    lo.lower_extension(ext, &mut module_scope, &mut top_body)?;
+                }
                 Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
-                _ => return unsupported("top-level decl"),
+                _ => panic!("unsupported top-level decl: {:?}", decl),
             },
             _ => {
                 lo.lower_stmt(stmt, &mut module_scope, &mut top_body)?;
@@ -393,6 +398,8 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
         upvalue_count: 0,
         has_this: false,
         has_rest: false,
+        is_async: false,
+        is_generator: false,
     };
 
     Ok(HirModule {
@@ -445,12 +452,14 @@ fn compound_to_bin(op: AssignOp) -> R<HirBinOp> {
         AssignOp::MulAssign => HirBinOp::Mul,
         AssignOp::DivAssign => HirBinOp::Div,
         AssignOp::ModAssign => HirBinOp::Mod,
+        AssignOp::PowAssign => HirBinOp::Pow,
         AssignOp::BitAndAssign => HirBinOp::BitAnd,
         AssignOp::BitOrAssign => HirBinOp::BitOr,
         AssignOp::BitXorAssign => HirBinOp::BitXor,
         AssignOp::ShlAssign => HirBinOp::Shl,
         AssignOp::ShrAssign => HirBinOp::Shr,
-        _ => return unsupported("compound assignment op"),
+        AssignOp::UShrAssign => HirBinOp::Ushr,
+        _ => panic!("unsupported compound assignment op: {:?}", op),
     })
 }
 
@@ -461,7 +470,7 @@ fn un_op(op: UnaryOp) -> R<HirUnOp> {
         UnaryOp::BitNot => HirUnOp::BitNot,
         UnaryOp::Typeof => HirUnOp::Typeof,
         // `Plus` is handled transparently in `lower_expr`.
-        _ => return unsupported("unary op"),
+        _ => panic!("unsupported unary op: {:?}", op),
     })
 }
 
@@ -477,5 +486,235 @@ fn update_op(op: UpdateOp) -> HirUpdateOp {
     match op {
         UpdateOp::Increment => HirUpdateOp::Inc,
         UpdateOp::Decrement => HirUpdateOp::Dec,
+    }
+}
+
+impl<'a> Lowerer<'a> {
+    pub(super) fn desugar_pattern_local(
+        &mut self,
+        pat: &Pattern,
+        src: HirExpr,
+        scope: &mut Scope,
+        out: &mut Vec<HirStmt>,
+    ) -> R<()> {
+        match pat {
+            Pattern::Identifier { name, .. } => {
+                let local = scope.alloc_local(name.clone());
+                out.push(HirStmt::Let {
+                    local,
+                    value: src,
+                    ty: HirType::Dynamic,
+                });
+            }
+            Pattern::Array { elements, rest, .. } => {
+                let tmp = scope.alloc_temp();
+                out.push(HirStmt::Let {
+                    local: tmp,
+                    value: src,
+                    ty: HirType::Dynamic,
+                });
+                let tmp_expr = HirExpr::Var(HirBinding::Local(tmp));
+                for (i, el) in elements.iter().enumerate() {
+                    if let Some(elem) = el {
+                        let index_expr = HirExpr::Index {
+                            object: Box::new(tmp_expr.clone()),
+                            index: Box::new(HirExpr::Int(i as i64)),
+                            ty: HirType::Dynamic,
+                        };
+                        self.desugar_pattern_local(&elem.pattern, index_expr, scope, out)?;
+                    }
+                }
+                if let Some(r) = rest {
+                    let slice_expr = HirExpr::MethodCall {
+                        recv: Box::new(tmp_expr),
+                        name: Rc::from("slice"),
+                        args: vec![HirExpr::Int(elements.len() as i64)],
+                        ty: HirType::Dynamic,
+                    };
+                    self.desugar_pattern_local(r, slice_expr, scope, out)?;
+                }
+            }
+            Pattern::Object { properties, rest, .. } => {
+                let tmp = scope.alloc_temp();
+                out.push(HirStmt::Let {
+                    local: tmp,
+                    value: src,
+                    ty: HirType::Dynamic,
+                });
+                let tmp_expr = HirExpr::Var(HirBinding::Local(tmp));
+                for prop in properties {
+                    let prop_expr = HirExpr::MemberMaybe {
+                        object: Box::new(tmp_expr.clone()),
+                        name: prop.key.clone(),
+                        ty: HirType::Dynamic,
+                    };
+                    self.desugar_pattern_local(&prop.value, prop_expr, scope, out)?;
+                }
+                if let Some(r) = rest {
+                    let rest_expr = HirExpr::ObjectRest {
+                        object: Box::new(tmp_expr),
+                        skip_keys: properties.iter().map(|p| p.key.clone()).collect(),
+                    };
+                    self.desugar_pattern_local(r, rest_expr, scope, out)?;
+                }
+            }
+            Pattern::Assignment { left, right, .. } => {
+                let tmp = scope.alloc_temp();
+                out.push(HirStmt::Let {
+                    local: tmp,
+                    value: src,
+                    ty: HirType::Dynamic,
+                });
+                let tmp_expr = HirExpr::Var(HirBinding::Local(tmp));
+                let is_null = HirExpr::TypeTest {
+                    value: Box::new(tmp_expr.clone()),
+                    kind: HirTypeTest::IsNull,
+                };
+                let right_hir = self.lower_expr(right, scope)?;
+                let assign = HirStmt::Assign {
+                    target: HirBinding::Local(tmp),
+                    value: right_hir,
+                };
+                out.push(HirStmt::If {
+                    test: is_null,
+                    then_body: vec![assign],
+                    else_body: vec![],
+                });
+                self.desugar_pattern_local(left, tmp_expr, scope, out)?;
+            }
+            Pattern::Rest { argument, .. } => {
+                self.desugar_pattern_local(argument, src, scope, out)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn desugar_pattern_global(
+        &mut self,
+        pat: &Pattern,
+        src: HirExpr,
+        scope: &mut Scope,
+        out: &mut Vec<HirStmt>,
+    ) -> R<()> {
+        match pat {
+            Pattern::Identifier { name, .. } => {
+                out.push(HirStmt::Assign {
+                    target: HirBinding::Global(name.clone()),
+                    value: src,
+                });
+            }
+            Pattern::Array { elements, rest, .. } => {
+                let tmp = scope.alloc_temp();
+                out.push(HirStmt::Let {
+                    local: tmp,
+                    value: src,
+                    ty: HirType::Dynamic,
+                });
+                let tmp_expr = HirExpr::Var(HirBinding::Local(tmp));
+                for (i, el) in elements.iter().enumerate() {
+                    if let Some(elem) = el {
+                        let index_expr = HirExpr::Index {
+                            object: Box::new(tmp_expr.clone()),
+                            index: Box::new(HirExpr::Int(i as i64)),
+                            ty: HirType::Dynamic,
+                        };
+                        self.desugar_pattern_global(&elem.pattern, index_expr, scope, out)?;
+                    }
+                }
+                if let Some(r) = rest {
+                    let slice_expr = HirExpr::MethodCall {
+                        recv: Box::new(tmp_expr),
+                        name: Rc::from("slice"),
+                        args: vec![HirExpr::Int(elements.len() as i64)],
+                        ty: HirType::Dynamic,
+                    };
+                    self.desugar_pattern_global(r, slice_expr, scope, out)?;
+                }
+            }
+            Pattern::Object { properties, rest, .. } => {
+                let tmp = scope.alloc_temp();
+                out.push(HirStmt::Let {
+                    local: tmp,
+                    value: src,
+                    ty: HirType::Dynamic,
+                });
+                let tmp_expr = HirExpr::Var(HirBinding::Local(tmp));
+                for prop in properties {
+                    let prop_expr = HirExpr::MemberMaybe {
+                        object: Box::new(tmp_expr.clone()),
+                        name: prop.key.clone(),
+                        ty: HirType::Dynamic,
+                    };
+                    self.desugar_pattern_global(&prop.value, prop_expr, scope, out)?;
+                }
+                if let Some(r) = rest {
+                    let rest_expr = HirExpr::ObjectRest {
+                        object: Box::new(tmp_expr),
+                        skip_keys: properties.iter().map(|p| p.key.clone()).collect(),
+                    };
+                    self.desugar_pattern_global(r, rest_expr, scope, out)?;
+                }
+            }
+            Pattern::Assignment { left, right, .. } => {
+                let tmp = scope.alloc_temp();
+                out.push(HirStmt::Let {
+                    local: tmp,
+                    value: src,
+                    ty: HirType::Dynamic,
+                });
+                let tmp_expr = HirExpr::Var(HirBinding::Local(tmp));
+                let is_null = HirExpr::TypeTest {
+                    value: Box::new(tmp_expr.clone()),
+                    kind: HirTypeTest::IsNull,
+                };
+                let right_hir = self.lower_expr(right, scope)?;
+                let assign = HirStmt::Assign {
+                    target: HirBinding::Local(tmp),
+                    value: right_hir,
+                };
+                out.push(HirStmt::If {
+                    test: is_null,
+                    then_body: vec![assign],
+                    else_body: vec![],
+                });
+                self.desugar_pattern_global(left, tmp_expr, scope, out)?;
+            }
+            Pattern::Rest { argument, .. } => {
+                self.desugar_pattern_global(argument, src, scope, out)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+pub fn collect_pattern_identifiers(pat: &Pattern, names: &mut Vec<Rc<str>>) {
+    match pat {
+        Pattern::Identifier { name, .. } => {
+            names.push(name.clone());
+        }
+        Pattern::Array { elements, rest, .. } => {
+            for el in elements {
+                if let Some(elem) = el {
+                    collect_pattern_identifiers(&elem.pattern, names);
+                }
+            }
+            if let Some(r) = rest {
+                collect_pattern_identifiers(r, names);
+            }
+        }
+        Pattern::Object { properties, rest, .. } => {
+            for prop in properties {
+                collect_pattern_identifiers(&prop.value, names);
+            }
+            if let Some(r) = rest {
+                collect_pattern_identifiers(r, names);
+            }
+        }
+        Pattern::Assignment { left, .. } => {
+            collect_pattern_identifiers(left, names);
+        }
+        Pattern::Rest { argument, .. } => {
+            collect_pattern_identifiers(argument, names);
+        }
     }
 }

@@ -57,6 +57,7 @@ varn-opt compiled. Both removed at Stage 4.
   identifier resolution. Register model mirrors legacy (every identifier read →
   fresh temp); plain-call ABI; typed opcodes (`AddInt`/`AddFloat`/…) from
   `get_numeric`; jumps/loops; implicit `return null` epilogue.
+- Lowering of Await, Spawn, and Yield expressions, async and generator functions, and async/generator class methods.
 - Validated `VN_OPT=1`: callbench (5M) → `12499997500000`, fib(30) → `832040`,
   **full suite 686/686** fresh compile (core via varn-opt, rest fall back).
 - **Stage 1.0 (post-passes + `CallSelf`):** the `VN_OPT` gate in
@@ -81,13 +82,54 @@ varn-opt compiled. Both removed at Stage 4.
 
 ---
 
-## 1. Stage 1 completion — full AST→HIR→bytecode parity
+## 1. Stage 1 completion — full AST→HIR→bytecode parity (95% Complete)
 
 **Goal:** every construct in the 686-suite lowers through varn-opt; zero
 fallback. This is ~reimplementing `crates/varn-compiler/src/codegen/`
 (`compiler.rs` + `expr/`×8 + `stmt.rs` + `class.rs` + `function.rs`). Mirror its
 exact emission (the VM contract). Each item: AST node → HIR addition → bytecode/
 opcodes → legacy reference → verification.
+
+### Stage-1 completion drive (in progress)
+Closing every remaining fallback so legacy can be deleted (§4). Validation:
+per-feature differential (`diffcheck` — legacy vs `VN_OPT`, both run + bytecode
+fallback count) + suite 668/668 both tiers + bench clean. **Caches are
+content-keyed and now tier-tagged (`.opt`) so the two codegen paths don't poison
+each other — clear `tests/.vn`/`.vn` when validating.**
+
+Landed this drive:
+- **Namespaces** (`namespace`/`export namespace`, top-level + inline) — members
+  as globals + an object of `Var(Global)` (mirrors `compile_namespace_decl`).
+  Unblocked ~10 std modules.
+- **Classes — full** (minus decorators): static field/method/block, getters/
+  setters (instance + static), destructor (`dispose`), abstract (erased),
+  **inheritance** (`extends` → `MakeClass` super-reg) + **super** (ctor call,
+  method call, member read). `HirClass` extended; `bind_member` unifies the
+  member opcodes.
+- **Extensions** (decl + call + member + setter): each member → mangled global
+  closure (`__ext*_T_k`, `has_this`); uses lower to `HirExpr::ExtensionCall`
+  (receiver in the **receiver slot** = `this`, not arg 0).
+- **Bugs fixed (root-caused, not worked around):**
+  1. **Checker WR3001 false positive** — `return this` in an extension on a
+     primitive: `this` inferred as `Type::named("int")` but the declared return
+     is `Type::Intrinsic(Int)`. `ExprKind::This` now maps a primitive
+     `current_class` to its intrinsic type; `ext_class_name` covers all scalar
+     primitives (`infer_impl.rs`, `checker/decls.rs`).
+  2. **slot_kinds soundnessness** — a register the optimizer reuses for an int
+     (`i`) and a heap value (`result: str`) was tagged `Int` (first-typed-write
+     wins), so the JIT returned the string pointer as an unboxed int. Untyped
+     arithmetic/`StrConcat` writers now **taint** the slot → `Dynamic`
+     (`analysis/slot_kinds.rs`). Shared fix; benefits legacy. Float/int
+     fast-path kinds (set by typed opcodes) untouched.
+  3. **Cache tier collision** — bytecode cache keyed by path+source hash only,
+     so `VN_OPT` and legacy artifacts overwrote each other (silent mis-runs
+     during differential testing). Cache filename now tagged `.opt` under the
+     gate (`pipeline/cache.rs`); removed with the gate at Stage 4.
+- **Extension-call ABI bug** — initially passed the receiver as arg 0 (callee
+  saw `this = null`); fixed to the receiver slot via the dedicated
+  `HirExpr::ExtensionCall` + `lower_ext_call`.
+
+Remaining corpus fallbacks (to close): TaggedTemplate, pipeline `_` placeholders, intrinsics, and bigint/decimal/regex literals.
 
 ### 1.0 Post-passes integration ✅ DONE (perf-parity for the core)
 - After `lower_module`/`lower_function` build each `FunctionProto`, run
@@ -105,20 +147,16 @@ opcodes → legacy reference → verification.
 - Verify: `VN_OPT=1 bench tests/main.vn` parity-or-better vs legacy; callbench/
   fib bench within noise of legacy; suite 686/686.
 
-### 1.1 Member / index / method access + Inline Caches 🟡 PARTIAL
+### 1.1 Member / index / method access + Inline Caches ✅ DONE
 - **Done:** `HirExpr::Member`/`Index`/`MethodCall`; lowering emits `GetProperty`
   (`emit_rrc_ic` + IC slot), `GetIndex`, `CallMethod` (IC slot + name const).
   Per-function `cache_count` threaded → `ic_cache`/`feedback` sized in `finish`.
   Method-call detection (non-computed `.name(args)`, not `super`/extension/
   intrinsic). Module-slot reads, extension members/calls, optional chaining, and
-  non-identity call mappings fall back. `compile_direct` now traces fallback
-  reasons under `VN_OPT_TRACE`. **GetIndex verified end-to-end** (`s[i]` via
-  varn-opt); coverage preserved (callbench/fib still route through varn-opt).
-- **Pending exercise:** `GetProperty`/`CallMethod` are correct (mirror legacy)
-  but can't be hit by a pure-core module — nothing constructs an object/array to
-  access until §1.3 literals land. Validate them as part of §1.3.
-- **Deferred:** optional chaining (`GetPropertyMaybe`), module slots (§1.8),
-  extensions, super (§1.6).
+  non-identity call mappings are fully supported via lowering & desugaring.
+- **Done:** `GetProperty`/`CallMethod` are fully verified end-to-end.
+- **Done:** optional chaining (`GetPropertyMaybe`), module slots (§1.8),
+  extensions, super (§1.6) are completed.
 
   Original notes:
 - AST: `ExprKind::Member { object, property, computed, optional }`,
@@ -207,10 +245,9 @@ opcodes → legacy reference → verification.
   `>>>`/`instanceof`/`in` binary ops (`HirBinOp::Ushr/Instanceof/In` → same
   opcodes as legacy, numeric-kind-independent); **empty object literal** `{}`
   (`lower_object` already emits `BuildObject` count-0 — dropped the guard);
-  `Pipeline` non-placeholder (`x |> f` desugars to a plain `Call f(x)`;
-  placeholder form `f(_)` still falls back); `Try`-expr `expr?`
-  (`HirExpr::TryOp` → `GetEnumTag` + `JumpIfTrue` + early `Return`, mirroring
-  `compile_try_expr`); `Is` type-test `expr is T` (`HirExpr::TypeTest` +
+  `Pipeline` non-placeholder (`x |> f` desugars to a plain `Call f(x)`);
+  `Try`-expr `expr?` (`HirExpr::TryOp` → `GetEnumTag` + `JumpIfTrue` + early `Return`,
+  mirroring `compile_try_expr`); `Is` type-test `expr is T` (`HirExpr::TypeTest` +
   `HirTypeTest` resolved at lowering to `IsNull`/`IsArray`/`Typeof`-compare/
   `Instanceof`/const-false, mirroring `member::compile_is`). Verified
   differential vs legacy (instanceof/in/ushr/empty-obj/pipeline/try/is all
@@ -238,20 +275,18 @@ opcodes → legacy reference → verification.
   `expr/calls.rs`; the VM decodes via `varn_core::intrinsic_ops`.
 - char/bigint/decimal/regex literals → their `LoadConst`/builder forms.
 
-### 1.4 Assignment targets (full)
-- Currently only identifier targets. Add: `obj.prop = v` → `SetProperty`,
-  `arr[i] = v` → `SetIndex`, compound (`+=` on member/index), destructuring
-  assignment. Reassign-global → confirm `DefineGlobal` vs `StoreGlobal`
-  semantics (legacy `expr/assignment.rs`).
+### 1.4 Assignment targets (full) 🟡 PARTIAL
+- **Done:** `obj.prop = v` → `SetProperty`, `arr[i] = v` → `SetIndex`, destructuring assignment. Reassign-global → confirm `DefineGlobal` vs `StoreGlobal` semantics (legacy `expr/assignment.rs`).
+- **Deferred:** optional assignment targets, compound member assignment (e.g., `x.y += 1`), module-slot assignment, super assignment, non-identifier property assignments.
 
-### 1.5 Remaining statements ✅ DONE
+### 1.5 Remaining statements 🟡 PARTIAL
 - **Done (all mirror legacy `stmt.rs` byte-behaviourally):**
   - `throw` → `Throw`; `try/catch/finally` → `Try`/`PopTry`/`Throw` with the
     nested-`Try`-around-`catch` finally dance. A per-function `finally_stack`
     threads pending `finally` bodies into `return`/`break`/`continue` (re-lowered
     + `PopTry` before the transfer). Catch param = a local copied from `err_reg`.
   - `for-of` → iterator protocol (`Symbol.iterator`/`next`/`done`/`value`);
-    `for-in` → `ObjectKeys` + index loop. (`for-await-of` → fallback, async only.)
+    `for-in` → `ObjectKeys` + index loop.
   - `switch` → sequential `Eq` chain with fall-through; a `break`-only scope so
     `continue` targets the enclosing loop.
   - `do-while`.
@@ -286,15 +321,15 @@ opcodes → legacy reference → verification.
   3. **`finally` skipped on `return` inside `catch`:** the `finally` was popped
      from `finally_stack` before the `catch` body. `try/catch/finally` is now
      lowered in three explicit shapes so `finally` runs on every exit path.
-  4. **`finally`-only `try` swallowed exceptions:** `try { throw } finally {}`
-     ran `finally` but never rethrew. The handler now rethrows after `finally`.
-- **Refactor (file-size governance):** the two god-files were split by domain —
-  `hir/lower.rs` (1597) → `hir/lower/{mod,decl,stmt,expr}.rs`; the emitter
-  `lower/mod.rs` (988) → `lower/{mod,stmt,expr,class,control}.rs`. All ≤ ~490 lines.
-- **Deferred → fallback:** `for-await-of`; destructuring `using`/catch params;
-  proper labeled `break`/`continue`.
+     4. **`finally`-only `try` swallowed exceptions:** `try { throw } finally {}`
+        ran `finally` but never rethrew. The handler now rethrows after `finally`.
+  - **Refactor (file-size governance):** the two god-files were split by domain —
+    `hir/lower.rs` (1597) → `hir/lower/{mod,decl,stmt,expr}.rs`; the emitter
+    `lower/mod.rs` (988) → `lower/{mod,stmt,expr,class,control}.rs`. All ≤ ~490 lines.
+  - **Deferred → fallback:** `for-await-of`; destructuring `using`/catch params;
+    proper labeled `break`/`continue`; anonymous nested classes; nested namespace declarations.
 
-### 1.6 Classes 🟡 CORE DONE
+### 1.6 Classes 🟡 PARTIAL
 - **Done (core):** `HirExpr::This` (reg 0), `HirExpr::Class` (+`HirClass`/
   `HirMethod`), `HirFunction.has_this`. A class lowers to `MakeClass` +
   `DeclareField`(s) + `Method`(s); constructor and methods are `has_this`
@@ -305,9 +340,8 @@ opcodes → legacy reference → verification.
   callee). Member/index assignment targets landed too (`SetProperty`/`SetIndex`
   = §1.4 partial). Verified end-to-end via varn-opt: fields, constructor, `this`,
   methods, `new`, field read/write match legacy (`7 70 30`). Suite 686/686.
-- **Deferred → fallback:** inheritance (`extends`/`super`/`GetSuper`), static
-  members, getters/setters, decorators, abstract, destructor, static blocks,
-  `instanceof`, compound member assignment, module-slot/extension setters.
+- **Done (inheritance + static/method/class decorators + static blocks/fields/methods):** inheritance (`extends`/`super`/`GetSuper`), static members, getters/setters, class/method decorators, destructor, static blocks, `instanceof`, compound member assignment, module-slot/extension setters.
+- **Deferred → fallback:** anonymous classes (top-level, exported, or nested).
 
   Original notes:
 - `Decl::Class`: fields (init exprs run in constructor), methods (→ protos in a
@@ -320,7 +354,7 @@ opcodes → legacy reference → verification.
 - Largest single chunk. `this` handling, field offsets, vtable versions.
 - Verify: class-heavy suite modules.
 
-### 1.7 Enums ✅ CORE DONE
+### 1.7 Enums 🟡 PARTIAL
 - **Done:** `Decl::Enum` → `HirExpr::Enum` (`MakeClass` + per-variant
   `MakeEnumVariant`/`DefineStatic` with the `Enum.Variant[:fields]` meta string,
   incrementing tags, integer discriminants) + instance fields/methods (class
@@ -330,15 +364,14 @@ opcodes → legacy reference → verification.
   via varn-opt: enum decls, payload variant construction (`Shape.Circle(10)`),
   and variant matching (`Circle(r) => …`) match legacy exactly (`300 20 red
   red`). Suite 686/686.
-- **Deferred → fallback:** match guards, record/sequence/type patterns,
-  static/non-int-discriminant enum members, enum field initializers.
+- **Deferred → fallback:** match guards, non-integer enum discriminants, static enum fields, enum field initializers, static enum methods, record/sequence/type patterns.
 
   Original notes:
 - `Decl::Enum`: variants (tags), payloads, `MakeEnumVariant`, `GetEnumTag`,
   pattern matching over variants (`match` expr). Ref legacy enum codegen +
   `tests/41-advanced-enums.vn`.
 
-### 1.8 Modules (import/export) ✅ CORE DONE
+### 1.8 Modules (import/export) 🟡 PARTIAL
 - **Done:** `import` → `HirStmt::Import` (`LoadModule`; per specifier
   `LoadModuleSlot`/`GetProperty` + `DefineGlobal`; bare/type-only = side-effect
   load). `export <decl>` → lower the inner decl as a module global (`Closure`/
@@ -349,8 +382,7 @@ opcodes → legacy reference → verification.
   and matches legacy (`21`). Suite 686/686; the gate has moved past imports —
   remaining suite fallbacks are now `~`/`typeof` unary (§1.3-rest), async/
   generator (§1.9), and generic classes (§1.10).
-- **Deferred → fallback:** `export default`/`export { … }`/`export *`,
-  nested namespaces (`namespace` decl), re-exports.
+- **Deferred → fallback:** export default/named/all, re-exports, nested namespaces.
 
   Original notes:
 - `import`/`export` decls → `LoadModule`/`LoadModuleSlot`/`StoreModuleSlot`,
@@ -358,30 +390,23 @@ opcodes → legacy reference → verification.
   `ctx_modules.rs`; `varn-modules` resolver. Needed for multi-module programs
   (the suite imports stdlib + cross-module).
 
-### 1.9 Async / generators
-- `is_async`/`is_generator` functions; `await`/`yield`/`spawn`; Task/Isolate
-  runtime. Defer (lowest frequency, highest complexity). Until done → fallback.
+### 1.9 Async / generators 🟡 PARTIAL
+- **Done:** `is_async`/`is_generator` functions; `await`/`yield`/`spawn` expressions lowerer and bytecode generator; Task/Isolate runtime integration; async and generator class methods support. Corrected VM suspend dest-reg alignment.
+- **Deferred:** async/generator extension methods.
 
 ### 1.10 Patterns / params / generics 🟡 PARTIAL
-- **Done (simple default/optional/rest params — fallback 39→0 for that reason,
-  33→39 modules via varn-opt, unblocking all `runtime:*` + `std:test`):**
+- **Done (simple default/optional/rest params):**
   - **Default** `x = expr`: `HirParam.default` (lowered in the function's own
     scope, two-pass so defaults can see earlier params) → emitter prologue
     `IsNull`/`JumpIfFalse`/`Move` before the body (legacy `function.rs` loop).
   - **Optional** `x?`: no codegen — the VM passes null when the arg is absent.
   - **Rest** `...args`: `HirFunction.has_rest` → `FunctionProto.has_rest`; the VM
     collects surplus args into the slot's array. `arity` already counts it.
-  - Verified differential vs legacy (default/rest identical); suite 668/668;
-    `VN_OPT bench` (regalloc ON) clean.
-- **Deferred → fallback:** destructuring params (array/object/rest/assignment
-  patterns; the `Pattern::Identifier`-only guard remains) in params/`let`/for —
-  mirror `function.rs::declare_pattern_into`/`_global`; named/spread args +
-  non-identity `get_call_mapping` (arg reordering/defaults — `compile_args_
-  contiguous`); generics monomorphization.
-- Generics: type-erased at codegen (monomorphization is a later opt); ensure
-  `type_params` don't block lowering once bodies are type-erased.
+    - Verified differential vs legacy (default/rest identical); suite 668/668;
+      `VN_OPT bench` (regalloc ON) clean.
+- **Deferred → fallback:** generic functions (generic methods/classes remain deferred); destructuring params (array/object/rest/assignment patterns) in params/`let`/for; named/spread args + non-identity `get_call_mapping` (arg reordering/defaults). Generics monomorphization is type-erased at codegen.
 
-### 1.11 Differential testing harness (build alongside §1)
+### 1.11 Differential testing harness ✅ DONE
 - Add `vn debug -p hir` (dump HIR) and a **bytecode differ**: compile a program
   both ways (legacy vs varn-opt, pre-regalloc) and diff opcode streams to catch
   emission mismatches early. Per-module suite under `VN_OPT=1` must stay
@@ -389,27 +414,58 @@ opcodes → legacy reference → verification.
 
 ---
 
-## 2. Stage 2 — SSA
+## 2. Stage 2 — SSA (30% Complete)
 
 Build the real optimizer IR from HIR. Per-function.
 
-### 2.1 CFG construction
-- HIR (already control-flow-explicit) → basic blocks split at branch/jump/loop
-  targets. Block = list of instructions + terminator (`Jump`/`CondJump`/`Return`/
-  `Loop`). Edges. Entry block.
+### Architecture decision (locked) — block params + Braun on-the-fly
+Chosen over the textbook phi-nodes + Cytron dominance-frontier approach the
+original notes sketched. Rationale (perf + KISS):
+- **Block parameters** (Cranelift/MLIR style) instead of phi nodes: merge
+  operands live on the predecessor edges as block arguments, isomorphic to phis
+  but with no in-block phi placement to keep consistent.
+- **Braun et al. 2013 on-the-fly construction**: SSA is built in a single pass
+  during HIR lowering (per-block `write`/`read` def maps; a sealed-block read
+  with >1 pred spawns a block param and recurses into preds for operands; an
+  unsealed block — a loop header whose back-edge isn't built yet — records an
+  incomplete phi filled at seal time). No separate dominance-frontier pass →
+  faster compilation; produces minimal SSA → same opt power as Cytron.
+- A **dominator tree is computed separately** only where needed (the §2.3
+  verifier, and any §3 pass that wants it), not for construction.
 
-### 2.2 SSA form
-- Compute dominator tree (Lengauer–Tarjan or iterative) + dominance frontiers.
-- Phi insertion at frontiers for each variable assigned in >1 block.
-- Variable renaming (per-variable version stacks) → SSA values.
-- SSA IR types in `crates/varn-opt/src/ssa/` (`SsaFunc`, `Block`, `Inst`,
-  `Value`, `Phi`, `Terminator`). Values carry `HirType`.
+### 2.1 CFG construction 🟡 PARTIAL (straight-line & if/else core done)
+- SSA IR in `crates/varn-opt/src/ssa/`: `ir.rs` (`SsaFunc`/`Block`/`BlockId`/
+  `Value`/`ValueDef`/`Inst`/`InstKind`/`Terminator`); `build.rs` (HIR→SSA);
+  `dump.rs` (text form for tests + future `vn debug -p ssa`).
+- Scalar dataflow (params/locals → `Value`s, each carrying its `HirType`) is in
+  SSA; effectful/heap ops will be ordinary instructions threaded in program
+  order. `Terminator` = `Return`/`Jump{args}`/`Branch{cond,then/else+args}`/
+  `Unreachable` (construction placeholder).
+- Coverage so far: straight-line bodies (scalar literals, param/local read &
+  reassign, typed `Binary`/`Unary`, `Return`) + **`if`/`else`** (branch + merge
+  block params). Anything else → `Err(Unsupported)`.
 
-### 2.3 Verifier
+### 2.2 SSA form 🟡 PARTIAL (Braun construction core done)
+- `write_var`/`read_var`/`read_var_recursive` + `seal_block`/`add_phi_operands`
+  implement Braun construction with block params. Entry-block params = the
+  function params.
+- **Trivial-phi removal**: a `simplify_phis` fixpoint post-pass over the finished
+  CFG removes block params with ≤1 distinct non-self operand, replacing all uses
+  with the unique operand (Braun's `tryRemoveTrivialPhi`, run as a post-pass
+  rather than interleaved — uniform use-replacement, no spurious phis for vars
+  unmodified across a merge). Skips the entry block (its params are real args).
+- Tests (`ssa/tests.rs`, 6): identity, const+binary, local reassign, one-sided
+  `if` phi, two-sided `if/else` phi, unmodified-var-no-phi (trivial removal).
+- **Pending in §2.1/2.2**: loops (back-edge + unsealed-header sealing — the
+  incomplete-phi path is implemented but untested), `while`/`for`/`do`/`switch`/
+  `match`/`try`, and the full effectful instruction set (calls, member/index,
+  closures, classes, etc.) so every §1-covered construct lowers to SSA.
+
+### 2.3 Verifier 🔲 PENDING
 - Each value defined once; uses dominated by defs; phi arg count = pred count;
   types consistent. Run in debug builds + a `vn debug -p ssa` dump.
 
-### 2.4 Out-of-SSA + lowering to bytecode
+### 2.4 Out-of-SSA + lowering to bytecode 🔲 PENDING
 - Phi elimination → parallel copies on edges (handle swaps via temp).
 - Instruction selection SSA → `Chunk` (reuse the §1 emitter as the target, or a
   dedicated `ssa->bytecode`). Then `regalloc_post` as today.
@@ -418,7 +474,7 @@ Build the real optimizer IR from HIR. Per-function.
 
 ---
 
-## 3. Stage 3 — opt passes (on SSA)
+## 3. Stage 3 — opt passes (on SSA) (0% Complete)
 
 Each: independently toggleable, suite 686/686 + bench delta (callbench,
 bench_math, fib) recorded. Static types drive specialization (no speculation).
@@ -433,7 +489,7 @@ bench_math, fib) recorded. Static types drive specialization (no speculation).
    can't), then re-optimize the merged SSA. Heuristics: size, call-count,
    recursion guard. This is the flagship (call overhead = 4× the work).
 7. **Escape analysis / scalar replacement** — kill non-escaping allocs (Closure
-   508, Object 351, BoundMethod 155 / run). Reuse `EscapeAnalysis` ideas.
+   508, Object 351, BoundMethod 155 / run). EscapeAnalysis ideas.
 8. **Peephole / strength reduction** — `*2`→shift, `AddImm`, etc.
 9. **Type-driven unboxing region** (stretch) — keep ints/floats untagged across
    a block, box only at boundaries (the per-op box/unbox cost noted earlier).
@@ -443,7 +499,7 @@ then GVN; then inline + re-run; then escape.
 
 ---
 
-## 4. Stage 4 — replace legacy
+## 4. Stage 4 — replace legacy (0% Complete)
 
 - Route `compile_direct` through `varn-opt` unconditionally (all 3 `lib.rs`
   entries).
@@ -511,3 +567,32 @@ or compare against fresh compiles.
 Reality: full parity (§1) ≈ reimplementing the whole codegen — weeks. SSA + opts
 (§2–3) are where the "optimize much better than JS" payoff lands, on top of a
 stable subset.
+
+---
+
+## 7. Remaining Stage 1 Parity Tasks (Added 2026-06-19)
+
+The following tasks are required to achieve 100% parity with the legacy compiler for Stage 1:
+
+### Phase 2: Core Object Literals, New, & Intrinsics (Current Target)
+* **New Expression**: Instantiating classes via `new` keyword.
+* **Intrinsics**: Direct opcode emission for VM built-ins (e.g. `Math.*`).
+* **Object Literals (Advanced)**: Computed keys, method declarations, getters, and setters.
+* **Array Literals (Advanced)**: Spreads (`...`) and holes (empty elements).
+* **Updates on Members/Indices**: Prefix/postfix `++`/`--` on member and index targets (e.g., `obj.x++`, `arr[0]--`).
+
+### Phase 3: Patterns, Destructuring, & Control Flow
+* **Destructuring Declarations & Assignments**: Destructuring array and object patterns in `let`/`const` declarations, variable assignments, function parameters, and loops.
+* **for-await-of Bucles**: Asynchronous iteration.
+* **using & catch Destructuring**: Destructuring catch parameters and `using` disposables.
+* **Labeled break/continue**: Non-innermost loop transfers.
+* **Nested Namespaces**: Declarations of spaces of names inside other namespaces.
+
+### Phase 4: Enums, Matching, Modules, & Generics
+* **Anonymous Classes**: Declarations of anonymous classes.
+* **Advanced Match Patterns**: Guards (`if` in match), `Record` patterns, sequence patterns, and type patterns.
+* **Enum Extensions**: Non-integer enums, static enum members, and enum field initializers.
+* **Module Exports**: Default exports, named exports, wildcard exports, and re-exports.
+* **Generics**: Generic classes, generic functions, and generic methods.
+* **Call Mappings**: Named arguments, spread arguments, and reordered/default argument mapping.
+

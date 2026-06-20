@@ -1,0 +1,93 @@
+// 1. Generics
+function identity<T>(x: T): T {
+    return x;
+}
+assert("generic identity int", identity<int>(123) === 123);
+assert("generic identity str", identity<str>("hello") === "hello");
+
+class Container<T> {
+    val: T;
+    constructor(val: T) {
+        this.val = val;
+    }
+    getVal(): T {
+        return this.val;
+    }
+}
+let container = new Container<int>(456);
+assert("generic class field read", container.val === 456);
+assert("generic class method call", container.getVal() === 456);
+
+// 5. Computed super compound assignment
+class Parent {
+    _val: int;
+    constructor() {
+        this._val = 10;
+    }
+    getVal(): int {
+        return this._val;
+    }
+    setVal(v: int): void {
+        this._val = v;
+    }
+}
+class Child extends Parent {
+    constructor() {
+        super();
+    }
+    mutateSuper(add: int): void {
+        super.setVal(super.getVal() + add);
+    }
+}
+let child = new Child();
+child.mutateSuper(5);
+assert("super method mutation", child.getVal() === 15);
+// 2. Anonymous classes
+let AnonClass: dynamic = class {
+    x: int;
+    constructor(x: int) {
+        this.x = x;
+    }
+    getX(): int {
+        return this.x;
+    }
+};
+let anonInst = new AnonClass(789);
+assert("anon class field read", anonInst.x === 789);
+assert("anon class method call", anonInst.getX() === 789);
+
+// 3. Named function expressions
+let namedExpr: dynamic = function foo(x: int): int {
+    return x + 1;
+};
+assert("named function expression", namedExpr(10) === 11);
+
+// 4. Variant record matching
+enum VariantRecord {
+    Point(x: int, y: int)
+}
+let pt = VariantRecord.Point(3, 4);
+let ptArea = match pt {
+    Point { x, y } => x * y,
+    _ => 0
+};
+assert("variant record matching", ptArea === 12);
+
+// 6. Extended enums (static blocks, methods, fields)
+enum ExtendedEnum {
+    A, B;
+    
+    static val: int;
+    static {
+        ExtendedEnum.val = 42;
+    }
+    
+    getVal(): int {
+        return ExtendedEnum.val;
+    }
+}
+assert("extended enum static block & field", ExtendedEnum.val === 42);
+let inst = ExtendedEnum.A;
+assert("extended enum instance method", inst.getVal() === 42);
+
+print("[PASSED] 51. Phase 4 Unsupported Features Parity");

@@ -197,12 +197,14 @@ pub fn prepare_call(
                     BoundMethodTarget::Native { func, .. } => {
                         let recv_nv = heap.intern(bm.receiver);
                         let args_start = stack.len() - arg_count;
+                        let mut final_count = arg_count;
                         if args_start >= stack.len() {
                             stack.push(recv_nv);
+                            final_count = 1;
                         } else {
                             stack[args_start] = recv_nv;
                         }
-                        return Ok(PreparedCall::NativeImmediate(func, arg_count));
+                        return Ok(PreparedCall::NativeImmediate(func, final_count));
                     }
                     BoundMethodTarget::Vm {
                         closure,
@@ -218,13 +220,19 @@ pub fn prepare_call(
                                 "BoundMethod(Vm): invalid closure payload",
                             ));
                         };
+                        let arity = nc.proto.arity as usize;
                         let mut full_arg_count = arg_count;
                         let base = stack.len() - arg_count;
-                        if base >= stack.len() {
-                            stack.push(recv_nv);
-                            full_arg_count = 1;
+                        if arg_count == arity - 1 {
+                            stack.insert(base, recv_nv);
+                            full_arg_count = arg_count + 1;
                         } else {
-                            stack[base] = recv_nv;
+                            if base >= stack.len() {
+                                stack.push(recv_nv);
+                                full_arg_count = 1;
+                            } else {
+                                stack[base] = recv_nv;
+                            }
                         }
                         if nc.proto.is_generator {
                             let args_start = stack.len() - full_arg_count;

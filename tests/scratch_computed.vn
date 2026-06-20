@@ -1,0 +1,4 @@
+let key = "prop";
+let obj = { [key]: 100 };
+print("obj[key] is:", obj[key]);
+print("obj[\"prop\"] is:", obj["prop"]);
