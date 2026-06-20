@@ -314,7 +314,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                 // Namespaces and extensions define their members as globals at
                 // lowering time (handled in pass 2); no hoisting needed here.
                 Decl::Namespace(_) | Decl::Extension(_) => {}
-                _ => panic!("unsupported top-level namespace/extension decl: {:?}", decl),
+                _ => return Err(OptError::Unsupported("hir: top-level decl (hoist)")),
             }
         }
     }
@@ -381,7 +381,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                     lo.lower_extension(ext, &mut module_scope, &mut top_body)?;
                 }
                 Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
-                _ => panic!("unsupported top-level decl: {:?}", decl),
+                _ => return Err(OptError::Unsupported("hir: top-level decl")),
             },
             _ => {
                 lo.lower_stmt(stmt, &mut module_scope, &mut top_body)?;
@@ -459,7 +459,7 @@ fn compound_to_bin(op: AssignOp) -> R<HirBinOp> {
         AssignOp::ShlAssign => HirBinOp::Shl,
         AssignOp::ShrAssign => HirBinOp::Shr,
         AssignOp::UShrAssign => HirBinOp::Ushr,
-        _ => panic!("unsupported compound assignment op: {:?}", op),
+        _ => return Err(OptError::Unsupported("hir: compound assignment op")),
     })
 }
 
@@ -470,7 +470,7 @@ fn un_op(op: UnaryOp) -> R<HirUnOp> {
         UnaryOp::BitNot => HirUnOp::BitNot,
         UnaryOp::Typeof => HirUnOp::Typeof,
         // `Plus` is handled transparently in `lower_expr`.
-        _ => panic!("unsupported unary op: {:?}", op),
+        _ => return Err(OptError::Unsupported("hir: unary op")),
     })
 }
 

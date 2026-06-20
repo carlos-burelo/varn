@@ -24,9 +24,6 @@ impl<'a> Lowerer<'a> {
         let subject = Box::new(self.lower_expr(subject, scope)?);
         let mut hcases = Vec::with_capacity(cases.len());
         for case in cases {
-            if case.guard.is_some() {
-                panic!("match guard is unsupported");
-            }
             scope.push_block();
             let test_res = self.lower_case_test(&case.pattern, scope);
             let test = match test_res {
@@ -35,6 +32,11 @@ impl<'a> Lowerer<'a> {
                     scope.pop_block();
                     return Err(e);
                 }
+            };
+            // Guard is lowered in the case scope so it sees pattern bindings.
+            let guard = match &case.guard {
+                Some(g) => Some(self.lower_expr(g, scope)?),
+                None => None,
             };
             let mut body = Vec::new();
             let result = match &case.body {
@@ -53,7 +55,7 @@ impl<'a> Lowerer<'a> {
             };
             let (captured, disposables) = scope.pop_block();
             block_epilogue(&mut body, captured, disposables);
-            hcases.push(HirMatchCase { test, body, result });
+            hcases.push(HirMatchCase { test, guard, body, result });
         }
         Ok(HirExpr::Match {
             subject,
@@ -99,7 +101,11 @@ impl<'a> Lowerer<'a> {
                     binds,
                 }
             }
-            _ => panic!("unsupported match pattern kind: {:?}", pat),
+            // `Sequence` (`[a, b]`) and `Type` (`T as x`) patterns: legacy
+            // `compile_match` treats both as a wildcard (always matches, no
+            // binding). Mirror that for parity — real destructuring/type
+            // matching here is a future feature for both backends.
+            MatchPattern::Sequence(_) | MatchPattern::Type { .. } => HirCaseTest::Wildcard,
         })
     }
 
@@ -112,11 +118,10 @@ impl<'a> Lowerer<'a> {
                 object,
                 property,
                 computed,
-                optional,
+                // `optional` (`o?.x = v`) is ignored: legacy `store_to_target`
+                // treats it as a plain member store (no null-guard). Mirror it.
+                ..
             } => {
-                if *optional {
-                    panic!("optional assignment target");
-                }
                 if matches!(object.kind, ExprKind::Super) {
                     if *computed {
                         let index = self.lower_expr(property, scope)?;
@@ -124,7 +129,7 @@ impl<'a> Lowerer<'a> {
                     } else {
                         let name = match &property.kind {
                             ExprKind::Identifier { name } => name.clone(),
-                            _ => panic!("non-identifier super property assign"),
+                            _ => return Err(OptError::Unsupported("hir: non-identifier super property assign")),
                         };
                         Ok(HirAssignTarget::SuperMember { name })
                     }
@@ -139,7 +144,7 @@ impl<'a> Lowerer<'a> {
                     } else {
                         let name = match &property.kind {
                             ExprKind::Identifier { name } => name.clone(),
-                            _ => panic!("non-identifier property assign"),
+                            _ => return Err(OptError::Unsupported("hir: non-identifier property assign")),
                         };
                         Ok(HirAssignTarget::Member {
                             object: object_hir,
@@ -148,7 +153,7 @@ impl<'a> Lowerer<'a> {
                     }
                 }
             }
-            _ => panic!("non-identifier assign target"),
+            _ => return Err(OptError::Unsupported("hir: non-identifier assign target")),
         }
     }
 
@@ -323,7 +328,7 @@ impl<'a> Lowerer<'a> {
                     } else {
                         let name = match &property.kind {
                             ExprKind::Identifier { name } => name.clone(),
-                            _ => panic!("non-identifier property"),
+                            _ => return Err(OptError::Unsupported("hir: non-identifier property")),
                         };
                         if self.ann.get_slot_idx(offset).is_some() {
                             let slot_idx = self.ann.get_slot_idx(offset).unwrap() as u16;
@@ -368,13 +373,13 @@ impl<'a> Lowerer<'a> {
                 if matches!(object.kind, ExprKind::Super) {
                     let name = match &property.kind {
                         ExprKind::Identifier { name } => name.clone(),
-                        _ => panic!("non-identifier super property"),
+                        _ => return Err(OptError::Unsupported("hir: non-identifier super property")),
                     };
                     return Ok(HirExpr::SuperMember { name });
                 }
                 let name = match &property.kind {
                     ExprKind::Identifier { name } => name.clone(),
-                    _ => panic!("non-identifier property"),
+                    _ => return Err(OptError::Unsupported("hir: non-identifier property")),
                 };
                 let object = Box::new(self.lower_expr(object, scope)?);
                 Ok(HirExpr::Member {
@@ -551,12 +556,9 @@ impl<'a> Lowerer<'a> {
                 } else {
                     s.parse()
                 };
-                let num = match parsed {
-                    Ok(n) => n,
-                    Err(_) => {
-                        return Err(OptError::Unsupported("bigint literal overflow"));
-                    }
-                };
+                // Overflow of i128 defaults to 0, mirroring legacy
+                // `codegen/expr/mod.rs` (no error / no fallback).
+                let num = parsed.unwrap_or(0);
                 Ok(HirExpr::BigInt(num))
             }
             ExprKind::RegexLiteral { pattern, flags } => {
@@ -625,12 +627,10 @@ impl<'a> Lowerer<'a> {
                     object,
                     property,
                     computed,
-                    optional,
+                    // `optional` (`o?.x = v`) ignored — see `lower_assign_target`.
+                    ..
                 } = &target.kind
                 {
-                    if *optional {
-                        panic!("optional assignment target");
-                    }
                     let off = target.range.start.offset;
                     // Extension setter `x.k = v` (as expression) → the setter
                     // call, which yields its return value.
@@ -672,7 +672,7 @@ impl<'a> Lowerer<'a> {
                         } else {
                             let name = match &property.kind {
                                 ExprKind::Identifier { name } => name.clone(),
-                                _ => panic!("non-identifier super property assign"),
+                                _ => return Err(OptError::Unsupported("hir: non-identifier super property assign")),
                             };
                             let value = self.lower_expr(value, scope)?;
                             if matches!(op, AssignOp::Assign) {
@@ -732,7 +732,7 @@ impl<'a> Lowerer<'a> {
                         } else {
                             let name = match &property.kind {
                                 ExprKind::Identifier { name } => name.clone(),
-                                _ => panic!("non-identifier property assign"),
+                                _ => return Err(OptError::Unsupported("hir: non-identifier property assign")),
                             };
                             let value = self.lower_expr(value, scope)?;
                             let current_val = HirExpr::Member {
@@ -784,7 +784,7 @@ impl<'a> Lowerer<'a> {
                         } else {
                             let name = match &property.kind {
                                 ExprKind::Identifier { name } => name.clone(),
-                                _ => panic!("non-identifier property assign"),
+                                _ => return Err(OptError::Unsupported("hir: non-identifier property assign")),
                             };
                             let value = self.lower_expr(value, scope)?;
                             let current_val = HirExpr::Member {
@@ -818,7 +818,7 @@ impl<'a> Lowerer<'a> {
                     } else {
                         let name = match &property.kind {
                             ExprKind::Identifier { name } => name.clone(),
-                            _ => panic!("non-identifier property assign"),
+                            _ => return Err(OptError::Unsupported("hir: non-identifier property assign")),
                         };
                         HirAssignTarget::Member {
                             object: object_hir,
@@ -833,7 +833,7 @@ impl<'a> Lowerer<'a> {
                 }
                 let binding = match &target.kind {
                     ExprKind::Identifier { name } => self.resolve(name, scope),
-                    _ => panic!("non-identifier assign target"),
+                    _ => return Err(OptError::Unsupported("hir: non-identifier assign target")),
                 };
                 let val_expr = self.lower_expr(value, scope)?;
                 if matches!(op, AssignOp::AndAssign | AssignOp::OrAssign | AssignOp::NullishAssign) {
@@ -950,7 +950,7 @@ impl<'a> Lowerer<'a> {
                 let hir_class = self.lower_class(declaration, scope)?;
                 Ok(HirExpr::Class(Box::new(hir_class)))
             }
-            _ => panic!("unsupported expression kind: {:?}", expr.kind),
+            _ => Err(OptError::Unsupported("hir: expression kind")),
         }
     }
 

@@ -132,6 +132,17 @@ impl FnLower {
         for case in cases {
             let mark = self.next_temp;
             let skip = self.lower_case_test(&case.test, subj);
+            // Guard: pattern matched but guard falsy → fall through to next case.
+            let guard_skip = match &case.guard {
+                Some(g) => {
+                    let gmark = self.next_temp;
+                    let gr = self.lower_expr(g);
+                    let j = self.chunk.emit_cond_jump(OpCode::JumpIfFalse, gr, self.line);
+                    self.free_to(gmark);
+                    Some(j)
+                }
+                None => None,
+            };
             for stmt in &case.body {
                 self.lower_stmt(stmt);
             }
@@ -148,6 +159,9 @@ impl FnLower {
             end_jumps.push(end);
             if let Some(s) = skip {
                 self.chunk.patch_jump(s);
+            }
+            if let Some(gs) = guard_skip {
+                self.chunk.patch_jump(gs);
             }
             self.free_to(mark);
         }

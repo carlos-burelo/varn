@@ -67,6 +67,24 @@ pub fn lower_module(module: &HirModule, source_file: Rc<str>, export_names: Vec<
 }
 
 fn lower_function(f: &HirFunction, source_file: Rc<str>) -> FunctionProto {
+    // Experimental SSA backend (AST→HIR→SSA→bytecode). Per-function: try the
+    // SSA pipeline, fall back to the naive emitter for anything it can't lower.
+    // Gated by `VN_OPT_SSA` until §2 covers the full instruction set.
+    if std::env::var_os("VN_OPT_SSA").is_some() {
+        match crate::ssa::try_compile_function(f, source_file.clone()) {
+            Ok(proto) => {
+                if std::env::var_os("VN_OPT_TRACE").is_some() {
+                    eprintln!("[varn-opt] ssa-compiled fn: {}", f.name);
+                }
+                return proto;
+            }
+            Err(OptError::Unsupported(why)) => {
+                if std::env::var_os("VN_OPT_TRACE").is_some() {
+                    eprintln!("[varn-opt] ssa fallback fn {}: {}", f.name, why);
+                }
+            }
+        }
+    }
     let nparams = f.params.len() as u32;
     let mut fl = FnLower::new(nparams, f.locals, source_file);
     // Param-default prologue runs before the body (legacy `function.rs`).
@@ -256,7 +274,7 @@ impl FnLower {
     }
 }
 
-fn bin_opcode(op: HirBinOp, ty: HirType) -> OpCode {
+pub(crate) fn bin_opcode(op: HirBinOp, ty: HirType) -> OpCode {
     use HirBinOp::*;
     match ty {
         HirType::Int => match op {

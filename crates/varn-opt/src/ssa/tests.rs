@@ -33,6 +33,12 @@ fn build(f: &HirFunction) -> String {
     dump(&build_function(f).expect("ssa build"))
 }
 
+/// Build a function to SSA and assert the verifier accepts it.
+fn verify_ok(f: &HirFunction) {
+    let ssa = build_function(f).expect("ssa build");
+    super::verify::verify(&ssa).expect("ssa verify");
+}
+
 fn int(n: i64) -> HirExpr {
     HirExpr::Int(n)
 }
@@ -387,6 +393,83 @@ fn f:
 }
 
 #[test]
+fn do_while_runs_body_before_test() {
+    // var i = 0; do { i = i + 1 } while (i < n) return i
+    // The body block is the loop entry and the test lives in a latch block.
+    let f = func(
+        vec![HirType::Int],
+        1,
+        vec![
+            let_local(0, int(0)),
+            HirStmt::DoWhile {
+                body: vec![assign_local(0, add(local(0), int(1)))],
+                test: cmp(HirBinOp::Lt, local(0), param(0)),
+            },
+            HirStmt::Return(Some(local(0))),
+        ],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: int):
+    v1 = int 0
+    jump b1(v1)
+  b1(v2: int):
+    v3 = int 1
+    v4 = add.int v2, v3
+    jump b2
+  b2():
+    v6 = lt.bool v4, v0
+    branch v6, b1(v4), b3
+  b3():
+    return v4
+"
+    );
+}
+
+#[test]
+fn continue_in_for_skips_rest_of_body_but_runs_update() {
+    // var i = 0; var s = 0; for (; i < n; i = i + 1) { continue; s = s + 1 }
+    // return s  — `continue` jumps to the update block, so `s` is never touched.
+    let f = func(
+        vec![HirType::Int],
+        2,
+        vec![
+            let_local(0, int(0)),
+            let_local(1, int(0)),
+            HirStmt::ForClassic {
+                test: cmp(HirBinOp::Lt, local(0), param(0)),
+                update: vec![assign_local(0, add(local(0), int(1)))],
+                body: vec![HirStmt::Continue, assign_local(1, add(local(1), int(1)))],
+            },
+            HirStmt::Return(Some(local(1))),
+        ],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: int):
+    v1 = int 0
+    v2 = int 0
+    jump b1(v1)
+  b1(v3: int):
+    v5 = lt.bool v3, v0
+    branch v5, b2, b4
+  b2():
+    jump b3
+  b3():
+    v6 = int 1
+    v7 = add.int v3, v6
+    jump b1(v7)
+  b4():
+    return v2
+"
+    );
+}
+
+#[test]
 fn nested_if_fallthrough_merges_from_inner_block() {
     // var y = 0; if (p) { if (q) { y = 1 } y = y + 1 } return y
     // The outer then-branch falls through to the outer merge from the INNER
@@ -429,4 +512,55 @@ fn f:
     jump b2(v6)
 "
     );
+}
+
+#[test]
+fn verifier_accepts_constructed_ssa() {
+    // The verifier must not reject any well-formed function the builder emits.
+    let while_loop = func(
+        vec![HirType::Int],
+        1,
+        vec![
+            let_local(0, int(0)),
+            HirStmt::While {
+                test: cmp(HirBinOp::Lt, local(0), param(0)),
+                body: vec![assign_local(0, add(local(0), int(1)))],
+            },
+            HirStmt::Return(Some(local(0))),
+        ],
+    );
+    let nested = func(
+        vec![HirType::Int, HirType::Int],
+        1,
+        vec![
+            let_local(0, int(0)),
+            if_stmt(
+                param(0),
+                vec![
+                    if_stmt(param(1), vec![assign_local(0, int(1))], vec![]),
+                    assign_local(0, add(local(0), int(1))),
+                ],
+                vec![],
+            ),
+            HirStmt::Return(Some(local(0))),
+        ],
+    );
+    let break_loop = func(
+        vec![HirType::Int],
+        1,
+        vec![
+            let_local(0, int(0)),
+            HirStmt::While {
+                test: HirExpr::Bool(true),
+                body: vec![
+                    if_stmt(cmp(HirBinOp::Ge, local(0), param(0)), vec![HirStmt::Break], vec![]),
+                    assign_local(0, add(local(0), int(1))),
+                ],
+            },
+            HirStmt::Return(Some(local(0))),
+        ],
+    );
+    verify_ok(&while_loop);
+    verify_ok(&nested);
+    verify_ok(&break_loop);
 }

@@ -356,10 +356,7 @@ impl<'a> Lowerer<'a> {
                 Ok(vec![f.id.clone()])
             }
             Decl::Class(cl) => {
-                let name = match &cl.id {
-                    Some(id) => id.clone(),
-                    None => panic!("anonymous class declaration has no name"),
-                };
+                let name = cl.id.clone().unwrap_or_else(|| Rc::from("anonymous"));
                 let hir_class = self.lower_class(cl, scope)?;
                 let value = HirExpr::Class(Box::new(hir_class));
                 if is_global {
@@ -463,7 +460,7 @@ impl<'a> Lowerer<'a> {
                 Ok(Vec::new())
             }
             Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => Ok(Vec::new()),
-            _ => panic!("unsupported inline decl kind: {:?}", decl),
+            _ => return Err(OptError::Unsupported("hir: inline decl kind")),
         }
     }
 
@@ -540,15 +537,20 @@ impl<'a> Lowerer<'a> {
         for member in &ext.members {
             match member {
                 ExtensionMember::Method(m) => {
-                    if m.modifiers.is_async || m.modifiers.is_generator {
-                        panic!("async/generator extension method is unsupported");
-                    }
                     let mangled: Rc<str> = Rc::from(format!("__ext_{}_{}", ty, m.id));
-                    self.push_global_closure(out, mangled, &m.params, &m.body, scope)?;
+                    self.push_global_closure(
+                        out,
+                        mangled,
+                        &m.params,
+                        &m.body,
+                        m.modifiers.is_async,
+                        m.modifiers.is_generator,
+                        scope,
+                    )?;
                 }
                 ExtensionMember::Getter { key, body, .. } => {
                     let mangled: Rc<str> = Rc::from(format!("__extget_{ty}_{key}"));
-                    self.push_global_closure(out, mangled, &[], body, scope)?;
+                    self.push_global_closure(out, mangled, &[], body, false, false, scope)?;
                 }
                 ExtensionMember::Setter {
                     key, param, body, ..
@@ -559,6 +561,8 @@ impl<'a> Lowerer<'a> {
                         mangled,
                         std::slice::from_ref(param),
                         body,
+                        false,
+                        false,
                         scope,
                     )?;
                 }
@@ -574,13 +578,15 @@ impl<'a> Lowerer<'a> {
         name: Rc<str>,
         params: &[Param],
         body: &Stmt,
+        is_async: bool,
+        is_generator: bool,
         scope: &mut Scope,
     ) -> R<()> {
         let (func, upvalues) = self.lower_function_like(
             name.clone(),
             params,
-            false,
-            false,
+            is_async,
+            is_generator,
             false,
             true,
             BodyRef::Block(body),
