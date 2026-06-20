@@ -602,6 +602,40 @@ impl Builder {
             HirExpr::Str(s) => Ok(self.emit(InstKind::ConstStr(s.clone()), HirType::Str)),
             HirExpr::Char(c) => Ok(self.emit(InstKind::ConstChar(*c), HirType::Int)),
             HirExpr::Null => Ok(self.emit(InstKind::ConstNull, HirType::Dynamic)),
+            HirExpr::Decimal(d) => Ok(self.emit(InstKind::ConstDecimal(*d), HirType::Ref)),
+            HirExpr::BigInt(n) => Ok(self.emit(InstKind::ConstBigInt(*n), HirType::Ref)),
+            HirExpr::Regex { pattern, flags } => Ok(self.emit(
+                InstKind::ConstStr(Rc::from(format!("/{pattern}/{flags}"))),
+                HirType::Ref,
+            )),
+            // `expr!` — assert non-null (side effect), value passes through.
+            HirExpr::NonNull(inner) => {
+                let v = self.lower_expr(inner)?;
+                self.emit_effect(InstKind::AssertNotNull { operand: v });
+                Ok(v)
+            }
+            // Comma sequence: evaluate all, yield the last.
+            HirExpr::Sequence(exprs) => {
+                let mut last = None;
+                for e in exprs {
+                    last = Some(self.lower_expr(e)?);
+                }
+                match last {
+                    Some(v) => Ok(v),
+                    None => Ok(self.emit(InstKind::ConstNull, HirType::Dynamic)),
+                }
+            }
+            HirExpr::MemberMaybe { object, name, ty } => {
+                let o = self.lower_expr(object)?;
+                Ok(self.emit(
+                    InstKind::GetPropertyMaybe { object: o, name: name.clone() },
+                    *ty,
+                ))
+            }
+            HirExpr::ModuleSlot { object, slot, ty } => {
+                let o = self.lower_expr(object)?;
+                Ok(self.emit(InstKind::ModuleSlot { object: o, slot: *slot }, *ty))
+            }
             HirExpr::Var(HirBinding::Global(name)) => {
                 Ok(self.emit(InstKind::LoadGlobal(name.clone()), HirType::Dynamic))
             }
@@ -1007,11 +1041,16 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                     sub(object);
                     args.iter_mut().for_each(sub);
                 }
+                InstKind::AssertNotNull { operand } => sub(operand),
+                InstKind::GetPropertyMaybe { object, .. } => sub(object),
+                InstKind::ModuleSlot { object, .. } => sub(object),
                 InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
                 | InstKind::ConstBool(_)
                 | InstKind::ConstStr(_)
                 | InstKind::ConstChar(_)
+                | InstKind::ConstDecimal(_)
+                | InstKind::ConstBigInt(_)
                 | InstKind::ConstNull
                 | InstKind::LoadGlobal(_) => {}
             }

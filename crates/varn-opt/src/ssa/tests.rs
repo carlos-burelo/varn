@@ -844,6 +844,69 @@ fn f:
 }
 
 #[test]
+fn nonnull_lowers_to_assertnotnull() {
+    // f(x) { return x! }
+    let f = func(
+        vec![HirType::Int],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::NonNull(Box::new(param(0)))))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: int):
+    assertnotnull v0
+    return v0
+"
+    );
+}
+
+#[test]
+fn sequence_evaluates_all_yields_last() {
+    // f(a, b) { return (a + 1, b) }
+    let f = func(
+        vec![HirType::Int, HirType::Int],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::Sequence(vec![
+            add(param(0), int(1)),
+            param(1),
+        ])))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: int, v1: int):
+    v2 = int 1
+    v3 = add.int v0, v2
+    return v1
+"
+    );
+}
+
+#[test]
+fn decimal_literal_lowers_to_constdecimal() {
+    // f() { return 3.14d }
+    let f = func(
+        vec![],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::Decimal(
+            rust_decimal::Decimal::new(314, 2),
+        )))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0():
+    v0 = decimal 3.14
+    return v0
+"
+    );
+}
+
+#[test]
 fn verifier_accepts_constructed_ssa() {
     // The verifier must not reject any well-formed function the builder emits.
     let while_loop = func(
