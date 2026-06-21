@@ -424,6 +424,17 @@ fn emit_inst(
         }
         // The receiver lives in register 0; copy it into this value's register.
         InstKind::This => chunk.emit_rr(OpCode::Move, d, 0, LINE),
+        // `start..end` → `InvokeRuntimeStatic __range__`. The VM reads `start`
+        // from arg_start and `end` from end_reg separately (no contiguity).
+        InstKind::Range { start, end, inclusive } => {
+            let method = chunk.add_str(varn_core::well_known::RUNTIME_RANGE);
+            let flag = if *inclusive { 1u8 } else { 0u8 };
+            chunk.emit(OpCode::InvokeRuntimeStatic, LINE);
+            chunk.write(Chunk::pack(d, 0), LINE);
+            chunk.write(method, LINE);
+            chunk.write(Chunk::pack(2, reg[start.0 as usize]), LINE);
+            chunk.write(Chunk::pack(reg[end.0 as usize], flag), LINE);
+        }
         // Dest-less side effects handled before the dest guard above.
         InstKind::SetProperty { .. } | InstKind::SetIndex { .. } | InstKind::AssertNotNull { .. } => {
             unreachable!()

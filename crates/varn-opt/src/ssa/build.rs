@@ -699,6 +699,14 @@ impl Builder {
                 }
             }
             HirExpr::This => Ok(self.emit(InstKind::This, HirType::Ref)),
+            HirExpr::Range { start, end, inclusive } => {
+                let s = self.lower_expr(start)?;
+                let e = self.lower_expr(end)?;
+                Ok(self.emit(
+                    InstKind::Range { start: s, end: e, inclusive: *inclusive },
+                    HirType::Ref,
+                ))
+            }
             HirExpr::Var(HirBinding::Global(name)) => {
                 Ok(self.emit(InstKind::LoadGlobal(name.clone()), HirType::Dynamic))
             }
@@ -1110,6 +1118,10 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                 InstKind::GetEnumTag { operand } => sub(operand),
                 InstKind::IsArray { operand } => sub(operand),
                 InstKind::This => {}
+                InstKind::Range { start, end, .. } => {
+                    sub(start);
+                    sub(end);
+                }
                 InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
                 | InstKind::ConstBool(_)

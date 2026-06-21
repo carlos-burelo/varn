@@ -195,6 +195,7 @@ fn inst_uses(kind: &InstKind) -> Vec<Value> {
         InstKind::ModuleSlot { object, .. } => vec![*object],
         InstKind::GetEnumTag { operand } => vec![*operand],
         InstKind::IsArray { operand } => vec![*operand],
+        InstKind::Range { start, end, .. } => vec![*start, *end],
         _ => Vec::new(),
     }
 }
