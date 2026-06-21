@@ -175,25 +175,29 @@ Done (`ssa/build.rs`, `ssa/ir.rs`):
   member read/write they now SSA-compile (the `MakeClass` value itself still uses
   `lower/`). Verified: a `Counter` class (`constructor`/`get`/`bump` all
   SSA-compiled) + a `throw`ing fn → `10 11 10` identical with/without `VN_OPT_SSA`.
+- **Range** — `a..b` / `a..=b` → `InvokeRuntimeStatic __range__`; the VM reads
+  `start` from `arg_start` and `end` from `end_reg` separately (no contiguity, no
+  `call_base`), so `dest`/`start`/`end` are the values' own regs. Verified: range
+  values build + print identically with/without `VN_OPT_SSA`.
 - **Trivial-phi removal** (`simplify_phis`): Braun's `tryRemoveTrivialPhi` as a
   fixpoint post-pass.
-- Tests (`ssa/tests.rs`, 33 — golden dumps + verifier): identity, const+binary,
+- Tests (`ssa/tests.rs`, 34 — golden dumps + verifier): identity, const+binary,
   reassign, one-/two-sided `if` phi, no-phi trivial removal, `while`/`for`/
   `do-while` carry, `break`/`continue`, nested-`if` merge, global call, self-call,
   member/index read, member/index write, method call, ternary, array/object
   literal, template, capture-free closure, intrinsic, non-null, sequence, decimal,
-  try-op, type-test, this, throw.
+  try-op, type-test, this, throw, range.
 
 **Pending** (the rest of §2's instruction set): closures **with upvalues**,
-`Super*`/extension calls, optional chaining, `Range`, `match`/enum-construction,
-the `MakeClass`/enum *value* expressions, modules (import/export),
-await/spawn/yield — plus `try`/`switch`/`for-of`/`for-in` control flow, so every
-§1 construct lowers to SSA. Until then `build_function` returns `Err(Unsupported)`
-and that function uses the `lower/` path. (Done: scalar exprs, control flow,
-loops, plain/self/method calls, member/index read+write, logical + conditional,
+`Super*`/extension calls, optional chaining, `match`/enum-construction, the
+`MakeClass`/enum *value* expressions, modules (import/export), await/spawn/yield —
+plus `try`/`switch`/`for-of`/`for-in` control flow, so every §1 construct lowers
+to SSA. Until then `build_function` returns `Err(Unsupported)` and that function
+uses the `lower/` path. (Done: scalar exprs, control flow, loops,
+plain/self/method calls, member/index read+write, logical + conditional,
 array/object literals, templates, capture-free closures, intrinsics,
 `!`/sequence/`?.`-member/module-slot/decimal/bigint/regex, `expr?`/`is`, `this`,
-`throw`; class **method bodies** SSA-compile.)
+`throw`, `range`; class **method bodies** SSA-compile.)
 
 > Closures with upvalues need captured locals to keep a stable register across
 > the function (the VM upvalue points at the slot). SSA renaming spreads a local

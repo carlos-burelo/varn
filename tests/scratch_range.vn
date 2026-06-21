@@ -1,0 +1,6 @@
+function mk(a: int, b: int): dynamic { return a..b }
+function mkIncl(a: int, b: int): dynamic { return a..=b }
+let r = mk(1, 4)
+let ri = mkIncl(1, 4)
+print(r)
+print(ri)

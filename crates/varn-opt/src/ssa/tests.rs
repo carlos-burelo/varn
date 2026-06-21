@@ -991,6 +991,29 @@ fn f:
 }
 
 #[test]
+fn range_lowers_to_range_inst() {
+    // f(a, b) { return a..b }
+    let f = func(
+        vec![HirType::Int, HirType::Int],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::Range {
+            start: Box::new(param(0)),
+            end: Box::new(param(1)),
+            inclusive: false,
+        }))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: int, v1: int):
+    v2 = range v0..v1
+    return v2
+"
+    );
+}
+
+#[test]
 fn verifier_accepts_constructed_ssa() {
     // The verifier must not reject any well-formed function the builder emits.
     let while_loop = func(

@@ -143,6 +143,8 @@ pub enum InstKind {
     IsArray { operand: Value },
     /// The method receiver (`this`) — register 0 copied into a value.
     This,
+    /// `start..end` / `start..=end` → `InvokeRuntimeStatic __range__`.
+    Range { start: Value, end: Value, inclusive: bool },
 }
 
 /// How a block ends and transfers control. Branch/jump carry the block-argument

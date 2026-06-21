@@ -93,6 +93,10 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::GetEnumTag { operand } => format!("enumtag {}", val(*operand)),
         InstKind::IsArray { operand } => format!("isarray {}", val(*operand)),
         InstKind::This => "this".to_owned(),
+        InstKind::Range { start, end, inclusive } => {
+            let op = if *inclusive { "..=" } else { ".." };
+            format!("range {}{op}{}", val(*start), val(*end))
+        }
     }
 }
 
