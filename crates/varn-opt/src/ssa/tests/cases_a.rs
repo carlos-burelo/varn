@@ -578,3 +578,26 @@ fn f:
     );
 }
 
+#[test]
+fn upvalue_read_lowers_to_loadupvalue() {
+    // f(x) { return x + <upvalue 0> }  (a closure body reading a captured var)
+    let f = func(
+        vec![HirType::Int],
+        0,
+        vec![HirStmt::Return(Some(add(
+            param(0),
+            HirExpr::Var(HirBinding::Upvalue(0)),
+        )))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: int):
+    v1 = upvalue #0
+    v2 = add.int v0, v1
+    return v2
+"
+    );
+}
+
