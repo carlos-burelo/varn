@@ -1,7 +1,7 @@
 use super::*;
 use crate::hir::{
-    HirArrayEl, HirBinOp, HirCaseTest, HirExpr, HirMatchCase, HirObjectProp, HirPropKey, HirStmt,
-    HirSwitchCase, HirTemplatePart, HirType, HirTypeTest, LocalId,
+    HirArrayEl, HirBinOp, HirCaseTest, HirExpr, HirMatchCase, HirObjectProp, HirOptionalProperty,
+    HirPropKey, HirStmt, HirSwitchCase, HirTemplatePart, HirType, HirTypeTest, LocalId,
 };
 
 #[test]
@@ -534,6 +534,35 @@ fn f:
     v0 = int 7
     v1 = supercall super.greet(v0)
     return v1
+"
+    );
+}
+
+#[test]
+fn optional_chain_member_branches_on_null() {
+    // f(o) { return o?.x }
+    let f = func(
+        vec![HirType::Dynamic],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::OptionalChain {
+            object: Box::new(param(0)),
+            property: HirOptionalProperty::Member("x".into()),
+        }))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: dyn):
+    v1 = isnull v0
+    branch v1, b1, b2
+  b1():
+    jump b3(v0)
+  b2():
+    v2 = getpropmaybe v0.x
+    jump b3(v2)
+  b3(v3: dyn):
+    return v3
 "
     );
 }

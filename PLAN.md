@@ -216,9 +216,17 @@ Done (`ssa/build.rs`, `ssa/ir.rs`):
   (bound method: `GetSuper name` + `Call` over args, no receiver). Verified:
   `Dog extends Animal` with `super(name)` in the ctor + `super.describe()` in an
   override → `Rex / Lab / Animal:Rex:Lab` identical with/without `VN_OPT_SSA`.
+- **Optional chaining** — `object?.…` → a null-check branch + result phi
+  (reuses `lower_branch_value`): `IsNull(object)` true short-circuits to the
+  object, else the property is applied. Member (`GetPropertyMaybe`), index
+  (`GetIndex`), module-slot, plain call (`obj(args)`), and method call
+  (`obj.m(args)`) all map to existing instructions; extension calls (which pass
+  `obj` as the receiver, not a plain-call arg) fall back. Verified: `b?.v ?? -1`
+  and `b?.get() ?? -1` on a `Box?` → `42 -1 42 -1` identical with/without
+  `VN_OPT_SSA`.
 - **Trivial-phi removal** (`simplify_phis`): Braun's `tryRemoveTrivialPhi` as a
   fixpoint post-pass.
-- Tests (`ssa/tests.rs`, 39 — golden dumps + verifier): identity, const+binary,
+- Tests (`ssa/tests.rs`, 40 — golden dumps + verifier): identity, const+binary,
   reassign, one-/two-sided `if` phi, no-phi trivial removal, `while`/`for`/
   `do-while` carry, `break`/`continue`, nested-`if` merge, global call, self-call,
   member/index read, member/index write, method call, ternary, array/object
