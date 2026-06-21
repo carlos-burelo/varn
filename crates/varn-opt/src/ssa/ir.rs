@@ -141,6 +141,8 @@ pub enum InstKind {
     GetEnumTag { operand: Value },
     /// `IsArray` — runtime array test (for `is Array` type tests).
     IsArray { operand: Value },
+    /// The method receiver (`this`) — register 0 copied into a value.
+    This,
 }
 
 /// How a block ends and transfers control. Branch/jump carry the block-argument
@@ -148,6 +150,8 @@ pub enum InstKind {
 #[derive(Debug, Clone)]
 pub enum Terminator {
     Return(Option<Value>),
+    /// `throw value` — unwinds; the block has no successors.
+    Throw(Value),
     Jump {
         target: BlockId,
         args: Vec<Value>,

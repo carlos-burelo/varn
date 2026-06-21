@@ -954,6 +954,43 @@ fn f:
 }
 
 #[test]
+fn this_lowers_to_move_from_reg0() {
+    // f() { return this }
+    let f = func(
+        vec![],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::This))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0():
+    v0 = this
+    return v0
+"
+    );
+}
+
+#[test]
+fn throw_terminates_block() {
+    // f(x) { throw x }
+    let f = func(
+        vec![HirType::Dynamic],
+        0,
+        vec![HirStmt::Throw(param(0))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: dyn):
+    throw v0
+"
+    );
+}
+
+#[test]
 fn verifier_accepts_constructed_ssa() {
     // The verifier must not reject any well-formed function the builder emits.
     let while_loop = func(

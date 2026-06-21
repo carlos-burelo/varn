@@ -422,6 +422,8 @@ fn emit_inst(
         InstKind::IsArray { operand } => {
             chunk.emit_rr(OpCode::IsArray, d, reg[operand.0 as usize], LINE);
         }
+        // The receiver lives in register 0; copy it into this value's register.
+        InstKind::This => chunk.emit_rr(OpCode::Move, d, 0, LINE),
         // Dest-less side effects handled before the dest guard above.
         InstKind::SetProperty { .. } | InstKind::SetIndex { .. } | InstKind::AssertNotNull { .. } => {
             unreachable!()
@@ -458,6 +460,9 @@ fn emit_terminator(
         Terminator::Return(None) | Terminator::Unreachable => {
             chunk.write(Chunk::pack_op(OpCode::LoadNull, null_reg), LINE);
             chunk.emit1(OpCode::Return, Chunk::pack(0, null_reg), LINE);
+        }
+        Terminator::Throw(v) => {
+            chunk.emit1(OpCode::Throw, Chunk::pack(reg[v.0 as usize], 0), LINE);
         }
         Terminator::Jump { target, args } => {
             emit_edge_copies(chunk, ssa, reg, *target, args, scratch);

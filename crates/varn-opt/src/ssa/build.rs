@@ -278,6 +278,11 @@ impl Builder {
                 self.set_term(Terminator::Return(v));
                 Ok(())
             }
+            HirStmt::Throw(e) => {
+                let v = self.lower_expr(e)?;
+                self.set_term(Terminator::Throw(v));
+                Ok(())
+            }
             HirStmt::If {
                 test,
                 then_body,
@@ -693,6 +698,7 @@ impl Builder {
                     HirTypeTest::AlwaysFalse => Ok(self.emit(InstKind::ConstBool(false), HirType::Bool)),
                 }
             }
+            HirExpr::This => Ok(self.emit(InstKind::This, HirType::Ref)),
             HirExpr::Var(HirBinding::Global(name)) => {
                 Ok(self.emit(InstKind::LoadGlobal(name.clone()), HirType::Dynamic))
             }
@@ -1103,6 +1109,7 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                 InstKind::ModuleSlot { object, .. } => sub(object),
                 InstKind::GetEnumTag { operand } => sub(operand),
                 InstKind::IsArray { operand } => sub(operand),
+                InstKind::This => {}
                 InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
                 | InstKind::ConstBool(_)
@@ -1116,6 +1123,7 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
         }
         match &mut block.term {
             Terminator::Return(Some(v)) => sub(v),
+            Terminator::Throw(v) => sub(v),
             Terminator::Return(None) | Terminator::Unreachable => {}
             Terminator::Jump { args, .. } => args.iter_mut().for_each(sub),
             Terminator::Branch {

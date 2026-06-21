@@ -135,7 +135,7 @@ fn check_use(
 
 fn succs(t: &Terminator) -> Vec<BlockId> {
     match t {
-        Terminator::Return(_) | Terminator::Unreachable => Vec::new(),
+        Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable => Vec::new(),
         Terminator::Jump { target, .. } => vec![*target],
         Terminator::Branch { then_blk, else_blk, .. } => vec![*then_blk, *else_blk],
     }
@@ -202,6 +202,7 @@ fn inst_uses(kind: &InstKind) -> Vec<Value> {
 fn term_value_uses(t: &Terminator) -> Vec<Value> {
     match t {
         Terminator::Return(Some(v)) => vec![*v],
+        Terminator::Throw(v) => vec![*v],
         Terminator::Branch { cond, .. } => vec![*cond],
         _ => Vec::new(),
     }
