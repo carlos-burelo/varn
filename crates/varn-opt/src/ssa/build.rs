@@ -308,6 +308,12 @@ impl Builder {
             } => self.lower_for_classic(test, update, body),
             HirStmt::DoWhile { body, test } => self.lower_do_while(body, test),
             HirStmt::ForIn { var, object, body } => self.lower_for_in(*var, object, body),
+            HirStmt::ForOf { var, iterable, body, is_await } => {
+                if *is_await {
+                    return Err(OptError::Unsupported("ssa: for-await-of"));
+                }
+                self.lower_for_of(*var, iterable, body)
+            }
             HirStmt::Switch { disc, cases } => self.lower_switch(disc, cases),
             HirStmt::Break => self.lower_jump_out(|c| c.break_target, "ssa: break outside loop"),
             HirStmt::Continue => {
@@ -630,6 +636,69 @@ impl Builder {
 
         self.seal_block(exit);
         self.current = exit;
+        Ok(())
+    }
+
+    /// `for (var of iterable) body` — the iterator protocol: `iter =
+    /// iterable[Symbol.iterator]()`, then each iteration `r = iter.next()`, exit
+    /// when `r.done`, bind `r.value` to `var`. The iterator is loop-invariant
+    /// (dominates the header); body-modified vars become loop phis via Braun (the
+    /// header is unsealed during the body). `continue` re-runs the header.
+    fn lower_for_of(&mut self, var: LocalId, iterable: &HirExpr, body: &[HirStmt]) -> Result<()> {
+        let it = self.lower_expr(iterable)?;
+        let iter_fn = self.emit(InstKind::GetSymbol { object: it, is_async: false }, HirType::Ref);
+        let iterator = self.emit(InstKind::IterCall { callee: iter_fn, recv: it }, HirType::Ref);
+
+        let pre = self.current;
+        let header = self.new_block();
+        self.set_term(Terminator::Jump { target: header, args: Vec::new() });
+        self.add_pred(header, pre);
+
+        self.current = header;
+        let next_fn = self.emit(
+            InstKind::GetProperty { object: iterator, name: Rc::from("next") },
+            HirType::Ref,
+        );
+        let result = self.emit(InstKind::IterCall { callee: next_fn, recv: iterator }, HirType::Ref);
+        let done = self.emit(
+            InstKind::GetProperty { object: result, name: Rc::from("done") },
+            HirType::Bool,
+        );
+        let body_b = self.new_block();
+        let exit_b = self.new_block();
+        // `done` truthy → exit; else → body.
+        self.set_term(Terminator::Branch {
+            cond: done,
+            then_blk: exit_b,
+            then_args: Vec::new(),
+            else_blk: body_b,
+            else_args: Vec::new(),
+        });
+        self.add_pred(exit_b, header);
+        self.add_pred(body_b, header);
+        self.seal_block(body_b);
+
+        self.loops.push(LoopCtx {
+            continue_target: header,
+            break_target: exit_b,
+        });
+        self.current = body_b;
+        let value = self.emit(
+            InstKind::GetProperty { object: result, name: Rc::from("value") },
+            HirType::Dynamic,
+        );
+        self.write_var(VarId::Local(var), body_b, value);
+        self.lower_block(body)?;
+        if self.is_open() {
+            let from = self.current;
+            self.set_term(Terminator::Jump { target: header, args: Vec::new() });
+            self.add_pred(header, from);
+        }
+        self.loops.pop();
+
+        self.seal_block(header);
+        self.seal_block(exit_b);
+        self.current = exit_b;
         Ok(())
     }
 
@@ -1286,6 +1355,11 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                     sub(end);
                 }
                 InstKind::ObjectKeys { operand } => sub(operand),
+                InstKind::GetSymbol { object, .. } => sub(object),
+                InstKind::IterCall { callee, recv } => {
+                    sub(callee);
+                    sub(recv);
+                }
                 InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
                 | InstKind::ConstBool(_)

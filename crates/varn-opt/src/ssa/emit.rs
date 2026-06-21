@@ -19,6 +19,7 @@ use std::rc::Rc;
 
 use varn_core::OpCode;
 use varn_types::chunk::{Chunk, FeedbackVector, FunctionProto, Literal, PolyICSlot, PoolEntry};
+use varn_types::value::RuntimeSymbol;
 
 use crate::hir::{HirFunction, HirUnOp};
 use crate::lower::bin_opcode;
@@ -206,6 +207,8 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
                 InstKind::BuildArray { elements } => elements.len() as u32,
                 // Intrinsic operands: object + args, contiguous in `call_base`.
                 InstKind::IntrinsicCall { args, .. } => args.len() as u32 + 1,
+                // Iterator-protocol call: just the receiver in `call_base`.
+                InstKind::IterCall { .. } => 1,
                 _ => 0,
             };
             max_call = max_call.max(t);
@@ -437,6 +440,18 @@ fn emit_inst(
         }
         InstKind::ObjectKeys { operand } => {
             chunk.emit_rr(OpCode::ObjectKeys, d, reg[operand.0 as usize], LINE);
+        }
+        InstKind::GetSymbol { object, is_async } => {
+            let sym = if *is_async { RuntimeSymbol::AsyncIterator } else { RuntimeSymbol::Iterator };
+            let idx = chunk.add_symbol(sym);
+            chunk.emit_rrc(OpCode::GetSymbol, d, reg[object.0 as usize], idx, LINE);
+        }
+        // Iterator-protocol call: receiver at `call_base`, `Call` with arg_count 1.
+        InstKind::IterCall { callee, recv } => {
+            chunk.emit_rr(OpCode::Move, call_base, reg[recv.0 as usize], LINE);
+            chunk.emit(OpCode::Call, LINE);
+            chunk.write(Chunk::pack(d, reg[callee.0 as usize]), LINE);
+            chunk.write(Chunk::pack(1, call_base), LINE);
         }
         // Dest-less side effects handled before the dest guard above.
         InstKind::SetProperty { .. } | InstKind::SetIndex { .. } | InstKind::AssertNotNull { .. } => {
