@@ -2,7 +2,7 @@
 
 use crate::hir::{
     HirArrayEl, HirBinOp, HirBinding, HirExpr, HirFunction, HirObjectProp, HirParam, HirPropKey,
-    HirStmt, HirTemplatePart, HirType, LocalId,
+    HirStmt, HirTemplatePart, HirType, HirTypeTest, LocalId,
 };
 
 use super::build::build_function;
@@ -902,6 +902,53 @@ fn f:
   b0():
     v0 = decimal 3.14
     return v0
+"
+    );
+}
+
+#[test]
+fn try_op_lowers_to_enumtag_branch_return() {
+    // f(x) { return x? }
+    let f = func(
+        vec![HirType::Dynamic],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::TryOp(Box::new(param(0)))))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: dyn):
+    v1 = enumtag v0
+    branch v1, b1, b2
+  b1():
+    return v0
+  b2():
+    return v0
+"
+    );
+}
+
+#[test]
+fn type_test_typeof_lowers_to_typeof_eq() {
+    // f(x) { return x is int }
+    let f = func(
+        vec![HirType::Dynamic],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::TypeTest {
+            value: Box::new(param(0)),
+            kind: HirTypeTest::TypeofEq("int".into()),
+        }))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: dyn):
+    v1 = typeof.str v0
+    v2 = str \"int\"
+    v3 = eq.dyn v1, v2
+    return v3
 "
     );
 }

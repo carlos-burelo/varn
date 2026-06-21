@@ -416,6 +416,12 @@ fn emit_inst(
         InstKind::ModuleSlot { object, slot } => {
             chunk.emit_rrc(OpCode::LoadModuleSlot, d, reg[object.0 as usize], *slot, LINE);
         }
+        InstKind::GetEnumTag { operand } => {
+            chunk.emit_rr(OpCode::GetEnumTag, d, reg[operand.0 as usize], LINE);
+        }
+        InstKind::IsArray { operand } => {
+            chunk.emit_rr(OpCode::IsArray, d, reg[operand.0 as usize], LINE);
+        }
         // Dest-less side effects handled before the dest guard above.
         InstKind::SetProperty { .. } | InstKind::SetIndex { .. } | InstKind::AssertNotNull { .. } => {
             unreachable!()

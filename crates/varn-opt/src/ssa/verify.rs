@@ -193,6 +193,8 @@ fn inst_uses(kind: &InstKind) -> Vec<Value> {
         InstKind::AssertNotNull { operand } => vec![*operand],
         InstKind::GetPropertyMaybe { object, .. } => vec![*object],
         InstKind::ModuleSlot { object, .. } => vec![*object],
+        InstKind::GetEnumTag { operand } => vec![*operand],
+        InstKind::IsArray { operand } => vec![*operand],
         _ => Vec::new(),
     }
 }
