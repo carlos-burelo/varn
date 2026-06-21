@@ -1,0 +1,13 @@
+function countKeys(o: dynamic): int {
+  let n = 0
+  for (let k in o) { n = n + 1 }
+  return n
+}
+function concatKeys(o: dynamic): str {
+  let s = ""
+  for (let k in o) { s = s + k }
+  return s
+}
+let o = { a: 1, b: 2, c: 3 }
+print(countKeys(o))
+print(concatKeys(o))

@@ -97,6 +97,7 @@ fn inst_kind(kind: &InstKind) -> String {
             let op = if *inclusive { "..=" } else { ".." };
             format!("range {}{op}{}", val(*start), val(*end))
         }
+        InstKind::ObjectKeys { operand } => format!("objectkeys {}", val(*operand)),
     }
 }
 

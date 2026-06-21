@@ -435,6 +435,9 @@ fn emit_inst(
             chunk.write(Chunk::pack(2, reg[start.0 as usize]), LINE);
             chunk.write(Chunk::pack(reg[end.0 as usize], flag), LINE);
         }
+        InstKind::ObjectKeys { operand } => {
+            chunk.emit_rr(OpCode::ObjectKeys, d, reg[operand.0 as usize], LINE);
+        }
         // Dest-less side effects handled before the dest guard above.
         InstKind::SetProperty { .. } | InstKind::SetIndex { .. } | InstKind::AssertNotNull { .. } => {
             unreachable!()

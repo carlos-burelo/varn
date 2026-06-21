@@ -66,11 +66,19 @@ impl LivenessAnalyzer {
         self.live_ranges.clear();
 
         for vreg in vregs_used {
-            if let (Some(&start_val), Some(uses)) =
-                (self.def_sites.get(&vreg), self.use_sites.get(&vreg))
-            {
+            // A register needs a live range if it is defined. With uses, the
+            // range spans def..last-use; **without** uses (e.g. a `for-in`/`for-of`
+            // loop variable the body never reads) it still gets a *point* range at
+            // the def, so it interferes with whatever is live there and the
+            // colourer can't alias another live value onto its slot — which would
+            // be clobbered by the (otherwise dead) write.
+            if let Some(&start_val) = self.def_sites.get(&vreg) {
                 let mut start = start_val;
-                let mut end = uses.iter().copied().max().unwrap_or(start);
+                let mut end = self
+                    .use_sites
+                    .get(&vreg)
+                    .map(|uses| uses.iter().copied().max().unwrap_or(start_val))
+                    .unwrap_or(start_val);
 
                 let mut changed = true;
                 while changed {

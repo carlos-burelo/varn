@@ -57,6 +57,9 @@ struct Builder {
     incomplete_phis: FxHashMap<BlockId, Vec<(VarId, Value)>>,
     /// Enclosing loops, innermost last (`break`/`continue` targets).
     loops: Vec<LoopCtx>,
+    /// Next id for a synthetic loop variable (e.g. a `for-in` index). Set above
+    /// the function's real local count so it never collides.
+    next_synthetic: u32,
     /// The block instructions are currently appended to.
     current: BlockId,
 }
@@ -71,6 +74,7 @@ impl Builder {
             var_ty: FxHashMap::default(),
             incomplete_phis: FxHashMap::default(),
             loops: Vec::new(),
+            next_synthetic: 0,
             current: BlockId(0),
         };
         let entry = b.new_block();
@@ -127,6 +131,14 @@ impl Builder {
     /// Append a side-effecting instruction that produces no value (`dest: None`).
     fn emit_effect(&mut self, kind: InstKind) {
         self.block_mut(self.current).insts.push(Inst { dest: None, kind });
+    }
+
+    /// A fresh synthetic loop variable (e.g. a `for-in` index), SSA-renamed by
+    /// the normal Braun machinery.
+    fn fresh_synthetic(&mut self) -> VarId {
+        let id = VarId::Local(LocalId(self.next_synthetic));
+        self.next_synthetic += 1;
+        id
     }
 
     // ----- variable read/write (Braun) -----------------------------------
@@ -295,6 +307,7 @@ impl Builder {
                 body,
             } => self.lower_for_classic(test, update, body),
             HirStmt::DoWhile { body, test } => self.lower_do_while(body, test),
+            HirStmt::ForIn { var, object, body } => self.lower_for_in(*var, object, body),
             HirStmt::Break => self.lower_jump_out(|c| c.break_target, "ssa: break outside loop"),
             HirStmt::Continue => {
                 self.lower_jump_out(|c| c.continue_target, "ssa: continue outside loop")
@@ -543,6 +556,85 @@ impl Builder {
                 args: Vec::new(),
             });
             self.add_pred(header, from); // back-edge
+        }
+
+        self.seal_block(header);
+        self.seal_block(exit_b);
+        self.current = exit_b;
+        Ok(())
+    }
+
+    /// `for (var in object) body` — `ObjectKeys` + an index loop. The index is a
+    /// synthetic loop variable carried by an ordinary Braun phi; `var` is bound to
+    /// `keys[idx]` each iteration. `continue` lands on the index increment.
+    fn lower_for_in(&mut self, var: LocalId, object: &HirExpr, body: &[HirStmt]) -> Result<()> {
+        let obj = self.lower_expr(object)?;
+        let keys = self.emit(InstKind::ObjectKeys { operand: obj }, HirType::Ref);
+        let idx_var = self.fresh_synthetic();
+        let zero = self.emit(InstKind::ConstInt(0), HirType::Int);
+        self.write_var(idx_var, self.current, zero);
+
+        let pre = self.current;
+        let header = self.new_block();
+        self.set_term(Terminator::Jump { target: header, args: Vec::new() });
+        self.add_pred(header, pre);
+
+        self.current = header;
+        let len = self.emit(
+            InstKind::GetProperty { object: keys, name: Rc::from("length") },
+            HirType::Int,
+        );
+        let idx = self.read_var(idx_var, header)?;
+        let cond = self.emit(
+            InstKind::Binary { op: HirBinOp::Lt, lhs: idx, rhs: len, ty: HirType::Bool },
+            HirType::Bool,
+        );
+        let body_b = self.new_block();
+        let update_b = self.new_block();
+        let exit_b = self.new_block();
+        self.set_term(Terminator::Branch {
+            cond,
+            then_blk: body_b,
+            then_args: Vec::new(),
+            else_blk: exit_b,
+            else_args: Vec::new(),
+        });
+        self.add_pred(body_b, header);
+        self.add_pred(exit_b, header);
+        self.seal_block(body_b);
+
+        self.loops.push(LoopCtx {
+            continue_target: update_b,
+            break_target: exit_b,
+        });
+        self.current = body_b;
+        let idx_b = self.read_var(idx_var, body_b)?;
+        let elem = self.emit(
+            InstKind::GetIndex { object: keys, index: idx_b },
+            HirType::Dynamic,
+        );
+        self.write_var(VarId::Local(var), body_b, elem);
+        self.lower_block(body)?;
+        if self.is_open() {
+            let from = self.current;
+            self.set_term(Terminator::Jump { target: update_b, args: Vec::new() });
+            self.add_pred(update_b, from);
+        }
+        self.loops.pop();
+
+        self.seal_block(update_b);
+        self.current = update_b;
+        let idx_u = self.read_var(idx_var, update_b)?;
+        let one = self.emit(InstKind::ConstInt(1), HirType::Int);
+        let next = self.emit(
+            InstKind::Binary { op: HirBinOp::Add, lhs: idx_u, rhs: one, ty: HirType::Int },
+            HirType::Int,
+        );
+        self.write_var(idx_var, update_b, next);
+        if self.is_open() {
+            let from = self.current;
+            self.set_term(Terminator::Jump { target: header, args: Vec::new() });
+            self.add_pred(header, from);
         }
 
         self.seal_block(header);
@@ -945,6 +1037,8 @@ pub fn build_function(func: &HirFunction) -> Result<SsaFunc> {
     }
 
     let mut b = Builder::new();
+    // Synthetic loop vars (e.g. `for-in` index) use ids above the real locals.
+    b.next_synthetic = func.locals;
     let entry = b.current;
 
     for (i, param) in func.params.iter().enumerate() {
@@ -1122,6 +1216,7 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                     sub(start);
                     sub(end);
                 }
+                InstKind::ObjectKeys { operand } => sub(operand),
                 InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
                 | InstKind::ConstBool(_)

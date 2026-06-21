@@ -196,6 +196,7 @@ fn inst_uses(kind: &InstKind) -> Vec<Value> {
         InstKind::GetEnumTag { operand } => vec![*operand],
         InstKind::IsArray { operand } => vec![*operand],
         InstKind::Range { start, end, .. } => vec![*start, *end],
+        InstKind::ObjectKeys { operand } => vec![*operand],
         _ => Vec::new(),
     }
 }
