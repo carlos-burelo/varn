@@ -439,7 +439,10 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                     sub(callee);
                     sub(recv);
                 }
-                InstKind::ConstInt(_)
+                InstKind::SuperCall { args } => args.iter_mut().for_each(sub),
+                InstKind::SuperMethodCall { args, .. } => args.iter_mut().for_each(sub),
+                InstKind::GetSuper { .. }
+                | InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
                 | InstKind::ConstBool(_)
                 | InstKind::ConstStr(_)

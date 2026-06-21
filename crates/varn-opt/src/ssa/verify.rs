@@ -199,6 +199,8 @@ fn inst_uses(kind: &InstKind) -> Vec<Value> {
         InstKind::ObjectKeys { operand } => vec![*operand],
         InstKind::GetSymbol { object, .. } => vec![*object],
         InstKind::IterCall { callee, recv } => vec![*callee, *recv],
+        InstKind::SuperCall { args } => args.clone(),
+        InstKind::SuperMethodCall { args, .. } => args.clone(),
         _ => Vec::new(),
     }
 }

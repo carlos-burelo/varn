@@ -211,9 +211,14 @@ Done (`ssa/build.rs`, `ssa/ir.rs`):
   (`__variant_name__` compare + `value{i}` payload binds); record patterns and
   guards fall back. Verified: enum-variant matching (`Circle(r)=>…`) + literal/
   bind (`0=>…, x=>…`) → `300 16 0 zero one many` identical with/without `VN_OPT_SSA`.
+- **Super** — `super` / `super.name` (`GetSuper`), `super(args)` (constructor:
+  `GetSuper "constructor"` + `Call` with `this` as receiver), `super.name(args)`
+  (bound method: `GetSuper name` + `Call` over args, no receiver). Verified:
+  `Dog extends Animal` with `super(name)` in the ctor + `super.describe()` in an
+  override → `Rex / Lab / Animal:Rex:Lab` identical with/without `VN_OPT_SSA`.
 - **Trivial-phi removal** (`simplify_phis`): Braun's `tryRemoveTrivialPhi` as a
   fixpoint post-pass.
-- Tests (`ssa/tests.rs`, 38 — golden dumps + verifier): identity, const+binary,
+- Tests (`ssa/tests.rs`, 39 — golden dumps + verifier): identity, const+binary,
   reassign, one-/two-sided `if` phi, no-phi trivial removal, `while`/`for`/
   `do-while` carry, `break`/`continue`, nested-`if` merge, global call, self-call,
   member/index read, member/index write, method call, ternary, array/object
