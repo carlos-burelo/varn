@@ -3,8 +3,8 @@
 use std::rc::Rc;
 
 use crate::hir::{
-    CaptureTarget, HirBinOp, HirCatch, HirExportSpec, HirExpr, HirImportKind, HirImportSpec,
-    HirStmt, HirSwitchCase, HirType, LocalId,
+    CaptureTarget, HirBinOp, HirBinding, HirCatch, HirExportSpec, HirExpr, HirImportKind,
+    HirImportSpec, HirStmt, HirSwitchCase, HirType, LocalId,
 };
 use crate::ssa::ir::{BlockId, InstKind, Terminator, Value};
 use crate::OptError;
@@ -30,7 +30,10 @@ impl Builder {
             }
             HirStmt::Let { local, value, .. } => {
                 let v = self.lower_expr(value)?;
-                self.write_var(VarId::Local(*local), self.current, v);
+                // Route through store_binding so a *pinned* (captured / `using`)
+                // local is written via StoreCaptured to its fixed slot, matching
+                // the LoadCaptured reads — a plain write_var would desync them.
+                self.store_binding(&HirBinding::Local(*local), v);
                 Ok(())
             }
             HirStmt::Assign { target, value } => {
