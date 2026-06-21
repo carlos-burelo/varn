@@ -20,8 +20,8 @@ use rustc_hash::FxHashMap;
 
 use crate::hir::{
     HirArrayEl, HirAssignTarget, HirBinOp, HirBinding, HirExpr, HirFunction, HirLogicalOp,
-    HirObjectProp, HirPropKey, HirStmt, HirTemplatePart, HirType, HirTypeTest, HirUnOp,
-    HirUpdateOp, LocalId,
+    HirObjectProp, HirPropKey, HirStmt, HirSwitchCase, HirTemplatePart, HirType, HirTypeTest,
+    HirUnOp, HirUpdateOp, LocalId,
 };
 use crate::OptError;
 
@@ -308,6 +308,7 @@ impl Builder {
             } => self.lower_for_classic(test, update, body),
             HirStmt::DoWhile { body, test } => self.lower_do_while(body, test),
             HirStmt::ForIn { var, object, body } => self.lower_for_in(*var, object, body),
+            HirStmt::Switch { disc, cases } => self.lower_switch(disc, cases),
             HirStmt::Break => self.lower_jump_out(|c| c.break_target, "ssa: break outside loop"),
             HirStmt::Continue => {
                 self.lower_jump_out(|c| c.continue_target, "ssa: continue outside loop")
@@ -561,6 +562,74 @@ impl Builder {
         self.seal_block(header);
         self.seal_block(exit_b);
         self.current = exit_b;
+        Ok(())
+    }
+
+    /// `switch (disc) { cases }` — a test chain (`disc == val` → branch to the
+    /// case body, else the next test) then the bodies in source order, **falling
+    /// through** to each other. `default` is reached by the no-match jump. A
+    /// `break`-only scope (exit); `continue` targets the enclosing loop. All edges
+    /// are forward (no back-edges), so every block is sealed once its predecessors
+    /// — its test branch, the no-match jump (default), and the previous body's
+    /// fall-through — are wired, which all happens before it is lowered.
+    fn lower_switch(&mut self, disc: &HirExpr, cases: &[HirSwitchCase]) -> Result<()> {
+        let dv = self.lower_expr(disc)?;
+        let n = cases.len();
+        let bodies: Vec<BlockId> = (0..n).map(|_| self.new_block()).collect();
+        let exit = self.new_block();
+        let default_idx = cases.iter().position(|c| c.test.is_none());
+
+        // Test chain, starting in the current block.
+        let mut cur = self.current;
+        for (i, case) in cases.iter().enumerate() {
+            if let Some(test) = &case.test {
+                self.current = cur;
+                let val = self.lower_expr(test)?;
+                let eq = self.emit(
+                    InstKind::Binary { op: HirBinOp::Eq, lhs: dv, rhs: val, ty: HirType::Dynamic },
+                    HirType::Bool,
+                );
+                let next = self.new_block();
+                self.set_term(Terminator::Branch {
+                    cond: eq,
+                    then_blk: bodies[i],
+                    then_args: Vec::new(),
+                    else_blk: next,
+                    else_args: Vec::new(),
+                });
+                self.add_pred(bodies[i], cur);
+                self.add_pred(next, cur);
+                self.seal_block(next);
+                cur = next;
+            }
+        }
+        // No test matched → the default body, or past the switch.
+        let no_match = match default_idx {
+            Some(d) => bodies[d],
+            None => exit,
+        };
+        self.current = cur;
+        self.set_term(Terminator::Jump { target: no_match, args: Vec::new() });
+        self.add_pred(no_match, cur);
+
+        // Bodies, falling through. `break` → exit; `continue` → enclosing loop.
+        let cont = self.loops.last().map(|c| c.continue_target).unwrap_or(exit);
+        self.loops.push(LoopCtx { continue_target: cont, break_target: exit });
+        for (i, case) in cases.iter().enumerate() {
+            self.seal_block(bodies[i]);
+            self.current = bodies[i];
+            self.lower_block(&case.body)?;
+            if self.is_open() {
+                let from = self.current;
+                let target = if i + 1 < n { bodies[i + 1] } else { exit };
+                self.set_term(Terminator::Jump { target, args: Vec::new() });
+                self.add_pred(target, from);
+            }
+        }
+        self.loops.pop();
+
+        self.seal_block(exit);
+        self.current = exit;
         Ok(())
     }
 
