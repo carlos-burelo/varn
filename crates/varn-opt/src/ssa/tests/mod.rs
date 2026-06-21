@@ -28,12 +28,12 @@ fn func(params: Vec<HirType>, locals: u32, body: Vec<HirStmt>) -> HirFunction {
 }
 
 fn build(f: &HirFunction) -> String {
-    dump(&build_function(f).expect("ssa build"))
+    dump(&build_function(f, &[]).expect("ssa build"))
 }
 
 /// Build a function to SSA and assert the verifier accepts it.
 fn verify_ok(f: &HirFunction) {
-    let ssa = build_function(f).expect("ssa build");
+    let ssa = build_function(f, &[]).expect("ssa build");
     super::verify::verify(&ssa).expect("ssa verify");
 }
 

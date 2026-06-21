@@ -86,7 +86,7 @@ fn inst_kind(kind: &InstKind) -> String {
         }
         InstKind::ToString { operand } => format!("tostring {}", val(*operand)),
         InstKind::BuildStr { parts } => format!("buildstr{}", args_list(parts)),
-        InstKind::MakeClosure { func } => format!("closure {}", func.name),
+        InstKind::MakeClosure { func, .. } => format!("closure {}", func.name),
         InstKind::IntrinsicCall { object, args, wire_byte } => {
             format!("intrinsic#{wire_byte} {}{}", val(*object), args_list(args))
         }
@@ -115,6 +115,57 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::SuperMethodCall { name, args } => {
             format!("supercall super.{name}{}", args_list(args))
         }
+        InstKind::ExtensionCall { func, recv, args } => {
+            format!("extcall {func}({}{})", val(*recv), {
+                let a = args.iter().map(|v| val(*v)).collect::<Vec<_>>().join(", ");
+                if a.is_empty() { String::new() } else { format!(", {a}") }
+            })
+        }
+        InstKind::CallSpread { callee, args } => {
+            let a = args
+                .iter()
+                .map(|(v, s)| if *s { format!("...{}", val(*v)) } else { val(*v) })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("callspread {}({a})", val(*callee))
+        }
+        InstKind::BuildArraySpread { elements } => {
+            let a = elements
+                .iter()
+                .map(|(v, s)| if *s { format!("...{}", val(*v)) } else { val(*v) })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("array[{a}]")
+        }
+        InstKind::BuildObjectSpread { parts } => {
+            let a = parts
+                .iter()
+                .map(|(k, v)| match k {
+                    Some(k) => format!("{k}: {}", val(*v)),
+                    None => format!("...{}", val(*v)),
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("object {{{a}}}")
+        }
+        InstKind::LoadCaptured { var } => format!("loadcaptured {var:?}"),
+        InstKind::StoreCaptured { var, value } => format!("storecaptured {var:?} = {}", val(*value)),
+        InstKind::MakeClass { name, super_class } => format!("makeclass {name} super={:?}", super_class.map(val)),
+        InstKind::DeclareField { class, name } => format!("declarefield {}.{name}", val(*class)),
+        InstKind::DefineStatic { class, name, value } => format!("definestatic {}.{name} = {}", val(*class), val(*value)),
+        InstKind::DefineMethod { class, name, method, is_static } => format!("definemethod {}.{name} = {} (static={is_static})", val(*class), val(*method)),
+        InstKind::DefineAccessor { class, name, accessor, is_getter, is_static } => format!("defineaccessor {}.{name} = {} (getter={is_getter}, static={is_static})", val(*class), val(*accessor)),
+        InstKind::MakeEnumVariant { tag, meta } => format!("makeenumvariant tag={tag} meta={meta}"),
+        InstKind::Try { handler } => format!("try b{}", handler.0),
+        InstKind::PopTry => "poptry".to_owned(),
+        InstKind::CatchParam { try_val } => format!("catchparam {}", val(*try_val)),
+        InstKind::CloseUpvalues { targets } => format!("closeupvalues {:?}", targets),
+        InstKind::Dispose { target, is_await } => format!("dispose {target:?} await={is_await}"),
+        InstKind::LoadModule { source } => format!("loadmodule {source}"),
+        InstKind::StoreModuleSlot { value, slot } => format!("storemoduleslot {slot} = {}", val(*value)),
+        InstKind::Await { operand } => format!("await {}", val(*operand)),
+        InstKind::Spawn { operand } => format!("spawn {}", val(*operand)),
+        InstKind::Yield { operand } => format!("yield {}", val(*operand)),
     }
 }
 
