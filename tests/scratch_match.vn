@@ -1,0 +1,25 @@
+enum Shape {
+  Circle(r: int),
+  Square(s: int),
+  Point
+}
+function area(sh: Shape): int {
+  return match sh {
+    Circle(r) => r * r * 3,
+    Square(s) => s * s,
+    Point => 0
+  }
+}
+function classify(n: int): str {
+  return match n {
+    0 => "zero",
+    1 => "one",
+    x => "many"
+  }
+}
+print(area(Shape.Circle(10)))
+print(area(Shape.Square(4)))
+print(area(Shape.Point))
+print(classify(0))
+print(classify(1))
+print(classify(7))

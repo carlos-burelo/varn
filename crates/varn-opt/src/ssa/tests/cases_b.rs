@@ -1,7 +1,7 @@
 use super::*;
 use crate::hir::{
-    HirArrayEl, HirBinOp, HirExpr, HirObjectProp, HirPropKey, HirStmt, HirSwitchCase,
-    HirTemplatePart, HirType, HirTypeTest, LocalId,
+    HirArrayEl, HirBinOp, HirCaseTest, HirExpr, HirMatchCase, HirObjectProp, HirPropKey, HirStmt,
+    HirSwitchCase, HirTemplatePart, HirType, HirTypeTest, LocalId,
 };
 
 #[test]
@@ -465,6 +465,52 @@ fn f:
   b3():
     v7 = int 0
     return v7
+"
+    );
+}
+
+#[test]
+fn match_lowers_to_test_chain_and_result_phi() {
+    // f(n) { return match n { 0 => 1, x => 2 } }
+    let f = func(
+        vec![HirType::Int],
+        1,
+        vec![HirStmt::Return(Some(HirExpr::Match {
+            subject: Box::new(param(0)),
+            cases: vec![
+                HirMatchCase {
+                    test: HirCaseTest::Literal(int(0)),
+                    guard: None,
+                    body: vec![],
+                    result: Some(int(1)),
+                },
+                HirMatchCase {
+                    test: HirCaseTest::Bind(LocalId(0)),
+                    guard: None,
+                    body: vec![],
+                    result: Some(int(2)),
+                },
+            ],
+        }))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: int):
+    v1 = int 0
+    v2 = eq.dyn v0, v1
+    branch v2, b2, b3
+  b1(v5: dyn):
+    return v5
+  b2():
+    v3 = int 1
+    jump b1(v3)
+  b3():
+    jump b4
+  b4():
+    v4 = int 2
+    jump b1(v4)
 "
     );
 }
