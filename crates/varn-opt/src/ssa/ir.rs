@@ -100,6 +100,12 @@ pub enum InstKind {
     /// (no SSA operands), so a closure *body* can be SSA-compiled even when the
     /// parent that builds the closure still falls back to `lower/`.
     LoadUpvalue(u32),
+    /// Write a module global (`DefineGlobal`). Side effect, no `dest`. Treated as
+    /// memory: emitted in program order, never reordered/CSE'd (no optimizer yet).
+    StoreGlobal { name: Rc<str>, value: Value },
+    /// Write a captured upvalue's shared cell (`StoreUpvalue`). Side effect, no
+    /// `dest`; mutations are visible to every closure sharing the cell.
+    StoreUpvalue { index: u32, value: Value },
     /// Plain call `callee(args)` — plain-call ABI (null receiver, contiguous args).
     Call { callee: Value, args: Vec<Value> },
     /// Statically-resolved self-recursion (`CallSelf`).

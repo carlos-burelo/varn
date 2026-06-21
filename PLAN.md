@@ -229,11 +229,20 @@ Done (`ssa/build.rs`, `ssa/ir.rs`):
   *builds* the closure still falls back, because the upvalue array is populated by
   the parent's `MakeClosure` regardless. Verified: `x => x + n` SSA-compiles
   (parent `makeAdder` falls back on closure creation) → `15 25` identical
-  with/without `VN_OPT_SSA`. Mutating an upvalue (`count++`) still falls back
-  (needs `StoreUpvalue` + the write path).
+  with/without `VN_OPT_SSA`.
+- **Binding writes + default params** — a unified `load_binding`/`store_binding`
+  pair lowers every `HirBinding`: params/locals stay SSA-tracked, while globals
+  and upvalues become `LoadGlobal`/`LoadUpvalue` reads and `StoreGlobal`
+  (`DefineGlobal`) / `StoreUpvalue` side-effect writes (dest-less, treated as
+  memory — no reorder/CSE until the optimizer models them). So mutating an
+  upvalue (`count++`) and assigning a global now SSA-compile. Default-valued
+  params get an entry prologue: an `IsNull`-guarded `branch_value` per param that
+  rewrites it to the default when the arg was omitted. Verified: `greet(name,
+  greeting="Hello")` and a `makeCounter` whose arrow does `count = count + 1`
+  → `Hello, World / Hi, World / 1 2 3` identical with/without `VN_OPT_SSA`.
 - **Trivial-phi removal** (`simplify_phis`): Braun's `tryRemoveTrivialPhi` as a
   fixpoint post-pass.
-- Tests (`ssa/tests.rs`, 41 — golden dumps + verifier): identity, const+binary,
+- Tests (`ssa/tests.rs`, 42 — golden dumps + verifier): identity, const+binary,
   reassign, one-/two-sided `if` phi, no-phi trivial removal, `while`/`for`/
   `do-while` carry, `break`/`continue`, nested-`if` merge, global call, self-call,
   member/index read, member/index write, method call, ternary, array/object
@@ -241,24 +250,23 @@ Done (`ssa/build.rs`, `ssa/ir.rs`):
   try-op, type-test, this, throw, range, for-in, switch, for-of, match.
 
 **Measured coverage** (`VN_OPT_SSA=1 VN_OPT_TRACE=1` over the full suite, after
-upvalue reads): **~527 functions SSA-compile, ~50 fall back (≈ 91%)**; suite
-**728/728**. Remaining fallback reasons, by frequency: closure **creation** with
-upvalues (~22), mutating an **upvalue write** (~7), `await`/`spawn`/`yield` +
-generators (`expression kind`, ~8), `try`/`using`/catch-destructure
-(`statement kind`, ~7), `default param` (~5), a few `global binding` *writes*,
-`for-await-of`, `update target`.
+binding writes + default params): **542 functions SSA-compile, 44 fall back
+(≈ 92.5%)**; suite **728/728**. Remaining fallback reasons, by frequency: closure
+**creation** with upvalues (22), `await`/`spawn`/`yield` + generators
+(`expression kind`, 12), `try`/`using`/catch-destructure (`statement kind`, 8),
+one `update target`, one `for-await-of`.
 
 **Pending** (the rest of §2's instruction set): closure **creation with
-upvalues** + **upvalue writes** (`StoreUpvalue`), global-binding *writes*
-(`StoreGlobal`), `default param`, enum-construction / the `MakeClass`/enum *value*
-expressions, modules (import/export), await/spawn/yield + generators — plus `try`
-control flow. Until then `build_function` returns `Err(Unsupported)` and that
-function uses the `lower/` path. (Done: scalar exprs, control flow, loops,
-plain/self/method calls, member/index read+write, logical + conditional,
-array/object literals, templates, capture-free closures, **upvalue reads**,
-intrinsics, `!`/sequence/`?.`-member/module-slot/decimal/bigint/regex, `expr?`/`is`,
-`this`, `throw`, `range`, `for-in`, `switch`, `for-of`, `match`, **super calls**,
-**optional chaining**; class **method bodies** SSA-compile.)
+upvalues**, enum-construction / the `MakeClass`/enum *value* expressions, modules
+(import/export), await/spawn/yield + generators — plus `try`/`using` control flow.
+Until then `build_function` returns `Err(Unsupported)` and that function uses the
+`lower/` path. (Done: scalar exprs, control flow, loops, plain/self/method calls,
+member/index read+write, logical + conditional, array/object literals, templates,
+capture-free closures, **upvalue reads + writes**, **global writes**,
+**default params**, intrinsics, `!`/sequence/`?.`-member/module-slot/decimal/
+bigint/regex, `expr?`/`is`, `this`, `throw`, `range`, `for-in`, `switch`,
+`for-of`, `match`, **super calls**, **optional chaining**; class **method bodies**
+SSA-compile.)
 
 > Closure *creation* with upvalues needs captured locals to keep a stable register
 > across the function (the VM upvalue points at the slot). SSA renaming spreads a

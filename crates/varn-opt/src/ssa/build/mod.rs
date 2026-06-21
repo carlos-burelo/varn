@@ -233,26 +233,42 @@ impl Builder {
         }
         self.sealed[block.0 as usize] = true;
     }
+
+    /// Read any binding to a `Value`. Params/locals are SSA-tracked variables;
+    /// globals and upvalues are external state read by `LoadGlobal`/`LoadUpvalue`.
+    pub(super) fn load_binding(&mut self, binding: &HirBinding) -> Result<Value> {
+        match binding {
+            HirBinding::Param(i) => self.read_var(VarId::Param(*i), self.current),
+            HirBinding::Local(id) => self.read_var(VarId::Local(*id), self.current),
+            HirBinding::Global(name) => {
+                Ok(self.emit(InstKind::LoadGlobal(name.clone()), HirType::Dynamic))
+            }
+            HirBinding::Upvalue(uv) => {
+                Ok(self.emit(InstKind::LoadUpvalue(*uv), HirType::Dynamic))
+            }
+        }
+    }
+
+    /// Write any binding from a `Value`. Params/locals update the SSA def map;
+    /// globals and upvalues emit a side-effecting `StoreGlobal`/`StoreUpvalue`.
+    pub(super) fn store_binding(&mut self, binding: &HirBinding, value: Value) {
+        match binding {
+            HirBinding::Param(i) => self.write_var(VarId::Param(*i), self.current, value),
+            HirBinding::Local(id) => self.write_var(VarId::Local(*id), self.current, value),
+            HirBinding::Global(name) => {
+                self.emit_effect(InstKind::StoreGlobal { name: name.clone(), value })
+            }
+            HirBinding::Upvalue(uv) => {
+                self.emit_effect(InstKind::StoreUpvalue { index: *uv, value })
+            }
+        }
+    }
 }
 
 mod expr;
 mod stmt;
-fn binding_var(binding: &HirBinding) -> Result<VarId> {
-    match binding {
-        HirBinding::Param(i) => Ok(VarId::Param(*i)),
-        HirBinding::Local(id) => Ok(VarId::Local(*id)),
-        HirBinding::Global(_) => Err(OptError::Unsupported("ssa: global binding")),
-        HirBinding::Upvalue(_) => Err(OptError::Unsupported("ssa: upvalue binding")),
-    }
-}
 
 pub fn build_function(func: &HirFunction) -> Result<SsaFunc> {
-    // Default-valued params need the `IsNull`/`Move` prologue the naive emitter
-    // produces; SSA construction does not model it yet, so decline them.
-    if func.params.iter().any(|p| p.default.is_some()) {
-        return Err(OptError::Unsupported("ssa: default param"));
-    }
-
     let mut b = Builder::new();
     // Synthetic loop vars (e.g. `for-in` index) use ids above the real locals.
     b.next_synthetic = func.locals;
@@ -262,6 +278,25 @@ pub fn build_function(func: &HirFunction) -> Result<SsaFunc> {
         let v = b.new_value(param.ty);
         b.block_mut(entry).params.push(v);
         b.write_var(VarId::Param(i as u32), entry, v);
+    }
+
+    // Default-valued params: a prologue of `IsNull`-guarded branches (the VM
+    // passes null for an omitted arg). Each rewrites the param var to the default
+    // when null, so the body reads the resolved value. Done after every param is
+    // an entry block-param so the values dominate.
+    for (i, param) in func.params.iter().enumerate() {
+        if let Some(default) = &param.default {
+            let pv = b.read_var(VarId::Param(i as u32), b.current)?;
+            let isnull = b.emit(InstKind::IsNull { operand: pv }, HirType::Bool);
+            let resolved = b.lower_branch_value(
+                isnull,
+                |s| s.lower_expr(default),
+                |_| Ok(pv),
+                param.ty,
+            )?;
+            let cur = b.current;
+            b.write_var(VarId::Param(i as u32), cur, resolved);
+        }
     }
 
     b.lower_block(&func.body)?;
@@ -441,6 +476,8 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                 }
                 InstKind::SuperCall { args } => args.iter_mut().for_each(sub),
                 InstKind::SuperMethodCall { args, .. } => args.iter_mut().for_each(sub),
+                InstKind::StoreGlobal { value, .. } => sub(value),
+                InstKind::StoreUpvalue { value, .. } => sub(value),
                 InstKind::GetSuper { .. }
                 | InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)

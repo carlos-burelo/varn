@@ -6,7 +6,7 @@ use crate::hir::{HirBinOp, HirExpr, HirStmt, HirSwitchCase, HirType, LocalId};
 use crate::ssa::ir::{BlockId, InstKind, Terminator, Value};
 use crate::OptError;
 
-use super::{binding_var, Builder, LoopCtx, Result, VarId};
+use super::{Builder, LoopCtx, Result, VarId};
 
 impl Builder {
     pub(super) fn lower_block(&mut self, stmts: &[HirStmt]) -> Result<()> {
@@ -31,9 +31,8 @@ impl Builder {
                 Ok(())
             }
             HirStmt::Assign { target, value } => {
-                let var = binding_var(target)?;
                 let v = self.lower_expr(value)?;
-                self.write_var(var, self.current, v);
+                self.store_binding(target, v);
                 Ok(())
             }
             HirStmt::SetMember { object, name, value } => {

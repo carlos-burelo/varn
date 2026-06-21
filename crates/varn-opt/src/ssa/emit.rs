@@ -262,6 +262,17 @@ fn emit_inst(
             chunk.emit1(OpCode::AssertNotNull, Chunk::pack(reg[operand.0 as usize], 0), LINE);
             return Ok(());
         }
+        // `DefineGlobal 0, value, name` (dest byte unused).
+        InstKind::StoreGlobal { name, value } => {
+            let idx = chunk.add_str(name);
+            chunk.emit_rrc(OpCode::DefineGlobal, 0, reg[value.0 as usize], idx, LINE);
+            return Ok(());
+        }
+        // `StoreUpvalue uv, value` (uv in the high byte).
+        InstKind::StoreUpvalue { index, value } => {
+            chunk.emit1(OpCode::StoreUpvalue, Chunk::pack(*index as u8, reg[value.0 as usize]), LINE);
+            return Ok(());
+        }
         _ => {}
     }
 
@@ -494,7 +505,11 @@ fn emit_inst(
             chunk.write(Chunk::pack(count, if count > 0 { call_base + 1 } else { 0 }), LINE);
         }
         // Dest-less side effects handled before the dest guard above.
-        InstKind::SetProperty { .. } | InstKind::SetIndex { .. } | InstKind::AssertNotNull { .. } => {
+        InstKind::SetProperty { .. }
+        | InstKind::SetIndex { .. }
+        | InstKind::AssertNotNull { .. }
+        | InstKind::StoreGlobal { .. }
+        | InstKind::StoreUpvalue { .. } => {
             unreachable!()
         }
     }
