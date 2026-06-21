@@ -147,6 +147,13 @@ pub enum InstKind {
     Range { start: Value, end: Value, inclusive: bool },
     /// `ObjectKeys` — the key array of an object (for `for-in`).
     ObjectKeys { operand: Value },
+    /// `GetSymbol` — fetch a well-known symbol method (`Symbol.iterator` /
+    /// `Symbol.asyncIterator`) off an object, for the `for-of` protocol.
+    GetSymbol { object: Value, is_async: bool },
+    /// Call `callee` with `recv` as its sole argument (the iterator-protocol
+    /// `iterable[Symbol.iterator]()` / `iterator.next()` shape): receiver at
+    /// `call_base`, `Call` with arg_count 1.
+    IterCall { callee: Value, recv: Value },
 }
 
 /// How a block ends and transfers control. Branch/jump carry the block-argument

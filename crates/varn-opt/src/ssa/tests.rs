@@ -1097,6 +1097,45 @@ fn f:
 }
 
 #[test]
+fn for_of_lowers_to_iterator_protocol() {
+    // f(a) { for (let x of a) {} return 0 }
+    let f = func(
+        vec![HirType::Dynamic],
+        1,
+        vec![
+            HirStmt::ForOf {
+                var: LocalId(0),
+                iterable: param(0),
+                body: vec![],
+                is_await: false,
+            },
+            HirStmt::Return(Some(int(0))),
+        ],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: dyn):
+    v1 = getsymbol v0.@@iterator
+    v2 = itercall v1(v0)
+    jump b1
+  b1():
+    v3 = getprop v2.next
+    v4 = itercall v3(v2)
+    v5 = getprop v4.done
+    branch v5, b3, b2
+  b2():
+    v6 = getprop v4.value
+    jump b1
+  b3():
+    v7 = int 0
+    return v7
+"
+    );
+}
+
+#[test]
 fn verifier_accepts_constructed_ssa() {
     // The verifier must not reject any well-formed function the builder emits.
     let while_loop = func(

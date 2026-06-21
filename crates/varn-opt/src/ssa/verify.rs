@@ -197,6 +197,8 @@ fn inst_uses(kind: &InstKind) -> Vec<Value> {
         InstKind::IsArray { operand } => vec![*operand],
         InstKind::Range { start, end, .. } => vec![*start, *end],
         InstKind::ObjectKeys { operand } => vec![*operand],
+        InstKind::GetSymbol { object, .. } => vec![*object],
+        InstKind::IterCall { callee, recv } => vec![*callee, *recv],
         _ => Vec::new(),
     }
 }
