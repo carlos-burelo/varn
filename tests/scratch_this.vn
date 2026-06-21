@@ -1,0 +1,14 @@
+class Counter {
+  count: int
+  constructor(c: int) { this.count = c }
+  get(): int { return this.count }
+  bump(): int { this.count = this.count + 1; return this.count }
+}
+function risky(x: int): int {
+  if (x < 0) { throw "negative" }
+  return x * 2
+}
+let c = new Counter(10)
+print(c.get())
+print(c.bump())
+print(risky(5))

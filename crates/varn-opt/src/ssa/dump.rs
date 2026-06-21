@@ -92,6 +92,7 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::ModuleSlot { object, slot } => format!("moduleslot {}[{slot}]", val(*object)),
         InstKind::GetEnumTag { operand } => format!("enumtag {}", val(*operand)),
         InstKind::IsArray { operand } => format!("isarray {}", val(*operand)),
+        InstKind::This => "this".to_owned(),
     }
 }
 
@@ -99,6 +100,7 @@ fn terminator(term: &Terminator) -> String {
     match term {
         Terminator::Return(Some(v)) => format!("return {}", val(*v)),
         Terminator::Return(None) => "return".to_owned(),
+        Terminator::Throw(v) => format!("throw {}", val(*v)),
         Terminator::Jump { target, args } => format!("jump b{}{}", target.0, args_list(args)),
         Terminator::Branch {
             cond,
