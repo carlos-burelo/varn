@@ -179,25 +179,38 @@ Done (`ssa/build.rs`, `ssa/ir.rs`):
   `start` from `arg_start` and `end` from `end_reg` separately (no contiguity, no
   `call_base`), so `dest`/`start`/`end` are the values' own regs. Verified: range
   values build + print identically with/without `VN_OPT_SSA`.
+- **`for-in`** — `ObjectKeys` + an index loop; the index is a **synthetic loop
+  variable** (`fresh_synthetic`, id above the real locals) carried by an ordinary
+  Braun phi, so it reuses the loop machinery; `var` is bound to `keys[idx]` each
+  iteration, `continue` lands on the increment. Verified: `countKeys`/`concatKeys`
+  → `3`/`abc`.
+  - **Backend bug fixed (benefits the default `lower/` path too):** `liveness.rs`
+    only built a live range for a register with **both** a def and uses, so a
+    def-only register — e.g. a `for-in` loop variable the body never reads — had
+    no range and the colourer aliased another *live* local onto its slot, which
+    the loop var's (otherwise dead) `Move` then clobbered (`countKeys` → `c1`
+    instead of `3` on the default path). A def-only register now gets a **point
+    range** at its def so it interferes there. Validated: default suite 728/728 +
+    `bench` clean; `countKeys` now `3` on the default path.
 - **Trivial-phi removal** (`simplify_phis`): Braun's `tryRemoveTrivialPhi` as a
   fixpoint post-pass.
-- Tests (`ssa/tests.rs`, 34 — golden dumps + verifier): identity, const+binary,
+- Tests (`ssa/tests.rs`, 35 — golden dumps + verifier): identity, const+binary,
   reassign, one-/two-sided `if` phi, no-phi trivial removal, `while`/`for`/
   `do-while` carry, `break`/`continue`, nested-`if` merge, global call, self-call,
   member/index read, member/index write, method call, ternary, array/object
   literal, template, capture-free closure, intrinsic, non-null, sequence, decimal,
-  try-op, type-test, this, throw, range.
+  try-op, type-test, this, throw, range, for-in.
 
 **Pending** (the rest of §2's instruction set): closures **with upvalues**,
 `Super*`/extension calls, optional chaining, `match`/enum-construction, the
 `MakeClass`/enum *value* expressions, modules (import/export), await/spawn/yield —
-plus `try`/`switch`/`for-of`/`for-in` control flow, so every §1 construct lowers
-to SSA. Until then `build_function` returns `Err(Unsupported)` and that function
-uses the `lower/` path. (Done: scalar exprs, control flow, loops,
-plain/self/method calls, member/index read+write, logical + conditional,
-array/object literals, templates, capture-free closures, intrinsics,
-`!`/sequence/`?.`-member/module-slot/decimal/bigint/regex, `expr?`/`is`, `this`,
-`throw`, `range`; class **method bodies** SSA-compile.)
+plus `try`/`switch`/`for-of` control flow, so every §1 construct lowers to SSA.
+Until then `build_function` returns `Err(Unsupported)` and that function uses the
+`lower/` path. (Done: scalar exprs, control flow, loops, plain/self/method calls,
+member/index read+write, logical + conditional, array/object literals, templates,
+capture-free closures, intrinsics, `!`/sequence/`?.`-member/module-slot/decimal/
+bigint/regex, `expr?`/`is`, `this`, `throw`, `range`, `for-in`; class **method
+bodies** SSA-compile.)
 
 > Closures with upvalues need captured locals to keep a stable register across
 > the function (the VM upvalue points at the slot). SSA renaming spreads a local

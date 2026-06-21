@@ -1014,6 +1014,47 @@ fn f:
 }
 
 #[test]
+fn for_in_lowers_to_objectkeys_index_loop() {
+    // f(o) { for (let k in o) {} return 0 }
+    let f = func(
+        vec![HirType::Dynamic],
+        1,
+        vec![
+            HirStmt::ForIn {
+                var: LocalId(0),
+                object: param(0),
+                body: vec![],
+            },
+            HirStmt::Return(Some(int(0))),
+        ],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: dyn):
+    v1 = objectkeys v0
+    v2 = int 0
+    jump b1(v2)
+  b1(v4: int):
+    v3 = getprop v1.length
+    v5 = lt.bool v4, v3
+    branch v5, b2, b4
+  b2():
+    v6 = getindex v1[v4]
+    jump b3
+  b3():
+    v7 = int 1
+    v8 = add.int v4, v7
+    jump b1(v8)
+  b4():
+    v9 = int 0
+    return v9
+"
+    );
+}
+
+#[test]
 fn verifier_accepts_constructed_ssa() {
     // The verifier must not reject any well-formed function the builder emits.
     let while_loop = func(

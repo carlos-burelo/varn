@@ -145,6 +145,8 @@ pub enum InstKind {
     This,
     /// `start..end` / `start..=end` → `InvokeRuntimeStatic __range__`.
     Range { start: Value, end: Value, inclusive: bool },
+    /// `ObjectKeys` — the key array of an object (for `for-in`).
+    ObjectKeys { operand: Value },
 }
 
 /// How a block ends and transfers control. Branch/jump carry the block-argument
