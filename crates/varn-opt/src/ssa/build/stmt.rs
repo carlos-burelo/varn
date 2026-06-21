@@ -2,7 +2,10 @@
 
 use std::rc::Rc;
 
-use crate::hir::{HirBinOp, HirExpr, HirStmt, HirSwitchCase, HirType, LocalId};
+use crate::hir::{
+    CaptureTarget, HirBinOp, HirCatch, HirExportSpec, HirExpr, HirImportKind, HirImportSpec,
+    HirStmt, HirSwitchCase, HirType, LocalId,
+};
 use crate::ssa::ir::{BlockId, InstKind, Terminator, Value};
 use crate::OptError;
 
@@ -53,7 +56,10 @@ impl Builder {
                     Some(e) => Some(self.lower_expr(e)?),
                     None => None,
                 };
-                self.set_term(Terminator::Return(v));
+                self.emit_exiting_finallys(0)?;
+                if self.is_open() {
+                    self.set_term(Terminator::Return(v));
+                }
                 Ok(())
             }
             HirStmt::Throw(e) => {
@@ -75,17 +81,50 @@ impl Builder {
             HirStmt::DoWhile { body, test } => self.lower_do_while(body, test),
             HirStmt::ForIn { var, object, body } => self.lower_for_in(*var, object, body),
             HirStmt::ForOf { var, iterable, body, is_await } => {
-                if *is_await {
-                    return Err(OptError::Unsupported("ssa: for-await-of"));
-                }
-                self.lower_for_of(*var, iterable, body)
+                self.lower_for_of(*var, iterable, body, *is_await)
             }
             HirStmt::Switch { disc, cases } => self.lower_switch(disc, cases),
-            HirStmt::Break => self.lower_jump_out(|c| c.break_target, "ssa: break outside loop"),
-            HirStmt::Continue => {
-                self.lower_jump_out(|c| c.continue_target, "ssa: continue outside loop")
+            HirStmt::Break => {
+                let loop_ctx = self.loops.last().ok_or(OptError::Unsupported("ssa: break outside loop"))?.clone();
+                self.emit_exiting_finallys(loop_ctx.finally_depth)?;
+                if self.is_open() {
+                    let from = self.current;
+                    self.set_term(Terminator::Jump { target: loop_ctx.break_target, args: Vec::new() });
+                    self.add_pred(loop_ctx.break_target, from);
+                }
+                Ok(())
             }
-            _ => Err(OptError::Unsupported("ssa: statement kind")),
+            HirStmt::Continue => {
+                let loop_ctx = self.loops.last().ok_or(OptError::Unsupported("ssa: continue outside loop"))?.clone();
+                self.emit_exiting_finallys(loop_ctx.finally_depth)?;
+                if self.is_open() {
+                    let from = self.current;
+                    self.set_term(Terminator::Jump { target: loop_ctx.continue_target, args: Vec::new() });
+                    self.add_pred(loop_ctx.continue_target, from);
+                }
+                Ok(())
+            }
+            HirStmt::Try { block, catch, finally } => self.lower_try(block, catch, finally),
+            HirStmt::CloseUpvalues(targets) => {
+                let vars = targets
+                    .iter()
+                    .map(|t| match t {
+                        CaptureTarget::Param(i) => VarId::Param(*i),
+                        CaptureTarget::Local(id) => VarId::Local(*id),
+                    })
+                    .collect();
+                self.emit_effect(InstKind::CloseUpvalues { targets: vars });
+                Ok(())
+            }
+            HirStmt::Dispose { target, is_await } => {
+                self.emit_effect(InstKind::Dispose { target: *target, is_await: *is_await });
+                Ok(())
+            }
+            HirStmt::Import { source, is_type, specs } => self.lower_import(source, *is_type, specs),
+            HirStmt::StoreExport { name, slot } => self.lower_store_export(name, *slot),
+            HirStmt::ExportNamed { specifiers, source } => self.lower_export_named(specifiers, source),
+            HirStmt::ExportAll { source, alias, slot } => self.lower_export_all(source, alias, slot),
+            HirStmt::ExportDefaultExpr { value, slot } => self.lower_export_default_expr(value, slot),
         }
     }
 
@@ -250,6 +289,7 @@ impl Builder {
         self.loops.push(LoopCtx {
             continue_target: header,
             break_target: exit_b,
+            finally_depth: self.finally_stack.len(),
         });
         self.current = body_b;
         self.lower_block(body)?;
@@ -306,6 +346,7 @@ impl Builder {
         self.loops.push(LoopCtx {
             continue_target: update_b,
             break_target: exit_b,
+            finally_depth: self.finally_stack.len(),
         });
         self.current = body_b;
         self.lower_block(body)?;
@@ -386,7 +427,11 @@ impl Builder {
 
         // Bodies, falling through. `break` → exit; `continue` → enclosing loop.
         let cont = self.loops.last().map(|c| c.continue_target).unwrap_or(exit);
-        self.loops.push(LoopCtx { continue_target: cont, break_target: exit });
+        self.loops.push(LoopCtx {
+            continue_target: cont,
+            break_target: exit,
+            finally_depth: self.finally_stack.len(),
+        });
         for (i, case) in cases.iter().enumerate() {
             self.seal_block(bodies[i]);
             self.current = bodies[i];
@@ -410,9 +455,9 @@ impl Builder {
     /// when `r.done`, bind `r.value` to `var`. The iterator is loop-invariant
     /// (dominates the header); body-modified vars become loop phis via Braun (the
     /// header is unsealed during the body). `continue` re-runs the header.
-    pub(super) fn lower_for_of(&mut self, var: LocalId, iterable: &HirExpr, body: &[HirStmt]) -> Result<()> {
+    pub(super) fn lower_for_of(&mut self, var: LocalId, iterable: &HirExpr, body: &[HirStmt], is_await: bool) -> Result<()> {
         let it = self.lower_expr(iterable)?;
-        let iter_fn = self.emit(InstKind::GetSymbol { object: it, is_async: false }, HirType::Ref);
+        let iter_fn = self.emit(InstKind::GetSymbol { object: it, is_async: is_await }, HirType::Ref);
         let iterator = self.emit(InstKind::IterCall { callee: iter_fn, recv: it }, HirType::Ref);
 
         let pre = self.current;
@@ -425,7 +470,10 @@ impl Builder {
             InstKind::GetProperty { object: iterator, name: Rc::from("next") },
             HirType::Ref,
         );
-        let result = self.emit(InstKind::IterCall { callee: next_fn, recv: iterator }, HirType::Ref);
+        let mut result = self.emit(InstKind::IterCall { callee: next_fn, recv: iterator }, HirType::Ref);
+        if is_await {
+            result = self.emit(InstKind::Await { operand: result }, HirType::Dynamic);
+        }
         let done = self.emit(
             InstKind::GetProperty { object: result, name: Rc::from("done") },
             HirType::Bool,
@@ -447,6 +495,7 @@ impl Builder {
         self.loops.push(LoopCtx {
             continue_target: header,
             break_target: exit_b,
+            finally_depth: self.finally_stack.len(),
         });
         self.current = body_b;
         let value = self.emit(
@@ -510,6 +559,7 @@ impl Builder {
         self.loops.push(LoopCtx {
             continue_target: update_b,
             break_target: exit_b,
+            finally_depth: self.finally_stack.len(),
         });
         self.current = body_b;
         let idx_b = self.read_var(idx_var, body_b)?;
@@ -565,6 +615,7 @@ impl Builder {
         self.loops.push(LoopCtx {
             continue_target: latch,
             break_target: exit_b,
+            finally_depth: self.finally_stack.len(),
         });
         self.current = body_b;
         self.lower_block(body)?;
@@ -596,4 +647,238 @@ impl Builder {
         Ok(())
     }
 
+    fn lower_try(
+        &mut self,
+        block: &[HirStmt],
+        catch: &Option<HirCatch>,
+        finally: &Option<Vec<HirStmt>>,
+    ) -> Result<()> {
+        match (catch, finally) {
+            (None, Some(fin)) => self.lower_try_finally(block, fin),
+            (Some(cc), None) => self.lower_try_catch(block, cc),
+            (Some(cc), Some(fin)) => self.lower_try_catch_finally(block, cc, fin),
+            (None, None) => self.lower_block(block),
+        }
+    }
+
+    fn lower_try_catch(&mut self, block: &[HirStmt], cc: &HirCatch) -> Result<()> {
+        let try_entry = self.current;
+        let catch_b = self.new_block();
+        let exit_b = self.new_block();
+
+        let try_val = self.emit(InstKind::Try { handler: catch_b }, HirType::Dynamic);
+        
+        self.lower_block(block)?;
+        
+        if self.is_open() {
+            self.emit_effect(InstKind::PopTry);
+            let from = self.current;
+            self.set_term(Terminator::Jump { target: exit_b, args: Vec::new() });
+            self.add_pred(exit_b, from);
+        }
+
+        self.add_pred(catch_b, try_entry);
+        self.seal_block(catch_b);
+        
+        self.current = catch_b;
+        let caught_err = self.emit(InstKind::CatchParam { try_val }, HirType::Dynamic);
+        if let Some(local) = cc.param {
+            self.write_var(VarId::Local(local), catch_b, caught_err);
+        }
+        
+        self.lower_block(&cc.body)?;
+        
+        if self.is_open() {
+            let from = self.current;
+            self.set_term(Terminator::Jump { target: exit_b, args: Vec::new() });
+            self.add_pred(exit_b, from);
+        }
+
+        self.seal_block(exit_b);
+        self.current = exit_b;
+        Ok(())
+    }
+
+    fn lower_try_finally(&mut self, block: &[HirStmt], fin: &[HirStmt]) -> Result<()> {
+        self.finally_stack.push(fin.to_vec());
+        let try_entry = self.current;
+        let handler_b = self.new_block();
+        let exit_b = self.new_block();
+
+        let try_val = self.emit(InstKind::Try { handler: handler_b }, HirType::Dynamic);
+        
+        self.lower_block(block)?;
+        
+        self.finally_stack.pop();
+        
+        if self.is_open() {
+            self.emit_effect(InstKind::PopTry);
+            self.lower_block(fin)?;
+            let from = self.current;
+            self.set_term(Terminator::Jump { target: exit_b, args: Vec::new() });
+            self.add_pred(exit_b, from);
+        }
+
+        self.add_pred(handler_b, try_entry);
+        self.seal_block(handler_b);
+        
+        self.current = handler_b;
+        let caught_err = self.emit(InstKind::CatchParam { try_val }, HirType::Dynamic);
+        self.lower_block(fin)?;
+        self.set_term(Terminator::Throw(caught_err));
+
+        self.seal_block(exit_b);
+        self.current = exit_b;
+        Ok(())
+    }
+
+    fn lower_try_catch_finally(&mut self, block: &[HirStmt], cc: &HirCatch, fin: &[HirStmt]) -> Result<()> {
+        self.finally_stack.push(fin.to_vec());
+        let try_entry = self.current;
+        let handler_b = self.new_block();
+        let exit_b = self.new_block();
+
+        let try_val = self.emit(InstKind::Try { handler: handler_b }, HirType::Dynamic);
+        
+        self.lower_block(block)?;
+        
+        self.finally_stack.pop();
+        
+        if self.is_open() {
+            self.emit_effect(InstKind::PopTry);
+            self.lower_block(fin)?;
+            let from = self.current;
+            self.set_term(Terminator::Jump { target: exit_b, args: Vec::new() });
+            self.add_pred(exit_b, from);
+        }
+
+        self.add_pred(handler_b, try_entry);
+        self.seal_block(handler_b);
+        
+        // Catch path:
+        self.current = handler_b;
+        let caught_err = self.emit(InstKind::CatchParam { try_val }, HirType::Dynamic);
+        
+        self.finally_stack.push(fin.to_vec());
+        let catch_entry = self.current;
+        let handler2_b = self.new_block();
+        let try_val2 = self.emit(InstKind::Try { handler: handler2_b }, HirType::Dynamic);
+        
+        if let Some(local) = cc.param {
+            self.write_var(VarId::Local(local), handler_b, caught_err);
+        }
+        
+        self.lower_block(&cc.body)?;
+        
+        self.finally_stack.pop();
+        
+        if self.is_open() {
+            self.emit_effect(InstKind::PopTry);
+            self.lower_block(fin)?;
+            let from = self.current;
+            self.set_term(Terminator::Jump { target: exit_b, args: Vec::new() });
+            self.add_pred(exit_b, from);
+        }
+        
+        self.add_pred(handler2_b, catch_entry);
+        self.seal_block(handler2_b);
+        
+        self.current = handler2_b;
+        let caught_err2 = self.emit(InstKind::CatchParam { try_val: try_val2 }, HirType::Dynamic);
+        self.lower_block(fin)?;
+        self.set_term(Terminator::Throw(caught_err2));
+
+        self.seal_block(exit_b);
+        self.current = exit_b;
+        Ok(())
+    }
+
+    fn lower_import(&mut self, source: &Rc<str>, is_type: bool, specs: &[HirImportSpec]) -> Result<()> {
+        let mod_val = self.emit(InstKind::LoadModule { source: source.clone() }, HirType::Ref);
+        if !is_type {
+            for spec in specs {
+                match &spec.kind {
+                    HirImportKind::Namespace => {
+                        self.emit_effect(InstKind::StoreGlobal { name: spec.local.clone(), value: mod_val });
+                    }
+                    HirImportKind::Default | HirImportKind::Named(_) => {
+                        let val = if let Some(slot) = spec.slot {
+                            self.emit(InstKind::ModuleSlot { object: mod_val, slot }, HirType::Dynamic)
+                        } else {
+                            let key = match &spec.kind {
+                                HirImportKind::Named(n) => n.clone(),
+                                _ => Rc::from("default"),
+                            };
+                            self.emit(InstKind::GetProperty { object: mod_val, name: key }, HirType::Dynamic)
+                        };
+                        self.emit_effect(InstKind::StoreGlobal { name: spec.local.clone(), value: val });
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn lower_store_export(&mut self, name: &Rc<str>, slot: u16) -> Result<()> {
+        let val = self.emit(InstKind::LoadGlobal(name.clone()), HirType::Dynamic);
+        self.emit_effect(InstKind::StoreModuleSlot { value: val, slot });
+        Ok(())
+    }
+
+    fn lower_export_named(&mut self, specifiers: &[HirExportSpec], source: &Option<Rc<str>>) -> Result<()> {
+        match source {
+            Some(src) => {
+                let mod_val = self.emit(InstKind::LoadModule { source: src.clone() }, HirType::Ref);
+                for spec in specifiers {
+                    let val = if let Some(imported_slot) = spec.local_slot {
+                        self.emit(InstKind::ModuleSlot { object: mod_val, slot: imported_slot }, HirType::Dynamic)
+                    } else {
+                        self.emit(InstKind::GetProperty { object: mod_val, name: spec.local.clone() }, HirType::Dynamic)
+                    };
+                    if let Some(exported_slot) = spec.exported_slot {
+                        self.emit_effect(InstKind::StoreModuleSlot { value: val, slot: exported_slot });
+                    }
+                }
+            }
+            None => {
+                for spec in specifiers {
+                    let val = self.load_binding(&spec.binding)?;
+                    if let Some(exported_slot) = spec.exported_slot {
+                        self.emit_effect(InstKind::StoreModuleSlot { value: val, slot: exported_slot });
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn lower_export_all(&mut self, source: &Rc<str>, alias: &Option<Rc<str>>, slot: &Option<u16>) -> Result<()> {
+        let mod_val = self.emit(InstKind::LoadModule { source: source.clone() }, HirType::Ref);
+        if alias.is_some() {
+            if let Some(slot_idx) = slot {
+                self.emit_effect(InstKind::StoreModuleSlot { value: mod_val, slot: *slot_idx });
+            }
+        }
+        Ok(())
+    }
+
+    fn lower_export_default_expr(&mut self, value: &HirExpr, slot: &Option<u16>) -> Result<()> {
+        let val = self.lower_expr(value)?;
+        if let Some(slot_idx) = slot {
+            self.emit_effect(InstKind::StoreModuleSlot { value: val, slot: *slot_idx });
+        }
+        Ok(())
+    }
+
+    fn emit_exiting_finallys(&mut self, depth: usize) -> Result<()> {
+        if depth >= self.finally_stack.len() {
+            return Ok(());
+        }
+        let fins: Vec<Vec<HirStmt>> = self.finally_stack[depth..].to_vec();
+        for fin in fins.iter().rev() {
+            self.emit_effect(InstKind::PopTry);
+            self.lower_block(fin)?;
+        }
+        Ok(())
+    }
 }

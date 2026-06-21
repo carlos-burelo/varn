@@ -12,7 +12,7 @@
 //!    (for a phi operand, the def dominates the predecessor the operand flows
 //!    in on — the value must be live on that edge).
 
-use super::ir::{BlockId, InstKind, SsaFunc, Terminator, Value};
+use super::ir::{Block, BlockId, InstKind, SsaFunc, Terminator, Value};
 
 pub type VerifyResult = Result<(), String>;
 
@@ -53,7 +53,7 @@ pub fn verify(func: &SsaFunc) -> VerifyResult {
 
     // (2)/(3) edge consistency + terminator targets in range.
     for (b, block) in func.blocks.iter().enumerate() {
-        for s in succs(&block.term) {
+        for s in block_succs(block) {
             if s.0 as usize >= n {
                 return Err(format!("block b{b} jumps to out-of-range block b{}", s.0));
             }
@@ -133,16 +133,29 @@ fn check_use(
     }
 }
 
-fn succs(t: &Terminator) -> Vec<BlockId> {
-    match t {
+fn block_succs(block: &Block) -> Vec<BlockId> {
+    let mut s = match &block.term {
         Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable => Vec::new(),
         Terminator::Jump { target, .. } => vec![*target],
         Terminator::Branch { then_blk, else_blk, .. } => vec![*then_blk, *else_blk],
+    };
+    for inst in &block.insts {
+        if let InstKind::Try { handler } = &inst.kind {
+            s.push(*handler);
+        }
     }
+    s
 }
 
 /// Number of block-arguments the `pred -> block` edge carries.
 fn edge_arg_count(func: &SsaFunc, pred: BlockId, block: BlockId) -> Result<usize, String> {
+    for inst in &func.blocks[pred.0 as usize].insts {
+        if let InstKind::Try { handler } = &inst.kind {
+            if *handler == block {
+                return Ok(0);
+            }
+        }
+    }
     match &func.blocks[pred.0 as usize].term {
         Terminator::Jump { target, args } if *target == block => Ok(args.len()),
         Terminator::Branch { then_blk, then_args, else_blk, else_args, .. } => {
@@ -158,7 +171,7 @@ fn edge_arg_count(func: &SsaFunc, pred: BlockId, block: BlockId) -> Result<usize
     }
 }
 
-fn inst_uses(kind: &InstKind) -> Vec<Value> {
+pub(crate) fn inst_uses(kind: &InstKind) -> Vec<Value> {
     match kind {
         InstKind::Binary { lhs, rhs, .. } => vec![*lhs, *rhs],
         InstKind::Unary { operand, .. } => vec![*operand],
@@ -201,9 +214,53 @@ fn inst_uses(kind: &InstKind) -> Vec<Value> {
         InstKind::IterCall { callee, recv } => vec![*callee, *recv],
         InstKind::SuperCall { args } => args.clone(),
         InstKind::SuperMethodCall { args, .. } => args.clone(),
+        InstKind::ExtensionCall { recv, args, .. } => {
+            let mut v = Vec::with_capacity(args.len() + 1);
+            v.push(*recv);
+            v.extend_from_slice(args);
+            v
+        }
+        InstKind::CallSpread { callee, args } => {
+            let mut v = Vec::with_capacity(args.len() + 1);
+            v.push(*callee);
+            v.extend(args.iter().map(|(a, _)| *a));
+            v
+        }
+        InstKind::BuildArraySpread { elements } => elements.iter().map(|(v, _)| *v).collect(),
+        InstKind::BuildObjectSpread { parts } => parts.iter().map(|(_, v)| *v).collect(),
         InstKind::StoreGlobal { value, .. } => vec![*value],
         InstKind::StoreUpvalue { value, .. } => vec![*value],
-        _ => Vec::new(),
+        InstKind::LoadCaptured { .. } => Vec::new(),
+        InstKind::StoreCaptured { value, .. } => vec![*value],
+        InstKind::MakeClass { super_class, .. } => super_class.map_or(Vec::new(), |sc| vec![sc]),
+        InstKind::DeclareField { class, .. } => vec![*class],
+        InstKind::DefineStatic { class, value, .. } => vec![*class, *value],
+        InstKind::DefineMethod { class, method, .. } => vec![*class, *method],
+        InstKind::DefineAccessor { class, accessor, .. } => vec![*class, *accessor],
+        InstKind::MakeEnumVariant { .. } => Vec::new(),
+        InstKind::Try { .. } => Vec::new(),
+        InstKind::PopTry => Vec::new(),
+        InstKind::CatchParam { try_val } => vec![*try_val],
+        InstKind::CloseUpvalues { .. } => Vec::new(),
+        InstKind::Dispose { .. } => Vec::new(),
+        InstKind::LoadModule { .. } => Vec::new(),
+        InstKind::StoreModuleSlot { value, .. } => vec![*value],
+        InstKind::Await { operand } => vec![*operand],
+        InstKind::Spawn { operand } => vec![*operand],
+        InstKind::Yield { operand } => vec![*operand],
+        InstKind::MakeClosure { upvalues, .. } => upvalues.clone(),
+        InstKind::ConstInt(_)
+        | InstKind::ConstFloat(_)
+        | InstKind::ConstBool(_)
+        | InstKind::ConstStr(_)
+        | InstKind::ConstChar(_)
+        | InstKind::ConstDecimal(_)
+        | InstKind::ConstBigInt(_)
+        | InstKind::ConstNull
+        | InstKind::LoadGlobal(_)
+        | InstKind::LoadUpvalue(_)
+        | InstKind::This
+        | InstKind::GetSuper { .. } => Vec::new(),
     }
 }
 
@@ -306,7 +363,7 @@ fn reverse_postorder(func: &SsaFunc) -> Vec<BlockId> {
     let mut stack: Vec<(BlockId, usize)> = vec![(func.entry, 0)];
     visited[func.entry.0 as usize] = true;
     while let Some((b, idx)) = stack.pop() {
-        let s = succs(&func.blocks[b.0 as usize].term);
+        let s = block_succs(&func.blocks[b.0 as usize]);
         if idx < s.len() {
             stack.push((b, idx + 1));
             let next = s[idx];

@@ -17,15 +17,17 @@
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
+use rustc_hash::FxHashSet;
+
 use varn_core::OpCode;
 use varn_types::chunk::{Chunk, FeedbackVector, FunctionProto, Literal, PolyICSlot, PoolEntry};
 use varn_types::value::RuntimeSymbol;
 
-use crate::hir::{HirFunction, HirUnOp};
+use crate::hir::{HirFunction, HirUnOp, HirUpvalueSrc};
 use crate::lower::bin_opcode;
 use crate::OptError;
 
-use super::ir::{Block, BlockId, Inst, InstKind, SsaFunc, Terminator, Value};
+use super::ir::{Block, BlockId, Inst, InstKind, SsaFunc, Terminator, Value, VarId};
 
 type Result<T> = std::result::Result<T, OptError>;
 
@@ -51,7 +53,17 @@ pub fn emit_function(mut ssa: SsaFunc, f: &HirFunction, source_file: Rc<str>) ->
         block_offset[b] = chunk.code.len();
         let insts = std::mem::take(&mut ssa.blocks[b].insts);
         for inst in &insts {
-            emit_inst(&mut chunk, inst, &reg, scratch, call_base, &mut cache_count, &source_file)?;
+            emit_inst(
+                &mut chunk,
+                inst,
+                &reg,
+                scratch,
+                call_base,
+                &mut cache_count,
+                &source_file,
+                nparams,
+                &mut fixups,
+            )?;
         }
         let term = ssa.blocks[b].term.clone();
         emit_terminator(&mut chunk, &ssa, &reg, b, &term, null_reg, scratch, &block_offset, &mut fixups)?;
@@ -171,27 +183,158 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
         assigned[p.0 as usize] = true;
     }
 
-    let mut next: u32 = 1 + nparams as u32;
-    let alloc = |v: Value, reg: &mut [u8], assigned: &mut [bool], next: &mut u32| -> Result<()> {
-        if !assigned[v.0 as usize] {
-            if *next > 255 {
-                return Err(OptError::Unsupported("ssa-emit: register count exceeds 255"));
-            }
-            reg[v.0 as usize] = *next as u8;
-            assigned[v.0 as usize] = true;
-            *next += 1;
-        }
-        Ok(())
-    };
-    for block in &ssa.blocks {
+    // Register reuse needs real liveness: a value used inside a loop is live
+    // across the back-edge, so a naive forward "last use" frees it too early and
+    // a later value would clobber it. Compute live-in/out per block by backward
+    // dataflow, then build a [def, end] interval per value that is point-precise
+    // within a block (def/use indices) and extended block-wide wherever the value
+    // is live-out (covering loops). A linear scan packs values above the fixed
+    // param+local slots, reusing registers whose interval has ended.
+    // `regalloc_post` re-colours afterwards; this only has to stay within u8.
+    let nvals = ssa.values.len();
+    let nblocks = ssa.blocks.len();
+    let mut def = vec![u32::MAX; nvals];
+    let mut last = vec![0u32; nvals];
+    let mut term_idx = vec![0u32; nblocks];
+    let mut defs: Vec<FxHashSet<u32>> = vec![FxHashSet::default(); nblocks];
+    let mut uses: Vec<FxHashSet<u32>> = vec![FxHashSet::default(); nblocks];
+    let mut succ: Vec<Vec<usize>> = vec![Vec::new(); nblocks];
+    let mut idx = 0u32;
+    for (b, block) in ssa.blocks.iter().enumerate() {
         for p in &block.params {
-            alloc(*p, &mut reg, &mut assigned, &mut next)?;
+            if def[p.0 as usize] == u32::MAX {
+                def[p.0 as usize] = idx;
+            }
+            defs[b].insert(p.0);
         }
+        idx += 1;
         for inst in &block.insts {
+            for u in crate::ssa::verify::inst_uses(&inst.kind) {
+                if last[u.0 as usize] < idx {
+                    last[u.0 as usize] = idx;
+                }
+                uses[b].insert(u.0);
+            }
             if let Some(d) = inst.dest {
-                alloc(d, &mut reg, &mut assigned, &mut next)?;
+                if def[d.0 as usize] == u32::MAX {
+                    def[d.0 as usize] = idx;
+                }
+                defs[b].insert(d.0);
+            }
+            if let InstKind::Try { handler } = &inst.kind {
+                succ[b].push(handler.0 as usize);
+            }
+            idx += 1;
+        }
+        let mut touch = |v: Value, uses: &mut FxHashSet<u32>| {
+            if last[v.0 as usize] < idx {
+                last[v.0 as usize] = idx;
+            }
+            uses.insert(v.0);
+        };
+        match &block.term {
+            Terminator::Return(Some(v)) | Terminator::Throw(v) => touch(*v, &mut uses[b]),
+            Terminator::Branch { cond, then_blk, then_args, else_blk, else_args } => {
+                touch(*cond, &mut uses[b]);
+                then_args.iter().chain(else_args).for_each(|a| touch(*a, &mut uses[b]));
+                succ[b].push(then_blk.0 as usize);
+                succ[b].push(else_blk.0 as usize);
+            }
+            Terminator::Jump { target, args } => {
+                args.iter().for_each(|a| touch(*a, &mut uses[b]));
+                succ[b].push(target.0 as usize);
+            }
+            Terminator::Return(None) | Terminator::Unreachable => {}
+        }
+        term_idx[b] = idx;
+        idx += 1;
+    }
+
+    // Backward dataflow: live_in[B] = uses[B] ∪ (live_out[B] \ defs[B]).
+    let mut live_in: Vec<FxHashSet<u32>> = vec![FxHashSet::default(); nblocks];
+    let mut live_out: Vec<FxHashSet<u32>> = vec![FxHashSet::default(); nblocks];
+    let mut changed = true;
+    while changed {
+        changed = false;
+        for b in (0..nblocks).rev() {
+            let mut out = FxHashSet::default();
+            for &s in &succ[b] {
+                out.extend(live_in[s].iter().copied());
+            }
+            let mut nin = uses[b].clone();
+            nin.extend(out.iter().copied().filter(|v| !defs[b].contains(v)));
+            if out != live_out[b] || nin != live_in[b] {
+                live_out[b] = out;
+                live_in[b] = nin;
+                changed = true;
             }
         }
+    }
+
+    // [def, end]: extend last-use to the end of any block the value is live-out of.
+    let mut end = last;
+    for b in 0..nblocks {
+        for &v in &live_out[b] {
+            if end[v as usize] < term_idx[b] {
+                end[v as usize] = term_idx[b];
+            }
+        }
+    }
+    for v in 0..nvals {
+        if def[v] != u32::MAX && end[v] < def[v] {
+            end[v] = def[v]; // a never-used value dies at its definition
+        }
+    }
+
+    // Only locals actually *captured* (via Load/StoreCaptured) need a fixed slot
+    // (so `MakeClosure` can capture by register); the rest are ordinary SSA
+    // values. Reserve just through the highest captured slot — reserving all
+    // `nlocals` wastes a register per uncaptured local and overflows big
+    // functions. Temps then start above the captured region.
+    let mut base = 1 + nparams as u32;
+    for block in &ssa.blocks {
+        for inst in &block.insts {
+            if let InstKind::LoadCaptured { var } | InstKind::StoreCaptured { var, .. } = &inst.kind {
+                base = base.max(var_reg(*var, nparams) as u32 + 1);
+            }
+        }
+    }
+    let mut order: Vec<usize> = (0..nvals).filter(|&v| !assigned[v] && def[v] != u32::MAX).collect();
+    order.sort_by_key(|&v| def[v]);
+    let mut next: u32 = base;
+    let mut free: Vec<u32> = Vec::new();
+    let mut active: Vec<(u32, u32)> = Vec::new(); // (interval end, register)
+    for &v in &order {
+        let d = def[v];
+        let mut i = 0;
+        while i < active.len() {
+            if active[i].0 < d {
+                free.push(active[i].1);
+                active.swap_remove(i);
+            } else {
+                i += 1;
+            }
+        }
+        let r = match free.iter().copied().min() {
+            Some(m) => {
+                free.retain(|&x| x != m);
+                m
+            }
+            None => {
+                let r = next;
+                next += 1;
+                r
+            }
+        };
+        if r > 255 {
+            if std::env::var_os("VN_OPT_TRACE").is_some() {
+                eprintln!("[varn-opt] regalloc overflow: peak temps need r={r} (nvals={nvals}, nblocks={nblocks})");
+            }
+            return Err(OptError::Unsupported("ssa-emit: register count exceeds 255"));
+        }
+        reg[v] = r as u8;
+        assigned[v] = true;
+        active.push((end[v], r));
     }
     // Widest call (receiver + args) → the contiguous call-ABI scratch block.
     let mut max_call = 0u32;
@@ -213,6 +356,10 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
                 // fn slot + args.
                 InstKind::SuperCall { args } => args.len() as u32 + 2,
                 InstKind::SuperMethodCall { args, .. } => args.len() as u32 + 1,
+                // Extension call: fn slot + receiver + args. Spread call: null
+                // receiver + args.
+                InstKind::ExtensionCall { args, .. } => args.len() as u32 + 2,
+                InstKind::CallSpread { args, .. } => args.len() as u32 + 1,
                 _ => 0,
             };
             max_call = max_call.max(t);
@@ -231,6 +378,13 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
     Ok((reg, scratch, null_reg, call_base, register_count))
 }
 
+fn var_reg(var: VarId, nparams: usize) -> u8 {
+    match var {
+        VarId::Param(i) => (1 + i) as u8,
+        VarId::Local(id) => (1 + nparams + id.0 as usize) as u8,
+    }
+}
+
 fn emit_inst(
     chunk: &mut Chunk,
     inst: &Inst,
@@ -239,6 +393,8 @@ fn emit_inst(
     call_base: u8,
     cache_count: &mut u16,
     source_file: &Rc<str>,
+    nparams: usize,
+    fixups: &mut Vec<(usize, BlockId)>,
 ) -> Result<()> {
     // Side-effecting writes have no `dest`; handle them before the dest guard.
     match &inst.kind {
@@ -271,6 +427,85 @@ fn emit_inst(
         // `StoreUpvalue uv, value` (uv in the high byte).
         InstKind::StoreUpvalue { index, value } => {
             chunk.emit1(OpCode::StoreUpvalue, Chunk::pack(*index as u8, reg[value.0 as usize]), LINE);
+            return Ok(());
+        }
+        InstKind::StoreCaptured { var, value } => {
+            let dest_reg = var_reg(*var, nparams);
+            chunk.emit_rr(OpCode::Move, dest_reg, reg[value.0 as usize], LINE);
+            return Ok(());
+        }
+        InstKind::StoreModuleSlot { value, slot } => {
+            chunk.emit_rc(OpCode::StoreModuleSlot, reg[value.0 as usize], *slot, LINE);
+            return Ok(());
+        }
+        InstKind::CloseUpvalues { targets } => {
+            let lowest = targets
+                .iter()
+                .map(|t| var_reg(*t, nparams))
+                .min()
+                .unwrap_or(0);
+            chunk.emit1(OpCode::CloseUpvalue, lowest as u16, LINE);
+            return Ok(());
+        }
+        InstKind::Dispose { target, is_await } => {
+            let r = var_reg(VarId::Local(*target), nparams);
+            let method = if *is_await { "disposeAsync" } else { "dispose" };
+            let str_idx = chunk.add_str(method);
+            if *cache_count > 255 {
+                return Err(OptError::Unsupported("ssa-emit: too many inline-cache sites"));
+            }
+            let cs = *cache_count as u8;
+            *cache_count += 1;
+            chunk.write(Chunk::pack_op(OpCode::CallMethod, cs), LINE);
+            chunk.write(Chunk::pack(r, r), LINE);
+            chunk.write(str_idx, LINE);
+            chunk.write(Chunk::pack(0u8, 0u8), LINE);
+            return Ok(());
+        }
+        InstKind::PopTry => {
+            chunk.emit(OpCode::PopTry, LINE);
+            return Ok(());
+        }
+        InstKind::DeclareField { class, name } => {
+            let class_reg = reg[class.0 as usize];
+            let key_idx = chunk.add_str(name);
+            chunk.emit(OpCode::DeclareField, LINE);
+            chunk.write(Chunk::pack(class_reg, 0), LINE);
+            chunk.write(key_idx, LINE);
+            return Ok(());
+        }
+        InstKind::DefineStatic { class, name, value } => {
+            let class_reg = reg[class.0 as usize];
+            let val_reg = reg[value.0 as usize];
+            let key_idx = chunk.add_str(name);
+            chunk.emit(OpCode::DefineStatic, LINE);
+            chunk.write(Chunk::pack(class_reg, val_reg), LINE);
+            chunk.write(key_idx, LINE);
+            return Ok(());
+        }
+        InstKind::DefineMethod { class, name, method, is_static } => {
+            let class_reg = reg[class.0 as usize];
+            let method_reg = reg[method.0 as usize];
+            let key_idx = chunk.add_str(name);
+            let op = if *is_static { OpCode::DefineStatic } else { OpCode::Method };
+            chunk.emit(op, LINE);
+            chunk.write(Chunk::pack(class_reg, method_reg), LINE);
+            chunk.write(key_idx, LINE);
+            return Ok(());
+        }
+        InstKind::DefineAccessor { class, name, accessor, is_getter, is_static } => {
+            let class_reg = reg[class.0 as usize];
+            let acc_reg = reg[accessor.0 as usize];
+            let key_idx = chunk.add_str(name);
+            let op = match (is_getter, is_static) {
+                (true, true) => OpCode::DefineStaticGetter,
+                (true, false) => OpCode::DefineGetter,
+                (false, true) => OpCode::DefineStaticSetter,
+                (false, false) => OpCode::DefineSetter,
+            };
+            chunk.emit(op, LINE);
+            chunk.write(Chunk::pack(class_reg, acc_reg), LINE);
+            chunk.write(key_idx, LINE);
             return Ok(());
         }
         _ => {}
@@ -405,11 +640,29 @@ fn emit_inst(
         }
         // Capture-free closure → compile the nested fn to a proto constant
         // (`lower_function` re-enters the SSA gate per-function), then LoadStaticFn.
-        InstKind::MakeClosure { func } => {
+        InstKind::MakeClosure { func, upvalues, upvalues_src } => {
             let proto = crate::lower::lower_function(func, source_file.clone());
             let idx = chunk.add_constant(PoolEntry::Function(Rc::new(proto)));
-            chunk.write(Chunk::pack_op(OpCode::LoadStaticFn, d), LINE);
-            chunk.write(idx, LINE);
+            if upvalues.is_empty() {
+                chunk.write(Chunk::pack_op(OpCode::LoadStaticFn, d), LINE);
+                chunk.write(idx, LINE);
+            } else {
+                let uv_count = upvalues.len() as u8;
+                chunk.emit(OpCode::MakeClosure, LINE);
+                chunk.write(Chunk::pack(d, uv_count), LINE);
+                chunk.write(idx, LINE);
+                for (uv_val, uv_src) in upvalues.iter().zip(upvalues_src) {
+                    let is_local = match uv_src {
+                        HirUpvalueSrc::ParentLocal(_) | HirUpvalueSrc::ParentParam(_) => 1u8,
+                        HirUpvalueSrc::ParentUpvalue(_) => 0u8,
+                    };
+                    let index = match uv_src {
+                        HirUpvalueSrc::ParentLocal(_) | HirUpvalueSrc::ParentParam(_) => reg[uv_val.0 as usize],
+                        HirUpvalueSrc::ParentUpvalue(idx) => *idx as u8,
+                    };
+                    chunk.write(Chunk::pack(is_local, index), LINE);
+                }
+            }
         }
         // `Intrinsic`: object + args contiguous from `call_base`, result lands in
         // `call_base`, then copied down to the value's register.
@@ -504,12 +757,117 @@ fn emit_inst(
             chunk.write(Chunk::pack(d, call_base), LINE);
             chunk.write(Chunk::pack(count, if count > 0 { call_base + 1 } else { 0 }), LINE);
         }
+        // Extension call: `LoadGlobal(func)` into the fn slot, `recv` as the
+        // receiver, args after; `Call` over `[receiver, args]`.
+        InstKind::ExtensionCall { func, recv, args } => {
+            let idx = chunk.add_str(func);
+            chunk.emit_rc(OpCode::LoadGlobal, call_base, idx, LINE);
+            chunk.emit_rr(OpCode::Move, call_base + 1, reg[recv.0 as usize], LINE);
+            for (i, a) in args.iter().enumerate() {
+                chunk.emit_rr(OpCode::Move, call_base + 2 + i as u8, reg[a.0 as usize], LINE);
+            }
+            let total = (args.len() + 1) as u8; // receiver + args
+            chunk.emit(OpCode::Call, LINE);
+            chunk.write(Chunk::pack(d, call_base), LINE);
+            chunk.write(Chunk::pack(total, call_base + 1), LINE);
+        }
+        // Plain call with spread: null receiver, args after (spreads WrapSpread'd),
+        // then `CallSpread`.
+        InstKind::CallSpread { callee, args } => {
+            chunk.emit_rr(OpCode::LoadNull, call_base, 0, LINE);
+            for (i, (a, spread)) in args.iter().enumerate() {
+                let op = if *spread { OpCode::WrapSpread } else { OpCode::Move };
+                chunk.emit_rr(op, call_base + 1 + i as u8, reg[a.0 as usize], LINE);
+            }
+            let total = (args.len() + 1) as u8;
+            chunk.emit(OpCode::CallSpread, LINE);
+            chunk.write(Chunk::pack(d, reg[callee.0 as usize]), LINE);
+            chunk.write(Chunk::pack(total, call_base), LINE);
+        }
+        // `[a, ...b]`: empty array in `d`, then ArrayPush / ArrayExtend per item.
+        InstKind::BuildArraySpread { elements } => {
+            chunk.emit(OpCode::BuildArray, LINE);
+            chunk.write(Chunk::pack(d, call_base), LINE);
+            chunk.write(Chunk::pack(0, 0), LINE);
+            for (v, spread) in elements {
+                let op = if *spread { OpCode::ArrayExtend } else { OpCode::ArrayPush };
+                chunk.emit_rr(op, d, reg[v.0 as usize], LINE);
+            }
+        }
+        // `{a: 1, ...b}`: empty object in `d`, then SetProperty / ObjectMerge.
+        InstKind::BuildObjectSpread { parts } => {
+            chunk.emit(OpCode::BuildObject, LINE);
+            chunk.write(Chunk::pack(d, 0), LINE);
+            for (key, v) in parts {
+                match key {
+                    Some(k) => {
+                        let idx = chunk.add_str(k);
+                        if *cache_count > 255 {
+                            return Err(OptError::Unsupported("ssa-emit: too many inline-cache sites"));
+                        }
+                        let cs = *cache_count as u8;
+                        *cache_count += 1;
+                        chunk.emit_rrc_ic(OpCode::SetProperty, d, reg[v.0 as usize], idx, cs, LINE);
+                    }
+                    None => chunk.emit_rr(OpCode::ObjectMerge, d, reg[v.0 as usize], LINE),
+                }
+            }
+        }
+        InstKind::LoadCaptured { var } => {
+            let src = var_reg(*var, nparams);
+            chunk.emit_rr(OpCode::Move, d, src, LINE);
+        }
+        InstKind::MakeClass { name, super_class } => {
+            let name_idx = chunk.add_str(name);
+            let super_reg = super_class.map(|sc| reg[sc.0 as usize]).unwrap_or(0);
+            chunk.emit_rrc(OpCode::MakeClass, d, super_reg, name_idx, LINE);
+        }
+        InstKind::MakeEnumVariant { tag, meta } => {
+            let meta_idx = chunk.add_str(meta);
+            chunk.emit_load_int(scratch, *tag, LINE);
+            chunk.emit(OpCode::MakeEnumVariant, LINE);
+            chunk.write(Chunk::pack(d, scratch), LINE);
+            chunk.write(meta_idx, LINE);
+        }
+        InstKind::Try { handler } => {
+            chunk.emit(OpCode::Try, LINE);
+            chunk.write(Chunk::pack(d, 0), LINE);
+            let pos = chunk.code.len();
+            chunk.write(0xFFFF, LINE);
+            chunk.write(0xFFFF, LINE);
+            fixups.push((pos, *handler));
+        }
+        InstKind::CatchParam { try_val } => {
+            chunk.emit_rr(OpCode::Move, d, reg[try_val.0 as usize], LINE);
+        }
+        InstKind::LoadModule { source } => {
+            let src_idx = chunk.add_str(source);
+            chunk.emit_rc(OpCode::LoadModule, d, src_idx, LINE);
+        }
+        InstKind::Await { operand } => {
+            chunk.emit_rr(OpCode::Await, d, reg[operand.0 as usize], LINE);
+        }
+        InstKind::Spawn { operand } => {
+            chunk.emit2(OpCode::Spawn, Chunk::pack(d, reg[operand.0 as usize]), 0, LINE);
+        }
+        InstKind::Yield { operand } => {
+            chunk.emit1(OpCode::Yield, Chunk::pack(d, reg[operand.0 as usize]), LINE);
+        }
         // Dest-less side effects handled before the dest guard above.
         InstKind::SetProperty { .. }
         | InstKind::SetIndex { .. }
         | InstKind::AssertNotNull { .. }
         | InstKind::StoreGlobal { .. }
-        | InstKind::StoreUpvalue { .. } => {
+        | InstKind::StoreUpvalue { .. }
+        | InstKind::StoreCaptured { .. }
+        | InstKind::StoreModuleSlot { .. }
+        | InstKind::CloseUpvalues { .. }
+        | InstKind::Dispose { .. }
+        | InstKind::PopTry
+        | InstKind::DeclareField { .. }
+        | InstKind::DefineStatic { .. }
+        | InstKind::DefineMethod { .. }
+        | InstKind::DefineAccessor { .. } => {
             unreachable!()
         }
     }

@@ -74,7 +74,7 @@ pub fn lower_to_ssa(
     let mut errors: Vec<(Rc<str>, &'static str)> = Vec::new();
 
     // Try top-level
-    match ssa::build::build_function(&module.top_level) {
+    match ssa::build::build_function(&module.top_level, &module.functions) {
         Ok(f) => funcs.push(f),
         Err(OptError::Unsupported(msg)) => {
             errors.push((module.top_level.name.clone(), msg));
@@ -83,7 +83,7 @@ pub fn lower_to_ssa(
 
     // Try each declared function
     for f in &module.functions {
-        match ssa::build::build_function(f) {
+        match ssa::build::build_function(f, &[]) {
             Ok(sf) => funcs.push(sf),
             Err(OptError::Unsupported(msg)) => {
                 errors.push((f.name.clone(), msg));
