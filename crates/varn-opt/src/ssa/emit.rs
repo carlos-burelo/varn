@@ -209,6 +209,10 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
                 InstKind::IntrinsicCall { args, .. } => args.len() as u32 + 1,
                 // Iterator-protocol call: just the receiver in `call_base`.
                 InstKind::IterCall { .. } => 1,
+                // `super(args)`: fn slot + receiver + args. `super.name(args)`:
+                // fn slot + args.
+                InstKind::SuperCall { args } => args.len() as u32 + 2,
+                InstKind::SuperMethodCall { args, .. } => args.len() as u32 + 1,
                 _ => 0,
             };
             max_call = max_call.max(t);
@@ -452,6 +456,38 @@ fn emit_inst(
             chunk.emit(OpCode::Call, LINE);
             chunk.write(Chunk::pack(d, reg[callee.0 as usize]), LINE);
             chunk.write(Chunk::pack(1, call_base), LINE);
+        }
+        // `super` / `super.name` member read.
+        InstKind::GetSuper { name } => {
+            let idx = chunk.add_str(name);
+            chunk.emit_rc(OpCode::GetSuper, d, idx, LINE);
+        }
+        // `super(args)`: GetSuper "constructor" into the fn slot, `this` (reg 0)
+        // as the receiver, args after; `Call` over `[receiver, args]`.
+        InstKind::SuperCall { args } => {
+            let ctor_idx = chunk.add_str("constructor");
+            chunk.emit_rc(OpCode::GetSuper, call_base, ctor_idx, LINE);
+            chunk.emit_rr(OpCode::Move, call_base + 1, 0, LINE); // `this`
+            for (i, a) in args.iter().enumerate() {
+                chunk.emit_rr(OpCode::Move, call_base + 2 + i as u8, reg[a.0 as usize], LINE);
+            }
+            let total = (args.len() + 1) as u8; // receiver + args
+            chunk.emit(OpCode::Call, LINE);
+            chunk.write(Chunk::pack(d, call_base), LINE);
+            chunk.write(Chunk::pack(total, call_base + 1), LINE);
+        }
+        // `super.name(args)`: GetSuper name (bound to `this`) into the fn slot,
+        // args after; `Call` over the args (no separate receiver).
+        InstKind::SuperMethodCall { name, args } => {
+            let name_idx = chunk.add_str(name);
+            chunk.emit_rc(OpCode::GetSuper, call_base, name_idx, LINE);
+            for (i, a) in args.iter().enumerate() {
+                chunk.emit_rr(OpCode::Move, call_base + 1 + i as u8, reg[a.0 as usize], LINE);
+            }
+            let count = args.len() as u8;
+            chunk.emit(OpCode::Call, LINE);
+            chunk.write(Chunk::pack(d, call_base), LINE);
+            chunk.write(Chunk::pack(count, if count > 0 { call_base + 1 } else { 0 }), LINE);
         }
         // Dest-less side effects handled before the dest guard above.
         InstKind::SetProperty { .. } | InstKind::SetIndex { .. } | InstKind::AssertNotNull { .. } => {

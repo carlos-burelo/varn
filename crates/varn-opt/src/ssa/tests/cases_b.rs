@@ -516,6 +516,29 @@ fn f:
 }
 
 #[test]
+fn super_method_call_lowers_to_supercall() {
+    // f() { return super.greet(7) }
+    let f = func(
+        vec![],
+        0,
+        vec![HirStmt::Return(Some(HirExpr::SuperMethodCall {
+            name: "greet".into(),
+            args: vec![int(7)],
+        }))],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0():
+    v0 = int 7
+    v1 = supercall super.greet(v0)
+    return v1
+"
+    );
+}
+
+#[test]
 fn verifier_accepts_constructed_ssa() {
     // The verifier must not reject any well-formed function the builder emits.
     let while_loop = func(

@@ -165,6 +165,30 @@ impl Builder {
                     *ty,
                 ))
             }
+            // `super` / `super.name` member read.
+            HirExpr::Super => Ok(self.emit(InstKind::GetSuper { name: Rc::from("super") }, HirType::Dynamic)),
+            HirExpr::SuperMember { name } => {
+                Ok(self.emit(InstKind::GetSuper { name: name.clone() }, HirType::Dynamic))
+            }
+            // `super(args)` — superclass constructor call.
+            HirExpr::SuperCall { args } => {
+                let mut avs = Vec::with_capacity(args.len());
+                for a in args {
+                    avs.push(self.lower_expr(a)?);
+                }
+                Ok(self.emit(InstKind::SuperCall { args: avs }, HirType::Dynamic))
+            }
+            // `super.name(args)` — superclass method call.
+            HirExpr::SuperMethodCall { name, args } => {
+                let mut avs = Vec::with_capacity(args.len());
+                for a in args {
+                    avs.push(self.lower_expr(a)?);
+                }
+                Ok(self.emit(
+                    InstKind::SuperMethodCall { name: name.clone(), args: avs },
+                    HirType::Dynamic,
+                ))
+            }
             // Short-circuiting `&&`/`||`/`??` → branch + result phi.
             HirExpr::Logical { op, lhs, rhs } => {
                 let l = self.lower_expr(lhs)?;

@@ -105,6 +105,11 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::IterCall { callee, recv } => {
             format!("itercall {}({})", val(*callee), val(*recv))
         }
+        InstKind::GetSuper { name } => format!("getsuper super.{name}"),
+        InstKind::SuperCall { args } => format!("supercall{}", args_list(args)),
+        InstKind::SuperMethodCall { name, args } => {
+            format!("supercall super.{name}{}", args_list(args))
+        }
     }
 }
 

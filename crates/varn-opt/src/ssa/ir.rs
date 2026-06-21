@@ -154,6 +154,14 @@ pub enum InstKind {
     /// `iterable[Symbol.iterator]()` / `iterator.next()` shape): receiver at
     /// `call_base`, `Call` with arg_count 1.
     IterCall { callee: Value, recv: Value },
+    /// `super` / `super.name` member read (`GetSuper`).
+    GetSuper { name: Rc<str> },
+    /// `super(args)` — superclass constructor call: `GetSuper "constructor"`
+    /// then `Call` with `this` (reg 0) as the receiver + args.
+    SuperCall { args: Vec<Value> },
+    /// `super.name(args)` — superclass method call: `GetSuper name` (bound to
+    /// `this`) then `Call` over the args (no separate receiver).
+    SuperMethodCall { name: Rc<str>, args: Vec<Value> },
 }
 
 /// How a block ends and transfers control. Branch/jump carry the block-argument
