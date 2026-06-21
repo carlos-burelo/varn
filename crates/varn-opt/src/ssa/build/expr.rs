@@ -3,9 +3,9 @@
 use std::rc::Rc;
 
 use crate::hir::{
-    HirArrayEl, HirAssignTarget, HirBinOp, HirCaseTest, HirClass, HirEnum, HirExpr, HirFunction,
-    HirLogicalOp, HirMatchCase, HirObjectProp, HirOptionalProperty, HirPropKey, HirTemplatePart,
-    HirType, HirTypeTest, HirUnOp, HirUpvalueSrc, HirUpdateOp,
+    HirArrayEl, HirAssignTarget, HirBinOp, HirBinding, HirCaseTest, HirClass, HirEnum, HirExpr,
+    HirFunction, HirLogicalOp, HirMatchCase, HirObjectProp, HirOptionalProperty, HirPropKey,
+    HirTemplatePart, HirType, HirTypeTest, HirUnOp, HirUpvalueSrc, HirUpdateOp,
 };
 use crate::ssa::ir::{BlockId, InstKind, Terminator, Value};
 use crate::OptError;
@@ -645,9 +645,12 @@ impl Builder {
     fn lower_closure(&mut self, func: &HirFunction, upvalues: &[HirUpvalueSrc]) -> Result<Value> {
         let mut uvs = Vec::with_capacity(upvalues.len());
         for uv in upvalues {
+            // Capture through load_binding so a *pinned* parent local/param is
+            // read from its fixed slot (LoadCaptured) rather than the SSA def map
+            // (which it isn't in) — a bare read_var would spawn a phantom phi.
             let val = match uv {
-                HirUpvalueSrc::ParentLocal(id) => self.read_var(VarId::Local(*id), self.current)?,
-                HirUpvalueSrc::ParentParam(i) => self.read_var(VarId::Param(*i), self.current)?,
+                HirUpvalueSrc::ParentLocal(id) => self.load_binding(&HirBinding::Local(*id))?,
+                HirUpvalueSrc::ParentParam(i) => self.load_binding(&HirBinding::Param(*i))?,
                 HirUpvalueSrc::ParentUpvalue(uv) => {
                     self.emit(InstKind::LoadUpvalue(*uv), HirType::Dynamic)
                 }

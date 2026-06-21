@@ -201,11 +201,17 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
     let mut succ: Vec<Vec<usize>> = vec![Vec::new(); nblocks];
     let mut idx = 0u32;
     for (b, block) in ssa.blocks.iter().enumerate() {
+        // `uses[b]` must be *upward-exposed*: a value counts only if used before it
+        // is (re)defined in this block. Otherwise a value defined-and-used in the
+        // same block (e.g. an edge arg passed by the terminator that defines it)
+        // leaks into live_in and propagates backward across the whole function.
+        let mut local_defined: FxHashSet<u32> = FxHashSet::default();
         for p in &block.params {
             if def[p.0 as usize] == u32::MAX {
                 def[p.0 as usize] = idx;
             }
             defs[b].insert(p.0);
+            local_defined.insert(p.0);
         }
         idx += 1;
         for inst in &block.insts {
@@ -213,13 +219,16 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
                 if last[u.0 as usize] < idx {
                     last[u.0 as usize] = idx;
                 }
-                uses[b].insert(u.0);
+                if !local_defined.contains(&u.0) {
+                    uses[b].insert(u.0);
+                }
             }
             if let Some(d) = inst.dest {
                 if def[d.0 as usize] == u32::MAX {
                     def[d.0 as usize] = idx;
                 }
                 defs[b].insert(d.0);
+                local_defined.insert(d.0);
             }
             if let InstKind::Try { handler } = &inst.kind {
                 succ[b].push(handler.0 as usize);
@@ -230,7 +239,9 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
             if last[v.0 as usize] < idx {
                 last[v.0 as usize] = idx;
             }
-            uses.insert(v.0);
+            if !local_defined.contains(&v.0) {
+                uses.insert(v.0);
+            }
         };
         match &block.term {
             Terminator::Return(Some(v)) | Terminator::Throw(v) => touch(*v, &mut uses[b]),
@@ -327,9 +338,6 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
             }
         };
         if r > 255 {
-            if std::env::var_os("VN_OPT_TRACE").is_some() {
-                eprintln!("[varn-opt] regalloc overflow: peak temps need r={r} (nvals={nvals}, nblocks={nblocks})");
-            }
             return Err(OptError::Unsupported("ssa-emit: register count exceeds 255"));
         }
         reg[v] = r as u8;
