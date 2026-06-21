@@ -2,7 +2,7 @@
 
 use crate::hir::{
     HirArrayEl, HirBinOp, HirBinding, HirExpr, HirFunction, HirObjectProp, HirParam, HirPropKey,
-    HirStmt, HirTemplatePart, HirType, HirTypeTest, LocalId,
+    HirStmt, HirSwitchCase, HirTemplatePart, HirType, HirTypeTest, LocalId,
 };
 
 use super::build::build_function;
@@ -1050,6 +1050,48 @@ fn f:
   b4():
     v9 = int 0
     return v9
+"
+    );
+}
+
+#[test]
+fn switch_lowers_to_test_chain_and_bodies() {
+    // f(x) { switch (x) { case 1: return 1; default: return 0 } }
+    let f = func(
+        vec![HirType::Int],
+        0,
+        vec![HirStmt::Switch {
+            disc: param(0),
+            cases: vec![
+                HirSwitchCase {
+                    test: Some(int(1)),
+                    body: vec![HirStmt::Return(Some(int(1)))],
+                },
+                HirSwitchCase {
+                    test: None,
+                    body: vec![HirStmt::Return(Some(int(0)))],
+                },
+            ],
+        }],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0(v0: int):
+    v1 = int 1
+    v2 = eq.dyn v0, v1
+    branch v2, b1, b4
+  b1():
+    v3 = int 1
+    return v3
+  b2():
+    v4 = int 0
+    return v4
+  b3():
+    return
+  b4():
+    jump b2
 "
     );
 }
