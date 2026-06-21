@@ -95,6 +95,11 @@ pub enum InstKind {
     },
     /// Read a module global by name (`LoadGlobal`).
     LoadGlobal(Rc<str>),
+    /// Read a captured upvalue by index (`LoadUpvalue`). The closure's upvalue
+    /// array is populated by the parent's `MakeClosure`; reading one is a leaf
+    /// (no SSA operands), so a closure *body* can be SSA-compiled even when the
+    /// parent that builds the closure still falls back to `lower/`.
+    LoadUpvalue(u32),
     /// Plain call `callee(args)` — plain-call ABI (null receiver, contiguous args).
     Call { callee: Value, args: Vec<Value> },
     /// Statically-resolved self-recursion (`CallSelf`).

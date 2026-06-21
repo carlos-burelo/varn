@@ -123,6 +123,9 @@ impl Builder {
             HirExpr::Var(HirBinding::Global(name)) => {
                 Ok(self.emit(InstKind::LoadGlobal(name.clone()), HirType::Dynamic))
             }
+            HirExpr::Var(HirBinding::Upvalue(uv)) => {
+                Ok(self.emit(InstKind::LoadUpvalue(*uv), HirType::Dynamic))
+            }
             HirExpr::Var(binding) => {
                 let var = binding_var(binding)?;
                 self.read_var(var, self.current)

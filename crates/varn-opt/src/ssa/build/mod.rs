@@ -450,7 +450,8 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                 | InstKind::ConstDecimal(_)
                 | InstKind::ConstBigInt(_)
                 | InstKind::ConstNull
-                | InstKind::LoadGlobal(_) => {}
+                | InstKind::LoadGlobal(_)
+                | InstKind::LoadUpvalue(_) => {}
             }
         }
         match &mut block.term {

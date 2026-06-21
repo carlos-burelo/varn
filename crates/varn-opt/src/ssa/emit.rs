@@ -316,6 +316,10 @@ fn emit_inst(
             let idx = chunk.add_str(name);
             chunk.emit_rc(OpCode::LoadGlobal, d, idx, LINE);
         }
+        InstKind::LoadUpvalue(uv) => {
+            chunk.emit(OpCode::LoadUpvalue, LINE);
+            chunk.write(Chunk::pack(d, *uv as u8), LINE);
+        }
         // Plain-call ABI: null receiver at `call_base`, args contiguous after it,
         // then `Call dest=d, callee` over `[receiver, args]`.
         InstKind::Call { callee, args } => {

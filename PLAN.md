@@ -224,30 +224,48 @@ Done (`ssa/build.rs`, `ssa/ir.rs`):
   `obj` as the receiver, not a plain-call arg) fall back. Verified: `b?.v ?? -1`
   and `b?.get() ?? -1` on a `Box?` → `42 -1 42 -1` identical with/without
   `VN_OPT_SSA`.
+- **Upvalue reads** — `HirBinding::Upvalue` read → `LoadUpvalue` (a leaf, like
+  `LoadGlobal`). A closure *body* can now SSA-compile even while the parent that
+  *builds* the closure still falls back, because the upvalue array is populated by
+  the parent's `MakeClosure` regardless. Verified: `x => x + n` SSA-compiles
+  (parent `makeAdder` falls back on closure creation) → `15 25` identical
+  with/without `VN_OPT_SSA`. Mutating an upvalue (`count++`) still falls back
+  (needs `StoreUpvalue` + the write path).
 - **Trivial-phi removal** (`simplify_phis`): Braun's `tryRemoveTrivialPhi` as a
   fixpoint post-pass.
-- Tests (`ssa/tests.rs`, 40 — golden dumps + verifier): identity, const+binary,
+- Tests (`ssa/tests.rs`, 41 — golden dumps + verifier): identity, const+binary,
   reassign, one-/two-sided `if` phi, no-phi trivial removal, `while`/`for`/
   `do-while` carry, `break`/`continue`, nested-`if` merge, global call, self-call,
   member/index read, member/index write, method call, ternary, array/object
   literal, template, capture-free closure, intrinsic, non-null, sequence, decimal,
   try-op, type-test, this, throw, range, for-in, switch, for-of, match.
 
-**Pending** (the rest of §2's instruction set): closures **with upvalues**,
-`Super*`/extension calls, optional chaining, enum-construction, the
-`MakeClass`/enum *value* expressions, modules (import/export), await/spawn/yield —
-plus `try` control flow, so every §1 construct lowers to SSA.
-Until then `build_function` returns `Err(Unsupported)` and that function uses the
-`lower/` path. (Done: scalar exprs, control flow, loops, plain/self/method calls,
-member/index read+write, logical + conditional, array/object literals, templates,
-capture-free closures, intrinsics, `!`/sequence/`?.`-member/module-slot/decimal/
-bigint/regex, `expr?`/`is`, `this`, `throw`, `range`, `for-in`, `switch`, `for-of`, `match`; class **method
-bodies** SSA-compile.)
+**Measured coverage** (`VN_OPT_SSA=1 VN_OPT_TRACE=1` over the full suite, after
+upvalue reads): **~527 functions SSA-compile, ~50 fall back (≈ 91%)**; suite
+**728/728**. Remaining fallback reasons, by frequency: closure **creation** with
+upvalues (~22), mutating an **upvalue write** (~7), `await`/`spawn`/`yield` +
+generators (`expression kind`, ~8), `try`/`using`/catch-destructure
+(`statement kind`, ~7), `default param` (~5), a few `global binding` *writes*,
+`for-await-of`, `update target`.
 
-> Closures with upvalues need captured locals to keep a stable register across
-> the function (the VM upvalue points at the slot). SSA renaming spreads a local
-> across values/regs, so capture-by-slot needs either pinning captured locals to a
-> fixed slot (don't SSA-rename them) or a dedicated upvalue cell. Deferred.
+**Pending** (the rest of §2's instruction set): closure **creation with
+upvalues** + **upvalue writes** (`StoreUpvalue`), global-binding *writes*
+(`StoreGlobal`), `default param`, enum-construction / the `MakeClass`/enum *value*
+expressions, modules (import/export), await/spawn/yield + generators — plus `try`
+control flow. Until then `build_function` returns `Err(Unsupported)` and that
+function uses the `lower/` path. (Done: scalar exprs, control flow, loops,
+plain/self/method calls, member/index read+write, logical + conditional,
+array/object literals, templates, capture-free closures, **upvalue reads**,
+intrinsics, `!`/sequence/`?.`-member/module-slot/decimal/bigint/regex, `expr?`/`is`,
+`this`, `throw`, `range`, `for-in`, `switch`, `for-of`, `match`, **super calls**,
+**optional chaining**; class **method bodies** SSA-compile.)
+
+> Closure *creation* with upvalues needs captured locals to keep a stable register
+> across the function (the VM upvalue points at the slot). SSA renaming spreads a
+> local across values/regs, so capture-by-slot needs either pinning captured
+> locals to a fixed slot (don't SSA-rename them) or a dedicated upvalue cell.
+> Deferred — but reading/using an existing upvalue (`LoadUpvalue`) is done, so a
+> closure *body* SSA-compiles independently of its parent.
 
 > **`regalloc_post` callee-frame constraint ✅ RESOLVED.** SSA calls were correct
 > pre-regalloc but `regalloc_post` miscompiled multi-call expressions: a call
