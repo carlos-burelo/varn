@@ -20,7 +20,8 @@ use rustc_hash::FxHashMap;
 
 use crate::hir::{
     HirArrayEl, HirAssignTarget, HirBinOp, HirBinding, HirExpr, HirFunction, HirLogicalOp,
-    HirObjectProp, HirPropKey, HirStmt, HirTemplatePart, HirType, HirUpdateOp, LocalId,
+    HirObjectProp, HirPropKey, HirStmt, HirTemplatePart, HirType, HirTypeTest, HirUnOp,
+    HirUpdateOp, LocalId,
 };
 use crate::OptError;
 
@@ -636,6 +637,62 @@ impl Builder {
                 let o = self.lower_expr(object)?;
                 Ok(self.emit(InstKind::ModuleSlot { object: o, slot: *slot }, *ty))
             }
+            // `expr?` try operator: if the operand's enum tag is falsy (Err/None),
+            // early-return it; else continue with it. A branch with a return arm.
+            HirExpr::TryOp(operand) => {
+                let v = self.lower_expr(operand)?;
+                let tag = self.emit(InstKind::GetEnumTag { operand: v }, HirType::Int);
+                let entry = self.current;
+                let ok_b = self.new_block();
+                let err_b = self.new_block();
+                self.set_term(Terminator::Branch {
+                    cond: tag,
+                    then_blk: ok_b,
+                    then_args: Vec::new(),
+                    else_blk: err_b,
+                    else_args: Vec::new(),
+                });
+                self.add_pred(ok_b, entry);
+                self.add_pred(err_b, entry);
+                self.seal_block(ok_b);
+                self.seal_block(err_b);
+                self.current = err_b;
+                self.set_term(Terminator::Return(Some(v)));
+                self.current = ok_b;
+                Ok(v)
+            }
+            // `expr is Type` runtime test → a concrete check yielding a bool.
+            HirExpr::TypeTest { value, kind } => {
+                let v = self.lower_expr(value)?;
+                match kind {
+                    HirTypeTest::IsNull => Ok(self.emit(InstKind::IsNull { operand: v }, HirType::Bool)),
+                    HirTypeTest::IsArray => Ok(self.emit(InstKind::IsArray { operand: v }, HirType::Bool)),
+                    HirTypeTest::TypeofEq(name) => {
+                        let t = self.emit(
+                            InstKind::Unary { op: HirUnOp::Typeof, operand: v, ty: HirType::Str },
+                            HirType::Str,
+                        );
+                        let s = self.emit(InstKind::ConstStr(name.clone()), HirType::Str);
+                        Ok(self.emit(
+                            InstKind::Binary { op: HirBinOp::Eq, lhs: t, rhs: s, ty: HirType::Dynamic },
+                            HirType::Bool,
+                        ))
+                    }
+                    HirTypeTest::Instanceof(name) => {
+                        let cls = self.emit(InstKind::LoadGlobal(name.clone()), HirType::Ref);
+                        Ok(self.emit(
+                            InstKind::Binary {
+                                op: HirBinOp::Instanceof,
+                                lhs: v,
+                                rhs: cls,
+                                ty: HirType::Dynamic,
+                            },
+                            HirType::Bool,
+                        ))
+                    }
+                    HirTypeTest::AlwaysFalse => Ok(self.emit(InstKind::ConstBool(false), HirType::Bool)),
+                }
+            }
             HirExpr::Var(HirBinding::Global(name)) => {
                 Ok(self.emit(InstKind::LoadGlobal(name.clone()), HirType::Dynamic))
             }
@@ -1044,6 +1101,8 @@ fn replace_all_uses(func: &mut SsaFunc, old: Value, new: Value) {
                 InstKind::AssertNotNull { operand } => sub(operand),
                 InstKind::GetPropertyMaybe { object, .. } => sub(object),
                 InstKind::ModuleSlot { object, .. } => sub(object),
+                InstKind::GetEnumTag { operand } => sub(operand),
+                InstKind::IsArray { operand } => sub(operand),
                 InstKind::ConstInt(_)
                 | InstKind::ConstFloat(_)
                 | InstKind::ConstBool(_)

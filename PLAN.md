@@ -164,23 +164,28 @@ Done (`ssa/build.rs`, `ssa/ir.rs`):
   module-slot reads (`LoadModuleSlot`), and decimal / bigint / regex literals
   (`LoadConst`; regex → `/pat/flags` string). Verified: `x!`, decimal, bigint,
   sequence run identically; suites green.
+- **`expr?` try op + `is` type tests** — `?` → `GetEnumTag` + branch with an
+  early-`Return` arm (continues in the ok block). `is T` → `IsNull` / `IsArray` /
+  `typeof`==name / `instanceof` global / const-false (reusing `Unary`/`Binary`/
+  `LoadGlobal`). Verified: `x is int`/`is str` → `true false true`; suites green.
 - **Trivial-phi removal** (`simplify_phis`): Braun's `tryRemoveTrivialPhi` as a
   fixpoint post-pass.
-- Tests (`ssa/tests.rs`, 29 — golden dumps + verifier): identity, const+binary,
+- Tests (`ssa/tests.rs`, 31 — golden dumps + verifier): identity, const+binary,
   reassign, one-/two-sided `if` phi, no-phi trivial removal, `while`/`for`/
   `do-while` carry, `break`/`continue`, nested-`if` merge, global call, self-call,
   member/index read, member/index write, method call, ternary, array/object
-  literal, template, capture-free closure, intrinsic, non-null, sequence, decimal.
+  literal, template, capture-free closure, intrinsic, non-null, sequence, decimal,
+  try-op, type-test.
 
 **Pending** (the rest of §2's instruction set): closures **with upvalues**,
-`This`/`Super*`/extension calls, optional chaining, `TryOp`/`TypeTest`/`Range`,
-classes, enums, `match`, `try`, modules (import/export), await/spawn/yield — plus
+`This`/`Super*`/extension calls, optional chaining, `Range`, classes, enums,
+`match`, `try`, modules (import/export), await/spawn/yield — plus
 `switch`/`for-of`/`for-in` control flow, so every §1 construct lowers to SSA.
 Until then `build_function` returns `Err(Unsupported)` and that function uses the
 `lower/` path. (Done: scalar exprs, control flow, loops, plain/self/method calls,
 member/index read+write, logical + conditional, array/object literals, templates,
 capture-free closures, intrinsics, `!`/sequence/`?.`-member/module-slot/decimal/
-bigint/regex.)
+bigint/regex, `expr?` try-op, `is` type-test.)
 
 > Closures with upvalues need captured locals to keep a stable register across
 > the function (the VM upvalue points at the slot). SSA renaming spreads a local

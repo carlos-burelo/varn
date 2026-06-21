@@ -90,6 +90,8 @@ fn inst_kind(kind: &InstKind) -> String {
             format!("getpropmaybe {}.{name}", val(*object))
         }
         InstKind::ModuleSlot { object, slot } => format!("moduleslot {}[{slot}]", val(*object)),
+        InstKind::GetEnumTag { operand } => format!("enumtag {}", val(*operand)),
+        InstKind::IsArray { operand } => format!("isarray {}", val(*operand)),
     }
 }
 

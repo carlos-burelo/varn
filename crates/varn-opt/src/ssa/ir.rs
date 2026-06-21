@@ -137,6 +137,10 @@ pub enum InstKind {
     GetPropertyMaybe { object: Value, name: Rc<str> },
     /// Module-slot read (`LoadModuleSlot`).
     ModuleSlot { object: Value, slot: u16 },
+    /// `GetEnumTag` — the enum/result tag of a value (for the `?` try operator).
+    GetEnumTag { operand: Value },
+    /// `IsArray` — runtime array test (for `is Array` type tests).
+    IsArray { operand: Value },
 }
 
 /// How a block ends and transfers control. Branch/jump carry the block-argument
