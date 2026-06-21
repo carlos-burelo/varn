@@ -55,6 +55,10 @@ fn inst_kind(kind: &InstKind) -> String {
         }
         InstKind::LoadGlobal(name) => format!("global {name}"),
         InstKind::LoadUpvalue(uv) => format!("upvalue #{uv}"),
+        InstKind::StoreGlobal { name, value } => format!("storeglobal {name} = {}", val(*value)),
+        InstKind::StoreUpvalue { index, value } => {
+            format!("storeupvalue #{index} = {}", val(*value))
+        }
         InstKind::Call { callee, args } => format!("call {}{}", val(*callee), args_list(args)),
         InstKind::SelfCall { args } => format!("callself{}", args_list(args)),
         InstKind::GetProperty { object, name } => format!("getprop {}.{name}", val(*object)),

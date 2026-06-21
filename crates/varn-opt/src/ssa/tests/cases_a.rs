@@ -601,3 +601,34 @@ fn f:
     );
 }
 
+#[test]
+fn global_and_upvalue_writes_lower_to_stores() {
+    // f() { someGlobal = 42; <upvalue 0> = 9 }
+    let f = func(
+        vec![],
+        0,
+        vec![
+            HirStmt::Assign {
+                target: HirBinding::Global("someGlobal".into()),
+                value: int(42),
+            },
+            HirStmt::Assign {
+                target: HirBinding::Upvalue(0),
+                value: int(9),
+            },
+        ],
+    );
+    assert_eq!(
+        build(&f),
+        "\
+fn f:
+  b0():
+    v0 = int 42
+    storeglobal someGlobal = v0
+    v1 = int 9
+    storeupvalue #0 = v1
+    return
+"
+    );
+}
+

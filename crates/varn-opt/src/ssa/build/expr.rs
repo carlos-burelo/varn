@@ -3,14 +3,14 @@
 use std::rc::Rc;
 
 use crate::hir::{
-    HirArrayEl, HirAssignTarget, HirBinOp, HirBinding, HirCaseTest, HirExpr, HirLogicalOp,
-    HirMatchCase, HirObjectProp, HirOptionalProperty, HirPropKey, HirTemplatePart, HirType,
-    HirTypeTest, HirUnOp, HirUpdateOp,
+    HirArrayEl, HirAssignTarget, HirBinOp, HirCaseTest, HirExpr, HirLogicalOp, HirMatchCase,
+    HirObjectProp, HirOptionalProperty, HirPropKey, HirTemplatePart, HirType, HirTypeTest, HirUnOp,
+    HirUpdateOp,
 };
 use crate::ssa::ir::{BlockId, InstKind, Terminator, Value};
 use crate::OptError;
 
-use super::{binding_var, Builder, Result, VarId};
+use super::{Builder, Result, VarId};
 
 impl Builder {
     pub(super) fn lower_expr(&mut self, expr: &HirExpr) -> Result<Value> {
@@ -120,16 +120,7 @@ impl Builder {
                     HirType::Ref,
                 ))
             }
-            HirExpr::Var(HirBinding::Global(name)) => {
-                Ok(self.emit(InstKind::LoadGlobal(name.clone()), HirType::Dynamic))
-            }
-            HirExpr::Var(HirBinding::Upvalue(uv)) => {
-                Ok(self.emit(InstKind::LoadUpvalue(*uv), HirType::Dynamic))
-            }
-            HirExpr::Var(binding) => {
-                let var = binding_var(binding)?;
-                self.read_var(var, self.current)
-            }
+            HirExpr::Var(binding) => self.load_binding(binding),
             HirExpr::Call { callee, args, ty } => {
                 let c = self.lower_expr(callee)?;
                 let mut avs = Vec::with_capacity(args.len());
@@ -335,9 +326,8 @@ impl Builder {
             // clause `i = i + 1`): write the new SSA value and yield it.
             HirExpr::Assign { target, value } => match &**target {
                 HirAssignTarget::Var(binding) => {
-                    let var = binding_var(binding)?;
                     let v = self.lower_expr(value)?;
-                    self.write_var(var, self.current, v);
+                    self.store_binding(binding, v);
                     Ok(v)
                 }
                 HirAssignTarget::Member { object, name } => {
@@ -359,8 +349,7 @@ impl Builder {
             // the old).
             HirExpr::Update { target, op, prefix } => match &**target {
                 HirAssignTarget::Var(binding) => {
-                    let var = binding_var(binding)?;
-                    let old = self.read_var(var, self.current)?;
+                    let old = self.load_binding(binding)?;
                     let ty = self.values[old.0 as usize].ty;
                     let one = self.emit(InstKind::ConstInt(1), HirType::Int);
                     let bop = match op {
@@ -371,7 +360,7 @@ impl Builder {
                         InstKind::Binary { op: bop, lhs: old, rhs: one, ty },
                         ty,
                     );
-                    self.write_var(var, self.current, new);
+                    self.store_binding(binding, new);
                     Ok(if *prefix { new } else { old })
                 }
                 _ => Err(OptError::Unsupported("ssa: update target")),

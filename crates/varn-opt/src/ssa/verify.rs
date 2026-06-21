@@ -201,6 +201,8 @@ fn inst_uses(kind: &InstKind) -> Vec<Value> {
         InstKind::IterCall { callee, recv } => vec![*callee, *recv],
         InstKind::SuperCall { args } => args.clone(),
         InstKind::SuperMethodCall { args, .. } => args.clone(),
+        InstKind::StoreGlobal { value, .. } => vec![*value],
+        InstKind::StoreUpvalue { value, .. } => vec![*value],
         _ => Vec::new(),
     }
 }
