@@ -4,8 +4,8 @@ use std::rc::Rc;
 
 use crate::hir::{
     HirArrayEl, HirAssignTarget, HirBinOp, HirBinding, HirCaseTest, HirExpr, HirLogicalOp,
-    HirMatchCase, HirObjectProp, HirPropKey, HirTemplatePart, HirType, HirTypeTest, HirUnOp,
-    HirUpdateOp,
+    HirMatchCase, HirObjectProp, HirOptionalProperty, HirPropKey, HirTemplatePart, HirType,
+    HirTypeTest, HirUnOp, HirUpdateOp,
 };
 use crate::ssa::ir::{BlockId, InstKind, Terminator, Value};
 use crate::OptError;
@@ -189,6 +189,19 @@ impl Builder {
                     HirType::Dynamic,
                 ))
             }
+            // `object?.…` optional chaining → null-check branch + result phi:
+            // if `object` is null the chain yields it (short-circuit), else the
+            // property is applied.
+            HirExpr::OptionalChain { object, property } => {
+                let obj = self.lower_expr(object)?;
+                let isnull = self.emit(InstKind::IsNull { operand: obj }, HirType::Bool);
+                self.lower_branch_value(
+                    isnull,
+                    |_| Ok(obj),
+                    |s| s.apply_optional(obj, property),
+                    HirType::Dynamic,
+                )
+            }
             // Short-circuiting `&&`/`||`/`??` → branch + result phi.
             HirExpr::Logical { op, lhs, rhs } => {
                 let l = self.lower_expr(lhs)?;
@@ -362,6 +375,47 @@ impl Builder {
             },
             HirExpr::Match { subject, cases } => self.lower_match(subject, cases),
             _ => Err(OptError::Unsupported("ssa: expression kind")),
+        }
+    }
+
+    /// Apply an optional-chain property to a known-non-null `obj` (the else arm
+    /// of the null check). Member/index/module-slot reads and plain/method calls
+    /// map to the ordinary instructions; extension calls (which pass `obj` as the
+    /// receiver, not as a plain-call arg) fall back.
+    fn apply_optional(&mut self, obj: Value, property: &HirOptionalProperty) -> Result<Value> {
+        match property {
+            HirOptionalProperty::Member(name) => Ok(self.emit(
+                InstKind::GetPropertyMaybe { object: obj, name: name.clone() },
+                HirType::Dynamic,
+            )),
+            HirOptionalProperty::Index(index) => {
+                let i = self.lower_expr(index)?;
+                Ok(self.emit(InstKind::GetIndex { object: obj, index: i }, HirType::Dynamic))
+            }
+            HirOptionalProperty::ModuleSlot(slot) => Ok(self.emit(
+                InstKind::ModuleSlot { object: obj, slot: *slot },
+                HirType::Dynamic,
+            )),
+            HirOptionalProperty::Call(args) => {
+                let mut avs = Vec::with_capacity(args.len());
+                for a in args {
+                    avs.push(self.lower_expr(a)?);
+                }
+                Ok(self.emit(InstKind::Call { callee: obj, args: avs }, HirType::Dynamic))
+            }
+            HirOptionalProperty::MethodCall(name, args) => {
+                let mut avs = Vec::with_capacity(args.len());
+                for a in args {
+                    avs.push(self.lower_expr(a)?);
+                }
+                Ok(self.emit(
+                    InstKind::MethodCall { recv: obj, name: name.clone(), args: avs },
+                    HirType::Dynamic,
+                ))
+            }
+            HirOptionalProperty::Extension(_) | HirOptionalProperty::ExtensionCall(..) => {
+                Err(OptError::Unsupported("ssa: optional-chain extension call"))
+            }
         }
     }
 
