@@ -3,13 +3,14 @@
 use std::rc::Rc;
 
 use crate::hir::{
-    HirArrayEl, HirAssignTarget, HirBinOp, HirBinding, HirExpr, HirLogicalOp, HirObjectProp,
-    HirPropKey, HirTemplatePart, HirType, HirTypeTest, HirUnOp, HirUpdateOp,
+    HirArrayEl, HirAssignTarget, HirBinOp, HirBinding, HirCaseTest, HirExpr, HirLogicalOp,
+    HirMatchCase, HirObjectProp, HirPropKey, HirTemplatePart, HirType, HirTypeTest, HirUnOp,
+    HirUpdateOp,
 };
-use crate::ssa::ir::{InstKind, Terminator, Value};
+use crate::ssa::ir::{BlockId, InstKind, Terminator, Value};
 use crate::OptError;
 
-use super::{binding_var, Builder, Result};
+use super::{binding_var, Builder, Result, VarId};
 
 impl Builder {
     pub(super) fn lower_expr(&mut self, expr: &HirExpr) -> Result<Value> {
@@ -335,7 +336,137 @@ impl Builder {
                 }
                 _ => Err(OptError::Unsupported("ssa: update target")),
             },
+            HirExpr::Match { subject, cases } => self.lower_match(subject, cases),
             _ => Err(OptError::Unsupported("ssa: expression kind")),
+        }
+    }
+
+    /// `match subject { cases }` → a chain of pattern tests; each matching arm
+    /// evaluates its body + result and jumps to a merge block whose single
+    /// block parameter is the match value. Supports wildcard / literal / bind /
+    /// enum-variant patterns; record patterns and guards fall back.
+    fn lower_match(&mut self, subject: &HirExpr, cases: &[HirMatchCase]) -> Result<Value> {
+        let subj = self.lower_expr(subject)?;
+        let merge = self.new_block();
+        let mut chain_alive = true;
+        for case in cases {
+            if !chain_alive {
+                break; // a prior unconditional arm caught everything
+            }
+            if case.guard.is_some() {
+                return Err(OptError::Unsupported("ssa: match guard"));
+            }
+            let test_blk = self.current;
+            let body_b = self.new_block();
+            let next = self.emit_match_test(&case.test, subj, body_b, test_blk)?;
+            self.current = body_b;
+            self.bind_pattern(&case.test, subj);
+            self.lower_block(&case.body)?;
+            let rv = match &case.result {
+                Some(e) => self.lower_expr(e)?,
+                None => self.emit(InstKind::ConstNull, HirType::Dynamic),
+            };
+            if self.is_open() {
+                let from = self.current;
+                self.set_term(Terminator::Jump { target: merge, args: vec![rv] });
+                self.add_pred(merge, from);
+            }
+            match next {
+                Some(nb) => self.current = nb,
+                None => chain_alive = false,
+            }
+        }
+        if chain_alive {
+            // No arm matched → the match yields null.
+            let from = self.current;
+            let nullv = self.emit(InstKind::ConstNull, HirType::Dynamic);
+            self.set_term(Terminator::Jump { target: merge, args: vec![nullv] });
+            self.add_pred(merge, from);
+        }
+        self.seal_block(merge);
+        self.current = merge;
+        Ok(self.add_block_param(merge, HirType::Dynamic))
+    }
+
+    /// Emit a case's pattern test in `test_blk`: on a match, control reaches
+    /// `body_b`; on failure it reaches the returned next-test block (or `None`
+    /// for an unconditional pattern, which ends the chain). Bindings are done in
+    /// `bind_pattern` once `body_b` is current.
+    fn emit_match_test(
+        &mut self,
+        test: &HirCaseTest,
+        subj: Value,
+        body_b: BlockId,
+        test_blk: BlockId,
+    ) -> Result<Option<BlockId>> {
+        match test {
+            HirCaseTest::Wildcard | HirCaseTest::Bind(_) => {
+                self.set_term(Terminator::Jump { target: body_b, args: Vec::new() });
+                self.add_pred(body_b, test_blk);
+                self.seal_block(body_b);
+                Ok(None)
+            }
+            HirCaseTest::Literal(lit) => {
+                let litv = self.lower_expr(lit)?;
+                let eq = self.emit(
+                    InstKind::Binary { op: HirBinOp::Eq, lhs: subj, rhs: litv, ty: HirType::Dynamic },
+                    HirType::Bool,
+                );
+                Ok(Some(self.branch_to(eq, body_b, test_blk)))
+            }
+            HirCaseTest::EnumVariant { name, .. } => {
+                let tag = self.emit(
+                    InstKind::GetProperty { object: subj, name: Rc::from("__variant_name__") },
+                    HirType::Str,
+                );
+                let namev = self.emit(InstKind::ConstStr(name.clone()), HirType::Str);
+                let eq = self.emit(
+                    InstKind::Binary { op: HirBinOp::Eq, lhs: tag, rhs: namev, ty: HirType::Dynamic },
+                    HirType::Bool,
+                );
+                Ok(Some(self.branch_to(eq, body_b, test_blk)))
+            }
+            HirCaseTest::Record { .. } => Err(OptError::Unsupported("ssa: match record pattern")),
+        }
+    }
+
+    /// `branch cond, body_b, <fresh next>` from `test_blk`; returns the new next
+    /// block (sealed; the chain continues there).
+    fn branch_to(&mut self, cond: Value, body_b: BlockId, test_blk: BlockId) -> BlockId {
+        let next = self.new_block();
+        self.set_term(Terminator::Branch {
+            cond,
+            then_blk: body_b,
+            then_args: Vec::new(),
+            else_blk: next,
+            else_args: Vec::new(),
+        });
+        self.add_pred(body_b, test_blk);
+        self.add_pred(next, test_blk);
+        self.seal_block(body_b);
+        self.seal_block(next);
+        next
+    }
+
+    /// Bind a pattern's variables in the (current) body block: `Bind` copies the
+    /// subject; `EnumVariant` reads each `value{i}` payload.
+    fn bind_pattern(&mut self, test: &HirCaseTest, subj: Value) {
+        match test {
+            HirCaseTest::Bind(local) => {
+                self.write_var(VarId::Local(*local), self.current, subj);
+            }
+            HirCaseTest::EnumVariant { binds, .. } => {
+                for (i, b) in binds.iter().enumerate() {
+                    if let Some(local) = b {
+                        let pv = self.emit(
+                            InstKind::GetProperty { object: subj, name: Rc::from(format!("value{i}")) },
+                            HirType::Dynamic,
+                        );
+                        self.write_var(VarId::Local(*local), self.current, pv);
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }

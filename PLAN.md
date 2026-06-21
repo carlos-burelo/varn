@@ -205,24 +205,30 @@ Done (`ssa/build.rs`, `ssa/ir.rs`):
   loop phis via Braun (header unsealed during the body); `continue` re-runs the
   header. `for-await-of` falls back. Verified: sum/count over an array and over a
   `0..n` range → `60`/`4`/`10` identical with/without `VN_OPT_SSA`.
+- **`match` expr** — a chain of pattern tests; each matching arm evaluates its
+  body + result and jumps to a merge block whose single block param is the match
+  value (a result phi). Supports wildcard / literal (`Eq`) / bind / enum-variant
+  (`__variant_name__` compare + `value{i}` payload binds); record patterns and
+  guards fall back. Verified: enum-variant matching (`Circle(r)=>…`) + literal/
+  bind (`0=>…, x=>…`) → `300 16 0 zero one many` identical with/without `VN_OPT_SSA`.
 - **Trivial-phi removal** (`simplify_phis`): Braun's `tryRemoveTrivialPhi` as a
   fixpoint post-pass.
-- Tests (`ssa/tests.rs`, 37 — golden dumps + verifier): identity, const+binary,
+- Tests (`ssa/tests.rs`, 38 — golden dumps + verifier): identity, const+binary,
   reassign, one-/two-sided `if` phi, no-phi trivial removal, `while`/`for`/
   `do-while` carry, `break`/`continue`, nested-`if` merge, global call, self-call,
   member/index read, member/index write, method call, ternary, array/object
   literal, template, capture-free closure, intrinsic, non-null, sequence, decimal,
-  try-op, type-test, this, throw, range, for-in, switch, for-of.
+  try-op, type-test, this, throw, range, for-in, switch, for-of, match.
 
 **Pending** (the rest of §2's instruction set): closures **with upvalues**,
-`Super*`/extension calls, optional chaining, `match`/enum-construction, the
+`Super*`/extension calls, optional chaining, enum-construction, the
 `MakeClass`/enum *value* expressions, modules (import/export), await/spawn/yield —
 plus `try` control flow, so every §1 construct lowers to SSA.
 Until then `build_function` returns `Err(Unsupported)` and that function uses the
 `lower/` path. (Done: scalar exprs, control flow, loops, plain/self/method calls,
 member/index read+write, logical + conditional, array/object literals, templates,
 capture-free closures, intrinsics, `!`/sequence/`?.`-member/module-slot/decimal/
-bigint/regex, `expr?`/`is`, `this`, `throw`, `range`, `for-in`, `switch`, `for-of`; class **method
+bigint/regex, `expr?`/`is`, `this`, `throw`, `range`, `for-in`, `switch`, `for-of`, `match`; class **method
 bodies** SSA-compile.)
 
 > Closures with upvalues need captured locals to keep a stable register across
