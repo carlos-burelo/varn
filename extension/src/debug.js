@@ -193,7 +193,7 @@ class VarnDebugConfigProvider {
     resolveDebugConfiguration(_folder, config) {
         if (!config.type && !config.request && !config.name) {
             const editor = vscode.window.activeTextEditor;
-            if (editor && editor.document.languageId === "Varn") {
+            if (editor && editor.document.languageId === "varn") {
                 return {
                     type:        "Varn",
                     request:     "launch",

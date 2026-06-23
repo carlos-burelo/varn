@@ -17,7 +17,7 @@ function createClient(binaryPath, outputChannel, args = []) {
     };
     
     const clientOptions = {
-        documentSelector: [{ scheme: "file", language: "Varn" }],
+        documentSelector: [{ scheme: "file", language: "varn" }],
         synchronize: {
             fileEvents: vscode.workspace.createFileSystemWatcher("**/*.vn"),
         },

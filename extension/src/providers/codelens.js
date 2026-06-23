@@ -3,7 +3,7 @@
 const vscode = require("vscode");
 
 function registerVarnCodeLensProvider() {
-    const selector = { language: "Varn", scheme: "file" };
+    const selector = { language: "varn", scheme: "file" };
     return vscode.languages.registerCodeLensProvider(selector, {
         provideCodeLenses(document) {
             const cfg = vscode.workspace.getConfiguration("Varn");

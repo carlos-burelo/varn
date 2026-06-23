@@ -24,6 +24,7 @@
 		{ "include": "#constant" },
 		{ "include": "#declaration" },
 		{ "include": "#type-annotation" },
+		{ "include": "#member-access" },
 		{ "include": "#primitive-type" },
 		{ "include": "#keyword" },
 		{ "include": "#operator" }
@@ -173,6 +174,11 @@
 					}
 				}
 			]
+		},
+		"member-access": {
+			"comment": "Colors the member name after a dot (e.g. spread.length). Mainly for member hovers; semantic tokens override this in the editor.",
+			"match": "(?<=\\.)([_$[:alpha:]][_$[:alnum:]]*)",
+			"name": "variable.other.property.vn"
 		},
 		"primitive-type": {
 			"name": "support.type.primitive.vn",
