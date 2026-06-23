@@ -1,4 +1,5 @@
 syntaxes/TypeScript.tmLanguage.json
+syntaxes/vn.tmLanguage.full.backup.json
 pnpm-lock.yaml
 **/*.ts
 !extension.js
