@@ -35,11 +35,19 @@ impl DocumentState {
             if let Some(sid) = info.symbol_id {
                 if sid < self.db.arena.len() {
                     let sym = self.db.arena.get(sid);
-                    
-                    let is_member_kind = matches!(
-                        sym.kind,
-                        SymbolKind::Property | SymbolKind::Method | SymbolKind::EnumMember
-                    );
+
+                    // The symbol_id from expr_types can be desynced from `arena`
+                    // (stdlib symbols shift the id space), so `arena.get(sid)` may
+                    // return an unrelated symbol — e.g. resolving `this.val` to
+                    // `RangeError.stack`. Only trust it when its name matches the
+                    // token; otherwise fall through to type-based resolution.
+                    let sid_matches = sym.name.as_ref() == tok.lexeme.as_str();
+
+                    let is_member_kind = sid_matches
+                        && matches!(
+                            sym.kind,
+                            SymbolKind::Property | SymbolKind::Method | SymbolKind::EnumMember
+                        );
 
                     // Check whether this token follows a dot (member access position)
                     let tok_idx_opt = self.tokens.iter().position(|t| t.offset == tok.offset);
@@ -51,11 +59,21 @@ impl DocumentState {
                     }).unwrap_or(false);
 
                     if is_member_kind {
-                        // Find the class or interface that contains this member
+                        // Find the class/interface that contains this member. The
+                        // member predicate must also match the token name: member
+                        // symbol_ids collide across stdlib/user symbols (e.g. sid 49
+                        // is both RangeError.stack and Container.val), so an id-only
+                        // match resolves `this.val` to `RangeError.stack`.
+                        let name = tok.lexeme.as_str();
+                        let member_pred = |m: &&MemberRecord| {
+                            m.name.as_str() == name
+                                && (m.symbol_id == Some(sid)
+                                    || (m.line == sym.line && m.col == sym.col))
+                        };
                         if let Some(s) = self.symbols.iter().find(|s| {
-                            s.members.iter().any(|m| m.symbol_id == Some(sid) || (m.line == sym.line && m.col == sym.col))
+                            s.members.iter().any(|m| member_pred(&m))
                         }) {
-                            let member = s.members.iter().find(|m| m.symbol_id == Some(sid) || (m.line == sym.line && m.col == sym.col)).unwrap();
+                            let member = s.members.iter().find(member_pred).unwrap();
                             return Some(ChainResult::Member {
                                 member,
                                 parent_name: s.name.clone(),
@@ -140,9 +158,13 @@ impl DocumentState {
                         }
                     }
 
-                    // Not a member access — look up as a top-level symbol
-                    if let Some(s) = self.symbols.iter().find(|s| s.symbol_id == Some(sid) || (s.line == sym.line && s.col == sym.col)) {
-                        return Some(ChainResult::Symbol(s));
+                    // Not a member access — look up as a top-level symbol (only when
+                    // the id is trustworthy; a desynced sym.line/col would match the
+                    // wrong symbol).
+                    if sid_matches {
+                        if let Some(s) = self.symbols.iter().find(|s| s.symbol_id == Some(sid) || (s.line == sym.line && s.col == sym.col)) {
+                            return Some(ChainResult::Symbol(s));
+                        }
                     }
                 }
             } else {
@@ -221,13 +243,17 @@ impl DocumentState {
                 && col < t.col + t.length
         })?;
 
-        // 1. Look up token in expr_types to see if it's a known member
+        // 1. Look up token in expr_types to see if it's a known member. Match the
+        // token name too: member symbol_ids collide across stdlib/user symbols.
         if let Some(info) = self.db.expr_types.get(&tok.offset) {
             if let Some(sid) = info.symbol_id {
-                if let Some(s) = self.symbols.iter().find(|s| {
-                    s.members.iter().any(|m| m.symbol_id == Some(sid) || (m.line == tok.line && m.col == tok.col))
-                }) {
-                    let member = s.members.iter().find(|m| m.symbol_id == Some(sid) || (m.line == tok.line && m.col == tok.col)).unwrap();
+                let name = tok.lexeme.as_str();
+                let member_pred = |m: &&MemberRecord| {
+                    m.name.as_str() == name
+                        && (m.symbol_id == Some(sid) || (m.line == tok.line && m.col == tok.col))
+                };
+                if let Some(s) = self.symbols.iter().find(|s| s.members.iter().any(|m| member_pred(&m))) {
+                    let member = s.members.iter().find(member_pred).unwrap();
                     return Some((s.name.clone(), s.kind, member));
                 }
             }
