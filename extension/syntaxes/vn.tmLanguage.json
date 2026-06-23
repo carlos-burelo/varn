@@ -9,6 +9,9 @@
 	"scopeName": "source.vn",
 	"patterns": [
 		{
+			"include": "#varn-builtin-types"
+		},
+		{
 			"include": "#directives"
 		},
 		{
@@ -19,6 +22,10 @@
 		}
 	],
 	"repository": {
+		"varn-builtin-types": {
+			"match": "(?<![._$[:alnum:]])(int|str|bool|float|decimal|bigint|char|void|dynamic|symbol|never|any|unknown)(?![_$[:alnum:]])",
+			"name": "support.type.primitive.vn"
+		},
 		"shebang": {
 			"name": "comment.line.shebang.vn",
 			"match": "\\A(#!).*(?=$)",
@@ -202,6 +209,9 @@
 			"patterns": [
 				{
 					"include": "#expressionWithoutIdentifiers"
+				},
+				{
+					"include": "#varn-builtin-types"
 				},
 				{
 					"include": "#identifiers"
