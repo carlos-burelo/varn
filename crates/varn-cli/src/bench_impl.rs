@@ -170,8 +170,8 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     let compile_samples = time_n(runs, || {
         // start compile timer
         timers.compile.start();
-        varn_compiler::codegen::regalloc_post::OPTIMIZE_TIME.with(|t| t.set(Duration::ZERO));
-        varn_compiler::codegen::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(true));
+        varn_backend::regalloc_post::OPTIMIZE_TIME.with(|t| t.set(Duration::ZERO));
+        varn_backend::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(true));
 
         let exports = varn_checker::module_resolver::resolve_module_exports_ref(
             &program_ref.filename,
@@ -195,8 +195,8 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         // stop compile timer
         timers.compile.stop();
         // record optimize time separately
-        varn_compiler::codegen::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(false));
-        let opt_dur = varn_compiler::codegen::regalloc_post::OPTIMIZE_TIME.with(|t| t.get());
+        varn_backend::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(false));
+        let opt_dur = varn_backend::regalloc_post::OPTIMIZE_TIME.with(|t| t.get());
         optimize_samples.borrow_mut().push(opt_dur);
 
         res.map(|_| ())
