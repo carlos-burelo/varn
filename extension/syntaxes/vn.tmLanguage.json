@@ -1,45 +1,45 @@
 {
 	"information_for_contributors": [
-		"Lexer-safe grammar for Varn, tuned for two jobs:",
-		"1. Editor fallback: in a live .vn buffer the varn-lsp semantic tokens provider is",
-		"   authoritative and OVERRIDES this grammar for every identifier it classifies.",
-		"   So the rules here only surface before the LSP responds or in error states.",
-		"2. Hover / markdown rendering: VSCode renders hover signatures as ```Varn code",
-		"   fences. Semantic tokens NEVER apply inside hover markdown, so this grammar is",
-		"   the ONLY thing that colors them. The declaration/type rules below exist mainly",
-		"   to make those hover signatures readable.",
-		"Rules are deterministic and keyword/colon-anchored. Do NOT add speculative",
-		"heuristics (arrow-fn detection, var-expr, destructuring, regex, decorator-as-",
-		"expression, JSX): those produced the bad inferences this grammar replaced. The",
-		"original TypeScript-derived grammar is preserved at vn.tmLanguage.full.backup.json.",
-		"Keyword/type sets are derived from varn-core TokenKind, not TypeScript."
+		"Hand-written, expressive grammar for Varn. Organized as small, single-purpose",
+		"repository rules composed via includes (scalable), using deterministic begin/end",
+		"contexts and keyword/':'/'<'/'.'-anchored matches. It intentionally avoids the",
+		"speculative look-ahead heuristics (arrow-fn detection, var-expr state machines)",
+		"that made the old TypeScript-derived grammar mis-classify tokens.",
+		"",
+		"In a live .vn buffer the varn-lsp semantic tokens provider is authoritative and",
+		"overrides this grammar for identifiers it classifies. This grammar is what colors",
+		"hover signatures (rendered as ```Varn fences, where semantic tokens never apply)",
+		"and the brief window before the LSP responds. Keyword/type sets come from",
+		"varn-core TokenKind. The previous grammar is preserved at vn.tmLanguage.full.backup.json."
 	],
 	"name": "Varn",
 	"scopeName": "source.vn",
 	"patterns": [
 		{ "include": "#comment" },
 		{ "include": "#shebang" },
-		{ "include": "#string" },
-		{ "include": "#number" },
-		{ "include": "#constant" },
-		{ "include": "#declaration" },
-		{ "include": "#type-annotation" },
-		{ "include": "#member-access" },
-		{ "include": "#primitive-type" },
-		{ "include": "#keyword" },
-		{ "include": "#operator" }
+		{ "include": "#hover-label" },
+		{ "include": "#import-declaration" },
+		{ "include": "#export-modifier" },
+		{ "include": "#decorator" },
+		{ "include": "#function-declaration" },
+		{ "include": "#class-declaration" },
+		{ "include": "#type-alias" },
+		{ "include": "#variable-declaration" },
+		{ "include": "#expression" }
 	],
 	"repository": {
 		"shebang": {
 			"name": "comment.line.shebang.vn",
 			"match": "\\A#!.*$"
 		},
+
 		"comment": {
 			"patterns": [
 				{
 					"name": "comment.block.documentation.vn",
 					"begin": "/\\*\\*",
-					"end": "\\*/"
+					"end": "\\*/",
+					"patterns": [ { "include": "#comment-tag" } ]
 				},
 				{
 					"name": "comment.block.vn",
@@ -49,10 +49,310 @@
 				{
 					"name": "comment.line.double-slash.vn",
 					"begin": "//",
-					"end": "(?=$)"
+					"end": "(?=$)",
+					"patterns": [ { "include": "#comment-tag" } ]
 				}
 			]
 		},
+		"comment-tag": {
+			"match": "\\b(TODO|FIXME|HACK|NOTE|XXX|BUG)\\b",
+			"name": "keyword.codetag.notation.vn"
+		},
+
+		"hover-label": {
+			"comment": "Pseudo-labels emitted only in LSP hover signatures, e.g. (property), (method). Rendered muted like an annotation.",
+			"match": "(\\()(type parameter|enum member|property|method|param|this|getter|setter|constructor|namespace|interface|struct|class|enum|var|prop)(\\))",
+			"captures": {
+				"1": { "name": "punctuation.definition.label.vn" },
+				"2": { "name": "comment.label.hover.vn" },
+				"3": { "name": "punctuation.definition.label.vn" }
+			}
+		},
+
+		"import-declaration": {
+			"begin": "(?<![._$[:alnum:]])(import)(?![_$[:alnum:]])",
+			"beginCaptures": {
+				"1": { "name": "keyword.control.import.vn" }
+			},
+			"end": "(?=;)|$",
+			"patterns": [
+				{ "include": "#comment" },
+				{ "include": "#string" },
+				{
+					"match": "(?<![._$[:alnum:]])(from|as)(?![_$[:alnum:]])",
+					"name": "keyword.control.import.vn"
+				},
+				{ "match": "\\*", "name": "variable.language.wildcard.vn" },
+				{ "match": "[_$[:alpha:]][_$[:alnum:]]*", "name": "variable.other.readwrite.alias.vn" },
+				{ "include": "#punctuation" }
+			]
+		},
+
+		"export-modifier": {
+			"match": "(?<![._$[:alnum:]])(export)(?![_$[:alnum:]])",
+			"name": "keyword.control.export.vn"
+		},
+
+		"decorator": {
+			"match": "(@)([_$[:alpha:]][_$[:alnum:]]*)",
+			"captures": {
+				"1": { "name": "punctuation.decorator.vn" },
+				"2": { "name": "entity.name.function.decorator.vn" }
+			}
+		},
+
+		"function-declaration": {
+			"name": "meta.function.declaration.vn",
+			"begin": "(?<![._$[:alnum:]])(function|method)(?![_$[:alnum:]])(?:\\s+([_$[:alpha:]][_$[:alnum:]]*))?",
+			"beginCaptures": {
+				"1": { "name": "storage.type.function.vn" },
+				"2": { "name": "entity.name.function.vn" }
+			},
+			"end": "(?=[{;])|(?=$)",
+			"patterns": [
+				{ "include": "#comment" },
+				{ "include": "#generic-arguments" },
+				{ "include": "#parameter-list" },
+				{ "include": "#type-annotation" }
+			]
+		},
+
+		"class-declaration": {
+			"name": "meta.class.declaration.vn",
+			"begin": "(?<![._$[:alnum:]])(class|struct|interface|enum|namespace|module|extension)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
+			"beginCaptures": {
+				"1": { "name": "storage.type.vn" },
+				"2": { "name": "entity.name.type.vn" }
+			},
+			"end": "(?<=\\})|(?=[;])",
+			"patterns": [
+				{ "include": "#comment" },
+				{ "include": "#generic-arguments" },
+				{ "include": "#heritage" },
+				{ "include": "#class-body" }
+			]
+		},
+
+		"heritage": {
+			"begin": "(?<![._$[:alnum:]])(extends|implements|on)(?![_$[:alnum:]])",
+			"beginCaptures": {
+				"1": { "name": "storage.modifier.vn" }
+			},
+			"end": "(?=[{=;])|$",
+			"patterns": [ { "include": "#type" } ]
+		},
+
+		"class-body": {
+			"begin": "\\{",
+			"beginCaptures": {
+				"0": { "name": "punctuation.section.class-body.begin.vn" }
+			},
+			"end": "\\}",
+			"endCaptures": {
+				"0": { "name": "punctuation.section.class-body.end.vn" }
+			},
+			"patterns": [
+				{ "include": "#comment" },
+				{ "include": "#decorator" },
+				{ "include": "#storage-modifier" },
+				{ "include": "#method-declaration" },
+				{ "include": "#property-declaration" },
+				{ "include": "#type-annotation" },
+				{ "include": "#block" },
+				{ "include": "#expression" }
+			]
+		},
+
+		"method-declaration": {
+			"name": "meta.method.declaration.vn",
+			"begin": "([_$[:alpha:]][_$[:alnum:]]*)\\s*(?=[(<])",
+			"beginCaptures": {
+				"1": { "name": "entity.name.function.vn" }
+			},
+			"end": "(?=[{;,])|(?=$)",
+			"patterns": [
+				{ "include": "#comment" },
+				{ "include": "#generic-arguments" },
+				{ "include": "#parameter-list" },
+				{ "include": "#type-annotation" }
+			]
+		},
+
+		"property-declaration": {
+			"match": "([_$[:alpha:]][_$[:alnum:]]*)\\s*(\\?)?\\s*(?=:)",
+			"captures": {
+				"1": { "name": "variable.other.property.vn" },
+				"2": { "name": "keyword.operator.optional.vn" }
+			}
+		},
+
+		"block": {
+			"begin": "\\{",
+			"beginCaptures": { "0": { "name": "punctuation.section.block.begin.vn" } },
+			"end": "\\}",
+			"endCaptures": { "0": { "name": "punctuation.section.block.end.vn" } },
+			"patterns": [
+				{ "include": "#block-statements" }
+			]
+		},
+		"block-statements": {
+			"patterns": [
+				{ "include": "#comment" },
+				{ "include": "#function-declaration" },
+				{ "include": "#class-declaration" },
+				{ "include": "#type-alias" },
+				{ "include": "#variable-declaration" },
+				{ "include": "#block" },
+				{ "include": "#expression" }
+			]
+		},
+
+		"type-alias": {
+			"begin": "(?<![._$[:alnum:]])(type)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)\\s*(=)",
+			"beginCaptures": {
+				"1": { "name": "storage.type.vn" },
+				"2": { "name": "entity.name.type.vn" },
+				"3": { "name": "keyword.operator.assignment.vn" }
+			},
+			"end": "(?=[;])|$",
+			"patterns": [ { "include": "#type" } ]
+		},
+
+		"variable-declaration": {
+			"patterns": [
+				{
+					"match": "(?<![._$[:alnum:]])(const)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
+					"captures": {
+						"1": { "name": "storage.type.vn" },
+						"2": { "name": "variable.other.constant.vn" }
+					}
+				},
+				{
+					"match": "(?<![._$[:alnum:]])(let|var|prop)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
+					"captures": {
+						"1": { "name": "storage.type.vn" },
+						"2": { "name": "variable.other.readwrite.vn" }
+					}
+				}
+			]
+		},
+
+		"parameter-list": {
+			"begin": "\\(",
+			"beginCaptures": {
+				"0": { "name": "punctuation.definition.parameters.begin.vn" }
+			},
+			"end": "\\)",
+			"endCaptures": {
+				"0": { "name": "punctuation.definition.parameters.end.vn" }
+			},
+			"patterns": [
+				{ "include": "#comment" },
+				{ "include": "#decorator" },
+				{ "include": "#storage-modifier" },
+				{
+					"match": "([_$[:alpha:]][_$[:alnum:]]*)\\s*(\\?)?\\s*(?=:)",
+					"captures": {
+						"1": { "name": "variable.parameter.vn" },
+						"2": { "name": "keyword.operator.optional.vn" }
+					}
+				},
+				{
+					"match": "([_$[:alpha:]][_$[:alnum:]]*)\\s*(?=[,)])",
+					"name": "variable.parameter.vn"
+				},
+				{ "include": "#type-annotation" },
+				{ "include": "#constant" },
+				{ "include": "#string" },
+				{ "include": "#number" },
+				{ "include": "#operator" },
+				{ "include": "#punctuation" }
+			]
+		},
+
+		"type-annotation": {
+			"begin": "(:)",
+			"beginCaptures": {
+				"1": { "name": "punctuation.separator.annotation.vn" }
+			},
+			"end": "(?=[,)=;{}\\]]|=>|$)",
+			"patterns": [ { "include": "#type" } ]
+		},
+
+		"type": {
+			"patterns": [
+				{ "include": "#comment" },
+				{ "include": "#builtin-type" },
+				{ "include": "#generic-arguments" },
+				{ "match": "\\|", "name": "keyword.operator.type.union.vn" },
+				{ "match": "&", "name": "keyword.operator.type.intersection.vn" },
+				{ "match": "\\?", "name": "keyword.operator.type.optional.vn" },
+				{ "match": "\\[\\]", "name": "punctuation.definition.array.vn" },
+				{ "match": "=>", "name": "keyword.operator.type.arrow.vn" },
+				{ "match": "(?<![._$[:alnum:]])(void|null)(?![_$[:alnum:]])", "name": "support.type.primitive.vn" },
+				{ "match": "[_$[:alpha:]][_$[:alnum:]]*", "name": "entity.name.type.vn" },
+				{ "match": "[(),.]", "name": "punctuation.type.vn" }
+			]
+		},
+
+		"generic-arguments": {
+			"begin": "(?<=[_$[:alnum:]])(<)(?=[_$[:alpha:](\\[])",
+			"beginCaptures": {
+				"1": { "name": "punctuation.definition.typeparameters.begin.vn" }
+			},
+			"end": ">",
+			"endCaptures": {
+				"0": { "name": "punctuation.definition.typeparameters.end.vn" }
+			},
+			"patterns": [
+				{ "include": "#type" },
+				{ "include": "#punctuation-comma" }
+			]
+		},
+
+		"builtin-type": {
+			"name": "support.type.primitive.vn",
+			"match": "(?<![._$[:alnum:]])(int|str|bool|float|decimal|bigint|char|void|dynamic|symbol|never|Object|Task|Result|Array)(?![_$[:alnum:]])"
+		},
+
+		"control-keyword": {
+			"name": "keyword.control.vn",
+			"match": "(?<![._$[:alnum:]])(if|else|switch|case|default|while|for|do|break|continue|return|throw|try|catch|finally|with|match|yield|await)(?![_$[:alnum:]])"
+		},
+
+		"storage-modifier": {
+			"name": "storage.modifier.vn",
+			"match": "(?<![._$[:alnum:]])(public|private|protected|static|abstract|override|readonly|declare|native|async|get|set)(?![_$[:alnum:]])"
+		},
+
+		"concurrency-keyword": {
+			"name": "keyword.control.concurrency.vn",
+			"match": "(?<![._$[:alnum:]])(spawn|parallel|start|using)(?![_$[:alnum:]])"
+		},
+
+		"new-expression": {
+			"match": "(?<![._$[:alnum:]])(new)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
+			"captures": {
+				"1": { "name": "keyword.operator.new.vn" },
+				"2": { "name": "entity.name.type.vn" }
+			}
+		},
+
+		"word-operator": {
+			"name": "keyword.operator.expression.vn",
+			"match": "(?<![._$[:alnum:]])(typeof|instanceof|in|of|is|delete)(?![_$[:alnum:]])"
+		},
+
+		"variable-language": {
+			"name": "variable.language.vn",
+			"match": "(?<![._$[:alnum:]])(this|super)(?![_$[:alnum:]])"
+		},
+
+		"constant": {
+			"name": "constant.language.vn",
+			"match": "(?<![._$[:alnum:]])(true|false|null)(?![_$[:alnum:]])"
+		},
+
 		"string": {
 			"patterns": [
 				{
@@ -92,166 +392,90 @@
 			"endCaptures": {
 				"0": { "name": "punctuation.definition.template-expression.end.vn" }
 			},
-			"patterns": [
-				{ "include": "#comment" },
-				{ "include": "#string" },
-				{ "include": "#number" },
-				{ "include": "#constant" },
-				{ "include": "#primitive-type" },
-				{ "include": "#keyword" },
-				{ "include": "#operator" }
-			]
+			"patterns": [ { "include": "#expression" } ]
 		},
+
 		"number": {
 			"patterns": [
-				{
-					"name": "constant.numeric.hex.vn",
-					"match": "\\b0[xX][0-9a-fA-F_]+n?\\b"
-				},
-				{
-					"name": "constant.numeric.octal.vn",
-					"match": "\\b0[oO][0-7_]+n?\\b"
-				},
-				{
-					"name": "constant.numeric.binary.vn",
-					"match": "\\b0[bB][01_]+n?\\b"
-				},
-				{
-					"name": "constant.numeric.decimal.vn",
-					"match": "\\b[0-9][0-9_]*(\\.[0-9_]+)?([eE][+-]?[0-9_]+)?[nm]?\\b"
-				}
+				{ "name": "constant.numeric.hex.vn", "match": "\\b0[xX][0-9a-fA-F_]+n?\\b" },
+				{ "name": "constant.numeric.octal.vn", "match": "\\b0[oO][0-7_]+n?\\b" },
+				{ "name": "constant.numeric.binary.vn", "match": "\\b0[bB][01_]+n?\\b" },
+				{ "name": "constant.numeric.decimal.vn", "match": "\\b[0-9][0-9_]*(\\.[0-9_]+)?([eE][+-]?[0-9_]+)?[nm]?\\b" }
 			]
 		},
-		"constant": {
-			"name": "constant.language.vn",
-			"match": "(?<![._$[:alnum:]])(true|false|null)(?![_$[:alnum:]])"
+
+		"method-call": {
+			"match": "(?<=\\.)\\s*([_$[:alpha:]][_$[:alnum:]]*)\\s*(?=[(<])",
+			"name": "entity.name.function.member.vn"
 		},
-		"declaration": {
-			"patterns": [
-				{
-					"match": "(?<![._$[:alnum:]])(function|method)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
-					"captures": {
-						"1": { "name": "storage.type.vn" },
-						"2": { "name": "entity.name.function.vn" }
-					}
-				},
-				{
-					"match": "(?<![._$[:alnum:]])(class|struct|interface|enum|namespace|module|extension|type)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
-					"captures": {
-						"1": { "name": "storage.type.vn" },
-						"2": { "name": "entity.name.type.vn" }
-					}
-				},
-				{
-					"match": "(?<![._$[:alnum:]])(const|let|var|prop)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
-					"captures": {
-						"1": { "name": "storage.type.vn" },
-						"2": { "name": "variable.other.vn" }
-					}
-				},
-				{
-					"match": "(?<![._$[:alnum:]])(get|set)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
-					"captures": {
-						"1": { "name": "storage.type.vn" },
-						"2": { "name": "entity.name.function.vn" }
-					}
-				}
-			]
-		},
-		"type-annotation": {
-			"patterns": [
-				{
-					"match": "(?<![._$[:alnum:]])(on|extends|implements)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
-					"captures": {
-						"1": { "name": "storage.modifier.vn" },
-						"2": { "name": "entity.name.type.vn" }
-					}
-				},
-				{
-					"match": "(:)\\s*([_$[:alpha:]][_$[:alnum:]]*)",
-					"captures": {
-						"2": { "name": "entity.name.type.vn" }
-					}
-				}
-			]
-		},
+
 		"member-access": {
-			"comment": "Colors the member name after a dot (e.g. spread.length). Mainly for member hovers; semantic tokens override this in the editor.",
-			"match": "(?<=\\.)([_$[:alpha:]][_$[:alnum:]]*)",
+			"match": "(?<=\\.)\\s*([_$[:alpha:]][_$[:alnum:]]*)",
 			"name": "variable.other.property.vn"
 		},
-		"primitive-type": {
-			"name": "support.type.primitive.vn",
-			"match": "(?<![._$[:alnum:]])(int|str|bool|float|decimal|bigint|char|void|dynamic|symbol|never|Object|Task|Result|Array)(?![_$[:alnum:]])"
+
+		"function-call": {
+			"match": "([_$[:alpha:]][_$[:alnum:]]*)\\s*(?=[(<])",
+			"name": "entity.name.function.call.vn"
 		},
-		"keyword": {
+
+		"type-name-reference": {
+			"comment": "Capitalized identifier used as a value (class/enum referenced as a value, e.g. Direction.North). Dotted members handled earlier.",
+			"match": "(?<![._$[:alnum:]])([[:upper:]][_$[:alnum:]]*)(?![_$[:alnum:]])",
+			"name": "entity.name.type.vn"
+		},
+
+		"expression": {
 			"patterns": [
-				{
-					"name": "keyword.control.vn",
-					"match": "(?<![._$[:alnum:]])(if|else|switch|case|default|while|for|do|break|continue|return|throw|try|catch|finally|with|match|yield|await)(?![_$[:alnum:]])"
-				},
-				{
-					"name": "keyword.control.import.vn",
-					"match": "(?<![._$[:alnum:]])(import|export|from|as)(?![_$[:alnum:]])"
-				},
-				{
-					"name": "keyword.control.concurrency.vn",
-					"match": "(?<![._$[:alnum:]])(spawn|parallel|start|using)(?![_$[:alnum:]])"
-				},
-				{
-					"name": "storage.type.vn",
-					"match": "(?<![._$[:alnum:]])(let|const|var|function|class|struct|interface|type|enum|namespace|module|extension|constructor|destructor|get|set)(?![_$[:alnum:]])"
-				},
-				{
-					"name": "storage.modifier.vn",
-					"match": "(?<![._$[:alnum:]])(public|private|protected|static|abstract|override|readonly|declare|native|async|extends|implements|on)(?![_$[:alnum:]])"
-				},
-				{
-					"name": "keyword.operator.expression.vn",
-					"match": "(?<![._$[:alnum:]])(typeof|instanceof|in|of|is|new|delete)(?![_$[:alnum:]])"
-				},
-				{
-					"name": "variable.language.vn",
-					"match": "(?<![._$[:alnum:]])(this|super)(?![_$[:alnum:]])"
-				}
+				{ "include": "#comment" },
+				{ "include": "#decorator" },
+				{ "include": "#new-expression" },
+				{ "include": "#word-operator" },
+				{ "include": "#concurrency-keyword" },
+				{ "include": "#control-keyword" },
+				{ "include": "#storage-modifier" },
+				{ "include": "#variable-language" },
+				{ "include": "#constant" },
+				{ "include": "#string" },
+				{ "include": "#number" },
+				{ "include": "#generic-arguments" },
+				{ "include": "#method-call" },
+				{ "include": "#member-access" },
+				{ "include": "#function-call" },
+				{ "include": "#builtin-type" },
+				{ "include": "#type-name-reference" },
+				{ "include": "#operator" },
+				{ "include": "#punctuation" }
 			]
 		},
+
 		"operator": {
-			"comment": "Specific sub-scopes are required: themes (e.g. One Dark Pro) color keyword.operator.{arithmetic,comparison,relational,logical,bitwise,assignment} but leave the bare keyword.operator at foreground. Ordered longest-first; rules are tried top-down.",
 			"patterns": [
-				{
-					"name": "keyword.operator.arrow.vn",
-					"match": "=>|->|\\|>"
-				},
-				{
-					"name": "keyword.operator.range.vn",
-					"match": "\\.\\.\\.|\\.\\.=|\\.\\."
-				},
-				{
-					"name": "keyword.operator.comparison.vn",
-					"match": "===|!==|==|!=|<=|>="
-				},
-				{
-					"name": "keyword.operator.assignment.vn",
-					"match": ">>>=|<<=|>>=|\\*\\*=|&&=|\\|\\|=|\\?\\?=|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|="
-				},
-				{
-					"name": "keyword.operator.arithmetic.vn",
-					"match": "\\+\\+|--|\\*\\*|\\+|-|\\*|/|%"
-				},
-				{
-					"name": "keyword.operator.logical.vn",
-					"match": "&&|\\|\\||!"
-				},
-				{
-					"name": "keyword.operator.bitwise.vn",
-					"match": "<<|>>>|>>|&|\\||\\^|~|<|>"
-				},
-				{
-					"name": "keyword.operator.ternary.vn",
-					"match": "\\?\\?|\\?\\.|\\?"
-				}
+				{ "name": "keyword.operator.arrow.vn", "match": "=>|->|\\|>" },
+				{ "name": "keyword.operator.range.vn", "match": "\\.\\.\\.|\\.\\.=|\\.\\." },
+				{ "name": "keyword.operator.comparison.vn", "match": "===|!==|==|!=|<=|>=" },
+				{ "name": "keyword.operator.assignment.vn", "match": ">>>=|<<=|>>=|\\*\\*=|&&=|\\|\\|=|\\?\\?=|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|=" },
+				{ "name": "keyword.operator.arithmetic.vn", "match": "\\+\\+|--|\\*\\*|\\+|-|\\*|/|%" },
+				{ "name": "keyword.operator.logical.vn", "match": "&&|\\|\\||!" },
+				{ "name": "keyword.operator.bitwise.vn", "match": "<<|>>>|>>|&|\\||\\^|~|<|>" },
+				{ "name": "keyword.operator.ternary.vn", "match": "\\?\\?|\\?\\.|\\?" }
 			]
+		},
+
+		"punctuation": {
+			"patterns": [
+				{ "name": "punctuation.accessor.vn", "match": "\\?\\.|\\." },
+				{ "name": "punctuation.terminator.statement.vn", "match": ";" },
+				{ "name": "punctuation.separator.comma.vn", "match": "," },
+				{ "name": "punctuation.section.braces.vn", "match": "[{}]" },
+				{ "name": "punctuation.section.brackets.vn", "match": "[\\[\\]]" },
+				{ "name": "punctuation.section.parens.vn", "match": "[()]" }
+			]
+		},
+
+		"punctuation-comma": {
+			"name": "punctuation.separator.comma.vn",
+			"match": ","
 		}
 	}
 }
