@@ -24,6 +24,7 @@
 		{ "include": "#function-declaration" },
 		{ "include": "#class-declaration" },
 		{ "include": "#type-alias" },
+		{ "include": "#destructuring-declaration" },
 		{ "include": "#variable-declaration" },
 		{ "include": "#expression" }
 	],
@@ -201,9 +202,63 @@
 				{ "include": "#function-declaration" },
 				{ "include": "#class-declaration" },
 				{ "include": "#type-alias" },
+				{ "include": "#destructuring-declaration" },
 				{ "include": "#variable-declaration" },
 				{ "include": "#block" },
 				{ "include": "#expression" }
+			]
+		},
+
+		"destructuring-declaration": {
+			"name": "meta.binding.destructuring.vn",
+			"begin": "(?<![._$[:alnum:]])(const|let|var)(?![_$[:alnum:]])(?=\\s*[{\\[])",
+			"beginCaptures": {
+				"1": { "name": "storage.type.vn" }
+			},
+			"end": "(?<=[}\\]])",
+			"patterns": [ { "include": "#binding-pattern" } ]
+		},
+		"binding-pattern": {
+			"patterns": [
+				{ "include": "#comment" },
+				{
+					"name": "meta.binding.object.vn",
+					"begin": "\\{",
+					"beginCaptures": { "0": { "name": "punctuation.definition.binding.begin.vn" } },
+					"end": "\\}",
+					"endCaptures": { "0": { "name": "punctuation.definition.binding.end.vn" } },
+					"patterns": [ { "include": "#binding-contents" } ]
+				},
+				{
+					"name": "meta.binding.array.vn",
+					"begin": "\\[",
+					"beginCaptures": { "0": { "name": "punctuation.definition.binding.begin.vn" } },
+					"end": "\\]",
+					"endCaptures": { "0": { "name": "punctuation.definition.binding.end.vn" } },
+					"patterns": [ { "include": "#binding-contents" } ]
+				}
+			]
+		},
+		"binding-contents": {
+			"patterns": [
+				{ "include": "#comment" },
+				{ "include": "#binding-pattern" },
+				{ "match": "\\.\\.\\.", "name": "keyword.operator.rest.vn" },
+				{
+					"match": "([_$[:alpha:]][_$[:alnum:]]*)\\s*(:)",
+					"captures": {
+						"1": { "name": "variable.other.property.vn" },
+						"2": { "name": "punctuation.separator.binding.vn" }
+					}
+				},
+				{
+					"begin": "=",
+					"beginCaptures": { "0": { "name": "keyword.operator.assignment.vn" } },
+					"end": "(?=[,}\\]])",
+					"patterns": [ { "include": "#expression" } ]
+				},
+				{ "match": "[_$[:alpha:]][_$[:alnum:]]*", "name": "variable.other.readwrite.vn" },
+				{ "match": ",", "name": "punctuation.separator.comma.vn" }
 			]
 		},
 
@@ -283,6 +338,10 @@
 			"patterns": [
 				{ "include": "#comment" },
 				{ "include": "#builtin-type" },
+				{
+					"match": "(?<![._$[:alnum:]])(extends|keyof|infer|typeof|readonly|in)(?![_$[:alnum:]])",
+					"name": "keyword.operator.type.vn"
+				},
 				{ "include": "#generic-arguments" },
 				{ "match": "\\|", "name": "keyword.operator.type.union.vn" },
 				{ "match": "&", "name": "keyword.operator.type.intersection.vn" },
@@ -429,15 +488,18 @@
 			"patterns": [
 				{ "include": "#comment" },
 				{ "include": "#decorator" },
+				{ "include": "#cast-expression" },
 				{ "include": "#new-expression" },
 				{ "include": "#word-operator" },
 				{ "include": "#concurrency-keyword" },
 				{ "include": "#control-keyword" },
 				{ "include": "#storage-modifier" },
 				{ "include": "#variable-language" },
+				{ "include": "#match-wildcard" },
 				{ "include": "#constant" },
 				{ "include": "#string" },
 				{ "include": "#number" },
+				{ "include": "#object-key" },
 				{ "include": "#generic-arguments" },
 				{ "include": "#method-call" },
 				{ "include": "#member-access" },
@@ -447,6 +509,27 @@
 				{ "include": "#operator" },
 				{ "include": "#punctuation" }
 			]
+		},
+
+		"cast-expression": {
+			"comment": "`expr as Type` cast. The `as` used in imports is handled inside #import-declaration.",
+			"match": "(?<![._$[:alnum:]])(as)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
+			"captures": {
+				"1": { "name": "keyword.control.cast.vn" },
+				"2": { "name": "entity.name.type.vn" }
+			}
+		},
+
+		"match-wildcard": {
+			"comment": "`_` placeholder in match arms / bindings.",
+			"match": "(?<![._$[:alnum:]])_(?![_$[:alnum:]])",
+			"name": "constant.language.wildcard.vn"
+		},
+
+		"object-key": {
+			"comment": "Object-literal key or named call argument: `key:` written without a space before the colon (so ternary `a : b` is not matched).",
+			"match": "([_$[:alpha:]][_$[:alnum:]]*)(?=:)",
+			"name": "variable.other.property.vn"
 		},
 
 		"operator": {
