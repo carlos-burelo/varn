@@ -40,6 +40,13 @@ impl Checker {
                 callee, type_args, ..
             } => {
                 let callee_ty = self.infer_type(callee, bind);
+                if callee_ty.is_dynamic() {
+                    // A `dynamic` callee (e.g. `let C: dynamic = class {…}`) has no
+                    // registered class type, so `new C()` is `dynamic`. Naming it
+                    // after the identifier would invent a memberless `C` type and
+                    // reject every field/method access on the instance.
+                    return Type::Dynamic;
+                }
                 match &callee_ty.0 {
                     TypeKind::Named(name, origin) => {
                         if !type_args.is_empty() {

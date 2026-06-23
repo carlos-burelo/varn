@@ -419,7 +419,10 @@ impl Checker {
             }
 
             ExprKind::ClassExpr { declaration } => {
-                let _ = declaration;
+                // Check the class like a declaration so its scope (created by the
+                // binder's bind_class) is consumed via next_child_scope — skipping
+                // it desyncs every later child-scope lookup (e.g. match arms).
+                self.check_decl(&varn_core::ast::Decl::Class((**declaration).clone()), bind);
             }
 
             ExprKind::Match { subject, cases } => {
