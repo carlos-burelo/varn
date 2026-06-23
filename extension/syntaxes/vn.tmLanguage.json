@@ -211,14 +211,39 @@
 			]
 		},
 		"operator": {
+			"comment": "Specific sub-scopes are required: themes (e.g. One Dark Pro) color keyword.operator.{arithmetic,comparison,relational,logical,bitwise,assignment} but leave the bare keyword.operator at foreground. Ordered longest-first; rules are tried top-down.",
 			"patterns": [
+				{
+					"name": "keyword.operator.arrow.vn",
+					"match": "=>|->|\\|>"
+				},
 				{
 					"name": "keyword.operator.range.vn",
 					"match": "\\.\\.\\.|\\.\\.=|\\.\\."
 				},
 				{
-					"name": "keyword.operator.vn",
-					"match": "[-+*/%=<>!&|^~?]+"
+					"name": "keyword.operator.comparison.vn",
+					"match": "===|!==|==|!=|<=|>="
+				},
+				{
+					"name": "keyword.operator.assignment.vn",
+					"match": ">>>=|<<=|>>=|\\*\\*=|&&=|\\|\\|=|\\?\\?=|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|="
+				},
+				{
+					"name": "keyword.operator.arithmetic.vn",
+					"match": "\\+\\+|--|\\*\\*|\\+|-|\\*|/|%"
+				},
+				{
+					"name": "keyword.operator.logical.vn",
+					"match": "&&|\\|\\||!"
+				},
+				{
+					"name": "keyword.operator.bitwise.vn",
+					"match": "<<|>>>|>>|&|\\||\\^|~|<|>"
+				},
+				{
+					"name": "keyword.operator.ternary.vn",
+					"match": "\\?\\?|\\?\\.|\\?"
 				}
 			]
 		}
