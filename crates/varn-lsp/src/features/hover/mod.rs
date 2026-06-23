@@ -21,8 +21,9 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
     let tok_any = state
         .tokens
         .iter()
-        .find(|t| t.line == line && t.col <= col && col < t.col + t.length);
-    if let Some(tok) = tok_any {
+        .enumerate()
+        .find(|(_, t)| t.line == line && t.col <= col && col < t.col + t.length);
+    if let Some((idx, tok)) = tok_any {
         if matches!(
             tok.kind,
             TokenKind::As | TokenKind::Import | TokenKind::Export
@@ -43,6 +44,18 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
                 return Some(make_lang_hover(format!("(this) this: {}", cls.name)));
             }
             return Some(make_lang_hover("(this) this".to_owned()));
+        }
+        // Keywords in keyword position (not member access) have no symbol hover.
+        // Contextual keywords such as `await`/`async`/`yield` are can_be_identifier(),
+        // so the resolution paths below would otherwise mis-report them, e.g.
+        // `(property) await: int`. A `.await` member access is left to resolve normally.
+        let prev_is_dot = idx
+            .checked_sub(1)
+            .and_then(|j| state.tokens.get(j))
+            .map(|t| t.kind == TokenKind::Dot)
+            .unwrap_or(false);
+        if tok.kind.is_keyword() && !prev_is_dot {
+            return None;
         }
     }
 
