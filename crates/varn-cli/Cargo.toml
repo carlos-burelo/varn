@@ -20,6 +20,7 @@ varn-lexer    = { path = "../varn-lexer" }
 varn-parser   = { path = "../varn-parser", features = ["profiling"] }
 varn-checker  = { path = "../varn-checker" }
 varn-compiler = { path = "../varn-compiler" }
+varn-backend  = { path = "../varn-backend" }
 varn-vm       = { path = "../varn-vm", features = ["profiling"] }
 varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
 varn-types    = { path = "../varn-types" }

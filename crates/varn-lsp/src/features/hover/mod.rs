@@ -6,7 +6,7 @@ mod symbols;
 pub use members::{format_enum_member, format_member_sig};
 pub use symbols::symbol_hover;
 
-use tower_lsp::lsp_types::{Hover, HoverContents, LanguageString, MarkedString};
+use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
 use varn_checker::SymbolKind;
 use varn_core::TokenKind;
 
@@ -102,11 +102,13 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
 }
 
 pub(crate) fn make_lang_hover(value: String) -> Hover {
+    // Markdown code fence so the client highlights the signature via the `Varn`
+    // grammar (MarkedString::LanguageString is deprecated + inconsistently styled).
     Hover {
-        contents: HoverContents::Array(vec![MarkedString::LanguageString(LanguageString {
-            language: "Varn".into(),
-            value,
-        })]),
+        contents: HoverContents::Markup(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: format!("```Varn\n{value}\n```"),
+        }),
         range: None,
     }
 }

@@ -58,7 +58,11 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                             .map(format_marked_string)
                             .collect::<Vec<_>>()
                             .join(" | "),
-                        HoverContents::Markup(m) => m.value,
+                        HoverContents::Markup(m) => m
+                            .value
+                            .replace("```Varn\n", "")
+                            .replace("\n```", "")
+                            .replace("```", ""),
                     };
                     varn_utilities::terminal::log(format!(
                         "    {DIM}({:>2}:{:>2}){RESET} {YELLOW}{:<15}{RESET} → {BOLD}{}{RESET}",

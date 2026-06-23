@@ -183,7 +183,6 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
             | OpCode::SetProperty
             | OpCode::GetFixedField
             | OpCode::SetFixedField
-            | OpCode::GetSuper
             | OpCode::GetSymbol => {
                 let w1 = code.get(offset + 1).copied().unwrap_or(0);
                 let src = (w1 >> 8) as usize;
@@ -194,6 +193,12 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
                     op, first_reg, src, const_idx, cs_idx
                 );
                 offset + 3
+            }
+
+            OpCode::GetSuper => {
+                let const_idx = code.get(offset + 1).copied().unwrap_or(0);
+                println!("{:?} r{} +{}", op, first_reg, const_idx);
+                offset + 2
             }
 
             OpCode::DeclareField => {
