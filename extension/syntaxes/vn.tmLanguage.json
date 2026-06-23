@@ -1,15 +1,18 @@
 {
 	"information_for_contributors": [
-		"Minimal lexer-safe grammar for Varn.",
-		"This grammar intentionally does ONLY what a lexer can know with certainty:",
-		"comments, strings, numbers, reserved keywords, builtin primitive types, operators.",
-		"All identifier classification (function / class / variable / parameter / property /",
-		"type / enum-member / interface / namespace / type-parameter) is driven by the",
-		"varn-lsp semantic tokens provider, NOT this grammar. Do not add identifier",
-		"heuristics (arrow-fn detection, var-expr, destructuring, regex, decorators-as-",
-		"expression, JSX) here: that is exactly what produced the bad inferences this",
-		"grammar replaces. The previous TypeScript-derived grammar is preserved at",
-		"vn.tmLanguage.full.backup.json."
+		"Lexer-safe grammar for Varn, tuned for two jobs:",
+		"1. Editor fallback: in a live .vn buffer the varn-lsp semantic tokens provider is",
+		"   authoritative and OVERRIDES this grammar for every identifier it classifies.",
+		"   So the rules here only surface before the LSP responds or in error states.",
+		"2. Hover / markdown rendering: VSCode renders hover signatures as ```Varn code",
+		"   fences. Semantic tokens NEVER apply inside hover markdown, so this grammar is",
+		"   the ONLY thing that colors them. The declaration/type rules below exist mainly",
+		"   to make those hover signatures readable.",
+		"Rules are deterministic and keyword/colon-anchored. Do NOT add speculative",
+		"heuristics (arrow-fn detection, var-expr, destructuring, regex, decorator-as-",
+		"expression, JSX): those produced the bad inferences this grammar replaced. The",
+		"original TypeScript-derived grammar is preserved at vn.tmLanguage.full.backup.json.",
+		"Keyword/type sets are derived from varn-core TokenKind, not TypeScript."
 	],
 	"name": "Varn",
 	"scopeName": "source.vn",
@@ -19,6 +22,8 @@
 		{ "include": "#string" },
 		{ "include": "#number" },
 		{ "include": "#constant" },
+		{ "include": "#declaration" },
+		{ "include": "#type-annotation" },
 		{ "include": "#primitive-type" },
 		{ "include": "#keyword" },
 		{ "include": "#operator" }
@@ -120,6 +125,55 @@
 			"name": "constant.language.vn",
 			"match": "(?<![._$[:alnum:]])(true|false|null)(?![_$[:alnum:]])"
 		},
+		"declaration": {
+			"patterns": [
+				{
+					"match": "(?<![._$[:alnum:]])(function|method)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
+					"captures": {
+						"1": { "name": "storage.type.vn" },
+						"2": { "name": "entity.name.function.vn" }
+					}
+				},
+				{
+					"match": "(?<![._$[:alnum:]])(class|struct|interface|enum|namespace|module|extension|type)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
+					"captures": {
+						"1": { "name": "storage.type.vn" },
+						"2": { "name": "entity.name.type.vn" }
+					}
+				},
+				{
+					"match": "(?<![._$[:alnum:]])(const|let|var|prop)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
+					"captures": {
+						"1": { "name": "storage.type.vn" },
+						"2": { "name": "variable.other.vn" }
+					}
+				},
+				{
+					"match": "(?<![._$[:alnum:]])(get|set)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
+					"captures": {
+						"1": { "name": "storage.type.vn" },
+						"2": { "name": "entity.name.function.vn" }
+					}
+				}
+			]
+		},
+		"type-annotation": {
+			"patterns": [
+				{
+					"match": "(?<![._$[:alnum:]])(on|extends|implements)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
+					"captures": {
+						"1": { "name": "storage.modifier.vn" },
+						"2": { "name": "entity.name.type.vn" }
+					}
+				},
+				{
+					"match": "(:)\\s*([_$[:alpha:]][_$[:alnum:]]*)",
+					"captures": {
+						"2": { "name": "entity.name.type.vn" }
+					}
+				}
+			]
+		},
 		"primitive-type": {
 			"name": "support.type.primitive.vn",
 			"match": "(?<![._$[:alnum:]])(int|str|bool|float|decimal|bigint|char|void|dynamic|symbol|never|Object|Task|Result|Array)(?![_$[:alnum:]])"
@@ -157,8 +211,16 @@
 			]
 		},
 		"operator": {
-			"name": "keyword.operator.vn",
-			"match": "=>|->|\\|>|\\?\\?|\\?\\.|===|!==|==|!=|<=|>=|\\+\\+|--|\\*\\*|&&|\\|\\||\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|=|\\+|-|\\*|/|%|!|&|\\^|~"
+			"patterns": [
+				{
+					"name": "keyword.operator.range.vn",
+					"match": "\\.\\.\\.|\\.\\.=|\\.\\."
+				},
+				{
+					"name": "keyword.operator.vn",
+					"match": "[-+*/%=<>!&|^~?]+"
+				}
+			]
 		}
 	}
 }
