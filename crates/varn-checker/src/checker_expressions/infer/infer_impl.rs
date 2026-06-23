@@ -36,6 +36,16 @@ impl Checker {
                     _ => Type::named(cn.to_string()),
                 })
                 .unwrap_or(Type::Dynamic),
+            // `super` is the enclosing class's parent type, so `super.method()`
+            // resolves against the superclass instead of falling back to
+            // `dynamic` (which previously produced hovers like
+            // `(property) super.speak: dynamic`).
+            ExprKind::Super => self
+                .current_class
+                .as_ref()
+                .and_then(|cn| bind.class_parents.get(cn))
+                .map(|parent| Type::named(parent.clone()))
+                .unwrap_or(Type::Dynamic),
             ExprKind::New {
                 callee, type_args, ..
             } => {
