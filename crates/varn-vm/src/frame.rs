@@ -4,7 +4,8 @@ use std::rc::Rc;
 use varn_base::VmValuePayload;
 use varn_types::chunk::PolyICSlot;
 pub use varn_types::VmValueRef;
-use varn_types::{FunctionProto, Value};
+use varn_types::{FunctionProto};
+use crate::exec::ctx;
 
 #[derive(Debug, Clone)]
 pub struct VmUpvalue {
@@ -118,10 +119,6 @@ impl VmClosure {
     }
 
     pub fn compile_jit(&mut self) {
-        if self.proto.name.as_deref() == Some("<module>") {
-            self.proto.jit_failed.set(true);
-            return;
-        }
         if self.proto.jit_failed.get() {
             return;
         }
@@ -136,108 +133,112 @@ impl VmClosure {
         }
 
         let helpers = varn_jit::JitHelpers {
-            load_const: crate::exec::ctx::jit_load_const as usize,
-            load_global_idx: crate::exec::ctx::jit_load_global_idx as usize,
-            store_global_idx: crate::exec::ctx::jit_store_global_idx as usize,
-            define_global_idx: crate::exec::ctx::jit_define_global_idx as usize,
-            eq: crate::exec::ctx::jit_eq as usize,
-            neq: crate::exec::ctx::jit_neq as usize,
-            lt: crate::exec::ctx::jit_lt as usize,
-            lte: crate::exec::ctx::jit_lte as usize,
-            gt: crate::exec::ctx::jit_gt as usize,
-            gte: crate::exec::ctx::jit_gte as usize,
-            add: crate::exec::ctx::jit_add as usize,
-            sub: crate::exec::ctx::jit_sub as usize,
-            mul: crate::exec::ctx::jit_mul as usize,
-            div: crate::exec::ctx::jit_div as usize,
-            modulo: crate::exec::ctx::jit_modulo as usize,
-            pow: crate::exec::ctx::jit_pow as usize,
-            to_string: crate::exec::ctx::jit_to_string as usize,
-            load_global: crate::exec::ctx::jit_load_global as usize,
-            load_upvalue: crate::exec::ctx::jit_load_upvalue as usize,
-            store_upvalue: crate::exec::ctx::jit_store_upvalue as usize,
-            make_closure: crate::exec::ctx::jit_make_closure as usize,
-            load_static_fn: crate::exec::ctx::jit_load_static_fn as usize,
-            call: crate::exec::ctx::jit_call as usize,
-            call_method: crate::exec::ctx::jit_call_method as usize,
-            get_property: crate::exec::ctx::jit_get_property as usize,
-            set_property: crate::exec::ctx::jit_set_property as usize,
-            build_array: crate::exec::ctx::jit_build_array as usize,
-            build_str: crate::exec::ctx::jit_build_str as usize,
-            negate: crate::exec::ctx::jit_negate as usize,
-            logical_not: crate::exec::ctx::jit_logical_not as usize,
-            get_index: crate::exec::ctx::jit_get_index as usize,
-            set_index: crate::exec::ctx::jit_set_index as usize,
-            typeof_val: crate::exec::ctx::jit_typeof_val as usize,
-            instanceof: crate::exec::ctx::jit_instanceof as usize,
-            array_length: crate::exec::ctx::jit_array_length as usize,
-            array_push: crate::exec::ctx::jit_array_push as usize,
-            array_pop: crate::exec::ctx::jit_array_pop as usize,
-            array_extend: crate::exec::ctx::jit_array_extend as usize,
-            str_concat: crate::exec::ctx::jit_str_concat as usize,
-            str_slice: crate::exec::ctx::jit_str_slice as usize,
-            str_length: crate::exec::ctx::jit_str_length as usize,
-            bit_and: crate::exec::ctx::jit_bitand as usize,
-            bit_or: crate::exec::ctx::jit_bitor as usize,
-            bit_xor: crate::exec::ctx::jit_bitxor as usize,
-            shl: crate::exec::ctx::jit_shl as usize,
-            shr: crate::exec::ctx::jit_shr as usize,
-            ushr: crate::exec::ctx::jit_ushr as usize,
-            load_module: crate::exec::ctx::jit_load_module as usize,
-            load_module_slot: crate::exec::ctx::jit_load_module_slot as usize,
-            store_module_slot: crate::exec::ctx::jit_store_module_slot as usize,
-            build_object_with_shape: crate::exec::ctx::jit_build_object_with_shape as usize,
-            range: crate::exec::ctx::jit_range as usize,
-            assert_not_null: crate::exec::ctx::jit_assert_not_null as usize,
-            close_upvalue: crate::exec::ctx::jit_close_upvalue as usize,
-            get_enum_tag: crate::exec::ctx::jit_get_enum_tag as usize,
-            is_array: crate::exec::ctx::jit_is_array_stub as usize,
-            wrap_spread: crate::exec::ctx::jit_wrap_spread_stub as usize,
-            object_keys: crate::exec::ctx::jit_object_keys_stub as usize,
-            op_in: crate::exec::ctx::jit_op_in_stub as usize,
-            object_merge: crate::exec::ctx::jit_object_merge_stub as usize,
-            get_fixed_field: crate::exec::ctx::jit_get_fixed_field as usize,
-            set_fixed_field: crate::exec::ctx::jit_set_fixed_field as usize,
-            get_property_maybe: crate::exec::ctx::jit_get_property_maybe_stub as usize,
-            get_super: crate::exec::ctx::jit_get_super as usize,
-            get_symbol: crate::exec::ctx::jit_get_symbol as usize,
-            bind_method: crate::exec::ctx::jit_bind_method as usize,
-            define_global: crate::exec::ctx::jit_define_global as usize,
-            store_global: crate::exec::ctx::jit_store_global as usize,
-            declare_field: crate::exec::ctx::jit_declare_field as usize,
-            make_class: crate::exec::ctx::jit_make_class as usize,
-            inherit: crate::exec::ctx::jit_inherit as usize,
-            class_member_op: crate::exec::ctx::jit_class_member_op as usize,
-            build_object: crate::exec::ctx::jit_build_object as usize,
-            object_rest: crate::exec::ctx::jit_object_rest as usize,
-            make_enum_variant: crate::exec::ctx::jit_make_enum_variant as usize,
-            spawn: crate::exec::ctx::jit_spawn as usize,
-            call_spread: crate::exec::ctx::jit_call_spread as usize,
-            load_module_by_idx: crate::exec::ctx::jit_load_module_by_idx as usize,
-            invoke_virtual: crate::exec::ctx::jit_invoke_virtual as usize,
-            try_push: crate::exec::ctx::jit_push_try as usize,
-            try_pop: crate::exec::ctx::jit_pop_try as usize,
-            throw: crate::exec::ctx::jit_throw as usize,
-            await_helper: crate::exec::ctx::jit_await as usize,
-            yield_helper: crate::exec::ctx::jit_yield as usize,
-            get_property_ic_fast: crate::exec::ctx::jit_get_property_ic_fast as usize,
-            get_property_maybe_ic_fast: crate::exec::ctx::jit_get_property_maybe_ic_fast as usize,
-            jit_prepare_call: crate::exec::ctx::jit_prepare_call as usize,
-            jit_push_self_frame: crate::exec::ctx::jit_push_self_frame as usize,
-            jit_post_call: crate::exec::ctx::jit_post_call as usize,
-            dispatch_intrinsic: crate::exec::ctx::jit_dispatch_intrinsic as usize,
+            load_const: ctx::jit_load_const as usize,
+            load_global_idx: ctx::jit_load_global_idx as usize,
+            store_global_idx: ctx::jit_store_global_idx as usize,
+            define_global_idx: ctx::jit_define_global_idx as usize,
+            eq: ctx::jit_eq as usize,
+            neq: ctx::jit_neq as usize,
+            lt: ctx::jit_lt as usize,
+            lte: ctx::jit_lte as usize,
+            gt: ctx::jit_gt as usize,
+            gte: ctx::jit_gte as usize,
+            add: ctx::jit_add as usize,
+            sub: ctx::jit_sub as usize,
+            mul: ctx::jit_mul as usize,
+            div: ctx::jit_div as usize,
+            modulo: ctx::jit_modulo as usize,
+            pow: ctx::jit_pow as usize,
+            to_string: ctx::jit_to_string as usize,
+            load_global: ctx::jit_load_global as usize,
+            load_upvalue: ctx::jit_load_upvalue as usize,
+            store_upvalue: ctx::jit_store_upvalue as usize,
+            make_closure: ctx::jit_make_closure as usize,
+            load_static_fn: ctx::jit_load_static_fn as usize,
+            call: ctx::jit_call as usize,
+            call_method: ctx::jit_call_method as usize,
+            get_property: ctx::jit_get_property as usize,
+            set_property: ctx::jit_set_property as usize,
+            build_array: ctx::jit_build_array as usize,
+            build_str: ctx::jit_build_str as usize,
+            negate: ctx::jit_negate as usize,
+            logical_not: ctx::jit_logical_not as usize,
+            get_index: ctx::jit_get_index as usize,
+            set_index: ctx::jit_set_index as usize,
+            typeof_val: ctx::jit_typeof_val as usize,
+            instanceof: ctx::jit_instanceof as usize,
+            array_length: ctx::jit_array_length as usize,
+            array_push: ctx::jit_array_push as usize,
+            array_pop: ctx::jit_array_pop as usize,
+            array_extend: ctx::jit_array_extend as usize,
+            str_concat: ctx::jit_str_concat as usize,
+            str_slice: ctx::jit_str_slice as usize,
+            str_length: ctx::jit_str_length as usize,
+            bit_and: ctx::jit_bitand as usize,
+            bit_or: ctx::jit_bitor as usize,
+            bit_xor: ctx::jit_bitxor as usize,
+            shl: ctx::jit_shl as usize,
+            shr: ctx::jit_shr as usize,
+            ushr: ctx::jit_ushr as usize,
+            load_module: ctx::jit_load_module as usize,
+            load_module_slot: ctx::jit_load_module_slot as usize,
+            store_module_slot: ctx::jit_store_module_slot as usize,
+            build_object_with_shape: ctx::jit_build_object_with_shape as usize,
+            range: ctx::jit_range as usize,
+            assert_not_null: ctx::jit_assert_not_null as usize,
+            close_upvalue: ctx::jit_close_upvalue as usize,
+            get_enum_tag: ctx::jit_get_enum_tag as usize,
+            is_array: ctx::jit_is_array_stub as usize,
+            wrap_spread: ctx::jit_wrap_spread_stub as usize,
+            object_keys: ctx::jit_object_keys_stub as usize,
+            op_in: ctx::jit_op_in_stub as usize,
+            object_merge: ctx::jit_object_merge_stub as usize,
+            get_fixed_field: ctx::jit_get_fixed_field as usize,
+            set_fixed_field: ctx::jit_set_fixed_field as usize,
+            get_property_maybe: ctx::jit_get_property_maybe_stub as usize,
+            get_super: ctx::jit_get_super as usize,
+            get_symbol: ctx::jit_get_symbol as usize,
+            bind_method: ctx::jit_bind_method as usize,
+            define_global: ctx::jit_define_global as usize,
+            store_global: ctx::jit_store_global as usize,
+            declare_field: ctx::jit_declare_field as usize,
+            make_class: ctx::jit_make_class as usize,
+            inherit: ctx::jit_inherit as usize,
+            class_member_op: ctx::jit_class_member_op as usize,
+            build_object: ctx::jit_build_object as usize,
+            object_rest: ctx::jit_object_rest as usize,
+            make_enum_variant: ctx::jit_make_enum_variant as usize,
+            spawn: ctx::jit_spawn as usize,
+            call_spread: ctx::jit_call_spread as usize,
+            load_module_by_idx: ctx::jit_load_module_by_idx as usize,
+            invoke_virtual: ctx::jit_invoke_virtual as usize,
+            try_push: ctx::jit_push_try as usize,
+            try_pop: ctx::jit_pop_try as usize,
+            throw: ctx::jit_throw as usize,
+            await_helper: ctx::jit_await as usize,
+            yield_helper: ctx::jit_yield as usize,
+            get_property_ic_fast: ctx::jit_get_property_ic_fast as usize,
+            get_property_maybe_ic_fast: ctx::jit_get_property_maybe_ic_fast as usize,
+            jit_prepare_call: ctx::jit_prepare_call as usize,
+            jit_push_self_frame: ctx::jit_push_self_frame as usize,
+            jit_post_call: ctx::jit_post_call as usize,
+            jit_ensure_stack_capacity: ctx::jit_ensure_stack_capacity as usize,
+            dispatch_intrinsic: ctx::jit_dispatch_intrinsic as usize,
+            jit_is_native_fn: ctx::jit_is_native_fn as usize,
+            jit_call_native_fast: ctx::jit_call_native_fast as usize,
             open_upvalues_offset: {
-                let dummy = std::mem::MaybeUninit::<crate::exec::ctx::ExecCtx>::uninit();
+                let dummy = std::mem::MaybeUninit::<ctx::ExecCtx>::uninit();
                 let dummy_ptr = dummy.as_ptr();
                 unsafe {
                     (std::ptr::addr_of!((*dummy_ptr).open_upvalues) as usize) - (dummy_ptr as usize)
                 }
             },
             pending_constructors_offset: {
-                let dummy = std::mem::MaybeUninit::<crate::exec::ctx::ExecCtx>::uninit();
+                let dummy = std::mem::MaybeUninit::<ctx::ExecCtx>::uninit();
                 let dummy_ptr = dummy.as_ptr();
                 unsafe {
-                    (std::ptr::addr_of!((*dummy_ptr).pending_constructors) as usize) - (dummy_ptr as usize)
+                    (std::ptr::addr_of!((*dummy_ptr).pending_constructors) as usize)
+                        - (dummy_ptr as usize)
                 }
             },
         };
@@ -250,19 +251,19 @@ impl VmClosure {
                 self.proto.jit_entry.set(Some(entry_usize));
                 *self.proto.jit_code.borrow_mut() = Some(code);
             }
-            Err(e) => {
+            Err(_) => {
                 self.proto.jit_failed.set(true);
             }
         }
     }
 
-    fn make_ic_slots(count: usize) -> Vec<PolyICSlot> {
-        let mut v = Vec::with_capacity(count);
-        for _ in 0..count {
-            v.push(PolyICSlot::new());
-        }
-        v
-    }
+    
+    
+    
+    
+    
+    
+    
 
     #[inline(always)]
     pub fn ic_cache_len(&self) -> usize {

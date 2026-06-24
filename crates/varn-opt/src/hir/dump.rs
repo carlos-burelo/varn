@@ -1,14 +1,7 @@
-//! Textual dump of a [`HirModule`] for `vn debug -p hir`.
-//!
-//! Each function prints its signature, param types, and every statement/
-//! expression indented. ANSI colors differentiate: functions (blue), bindings
-//! (cyan), control-flow keywords (yellow), literals (green), and calls (magenta).
-
 use std::fmt::Write;
 
 use super::*;
 
-// ── ANSI colour constants ──────────────────────────────────────────────────────
 const R: &str = "\x1b[0m";
 const BOLD: &str = "\x1b[1m";
 const DIM: &str = "\x1b[2m";
@@ -18,9 +11,6 @@ const MAGENTA: &str = "\x1b[35m";
 const CYAN: &str = "\x1b[36m";
 const GREEN: &str = "\x1b[32m";
 
-// ── Public entry points ────────────────────────────────────────────────────────
-
-/// Dump a whole module to stderr (coloured).
 pub fn dump_module(module: &HirModule, filename: &str) {
     let mut out = String::new();
     let _ = writeln!(
@@ -28,10 +18,8 @@ pub fn dump_module(module: &HirModule, filename: &str) {
         "\n{BOLD}{BLUE}HIR{R}{DIM} ─────────────────────────────── {filename}{R}"
     );
 
-    // Top-level body
     dump_function(&mut out, &module.top_level, 0);
 
-    // Declared functions
     for f in &module.functions {
         dump_function(&mut out, f, 0);
     }
@@ -40,34 +28,32 @@ pub fn dump_module(module: &HirModule, filename: &str) {
     eprint!("{out}");
 }
 
-// ── Function ──────────────────────────────────────────────────────────────────
-
 fn dump_function(out: &mut String, f: &HirFunction, depth: usize) {
     let ind = indent(depth);
 
-    // Build flags string
     let mut flags = Vec::new();
-    if f.is_async    { flags.push("async"); }
-    if f.is_generator { flags.push("gen"); }
-    if f.has_this    { flags.push("has_this"); }
-    if f.has_rest    { flags.push("has_rest"); }
+    if f.is_async {
+        flags.push("async");
+    }
+    if f.is_generator {
+        flags.push("gen");
+    }
+    if f.has_this {
+        flags.push("has_this");
+    }
+    if f.has_rest {
+        flags.push("has_rest");
+    }
     let flags_str = if flags.is_empty() {
         String::new()
     } else {
         format!("  {DIM}[{}]{R}", flags.join(", "))
     };
 
-    // Params
     let params: Vec<String> = f
         .params
         .iter()
-        .map(|p| {
-            format!(
-                "{CYAN}{}{R}: {DIM}{}{R}",
-                p.name,
-                hir_ty(p.ty)
-            )
-        })
+        .map(|p| format!("{CYAN}{}{R}: {DIM}{}{R}", p.name, hir_ty(p.ty)))
         .collect();
 
     let _ = writeln!(
@@ -86,8 +72,6 @@ fn dump_function(out: &mut String, f: &HirFunction, depth: usize) {
     }
 }
 
-// ── Statements ────────────────────────────────────────────────────────────────
-
 fn dump_stmt(out: &mut String, stmt: &HirStmt, depth: usize) {
     let ind = indent(depth);
     match stmt {
@@ -104,14 +88,13 @@ fn dump_stmt(out: &mut String, stmt: &HirStmt, depth: usize) {
             );
         }
         HirStmt::Assign { target, value } => {
-            let _ = writeln!(
-                out,
-                "{ind}{} = {}",
-                dump_binding(target),
-                dump_expr(value)
-            );
+            let _ = writeln!(out, "{ind}{} = {}", dump_binding(target), dump_expr(value));
         }
-        HirStmt::SetMember { object, name, value } => {
+        HirStmt::SetMember {
+            object,
+            name,
+            value,
+        } => {
             let _ = writeln!(
                 out,
                 "{ind}{}.{CYAN}{name}{R} = {}",
@@ -119,7 +102,11 @@ fn dump_stmt(out: &mut String, stmt: &HirStmt, depth: usize) {
                 dump_expr(value)
             );
         }
-        HirStmt::SetIndex { object, index, value } => {
+        HirStmt::SetIndex {
+            object,
+            index,
+            value,
+        } => {
             let _ = writeln!(
                 out,
                 "{ind}{}[{}] = {}",
@@ -137,33 +124,54 @@ fn dump_stmt(out: &mut String, stmt: &HirStmt, depth: usize) {
         HirStmt::Throw(e) => {
             let _ = writeln!(out, "{ind}{YELLOW}throw{R} {}", dump_expr(e));
         }
-        HirStmt::If { test, then_body, else_body } => {
+        HirStmt::If {
+            test,
+            then_body,
+            else_body,
+        } => {
             let _ = writeln!(out, "{ind}{YELLOW}if{R} {} {{", dump_expr(test));
-            for s in then_body { dump_stmt(out, s, depth + 1); }
+            for s in then_body {
+                dump_stmt(out, s, depth + 1);
+            }
             if !else_body.is_empty() {
                 let _ = writeln!(out, "{ind}}} {YELLOW}else{R} {{");
-                for s in else_body { dump_stmt(out, s, depth + 1); }
+                for s in else_body {
+                    dump_stmt(out, s, depth + 1);
+                }
             }
             let _ = writeln!(out, "{ind}}}");
         }
         HirStmt::While { test, body } => {
             let _ = writeln!(out, "{ind}{YELLOW}while{R} {} {{", dump_expr(test));
-            for s in body { dump_stmt(out, s, depth + 1); }
+            for s in body {
+                dump_stmt(out, s, depth + 1);
+            }
             let _ = writeln!(out, "{ind}}}");
         }
         HirStmt::DoWhile { body, test } => {
             let _ = writeln!(out, "{ind}{YELLOW}do{R} {{");
-            for s in body { dump_stmt(out, s, depth + 1); }
+            for s in body {
+                dump_stmt(out, s, depth + 1);
+            }
             let _ = writeln!(out, "{ind}}} {YELLOW}while{R} {}", dump_expr(test));
         }
         HirStmt::ForClassic { test, update, body } => {
             let _ = writeln!(out, "{ind}{YELLOW}for{R} ({}; update) {{", dump_expr(test));
-            for s in body { dump_stmt(out, s, depth + 1); }
+            for s in body {
+                dump_stmt(out, s, depth + 1);
+            }
             let _ = writeln!(out, "{ind}  {DIM}-- update --{R}");
-            for s in update { dump_stmt(out, s, depth + 2); }
+            for s in update {
+                dump_stmt(out, s, depth + 2);
+            }
             let _ = writeln!(out, "{ind}}}");
         }
-        HirStmt::ForOf { var, iterable, body, is_await } => {
+        HirStmt::ForOf {
+            var,
+            iterable,
+            body,
+            is_await,
+        } => {
             let kw = if *is_await { "for await" } else { "for" };
             let _ = writeln!(
                 out,
@@ -171,7 +179,9 @@ fn dump_stmt(out: &mut String, stmt: &HirStmt, depth: usize) {
                 var.0,
                 dump_expr(iterable)
             );
-            for s in body { dump_stmt(out, s, depth + 1); }
+            for s in body {
+                dump_stmt(out, s, depth + 1);
+            }
             let _ = writeln!(out, "{ind}}}");
         }
         HirStmt::ForIn { var, object, body } => {
@@ -181,7 +191,9 @@ fn dump_stmt(out: &mut String, stmt: &HirStmt, depth: usize) {
                 var.0,
                 dump_expr(object)
             );
-            for s in body { dump_stmt(out, s, depth + 1); }
+            for s in body {
+                dump_stmt(out, s, depth + 1);
+            }
             let _ = writeln!(out, "{ind}}}");
         }
         HirStmt::Switch { disc, cases } => {
@@ -195,36 +207,62 @@ fn dump_stmt(out: &mut String, stmt: &HirStmt, depth: usize) {
                         let _ = writeln!(out, "{}  {YELLOW}default{R}:", ind);
                     }
                 }
-                for s in &case.body { dump_stmt(out, s, depth + 2); }
+                for s in &case.body {
+                    dump_stmt(out, s, depth + 2);
+                }
             }
             let _ = writeln!(out, "{ind}}}");
         }
-        HirStmt::Break => { let _ = writeln!(out, "{ind}{YELLOW}break{R}"); }
-        HirStmt::Continue => { let _ = writeln!(out, "{ind}{YELLOW}continue{R}"); }
-        HirStmt::Try { block, catch, finally } => {
+        HirStmt::Break => {
+            let _ = writeln!(out, "{ind}{YELLOW}break{R}");
+        }
+        HirStmt::Continue => {
+            let _ = writeln!(out, "{ind}{YELLOW}continue{R}");
+        }
+        HirStmt::Try {
+            block,
+            catch,
+            finally,
+        } => {
             let _ = writeln!(out, "{ind}{YELLOW}try{R} {{");
-            for s in block { dump_stmt(out, s, depth + 1); }
+            for s in block {
+                dump_stmt(out, s, depth + 1);
+            }
             if let Some(c) = catch {
                 let param_str = match c.param {
                     Some(id) => format!(" ({CYAN}l{}{R})", id.0),
                     None => String::new(),
                 };
                 let _ = writeln!(out, "{ind}}} {YELLOW}catch{param_str}{R} {{");
-                for s in &c.body { dump_stmt(out, s, depth + 1); }
+                for s in &c.body {
+                    dump_stmt(out, s, depth + 1);
+                }
             }
             if let Some(fin) = finally {
                 let _ = writeln!(out, "{ind}}} {YELLOW}finally{R} {{");
-                for s in fin { dump_stmt(out, s, depth + 1); }
+                for s in fin {
+                    dump_stmt(out, s, depth + 1);
+                }
             }
             let _ = writeln!(out, "{ind}}}");
         }
-        HirStmt::Import { source, is_type, specs } => {
+        HirStmt::Import {
+            source,
+            is_type,
+            specs,
+        } => {
             if *is_type {
-                let _ = writeln!(out, "{ind}{YELLOW}import type{R} from {GREEN}\"{source}\"{R}");
+                let _ = writeln!(
+                    out,
+                    "{ind}{YELLOW}import type{R} from {GREEN}\"{source}\"{R}"
+                );
             } else if specs.is_empty() {
                 let _ = writeln!(out, "{ind}{YELLOW}import{R} {GREEN}\"{source}\"{R}");
             } else {
-                let names: Vec<String> = specs.iter().map(|s| format!("{CYAN}{}{R}", s.local)).collect();
+                let names: Vec<String> = specs
+                    .iter()
+                    .map(|s| format!("{CYAN}{}{R}", s.local))
+                    .collect();
                 let _ = writeln!(
                     out,
                     "{ind}{YELLOW}import{R} {{ {} }} from {GREEN}\"{source}\"{R}",
@@ -233,18 +271,35 @@ fn dump_stmt(out: &mut String, stmt: &HirStmt, depth: usize) {
             }
         }
         HirStmt::StoreExport { name, slot } => {
-            let _ = writeln!(out, "{ind}{YELLOW}export{R} {CYAN}{name}{R} → slot[{DIM}{slot}{R}]");
+            let _ = writeln!(
+                out,
+                "{ind}{YELLOW}export{R} {CYAN}{name}{R} → slot[{DIM}{slot}{R}]"
+            );
         }
         HirStmt::ExportNamed { specifiers, source } => {
-            let src_str = source.as_ref().map(|s| format!(" from \"{s}\"")).unwrap_or_default();
+            let src_str = source
+                .as_ref()
+                .map(|s| format!(" from \"{s}\""))
+                .unwrap_or_default();
             let specs: Vec<String> = specifiers
                 .iter()
                 .map(|s| format!("{} as {}", s.local, s.exported))
                 .collect();
-            let _ = writeln!(out, "{ind}{YELLOW}export{R} {{{}}}{src_str}", specs.join(", "));
+            let _ = writeln!(
+                out,
+                "{ind}{YELLOW}export{R} {{{}}}{src_str}",
+                specs.join(", ")
+            );
         }
-        HirStmt::ExportAll { source, alias, slot: _ } => {
-            let alias_str = alias.as_ref().map(|a| format!(" * as {a}")).unwrap_or_else(|| " *".to_string());
+        HirStmt::ExportAll {
+            source,
+            alias,
+            slot: _,
+        } => {
+            let alias_str = alias
+                .as_ref()
+                .map(|a| format!(" * as {a}"))
+                .unwrap_or_else(|| " *".to_string());
             let _ = writeln!(out, "{ind}{YELLOW}export{R}{alias_str} from \"{source}\"");
         }
         HirStmt::ExportDefaultExpr { value, slot: _ } => {
@@ -259,34 +314,33 @@ fn dump_stmt(out: &mut String, stmt: &HirStmt, depth: usize) {
         }
         HirStmt::Dispose { target, is_await } => {
             let kw = if *is_await { "disposeAsync" } else { "dispose" };
-            let _ = writeln!(
-                out,
-                "{ind}{DIM}{kw}(l{}){R}",
-                target.0
-            );
+            let _ = writeln!(out, "{ind}{DIM}{kw}(l{}){R}", target.0);
         }
     }
 }
 
-// ── Expressions ───────────────────────────────────────────────────────────────
-
 fn dump_expr(expr: &HirExpr) -> String {
     match expr {
-        HirExpr::Int(n)     => format!("{GREEN}{n}{R}"),
-        HirExpr::Float(f)   => format!("{GREEN}{f}{R}"),
-        HirExpr::Bool(b)    => format!("{GREEN}{b}{R}"),
-        HirExpr::Char(c)    => format!("{GREEN}'{c}'{R}"),
-        HirExpr::Str(s)     => format!("{GREEN}\"{s}\"{R}"),
+        HirExpr::Int(n) => format!("{GREEN}{n}{R}"),
+        HirExpr::Float(f) => format!("{GREEN}{f}{R}"),
+        HirExpr::Bool(b) => format!("{GREEN}{b}{R}"),
+        HirExpr::Char(c) => format!("{GREEN}'{c}'{R}"),
+        HirExpr::Str(s) => format!("{GREEN}\"{s}\"{R}"),
         HirExpr::Decimal(d) => format!("{GREEN}{d}d{R}"),
-        HirExpr::BigInt(n)  => format!("{GREEN}{n}n{R}"),
+        HirExpr::BigInt(n) => format!("{GREEN}{n}n{R}"),
         HirExpr::Regex { pattern, flags } => format!("{GREEN}/{pattern}/{flags}{R}"),
-        HirExpr::Null       => format!("{DIM}null{R}"),
-        HirExpr::This       => format!("{CYAN}this{R}"),
-        HirExpr::Super      => "super".to_string(),
+        HirExpr::Null => format!("{DIM}null{R}"),
+        HirExpr::This => format!("{CYAN}this{R}"),
+        HirExpr::Super => "super".to_string(),
         HirExpr::TaggedTemplate { tag, template } => {
             format!("{}[{}]", dump_expr(tag), dump_expr(template))
         }
-        HirExpr::IntrinsicCall { object, args, wire_byte, .. } => {
+        HirExpr::IntrinsicCall {
+            object,
+            args,
+            wire_byte,
+            ..
+        } => {
             format!(
                 "{MAGENTA}intrinsic:{wire_byte}{R}({}, [{}])",
                 dump_expr(object),
@@ -300,11 +354,11 @@ fn dump_expr(expr: &HirExpr) -> String {
         HirExpr::Var(b) => dump_binding(b),
 
         HirExpr::NonNull(e) => format!("{}!", dump_expr(e)),
-        HirExpr::TryOp(e)   => format!("{}?", dump_expr(e)),
-        HirExpr::Await(e)   => format!("{YELLOW}await{R} {}", dump_expr(e)),
-        HirExpr::Spawn(e)   => format!("{YELLOW}spawn{R} {}", dump_expr(e)),
-        HirExpr::Yield(e)   => format!("{YELLOW}yield{R} {}", dump_expr(e)),
-        HirExpr::Spread(e)  => format!("...{}", dump_expr(e)),
+        HirExpr::TryOp(e) => format!("{}?", dump_expr(e)),
+        HirExpr::Await(e) => format!("{YELLOW}await{R} {}", dump_expr(e)),
+        HirExpr::Spawn(e) => format!("{YELLOW}spawn{R} {}", dump_expr(e)),
+        HirExpr::Yield(e) => format!("{YELLOW}yield{R} {}", dump_expr(e)),
+        HirExpr::Spread(e) => format!("...{}", dump_expr(e)),
 
         HirExpr::TypeTest { value, kind } => {
             let test = match kind {
@@ -320,11 +374,19 @@ fn dump_expr(expr: &HirExpr) -> String {
         HirExpr::Binary { op, lhs, rhs, ty } => {
             format!(
                 "({} {DIM}{:?}{R}:{DIM}{}{R} {})",
-                dump_expr(lhs), op, hir_ty(*ty), dump_expr(rhs)
+                dump_expr(lhs),
+                op,
+                hir_ty(*ty),
+                dump_expr(rhs)
             )
         }
         HirExpr::Unary { op, operand, ty } => {
-            format!("({DIM}{:?}{R}:{DIM}{}{R} {})", op, hir_ty(*ty), dump_expr(operand))
+            format!(
+                "({DIM}{:?}{R}:{DIM}{}{R} {})",
+                op,
+                hir_ty(*ty),
+                dump_expr(operand)
+            )
         }
         HirExpr::Logical { op, lhs, rhs } => {
             let sym = match op {
@@ -335,10 +397,18 @@ fn dump_expr(expr: &HirExpr) -> String {
             format!("({} {sym} {})", dump_expr(lhs), dump_expr(rhs))
         }
         HirExpr::Conditional { test, cons, alt } => {
-            format!("({} ? {} : {})", dump_expr(test), dump_expr(cons), dump_expr(alt))
+            format!(
+                "({} ? {} : {})",
+                dump_expr(test),
+                dump_expr(cons),
+                dump_expr(alt)
+            )
         }
         HirExpr::Update { target, op, prefix } => {
-            let sym = match op { HirUpdateOp::Inc => "++", HirUpdateOp::Dec => "--" };
+            let sym = match op {
+                HirUpdateOp::Inc => "++",
+                HirUpdateOp::Dec => "--",
+            };
             let tgt = match target.as_ref() {
                 HirAssignTarget::Var(b) => dump_binding(b),
                 HirAssignTarget::Member { object, name } => {
@@ -374,7 +444,9 @@ fn dump_expr(expr: &HirExpr) -> String {
         HirExpr::SelfCall { args, .. } => {
             format!("{MAGENTA}self{R}([{}])", dump_exprs(args))
         }
-        HirExpr::MethodCall { recv, name, args, .. } => {
+        HirExpr::MethodCall {
+            recv, name, args, ..
+        } => {
             format!(
                 "{MAGENTA}method{R}({}.{CYAN}{name}{R}, [{}])",
                 dump_expr(recv),
@@ -449,7 +521,11 @@ fn dump_expr(expr: &HirExpr) -> String {
         HirExpr::Sequence(es) => {
             format!("(seq: {})", dump_exprs(es))
         }
-        HirExpr::Range { start, end, inclusive } => {
+        HirExpr::Range {
+            start,
+            end,
+            inclusive,
+        } => {
             let op = if *inclusive { "..=" } else { ".." };
             format!("({}{op}{})", dump_expr(start), dump_expr(end))
         }
@@ -494,7 +570,11 @@ fn dump_expr(expr: &HirExpr) -> String {
             format!(
                 "{{...rest({}, skip=[{}])}}",
                 dump_expr(object),
-                skip_keys.iter().map(|k| format!("{CYAN}{k}{R}")).collect::<Vec<_>>().join(", ")
+                skip_keys
+                    .iter()
+                    .map(|k| format!("{CYAN}{k}{R}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
             )
         }
 
@@ -538,14 +618,12 @@ fn dump_expr(expr: &HirExpr) -> String {
     }
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 fn dump_binding(b: &HirBinding) -> String {
     match b {
-        HirBinding::Param(i)    => format!("{CYAN}p{i}{R}"),
-        HirBinding::Local(id)   => format!("{CYAN}l{}{R}", id.0),
-        HirBinding::Global(n)   => format!("{CYAN}g:{n}{R}"),
-        HirBinding::Upvalue(i)  => format!("{CYAN}uv{i}{R}"),
+        HirBinding::Param(i) => format!("{CYAN}p{i}{R}"),
+        HirBinding::Local(id) => format!("{CYAN}l{}{R}", id.0),
+        HirBinding::Global(n) => format!("{CYAN}g:{n}{R}"),
+        HirBinding::Upvalue(i) => format!("{CYAN}uv{i}{R}"),
     }
 }
 
@@ -562,11 +640,11 @@ fn dump_exprs(exprs: &[HirExpr]) -> String {
 
 fn hir_ty(ty: HirType) -> &'static str {
     match ty {
-        HirType::Int     => "int",
-        HirType::Float   => "float",
-        HirType::Bool    => "bool",
-        HirType::Str     => "str",
-        HirType::Ref     => "ref",
+        HirType::Int => "int",
+        HirType::Float => "float",
+        HirType::Bool => "bool",
+        HirType::Str => "str",
+        HirType::Ref => "ref",
         HirType::Dynamic => "dyn",
     }
 }

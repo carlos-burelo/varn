@@ -4,8 +4,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
-/// Native implementation backing the `runtime:reflect` contract
-/// (`src/modules/std/reflect/runtime/reflect_runtime.vn`).
 pub struct ReflectRuntime;
 
 thread_local! {

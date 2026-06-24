@@ -2,7 +2,8 @@ use varn_checker::SymbolKind;
 use varn_modules::resolver::path_to_uri;
 use varn_modules::spec::{CORE_PREFIX, STD_PREFIX};
 
-use crate::document::{import::uri_to_path, DocumentState, MemberKind, MemberRecord};
+use crate::document::{import::uri_to_path, DocumentState, MemberRecord};
+use crate::util::kinds::member_to_symbol_kind;
 
 use super::{ExportEntry, ProjectIndex};
 
@@ -83,7 +84,7 @@ fn collect_member_exports(
             out.push(ExportEntry {
                 name: m.name.clone(),
                 global_key: key,
-                kind: member_kind_to_symbol_kind(m.kind),
+                kind: member_to_symbol_kind(m.kind),
                 uri: uri.to_owned(),
                 line: m.line,
                 col: m.col,
@@ -94,24 +95,6 @@ fn collect_member_exports(
         if !m.members.is_empty() {
             collect_member_exports(uri, &m.name, &m.members, out);
         }
-    }
-}
-
-fn member_kind_to_symbol_kind(kind: MemberKind) -> SymbolKind {
-    match kind {
-        MemberKind::Constructor => SymbolKind::Method,
-        MemberKind::Method => SymbolKind::Method,
-        MemberKind::Function => SymbolKind::Function,
-        MemberKind::Property => SymbolKind::Property,
-        MemberKind::Variable => SymbolKind::Var,
-        MemberKind::EnumMember => SymbolKind::EnumMember,
-        MemberKind::Getter => SymbolKind::Property,
-        MemberKind::Setter => SymbolKind::Property,
-        MemberKind::Class => SymbolKind::Class,
-        MemberKind::Interface => SymbolKind::Interface,
-        MemberKind::Namespace => SymbolKind::Namespace,
-        MemberKind::Enum => SymbolKind::Enum,
-        MemberKind::Struct => SymbolKind::Struct,
     }
 }
 

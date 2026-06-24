@@ -2,37 +2,29 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-/// Canonical scheme for a module — encodes which layer owns it.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum ModuleScheme {
-    /// Intrinsic domains: primitive method tables, compiler-known symbols.
-    /// Not user-importable; injected by the runtime.
     Core,
-    /// ABI boundary between stdlib and OS/VM. Unstable, runtime-versioned.
+
     Runtime,
-    /// Public standard library. Stable API, uses runtime: internally.
+
     Std,
-    /// Filesystem path (user files, relative imports).
+
     File,
-    /// User-installed packages resolved via manifest + lockfile.
+
     Package,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, serde::Serialize, serde::Deserialize)]
 pub enum ModuleId {
-    /// core:* — compiler-internal intrinsic domain. Not user-importable.
     Core(Arc<str>),
 
-    /// std:* — public standard library with stable API.
     Std(Arc<str>),
 
-    /// runtime:* — ABI boundary, resolved to native ops.
     Runtime(Arc<str>),
 
-    /// Canonical filesystem path (normalized: forward slashes, lowercase drive letter).
     Local(Arc<str>),
 
-    /// User-installed package resolved via manifest + lockfile.
     Package {
         name: Arc<str>,
         version: Arc<str>,
@@ -41,8 +33,6 @@ pub enum ModuleId {
 }
 
 fn normalize_local_path(path: &str) -> Arc<str> {
-    // Match varn_modules::normalize_path_string: strip \\?\ prefix, forward slashes.
-    // Drive-letter case normalization deferred until precompiled map is also ModuleId-keyed.
     if path.starts_with("\\\\?\\") {
         return Arc::from(path[4..].replace('\\', "/").as_str());
     }
@@ -58,7 +48,6 @@ impl ModuleId {
         Self::Std(Arc::from(spec))
     }
 
-    /// Smart constructor: routes core: → Core, std: → Std.
     pub fn stdlib(spec: &str) -> Self {
         if spec.starts_with("core:") {
             Self::Core(Arc::from(spec))
@@ -87,8 +76,6 @@ impl ModuleId {
         }
     }
 
-    /// Parse a canonical key string back into a ModuleId.
-    /// Inverse of `as_str()` for core/std/runtime/local forms.
     pub fn from_canonical_str(s: &str) -> Self {
         if s.starts_with("core:") {
             Self::Core(Arc::from(s))
@@ -115,7 +102,6 @@ impl ModuleId {
         }
     }
 
-    /// Returns the canonical scheme this module belongs to.
     pub fn scheme(&self) -> ModuleScheme {
         match self {
             Self::Core(_) => ModuleScheme::Core,
@@ -134,7 +120,6 @@ impl ModuleId {
         matches!(self, Self::Std(_))
     }
 
-    /// True for both Core and Std — any managed stdlib module.
     pub fn is_stdlib(&self) -> bool {
         matches!(self, Self::Core(_) | Self::Std(_))
     }
@@ -168,13 +153,10 @@ impl fmt::Display for ModuleId {
 pub enum ImportSpecifier {
     Relative(PathBuf),
 
-    /// std:* — public standard library.
     Stdlib(Arc<str>),
 
-    /// core:* — intrinsic domain (compiler-internal; blocked for user code).
     Core(Arc<str>),
 
-    /// runtime:* — ABI boundary module, resolved to native ops.
     Runtime(Arc<str>),
 
     Package(Arc<str>),
@@ -197,7 +179,6 @@ impl ImportSpecifier {
         }
     }
 
-    /// True for both core: and std: specifiers.
     pub fn is_managed(&self) -> bool {
         matches!(self, Self::Stdlib(_) | Self::Core(_))
     }

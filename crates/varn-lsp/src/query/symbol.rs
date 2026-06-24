@@ -18,15 +18,7 @@ pub fn symbol_at(state: &DocumentState, line: u32, col: u32) -> Option<&SymbolRe
         return None;
     }
 
-    if let Some(info) = state.db.expr_types.get(&tok.offset) {
-        if let Some(sid) = info.symbol_id {
-            return state.symbols.iter().find(|s| s.symbol_id == Some(sid));
-        }
-    }
-
-    if let Some((sid, _)) = state.db.resolve_at(&tok.lexeme, tok.offset) {
-        return state.symbols.iter().find(|s| s.symbol_id == Some(sid));
-    }
-
-    None
+    state
+        .checker_symbol_at(line, col)
+        .filter(|sym| sym.name == tok.lexeme)
 }

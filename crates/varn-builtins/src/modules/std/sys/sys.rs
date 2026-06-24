@@ -3,8 +3,6 @@ use std::time::Instant;
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
-/// Native implementation backing the `runtime:process` contract
-/// (`src/modules/std/sys/runtime/sys_runtime.vn`).
 pub struct SysRuntime;
 
 static START_TIME: OnceLock<Instant> = OnceLock::new();
@@ -31,7 +29,7 @@ varn_contract! {
             Ok(std::env::var(key).unwrap_or_default())
         }
         fn processSetEnv(_ctx: &mut dyn NativeCtx, _key: &str, _val: &str) -> Result<(), String> {
-            // No-op (preserves prior behavior; mutating process env is unsafe).
+
             Ok(())
         }
         fn processNow(_ctx: &mut dyn NativeCtx) -> Result<f64, String> {

@@ -2,6 +2,7 @@ use varn_core::OpCode;
 
 use crate::assembler::Reg;
 use crate::regalloc::{emit_epilogue, emit_load, emit_store};
+use crate::safepoint::{emit_load_reg, emit_store_reg};
 
 use super::CodegenCtx;
 
@@ -57,8 +58,27 @@ pub(crate) fn emit_immediates(
             let w1 = code[*ip];
             *ip += 1;
             let src = (w1 >> 8) as usize;
-            emit_load(asm, Reg::Rax, src, regmap);
-            emit_store(asm, Reg::Rax, first_reg, regmap);
+            let src_phys = regmap.get(src);
+            let dest_phys = regmap.get(first_reg);
+            match (src_phys, dest_phys) {
+                (Some(s), Some(d)) => {
+                    if s != d {
+                        asm.mov_reg_reg(d, s);
+                    }
+                }
+                (Some(s), None) => {
+                    emit_store_reg(asm, s, first_reg);
+                }
+                (None, Some(d)) => {
+                    emit_load_reg(asm, d, src);
+                }
+                (None, None) => {
+                    if src != first_reg {
+                        emit_load_reg(asm, Reg::Rax, src);
+                        emit_store_reg(asm, Reg::Rax, first_reg);
+                    }
+                }
+            }
         }
         OpCode::Return => {
             let w1 = code[*ip];

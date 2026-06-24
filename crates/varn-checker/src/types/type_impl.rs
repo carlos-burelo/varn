@@ -79,7 +79,9 @@ impl Type {
                 return members.into_iter().next().unwrap();
             }
         } else if members.len() == 2 {
-            if !matches!(members[0].0, TypeKind::Union(_)) && !matches!(members[1].0, TypeKind::Union(_)) {
+            if !matches!(members[0].0, TypeKind::Union(_))
+                && !matches!(members[1].0, TypeKind::Union(_))
+            {
                 if members[0] == members[1] {
                     return members.into_iter().next().unwrap();
                 } else {

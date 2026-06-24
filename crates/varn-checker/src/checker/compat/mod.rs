@@ -205,7 +205,15 @@ pub(super) fn types_compatible_impl(
         | (TypeKind::Named(dn, origin_d), TypeKind::Generic(in_, _, origin_i))
         | (TypeKind::Generic(dn, _, origin_d), TypeKind::Named(in_, origin_i))
         | (TypeKind::Generic(dn, _, origin_d), TypeKind::Generic(in_, _, origin_i)) => {
-            compatible_named(dn, origin_d.as_deref(), in_, origin_i.as_deref(), bind, cache, in_progress)
+            compatible_named(
+                dn,
+                origin_d.as_deref(),
+                in_,
+                origin_i.as_deref(),
+                bind,
+                cache,
+                in_progress,
+            )
         }
         (TypeKind::Named(dn, origin_d), TypeKind::Fn(ft))
         | (TypeKind::Generic(dn, _, origin_d), TypeKind::Fn(ft)) => {

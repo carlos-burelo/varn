@@ -1,8 +1,6 @@
-//! Expression AST→HIR lowering, plus `match` lowering and name resolution.
-
+use rust_decimal::Decimal;
 use std::rc::Rc;
 use std::str::FromStr;
-use rust_decimal::Decimal;
 
 use varn_core::ast::expr::{ArrayEl, ArrowBody, MatchBody, ObjectProp, PropKey, TemplatePart};
 use varn_core::ast::operators::{AssignOp, UnaryOp};
@@ -12,9 +10,6 @@ use varn_core::ast::{Arg, Expr, ExprKind, StmtKind};
 use super::*;
 
 impl<'a> Lowerer<'a> {
-    /// Lower a `match` expression to a `HirExpr::Match`. Each case allocates its
-    /// pattern bindings as locals in a per-case block scope, then lowers the arm
-    /// body. Guards and record/sequence/type patterns fall back to legacy.
     fn lower_match(
         &mut self,
         subject: &Expr,
@@ -33,7 +28,7 @@ impl<'a> Lowerer<'a> {
                     return Err(e);
                 }
             };
-            // Guard is lowered in the case scope so it sees pattern bindings.
+
             let guard = match &case.guard {
                 Some(g) => Some(self.lower_expr(g, scope)?),
                 None => None,
@@ -55,7 +50,12 @@ impl<'a> Lowerer<'a> {
             };
             let (captured, disposables) = scope.pop_block();
             block_epilogue(&mut body, captured, disposables);
-            hcases.push(HirMatchCase { test, guard, body, result });
+            hcases.push(HirMatchCase {
+                test,
+                guard,
+                body,
+                result,
+            });
         }
         Ok(HirExpr::Match {
             subject,
@@ -101,25 +101,18 @@ impl<'a> Lowerer<'a> {
                     binds,
                 }
             }
-            // `Sequence` (`[a, b]`) and `Type` (`T as x`) patterns: legacy
-            // `compile_match` treats both as a wildcard (always matches, no
-            // binding). Mirror that for parity — real destructuring/type
-            // matching here is a future feature for both backends.
+
             MatchPattern::Sequence(_) | MatchPattern::Type { .. } => HirCaseTest::Wildcard,
         })
     }
 
     fn lower_assign_target(&mut self, expr: &Expr, scope: &mut Scope) -> R<HirAssignTarget> {
         match &expr.kind {
-            ExprKind::Identifier { name } => {
-                Ok(HirAssignTarget::Var(self.resolve(name, scope)))
-            }
+            ExprKind::Identifier { name } => Ok(HirAssignTarget::Var(self.resolve(name, scope))),
             ExprKind::Member {
                 object,
                 property,
                 computed,
-                // `optional` (`o?.x = v`) is ignored: legacy `store_to_target`
-                // treats it as a plain member store (no null-guard). Mirror it.
                 ..
             } => {
                 if matches!(object.kind, ExprKind::Super) {
@@ -129,7 +122,11 @@ impl<'a> Lowerer<'a> {
                     } else {
                         let name = match &property.kind {
                             ExprKind::Identifier { name } => name.clone(),
-                            _ => return Err(OptError::Unsupported("hir: non-identifier super property assign")),
+                            _ => {
+                                return Err(OptError::Unsupported(
+                                    "hir: non-identifier super property assign",
+                                ))
+                            }
                         };
                         Ok(HirAssignTarget::SuperMember { name })
                     }
@@ -144,7 +141,11 @@ impl<'a> Lowerer<'a> {
                     } else {
                         let name = match &property.kind {
                             ExprKind::Identifier { name } => name.clone(),
-                            _ => return Err(OptError::Unsupported("hir: non-identifier property assign")),
+                            _ => {
+                                return Err(OptError::Unsupported(
+                                    "hir: non-identifier property assign",
+                                ))
+                            }
                         };
                         Ok(HirAssignTarget::Member {
                             object: object_hir,
@@ -167,9 +168,6 @@ impl<'a> Lowerer<'a> {
             ExprKind::NullLiteral => Ok(HirExpr::Null),
             ExprKind::This => Ok(HirExpr::This),
             ExprKind::New { callee, args, .. } => {
-                // `new C(args)` compiles to a plain Call; the VM constructs an
-                // instance when the callee is a class (legacy `expr/mod.rs`).
-                // Named-arg/default mapping resolved here; spread falls back.
                 let hargs = self.lower_call_args(args, offset, scope)?;
                 let callee = Box::new(self.lower_expr(callee, scope)?);
                 Ok(HirExpr::Call {
@@ -192,7 +190,6 @@ impl<'a> Lowerer<'a> {
                 })
             }
             ExprKind::Unary { op, operand, .. } => {
-                // Unary `+` is a transparent no-op.
                 if matches!(op, UnaryOp::Plus) {
                     return self.lower_expr(operand, scope);
                 }
@@ -209,7 +206,6 @@ impl<'a> Lowerer<'a> {
                 optional,
                 ..
             } => {
-                // If it is an optional call (callee?.(args)), lower to OptionalChain.
                 if *optional {
                     let hargs = self.lower_call_args(args, offset, scope)?;
                     let callee_hir = self.lower_expr(callee, scope)?;
@@ -219,7 +215,12 @@ impl<'a> Lowerer<'a> {
                     });
                 }
                 if let Some(wire_byte) = self.ann.get_intrinsic(offset) {
-                    if let ExprKind::Member { object, computed: false, .. } = &callee.kind {
+                    if let ExprKind::Member {
+                        object,
+                        computed: false,
+                        ..
+                    } = &callee.kind
+                    {
                         let has_spread = args.iter().any(|a| matches!(a, Arg::Spread(_)));
                         if !has_spread {
                             let hobj = self.lower_expr(object, scope)?;
@@ -234,10 +235,13 @@ impl<'a> Lowerer<'a> {
                     }
                 }
 
-                // Extension method call: `x.m(args)` → `__ext_T_m(x, args)`
-                // (receiver lowered first, matching legacy evaluation order).
                 if let Some(mangled) = self.extension_calls.get(&offset).cloned() {
-                    if let ExprKind::Member { object, optional: mem_opt, .. } = &callee.kind {
+                    if let ExprKind::Member {
+                        object,
+                        optional: mem_opt,
+                        ..
+                    } = &callee.kind
+                    {
                         let recv = self.lower_expr(object, scope)?;
                         let call_args = self.lower_call_args(args, offset, scope)?;
                         if *mem_opt {
@@ -249,14 +253,13 @@ impl<'a> Lowerer<'a> {
                         return Ok(self.ext_global_call(mangled, recv, call_args));
                     }
                 }
-                // Args in callee parameter order (named-arg + default mapping
-                // resolved here); spread still falls back.
+
                 let hargs = self.lower_call_args(args, offset, scope)?;
-                // `super(args)` — superclass constructor call.
+
                 if matches!(callee.kind, ExprKind::Super) {
                     return Ok(HirExpr::SuperCall { args: hargs });
                 }
-                // `super.name(args)` — superclass method call.
+
                 if let ExprKind::Member {
                     object,
                     property,
@@ -273,7 +276,7 @@ impl<'a> Lowerer<'a> {
                         }
                     }
                 }
-                // Method call: callee is a non-computed `.name` member (optional or not)
+
                 if let ExprKind::Member {
                     object,
                     property,
@@ -299,7 +302,7 @@ impl<'a> Lowerer<'a> {
                         }
                     }
                 }
-                // Statically-resolved self-recursion → `CallSelf` (see HIR doc).
+
                 let has_spread = args.iter().any(|a| matches!(a, Arg::Spread(_)));
                 if !has_spread && self.is_self_call(callee, scope) {
                     return Ok(HirExpr::SelfCall {
@@ -345,7 +348,6 @@ impl<'a> Lowerer<'a> {
                     });
                 }
                 if *computed {
-                    // `object[index]` → GetIndex.
                     let object = Box::new(self.lower_expr(object, scope)?);
                     let index = Box::new(self.lower_expr(property, scope)?);
                     return Ok(HirExpr::Index {
@@ -354,9 +356,7 @@ impl<'a> Lowerer<'a> {
                         ty: HirType::Dynamic,
                     });
                 }
-                // Non-computed `object.name` property read. Module-slot reads
-                // (`LoadModuleSlot`) and extension members are desugared
-                // differently by the legacy codegen → fall back for now.
+
                 if let Some(slot_idx) = self.ann.get_slot_idx(offset) {
                     let object_hir = self.lower_expr(object, scope)?;
                     return Ok(HirExpr::ModuleSlot {
@@ -365,7 +365,7 @@ impl<'a> Lowerer<'a> {
                         ty: HirType::Dynamic,
                     });
                 }
-                // Extension getter `x.k` → `__extget_T_k(x)`.
+
                 if let Some(mangled) = self.extension_members.get(&offset).cloned() {
                     let recv = self.lower_expr(object, scope)?;
                     return Ok(self.ext_global_call(mangled, recv, vec![]));
@@ -373,7 +373,9 @@ impl<'a> Lowerer<'a> {
                 if matches!(object.kind, ExprKind::Super) {
                     let name = match &property.kind {
                         ExprKind::Identifier { name } => name.clone(),
-                        _ => return Err(OptError::Unsupported("hir: non-identifier super property")),
+                        _ => {
+                            return Err(OptError::Unsupported("hir: non-identifier super property"))
+                        }
                     };
                     return Ok(HirExpr::SuperMember { name });
                 }
@@ -424,7 +426,9 @@ impl<'a> Lowerer<'a> {
                 for el in elements {
                     match el {
                         ArrayEl::Expr(e) => out.push(HirArrayEl::Expr(self.lower_expr(e, scope)?)),
-                        ArrayEl::Spread(e) => out.push(HirArrayEl::Spread(self.lower_expr(e, scope)?)),
+                        ArrayEl::Spread(e) => {
+                            out.push(HirArrayEl::Spread(self.lower_expr(e, scope)?))
+                        }
                         ArrayEl::Hole => out.push(HirArrayEl::Hole),
                     }
                 }
@@ -434,15 +438,17 @@ impl<'a> Lowerer<'a> {
                 let mut props = Vec::with_capacity(properties.len());
                 for prop in properties {
                     match prop {
-                        ObjectProp::Property {
-                            key,
-                            value,
-                            ..
-                        } => {
+                        ObjectProp::Property { key, value, .. } => {
                             let k = match key {
-                                PropKey::Computed(e) => HirPropKey::Computed(self.lower_expr(e, scope)?),
-                                PropKey::Identifier(s) | PropKey::Str(s) => HirPropKey::Static(Rc::from(s.as_str())),
-                                PropKey::Int(n) => HirPropKey::Static(Rc::from(n.to_string().as_str())),
+                                PropKey::Computed(e) => {
+                                    HirPropKey::Computed(self.lower_expr(e, scope)?)
+                                }
+                                PropKey::Identifier(s) | PropKey::Str(s) => {
+                                    HirPropKey::Static(Rc::from(s.as_str()))
+                                }
+                                PropKey::Int(n) => {
+                                    HirPropKey::Static(Rc::from(n.to_string().as_str()))
+                                }
                             };
                             let val = self.lower_expr(value, scope)?;
                             props.push(HirObjectProp::Property { key: k, value: val });
@@ -456,9 +462,15 @@ impl<'a> Lowerer<'a> {
                             ..
                         } => {
                             let k = match key {
-                                PropKey::Computed(e) => HirPropKey::Computed(self.lower_expr(e, scope)?),
-                                PropKey::Identifier(s) | PropKey::Str(s) => HirPropKey::Static(Rc::from(s.as_str())),
-                                PropKey::Int(n) => HirPropKey::Static(Rc::from(n.to_string().as_str())),
+                                PropKey::Computed(e) => {
+                                    HirPropKey::Computed(self.lower_expr(e, scope)?)
+                                }
+                                PropKey::Identifier(s) | PropKey::Str(s) => {
+                                    HirPropKey::Static(Rc::from(s.as_str()))
+                                }
+                                PropKey::Int(n) => {
+                                    HirPropKey::Static(Rc::from(n.to_string().as_str()))
+                                }
                             };
                             let method_name = match key {
                                 PropKey::Identifier(s) | PropKey::Str(s) => s.clone(),
@@ -470,19 +482,23 @@ impl<'a> Lowerer<'a> {
                                 params,
                                 *is_async,
                                 *is_generator,
-                                false, // generic
-                                true, // has_this
+                                false,
+                                true,
                                 BodyRef::Block(body),
                                 &[],
                                 scope,
                             )?;
-                            props.push(HirObjectProp::Method { key: k, func, upvalues });
+                            props.push(HirObjectProp::Method {
+                                key: k,
+                                func,
+                                upvalues,
+                            });
                         }
                         ObjectProp::Spread { argument, .. } => {
                             let arg = self.lower_expr(argument, scope)?;
                             props.push(HirObjectProp::Spread(arg));
                         }
-                        _ => {} // Ignore Getter and Setter matching legacy ignore.
+                        _ => {}
                     }
                 }
                 Ok(HirExpr::Object { properties: props })
@@ -541,13 +557,13 @@ impl<'a> Lowerer<'a> {
             ExprKind::Match { subject, cases } => self.lower_match(subject, cases, scope),
             ExprKind::CharLiteral { value } => Ok(HirExpr::Char(*value)),
             ExprKind::DecimalLiteral { raw } => {
-                let d = Decimal::from_str(raw.trim_end_matches('d'))
-                    .unwrap_or(Decimal::ZERO);
+                let d = Decimal::from_str(raw.trim_end_matches('d')).unwrap_or(Decimal::ZERO);
                 Ok(HirExpr::Decimal(d))
             }
             ExprKind::BigIntLiteral { raw } => {
                 let s = raw.trim_end_matches('n').replace('_', "");
-                let parsed = if let Some(r) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+                let parsed = if let Some(r) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X"))
+                {
                     i128::from_str_radix(r, 16)
                 } else if let Some(r) = s.strip_prefix("0o").or_else(|| s.strip_prefix("0O")) {
                     i128::from_str_radix(r, 8)
@@ -556,17 +572,14 @@ impl<'a> Lowerer<'a> {
                 } else {
                     s.parse()
                 };
-                // Overflow of i128 defaults to 0, mirroring legacy
-                // `codegen/expr/mod.rs` (no error / no fallback).
+
                 let num = parsed.unwrap_or(0);
                 Ok(HirExpr::BigInt(num))
             }
-            ExprKind::RegexLiteral { pattern, flags } => {
-                Ok(HirExpr::Regex {
-                    pattern: Rc::from(pattern.as_str()),
-                    flags: Rc::from(flags.as_str()),
-                })
-            }
+            ExprKind::RegexLiteral { pattern, flags } => Ok(HirExpr::Regex {
+                pattern: Rc::from(pattern.as_str()),
+                flags: Rc::from(flags.as_str()),
+            }),
             ExprKind::Await { argument } => {
                 let inner = self.lower_expr(argument, scope)?;
                 Ok(HirExpr::Await(Box::new(inner)))
@@ -583,13 +596,13 @@ impl<'a> Lowerer<'a> {
                 };
                 Ok(HirExpr::Yield(Box::new(inner)))
             }
-            // `as` / `satisfies` are type-only — transparent at codegen.
+
             ExprKind::As { expression, .. } | ExprKind::Satisfies { expression, .. } => {
                 self.lower_expr(expression, scope)
             }
-            ExprKind::NonNull { expression } => {
-                Ok(HirExpr::NonNull(Box::new(self.lower_expr(expression, scope)?)))
-            }
+            ExprKind::NonNull { expression } => Ok(HirExpr::NonNull(Box::new(
+                self.lower_expr(expression, scope)?,
+            ))),
             ExprKind::Sequence { expressions } => {
                 let mut out = Vec::with_capacity(expressions.len());
                 for e in expressions {
@@ -620,20 +633,17 @@ impl<'a> Lowerer<'a> {
                 }
                 Ok(HirExpr::Template(out))
             }
-            // Assignment in expression position (statement-level assigns are
-            // handled in `lower_stmt`). Yields the assigned value.
+
             ExprKind::Assign { op, target, value } => {
                 if let ExprKind::Member {
                     object,
                     property,
                     computed,
-                    // `optional` (`o?.x = v`) ignored — see `lower_assign_target`.
                     ..
                 } = &target.kind
                 {
                     let off = target.range.start.offset;
-                    // Extension setter `x.k = v` (as expression) → the setter
-                    // call, which yields its return value.
+
                     if let Some(mangled) = self.extension_set_members.get(&off).cloned() {
                         let recv = self.lower_expr(object, scope)?;
                         let val = self.lower_expr(value, scope)?;
@@ -672,7 +682,11 @@ impl<'a> Lowerer<'a> {
                         } else {
                             let name = match &property.kind {
                                 ExprKind::Identifier { name } => name.clone(),
-                                _ => return Err(OptError::Unsupported("hir: non-identifier super property assign")),
+                                _ => {
+                                    return Err(OptError::Unsupported(
+                                        "hir: non-identifier super property assign",
+                                    ))
+                                }
                             };
                             let value = self.lower_expr(value, scope)?;
                             if matches!(op, AssignOp::Assign) {
@@ -699,7 +713,10 @@ impl<'a> Lowerer<'a> {
                             }
                         }
                     }
-                    if matches!(op, AssignOp::AndAssign | AssignOp::OrAssign | AssignOp::NullishAssign) {
+                    if matches!(
+                        op,
+                        AssignOp::AndAssign | AssignOp::OrAssign | AssignOp::NullishAssign
+                    ) {
                         let lop = match op {
                             AssignOp::AndAssign => HirLogicalOp::And,
                             AssignOp::OrAssign => HirLogicalOp::Or,
@@ -732,7 +749,11 @@ impl<'a> Lowerer<'a> {
                         } else {
                             let name = match &property.kind {
                                 ExprKind::Identifier { name } => name.clone(),
-                                _ => return Err(OptError::Unsupported("hir: non-identifier property assign")),
+                                _ => {
+                                    return Err(OptError::Unsupported(
+                                        "hir: non-identifier property assign",
+                                    ))
+                                }
                             };
                             let value = self.lower_expr(value, scope)?;
                             let current_val = HirExpr::Member {
@@ -784,7 +805,11 @@ impl<'a> Lowerer<'a> {
                         } else {
                             let name = match &property.kind {
                                 ExprKind::Identifier { name } => name.clone(),
-                                _ => return Err(OptError::Unsupported("hir: non-identifier property assign")),
+                                _ => {
+                                    return Err(OptError::Unsupported(
+                                        "hir: non-identifier property assign",
+                                    ))
+                                }
                             };
                             let value = self.lower_expr(value, scope)?;
                             let current_val = HirExpr::Member {
@@ -818,7 +843,11 @@ impl<'a> Lowerer<'a> {
                     } else {
                         let name = match &property.kind {
                             ExprKind::Identifier { name } => name.clone(),
-                            _ => return Err(OptError::Unsupported("hir: non-identifier property assign")),
+                            _ => {
+                                return Err(OptError::Unsupported(
+                                    "hir: non-identifier property assign",
+                                ))
+                            }
                         };
                         HirAssignTarget::Member {
                             object: object_hir,
@@ -836,7 +865,10 @@ impl<'a> Lowerer<'a> {
                     _ => return Err(OptError::Unsupported("hir: non-identifier assign target")),
                 };
                 let val_expr = self.lower_expr(value, scope)?;
-                if matches!(op, AssignOp::AndAssign | AssignOp::OrAssign | AssignOp::NullishAssign) {
+                if matches!(
+                    op,
+                    AssignOp::AndAssign | AssignOp::OrAssign | AssignOp::NullishAssign
+                ) {
                     let lop = match op {
                         AssignOp::AndAssign => HirLogicalOp::And,
                         AssignOp::OrAssign => HirLogicalOp::Or,
@@ -873,8 +905,6 @@ impl<'a> Lowerer<'a> {
                 })
             }
             ExprKind::Try { expression } => {
-                // `expr?` try operator. Emits `GetEnumTag` + `JumpIfTrue` +
-                // early `Return` in the emitter (legacy `compile_try_expr`).
                 let inner = self.lower_expr(expression, scope)?;
                 Ok(HirExpr::TryOp(Box::new(inner)))
             }
@@ -954,11 +984,6 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    /// Whether `callee` is a statically-guaranteed reference to the enclosing
-    /// function: a bare identifier equal to the current function's name, not
-    /// shadowed by a local/param, and never reassigned in the module. Mirrors
-    /// legacy `can_emit_self_call` (async/generator/rest/`this` cases are
-    /// already excluded upstream because such functions fall back to legacy).
     fn is_self_call(&self, callee: &Expr, scope: &Scope) -> bool {
         let ExprKind::Identifier { name } = &callee.kind else {
             return false;
@@ -967,41 +992,24 @@ impl<'a> Lowerer<'a> {
             Some(cur) if cur == name => {}
             _ => return false,
         }
-        // Self-recursion is `CallSelf` (direct, no closure lookup) when the name
-        // is not shadowed by a param/local of *this* function and is not
-        // reassigned. Checking only the current frame — not capturing from a
-        // parent — matches legacy `name_resolves_locally`, so a nested function
-        // recurses via `CallSelf` instead of an upvalue to its own slot (which
-        // would be a use-before-def the register allocator can't model).
+
         scope.resolve_in_current_frame(name).is_none() && !self.ann.is_reassigned_name(name)
     }
 
-    /// Lower a call's arguments into the callee's **parameter order**, honouring
-    /// the checker's `get_call_mapping` (named-arg reordering + default fills,
-    /// where a `None` slot becomes `null` and the callee's default prologue
-    /// supplies the value). Evaluation order matches legacy (param order). Spread
-    /// args still fall back. Used by plain/method/extension/`new` calls.
-    fn lower_call_args(
-        &mut self,
-        args: &[Arg],
-        offset: u32,
-        scope: &mut Scope,
-    ) -> R<Vec<HirExpr>> {
+    fn lower_call_args(&mut self, args: &[Arg], offset: u32, scope: &mut Scope) -> R<Vec<HirExpr>> {
         if let Some(mapping) = self.ann.get_call_mapping(offset).cloned() {
             let mut out = Vec::with_capacity(mapping.len());
             for opt in &mapping {
                 match opt {
-                    Some(i) => {
-                        match &args[*i] {
-                            Arg::Positional(e) | Arg::Named { value: e, .. } => {
-                                out.push(self.lower_expr(e, scope)?);
-                            }
-                            Arg::Spread(e) => {
-                                let h = self.lower_expr(e, scope)?;
-                                out.push(HirExpr::Spread(Box::new(h)));
-                            }
+                    Some(i) => match &args[*i] {
+                        Arg::Positional(e) | Arg::Named { value: e, .. } => {
+                            out.push(self.lower_expr(e, scope)?);
                         }
-                    }
+                        Arg::Spread(e) => {
+                            let h = self.lower_expr(e, scope)?;
+                            out.push(HirExpr::Spread(Box::new(h)));
+                        }
+                    },
                     None => out.push(HirExpr::Null),
                 }
             }
@@ -1023,8 +1031,6 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    /// Build a call of a mangled extension global (`__ext*_T_k`): `recv` is the
-    /// receiver (`this`), `args` follow.
     pub(super) fn ext_global_call(
         &self,
         mangled: Rc<str>,
@@ -1042,15 +1048,11 @@ impl<'a> Lowerer<'a> {
         if let Some(b) = scope.resolve(name) {
             b
         } else {
-            // Unresolved locally -> module global (covers builtins like `print`
-            // too, which the VM resolves by name).
             HirBinding::Global(name.clone())
         }
     }
 }
 
-/// Reduce an `expr is Type` `TypeNode` to one concrete runtime check. Mirrors
-/// legacy `member::compile_is`'s match over `TypeKind`.
 fn type_test_of(type_ann: &varn_core::ast::types::TypeNode) -> HirTypeTest {
     use varn_core::{IntrinsicType, TypeKind, TypeTag};
     match &type_ann.kind {
@@ -1059,7 +1061,9 @@ fn type_test_of(type_ann: &varn_core::ast::types::TypeNode) -> HirTypeTest {
         TypeKind::Generic(n, _, _) if n.as_str() == IntrinsicType::Array.as_str() => {
             HirTypeTest::IsArray
         }
-        TypeKind::Intrinsic(tt) => HirTypeTest::TypeofEq(Rc::from(IntrinsicType::from(*tt).as_str())),
+        TypeKind::Intrinsic(tt) => {
+            HirTypeTest::TypeofEq(Rc::from(IntrinsicType::from(*tt).as_str()))
+        }
         TypeKind::Named(name, _) => match IntrinsicType::from_str(name) {
             Some(it) if it.is_scalar_primitive() => HirTypeTest::TypeofEq(Rc::from(it.as_str())),
             _ => HirTypeTest::Instanceof(Rc::from(name.as_str())),
@@ -1068,9 +1072,6 @@ fn type_test_of(type_ann: &varn_core::ast::types::TypeNode) -> HirTypeTest {
     }
 }
 
-/// Whether a `|>` right-hand side uses the `_` placeholder (`x |> f(_)`), which
-/// legacy desugars into a synthetic closure. Mirrors legacy
-/// `templates::pipeline_has_placeholder`; varn-opt defers that form.
 fn pipeline_has_placeholder(expr: &Expr) -> bool {
     match &expr.kind {
         ExprKind::Identifier { name } => &**name == "_",

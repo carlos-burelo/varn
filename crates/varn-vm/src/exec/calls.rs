@@ -4,7 +4,7 @@ use crate::frame::{CallFrame, VmClosure, VmClosurePayload, VmUpvalue};
 use crate::globals::GlobalStore;
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
-use std::cell::RefCell;
+
 use std::rc::Rc;
 use varn_types::generator::GeneratorObj;
 use varn_types::value::BoundMethodTarget;
@@ -107,7 +107,7 @@ pub fn prepare_call(
     arg_count: usize,
     stack: &mut Vec<VmValue>,
     heap: &mut Heap,
-    globals: &mut GlobalStore,
+    
 ) -> VmResult<PreparedCall> {
     let mut arg_count = arg_count;
 
@@ -292,7 +292,8 @@ pub fn prepare_call(
                                 .collect();
                             let consts: Vec<varn_types::Value> =
                                 nc.constants.iter().map(|&c| heap.extract(c)).collect();
-                            let closure = varn_types::Closure::new(nc.proto.clone(), upvalues, consts);
+                            let closure =
+                                varn_types::Closure::new(nc.proto.clone(), upvalues, consts);
                             let task = Value::Task(std::rc::Rc::new(LazyTask {
                                 closure: std::rc::Rc::new(closure),
                                 args,

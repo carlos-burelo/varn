@@ -3,8 +3,6 @@ use varn_op_macros::varn_contract;
 use varn_types::value::MapRef;
 use varn_types::{NativeCtx, Value, VmValue};
 
-/// Native implementation backing the `Map` contract
-/// (`src/modules/primitives/map/map.vn`).
 pub struct Map;
 
 fn get_map(ctx: &dyn NativeCtx, this: VmValue) -> Option<MapRef> {
@@ -15,8 +13,6 @@ fn get_map(ctx: &dyn NativeCtx, this: VmValue) -> Option<MapRef> {
     }
 }
 
-/// Canonicalise a `&str` key into the `Value` the map is keyed by, by routing
-/// it through the same str-allocation path the runtime uses.
 fn str_key(ctx: &mut dyn NativeCtx, key: &str) -> Value {
     let kv = ctx.alloc_str(key);
     ctx.extract(kv)

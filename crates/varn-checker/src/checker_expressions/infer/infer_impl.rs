@@ -27,19 +27,11 @@ impl Checker {
                 .current_class
                 .as_ref()
                 .map(|cn| match IntrinsicType::from_str(cn) {
-                    // Extensions on a primitive set `current_class` to the
-                    // primitive's name; `this` is then that intrinsic type, not
-                    // a named type, so `return this` stays compatible with the
-                    // primitive's declared return type (fixes WR3001 on e.g.
-                    // `extension X on int { f(): int { return this } }`).
                     Some(it) if it.is_scalar_primitive() => Type::intrinsic(it.0),
                     _ => Type::named(cn.to_string()),
                 })
                 .unwrap_or(Type::Dynamic),
-            // `super` is the enclosing class's parent type, so `super.method()`
-            // resolves against the superclass instead of falling back to
-            // `dynamic` (which previously produced hovers like
-            // `(property) super.speak: dynamic`).
+
             ExprKind::Super => self
                 .current_class
                 .as_ref()
@@ -51,10 +43,6 @@ impl Checker {
             } => {
                 let callee_ty = self.infer_type(callee, bind);
                 if callee_ty.is_dynamic() {
-                    // A `dynamic` callee (e.g. `let C: dynamic = class {…}`) has no
-                    // registered class type, so `new C()` is `dynamic`. Naming it
-                    // after the identifier would invent a memberless `C` type and
-                    // reject every field/method access on the instance.
                     return Type::Dynamic;
                 }
                 match &callee_ty.0 {
@@ -76,13 +64,11 @@ impl Checker {
                             )
                         }
                     }
-                    TypeKind::Generic(name, args, origin) => {
-                        Type::generic_with_origin(
-                            name.to_string(),
-                            args.clone(),
-                            origin.as_ref().map(|s| s.to_string()),
-                        )
-                    }
+                    TypeKind::Generic(name, args, origin) => Type::generic_with_origin(
+                        name.to_string(),
+                        args.clone(),
+                        origin.as_ref().map(|s| s.to_string()),
+                    ),
                     _ => {
                         if let ExprKind::Identifier { name } = &callee.kind {
                             if !type_args.is_empty() {
@@ -346,11 +332,14 @@ impl Checker {
             TypeKind::Array(inner) if matches!(prop_ty.0, TypeKind::Intrinsic(TypeTag::Int)) => {
                 (**inner).clone()
             }
-            TypeKind::Intrinsic(TypeTag::Str) if matches!(prop_ty.0, TypeKind::Intrinsic(TypeTag::Int)) => {
+            TypeKind::Intrinsic(TypeTag::Str)
+                if matches!(prop_ty.0, TypeKind::Intrinsic(TypeTag::Int)) =>
+            {
                 Type::Str
             }
             TypeKind::Named(name, _)
-                if name.as_ref() == "str" && matches!(prop_ty.0, TypeKind::Intrinsic(TypeTag::Int)) =>
+                if name.as_ref() == "str"
+                    && matches!(prop_ty.0, TypeKind::Intrinsic(TypeTag::Int)) =>
             {
                 Type::Str
             }

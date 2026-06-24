@@ -3,6 +3,7 @@ use varn_checker::SymbolKind;
 
 use crate::document::{DocumentState, SymbolRecord};
 use crate::util::converters::{range_on_line, to_lsp_symbol_kind};
+use crate::util::kinds::{is_container_symbol_kind, member_to_symbol_kind};
 
 pub fn build_document_symbols(state: &DocumentState) -> DocumentSymbolResponse {
     let mut sorted: Vec<&SymbolRecord> = state
@@ -16,14 +17,7 @@ pub fn build_document_symbols(state: &DocumentState) -> DocumentSymbolResponse {
 }
 
 fn is_container(kind: SymbolKind) -> bool {
-    matches!(
-        kind,
-        SymbolKind::Class
-            | SymbolKind::Interface
-            | SymbolKind::Namespace
-            | SymbolKind::Enum
-            | SymbolKind::Struct
-    )
+    is_container_symbol_kind(kind)
 }
 
 #[allow(deprecated)]
@@ -76,38 +70,23 @@ fn insert_at_depth(nodes: &mut Vec<DocumentSymbol>, depth: usize, sym: DocumentS
 #[allow(deprecated)]
 fn member_to_doc(m: &crate::document::MemberRecord) -> DocumentSymbol {
     let name_end = m.col + m.name.len() as u32;
-    // Map MemberKind to SymbolKind
-    let kind = match m.kind {
-        crate::document::MemberKind::Constructor => SymbolKind::Method,
-        crate::document::MemberKind::Method => SymbolKind::Method,
-        crate::document::MemberKind::Function => SymbolKind::Function,
-        crate::document::MemberKind::Property => SymbolKind::Property,
-        crate::document::MemberKind::Variable => SymbolKind::Let,
-        crate::document::MemberKind::EnumMember => SymbolKind::EnumMember,
-        crate::document::MemberKind::Getter => SymbolKind::Method,
-        crate::document::MemberKind::Setter => SymbolKind::Method,
-        crate::document::MemberKind::Class => SymbolKind::Class,
-        crate::document::MemberKind::Interface => SymbolKind::Interface,
-        crate::document::MemberKind::Namespace => SymbolKind::Namespace,
-        crate::document::MemberKind::Enum => SymbolKind::Enum,
-        crate::document::MemberKind::Struct => SymbolKind::Struct,
-    };
-    
+    let kind = member_to_symbol_kind(m.kind);
+
     let full_range = range_on_line(m.line, m.col, name_end);
     let select_range = range_on_line(m.line, m.col, name_end);
-    
+
     let detail = if m.type_str.is_empty() {
         None
     } else {
         Some(m.type_str.clone())
     };
-    
+
     let children = if m.members.is_empty() {
         None
     } else {
         Some(m.members.iter().map(member_to_doc).collect())
     };
-    
+
     DocumentSymbol {
         name: m.name.clone(),
         detail,

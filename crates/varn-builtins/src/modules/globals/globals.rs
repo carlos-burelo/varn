@@ -24,7 +24,6 @@ fn init_error(ctx: &mut dyn NativeCtx, this: VmValue, message: Option<&str>, cla
     ctx.set_field(this, "stack", stack);
 }
 
-/// Global builtin functions (`print`, `assert`, ...).
 pub struct Globals;
 
 varn_contract! {
@@ -91,7 +90,6 @@ varn_contract! {
     }
 }
 
-/// `Error` builtin class.
 pub struct ErrorClass;
 
 varn_contract! {
@@ -122,7 +120,6 @@ varn_contract! {
     }
 }
 
-/// `TypeError` builtin class.
 pub struct TypeErrorClass;
 
 varn_contract! {
@@ -138,7 +135,6 @@ varn_contract! {
     }
 }
 
-/// `RangeError` builtin class.
 pub struct RangeErrorClass;
 
 varn_contract! {

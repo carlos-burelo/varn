@@ -45,10 +45,7 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
             }
             return Some(make_lang_hover("(this) this".to_owned()));
         }
-        // Keywords in keyword position (not member access) have no symbol hover.
-        // Contextual keywords such as `await`/`async`/`yield` are can_be_identifier(),
-        // so the resolution paths below would otherwise mis-report them, e.g.
-        // `(property) await: int`. A `.await` member access is left to resolve normally.
+
         let prev_is_dot = idx
             .checked_sub(1)
             .and_then(|j| state.tokens.get(j))
@@ -115,8 +112,6 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
 }
 
 pub(crate) fn make_lang_hover(value: String) -> Hover {
-    // Markdown code fence so the client highlights the signature via the `Varn`
-    // grammar (MarkedString::LanguageString is deprecated + inconsistently styled).
     Hover {
         contents: HoverContents::Markup(MarkupContent {
             kind: MarkupKind::Markdown,

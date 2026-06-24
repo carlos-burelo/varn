@@ -1,6 +1,5 @@
 use crate::heap::{HeapInner, HeapObj};
 use crate::nursery::{is_old_idx, old_idx_raw};
-use crate::value::VmValue;
 use std::collections::VecDeque;
 use std::fmt;
 
@@ -91,7 +90,7 @@ pub struct TricolorMarker {
     gray_queue: VecDeque<u32>,
     marked_count: usize,
 
-    max_recursion_depth: usize,
+    
 }
 
 impl TricolorMarker {
@@ -100,7 +99,7 @@ impl TricolorMarker {
             marks: MarkBitmap::new(heap_capacity),
             gray_queue: VecDeque::new(),
             marked_count: 0,
-            max_recursion_depth: 1000,
+            
         }
     }
 

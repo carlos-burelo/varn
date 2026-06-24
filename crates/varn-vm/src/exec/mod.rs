@@ -20,11 +20,8 @@ pub mod modules;
 pub mod props;
 pub mod strings;
 pub mod vars;
-
 pub use ctx::ExecCtx;
-
 use crate::value::VmValue;
-use varn_types::generator::GenChannel;
 
 pub enum VmSuspend {
     Yield {

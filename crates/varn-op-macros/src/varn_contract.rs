@@ -1,30 +1,3 @@
-//! `varn_contract!` — the contract-driven native binding generator.
-//!
-//! The `.vn` declaration of a builtin type is the single source of truth.
-//! This macro reads that contract at expansion time (via the real
-//! `varn-lexer`/`varn-parser`), turns every declared member into a typed Rust
-//! trait method, re-emits the caller-supplied bodies as `impl Trait for T`,
-//! and generates the `&[VmValue]` dispatch wrappers + the class builder +
-//! the linker-section registration entry.
-//!
-//! Because the trait is generated from the contract and the bodies are placed
-//! in an `impl` of that trait, *drift becomes a Rust compile error*:
-//!   - a declared method with no body  → "not all trait items implemented"
-//!   - a body whose name/type is wrong → trait mismatch / unknown-method error
-//!
-//! Usage:
-//! ```ignore
-//! varn_contract! {
-//!     module: "globals",
-//!     class: "bool",
-//!     contract: "src/modules/primitives/bool/bool.vn",
-//!     impl Bool {
-//!         fn toString(_ctx: &mut dyn NativeCtx, this: bool) -> String { ... }
-//!         fn valueOf(_ctx: &mut dyn NativeCtx, this: bool) -> bool { this }
-//!     }
-//! }
-//! ```
-
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TS2;
 use quote::{format_ident, quote};
@@ -37,16 +10,11 @@ use varn_core::ast::{FunctionDecl, TypeNode};
 use varn_core::kinds::TypeKind;
 use varn_core::TypeTag;
 
-// ---------------------------------------------------------------------------
-// Macro input
-// ---------------------------------------------------------------------------
-
 pub(crate) struct ContractInput {
     module: String,
-    /// `Some` for a `declare class` contract; `None` for a function-module
-    /// contract (top-level `declare function`s).
+
     class: Option<String>,
-    /// Optional superclass name for a class contract (`extends`).
+
     extends: Option<String>,
     contract: String,
     self_ty: syn::Type,
@@ -102,10 +70,6 @@ impl Parse for ContractInput {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Type mapping (contract TypeNode -> Rust types)
-// ---------------------------------------------------------------------------
-
 #[derive(Clone)]
 enum Mapped {
     Int,
@@ -145,7 +109,6 @@ fn classify(t: &TypeNode) -> Mapped {
     }
 }
 
-/// Receiver (`this`) type for an instance member of `class`.
 fn receiver_mapped(class: &str) -> Mapped {
     match class {
         "str" => Mapped::Str,
@@ -158,7 +121,6 @@ fn receiver_mapped(class: &str) -> Mapped {
     }
 }
 
-/// Type as it appears in the trait signature (what the body author sees).
 fn param_ty(m: &Mapped) -> TS2 {
     match m {
         Mapped::Int => quote!(i64),
@@ -176,7 +138,6 @@ fn param_ty(m: &Mapped) -> TS2 {
     }
 }
 
-/// Owned type produced by `FromVm` for decoding (the wrapper local binding).
 fn owned_ty(m: &Mapped) -> TS2 {
     match m {
         Mapped::Str => quote!(String),
@@ -188,7 +149,6 @@ fn owned_ty(m: &Mapped) -> TS2 {
     }
 }
 
-/// Return type in the trait signature.
 fn ret_ty(m: &Mapped) -> TS2 {
     match m {
         Mapped::Str => quote!(String),
@@ -201,7 +161,6 @@ fn ret_ty(m: &Mapped) -> TS2 {
     }
 }
 
-/// How a decoded local binding is passed to the trait method.
 fn call_expr(binding: &Ident, m: &Mapped) -> TS2 {
     match m {
         Mapped::Str => quote!(&#binding),
@@ -210,10 +169,6 @@ fn call_expr(binding: &Ident, m: &Mapped) -> TS2 {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Member model
-// ---------------------------------------------------------------------------
-
 #[derive(Clone, Copy, PartialEq)]
 enum Kind {
     Method,
@@ -221,8 +176,7 @@ enum Kind {
     StaticMethod,
     StaticGetter,
     Constructor,
-    /// A free `declare function` in a function-module contract. Like a static
-    /// method (no receiver) but registered as a standalone module op.
+
     Function,
 }
 
@@ -280,12 +234,13 @@ fn collect_members(class_name: &str, decl: &ClassDecl) -> Vec<Member> {
                     symbol: key.to_string(),
                     kind,
                     params: vec![],
-                    ret: return_type.as_ref().map(classify).unwrap_or(Mapped::Dynamic),
+                    ret: return_type
+                        .as_ref()
+                        .map(classify)
+                        .unwrap_or(Mapped::Dynamic),
                 });
             }
-            // A `readonly`/`static` property in a declare class is a native
-            // getter/static value. A plain instance property (e.g.
-            // `message: str` on Error) is just a data field — skip it.
+
             ClassMember::Property {
                 key,
                 type_ann,
@@ -306,9 +261,6 @@ fn collect_members(class_name: &str, decl: &ClassDecl) -> Vec<Member> {
                 });
             }
             ClassMember::Constructor { params, .. } => {
-                // A native constructor returns a `VmValue`: returning `this`
-                // keeps the VM-allocated instance, returning a fresh value
-                // replaces it (how Set/Map/Range become their backing Value).
                 out.push(Member {
                     symbol: "constructor".to_string(),
                     kind: Kind::Constructor,
@@ -323,7 +275,6 @@ fn collect_members(class_name: &str, decl: &ClassDecl) -> Vec<Member> {
     out
 }
 
-/// Collect top-level `export declare function`s for a function-module contract.
 fn collect_functions(body: &[Stmt]) -> Vec<Member> {
     fn from_decl(decl: &Decl, out: &mut Vec<Member>) {
         match decl {
@@ -350,8 +301,6 @@ fn function_member(f: &FunctionDecl) -> Member {
     }
 }
 
-/// The parser stores a param's type either on `Param.type_ann` (optional
-/// params) or on the identifier pattern (`name: T`), so check both.
 fn param_type(p: &Param) -> Option<&TypeNode> {
     if let Some(t) = &p.type_ann {
         return Some(t);
@@ -381,14 +330,9 @@ fn map_params(params: &[Param]) -> Vec<ParamInfo> {
         .collect()
 }
 
-// ---------------------------------------------------------------------------
-// Expansion
-// ---------------------------------------------------------------------------
-
 pub(crate) fn expand(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as ContractInput);
 
-    // Read + parse the contract `.vn` at macro-expansion time.
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
     let abs_path = Path::new(&manifest_dir).join(&input.contract);
     let abs_path_str = abs_path.to_string_lossy().replace('\\', "/");
@@ -425,7 +369,6 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
         }
     };
 
-    // Naming prefix: the class name, or the module id for a function-module.
     let prefix = input.class.clone().unwrap_or_else(|| input.module.clone());
     let trait_ident = format_ident!("__VarnContract_{}", sanitize(&prefix));
 
@@ -444,13 +387,10 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
         let method_ident = format_ident!("{}", sym);
         let wrap_ident = format_ident!("__varn_wrap_{}_{}", sanitize(&prefix), sanitize(sym));
 
-        // Build the receiver param (if any), the trait params and the wrapper
-        // decode statements + call args.
         let mut sig_params: Vec<TS2> = Vec::new();
         let mut decode: Vec<TS2> = Vec::new();
         let mut call_args: Vec<TS2> = Vec::new();
 
-        // index into `args` where positional contract params start
         let mut arg_base = 0usize;
 
         match m.kind {
@@ -470,7 +410,6 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                 arg_base = 1;
             }
             Kind::Constructor => {
-                // The object being constructed is passed raw.
                 sig_params.push(quote!(this: ::varn_types::VmValue));
                 let b = format_ident!("__this");
                 decode.push(quote! {
@@ -479,9 +418,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                 call_args.push(quote!(#b));
                 arg_base = 1;
             }
-            Kind::StaticMethod | Kind::StaticGetter | Kind::Function => {
-                // positional params start at args[0]
-            }
+            Kind::StaticMethod | Kind::StaticGetter | Kind::Function => {}
         }
 
         for (i, p) in m.params.iter().enumerate() {
@@ -512,9 +449,6 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
         let is_void = matches!(m.ret, Mapped::Void);
         let is_fn = m.kind == Kind::Function;
 
-        // Function-module ops sit on the fallible native boundary, so their
-        // bodies return `Result<T, String>` and the wrapper propagates the
-        // error. Class members are pure and return `T` directly.
         let trait_ret = if is_fn {
             let inner = if is_void { quote!(()) } else { rty.clone() };
             quote!(::core::result::Result<#inner, String>)
@@ -557,8 +491,6 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
             }
         });
 
-        // Registration: a function-module op is a standalone linker entry;
-        // class members are wired onto the ClassObj inside the builder.
         if m.kind == Kind::Function {
             let fn_entry_ident = format_ident!(
                 "__VARN_OP_{}_{}",
@@ -651,7 +583,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     };
 
     let out = quote! {
-        // Force a rebuild whenever the contract file changes.
+
         const _: &[u8] = include_bytes!(#abs_lit);
 
         #[allow(non_camel_case_types)]

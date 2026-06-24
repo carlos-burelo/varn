@@ -87,7 +87,9 @@ pub enum ObjectTypeMember {
     },
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, Default, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum ClassMemberKind {
     Constructor,
     Method,

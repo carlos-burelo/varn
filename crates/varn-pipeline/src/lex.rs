@@ -7,7 +7,12 @@ pub fn lex(source: &str, path: &str, verbose: bool, debug: &DebugFlags) -> (Vec<
 
     for e in &errors {
         varn_utilities::terminal::error(crate::fmt::format_error_with_context(
-            source, path, e.range.start.line, e.range.start.column, "lex", &e.message,
+            source,
+            path,
+            e.range.start.line,
+            e.range.start.column,
+            "lex",
+            &e.message,
         ));
     }
 

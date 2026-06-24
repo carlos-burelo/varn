@@ -1,25 +1,21 @@
-use crate::ssa::ir::{BlockId, SsaFunc, Terminator, Value, InstKind};
+use crate::ssa::ir::{BlockId, InstKind, SsaFunc, Terminator, Value};
 use rustc_hash::FxHashSet;
 
-/// Run Dead Code Elimination on `func`. Returns `true` if any changes were made.
 pub fn run(func: &mut SsaFunc) -> bool {
     let mut changed = false;
     let mut used = FxHashSet::default();
-    
-    // 1. Collect all used values
+
     for block in &func.blocks {
         for inst in &block.insts {
             add_inst_uses(&inst.kind, &mut used);
         }
         add_term_uses(&block.term, &mut used);
     }
-    
-    // 2. Eliminate unused instructions with no side effects
+
     for block_idx in 0..func.blocks.len() {
         let b_id = BlockId(block_idx as u32);
         let mut new_insts = Vec::new();
-        
-        // Temporarily take instructions to avoid borrowing issues
+
         let old_insts = std::mem::take(&mut func.blocks[b_id.0 as usize].insts);
         for inst in old_insts {
             if let Some(dest) = inst.dest {
@@ -32,14 +28,13 @@ pub fn run(func: &mut SsaFunc) -> bool {
         }
         func.blocks[b_id.0 as usize].insts = new_insts;
     }
-    
-    // 3. Eliminate unused block parameters (phis) in non-entry blocks
+
     for b_idx in 0..func.blocks.len() {
         let b_id = BlockId(b_idx as u32);
         if b_id == func.entry {
             continue;
         }
-        
+
         let mut pos = 0;
         while pos < func.blocks[b_id.0 as usize].params.len() {
             let phi = func.blocks[b_id.0 as usize].params[pos];
@@ -51,7 +46,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
             }
         }
     }
-    
+
     changed
 }
 
@@ -64,6 +59,7 @@ fn has_side_effects(kind: &InstKind) -> bool {
             | InstKind::SelfCall { .. }
             | InstKind::SetProperty { .. }
             | InstKind::SetIndex { .. }
+            | InstKind::ObjectMerge { .. }
             | InstKind::MethodCall { .. }
             | InstKind::IntrinsicCall { .. }
             | InstKind::AssertNotNull { .. }
@@ -89,7 +85,6 @@ fn has_side_effects(kind: &InstKind) -> bool {
             | InstKind::Yield { .. }
     )
 }
-
 
 fn remove_param(func: &mut SsaFunc, block: BlockId, pos: usize) {
     func.blocks[block.0 as usize].params.remove(pos);
@@ -118,8 +113,6 @@ fn remove_param(func: &mut SsaFunc, block: BlockId, pos: usize) {
     }
 }
 
-/// Operands used by an instruction — delegates to the single source of truth
-/// (`verify::inst_uses`) so DCE never drifts out of sync with the IR.
 fn add_inst_uses(kind: &InstKind, used: &mut FxHashSet<Value>) {
     used.extend(crate::ssa::verify::inst_uses(kind));
 }
@@ -137,7 +130,12 @@ fn add_term_uses(term: &Terminator, used: &mut FxHashSet<Value>) {
                 used.insert(arg);
             }
         }
-        Terminator::Branch { cond, then_args, else_args, .. } => {
+        Terminator::Branch {
+            cond,
+            then_args,
+            else_args,
+            ..
+        } => {
             used.insert(*cond);
             for &arg in then_args {
                 used.insert(arg);

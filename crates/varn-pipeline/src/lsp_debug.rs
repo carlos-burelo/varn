@@ -204,7 +204,11 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
             let mut curr_col = 0u32;
             for chunk in sem_tokens.chunks_exact(5) {
                 curr_line += chunk[0];
-                curr_col = if chunk[0] == 0 { curr_col + chunk[1] } else { chunk[1] };
+                curr_col = if chunk[0] == 0 {
+                    curr_col + chunk[1]
+                } else {
+                    chunk[1]
+                };
                 abs_spans.push((curr_line, curr_col, chunk[2], chunk[3]));
             }
         }

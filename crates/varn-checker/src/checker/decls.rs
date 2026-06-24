@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::{Type, ClassMemberKind, TypeContext};
+use crate::types::{ClassMemberKind, Type, TypeContext};
 use varn_core::ast::{ClassMember, Decl, ExprKind, ExtensionMember};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
@@ -90,12 +90,22 @@ impl Checker {
                 if is_gen {
                     let yields = self.yielded_types.take().unwrap_or_default();
                     if f.return_type.is_none() {
-                        let inferred_yield = if yields.is_empty() { Type::Void } else { Type::union(yields) };
+                        let inferred_yield = if yields.is_empty() {
+                            Type::Void
+                        } else {
+                            Type::union(yields)
+                        };
                         let scope = bind.scopes.get(saved_scope);
                         if let Some(sym_id) = scope.resolve(&f.id, &bind.scopes) {
-                            if let Some(mut fn_ty) = self.symbol_types.get(&sym_id).cloned().or_else(|| bind.arena.get(sym_id).ty.clone()) {
+                            if let Some(mut fn_ty) = self
+                                .symbol_types
+                                .get(&sym_id)
+                                .cloned()
+                                .or_else(|| bind.arena.get(sym_id).ty.clone())
+                            {
                                 if let TypeKind::Fn(ref mut ft) = fn_ty.0 {
-                                    ft.return_type = Box::new(Type::generic("Generator", vec![inferred_yield]));
+                                    ft.return_type =
+                                        Box::new(Type::generic("Generator", vec![inferred_yield]));
                                 }
                                 self.symbol_types.insert(sym_id, fn_ty.clone());
                                 self.record_type_with_symbol(f.id_offset, fn_ty, sym_id);
@@ -118,7 +128,9 @@ impl Checker {
                 }
 
                 let mut superclass_members = Vec::new();
-                let mut parent = c.id.as_ref().and_then(|cls_id| bind.class_parents.get(cls_id));
+                let mut parent =
+                    c.id.as_ref()
+                        .and_then(|cls_id| bind.class_parents.get(cls_id));
                 while let Some(parent_name) = parent {
                     if let Some(m) = bind.get_class_members(parent_name, None) {
                         superclass_members.extend(m);
@@ -128,11 +140,29 @@ impl Checker {
 
                 for member in &c.body {
                     match member {
-                        ClassMember::Method { key, modifiers, range, .. } |
-                        ClassMember::Getter { key, modifiers, range, .. } |
-                        ClassMember::Setter { key, modifiers, range, .. } => {
+                        ClassMember::Method {
+                            key,
+                            modifiers,
+                            range,
+                            ..
+                        }
+                        | ClassMember::Getter {
+                            key,
+                            modifiers,
+                            range,
+                            ..
+                        }
+                        | ClassMember::Setter {
+                            key,
+                            modifiers,
+                            range,
+                            ..
+                        } => {
                             let is_override = modifiers.is_override;
-                            let exists_in_superclass = superclass_members.iter().any(|m| m.name.as_ref() == key.as_ref() && m.kind != ClassMemberKind::Constructor);
+                            let exists_in_superclass = superclass_members.iter().any(|m| {
+                                m.name.as_ref() == key.as_ref()
+                                    && m.kind != ClassMemberKind::Constructor
+                            });
                             if exists_in_superclass {
                                 if !is_override {
                                     self.emit(
@@ -372,7 +402,11 @@ impl Checker {
                             }
                         }
                         ClassMember::Setter {
-                            key, param, body, range, ..
+                            key,
+                            param,
+                            body,
+                            range,
+                            ..
                         } => {
                             if let Some(body_stmt) = body {
                                 let saved_setter_scope = self.current_scope;
@@ -389,8 +423,13 @@ impl Checker {
 
                                 if param_ty.is_dynamic() {
                                     if let Some(ref class_name) = self.current_class {
-                                        if let Some(members) = bind.get_class_members(class_name, None) {
-                                            if let Some(m) = members.iter().find(|m| m.name.as_ref() == key.as_ref()) {
+                                        if let Some(members) =
+                                            bind.get_class_members(class_name, None)
+                                        {
+                                            if let Some(m) = members
+                                                .iter()
+                                                .find(|m| m.name.as_ref() == key.as_ref())
+                                            {
                                                 param_ty = m.ty.clone();
                                             }
                                         }
@@ -446,10 +485,10 @@ impl Checker {
                 let ext_self_ty = self.resolve_type_node_cached(&ext.target, bind);
                 let ext_class_name = match &ext_self_ty.0 {
                     TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(n.clone()),
-                    // Every scalar primitive target (int/float/bool/str/char/
-                    // decimal/bigint/symbol) names `this` by its intrinsic name,
-                    // kept in sync with the `ExprKind::This` inference.
-                    TypeKind::Intrinsic(tag) if varn_core::IntrinsicType(*tag).is_scalar_primitive() => {
+
+                    TypeKind::Intrinsic(tag)
+                        if varn_core::IntrinsicType(*tag).is_scalar_primitive() =>
+                    {
                         Some(varn_core::IntrinsicType(*tag).as_str().into())
                     }
                     _ => None,

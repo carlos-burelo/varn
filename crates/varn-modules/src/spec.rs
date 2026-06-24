@@ -3,30 +3,17 @@ pub const STD_PREFIX: &str = "std:";
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ModuleKind {
-    /// Intrinsic domain: primitive methods, compiler-known symbols.
     Core,
-
-    /// Public standard library: stable API, versioned.
     Stdlib,
-
-    /// ABI boundary: low-level runtime ops, native-only.
     Runtime,
 }
 
 pub struct ModuleSpec {
     pub id: &'static str,
     pub kind: ModuleKind,
-
     pub vn_source: &'static str,
-
     pub embedded: Option<&'static str>,
-
     pub exports: &'static [&'static str],
-
-    /// True when this module has no side effects at init time and contains only
-    /// primitives, native functions, and nested namespaces. Such modules can be
-    /// evaluated once and their exports frozen into `FrozenModuleObj` for reuse
-    /// across VM instances without re-execution.
     pub pure: bool,
 }
 

@@ -1,8 +1,6 @@
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, Value, VmValue};
 
-/// Native implementation backing the `char` contract
-/// (`src/modules/primitives/char/char.vn`).
 pub struct Char;
 
 varn_contract! {

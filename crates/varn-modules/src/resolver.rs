@@ -7,8 +7,6 @@ pub use super::{
 use std::path::{Component, Path, PathBuf};
 use varn_core::ModuleId;
 
-/// Pure-logic module resolver. No source file I/O — resolves specifiers to `ModuleId` using
-/// path math and manifest reads only.
 pub struct ModuleResolver;
 
 impl Default for ModuleResolver {
@@ -62,7 +60,6 @@ impl ModuleResolver {
     }
 }
 
-/// Resolve `..` and `.` components without touching the filesystem.
 fn normalize_components(path: &Path) -> PathBuf {
     let mut out = PathBuf::new();
     for c in path.components() {
@@ -126,21 +123,19 @@ pub fn is_known_module(specifier: &str) -> bool {
 pub const VARN_SCHEME: &str = "varn://";
 
 pub fn to_varn_uri(specifier: &str) -> String {
-    // "core:global" → "varn://core/global"
-    // "std:io"      → "varn://std/io"
     if let Some((cat, rest)) = specifier.split_once(':') {
-        format!("varn://{cat}/{rest}")
+        format!("{VARN_SCHEME}{cat}/{rest}")
     } else {
-        format!("varn://{specifier}")
+        format!("{VARN_SCHEME}{specifier}")
     }
 }
 
 pub fn is_varn_uri(uri: &str) -> bool {
-    uri.starts_with("varn://")
+    uri.starts_with(VARN_SCHEME)
 }
 
 pub fn specifier_from_uri(uri: &str) -> Option<String> {
-    let path = uri.strip_prefix("varn://")?;
+    let path = uri.strip_prefix(VARN_SCHEME)?;
     let slash = path.find('/')?;
     let cat = &path[..slash];
     let rest = &path[slash + 1..];

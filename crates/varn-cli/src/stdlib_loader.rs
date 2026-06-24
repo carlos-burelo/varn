@@ -4,8 +4,8 @@ use varn_core::{ImportSpecifier, ModuleId};
 use varn_types::FunctionProto;
 use varn_vm::loader::{ModuleError, ModuleLoader};
 
-/// Loads user `.vn` files from the filesystem. All I/O lives here — the resolver produces
-/// a `ModuleId::Local` path; this loader reads, parses, and compiles it.
+
+
 pub struct FileLoader;
 
 impl ModuleLoader for FileLoader {
@@ -60,7 +60,7 @@ impl ModuleLoader for StdlibLoader {
     fn load(&self, id: &ModuleId) -> Result<Option<Rc<FunctionProto>>, ModuleError> {
         let spec = match id {
             ModuleId::Std(s) | ModuleId::Core(s) => s.as_ref(),
-            // runtime:* modules are native-only — no .vn source to compile.
+            
             ModuleId::Runtime(_) => return Ok(None),
             _ => return Ok(None),
         };

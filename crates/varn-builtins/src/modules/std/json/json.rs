@@ -1,8 +1,6 @@
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, Value, VmValue};
 
-/// Native implementation backing the `runtime:json` contract
-/// (`src/modules/std/json/runtime/json_runtime.vn`).
 pub struct JsonRuntime;
 
 varn_contract! {

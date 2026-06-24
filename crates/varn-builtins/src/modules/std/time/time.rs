@@ -1,8 +1,6 @@
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, Value, VmValue};
 
-/// Native implementation backing the `runtime:time` contract
-/// (`src/modules/std/time/runtime/time_runtime.vn`).
 pub struct TimeRuntime;
 
 fn parse_iso_duration(s: &str) -> i64 {

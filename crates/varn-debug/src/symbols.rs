@@ -1,19 +1,26 @@
+use varn_checker::CheckResult;
 use varn_utilities::chalk::chalk;
 use varn_utilities::terminal;
 use varn_utilities::terminal::Section;
-use varn_checker::CheckResult;
 
 pub fn debug_symbols(
     check_result: &CheckResult,
     filename: &str,
     _flags: &crate::flags::DebugFlags,
 ) {
-    Section::new("type inference engine").subtitle(filename).color(|c| c.blue()).print();
+    Section::new("type inference engine")
+        .subtitle(filename)
+        .color(|c| c.blue())
+        .print();
 
     terminal::log("  Symbol Types");
     terminal::log(format!(
         "  {}",
-        chalk(format!("{:<8} │ {:<15} │ {:<20} │ Type Details", "Loc", "Kind", "Name")).dim()
+        chalk(format!(
+            "{:<8} │ {:<15} │ {:<20} │ Type Details",
+            "Loc", "Kind", "Name"
+        ))
+        .dim()
     ));
     terminal::log(format!("  {}", "─".repeat(80)));
 
@@ -65,6 +72,9 @@ pub fn debug_symbols(
 
     terminal::blank();
     Section::new("type inference engine")
-        .subtitle(format!("{} symbols analyzed", check_result.bind.arena.len()))
+        .subtitle(format!(
+            "{} symbols analyzed",
+            check_result.bind.arena.len()
+        ))
         .close();
 }

@@ -1,8 +1,8 @@
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
-use std::sync::mpsc::{channel, Sender, Receiver};
+use varn_types::task::AsyncTask;
 use varn_types::value::SendValue;
 use varn_types::value::VmValuePayload;
-use varn_types::task::AsyncTask;
 
 #[derive(Clone, Debug)]
 pub struct IsolatePort {
@@ -12,7 +12,6 @@ pub struct IsolatePort {
     pub remote_waker: Arc<std::sync::Mutex<Option<AsyncTask>>>,
 }
 
-// SAFETY: All fields are thread‑safe.
 unsafe impl Send for IsolatePort {}
 unsafe impl Sync for IsolatePort {}
 
@@ -20,10 +19,10 @@ impl IsolatePort {
     pub fn new() -> (Self, Self) {
         let (tx1, rx1) = channel();
         let (tx2, rx2) = channel();
-        
+
         let waker1 = Arc::new(std::sync::Mutex::new(None));
         let waker2 = Arc::new(std::sync::Mutex::new(None));
-        
+
         let port1 = IsolatePort {
             tx: tx1,
             rx: Arc::new(std::sync::Mutex::new(rx2)),
@@ -44,7 +43,9 @@ impl IsolatePort {
             waker.resolve(val.to_value());
             Ok(())
         } else {
-            self.tx.send(val).map_err(|_| "Receiver dropped".to_string())
+            self.tx
+                .send(val)
+                .map_err(|_| "Receiver dropped".to_string())
         }
     }
 }

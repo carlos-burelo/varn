@@ -2,8 +2,6 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
-/// Native implementation backing the `runtime:test` contract
-/// (`src/modules/std/testing/runtime/test_runtime.vn`).
 pub struct TestRuntime;
 
 static PASSED: AtomicU64 = AtomicU64::new(0);
@@ -39,7 +37,6 @@ fn print_summary() {
     }
 }
 
-/// Stable entrypoint used by the global `assertSummary` builtin.
 pub fn summary(_ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, String> {
     print_summary();
     Ok(VmValue::null())

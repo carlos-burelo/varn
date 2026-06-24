@@ -7,12 +7,12 @@ use crate::profile::{HotspotCounters, ProfileCounters, VmProfile};
 use crate::value::VmValue;
 use exec::calls;
 use exec::ExecCtx;
-use rustc_hash::FxHashMap;
+
 use std::cell::RefCell;
 use std::cmp::Reverse;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+
 use varn_core::{ModuleId, OpCode};
 use varn_types::chunk::FunctionProto;
 use varn_types::chunk::PoolEntry;
@@ -87,13 +87,23 @@ impl Vm {
     }
 
     pub fn snapshot(&self) -> (GlobalStore, Heap, rustc_hash::FxHashMap<ModuleId, VmValue>) {
-        // Only include native (std:/core:/runtime:) modules in the snapshot.
-        // User/local modules are stateful and must re-execute each run.
-        let native_modules = self.ctx.modules.iter()
-            .filter(|(id, _)| matches!(id, ModuleId::Std(_) | ModuleId::Core(_) | ModuleId::Runtime(_)))
+        let native_modules = self
+            .ctx
+            .modules
+            .iter()
+            .filter(|(id, _)| {
+                matches!(
+                    id,
+                    ModuleId::Std(_) | ModuleId::Core(_) | ModuleId::Runtime(_)
+                )
+            })
             .map(|(k, v)| (k.clone(), *v))
             .collect();
-        (self.ctx.globals.clone(), self.ctx.heap.clone(), native_modules)
+        (
+            self.ctx.globals.clone(),
+            self.ctx.heap.clone(),
+            native_modules,
+        )
     }
 
     pub fn enable_opcode_profiling(&mut self) {
@@ -116,12 +126,13 @@ impl Vm {
 
     pub fn take_hotspots(&mut self) -> Option<HotspotCounters> {
         self.ctx.heap.hotspot = None;
-        self.ctx.hotspot_counters.take().map(|rc| {
-            match Rc::try_unwrap(rc) {
+        self.ctx
+            .hotspot_counters
+            .take()
+            .map(|rc| match Rc::try_unwrap(rc) {
                 Ok(cell) => cell.into_inner(),
                 Err(rc) => rc.borrow().clone(),
-            }
-        })
+            })
     }
 
     pub fn take_profile(&mut self) -> Option<VmProfile> {
@@ -186,16 +197,8 @@ impl Vm {
     }
 }
 
-/// Pre-load all native (std:/core:/runtime:) modules into `vm` so they are
-/// present when `snapshot()` is called. Each bench run then gets them from the
-/// snapshot instead of calling `build_module()` and allocating fresh NativeFn
-/// objects every time.
 pub fn prefill_native_modules(vm: &mut Vm) {
-    // Pass 1: load all directly-native MODULE_OPS entries.
     for raw_id in varn_builtins::all_native_module_ids() {
-        // Skip "globals" — those are injected into the global store directly,
-        // not via module imports. ModuleId::from_canonical_str would map them
-        // to Local paths which never match import lookups.
         if !raw_id.contains(':') {
             continue;
         }
@@ -204,7 +207,7 @@ pub fn prefill_native_modules(vm: &mut Vm) {
         if vm.ctx.modules.contains_key(&resolved) {
             continue;
         }
-        // MODULE_OPS keys ARE the full IDs that build_module() expects.
+
         if let Some(nv) = varn_builtins::build_module(&raw_id, &mut vm.ctx.heap) {
             if let Ok(converted) = vm.ctx.convert_to_module_obj(resolved.clone(), nv) {
                 vm.ctx.modules.insert(resolved, converted);
@@ -212,15 +215,9 @@ pub fn prefill_native_modules(vm: &mut Vm) {
         }
     }
 
-    // Pass 2: freeze pure modules (no-op until .vn wrappers export only
-    // NativeFns — currently std:math etc. export VM closures which are not
-    // freezeable; freeze_module returns None for those and they are skipped).
     freeze_pure_modules(vm);
 }
 
-/// Evaluate all `pure = true` modules from MODULE_REGISTRY in an isolated
-/// scratch VM, freeze the results, and install them into `vm`'s module cache.
-/// The scratch VM is disposable — its globals never touch `vm`'s layout.
 fn freeze_pure_modules(vm: &mut Vm) {
     let pure_ids: Vec<&'static str> = varn_builtins::MODULE_REGISTRY
         .iter()
@@ -232,18 +229,13 @@ fn freeze_pure_modules(vm: &mut Vm) {
         return;
     }
 
-    // Build a scratch VM with the same precompiled map and loader.
-    // Its global layout is independent of init_vm — no shared state.
     let mut scratch = Vm::new(vm.ctx.precompiled.clone());
     if let Some(loader) = &vm.ctx.loader {
         scratch.ctx.loader = Some(loader.clone());
     }
-    // Seed the scratch VM with the already-built native modules from pass 1
-    // so pure wrappers that import runtime:* find them without re-building.
+
     for (id, &val) in &vm.ctx.modules {
         if matches!(id, varn_core::ModuleId::Runtime(_)) {
-            // Re-intern native module object into scratch heap.
-            // NativeFns are function pointers — safe to rebuild cheaply.
             if let Some(frozen_arc) =
                 crate::exec::ctx_modules::freeze_module(val, id.clone(), &vm.ctx.heap)
             {
@@ -257,32 +249,28 @@ fn freeze_pure_modules(vm: &mut Vm) {
     for id_str in pure_ids {
         let resolved = varn_core::ModuleId::from_canonical_str(id_str);
 
-        // Skip core: modules — blocked by resolver from non-stdlib context.
         if matches!(resolved, varn_core::ModuleId::Core(_)) {
             continue;
         }
 
-        // Skip if init_vm already has it cached (shouldn't happen for .vn pure
-        // modules since pass 1 only handles MODULE_OPS entries).
         if vm.ctx.modules.contains_key(&resolved) {
             continue;
         }
 
-        // Evaluate in scratch VM.
         let load_result = scratch.ctx.load_module(id_str);
         let module_val = match load_result {
             Ok(v) => v,
             Err(_) => continue,
         };
 
-        // Freeze from scratch heap → Arc (no heap indices).
-        let Some(frozen) =
-            crate::exec::ctx_modules::freeze_module(module_val, resolved.clone(), &scratch.ctx.heap)
-        else {
+        let Some(frozen) = crate::exec::ctx_modules::freeze_module(
+            module_val,
+            resolved.clone(),
+            &scratch.ctx.heap,
+        ) else {
             continue;
         };
 
-        // Install frozen handle in init_vm's heap and module cache.
         let frozen_val = vm.ctx.heap.alloc_frozen_module(frozen);
         vm.ctx.modules.insert(resolved.clone(), frozen_val);
         vm.ctx.linker.set_done(resolved, frozen_val);

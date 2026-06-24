@@ -13,7 +13,7 @@ pub struct ModuleGraphBuild {
     pub modules: HashMap<String, FunctionProto>,
     pub source_hashes: HashMap<String, u64>,
     pub package_nodes: Vec<varn_types::PackageNode>,
-    /// Dependency edges: module_path → [direct_dep_paths].
+
     pub deps: HashMap<String, Vec<String>>,
 }
 
@@ -256,7 +256,7 @@ pub fn resolve_import_specifier(
             }
             Ok(None)
         }
-        // runtime:* modules are native-only; no .vn source to precompile.
+
         ImportSpecifier::Runtime(_) => Ok(Some(specifier.to_owned())),
         ImportSpecifier::Relative(rel) => {
             let joined = module_dir.join(&rel);

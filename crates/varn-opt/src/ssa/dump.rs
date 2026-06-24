@@ -1,9 +1,3 @@
-//! Textual dump of an [`SsaFunc`], for `vn debug -p ssa` and tests.
-//!
-//! Deterministic, compact, one instruction per line. Block parameters render as
-//! `bN(v0: int, v1: float):`; branch/jump terminators show their block-argument
-//! lists so the SSA merge operands are visible.
-
 use std::fmt::Write;
 
 use crate::hir::{HirBinOp, HirType, HirUnOp};
@@ -47,7 +41,12 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::ConstDecimal(d) => format!("decimal {d}"),
         InstKind::ConstBigInt(n) => format!("bigint {n}"),
         InstKind::ConstNull => "null".to_owned(),
-        InstKind::Binary { op, lhs, rhs, ty: t } => {
+        InstKind::Binary {
+            op,
+            lhs,
+            rhs,
+            ty: t,
+        } => {
             format!("{}.{} {}, {}", binop(*op), ty(*t), val(*lhs), val(*rhs))
         }
         InstKind::Unary { op, operand, ty: t } => {
@@ -65,11 +64,27 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::GetIndex { object, index } => {
             format!("getindex {}[{}]", val(*object), val(*index))
         }
-        InstKind::SetProperty { object, name, value } => {
+        InstKind::SetProperty {
+            object,
+            name,
+            value,
+        } => {
             format!("setprop {}.{name} = {}", val(*object), val(*value))
         }
-        InstKind::SetIndex { object, index, value } => {
-            format!("setindex {}[{}] = {}", val(*object), val(*index), val(*value))
+        InstKind::SetIndex {
+            object,
+            index,
+            value,
+        } => {
+            format!(
+                "setindex {}[{}] = {}",
+                val(*object),
+                val(*index),
+                val(*value)
+            )
+        }
+        InstKind::ObjectMerge { target, source } => {
+            format!("objectmerge {} <- {}", val(*target), val(*source))
         }
         InstKind::MethodCall { recv, name, args } => {
             format!("callmethod {}.{name}{}", val(*recv), args_list(args))
@@ -87,7 +102,11 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::ToString { operand } => format!("tostring {}", val(*operand)),
         InstKind::BuildStr { parts } => format!("buildstr{}", args_list(parts)),
         InstKind::MakeClosure { func, .. } => format!("closure {}", func.name),
-        InstKind::IntrinsicCall { object, args, wire_byte } => {
+        InstKind::IntrinsicCall {
+            object,
+            args,
+            wire_byte,
+        } => {
             format!("intrinsic#{wire_byte} {}{}", val(*object), args_list(args))
         }
         InstKind::AssertNotNull { operand } => format!("assertnotnull {}", val(*operand)),
@@ -98,13 +117,21 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::GetEnumTag { operand } => format!("enumtag {}", val(*operand)),
         InstKind::IsArray { operand } => format!("isarray {}", val(*operand)),
         InstKind::This => "this".to_owned(),
-        InstKind::Range { start, end, inclusive } => {
+        InstKind::Range {
+            start,
+            end,
+            inclusive,
+        } => {
             let op = if *inclusive { "..=" } else { ".." };
             format!("range {}{op}{}", val(*start), val(*end))
         }
         InstKind::ObjectKeys { operand } => format!("objectkeys {}", val(*operand)),
         InstKind::GetSymbol { object, is_async } => {
-            let s = if *is_async { "asyncIterator" } else { "iterator" };
+            let s = if *is_async {
+                "asyncIterator"
+            } else {
+                "iterator"
+            };
             format!("getsymbol {}.@@{s}", val(*object))
         }
         InstKind::IterCall { callee, recv } => {
@@ -118,13 +145,23 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::ExtensionCall { func, recv, args } => {
             format!("extcall {func}({}{})", val(*recv), {
                 let a = args.iter().map(|v| val(*v)).collect::<Vec<_>>().join(", ");
-                if a.is_empty() { String::new() } else { format!(", {a}") }
+                if a.is_empty() {
+                    String::new()
+                } else {
+                    format!(", {a}")
+                }
             })
         }
         InstKind::CallSpread { callee, args } => {
             let a = args
                 .iter()
-                .map(|(v, s)| if *s { format!("...{}", val(*v)) } else { val(*v) })
+                .map(|(v, s)| {
+                    if *s {
+                        format!("...{}", val(*v))
+                    } else {
+                        val(*v)
+                    }
+                })
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("callspread {}({a})", val(*callee))
@@ -132,7 +169,13 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::BuildArraySpread { elements } => {
             let a = elements
                 .iter()
-                .map(|(v, s)| if *s { format!("...{}", val(*v)) } else { val(*v) })
+                .map(|(v, s)| {
+                    if *s {
+                        format!("...{}", val(*v))
+                    } else {
+                        val(*v)
+                    }
+                })
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("array[{a}]")
@@ -149,12 +192,37 @@ fn inst_kind(kind: &InstKind) -> String {
             format!("object {{{a}}}")
         }
         InstKind::LoadCaptured { var } => format!("loadcaptured {var:?}"),
-        InstKind::StoreCaptured { var, value } => format!("storecaptured {var:?} = {}", val(*value)),
-        InstKind::MakeClass { name, super_class } => format!("makeclass {name} super={:?}", super_class.map(val)),
+        InstKind::StoreCaptured { var, value } => {
+            format!("storecaptured {var:?} = {}", val(*value))
+        }
+        InstKind::MakeClass { name, super_class } => {
+            format!("makeclass {name} super={:?}", super_class.map(val))
+        }
         InstKind::DeclareField { class, name } => format!("declarefield {}.{name}", val(*class)),
-        InstKind::DefineStatic { class, name, value } => format!("definestatic {}.{name} = {}", val(*class), val(*value)),
-        InstKind::DefineMethod { class, name, method, is_static } => format!("definemethod {}.{name} = {} (static={is_static})", val(*class), val(*method)),
-        InstKind::DefineAccessor { class, name, accessor, is_getter, is_static } => format!("defineaccessor {}.{name} = {} (getter={is_getter}, static={is_static})", val(*class), val(*accessor)),
+        InstKind::DefineStatic { class, name, value } => {
+            format!("definestatic {}.{name} = {}", val(*class), val(*value))
+        }
+        InstKind::DefineMethod {
+            class,
+            name,
+            method,
+            is_static,
+        } => format!(
+            "definemethod {}.{name} = {} (static={is_static})",
+            val(*class),
+            val(*method)
+        ),
+        InstKind::DefineAccessor {
+            class,
+            name,
+            accessor,
+            is_getter,
+            is_static,
+        } => format!(
+            "defineaccessor {}.{name} = {} (getter={is_getter}, static={is_static})",
+            val(*class),
+            val(*accessor)
+        ),
         InstKind::MakeEnumVariant { tag, meta } => format!("makeenumvariant tag={tag} meta={meta}"),
         InstKind::Try { handler } => format!("try b{}", handler.0),
         InstKind::PopTry => "poptry".to_owned(),
@@ -162,7 +230,9 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::CloseUpvalues { targets } => format!("closeupvalues {:?}", targets),
         InstKind::Dispose { target, is_await } => format!("dispose {target:?} await={is_await}"),
         InstKind::LoadModule { source } => format!("loadmodule {source}"),
-        InstKind::StoreModuleSlot { value, slot } => format!("storemoduleslot {slot} = {}", val(*value)),
+        InstKind::StoreModuleSlot { value, slot } => {
+            format!("storemoduleslot {slot} = {}", val(*value))
+        }
         InstKind::Await { operand } => format!("await {}", val(*operand)),
         InstKind::Spawn { operand } => format!("spawn {}", val(*operand)),
         InstKind::Yield { operand } => format!("yield {}", val(*operand)),

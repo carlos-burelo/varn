@@ -45,7 +45,10 @@ pub fn compile(
         export_names,
     )
     .map_err(|e| {
-        PipelineError::fatal(format!("{}: {e}", varn_utilities::chalk::chalk("error[emit]").red().bold()))
+        PipelineError::fatal(format!(
+            "{}: {e}",
+            varn_utilities::chalk::chalk("error[emit]").red().bold()
+        ))
     })?;
 
     if debug.bytecode {

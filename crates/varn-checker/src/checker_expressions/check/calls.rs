@@ -53,11 +53,12 @@ impl Checker {
             self.record_type(callee.range.start.offset, effective_callee_ty.clone());
         }
 
-        let params_for_context: Vec<FunctionParam> = if let TypeKind::Fn(ft) = &effective_callee_ty.0 {
-            ft.params.clone()
-        } else {
-            vec![]
-        };
+        let params_for_context: Vec<FunctionParam> =
+            if let TypeKind::Fn(ft) = &effective_callee_ty.0 {
+                ft.params.clone()
+            } else {
+                vec![]
+            };
         self.check_call_args_with_context(args, &params_for_context, bind);
 
         if let TypeKind::Fn(crate::types::FunctionType { params, .. }) = &effective_callee_ty.0 {

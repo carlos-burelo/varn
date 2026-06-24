@@ -1,5 +1,0 @@
-function isInt(x: dynamic): bool { return x is int }
-function isStr(x: dynamic): bool { return x is str }
-print(isInt(5))
-print(isInt("a"))
-print(isStr("a"))

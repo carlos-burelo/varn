@@ -143,7 +143,7 @@ impl super::super::Binder {
                                     .as_ref()
                                     .map(|e| infer_expr_type(e, Some(self)))
                                     .filter(|t| !t.is_dynamic())
-                             })
+                            })
                             .unwrap_or(Type::Dynamic);
                         let symbol_id = scope.resolve(&name, &self.scopes);
                         members.push(ClassMemberInfo {

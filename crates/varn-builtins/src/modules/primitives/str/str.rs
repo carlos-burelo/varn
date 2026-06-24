@@ -1,8 +1,6 @@
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, NativeFnResult, VmValue};
 
-/// Native implementation backing the `str` contract
-/// (`src/modules/primitives/str/str.vn`).
 pub struct Str;
 
 fn normalize_idx(idx: i64, len: i64) -> usize {
@@ -18,7 +16,7 @@ varn_contract! {
     class: "str",
     contract: "src/modules/primitives/str/str.vn",
     impl Str {
-        // ---- statics ----
+
         fn EMPTY(_ctx: &mut dyn NativeCtx) -> String { String::new() }
 
         fn fromCharCode(_ctx: &mut dyn NativeCtx, codes: &[VmValue]) -> String {
@@ -47,10 +45,10 @@ varn_contract! {
             parts.join(sep)
         }
 
-        // ---- getter ----
+
         fn length(_ctx: &mut dyn NativeCtx, this: &str) -> i64 { this.chars().count() as i64 }
 
-        // ---- conversion ----
+
         fn toString(_ctx: &mut dyn NativeCtx, this: &str) -> String { this.to_string() }
         fn toStr(_ctx: &mut dyn NativeCtx, this: &str) -> String { this.to_string() }
         fn valueOf(_ctx: &mut dyn NativeCtx, this: &str) -> String { this.to_string() }
@@ -60,7 +58,7 @@ varn_contract! {
         fn trimStart(_ctx: &mut dyn NativeCtx, this: &str) -> String { this.trim_start().to_string() }
         fn trimEnd(_ctx: &mut dyn NativeCtx, this: &str) -> String { this.trim_end().to_string() }
 
-        // ---- search ----
+
         fn includes(_ctx: &mut dyn NativeCtx, this: &str, search: &str) -> bool { this.contains(search) }
         fn contains(_ctx: &mut dyn NativeCtx, this: &str, search: &str) -> bool { this.contains(search) }
         fn startsWith(_ctx: &mut dyn NativeCtx, this: &str, search: &str) -> bool { this.starts_with(search) }
@@ -79,7 +77,7 @@ varn_contract! {
             chars.windows(sc.len()).rposition(|w| w == sc.as_slice()).map(|i| i as i64).unwrap_or(-1)
         }
 
-        // ---- slicing ----
+
         fn substring(_ctx: &mut dyn NativeCtx, this: &str, start: i64, end: Option<i64>) -> String {
             let chars: Vec<char> = this.chars().collect();
             let len = chars.len();
@@ -114,7 +112,7 @@ varn_contract! {
             chars[st..end].iter().collect()
         }
 
-        // ---- replace / split ----
+
         fn replace(_ctx: &mut dyn NativeCtx, this: &str, from: &str, to: &str) -> String {
             this.replacen(from, to, 1)
         }
@@ -134,7 +132,7 @@ varn_contract! {
             this.split_whitespace().map(|w| ctx.alloc_str_owned(w.to_owned())).collect()
         }
 
-        // ---- char codes ----
+
         fn charCodeAt(_ctx: &mut dyn NativeCtx, this: &str, pos: i64) -> i64 {
             this.chars().nth(pos.max(0) as usize).map(|c| c as i64).unwrap_or(-1)
         }
@@ -145,7 +143,7 @@ varn_contract! {
             this.chars().nth(pos.max(0) as usize).map(|c| c as i64).unwrap_or(-1)
         }
 
-        // ---- build ----
+
         fn repeat(_ctx: &mut dyn NativeCtx, this: &str, n: i64) -> String {
             this.repeat(n.max(0) as usize)
         }
@@ -165,7 +163,7 @@ varn_contract! {
             format!("{this}{other}")
         }
 
-        // ---- predicates ----
+
         fn isEmpty(_ctx: &mut dyn NativeCtx, this: &str) -> bool { this.is_empty() }
         fn isBlank(_ctx: &mut dyn NativeCtx, this: &str) -> bool { this.trim().is_empty() }
         fn isDigit(_ctx: &mut dyn NativeCtx, this: &str) -> bool {
@@ -178,7 +176,7 @@ varn_contract! {
             !this.is_empty() && this.chars().all(|c| c.is_whitespace())
         }
 
-        // ---- transform ----
+
         fn reverse(_ctx: &mut dyn NativeCtx, this: &str) -> String { this.chars().rev().collect() }
         fn capitalize(_ctx: &mut dyn NativeCtx, this: &str) -> String {
             let mut chars = this.chars();
@@ -222,7 +220,6 @@ fn pad_end(s: &str, target: i64, pad: Option<&str>) -> String {
     format!("{s}{suffix}")
 }
 
-// Free helpers re-exported from `primitives/mod.rs`; unrelated to the contract.
 pub fn str_from_char_code(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
     let mut res = String::new();
     for &v in args {

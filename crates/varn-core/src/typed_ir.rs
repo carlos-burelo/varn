@@ -33,9 +33,6 @@ impl TypeAnnotations {
         &self.module_caps
     }
 
-    /// Mark `name` as appearing as an assignment target somewhere in the
-    /// module. Used to disable self-call optimizations for rebindable
-    /// function declarations.
     pub fn record_reassigned_name(&mut self, name: &str) {
         self.reassigned_names.insert(name.to_owned());
     }

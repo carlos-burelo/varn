@@ -350,6 +350,30 @@ Each pass independently toggleable; record suite 728/728 + bench delta
 Order: const-fold → copy-prop → DCE → CFG-simplify to fixpoint; then GVN; then
 inline + re-run; then escape.
 
+### 3.1 High-Impact Performance Optimizations
+
+The following optimizations are expected to yield the most significant, order-of-magnitude improvements in execution times, directly addressing current bottlenecks:
+
+1. **Compile-time Devirtualization & IC Bypass (Leveraging Static Types)**
+   - **Mechanism**: Using exact class types from `varn-checker`, lower virtual property accesses and method calls on statically known types directly to static offset accesses (`OpGetFixedField` / `OpSetFixedField`) or direct static calls.
+   - **Impact**: Completely bypasses runtime Inline Cache (IC) check overhead and enables subsequent **Inlining** of class methods.
+
+2. **SSA-based Loop-Invariant Code Motion (LICM)**
+   - **Mechanism**: Identify SSA expressions (including constant loads, global/module slot reads, and arithmetic) in loops whose inputs are defined outside the loop, and hoist them into a newly created loop pre-header block.
+   - **Impact**: Accelerates computational loops by removing redundant calculations from the critical execution path.
+
+3. **SSA Register Coalescing & Linear Scan Register Allocation (LSRA)**
+   - **Mechanism**: Move register allocation to the SSA IR phase using Linear Scan Register Allocation. Aggressively merge variables connected by `Move` instructions (from phi/block param lowering or variable assignments) if their live ranges do not interfere.
+   - **Impact**: Eliminates most `Move` opcodes in the emitted bytecode, reducing bytecode footprint and register-shuffling overhead in the VM loop.
+
+4. **Type-Driven Scalar Replacement of Aggregates (SROA)**
+   - **Mechanism**: Perform escape analysis on the SSA IR. If an allocated object, closure, or array literal does not escape the current function boundary, decompose its fields into individual scalar SSA variables.
+   - **Impact**: Eliminates heap allocation and GC pressure for short-lived temporary objects, closures (e.g., in higher-order function chains), or intermediate data structures.
+
+5. **VM Dispatch Optimization (Direct Threading / Tail Calls)**
+   - **Mechanism**: The interpreter loop uses a `match` dispatch that can suffer from branch mispredictions. Optimize via direct threaded dispatch using Clang/GCC tail-call optimization (`[[musttail]]`) or labels-as-values (computed goto).
+   - **Impact**: Significantly reduces branch mispredictions and dispatch overhead, which is the primary interpreter bottleneck.
+
 ---
 
 ## 4. Stage 4 — Hito A: delete legacy ✅ DONE

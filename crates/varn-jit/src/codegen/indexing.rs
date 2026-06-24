@@ -79,9 +79,8 @@ fn emit_get_index(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.pop(ARG_CLOSURE);
     asm.pop(ARG_CTX);
 
-    // Reload ARG_CTX from ExecCtx.stack.ptr (offset 8) in case stack reallocated
     asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
-    // Recompute REG_FRAME_BASE = ARG_CTX + ARG_BASE * 8
+
     asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_BASE);
     asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
     asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
@@ -145,9 +144,8 @@ fn emit_set_index(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.pop(ARG_CLOSURE);
     asm.pop(ARG_CTX);
 
-    // Reload ARG_CTX from ExecCtx.stack.ptr (offset 8) in case stack reallocated
     asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
-    // Recompute REG_FRAME_BASE = ARG_CTX + ARG_BASE * 8
+
     asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_BASE);
     asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
     asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
@@ -202,9 +200,8 @@ fn emit_typeof(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.pop(ARG_CLOSURE);
     asm.pop(ARG_CTX);
 
-    // Reload ARG_CTX from ExecCtx.stack.ptr (offset 8) in case stack reallocated
     asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
-    // Recompute REG_FRAME_BASE = ARG_CTX + ARG_BASE * 8
+
     asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_BASE);
     asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
     asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
@@ -261,9 +258,8 @@ fn emit_instanceof(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.pop(ARG_CLOSURE);
     asm.pop(ARG_CTX);
 
-    // Reload ARG_CTX from ExecCtx.stack.ptr (offset 8) in case stack reallocated
     asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
-    // Recompute REG_FRAME_BASE = ARG_CTX + ARG_BASE * 8
+
     asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_BASE);
     asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
     asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);

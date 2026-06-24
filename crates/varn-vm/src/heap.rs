@@ -2,27 +2,26 @@ use crate::error::{RuntimeError, VmResult};
 use crate::frame::{VmClosure, VmClosurePayload, VmValueRef};
 use crate::gc::GcCollector;
 use crate::nursery::{
-    is_nursery_idx, is_old_idx, old_idx_raw, pack_old_idx, Nursery, OLD_GEN_FLAG,
+    is_nursery_idx, is_old_idx, old_idx_raw, pack_old_idx, Nursery,
 };
 use crate::profile::HotspotCounters;
 use crate::value::VmValue;
+use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
-use rustc_hash::FxHashMap;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
+use std::sync::Arc;
+use varn_base::VmValuePayload;
 use varn_types::{
     generator::{AsyncQueue, GeneratorObj},
     value::{
-        ArrayRef, EnumVariantData, FrozenModuleObj, MapRef, ModuleObj, ObjRef, RangeData,
-        RuntimeSymbol, SetRef, BoundMethod
+        ArrayRef, BoundMethod, EnumVariantData, FrozenModuleObj, MapRef, ModuleObj, ObjRef,
+        RangeData, RuntimeSymbol, SetRef,
     },
     AsyncTask, ClassObj, LazyTask, NativeCtx, NativeFn, ObjData, ResourceStore, RuntimeString,
     Value, VmArray,
 };
-use varn_base::VmValuePayload;
-use std::sync::Arc;
-
 
 #[derive(Debug, Clone)]
 pub enum HeapObj {
@@ -31,7 +30,7 @@ pub enum HeapObj {
     Object(ObjRef),
 
     Module(Rc<ModuleObj>),
-    /// Frozen (pure) module — heap-index-free, shared across VM instances.
+
     FrozenModule(Arc<FrozenModuleObj>),
     VmClosure(Rc<VmClosure>),
     Class(Rc<ClassObj>),
@@ -175,14 +174,12 @@ impl HeapInner {
             | HeapObj::Char(_)
             | HeapObj::Symbol(_)
             | HeapObj::BigInt(_)
-            | HeapObj::Decimal(_) => {
-                match self.nursery.try_alloc(obj) {
-                    Ok(ni) => return ni,
-                    Err(returned_obj) => {
-                        obj = returned_obj;
-                    }
+            | HeapObj::Decimal(_) => match self.nursery.try_alloc(obj) {
+                Ok(ni) => return ni,
+                Err(returned_obj) => {
+                    obj = returned_obj;
                 }
-            }
+            },
             _ => {}
         }
         pack_old_idx(alloc_into(
@@ -456,7 +453,7 @@ impl HeapInner {
                 HeapObj::Spread(inner) => Value::Spread(Box::new(self.extract(*inner))),
                 HeapObj::VmValue(payload) => Value::VmValue(payload.clone_payload()),
                 HeapObj::Module(m) => Value::Module(m.clone()),
-                // FrozenModule is never extracted as a Value; it is thawed on import.
+
                 HeapObj::FrozenModule(_) => Value::Null,
             });
         }
@@ -531,6 +528,34 @@ impl HeapInner {
         let packed = pack_old_idx(oi);
         self.string_interner.insert(rs, packed);
         VmValue::from_heap_idx(packed)
+    }
+
+    /// Allocate a string that is *not* registered in the content interner.
+    ///
+    /// Used for dynamically produced strings (concatenation, slicing, coercion).
+    /// Interning these would hash the full contents on every allocation — turning
+    /// an accumulation loop into O(n^2) work — and would retain a reference to
+    /// every transient string, defeating the GC and exhausting memory. Only
+    /// known-constant strings should ever enter the interner (`alloc_str_interned`).
+    pub fn alloc_str_dynamic(&mut self, s: impl AsRef<str>) -> VmValue {
+        let s_ref = s.as_ref();
+
+        if let Some(sso) = VmValue::try_from_sso(s_ref) {
+            return sso;
+        }
+
+        let rs: RuntimeString = Rc::from(s_ref);
+        let idx = match self.nursery.try_alloc(HeapObj::Str(rs)) {
+            Ok(ni) => ni,
+            Err(obj) => pack_old_idx(alloc_into(
+                &mut self.objects,
+                &mut self.free,
+                &mut self.alloc_count,
+                &mut self.gc_alloc_since_collect,
+                obj,
+            )),
+        };
+        VmValue::from_heap_idx(idx)
     }
 
     pub fn alloc_symbol(&mut self, s: RuntimeSymbol) -> VmValue {

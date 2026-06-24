@@ -21,9 +21,17 @@ fn clean() -> Result<(), CliError> {
     let mut count = 0usize;
     let mut bytes = 0u64;
 
-    fn clean_dir(dir: &std::path::Path, count: &mut usize, bytes: &mut u64) -> Result<(), CliError> {
-        let entries = std::fs::read_dir(dir)
-            .map_err(|e| CliError::fatal(format!("error[cache]: cannot read dir {}: {e}", dir.display())))?;
+    fn clean_dir(
+        dir: &std::path::Path,
+        count: &mut usize,
+        bytes: &mut u64,
+    ) -> Result<(), CliError> {
+        let entries = std::fs::read_dir(dir).map_err(|e| {
+            CliError::fatal(format!(
+                "error[cache]: cannot read dir {}: {e}",
+                dir.display()
+            ))
+        })?;
 
         for entry in entries.flatten() {
             let path = entry.path();
@@ -32,7 +40,10 @@ fn clean() -> Result<(), CliError> {
                 let _ = std::fs::remove_dir(&path);
             } else if path.is_file() {
                 let ext = path.extension().map(|e| e.to_string_lossy().to_string());
-                if ext.as_deref() == Some("vnc") || ext.as_deref() == Some("vnm") || ext.as_deref() == Some("bin") {
+                if ext.as_deref() == Some("vnc")
+                    || ext.as_deref() == Some("vnm")
+                    || ext.as_deref() == Some("bin")
+                {
                     if let Ok(meta) = std::fs::metadata(&path) {
                         *bytes += meta.len();
                     }

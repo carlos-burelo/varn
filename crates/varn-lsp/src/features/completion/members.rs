@@ -1,5 +1,6 @@
 use crate::document::{DocumentState, MemberKind, MemberRecord};
-use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, InsertTextFormat};
+use crate::util::kinds::member_to_completion_kind;
+use tower_lsp::lsp_types::{CompletionItem, InsertTextFormat};
 use varn_core::{IntrinsicType, TokenKind};
 
 pub enum ReceiverInfo {
@@ -18,20 +19,28 @@ pub fn build_member_completions(
     use_snippets: bool,
 ) -> Vec<CompletionItem> {
     match info {
-        ReceiverInfo::Named { name, is_instance, origin } => {
+        ReceiverInfo::Named {
+            name,
+            is_instance,
+            origin,
+        } => {
             let mut target_bind = None;
             if let Some(origin_mod) = origin.as_deref() {
-                if origin_mod.starts_with("std:") || origin_mod.starts_with("runtime:") || origin_mod.starts_with("core:") {
-                    target_bind = varn_checker::module_resolver::resolve_stdlib_module_bind_ref(origin_mod);
+                if origin_mod.starts_with("std:")
+                    || origin_mod.starts_with("runtime:")
+                    || origin_mod.starts_with("core:")
+                {
+                    target_bind =
+                        varn_checker::module_resolver::resolve_stdlib_module_bind_ref(origin_mod);
                 } else {
-                    target_bind = varn_checker::module_resolver::resolve_module_bind_ref(origin_mod);
+                    target_bind =
+                        varn_checker::module_resolver::resolve_module_bind_ref(origin_mod);
                 }
             }
 
             let mut seen = std::collections::HashSet::new();
             let mut items = Vec::new();
 
-            // 1. Try to find the symbol locally in state.symbols
             if let Some(sym) = state.symbols.iter().find(|s| s.name == name) {
                 for m in sym
                     .members
@@ -44,7 +53,6 @@ pub fn build_member_completions(
                     }
                 }
             } else if let Some(tb) = &target_bind {
-                // 2. Query the origin module's BindResult and map its type members dynamically
                 let mapped = if let Some(class_info) = tb.get_class_entry(&name) {
                     crate::pipeline::symbols::map_members(&class_info.members, &[])
                 } else if let Some(interface_info) = tb.get_interface_members_local(&name) {
@@ -89,28 +97,15 @@ pub fn build_member_completions(
 }
 
 fn member_to_completion_item(m: &MemberRecord, use_snippets: bool) -> CompletionItem {
-    let (item_kind, insert_text, insert_text_format) = match m.kind {
-        MemberKind::Property | MemberKind::Variable | MemberKind::Getter | MemberKind::Setter => {
-            (CompletionItemKind::PROPERTY, m.name.clone(), None)
-        }
+    let (insert_text, insert_text_format) = match m.kind {
         MemberKind::Method | MemberKind::Function => {
             if use_snippets {
-                (
-                    CompletionItemKind::METHOD,
-                    format!("{}($0)", m.name),
-                    Some(InsertTextFormat::SNIPPET),
-                )
+                (format!("{}($0)", m.name), Some(InsertTextFormat::SNIPPET))
             } else {
-                (CompletionItemKind::METHOD, m.name.clone(), None)
+                (m.name.clone(), None)
             }
         }
-        MemberKind::Constructor => (CompletionItemKind::CONSTRUCTOR, m.name.clone(), None),
-        MemberKind::Class => (CompletionItemKind::CLASS, m.name.clone(), None),
-        MemberKind::Interface => (CompletionItemKind::INTERFACE, m.name.clone(), None),
-        MemberKind::Namespace => (CompletionItemKind::MODULE, m.name.clone(), None),
-        MemberKind::Enum => (CompletionItemKind::ENUM, m.name.clone(), None),
-        MemberKind::EnumMember => (CompletionItemKind::ENUM_MEMBER, m.name.clone(), None),
-        MemberKind::Struct => (CompletionItemKind::STRUCT, m.name.clone(), None),
+        _ => (m.name.clone(), None),
     };
     let detail = match m.kind {
         MemberKind::Property | MemberKind::Variable | MemberKind::Getter => {
@@ -129,7 +124,7 @@ fn member_to_completion_item(m: &MemberRecord, use_snippets: bool) -> Completion
     };
     CompletionItem {
         label: m.name.clone(),
-        kind: Some(item_kind),
+        kind: Some(member_to_completion_kind(m.kind)),
         detail,
         insert_text: Some(insert_text),
         insert_text_format,
@@ -221,7 +216,8 @@ pub fn dot_receiver(
                     origin: None,
                 });
             }
-            varn_core::TypeKind::Named(name, origin) | varn_core::TypeKind::Generic(name, _, origin) => {
+            varn_core::TypeKind::Named(name, origin)
+            | varn_core::TypeKind::Generic(name, _, origin) => {
                 let mut is_instance = true;
                 if let Some(sym) = state
                     .symbols
@@ -475,7 +471,8 @@ pub fn pattern_receiver(state: &DocumentState, line: u32, col: u32) -> Option<Re
                     origin: None,
                 });
             }
-            varn_core::TypeKind::Named(name, origin) | varn_core::TypeKind::Generic(name, _, origin) => {
+            varn_core::TypeKind::Named(name, origin)
+            | varn_core::TypeKind::Generic(name, _, origin) => {
                 return Some(ReceiverInfo::Named {
                     name: name.to_string(),
                     is_instance: true,

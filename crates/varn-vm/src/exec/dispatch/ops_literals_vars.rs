@@ -52,10 +52,11 @@ impl ExecCtx {
                 *ip += 1;
                 let dest = base + first_reg;
                 let src = base + hi(w1) as usize;
-                // Ensure destination and source slots exist on the stack
+
                 let max_idx = dest.max(src);
                 if max_idx >= self.stack.len() {
-                    self.stack.resize(max_idx + 1, crate::value::VmValue::null());
+                    self.stack
+                        .resize(max_idx + 1, crate::value::VmValue::null());
                 }
                 self.stack[dest] = self.stack[src];
             }

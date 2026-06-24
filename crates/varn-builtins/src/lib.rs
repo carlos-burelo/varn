@@ -18,6 +18,8 @@ pub mod resource;
 pub mod runtime_ops;
 
 #[cfg(feature = "runtime")]
+pub use dispatch::all_native_module_ids;
+#[cfg(feature = "runtime")]
 pub use dispatch::{describe_op, dispatch_runtime_op, register_globals_vm};
 #[cfg(feature = "runtime")]
 pub use modules::build_module;
@@ -25,8 +27,6 @@ pub use modules::build_module;
 pub use modules::globals::set_print_silent;
 #[cfg(feature = "runtime")]
 pub use modules::has_native_builder;
-#[cfg(feature = "runtime")]
-pub use dispatch::all_native_module_ids;
 #[cfg(feature = "runtime")]
 pub use modules::testing::{reset_testing_counters, set_testing_silent};
 #[cfg(feature = "runtime")]

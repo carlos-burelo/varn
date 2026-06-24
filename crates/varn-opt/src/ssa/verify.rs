@@ -1,23 +1,7 @@
-//! SSA verifier — structural + dominance invariants.
-//!
-//! Run before out-of-SSA lowering (and in tests) as a safety net: a violation
-//! means the construction produced malformed SSA, so the caller falls back to
-//! the naive HIR→bytecode path rather than emitting wrong code. Checks:
-//!
-//! 1. every [`Value`] is defined exactly once (a block param or an inst dest);
-//! 2. each block's predecessor edges carry exactly as many block-arguments as
-//!    the block has parameters;
-//! 3. terminators reference in-range blocks;
-//! 4. every used value is defined, and its definition **dominates** the use
-//!    (for a phi operand, the def dominates the predecessor the operand flows
-//!    in on — the value must be live on that edge).
-
 use super::ir::{Block, BlockId, InstKind, SsaFunc, Terminator, Value};
 
 pub type VerifyResult = Result<(), String>;
 
-/// Where a value is defined: a block plus an order key within it (params sort
-/// before instructions; instruction `i` has key `i + 1`).
 #[derive(Clone, Copy)]
 struct DefSite {
     block: BlockId,
@@ -28,7 +12,6 @@ pub fn verify(func: &SsaFunc) -> VerifyResult {
     let n = func.blocks.len();
     let mut def: Vec<Option<DefSite>> = vec![None; func.values.len()];
 
-    // (1) single definition + collect def sites.
     let define = |v: Value, site: DefSite, def: &mut Vec<Option<DefSite>>| -> VerifyResult {
         let slot = def
             .get_mut(v.0 as usize)
@@ -42,16 +25,29 @@ pub fn verify(func: &SsaFunc) -> VerifyResult {
     for (b, block) in func.blocks.iter().enumerate() {
         let bid = BlockId(b as u32);
         for p in &block.params {
-            define(*p, DefSite { block: bid, order: 0 }, &mut def)?;
+            define(
+                *p,
+                DefSite {
+                    block: bid,
+                    order: 0,
+                },
+                &mut def,
+            )?;
         }
         for (i, inst) in block.insts.iter().enumerate() {
             if let Some(d) = inst.dest {
-                define(d, DefSite { block: bid, order: i as u32 + 1 }, &mut def)?;
+                define(
+                    d,
+                    DefSite {
+                        block: bid,
+                        order: i as u32 + 1,
+                    },
+                    &mut def,
+                )?;
             }
         }
     }
 
-    // (2)/(3) edge consistency + terminator targets in range.
     for (b, block) in func.blocks.iter().enumerate() {
         for s in block_succs(block) {
             if s.0 as usize >= n {
@@ -73,25 +69,22 @@ pub fn verify(func: &SsaFunc) -> VerifyResult {
         }
     }
 
-    // (4) uses defined + dominated by defs.
     let idom = dominators(func);
     for (b, block) in func.blocks.iter().enumerate() {
         let bid = BlockId(b as u32);
-        // Instruction operands: def must dominate this block, and within the
-        // same block precede the instruction.
+
         for (i, inst) in block.insts.iter().enumerate() {
             let use_order = i as u32 + 1;
             for u in inst_uses(&inst.kind) {
                 check_use(func, &def, &idom, u, bid, use_order)?;
             }
         }
-        // Terminator value uses (cond / return) are at end-of-block order.
+
         let end = block.insts.len() as u32 + 1;
         for u in term_value_uses(&block.term) {
             check_use(func, &def, &idom, u, bid, end)?;
         }
-        // Phi operands: each block-argument on an outgoing edge must be defined
-        // and available (dominate) at the END of this (predecessor) block.
+
         for (target, args) in out_edges(&block.term) {
             for &a in args {
                 check_use(func, &def, &idom, a, bid, u32::MAX)?;
@@ -102,8 +95,6 @@ pub fn verify(func: &SsaFunc) -> VerifyResult {
     Ok(())
 }
 
-/// A use is valid if its def dominates the using block; if def and use share a
-/// block, the def must come first in program order.
 fn check_use(
     func: &SsaFunc,
     def: &[Option<DefSite>],
@@ -137,7 +128,9 @@ fn block_succs(block: &Block) -> Vec<BlockId> {
     let mut s = match &block.term {
         Terminator::Return(_) | Terminator::Throw(_) | Terminator::Unreachable => Vec::new(),
         Terminator::Jump { target, .. } => vec![*target],
-        Terminator::Branch { then_blk, else_blk, .. } => vec![*then_blk, *else_blk],
+        Terminator::Branch {
+            then_blk, else_blk, ..
+        } => vec![*then_blk, *else_blk],
     };
     for inst in &block.insts {
         if let InstKind::Try { handler } = &inst.kind {
@@ -147,7 +140,6 @@ fn block_succs(block: &Block) -> Vec<BlockId> {
     s
 }
 
-/// Number of block-arguments the `pred -> block` edge carries.
 fn edge_arg_count(func: &SsaFunc, pred: BlockId, block: BlockId) -> Result<usize, String> {
     for inst in &func.blocks[pred.0 as usize].insts {
         if let InstKind::Try { handler } = &inst.kind {
@@ -158,7 +150,13 @@ fn edge_arg_count(func: &SsaFunc, pred: BlockId, block: BlockId) -> Result<usize
     }
     match &func.blocks[pred.0 as usize].term {
         Terminator::Jump { target, args } if *target == block => Ok(args.len()),
-        Terminator::Branch { then_blk, then_args, else_blk, else_args, .. } => {
+        Terminator::Branch {
+            then_blk,
+            then_args,
+            else_blk,
+            else_args,
+            ..
+        } => {
             if *then_blk == block {
                 Ok(then_args.len())
             } else if *else_blk == block {
@@ -185,7 +183,12 @@ pub(crate) fn inst_uses(kind: &InstKind) -> Vec<Value> {
         InstKind::GetProperty { object, .. } => vec![*object],
         InstKind::GetIndex { object, index } => vec![*object, *index],
         InstKind::SetProperty { object, value, .. } => vec![*object, *value],
-        InstKind::SetIndex { object, index, value } => vec![*object, *index, *value],
+        InstKind::SetIndex {
+            object,
+            index,
+            value,
+        } => vec![*object, *index, *value],
+        InstKind::ObjectMerge { target, source } => vec![*target, *source],
         InstKind::MethodCall { recv, args, .. } => {
             let mut v = Vec::with_capacity(args.len() + 1);
             v.push(*recv);
@@ -236,7 +239,9 @@ pub(crate) fn inst_uses(kind: &InstKind) -> Vec<Value> {
         InstKind::DeclareField { class, .. } => vec![*class],
         InstKind::DefineStatic { class, value, .. } => vec![*class, *value],
         InstKind::DefineMethod { class, method, .. } => vec![*class, *method],
-        InstKind::DefineAccessor { class, accessor, .. } => vec![*class, *accessor],
+        InstKind::DefineAccessor {
+            class, accessor, ..
+        } => vec![*class, *accessor],
         InstKind::MakeEnumVariant { .. } => Vec::new(),
         InstKind::Try { .. } => Vec::new(),
         InstKind::PopTry => Vec::new(),
@@ -276,14 +281,18 @@ fn term_value_uses(t: &Terminator) -> Vec<Value> {
 fn out_edges(t: &Terminator) -> Vec<(BlockId, &Vec<Value>)> {
     match t {
         Terminator::Jump { target, args } => vec![(*target, args)],
-        Terminator::Branch { then_blk, then_args, else_blk, else_args, .. } => {
+        Terminator::Branch {
+            then_blk,
+            then_args,
+            else_blk,
+            else_args,
+            ..
+        } => {
             vec![(*then_blk, then_args), (*else_blk, else_args)]
         }
         _ => Vec::new(),
     }
 }
-
-// ----- dominators (Cooper-Harvey-Kennedy over reverse postorder) -----------
 
 fn dominators(func: &SsaFunc) -> Vec<Option<BlockId>> {
     let n = func.blocks.len();
@@ -305,7 +314,7 @@ fn dominators(func: &SsaFunc) -> Vec<Option<BlockId>> {
             let mut new_idom: Option<BlockId> = None;
             for &p in &func.blocks[b.0 as usize].preds {
                 if idom[p.0 as usize].is_none() {
-                    continue; // pred not yet processed / unreachable
+                    continue;
                 }
                 new_idom = Some(match new_idom {
                     None => p,
@@ -338,7 +347,6 @@ fn intersect(
     a
 }
 
-/// Does `a` dominate `b`? Walk `b` up the idom tree to the entry.
 fn dominates(idom: &[Option<BlockId>], entry: BlockId, a: BlockId, b: BlockId) -> bool {
     let mut cur = b;
     loop {
@@ -350,7 +358,7 @@ fn dominates(idom: &[Option<BlockId>], entry: BlockId, a: BlockId, b: BlockId) -
         }
         match idom[cur.0 as usize] {
             Some(next) if next != cur => cur = next,
-            _ => return false, // unreachable block or no idom
+            _ => return false,
         }
     }
 }
@@ -359,7 +367,7 @@ fn reverse_postorder(func: &SsaFunc) -> Vec<BlockId> {
     let n = func.blocks.len();
     let mut visited = vec![false; n];
     let mut post: Vec<BlockId> = Vec::with_capacity(n);
-    // Iterative DFS recording postorder.
+
     let mut stack: Vec<(BlockId, usize)> = vec![(func.entry, 0)];
     visited[func.entry.0 as usize] = true;
     while let Some((b, idx)) = stack.pop() {

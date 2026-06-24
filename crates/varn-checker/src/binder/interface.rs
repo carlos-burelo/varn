@@ -77,12 +77,8 @@ impl super::Binder {
             } => {
                 let ty = resolve_type_node(type_ann, Some(self));
 
-                let mut sym = Symbol::new(
-                    SymbolKind::Property,
-                    key.clone(),
-                    range.start.line,
-                )
-                .with_type(ty.clone());
+                let mut sym = Symbol::new(SymbolKind::Property, key.clone(), range.start.line)
+                    .with_type(ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 let symbol_id = self.arena.push(sym);
@@ -155,12 +151,8 @@ impl super::Binder {
                     type_params: fn_tps,
                 });
 
-                let mut sym = Symbol::new(
-                    SymbolKind::Method,
-                    key.clone(),
-                    range.start.line,
-                )
-                .with_type(fn_type.clone());
+                let mut sym = Symbol::new(SymbolKind::Method, key.clone(), range.start.line)
+                    .with_type(fn_type.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 let symbol_id = self.arena.push(sym);

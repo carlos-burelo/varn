@@ -20,7 +20,6 @@ pub fn build_document_highlights(
 
     let name = tok.lexeme.as_str();
 
-    // 1. Try to match precisely by SymbolId using the type checker's expr_types
     let target_sid = state
         .db
         .expr_types
@@ -31,7 +30,7 @@ pub fn build_document_highlights(
         let mut decl_positions = HashSet::new();
         if target_sid < state.db.arena.len() {
             let sym = state.db.arena.get(target_sid);
-            // Convert to 0-indexed line to match state.tokens lines
+
             decl_positions.insert((sym.line.saturating_sub(1), sym.col));
         }
 
@@ -61,7 +60,6 @@ pub fn build_document_highlights(
         }
     }
 
-    // 2. Fallback to naive text-based lexeme name search if type information is not present
     let decl_positions: HashSet<(u32, u32)> = state
         .symbols
         .iter()
@@ -72,7 +70,9 @@ pub fn build_document_highlights(
     state
         .tokens
         .iter()
-        .filter(|t| (t.kind == TokenKind::Identifier || t.kind.can_be_identifier()) && t.lexeme == name)
+        .filter(|t| {
+            (t.kind == TokenKind::Identifier || t.kind.can_be_identifier()) && t.lexeme == name
+        })
         .map(|t| {
             let kind = if decl_positions.contains(&(t.line, t.col)) {
                 DocumentHighlightKind::WRITE

@@ -45,7 +45,7 @@ assert("process null", process(null) === null)
 assert("process 42", process(42) === 42)
 
 // 5. Critical Cast and Ternary Disambiguation
-const val: dynamic = 42
+const val: int = 42
 
 // a) Cast to nullable type T?
 const cast1 = val as int?

@@ -1,5 +1,3 @@
-//! Naive compiler wrapper that delegates unconditionally to the SSA compiler pipeline.
-
 use std::rc::Rc;
 
 use varn_core::OpCode;
@@ -12,7 +10,10 @@ pub(crate) fn lower_function(f: &HirFunction, source_file: Rc<str>) -> FunctionP
     match crate::ssa::try_compile_function(f, source_file) {
         Ok(proto) => proto,
         Err(OptError::Unsupported(why)) => {
-            panic!("SSA compiler unsupported construct in function {}: {}", f.name, why);
+            panic!(
+                "SSA compiler unsupported construct in function {}: {}",
+                f.name, why
+            );
         }
     }
 }
@@ -92,6 +93,10 @@ pub(crate) fn bin_opcode(op: HirBinOp, ty: HirType) -> OpCode {
     }
 }
 
-pub fn lower(module: &HirModule, source_file: Rc<str>, export_names: Vec<Rc<str>>) -> Result<FunctionProto, OptError> {
+pub fn lower(
+    module: &HirModule,
+    source_file: Rc<str>,
+    export_names: Vec<Rc<str>>,
+) -> Result<FunctionProto, OptError> {
     crate::ssa::lower_module(module, source_file, export_names)
 }

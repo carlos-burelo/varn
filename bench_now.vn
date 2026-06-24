@@ -1,25 +1,13 @@
-import { now, sys } from "std:sys";
+let sum = 0
 
-function fib(n: int): int {
-    if (n <= 1) return n;
-    return fib(n - 1) + fib(n - 2);
+for (let i = 0; i < 10_000_000; i++) {
+    let x = {
+        a: i,
+        b: i + 1,
+        c: i + 2
+    }
+
+    sum += x.a
 }
 
-let start = now();
-let result = fib(35);
-let elapsed = now() - start;
-
-print("fib(35) =");
-print(result);
-print("Elapsed time (ms):");
-print(elapsed);
-
-let s = sys.now();
-// Do a tiny spin to ensure time advances
-let sum = 0;
-for (let i = 0; i < 100000; i = i + 1) {
-    sum = sum + i;
-}
-let e = sys.now() - s;
-print("sys.now() elapsed:");
-print(e);
+print(sum)

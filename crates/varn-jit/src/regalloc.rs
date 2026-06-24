@@ -261,23 +261,82 @@ impl RegMap {
     }
 }
 
-pub fn emit_prologue(asm: &mut Assembler, regmap: &RegMap) {
+pub fn emit_prologue(
+    asm: &mut Assembler,
+    regmap: &RegMap,
+    proto: &varn_types::FunctionProto,
+    helpers: &crate::JitHelpers,
+) {
+    let is_pure = proto.upvalue_count == 0 && !proto.is_async && !proto.is_generator;
+    if is_pure {
+        use crate::assembler::Cond;
+
+        asm.mov_reg_mem(Reg::R10, crate::registers::ARG_EXEC_CTX, 0);
+
+        asm.mov_reg_reg(Reg::R11, crate::registers::ARG_BASE);
+        asm.add_reg_imm32(Reg::R11, (proto.register_count + 32) as i32);
+
+        asm.cmp_reg_reg(Reg::R10, Reg::R11);
+        let skip_grow = asm.jmp_cond(Cond::GreaterEqual);
+
+        asm.push(crate::registers::ARG_CTX);
+        asm.push(crate::registers::ARG_CLOSURE);
+        asm.push(crate::registers::ARG_BASE);
+        asm.push(crate::registers::ARG_EXEC_CTX);
+
+        let need_dummy = true;
+        if need_dummy {
+            asm.push(Reg::Rax);
+        }
+
+        asm.mov_reg_reg(crate::registers::ARG_CTX, crate::registers::ARG_EXEC_CTX);
+
+        asm.mov_reg_reg(crate::registers::ARG_CLOSURE, crate::registers::ARG_BASE);
+        asm.add_reg_imm32(crate::registers::ARG_CLOSURE, proto.register_count as i32);
+
+        #[cfg(target_os = "windows")]
+        asm.add_reg_imm8(Reg::Rsp, -32);
+
+        asm.mov_reg_imm64(Reg::R10, helpers.jit_ensure_stack_capacity as u64);
+        asm.call_reg(Reg::R10);
+
+        #[cfg(target_os = "windows")]
+        asm.add_reg_imm8(Reg::Rsp, 32);
+
+        if need_dummy {
+            asm.pop(Reg::R11);
+        }
+
+        asm.pop(crate::registers::ARG_EXEC_CTX);
+        asm.pop(crate::registers::ARG_BASE);
+        asm.pop(crate::registers::ARG_CLOSURE);
+        asm.pop(crate::registers::ARG_CTX);
+
+        asm.mov_reg_mem(crate::registers::ARG_CTX, crate::registers::ARG_EXEC_CTX, 8);
+
+        let post_grow_pos = asm.current_offset();
+        let disp = (post_grow_pos as i32 - (skip_grow as i32 + 4)) as u32;
+        asm.patch_u32(skip_grow, disp);
+
+        asm.mov_reg_reg(Reg::R10, crate::registers::ARG_BASE);
+        asm.add_reg_imm32(Reg::R10, proto.register_count as i32);
+        asm.mov_mem_reg(crate::registers::ARG_EXEC_CTX, 16, Reg::R10);
+    }
+
     asm.push(crate::registers::REG_FRAME_BASE);
 
     asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_BASE);
     asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
     asm.add_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_CTX);
 
-    // Save R15 (callee-saved, used as dedicated INT_TAG register)
     asm.push(crate::registers::REG_INT_TAG);
 
     for &phys in &regmap.used_phys {
         asm.push(phys);
     }
 
-    // Save closure pointer to avoid clobbering by helper/native calls
     asm.push(crate::registers::ARG_CLOSURE);
-    asm.push(Reg::Rax); // Dummy register to maintain 16-byte stack alignment
+    asm.push(Reg::Rax);
 
     asm.mov_reg_imm64(crate::registers::REG_INT_TAG, 0x7FFC_0000_0000_0000u64);
 }
@@ -287,7 +346,6 @@ pub fn emit_epilogue(asm: &mut Assembler, regmap: &RegMap) {
         emit_store_phys_to_mem(asm, phys, vreg);
     }
 
-    // Restore dummy and closure pointer
     asm.pop(Reg::Rax);
     asm.pop(crate::registers::ARG_CLOSURE);
 
@@ -295,7 +353,6 @@ pub fn emit_epilogue(asm: &mut Assembler, regmap: &RegMap) {
         asm.pop(phys);
     }
 
-    // Restore R15 (dedicated INT_TAG register)
     asm.pop(crate::registers::REG_INT_TAG);
 
     asm.pop(crate::registers::REG_FRAME_BASE);
@@ -342,7 +399,6 @@ pub fn emit_reload_all_except(asm: &mut Assembler, regmap: &RegMap, except: Opti
         }
     }
 }
-
 
 fn emit_store_phys_to_mem(asm: &mut Assembler, phys: Reg, vreg: usize) {
     emit_store_reg(asm, phys, vreg);

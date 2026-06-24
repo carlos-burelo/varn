@@ -3,8 +3,6 @@ use rust_decimal::{Decimal, MathematicalOps};
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, NativeFnResult, Value, VmValue};
 
-/// Native implementation backing the `decimal` contract
-/// (`src/modules/primitives/decimal/decimal.vn`).
 pub struct Dec;
 
 fn get_decimal(ctx: &dyn NativeCtx, this: VmValue) -> Option<Decimal> {
@@ -94,7 +92,6 @@ varn_contract! {
     }
 }
 
-// Free helper re-exported from `primitives/mod.rs`; unrelated to the contract.
 pub fn decimal_parse(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
     let s = args.first().map(|&v| ctx.str_repr(v)).unwrap_or_default();
     if let Ok(d) = s.parse::<Decimal>() {

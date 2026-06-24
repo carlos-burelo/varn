@@ -5,8 +5,6 @@ use crate::document::SymbolRecord;
 use super::format::format_signature;
 
 pub fn symbol_hover(sym: &SymbolRecord) -> Hover {
-    // A Markdown code fence (not the deprecated MarkedString) so the client
-    // syntax-highlights the signature via the `Varn` TextMate grammar.
     let mut value = format!("```Varn\n{}\n```", format_signature(sym));
 
     if let Some(raw) = &sym.doc {

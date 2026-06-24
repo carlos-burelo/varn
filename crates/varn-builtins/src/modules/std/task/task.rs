@@ -1,11 +1,8 @@
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, Value, VmValue};
 
-/// Native functions backing the `runtime:task` contract
-/// (`src/modules/std/task/runtime/task_runtime.vn`).
 pub struct TaskRuntime;
 
-/// Native implementation of the `IsolatePort` class from the same contract.
 pub struct IsolatePortImpl;
 
 varn_contract! {

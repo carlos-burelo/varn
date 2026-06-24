@@ -3,8 +3,6 @@ use varn_op_macros::varn_contract;
 use varn_types::value::SetRef;
 use varn_types::{NativeCtx, Value, VmValue};
 
-/// Native implementation backing the `Set` contract
-/// (`src/modules/primitives/set/set.vn`).
 pub struct Set;
 
 fn get_set(ctx: &dyn NativeCtx, this: VmValue) -> Option<SetRef> {

@@ -112,7 +112,8 @@ impl Checker {
                     }
                     _ => Vec::new(),
                 };
-                self.expected_object_members_cache.insert(ty, resolved.clone());
+                self.expected_object_members_cache
+                    .insert(ty, resolved.clone());
                 resolved
             }
         } else {

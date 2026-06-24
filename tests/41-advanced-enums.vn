@@ -1,5 +1,3 @@
-// 41. Advanced Enums and Algebraic Data Types (ADTs)
-
 // 1. Basic Enums & Singleton Identity
 enum Direction {
     North,

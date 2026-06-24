@@ -1,8 +1,6 @@
 use varn_op_macros::varn_contract;
 use varn_types::NativeCtx;
 
-/// Native implementation backing the `runtime:math` contract
-/// (`src/modules/std/math/runtime/math_runtime.vn`).
 pub struct MathRuntime;
 
 varn_contract! {

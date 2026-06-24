@@ -2,8 +2,8 @@ use varn_checker::Checker;
 use varn_core::ast::Program;
 
 use crate::PipelineError;
-use varn_utilities::chalk::chalk;
 use varn_debug::flags::DebugFlags;
+use varn_utilities::chalk::chalk;
 
 type PipelineResult<T> = Result<T, PipelineError>;
 

@@ -1,9 +1,9 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum IntrinsicDomain {
-    Math      = 0x0,
-    String    = 0x1,
-    Array     = 0x2,
+    Math = 0x0,
+    String = 0x1,
+    Array = 0x2,
     TypeCheck = 0x3,
 }
 

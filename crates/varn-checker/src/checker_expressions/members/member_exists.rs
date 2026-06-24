@@ -30,7 +30,8 @@ fn check_in_bind(name: &Rc<str>, key: &str, ext_bind: &crate::binder::BindResult
 
 fn check_origin_module(name: &Rc<str>, origin: &Option<Rc<str>>, key: &str) -> bool {
     let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
-    if let Some(ext_bind) = crate::module_resolver::find_module_bind_for_type_ref(name, &origin_modules)
+    if let Some(ext_bind) =
+        crate::module_resolver::find_module_bind_for_type_ref(name, &origin_modules)
     {
         if check_in_bind(name, key, &ext_bind) {
             return true;
@@ -150,7 +151,10 @@ impl Checker {
                             }
                         }
                         if let Some(ext_bind) =
-                            crate::module_resolver::find_module_bind_for_type_ref(name, &origin_modules)
+                            crate::module_resolver::find_module_bind_for_type_ref(
+                                name,
+                                &origin_modules,
+                            )
                         {
                             if let Some(fields) = ext_bind.sum_variant_fields.get(v) {
                                 if fields.iter().any(|(fname, _)| fname.as_ref() == key) {

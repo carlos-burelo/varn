@@ -30,12 +30,9 @@ pub fn load_cached_graph(
         return Ok(None);
     }
     let bytes = std::fs::read(cache_path).map_err(|e| e.to_string())?;
-    let payload = varn_modules::artifact::read_envelope(
-        varn_modules::artifact::MAGIC_VNC,
-        version,
-        &bytes,
-    )
-    .map_err(|e| e.to_string())?;
+    let payload =
+        varn_modules::artifact::read_envelope(varn_modules::artifact::MAGIC_VNC, version, &bytes)
+            .map_err(|e| e.to_string())?;
 
     let graph: ModuleGraphArtifact = postcard::from_bytes(payload).map_err(|e| e.to_string())?;
 

@@ -2,8 +2,6 @@ use std::fs;
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
-/// Native implementation backing the `runtime:fs` contract
-/// (`src/modules/std/fs/runtime/fs_runtime.vn`).
 pub struct FsRuntime;
 
 varn_contract! {

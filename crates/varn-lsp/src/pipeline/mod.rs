@@ -25,14 +25,22 @@ fn stable_global_key(
 ) -> String {
     if let Some(origin_mod) = origin {
         let canonical_name = original_name.unwrap_or(name);
-        let origin_uri = if origin_mod.starts_with("file://") || origin_mod.starts_with("std:") || origin_mod.starts_with("core:") || origin_mod.starts_with("runtime:") {
+        let origin_uri = if origin_mod.starts_with("file://")
+            || origin_mod.starts_with("std:")
+            || origin_mod.starts_with("core:")
+            || origin_mod.starts_with("runtime:")
+        {
             origin_mod.to_owned()
         } else {
             varn_modules::resolver::path_to_uri(origin_mod)
         };
         return format!("m:{}#{kind:?}:{}", origin_uri, canonical_name);
     }
-    let norm_uri = if uri.starts_with("file://") || uri.starts_with("std:") || uri.starts_with("core:") || uri.starts_with("runtime:") {
+    let norm_uri = if uri.starts_with("file://")
+        || uri.starts_with("std:")
+        || uri.starts_with("core:")
+        || uri.starts_with("runtime:")
+    {
         uri.to_owned()
     } else {
         varn_modules::resolver::path_to_uri(uri)

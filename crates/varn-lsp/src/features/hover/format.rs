@@ -1,4 +1,5 @@
 use crate::document::{MemberKind, MemberRecord, SymbolRecord};
+use crate::util::kinds::{member_kind_label, symbol_kind_label};
 use varn_checker::SymbolKind;
 use varn_core::TypeTag;
 
@@ -48,11 +49,7 @@ pub fn format_signature(sym: &SymbolRecord) -> String {
 
 fn format_fn(sym: &SymbolRecord) -> String {
     let async_prefix = if sym.is_async { "async " } else { "" };
-    let kw = match sym.kind {
-        SymbolKind::Method => "method",
-        SymbolKind::EnumMember => "enum member",
-        _ => "function",
-    };
+    let kw = symbol_kind_label(sym.kind);
     let tp = format_type_params(&sym.type_params);
     let gen_star = if sym.is_generator { "*" } else { "" };
     if sym.is_arrow {
@@ -68,7 +65,9 @@ fn format_fn(sym: &SymbolRecord) -> String {
 }
 
 fn is_primitive_class_name(name: &str) -> bool {
-    TypeTag::from_str(name).map(|t| t.is_primitive()).unwrap_or(false)
+    TypeTag::from_str(name)
+        .map(|t| t.is_primitive())
+        .unwrap_or(false)
 }
 
 fn format_class(sym: &SymbolRecord) -> String {
@@ -144,29 +143,10 @@ pub fn format_inner_member(m: &MemberRecord) -> String {
                 "{}{}{} {}({})",
                 indent,
                 static_prefix,
-                m.kind.kind_label(),
+                member_kind_label(m.kind),
                 m.name,
                 m.params_str
             )
-        }
-    }
-}
-
-impl MemberKind {
-    pub fn kind_label(&self) -> &'static str {
-        match self {
-            MemberKind::Class => "class",
-            MemberKind::Interface => "interface",
-            MemberKind::Namespace => "namespace",
-            MemberKind::Enum | MemberKind::EnumMember => "enum",
-            MemberKind::Struct => "struct",
-            MemberKind::Property => "prop",
-            MemberKind::Variable => "var",
-            MemberKind::Method => "method",
-            MemberKind::Function => "function",
-            MemberKind::Getter => "get",
-            MemberKind::Setter => "set",
-            MemberKind::Constructor => "constructor",
         }
     }
 }

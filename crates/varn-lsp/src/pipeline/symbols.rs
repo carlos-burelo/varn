@@ -118,8 +118,12 @@ pub fn inject_stdlib_symbols(
 
         let mut target_bind = None;
         if let Some(origin_mod) = sym.origin_module.as_deref() {
-            if origin_mod.starts_with("std:") || origin_mod.starts_with("runtime:") || origin_mod.starts_with("core:") {
-                target_bind = varn_checker::module_resolver::resolve_stdlib_module_bind_ref(origin_mod);
+            if origin_mod.starts_with("std:")
+                || origin_mod.starts_with("runtime:")
+                || origin_mod.starts_with("core:")
+            {
+                target_bind =
+                    varn_checker::module_resolver::resolve_stdlib_module_bind_ref(origin_mod);
             } else {
                 target_bind = varn_checker::module_resolver::resolve_module_bind_ref(origin_mod);
             }
@@ -127,25 +131,29 @@ pub fn inject_stdlib_symbols(
         let bind_to_use = target_bind.as_ref().map(|b| b.as_ref()).unwrap_or(bind);
 
         let members = if sym.kind == SymbolKind::Namespace {
-            bind_to_use.type_members
+            bind_to_use
+                .type_members
                 .namespaces
                 .get(&sym.name)
                 .map(|ms| map_members(ms, tokens))
                 .unwrap_or_default()
         } else if sym.kind == SymbolKind::Class || sym.kind == SymbolKind::Interface {
-            bind_to_use.type_members
+            bind_to_use
+                .type_members
                 .classes
                 .get(&sym.name)
                 .map(|e| map_members(&e.members, tokens))
                 .or_else(|| {
-                    bind_to_use.type_members
+                    bind_to_use
+                        .type_members
                         .interfaces
                         .get(&sym.name)
                         .map(|ms| map_members(ms, tokens))
                 })
                 .unwrap_or_default()
         } else if sym.kind == SymbolKind::Enum {
-            bind_to_use.type_members
+            bind_to_use
+                .type_members
                 .enums
                 .get(&sym.name)
                 .map(|ms| map_enum_members(ms, tokens))

@@ -48,7 +48,11 @@ impl GlobalStore {
             values.push(val);
         }
 
-        Self { values, names, idx_to_name }
+        Self {
+            values,
+            names,
+            idx_to_name,
+        }
     }
 
     pub fn define(&mut self, name: &str, value: VmValue) -> usize {
@@ -90,22 +94,26 @@ impl GlobalStore {
         self.values.get(idx).copied()
     }
 
-    /// # Safety / invariant
-    /// `idx` must be a compiler-emitted global index, which is always in range
-    /// (the global table is pre-sized before execution). Checked in debug
-    /// builds; UB on out-of-range in release. Callers that can't guarantee this
-    /// must use [`get_by_index`].
     #[inline(always)]
     pub fn get_by_index_unchecked(&self, idx: usize) -> VmValue {
-        debug_assert!(idx < self.values.len(), "global index OOB: {idx} >= {}", self.values.len());
+        debug_assert!(
+            idx < self.values.len(),
+            "global index OOB: {idx} >= {}",
+            self.values.len()
+        );
         unsafe { *self.values.get_unchecked(idx) }
     }
 
-    /// See [`get_by_index_unchecked`] for the in-range invariant.
     #[inline(always)]
     pub fn set_by_index_unchecked(&mut self, idx: usize, value: VmValue) {
-        debug_assert!(idx < self.values.len(), "global index OOB: {idx} >= {}", self.values.len());
-        unsafe { *self.values.get_unchecked_mut(idx) = value; }
+        debug_assert!(
+            idx < self.values.len(),
+            "global index OOB: {idx} >= {}",
+            self.values.len()
+        );
+        unsafe {
+            *self.values.get_unchecked_mut(idx) = value;
+        }
     }
 
     pub fn resolve_index(&self, name: &str) -> Option<usize> {

@@ -66,8 +66,7 @@ pub(crate) fn infer_mapping_from_args(
     bind: &BindResult,
 ) -> FxHashMap<Rc<str>, Type> {
     let mut mapping = FxHashMap::default();
-    
-    // Pass 1: Process non-arrow/non-callback arguments to resolve as many generic type parameters as possible
+
     for (param, arg) in param_types.iter().zip(args.iter()) {
         let is_arrow = match arg {
             Arg::Positional(e) => matches!(e.kind, ExprKind::Arrow { .. }),
@@ -85,7 +84,6 @@ pub(crate) fn infer_mapping_from_args(
         collect_type_inferences(&param.ty, &arg_ty, type_params, &mut mapping);
     }
 
-    // Pass 2: Process arrow/callback arguments using the partially resolved type parameter mappings so far
     for (param, arg) in param_types.iter().zip(args.iter()) {
         let is_arrow = match arg {
             Arg::Positional(e) => matches!(e.kind, ExprKind::Arrow { .. }),
@@ -95,7 +93,7 @@ pub(crate) fn infer_mapping_from_args(
         if !is_arrow {
             continue;
         }
-        
+
         let mapped_param_ty = map_generics_cached(checker, &param.ty, &mapping);
         let arg_ty = match arg {
             Arg::Positional(e) => {
@@ -148,7 +146,7 @@ fn infer_arrow_with_context(
 
     let arrow_scope = find_arrow_scope(checker.current_scope, params, bind);
     let saved_scope = checker.current_scope;
-    
+
     if let Some(scope_id) = arrow_scope {
         checker.current_scope = scope_id;
         for (ap, ep) in params.iter().zip(expected_fn.params.iter()) {
@@ -160,11 +158,13 @@ fn infer_arrow_with_context(
                         .type_ann
                         .as_ref()
                         .or(match &ap.pattern {
-                            varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                            varn_core::ast::Pattern::Identifier { type_ann, .. } => {
+                                type_ann.as_ref()
+                            }
                             _ => None,
                         })
                         .map(|m| checker.resolve_type_node_cached(m, bind));
-                    
+
                     let ty = explicit_ty.unwrap_or_else(|| ep.ty.clone());
                     checker.symbol_types.insert(sym_id, ty);
                 }

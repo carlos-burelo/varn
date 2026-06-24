@@ -7,8 +7,8 @@ use crate::regalloc::{emit_prologue, RegMap};
 
 use crate::codegen::{
     emit_arith, emit_arrays, emit_calls, emit_closures, emit_compare, emit_globals,
-    emit_immediates, emit_indexing, emit_jumps, emit_modules, emit_properties, emit_strings,
-    emit_misc_ops, CodegenCtx,
+    emit_immediates, emit_indexing, emit_jumps, emit_misc_ops, emit_modules, emit_properties,
+    emit_strings, CodegenCtx,
 };
 
 #[allow(unreachable_patterns)]
@@ -118,7 +118,7 @@ pub fn compile_proto(
                 ip += uv_count;
             }
             OpCode::Intrinsic => {
-                ip += 1; // wire_byte + arg_count word
+                ip += 1;
             }
             OpCode::AddInt
             | OpCode::SubInt
@@ -135,7 +135,11 @@ pub fn compile_proto(
             OpCode::Jump | OpCode::Loop | OpCode::JumpIfFalse | OpCode::JumpIfTrue => {
                 ip += 2;
             }
-            OpCode::GetProperty | OpCode::SetProperty | OpCode::Call | OpCode::CallSelf | OpCode::BuildArray => {
+            OpCode::GetProperty
+            | OpCode::SetProperty
+            | OpCode::Call
+            | OpCode::CallSelf
+            | OpCode::BuildArray => {
                 ip += 2;
             }
             OpCode::CallMethod | OpCode::InvokeVirtual | OpCode::Try => {
@@ -227,7 +231,7 @@ pub fn compile_proto(
 
     let mut asm = Assembler::new();
     let regmap = RegMap::from_bytecode(code);
-    emit_prologue(&mut asm, &regmap);
+    emit_prologue(&mut asm, &regmap, proto, &helpers);
     crate::regalloc::emit_reload_all(&mut asm, &regmap);
 
     let code_len = code.len();
@@ -320,9 +324,10 @@ pub fn compile_proto(
                 emit_jumps(&mut cctx, op, first_reg)?
             }
 
-            OpCode::LoadUpvalue | OpCode::StoreUpvalue | OpCode::MakeClosure | OpCode::LoadStaticFn => {
-                emit_closures(&mut cctx, op, first_reg)?
-            }
+            OpCode::LoadUpvalue
+            | OpCode::StoreUpvalue
+            | OpCode::MakeClosure
+            | OpCode::LoadStaticFn => emit_closures(&mut cctx, op, first_reg)?,
 
             OpCode::GetProperty | OpCode::SetProperty => emit_properties(&mut cctx, op, first_reg)?,
 
@@ -337,9 +342,7 @@ pub fn compile_proto(
             | OpCode::ArrayExtend
             | OpCode::BuildStr => emit_arrays(&mut cctx, op, first_reg)?,
 
-            OpCode::Intrinsic => {
-                emit_calls(&mut cctx, op, first_reg)?
-            },
+            OpCode::Intrinsic => emit_calls(&mut cctx, op, first_reg)?,
 
             OpCode::StrConcat | OpCode::StrSlice | OpCode::StrLength => {
                 emit_strings(&mut cctx, op, first_reg)?
@@ -405,7 +408,6 @@ pub fn compile_proto(
         cctx.asm.patch_u32(patch.patch_pos, displacement as u32);
     }
 
-    // Optimize generated assembly before finalizing
     crate::codegen::optimizer::optimize(&mut cctx.asm)?;
     let native_bytes = cctx.asm.into_bytes();
     let mut jit_buf = JitBuffer::new(native_bytes.len())?;

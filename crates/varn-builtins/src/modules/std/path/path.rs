@@ -1,8 +1,6 @@
 use varn_op_macros::varn_contract;
 use varn_types::NativeCtx;
 
-/// Native implementation backing the `runtime:path` contract
-/// (`src/modules/std/path/runtime/path_runtime.vn`).
 pub struct PathRuntime;
 
 varn_contract! {

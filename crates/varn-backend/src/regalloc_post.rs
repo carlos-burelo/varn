@@ -9,7 +9,7 @@ thread_local! {
     pub static OPTIMIZE_ENABLED: Cell<bool> = Cell::new(true);
 }
 
-use super::liveness::{LiveRange, LivenessAnalyzer};
+use crate::liveness::{LiveRange, LivenessAnalyzer};
 
 struct InstrInfo {
     len: usize,
@@ -68,13 +68,18 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
     let info = match op {
         OpCode::PopTry | OpCode::Nop => s(1, None, vec![]),
         OpCode::Intrinsic => {
-            // w1 = (wire_byte << 8) | arg_count; arg_count includes object at dest0
             let arg_count = lo1 as usize;
             let mut uses = vec![];
             for i in 0..arg_count {
                 uses.push(dest0.wrapping_add(i as u8));
             }
-            InstrInfo { len: 2, def: Some(dest0), uses, call_args: Some((dest0, arg_count as u8)), opaque: false }
+            InstrInfo {
+                len: 2,
+                def: Some(dest0),
+                uses,
+                call_args: Some((dest0, arg_count as u8)),
+                opaque: false,
+            }
         }
         OpCode::LoadStaticFn => s(2, Some(dest0), vec![]),
 
@@ -265,9 +270,10 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
             opaque: false,
         },
 
-        OpCode::GetProperty | OpCode::GetPropertyMaybe | OpCode::GetFixedField | OpCode::GetSymbol => {
-            s(3, Some(dest0), vec![hi1])
-        }
+        OpCode::GetProperty
+        | OpCode::GetPropertyMaybe
+        | OpCode::GetFixedField
+        | OpCode::GetSymbol => s(3, Some(dest0), vec![hi1]),
         OpCode::SetProperty | OpCode::SetFixedField => s(3, None, vec![dest0, hi1]),
 
         OpCode::GetSuper => s(2, Some(dest0), vec![]),
@@ -306,7 +312,11 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
             let fn_reg = lo1;
             let argc = hi2;
             let arg_start = lo2;
-            let mut uses = if op == OpCode::CallSelf { Vec::new() } else { vec![fn_reg] };
+            let mut uses = if op == OpCode::CallSelf {
+                Vec::new()
+            } else {
+                vec![fn_reg]
+            };
             for i in 0..argc {
                 uses.push(arg_start.wrapping_add(i));
             }
@@ -345,9 +355,6 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
                 len: 4,
                 def: Some(hi1),
                 uses,
-                // Always record the arg block (even for 0/1 args) so the
-                // callee-frame constraint covers every method call. The
-                // contiguity check is a no-op for `arg_count <= 1`.
                 call_args: Some((lo3, hi3)),
                 opaque: false,
             }
@@ -357,34 +364,18 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
     Some(info)
 }
 
-#[allow(dead_code)]
 struct ScanResult {
     defs: HashMap<u8, usize>,
 
     uses: HashMap<u8, Vec<usize>>,
 
-    call_arg_ranges: Vec<(u8, u8)>,
-
-    /// Call sites as `(instr_idx, arg_start, arg_count)` — for the callee-frame
-    /// constraint (a value live across a call must not colour into the callee's
-    /// frame, i.e. at `>= arg_start`).
     call_sites: Vec<(usize, u8, u8)>,
-
-    pinned: std::collections::HashSet<u8>,
 }
 
 fn scan_bytecode(code: &[u16]) -> ScanResult {
     let mut defs: HashMap<u8, usize> = HashMap::new();
     let mut uses: HashMap<u8, Vec<usize>> = HashMap::new();
-    let mut call_arg_ranges: Vec<(u8, u8)> = Vec::new();
     let mut call_sites: Vec<(usize, u8, u8)> = Vec::new();
-    let pinned: std::collections::HashSet<u8> = std::collections::HashSet::new();
-    // Locals captured by a `MakeClosure` as an *open* upvalue: the upvalue keeps
-    // pointing at the local's register slot until it is closed (`CloseUpvalue`)
-    // or the frame returns, so the slot must stay live until then — otherwise a
-    // later def (e.g. the closure's own dest) could be coloured onto it and
-    // corrupt the captured value. Their liveness is extended to the function end
-    // below (conservative; `CloseUpvalue` already records its own use earlier).
     let mut open_captures: Vec<u8> = Vec::new();
 
     let mut offset = 0;
@@ -420,7 +411,6 @@ fn scan_bytecode(code: &[u16]) -> ScanResult {
             uses.entry(use_reg).or_insert_with(Vec::new).push(instr_idx);
         }
         if let Some((arg_start, arg_count)) = info.call_args {
-            call_arg_ranges.push((arg_start, arg_count));
             call_sites.push((instr_idx, arg_start, arg_count));
         }
 
@@ -428,7 +418,6 @@ fn scan_bytecode(code: &[u16]) -> ScanResult {
         instr_idx += 1;
     }
 
-    // Keep captured locals live to the last instruction.
     let last = instr_idx.saturating_sub(1);
     for reg in open_captures {
         uses.entry(reg).or_insert_with(Vec::new).push(last);
@@ -437,13 +426,11 @@ fn scan_bytecode(code: &[u16]) -> ScanResult {
     ScanResult {
         defs,
         uses,
-        call_arg_ranges,
         call_sites,
-        pinned,
     }
 }
 
-fn color_with_base(ranges: &[LiveRange], base: u8) -> HashMap<u8, u8> {
+fn color_with_base(ranges: &[LiveRange], base: u8, copies: &[(u8, u8)]) -> HashMap<u8, u8> {
     let mut coloring: HashMap<u8, u8> = HashMap::new();
 
     let mut sorted = ranges.to_vec();
@@ -457,9 +444,30 @@ fn color_with_base(ranges: &[LiveRange], base: u8) -> HashMap<u8, u8> {
             .filter_map(|&n| coloring.get(&(n as u8)).copied())
             .collect();
 
-        let color = (base..)
-            .find(|c| !neighbor_colors.contains(c))
-            .unwrap_or(base);
+        let mut color_opt = None;
+        for &(u, v) in copies {
+            if u == reg {
+                if let Some(&c) = coloring.get(&v) {
+                    if !neighbor_colors.contains(&c) {
+                        color_opt = Some(c);
+                        break;
+                    }
+                }
+            } else if v == reg {
+                if let Some(&c) = coloring.get(&u) {
+                    if !neighbor_colors.contains(&c) {
+                        color_opt = Some(c);
+                        break;
+                    }
+                }
+            }
+        }
+
+        let color = color_opt.unwrap_or_else(|| {
+            (base..)
+                .find(|c| !neighbor_colors.contains(c))
+                .unwrap_or(base)
+        });
         coloring.insert(reg, color);
     }
 
@@ -491,15 +499,6 @@ fn verify_call_constraints(code: &[u16], mapping: &HashMap<u8, u8>) -> bool {
     true
 }
 
-/// A call's callee frame occupies `[arg_start, arg_start + callee_register_count)`
-/// — which extends past `arg_count`. A register live across the call (defined
-/// before it, used after it) that colours into that region would be clobbered by
-/// the callee. We can't know `callee_register_count`, so conservatively require
-/// every live-across register to colour **below** the call's `arg_start`. If the
-/// proposed `mapping` would violate this, bail (the caller keeps the original,
-/// already-correct registers). Never triggers on the legacy-shaped emission
-/// (results sit below `arg_start` and colouring preserves it); catches the
-/// SSA emitter's pattern where a call result is live across a later call.
 fn verify_callee_frame_constraints(scan: &ScanResult, mapping: &HashMap<u8, u8>) -> bool {
     let m = |r: u8| mapping.get(&r).copied().unwrap_or(r);
     for &(call_idx, arg_start, arg_count) in &scan.call_sites {
@@ -507,9 +506,8 @@ fn verify_callee_frame_constraints(scan: &ScanResult, mapping: &HashMap<u8, u8>)
         let arg_end = arg_start.wrapping_add(arg_count);
         for (&reg, &def_idx) in &scan.defs {
             if def_idx >= call_idx {
-                continue; // not defined before the call (incl. the call's own dest)
+                continue;
             }
-            // The call's own receiver/arg registers are not "live across".
             if reg >= arg_start && reg < arg_end {
                 continue;
             }
@@ -728,11 +726,13 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), lo1);
                 }
-                OpCode::GetPropertyMaybe
-                | OpCode::GetFixedField
-                | OpCode::GetSymbol => {
+                OpCode::GetPropertyMaybe | OpCode::GetFixedField | OpCode::GetSymbol => {
                     let new_dest = m(mapping, dest0);
-                    let new_obj = if dest0 == hi1 { new_dest } else { m(mapping, hi1) };
+                    let new_obj = if dest0 == hi1 {
+                        new_dest
+                    } else {
+                        m(mapping, hi1)
+                    };
                     code[offset] = pack_op(op, new_dest);
                     code[offset + 1] = pack(new_obj, lo1);
                 }
@@ -767,8 +767,11 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
 
                 OpCode::GetProperty => {
                     let new_dest = m(mapping, dest0);
-                    // When dest==src (in-place load), keep them aliased after remapping.
-                    let new_obj = if dest0 == hi1 { new_dest } else { m(mapping, hi1) };
+                    let new_obj = if dest0 == hi1 {
+                        new_dest
+                    } else {
+                        m(mapping, hi1)
+                    };
                     code[offset] = pack_op(op, new_dest);
                     code[offset + 1] = pack(new_obj, lo1);
                 }
@@ -798,7 +801,6 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
 
                 OpCode::InvokeVirtual => {
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
-                    // word 2 is the name constant index — not a register, leave untouched
                     code[offset + 3] = pack(hi3, m(mapping, lo3));
                 }
 
@@ -846,7 +848,6 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
 
                 OpCode::BuildArray => {
                     let start = lo1 as usize;
-                    let _count = hi2 as usize;
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, start as u8));
                 }
 
@@ -865,12 +866,10 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                 }
 
                 OpCode::Intrinsic => {
-                    // dest0 is the object/dest register; wire_byte+arg_count in word 1 are not regs
                     code[offset] = pack_op(op, m(mapping, dest0));
                 }
                 OpCode::LoadStaticFn => {
                     code[offset] = pack_op(op, m(mapping, dest0));
-                    // word 1 is proto_idx constant — not a register
                 }
                 OpCode::AddImm | OpCode::SubImm => {
                     code[offset] = pack_op(op, m(mapping, dest0));
@@ -958,8 +957,6 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
     let fixed_count = proto.arity + if proto.has_this { 1 } else { 0 };
     let base = fixed_count as u8;
 
-    // println of OPTIMIZING FUNCTION removed
-
     if proto.chunk.code.is_empty() {
         return;
     }
@@ -1003,14 +1000,30 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         return;
     }
 
-    let raw_mapping = color_with_base(&ranges, base);
+    let mut copies = Vec::new();
+    let mut offset = 0;
+    while offset < proto.chunk.code.len() {
+        if let Some(info) = decode(&proto.chunk.code, offset) {
+            if OpCode::from_u16(proto.chunk.code[offset]) == Some(OpCode::Move) {
+                let w1 = proto.chunk.code[offset + 1];
+                let dest = (proto.chunk.code[offset] >> 8) as u8;
+                let src = (w1 >> 8) as u8;
+                if dest >= base && src >= base {
+                    copies.push((dest, src));
+                }
+            }
+            offset += info.len;
+        } else {
+            break;
+        }
+    }
+
+    let raw_mapping = color_with_base(&ranges, base, &copies);
 
     let mapping: HashMap<u8, u8> = raw_mapping
         .into_iter()
         .filter(|&(old, new)| old != new)
         .collect();
-
-    // println of SPAWN MAPPING removed
 
     if mapping.is_empty() {
         return;

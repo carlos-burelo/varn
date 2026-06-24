@@ -35,7 +35,10 @@ pub fn execute(
     for builtin_proto in core::core_protos_owned()? {
         if _debug.trace {
             let name = builtin_proto.name.as_deref().unwrap_or("<builtin>");
-            varn_utilities::terminal::tagged("pipeline:execute", format_args!("running builtin {name}"));
+            varn_utilities::terminal::tagged(
+                "pipeline:execute",
+                format_args!("running builtin {name}"),
+            );
         }
         let closure = Rc::new(Closure::new(Rc::new(builtin_proto), Vec::new(), Vec::new()));
         machine
@@ -43,7 +46,6 @@ pub fn execute(
             .map_err(|e| PipelineError::fatal(format!("failed to run builtin: {}", e)))?;
     }
 
-    // Resolve globals in precompiled modules and entry script to direct array indices
     let mut optimized_precompiled_map = (*precompiled).clone();
     for module_proto_rc in optimized_precompiled_map.values_mut() {
         machine.resolve_globals(Rc::make_mut(module_proto_rc));
@@ -53,15 +55,21 @@ pub fn execute(
     let mut optimized_proto = proto;
     machine.resolve_globals(&mut optimized_proto);
 
-    let main_closure = Rc::new(Closure::new(Rc::new(optimized_proto), Vec::new(), Vec::new()));
+    let main_closure = Rc::new(Closure::new(
+        Rc::new(optimized_proto),
+        Vec::new(),
+        Vec::new(),
+    ));
 
-    // Register the main module to support top-level exports in the entry script (needed for Isolates)
     let main_module_id = ModuleId::local_str(&main_closure.proto.chunk.source_file);
     let mut export_map = FxHashMap::default();
     for (idx, name) in main_closure.proto.export_names.iter().enumerate() {
         export_map.insert(name.clone(), idx);
     }
-    let mut module_obj = varn_types::ModuleObj::new(main_module_id.clone(), main_closure.proto.export_names.len());
+    let mut module_obj = varn_types::ModuleObj::new(
+        main_module_id.clone(),
+        main_closure.proto.export_names.len(),
+    );
     module_obj.export_map = export_map;
     let module_val = machine.ctx.heap.alloc_module(Rc::new(module_obj));
     machine.ctx.modules.insert(main_module_id, module_val);
@@ -84,7 +92,10 @@ pub fn execute(
                             match handle.peek_state() {
                                 varn_types::task::TaskState::Resolved(v) => v,
                                 varn_types::task::TaskState::Rejected(e) => {
-                                    return Err(PipelineError::fatal(format!("awaited task failed: {}", e)));
+                                    return Err(PipelineError::fatal(format!(
+                                        "awaited task failed: {}",
+                                        e
+                                    )));
                                 }
                                 _ => varn_types::Value::Null,
                             }
@@ -93,8 +104,13 @@ pub fn execute(
                             varn_types::task::TaskState::Resolved(v) => v,
                             _ => match varn_vm::exec::ExecCtx::wait_task_handle(handle.clone()) {
                                 Ok(v) => v,
-                                Err(e) => return Err(PipelineError::fatal(format!("awaited task failed: {}", e))),
-                            }
+                                Err(e) => {
+                                    return Err(PipelineError::fatal(format!(
+                                        "awaited task failed: {}",
+                                        e
+                                    )))
+                                }
+                            },
                         },
                         other => other,
                     };

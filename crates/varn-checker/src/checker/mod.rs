@@ -4,7 +4,7 @@ mod stmts;
 use crate::binder::{BindResult, Binder};
 use crate::scope::ScopeId;
 use crate::symbol::SymbolId;
-use crate::types::{Type, ObjectTypeMember};
+use crate::types::{ObjectTypeMember, Type};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
@@ -218,7 +218,10 @@ impl Checker {
             loop_depth: 0,
             switch_depth: 0,
             in_function: false,
-            expected_object_members_cache: FxHashMap::with_capacity_and_hasher(512, Default::default()),
+            expected_object_members_cache: FxHashMap::with_capacity_and_hasher(
+                512,
+                Default::default(),
+            ),
         };
 
         let started = Instant::now();
@@ -229,7 +232,8 @@ impl Checker {
         final_diagnostics.extend(checker.diagnostics);
 
         let started = Instant::now();
-        let mut annotations = collect_type_annotations(program, &bind, &checker.resolved_expr_types);
+        let mut annotations =
+            collect_type_annotations(program, &bind, &checker.resolved_expr_types);
 
         for (k, v) in checker.call_mappings {
             annotations.record_call_mapping(k, v);

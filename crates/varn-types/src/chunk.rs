@@ -496,9 +496,6 @@ pub struct FunctionProto {
     #[serde(skip, default = "proto_feedback_default")]
     pub feedback: Rc<RefCell<FeedbackVector>>,
 
-    /// Cache for `LoadStaticFn`: stores the heap-allocated VmValue of this
-    /// closure after the first creation, as a raw u64 (NaN-boxed). Zero means
-    /// not yet cached. Avoids a HashMap lookup on every `LoadStaticFn`.
     #[serde(skip)]
     #[serde(default)]
     pub static_closure_val: std::cell::Cell<u64>,

@@ -1,8 +1,6 @@
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, NativeFnResult, VmValue};
 
-/// Native implementation backing the `float` contract
-/// (`src/modules/primitives/float/float.vn`).
 pub struct Float;
 
 varn_contract! {
@@ -10,7 +8,7 @@ varn_contract! {
     class: "float",
     contract: "src/modules/primitives/float/float.vn",
     impl Float {
-        // ---- statics ----
+
         fn MAX_VALUE(_ctx: &mut dyn NativeCtx) -> f64 { f64::MAX }
         fn MIN_VALUE(_ctx: &mut dyn NativeCtx) -> f64 { f64::MIN }
         fn EPSILON(_ctx: &mut dyn NativeCtx) -> f64 { f64::EPSILON }
@@ -28,7 +26,7 @@ varn_contract! {
             val.is_f64() && val.as_f64().is_infinite()
         }
 
-        // ---- instance ----
+
         fn toString(_ctx: &mut dyn NativeCtx, this: f64) -> String { this.to_string() }
         fn valueOf(_ctx: &mut dyn NativeCtx, this: f64) -> f64 { this }
         fn toFixed(_ctx: &mut dyn NativeCtx, this: f64, digits: Option<i64>) -> String {
@@ -56,7 +54,6 @@ varn_contract! {
     }
 }
 
-// Free helpers re-exported from `primitives/mod.rs`; unrelated to the contract.
 pub fn float_is_finite(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
     if let Some(&v) = args.first() {
         if v.is_f64() {

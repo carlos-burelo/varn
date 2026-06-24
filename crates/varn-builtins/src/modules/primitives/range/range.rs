@@ -2,8 +2,6 @@ use varn_op_macros::varn_contract;
 use varn_types::value::RangeData;
 use varn_types::{NativeCtx, Value, VmValue};
 
-/// Native implementation backing the `Range` contract
-/// (`src/modules/primitives/range/range.vn`).
 pub struct Range;
 
 fn get_range(ctx: &dyn NativeCtx, this: VmValue) -> Option<RangeData> {
@@ -27,7 +25,7 @@ varn_contract! {
     class: "Range",
     contract: "src/modules/primitives/range/range.vn",
     impl Range {
-        // ---- getters ----
+
         fn start(ctx: &mut dyn NativeCtx, this: VmValue) -> i64 {
             get_range(ctx, this).map(|r| r.start).unwrap_or(0)
         }
@@ -50,7 +48,7 @@ varn_contract! {
             }
         }
 
-        // ---- methods ----
+
         fn toString(ctx: &mut dyn NativeCtx, this: VmValue) -> String {
             match get_range(ctx, this) {
                 Some(r) if r.inclusive => format!("{}..={}", r.start, r.end),
@@ -124,7 +122,7 @@ varn_contract! {
             out
         }
 
-        // ---- statics ----
+
         fn from(ctx: &mut dyn NativeCtx, start: i64, end: i64) -> VmValue {
             ctx.alloc_range(start, end, false)
         }
@@ -134,7 +132,6 @@ varn_contract! {
     }
 }
 
-/// Backing helper for the `..` range operator; unrelated to the contract.
 pub fn range_op(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
     let get_int = |i: usize| -> i64 {
         args.get(i)

@@ -30,9 +30,9 @@ pub struct DebugFlags {
     pub lsp_symbols: bool,
     pub lsp_colorize: bool,
     pub lsp_hints: bool,
-    /// `vn debug -p hir` — dump del HIR producido por varn-opt.
+
     pub hir: bool,
-    /// `vn debug -p ssa` — dump del SSA CFG (construcción Braun).
+
     pub ssa: bool,
 }
 

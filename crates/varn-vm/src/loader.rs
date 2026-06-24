@@ -1,6 +1,5 @@
 use std::fmt::{self, Display};
 use std::rc::Rc;
-use std::sync::Arc;
 
 use varn_core::ModuleId;
 use varn_types::FunctionProto;

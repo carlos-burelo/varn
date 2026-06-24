@@ -3,8 +3,6 @@
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue, VnArray};
 
-/// Native implementation backing the `Array` contract
-/// (`src/modules/primitives/array/array.vn`).
 pub struct Array;
 
 fn vm_eq(ctx: &dyn NativeCtx, a: VmValue, b: VmValue) -> bool {
@@ -50,12 +48,12 @@ varn_contract! {
     class: "Array",
     contract: "src/modules/primitives/array/array.vn",
     impl Array {
-        // ---- getter ----
+
         fn length(ctx: &mut dyn NativeCtx, this: VnArray) -> i64 {
             this.len(ctx) as i64
         }
 
-        // ---- mutators ----
+
         fn push(ctx: &mut dyn NativeCtx, this: VnArray, item: VmValue) {
             this.push(ctx, item);
         }
@@ -88,7 +86,7 @@ varn_contract! {
             }
         }
 
-        // ---- queries ----
+
         fn join(ctx: &mut dyn NativeCtx, this: VnArray, separator: Option<&str>) -> String {
             let sep = separator.unwrap_or(",");
             let len = this.len(ctx);
@@ -163,7 +161,7 @@ varn_contract! {
             -1
         }
 
-        // ---- producers ----
+
         fn concat(ctx: &mut dyn NativeCtx, this: VnArray, items: &[VmValue]) -> Vec<VmValue> {
             let mut out = this.to_vec(ctx);
             for &other in items {
@@ -202,7 +200,7 @@ varn_contract! {
             items
         }
 
-        // ---- callbacks ----
+
         fn map(ctx: &mut dyn NativeCtx, this: VnArray, callback: VmValue) -> Vec<VmValue> {
             let arr = this.raw();
             let len = this.len(ctx);
@@ -380,7 +378,7 @@ varn_contract! {
             false
         }
 
-        // ---- statics ----
+
         fn isArray(ctx: &mut dyn NativeCtx, obj: VmValue) -> bool {
             ctx.is_array(obj)
         }

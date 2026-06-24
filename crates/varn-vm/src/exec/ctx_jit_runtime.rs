@@ -211,11 +211,7 @@ pub extern "C" fn jit_load_module_slot(
     }
 }
 
-pub extern "C" fn jit_store_module_slot(
-    ctx: *mut ExecCtx,
-    slot_idx: usize,
-    val_nv: VmValue,
-) {
+pub extern "C" fn jit_store_module_slot(ctx: *mut ExecCtx, slot_idx: usize, val_nv: VmValue) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let caller_depth = ctx_ref.frames.len();
@@ -231,7 +227,9 @@ pub extern "C" fn jit_store_module_slot(
             panic!("OpStoreModuleSlot: active module object is not a heap object");
         }
 
-        if let Some(crate::heap::HeapObj::Module(m)) = ctx_ref.heap.get_mut(exports_nv.as_heap_idx()) {
+        if let Some(crate::heap::HeapObj::Module(m)) =
+            ctx_ref.heap.get_mut(exports_nv.as_heap_idx())
+        {
             let m = std::rc::Rc::make_mut(m);
             m.set_slot(slot_idx, val_nv);
         } else {
@@ -240,21 +238,14 @@ pub extern "C" fn jit_store_module_slot(
     }
 }
 
-pub extern "C" fn jit_spawn(
-    ctx: *mut ExecCtx,
-    task_val: VmValue,
-) -> VmValue {
+pub extern "C" fn jit_spawn(ctx: *mut ExecCtx, task_val: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         ctx_ref.exec_spawn(task_val).unwrap()
     }
 }
 
-pub extern "C" fn jit_push_try(
-    ctx: *mut ExecCtx,
-    catch_ip: usize,
-    err_reg: u32,
-) {
+pub extern "C" fn jit_push_try(ctx: *mut ExecCtx, catch_ip: usize, err_reg: u32) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_depth = ctx_ref.frames.len();
@@ -267,31 +258,23 @@ pub extern "C" fn jit_push_try(
     }
 }
 
-pub extern "C" fn jit_pop_try(
-    ctx: *mut ExecCtx,
-) {
+pub extern "C" fn jit_pop_try(ctx: *mut ExecCtx) {
     unsafe {
         let ctx_ref = &mut *ctx;
         crate::exec::exceptions::pop_try(&mut ctx_ref.try_handlers);
     }
 }
 
-pub extern "C" fn jit_throw(
-    ctx: *mut ExecCtx,
-    error: VmValue,
-) {
+pub extern "C" fn jit_throw(ctx: *mut ExecCtx, error: VmValue) {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let err = crate::exec::exceptions::build_thrown_error(
-            error,
-            &ctx_ref.heap,
-            &ctx_ref.frames,
-        );
+        let err =
+            crate::exec::exceptions::build_thrown_error(error, &ctx_ref.heap, &ctx_ref.frames);
         let handler = ctx_ref.try_handlers.pop();
         ctx_ref.jit_panic_exception_handler = handler;
         ctx_ref.jit_panic_exception_error = Some(err.thrown.unwrap_or(VmValue::null()));
         ctx_ref.jit_panic_exception_err_obj = Some(err);
-        
+
         let buf = ctx_ref.jit_jmp_buf;
         if !buf.is_null() {
             super::ctx::my_longjmp(buf, 1);
@@ -301,12 +284,7 @@ pub extern "C" fn jit_throw(
     }
 }
 
-pub extern "C" fn jit_await(
-    ctx: *mut ExecCtx,
-    fut: VmValue,
-    dest_reg: u32,
-    resume_ip: usize,
-) {
+pub extern "C" fn jit_await(ctx: *mut ExecCtx, fut: VmValue, dest_reg: u32, resume_ip: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let caller_depth = ctx_ref.frames.len();
@@ -317,7 +295,7 @@ pub extern "C" fn jit_await(
             dest_reg: dest_reg as u16,
         });
         ctx_ref.jit_panic_suspend_resume_ip = Some(resume_ip);
-        
+
         let buf = ctx_ref.jit_jmp_buf;
         if !buf.is_null() {
             super::ctx::my_longjmp(buf, 2);
@@ -327,12 +305,7 @@ pub extern "C" fn jit_await(
     }
 }
 
-pub extern "C" fn jit_yield(
-    ctx: *mut ExecCtx,
-    val: VmValue,
-    dest_reg: u32,
-    resume_ip: usize,
-) {
+pub extern "C" fn jit_yield(ctx: *mut ExecCtx, val: VmValue, dest_reg: u32, resume_ip: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let caller_depth = ctx_ref.frames.len();
@@ -343,7 +316,7 @@ pub extern "C" fn jit_yield(
             dest_reg: dest_reg as u8,
         });
         ctx_ref.jit_panic_suspend_resume_ip = Some(resume_ip);
-        
+
         let buf = ctx_ref.jit_jmp_buf;
         if !buf.is_null() {
             super::ctx::my_longjmp(buf, 2);
@@ -366,7 +339,6 @@ pub extern "C" fn jit_build_object_with_shape(
             Some(varn_types::chunk::PoolEntry::Shape(k)) => k.clone(),
             _ => return VmValue::null(),
         };
-        let count = keys.len();
         let frame_idx = ctx_ref.frames.len() - 1;
         let base = ctx_ref.frames[frame_idx].base;
 
@@ -425,8 +397,6 @@ pub struct JitClassMemberArgs {
 }
 
 pub extern "C" fn jit_assert_not_null(ctx: *mut ExecCtx, val: VmValue) {
-    // Reuse the interpreter's fallible check so the JIT raises the identical
-    // catchable error ("assertion failed: value is null") instead of panicking.
     if let Err(e) = crate::exec::advanced::assert_not_null(val) {
         unsafe {
             let ctx_ref = &mut *ctx;
@@ -465,7 +435,9 @@ pub extern "C" fn jit_wrap_spread_stub(ctx: *mut ExecCtx, val: VmValue) -> VmVal
     unsafe {
         let ctx_ref = &mut *ctx;
         let extracted = ctx_ref.heap.extract(val);
-        ctx_ref.heap.intern(varn_types::Value::Spread(Box::new(extracted)))
+        ctx_ref
+            .heap
+            .intern(varn_types::Value::Spread(Box::new(extracted)))
     }
 }
 
@@ -515,7 +487,11 @@ pub extern "C" fn jit_set_fixed_field(ctx: *mut ExecCtx, obj: VmValue, slot: usi
     }
 }
 
-pub extern "C" fn jit_get_property_maybe_stub(ctx: *mut ExecCtx, obj: VmValue, name_idx: usize) -> VmValue {
+pub extern "C" fn jit_get_property_maybe_stub(
+    ctx: *mut ExecCtx,
+    obj: VmValue,
+    name_idx: usize,
+) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
@@ -621,7 +597,11 @@ pub extern "C" fn jit_declare_field(ctx: *mut ExecCtx, class_val: VmValue, name_
     }
 }
 
-pub extern "C" fn jit_make_class(ctx: *mut ExecCtx, super_val: VmValue, name_idx: usize) -> VmValue {
+pub extern "C" fn jit_make_class(
+    ctx: *mut ExecCtx,
+    super_val: VmValue,
+    name_idx: usize,
+) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
@@ -655,14 +635,41 @@ pub extern "C" fn jit_class_member_op(ctx: *mut ExecCtx, args: *const std::ffi::
         let closure_ref = ctx_ref.frames[frame_idx].closure();
         let key_nv = closure_ref.constants[args.name_idx];
         let key = ctx_ref.heap.str_val(key_nv).expect("non-string const");
-        
+
         let res = match args.kind {
-            0 => crate::exec::class::op_method(args.class_val, &key, args.fn_val, &mut ctx_ref.heap),
-            1 => crate::exec::class::op_define_static(args.class_val, &key, args.fn_val, &mut ctx_ref.heap),
-            2 => crate::exec::class::op_define_getter(args.class_val, &key, args.fn_val, &mut ctx_ref.heap),
-            3 => crate::exec::class::op_define_setter(args.class_val, &key, args.fn_val, &mut ctx_ref.heap),
-            4 => crate::exec::class::op_define_static_getter(args.class_val, &key, args.fn_val, &mut ctx_ref.heap),
-            5 => crate::exec::class::op_define_static_setter(args.class_val, &key, args.fn_val, &mut ctx_ref.heap),
+            0 => {
+                crate::exec::class::op_method(args.class_val, &key, args.fn_val, &mut ctx_ref.heap)
+            }
+            1 => crate::exec::class::op_define_static(
+                args.class_val,
+                &key,
+                args.fn_val,
+                &mut ctx_ref.heap,
+            ),
+            2 => crate::exec::class::op_define_getter(
+                args.class_val,
+                &key,
+                args.fn_val,
+                &mut ctx_ref.heap,
+            ),
+            3 => crate::exec::class::op_define_setter(
+                args.class_val,
+                &key,
+                args.fn_val,
+                &mut ctx_ref.heap,
+            ),
+            4 => crate::exec::class::op_define_static_getter(
+                args.class_val,
+                &key,
+                args.fn_val,
+                &mut ctx_ref.heap,
+            ),
+            5 => crate::exec::class::op_define_static_setter(
+                args.class_val,
+                &key,
+                args.fn_val,
+                &mut ctx_ref.heap,
+            ),
             _ => panic!("Unknown class member op kind: {}", args.kind),
         };
         if let Err(e) = res {
@@ -691,7 +698,9 @@ pub extern "C" fn jit_build_object(ctx: *mut ExecCtx, ip_before: usize) -> VmVal
             temp_ip += 1;
             let val_reg = (w >> 8) as usize;
             let key_nv = closure_ref.constants[k_idx];
-            let key = ctx_ref.heap.str_val(key_nv)
+            let key = ctx_ref
+                .heap
+                .str_val(key_nv)
                 .map(|s| s.to_string())
                 .unwrap_or_else(|| {
                     closure_ref.proto.chunk.constants[k_idx]

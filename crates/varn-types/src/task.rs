@@ -10,8 +10,8 @@ pub enum TaskState {
 
 type SettleCallback = Box<dyn FnOnce(Result<Value, Value>) + 'static>;
 
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Mutex;
 
 struct Inner {
     state: Mutex<TaskState>,

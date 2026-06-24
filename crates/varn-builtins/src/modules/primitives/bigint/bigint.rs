@@ -1,8 +1,6 @@
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, Value, VmValue};
 
-/// Native implementation backing the `bigint` contract
-/// (`src/modules/primitives/bigint/bigint.vn`).
 pub struct BigInt;
 
 fn get_bigint(ctx: &dyn NativeCtx, this: VmValue) -> Option<i128> {

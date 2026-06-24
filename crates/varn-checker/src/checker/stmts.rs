@@ -335,7 +335,7 @@ impl Checker {
                     let init = d.init.as_ref().unwrap();
                     self.with_expected(ann_ty_opt.clone(), |c| c.check_expr(init, bind));
                     let init_ty = self.infer_type(init, bind);
-                    
+
                     if !init_ty.is_dynamic()
                         && !self.member_exists_cached(&init_ty, dispose_method, bind)
                     {

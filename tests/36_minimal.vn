@@ -1,4 +1,4 @@
-function memoize<T>(f: (a:int) => T): (int) => T {
+function memoize<T>(f: (a:int) => T): (b: int) => T {
     const cache: T[] = []
     const seen: bool[] = []
     return (n: int) => {

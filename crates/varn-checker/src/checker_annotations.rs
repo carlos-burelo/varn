@@ -17,7 +17,10 @@ struct AnnotateCtx<'a> {
 }
 
 impl<'a> AnnotateCtx<'a> {
-    fn new(bind: &'a BindResult, resolved_expr_types: &'a rustc_hash::FxHashMap<u32, Type>) -> Self {
+    fn new(
+        bind: &'a BindResult,
+        resolved_expr_types: &'a rustc_hash::FxHashMap<u32, Type>,
+    ) -> Self {
         Self {
             bind,
             locals: rustc_hash::FxHashMap::default(),
@@ -111,7 +114,7 @@ pub fn collect_type_annotations(
     for stmt in &program.body {
         annotate_stmt(stmt, &mut ann, &mut ctx);
     }
-    // Scan exported functions for @cap decorators
+
     for stmt in &program.body {
         if let StmtKind::Decl(decl_node) = &stmt.kind {
             if let Decl::Export(ExportDecl::Decl { declaration, .. }) = &**decl_node {
@@ -380,10 +383,16 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
 
             use varn_core::TypeTag;
             let is_int = |tk: &TypeKind<_, _, _, _, _, _>| {
-                matches!(tk, TypeKind::Intrinsic(TypeTag::Int) | TypeKind::LiteralInt(_))
+                matches!(
+                    tk,
+                    TypeKind::Intrinsic(TypeTag::Int) | TypeKind::LiteralInt(_)
+                )
             };
             let is_float = |tk: &TypeKind<_, _, _, _, _, _>| {
-                matches!(tk, TypeKind::Intrinsic(TypeTag::Float) | TypeKind::LiteralFloat(_))
+                matches!(
+                    tk,
+                    TypeKind::Intrinsic(TypeTag::Float) | TypeKind::LiteralFloat(_)
+                )
             };
 
             let kind = if is_arithmetic {
@@ -441,8 +450,14 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                 };
                 annotate_expr(e, ann, ctx);
             }
-            // Detect calls to stdlib intrinsic functions: module.fn(...)
-            if let ExprKind::Member { object, property, computed: false, .. } = &callee.kind {
+
+            if let ExprKind::Member {
+                object,
+                property,
+                computed: false,
+                ..
+            } = &callee.kind
+            {
                 if let ExprKind::Identifier { name: prop_name } = &property.kind {
                     let obj_ty = get_expr_type(object, ctx);
                     if let TypeKind::Named(_, Some(ref origin_path)) = &obj_ty.non_nullified().0 {

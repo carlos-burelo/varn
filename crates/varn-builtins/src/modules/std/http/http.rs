@@ -7,13 +7,11 @@ use varn_types::{NativeCtx, Value, VmValue};
 
 use super::http_helpers::{find_route, split_path_query};
 
-/// Native implementation backing the `runtime:http` contract
-/// (`src/modules/std/http/runtime/http_runtime.vn`).
 pub struct HttpRuntime;
 
 #[derive(Clone)]
 struct ServerInstance {
-    routes: Vec<(String, String, Value)>, // (method, pattern, callback)
+    routes: Vec<(String, String, Value)>,
     port: u16,
 }
 
@@ -31,8 +29,12 @@ fn parse_query_string_ctx(ctx: &mut dyn NativeCtx, qs: &str) -> VmValue {
             Some(i) => (&pair[..i], &pair[i + 1..]),
             None => (pair, ""),
         };
-        let key = urlencoding::decode(k).map(|s| s.into_owned()).unwrap_or_else(|_| k.to_owned());
-        let val = urlencoding::decode(v).map(|s| s.into_owned()).unwrap_or_else(|_| v.to_owned());
+        let key = urlencoding::decode(k)
+            .map(|s| s.into_owned())
+            .unwrap_or_else(|_| k.to_owned());
+        let val = urlencoding::decode(v)
+            .map(|s| s.into_owned())
+            .unwrap_or_else(|_| v.to_owned());
         let val_nv = ctx.alloc_str_owned(val);
         ctx.set_field(obj, &key, val_nv);
     }

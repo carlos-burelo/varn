@@ -1,24 +1,17 @@
-//! Declaration-level AST→HIR lowering: functions, classes, enums, imports,
-//! exports, and the shared function-like body builder.
-
 use std::rc::Rc;
 
 use varn_core::ast::decl::{
-    ClassDecl, ClassMember, EnumDecl, ExportDecl, ExportDefaultDecl, ExtensionDecl, ExtensionMember, ImportDecl,
-    ImportSpecifier, NamespaceDecl, SumTypeDecl,
+    ClassDecl, ClassMember, EnumDecl, ExportDecl, ExportDefaultDecl, ExtensionDecl,
+    ExtensionMember, ImportDecl, ImportSpecifier, NamespaceDecl, SumTypeDecl,
 };
 use varn_core::ast::{
-    Decl, Decorator, Expr, ExprKind, FunctionDecl, Modifiers, Param, Pattern, Stmt, StmtKind, TypeNode,
-    Visibility,
+    Decl, Decorator, Expr, ExprKind, FunctionDecl, Modifiers, Param, Pattern, Stmt, StmtKind,
+    TypeNode, Visibility,
 };
 
 use super::*;
 
 impl<'a> Lowerer<'a> {
-    /// Lower a function declaration into its `HirFunction` plus the upvalues it
-    /// captures from enclosing frames. `scope` carries the enclosing frame
-    /// stack so nested functions can capture; top-level callers pass a fresh
-    /// `Scope` (its empty frame 0 yields no captures → globals).
     pub(super) fn lower_function(
         &mut self,
         f: &FunctionDecl,
@@ -29,7 +22,6 @@ impl<'a> Lowerer<'a> {
             &f.params,
             f.modifiers.is_async,
             f.modifiers.is_generator,
-            // Type parameters are erased at codegen — they don't block lowering.
             false,
             false,
             BodyRef::Block(&f.body),
@@ -38,10 +30,6 @@ impl<'a> Lowerer<'a> {
         )
     }
 
-    /// Lower a class declaration to a `HirClass`. Covers fields, constructor,
-    /// instance/static methods, getters/setters, static blocks, and destructor.
-    /// `abstract` and type parameters are erased; inheritance and decorators
-    /// still fall back to legacy.
     pub(super) fn lower_class(&mut self, decl: &ClassDecl, scope: &mut Scope) -> R<HirClass> {
         let name = decl.id.clone().unwrap_or_else(|| Rc::from("anonymous"));
         let mut class_decorators = Vec::new();
@@ -58,7 +46,8 @@ impl<'a> Lowerer<'a> {
         let mut static_fields: Vec<(Rc<str>, Option<HirExpr>)> = Vec::new();
         let mut ctor_member: Option<(&[Param], &Stmt)> = None;
         let mut methods_ast: Vec<(Rc<str>, &[Param], &Stmt, &[Decorator], &Modifiers)> = Vec::new();
-        let mut static_methods_ast: Vec<(Rc<str>, &[Param], &Stmt, &[Decorator], &Modifiers)> = Vec::new();
+        let mut static_methods_ast: Vec<(Rc<str>, &[Param], &Stmt, &[Decorator], &Modifiers)> =
+            Vec::new();
         let mut getters_ast: Vec<(Rc<str>, &Stmt, bool)> = Vec::new();
         let mut setters_ast: Vec<(Rc<str>, &Param, &Stmt, bool)> = Vec::new();
         let mut static_blocks_ast: Vec<&Stmt> = Vec::new();
@@ -102,7 +91,7 @@ impl<'a> Lowerer<'a> {
                         methods_ast.push((key.clone(), params, body, decorators, modifiers));
                     }
                 }
-                // Abstract method/accessor (no body): declares nothing at runtime.
+
                 ClassMember::Method { body: None, .. }
                 | ClassMember::Getter { body: None, .. }
                 | ClassMember::Setter { body: None, .. } => {}
@@ -124,7 +113,6 @@ impl<'a> Lowerer<'a> {
             }
         }
 
-        // Constructor (synthesised when absent); field inits run after its body.
         let (ctor_func, ctor_ups) = match ctor_member {
             Some((params, body)) => self.lower_function_like(
                 Rc::from("constructor"),
@@ -174,17 +162,10 @@ impl<'a> Lowerer<'a> {
                 is_private,
             });
         }
-        // Destructor → an instance method bound as `dispose`.
+
         if let Some(body) = destructor_ast {
-            let (func, upvalues) = self.lower_method_fn(
-                Rc::from("dispose"),
-                &[],
-                body,
-                true,
-                false,
-                false,
-                scope,
-            )?;
+            let (func, upvalues) =
+                self.lower_method_fn(Rc::from("dispose"), &[], body, true, false, false, scope)?;
             methods.push(HirMethod {
                 key: Rc::from("dispose"),
                 func,
@@ -221,15 +202,8 @@ impl<'a> Lowerer<'a> {
 
         let mut getters = Vec::new();
         for (key, body, is_static) in getters_ast {
-            let (func, upvalues) = self.lower_method_fn(
-                key.clone(),
-                &[],
-                body,
-                !is_static,
-                false,
-                false,
-                scope,
-            )?;
+            let (func, upvalues) =
+                self.lower_method_fn(key.clone(), &[], body, !is_static, false, false, scope)?;
             getters.push(HirAccessor {
                 key,
                 func,
@@ -297,8 +271,6 @@ impl<'a> Lowerer<'a> {
         })
     }
 
-    /// Lower a class method/accessor/static-block body to a function + upvalues.
-    /// `has_this` is false for statics and static blocks.
     fn lower_method_fn(
         &mut self,
         key: Rc<str>,
@@ -322,9 +294,6 @@ impl<'a> Lowerer<'a> {
         )
     }
 
-    /// Lower a declaration that defines module global(s) inline, emitting the
-    /// defining statements into `out` and returning the names it bound. Used for
-    /// `export <decl>` and namespace members.
     fn lower_decl_inline(
         &mut self,
         decl: &Decl,
@@ -464,12 +433,6 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    /// Lower `namespace N { members }`: each member is defined as a module
-    /// global, then an object `{ name: <global>, … }` is bound to global `N`.
-    /// Mirrors legacy `compile_namespace_decl` — members are globals (last-write
-    /// wins on name clashes), and only `function`/`class`/`var` members become
-    /// object properties (enum/nested-namespace members are defined but not
-    /// captured, matching legacy).
     pub(super) fn lower_namespace(
         &mut self,
         ns: &NamespaceDecl,
@@ -487,7 +450,12 @@ impl<'a> Lowerer<'a> {
             let bound = self.lower_decl_inline(inner, scope, out)?;
             if matches!(
                 inner,
-                Decl::Function(_) | Decl::Class(_) | Decl::Variable(_) | Decl::Namespace(_) | Decl::Enum(_) | Decl::SumType(_)
+                Decl::Function(_)
+                    | Decl::Class(_)
+                    | Decl::Variable(_)
+                    | Decl::Namespace(_)
+                    | Decl::Enum(_)
+                    | Decl::SumType(_)
             ) {
                 names.extend(bound);
             }
@@ -495,7 +463,8 @@ impl<'a> Lowerer<'a> {
         let properties = names
             .into_iter()
             .map(|name| {
-                let binding = scope.resolve_in_current_frame(&name)
+                let binding = scope
+                    .resolve_in_current_frame(&name)
                     .unwrap_or(HirBinding::Global(name.clone()));
                 let value = HirExpr::Var(binding);
                 HirObjectProp::Property {
@@ -522,11 +491,6 @@ impl<'a> Lowerer<'a> {
         Ok(())
     }
 
-    /// Lower an `extension Target { … }` declaration: each member becomes a
-    /// mangled global closure (`__ext_T_m` / `__extget_T_k` / `__extset_T_k`,
-    /// all `has_this`), exactly as legacy `compile_extension_decl`. Uses
-    /// (`x.m()`, `x.k`, `x.k = v`) are lowered to plain calls of these globals
-    /// via the checker's `extension_calls`/`_members`/`_set_members` maps.
     pub(super) fn lower_extension(
         &mut self,
         ext: &ExtensionDecl,
@@ -571,7 +535,6 @@ impl<'a> Lowerer<'a> {
         Ok(())
     }
 
-    /// Lower a `has_this` function body and bind it as a module global closure.
     fn push_global_closure(
         &mut self,
         out: &mut Vec<HirStmt>,
@@ -665,13 +628,17 @@ impl<'a> Lowerer<'a> {
                             },
                             ty: HirType::Dynamic,
                         });
-                        let slot = self.export_names
+                        let slot = self
+                            .export_names
                             .iter()
                             .position(|n| &**n == "default")
                             .or_else(|| self.ann.get_slot_idx(range.start.offset))
                             .map(|p| p as u16);
                         if let Some(slot) = slot {
-                            out.push(HirStmt::StoreExport { name: f.id.clone(), slot });
+                            out.push(HirStmt::StoreExport {
+                                name: f.id.clone(),
+                                slot,
+                            });
                         }
                     }
                     Ok(())
@@ -694,7 +661,8 @@ impl<'a> Lowerer<'a> {
                                 ty: HirType::Dynamic,
                             });
                         }
-                        let slot = self.export_names
+                        let slot = self
+                            .export_names
                             .iter()
                             .position(|n| &**n == "default")
                             .or_else(|| self.ann.get_slot_idx(range.start.offset))
@@ -707,7 +675,8 @@ impl<'a> Lowerer<'a> {
                 }
                 ExportDefaultDecl::Expr(e) => {
                     let value = self.lower_expr(e, scope)?;
-                    let slot = self.export_names
+                    let slot = self
+                        .export_names
                         .iter()
                         .position(|n| &**n == "default")
                         .or_else(|| self.ann.get_slot_idx(range.start.offset))
@@ -725,8 +694,12 @@ impl<'a> Lowerer<'a> {
                 let mut specs = Vec::new();
                 for spec in specifiers {
                     let binding = self.resolve(&spec.local, scope);
-                    let local_slot = self.ann.get_slot_idx(spec.range.start.offset).map(|s| s as u16);
-                    let exported_slot = self.export_names
+                    let local_slot = self
+                        .ann
+                        .get_slot_idx(spec.range.start.offset)
+                        .map(|s| s as u16);
+                    let exported_slot = self
+                        .export_names
                         .iter()
                         .position(|n| &**n == &*spec.exported)
                         .or_else(|| self.ann.get_slot_idx(spec.range.start.offset))
@@ -776,10 +749,7 @@ impl<'a> Lowerer<'a> {
             .or_else(|| self.ann.get_slot_idx(offset).map(|s| s as u16))
     }
 
-    /// Lower an enum declaration. Variants become `MakeEnumVariant` statics on
-    /// a class; instance fields/methods mirror the class core.
     pub(super) fn lower_enum(&mut self, decl: &EnumDecl, scope: &mut Scope) -> R<HirEnum> {
-        // Type parameters are erased at codegen — they don't block lowering.
         let name = decl.id.clone();
         let mut variants = Vec::new();
         let mut tag = 0i64;
@@ -832,7 +802,8 @@ impl<'a> Lowerer<'a> {
         let mut static_fields: Vec<(Rc<str>, Option<HirExpr>)> = Vec::new();
         let mut ctor_member: Option<(&[Param], &Stmt)> = None;
         let mut methods_ast: Vec<(Rc<str>, &[Param], &Stmt, &[Decorator], &Modifiers)> = Vec::new();
-        let mut static_methods_ast: Vec<(Rc<str>, &[Param], &Stmt, &[Decorator], &Modifiers)> = Vec::new();
+        let mut static_methods_ast: Vec<(Rc<str>, &[Param], &Stmt, &[Decorator], &Modifiers)> =
+            Vec::new();
         let mut getters_ast: Vec<(Rc<str>, &Stmt, bool)> = Vec::new();
         let mut setters_ast: Vec<(Rc<str>, &Param, &Stmt, bool)> = Vec::new();
         let mut static_blocks_ast: Vec<&Stmt> = Vec::new();
@@ -971,15 +942,8 @@ impl<'a> Lowerer<'a> {
 
         let mut getters = Vec::new();
         for (key, body, is_static) in getters_ast {
-            let (func, upvalues) = self.lower_method_fn(
-                key.clone(),
-                &[],
-                body,
-                !is_static,
-                false,
-                false,
-                scope,
-            )?;
+            let (func, upvalues) =
+                self.lower_method_fn(key.clone(), &[], body, !is_static, false, false, scope)?;
             getters.push(HirAccessor {
                 key,
                 func,
@@ -1100,11 +1064,6 @@ impl<'a> Lowerer<'a> {
         })
     }
 
-    /// Shared lowering for declarations, function expressions, arrows, and class
-    /// methods/constructors. `has_this` marks register 0 as the receiver;
-    /// `field_inits` are `this.name = expr` assignments appended after the body
-    /// (constructor field initializers, lowered in the constructor's frame —
-    /// matching legacy ordering).
     #[allow(clippy::too_many_arguments)]
     pub(super) fn lower_function_like(
         &mut self,
@@ -1118,7 +1077,6 @@ impl<'a> Lowerer<'a> {
         field_inits: &[(Rc<str>, &Expr)],
         scope: &mut Scope,
     ) -> R<(HirFunction, Vec<HirUpvalueSrc>)> {
-
         scope.push_frame();
         let prev_fn = self.current_fn.take();
         self.current_fn = Some(name.clone());
@@ -1129,15 +1087,11 @@ impl<'a> Lowerer<'a> {
         let (params, mut body) = match built {
             Ok(v) => v,
             Err(e) => {
-                scope.pop_frame(); // keep the frame stack balanced on error
+                scope.pop_frame();
                 return Err(e);
             }
         };
-        // Function-level captures (params + top-level locals) are closed by the
-        // VM's `Return` (close_upvalues_above base); only inner blocks need an
-        // explicit `CloseUpvalue`, emitted in `lower_block`/`Block`/`For`.
-        // Function-level `using` resources are disposed at the body's end
-        // (reverse declaration order), matching legacy `pop_scope`.
+
         let (locals, upvalues, _captured0, disposables0) = scope.pop_frame();
         for (target, is_await) in disposables0.into_iter().rev() {
             body.push(HirStmt::Dispose { target, is_await });
@@ -1164,9 +1118,6 @@ impl<'a> Lowerer<'a> {
         field_inits: &[(Rc<str>, &Expr)],
         scope: &mut Scope,
     ) -> R<(Vec<HirParam>, Vec<HirStmt>)> {
-        // Pass 1: bind every param name so defaults (lowered below) can refer to
-        // earlier params, exactly like the legacy child compiler which collects
-        // `param_regs` before running the default prologue.
         let mut params = Vec::new();
         let mut destructuring_params = Vec::new();
         for (i, p) in params_ast.iter().enumerate() {
@@ -1185,9 +1136,7 @@ impl<'a> Lowerer<'a> {
                 default: None,
             });
         }
-        // Pass 2: lower default expressions (`x = expr`). `is_optional` without a
-        // default needs nothing — the VM passes null when the arg is absent; rest
-        // params are handled via `HirFunction.has_rest`.
+
         for (i, p) in params_ast.iter().enumerate() {
             if let Some(default) = &p.default {
                 params[i].default = Some(self.lower_expr(default, scope)?);
@@ -1195,7 +1144,12 @@ impl<'a> Lowerer<'a> {
         }
         let mut out = Vec::new();
         for (i, pat) in destructuring_params {
-            self.desugar_pattern_local(pat, HirExpr::Var(HirBinding::Param(i as u32)), scope, &mut out)?;
+            self.desugar_pattern_local(
+                pat,
+                HirExpr::Var(HirBinding::Param(i as u32)),
+                scope,
+                &mut out,
+            )?;
         }
         match body {
             BodyRef::Block(stmt) => match &stmt.kind {
@@ -1212,7 +1166,7 @@ impl<'a> Lowerer<'a> {
             }
             BodyRef::Empty => {}
         }
-        // Constructor field initializers run after the body (legacy order).
+
         for (fname, fexpr) in field_inits {
             let value = self.lower_expr(fexpr, scope)?;
             out.push(HirStmt::SetMember {
@@ -1225,9 +1179,6 @@ impl<'a> Lowerer<'a> {
     }
 }
 
-/// The mangled type prefix for an extension target (`int`, `str`, a class name,
-/// …). Mirrors legacy `compile_extension_decl` so the generated global names
-/// match the checker's `extension_*` maps used at the call/member sites.
 fn extension_type_name(target: &TypeNode) -> String {
     use varn_core::{IntrinsicType, TypeKind, TypeTag};
     match &target.kind {

@@ -13,8 +13,6 @@ pub struct TokenStream {
     pub errors: varn_core::DiagnosticBag,
     pub profile: ParseProfile,
 
-    // Tracks how many synthetic RAngle tokens remain after splitting a >> or >>> token.
-    // Allows `Array<Task<T>>` to parse correctly without the lexer needing context.
     split_count: u8,
 }
 
@@ -266,8 +264,6 @@ impl TokenStream {
         self.pending_doc.take()
     }
 
-    /// True when current token closes a generic type arg list.
-    /// Handles split `>>` and `>>>` so nested generics like `Array<Task<T>>` parse correctly.
     #[inline]
     pub fn check_rangle(&self) -> bool {
         if self.split_count > 0 {
@@ -279,7 +275,6 @@ impl TokenStream {
         )
     }
 
-    /// Consume one closing `>`, splitting `>>` into two virtual tokens.
     pub fn eat_rangle(&mut self) -> bool {
         if self.split_count > 0 {
             self.split_count -= 1;

@@ -4,6 +4,58 @@ use crate::types::{ObjectTypeMember, Type};
 use std::rc::Rc;
 use varn_core::TypeKind;
 
+fn resolve_extension_symbol_type(bind: &BindResult, mangled: &Rc<str>) -> Option<Type> {
+    let scope = bind.scopes.get(bind.global_scope);
+    let sid = scope.resolve(mangled.as_ref(), &bind.scopes)?;
+    bind.arena.get(sid).ty.clone()
+}
+
+fn extension_method_type(bind: &BindResult, mangled: &Rc<str>) -> Option<Type> {
+    let sym_ty = resolve_extension_symbol_type(bind, mangled)?;
+    let TypeKind::Fn(ft) = &sym_ty.0 else {
+        return Some(sym_ty);
+    };
+
+    let params = ft
+        .params
+        .iter()
+        .skip_while(|p| p.name.as_deref() == Some("this"))
+        .cloned()
+        .collect();
+
+    Some(Type::fn_(crate::types::FunctionType {
+        params,
+        return_type: ft.return_type.clone(),
+        is_arrow: ft.is_arrow,
+        type_params: ft.type_params.clone(),
+    }))
+}
+
+fn extension_getter_type(bind: &BindResult, mangled: &Rc<str>) -> Option<Type> {
+    let sym_ty = resolve_extension_symbol_type(bind, mangled)?;
+    match &sym_ty.0 {
+        TypeKind::Fn(ft) => Some(ft.return_type.as_ref().clone()),
+        _ => Some(sym_ty),
+    }
+}
+
+fn intrinsic_member_info(
+    bind: &BindResult,
+    type_name: &str,
+    key: &str,
+) -> Option<(Type, Option<usize>)> {
+    bind.core
+        .as_ref()
+        .and_then(|b| b.class_members.get(type_name))
+        .and_then(|members| {
+            members
+                .members
+                .iter()
+                .find(|m| m.name.as_ref() == key)
+                .map(|m| (m.ty.clone(), m.symbol_id))
+        })
+}
+
 impl Checker {
     pub(crate) fn find_member_info(
         &mut self,
@@ -49,10 +101,15 @@ impl Checker {
                 if name.as_ref() == "*" {
                     if let Some(origin_path) = origin {
                         let exports = if crate::module_resolver::is_known_module(origin_path) {
-                            Some(crate::module_resolver::resolve_stdlib_module_exports_ref(origin_path))
+                            Some(crate::module_resolver::resolve_stdlib_module_exports_ref(
+                                origin_path,
+                            ))
                         } else {
                             let mut visiting = Vec::new();
-                            Some(crate::module_resolver::resolve_module_exports_ref(origin_path, &mut visiting))
+                            Some(crate::module_resolver::resolve_module_exports_ref(
+                                origin_path,
+                                &mut visiting,
+                            ))
                         };
                         if let Some(exports) = exports {
                             if let Some(sym) = exports.get(key) {
@@ -112,7 +169,10 @@ impl Checker {
                             }
                         }
                         if let Some(ext_bind) =
-                            crate::module_resolver::find_module_bind_for_type_ref(name, &origin_modules)
+                            crate::module_resolver::find_module_bind_for_type_ref(
+                                name,
+                                &origin_modules,
+                            )
                         {
                             if let Some(fields) = ext_bind.sum_variant_fields.get(v) {
                                 if let Some((_, ty)) =
@@ -167,9 +227,13 @@ impl Checker {
                     if let Some(b) = ext_bind_opt {
                         Box::new(std::iter::once(b))
                     } else if origin.is_none() {
-                        Box::new(varn_modules::std_module_ids().into_iter().filter_map(|spec| {
-                            crate::module_resolver::resolve_stdlib_module_bind_ref(spec)
-                        }))
+                        Box::new(
+                            varn_modules::std_module_ids()
+                                .into_iter()
+                                .filter_map(|spec| {
+                                    crate::module_resolver::resolve_stdlib_module_bind_ref(spec)
+                                }),
+                        )
                     } else {
                         Box::new(std::iter::empty())
                     };
@@ -242,7 +306,10 @@ impl Checker {
                 }
             }
             TypeKind::Array(inner) => {
-                let array_ty = Type::generic(varn_core::IntrinsicType::Array.as_str().to_owned(), vec![*inner.clone()]);
+                let array_ty = Type::generic(
+                    varn_core::IntrinsicType::Array.as_str().to_owned(),
+                    vec![*inner.clone()],
+                );
                 self.find_member_info_uncached(&array_ty, key, bind)
             }
             TypeKind::LiteralStr(_) => self.find_member_info_uncached(&Type::Str, key, bind),
@@ -253,42 +320,31 @@ impl Checker {
                 if key == "length" {
                     Some((Type::Int, None))
                 } else {
-                    bind.core
-                        .as_ref()
-                        .and_then(|b| b.class_members.get(varn_core::IntrinsicType::Str.as_str()))
-                        .and_then(|members| {
-                            members
-                                .members
-                                .iter()
-                                .find(|m| m.name.as_ref() == key)
-                                .map(|m| (m.ty.clone(), m.symbol_id))
-                        })
+                    intrinsic_member_info(bind, varn_core::IntrinsicType::Str.as_str(), key)
                 }
             }
-            TypeKind::Intrinsic(varn_core::TypeTag::Range) => {
-                let range_ty = Type::named(varn_core::IntrinsicType::Range.as_str().to_owned());
-                self.find_member_info_uncached(&range_ty, key, bind)
+            TypeKind::Intrinsic(tag) => {
+                if let Some(info) = intrinsic_member_info(bind, tag.name(), key) {
+                    Some(info)
+                } else if *tag == varn_core::TypeTag::Range {
+                    let range_ty = Type::named(varn_core::IntrinsicType::Range.as_str().to_owned());
+                    self.find_member_info_uncached(&range_ty, key, bind)
+                } else {
+                    None
+                }
             }
             _ => None,
         };
         if res.is_none() {
             if let Some(tn) = crate::checker_expressions::check::members::extension_type_name(ty) {
                 if let Some(mangled) = bind.extensions.methods.get(&tn).and_then(|m| m.get(key)) {
-                    if let Some(sym) = bind
-                        .class_methods
-                        .get(&tn)
-                        .and_then(|m| m.get(mangled.as_ref()))
-                    {
-                        return Some((sym.clone(), None));
+                    if let Some(sym_ty) = extension_method_type(bind, mangled) {
+                        return Some((sym_ty, None));
                     }
                 }
                 if let Some(mangled) = bind.extensions.getters.get(&tn).and_then(|m| m.get(key)) {
-                    if let Some(sym) = bind
-                        .class_methods
-                        .get(&tn)
-                        .and_then(|m| m.get(mangled.as_ref()))
-                    {
-                        return Some((sym.clone(), None));
+                    if let Some(sym_ty) = extension_getter_type(bind, mangled) {
+                        return Some((sym_ty, None));
                     }
                 }
             }
@@ -335,10 +391,15 @@ impl Checker {
                 if name.as_ref() == "*" {
                     if let Some(origin_path) = origin {
                         let exports = if crate::module_resolver::is_known_module(origin_path) {
-                            Some(crate::module_resolver::resolve_stdlib_module_exports_ref(origin_path))
+                            Some(crate::module_resolver::resolve_stdlib_module_exports_ref(
+                                origin_path,
+                            ))
                         } else {
                             let mut visiting = Vec::new();
-                            Some(crate::module_resolver::resolve_module_exports_ref(origin_path, &mut visiting))
+                            Some(crate::module_resolver::resolve_module_exports_ref(
+                                origin_path,
+                                &mut visiting,
+                            ))
                         };
                         if let Some(exports) = exports {
                             if let Some(sym) = exports.get(key) {
@@ -393,11 +454,7 @@ impl Checker {
         if res.is_none() {
             if let Some(tn) = crate::checker_expressions::check::members::extension_type_name(ty) {
                 if let Some(mangled) = bind.extensions.methods.get(&tn).and_then(|m| m.get(key)) {
-                    if let Some(sym) = bind
-                        .class_methods
-                        .get(&tn)
-                        .and_then(|m| m.get(mangled.as_ref()))
-                    {
+                    if let Some(sym) = extension_method_type(bind, mangled) {
                         return Some(ObjectTypeMember::Method {
                             name: Rc::from(key),
                             params: match &sym.0 {
@@ -414,16 +471,18 @@ impl Checker {
                     }
                 }
                 if let Some(mangled) = bind.extensions.getters.get(&tn).and_then(|m| m.get(key)) {
-                    if let Some(sym) = bind
-                        .class_methods
-                        .get(&tn)
-                        .and_then(|m| m.get(mangled.as_ref()))
-                    {
+                    if let Some(sym) = extension_getter_type(bind, mangled) {
+                        let has_setter = bind
+                            .extensions
+                            .setters
+                            .get(&tn)
+                            .and_then(|m| m.get(key))
+                            .is_some();
                         return Some(ObjectTypeMember::Property {
                             name: Rc::from(key),
                             ty: sym.clone(),
                             optional: false,
-                            readonly: true,
+                            readonly: !has_setter,
                         });
                     }
                 }
