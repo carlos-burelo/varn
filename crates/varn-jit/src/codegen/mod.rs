@@ -7,12 +7,12 @@ pub(crate) mod globals;
 pub(crate) mod immediates;
 pub(crate) mod indexing;
 pub(crate) mod jumps;
+pub(crate) mod misc;
 pub(crate) mod modules;
+pub(crate) mod optimizer;
 pub(crate) mod properties;
 pub(crate) mod strings;
 pub(crate) mod unary;
-pub(crate) mod misc;
-pub(crate) mod optimizer;
 
 pub(crate) use arith::emit_arith;
 pub(crate) use arrays::emit_arrays;
@@ -23,10 +23,10 @@ pub(crate) use globals::emit_globals;
 pub(crate) use immediates::emit_immediates;
 pub(crate) use indexing::emit_indexing;
 pub(crate) use jumps::emit_jumps;
+pub(crate) use misc::emit_misc_ops;
 pub(crate) use modules::emit_modules;
 pub(crate) use properties::emit_properties;
 pub(crate) use strings::emit_strings;
-pub(crate) use misc::emit_misc_ops;
 
 use crate::assembler::Assembler;
 use crate::regalloc::RegMap;
@@ -37,7 +37,6 @@ pub(crate) struct JumpPatch {
     pub target_bytecode_ip: usize,
 }
 
-#[allow(dead_code)]
 pub(crate) struct CodegenCtx<'a> {
     pub asm: Assembler,
     pub code: &'a [u16],

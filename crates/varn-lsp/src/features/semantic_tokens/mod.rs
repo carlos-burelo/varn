@@ -121,6 +121,16 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
         let mut token_type: Option<u32> = None;
         let mut modifier: u32 = 0;
 
+        if tok.kind.is_keyword() && !prev_is_dot {
+            token_type = classify::classify(
+                tok,
+                &state.symbol_map,
+                next_is_lparen,
+                prev_is_dot,
+                &state.type_param_names,
+            );
+        }
+
         if token_type.is_none() {
             if let Some(&(tt, mods)) = member_overrides.get(&(tok.line, tok.lexeme.clone())) {
                 token_type = Some(tt);
@@ -224,9 +234,14 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
             {
                 let is_fn_val = if let Some(val_tok) = tokens.get(i + 2) {
                     match val_tok.kind {
-                        TokenKind::LParen | TokenKind::Function | TokenKind::Async | TokenKind::Lt => true,
+                        TokenKind::LParen
+                        | TokenKind::Function
+                        | TokenKind::Async
+                        | TokenKind::Lt => true,
                         TokenKind::Identifier => {
-                            if let Some((_, ty)) = state.db.resolve_at(&val_tok.lexeme, val_tok.offset) {
+                            if let Some((_, ty)) =
+                                state.db.resolve_at(&val_tok.lexeme, val_tok.offset)
+                            {
                                 matches!(ty.0, varn_core::TypeKind::Fn(_))
                             } else {
                                 false

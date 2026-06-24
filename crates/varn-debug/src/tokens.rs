@@ -1,14 +1,21 @@
+use varn_core::Token;
 use varn_utilities::chalk::chalk;
 use varn_utilities::terminal;
 use varn_utilities::terminal::Section;
-use varn_core::Token;
 
 pub fn debug_tokens(tokens: &[Token], lexeme_buf: &[u8], filename: &str) {
-    Section::new("tokens").subtitle(filename).color(|c| c.magenta()).print();
+    Section::new("tokens")
+        .subtitle(filename)
+        .color(|c| c.magenta())
+        .print();
 
     terminal::log(format!(
         "  {}",
-        chalk(format!("{:<5} │ {:<10} │ {:<20} │ Lexeme", "Idx", "Loc", "Kind")).dim()
+        chalk(format!(
+            "{:<5} │ {:<10} │ {:<20} │ Lexeme",
+            "Idx", "Loc", "Kind"
+        ))
+        .dim()
     ));
     terminal::log(format!("  {}", "─".repeat(70)));
 
@@ -24,5 +31,7 @@ pub fn debug_tokens(tokens: &[Token], lexeme_buf: &[u8], filename: &str) {
         ));
     }
 
-    Section::new("tokens").subtitle(format!("{} tokens scanned", tokens.len())).close();
+    Section::new("tokens")
+        .subtitle(format!("{} tokens scanned", tokens.len()))
+        .close();
 }

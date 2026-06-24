@@ -1,12 +1,15 @@
-use varn_utilities::chalk::chalk;
-use varn_utilities::terminal;
-use varn_utilities::terminal::Section;
 use varn_compiler::FunctionProto;
 use varn_types::chunk::Literal;
 use varn_types::chunk::PoolEntry;
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal;
+use varn_utilities::terminal::Section;
 
 pub fn debug_scopes(proto: &FunctionProto, filename: &str) {
-    Section::new("static scope tree").subtitle(filename).color(|c| c.magenta()).print();
+    Section::new("static scope tree")
+        .subtitle(filename)
+        .color(|c| c.magenta())
+        .print();
 
     print_scope_tree(proto, 0);
 
@@ -24,7 +27,11 @@ fn print_scope_tree(proto: &FunctionProto, depth: usize) {
     };
 
     let name = proto.name.as_deref().unwrap_or("<anonymous>");
-    let outer_indent = if depth == 0 { "" } else { &indent[..indent.len() - 4] };
+    let outer_indent = if depth == 0 {
+        ""
+    } else {
+        &indent[..indent.len() - 4]
+    };
 
     terminal::log(format!(
         "{outer_indent}{marker}{} {} (upvalues: {})",

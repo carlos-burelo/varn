@@ -1,6 +1,4 @@
 
-print("HELLO FROM TOP OF FILE")
-// ── Generic with constraint via interface ─────────────────────────
 interface Comparable<T> {
     compareTo(other: T): int
 }
@@ -152,12 +150,8 @@ const expensiveFib = memoize((n) => {
     return n
 })
 expensiveFib(5)
-print("after 1:", callCount)
 expensiveFib(5)
-print("after 2:", callCount)
 expensiveFib(5)
-print("after 3:", callCount)
-print("DEBUG callCount =", callCount)
 assert("memoize called once", callCount === 1)
 
 // ── Generic counter factory ───────────────────────────────────────

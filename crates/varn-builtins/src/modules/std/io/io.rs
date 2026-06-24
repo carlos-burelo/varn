@@ -2,8 +2,6 @@ use std::io::Write as IoWrite;
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
-/// Native implementation backing the `runtime:io` contract
-/// (`src/modules/std/io/runtime/io_runtime.vn`).
 pub struct IoRuntime;
 
 varn_contract! {
@@ -52,7 +50,6 @@ varn_contract! {
     }
 }
 
-/// Stable entrypoint for the global `input()` builtin (raw `&[VmValue]` form).
 pub fn read_line(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
     if let Some(&p) = args.first() {
         if !p.is_null() && !crate::modules::globals::is_print_silent() {

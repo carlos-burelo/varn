@@ -1,64 +1,56 @@
-use varn_utilities::chalk::chalk;
-use varn_utilities::terminal;
-use varn_utilities::terminal::Section;
 use varn_compiler::FunctionProto;
 use varn_core::OpCode;
 use varn_types::PoolEntry;
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal;
+use varn_utilities::terminal::Section;
 
-// ── ANSI colour constants ──────────────────────────────────────────────────────
-const R:     &str = "\x1b[0m";
-const DIM:   &str = "\x1b[2m";
-const YELLOW: &str = "\x1b[33m"; // control-flow
-const BLUE:  &str = "\x1b[34m";  // constructors
-const MAGENTA: &str = "\x1b[35m"; // calls
-const CYAN:  &str = "\x1b[36m";  // loads / globals / modules
-const GREEN: &str = "\x1b[32m";  // arithmetic / comparisons
+const R: &str = "\x1b[0m";
+const DIM: &str = "\x1b[2m";
+const YELLOW: &str = "\x1b[33m";
+const BLUE: &str = "\x1b[34m";
+const MAGENTA: &str = "\x1b[35m";
+const CYAN: &str = "\x1b[36m";
+const GREEN: &str = "\x1b[32m";
 
-/// Return the ANSI colour prefix for a given opcode category.
 fn op_color(op: OpCode) -> &'static str {
     use OpCode::*;
     match op {
-        // Control flow
         Jump | JumpIfFalse | JumpIfTrue | Loop | Return | Throw | Try | PopTry => YELLOW,
-        // Calls
+
         Call | CallSpread | CallSelf | CallMethod | InvokeVirtual | Spawn => MAGENTA,
-        // Loads / stores / globals / modules
-        LoadConst | LoadInt | LoadIntZero | LoadIntOne | LoadIntMinusOne
-        | LoadGlobal | LoadGlobalIdx | StoreGlobal | StoreGlobalIdx
-        | DefineGlobal | DefineGlobalIdx
-        | LoadModule | LoadModuleSlot | StoreModuleSlot
-        | LoadUpvalue | StoreUpvalue => CYAN,
-        // Constructors / class / closure
+
+        LoadConst | LoadInt | LoadIntZero | LoadIntOne | LoadIntMinusOne | LoadGlobal
+        | LoadGlobalIdx | StoreGlobal | StoreGlobalIdx | DefineGlobal | DefineGlobalIdx
+        | LoadModule | LoadModuleSlot | StoreModuleSlot | LoadUpvalue | StoreUpvalue => CYAN,
+
         MakeClass | MakeClosure | LoadStaticFn | BuildArray | BuildObject
-        | BuildObjectWithShape | BuildStr | Method | DefineStatic
-        | DefineGetter | DefineSetter | DefineStaticGetter | DefineStaticSetter
-        | DeclareField | Inherit | BindMethod | MakeEnumVariant => BLUE,
-        // Arithmetic / logical / comparisons
-        Add | Sub | Mul | Div | Mod | Pow | Eq | Neq | Lt | Lte | Gt | Gte
-        | BitAnd | BitOr | BitXor | Shl | Shr | Ushr | In | Instanceof
-        | AddInt | SubInt | MulInt | DivInt | ModInt | PowInt
-        | LtInt | GtInt | LteInt | GteInt | EqInt | NeqInt
-        | AddFloat | SubFloat | MulFloat | DivFloat | ModFloat | PowFloat
-        | LtFloat | GtFloat | LteFloat | GteFloat | EqFloat | NeqFloat
-        | StrConcat | StrSlice | AddImm | SubImm => GREEN,
+        | BuildObjectWithShape | BuildStr | Method | DefineStatic | DefineGetter | DefineSetter
+        | DefineStaticGetter | DefineStaticSetter | DeclareField | Inherit | BindMethod
+        | MakeEnumVariant => BLUE,
+
+        Add | Sub | Mul | Div | Mod | Pow | Eq | Neq | Lt | Lte | Gt | Gte | BitAnd | BitOr
+        | BitXor | Shl | Shr | Ushr | In | Instanceof | AddInt | SubInt | MulInt | DivInt
+        | ModInt | PowInt | LtInt | GtInt | LteInt | GteInt | EqInt | NeqInt | AddFloat
+        | SubFloat | MulFloat | DivFloat | ModFloat | PowFloat | LtFloat | GtFloat | LteFloat
+        | GteFloat | EqFloat | NeqFloat | StrConcat | StrSlice | AddImm | SubImm => GREEN,
         _ => "",
     }
 }
 
-/// Render a pool constant as a human-readable hint (no Rust `{:?}` syntax).
 fn const_hint(entry: &PoolEntry) -> String {
     use varn_types::chunk::Literal;
     match entry {
         PoolEntry::Literal(lit) => match lit {
-            Literal::Null       => format!("{DIM}null{R}"),
-            Literal::Bool(b)    => format!("{GREEN}{b}{R}"),
-            Literal::Int(n)     => format!("{GREEN}{n}{R}"),
-            Literal::Float(f)   => format!("{GREEN}{f}{R}"),
-            Literal::Str(s)     => format!("{GREEN}\"{s}\"{R}"),
-            Literal::BigInt(n)  => format!("{GREEN}{n}n{R}"),
+            Literal::Null => format!("{DIM}null{R}"),
+            Literal::Bool(b) => format!("{GREEN}{b}{R}"),
+            Literal::Int(n) => format!("{GREEN}{n}{R}"),
+            Literal::Float(f) => format!("{GREEN}{f}{R}"),
+            Literal::Str(s) => format!("{GREEN}\"{s}\"{R}"),
+            Literal::BigInt(n) => format!("{GREEN}{n}n{R}"),
             Literal::Decimal(d) => format!("{GREEN}{d}d{R}"),
-            Literal::Char(c)    => format!("{GREEN}'{c}'{R}"),
-            Literal::Symbol(s)  => format!("{DIM}Symbol({s:?}){R}"),
+            Literal::Char(c) => format!("{GREEN}'{c}'{R}"),
+            Literal::Symbol(s) => format!("{DIM}Symbol({s:?}){R}"),
         },
         PoolEntry::Function(f) => {
             let fname = f.name.as_deref().unwrap_or("<anon>");
@@ -68,8 +60,6 @@ fn const_hint(entry: &PoolEntry) -> String {
     }
 }
 
-
-/// Build a map from pool index → nested-function name for cross-references.
 fn build_fn_index(proto: &FunctionProto) -> std::collections::HashMap<u16, String> {
     let mut map = std::collections::HashMap::new();
     for (i, entry) in proto.chunk.constants.iter().enumerate() {
@@ -82,7 +72,10 @@ fn build_fn_index(proto: &FunctionProto) -> std::collections::HashMap<u16, Strin
 }
 
 pub fn debug_bytecode(proto: &FunctionProto, _flags: &crate::flags::DebugFlags) {
-    Section::new("bytecode").subtitle("...").color(|c| c.yellow()).print();
+    Section::new("bytecode")
+        .subtitle("...")
+        .color(|c| c.yellow())
+        .print();
 
     let mut total_words = 0;
     print_proto(proto, 0, &mut total_words);
@@ -126,23 +119,31 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
         proto.upvalue_count,
     ));
 
-    // Constants pool — human-readable
     if !proto.chunk.constants.is_empty() {
-        terminal::log(format!("{indent}  {DIM}constants ({}){R}", proto.chunk.constants.len()));
+        terminal::log(format!(
+            "{indent}  {DIM}constants ({}){R}",
+            proto.chunk.constants.len()
+        ));
         for (i, c) in proto.chunk.constants.iter().enumerate() {
             terminal::log(format!("{indent}  {DIM}[{:03}]{R} {}", i, const_hint(c)));
         }
     }
-    terminal::log(format!("{indent}  {DIM}code ({}) words{R}", proto.chunk.code.len()));
+    terminal::log(format!(
+        "{indent}  {DIM}code ({}) words{R}",
+        proto.chunk.code.len()
+    ));
     *total += proto.chunk.code.len();
 
     terminal::log(format!(
         "{indent}  {}",
-        chalk(format!("{:<4} │ {:<3} │ {:<20} │ Operands / Hint", "Off", "Lin", "Opcode")).dim()
+        chalk(format!(
+            "{:<4} │ {:<3} │ {:<20} │ Operands / Hint",
+            "Off", "Lin", "Opcode"
+        ))
+        .dim()
     ));
     terminal::log(format!("{indent}  {}", "─".repeat(72)));
 
-    // Build fn-index for cross-reference hints on MakeClosure/LoadStaticFn
     let fn_index = build_fn_index(proto);
 
     let code = &proto.chunk.code;
@@ -184,7 +185,6 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             | OpCode::IsNull
             | OpCode::IsArray
             | OpCode::Typeof
-            | OpCode::AssertNotNull
             | OpCode::WrapSpread
             | OpCode::ArrayLength
             | OpCode::StrLength
@@ -192,6 +192,10 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             | OpCode::Await => {
                 let w1 = w!();
                 format!("r{} = r{}", hi(op_val), hi(w1))
+            }
+            OpCode::AssertNotNull => {
+                let w1 = w!();
+                format!("assert r{}", hi(w1))
             }
             OpCode::ArrayPop => {
                 let w1 = w!();
@@ -268,7 +272,11 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             }
             OpCode::In | OpCode::Instanceof => {
                 let w1 = w!();
-                let op_str = if matches!(op, OpCode::In) { "in" } else { "instanceof" };
+                let op_str = if matches!(op, OpCode::In) {
+                    "in"
+                } else {
+                    "instanceof"
+                };
                 format!("r{} = r{} {} r{}", hi(op_val), hi(w1), lo(w1), op_str)
             }
             OpCode::ArrayExtend => {
@@ -360,12 +368,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             OpCode::CallSelf => {
                 let w1 = w!();
                 let w2 = w!();
-                format!(
-                    "r{} = callself ({} args @ r{})",
-                    hi(w1),
-                    hi(w2),
-                    lo(w2)
-                )
+                format!("r{} = callself ({} args @ r{})", hi(w1), hi(w2), lo(w2))
             }
             OpCode::InvokeVirtual => {
                 let w1 = w!();
@@ -403,20 +406,30 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             OpCode::GetProperty => {
                 let w1 = w!();
                 let name_idx = w!();
-                let cs_idx = hi(op_val);
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
                     hint = format!("{:?}", c);
                 }
-                format!("r{} = r{}.prop[{}] cs={}", hi(w1), lo(w1), name_idx, cs_idx)
+                format!(
+                    "r{} = r{}.prop[{}] cs={}",
+                    hi(op_val),
+                    hi(w1),
+                    name_idx,
+                    lo(w1)
+                )
             }
             OpCode::SetProperty => {
                 let w1 = w!();
                 let name_idx = w!();
-                let cs_idx = hi(op_val);
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
                     hint = format!("{:?}", c);
                 }
-                format!("r{}.prop[{}] = r{} cs={}", hi(w1), name_idx, lo(w1), cs_idx)
+                format!(
+                    "r{}.prop[{}] = r{} cs={}",
+                    hi(op_val),
+                    name_idx,
+                    hi(w1),
+                    lo(w1)
+                )
             }
 
             OpCode::GetPropertyMaybe => {
@@ -425,25 +438,29 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
                     hint = format!("{:?}", c);
                 }
-                format!("r{} = r{}.prop?[{}]", hi(w1), lo(w1), name_idx)
+                format!("r{} = r{}.prop?[{}]", hi(op_val), hi(w1), name_idx)
             }
-            OpCode::GetFixedField | OpCode::SetFixedField => {
+            OpCode::GetFixedField => {
                 let w1 = w!();
                 let idx = w!();
-                format!("r{} fixed[{}] r{}", hi(w1), idx, lo(w1))
+                format!("r{} = r{}.fixed[{}]", hi(op_val), hi(w1), idx)
+            }
+            OpCode::SetFixedField => {
+                let w1 = w!();
+                let idx = w!();
+                format!("r{}.fixed[{}] = r{}", hi(op_val), idx, hi(w1))
             }
             OpCode::GetSuper => {
-                let w1 = w!();
                 let name_idx = w!();
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
                     hint = format!("{:?}", c);
                 }
-                format!("r{} = super.prop[{}]", hi(w1), name_idx)
+                format!("r{} = super.prop[{}]", hi(op_val), name_idx)
             }
             OpCode::GetSymbol => {
                 let w1 = w!();
                 let idx = w!();
-                format!("r{} = sym[{}]", hi(w1), idx)
+                format!("r{} = r{}.sym[{}]", hi(op_val), hi(w1), idx)
             }
             OpCode::BindMethod => {
                 let w1 = w!();
@@ -486,7 +503,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w1 = w!();
                 let proto_idx = w!();
                 let uv_count = lo(w1);
-                // Cross-reference: show the name of the nested function
+
                 if let Some(fn_name) = fn_index.get(&proto_idx) {
                     hint = format!("{BLUE}→ fn {fn_name}{R}");
                 } else if let Some(c) = proto.chunk.constants.get(proto_idx as usize) {
@@ -505,7 +522,19 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
                     hint = const_hint(c);
                 }
-                format!("r{} = class[{}]", hi(w1), name_idx)
+                let super_reg = hi(w1);
+                let dest = hi(op_val);
+                if super_reg != 0 {
+                    format!(
+                        "r{} = class[{}] extends r{} (raw={:04x} {:04x} {:04x})",
+                        dest, name_idx, super_reg, op_val, w1, name_idx
+                    )
+                } else {
+                    format!(
+                        "r{} = class[{}] (raw={:04x} {:04x} {:04x})",
+                        dest, name_idx, op_val, w1, name_idx
+                    )
+                }
             }
             OpCode::Inherit => {
                 let w1 = w!();
@@ -519,11 +548,10 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             | OpCode::DefineStaticSetter => {
                 let w1 = w!();
                 let name_idx = w!();
-                let w3 = w!();
                 if let Some(c) = proto.chunk.constants.get(name_idx as usize) {
                     hint = const_hint(c);
                 }
-                format!("r{}[{}] = r{}", hi(w1), name_idx, hi(w3))
+                format!("r{}[{}] = r{}", hi(w1), name_idx, lo(w1))
             }
             OpCode::DeclareField => {
                 let w1 = w!();
@@ -580,7 +608,13 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 if let Some(c) = proto.chunk.constants.get(fn_idx as usize) {
                     hint = const_hint(c);
                 }
-                format!("r{} = runtime[{}]({} args @ r{})", hi(w1), fn_idx, arg_count, lo(w3))
+                format!(
+                    "r{} = runtime[{}]({} args @ r{})",
+                    hi(w1),
+                    fn_idx,
+                    arg_count,
+                    lo(w3)
+                )
             }
 
             OpCode::AddImm | OpCode::SubImm => {
@@ -618,7 +652,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             OpCode::LoadStaticFn => {
                 let dest = hi(op_val);
                 let proto_idx = w!();
-                // Cross-reference: show the name of the nested function
+
                 if let Some(fn_name) = fn_index.get(&proto_idx) {
                     hint = format!("{BLUE}→ fn {fn_name}{R}");
                 } else if let Some(c) = proto.chunk.constants.get(proto_idx as usize) {
@@ -628,7 +662,6 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             }
         };
 
-        // Colour the opcode name by category
         let color = op_color(op);
         let op_name = format!("{color}{:<20}{R}", format!("{:?}", op));
         terminal::log(format!(

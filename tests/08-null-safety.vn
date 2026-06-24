@@ -8,9 +8,9 @@ interface Profile {
     address?: Address
 }
 
-const p1: Profile | null = { name: "Alice", address: { city: "NY" } }
-const p2: Profile | null = { name: "Bob" }
-const p3: Profile | null = null
+const p1: Profile? = { name: "Alice", address: { city: "NY" } }
+const p2: Profile? = { name: "Bob" }
+const p3: Profile? = null
 
 assert("?. non-null chain",   p1?.address?.city === "NY")
 assert("?. missing nested",   p2?.address?.city === null)

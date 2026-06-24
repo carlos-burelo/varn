@@ -3,7 +3,7 @@ use crate::exec::props::bind_method_to_receiver;
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use std::rc::Rc;
-use varn_types::{value::ObjRef, ClassObj, ObjData, Value};
+use varn_types::{value::ObjRef, ClassObj, ObjData};
 
 pub fn op_class(name: &str, heap: &mut Heap) -> VmValue {
     let cls = ClassObj::new_rc(name);
@@ -154,14 +154,14 @@ pub fn new_instance(class_nv: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     Ok(VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref))))
 }
 
-fn get_class_mut(nv: VmValue, heap: &mut Heap) -> VmResult<&mut Rc<ClassObj>> {
-    if nv.is_heap() {
-        if let Some(HeapObj::Class(c)) = heap.get_mut(nv.as_heap_idx()) {
-            return Ok(c);
-        }
-    }
-    Err(RuntimeError::new("expected class"))
-}
+
+
+
+
+
+
+
+
 
 fn get_class_arc(nv: VmValue, heap: &Heap) -> VmResult<Rc<ClassObj>> {
     if nv.is_heap() {
@@ -172,12 +172,12 @@ fn get_class_arc(nv: VmValue, heap: &Heap) -> VmResult<Rc<ClassObj>> {
     Err(RuntimeError::new("expected class"))
 }
 
-fn require_vm_closure_idx(nv: VmValue, heap: &Heap, ctx: &str) -> VmResult<u32> {
-    if nv.is_heap() {
-        let idx = nv.as_heap_idx();
-        if matches!(heap.get(idx), Some(HeapObj::VmClosure(_))) {
-            return Ok(idx);
-        }
-    }
-    Err(RuntimeError::new(format!("{ctx}: expected VmClosure")))
-}
+
+
+
+
+
+
+
+
+

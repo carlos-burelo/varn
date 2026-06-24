@@ -35,6 +35,109 @@ pub(crate) fn emit_compare(
     Ok(())
 }
 
+fn slot_is_int(meta: &[varn_types::register_meta::RegisterMeta], reg: usize) -> bool {
+    meta.get(reg).map_or(false, |m| {
+        m.kind == varn_types::register_meta::SlotKind::Int
+    })
+}
+
+fn slot_is_float(meta: &[varn_types::register_meta::RegisterMeta], reg: usize) -> bool {
+    meta.get(reg).map_or(false, |m| {
+        m.kind == varn_types::register_meta::SlotKind::Float
+    })
+}
+
+fn emit_compare_inline(
+    asm: &mut crate::assembler::Assembler,
+    op: OpCode,
+    src1: usize,
+    src2: usize,
+    first_reg: usize,
+    regmap: &crate::regalloc::RegMap,
+    both_int: bool,
+) {
+    emit_load(asm, Reg::Rax, src1, regmap);
+    emit_load(asm, Reg::R11, src2, regmap);
+
+    let mut p_true_patches = Vec::new();
+    let mut p_false_patches = Vec::new();
+
+    if both_int {
+        asm.shl_reg_imm8(Reg::Rax, 16);
+        asm.shl_reg_imm8(Reg::R11, 16);
+        asm.cmp_reg_reg(Reg::Rax, Reg::R11);
+
+        let cond = match op {
+            OpCode::Eq | OpCode::EqFloat | OpCode::EqInt => Cond::Equal,
+            OpCode::Neq | OpCode::NeqFloat | OpCode::NeqInt => Cond::NotEqual,
+            OpCode::Lt | OpCode::LtFloat | OpCode::LtInt => Cond::Less,
+            OpCode::Lte | OpCode::LteFloat | OpCode::LteInt => Cond::LessEqual,
+            OpCode::Gt | OpCode::GtFloat | OpCode::GtInt => Cond::Greater,
+            OpCode::Gte | OpCode::GteFloat | OpCode::GteInt => Cond::GreaterEqual,
+            _ => unreachable!(),
+        };
+        p_true_patches.push(asm.jmp_cond(cond));
+    } else {
+        asm.emit_debug_assert_not_int(Reg::Rax);
+        asm.emit_debug_assert_not_int(Reg::R11);
+        asm.movq_xmm_from_gpr(0, Reg::Rax);
+        asm.movq_xmm_from_gpr(1, Reg::R11);
+        asm.ucomisd(0, 1);
+
+        match op {
+            OpCode::Eq | OpCode::EqFloat => {
+                p_false_patches.push(asm.jmp_cond(Cond::Parity));
+                p_true_patches.push(asm.jmp_cond(Cond::Equal));
+            }
+            OpCode::Neq | OpCode::NeqFloat => {
+                p_true_patches.push(asm.jmp_cond(Cond::Parity));
+                p_true_patches.push(asm.jmp_cond(Cond::NotEqual));
+            }
+            OpCode::Lt | OpCode::LtFloat => {
+                p_false_patches.push(asm.jmp_cond(Cond::Parity));
+                p_true_patches.push(asm.jmp_cond(Cond::Below));
+            }
+            OpCode::Lte | OpCode::LteFloat => {
+                p_false_patches.push(asm.jmp_cond(Cond::Parity));
+                p_true_patches.push(asm.jmp_cond(Cond::BelowEqual));
+            }
+            OpCode::Gt | OpCode::GtFloat => {
+                p_false_patches.push(asm.jmp_cond(Cond::Parity));
+                p_true_patches.push(asm.jmp_cond(Cond::Above));
+            }
+            OpCode::Gte | OpCode::GteFloat => {
+                p_false_patches.push(asm.jmp_cond(Cond::Parity));
+                p_true_patches.push(asm.jmp_cond(Cond::AboveEqual));
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    let false_pos = asm.current_offset();
+    let false_val = 0x7FFA_0000_0000_0000u64;
+    asm.mov_reg_imm64(Reg::Rax, false_val);
+    let jmp_end_patch = asm.jmp_near();
+
+    let true_pos = asm.current_offset();
+    let true_val = 0x7FFB_0000_0000_0000u64;
+    asm.mov_reg_imm64(Reg::Rax, true_val);
+
+    let end_pos = asm.current_offset();
+
+    for patch in p_false_patches {
+        let disp = (false_pos as i32 - (patch as i32 + 4)) as u32;
+        asm.patch_u32(patch, disp);
+    }
+    for patch in p_true_patches {
+        let disp = (true_pos as i32 - (patch as i32 + 4)) as u32;
+        asm.patch_u32(patch, disp);
+    }
+    let disp_end = (end_pos as i32 - (jmp_end_patch as i32 + 4)) as u32;
+    asm.patch_u32(jmp_end_patch, disp_end);
+
+    emit_store(asm, Reg::Rax, first_reg, regmap);
+}
+
 fn emit_float_compare(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     let asm = &mut ctx.asm;
     let code = ctx.code;
@@ -46,6 +149,16 @@ fn emit_float_compare(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     *ip += 1;
     let src1 = (w1 >> 8) as usize;
     let src2 = (w1 & 0xFF) as usize;
+
+    let both_int =
+        slot_is_int(&ctx.proto.register_meta, src1) && slot_is_int(&ctx.proto.register_meta, src2);
+    let both_float = slot_is_float(&ctx.proto.register_meta, src1)
+        && slot_is_float(&ctx.proto.register_meta, src2);
+
+    if both_int || both_float {
+        emit_compare_inline(asm, op, src1, src2, first_reg, regmap, both_int);
+        return;
+    }
 
     asm.push(ARG_CTX);
     asm.push(ARG_CLOSURE);
@@ -111,9 +224,7 @@ fn emit_int_compare(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     emit_load(asm, Reg::R11, src2, regmap);
 
     asm.shl_reg_imm8(Reg::Rax, 16);
-    asm.sar_reg_imm8(Reg::Rax, 16);
     asm.shl_reg_imm8(Reg::R11, 16);
-    asm.sar_reg_imm8(Reg::R11, 16);
 
     asm.cmp_reg_reg(Reg::Rax, Reg::R11);
 

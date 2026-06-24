@@ -1,9 +1,7 @@
 use varn_core::OpCode;
 
 use crate::assembler::Reg;
-use crate::regalloc::{
-    emit_load, emit_store,
-};
+use crate::regalloc::{emit_load, emit_store};
 use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
 
 use super::CodegenCtx;
@@ -24,7 +22,6 @@ pub(crate) fn emit_globals(
             let idx = code[*ip] as usize;
             *ip += 1;
 
-            // Load values ptr (offset 56) and read from it
             asm.mov_reg_mem(Reg::R11, ARG_EXEC_CTX, 56);
             asm.mov_reg_mem(Reg::R11, Reg::R11, (idx * 8) as i32);
             emit_store(asm, Reg::R11, first_reg, regmap);
@@ -36,17 +33,15 @@ pub(crate) fn emit_globals(
             let idx = code[*ip] as usize;
             *ip += 1;
 
-            // Load value to store into Rax
             emit_load(asm, Reg::Rax, src, regmap);
 
-            // Load values ptr (offset 56) and write to ptr[idx]
             asm.mov_reg_mem(Reg::R11, ARG_EXEC_CTX, 56);
             asm.mov_mem_reg(Reg::R11, (idx * 8) as i32, Reg::Rax);
         }
         OpCode::LoadGlobal => {
             let idx = code[*ip] as usize;
             *ip += 1;
-            // Reload closure pointer from saved stack slot
+
             asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
 
             asm.push(ARG_CTX);
@@ -87,4 +82,3 @@ pub(crate) fn emit_globals(
     }
     Ok(())
 }
-

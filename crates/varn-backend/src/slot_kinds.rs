@@ -2,18 +2,6 @@ use varn_core::OpCode;
 use varn_types::chunk::FunctionProto;
 use varn_types::register_meta::{RegisterMeta, SlotKind};
 
-// INVARIANT (load-bearing for the JIT float fast paths):
-// `SlotKind::Int` / `SlotKind::Float` are assigned *only* from the typed
-// arithmetic opcodes that provably produce that representation (e.g.
-// `AddFloat`/`SubFloat`/`MulFloat` → Float). Untyped writers (`LoadConst`,
-// `Move`, `Call`, `GetIndex`, …) leave the slot `Dynamic`. Because of this,
-// a `Float` slot can only hold a float result (or `null`, from the
-// NaN→null canonicalisation), never a raw int box — which is what lets the
-// JIT (`varn_jit::codegen::arith` / `::calls`) treat a Float operand's bits
-// directly as an IEEE-754 double without a runtime tag check. Do NOT widen
-// the set of opcodes that set `Int`/`Float` to any that can yield a
-// different representation without auditing those fast paths.
-
 pub fn infer(proto: &mut FunctionProto) {
     let n = proto.register_count as usize;
     if n == 0 {
@@ -21,14 +9,6 @@ pub fn infer(proto: &mut FunctionProto) {
     }
 
     let mut kinds: Vec<SlotKind> = vec![SlotKind::Dynamic; n];
-    // Slots written by an *untyped* representation-producing opcode (untyped
-    // arithmetic — which dispatches on dynamic operands and can yield a string,
-    // e.g. `"a" + "b"` — or `StrConcat`). Such a slot is genuinely `Dynamic`;
-    // force it so even if a *typed* writer (e.g. `LoadIntZero` for a reused
-    // loop counter) also targets it. Without this, a register the optimizer
-    // reuses for both an int and a heap value (str) is mistagged `Int`, and the
-    // JIT returns the heap pointer as an unboxed int. Does not touch `Move`/
-    // `LoadConst` writers, so int/float accumulators keep their fast-path kind.
     let mut tainted: Vec<bool> = vec![false; n];
     let code = &proto.chunk.code;
     let mut ip = 0;
@@ -113,7 +93,10 @@ pub fn infer(proto: &mut FunctionProto) {
         }
     }
 
-    proto.register_meta = kinds.into_iter().map(|kind| RegisterMeta { kind }).collect();
+    proto.register_meta = kinds
+        .into_iter()
+        .map(|kind| RegisterMeta { kind })
+        .collect();
 }
 
 #[inline]
@@ -129,11 +112,11 @@ fn instruction_extra_words(op: OpCode, code: &[u16], ip: usize) -> usize {
         LoadConst | Move | LoadGlobal | StoreGlobal | DefineGlobal | LoadGlobalIdx
         | StoreGlobalIdx | DefineGlobalIdx | LoadUpvalue | StoreUpvalue | CloseUpvalue | Add
         | Sub | Mul | Div | Mod | Pow | Negate | Not | ToString | Eq | Neq | Lt | Lte | Gt
-        | Gte | BitAnd | BitOr | BitXor | Shl | Shr | Ushr | StrConcat | StrLength
-        | StrSlice | ArrayLength | ArrayPush | ArrayPop | GetIndex | SetIndex | GetEnumTag
-        | IsNull | IsArray | AssertNotNull | Typeof | Instanceof | In | WrapSpread | Yield
-        | Await | Spawn | Throw | Return | GetFixedField | SetFixedField | GetSuper
-        | GetSymbol | BindMethod | Nop => 1,
+        | Gte | BitAnd | BitOr | BitXor | Shl | Shr | Ushr | StrConcat | StrLength | StrSlice
+        | ArrayLength | ArrayPush | ArrayPop | GetIndex | SetIndex | GetEnumTag | IsNull
+        | IsArray | AssertNotNull | Typeof | Instanceof | In | WrapSpread | Yield | Await
+        | Spawn | Throw | Return | GetFixedField | SetFixedField | GetSuper | GetSymbol
+        | BindMethod | Nop => 1,
 
         LoadNull | LoadTrue | LoadFalse | LoadIntZero | LoadIntOne | LoadIntMinusOne | PopTry => 0,
 

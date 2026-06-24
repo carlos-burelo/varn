@@ -3,8 +3,6 @@ use urlencoding::{decode, encode};
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
-/// Native implementation backing the `runtime:net` contract
-/// (`src/modules/std/net/runtime/net_runtime.vn`).
 pub struct NetRuntime;
 
 varn_contract! {

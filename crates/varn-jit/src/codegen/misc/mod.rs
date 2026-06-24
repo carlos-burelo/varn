@@ -1,12 +1,11 @@
-#![allow(dead_code)]
 
-use varn_core::OpCode;
 use crate::codegen::CodegenCtx;
+use varn_core::OpCode;
 
 pub(crate) mod class;
-pub(crate) mod objects;
 pub(crate) mod globals;
 pub(crate) mod helpers;
+pub(crate) mod objects;
 
 pub(super) const NULL_BITS: u64 = 0x7FF9_0000_0000_0000;
 

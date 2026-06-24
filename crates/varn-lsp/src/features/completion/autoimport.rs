@@ -1,13 +1,13 @@
 use std::collections::HashSet;
 
-use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind, Position, Range, TextEdit};
-use varn_checker::SymbolKind;
+use tower_lsp::lsp_types::{CompletionItem, Position, Range, TextEdit};
 
 use varn_modules::resolver::{normalize_display_path, relative_import_path};
 
 use crate::constants::{SORT_AUTOIMPORT, STDLIB_STD_PATH, STD_PREFIX};
 use crate::document::import::uri_to_path;
 use crate::index::ProjectIndex;
+use crate::util::kinds::to_completion_kind;
 
 pub fn build_autoimport_completions(
     source: &str,
@@ -36,17 +36,7 @@ pub fn build_autoimport_completions(
         let specifier = uri_to_specifier(doc_uri, target_uri);
         let import_text = format!("import {{ {name} }} from \"{specifier}\";\n");
 
-        let kind = Some(match entry.kind {
-            SymbolKind::Function => CompletionItemKind::FUNCTION,
-            SymbolKind::Class => CompletionItemKind::CLASS,
-            SymbolKind::Interface => CompletionItemKind::INTERFACE,
-            SymbolKind::Enum => CompletionItemKind::ENUM,
-            SymbolKind::Const => CompletionItemKind::CONSTANT,
-            SymbolKind::Namespace => CompletionItemKind::MODULE,
-            SymbolKind::Struct => CompletionItemKind::CLASS,
-            SymbolKind::TypeAlias => CompletionItemKind::CLASS,
-            _ => CompletionItemKind::VARIABLE,
-        });
+        let kind = Some(to_completion_kind(entry.kind));
 
         let type_hint = if entry.type_str.is_empty() {
             String::new()

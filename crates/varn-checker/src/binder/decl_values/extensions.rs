@@ -1,11 +1,10 @@
-use std::rc::Rc;
-use varn_core::ast::{ExtensionDecl, ExtensionMember, Pattern};
-
 use super::super::type_resolution::resolve_type_node;
 use super::type_node_to_name;
 use crate::scope::ScopeKind;
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::Type;
+use std::rc::Rc;
+use varn_core::ast::{ExtensionDecl, ExtensionMember, Pattern};
 
 impl super::super::Binder {
     pub(crate) fn bind_extension(&mut self, e: &ExtensionDecl) {
@@ -17,7 +16,8 @@ impl super::super::Binder {
             let name = id.clone();
             let line = e.range.start.line;
             let ext_type = receiver_ty.clone();
-            let mut sym = Symbol::new(SymbolKind::Extension, name.clone(), line).with_type(ext_type);
+            let mut sym =
+                Symbol::new(SymbolKind::Extension, name.clone(), line).with_type(ext_type);
             sym.col = e.range.start.column;
             sym.offset = e.range.start.offset;
             self.define(name.to_string(), sym);

@@ -114,8 +114,6 @@ pub fn fmt_num(n: usize) -> String {
     out.chars().rev().collect()
 }
 
-/// Render the per-phase timing table: header, one row per phase, a rule, then a
-/// `total` summary row. `total_p50` drives each phase's `%` share.
 pub fn print_table(phases: &[PhaseStats], total_p50: Duration) {
     use terminal::Align::{Left, Right};
 

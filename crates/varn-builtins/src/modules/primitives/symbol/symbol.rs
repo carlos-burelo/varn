@@ -2,8 +2,6 @@ use varn_op_macros::varn_contract;
 use varn_types::value::RuntimeSymbol;
 use varn_types::{NativeCtx, Value, VmValue};
 
-/// Native implementation backing the `Symbol` contract
-/// (`src/modules/primitives/symbol/symbol.vn`).
 pub struct Symbol;
 
 varn_contract! {

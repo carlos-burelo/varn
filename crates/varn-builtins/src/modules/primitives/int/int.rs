@@ -1,11 +1,8 @@
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, NativeFnResult, VmValue};
 
-/// Native implementation backing the `int` contract
-/// (`src/modules/primitives/int/int.vn`).
 pub struct Int;
 
-// Varn `int` is a 48-bit NaN-boxed integer (see `VmValue::from_int` / `MASK_INT48`).
 const INT_MAX: i64 = (1 << 47) - 1;
 const INT_MIN: i64 = -(1 << 47);
 
@@ -14,7 +11,7 @@ varn_contract! {
     class: "int",
     contract: "src/modules/primitives/int/int.vn",
     impl Int {
-        // ---- statics ----
+
         fn MAX_VALUE(_ctx: &mut dyn NativeCtx) -> i64 { INT_MAX }
         fn MIN_VALUE(_ctx: &mut dyn NativeCtx) -> i64 { INT_MIN }
 
@@ -28,7 +25,7 @@ varn_contract! {
             val >= INT_MIN && val <= INT_MAX
         }
 
-        // ---- instance ----
+
         fn toString(_ctx: &mut dyn NativeCtx, this: i64) -> String { this.to_string() }
         fn valueOf(_ctx: &mut dyn NativeCtx, this: i64) -> i64 { this }
         fn toLocaleString(_ctx: &mut dyn NativeCtx, this: i64) -> String { this.to_string() }
@@ -67,7 +64,6 @@ varn_contract! {
     }
 }
 
-// Free helpers re-exported from `primitives/mod.rs`; unrelated to the contract.
 pub fn int_is_integer(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
     if let Some(&v) = args.first() {
         return Ok(VmValue::from_bool(v.is_int()));

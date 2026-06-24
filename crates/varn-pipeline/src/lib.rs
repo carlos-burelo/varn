@@ -145,7 +145,10 @@ fn compile_source_cached(source: &str, path: &str, verbose: bool) -> PipelineRes
         Ok(None) => {}
         Err(e) => {
             if verbose {
-                varn_utilities::terminal::tagged("Varn", format_args!("compile cache read skipped: {e}"));
+                varn_utilities::terminal::tagged(
+                    "Varn",
+                    format_args!("compile cache read skipped: {e}"),
+                );
             }
         }
     }
@@ -157,7 +160,10 @@ fn compile_source_cached(source: &str, path: &str, verbose: bool) -> PipelineRes
     let compiled = compile_source(source, path, verbose, &DebugFlags::default(), false)?;
     if let Err(e) = cache::store_cached_graph(&cache_path, &compiled.graph_artifact) {
         if verbose {
-            varn_utilities::terminal::tagged("Varn", format_args!("compile cache write skipped: {e}"));
+            varn_utilities::terminal::tagged(
+                "Varn",
+                format_args!("compile cache write skipped: {e}"),
+            );
         }
     }
     Ok(compiled)

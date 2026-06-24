@@ -1,7 +1,6 @@
-use crate::error::{FrameInfo, RuntimeError, VmResult};
-use crate::frame::{CallFrame, TryHandler, VmClosure, VmUpvalue};
+use crate::frame::{CallFrame, TryHandler, VmUpvalue};
 use crate::globals::GlobalStore;
-use crate::heap::{Heap, HeapObj};
+use crate::heap::{Heap};
 use crate::loader::ModuleLoader;
 use crate::profile::{HotspotCounters, ProfileCounters};
 use crate::value::VmValue;
@@ -10,37 +9,35 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 use varn_core::ModuleId;
-use varn_core::OpCode;
 use varn_types::value::LazyTask;
-use varn_types::{FunctionProto, Literal, ModuleObj, NativeCtx, PoolEntry, Value};
+use varn_types::{FunctionProto, NativeCtx};
 
 use crate::linker::Linker;
 
-use super::calls::{self, PreparedCall};
 use super::VmSuspend;
 use varn_types::generator::GenChannel;
 
 pub use super::ctx_jit_runtime::{
-    jit_array_extend, jit_array_length, jit_array_pop, jit_array_push, jit_bitand, jit_bitor,
-    jit_bitxor, jit_build_object_with_shape, jit_div, jit_get_index, jit_instanceof,
-    jit_load_module, jit_load_module_slot, jit_store_module_slot, jit_logical_not, jit_modulo, jit_negate, jit_pow,
-    jit_range, jit_set_index, jit_shl, jit_shr, jit_str_concat, jit_str_length, jit_str_slice,
-    jit_typeof_val, jit_ushr,
-    jit_assert_not_null, jit_close_upvalue, jit_get_enum_tag, jit_is_array_stub, jit_wrap_spread_stub,
-    jit_object_keys_stub, jit_op_in_stub, jit_object_merge_stub, jit_get_fixed_field,
-    jit_set_fixed_field, jit_get_property_maybe_stub, jit_get_super, jit_get_symbol,
-    jit_bind_method, jit_define_global, jit_store_global, jit_declare_field, jit_make_class,
-    jit_inherit, jit_class_member_op, jit_build_object, jit_object_rest, jit_make_enum_variant,
-    jit_spawn, jit_call_spread, jit_load_module_by_idx,
-    jit_push_try, jit_pop_try, jit_throw, jit_await, jit_yield,
+    jit_array_extend, jit_array_length, jit_array_pop, jit_array_push, jit_assert_not_null,
+    jit_await, jit_bind_method, jit_bitand, jit_bitor, jit_bitxor, jit_build_object,
+    jit_build_object_with_shape, jit_call_spread, jit_class_member_op, jit_close_upvalue,
+    jit_declare_field, jit_define_global, jit_div, jit_get_enum_tag, jit_get_fixed_field,
+    jit_get_index, jit_get_property_maybe_stub, jit_get_super, jit_get_symbol, jit_inherit,
+    jit_instanceof, jit_is_array_stub, jit_load_module, jit_load_module_by_idx,
+    jit_load_module_slot, jit_logical_not, jit_make_class, jit_make_enum_variant, jit_modulo,
+    jit_negate, jit_object_keys_stub, jit_object_merge_stub, jit_object_rest, jit_op_in_stub,
+    jit_pop_try, jit_pow, jit_push_try, jit_range, jit_set_fixed_field, jit_set_index, jit_shl,
+    jit_shr, jit_spawn, jit_store_global, jit_store_module_slot, jit_str_concat, jit_str_length,
+    jit_str_slice, jit_throw, jit_typeof_val, jit_ushr, jit_wrap_spread_stub, jit_yield,
 };
 pub use super::ctx_jit_values::{
-    jit_add, jit_build_array, jit_build_str, jit_call, jit_call_method, jit_define_global_idx,
-    jit_dispatch_intrinsic, jit_eq, jit_get_property, jit_gt, jit_gte, jit_load_const, jit_load_global,
-    jit_load_global_idx, jit_load_upvalue, jit_lt, jit_lte, jit_make_closure, jit_load_static_fn, jit_mul, jit_neq,
-    jit_set_property, jit_store_global_idx, jit_store_upvalue, jit_sub, jit_to_string,
-    jit_invoke_virtual, jit_get_property_ic_fast, jit_get_property_maybe_ic_fast,
-    jit_prepare_call, jit_push_self_frame, jit_post_call,
+    jit_add, jit_build_array, jit_build_str, jit_call, jit_call_method, jit_call_native_fast,
+    jit_define_global_idx, jit_dispatch_intrinsic, jit_ensure_stack_capacity, jit_eq,
+    jit_get_property, jit_get_property_ic_fast, jit_get_property_maybe_ic_fast, jit_gt, jit_gte,
+    jit_invoke_virtual, jit_is_native_fn, jit_load_const, jit_load_global, jit_load_global_idx,
+    jit_load_static_fn, jit_load_upvalue, jit_lt, jit_lte, jit_make_closure, jit_mul, jit_neq,
+    jit_post_call, jit_prepare_call, jit_push_self_frame, jit_set_property, jit_store_global_idx,
+    jit_store_upvalue, jit_sub, jit_to_string,
 };
 
 #[repr(C)]

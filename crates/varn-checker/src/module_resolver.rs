@@ -4,9 +4,9 @@ use crate::types::Type;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::fs::read_to_string;
+use std::hash::{Hash, Hasher};
 use std::path::Path;
 use std::rc::Rc;
-use std::hash::{Hash, Hasher};
 use varn_core::ast::{Decl, ExportDecl, ExportDefaultDecl, Pattern, Stmt, StmtKind};
 use varn_core::ModuleId;
 
@@ -26,7 +26,8 @@ fn get_cache_dir() -> std::path::PathBuf {
     PROJECT_ROOT.with(|r| {
         let mut guard = r.borrow_mut();
         if guard.is_none() {
-            let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let current_dir =
+                std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
             let root = varn_modules::artifact::find_project_root(&current_dir);
             *guard = Some(root);
         }
@@ -233,7 +234,6 @@ pub fn resolve_stdlib_module_exports_ref(specifier: &str) -> Rc<ExportMap> {
         }
     }
 
-    // Prefer embedded source — no filesystem dependency, works in release builds.
     if let Some(provider) = varn_modules::provider::get() {
         if let Some(source) = provider.embedded_source(specifier) {
             let mut visiting = vec![];
@@ -279,7 +279,7 @@ fn resolve_from_embedded_source(
     if let Some(cached) = try_load_cache(virtual_id, source) {
         let bind_rc = Rc::new(cached.bind);
         let exports_rc = Rc::new(cached.exports);
-        
+
         bind_cache_insert(virtual_id.to_owned(), Rc::clone(&bind_rc));
         visiting.pop();
         return exports_rc;
@@ -442,8 +442,6 @@ pub fn resolve_module_exports_ref(abs_path: &str, visiting: &mut Vec<String>) ->
         return Rc::new(FxHashMap::default());
     }
 
-    // Insert sentinel before resolving so re-entrant calls (from bind_import's fresh visiting
-    // vectors) hit the cache and return empty rather than recursing infinitely.
     let sentinel = Rc::new(FxHashMap::default());
     export_cache_insert(canonical_abs.clone(), Rc::clone(&sentinel));
 
@@ -484,8 +482,7 @@ fn cache_get_or_insert_ref(abs_path: &str) -> Option<Rc<BindResult>> {
         bind.diagnostics.emit(e);
     }
     let result = Rc::new(bind);
-    
-    // Save to cache for normal filesystem modules
+
     let base_dir = Path::new(&canonical_abs).parent().unwrap_or(Path::new("."));
     let mut exports = ExportMap::default();
     let mut visiting = vec![];

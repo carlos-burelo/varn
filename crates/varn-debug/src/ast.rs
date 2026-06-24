@@ -1,14 +1,17 @@
-use varn_utilities::chalk::chalk;
-use varn_utilities::terminal;
-use varn_utilities::terminal::Section;
 use varn_core::ast::{
     Arg, ArrayEl, ArrowBody, ClassMember, Decl, ExportDecl, ExportDefaultDecl, Expr, ExprKind,
     ForInit, InterfaceMember, MatchBody, ObjectProp, Pattern, Program, PropKey, Stmt, StmtKind,
     TemplatePart, VarKind,
 };
+use varn_utilities::chalk::chalk;
+use varn_utilities::terminal;
+use varn_utilities::terminal::Section;
 
 pub fn debug_ast(program: &Program) {
-    Section::new("abstract syntax tree").subtitle(&program.filename).color(|c| c.cyan()).print();
+    Section::new("abstract syntax tree")
+        .subtitle(&program.filename)
+        .color(|c| c.cyan())
+        .print();
 
     for (i, stmt) in program.body.iter().enumerate() {
         let is_last = i == program.body.len() - 1;
@@ -69,7 +72,11 @@ fn print_stmt(stmt: &Stmt, indent: &str, is_last: bool) {
             if let Some(i) = init {
                 match &**i {
                     ForInit::Var { kind, declarators } => {
-                        terminal::log(format!("{child_indent}├── {} ({:?})", chalk("Init").bold(), kind));
+                        terminal::log(format!(
+                            "{child_indent}├── {} ({:?})",
+                            chalk("Init").bold(),
+                            kind
+                        ));
                         for (idx, d) in declarators.iter().enumerate() {
                             let m = if idx == declarators.len() - 1 {
                                 "└── "
@@ -97,7 +104,10 @@ fn print_stmt(stmt: &Stmt, indent: &str, is_last: bool) {
             left, right, body, ..
         } => {
             terminal::log(format!("{indent}{marker}{}", chalk("ForInStmt").bold()));
-            terminal::log(format!("{child_indent}├── {}", chalk(format_pattern(left)).yellow()));
+            terminal::log(format!(
+                "{child_indent}├── {}",
+                chalk(format_pattern(left)).yellow()
+            ));
             print_expr(right, &child_indent, false);
             print_stmt(body, &child_indent, true);
         }
@@ -114,7 +124,10 @@ fn print_stmt(stmt: &Stmt, indent: &str, is_last: bool) {
                 chalk("ForOfStmt").bold(),
                 chalk(await_str).dim()
             ));
-            terminal::log(format!("{child_indent}├── {}", chalk(format_pattern(left)).yellow()));
+            terminal::log(format!(
+                "{child_indent}├── {}",
+                chalk(format_pattern(left)).yellow()
+            ));
             print_expr(right, &child_indent, false);
             print_stmt(body, &child_indent, true);
         }
@@ -213,10 +226,16 @@ fn print_stmt(stmt: &Stmt, indent: &str, is_last: bool) {
             }
         }
         StmtKind::Labeled { label, body } => {
-            terminal::log(format!("{indent}{marker}{} {}:", chalk("Label").bold(), chalk(label).cyan()));
+            terminal::log(format!(
+                "{indent}{marker}{} {}:",
+                chalk("Label").bold(),
+                chalk(label).cyan()
+            ));
             print_stmt(body, &child_indent, true);
         }
-        StmtKind::Debugger => terminal::log(format!("{indent}{marker}{}", chalk("Debugger").bold())),
+        StmtKind::Debugger => {
+            terminal::log(format!("{indent}{marker}{}", chalk("Debugger").bold()))
+        }
     }
 }
 
@@ -230,7 +249,10 @@ fn print_decl(decl: &Decl, indent: &str, is_last: bool) {
                 VarKind::Let => "Let",
                 VarKind::Const => "Const",
             };
-            terminal::log(format!("{indent}{marker}{}", chalk(format!("VariableDecl ({kind})")).bold()));
+            terminal::log(format!(
+                "{indent}{marker}{}",
+                chalk(format!("VariableDecl ({kind})")).bold()
+            ));
             for (i, d) in v.declarators.iter().enumerate() {
                 let d_is_last = i == v.declarators.len() - 1;
                 let d_marker = if d_is_last {
@@ -260,29 +282,32 @@ fn print_decl(decl: &Decl, indent: &str, is_last: bool) {
         }
         Decl::Class(c) => {
             let name = c.id.as_deref().unwrap_or("<anonymous>");
-            terminal::log(format!("{indent}{marker}{} {}", chalk("ClassDecl").bold(), chalk(name).blue()));
+            terminal::log(format!(
+                "{indent}{marker}{} {}",
+                chalk("ClassDecl").bold(),
+                chalk(name).blue()
+            ));
             for (i, m) in c.body.iter().enumerate() {
                 let is_l = i == c.body.len() - 1;
                 let mk = if is_l { "└── " } else { "├── " };
                 match m {
-                    ClassMember::Method { key, .. } => {
-                        terminal::log(format!(
-                            "{child_indent}{mk}{} {}",
-                            chalk("Method").bold(),
-                            chalk(key).blue()
-                        ))
-                    }
-                    ClassMember::Property { key, .. } => {
-                        terminal::log(format!(
-                            "{child_indent}{mk}{} {}",
-                            chalk("Property").bold(),
-                            chalk(key).cyan()
-                        ))
-                    }
+                    ClassMember::Method { key, .. } => terminal::log(format!(
+                        "{child_indent}{mk}{} {}",
+                        chalk("Method").bold(),
+                        chalk(key).blue()
+                    )),
+                    ClassMember::Property { key, .. } => terminal::log(format!(
+                        "{child_indent}{mk}{} {}",
+                        chalk("Property").bold(),
+                        chalk(key).cyan()
+                    )),
                     ClassMember::Constructor { .. } => {
                         terminal::log(format!("{child_indent}{mk}{}", chalk("Constructor").bold()))
                     }
-                    _ => terminal::log(format!("{child_indent}{mk}{}", chalk("<other member>").dim())),
+                    _ => terminal::log(format!(
+                        "{child_indent}{mk}{}",
+                        chalk("<other member>").dim()
+                    )),
                 }
             }
         }
@@ -296,20 +321,16 @@ fn print_decl(decl: &Decl, indent: &str, is_last: bool) {
                 let is_l = idx == i_node.body.len() - 1;
                 let mk = if is_l { "└── " } else { "├── " };
                 match m {
-                    InterfaceMember::Property { key, .. } => {
-                        terminal::log(format!(
-                            "{child_indent}{mk}{} {}",
-                            chalk("Property").bold(),
-                            chalk(key).cyan()
-                        ))
-                    }
-                    InterfaceMember::Method { key, .. } => {
-                        terminal::log(format!(
-                            "{child_indent}{mk}{} {}",
-                            chalk("Method").bold(),
-                            chalk(key).blue()
-                        ))
-                    }
+                    InterfaceMember::Property { key, .. } => terminal::log(format!(
+                        "{child_indent}{mk}{} {}",
+                        chalk("Property").bold(),
+                        chalk(key).cyan()
+                    )),
+                    InterfaceMember::Method { key, .. } => terminal::log(format!(
+                        "{child_indent}{mk}{} {}",
+                        chalk("Method").bold(),
+                        chalk(key).blue()
+                    )),
                     InterfaceMember::Callable { .. } => {
                         terminal::log(format!("{child_indent}{mk}{}", chalk("Callable").bold()))
                     }
@@ -377,7 +398,10 @@ fn print_decl(decl: &Decl, indent: &str, is_last: bool) {
                     .as_ref()
                     .map(|s| format!(" from {s:?}"))
                     .unwrap_or_default();
-                terminal::log(format!("{indent}{marker}{}{s}", chalk("ExportNamed").bold()));
+                terminal::log(format!(
+                    "{indent}{marker}{}{s}",
+                    chalk("ExportNamed").bold()
+                ));
             }
             ExportDecl::All { source, .. } => {
                 terminal::log(format!(
@@ -432,70 +456,54 @@ fn print_expr(expr: &Expr, indent: &str, is_last: bool) {
     let child_indent = format!("{indent}{}", if is_last { "    " } else { "│   " });
 
     match &expr.kind {
-        ExprKind::IntLiteral { value, .. } => {
-            terminal::log(format!(
-                "{indent}{marker}{} {}",
-                chalk(value).yellow(),
-                chalk("(int)").dim()
-            ))
+        ExprKind::IntLiteral { value, .. } => terminal::log(format!(
+            "{indent}{marker}{} {}",
+            chalk(value).yellow(),
+            chalk("(int)").dim()
+        )),
+        ExprKind::FloatLiteral { value, .. } => terminal::log(format!(
+            "{indent}{marker}{} {}",
+            chalk(value).yellow(),
+            chalk("(float)").dim()
+        )),
+        ExprKind::BigIntLiteral { raw } => terminal::log(format!(
+            "{indent}{marker}{} {}",
+            chalk(raw).yellow(),
+            chalk("(bigint)").dim()
+        )),
+        ExprKind::DecimalLiteral { raw } => terminal::log(format!(
+            "{indent}{marker}{} {}",
+            chalk(raw).yellow(),
+            chalk("(decimal)").dim()
+        )),
+        ExprKind::StrLiteral { value } => terminal::log(format!(
+            "{indent}{marker}{} {}",
+            chalk(format!("{value:?}")).yellow(),
+            chalk("(str)").dim()
+        )),
+        ExprKind::CharLiteral { value } => terminal::log(format!(
+            "{indent}{marker}{} {}",
+            chalk(format!("'{value}'")),
+            chalk("(char)").dim()
+        )),
+        ExprKind::BoolLiteral { value } => terminal::log(format!(
+            "{indent}{marker}{} {}",
+            chalk(value).yellow(),
+            chalk("(bool)").dim()
+        )),
+        ExprKind::NullLiteral => {
+            terminal::log(format!("{indent}{marker}{}", chalk("null").yellow()))
         }
-        ExprKind::FloatLiteral { value, .. } => {
-            terminal::log(format!(
-                "{indent}{marker}{} {}",
-                chalk(value).yellow(),
-                chalk("(float)").dim()
-            ))
-        }
-        ExprKind::BigIntLiteral { raw } => {
-            terminal::log(format!(
-                "{indent}{marker}{} {}",
-                chalk(raw).yellow(),
-                chalk("(bigint)").dim()
-            ))
-        }
-        ExprKind::DecimalLiteral { raw } => {
-            terminal::log(format!(
-                "{indent}{marker}{} {}",
-                chalk(raw).yellow(),
-                chalk("(decimal)").dim()
-            ))
-        }
-        ExprKind::StrLiteral { value } => {
-            terminal::log(format!(
-                "{indent}{marker}{} {}",
-                chalk(format!("{value:?}")).yellow(),
-                chalk("(str)").dim()
-            ))
-        }
-        ExprKind::CharLiteral { value } => {
-            terminal::log(format!(
-                "{indent}{marker}{} {}",
-                chalk(format!("'{value}'")),
-                chalk("(char)").dim()
-            ))
-        }
-        ExprKind::BoolLiteral { value } => {
-            terminal::log(format!(
-                "{indent}{marker}{} {}",
-                chalk(value).yellow(),
-                chalk("(bool)").dim()
-            ))
-        }
-        ExprKind::NullLiteral => terminal::log(format!("{indent}{marker}{}", chalk("null").yellow())),
-        ExprKind::RegexLiteral { pattern, flags } => {
-            terminal::log(format!(
-                "{indent}{marker}{} {}",
-                chalk(format!("/{pattern}/{flags}")).yellow(),
-                chalk("(regex)").dim()
-            ))
-        }
-        ExprKind::Identifier { name } => {
-            terminal::log(format!(
-                "{indent}{marker}{} {}",
-                chalk(name).cyan(),
-                chalk("(id)").dim()
-            ))
-        }
+        ExprKind::RegexLiteral { pattern, flags } => terminal::log(format!(
+            "{indent}{marker}{} {}",
+            chalk(format!("/{pattern}/{flags}")).yellow(),
+            chalk("(regex)").dim()
+        )),
+        ExprKind::Identifier { name } => terminal::log(format!(
+            "{indent}{marker}{} {}",
+            chalk(name).cyan(),
+            chalk("(id)").dim()
+        )),
         ExprKind::This => terminal::log(format!("{indent}{marker}{}", chalk("this").cyan())),
         ExprKind::Super => terminal::log(format!("{indent}{marker}{}", chalk("super").cyan())),
         ExprKind::Member {
@@ -514,7 +522,10 @@ fn print_expr(expr: &Expr, indent: &str, is_last: bool) {
                     return;
                 }
             }
-            terminal::log(format!("{indent}{marker}{} (computed)", chalk("Member").bold()));
+            terminal::log(format!(
+                "{indent}{marker}{} (computed)",
+                chalk("Member").bold()
+            ));
             print_expr(object, &child_indent, false);
             print_expr(property, &child_indent, true);
         }
@@ -549,7 +560,11 @@ fn print_expr(expr: &Expr, indent: &str, is_last: bool) {
         ExprKind::Array { elements } => {
             if elements.iter().all(is_simple_array_el) && elements.len() <= 10 {
                 let items: Vec<String> = elements.iter().map(format_array_el_short).collect();
-                terminal::log(format!("{indent}{marker}{} [{}]", chalk("Array").bold(), items.join(", ")));
+                terminal::log(format!(
+                    "{indent}{marker}{} [{}]",
+                    chalk("Array").bold(),
+                    items.join(", ")
+                ));
             } else {
                 terminal::log(format!("{indent}{marker}{}", chalk("Array").bold()));
                 for (i, el) in elements.iter().enumerate() {
@@ -738,15 +753,19 @@ fn print_expr(expr: &Expr, indent: &str, is_last: bool) {
                 let is_l = i == parts.len() - 1;
                 let m = if is_l { "└── " } else { "├── " };
                 match p {
-                    TemplatePart::Literal(s) => {
-                        terminal::log(format!("{child_indent}{m}{}", chalk(format!("{s:?}")).yellow()))
-                    }
+                    TemplatePart::Literal(s) => terminal::log(format!(
+                        "{child_indent}{m}{}",
+                        chalk(format!("{s:?}")).yellow()
+                    )),
                     TemplatePart::Interpolation(e) => print_expr(e, &child_indent, is_l),
                 }
             }
         }
         ExprKind::TaggedTemplate { tag, template, .. } => {
-            terminal::log(format!("{indent}{marker}{}", chalk("TaggedTemplate").bold()));
+            terminal::log(format!(
+                "{indent}{marker}{}",
+                chalk("TaggedTemplate").bold()
+            ));
             print_expr(tag, &child_indent, false);
             print_expr(template, &child_indent, true);
         }
@@ -831,7 +850,10 @@ fn print_expr(expr: &Expr, indent: &str, is_last: bool) {
                 .unwrap_or("Expr")
                 .trim()
                 .to_owned();
-            terminal::log(format!("{indent}{marker}{}", chalk(format!("<{label}>")).dim()));
+            terminal::log(format!(
+                "{indent}{marker}{}",
+                chalk(format!("<{label}>")).dim()
+            ));
         }
     }
 }

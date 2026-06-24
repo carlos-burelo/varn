@@ -22,7 +22,6 @@ impl Checker {
         let ty = self.infer_type(expr, bind);
         self.resolved_expr_types.insert(expr.id, ty.clone());
 
-
         let mut symbol_id = None;
         if let ExprKind::Identifier { name } = &expr.kind {
             let scope = bind.scopes.get(self.current_scope);
@@ -289,7 +288,10 @@ impl Checker {
 
                 self.check_extension_assignment(target, bind);
 
-                if !matches!(&target.kind, ExprKind::Identifier { .. } | ExprKind::Member { .. }) {
+                if !matches!(
+                    &target.kind,
+                    ExprKind::Identifier { .. } | ExprKind::Member { .. }
+                ) {
                     self.emit(
                         Diagnostic::error(
                             ErrorCode::NotAssignable,
@@ -419,9 +421,6 @@ impl Checker {
             }
 
             ExprKind::ClassExpr { declaration } => {
-                // Check the class like a declaration so its scope (created by the
-                // binder's bind_class) is consumed via next_child_scope — skipping
-                // it desyncs every later child-scope lookup (e.g. match arms).
                 self.check_decl(&varn_core::ast::Decl::Class((**declaration).clone()), bind);
             }
 
@@ -501,7 +500,10 @@ impl Checker {
 
             ExprKind::Update { operand, .. } => {
                 self.check_expr(operand, bind);
-                if !matches!(&operand.kind, ExprKind::Identifier { .. } | ExprKind::Member { .. }) {
+                if !matches!(
+                    &operand.kind,
+                    ExprKind::Identifier { .. } | ExprKind::Member { .. }
+                ) {
                     self.emit(
                         Diagnostic::error(
                             ErrorCode::NotAssignable,

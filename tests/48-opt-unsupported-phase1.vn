@@ -11,17 +11,14 @@ assert("compound >>>=", y === 4);
 // 2. Logical compound assignments (&&=, ||=, ??=) on variables
 let a = true;
 a &&= false;
-print("a after &&= false is:", a);
 assert("variable &&=", a === false);
 
 let b = false;
 b ||= true;
-print("b after ||= true is:", b);
 assert("variable ||=", b === true);
 
 let c: dynamic = null;
 c ??= 42;
-print("c after ??= 42 is:", c);
 assert("variable ??=", c === 42);
 
 // 3. Compound member and index assignments

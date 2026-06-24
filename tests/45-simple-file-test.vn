@@ -1,11 +1,6 @@
 import { File } from "std:fs";
 
-print("Opening file with using...");
 {
     using file = File.open("temp_simple.txt", "w");
-    print("File opened successfully!");
-    print("Writing to file...");
     file.write("Hello simple using!");
-    print("Write completed successfully!");
 }
-print("Exited using block!");

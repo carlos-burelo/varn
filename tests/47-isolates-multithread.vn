@@ -44,20 +44,17 @@ function localUnexported(port: dynamic) {
 
 async function testIsolates() {
     // ---- CASO 1: Test básico original ----
-    print("Running Caso 1...");
     const port1 = await spawnIsolate(workerMain, []);
     port1.send({ value: 10 });
     const res1: dynamic = await port1.receive();
     assert("response from basic worker", res1 === 20);
 
     // ---- CASO 2: Múltiples argumentos complejos ----
-    print("Running Caso 2...");
     const port2 = await spawnIsolate(workerArgs, [42, "hello", [1, 2, 3], { x: "nested" }]);
     const res2: dynamic = await port2.receive();
     assert("response from args worker", res2 === "args_ok");
 
     // ---- CASO 3: Diálogo continuo de mensajes (Ping-Pong) ----
-    print("Running Caso 3...");
     const port3 = await spawnIsolate(workerDialog, []);
     
     port3.send({ val: 1 });
@@ -73,7 +70,6 @@ async function testIsolates() {
     assert("dialog exit", reply3 === "bye");
 
     // ---- CASO 4: Ejecución paralela / concurrente ----
-    print("Running Caso 4...");
     const w1 = await spawnIsolate(workerParallel, [1, 0]);
     const w2 = await spawnIsolate(workerParallel, [2, 0]);
     const w3 = await spawnIsolate(workerParallel, [3, 0]);
@@ -89,7 +85,6 @@ async function testIsolates() {
     assert("w1 finish third", r1 === 10);
 
     // ---- CASO 5: Error al pasar función anónima (clausura local) ----
-    print("Running Caso 5...");
     let threwAnon = false;
     try {
         await spawnIsolate((p: dynamic) => {}, []);
@@ -100,7 +95,6 @@ async function testIsolates() {
     assert("should throw for anon function", threwAnon);
 
     // ---- CASO 6: Error al pasar función local no exportada ----
-    print("Running Caso 6...");
     let threwUnexported = false;
     try {
         await spawnIsolate(localUnexported, []);
@@ -113,7 +107,6 @@ async function testIsolates() {
     print("[PASSED] 47. Isolates Multi-Thread");
 }
 
-print("--- isIsolate = ", isIsolate);
 if (!isIsolate) {
     await testIsolates();
 }

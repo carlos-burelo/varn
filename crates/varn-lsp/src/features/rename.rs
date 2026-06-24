@@ -12,8 +12,7 @@ pub fn build_prepare_rename(
 ) -> Option<PrepareRenameResponse> {
     let token = find_ident_at(state, line, col)?;
     let sid = resolve_symbol_id(state, token.offset)?;
-    
-    // Ensure the symbol is local to the current project/file (no external origin module)
+
     if sid >= state.db.arena.len() {
         return None;
     }

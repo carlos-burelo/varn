@@ -1,8 +1,7 @@
 use std::mem::MaybeUninit;
 
-use crate::error::{RuntimeError, VmResult};
+use crate::error::{ VmResult};
 use crate::exec::ctx::ExecCtx;
-use crate::frame::VmClosure;
 use crate::value::VmValue;
 use varn_types::{Value, VmArray};
 
@@ -54,7 +53,13 @@ impl ExecCtx {
                                 let mut buf: [MaybeUninit<VmValue>; 16] =
                                     unsafe { MaybeUninit::uninit().assume_init() };
                                 let n = unsafe {
-                                    copy_args_to_buf(&self.stack, base, arg_start, arg_count, &mut buf)
+                                    copy_args_to_buf(
+                                        &self.stack,
+                                        base,
+                                        arg_start,
+                                        arg_count,
+                                        &mut buf,
+                                    )
                                 };
                                 let slice = unsafe {
                                     std::slice::from_raw_parts(buf.as_ptr().cast::<VmValue>(), n)
@@ -134,7 +139,10 @@ impl ExecCtx {
 
                 let has_placeholder = match &bm.target {
                     varn_types::value::BoundMethodTarget::Vm { closure, .. } => {
-                        if let Some(nc_w) = closure.as_any().downcast_ref::<crate::frame::VmClosurePayload>() {
+                        if let Some(nc_w) = closure
+                            .as_any()
+                            .downcast_ref::<crate::frame::VmClosurePayload>()
+                        {
                             arg_count == nc_w.0.proto.arity
                         } else {
                             false
@@ -160,7 +168,7 @@ impl ExecCtx {
                             let n = unsafe {
                                 copy_args_to_buf(&self.stack, base, arg_start, arg_count, &mut buf)
                             };
-                            // skip slot 0 (callee/receiver), pass actual args
+
                             let slice = if n > 0 {
                                 unsafe {
                                     std::slice::from_raw_parts(
@@ -193,7 +201,8 @@ impl ExecCtx {
 
                             if !nc.proto.has_rest && arg_count <= arity {
                                 let nc = nc.clone();
-                                let fn_name = nc.proto.name.as_deref().unwrap_or("<anon>").to_owned();
+                                let fn_name =
+                                    nc.proto.name.as_deref().unwrap_or("<anon>").to_owned();
                                 let is_jit = nc.jit_entry.is_some();
                                 self.record_hotspot_fn(&fn_name, is_jit);
                                 self.stack.push(callee);
@@ -223,7 +232,8 @@ impl ExecCtx {
                                 return Ok(true);
                             } else if nc.proto.has_rest && arg_count <= arity {
                                 let nc = nc.clone();
-                                let fn_name2 = nc.proto.name.as_deref().unwrap_or("<anon>").to_owned();
+                                let fn_name2 =
+                                    nc.proto.name.as_deref().unwrap_or("<anon>").to_owned();
                                 let is_jit2 = nc.jit_entry.is_some();
                                 self.record_hotspot_fn(&fn_name2, is_jit2);
                                 let rest_idx = arity.saturating_sub(1);
@@ -323,7 +333,12 @@ impl ExecCtx {
             let arity = closure_ref.proto.arity;
 
             if !closure_ref.proto.has_rest && arg_count <= arity {
-                let fn_name = closure_ref.proto.name.as_deref().unwrap_or("<anon>").to_owned();
+                let fn_name = closure_ref
+                    .proto
+                    .name
+                    .as_deref()
+                    .unwrap_or("<anon>")
+                    .to_owned();
                 let is_jit = closure_ref.jit_entry.is_some();
                 self.record_hotspot_fn(&fn_name, is_jit);
                 self.stack.push(callee);
@@ -352,7 +367,12 @@ impl ExecCtx {
                 self.frames.push(frame);
                 return Ok(true);
             } else if closure_ref.proto.has_rest && arg_count <= arity {
-                let fn_name2 = closure_ref.proto.name.as_deref().unwrap_or("<anon>").to_owned();
+                let fn_name2 = closure_ref
+                    .proto
+                    .name
+                    .as_deref()
+                    .unwrap_or("<anon>")
+                    .to_owned();
                 let is_jit2 = closure_ref.jit_entry.is_some();
                 self.record_hotspot_fn(&fn_name2, is_jit2);
                 let rest_idx = arity.saturating_sub(1);
@@ -372,9 +392,10 @@ impl ExecCtx {
                 } else {
                     vec![]
                 };
-                let rest_nv = VmValue::from_heap_idx(self.heap.alloc(
-                    crate::heap::HeapObj::Array(VmArray::new(rest_items)),
-                ));
+                let rest_nv = VmValue::from_heap_idx(
+                    self.heap
+                        .alloc(crate::heap::HeapObj::Array(VmArray::new(rest_items))),
+                );
                 self.stack.push(rest_nv);
                 if self.frames.len() >= 10000 {
                     return Err(crate::error::RuntimeError::new(

@@ -10,8 +10,8 @@ pub const COMPILER_CACHE_VERSION: u32 = 10;
 pub const TYPE_CACHE_VERSION: u32 = 1;
 
 pub const MAGIC_WRC: &[u8; 4] = b"WRC\0";
-pub const MAGIC_VNC: &[u8; 4] = b"VNC\0"; // Used for cached VM compilations
-pub const MAGIC_VNM: &[u8; 4] = b"VNM\0"; // Used for cached type checker metadata
+pub const MAGIC_VNC: &[u8; 4] = b"VNC\0";
+pub const MAGIC_VNM: &[u8; 4] = b"VNM\0";
 
 pub fn find_project_root(start_path: &Path) -> PathBuf {
     start_path

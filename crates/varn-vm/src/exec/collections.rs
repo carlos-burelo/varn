@@ -199,7 +199,7 @@ pub fn array_extend(dst: VmValue, src: VmValue, heap: &Heap) -> VmResult<()> {
         {
             let items: Vec<VmValue> = sa.borrow().clone();
             da.borrow_mut().extend(items.clone());
-            let mut heap_mut = unsafe { heap.inner_mut() };
+            let  heap_mut = unsafe { heap.inner_mut() };
             for &item in &items {
                 heap_mut.write_barrier(dst.as_heap_idx(), item);
             }

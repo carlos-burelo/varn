@@ -44,12 +44,6 @@ impl ExecCtx {
             let mut hit_found = false;
 
             {
-                // SAFETY: raw IC read instead of RefCell::borrow() to skip the
-                // borrow-flag overhead on this hot path. Sound because the VM is
-                // single-threaded and non-reentrant: these `&*as_ptr()` reads are
-                // short-lived (values are cloned/copied out before any code that
-                // could re-borrow the same cell runs). No `&mut` to these cells is
-                // live during the read.
                 let slot_cache = unsafe { &*closure.ic_cache.as_ptr() };
                 let poly_slot = &slot_cache[cs_idx];
 
@@ -77,7 +71,9 @@ impl ExecCtx {
                     } else if entry.is_class == 8 {
                         if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
                             if cls.id == entry.id {
-                                if let Some(crate::heap::HeapObj::Array(arr)) = self.heap.get(obj.as_heap_idx()) {
+                                if let Some(crate::heap::HeapObj::Array(arr)) =
+                                    self.heap.get(obj.as_heap_idx())
+                                {
                                     let len = unsafe { &*arr.0.as_ptr() }.len();
                                     found_slot_val = Some(VmValue::from_int(len as i64));
                                     hit_found = true;
@@ -88,7 +84,9 @@ impl ExecCtx {
                     } else if entry.is_class == 9 {
                         if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
                             if cls.id == entry.id {
-                                if let Some(crate::heap::HeapObj::Str(s)) = self.heap.get(obj.as_heap_idx()) {
+                                if let Some(crate::heap::HeapObj::Str(s)) =
+                                    self.heap.get(obj.as_heap_idx())
+                                {
                                     let len = s.len();
                                     found_slot_val = Some(VmValue::from_int(len as i64));
                                     hit_found = true;
@@ -191,7 +189,8 @@ impl ExecCtx {
                         closure.feedback.borrow_mut().observe(cs_idx, cls.id);
                         return Ok(false);
                     }
-                } else if let Some(crate::heap::HeapObj::Str(_)) = self.heap.get(obj.as_heap_idx()) {
+                } else if let Some(crate::heap::HeapObj::Str(_)) = self.heap.get(obj.as_heap_idx())
+                {
                     if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
                         let entry = varn_types::chunk::CacheEntry {
                             id: cls.id,

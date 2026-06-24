@@ -110,7 +110,10 @@ pub struct JitHelpers {
     pub jit_prepare_call: usize,
     pub jit_push_self_frame: usize,
     pub jit_post_call: usize,
+    pub jit_ensure_stack_capacity: usize,
     pub dispatch_intrinsic: usize,
+    pub jit_is_native_fn: usize,
+    pub jit_call_native_fast: usize,
     pub open_upvalues_offset: usize,
     pub pending_constructors_offset: usize,
 }

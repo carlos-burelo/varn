@@ -443,7 +443,13 @@ fn walk_dir(dir: &std::path::Path, files: &mut Vec<std::path::PathBuf>) {
                 if ft.is_dir() {
                     let name = path.file_name().and_then(|n| n.to_str());
                     if let Some(n) = name {
-                        if n == ".git" || n == "target" || n == ".vn" || n == "node_modules" || n == ".vscode" || n == ".claude" {
+                        if n == ".git"
+                            || n == "target"
+                            || n == ".vn"
+                            || n == "node_modules"
+                            || n == ".vscode"
+                            || n == ".claude"
+                        {
                             continue;
                         }
                     }

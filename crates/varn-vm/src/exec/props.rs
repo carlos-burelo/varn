@@ -1,11 +1,9 @@
 use crate::error::{RuntimeError, VmResult};
-use crate::frame::{VmClosure, VmClosurePayload};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use std::rc::Rc;
-use varn_core::MemberKey;
 use varn_types::{
-    value::{find_method_with_owner, BoundMethod, ClassObj, ObjRef},
+    value::{find_method_with_owner, BoundMethod, ClassObj},
     NativeCtx, Value,
 };
 
@@ -45,21 +43,11 @@ pub fn find_setter(obj: VmValue, key: &str, heap: &Heap) -> Option<Value> {
     }
 }
 
-/// Result of resolving a property without interning. Lets hot call sites
-/// (e.g. `CallMethod`) inspect a resolved method and dispatch it directly
-/// instead of paying for a transient `BoundMethod` heap allocation.
 pub enum ResolvedProperty {
-    /// Already a heap value (module export or own-data field). Pass through;
-    /// it must NOT be re-interned (that would duplicate the object).
     Nv(VmValue),
-    /// A freshly-built `Value` (method bind, intrinsic, "name", null, ...).
-    /// The caller decides whether to dispatch it directly or intern it.
     Built(Value),
 }
 
-/// Resolve a property to an un-interned form. `get_property` is the interning
-/// wrapper around this; method-call dispatch uses the raw result to avoid
-/// allocating a `BoundMethod` it would immediately unwrap.
 pub fn resolve_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult<ResolvedProperty> {
     if obj.is_heap() {
         if let Some(HeapObj::Module(m)) = heap.get(obj.as_heap_idx()) {
@@ -82,7 +70,8 @@ pub fn resolve_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult<Re
 }
 
 pub fn get_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult<VmValue> {
-    match resolve_property(obj, key, heap)? {
+    let resolved = resolve_property(obj, key, heap)?;
+    match resolved {
         ResolvedProperty::Nv(v) => Ok(v),
         ResolvedProperty::Built(v) => Ok(heap.intern(v)),
     }
@@ -100,7 +89,10 @@ pub fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Heap) -> V
         )));
     }
 
-    if matches!(heap.get(obj.as_heap_idx()), Some(HeapObj::Module(_)) | Some(HeapObj::FrozenModule(_))) {
+    if matches!(
+        heap.get(obj.as_heap_idx()),
+        Some(HeapObj::Module(_)) | Some(HeapObj::FrozenModule(_))
+    ) {
         return Ok(());
     }
     let idx = obj.as_heap_idx();

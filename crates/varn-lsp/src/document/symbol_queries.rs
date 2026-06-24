@@ -43,21 +43,8 @@ impl DocumentState {
             return None;
         }
 
-        if let Some(info) = self.db.expr_types.get(&tok.offset) {
-            if let Some(sid) = info.symbol_id {
-                if let Some(sym) = self.symbols.iter().find(|s| s.symbol_id == Some(sid)) {
-                    return Some(sym);
-                }
-            }
-        }
-
-        if let Some((sid, _)) = self.db.resolve_at(&tok.lexeme, tok.offset) {
-            if let Some(sym) = self.symbols.iter().find(|s| s.symbol_id == Some(sid)) {
-                return Some(sym);
-            }
-        }
-
-        None
+        self.checker_symbol_at(line, col)
+            .filter(|sym| sym.name == tok.lexeme)
     }
 
     pub fn symbols_named(&self, name: &str) -> Vec<&SymbolRecord> {

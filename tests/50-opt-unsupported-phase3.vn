@@ -6,7 +6,7 @@ class AsyncCounter {
     constructor() {
         this.i = 0;
     }
-    async next(): dynamic {
+    async next() {
         if (this.i < 3) {
             let val = this.i;
             this.i = this.i + 1;
@@ -18,7 +18,7 @@ class AsyncCounter {
 }
 
 const myAsyncIterable = {
-    "Symbol.asyncIterator": function(): dynamic {
+    "Symbol.asyncIterator": function() {
         return new AsyncCounter();
     }
 };

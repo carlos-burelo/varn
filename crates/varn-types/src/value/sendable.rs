@@ -1,14 +1,14 @@
-use std::rc::Rc;
-use crate::value::{Value, alloc_array, alloc_object, alloc_map, alloc_set, nv_to_value};
+use crate::value::{alloc_array, alloc_map, alloc_object, alloc_set, nv_to_value, Value};
 use crate::vm_value::VmValue;
 use rust_decimal::Decimal;
+use std::rc::Rc;
 
 #[derive(Clone, Debug)]
 pub enum SendValue {
     Null,
     Bool(bool),
     Int(i64),
-    Float(u64), // Representación de bits de f64
+    Float(u64),
     Str(String),
     BigInt(i128),
     Decimal(Decimal),

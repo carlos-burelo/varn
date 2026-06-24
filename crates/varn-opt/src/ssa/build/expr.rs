@@ -1,13 +1,11 @@
-//! HIR -> SSA: expression lowering (`lower_expr`).
-
 use std::rc::Rc;
 
 use crate::hir::{
     HirArrayEl, HirAssignTarget, HirBinOp, HirBinding, HirCaseTest, HirClass, HirEnum, HirExpr,
     HirFunction, HirLogicalOp, HirMatchCase, HirObjectProp, HirOptionalProperty, HirPropKey,
-    HirTemplatePart, HirType, HirTypeTest, HirUnOp, HirUpvalueSrc, HirUpdateOp,
+    HirTemplatePart, HirType, HirTypeTest, HirUnOp, HirUpdateOp, HirUpvalueSrc,
 };
-use crate::ssa::ir::{BlockId, InstKind, Terminator, Value};
+use crate::ssa::ir::{InstKind, Terminator, Value};
 use crate::OptError;
 
 use super::{Builder, Result, VarId};
@@ -27,13 +25,13 @@ impl Builder {
                 InstKind::ConstStr(Rc::from(format!("/{pattern}/{flags}"))),
                 HirType::Ref,
             )),
-            // `expr!` — assert non-null (side effect), value passes through.
+
             HirExpr::NonNull(inner) => {
                 let v = self.lower_expr(inner)?;
                 self.emit_effect(InstKind::AssertNotNull { operand: v });
                 Ok(v)
             }
-            // Comma sequence: evaluate all, yield the last.
+
             HirExpr::Sequence(exprs) => {
                 let mut last = None;
                 for e in exprs {
@@ -47,16 +45,24 @@ impl Builder {
             HirExpr::MemberMaybe { object, name, ty } => {
                 let o = self.lower_expr(object)?;
                 Ok(self.emit(
-                    InstKind::GetPropertyMaybe { object: o, name: name.clone() },
+                    InstKind::GetPropertyMaybe {
+                        object: o,
+                        name: name.clone(),
+                    },
                     *ty,
                 ))
             }
             HirExpr::ModuleSlot { object, slot, ty } => {
                 let o = self.lower_expr(object)?;
-                Ok(self.emit(InstKind::ModuleSlot { object: o, slot: *slot }, *ty))
+                Ok(self.emit(
+                    InstKind::ModuleSlot {
+                        object: o,
+                        slot: *slot,
+                    },
+                    *ty,
+                ))
             }
-            // `expr?` try operator: if the operand's enum tag is falsy (Err/None),
-            // early-return it; else continue with it. A branch with a return arm.
+
             HirExpr::TryOp(operand) => {
                 let v = self.lower_expr(operand)?;
                 let tag = self.emit(InstKind::GetEnumTag { operand: v }, HirType::Int);
@@ -79,20 +85,33 @@ impl Builder {
                 self.current = ok_b;
                 Ok(v)
             }
-            // `expr is Type` runtime test → a concrete check yielding a bool.
+
             HirExpr::TypeTest { value, kind } => {
                 let v = self.lower_expr(value)?;
                 match kind {
-                    HirTypeTest::IsNull => Ok(self.emit(InstKind::IsNull { operand: v }, HirType::Bool)),
-                    HirTypeTest::IsArray => Ok(self.emit(InstKind::IsArray { operand: v }, HirType::Bool)),
+                    HirTypeTest::IsNull => {
+                        Ok(self.emit(InstKind::IsNull { operand: v }, HirType::Bool))
+                    }
+                    HirTypeTest::IsArray => {
+                        Ok(self.emit(InstKind::IsArray { operand: v }, HirType::Bool))
+                    }
                     HirTypeTest::TypeofEq(name) => {
                         let t = self.emit(
-                            InstKind::Unary { op: HirUnOp::Typeof, operand: v, ty: HirType::Str },
+                            InstKind::Unary {
+                                op: HirUnOp::Typeof,
+                                operand: v,
+                                ty: HirType::Str,
+                            },
                             HirType::Str,
                         );
                         let s = self.emit(InstKind::ConstStr(name.clone()), HirType::Str);
                         Ok(self.emit(
-                            InstKind::Binary { op: HirBinOp::Eq, lhs: t, rhs: s, ty: HirType::Dynamic },
+                            InstKind::Binary {
+                                op: HirBinOp::Eq,
+                                lhs: t,
+                                rhs: s,
+                                ty: HirType::Dynamic,
+                            },
                             HirType::Bool,
                         ))
                     }
@@ -108,15 +127,25 @@ impl Builder {
                             HirType::Bool,
                         ))
                     }
-                    HirTypeTest::AlwaysFalse => Ok(self.emit(InstKind::ConstBool(false), HirType::Bool)),
+                    HirTypeTest::AlwaysFalse => {
+                        Ok(self.emit(InstKind::ConstBool(false), HirType::Bool))
+                    }
                 }
             }
             HirExpr::This => Ok(self.emit(InstKind::This, HirType::Ref)),
-            HirExpr::Range { start, end, inclusive } => {
+            HirExpr::Range {
+                start,
+                end,
+                inclusive,
+            } => {
                 let s = self.lower_expr(start)?;
                 let e = self.lower_expr(end)?;
                 Ok(self.emit(
-                    InstKind::Range { start: s, end: e, inclusive: *inclusive },
+                    InstKind::Range {
+                        start: s,
+                        end: e,
+                        inclusive: *inclusive,
+                    },
                     HirType::Ref,
                 ))
             }
@@ -131,15 +160,27 @@ impl Builder {
                             _ => avs.push((self.lower_expr(a)?, false)),
                         }
                     }
-                    return Ok(self.emit(InstKind::CallSpread { callee: c, args: avs }, *ty));
+                    return Ok(self.emit(
+                        InstKind::CallSpread {
+                            callee: c,
+                            args: avs,
+                        },
+                        *ty,
+                    ));
                 }
                 let mut avs = Vec::with_capacity(args.len());
                 for a in args {
                     avs.push(self.lower_expr(a)?);
                 }
-                Ok(self.emit(InstKind::Call { callee: c, args: avs }, *ty))
+                Ok(self.emit(
+                    InstKind::Call {
+                        callee: c,
+                        args: avs,
+                    },
+                    *ty,
+                ))
             }
-            // Extension call `recv.m(args)` → mangled global with `recv` as receiver.
+
             HirExpr::ExtensionCall { func, recv, args } => {
                 let r = self.lower_expr(recv)?;
                 let mut avs = Vec::with_capacity(args.len());
@@ -147,7 +188,11 @@ impl Builder {
                     avs.push(self.lower_expr(a)?);
                 }
                 Ok(self.emit(
-                    InstKind::ExtensionCall { func: func.clone(), recv: r, args: avs },
+                    InstKind::ExtensionCall {
+                        func: func.clone(),
+                        recv: r,
+                        args: avs,
+                    },
                     HirType::Dynamic,
                 ))
             }
@@ -161,32 +206,55 @@ impl Builder {
             HirExpr::Member { object, name, ty } => {
                 let o = self.lower_expr(object)?;
                 Ok(self.emit(
-                    InstKind::GetProperty { object: o, name: name.clone() },
+                    InstKind::GetProperty {
+                        object: o,
+                        name: name.clone(),
+                    },
                     *ty,
                 ))
             }
             HirExpr::Index { object, index, ty } => {
                 let o = self.lower_expr(object)?;
                 let i = self.lower_expr(index)?;
-                Ok(self.emit(InstKind::GetIndex { object: o, index: i }, *ty))
+                Ok(self.emit(
+                    InstKind::GetIndex {
+                        object: o,
+                        index: i,
+                    },
+                    *ty,
+                ))
             }
-            HirExpr::MethodCall { recv, name, args, ty } => {
+            HirExpr::MethodCall {
+                recv,
+                name,
+                args,
+                ty,
+            } => {
                 let r = self.lower_expr(recv)?;
                 let mut avs = Vec::with_capacity(args.len());
                 for a in args {
                     avs.push(self.lower_expr(a)?);
                 }
                 Ok(self.emit(
-                    InstKind::MethodCall { recv: r, name: name.clone(), args: avs },
+                    InstKind::MethodCall {
+                        recv: r,
+                        name: name.clone(),
+                        args: avs,
+                    },
                     *ty,
                 ))
             }
-            // `super` / `super.name` member read.
-            HirExpr::Super => Ok(self.emit(InstKind::GetSuper { name: Rc::from("super") }, HirType::Dynamic)),
+
+            HirExpr::Super => Ok(self.emit(
+                InstKind::GetSuper {
+                    name: Rc::from("super"),
+                },
+                HirType::Dynamic,
+            )),
             HirExpr::SuperMember { name } => {
                 Ok(self.emit(InstKind::GetSuper { name: name.clone() }, HirType::Dynamic))
             }
-            // `super(args)` — superclass constructor call.
+
             HirExpr::SuperCall { args } => {
                 let mut avs = Vec::with_capacity(args.len());
                 for a in args {
@@ -194,20 +262,21 @@ impl Builder {
                 }
                 Ok(self.emit(InstKind::SuperCall { args: avs }, HirType::Dynamic))
             }
-            // `super.name(args)` — superclass method call.
+
             HirExpr::SuperMethodCall { name, args } => {
                 let mut avs = Vec::with_capacity(args.len());
                 for a in args {
                     avs.push(self.lower_expr(a)?);
                 }
                 Ok(self.emit(
-                    InstKind::SuperMethodCall { name: name.clone(), args: avs },
+                    InstKind::SuperMethodCall {
+                        name: name.clone(),
+                        args: avs,
+                    },
                     HirType::Dynamic,
                 ))
             }
-            // `object?.…` optional chaining → null-check branch + result phi:
-            // if `object` is null the chain yields it (short-circuit), else the
-            // property is applied.
+
             HirExpr::OptionalChain { object, property } => {
                 let obj = self.lower_expr(object)?;
                 let isnull = self.emit(InstKind::IsNull { operand: obj }, HirType::Bool);
@@ -218,26 +287,36 @@ impl Builder {
                     HirType::Dynamic,
                 )
             }
-            // Short-circuiting `&&`/`||`/`??` → branch + result phi.
+
             HirExpr::Logical { op, lhs, rhs } => {
                 let l = self.lower_expr(lhs)?;
                 match op {
-                    // `a && b`: a truthy → b, else a.
-                    HirLogicalOp::And => {
-                        self.lower_branch_value(l, |s| s.lower_expr(rhs), |_| Ok(l), HirType::Dynamic)
-                    }
-                    // `a || b`: a truthy → a, else b.
-                    HirLogicalOp::Or => {
-                        self.lower_branch_value(l, |_| Ok(l), |s| s.lower_expr(rhs), HirType::Dynamic)
-                    }
-                    // `a ?? b`: a null → b, else a.
+                    HirLogicalOp::And => self.lower_branch_value(
+                        l,
+                        |s| s.lower_expr(rhs),
+                        |_| Ok(l),
+                        HirType::Dynamic,
+                    ),
+
+                    HirLogicalOp::Or => self.lower_branch_value(
+                        l,
+                        |_| Ok(l),
+                        |s| s.lower_expr(rhs),
+                        HirType::Dynamic,
+                    ),
+
                     HirLogicalOp::Nullish => {
                         let isnull = self.emit(InstKind::IsNull { operand: l }, HirType::Bool);
-                        self.lower_branch_value(isnull, |s| s.lower_expr(rhs), |_| Ok(l), HirType::Dynamic)
+                        self.lower_branch_value(
+                            isnull,
+                            |s| s.lower_expr(rhs),
+                            |_| Ok(l),
+                            HirType::Dynamic,
+                        )
                     }
                 }
             }
-            // `[a, b, …]` array literal (no spread/holes) → `BuildArray`.
+
             HirExpr::Array(els) => {
                 if els.iter().any(|e| matches!(e, HirArrayEl::Spread(_))) {
                     let mut elements = Vec::with_capacity(els.len());
@@ -265,14 +344,86 @@ impl Builder {
                 }
                 Ok(self.emit(InstKind::BuildArray { elements: vals }, HirType::Ref))
             }
-            // `{ k: v, … }` object literal → `BuildObject`; with spread, an empty
-            // object built up by `SetProperty` / `ObjectMerge` in order.
+
             HirExpr::Object { properties } => {
-                if properties.iter().any(|p| matches!(p, HirObjectProp::Spread(_))) {
+                let has_computed_or_method = properties.iter().any(|p| match p {
+                    HirObjectProp::Property {
+                        key: HirPropKey::Computed(_),
+                        ..
+                    } => true,
+                    HirObjectProp::Method { .. } => true,
+                    _ => false,
+                });
+                if has_computed_or_method {
+                    let obj = self.emit(InstKind::BuildObject { pairs: Vec::new() }, HirType::Ref);
+                    for prop in properties {
+                        match prop {
+                            HirObjectProp::Property { key, value } => {
+                                let v = self.lower_expr(value)?;
+                                match key {
+                                    HirPropKey::Static(k) => {
+                                        self.emit_effect(InstKind::SetProperty {
+                                            object: obj,
+                                            name: k.clone(),
+                                            value: v,
+                                        });
+                                    }
+                                    HirPropKey::Computed(e) => {
+                                        let k = self.lower_expr(e)?;
+                                        self.emit_effect(InstKind::SetIndex {
+                                            object: obj,
+                                            index: k,
+                                            value: v,
+                                        });
+                                    }
+                                }
+                            }
+                            HirObjectProp::Method {
+                                key,
+                                func,
+                                upvalues,
+                            } => {
+                                let v = self.lower_closure(func, upvalues)?;
+                                match key {
+                                    HirPropKey::Static(k) => {
+                                        self.emit_effect(InstKind::SetProperty {
+                                            object: obj,
+                                            name: k.clone(),
+                                            value: v,
+                                        });
+                                    }
+                                    HirPropKey::Computed(e) => {
+                                        let k = self.lower_expr(e)?;
+                                        self.emit_effect(InstKind::SetIndex {
+                                            object: obj,
+                                            index: k,
+                                            value: v,
+                                        });
+                                    }
+                                }
+                            }
+                            HirObjectProp::Spread(e) => {
+                                let v = self.lower_expr(e)?;
+                                self.emit_effect(InstKind::ObjectMerge {
+                                    target: obj,
+                                    source: v,
+                                });
+                            }
+                        }
+                    }
+                    return Ok(obj);
+                }
+                if properties
+                    .iter()
+                    .any(|p| matches!(p, HirObjectProp::Spread(_)))
+                {
                     let mut parts = Vec::with_capacity(properties.len());
                     for prop in properties {
                         match prop {
-                            HirObjectProp::Property { key: HirPropKey::Static(k), value } => {
+                            HirObjectProp::Property {
+                                key: HirPropKey::Static(k),
+                                value,
+                            } => {
                                 let v = self.lower_expr(value)?;
                                 parts.push((Some(k.clone()), v));
                             }
@@ -280,9 +431,7 @@ impl Builder {
                                 let v = self.lower_expr(e)?;
                                 parts.push((None, v));
                             }
-                            _ => {
-                                return Err(OptError::Unsupported("ssa: object computed/method"))
-                            }
+                            _ => unreachable!(),
                         }
                     }
                     return Ok(self.emit(InstKind::BuildObjectSpread { parts }, HirType::Ref));
@@ -290,18 +439,19 @@ impl Builder {
                 let mut pairs = Vec::with_capacity(properties.len());
                 for prop in properties {
                     match prop {
-                        HirObjectProp::Property { key: HirPropKey::Static(k), value } => {
+                        HirObjectProp::Property {
+                            key: HirPropKey::Static(k),
+                            value,
+                        } => {
                             let v = self.lower_expr(value)?;
                             pairs.push((k.clone(), v));
                         }
-                        _ => {
-                            return Err(OptError::Unsupported("ssa: object computed/method"))
-                        }
+                        _ => unreachable!(),
                     }
                 }
                 Ok(self.emit(InstKind::BuildObject { pairs }, HirType::Ref))
             }
-            // Template literal `` `a${x}b` `` → `BuildStr` over stringified parts.
+
             HirExpr::Template(parts) => {
                 let mut pvals = Vec::with_capacity(parts.len());
                 for part in parts {
@@ -321,22 +471,29 @@ impl Builder {
                     Ok(self.emit(InstKind::BuildStr { parts: pvals }, HirType::Str))
                 }
             }
-            HirExpr::Closure { func, upvalues } => {
-                self.lower_closure(func, upvalues)
-            }
-            // VM intrinsic `obj.fn(args)` (`Math.*`, etc.) → `Intrinsic` opcode.
-            HirExpr::IntrinsicCall { object, args, wire_byte, ty } => {
+            HirExpr::Closure { func, upvalues } => self.lower_closure(func, upvalues),
+
+            HirExpr::IntrinsicCall {
+                object,
+                args,
+                wire_byte,
+                ty,
+            } => {
                 let o = self.lower_expr(object)?;
                 let mut avs = Vec::with_capacity(args.len());
                 for a in args {
                     avs.push(self.lower_expr(a)?);
                 }
                 Ok(self.emit(
-                    InstKind::IntrinsicCall { object: o, args: avs, wire_byte: *wire_byte },
+                    InstKind::IntrinsicCall {
+                        object: o,
+                        args: avs,
+                        wire_byte: *wire_byte,
+                    },
                     *ty,
                 ))
             }
-            // Ternary `test ? cons : alt` → branch + result phi.
+
             HirExpr::Conditional { test, cons, alt } => {
                 let t = self.lower_expr(test)?;
                 self.lower_branch_value(
@@ -370,8 +527,7 @@ impl Builder {
                     *ty,
                 ))
             }
-            // Assignment-as-expression on a scalar binding (e.g. a `for` update
-            // clause `i = i + 1`): write the new SSA value and yield it.
+
             HirExpr::Assign { target, value } => match &**target {
                 HirAssignTarget::Var(binding) => {
                     let v = self.lower_expr(value)?;
@@ -381,20 +537,55 @@ impl Builder {
                 HirAssignTarget::Member { object, name } => {
                     let o = self.lower_expr(object)?;
                     let v = self.lower_expr(value)?;
-                    self.emit_effect(InstKind::SetProperty { object: o, name: name.clone(), value: v });
+                    self.emit_effect(InstKind::SetProperty {
+                        object: o,
+                        name: name.clone(),
+                        value: v,
+                    });
                     Ok(v)
                 }
                 HirAssignTarget::Index { object, index } => {
                     let o = self.lower_expr(object)?;
                     let i = self.lower_expr(index)?;
                     let v = self.lower_expr(value)?;
-                    self.emit_effect(InstKind::SetIndex { object: o, index: i, value: v });
+                    self.emit_effect(InstKind::SetIndex {
+                        object: o,
+                        index: i,
+                        value: v,
+                    });
                     Ok(v)
                 }
-                _ => Err(OptError::Unsupported("ssa: assign target")),
+                HirAssignTarget::ModuleSlot { slot } => {
+                    let v = self.lower_expr(value)?;
+                    self.emit_effect(InstKind::StoreModuleSlot {
+                        value: v,
+                        slot: *slot,
+                    });
+                    Ok(v)
+                }
+                HirAssignTarget::SuperMember { name } => {
+                    let v = self.lower_expr(value)?;
+                    let this_val = self.emit(InstKind::This, HirType::Ref);
+                    self.emit_effect(InstKind::SetProperty {
+                        object: this_val,
+                        name: name.clone(),
+                        value: v,
+                    });
+                    Ok(v)
+                }
+                HirAssignTarget::SuperIndex { index } => {
+                    let i = self.lower_expr(index)?;
+                    let v = self.lower_expr(value)?;
+                    let this_val = self.emit(InstKind::This, HirType::Ref);
+                    self.emit_effect(InstKind::SetIndex {
+                        object: this_val,
+                        index: i,
+                        value: v,
+                    });
+                    Ok(v)
+                }
             },
-            // `++`/`--` on a scalar binding (prefix yields the new value, postfix
-            // the old).
+
             HirExpr::Update { target, op, prefix } => match &**target {
                 HirAssignTarget::Var(binding) => {
                     let old = self.load_binding(binding)?;
@@ -405,17 +596,25 @@ impl Builder {
                         HirUpdateOp::Dec => HirBinOp::Sub,
                     };
                     let new = self.emit(
-                        InstKind::Binary { op: bop, lhs: old, rhs: one, ty },
+                        InstKind::Binary {
+                            op: bop,
+                            lhs: old,
+                            rhs: one,
+                            ty,
+                        },
                         ty,
                     );
                     self.store_binding(binding, new);
                     Ok(if *prefix { new } else { old })
                 }
-                // `o.x++` / `++o.x`: read member, ±1, write back.
+
                 HirAssignTarget::Member { object, name } => {
                     let o = self.lower_expr(object)?;
                     let old = self.emit(
-                        InstKind::GetProperty { object: o, name: name.clone() },
+                        InstKind::GetProperty {
+                            object: o,
+                            name: name.clone(),
+                        },
                         HirType::Dynamic,
                     );
                     let one = self.emit(InstKind::ConstInt(1), HirType::Int);
@@ -424,7 +623,12 @@ impl Builder {
                         HirUpdateOp::Dec => HirBinOp::Sub,
                     };
                     let new = self.emit(
-                        InstKind::Binary { op: bop, lhs: old, rhs: one, ty: HirType::Dynamic },
+                        InstKind::Binary {
+                            op: bop,
+                            lhs: old,
+                            rhs: one,
+                            ty: HirType::Dynamic,
+                        },
                         HirType::Dynamic,
                     );
                     self.emit_effect(InstKind::SetProperty {
@@ -434,24 +638,97 @@ impl Builder {
                     });
                     Ok(if *prefix { new } else { old })
                 }
-                // `a[i]++` / `++a[i]`: read element, ±1, write back.
+
                 HirAssignTarget::Index { object, index } => {
                     let o = self.lower_expr(object)?;
                     let i = self.lower_expr(index)?;
-                    let old = self.emit(InstKind::GetIndex { object: o, index: i }, HirType::Dynamic);
+                    let old = self.emit(
+                        InstKind::GetIndex {
+                            object: o,
+                            index: i,
+                        },
+                        HirType::Dynamic,
+                    );
                     let one = self.emit(InstKind::ConstInt(1), HirType::Int);
                     let bop = match op {
                         HirUpdateOp::Inc => HirBinOp::Add,
                         HirUpdateOp::Dec => HirBinOp::Sub,
                     };
                     let new = self.emit(
-                        InstKind::Binary { op: bop, lhs: old, rhs: one, ty: HirType::Dynamic },
+                        InstKind::Binary {
+                            op: bop,
+                            lhs: old,
+                            rhs: one,
+                            ty: HirType::Dynamic,
+                        },
                         HirType::Dynamic,
                     );
-                    self.emit_effect(InstKind::SetIndex { object: o, index: i, value: new });
+                    self.emit_effect(InstKind::SetIndex {
+                        object: o,
+                        index: i,
+                        value: new,
+                    });
                     Ok(if *prefix { new } else { old })
                 }
-                _ => Err(OptError::Unsupported("ssa: update target")),
+                HirAssignTarget::ModuleSlot { .. } => {
+                    Err(OptError::Unsupported("ssa: update module slot"))
+                }
+                HirAssignTarget::SuperMember { name } => {
+                    let old =
+                        self.emit(InstKind::GetSuper { name: name.clone() }, HirType::Dynamic);
+                    let one = self.emit(InstKind::ConstInt(1), HirType::Int);
+                    let bop = match op {
+                        HirUpdateOp::Inc => HirBinOp::Add,
+                        HirUpdateOp::Dec => HirBinOp::Sub,
+                    };
+                    let new = self.emit(
+                        InstKind::Binary {
+                            op: bop,
+                            lhs: old,
+                            rhs: one,
+                            ty: HirType::Dynamic,
+                        },
+                        HirType::Dynamic,
+                    );
+                    let this_val = self.emit(InstKind::This, HirType::Ref);
+                    self.emit_effect(InstKind::SetProperty {
+                        object: this_val,
+                        name: name.clone(),
+                        value: new,
+                    });
+                    Ok(if *prefix { new } else { old })
+                }
+                HirAssignTarget::SuperIndex { index } => {
+                    let i = self.lower_expr(index)?;
+                    let this_val = self.emit(InstKind::This, HirType::Ref);
+                    let old = self.emit(
+                        InstKind::GetIndex {
+                            object: this_val,
+                            index: i,
+                        },
+                        HirType::Dynamic,
+                    );
+                    let one = self.emit(InstKind::ConstInt(1), HirType::Int);
+                    let bop = match op {
+                        HirUpdateOp::Inc => HirBinOp::Add,
+                        HirUpdateOp::Dec => HirBinOp::Sub,
+                    };
+                    let new = self.emit(
+                        InstKind::Binary {
+                            op: bop,
+                            lhs: old,
+                            rhs: one,
+                            ty: HirType::Dynamic,
+                        },
+                        HirType::Dynamic,
+                    );
+                    self.emit_effect(InstKind::SetIndex {
+                        object: this_val,
+                        index: i,
+                        value: new,
+                    });
+                    Ok(if *prefix { new } else { old })
+                }
             },
             HirExpr::Match { subject, cases } => self.lower_match(subject, cases),
             HirExpr::Class(cls) => self.lower_class(cls),
@@ -472,22 +749,30 @@ impl Builder {
         }
     }
 
-    /// Apply an optional-chain property to a known-non-null `obj` (the else arm
-    /// of the null check). Member/index/module-slot reads and plain/method calls
-    /// map to the ordinary instructions; extension calls (which pass `obj` as the
-    /// receiver, not as a plain-call arg) fall back.
     fn apply_optional(&mut self, obj: Value, property: &HirOptionalProperty) -> Result<Value> {
         match property {
             HirOptionalProperty::Member(name) => Ok(self.emit(
-                InstKind::GetPropertyMaybe { object: obj, name: name.clone() },
+                InstKind::GetPropertyMaybe {
+                    object: obj,
+                    name: name.clone(),
+                },
                 HirType::Dynamic,
             )),
             HirOptionalProperty::Index(index) => {
                 let i = self.lower_expr(index)?;
-                Ok(self.emit(InstKind::GetIndex { object: obj, index: i }, HirType::Dynamic))
+                Ok(self.emit(
+                    InstKind::GetIndex {
+                        object: obj,
+                        index: i,
+                    },
+                    HirType::Dynamic,
+                ))
             }
             HirOptionalProperty::ModuleSlot(slot) => Ok(self.emit(
-                InstKind::ModuleSlot { object: obj, slot: *slot },
+                InstKind::ModuleSlot {
+                    object: obj,
+                    slot: *slot,
+                },
                 HirType::Dynamic,
             )),
             HirOptionalProperty::Call(args) => {
@@ -495,7 +780,13 @@ impl Builder {
                 for a in args {
                     avs.push(self.lower_expr(a)?);
                 }
-                Ok(self.emit(InstKind::Call { callee: obj, args: avs }, HirType::Dynamic))
+                Ok(self.emit(
+                    InstKind::Call {
+                        callee: obj,
+                        args: avs,
+                    },
+                    HirType::Dynamic,
+                ))
             }
             HirOptionalProperty::MethodCall(name, args) => {
                 let mut avs = Vec::with_capacity(args.len());
@@ -503,36 +794,165 @@ impl Builder {
                     avs.push(self.lower_expr(a)?);
                 }
                 Ok(self.emit(
-                    InstKind::MethodCall { recv: obj, name: name.clone(), args: avs },
+                    InstKind::MethodCall {
+                        recv: obj,
+                        name: name.clone(),
+                        args: avs,
+                    },
                     HirType::Dynamic,
                 ))
             }
-            HirOptionalProperty::Extension(_) | HirOptionalProperty::ExtensionCall(..) => {
-                Err(OptError::Unsupported("ssa: optional-chain extension call"))
+            HirOptionalProperty::Extension(func) => Ok(self.emit(
+                InstKind::ExtensionCall {
+                    func: func.clone(),
+                    recv: obj,
+                    args: Vec::new(),
+                },
+                HirType::Dynamic,
+            )),
+            HirOptionalProperty::ExtensionCall(func, args) => {
+                let mut avs = Vec::with_capacity(args.len());
+                for a in args {
+                    avs.push(self.lower_expr(a)?);
+                }
+                Ok(self.emit(
+                    InstKind::ExtensionCall {
+                        func: func.clone(),
+                        recv: obj,
+                        args: avs,
+                    },
+                    HirType::Dynamic,
+                ))
             }
         }
     }
 
-    /// `match subject { cases }` → a chain of pattern tests; each matching arm
-    /// evaluates its body + result and jumps to a merge block whose single
-    /// block parameter is the match value. Supports wildcard / literal / bind /
-    /// enum-variant patterns; record patterns and guards fall back.
     fn lower_match(&mut self, subject: &HirExpr, cases: &[HirMatchCase]) -> Result<Value> {
         let subj = self.lower_expr(subject)?;
         let merge = self.new_block();
         let mut chain_alive = true;
         for case in cases {
             if !chain_alive {
-                break; // a prior unconditional arm caught everything
-            }
-            if case.guard.is_some() {
-                return Err(OptError::Unsupported("ssa: match guard"));
+                break;
             }
             let test_blk = self.current;
+            let has_guard = case.guard.is_some();
+
+            let cond = match &case.test {
+                HirCaseTest::Wildcard | HirCaseTest::Bind(_) | HirCaseTest::Record { .. } => None,
+                HirCaseTest::Literal(lit) => {
+                    let litv = self.lower_expr(lit)?;
+                    Some(self.emit(
+                        InstKind::Binary {
+                            op: HirBinOp::Eq,
+                            lhs: subj,
+                            rhs: litv,
+                            ty: HirType::Dynamic,
+                        },
+                        HirType::Bool,
+                    ))
+                }
+                HirCaseTest::EnumVariant { name, .. } => {
+                    let tag = self.emit(
+                        InstKind::GetProperty {
+                            object: subj,
+                            name: Rc::from("__variant_name__"),
+                        },
+                        HirType::Str,
+                    );
+                    let namev = self.emit(InstKind::ConstStr(name.clone()), HirType::Str);
+                    Some(self.emit(
+                        InstKind::Binary {
+                            op: HirBinOp::Eq,
+                            lhs: tag,
+                            rhs: namev,
+                            ty: HirType::Dynamic,
+                        },
+                        HirType::Bool,
+                    ))
+                }
+            };
+
+            let is_unconditional = cond.is_none() && !has_guard;
             let body_b = self.new_block();
-            let next = self.emit_match_test(&case.test, subj, body_b, test_blk)?;
-            self.current = body_b;
-            self.bind_pattern(&case.test, subj);
+            let mut fail_blk_opt = None;
+
+            if is_unconditional {
+                self.set_term(Terminator::Jump {
+                    target: body_b,
+                    args: Vec::new(),
+                });
+                self.add_pred(body_b, test_blk);
+                self.seal_block(body_b);
+                self.current = body_b;
+                self.bind_pattern(&case.test, subj);
+            } else {
+                let fail_blk = self.new_block();
+                fail_blk_opt = Some(fail_blk);
+                if has_guard {
+                    if let Some(c) = cond {
+                        let guard_b = self.new_block();
+                        self.set_term(Terminator::Branch {
+                            cond: c,
+                            then_blk: guard_b,
+                            then_args: Vec::new(),
+                            else_blk: fail_blk,
+                            else_args: Vec::new(),
+                        });
+                        self.add_pred(guard_b, test_blk);
+                        self.add_pred(fail_blk, test_blk);
+                        self.seal_block(guard_b);
+
+                        self.current = guard_b;
+                        self.bind_pattern(&case.test, subj);
+                        let g_val = self.lower_expr(case.guard.as_ref().unwrap())?;
+                        self.set_term(Terminator::Branch {
+                            cond: g_val,
+                            then_blk: body_b,
+                            then_args: Vec::new(),
+                            else_blk: fail_blk,
+                            else_args: Vec::new(),
+                        });
+                        self.add_pred(body_b, guard_b);
+                        self.add_pred(fail_blk, guard_b);
+                        self.seal_block(body_b);
+                        self.seal_block(fail_blk);
+                    } else {
+                        self.bind_pattern(&case.test, subj);
+                        let g_val = self.lower_expr(case.guard.as_ref().unwrap())?;
+                        self.set_term(Terminator::Branch {
+                            cond: g_val,
+                            then_blk: body_b,
+                            then_args: Vec::new(),
+                            else_blk: fail_blk,
+                            else_args: Vec::new(),
+                        });
+                        self.add_pred(body_b, test_blk);
+                        self.add_pred(fail_blk, test_blk);
+                        self.seal_block(body_b);
+                        self.seal_block(fail_blk);
+                    }
+                } else {
+                    let c = cond.unwrap();
+                    self.set_term(Terminator::Branch {
+                        cond: c,
+                        then_blk: body_b,
+                        then_args: Vec::new(),
+                        else_blk: fail_blk,
+                        else_args: Vec::new(),
+                    });
+                    self.add_pred(body_b, test_blk);
+                    self.add_pred(fail_blk, test_blk);
+                    self.seal_block(body_b);
+                    self.seal_block(fail_blk);
+
+                    self.current = body_b;
+                    self.bind_pattern(&case.test, subj);
+                }
+
+                self.current = body_b;
+            }
+
             self.lower_block(&case.body)?;
             let rv = match &case.result {
                 Some(e) => self.lower_expr(e)?,
@@ -540,19 +960,26 @@ impl Builder {
             };
             if self.is_open() {
                 let from = self.current;
-                self.set_term(Terminator::Jump { target: merge, args: vec![rv] });
+                self.set_term(Terminator::Jump {
+                    target: merge,
+                    args: vec![rv],
+                });
                 self.add_pred(merge, from);
             }
-            match next {
-                Some(nb) => self.current = nb,
-                None => chain_alive = false,
+
+            if is_unconditional {
+                chain_alive = false;
+            } else {
+                self.current = fail_blk_opt.unwrap();
             }
         }
         if chain_alive {
-            // No arm matched → the match yields null.
             let from = self.current;
             let nullv = self.emit(InstKind::ConstNull, HirType::Dynamic);
-            self.set_term(Terminator::Jump { target: merge, args: vec![nullv] });
+            self.set_term(Terminator::Jump {
+                target: merge,
+                args: vec![nullv],
+            });
             self.add_pred(merge, from);
         }
         self.seal_block(merge);
@@ -560,68 +987,6 @@ impl Builder {
         Ok(self.add_block_param(merge, HirType::Dynamic))
     }
 
-    /// Emit a case's pattern test in `test_blk`: on a match, control reaches
-    /// `body_b`; on failure it reaches the returned next-test block (or `None`
-    /// for an unconditional pattern, which ends the chain). Bindings are done in
-    /// `bind_pattern` once `body_b` is current.
-    fn emit_match_test(
-        &mut self,
-        test: &HirCaseTest,
-        subj: Value,
-        body_b: BlockId,
-        test_blk: BlockId,
-    ) -> Result<Option<BlockId>> {
-        match test {
-            HirCaseTest::Wildcard | HirCaseTest::Bind(_) => {
-                self.set_term(Terminator::Jump { target: body_b, args: Vec::new() });
-                self.add_pred(body_b, test_blk);
-                self.seal_block(body_b);
-                Ok(None)
-            }
-            HirCaseTest::Literal(lit) => {
-                let litv = self.lower_expr(lit)?;
-                let eq = self.emit(
-                    InstKind::Binary { op: HirBinOp::Eq, lhs: subj, rhs: litv, ty: HirType::Dynamic },
-                    HirType::Bool,
-                );
-                Ok(Some(self.branch_to(eq, body_b, test_blk)))
-            }
-            HirCaseTest::EnumVariant { name, .. } => {
-                let tag = self.emit(
-                    InstKind::GetProperty { object: subj, name: Rc::from("__variant_name__") },
-                    HirType::Str,
-                );
-                let namev = self.emit(InstKind::ConstStr(name.clone()), HirType::Str);
-                let eq = self.emit(
-                    InstKind::Binary { op: HirBinOp::Eq, lhs: tag, rhs: namev, ty: HirType::Dynamic },
-                    HirType::Bool,
-                );
-                Ok(Some(self.branch_to(eq, body_b, test_blk)))
-            }
-            HirCaseTest::Record { .. } => Err(OptError::Unsupported("ssa: match record pattern")),
-        }
-    }
-
-    /// `branch cond, body_b, <fresh next>` from `test_blk`; returns the new next
-    /// block (sealed; the chain continues there).
-    fn branch_to(&mut self, cond: Value, body_b: BlockId, test_blk: BlockId) -> BlockId {
-        let next = self.new_block();
-        self.set_term(Terminator::Branch {
-            cond,
-            then_blk: body_b,
-            then_args: Vec::new(),
-            else_blk: next,
-            else_args: Vec::new(),
-        });
-        self.add_pred(body_b, test_blk);
-        self.add_pred(next, test_blk);
-        self.seal_block(body_b);
-        self.seal_block(next);
-        next
-    }
-
-    /// Bind a pattern's variables in the (current) body block: `Bind` copies the
-    /// subject; `EnumVariant` reads each `value{i}` payload.
     fn bind_pattern(&mut self, test: &HirCaseTest, subj: Value) {
         match test {
             HirCaseTest::Bind(local) => {
@@ -631,7 +996,24 @@ impl Builder {
                 for (i, b) in binds.iter().enumerate() {
                     if let Some(local) = b {
                         let pv = self.emit(
-                            InstKind::GetProperty { object: subj, name: Rc::from(format!("value{i}")) },
+                            InstKind::GetProperty {
+                                object: subj,
+                                name: Rc::from(format!("value{i}")),
+                            },
+                            HirType::Dynamic,
+                        );
+                        self.write_var(VarId::Local(*local), self.current, pv);
+                    }
+                }
+            }
+            HirCaseTest::Record { fields } => {
+                for (name, local_opt) in fields {
+                    if let Some(local) = local_opt {
+                        let pv = self.emit(
+                            InstKind::GetProperty {
+                                object: subj,
+                                name: name.clone(),
+                            },
                             HirType::Dynamic,
                         );
                         self.write_var(VarId::Local(*local), self.current, pv);
@@ -645,9 +1027,6 @@ impl Builder {
     fn lower_closure(&mut self, func: &HirFunction, upvalues: &[HirUpvalueSrc]) -> Result<Value> {
         let mut uvs = Vec::with_capacity(upvalues.len());
         for uv in upvalues {
-            // Capture through load_binding so a *pinned* parent local/param is
-            // read from its fixed slot (LoadCaptured) rather than the SSA def map
-            // (which it isn't in) — a bare read_var would spawn a phantom phi.
             let val = match uv {
                 HirUpvalueSrc::ParentLocal(id) => self.load_binding(&HirBinding::Local(*id))?,
                 HirUpvalueSrc::ParentParam(i) => self.load_binding(&HirBinding::Param(*i))?,
@@ -673,20 +1052,33 @@ impl Builder {
             Some(sup) => Some(self.lower_expr(sup)?),
             None => None,
         };
-        let mut class_val = self.emit(InstKind::MakeClass { name: name_idx, super_class }, HirType::Ref);
-        
+        let mut class_val = self.emit(
+            InstKind::MakeClass {
+                name: name_idx,
+                super_class,
+            },
+            HirType::Ref,
+        );
+
         for field in &cls.fields {
-            self.emit_effect(InstKind::DeclareField { class: class_val, name: field.clone() });
+            self.emit_effect(InstKind::DeclareField {
+                class: class_val,
+                name: field.clone(),
+            });
         }
-        
+
         for (key, init) in &cls.static_fields {
             let val = match init {
                 Some(e) => self.lower_expr(e)?,
                 None => self.emit(InstKind::ConstNull, HirType::Dynamic),
             };
-            self.emit_effect(InstKind::DefineStatic { class: class_val, name: key.clone(), value: val });
+            self.emit_effect(InstKind::DefineStatic {
+                class: class_val,
+                name: key.clone(),
+                value: val,
+            });
         }
-        
+
         self.bind_method(class_val, &cls.ctor, false)?;
         for m in &cls.methods {
             self.bind_method(class_val, m, false)?;
@@ -695,45 +1087,88 @@ impl Builder {
             self.bind_method(class_val, m, true)?;
         }
         for a in &cls.getters {
-            self.bind_member(class_val, a.key.clone(), &a.func, &a.upvalues, true, a.is_static)?;
+            self.bind_member(
+                class_val,
+                a.key.clone(),
+                &a.func,
+                &a.upvalues,
+                true,
+                a.is_static,
+            )?;
         }
         for a in &cls.setters {
-            self.bind_member(class_val, a.key.clone(), &a.func, &a.upvalues, false, a.is_static)?;
+            self.bind_member(
+                class_val,
+                a.key.clone(),
+                &a.func,
+                &a.upvalues,
+                false,
+                a.is_static,
+            )?;
         }
-        
+
         for b in &cls.static_blocks {
             let fn_val = self.lower_closure(&b.func, &b.upvalues)?;
-            self.emit(InstKind::Call { callee: fn_val, args: Vec::new() }, HirType::Dynamic);
+            self.emit(
+                InstKind::Call {
+                    callee: fn_val,
+                    args: Vec::new(),
+                },
+                HirType::Dynamic,
+            );
         }
-        
+
         if !cls.decorators.is_empty() {
             class_val = self.apply_class_decorators(class_val, &cls.decorators)?;
         }
-        
+
         Ok(class_val)
     }
 
     fn lower_enum(&mut self, en: &HirEnum) -> Result<Value> {
         let name_idx = en.name.clone();
-        let class_val = self.emit(InstKind::MakeClass { name: name_idx, super_class: None }, HirType::Ref);
-        
+        let class_val = self.emit(
+            InstKind::MakeClass {
+                name: name_idx,
+                super_class: None,
+            },
+            HirType::Ref,
+        );
+
         for v in &en.variants {
-            let variant_val = self.emit(InstKind::MakeEnumVariant { tag: v.tag, meta: v.meta.clone() }, HirType::Ref);
-            self.emit_effect(InstKind::DefineStatic { class: class_val, name: v.name.clone(), value: variant_val });
+            let variant_val = self.emit(
+                InstKind::MakeEnumVariant {
+                    tag: v.tag,
+                    meta: v.meta.clone(),
+                },
+                HirType::Ref,
+            );
+            self.emit_effect(InstKind::DefineStatic {
+                class: class_val,
+                name: v.name.clone(),
+                value: variant_val,
+            });
         }
-        
+
         for field in &en.fields {
-            self.emit_effect(InstKind::DeclareField { class: class_val, name: field.clone() });
+            self.emit_effect(InstKind::DeclareField {
+                class: class_val,
+                name: field.clone(),
+            });
         }
-        
+
         for (key, init) in &en.static_fields {
             let val = match init {
                 Some(e) => self.lower_expr(e)?,
                 None => self.emit(InstKind::ConstNull, HirType::Dynamic),
             };
-            self.emit_effect(InstKind::DefineStatic { class: class_val, name: key.clone(), value: val });
+            self.emit_effect(InstKind::DefineStatic {
+                class: class_val,
+                name: key.clone(),
+                value: val,
+            });
         }
-        
+
         self.bind_method(class_val, &en.ctor, false)?;
         for m in &en.methods {
             self.bind_method(class_val, m, false)?;
@@ -742,40 +1177,81 @@ impl Builder {
             self.bind_method(class_val, m, true)?;
         }
         for a in &en.getters {
-            self.bind_member(class_val, a.key.clone(), &a.func, &a.upvalues, true, a.is_static)?;
+            self.bind_member(
+                class_val,
+                a.key.clone(),
+                &a.func,
+                &a.upvalues,
+                true,
+                a.is_static,
+            )?;
         }
         for a in &en.setters {
-            self.bind_member(class_val, a.key.clone(), &a.func, &a.upvalues, false, a.is_static)?;
+            self.bind_member(
+                class_val,
+                a.key.clone(),
+                &a.func,
+                &a.upvalues,
+                false,
+                a.is_static,
+            )?;
         }
-        
+
         for v in &en.variants {
             if !v.const_args.is_empty() {
-                let receiver = self.emit(InstKind::GetProperty { object: class_val, name: v.name.clone() }, HirType::Ref);
-                let ctor = self.emit(InstKind::GetProperty { object: receiver, name: Rc::from("constructor") }, HirType::Ref);
-                let mut args = vec![receiver];
+                let receiver = self.emit(
+                    InstKind::GetProperty {
+                        object: class_val,
+                        name: v.name.clone(),
+                    },
+                    HirType::Ref,
+                );
+                let mut args = Vec::with_capacity(v.const_args.len());
                 for arg in &v.const_args {
                     args.push(self.lower_expr(arg)?);
                 }
-                self.emit(InstKind::Call { callee: ctor, args }, HirType::Dynamic);
+                self.emit(
+                    InstKind::MethodCall {
+                        recv: receiver,
+                        name: Rc::from("constructor"),
+                        args,
+                    },
+                    HirType::Dynamic,
+                );
             }
         }
-        
+
         if !en.static_blocks.is_empty() {
-            self.emit_effect(InstKind::StoreGlobal { name: en.name.clone(), value: class_val });
+            self.emit_effect(InstKind::StoreGlobal {
+                name: en.name.clone(),
+                value: class_val,
+            });
         }
-        
+
         for b in &en.static_blocks {
             let fn_val = self.lower_closure(&b.func, &b.upvalues)?;
-            self.emit(InstKind::Call { callee: fn_val, args: Vec::new() }, HirType::Dynamic);
+            self.emit(
+                InstKind::Call {
+                    callee: fn_val,
+                    args: Vec::new(),
+                },
+                HirType::Dynamic,
+            );
         }
-        
+
         Ok(class_val)
     }
 
-    fn bind_method(&mut self, class_val: Value, m: &crate::hir::HirMethod, is_static: bool) -> Result<()> {
+    fn bind_method(
+        &mut self,
+        class_val: Value,
+        m: &crate::hir::HirMethod,
+        is_static: bool,
+    ) -> Result<()> {
         let mut reg = self.lower_closure(&m.func, &m.upvalues)?;
         if !m.decorators.is_empty() {
-            reg = self.apply_method_decorators(reg, &m.key, is_static, m.is_private, &m.decorators)?;
+            reg =
+                self.apply_method_decorators(reg, &m.key, is_static, m.is_private, &m.decorators)?;
         }
         self.emit_effect(InstKind::DefineMethod {
             class: class_val,
@@ -821,7 +1297,7 @@ impl Builder {
             let kind_r = self.emit(InstKind::ConstStr(Rc::from("method")), HirType::Str);
             let static_r = self.emit(InstKind::ConstBool(is_static), HirType::Bool);
             let private_r = self.emit(InstKind::ConstBool(is_private), HirType::Bool);
-            
+
             let pairs = vec![
                 (Rc::from("name"), n_r),
                 (Rc::from("kind"), kind_r),
@@ -830,7 +1306,13 @@ impl Builder {
             ];
             let ctx_obj = self.emit(InstKind::BuildObject { pairs }, HirType::Ref);
             let args = vec![current_method, ctx_obj];
-            let result = self.emit(InstKind::Call { callee: deco_fn, args }, HirType::Dynamic);
+            let result = self.emit(
+                InstKind::Call {
+                    callee: deco_fn,
+                    args,
+                },
+                HirType::Dynamic,
+            );
             let isnull = self.emit(InstKind::IsNull { operand: result }, HirType::Bool);
             current_method = self.lower_branch_value(
                 isnull,
@@ -842,12 +1324,22 @@ impl Builder {
         Ok(current_method)
     }
 
-    fn apply_class_decorators(&mut self, class_val: Value, decorators: &[HirExpr]) -> Result<Value> {
+    fn apply_class_decorators(
+        &mut self,
+        class_val: Value,
+        decorators: &[HirExpr],
+    ) -> Result<Value> {
         let mut current_class = class_val;
         for deco in decorators.iter().rev() {
             let deco_fn = self.lower_expr(deco)?;
             let args = vec![current_class];
-            let result = self.emit(InstKind::Call { callee: deco_fn, args }, HirType::Dynamic);
+            let result = self.emit(
+                InstKind::Call {
+                    callee: deco_fn,
+                    args,
+                },
+                HirType::Dynamic,
+            );
             let isnull = self.emit(InstKind::IsNull { operand: result }, HirType::Bool);
             current_class = self.lower_branch_value(
                 isnull,

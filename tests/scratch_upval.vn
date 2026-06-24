@@ -1,6 +1,0 @@
-function makeAdder(n: int): (int) => int {
-  return x => x + n
-}
-const add5 = makeAdder(5)
-print(add5(10))
-print(add5(20))

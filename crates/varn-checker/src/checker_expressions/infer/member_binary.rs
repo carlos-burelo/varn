@@ -54,7 +54,6 @@ pub(super) fn infer_member_type(
         }
     };
 
-
     match &obj_ty.0 {
         TypeKind::Named(class_name, _origin) | TypeKind::Generic(class_name, _, _origin) => {
             let mapping = if let TypeKind::Generic(_, type_args, _orig) = &obj_ty.0 {

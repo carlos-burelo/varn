@@ -4,7 +4,10 @@ use crate::bench_output::{
 };
 use crate::bench_phase::{fmt_bytes, fmt_dur, fmt_num, print_table, PhaseStats};
 use crate::error::CliError;
+use crate::profiling::JitTimers;
 use rustc_hash::FxHashMap;
+use std::fs::File;
+use std::io::Write;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 use varn_checker::Checker;
@@ -14,9 +17,6 @@ use varn_types::value::Closure;
 use varn_utilities::chalk::chalk;
 use varn_utilities::terminal;
 use varn_vm::Vm;
-use std::fs::File;
-use std::io::Write;
-use crate::profiling::JitTimers;
 
 fn run_vm_to_completion(machine: &mut Vm, closure: Rc<Closure>) -> Result<(), String> {
     loop {
@@ -41,7 +41,7 @@ fn run_vm_to_completion(machine: &mut Vm, closure: Rc<Closure>) -> Result<(), St
                             _ => match varn_vm::exec::ExecCtx::wait_task_handle(handle.clone()) {
                                 Ok(v) => v,
                                 Err(e) => return Err(format!("awaited task failed: {}", e)),
-                            }
+                            },
                         },
                         other => other,
                     };
@@ -89,7 +89,6 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     if crate::pipeline::wrc::is_wrc(path) {
         return run_bench_wrc(path, runs, show_output);
     }
-
 
     let canonical = crate::pipeline::canonicalize_path(path)?;
     let path = canonical.as_str();
@@ -168,7 +167,6 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     let optimize_samples = std::cell::RefCell::new(Vec::with_capacity(runs));
     let timers = JitTimers::new();
     let compile_samples = time_n(runs, || {
-        // start compile timer
         timers.compile.start();
         varn_backend::regalloc_post::OPTIMIZE_TIME.with(|t| t.set(Duration::ZERO));
         varn_backend::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(true));
@@ -192,9 +190,8 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
             export_names,
         );
 
-        // stop compile timer
         timers.compile.stop();
-        // record optimize time separately
+
         varn_backend::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(false));
         let opt_dur = varn_backend::regalloc_post::OPTIMIZE_TIME.with(|t| t.get());
         optimize_samples.borrow_mut().push(opt_dur);
@@ -210,7 +207,6 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         .map(|(c, o)| c.saturating_sub(*o))
         .collect();
 
-    // Record optimize timer
     timers.optimize.stop();
 
     let exports =
@@ -271,7 +267,6 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     varn_builtins::set_print_silent(!show_output);
     varn_builtins::set_testing_silent(!show_output);
 
-
     let mut optimized_proto = proto.clone();
     init_vm.resolve_globals(&mut optimized_proto);
 
@@ -283,11 +278,6 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
 
     let proto_rc = Rc::new(optimized_proto);
 
-    // Pre-load all known std:/core:/runtime: modules into init_vm so the
-    // snapshot has them cached. Each bench run finds them in snap_modules and
-    // skips re-evaluation (and the NativeFn/Class/BoundMethod allocs).
-    // We load directly in init_vm (not a warmup VM) so global index layout
-    // matches the resolve_globals pass done above.
     varn_builtins::set_print_silent(true);
     varn_builtins::set_testing_silent(true);
     varn_vm::prefill_native_modules(&mut init_vm);
@@ -303,7 +293,6 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     let snap_heap_ref = &snap_heap;
     let snap_modules_ref = &snap_modules;
     let exec_samples = time_n(runs, || {
-        // start execute timer
         timers.execute.start();
         varn_builtins::reset_testing_counters();
 
@@ -312,13 +301,15 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
             snap_heap_ref.clone(),
             precompiled_ref.clone(),
             snap_modules_ref.clone(),
-        ).with_loader(loader.clone());
+        )
+        .with_loader(loader.clone());
         let main_module_id = ModuleId::local_str(path);
         let mut export_map = FxHashMap::default();
         for (idx, name) in proto_rc.export_names.iter().enumerate() {
             export_map.insert(name.clone(), idx);
         }
-        let mut module_obj = varn_types::ModuleObj::new(main_module_id.clone(), proto_rc.export_names.len());
+        let mut module_obj =
+            varn_types::ModuleObj::new(main_module_id.clone(), proto_rc.export_names.len());
         module_obj.export_map = export_map;
         let module_val = machine.ctx.heap.alloc_module(Rc::new(module_obj));
         machine.ctx.modules.insert(main_module_id, module_val);
@@ -326,7 +317,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
 
         let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
         let res = run_vm_to_completion(&mut machine, closure);
-        // stop execute timer
+
         timers.execute.stop();
         res
     })?;
@@ -335,20 +326,22 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     varn_builtins::reset_testing_counters();
     varn_builtins::set_print_silent(true);
     varn_builtins::set_testing_silent(true);
-    // Record execute timer end (already stopped above)
+
     let (opcode_counts, mut vm_profile, jit_stats, hotspots) = {
         let mut profile_vm = Vm::from_snapshot(
             snap_globals.clone(),
             snap_heap.clone(),
             optimized_precompiled.clone(),
             snap_modules.clone(),
-        ).with_loader(loader.clone());
+        )
+        .with_loader(loader.clone());
         let main_module_id = ModuleId::local_str(path);
         let mut export_map = FxHashMap::default();
         for (idx, name) in proto_rc.export_names.iter().enumerate() {
             export_map.insert(name.clone(), idx);
         }
-        let mut module_obj = varn_types::ModuleObj::new(main_module_id.clone(), proto_rc.export_names.len());
+        let mut module_obj =
+            varn_types::ModuleObj::new(main_module_id.clone(), proto_rc.export_names.len());
         module_obj.export_map = export_map;
         let module_val = profile_vm.ctx.heap.alloc_module(Rc::new(module_obj));
         profile_vm.ctx.modules.insert(main_module_id, module_val);
@@ -370,7 +363,6 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     varn_builtins::set_print_silent(!show_output);
     varn_builtins::set_testing_silent(!show_output);
 
-    // Write profiling data to files for later analysis
     if let Some(ref profile) = vm_profile {
         if let Ok(mut f) = File::create("target/debug/vm_profile.txt") {
             let _ = write!(f, "{:?}", profile);
@@ -379,7 +371,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     if let Ok(mut f) = File::create("target/debug/opcode_counts.txt") {
         let _ = write!(f, "{:?}", opcode_counts);
     }
-    // Write JIT timer CSV
+
     if let Ok(mut f) = File::create("target/debug/jit_profile.csv") {
         let _ = write!(
             f,
@@ -468,7 +460,9 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         chalk(format!("(precompile + p50: {})", fmt_dur(cold_start))).dim()
     ));
     if !show_output {
-        terminal::log(chalk("  Execution measured with stdout muted (--show-output to disable)").dim());
+        terminal::log(
+            chalk("  Execution measured with stdout muted (--show-output to disable)").dim(),
+        );
     }
     print_parse_breakdown(&parse_profile);
     print_check_breakdown(&check_result.profile);
@@ -559,13 +553,15 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
             snap_heap_ref.clone(),
             precompiled_ref.clone(),
             snap_modules_ref.clone(),
-        ).with_loader(loader.clone());
+        )
+        .with_loader(loader.clone());
         let main_module_id = ModuleId::local_str(path);
         let mut export_map = FxHashMap::default();
         for (idx, name) in proto_rc.export_names.iter().enumerate() {
             export_map.insert(name.clone(), idx);
         }
-        let mut module_obj = varn_types::ModuleObj::new(main_module_id.clone(), proto_rc.export_names.len());
+        let mut module_obj =
+            varn_types::ModuleObj::new(main_module_id.clone(), proto_rc.export_names.len());
         module_obj.export_map = export_map;
         let module_val = machine.ctx.heap.alloc_module(Rc::new(module_obj));
         machine.ctx.modules.insert(main_module_id, module_val);
@@ -585,13 +581,15 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
             snap_heap.clone(),
             optimized_precompiled.clone(),
             snap_modules.clone(),
-        ).with_loader(loader.clone());
+        )
+        .with_loader(loader.clone());
         let main_module_id = ModuleId::local_str(path);
         let mut export_map = FxHashMap::default();
         for (idx, name) in proto_rc.export_names.iter().enumerate() {
             export_map.insert(name.clone(), idx);
         }
-        let mut module_obj = varn_types::ModuleObj::new(main_module_id.clone(), proto_rc.export_names.len());
+        let mut module_obj =
+            varn_types::ModuleObj::new(main_module_id.clone(), proto_rc.export_names.len());
         module_obj.export_map = export_map;
         let module_val = profile_vm.ctx.heap.alloc_module(Rc::new(module_obj));
         profile_vm.ctx.modules.insert(main_module_id, module_val);
@@ -634,7 +632,11 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     ));
     terminal::log(format!(
         "  {}",
-        chalk(format!("Binary  {}  (no source phases)", fmt_bytes(file_size))).dim()
+        chalk(format!(
+            "Binary  {}  (no source phases)",
+            fmt_bytes(file_size)
+        ))
+        .dim()
     ));
     terminal::blank();
     print_table(&stats, total_p50);
@@ -654,7 +656,9 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         chalk(fmt_dur(total_pipeline_dur)).cyan()
     ));
     if !show_output {
-        terminal::log(chalk("  Execution measured with stdout muted (--show-output to disable)").dim());
+        terminal::log(
+            chalk("  Execution measured with stdout muted (--show-output to disable)").dim(),
+        );
     }
     print_opcode_hotspots(&opcode_counts);
     if let Some(ref mut profile) = vm_profile {
@@ -677,4 +681,3 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
 
     Ok(())
 }
-

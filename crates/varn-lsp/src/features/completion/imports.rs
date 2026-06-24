@@ -1,8 +1,8 @@
 use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind};
-use varn_checker::SymbolKind;
 
 use crate::constants::STD_PREFIX;
 use crate::document::import::uri_to_path;
+use crate::util::kinds::to_completion_kind;
 
 pub fn build_import_completions(prefix: &str, doc_uri: &str) -> Vec<CompletionItem> {
     let mut items: Vec<CompletionItem> = Vec::new();
@@ -119,17 +119,7 @@ fn build_stdlib_export_completions(module_path: &str) -> Vec<CompletionItem> {
         .into_iter()
         .filter(|(name, _)| !name.contains('.'))
         .map(|(name, sym)| {
-            let kind = Some(match sym.kind {
-                SymbolKind::Function => CompletionItemKind::FUNCTION,
-                SymbolKind::Class => CompletionItemKind::CLASS,
-                SymbolKind::Interface => CompletionItemKind::INTERFACE,
-                SymbolKind::Enum => CompletionItemKind::ENUM,
-                SymbolKind::Const => CompletionItemKind::CONSTANT,
-                SymbolKind::Namespace => CompletionItemKind::MODULE,
-                SymbolKind::Struct => CompletionItemKind::CLASS,
-                SymbolKind::TypeAlias => CompletionItemKind::CLASS,
-                _ => CompletionItemKind::VARIABLE,
-            });
+            let kind = Some(to_completion_kind(sym.kind));
             CompletionItem {
                 label: name,
                 kind,
@@ -168,17 +158,7 @@ fn build_relative_export_completions(module_path: &str, doc_uri: &str) -> Vec<Co
         .into_iter()
         .filter(|(name, _)| !name.contains('.'))
         .map(|(name, sym)| {
-            let kind = Some(match sym.kind {
-                SymbolKind::Function => CompletionItemKind::FUNCTION,
-                SymbolKind::Class => CompletionItemKind::CLASS,
-                SymbolKind::Interface => CompletionItemKind::INTERFACE,
-                SymbolKind::Enum => CompletionItemKind::ENUM,
-                SymbolKind::Const => CompletionItemKind::CONSTANT,
-                SymbolKind::Namespace => CompletionItemKind::MODULE,
-                SymbolKind::Struct => CompletionItemKind::CLASS,
-                SymbolKind::TypeAlias => CompletionItemKind::CLASS,
-                _ => CompletionItemKind::VARIABLE,
-            });
+            let kind = Some(to_completion_kind(sym.kind));
             CompletionItem {
                 label: name,
                 kind,

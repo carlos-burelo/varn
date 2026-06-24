@@ -1,10 +1,13 @@
+use varn_core::ast::{Decl, Program, StmtKind};
 use varn_utilities::chalk::chalk;
 use varn_utilities::terminal;
 use varn_utilities::terminal::Section;
-use varn_core::ast::{Decl, Program, StmtKind};
 
 pub fn debug_modules(program: &Program) {
-    Section::new("module linkage").subtitle(&program.filename).color(|c| c.cyan()).print();
+    Section::new("module linkage")
+        .subtitle(&program.filename)
+        .color(|c| c.cyan())
+        .print();
 
     let mut imports = 0;
     let mut exports = 0;
@@ -22,7 +25,11 @@ pub fn debug_modules(program: &Program) {
                     imports += 1;
                 }
                 Decl::Export(e) => {
-                    terminal::log(format!("  {} {}", chalk("export").bold(), chalk(format!("{:?}", e)).cyan()));
+                    terminal::log(format!(
+                        "  {} {}",
+                        chalk("export").bold(),
+                        chalk(format!("{:?}", e)).cyan()
+                    ));
                     exports += 1;
                 }
                 _ => {}

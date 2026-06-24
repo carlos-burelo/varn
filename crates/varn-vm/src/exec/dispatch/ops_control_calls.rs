@@ -36,6 +36,15 @@ impl ExecCtx {
                 let offset = ((code[*ip] as u32) << 16 | code[*ip + 1] as u32) as usize;
                 *ip += 2;
                 *ip -= offset;
+                // Collect on loop back-edges, not only at call boundaries. A long,
+                // call-free allocating loop (e.g. string concatenation) would
+                // otherwise never reach a GC check and exhaust memory.
+                if self.heap.needs_minor_gc() {
+                    self.run_minor_gc();
+                }
+                if self.heap.needs_gc() {
+                    self.trigger_gc();
+                }
                 Ok(Some(ControlCallFlow::ContinueInstruction))
             }
             OpCode::JumpIfFalse => {

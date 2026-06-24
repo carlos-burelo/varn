@@ -87,11 +87,12 @@ fn compile_source(source: &str, path: &str) -> Result<FunctionProto, String> {
         varn_parser::parse(tokens, lexeme_buf, path).map_err(|errs| errs[0].message.clone())?;
     varn_core::assign_ast_ids(&mut program);
     let check = varn_checker::Checker::check(&program);
-    let exports = if path.starts_with("std:") || path.starts_with("core:") || path.starts_with("runtime:") {
-        varn_checker::module_resolver::resolve_stdlib_module_exports_ref(path)
-    } else {
-        varn_checker::module_resolver::resolve_module_exports_ref(path, &mut vec![])
-    };
+    let exports =
+        if path.starts_with("std:") || path.starts_with("core:") || path.starts_with("runtime:") {
+            varn_checker::module_resolver::resolve_stdlib_module_exports_ref(path)
+        } else {
+            varn_checker::module_resolver::resolve_module_exports_ref(path, &mut vec![])
+        };
     let mut export_names: Vec<std::rc::Rc<str>> = exports
         .keys()
         .map(|k| std::rc::Rc::from(k.as_str()))

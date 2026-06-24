@@ -1,19 +1,17 @@
+pub mod add;
 pub mod bench;
-pub mod cache;
 pub mod build;
+pub mod cache;
 pub mod check;
 pub mod completions;
 pub mod debug;
 pub mod doctor;
 pub mod eval;
 pub mod init;
+pub mod install;
 pub mod lsp;
 pub mod pkg;
+pub mod remove;
 pub mod repl;
 pub mod run;
-
-// kept for pkg subcommand dispatch
-pub mod add;
-pub mod install;
-pub mod remove;
 pub mod update;

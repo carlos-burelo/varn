@@ -18,7 +18,13 @@ pub fn enrich_call_returns(bind: &mut BindResult) {
     for entry in &pending {
         match entry {
             PendingEnrich::Var { sym_id, init } => {
-                if bind.arena.get(*sym_id).ty.as_ref().map_or(false, |t| !t.is_dynamic()) {
+                if bind
+                    .arena
+                    .get(*sym_id)
+                    .ty
+                    .as_ref()
+                    .map_or(false, |t| !t.is_dynamic())
+                {
                     continue;
                 }
                 let expr: &Expr = unsafe { &**init };
@@ -103,6 +109,13 @@ pub fn enrich_call_returns(bind: &mut BindResult) {
                             if let crate::types::Type(varn_core::TypeKind::Fn(ft), _) = &mut m.ty {
                                 ft.return_type = Box::new(final_ret.clone());
                             }
+                            if let Some(symbol_id) = m.symbol_id {
+                                if let Some(crate::types::Type(varn_core::TypeKind::Fn(ft), _)) =
+                                    &mut bind.arena.get_mut(symbol_id).ty
+                                {
+                                    ft.return_type = Box::new(final_ret.clone());
+                                }
+                            }
                         }
                     }
                 }
@@ -136,6 +149,9 @@ pub fn enrich_call_returns(bind: &mut BindResult) {
                             .find(|m| m.name.as_ref() == key.as_ref())
                         {
                             m.ty = ret.clone();
+                            if let Some(symbol_id) = m.symbol_id {
+                                bind.arena.get_mut(symbol_id).ty = Some(ret.clone());
+                            }
                         }
                     }
                 }

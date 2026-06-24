@@ -1,10 +1,8 @@
 use crate::assembler::Reg;
+use crate::codegen::CodegenCtx;
 use crate::regalloc::{emit_flush_all, emit_load, emit_reload_all};
 use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
-use crate::codegen::CodegenCtx;
 
-/// DefineGlobal: ip+2 (src=hi(w1), name_idx=code[ip+1]), void
-/// Signature: jit_define_global(ctx, src_val, name_idx) -> void
 pub(crate) fn emit_define_global(ctx: &mut CodegenCtx, _first_reg: usize) {
     let asm = &mut ctx.asm;
     let code = ctx.code;
@@ -53,8 +51,6 @@ pub(crate) fn emit_define_global(ctx: &mut CodegenCtx, _first_reg: usize) {
     emit_reload_all(asm, regmap);
 }
 
-/// StoreGlobal: ip+2 (src=hi(w1), name_idx=code[ip+1]), void
-/// Signature: jit_store_global(ctx, src_val, name_idx) -> void
 pub(crate) fn emit_store_global(ctx: &mut CodegenCtx, _first_reg: usize) {
     let asm = &mut ctx.asm;
     let code = ctx.code;

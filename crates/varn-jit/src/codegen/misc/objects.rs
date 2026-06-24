@@ -1,12 +1,10 @@
 use crate::assembler::Reg;
-use crate::regalloc::{emit_flush_all, emit_load, emit_reload_all, emit_reload_all_except, emit_store};
-use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
 use crate::codegen::CodegenCtx;
+use crate::regalloc::{
+    emit_flush_all, emit_load, emit_reload_all, emit_reload_all_except, emit_store,
+};
+use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
 
-/// BuildObject: ip+1+count*2 (variable)
-/// w1: dest=hi(w1), count=lo(w1); followed by count*(key_idx, val_reg) pairs
-/// Passes ip_offset (position of w1) to helper
-/// Signature: jit_build_object(ctx, ip_offset) -> VmValue
 pub(crate) fn emit_build_object(ctx: &mut CodegenCtx, _first_reg: usize) {
     let asm = &mut ctx.asm;
     let code = ctx.code;
@@ -19,11 +17,10 @@ pub(crate) fn emit_build_object(ctx: &mut CodegenCtx, _first_reg: usize) {
     *ip += 1;
     let dest = (w1 >> 8) as usize;
     let count = (w1 & 0xFF) as usize;
-    *ip += count * 2; // skip all key+val pairs
+    *ip += count * 2;
 
     emit_flush_all(asm, regmap);
 
-    // Reload closure pointer from saved stack slot
     asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
 
     asm.push(ARG_CTX);
@@ -62,9 +59,6 @@ pub(crate) fn emit_build_object(ctx: &mut CodegenCtx, _first_reg: usize) {
     emit_reload_all_except(asm, regmap, Some(dest));
 }
 
-/// ObjectRest: ip+2+skip_count (variable)
-/// w1: dest=hi(w1), src=lo(w1); w2: skip_count=hi(w2); followed by skip_count key indices
-/// Signature: jit_object_rest(ctx, ip_offset) -> VmValue
 pub(crate) fn emit_object_rest(ctx: &mut CodegenCtx, _first_reg: usize) {
     let asm = &mut ctx.asm;
     let code = ctx.code;
@@ -79,11 +73,10 @@ pub(crate) fn emit_object_rest(ctx: &mut CodegenCtx, _first_reg: usize) {
     let w2 = code[*ip];
     *ip += 1;
     let skip_count = (w2 >> 8) as usize;
-    *ip += skip_count; // skip the key indices
+    *ip += skip_count;
 
     emit_flush_all(asm, regmap);
 
-    // Reload closure pointer from saved stack slot
     asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
 
     asm.push(ARG_CTX);
@@ -122,8 +115,6 @@ pub(crate) fn emit_object_rest(ctx: &mut CodegenCtx, _first_reg: usize) {
     emit_reload_all_except(asm, regmap, Some(dest));
 }
 
-/// GetFixedField: ip+2 (obj_reg=hi(code[ip]), slot=code[ip+1]), dest=first_reg
-/// Signature: jit_get_fixed_field(ctx, obj, slot) -> VmValue
 pub(crate) fn emit_get_fixed_field(ctx: &mut CodegenCtx, first_reg: usize) {
     let asm = &mut ctx.asm;
     let code = ctx.code;
@@ -176,8 +167,6 @@ pub(crate) fn emit_get_fixed_field(ctx: &mut CodegenCtx, first_reg: usize) {
     emit_reload_all_except(asm, regmap, Some(first_reg));
 }
 
-/// SetFixedField: ip+2 (val_reg=hi(code[ip]), slot=code[ip+1]), obj=first_reg
-/// Signature: jit_set_fixed_field(ctx, obj, slot, val) -> void
 pub(crate) fn emit_set_fixed_field(ctx: &mut CodegenCtx, first_reg: usize) {
     let asm = &mut ctx.asm;
     let code = ctx.code;
@@ -191,8 +180,8 @@ pub(crate) fn emit_set_fixed_field(ctx: &mut CodegenCtx, first_reg: usize) {
     *ip += 1;
 
     emit_flush_all(asm, regmap);
-    emit_load(asm, Reg::Rax, first_reg, regmap); // obj
-    emit_load(asm, Reg::R11, val_reg, regmap);   // val
+    emit_load(asm, Reg::Rax, first_reg, regmap);
+    emit_load(asm, Reg::R11, val_reg, regmap);
 
     asm.push(ARG_CTX);
     asm.push(ARG_CLOSURE);
@@ -207,12 +196,10 @@ pub(crate) fn emit_set_fixed_field(ctx: &mut CodegenCtx, first_reg: usize) {
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    // set_fixed_field(ctx, obj, slot, val) - 4 args
-    // Must set ARG_CTX = ARG_EXEC_CTX FIRST before overwriting ARG_EXEC_CTX
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);     // arg1 = ctx
-    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);      // arg2 = obj
-    asm.mov_reg_imm64(ARG_BASE, slot as u64);    // arg3 = slot
-    asm.mov_reg_reg(ARG_EXEC_CTX, Reg::R11);     // arg4 = val
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
+    asm.mov_reg_imm64(ARG_BASE, slot as u64);
+    asm.mov_reg_reg(ARG_EXEC_CTX, Reg::R11);
 
     asm.mov_reg_imm64(Reg::R10, helpers.set_fixed_field as u64);
     asm.call_reg(Reg::R10);
@@ -231,8 +218,6 @@ pub(crate) fn emit_set_fixed_field(ctx: &mut CodegenCtx, first_reg: usize) {
     emit_reload_all(asm, regmap);
 }
 
-/// GetPropertyMaybe: ip+2 (obj_reg=hi(code[ip]), name_idx=code[ip+1]), dest=first_reg
-/// Signature: jit_get_property_maybe(ctx, obj, name_idx) -> VmValue
 pub(crate) fn emit_get_property_maybe(ctx: &mut CodegenCtx, first_reg: usize) {
     let asm = &mut ctx.asm;
     let code = ctx.code;
@@ -285,8 +270,6 @@ pub(crate) fn emit_get_property_maybe(ctx: &mut CodegenCtx, first_reg: usize) {
     emit_reload_all_except(asm, regmap, Some(first_reg));
 }
 
-/// GetSuper: ip+1 (name_idx=code[ip]), dest=first_reg
-/// Signature: jit_get_super(ctx, name_idx) -> VmValue
 pub(crate) fn emit_get_super(ctx: &mut CodegenCtx, first_reg: usize) {
     let asm = &mut ctx.asm;
     let code = ctx.code;
@@ -335,8 +318,6 @@ pub(crate) fn emit_get_super(ctx: &mut CodegenCtx, first_reg: usize) {
     emit_reload_all_except(asm, regmap, Some(first_reg));
 }
 
-/// GetSymbol: ip+2 (obj_reg=hi(code[ip]), sym_idx=code[ip+1]), dest=first_reg
-/// Signature: jit_get_symbol(ctx, obj, sym_idx) -> VmValue
 pub(crate) fn emit_get_symbol(ctx: &mut CodegenCtx, first_reg: usize) {
     let asm = &mut ctx.asm;
     let code = ctx.code;

@@ -3,9 +3,9 @@ use std::rc::Rc;
 
 use crate::native::NativeFn;
 use crate::resource::ResourceStore;
+use crate::value::SendValue;
 use crate::vm_value::VmValue;
 use crate::ClassObj;
-use crate::value::SendValue;
 
 pub trait NativeCtx {
     fn null_val(&self) -> VmValue {

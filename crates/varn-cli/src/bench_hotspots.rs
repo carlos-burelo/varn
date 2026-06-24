@@ -31,7 +31,6 @@ pub fn print_hotspots(h: &HotspotCounters) {
     terminal::blank();
     terminal::log(chalk("Runtime Hotspots").cyan().bold());
 
-    // Functions
     if !h.fn_calls.is_empty() {
         section_blank();
         section_header("Functions");
@@ -53,7 +52,6 @@ pub fn print_hotspots(h: &HotspotCounters) {
         }
     }
 
-    // Methods
     if !h.method_calls.is_empty() {
         section_blank();
         section_header("Methods");
@@ -75,7 +73,6 @@ pub fn print_hotspots(h: &HotspotCounters) {
         }
     }
 
-    // Natives
     if !h.native_calls.is_empty() {
         section_blank();
         section_header("Native Calls");
@@ -88,8 +85,7 @@ pub fn print_hotspots(h: &HotspotCounters) {
                 fmt_num(**count),
             ));
         }
-        // Total wall-time spent inside native builtins (self-time): the actual
-        // cost, vs the call counts above. Compare against the `execute` phase.
+
         if h.total_native_ns > 0 {
             terminal::log(format!(
                 "  {:<W_NAME$}  {:>W_COUNT$}",
@@ -99,7 +95,6 @@ pub fn print_hotspots(h: &HotspotCounters) {
         }
     }
 
-    // Globals
     if !h.global_accesses.is_empty() {
         section_blank();
         section_header("Global Accesses");
@@ -114,7 +109,6 @@ pub fn print_hotspots(h: &HotspotCounters) {
         }
     }
 
-    // Allocations
     if !h.alloc_types.is_empty() {
         section_blank();
         section_header("Allocation Types");

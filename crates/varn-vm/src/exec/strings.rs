@@ -17,12 +17,15 @@ pub fn str_length(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
 pub fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
     let sa = heap.str_repr(a);
     let sb = heap.str_repr(b);
-    heap.alloc_str(format!("{}{}", sa, sb))
+    let mut out = String::with_capacity(sa.len() + sb.len());
+    out.push_str(&sa);
+    out.push_str(&sb);
+    heap.alloc_str_dynamic(out)
 }
 
 pub fn to_string(val: VmValue, heap: &mut Heap) -> VmValue {
     let s = heap.str_repr(val);
-    heap.alloc_str(s)
+    heap.alloc_str_dynamic(s)
 }
 
 pub fn str_slice(
@@ -58,7 +61,7 @@ pub fn str_slice(
     let ei = ei.max(si);
 
     let result: String = chars[si..ei].iter().collect();
-    Ok(heap.alloc_str(result))
+    Ok(heap.alloc_str_dynamic(result))
 }
 
 fn normalize_index(idx: i32, len: i32) -> usize {

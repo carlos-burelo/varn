@@ -1,14 +1,9 @@
-//! Statement AST→HIR lowering.
-
 use varn_core::ast::operators::AssignOp;
 use varn_core::ast::{Decl, ExprKind, ForInit, Pattern, Stmt, StmtKind};
 
 use super::*;
 
 impl<'a> Lowerer<'a> {
-    /// Lower a statement that introduces its own block scope, returning the
-    /// lowered body (with a trailing `CloseUpvalues` if the block captured any
-    /// bindings).
     fn lower_block(&mut self, stmt: &Stmt, scope: &mut Scope) -> R<Vec<HirStmt>> {
         let mut out = Vec::new();
         scope.push_block();
@@ -25,15 +20,7 @@ impl<'a> Lowerer<'a> {
         Ok(out)
     }
 
-    /// Lower a loop/clause body (a block or single statement) into `out` within
-    /// the *current*, already-pushed block scope — so a loop variable declared
-    /// in that block is visible to the body.
-    fn lower_body_into(
-        &mut self,
-        body: &Stmt,
-        scope: &mut Scope,
-        out: &mut Vec<HirStmt>,
-    ) -> R<()> {
+    fn lower_body_into(&mut self, body: &Stmt, scope: &mut Scope, out: &mut Vec<HirStmt>) -> R<()> {
         match &body.kind {
             StmtKind::Block { stmts } => {
                 for s in stmts {
@@ -68,7 +55,11 @@ impl<'a> Lowerer<'a> {
                     } else {
                         false
                     };
-                    if matches!(op, AssignOp::AndAssign | AssignOp::OrAssign | AssignOp::NullishAssign) || is_super {
+                    if matches!(
+                        op,
+                        AssignOp::AndAssign | AssignOp::OrAssign | AssignOp::NullishAssign
+                    ) || is_super
+                    {
                         let expr = self.lower_expr(expression.as_ref(), scope)?;
                         out.push(HirStmt::Expr(expr));
                         return Ok(());
@@ -78,12 +69,11 @@ impl<'a> Lowerer<'a> {
                         object,
                         property,
                         computed,
-                        // `optional` (`o?.x = v`) ignored — matches legacy store.
                         ..
                     } = &target.kind
                     {
                         let off = target.range.start.offset;
-                        // Extension setter `x.k = v` → `__extset_T_k(x, v)`.
+
                         if let Some(mangled) = self.extension_set_members.get(&off).cloned() {
                             let recv = self.lower_expr(object.as_ref(), scope)?;
                             let val = self.lower_expr(value.as_ref(), scope)?;
@@ -120,7 +110,11 @@ impl<'a> Lowerer<'a> {
                             } else {
                                 let name = match &property.kind {
                                     ExprKind::Identifier { name } => name.clone(),
-                                    _ => return Err(OptError::Unsupported("hir: non-identifier property assign")),
+                                    _ => {
+                                        return Err(OptError::Unsupported(
+                                            "hir: non-identifier property assign",
+                                        ))
+                                    }
                                 };
                                 let value = self.lower_expr(value.as_ref(), scope)?;
                                 let current_val = HirExpr::Member {
@@ -154,7 +148,11 @@ impl<'a> Lowerer<'a> {
                         } else {
                             let name = match &property.kind {
                                 ExprKind::Identifier { name } => name.clone(),
-                                _ => return Err(OptError::Unsupported("hir: non-identifier property assign")),
+                                _ => {
+                                    return Err(OptError::Unsupported(
+                                        "hir: non-identifier property assign",
+                                    ))
+                                }
                             };
                             let value = self.lower_expr(value.as_ref(), scope)?;
                             out.push(HirStmt::SetMember {
@@ -167,7 +165,9 @@ impl<'a> Lowerer<'a> {
                     }
                     let binding = match &target.kind {
                         ExprKind::Identifier { name } => self.resolve(name, scope),
-                        _ => return Err(OptError::Unsupported("hir: non-identifier assign target")),
+                        _ => {
+                            return Err(OptError::Unsupported("hir: non-identifier assign target"))
+                        }
                     };
                     let val_expr = self.lower_expr(value.as_ref(), scope)?;
                     let value = match op {
@@ -202,9 +202,7 @@ impl<'a> Lowerer<'a> {
                         self.desugar_pattern_local(&d.id, value, scope, out)?;
                     }
                 }
-                // Nested function declaration → closure bound to a local. Bind
-                // the name *before* lowering the body so the body can capture
-                // itself (recursion via an open upvalue on this local slot).
+
                 Decl::Function(f) => {
                     let local = scope.alloc_local(f.id.clone());
                     let (func, upvalues) = self.lower_function(f, scope)?;
@@ -298,8 +296,6 @@ impl<'a> Lowerer<'a> {
                 update,
                 body,
             } => {
-                // Desugar `for (init; test; update) body`
-                //   -> init; while (test) { body; update }
                 scope.push_block();
                 if let Some(init) = init {
                     match init.as_ref() {
@@ -322,8 +318,7 @@ impl<'a> Lowerer<'a> {
                     Some(t) => self.lower_expr(t, scope)?,
                     None => HirExpr::Bool(true),
                 };
-                // `continue` must run `update` (not skip it), so the update is a
-                // dedicated field rather than appended to the body.
+
                 let body = self.lower_block(body, scope)?;
                 let update = match update {
                     Some(u) => vec![HirStmt::Expr(self.lower_expr(u, scope)?)],
@@ -340,9 +335,6 @@ impl<'a> Lowerer<'a> {
                 is_await,
                 ..
             } => {
-                // The iterable is evaluated in the enclosing scope (it cannot
-                // reference the loop variable), which is then bound per-iteration
-                // in the body's block.
                 let iterable = self.lower_expr(right, scope)?;
                 scope.push_block();
                 let (loop_var, must_desugar) = match left {
@@ -351,7 +343,12 @@ impl<'a> Lowerer<'a> {
                 };
                 let mut hbody = Vec::new();
                 if must_desugar {
-                    self.desugar_pattern_local(left, HirExpr::Var(HirBinding::Local(loop_var)), scope, &mut hbody)?;
+                    self.desugar_pattern_local(
+                        left,
+                        HirExpr::Var(HirBinding::Local(loop_var)),
+                        scope,
+                        &mut hbody,
+                    )?;
                 }
                 if let Err(e) = self.lower_body_into(body, scope, &mut hbody) {
                     scope.pop_block();
@@ -377,7 +374,12 @@ impl<'a> Lowerer<'a> {
                 };
                 let mut hbody = Vec::new();
                 if must_desugar {
-                    self.desugar_pattern_local(left, HirExpr::Var(HirBinding::Local(loop_var)), scope, &mut hbody)?;
+                    self.desugar_pattern_local(
+                        left,
+                        HirExpr::Var(HirBinding::Local(loop_var)),
+                        scope,
+                        &mut hbody,
+                    )?;
                 }
                 if let Err(e) = self.lower_body_into(body, scope, &mut hbody) {
                     scope.pop_block();
@@ -392,8 +394,6 @@ impl<'a> Lowerer<'a> {
                 });
             }
             StmtKind::DoWhile { body, test } => {
-                // Body's block-scoped locals are not visible to the trailing
-                // test, so the test is lowered after the body's block closes.
                 let hbody = self.lower_block(body, scope)?;
                 let test = self.lower_expr(test, scope)?;
                 out.push(HirStmt::DoWhile { body: hbody, test });
@@ -403,7 +403,7 @@ impl<'a> Lowerer<'a> {
                 cases,
             } => {
                 let disc = self.lower_expr(discriminant, scope)?;
-                // All cases share one block scope (JS switch-block semantics).
+
                 scope.push_block();
                 let mut hcases = Vec::new();
                 let mut err = None;
@@ -432,12 +432,13 @@ impl<'a> Lowerer<'a> {
                     return Err(e);
                 }
                 let (captured, disposables) = scope.pop_block();
-                out.push(HirStmt::Switch { disc, cases: hcases });
+                out.push(HirStmt::Switch {
+                    disc,
+                    cases: hcases,
+                });
                 block_epilogue(out, captured, disposables);
             }
-            // Labels are ignored (legacy `stmt.rs` does the same): `break`/
-            // `continue` always target the innermost loop, and `Labeled` just
-            // lowers its body.
+
             StmtKind::Break { .. } => out.push(HirStmt::Break),
             StmtKind::Continue { .. } => out.push(HirStmt::Continue),
             StmtKind::Labeled { body, .. } => self.lower_stmt(body, scope, out)?,
@@ -496,9 +497,7 @@ impl<'a> Lowerer<'a> {
                             Some(Pattern::Identifier { name, .. }) => {
                                 Some(scope.alloc_local(name.clone()))
                             }
-                            Some(_) => {
-                                Some(scope.alloc_temp())
-                            }
+                            Some(_) => Some(scope.alloc_temp()),
                         };
                         let mut body = Vec::new();
                         if let Some(param_local) = param {

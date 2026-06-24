@@ -3,9 +3,6 @@ use varn_op_macros::varn_contract;
 use varn_types::value::{MapRef, Value};
 use varn_types::{NativeCtx, VmValue, VnArray};
 
-// `List`/`Stack`/`Queue`/`Record` of `std:collections`. The `.vn` carries the
-// declarations (and Varn-visible bodies); these native impls back the runtime.
-
 pub struct List;
 pub struct Stack;
 pub struct Queue;
@@ -27,14 +24,17 @@ fn ensure_items(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
 
 fn items_to_vec(ctx: &dyn NativeCtx, items: VmValue) -> Vec<VmValue> {
     let len = ctx.array_len(items);
-    (0..len).map(|i| ctx.array_get(items, i).unwrap_or_else(VmValue::null)).collect()
+    (0..len)
+        .map(|i| ctx.array_get(items, i).unwrap_or_else(VmValue::null))
+        .collect()
 }
 
 fn get_record_entries(ctx: &dyn NativeCtx, this: VmValue) -> Option<MapRef> {
-    ctx.get_field(this, "entries").and_then(|v| match ctx.extract(v) {
-        Value::Map(map) => Some(map),
-        _ => None,
-    })
+    ctx.get_field(this, "entries")
+        .and_then(|v| match ctx.extract(v) {
+            Value::Map(map) => Some(map),
+            _ => None,
+        })
 }
 
 fn ensure_record_entries(ctx: &mut dyn NativeCtx, this: VmValue) -> MapRef {

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use super::ir::IrModule;
+use crate::ir::IrModule;
 
 #[derive(Debug, Clone)]
 pub struct LiveRange {
@@ -66,12 +66,6 @@ impl LivenessAnalyzer {
         self.live_ranges.clear();
 
         for vreg in vregs_used {
-            // A register needs a live range if it is defined. With uses, the
-            // range spans def..last-use; **without** uses (e.g. a `for-in`/`for-of`
-            // loop variable the body never reads) it still gets a *point* range at
-            // the def, so it interferes with whatever is live there and the
-            // colourer can't alias another live value onto its slot — which would
-            // be clobbered by the (otherwise dead) write.
             if let Some(&start_val) = self.def_sites.get(&vreg) {
                 let mut start = start_val;
                 let mut end = self

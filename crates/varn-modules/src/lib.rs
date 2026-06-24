@@ -52,7 +52,6 @@ pub const STD_TEST: &str = "std:test";
 pub const STD_TIME: &str = "std:time";
 pub const STD_TYPES: &str = "std:types";
 
-/// runtime:* ABI boundary — unstable, runtime-versioned, not for direct user import.
 pub const RUNTIME_PREFIX: &str = "runtime:";
 pub const RUNTIME_FS: &str = "runtime:fs";
 pub const RUNTIME_IO: &str = "runtime:io";
@@ -66,11 +65,6 @@ pub const RUNTIME_REFLECT: &str = "runtime:reflect";
 pub const RUNTIME_JSON: &str = "runtime:json";
 pub const RUNTIME_PATH: &str = "runtime:path";
 pub const RUNTIME_TEST: &str = "runtime:test";
-
-// The set of core/std/runtime modules is derived at runtime from the embedded
-// module registry (each `ModuleSpec` carries its `ModuleKind`), so there is a
-// single source of truth — the `module.json` files scanned at build time — and
-// no hand-maintained list to drift out of sync.
 
 fn module_ids_of_kind(kind: ModuleKind) -> Vec<&'static str> {
     provider::get()
@@ -96,9 +90,10 @@ pub fn runtime_module_ids() -> Vec<&'static str> {
     module_ids_of_kind(ModuleKind::Runtime)
 }
 
-/// True for any registered core/std/runtime module specifier.
 pub fn is_known_stdlib_module(specifier: &str) -> bool {
-    provider::get().and_then(|p| p.spec_for(specifier)).is_some()
+    provider::get()
+        .and_then(|p| p.spec_for(specifier))
+        .is_some()
 }
 
 pub use spec::{ModuleKind, ModuleSpec};

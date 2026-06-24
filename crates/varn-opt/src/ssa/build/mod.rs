@@ -1,21 +1,5 @@
-//! HIR → SSA construction (Braun et al. 2013, on-the-fly).
-//!
-//! Variables (params + locals) become SSA [`Value`]s via per-block `write`/`read`
-//! definition maps. At a merge point a read of a variable with no local
-//! definition creates a **block parameter** (the phi equivalent) and recurses
-//! into the predecessors for the operands; predecessors carry the operands as
-//! block arguments on their terminators.
-//!
-//! Blocks are *sealed* once all their predecessors are known. Reads in a sealed
-//! block resolve immediately; reads in an unsealed block (loop headers, whose
-//! back-edge is not yet built) record an incomplete phi filled at seal time.
-//!
-//! Trivial phis (one distinct operand, or only self) are removed by a fixpoint
-//! [`simplify_phis`] post-pass, which keeps the SSA minimal without interleaving
-//! use-replacement with construction.
-
-use std::rc::Rc;
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::rc::Rc;
 
 use crate::hir::{
     HirArrayEl, HirAssignTarget, HirBinding, HirExpr, HirFunction, HirObjectProp,
@@ -27,8 +11,6 @@ use super::ir::{Block, BlockId, Inst, InstKind, SsaFunc, Terminator, Value, Valu
 
 type Result<T> = std::result::Result<T, OptError>;
 
-/// The enclosing loop's branch targets, pushed while a loop body is lowered so
-/// `break`/`continue` know where to jump.
 #[derive(Debug, Clone, Copy)]
 struct LoopCtx {
     continue_target: BlockId,
@@ -40,18 +22,17 @@ struct Builder {
     blocks: Vec<Block>,
     values: Vec<ValueDef>,
     sealed: Vec<bool>,
-    /// Braun's `currentDef`: `(variable, block)` → its value in that block.
+
     defs: FxHashMap<(VarId, BlockId), Value>,
-    /// Static type of each variable (for typing freshly created phis).
+
     var_ty: FxHashMap<VarId, HirType>,
-    /// Phis created in a block before it was sealed; operands filled on seal.
+
     incomplete_phis: FxHashMap<BlockId, Vec<(VarId, Value)>>,
-    /// Enclosing loops, innermost last (`break`/`continue` targets).
+
     loops: Vec<LoopCtx>,
-    /// Next id for a synthetic loop variable (e.g. a `for-in` index). Set above
-    /// the function's real local count so it never collides.
+
     next_synthetic: u32,
-    /// The block instructions are currently appended to.
+
     current: BlockId,
     pinned_vars: FxHashSet<VarId>,
     finally_stack: Vec<Vec<HirStmt>>,
@@ -73,7 +54,7 @@ impl Builder {
             finally_stack: Vec::new(),
         };
         let entry = b.new_block();
-        b.sealed[entry.0 as usize] = true; // entry has no predecessors
+        b.sealed[entry.0 as usize] = true;
         b.current = entry;
         b
     }
@@ -100,9 +81,11 @@ impl Builder {
         &mut self.blocks[id.0 as usize]
     }
 
-    /// The current block accepts no more instructions once it has a terminator.
     fn is_open(&self) -> bool {
-        matches!(self.blocks[self.current.0 as usize].term, Terminator::Unreachable)
+        matches!(
+            self.blocks[self.current.0 as usize].term,
+            Terminator::Unreachable
+        )
     }
 
     fn set_term(&mut self, term: Terminator) {
@@ -113,7 +96,6 @@ impl Builder {
         self.block_mut(block).preds.push(pred);
     }
 
-    /// Append an instruction defining a fresh value of `ty` to the current block.
     fn emit(&mut self, kind: InstKind, ty: HirType) -> Value {
         let dest = self.new_value(ty);
         self.block_mut(self.current).insts.push(Inst {
@@ -123,20 +105,17 @@ impl Builder {
         dest
     }
 
-    /// Append a side-effecting instruction that produces no value (`dest: None`).
     fn emit_effect(&mut self, kind: InstKind) {
-        self.block_mut(self.current).insts.push(Inst { dest: None, kind });
+        self.block_mut(self.current)
+            .insts
+            .push(Inst { dest: None, kind });
     }
 
-    /// A fresh synthetic loop variable (e.g. a `for-in` index), SSA-renamed by
-    /// the normal Braun machinery.
     fn fresh_synthetic(&mut self) -> VarId {
         let id = VarId::Local(LocalId(self.next_synthetic));
         self.next_synthetic += 1;
         id
     }
-
-    // ----- variable read/write (Braun) -----------------------------------
 
     fn write_var(&mut self, var: VarId, block: BlockId, value: Value) {
         self.var_ty.insert(var, self.values[value.0 as usize].ty);
@@ -157,9 +136,11 @@ impl Builder {
             .ok_or(OptError::Unsupported("ssa: read of undefined variable"))?;
 
         if !self.sealed[block.0 as usize] {
-            // Loop header not yet sealed: emit a phi now, fill operands on seal.
             let phi = self.add_block_param(block, ty);
-            self.incomplete_phis.entry(block).or_default().push((var, phi));
+            self.incomplete_phis
+                .entry(block)
+                .or_default()
+                .push((var, phi));
             self.write_var(var, block, phi);
             return Ok(phi);
         }
@@ -169,7 +150,7 @@ impl Builder {
             self.read_var(var, preds[0])?
         } else {
             let phi = self.add_block_param(block, ty);
-            self.write_var(var, block, phi); // break cycles before recursing
+            self.write_var(var, block, phi);
             self.add_phi_operands(var, block, phi)?;
             phi
         };
@@ -183,8 +164,6 @@ impl Builder {
         v
     }
 
-    /// Fill a phi's operands: for each predecessor, append the variable's value
-    /// on that edge as a block argument at the phi's parameter position.
     fn add_phi_operands(&mut self, var: VarId, block: BlockId, phi: Value) -> Result<()> {
         let pos = self.blocks[block.0 as usize]
             .params
@@ -198,8 +177,6 @@ impl Builder {
         Ok(())
     }
 
-    /// Append `arg` to the `pred -> block` edge's argument list (must land at
-    /// index `pos`, i.e. operands are filled in parameter order).
     fn append_edge_arg(&mut self, pred: BlockId, block: BlockId, pos: usize, arg: Value) {
         match &mut self.block_mut(pred).term {
             Terminator::Jump { target, args } if *target == block => {
@@ -235,8 +212,6 @@ impl Builder {
         self.sealed[block.0 as usize] = true;
     }
 
-    /// Read any binding to a `Value`. Params/locals are SSA-tracked variables;
-    /// globals and upvalues are external state read by `LoadGlobal`/`LoadUpvalue`.
     pub(super) fn load_binding(&mut self, binding: &HirBinding) -> Result<Value> {
         let var = match binding {
             HirBinding::Param(i) => VarId::Param(*i),
@@ -256,14 +231,15 @@ impl Builder {
         }
     }
 
-    /// Write any binding from a `Value`. Params/locals update the SSA def map;
-    /// globals and upvalues emit a side-effecting `StoreGlobal`/`StoreUpvalue`.
     pub(super) fn store_binding(&mut self, binding: &HirBinding, value: Value) {
         let var = match binding {
             HirBinding::Param(i) => VarId::Param(*i),
             HirBinding::Local(id) => VarId::Local(*id),
             HirBinding::Global(name) => {
-                self.emit_effect(InstKind::StoreGlobal { name: name.clone(), value });
+                self.emit_effect(InstKind::StoreGlobal {
+                    name: name.clone(),
+                    value,
+                });
                 return;
             }
             HirBinding::Upvalue(uv) => {
@@ -291,8 +267,12 @@ fn scan_stmt(stmt: &HirStmt, pinned: &mut FxHashSet<VarId>, in_try: bool) {
             scan_expr(value, pinned, in_try);
             if in_try {
                 match target {
-                    HirBinding::Local(id) => { pinned.insert(VarId::Local(*id)); }
-                    HirBinding::Param(i) => { pinned.insert(VarId::Param(*i)); }
+                    HirBinding::Local(id) => {
+                        pinned.insert(VarId::Local(*id));
+                    }
+                    HirBinding::Param(i) => {
+                        pinned.insert(VarId::Param(*i));
+                    }
                     _ => {}
                 }
             }
@@ -301,7 +281,11 @@ fn scan_stmt(stmt: &HirStmt, pinned: &mut FxHashSet<VarId>, in_try: bool) {
             scan_expr(object, pinned, in_try);
             scan_expr(value, pinned, in_try);
         }
-        HirStmt::SetIndex { object, index, value } => {
+        HirStmt::SetIndex {
+            object,
+            index,
+            value,
+        } => {
             scan_expr(object, pinned, in_try);
             scan_expr(index, pinned, in_try);
             scan_expr(value, pinned, in_try);
@@ -312,46 +296,80 @@ fn scan_stmt(stmt: &HirStmt, pinned: &mut FxHashSet<VarId>, in_try: bool) {
             }
         }
         HirStmt::Throw(expr) => scan_expr(expr, pinned, in_try),
-        HirStmt::If { test, then_body, else_body } => {
+        HirStmt::If {
+            test,
+            then_body,
+            else_body,
+        } => {
             scan_expr(test, pinned, in_try);
-            for s in then_body { scan_stmt(s, pinned, in_try); }
-            for s in else_body { scan_stmt(s, pinned, in_try); }
+            for s in then_body {
+                scan_stmt(s, pinned, in_try);
+            }
+            for s in else_body {
+                scan_stmt(s, pinned, in_try);
+            }
         }
         HirStmt::While { test, body } => {
             scan_expr(test, pinned, in_try);
-            for s in body { scan_stmt(s, pinned, in_try); }
+            for s in body {
+                scan_stmt(s, pinned, in_try);
+            }
         }
         HirStmt::ForClassic { test, update, body } => {
             scan_expr(test, pinned, in_try);
-            for s in update { scan_stmt(s, pinned, in_try); }
-            for s in body { scan_stmt(s, pinned, in_try); }
+            for s in update {
+                scan_stmt(s, pinned, in_try);
+            }
+            for s in body {
+                scan_stmt(s, pinned, in_try);
+            }
         }
         HirStmt::ForOf { iterable, body, .. } => {
             scan_expr(iterable, pinned, in_try);
-            for s in body { scan_stmt(s, pinned, in_try); }
+            for s in body {
+                scan_stmt(s, pinned, in_try);
+            }
         }
         HirStmt::ForIn { object, body, .. } => {
             scan_expr(object, pinned, in_try);
-            for s in body { scan_stmt(s, pinned, in_try); }
+            for s in body {
+                scan_stmt(s, pinned, in_try);
+            }
         }
         HirStmt::DoWhile { body, test } => {
-            for s in body { scan_stmt(s, pinned, in_try); }
+            for s in body {
+                scan_stmt(s, pinned, in_try);
+            }
             scan_expr(test, pinned, in_try);
         }
         HirStmt::Switch { disc, cases } => {
             scan_expr(disc, pinned, in_try);
             for c in cases {
-                if let Some(t) = &c.test { scan_expr(t, pinned, in_try); }
-                for s in &c.body { scan_stmt(s, pinned, in_try); }
+                if let Some(t) = &c.test {
+                    scan_expr(t, pinned, in_try);
+                }
+                for s in &c.body {
+                    scan_stmt(s, pinned, in_try);
+                }
             }
         }
-        HirStmt::Try { block, catch, finally } => {
-            for s in block { scan_stmt(s, pinned, true); }
+        HirStmt::Try {
+            block,
+            catch,
+            finally,
+        } => {
+            for s in block {
+                scan_stmt(s, pinned, true);
+            }
             if let Some(c) = catch {
-                for s in &c.body { scan_stmt(s, pinned, in_try); }
+                for s in &c.body {
+                    scan_stmt(s, pinned, in_try);
+                }
             }
             if let Some(f) = finally {
-                for s in f { scan_stmt(s, pinned, in_try); }
+                for s in f {
+                    scan_stmt(s, pinned, in_try);
+                }
             }
         }
         HirStmt::Dispose { target, .. } => {
@@ -367,7 +385,9 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
         HirExpr::TryOp(inner) => scan_expr(inner, pinned, in_try),
         HirExpr::TypeTest { value, .. } => scan_expr(value, pinned, in_try),
         HirExpr::Sequence(exprs) => {
-            for e in exprs { scan_expr(e, pinned, in_try); }
+            for e in exprs {
+                scan_expr(e, pinned, in_try);
+            }
         }
         HirExpr::Range { start, end, .. } => {
             scan_expr(start, pinned, in_try);
@@ -375,15 +395,21 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
         }
         HirExpr::Template(parts) => {
             for p in parts {
-                if let HirTemplatePart::Expr(e) = p { scan_expr(e, pinned, in_try); }
+                if let HirTemplatePart::Expr(e) = p {
+                    scan_expr(e, pinned, in_try);
+                }
             }
         }
         HirExpr::Assign { target, value } => {
             scan_expr(value, pinned, in_try);
             if in_try {
                 match &**target {
-                    HirAssignTarget::Var(HirBinding::Local(id)) => { pinned.insert(VarId::Local(*id)); }
-                    HirAssignTarget::Var(HirBinding::Param(i)) => { pinned.insert(VarId::Param(*i)); }
+                    HirAssignTarget::Var(HirBinding::Local(id)) => {
+                        pinned.insert(VarId::Local(*id));
+                    }
+                    HirAssignTarget::Var(HirBinding::Param(i)) => {
+                        pinned.insert(VarId::Param(*i));
+                    }
                     _ => {}
                 }
             }
@@ -395,10 +421,14 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
         HirExpr::Unary { operand, .. } => scan_expr(operand, pinned, in_try),
         HirExpr::Call { callee, args, .. } => {
             scan_expr(callee, pinned, in_try);
-            for a in args { scan_expr(a, pinned, in_try); }
+            for a in args {
+                scan_expr(a, pinned, in_try);
+            }
         }
         HirExpr::SelfCall { args, .. } => {
-            for a in args { scan_expr(a, pinned, in_try); }
+            for a in args {
+                scan_expr(a, pinned, in_try);
+            }
         }
         HirExpr::Member { object, .. } => scan_expr(object, pinned, in_try),
         HirExpr::Index { object, index, .. } => {
@@ -407,57 +437,93 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
         }
         HirExpr::MethodCall { recv, args, .. } => {
             scan_expr(recv, pinned, in_try);
-            for a in args { scan_expr(a, pinned, in_try); }
+            for a in args {
+                scan_expr(a, pinned, in_try);
+            }
         }
         HirExpr::SuperCall { args } => {
-            for a in args { scan_expr(a, pinned, in_try); }
+            for a in args {
+                scan_expr(a, pinned, in_try);
+            }
         }
         HirExpr::SuperMethodCall { args, .. } => {
-            for a in args { scan_expr(a, pinned, in_try); }
+            for a in args {
+                scan_expr(a, pinned, in_try);
+            }
         }
         HirExpr::ExtensionCall { recv, args, .. } => {
             scan_expr(recv, pinned, in_try);
-            for a in args { scan_expr(a, pinned, in_try); }
+            for a in args {
+                scan_expr(a, pinned, in_try);
+            }
         }
         HirExpr::Class(cls) => {
-            if let Some(sup) = &cls.super_class { scan_expr(sup, pinned, in_try); }
-            for (_, init) in &cls.static_fields {
-                if let Some(init) = init { scan_expr(init, pinned, in_try); }
+            if let Some(sup) = &cls.super_class {
+                scan_expr(sup, pinned, in_try);
             }
-            for deco in &cls.decorators { scan_expr(deco, pinned, in_try); }
+            for (_, init) in &cls.static_fields {
+                if let Some(init) = init {
+                    scan_expr(init, pinned, in_try);
+                }
+            }
+            for deco in &cls.decorators {
+                scan_expr(deco, pinned, in_try);
+            }
             for uv in &cls.ctor.upvalues {
                 match uv {
-                    HirUpvalueSrc::ParentLocal(id) => { pinned.insert(VarId::Local(*id)); }
-                    HirUpvalueSrc::ParentParam(i) => { pinned.insert(VarId::Param(*i)); }
+                    HirUpvalueSrc::ParentLocal(id) => {
+                        pinned.insert(VarId::Local(*id));
+                    }
+                    HirUpvalueSrc::ParentParam(i) => {
+                        pinned.insert(VarId::Param(*i));
+                    }
                     _ => {}
                 }
             }
-            for deco in &cls.ctor.decorators { scan_expr(deco, pinned, in_try); }
+            for deco in &cls.ctor.decorators {
+                scan_expr(deco, pinned, in_try);
+            }
             for m in &cls.methods {
                 for uv in &m.upvalues {
                     match uv {
-                        HirUpvalueSrc::ParentLocal(id) => { pinned.insert(VarId::Local(*id)); }
-                        HirUpvalueSrc::ParentParam(i) => { pinned.insert(VarId::Param(*i)); }
+                        HirUpvalueSrc::ParentLocal(id) => {
+                            pinned.insert(VarId::Local(*id));
+                        }
+                        HirUpvalueSrc::ParentParam(i) => {
+                            pinned.insert(VarId::Param(*i));
+                        }
                         _ => {}
                     }
                 }
-                for deco in &m.decorators { scan_expr(deco, pinned, in_try); }
+                for deco in &m.decorators {
+                    scan_expr(deco, pinned, in_try);
+                }
             }
             for m in &cls.static_methods {
                 for uv in &m.upvalues {
                     match uv {
-                        HirUpvalueSrc::ParentLocal(id) => { pinned.insert(VarId::Local(*id)); }
-                        HirUpvalueSrc::ParentParam(i) => { pinned.insert(VarId::Param(*i)); }
+                        HirUpvalueSrc::ParentLocal(id) => {
+                            pinned.insert(VarId::Local(*id));
+                        }
+                        HirUpvalueSrc::ParentParam(i) => {
+                            pinned.insert(VarId::Param(*i));
+                        }
                         _ => {}
                     }
                 }
-                for deco in &m.decorators { scan_expr(deco, pinned, in_try); }
+                for deco in &m.decorators {
+                    scan_expr(deco, pinned, in_try);
+                }
             }
             for a in &cls.getters {
                 for uv in &a.upvalues {
                     match uv {
-                        HirUpvalueSrc::ParentLocal(id) => { pinned.insert(VarId::Local(*id)); }
-                        HirUpvalueSrc::ParentParam(i) => { pinned.insert(VarId::Param(*i)); }
+                        HirUpvalueSrc::ParentLocal(id) => {
+                            pinned.insert(VarId::Local(*id));
+                        }
+                        HirUpvalueSrc::ParentParam(i) => {
+                            pinned.insert(VarId::Param(*i));
+                        }
                         _ => {}
                     }
                 }
@@ -465,8 +531,12 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
             for a in &cls.setters {
                 for uv in &a.upvalues {
                     match uv {
-                        HirUpvalueSrc::ParentLocal(id) => { pinned.insert(VarId::Local(*id)); }
-                        HirUpvalueSrc::ParentParam(i) => { pinned.insert(VarId::Param(*i)); }
+                        HirUpvalueSrc::ParentLocal(id) => {
+                            pinned.insert(VarId::Local(*id));
+                        }
+                        HirUpvalueSrc::ParentParam(i) => {
+                            pinned.insert(VarId::Param(*i));
+                        }
                         _ => {}
                     }
                 }
@@ -474,8 +544,12 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
             for b in &cls.static_blocks {
                 for uv in &b.upvalues {
                     match uv {
-                        HirUpvalueSrc::ParentLocal(id) => { pinned.insert(VarId::Local(*id)); }
-                        HirUpvalueSrc::ParentParam(i) => { pinned.insert(VarId::Param(*i)); }
+                        HirUpvalueSrc::ParentLocal(id) => {
+                            pinned.insert(VarId::Local(*id));
+                        }
+                        HirUpvalueSrc::ParentParam(i) => {
+                            pinned.insert(VarId::Param(*i));
+                        }
                         _ => {}
                     }
                 }
@@ -483,23 +557,35 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
         }
         HirExpr::Enum(en) => {
             for (_, init) in &en.static_fields {
-                if let Some(init) = init { scan_expr(init, pinned, in_try); }
+                if let Some(init) = init {
+                    scan_expr(init, pinned, in_try);
+                }
             }
             for v in &en.variants {
-                for arg in &v.const_args { scan_expr(arg, pinned, in_try); }
+                for arg in &v.const_args {
+                    scan_expr(arg, pinned, in_try);
+                }
             }
             for uv in &en.ctor.upvalues {
                 match uv {
-                    HirUpvalueSrc::ParentLocal(id) => { pinned.insert(VarId::Local(*id)); }
-                    HirUpvalueSrc::ParentParam(i) => { pinned.insert(VarId::Param(*i)); }
+                    HirUpvalueSrc::ParentLocal(id) => {
+                        pinned.insert(VarId::Local(*id));
+                    }
+                    HirUpvalueSrc::ParentParam(i) => {
+                        pinned.insert(VarId::Param(*i));
+                    }
                     _ => {}
                 }
             }
             for m in &en.methods {
                 for uv in &m.upvalues {
                     match uv {
-                        HirUpvalueSrc::ParentLocal(id) => { pinned.insert(VarId::Local(*id)); }
-                        HirUpvalueSrc::ParentParam(i) => { pinned.insert(VarId::Param(*i)); }
+                        HirUpvalueSrc::ParentLocal(id) => {
+                            pinned.insert(VarId::Local(*id));
+                        }
+                        HirUpvalueSrc::ParentParam(i) => {
+                            pinned.insert(VarId::Param(*i));
+                        }
                         _ => {}
                     }
                 }
@@ -507,8 +593,12 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
             for m in &en.static_methods {
                 for uv in &m.upvalues {
                     match uv {
-                        HirUpvalueSrc::ParentLocal(id) => { pinned.insert(VarId::Local(*id)); }
-                        HirUpvalueSrc::ParentParam(i) => { pinned.insert(VarId::Param(*i)); }
+                        HirUpvalueSrc::ParentLocal(id) => {
+                            pinned.insert(VarId::Local(*id));
+                        }
+                        HirUpvalueSrc::ParentParam(i) => {
+                            pinned.insert(VarId::Param(*i));
+                        }
                         _ => {}
                     }
                 }
@@ -516,8 +606,12 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
             for a in &en.getters {
                 for uv in &a.upvalues {
                     match uv {
-                        HirUpvalueSrc::ParentLocal(id) => { pinned.insert(VarId::Local(*id)); }
-                        HirUpvalueSrc::ParentParam(i) => { pinned.insert(VarId::Param(*i)); }
+                        HirUpvalueSrc::ParentLocal(id) => {
+                            pinned.insert(VarId::Local(*id));
+                        }
+                        HirUpvalueSrc::ParentParam(i) => {
+                            pinned.insert(VarId::Param(*i));
+                        }
                         _ => {}
                     }
                 }
@@ -525,8 +619,12 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
             for a in &en.setters {
                 for uv in &a.upvalues {
                     match uv {
-                        HirUpvalueSrc::ParentLocal(id) => { pinned.insert(VarId::Local(*id)); }
-                        HirUpvalueSrc::ParentParam(i) => { pinned.insert(VarId::Param(*i)); }
+                        HirUpvalueSrc::ParentLocal(id) => {
+                            pinned.insert(VarId::Local(*id));
+                        }
+                        HirUpvalueSrc::ParentParam(i) => {
+                            pinned.insert(VarId::Param(*i));
+                        }
                         _ => {}
                     }
                 }
@@ -534,8 +632,12 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
             for b in &en.static_blocks {
                 for uv in &b.upvalues {
                     match uv {
-                        HirUpvalueSrc::ParentLocal(id) => { pinned.insert(VarId::Local(*id)); }
-                        HirUpvalueSrc::ParentParam(i) => { pinned.insert(VarId::Param(*i)); }
+                        HirUpvalueSrc::ParentLocal(id) => {
+                            pinned.insert(VarId::Local(*id));
+                        }
+                        HirUpvalueSrc::ParentParam(i) => {
+                            pinned.insert(VarId::Param(*i));
+                        }
                         _ => {}
                     }
                 }
@@ -544,8 +646,12 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
         HirExpr::Closure { upvalues, .. } => {
             for uv in upvalues {
                 match uv {
-                    HirUpvalueSrc::ParentLocal(id) => { pinned.insert(VarId::Local(*id)); }
-                    HirUpvalueSrc::ParentParam(i) => { pinned.insert(VarId::Param(*i)); }
+                    HirUpvalueSrc::ParentLocal(id) => {
+                        pinned.insert(VarId::Local(*id));
+                    }
+                    HirUpvalueSrc::ParentParam(i) => {
+                        pinned.insert(VarId::Param(*i));
+                    }
                     _ => {}
                 }
             }
@@ -553,8 +659,12 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
         HirExpr::Update { target, .. } => {
             if in_try {
                 match &**target {
-                    HirAssignTarget::Var(HirBinding::Local(id)) => { pinned.insert(VarId::Local(*id)); }
-                    HirAssignTarget::Var(HirBinding::Param(i)) => { pinned.insert(VarId::Param(*i)); }
+                    HirAssignTarget::Var(HirBinding::Local(id)) => {
+                        pinned.insert(VarId::Local(*id));
+                    }
+                    HirAssignTarget::Var(HirBinding::Param(i)) => {
+                        pinned.insert(VarId::Param(*i));
+                    }
                     _ => {}
                 }
             }
@@ -572,11 +682,26 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
             for p in properties {
                 match p {
                     HirObjectProp::Property { key, value } => {
-                        if let HirPropKey::Computed(e) = key { scan_expr(e, pinned, in_try); }
+                        if let HirPropKey::Computed(e) = key {
+                            scan_expr(e, pinned, in_try);
+                        }
                         scan_expr(value, pinned, in_try);
                     }
-                    HirObjectProp::Method { key, .. } => {
-                        if let HirPropKey::Computed(e) = key { scan_expr(e, pinned, in_try); }
+                    HirObjectProp::Method { key, upvalues, .. } => {
+                        if let HirPropKey::Computed(e) = key {
+                            scan_expr(e, pinned, in_try);
+                        }
+                        for uv in upvalues {
+                            match uv {
+                                HirUpvalueSrc::ParentLocal(id) => {
+                                    pinned.insert(VarId::Local(*id));
+                                }
+                                HirUpvalueSrc::ParentParam(i) => {
+                                    pinned.insert(VarId::Param(*i));
+                                }
+                                _ => {}
+                            }
+                        }
                     }
                     HirObjectProp::Spread(e) => scan_expr(e, pinned, in_try),
                 }
@@ -585,9 +710,15 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
         HirExpr::Match { subject, cases } => {
             scan_expr(subject, pinned, in_try);
             for c in cases {
-                if let Some(g) = &c.guard { scan_expr(g, pinned, in_try); }
-                for s in &c.body { scan_stmt(s, pinned, in_try); }
-                if let Some(r) = &c.result { scan_expr(r, pinned, in_try); }
+                if let Some(g) = &c.guard {
+                    scan_expr(g, pinned, in_try);
+                }
+                for s in &c.body {
+                    scan_stmt(s, pinned, in_try);
+                }
+                if let Some(r) = &c.result {
+                    scan_expr(r, pinned, in_try);
+                }
             }
         }
         HirExpr::OptionalChain { object, property } => {
@@ -595,10 +726,14 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
             match property {
                 HirOptionalProperty::Index(e) => scan_expr(e, pinned, in_try),
                 HirOptionalProperty::Call(args) => {
-                    for a in args { scan_expr(a, pinned, in_try); }
+                    for a in args {
+                        scan_expr(a, pinned, in_try);
+                    }
                 }
                 HirOptionalProperty::MethodCall(_, args) => {
-                    for a in args { scan_expr(a, pinned, in_try); }
+                    for a in args {
+                        scan_expr(a, pinned, in_try);
+                    }
                 }
                 _ => {}
             }
@@ -612,7 +747,9 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
         }
         HirExpr::IntrinsicCall { object, args, .. } => {
             scan_expr(object, pinned, in_try);
-            for a in args { scan_expr(a, pinned, in_try); }
+            for a in args {
+                scan_expr(a, pinned, in_try);
+            }
         }
         HirExpr::ModuleSlot { object, .. } => scan_expr(object, pinned, in_try),
         _ => {}
@@ -635,7 +772,7 @@ fn scan_pinned_vars(func: &HirFunction) -> FxHashSet<VarId> {
 pub fn build_function(func: &HirFunction, module_funcs: &[HirFunction]) -> Result<SsaFunc> {
     let pinned = scan_pinned_vars(func);
     let mut b = Builder::new(pinned);
-    // Synthetic loop vars (e.g. `for-in` index) use ids above the real locals.
+
     b.next_synthetic = func.locals;
     let entry = b.current;
 
@@ -646,31 +783,26 @@ pub fn build_function(func: &HirFunction, module_funcs: &[HirFunction]) -> Resul
     }
 
     for f in module_funcs {
-        let fn_val = b.emit(InstKind::MakeClosure {
-            func: Rc::new(f.clone()),
-            upvalues: Vec::new(),
-            upvalues_src: Vec::new(),
-        }, HirType::Ref);
+        let fn_val = b.emit(
+            InstKind::MakeClosure {
+                func: Rc::new(f.clone()),
+                upvalues: Vec::new(),
+                upvalues_src: Vec::new(),
+            },
+            HirType::Ref,
+        );
         b.emit_effect(InstKind::StoreGlobal {
             name: f.name.clone(),
             value: fn_val,
         });
     }
 
-    // Default-valued params: a prologue of `IsNull`-guarded branches (the VM
-    // passes null for an omitted arg). Each rewrites the param var to the default
-    // when null, so the body reads the resolved value. Done after every param is
-    // an entry block-param so the values dominate.
     for (i, param) in func.params.iter().enumerate() {
         if let Some(default) = &param.default {
             let pv = b.read_var(VarId::Param(i as u32), b.current)?;
             let isnull = b.emit(InstKind::IsNull { operand: pv }, HirType::Bool);
-            let resolved = b.lower_branch_value(
-                isnull,
-                |s| s.lower_expr(default),
-                |_| Ok(pv),
-                param.ty,
-            )?;
+            let resolved =
+                b.lower_branch_value(isnull, |s| s.lower_expr(default), |_| Ok(pv), param.ty)?;
             let cur = b.current;
             b.write_var(VarId::Param(i as u32), cur, resolved);
         }
@@ -679,7 +811,7 @@ pub fn build_function(func: &HirFunction, module_funcs: &[HirFunction]) -> Resul
     b.lower_block(&func.body)?;
 
     if b.is_open() {
-        b.set_term(Terminator::Return(None)); // implicit `return null` epilogue
+        b.set_term(Terminator::Return(None));
     }
 
     let mut ssa = SsaFunc {
@@ -694,14 +826,10 @@ pub fn build_function(func: &HirFunction, module_funcs: &[HirFunction]) -> Resul
     Ok(ssa)
 }
 
-/// Remove trivial block parameters (phis with ≤1 distinct non-self operand) to
-/// fixpoint, replacing each removed value with its unique operand. Mirrors
-/// Braun's `tryRemoveTrivialPhi`, run as a post-pass over the finished CFG.
 fn simplify_phis(func: &mut SsaFunc) {
     loop {
         let mut removed = None;
         'scan: for b in 0..func.blocks.len() {
-            // Entry-block parameters are the function parameters, not phis.
             if BlockId(b as u32) == func.entry {
                 continue;
             }
@@ -721,8 +849,6 @@ fn simplify_phis(func: &mut SsaFunc) {
     }
 }
 
-/// If the phi at `block`'s parameter `pos` has at most one distinct operand
-/// besides itself, return that operand (the value it collapses to).
 fn trivial_operand(func: &SsaFunc, block: BlockId, pos: usize, phi: Value) -> Option<Value> {
     let mut same: Option<Value> = None;
     for &pred in &func.blocks[block.0 as usize].preds {
@@ -731,7 +857,7 @@ fn trivial_operand(func: &SsaFunc, block: BlockId, pos: usize, phi: Value) -> Op
             continue;
         }
         if same.is_some() {
-            return None; // ≥2 distinct real operands: not trivial
+            return None;
         }
         same = Some(op);
     }
@@ -759,8 +885,6 @@ fn edge_arg(func: &SsaFunc, pred: BlockId, block: BlockId, pos: usize) -> Value 
     }
 }
 
-/// Remove block parameter `pos` from `block` and the matching argument from
-/// every predecessor edge.
 fn remove_param(func: &mut SsaFunc, block: BlockId, pos: usize) {
     func.blocks[block.0 as usize].params.remove(pos);
     let preds = func.blocks[block.0 as usize].preds.clone();
@@ -787,5 +911,3 @@ fn remove_param(func: &mut SsaFunc, block: BlockId, pos: usize) {
         }
     }
 }
-
-

@@ -33,7 +33,7 @@ fn collect_registry_entries(dir: &Path, out: &mut impl Write) {
 
                 let vn_rel = find_vn_source(&path)
                     .unwrap_or_else(|| panic!("cannot find .vn source in {}", path.display()));
-                // Relative to crate src root (for the vn_source field).
+
                 let vn_source_rel = vn_rel.trim_start_matches("src/").to_string();
                 let vn_source_field = format!("crates/varn-builtins/src/{vn_source_rel}");
 
@@ -41,10 +41,9 @@ fn collect_registry_entries(dir: &Path, out: &mut impl Write) {
                     .unwrap_or_else(|e| panic!("cannot read .vn source at {vn_rel}: {e}"));
                 let exports = extract_exports_from_source(&source_content);
 
-                // Parse JSON — handle both {"id":...} and {"modules":[...]} forms.
                 emit_entries_from_json(&raw, &vn_source_field, &vn_rel, &exports, out);
             }
-            // Recurse into subdirectories.
+
             collect_registry_entries(&path, out);
         }
     }
@@ -75,11 +74,9 @@ fn emit_entries_from_json(
     exports: &[String],
     out: &mut impl Write,
 ) {
-    // Minimal JSON parsing — avoid pulling in serde_json at build time.
     let json = json.trim();
 
     if json.contains("\"modules\"") {
-        // Array form: {"modules": [...]}
         let inner = extract_array(json, "modules");
         for entry in parse_object_array(&inner) {
             if let (Some(id), Some(kind)) = (extract_str(&entry, "id"), extract_str(&entry, "kind"))
@@ -99,7 +96,6 @@ fn emit_entries_from_json(
             }
         }
     } else {
-        // Single object form: {"id": "...", "kind": "..."}
         if let (Some(id), Some(kind)) = (extract_str(json, "id"), extract_str(json, "kind")) {
             let capabilities = extract_capabilities(json);
             let pure_module = extract_bool(json, "pure");
@@ -152,9 +148,13 @@ fn emit_spec_entry(
 
 fn extract_bool(json: &str, key: &str) -> bool {
     let needle = format!("\"{key}\"");
-    let Some(pos) = json.find(&needle) else { return false; };
+    let Some(pos) = json.find(&needle) else {
+        return false;
+    };
     let after_key = &json[pos + needle.len()..];
-    let Some(colon) = after_key.find(':') else { return false; };
+    let Some(colon) = after_key.find(':') else {
+        return false;
+    };
     let after_colon = after_key[colon + 1..].trim_start();
     after_colon.starts_with("true")
 }

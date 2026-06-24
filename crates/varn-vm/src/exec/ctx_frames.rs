@@ -25,7 +25,6 @@ impl ExecCtx {
                     };
                     if let Some(receiver) = receiver_clone {
                         let recv_nv = self.heap.intern(receiver);
-
                         match prepared {
                             PreparedCall::Frame(ref frame) => {
                                 if frame.base >= self.stack.len() {
@@ -57,7 +56,6 @@ impl ExecCtx {
             arg_count,
             &mut self.stack,
             &mut self.heap,
-            &mut self.globals,
         )
     }
 

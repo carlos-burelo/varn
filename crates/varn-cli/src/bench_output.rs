@@ -149,7 +149,11 @@ pub fn print_vm_profile(profile: &VmProfile) {
         "gc collections",
         fmt_num_u64(profile.gc_collections)
     ));
-    terminal::log(format!("  {:<22} {:>10}", "gc freed", fmt_num_u64(profile.gc_freed)));
+    terminal::log(format!(
+        "  {:<22} {:>10}",
+        "gc freed",
+        fmt_num_u64(profile.gc_freed)
+    ));
     terminal::log(format!(
         "  {:<22} {:>10}",
         "heap live (post-gc)",

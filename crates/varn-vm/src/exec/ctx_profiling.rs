@@ -126,11 +126,6 @@ impl ExecCtx {
         }
     }
 
-    /// Invoke a native builtin, timing its wall-clock cost when profiling is on.
-    /// In normal `run` mode (no hotspot counters) this is just the bare call —
-    /// one predictable-not-taken branch, no `Instant::now()` overhead. Borrow
-    /// profile is identical to a direct `(f)(self, args)`, so it drops in at
-    /// every native-invocation site.
     #[inline(always)]
     pub fn invoke_native(
         &mut self,

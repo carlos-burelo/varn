@@ -57,4 +57,3 @@ pub fn clear_interner() {
         interner.borrow_mut().clear();
     });
 }
-

@@ -55,9 +55,7 @@ pub fn build_signature_help(state: &DocumentState, line: u32, col: u32) -> Optio
     if let Some(chain) = state.resolve_chain_at(fn_tok.line, fn_tok.col) {
         use crate::document::ChainResult;
         let (params_str, ret_str) = match chain {
-            ChainResult::Symbol(sym) => {
-                split_arrow_type(&sym.type_str)?
-            }
+            ChainResult::Symbol(sym) => split_arrow_type(&sym.type_str)?,
             ChainResult::Member { member, .. } => {
                 (member.params_str.clone(), member.type_str.clone())
             }

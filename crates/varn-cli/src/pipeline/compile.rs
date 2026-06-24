@@ -158,11 +158,11 @@ fn print_graph_node(
 }
 
 fn shorten_path(path: &str) -> String {
-    // Show std:* and runtime:* as-is; shorten filesystem paths.
+    
     if path.contains(':') && !path.contains('/') && !path.contains('\\') {
         return path.to_owned();
     }
-    // Show only last 2 path components for readability.
+    
     let normalized = path.replace('\\', "/");
     let parts: Vec<&str> = normalized.split('/').filter(|s| !s.is_empty()).collect();
     if parts.len() <= 2 {

@@ -5,8 +5,6 @@ use sha2::{Digest, Sha256, Sha512};
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
-/// Native implementation backing the `runtime:crypto` contract
-/// (`src/modules/std/crypto/runtime/crypto_runtime.vn`).
 pub struct CryptoRuntime;
 
 varn_contract! {

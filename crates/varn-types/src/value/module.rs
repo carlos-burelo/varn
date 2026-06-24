@@ -12,8 +12,6 @@ pub struct ModuleObj {
     pub export_map: FxHashMap<Rc<str>, usize>,
 }
 
-/// A heap-index-free snapshot of a pure module's exports.
-/// Created once at init time; thawed into each VM run's heap on import.
 #[derive(Debug, Clone)]
 pub struct FrozenModuleObj {
     pub id: ModuleId,
@@ -21,16 +19,11 @@ pub struct FrozenModuleObj {
     pub export_map: FxHashMap<Arc<str>, usize>,
 }
 
-/// Portable export value — no heap indices, safe to share across VM instances.
 #[derive(Debug, Clone)]
 pub enum FrozenExport {
-    /// NaN-boxed primitive (int/float/bool/null) — copy-safe.
     Primitive(VmValue),
-    /// Interned string — shared immutably.
     Str(Arc<str>),
-    /// Native function pointer — stateless, shareable.
     NativeFn(NativeFn, &'static str),
-    /// Nested frozen namespace (e.g. Math.Trig sub-object).
     Nested(Arc<FrozenModuleObj>),
 }
 

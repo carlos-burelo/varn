@@ -54,19 +54,7 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     let src1 = (w1 >> 8) as usize;
     let src2 = (w1 & 0xFF) as usize;
 
-    // --- Float fast path: inline SSE2 scalar-double, no FFI helper call ---
-    // Floats are NaN-boxed as their raw IEEE-754 bits (`as_f64 = from_bits`),
-    // so a boxed operand moves straight into xmm and the result moves back
-    // unchanged. Only taken when the checker statically proved both slots Float
-    // (same trust model as the `both_int` path below). A NaN result (e.g.
-    // inf - inf) is canonicalised to `null` via `emit_nan_to_null`, matching
-    // the `from_f64` helper semantics. DivFloat is deliberately excluded: the
-    // helper raises a "division by zero" runtime error that `divsd` cannot
-    // reproduce, so division stays on the slow path.
-    let is_float_op = matches!(
-        op,
-        OpCode::AddFloat | OpCode::SubFloat | OpCode::MulFloat
-    );
+    let is_float_op = matches!(op, OpCode::AddFloat | OpCode::SubFloat | OpCode::MulFloat);
     if is_float_op
         && slot_is_float(&ctx.proto.register_meta, src1)
         && slot_is_float(&ctx.proto.register_meta, src2)
@@ -75,10 +63,10 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
         let regmap = &ctx.regmap;
         emit_load(asm, Reg::Rax, src1, regmap);
         emit_load(asm, Reg::R11, src2, regmap);
-        asm.emit_debug_assert_not_int(Reg::Rax); // invariant: Float slot ≠ int
+        asm.emit_debug_assert_not_int(Reg::Rax);
         asm.emit_debug_assert_not_int(Reg::R11);
-        asm.movq_xmm_from_gpr(0, Reg::Rax); // xmm0 = src1
-        asm.movq_xmm_from_gpr(1, Reg::R11); // xmm1 = src2
+        asm.movq_xmm_from_gpr(0, Reg::Rax);
+        asm.movq_xmm_from_gpr(1, Reg::R11);
         match op {
             OpCode::AddFloat => asm.addsd(0, 1),
             OpCode::SubFloat => asm.subsd(0, 1),
@@ -86,7 +74,7 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
             _ => unreachable!(),
         }
         asm.movq_gpr_from_xmm(Reg::Rax, 0);
-        asm.emit_nan_to_null(Reg::Rax, 0); // NaN result → null, per from_f64
+        asm.emit_nan_to_null(Reg::Rax, 0);
         emit_store(asm, Reg::Rax, first_reg, regmap);
         return;
     }
@@ -101,42 +89,47 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
         let regmap = &ctx.regmap;
         let helpers = ctx.helpers;
 
-        // --- 1. Load operands to RAX and R11 ---
         emit_load(asm, Reg::Rax, src1, regmap);
         emit_load(asm, Reg::R11, src2, regmap);
 
         if both_int {
-            // Both sources are statically typed Int — skip runtime guards entirely.
-            asm.shl_reg_imm8(Reg::Rax, 16);
-            asm.sar_reg_imm8(Reg::Rax, 16);
-            asm.shl_reg_imm8(Reg::R11, 16);
-            asm.sar_reg_imm8(Reg::R11, 16);
             match op {
-                OpCode::Add => asm.add_reg_reg(Reg::Rax, Reg::R11),
-                OpCode::Sub => asm.sub_reg_reg(Reg::Rax, Reg::R11),
-                OpCode::Mul => asm.imul_reg_reg(Reg::Rax, Reg::R11),
+                OpCode::Add => {
+                    asm.add_reg_reg(Reg::Rax, Reg::R11);
+                    asm.sub_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
+                }
+                OpCode::Sub => {
+                    asm.sub_reg_reg(Reg::Rax, Reg::R11);
+                    asm.shl_reg_imm8(Reg::Rax, 16);
+                    asm.shr_reg_imm8(Reg::Rax, 16);
+                    asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
+                }
+                OpCode::Mul => {
+                    asm.shl_reg_imm8(Reg::Rax, 16);
+                    asm.sar_reg_imm8(Reg::Rax, 16);
+                    asm.shl_reg_imm8(Reg::R11, 16);
+                    asm.sar_reg_imm8(Reg::R11, 16);
+                    asm.imul_reg_reg(Reg::Rax, Reg::R11);
+                    asm.shl_reg_imm8(Reg::Rax, 16);
+                    asm.shr_reg_imm8(Reg::Rax, 16);
+                    asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
+                }
                 _ => unreachable!(),
             }
-            asm.shl_reg_imm8(Reg::Rax, 16);
-            asm.shr_reg_imm8(Reg::Rax, 16);
-            asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
             emit_store(asm, Reg::Rax, first_reg, regmap);
         } else {
-            // --- 2. Check if src1 (RAX) is an integer ---
             asm.mov_reg_reg(Reg::R10, Reg::Rax);
             asm.mov_reg_imm64(Reg::Rcx, 0x7FFF_0000_0000_0000u64);
             asm.and_reg_reg(Reg::R10, Reg::Rcx);
             asm.cmp_reg_reg(Reg::R10, crate::registers::REG_INT_TAG);
             let p_fallback1 = asm.jmp_cond(crate::assembler::Cond::NotEqual);
 
-            // --- 3. Check if src2 (R11) is an integer ---
             asm.mov_reg_reg(Reg::R10, Reg::R11);
             asm.mov_reg_imm64(Reg::Rcx, 0x7FFF_0000_0000_0000u64);
             asm.and_reg_reg(Reg::R10, Reg::Rcx);
             asm.cmp_reg_reg(Reg::R10, crate::registers::REG_INT_TAG);
             let p_fallback2 = asm.jmp_cond(crate::assembler::Cond::NotEqual);
 
-            // --- 4. FAST PATH (both are integers) ---
             asm.shl_reg_imm8(Reg::Rax, 16);
             asm.sar_reg_imm8(Reg::Rax, 16);
             asm.shl_reg_imm8(Reg::R11, 16);
@@ -153,7 +146,6 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
             emit_store(asm, Reg::Rax, first_reg, regmap);
             let p_skip_ffi = asm.jmp_near();
 
-            // --- 5. SLOW PATH (FFI fallback) ---
             let fallback_pos = asm.current_offset();
             let disp1 = (fallback_pos as i32 - (p_fallback1 as i32 + 4)) as u32;
             asm.patch_u32(p_fallback1, disp1);
@@ -201,13 +193,17 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
             asm.patch_u32(p_skip_ffi, disp_skip);
         }
     } else {
-        // --- ORIGINAL FFI execution for non-optimized ops ---
         let asm = &mut ctx.asm;
         let regmap = &ctx.regmap;
         let helpers = ctx.helpers;
         let is_gc_free = matches!(
             op,
-            OpCode::BitAnd | OpCode::BitOr | OpCode::BitXor | OpCode::Shl | OpCode::Shr | OpCode::Ushr
+            OpCode::BitAnd
+                | OpCode::BitOr
+                | OpCode::BitXor
+                | OpCode::Shl
+                | OpCode::Shr
+                | OpCode::Ushr
         );
 
         if !is_gc_free {
@@ -314,21 +310,29 @@ fn emit_int_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     emit_load(asm, Reg::Rax, src1, regmap);
     emit_load(asm, Reg::R11, src2, regmap);
 
-    asm.shl_reg_imm8(Reg::Rax, 16);
-    asm.sar_reg_imm8(Reg::Rax, 16);
-    asm.shl_reg_imm8(Reg::R11, 16);
-    asm.sar_reg_imm8(Reg::R11, 16);
-
     match op {
-        OpCode::AddInt => asm.add_reg_reg(Reg::Rax, Reg::R11),
-        OpCode::SubInt => asm.sub_reg_reg(Reg::Rax, Reg::R11),
-        OpCode::MulInt => asm.imul_reg_reg(Reg::Rax, Reg::R11),
+        OpCode::AddInt => {
+            asm.add_reg_reg(Reg::Rax, Reg::R11);
+            asm.sub_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
+        }
+        OpCode::SubInt => {
+            asm.sub_reg_reg(Reg::Rax, Reg::R11);
+            asm.shl_reg_imm8(Reg::Rax, 16);
+            asm.shr_reg_imm8(Reg::Rax, 16);
+            asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
+        }
+        OpCode::MulInt => {
+            asm.shl_reg_imm8(Reg::Rax, 16);
+            asm.sar_reg_imm8(Reg::Rax, 16);
+            asm.shl_reg_imm8(Reg::R11, 16);
+            asm.sar_reg_imm8(Reg::R11, 16);
+            asm.imul_reg_reg(Reg::Rax, Reg::R11);
+            asm.shl_reg_imm8(Reg::Rax, 16);
+            asm.shr_reg_imm8(Reg::Rax, 16);
+            asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
+        }
         _ => unreachable!(),
     }
-
-    asm.shl_reg_imm8(Reg::Rax, 16);
-    asm.shr_reg_imm8(Reg::Rax, 16);
-    asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
 
     emit_store(asm, Reg::Rax, first_reg, regmap);
 }

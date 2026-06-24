@@ -261,7 +261,6 @@ impl ExecCtx {
         op: OpCode,
         code: &[u16],
         ip: &mut usize,
-        base: usize,
         frame_idx: usize,
         closure: &VmClosure,
         first_reg: usize,

@@ -61,8 +61,9 @@ impl ExecCtx {
                         ))
                     })
                     .clone();
-                let vm_closure =
-                    std::rc::Rc::new(crate::frame::VmClosure::with_upvalues(proto, upvalues, constants));
+                let vm_closure = std::rc::Rc::new(crate::frame::VmClosure::with_upvalues(
+                    proto, upvalues, constants,
+                ));
                 self.stack[base + dest] = self.heap.alloc_vm_closure(vm_closure);
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
@@ -113,9 +114,8 @@ impl ExecCtx {
                 self.frames[frame_idx].ip = *ip;
                 let obj = self.stack[base + obj_reg];
                 let val = self.stack[base + val_reg];
-                let jumped = self.exec_set_property_reg(
-                    obj, val, name_idx, cs_idx, base, frame_idx, closure,
-                )?;
+                let jumped = self
+                    .exec_set_property_reg(obj, val, name_idx, cs_idx, base, frame_idx, closure)?;
                 if jumped {
                     return Ok(Some(ObjectFlow::ContinueFrame));
                 }
@@ -299,7 +299,8 @@ impl ExecCtx {
                 let src = hi(code[*ip]);
                 *ip += 1;
                 let v = self.heap.extract(self.stack[base + src]);
-                self.stack[base + first_reg] = self.heap.intern(varn_types::Value::Spread(Box::new(v)));
+                self.stack[base + first_reg] =
+                    self.heap.intern(varn_types::Value::Spread(Box::new(v)));
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::ArrayLength => {

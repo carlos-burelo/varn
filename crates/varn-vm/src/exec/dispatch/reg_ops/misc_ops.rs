@@ -125,7 +125,6 @@ impl ExecCtx {
             vals.push(self.stack[base + start_reg + i]);
         }
 
-        let old_len = self.stack.len();
         for v in vals {
             self.stack.push(v);
         }

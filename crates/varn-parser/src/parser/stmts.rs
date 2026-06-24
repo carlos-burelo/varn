@@ -196,7 +196,10 @@ fn parse_for_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
             TokenKind::Const => VarKind::Const,
             TokenKind::Var => {
                 let err_range = s.range();
-                s.push_error("`var` is not supported; use `let` or `const`".to_owned(), err_range);
+                s.push_error(
+                    "`var` is not supported; use `let` or `const`".to_owned(),
+                    err_range,
+                );
                 VarKind::Let
             }
             _ => return Err(String::from("Expected `let` or `const`")),

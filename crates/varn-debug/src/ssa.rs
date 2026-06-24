@@ -1,9 +1,7 @@
-//! `vn debug -p ssa` — dump del SSA CFG generado por `varn-opt`.
-
-use varn_core::ast::Program;
-use varn_core::TypeAnnotations;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
+use varn_core::ast::Program;
+use varn_core::TypeAnnotations;
 
 const DIM: &str = "\x1b[2m";
 const YELLOW: &str = "\x1b[33m";
@@ -11,10 +9,6 @@ const BLUE: &str = "\x1b[34m";
 const BOLD: &str = "\x1b[1m";
 const R: &str = "\x1b[0m";
 
-/// Construye el SSA CFG para cada función del módulo e imprime el dump.
-/// Funciones cuya cobertura SSA falla (construcciones no implementadas aún)
-/// se omiten con un aviso; los errores completos de lowering (HIR) producen
-/// un mensaje de falla claro.
 pub fn debug_ssa(
     program: &Program,
     annotations: &TypeAnnotations,
@@ -51,7 +45,10 @@ pub fn debug_ssa(
             }
 
             if !skipped.is_empty() {
-                eprintln!("\n  {DIM}── SSA coverage gaps ({} fn(s) skipped) ──{R}", skipped.len());
+                eprintln!(
+                    "\n  {DIM}── SSA coverage gaps ({} fn(s) skipped) ──{R}",
+                    skipped.len()
+                );
                 for (name, reason) in &skipped {
                     eprintln!("  {DIM}  {name}: {reason}{R}");
                 }
@@ -60,9 +57,7 @@ pub fn debug_ssa(
             eprintln!("{DIM}── end: SSA ──{R}");
         }
         Err(varn_opt::OptError::Unsupported(msg)) => {
-            eprintln!(
-                "\n  {YELLOW}warn{R} HIR lowering failed — cannot build SSA"
-            );
+            eprintln!("\n  {YELLOW}warn{R} HIR lowering failed — cannot build SSA");
             eprintln!("  {DIM}unsupported construct: {msg}{R}");
         }
     }

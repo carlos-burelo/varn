@@ -42,8 +42,6 @@ impl ExecCtx {
             let ic_native: Option<(NativeFnPtr, VmValue)>;
             let ic_vm: Option<(Rc<VmClosure>, Option<Rc<varn_types::value::ClassObj>>)>;
             {
-                // SAFETY: raw IC read (see get_property.rs) — short-lived, no live
-                // `&mut` to these cells; single-threaded, non-reentrant VM.
                 let ic = unsafe { &*closure.ic_cache.as_ptr() };
                 let poly = &ic[cs];
                 let mut found_nat: Option<(NativeFnPtr, VmValue)> = None;
@@ -73,7 +71,8 @@ impl ExecCtx {
                             let cls_ver = (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8;
                             if cls.id == entry.id && cls_ver == entry.vtable_ver {
                                 let slot = entry.slot as usize;
-                                let method_val = unsafe { &*cls.vtable.as_ptr() }.get(slot).cloned();
+                                let method_val =
+                                    unsafe { &*cls.vtable.as_ptr() }.get(slot).cloned();
                                 if let Some(Value::VmValue(payload)) = method_val {
                                     if let Some(nc_w) =
                                         payload.as_any().downcast_ref::<VmClosurePayload>()
@@ -123,17 +122,8 @@ impl ExecCtx {
             self.record_ic_miss_callmethod();
         }
 
-        // IC miss: resolve the property WITHOUT interning, so a bound method
-        // (the common case) can be dispatched directly instead of allocating a
-        // transient `BoundMethod` on the heap that we immediately unwrap.
         let resolved = crate::exec::props::resolve_property(this_val, &name, &mut self.heap)?;
 
-        // Native bound methods are dispatched directly with `this_val` as the
-        // receiver — identical to the early native branch below, but without
-        // interning the transient `BoundMethod` first. VM bound methods are NOT
-        // intercepted here: they need the general `prepare_call`/`skip_this`
-        // path (e.g. decorator wrappers are no-`this` rest-param closures), and
-        // repeat calls are served allocation-free by the IC-hit path anyway.
         if let crate::exec::props::ResolvedProperty::Built(Value::BoundMethod(bm)) = &resolved {
             if let varn_types::value::BoundMethodTarget::Native { func, .. } = &bm.target {
                 let f = *func;
@@ -155,8 +145,6 @@ impl ExecCtx {
             }
         }
 
-        // Fallback (modules, own fields, enum variants, namespace natives, all
-        // VM methods): intern and use the general prepare_call path, as before.
         let method_nv = match resolved {
             crate::exec::props::ResolvedProperty::Nv(v) => v,
             crate::exec::props::ResolvedProperty::Built(v) => self.heap.intern(v),
@@ -356,9 +344,6 @@ impl ExecCtx {
         Ok(result)
     }
 
-    /// Push args and a frame for a VM method, then return `Ok(true)` to signal
-    /// the dispatcher to enter the new frame. Shared by the IC-hit path and the
-    /// alloc-free IC-miss resolution path.
     #[allow(clippy::too_many_arguments)]
     fn invoke_vm_method_fast(
         &mut self,
@@ -414,12 +399,12 @@ impl ExecCtx {
             self.stack.push(rest_nv);
         }
         let full_arg_count = nc.proto.arity;
+        let final_base = self.stack.len() - full_arg_count;
         if self.frames.len() >= 10000 {
             return Err(crate::error::RuntimeError::new(
                 "stack overflow: call depth exceeded 10000",
             ));
         }
-        let final_base = self.stack.len() - full_arg_count;
         let required = final_base + nc.proto.register_count as usize;
         if self.stack.len() < required {
             self.stack.resize(required, VmValue::null());
@@ -432,9 +417,6 @@ impl ExecCtx {
         Ok(true)
     }
 
-    /// Insert a method IC entry resolved on an IC miss, so the next call to this
-    /// site hits the fast path. `is_class` is 6 (native) or 7 (VM). No-op when
-    /// the site is megamorphic, out of range, or the method is not in the vtable.
     #[allow(clippy::too_many_arguments)]
     fn populate_method_ic(
         &self,

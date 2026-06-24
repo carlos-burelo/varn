@@ -1,10 +1,7 @@
 use crate::error::{RuntimeError, VmResult};
-use crate::frame::CallFrame;
 use crate::heap::HeapObj;
 use crate::value::VmValue;
-use varn_types::value::{ObjData, ObjRef};
-use varn_types::{ClassObj, NativeCtx, NativeFn, ResourceStore, VmArray};
-
+use varn_types::{ClassObj, NativeCtx, NativeFn, ResourceStore};
 use super::calls::PreparedCall;
 use super::ctx::ExecCtx;
 
@@ -151,37 +148,37 @@ impl ExecCtx {
         Ok(())
     }
 
-    pub(crate) fn dispatch_prepared_setter_call(
-        &mut self,
-        call: PreparedCall,
-        assigned_value: VmValue,
-    ) -> VmResult<()> {
-        match call {
-            PreparedCall::Frame(frame) => {
-                self.record_call_vm_fast();
-                let setter_frame_idx = self.frames.len();
-                let required = frame.base + frame.closure().proto.register_count as usize;
-                if self.stack.len() < required {
-                    self.stack.resize(required, VmValue::null());
-                }
-                self.frames.push(frame);
-                self.pending_setters
-                    .push((setter_frame_idx, assigned_value));
-            }
-            PreparedCall::Native(f, args) => {
-                self.record_call_native();
-                let _ = (f)(self as &mut dyn NativeCtx, &args).map_err(RuntimeError::new)?;
-                self.stack.pop();
-                self.push(assigned_value);
-            }
-            other => {
-                self.dispatch_prepared_call(other)?;
-                let _ = self.pop()?;
-                self.push(assigned_value);
-            }
-        }
-        Ok(())
-    }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 
     pub fn do_return(&mut self, result: VmValue) -> VmResult<VmValue> {
         let returning_frame_idx = self.frames.len().saturating_sub(1);
@@ -199,10 +196,16 @@ impl ExecCtx {
             self.try_handlers.pop();
         }
         if self.trace {
-            varn_utilities::terminal::tagged("vm:return", format_args!(
-                "frame={} base={} stack_before={} handlers_before={}",
-                returning_frame_idx, frame.base, self.stack.len(), self.try_handlers.len(),
-            ));
+            varn_utilities::terminal::tagged(
+                "vm:return",
+                format_args!(
+                    "frame={} base={} stack_before={} handlers_before={}",
+                    returning_frame_idx,
+                    frame.base,
+                    self.stack.len(),
+                    self.try_handlers.len(),
+                ),
+            );
         }
         let mut result = result;
         if let Some(exports_nv) = self.module_exports.remove(&returning_frame_idx) {
@@ -256,10 +259,16 @@ impl ExecCtx {
         } else {
             self.push(result);
             if self.trace {
-                varn_utilities::terminal::tagged("vm:return", format_args!(
-                    "frame={} result_type={} stack_after={} handlers_after={}",
-                    returning_frame_idx, format!("{result:?}"), self.stack.len(), self.try_handlers.len(),
-                ));
+                varn_utilities::terminal::tagged(
+                    "vm:return",
+                    format_args!(
+                        "frame={} result_type={} stack_after={} handlers_after={}",
+                        returning_frame_idx,
+                        format!("{result:?}"),
+                        self.stack.len(),
+                        self.try_handlers.len(),
+                    ),
+                );
             }
             Ok(result)
         }
@@ -550,11 +559,14 @@ impl NativeCtx for ExecCtx {
     fn current_source_file(&self) -> Option<String> {
         for frame in self.frames.iter().rev() {
             let src = &frame.closure().proto.chunk.source_file;
-            if !src.starts_with("std:") && !src.starts_with("runtime:") && !src.starts_with("core:") {
+            if !src.starts_with("std:") && !src.starts_with("runtime:") && !src.starts_with("core:")
+            {
                 return Some(src.to_string());
             }
         }
-        self.frames.last().map(|f| f.closure().proto.chunk.source_file.to_string())
+        self.frames
+            .last()
+            .map(|f| f.closure().proto.chunk.source_file.to_string())
     }
 
     fn spawn_isolate(
@@ -565,19 +577,25 @@ impl NativeCtx for ExecCtx {
         port: Box<dyn varn_base::VmValuePayload + Send + Sync>,
     ) -> Result<(), String> {
         let loader = self.loader.clone();
-        
+
         let module_path_str = module_path.to_string();
         let export_name_str = export_name.to_string();
 
         std::thread::spawn(move || {
             let mut machine = crate::Vm::new(std::rc::Rc::new(rustc_hash::FxHashMap::default()));
-            machine.ctx.globals.define("isIsolate", VmValue::from_bool(true));
+            machine
+                .ctx
+                .globals
+                .define("isIsolate", VmValue::from_bool(true));
             if let Some(ld) = loader {
                 machine = machine.with_loader(ld);
             }
 
             if let Err(e) = machine.ctx.load_module("std:task") {
-                varn_utilities::terminal::tagged("isolate worker", format_args!("Failed to load std:task: {:?}", e));
+                varn_utilities::terminal::tagged(
+                    "isolate worker",
+                    format_args!("Failed to load std:task: {:?}", e),
+                );
                 return;
             }
 
@@ -597,7 +615,10 @@ impl NativeCtx for ExecCtx {
                 None => {
                     varn_utilities::terminal::tagged(
                         "isolate worker",
-                        format_args!("Export '{}' not found in module {}", export_name_str, module_path_str),
+                        format_args!(
+                            "Export '{}' not found in module {}",
+                            export_name_str, module_path_str
+                        ),
                     );
                     return;
                 }
@@ -606,18 +627,26 @@ impl NativeCtx for ExecCtx {
             let class_obj = match machine.ctx.get_class("IsolatePort") {
                 Some(cls) => cls,
                 None => {
-                    varn_utilities::terminal::tagged("isolate worker", format_args!("Class IsolatePort not found"));
+                    varn_utilities::terminal::tagged(
+                        "isolate worker",
+                        format_args!("Class IsolatePort not found"),
+                    );
                     return;
                 }
             };
             let instance_nv = machine.ctx.heap.alloc_object();
-            if let Some(crate::heap::HeapObj::Object(o)) = machine.ctx.heap.get_mut(instance_nv.as_heap_idx()) {
+            if let Some(crate::heap::HeapObj::Object(o)) =
+                machine.ctx.heap.get_mut(instance_nv.as_heap_idx())
+            {
                 o.borrow_mut().set_class(class_obj);
             }
             let port_value = varn_types::Value::VmValue(port);
             let port_nv = machine.ctx.heap.intern(port_value);
-            if let Some(crate::heap::HeapObj::Object(o)) = machine.ctx.heap.get_mut(instance_nv.as_heap_idx()) {
-                o.borrow_mut().set_field_nv(std::rc::Rc::from("_port"), port_nv);
+            if let Some(crate::heap::HeapObj::Object(o)) =
+                machine.ctx.heap.get_mut(instance_nv.as_heap_idx())
+            {
+                o.borrow_mut()
+                    .set_field_nv(std::rc::Rc::from("_port"), port_nv);
             }
 
             let mut vm_args = vec![instance_nv];
@@ -632,12 +661,18 @@ impl NativeCtx for ExecCtx {
                     if let varn_types::Value::Task(lazy) = val {
                         let handle = machine.ctx.run_lazy_task_sync(lazy.as_ref());
                         if let varn_types::task::TaskState::Rejected(e) = handle.peek_state() {
-                            varn_utilities::terminal::tagged("isolate worker", format_args!("Task failed: {}", e));
+                            varn_utilities::terminal::tagged(
+                                "isolate worker",
+                                format_args!("Task failed: {}", e),
+                            );
                         }
                     }
                 }
                 Err(e) => {
-                    varn_utilities::terminal::tagged("isolate worker", format_args!("Execution failed: {}", e));
+                    varn_utilities::terminal::tagged(
+                        "isolate worker",
+                        format_args!("Execution failed: {}", e),
+                    );
                 }
             }
         });
@@ -648,7 +683,8 @@ impl NativeCtx for ExecCtx {
     fn alloc_instance(&mut self, class_name: &str) -> Option<VmValue> {
         let class_obj = self.get_class(class_name)?;
         let instance_nv = self.heap.alloc_object();
-        if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get_mut(instance_nv.as_heap_idx()) {
+        if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get_mut(instance_nv.as_heap_idx())
+        {
             o.borrow_mut().set_class(class_obj);
         }
         Some(instance_nv)
@@ -662,21 +698,22 @@ impl NativeCtx for ExecCtx {
                     let name = c.proto.name.as_ref()?.to_string();
                     Some((source_file, name))
                 }
-                Some(HeapObj::BoundMethod(bm)) => {
-                    match &bm.target {
-                        varn_types::value::BoundMethodTarget::Vm { closure, .. } => {
-                            if let Some(wrapper) = closure.as_any().downcast_ref::<crate::frame::VmClosurePayload>() {
-                                let c = &wrapper.0;
-                                let source_file = c.proto.chunk.source_file.to_string();
-                                let name = c.proto.name.as_ref()?.to_string();
-                                Some((source_file, name))
-                            } else {
-                                None
-                            }
+                Some(HeapObj::BoundMethod(bm)) => match &bm.target {
+                    varn_types::value::BoundMethodTarget::Vm { closure, .. } => {
+                        if let Some(wrapper) = closure
+                            .as_any()
+                            .downcast_ref::<crate::frame::VmClosurePayload>()
+                        {
+                            let c = &wrapper.0;
+                            let source_file = c.proto.chunk.source_file.to_string();
+                            let name = c.proto.name.as_ref()?.to_string();
+                            Some((source_file, name))
+                        } else {
+                            None
                         }
-                        _ => None,
                     }
-                }
+                    _ => None,
+                },
                 _ => None,
             }
         } else {
@@ -703,7 +740,9 @@ impl NativeCtx for ExecCtx {
         }
         if val.is_sso() {
             let mut buf = [0u8; 5];
-            return Ok(varn_types::value::SendValue::Str(val.sso_as_str(&mut buf).to_owned()));
+            return Ok(varn_types::value::SendValue::Str(
+                val.sso_as_str(&mut buf).to_owned(),
+            ));
         }
         if val.is_heap() {
             match self.heap.get_by_idx(val.as_heap_idx()) {
@@ -741,10 +780,19 @@ impl NativeCtx for ExecCtx {
                 Some(HeapObj::Char(c)) => Ok(varn_types::value::SendValue::Char(*c)),
                 Some(HeapObj::Range(r)) => {
                     let mut fields = std::collections::HashMap::new();
-                    fields.insert("start".to_string(), varn_types::value::SendValue::Int(r.start));
+                    fields.insert(
+                        "start".to_string(),
+                        varn_types::value::SendValue::Int(r.start),
+                    );
                     fields.insert("end".to_string(), varn_types::value::SendValue::Int(r.end));
-                    fields.insert("inclusive".to_string(), varn_types::value::SendValue::Bool(r.inclusive));
-                    fields.insert("step".to_string(), varn_types::value::SendValue::Int(r.step));
+                    fields.insert(
+                        "inclusive".to_string(),
+                        varn_types::value::SendValue::Bool(r.inclusive),
+                    );
+                    fields.insert(
+                        "step".to_string(),
+                        varn_types::value::SendValue::Int(r.step),
+                    );
                     Ok(varn_types::value::SendValue::Object(fields))
                 }
                 _ => Err("Value cannot be sent to an isolate".to_string()),
@@ -756,7 +804,10 @@ impl NativeCtx for ExecCtx {
 }
 
 impl ExecCtx {
-    fn value_to_sendable(&self, val: &varn_types::Value) -> Result<varn_types::value::SendValue, String> {
+    fn value_to_sendable(
+        &self,
+        val: &varn_types::Value,
+    ) -> Result<varn_types::value::SendValue, String> {
         match val {
             varn_types::Value::Null => Ok(varn_types::value::SendValue::Null),
             varn_types::Value::Bool(b) => Ok(varn_types::value::SendValue::Bool(*b)),
@@ -796,10 +847,19 @@ impl ExecCtx {
             }
             varn_types::Value::Range(r) => {
                 let mut fields = std::collections::HashMap::new();
-                fields.insert("start".to_string(), varn_types::value::SendValue::Int(r.start));
+                fields.insert(
+                    "start".to_string(),
+                    varn_types::value::SendValue::Int(r.start),
+                );
                 fields.insert("end".to_string(), varn_types::value::SendValue::Int(r.end));
-                fields.insert("inclusive".to_string(), varn_types::value::SendValue::Bool(r.inclusive));
-                fields.insert("step".to_string(), varn_types::value::SendValue::Int(r.step));
+                fields.insert(
+                    "inclusive".to_string(),
+                    varn_types::value::SendValue::Bool(r.inclusive),
+                );
+                fields.insert(
+                    "step".to_string(),
+                    varn_types::value::SendValue::Int(r.step),
+                );
                 Ok(varn_types::value::SendValue::Object(fields))
             }
             varn_types::Value::VmValue(payload) => {

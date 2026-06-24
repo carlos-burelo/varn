@@ -266,12 +266,8 @@ impl super::Binder {
                     .map(|ann| resolve_type_node(ann, Some(self)))
                     .unwrap_or(Type::Dynamic);
 
-                let mut sym = Symbol::new(
-                    SymbolKind::Property,
-                    key_rc.clone(),
-                    range.start.line,
-                )
-                .with_type(ty.clone());
+                let mut sym = Symbol::new(SymbolKind::Property, key_rc.clone(), range.start.line)
+                    .with_type(ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 let symbol_id = self.arena.push(sym);
@@ -354,12 +350,8 @@ impl super::Binder {
                     type_params: fn_tps,
                 });
 
-                let mut sym = Symbol::new(
-                    SymbolKind::Method,
-                    key_rc.clone(),
-                    range.start.line,
-                )
-                .with_type(fn_ty.clone());
+                let mut sym = Symbol::new(SymbolKind::Method, key_rc.clone(), range.start.line)
+                    .with_type(fn_ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 sym.is_async = modifiers.is_async;
@@ -398,12 +390,8 @@ impl super::Binder {
                     .map(|ann| resolve_type_node(ann, Some(self)))
                     .unwrap_or(Type::Dynamic);
 
-                let mut sym = Symbol::new(
-                    SymbolKind::Property,
-                    key_rc.clone(),
-                    range.start.line,
-                )
-                .with_type(ty.clone());
+                let mut sym = Symbol::new(SymbolKind::Property, key_rc.clone(), range.start.line)
+                    .with_type(ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 let symbol_id = self.arena.push(sym);
@@ -435,12 +423,8 @@ impl super::Binder {
             } => {
                 let key_rc: Rc<str> = Rc::from(key.as_ref());
 
-                let mut sym = Symbol::new(
-                    SymbolKind::Property,
-                    key_rc.clone(),
-                    range.start.line,
-                )
-                .with_type(Type::Dynamic);
+                let mut sym = Symbol::new(SymbolKind::Property, key_rc.clone(), range.start.line)
+                    .with_type(Type::Dynamic);
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
                 let symbol_id = self.arena.push(sym);

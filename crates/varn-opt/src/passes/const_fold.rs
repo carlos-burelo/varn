@@ -1,15 +1,14 @@
-use crate::ssa::ir::{BlockId, SsaFunc, Terminator, Value, InstKind};
+use crate::hir::{HirBinOp, HirType, HirUnOp};
+use crate::ssa::ir::{BlockId, InstKind, SsaFunc, Terminator, Value};
 use rustc_hash::FxHashMap;
-use crate::hir::{HirBinOp, HirUnOp, HirType};
 
-/// Run constant folding on `func`. Returns `true` if any changes were made.
 pub fn run(func: &mut SsaFunc) -> bool {
     let mut changed = false;
     let mut const_map = FxHashMap::default();
-    
+
     for block_idx in 0..func.blocks.len() {
         let b_id = BlockId(block_idx as u32);
-        
+
         for inst_idx in 0..func.blocks[b_id.0 as usize].insts.len() {
             let inst = &func.blocks[b_id.0 as usize].insts[inst_idx];
             if let Some(dest) = inst.dest {
@@ -17,7 +16,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
                     const_map.insert(dest, inst.kind.clone());
                     continue;
                 }
-                
+
                 if let Some(folded_kind) = fold_inst(&inst.kind, &const_map) {
                     func.blocks[b_id.0 as usize].insts[inst_idx].kind = folded_kind.clone();
                     const_map.insert(dest, folded_kind);
@@ -25,9 +24,16 @@ pub fn run(func: &mut SsaFunc) -> bool {
                 }
             }
         }
-        
+
         let term = func.blocks[b_id.0 as usize].term.clone();
-        if let Terminator::Branch { cond, then_blk, then_args, else_blk, else_args } = term {
+        if let Terminator::Branch {
+            cond,
+            then_blk,
+            then_args,
+            else_blk,
+            else_args,
+        } = term
+        {
             if let Some(InstKind::ConstBool(b)) = const_map.get(&cond) {
                 if *b {
                     func.blocks[b_id.0 as usize].term = Terminator::Jump {
@@ -52,7 +58,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
             }
         }
     }
-    
+
     changed
 }
 

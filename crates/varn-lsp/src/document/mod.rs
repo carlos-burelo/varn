@@ -1,5 +1,6 @@
 mod chain_queries;
 pub mod import;
+mod resolution;
 mod symbol_queries;
 
 use rustc_hash::FxHashMap;
@@ -227,23 +228,20 @@ pub type DocumentAnalysis = DocumentState;
 
 impl DocumentState {
     pub fn resolve_symbol_id_at_offset(&self, offset: u32) -> Option<varn_checker::SymbolId> {
-        // 1. Try to look up in expr_types
         if let Some(info) = self.db.expr_types.get(&offset) {
             if let Some(sid) = info.symbol_id {
                 return Some(sid);
             }
         }
-        
-        // 2. Try to find a token at this offset
         let token = self.tokens.iter().find(|t| t.offset == offset)?;
-        
-        // 3. Try to resolve via scope at the token's offset
         if let Some((sid, _)) = self.db.resolve_at(&token.lexeme, token.offset) {
             return Some(sid);
         }
-
-        // 4. Try to find the symbol declaration by name and line (1-based)
-        if let Some(sid) = self.db.arena.find_id_by_name_and_line(&token.lexeme, token.line + 1) {
+        if let Some(sid) = self
+            .db
+            .arena
+            .find_id_by_name_and_line(&token.lexeme, token.line + 1)
+        {
             return Some(sid);
         }
 
@@ -262,7 +260,11 @@ impl DocumentState {
 
         if let Some(origin_mod) = origin {
             let canonical_name = original_name.unwrap_or(name);
-            let origin_uri = if origin_mod.starts_with("file://") || origin_mod.starts_with("std:") || origin_mod.starts_with("core:") || origin_mod.starts_with("runtime:") {
+            let origin_uri = if origin_mod.starts_with("file://")
+                || origin_mod.starts_with("std:")
+                || origin_mod.starts_with("core:")
+                || origin_mod.starts_with("runtime:")
+            {
                 origin_mod.to_owned()
             } else {
                 varn_modules::resolver::path_to_uri(origin_mod)
@@ -270,8 +272,18 @@ impl DocumentState {
             return Some(format!("m:{}#{kind:?}:{}", origin_uri, canonical_name));
         }
 
-        let is_global = self.db.scopes.get(self.db.global_scope).bindings.values().any(|&sid| sid == id);
-        let norm_uri = if self.uri.starts_with("file://") || self.uri.starts_with("std:") || self.uri.starts_with("core:") || self.uri.starts_with("runtime:") {
+        let is_global = self
+            .db
+            .scopes
+            .get(self.db.global_scope)
+            .bindings
+            .values()
+            .any(|&sid| sid == id);
+        let norm_uri = if self.uri.starts_with("file://")
+            || self.uri.starts_with("std:")
+            || self.uri.starts_with("core:")
+            || self.uri.starts_with("runtime:")
+        {
             self.uri.to_owned()
         } else {
             varn_modules::resolver::path_to_uri(&self.uri)

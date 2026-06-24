@@ -2,17 +2,8 @@ use crate::error::VmResult;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use varn_core::OpCode;
-
-pub mod collections;
-pub mod control;
-pub mod exceptions;
-mod literals;
-pub mod math;
 pub mod modules;
-pub mod objects;
 pub mod reg_ops;
-pub mod variables;
-
 pub mod ops_control_calls;
 pub mod ops_literals_vars;
 pub mod ops_math_cmp;
@@ -114,7 +105,7 @@ impl ExecCtx {
                 if (*ctx).trace {
                     (*ctx).trace_event("JIT ENTRY", frame_idx, closure, 0, None);
                 }
-                
+
                 let base = (*ctx).frames[frame_idx].base;
                 let res = Self::execute_jit_frame(ctx, jit_fn, closure_ptr, base);
 
@@ -123,9 +114,12 @@ impl ExecCtx {
                     Err(code) => {
                         if code == 1 {
                             let handler = (*ctx).jit_panic_exception_handler.take();
-                            let error = (*ctx).jit_panic_exception_error.take().unwrap_or(VmValue::null());
+                            let error = (*ctx)
+                                .jit_panic_exception_error
+                                .take()
+                                .unwrap_or(VmValue::null());
                             let err_obj = (*ctx).jit_panic_exception_err_obj.take();
-                            
+
                             if let Some(handler) = handler {
                                 while (*ctx).frames.len() > handler.frame_depth {
                                     (*ctx).record_frame_pop();
@@ -181,7 +175,8 @@ impl ExecCtx {
                 (*ctx).stack.truncate(frame.base);
 
                 let ctor_pos = if !(*ctx).pending_constructors.is_empty() {
-                    (*ctx).pending_constructors
+                    (*ctx)
+                        .pending_constructors
                         .iter()
                         .rposition(|(idx, _)| *idx == frame_idx)
                 } else {
@@ -244,9 +239,6 @@ impl ExecCtx {
                     }
                 };
 
-                // Compiler fence: prevents the optimizer from caching ctx's fields across
-                // iterations. The interpreter may re-enter itself (yield/await), so ctx state
-                // can legitimately change between opcodes.
                 std::sync::atomic::compiler_fence(std::sync::atomic::Ordering::SeqCst);
 
                 #[cfg(feature = "profiling")]
@@ -293,14 +285,14 @@ impl ExecCtx {
                     OpCode::LoadGlobalIdx => {
                         let gidx = code[ip] as usize;
                         ip += 1;
-                        // Routed through the guarded accessor (debug_assert bounds check).
+
                         reg!(first_reg) = (*ctx).globals.get_by_index_unchecked(gidx);
                         (*ctx).record_hotspot_global(gidx);
                     }
                     OpCode::LoadConst => {
                         let cidx = code[ip] as usize;
                         ip += 1;
-                        // cidx is a compiler-emitted constant-pool index, always in range.
+
                         debug_assert!(
                             cidx < closure.constants.len(),
                             "const index OOB: {cidx} >= {}",
@@ -331,7 +323,9 @@ impl ExecCtx {
                         let src = base + hi(w1) as usize;
                         let max_idx = dest.max(src);
                         if max_idx >= (*ctx).stack.len() {
-                            (*ctx).stack.resize(max_idx + 1, crate::value::VmValue::null());
+                            (*ctx)
+                                .stack
+                                .resize(max_idx + 1, crate::value::VmValue::null());
                         }
                         (*ctx).stack[dest] = (*ctx).stack[src];
                     }
@@ -492,7 +486,8 @@ impl ExecCtx {
                     }
                     OpCode::MakeEnumVariant => {
                         (*ctx).frames[frame_idx].ip = ip;
-                        (*ctx).exec_make_enum_variant_reg(code, &mut ip, base, frame_idx, &closure)?;
+                        (*ctx)
+                            .exec_make_enum_variant_reg(code, &mut ip, base, frame_idx, &closure)?;
                         let frame_idx2 = (*ctx).frames.len() - 1;
                         ip = (*ctx).frames[frame_idx2].ip;
                     }
@@ -587,15 +582,19 @@ impl ExecCtx {
                         let w1 = code[ip];
                         ip += 1;
                         let (dest, src) = (hi(w1), lo(w1));
-                        // Ensure source and destination register slots exist
+
                         let src_slot = base + src as usize;
                         if src_slot >= (*ctx).stack.len() {
-                            (*ctx).stack.resize(src_slot + 1, crate::value::VmValue::null());
+                            (*ctx)
+                                .stack
+                                .resize(src_slot + 1, crate::value::VmValue::null());
                         }
                         let task_val = reg![src];
                         let dest_slot = base + dest as usize;
                         if dest_slot >= (*ctx).stack.len() {
-                            (*ctx).stack.resize(dest_slot + 1, crate::value::VmValue::null());
+                            (*ctx)
+                                .stack
+                                .resize(dest_slot + 1, crate::value::VmValue::null());
                         }
                         reg![dest] = (*ctx).exec_spawn(task_val)?;
                     }
@@ -603,7 +602,7 @@ impl ExecCtx {
                     OpCode::LoadModule | OpCode::LoadModuleSlot | OpCode::StoreModuleSlot => {
                         (*ctx).frames[frame_idx].ip = ip;
                         (*ctx).exec_module_op_reg(
-                            op, code, &mut ip, base, frame_idx, &closure, first_reg,
+                            op, code, &mut ip, frame_idx, &closure, first_reg,
                         )?;
                         ip = (*ctx).frames[frame_idx].ip;
                     }
@@ -620,7 +619,7 @@ impl ExecCtx {
                         let w1 = code[ip];
                         ip += 1;
                         let wire_byte = (w1 >> 8) as u8;
-                        // arg_count includes object at dest (arg[0]); slice starts at dest
+
                         let arg_count = (w1 & 0xFF) as usize;
                         let args_start = base + first_reg;
                         let result = crate::exec::intrinsics::dispatch(
@@ -643,18 +642,21 @@ impl ExecCtx {
                                 )))
                             }
                         };
-                        // Cache scope is the per-ExecCtx `static_closures` map
-                        // (GC-rooted and relocated). Do NOT cache the heap index
-                        // on the shared `FunctionProto`: it leaks across heap/VM
-                        // boundaries (snapshot precompile -> benchmarked run).
+
                         let proto_ptr = std::rc::Rc::as_ptr(proto) as usize;
-                        let val = if let Some(&cached_val) = (*ctx).static_closures.get(&proto_ptr) {
+                        let val = if let Some(&cached_val) = (*ctx).static_closures.get(&proto_ptr)
+                        {
                             cached_val
                         } else {
-                            let constants = std::rc::Rc::new(crate::exec::calls::resolve_constants(proto, &mut (*ctx).heap));
-                            let vm_closure = std::rc::Rc::new(
-                                crate::frame::VmClosure::with_upvalues(proto.clone(), vec![], constants),
+                            let constants = std::rc::Rc::new(
+                                crate::exec::calls::resolve_constants(proto, &mut (*ctx).heap),
                             );
+                            let vm_closure =
+                                std::rc::Rc::new(crate::frame::VmClosure::with_upvalues(
+                                    proto.clone(),
+                                    vec![],
+                                    constants,
+                                ));
                             let val = (*ctx).heap.alloc_vm_closure(vm_closure);
                             (*ctx).static_closures.insert(proto_ptr, val);
                             val
@@ -782,8 +784,4 @@ impl ExecCtx {
             _ => "unknown",
         }
     }
-}
-
-fn frames_return_reg(frames: &[crate::frame::CallFrame]) -> Option<u16> {
-    frames.last()?.return_reg
 }

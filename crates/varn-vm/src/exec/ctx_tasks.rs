@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::frame::{CallFrame, VmClosure, VmUpvalue};
@@ -45,9 +44,15 @@ impl ExecCtx {
         let line = closure.proto.chunk.lines.get_line(op_ip);
         varn_utilities::terminal::tagged(
             format_args!("vm:{label}"),
-            format_args!("fn={fn_name} file={} frame={} ip={} line={} stack={} tries={} op={:?}",
-                closure.proto.chunk.source_file, frame_idx, op_ip, line,
-                self.stack.len(), self.try_handlers.len(), op,
+            format_args!(
+                "fn={fn_name} file={} frame={} ip={} line={} stack={} tries={} op={:?}",
+                closure.proto.chunk.source_file,
+                frame_idx,
+                op_ip,
+                line,
+                self.stack.len(),
+                self.try_handlers.len(),
+                op,
             ),
         );
     }
@@ -112,8 +117,10 @@ impl ExecCtx {
                                 varn_types::task::TaskState::Rejected(v) => Err(v),
                                 _ => match ExecCtx::wait_task_handle(handle.clone()) {
                                     Ok(v) => Ok(v),
-                                    Err(e) => Err(varn_types::Value::Str(std::rc::Rc::from(e.as_str()))),
-                                }
+                                    Err(e) => {
+                                        Err(varn_types::Value::Str(std::rc::Rc::from(e.as_str())))
+                                    }
+                                },
                             },
                             other => Ok(other),
                         };
@@ -148,8 +155,8 @@ impl ExecCtx {
 
                                     let f2 = fork.frames.len() - 1;
                                     let b2 = fork.frames[f2].base;
-                                    let required_depth =
-                                        b2 + fork.frames[f2].closure().proto.register_count as usize;
+                                    let required_depth = b2
+                                        + fork.frames[f2].closure().proto.register_count as usize;
                                     fork.stack.truncate(required_depth);
                                     let thrown_val = err.thrown.unwrap_or(VmValue::null());
 

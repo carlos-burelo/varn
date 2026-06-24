@@ -80,8 +80,8 @@ impl Checker {
         }
     }
 
-    /// Record every identifier that appears as an assignment target so the
-    /// compiler can rule out self-call optimizations on rebindable names.
+    
+    
     fn collect_reassigned_names(&mut self, target: &Expr) {
         match &target.kind {
             ExprKind::Identifier { name } => {

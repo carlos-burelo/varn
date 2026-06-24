@@ -35,7 +35,8 @@ impl Checker {
                 properties, rest, ..
             } => {
                 for prop in properties {
-                    let prop_ty = self.find_member_info(value_ty, prop.key.as_ref(), bind)
+                    let prop_ty = self
+                        .find_member_info(value_ty, prop.key.as_ref(), bind)
                         .map(|(t, _)| t)
                         .unwrap_or(Type::Dynamic);
                     self.check_pattern(&prop.value, &prop_ty, bind);
@@ -93,7 +94,8 @@ impl Checker {
             }
             MatchPattern::Record { fields, .. } => {
                 for (key, sub_pat) in fields {
-                    let member_ty = self.find_member_info(value_ty, key.as_ref(), bind)
+                    let member_ty = self
+                        .find_member_info(value_ty, key.as_ref(), bind)
                         .map(|(t, _)| t)
                         .unwrap_or(Type::Dynamic);
                     if let Some(sub) = sub_pat {
