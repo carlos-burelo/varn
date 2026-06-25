@@ -193,8 +193,13 @@ impl TricolorMarker {
                     }
                 }
                 HeapObj::Array(arr) => {
-                    let items = arr.0.borrow().clone();
-                    for nv in &items {
+                    // Iterate the borrowed elements directly. Cloning the whole
+                    // Vec here made every mark O(n) *with an allocation*, so a
+                    // large live array re-scanned each GC was O(n²) overall (and
+                    // the throwaway clones generated more garbage). `mark_gray`
+                    // only mutates the marker, never this RefCell, so holding the
+                    // borrow across the loop is sound.
+                    for nv in arr.0.borrow().iter() {
                         if let Some(child_idx) = heap.get_heap_idx(*nv) {
                             self.mark_gray(child_idx);
                         }
@@ -202,9 +207,7 @@ impl TricolorMarker {
                 }
                 HeapObj::Object(obj_ref) => {
                     let guard = obj_ref.borrow();
-                    let values = guard.inner.values.clone();
-                    drop(guard);
-                    for nv in &values {
+                    for nv in guard.inner.values.iter() {
                         if let Some(child_idx) = heap.get_heap_idx(*nv) {
                             self.mark_gray(child_idx);
                         }

@@ -9,8 +9,7 @@ use varn_types::{
 
 pub fn find_getter(obj: VmValue, key: &str, heap: &Heap) -> Option<Value> {
     if !obj.is_heap() {
-        let val = heap.extract(obj);
-        return get_class_for_value(&val, heap)?.find_getter(key);
+        return get_class(obj, heap)?.find_getter(key);
     }
     match heap.get(obj.as_heap_idx()) {
         Some(HeapObj::Object(o)) => {
@@ -18,17 +17,15 @@ pub fn find_getter(obj: VmValue, key: &str, heap: &Heap) -> Option<Value> {
             guard.class()?.find_getter(key)
         }
         Some(HeapObj::Class(cls)) => cls.find_static_getter(key),
-        _ => {
-            let val = heap.extract(obj);
-            get_class_for_value(&val, heap)?.find_getter(key)
-        }
+        // `get_class` derives the class without cloning array/string contents
+        // (an `extract` here made every `arr.length` access O(n)).
+        _ => get_class(obj, heap)?.find_getter(key),
     }
 }
 
 pub fn find_setter(obj: VmValue, key: &str, heap: &Heap) -> Option<Value> {
     if !obj.is_heap() {
-        let val = heap.extract(obj);
-        return get_class_for_value(&val, heap)?.find_setter(key);
+        return get_class(obj, heap)?.find_setter(key);
     }
     match heap.get(obj.as_heap_idx()) {
         Some(HeapObj::Object(o)) => {
@@ -36,10 +33,7 @@ pub fn find_setter(obj: VmValue, key: &str, heap: &Heap) -> Option<Value> {
             guard.class()?.find_setter(key)
         }
         Some(HeapObj::Class(cls)) => cls.find_static_setter(key),
-        _ => {
-            let val = heap.extract(obj);
-            get_class_for_value(&val, heap)?.find_setter(key)
-        }
+        _ => get_class(obj, heap)?.find_setter(key),
     }
 }
 
@@ -182,6 +176,13 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
         Some(HeapObj::Object(o)) => {
             let guard = o.borrow();
             guard.inner.get(key)
+        }
+        // O(1) array length. Without this, `arr.length` falls through to
+        // `heap.extract(obj)` in `resolve_property`, which clones the entire
+        // array's Vec just to read its length — making `arr.length` O(n) and any
+        // loop over it O(n²). (`heap.get(..).cloned()` only bumps the array's Rc.)
+        Some(HeapObj::Array(a)) if key == "length" => {
+            Some(VmValue::from_int(a.0.borrow().len() as i64))
         }
         _ => None,
     }
@@ -335,6 +336,18 @@ fn generator_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, 
 }
 
 pub fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
+    // Fast path for heap types whose class is fixed by their type: avoid
+    // `heap.extract`, which deep-clones the contents. This is on the property-
+    // access IC hot path, so cloning made every `arr.length` / array property
+    // access O(n) and any loop over it O(n²). These return exactly what the slow
+    // path would (`get_class_for_value` maps `Value::Array` -> intrinsic "Array").
+    if val.is_heap() {
+        match heap.get(val.as_heap_idx()) {
+            Some(HeapObj::Array(_)) => return heap.get_intrinsic_class("Array"),
+            Some(HeapObj::Str(_)) => return heap.get_intrinsic_class("str"),
+            _ => {}
+        }
+    }
     let v = heap.extract(val);
     get_class_for_value(&v, heap)
 }
