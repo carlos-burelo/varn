@@ -1,6 +1,7 @@
 use crate::binder::BindResult;
 use crate::checker::Checker;
 use crate::types::Type;
+use varn_core::TypeKind;
 
 impl Checker {
     pub(crate) fn check_pattern(
@@ -74,20 +75,24 @@ impl Checker {
                 bindings,
                 ..
             } => {
-                if let Some(fields) = bind.sum_variant_fields.get(variant_name.as_ref()) {
-                    for (i, binding) in bindings.iter().enumerate() {
-                        if binding.name.as_ref() == "_" {
-                            continue;
-                        }
-                        if let Some((_, field_ty)) = fields.get(i) {
-                            let scope = bind.scopes.get(self.current_scope);
-                            if let Some(id) = scope.resolve(&binding.name, &bind.scopes) {
-                                self.record_type_with_symbol(
-                                    binding.range.start.offset,
-                                    field_ty.clone(),
-                                    id,
-                                );
-                            }
+                let Some((fields, mapping)) =
+                    self.variant_fields_with_subst(variant_name.as_ref(), value_ty, bind)
+                else {
+                    return;
+                };
+                for (i, binding) in bindings.iter().enumerate() {
+                    if binding.name.as_ref() == "_" {
+                        continue;
+                    }
+                    if let Some((_, field_ty)) = fields.get(i) {
+                        let resolved = if mapping.is_empty() {
+                            field_ty.clone()
+                        } else {
+                            crate::checker_generics::map_generics_cached(self, field_ty, &mapping)
+                        };
+                        let scope = bind.scopes.get(self.current_scope);
+                        if let Some(id) = scope.resolve(&binding.name, &bind.scopes) {
+                            self.record_type_with_symbol(binding.range.start.offset, resolved, id);
                         }
                     }
                 }
@@ -119,5 +124,68 @@ impl Checker {
             }
             _ => {}
         }
+    }
+
+    /// Resolve a sum-type variant's field types plus a generic substitution
+    /// derived from the matched value's concrete type arguments.
+    ///
+    /// Variant metadata is looked up in this module's bind first, then in the
+    /// module that defines the type (via the scrutinee type's origin), so
+    /// imported sum types such as `Result`/`Option` resolve. When the scrutinee
+    /// is a generic instantiation (`Result<str, int>`), the enum's type
+    /// parameters are mapped to the concrete arguments so `Ok(v)` binds
+    /// `v: str` instead of the unsubstituted parameter (which surfaces as
+    /// `dynamic`).
+    fn variant_fields_with_subst(
+        &mut self,
+        variant: &str,
+        value_ty: &Type,
+        bind: &BindResult,
+    ) -> Option<(
+        Vec<(std::rc::Rc<str>, Type)>,
+        rustc_hash::FxHashMap<std::rc::Rc<str>, Type>,
+    )> {
+        let (parent, args, origin) = match &value_ty.0 {
+            TypeKind::Generic(n, a, o) => (Some(n.clone()), a.clone(), o.clone()),
+            TypeKind::Named(n, o) => (Some(n.clone()), Vec::new(), o.clone()),
+            _ => (None, Vec::new(), None),
+        };
+
+        // Fields: this module first, then the module that defines the type.
+        let mut fields = bind.sum_variant_fields.get(variant).cloned();
+        let mut def_bind: Option<std::rc::Rc<BindResult>> = None;
+        if fields.is_none() {
+            if let Some(o) = &origin {
+                let mb = crate::module_resolver::resolve_module_bind_ref(o.as_ref())
+                    .or_else(|| crate::module_resolver::resolve_stdlib_module_bind_ref(o.as_ref()));
+                if let Some(mb) = mb {
+                    fields = mb.sum_variant_fields.get(variant).cloned();
+                    def_bind = Some(mb);
+                }
+            }
+        }
+        let fields = fields?;
+
+        // {type-param -> concrete arg}, e.g. {T: str, E: int} for Result<str, int>.
+        let mut mapping = rustc_hash::FxHashMap::default();
+        if !args.is_empty() {
+            if let Some(p) = &parent {
+                let mut params = self.symbol_type_params_any(p.as_ref(), bind);
+                if params.is_empty() {
+                    if let Some(db) = &def_bind {
+                        params = db
+                            .scopes
+                            .get(db.global_scope)
+                            .resolve(p.as_ref(), &db.scopes)
+                            .map(|sid| db.arena.get(sid).type_params.clone())
+                            .unwrap_or_default();
+                    }
+                }
+                for (name, arg) in params.iter().zip(args.iter()) {
+                    mapping.insert(name.clone(), arg.clone());
+                }
+            }
+        }
+        Some((fields, mapping))
     }
 }

@@ -104,6 +104,39 @@ fn get_expr_type(expr: &Expr, ctx: &AnnotateCtx) -> Type {
     }
 }
 
+/// The native core class a receiver type belongs to, if any. Only core types
+/// whose methods are natively registered (and thus op-id-addressable).
+fn core_class_of_type(ty: &Type) -> Option<&'static str> {
+    match &ty.0 {
+        TypeKind::Array(_) => Some("Array"),
+        TypeKind::Named(name, _) => varn_core::op_id::core_class(name.as_ref()),
+        _ => None,
+    }
+}
+
+/// Whether `method` is a member of core class `class` (per the loaded `.vn`
+/// contracts). Guards op-id emission so we never emit a `CallNativeOp` whose id
+/// would not resolve at runtime.
+fn core_has_method(bind: &BindResult, class: &str, method: &str) -> bool {
+    bind.core
+        .as_ref()
+        .and_then(|c| c.class_members.get(class))
+        .map_or(false, |info| {
+            info.members.iter().any(|m| {
+                m.name.as_ref() == method
+                    // Only instance methods: static methods (`str.from`,
+                    // `Array.isArray`) take no receiver, so the op-id arg layout
+                    // (receiver at args[0]) would not match their wrapper.
+                    // Getters/setters/ctors aren't valid in call position; async/
+                    // generators need promise/iterator handling.
+                    && matches!(m.kind, crate::types::ClassMemberKind::Method)
+                    && !m.is_static
+                    && !m.is_async
+                    && !m.is_generator
+            })
+        })
+}
+
 pub fn collect_type_annotations(
     program: &Program,
     bind: &BindResult,
@@ -460,10 +493,31 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
             {
                 if let ExprKind::Identifier { name: prop_name } = &property.kind {
                     let obj_ty = get_expr_type(object, ctx);
-                    if let TypeKind::Named(_, Some(ref origin_path)) = &obj_ty.non_nullified().0 {
+                    let obj_ty_nn = obj_ty.non_nullified();
+                    let mut recorded = false;
+                    if let TypeKind::Named(_, Some(ref origin_path)) = &obj_ty_nn.0 {
                         let key = format!("{}/{}", origin_path, prop_name);
                         if let Some(wire_byte) = intrinsic_lookup(&key) {
                             ann.record_intrinsic(expr.range.start.offset, wire_byte);
+                            recorded = true;
+                        }
+                    }
+                    // Statically-typed core-type method call (e.g. `arr.push(x)`):
+                    // resolve directly to its native op-id so codegen can emit a
+                    // direct dispatch, bypassing the string-name + inline-cache
+                    // lookup. Only when the receiver is concretely a core class
+                    // and the member is one of its native methods.
+                    if !recorded {
+                        let has_spread = args.iter().any(|a| matches!(a, Arg::Spread(_)));
+                        if !has_spread {
+                            if let Some(class) = core_class_of_type(&obj_ty_nn) {
+                                if core_has_method(ctx.bind, class, prop_name) {
+                                    ann.record_native_op(
+                                        expr.range.start.offset,
+                                        varn_core::op_id::core_method_op_id(class, prop_name),
+                                    );
+                                }
+                            }
                         }
                     }
                 }

@@ -226,6 +226,7 @@ impl VmClosure {
             dispatch_intrinsic: ctx::jit_dispatch_intrinsic as usize,
             jit_is_native_fn: ctx::jit_is_native_fn as usize,
             jit_call_native_fast: ctx::jit_call_native_fast as usize,
+            jit_call_native_op: ctx::jit_call_native_op as usize,
             open_upvalues_offset: {
                 let dummy = std::mem::MaybeUninit::<ctx::ExecCtx>::uninit();
                 let dummy_ptr = dummy.as_ptr();

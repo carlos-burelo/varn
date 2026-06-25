@@ -1,7 +1,10 @@
 use varn_core::OpCode;
 
 use crate::assembler::{Cond, Reg};
-use crate::regalloc::{emit_flush_all, emit_load, emit_reload_all_except, emit_store};
+use crate::regalloc::{
+    emit_flush_all, emit_flush_for_call, emit_load, emit_reload_after_call, emit_reload_all_except,
+    emit_store,
+};
 use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
 
 use super::CodegenCtx;
@@ -18,6 +21,7 @@ pub(crate) fn emit_calls(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) -> 
         OpCode::CallMethod => emit_call_method(ctx, first_reg),
         OpCode::InvokeVirtual => emit_invoke_virtual(ctx),
         OpCode::Intrinsic => emit_intrinsic(ctx, first_reg),
+        OpCode::CallNativeOp => emit_call_native_op(ctx, first_reg),
         _ => unreachable!("emit_calls called with {:?}", op),
     }
     Ok(())
@@ -331,6 +335,8 @@ fn emit_call_self(ctx: &mut CodegenCtx, first_reg: usize) {
     let ip = &mut ctx.ip;
     let regmap = &ctx.regmap;
     let helpers = ctx.helpers;
+    let meta = &ctx.proto.register_meta;
+    let safe_opt = ctx.safe_int_call_opt;
 
     let w1 = code[*ip];
     *ip += 1;
@@ -343,9 +349,11 @@ fn emit_call_self(ctx: &mut CodegenCtx, first_reg: usize) {
 
     let _ = first_reg;
     let _ = callee_dummy;
-    let _ = arg_count;
 
-    emit_flush_all(asm, regmap);
+    // Immediate (`int`/`float`/`bool`) locals that aren't arguments stay in their
+    // callee-saved registers across the recursive call; only pointer slots and the
+    // arguments the callee reads from memory are spilled. See `emit_flush_for_call`.
+    emit_flush_for_call(asm, regmap, meta, safe_opt, arg_start, arg_start + arg_count);
 
     // NOTE: a former "is_pure" fast path emitted a bare native `call` to self with
     // no frame push and no depth check, so deep self-recursion overflowed the host
@@ -536,7 +544,9 @@ fn emit_call_self(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
 
     emit_store(asm, Reg::Rax, dest, regmap);
-    emit_reload_all_except(asm, regmap, Some(dest));
+    // Immediate locals survived in callee-saved registers; only reload pointer
+    // slots (a copying GC in the callee may have relocated them).
+    emit_reload_after_call(asm, regmap, meta, safe_opt, Some(dest));
 }
 
 fn emit_call_method(ctx: &mut CodegenCtx, first_reg: usize) {
@@ -788,6 +798,72 @@ fn emit_intrinsic(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.add_reg_imm8(Reg::Rsp, -32);
 
     asm.mov_reg_imm64(Reg::R10, helpers.dispatch_intrinsic as u64);
+    asm.call_reg(Reg::R10);
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, 32);
+
+    if need_align {
+        asm.pop(Reg::R11);
+    }
+
+    asm.pop(ARG_BASE);
+    asm.pop(ARG_EXEC_CTX);
+    asm.pop(ARG_CTX);
+
+    asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
+
+    asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_BASE);
+    asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
+    asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
+
+    emit_store(asm, Reg::Rax, dest, regmap);
+    emit_reload_all_except(asm, regmap, Some(dest));
+}
+
+fn emit_call_native_op(ctx: &mut CodegenCtx, first_reg: usize) {
+    let asm = &mut ctx.asm;
+    let code = ctx.code;
+    let ip = &mut ctx.ip;
+    let regmap = &ctx.regmap;
+    let helpers = ctx.helpers;
+    let proto = ctx.proto;
+
+    let cidx = code[*ip] as usize;
+    let total = code[*ip + 1] as usize; // receiver + args
+    *ip += 2;
+
+    // Op-id is known at JIT-compile time (constants hold a full i64).
+    let op_id = match proto.chunk.constants.get(cidx) {
+        Some(varn_types::chunk::PoolEntry::Literal(varn_types::chunk::Literal::Int(i))) => {
+            *i as u64
+        }
+        _ => 0,
+    };
+
+    let dest = first_reg;
+
+    emit_flush_all(asm, regmap);
+
+    asm.push(ARG_CTX);
+    asm.push(ARG_EXEC_CTX);
+    asm.push(ARG_BASE);
+
+    let need_align = (regmap.used_phys.len() + 4) % 2 != 0;
+    if need_align {
+        asm.push(Reg::Rax);
+    }
+
+    // jit_call_native_op(ctx, op_id, args_start = base + dest, total)
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+    asm.mov_reg_imm64(ARG_CLOSURE, op_id);
+    asm.add_reg_imm32(ARG_BASE, dest as i32);
+    asm.mov_reg_imm64(ARG_EXEC_CTX, total as u64);
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, -32);
+
+    asm.mov_reg_imm64(Reg::R10, helpers.jit_call_native_op as u64);
     asm.call_reg(Reg::R10);
 
     #[cfg(target_os = "windows")]

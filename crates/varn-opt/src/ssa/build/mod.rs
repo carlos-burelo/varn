@@ -751,6 +751,12 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
                 scan_expr(a, pinned, in_try);
             }
         }
+        HirExpr::NativeMethodCall { object, args, .. } => {
+            scan_expr(object, pinned, in_try);
+            for a in args {
+                scan_expr(a, pinned, in_try);
+            }
+        }
         HirExpr::ModuleSlot { object, .. } => scan_expr(object, pinned, in_try),
         _ => {}
     }

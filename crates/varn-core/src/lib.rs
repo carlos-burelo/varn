@@ -5,6 +5,7 @@ pub mod intrinsic_ops;
 pub mod intrinsics;
 pub mod kinds;
 pub mod module_id;
+pub mod op_id;
 pub mod op_meta;
 pub mod opcode;
 pub mod paths;

@@ -32,6 +32,7 @@ pub use super::ctx_jit_runtime::{
 };
 pub use super::ctx_jit_values::{
     jit_add, jit_build_array, jit_build_str, jit_call, jit_call_method, jit_call_native_fast,
+    jit_call_native_op,
     jit_define_global_idx, jit_dispatch_intrinsic, jit_ensure_stack_capacity, jit_eq,
     jit_get_property, jit_get_property_ic_fast, jit_get_property_maybe_ic_fast, jit_gt, jit_gte,
     jit_invoke_virtual, jit_is_native_fn, jit_load_const, jit_load_global, jit_load_global_idx,

@@ -47,3 +47,12 @@ opt-level = 3
 
 [profile.dev]
 opt-level = 1
+
+# Fast-iteration optimized build: keeps opt-level 3 for representative
+# JIT/VM perf, but thin LTO + parallel codegen ~= 2x faster rebuilds.
+# Use `cargo build --profile quick` while iterating on the perf branch;
+# keep `release` for final benchmarks / distribution.
+[profile.quick]
+inherits = "release"
+lto = "thin"
+codegen-units = 16

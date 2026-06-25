@@ -282,6 +282,14 @@ pub enum HirExpr {
         ty: HirType,
     },
 
+    /// Direct dispatch of a statically-typed core-type method by stable op-id.
+    NativeMethodCall {
+        object: Box<HirExpr>,
+        args: Vec<HirExpr>,
+        op_id: u64,
+        ty: HirType,
+    },
+
     ModuleSlot {
         object: Box<HirExpr>,
         slot: u16,

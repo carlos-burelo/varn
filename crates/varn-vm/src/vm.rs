@@ -342,6 +342,11 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
                 ip += 1;
             }
 
+            // opcode word + [op_id_const_idx] + [arg_count]
+            OpCode::CallNativeOp => {
+                ip += 3;
+            }
+
             OpCode::LoadInt
             | OpCode::LoadConst
             | OpCode::LoadGlobalIdx

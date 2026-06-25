@@ -62,6 +62,7 @@ fn has_side_effects(kind: &InstKind) -> bool {
             | InstKind::ObjectMerge { .. }
             | InstKind::MethodCall { .. }
             | InstKind::IntrinsicCall { .. }
+            | InstKind::CallNativeOp { .. }
             | InstKind::AssertNotNull { .. }
             | InstKind::IterCall { .. }
             | InstKind::SuperCall { .. }

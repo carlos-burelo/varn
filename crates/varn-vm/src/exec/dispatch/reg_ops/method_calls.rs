@@ -308,7 +308,7 @@ impl ExecCtx {
     }
 
     #[inline(always)]
-    fn call_native_with_receiver(
+    pub(crate) fn call_native_with_receiver(
         &mut self,
         f: fn(&mut dyn varn_types::NativeCtx, &[VmValue]) -> Result<VmValue, String>,
         receiver: VmValue,

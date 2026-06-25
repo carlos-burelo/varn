@@ -148,10 +148,17 @@ impl super::super::Binder {
     }
 
     pub(crate) fn bind_sum_type(&mut self, t: &SumTypeDecl) {
-        let pe_sym =
+        let mut pe_sym =
             Symbol::new(SymbolKind::TypeAlias, t.id.clone(), t.range.start.line).with_type(
                 Type::named_with_origin(t.id.clone(), Some(Rc::from(self.source_file.as_ref()))),
             );
+        // Expose the alias' generic parameters so consumers (e.g. match-variant
+        // payload typing) can substitute them with concrete type arguments.
+        pe_sym.type_params = t
+            .type_params
+            .iter()
+            .map(|tp| Rc::from(tp.name.as_str()))
+            .collect();
         self.define(t.id.to_string(), pe_sym);
 
         let mut variant_names = Vec::new();

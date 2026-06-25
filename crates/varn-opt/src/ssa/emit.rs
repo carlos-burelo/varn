@@ -346,6 +346,7 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
                 InstKind::BuildArray { elements } => elements.len() as u32,
 
                 InstKind::IntrinsicCall { args, .. } => args.len() as u32 + 1,
+                InstKind::CallNativeOp { args, .. } => args.len() as u32 + 1,
 
                 InstKind::IterCall { .. } => 1,
 
@@ -754,6 +755,30 @@ fn emit_inst(
             let arg_count = (args.len() + 1) as u16;
             chunk.write(Chunk::pack_op(OpCode::Intrinsic, call_base), LINE);
             chunk.write(((*wire_byte as u16) << 8) | arg_count, LINE);
+            chunk.emit_rr(OpCode::Move, d, call_base, LINE);
+        }
+
+        InstKind::CallNativeOp {
+            object,
+            args,
+            op_id,
+        } => {
+            chunk.emit_rr(OpCode::Move, call_base, reg[object.0 as usize], LINE);
+            for (i, a) in args.iter().enumerate() {
+                chunk.emit_rr(
+                    OpCode::Move,
+                    call_base + 1 + i as u8,
+                    reg[a.0 as usize],
+                    LINE,
+                );
+            }
+            // arg_count includes the receiver; op-id stored as a constant
+            // (full i64) so it survives `.vnc` serialization.
+            let arg_count = (args.len() + 1) as u16;
+            let cidx = chunk.add_int(*op_id as i64);
+            chunk.write(Chunk::pack_op(OpCode::CallNativeOp, call_base), LINE);
+            chunk.write(cidx, LINE);
+            chunk.write(arg_count, LINE);
             chunk.emit_rr(OpCode::Move, d, call_base, LINE);
         }
 

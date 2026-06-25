@@ -109,6 +109,13 @@ fn inst_kind(kind: &InstKind) -> String {
         } => {
             format!("intrinsic#{wire_byte} {}{}", val(*object), args_list(args))
         }
+        InstKind::CallNativeOp {
+            object,
+            args,
+            op_id,
+        } => {
+            format!("nativeop#{op_id:#x} {}{}", val(*object), args_list(args))
+        }
         InstKind::AssertNotNull { operand } => format!("assertnotnull {}", val(*operand)),
         InstKind::GetPropertyMaybe { object, name } => {
             format!("getpropmaybe {}.{name}", val(*object))

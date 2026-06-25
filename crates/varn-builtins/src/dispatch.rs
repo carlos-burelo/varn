@@ -57,7 +57,16 @@ fn build_table() -> FxHashMap<u64, DispatchEntry> {
     for entry in iter_native_ops() {
         let module = entry.module_id();
         let symbol = entry.symbol_name();
-        let id = entry::compound_op_id(module, symbol);
+        // Class-qualified members (core-type methods/getters) carry the class in
+        // `namespace_path`; module-level ops have it empty. All historically
+        // emitted entries have an empty namespace, so this only ever affects the
+        // new per-method entries — existing dispatch ids are unchanged.
+        let ns = entry.namespace_path();
+        let id = if ns.is_empty() {
+            entry::compound_op_id(module, symbol)
+        } else {
+            entry::compound_op_id3(module, ns, symbol)
+        };
         table.insert(
             id,
             DispatchEntry {
@@ -93,6 +102,14 @@ pub fn describe_op(id: u64) -> Option<OpMeta> {
         is_async: false,
         capability: entry.capability,
     })
+}
+
+/// Resolve a stable op-id to its native function pointer, for callers that want
+/// to invoke it through their own native-call path (preserving their error and
+/// profiling semantics) rather than the wrapped [`dispatch_runtime_op`].
+pub fn native_op_fn(id: u64) -> Option<varn_types::NativeFn> {
+    let table = TABLE.get_or_init(build_table);
+    table.get(&id).map(|e| e.func)
 }
 
 pub fn dispatch_runtime_op(
@@ -175,7 +192,10 @@ pub(crate) fn build_module(id: &str, ctx: &mut dyn NativeCtx) -> Option<VmValue>
         let val = match entry.entry_kind {
             0x09 => ctx.call_static(entry.func()),
             0x10 => (entry.func())(ctx, &[]).unwrap_or(VmValue::null()),
-            0x11 | 0x12 | 0x13 | 0x14 | 0x15 => continue,
+            // Class-qualified members (instance/static method, getter, setter)
+            // belong to a class built by its ClassDef (0x10), not to the module
+            // object. They exist only to be op-id-addressable for direct dispatch.
+            0x03 | 0x04 | 0x05 | 0x06 | 0x11 | 0x12 | 0x13 | 0x14 | 0x15 => continue,
             _ => ctx.alloc_fn(entry.func(), symbol),
         };
 
@@ -312,5 +332,28 @@ impl varn_types::NativeCtx for DevNullModuleCtx {
     }
     fn call_static(&mut self, _f: varn_types::NativeFn) -> VmValue {
         VmValue::null()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn core_methods_are_op_id_addressable() {
+        // Phase 1: core-type methods must be present in the dispatch table under
+        // their class-qualified op-id, distinct from any module-level symbol.
+        let push = entry::compound_op_id3("globals", "Array", "push");
+        assert!(
+            describe_op(push).is_some(),
+            "Array.push missing from dispatch table"
+        );
+        let len = entry::compound_op_id3("globals", "Array", "length");
+        assert!(
+            describe_op(len).is_some(),
+            "Array.length getter missing from dispatch table"
+        );
+        // The class-qualified id must not collide with the 2-segment module space.
+        assert_ne!(push, entry::compound_op_id("globals", "push"));
     }
 }

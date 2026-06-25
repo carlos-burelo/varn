@@ -81,6 +81,23 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
                 opaque: false,
             }
         }
+        OpCode::CallNativeOp => {
+            // Operands: [op_id_const_idx][arg_count]. Receiver + args are
+            // contiguous from `dest0` (call_base); `arg_count` includes the
+            // receiver. Mirrors `Intrinsic` so regalloc keeps them contiguous.
+            let total = lo2 as usize;
+            let mut uses = vec![];
+            for i in 0..total {
+                uses.push(dest0.wrapping_add(i as u8));
+            }
+            InstrInfo {
+                len: 3,
+                def: Some(dest0),
+                uses,
+                call_args: Some((dest0, total as u8)),
+                opaque: false,
+            }
+        }
         OpCode::LoadStaticFn => s(2, Some(dest0), vec![]),
 
         OpCode::LoadNull
@@ -866,6 +883,9 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                 }
 
                 OpCode::Intrinsic => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                }
+                OpCode::CallNativeOp => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                 }
                 OpCode::LoadStaticFn => {
