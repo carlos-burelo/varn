@@ -494,6 +494,27 @@ impl Builder {
                 ))
             }
 
+            HirExpr::NativeMethodCall {
+                object,
+                args,
+                op_id,
+                ty,
+            } => {
+                let o = self.lower_expr(object)?;
+                let mut avs = Vec::with_capacity(args.len());
+                for a in args {
+                    avs.push(self.lower_expr(a)?);
+                }
+                Ok(self.emit(
+                    InstKind::CallNativeOp {
+                        object: o,
+                        args: avs,
+                        op_id: *op_id,
+                    },
+                    *ty,
+                ))
+            }
+
             HirExpr::Conditional { test, cons, alt } => {
                 let t = self.lower_expr(test)?;
                 self.lower_branch_value(

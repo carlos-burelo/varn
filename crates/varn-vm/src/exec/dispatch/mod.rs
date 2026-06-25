@@ -630,6 +630,40 @@ impl ExecCtx {
                         (*ctx).stack[base + first_reg] = result;
                     }
 
+                    OpCode::CallNativeOp => {
+                        let cidx = code[ip] as usize;
+                        let total = code[ip + 1] as usize; // receiver + args
+                        ip += 2;
+                        // op-id is stored as a full i64 constant (NOT the
+                        // NaN-boxed `closure.constants` cache, which truncates).
+                        let op_id = match closure.proto.chunk.constants.get(cidx) {
+                            Some(varn_types::chunk::PoolEntry::Literal(
+                                varn_types::chunk::Literal::Int(i),
+                            )) => *i as u64,
+                            _ => {
+                                return Err(crate::error::RuntimeError::new(format!(
+                                    "CallNativeOp: const {cidx} is not an op-id"
+                                )))
+                            }
+                        };
+                        let f = varn_builtins::native_op_fn(op_id).ok_or_else(|| {
+                            crate::error::RuntimeError::new(format!(
+                                "CallNativeOp: unknown op-id {op_id}"
+                            ))
+                        })?;
+                        let receiver = (*ctx).stack[base + first_reg];
+                        // Reuse the exact native-call path the inline cache uses,
+                        // so error and profiling semantics are identical.
+                        let result = (*ctx).call_native_with_receiver(
+                            f,
+                            receiver,
+                            base,
+                            first_reg + 1,
+                            total - 1,
+                        )?;
+                        (*ctx).stack[base + first_reg] = result;
+                    }
+
                     OpCode::LoadStaticFn => {
                         let proto_idx = code[ip] as usize;
                         ip += 1;

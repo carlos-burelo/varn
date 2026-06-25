@@ -220,6 +220,12 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             OpCode::PopTry => String::new(),
             OpCode::Nop => String::new(),
 
+            OpCode::CallNativeOp => {
+                let cidx = w!();
+                let argc = w!();
+                format!("r{} = nativeop const[{}]({} args)", hi(op_val), cidx, argc)
+            }
+
             OpCode::Add
             | OpCode::Sub
             | OpCode::Mul

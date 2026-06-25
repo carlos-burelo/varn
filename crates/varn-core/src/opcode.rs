@@ -179,12 +179,19 @@ pub enum OpCode {
     CallSelf,
 
     Nop,
+
+    /// Direct dispatch of a statically-typed core-type method by stable op-id.
+    /// Operands: `[op_id_const_idx: u16][arg_count: u16]` where `arg_count`
+    /// includes the receiver. The receiver sits at the packed `call_base`
+    /// register, args contiguous above it; the result is written back to
+    /// `call_base`. Bypasses the string method name + inline-cache lookup.
+    CallNativeOp,
 }
 
 impl OpCode {
     #[inline(always)]
     pub fn from_u8(v: u8) -> Option<Self> {
-        if v <= OpCode::Nop as u8 {
+        if v <= OpCode::CallNativeOp as u8 {
             Some(unsafe { std::mem::transmute::<u8, OpCode>(v) })
         } else {
             None

@@ -114,6 +114,7 @@ pub struct JitHelpers {
     pub dispatch_intrinsic: usize,
     pub jit_is_native_fn: usize,
     pub jit_call_native_fast: usize,
+    pub jit_call_native_op: usize,
     pub open_upvalues_offset: usize,
     pub pending_constructors_offset: usize,
 }

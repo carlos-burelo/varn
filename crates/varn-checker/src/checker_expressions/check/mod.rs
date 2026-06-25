@@ -546,6 +546,12 @@ impl Checker {
                             )
                             .with_range(expr.range),
                         );
+                    } else if self.in_pipeline_rhs {
+                        // `_` stands for the piped value; record its concrete type so
+                        // downstream consumers (compiler, LSP) don't see `dynamic`.
+                        if let Some(ty) = self.pipeline_value_type.clone() {
+                            self.record_type(expr.range.start.offset, ty);
+                        }
                     }
                     return;
                 }

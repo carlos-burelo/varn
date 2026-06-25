@@ -377,10 +377,18 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     let module = &input.module;
     let ns = "";
 
+    // Class name for the `namespace_path` of per-method dispatch entries; empty
+    // for function-modules (whose members are all `Kind::Function`).
+    let class_name_str: String = input.class.clone().unwrap_or_default();
+
     let mut trait_sigs: Vec<TS2> = Vec::new();
     let mut wrappers: Vec<TS2> = Vec::new();
     let mut setup_calls: Vec<TS2> = Vec::new();
     let mut fn_entries: Vec<TS2> = Vec::new();
+    // Per-method `NativeOpEntry`s so core-type methods/getters are addressable by
+    // a stable op-id (`module::class::symbol`) for direct dispatch — in addition
+    // to living in the class vtable via `setup_calls`.
+    let mut method_entries: Vec<TS2> = Vec::new();
 
     for m in &members {
         let sym = &m.symbol;
@@ -529,6 +537,42 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                 Kind::Function => unreachable!(),
             };
             setup_calls.push(setup);
+
+            // Emit a stable, op-id-addressable dispatch entry for callable
+            // members (skip the constructor — invoked via `new`, not by op-id).
+            let mkind: u8 = match m.kind {
+                Kind::Method => 0x03,
+                Kind::StaticMethod => 0x04,
+                Kind::Getter => 0x05,
+                Kind::StaticGetter => 0x14,
+                _ => 0x00,
+            };
+            if mkind != 0x00 {
+                let mentry_ident = format_ident!(
+                    "__VARN_OPM_{}_{}",
+                    sanitize(&prefix).to_uppercase(),
+                    sanitize(sym).to_uppercase()
+                );
+                method_entries.push(quote! {
+                    #[used]
+                    #[cfg_attr(target_os = "windows", link_section = ".varn_ops$B")]
+                    #[cfg_attr(target_os = "macos", link_section = "__DATA,varn_ops")]
+                    #[cfg_attr(not(any(target_os = "windows", target_os = "macos")), link_section = "varn_ops")]
+                    static #mentry_ident: ::varn_types::NativeOpEntry = ::varn_types::NativeOpEntry {
+                        module_id: #module.as_ptr(),
+                        module_id_len: #module.len() as u32,
+                        namespace_path: #class_name_str.as_ptr(),
+                        namespace_path_len: #class_name_str.len() as u32,
+                        symbol_name: #sym.as_ptr(),
+                        symbol_name_len: #sym.len() as u32,
+                        func_ptr: #wrap_ident::<#self_ty> as *const u8,
+                        capability_mask: 0,
+                        entry_kind: #mkind,
+                        flags: 0,
+                        _reserved: [0; 7],
+                    };
+                });
+            }
         }
     }
 
@@ -577,6 +621,8 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                 flags: 0,
                 _reserved: [0; 7],
             };
+
+            #(#method_entries)*
         }
     } else {
         quote! { #(#fn_entries)* }

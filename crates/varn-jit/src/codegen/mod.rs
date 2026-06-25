@@ -47,4 +47,10 @@ pub(crate) struct CodegenCtx<'a> {
     pub proto: &'a FunctionProto,
     pub helpers: &'a crate::JitHelpers,
     pub constants: &'a [varn_types::VmValue],
+    /// When true, immediate-typed (`int`/`float`/`bool`) locals may stay solely
+    /// in their callee-saved physical register across a call: the function is
+    /// pure (no upvalues / async / generator) and creates no closures, so no
+    /// local is aliased into a heap upvalue cell. Enables spill elision around
+    /// self-calls (see `emit_flush_for_call` / `emit_reload_after_call`).
+    pub safe_int_call_opt: bool,
 }

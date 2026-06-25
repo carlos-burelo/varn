@@ -99,6 +99,10 @@ impl SsaFunc {
                         sub(object);
                         args.iter_mut().for_each(sub);
                     }
+                    InstKind::CallNativeOp { object, args, .. } => {
+                        sub(object);
+                        args.iter_mut().for_each(sub);
+                    }
                     InstKind::AssertNotNull { operand } => sub(operand),
                     InstKind::GetPropertyMaybe { object, .. } => sub(object),
                     InstKind::ModuleSlot { object, .. } => sub(object),
@@ -389,6 +393,12 @@ pub enum InstKind {
         object: Value,
         args: Vec<Value>,
         wire_byte: u8,
+    },
+
+    CallNativeOp {
+        object: Value,
+        args: Vec<Value>,
+        op_id: u64,
     },
 
     AssertNotNull {

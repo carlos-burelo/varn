@@ -18,6 +18,12 @@ pub fn compile_proto(
     helpers: crate::JitHelpers,
 ) -> Result<JitBuffer, String> {
     let code = &proto.chunk.code;
+    // Set when the function materializes any closure: such a closure may capture
+    // one of this function's locals by reference, aliasing its stack slot into a
+    // heap upvalue cell. That breaks the "immediate locals live only in a
+    // callee-saved register across a call" invariant, so it disables spill
+    // elision around calls.
+    let mut creates_closures = false;
     let mut ip = 0;
     while ip < code.len() {
         let raw_op = code[ip];
@@ -111,6 +117,7 @@ pub fn compile_proto(
                 ip += 1;
             }
             OpCode::MakeClosure => {
+                creates_closures = true;
                 let w1 = code[ip];
                 ip += 1;
                 let uv_count = (w1 & 0xFF) as usize;
@@ -119,6 +126,9 @@ pub fn compile_proto(
             }
             OpCode::Intrinsic => {
                 ip += 1;
+            }
+            OpCode::CallNativeOp => {
+                ip += 2;
             }
             OpCode::AddInt
             | OpCode::SubInt
@@ -234,6 +244,9 @@ pub fn compile_proto(
     emit_prologue(&mut asm, &regmap, proto, &helpers);
     crate::regalloc::emit_reload_all(&mut asm, &regmap);
 
+    let is_pure = proto.upvalue_count == 0 && !proto.is_async && !proto.is_generator;
+    let safe_int_call_opt = is_pure && !creates_closures;
+
     let code_len = code.len();
     let mut cctx = CodegenCtx {
         asm,
@@ -245,6 +258,7 @@ pub fn compile_proto(
         proto,
         helpers: &helpers,
         constants,
+        safe_int_call_opt,
     };
 
     while cctx.ip < code_len {
@@ -342,7 +356,7 @@ pub fn compile_proto(
             | OpCode::ArrayExtend
             | OpCode::BuildStr => emit_arrays(&mut cctx, op, first_reg)?,
 
-            OpCode::Intrinsic => emit_calls(&mut cctx, op, first_reg)?,
+            OpCode::Intrinsic | OpCode::CallNativeOp => emit_calls(&mut cctx, op, first_reg)?,
 
             OpCode::StrConcat | OpCode::StrSlice | OpCode::StrLength => {
                 emit_strings(&mut cctx, op, first_reg)?

@@ -206,6 +206,12 @@ pub(crate) fn inst_uses(kind: &InstKind) -> Vec<Value> {
             v.extend_from_slice(args);
             v
         }
+        InstKind::CallNativeOp { object, args, .. } => {
+            let mut v = Vec::with_capacity(args.len() + 1);
+            v.push(*object);
+            v.extend_from_slice(args);
+            v
+        }
         InstKind::AssertNotNull { operand } => vec![*operand],
         InstKind::GetPropertyMaybe { object, .. } => vec![*object],
         InstKind::ModuleSlot { object, .. } => vec![*object],

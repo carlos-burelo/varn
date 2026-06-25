@@ -347,6 +347,18 @@ fn dump_expr(expr: &HirExpr) -> String {
                 dump_exprs(args)
             )
         }
+        HirExpr::NativeMethodCall {
+            object,
+            args,
+            op_id,
+            ..
+        } => {
+            format!(
+                "{MAGENTA}nativeop:{op_id:#x}{R}({}, [{}])",
+                dump_expr(object),
+                dump_exprs(args)
+            )
+        }
         HirExpr::ModuleSlot { object, slot, .. } => {
             format!("{}.slot#{slot}", dump_expr(object))
         }

@@ -9,6 +9,7 @@ pub struct ExprAnnotation {
     pub call_mapping: Option<Vec<Option<usize>>>,
     pub slot_idx: Option<usize>,
     pub intrinsic: Option<u8>,
+    pub native_op: Option<u64>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -79,6 +80,14 @@ impl TypeAnnotations {
 
     pub fn get_intrinsic(&self, offset: u32) -> Option<u8> {
         self.inner.get(&offset)?.intrinsic
+    }
+
+    pub fn record_native_op(&mut self, offset: u32, op_id: u64) {
+        self.inner.entry(offset).or_default().native_op = Some(op_id);
+    }
+
+    pub fn get_native_op(&self, offset: u32) -> Option<u64> {
+        self.inner.get(&offset)?.native_op
     }
 
     pub fn is_empty(&self) -> bool {

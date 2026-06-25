@@ -907,3 +907,41 @@ pub extern "C" fn jit_call_native_fast(
         panic!("jit_call_native_fast called with non-native callee");
     }
 }
+
+/// JIT helper for `CallNativeOp`: resolve the stable op-id to its native fn and
+/// invoke it. The stack slice `[receiver, args...]` is already laid out
+/// contiguously at `args_start` (absolute), which is exactly the layout the
+/// macro-generated wrapper expects — so this mirrors the interpreter's
+/// `CallNativeOp` arm (and its `call_native_with_receiver` path).
+pub extern "C" fn jit_call_native_op(
+    ctx: *mut ExecCtx,
+    op_id: u64,
+    args_start: usize,
+    total: usize,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let f = match varn_builtins::native_op_fn(op_id) {
+            Some(f) => f,
+            None => jit_propagate_error(
+                ctx_ref,
+                crate::error::RuntimeError::new(format!("CallNativeOp: unknown op-id {op_id}")),
+            ),
+        };
+        ctx_ref.record_call_native();
+        let result = if total <= 16 {
+            let mut buf = [VmValue::null(); 16];
+            for i in 0..total {
+                buf[i] = ctx_ref.stack[args_start + i];
+            }
+            ctx_ref.invoke_native(f, &buf[..total])
+        } else {
+            let v: Vec<VmValue> = (0..total).map(|i| ctx_ref.stack[args_start + i]).collect();
+            ctx_ref.invoke_native(f, &v)
+        };
+        match result {
+            Ok(v) => v,
+            Err(msg) => jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg)),
+        }
+    }
+}

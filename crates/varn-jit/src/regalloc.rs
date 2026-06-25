@@ -400,6 +400,65 @@ pub fn emit_reload_all_except(asm: &mut Assembler, regmap: &RegMap, except: Opti
     }
 }
 
+/// True for register slots whose value is always a NaN-boxed immediate
+/// (`int`/`float`/`bool`) and therefore can never be a heap pointer / GC root.
+#[inline]
+fn slot_is_immediate(meta: &[varn_types::register_meta::RegisterMeta], vreg: usize) -> bool {
+    use varn_types::register_meta::SlotKind;
+    meta.get(vreg).map_or(false, |m| {
+        matches!(m.kind, SlotKind::Int | SlotKind::Float | SlotKind::Bool)
+    })
+}
+
+/// Flush enregistered locals to their VM-stack slots ahead of a call.
+///
+/// When `skip_immediates` holds (caller proven free of local-capture aliasing),
+/// registers holding immediate values that are *not* call arguments are left
+/// only in their callee-saved physical register: they can never be GC roots and
+/// the callee never reads their stack slot, so the spill is dead. Arguments in
+/// `[arg_lo, arg_hi)` are always flushed — the callee reads them from memory —
+/// and pointer-bearing slots are always flushed so the GC can see them.
+pub fn emit_flush_for_call(
+    asm: &mut Assembler,
+    regmap: &RegMap,
+    meta: &[varn_types::register_meta::RegisterMeta],
+    skip_immediates: bool,
+    arg_lo: usize,
+    arg_hi: usize,
+) {
+    for (&vreg, &phys) in &regmap.map {
+        if skip_immediates && !(arg_lo..arg_hi).contains(&vreg) && slot_is_immediate(meta, vreg) {
+            continue;
+        }
+        emit_store_phys_to_mem(asm, phys, vreg);
+    }
+}
+
+/// Reload enregistered locals after a call, mirroring [`emit_flush_for_call`].
+///
+/// Pointer-bearing slots are always reloaded: a minor (copying) GC during the
+/// callee may relocate the object and update the spilled slot, so the stale
+/// pointer in the callee-saved register must be refreshed. Immediate slots are
+/// skipped under `skip_immediates`: the callee-saved register still holds the
+/// exact value, so re-reading memory is dead work.
+pub fn emit_reload_after_call(
+    asm: &mut Assembler,
+    regmap: &RegMap,
+    meta: &[varn_types::register_meta::RegisterMeta],
+    skip_immediates: bool,
+    except: Option<usize>,
+) {
+    for (&vreg, &phys) in &regmap.map {
+        if Some(vreg) == except {
+            continue;
+        }
+        if skip_immediates && slot_is_immediate(meta, vreg) {
+            continue;
+        }
+        emit_load_reg(asm, phys, vreg);
+    }
+}
+
 fn emit_store_phys_to_mem(asm: &mut Assembler, phys: Reg, vreg: usize) {
     emit_store_reg(asm, phys, vreg);
 }

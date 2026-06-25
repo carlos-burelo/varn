@@ -234,6 +234,26 @@ impl<'a> Lowerer<'a> {
                         }
                     }
                 }
+                if let Some(op_id) = self.ann.get_native_op(offset) {
+                    if let ExprKind::Member {
+                        object,
+                        computed: false,
+                        ..
+                    } = &callee.kind
+                    {
+                        let has_spread = args.iter().any(|a| matches!(a, Arg::Spread(_)));
+                        if !has_spread {
+                            let hobj = self.lower_expr(object, scope)?;
+                            let hargs = self.lower_call_args(args, offset, scope)?;
+                            return Ok(HirExpr::NativeMethodCall {
+                                object: Box::new(hobj),
+                                args: hargs,
+                                op_id,
+                                ty: HirType::Dynamic,
+                            });
+                        }
+                    }
+                }
 
                 if let Some(mangled) = self.extension_calls.get(&offset).cloned() {
                     if let ExprKind::Member {

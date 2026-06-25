@@ -12,6 +12,11 @@ impl Checker {
     pub(super) fn infer_type_impl(&mut self, expr: &Expr, bind: &BindResult) -> Type {
         match &expr.kind {
             ExprKind::Identifier { name } => {
+                // Pipeline placeholder `_` stands for the piped value, so it
+                // carries that value's type (`x |> f(_, y)` ⇒ `_` has `x`'s type).
+                if name.as_ref() == "_" && self.in_pipeline_rhs {
+                    return self.pipeline_value_type.clone().unwrap_or(Type::Dynamic);
+                }
                 let scope = bind.scopes.get(self.current_scope);
                 if let Some(sid) = scope.resolve(name.as_ref(), &bind.scopes) {
                     if let Some(ty) = self.symbol_types.get(&sid) {
