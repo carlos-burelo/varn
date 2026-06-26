@@ -187,10 +187,12 @@ pub(crate) fn extension_type_name(ty: &Type) -> Option<std::rc::Rc<str>> {
     match &ty.0 {
         TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(n.clone()),
         TypeKind::Intrinsic(tag) => Some(std::rc::Rc::from(tag.name())),
-        TypeKind::LiteralStr(_) => Some(std::rc::Rc::from("str")),
-        TypeKind::LiteralInt(_) => Some(std::rc::Rc::from("int")),
-        TypeKind::LiteralFloat(_) => Some(std::rc::Rc::from("float")),
-        TypeKind::LiteralBool(_) => Some(std::rc::Rc::from("bool")),
+        TypeKind::LiteralStr(_) => Some(std::rc::Rc::from(varn_core::IntrinsicType::Str.as_str())),
+        TypeKind::LiteralInt(_) => Some(std::rc::Rc::from(varn_core::IntrinsicType::Int.as_str())),
+        TypeKind::LiteralFloat(_) => {
+            Some(std::rc::Rc::from(varn_core::IntrinsicType::Float.as_str()))
+        }
+        TypeKind::LiteralBool(_) => Some(std::rc::Rc::from(varn_core::IntrinsicType::Bool.as_str())),
         _ => None,
     }
 }

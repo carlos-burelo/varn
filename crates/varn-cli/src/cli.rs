@@ -106,6 +106,9 @@ pub struct BenchArgs {
 
     #[arg(long)]
     pub show_output: bool,
+
+    #[arg(short, long)]
+    pub verbose: bool,
 }
 
 #[derive(Args)]

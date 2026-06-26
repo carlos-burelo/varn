@@ -25,14 +25,11 @@ pub use kinds::TypeKind;
 pub use opcode::OpCode;
 pub use source::{SourceLocation, SourceRange};
 
-pub mod tag_ext;
-pub use intrinsics::{IntrinsicType, MemberKey, RuntimeTypeName};
+pub use intrinsics::{IntrinsicType, MemberKey};
 pub use module_id::{ImportSpecifier, ModuleId};
-pub use tag_ext::TypeTagExt;
 pub use token::{ParsedNumber, Token, TokenKind};
 pub use typed_ir::{NumericKind, TypeAnnotations};
 pub use varn_base::TypeTag;
-
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;

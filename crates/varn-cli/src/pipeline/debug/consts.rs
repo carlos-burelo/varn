@@ -1,4 +1,5 @@
 use varn_compiler::{FunctionProto, Literal, PoolEntry};
+use varn_core::{IntrinsicType, TypeTag};
 use varn_utilities::chalk::chalk;
 use varn_utilities::terminal::{self, Section, Table};
 
@@ -44,18 +45,22 @@ fn print_fn_consts(proto: &FunctionProto, indent: &str, total: &mut usize) {
 
 fn pool_const_parts(entry: &PoolEntry) -> (&'static str, String) {
     match entry {
-        PoolEntry::Literal(Literal::Null) => ("null", "null".to_owned()),
-        PoolEntry::Literal(Literal::Bool(b)) => ("bool", b.to_string()),
-        PoolEntry::Literal(Literal::Int(n)) => ("int", n.to_string()),
-        PoolEntry::Literal(Literal::Float(f)) => ("float", format!("{f:?}")),
-        PoolEntry::Literal(Literal::Str(s)) => ("str", format!("\"{}\"", s)),
-        PoolEntry::Literal(Literal::BigInt(n)) => ("bigint", format!("{n}n")),
-        PoolEntry::Literal(Literal::Decimal(d)) => ("decimal", format!("{d}d")),
-        PoolEntry::Literal(Literal::Symbol(s)) => ("symbol", format!("Symbol({s:?})")),
-        PoolEntry::Literal(Literal::Char(c)) => ("char", format!("'{c}'")),
+        PoolEntry::Literal(Literal::Null) => (IntrinsicType::Null.as_str(), "null".to_owned()),
+        PoolEntry::Literal(Literal::Bool(b)) => (IntrinsicType::Bool.as_str(), b.to_string()),
+        PoolEntry::Literal(Literal::Int(n)) => (IntrinsicType::Int.as_str(), n.to_string()),
+        PoolEntry::Literal(Literal::Float(f)) => (IntrinsicType::Float.as_str(), format!("{f:?}")),
+        PoolEntry::Literal(Literal::Str(s)) => (IntrinsicType::Str.as_str(), format!("\"{}\"", s)),
+        PoolEntry::Literal(Literal::BigInt(n)) => (IntrinsicType::BigInt.as_str(), format!("{n}n")),
+        PoolEntry::Literal(Literal::Decimal(d)) => {
+            (IntrinsicType::Decimal.as_str(), format!("{d}d"))
+        }
+        PoolEntry::Literal(Literal::Symbol(s)) => {
+            (IntrinsicType::Symbol.as_str(), format!("Symbol({s:?})"))
+        }
+        PoolEntry::Literal(Literal::Char(c)) => (IntrinsicType::Char.as_str(), format!("'{c}'")),
         PoolEntry::Function(p) => {
             let name = p.name.as_deref().unwrap_or("<anon>");
-            ("fn", format!("fn {name} (arity={})", p.arity))
+            (TypeTag::Function.name(), format!("fn {name} (arity={})", p.arity))
         }
     }
 }

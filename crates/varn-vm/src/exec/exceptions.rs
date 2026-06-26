@@ -2,6 +2,7 @@ use crate::error::{FrameInfo, RuntimeError};
 use crate::frame::{CallFrame, TryHandler};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
+use varn_core::{IntrinsicType, TypeTag};
 
 pub fn push_try(handlers: &mut Vec<TryHandler>, catch_ip: usize, frame_depth: usize, err_reg: u8) {
     handlers.push(TryHandler {
@@ -58,7 +59,10 @@ fn extract_error_message(val: VmValue, heap: &Heap) -> String {
 
                 if let Some(name_nv) = obj.get_field_nv("name") {
                     let name = heap.str_repr(name_nv);
-                    if !name.is_empty() && name != "Error" && name != "null" {
+                    if !name.is_empty()
+                        && name != IntrinsicType::Error.as_str()
+                        && name != TypeTag::Null.name()
+                    {
                         return format!("{}: {}", name, msg);
                     }
                 }
@@ -66,7 +70,7 @@ fn extract_error_message(val: VmValue, heap: &Heap) -> String {
             }
 
             let class_name = obj.class_name();
-            if class_name != "object" {
+            if class_name != TypeTag::Object.name() {
                 return format!("[{}]", class_name);
             }
             return "[object Object]".into();

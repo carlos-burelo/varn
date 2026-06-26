@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use varn_checker::SymbolKind;
-use varn_core::{IntrinsicType, RuntimeTypeName, TokenKind};
+use varn_core::{IntrinsicType, TokenKind, TypeTag};
 
 use super::{
     TT_CLASS, TT_ENUM_MEMBER, TT_FUNCTION, TT_INTERFACE, TT_KEYWORD, TT_NAMESPACE, TT_NUMBER,
@@ -84,7 +84,7 @@ pub fn classify_identifier(
             || n == IntrinsicType::Char.as_str()
             || n == IntrinsicType::Bool.as_str()
             || n == IntrinsicType::Symbol.as_str()
-            || n == RuntimeTypeName::Object.as_str()
+            || n == TypeTag::Object.name()
             || n == IntrinsicType::Void.as_str()
             || n == IntrinsicType::Never.as_str()
             || n == IntrinsicType::Dynamic.as_str()

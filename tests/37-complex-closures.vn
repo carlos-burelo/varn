@@ -49,7 +49,7 @@ assert("shared counter",    sc.get() === 2)
 // ── Recursive closure via self-reference ─────────────────────────
 function makeRecursiveFib(): (n: int) => int {
     let memo: int[] = []
-    const fib = (n: int) => {
+    const fib = (n: int):int => {
         if (n <= 1) return n
         while (memo.length <= n) memo.push(-1)
         if (memo[n] >= 0) return memo[n]

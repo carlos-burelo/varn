@@ -651,11 +651,12 @@ fn dump_exprs(exprs: &[HirExpr]) -> String {
 }
 
 fn hir_ty(ty: HirType) -> &'static str {
+    use varn_core::IntrinsicType;
     match ty {
-        HirType::Int => "int",
-        HirType::Float => "float",
-        HirType::Bool => "bool",
-        HirType::Str => "str",
+        HirType::Int => IntrinsicType::Int.as_str(),
+        HirType::Float => IntrinsicType::Float.as_str(),
+        HirType::Bool => IntrinsicType::Bool.as_str(),
+        HirType::Str => IntrinsicType::Str.as_str(),
         HirType::Ref => "ref",
         HirType::Dynamic => "dyn",
     }

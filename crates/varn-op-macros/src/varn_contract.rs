@@ -8,7 +8,7 @@ use syn::{Ident, LitStr, Token};
 use varn_core::ast::{ClassDecl, ClassMember, Decl, ExportDecl, Param, Pattern, Stmt, StmtKind};
 use varn_core::ast::{FunctionDecl, TypeNode};
 use varn_core::kinds::TypeKind;
-use varn_core::TypeTag;
+use varn_core::{IntrinsicType, TypeTag};
 
 pub(crate) struct ContractInput {
     module: String,
@@ -83,17 +83,27 @@ enum Mapped {
     Opt(Box<Mapped>),
 }
 
+/// Scalar marshalling shape for a [`TypeTag`]. Deliberately excludes `Array`:
+/// `Array` reaches `Mapped::Array` only structurally (a `T[]` node in
+/// [`classify`]) or as an explicit receiver in [`receiver_mapped`], never from
+/// a `Named` value-type position.
+fn scalar_mapped(tag: TypeTag) -> Mapped {
+    match tag {
+        TypeTag::Int => Mapped::Int,
+        TypeTag::Float => Mapped::Float,
+        TypeTag::Bool => Mapped::Bool,
+        TypeTag::Char => Mapped::Char,
+        TypeTag::Str => Mapped::Str,
+        TypeTag::Void => Mapped::Void,
+        _ => Mapped::Dynamic,
+    }
+}
+
 fn classify(t: &TypeNode) -> Mapped {
     match &t.kind {
-        TypeKind::Named(n, _) => match n.as_str() {
-            "int" => Mapped::Int,
-            "float" | "number" => Mapped::Float,
-            "bool" => Mapped::Bool,
-            "char" => Mapped::Char,
-            "str" | "string" => Mapped::Str,
-            "void" => Mapped::Void,
-            _ => Mapped::Dynamic,
-        },
+        TypeKind::Named(n, _) => TypeTag::from_str(n.as_str())
+            .map(scalar_mapped)
+            .unwrap_or(Mapped::Dynamic),
         TypeKind::Intrinsic(TypeTag::Void) => Mapped::Void,
         TypeKind::Array(_) => Mapped::Array,
         TypeKind::Union(members) if members.len() == 2 => {
@@ -110,15 +120,12 @@ fn classify(t: &TypeNode) -> Mapped {
 }
 
 fn receiver_mapped(class: &str) -> Mapped {
-    match class {
-        "str" => Mapped::Str,
-        "int" => Mapped::Int,
-        "float" => Mapped::Float,
-        "bool" => Mapped::Bool,
-        "char" => Mapped::Char,
-        "Array" => Mapped::Array,
-        _ => Mapped::Dynamic,
+    if class == IntrinsicType::Array.as_str() {
+        return Mapped::Array;
     }
+    TypeTag::from_str(class)
+        .map(scalar_mapped)
+        .unwrap_or(Mapped::Dynamic)
 }
 
 fn param_ty(m: &Mapped) -> TS2 {

@@ -399,16 +399,11 @@ pub fn prepare_call(
 
     let callee_repr = heap.str_repr(callee_nv);
     let extracted = heap.extract(callee_nv);
+    // Names derive from the canonical `Value::type_name`; a class value reports
+    // its own class name rather than the generic `"class"`.
     let type_name = match extracted {
-        Value::Null => "null",
-        Value::Bool(_) => "bool",
-        Value::Int(_) => "int",
-        Value::Float(_) => "float",
-        Value::Str(_) => "str",
-        Value::Object(_) => "object",
-        Value::Array(_) => "array",
-        Value::Class(ref c) => &c.name,
-        _ => "unknown",
+        Value::Class(ref c) => c.name.as_str(),
+        ref other => other.type_name(),
     };
     Err(RuntimeError::new(format!(
         "value is not callable: {} (type: {})",

@@ -190,28 +190,28 @@ pub fn dot_receiver(
             }
             varn_core::TypeKind::LiteralStr(_) => {
                 return Some(ReceiverInfo::Named {
-                    name: "str".to_owned(),
+                    name: varn_core::IntrinsicType::Str.as_str().to_owned(),
                     is_instance: true,
                     origin: None,
                 });
             }
             varn_core::TypeKind::LiteralInt(_) => {
                 return Some(ReceiverInfo::Named {
-                    name: "int".to_owned(),
+                    name: varn_core::IntrinsicType::Int.as_str().to_owned(),
                     is_instance: true,
                     origin: None,
                 });
             }
             varn_core::TypeKind::LiteralFloat(_) => {
                 return Some(ReceiverInfo::Named {
-                    name: "float".to_owned(),
+                    name: varn_core::IntrinsicType::Float.as_str().to_owned(),
                     is_instance: true,
                     origin: None,
                 });
             }
             varn_core::TypeKind::LiteralBool(_) => {
                 return Some(ReceiverInfo::Named {
-                    name: "bool".to_owned(),
+                    name: varn_core::IntrinsicType::Bool.as_str().to_owned(),
                     is_instance: true,
                     origin: None,
                 });
@@ -445,28 +445,28 @@ pub fn pattern_receiver(state: &DocumentState, line: u32, col: u32) -> Option<Re
             }
             varn_core::TypeKind::LiteralStr(_) => {
                 return Some(ReceiverInfo::Named {
-                    name: "str".to_owned(),
+                    name: varn_core::IntrinsicType::Str.as_str().to_owned(),
                     is_instance: true,
                     origin: None,
                 });
             }
             varn_core::TypeKind::LiteralInt(_) => {
                 return Some(ReceiverInfo::Named {
-                    name: "int".to_owned(),
+                    name: varn_core::IntrinsicType::Int.as_str().to_owned(),
                     is_instance: true,
                     origin: None,
                 });
             }
             varn_core::TypeKind::LiteralFloat(_) => {
                 return Some(ReceiverInfo::Named {
-                    name: "float".to_owned(),
+                    name: varn_core::IntrinsicType::Float.as_str().to_owned(),
                     is_instance: true,
                     origin: None,
                 });
             }
             varn_core::TypeKind::LiteralBool(_) => {
                 return Some(ReceiverInfo::Named {
-                    name: "bool".to_owned(),
+                    name: varn_core::IntrinsicType::Bool.as_str().to_owned(),
                     is_instance: true,
                     origin: None,
                 });

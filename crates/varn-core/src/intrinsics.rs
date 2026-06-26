@@ -36,8 +36,8 @@ impl IntrinsicType {
     pub const RangeError: Self = Self(TypeTag::RangeError);
     pub const Range: Self = Self(TypeTag::Range);
 
-    pub fn as_str(self) -> &'static str {
-        self.0.to_intrinsic_str()
+    pub const fn as_str(self) -> &'static str {
+        self.0.name()
     }
 
     pub fn from_str(s: &str) -> Option<Self> {
@@ -49,7 +49,9 @@ impl IntrinsicType {
             "str" => Some(Self::Str),
             "char" => Some(Self::Char),
             "bool" => Some(Self::Bool),
-            "symbol" => Some(Self::Symbol),
+            // `Symbol` is the canonical class name; `symbol` is the surface
+            // scalar annotation. Both resolve to the one tag.
+            "Symbol" | "symbol" => Some(Self::Symbol),
             "void" => Some(Self::Void),
             "null" => Some(Self::Null),
             "never" => Some(Self::Never),
@@ -135,42 +137,3 @@ impl MemberKey {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct RuntimeTypeName(pub TypeTag);
-
-impl From<TypeTag> for RuntimeTypeName {
-    fn from(tag: TypeTag) -> Self {
-        Self(tag)
-    }
-}
-
-#[allow(non_upper_case_globals)]
-impl RuntimeTypeName {
-    pub const Int: Self = Self(TypeTag::Int);
-    pub const Float: Self = Self(TypeTag::Float);
-    pub const Decimal: Self = Self(TypeTag::Decimal);
-    pub const BigInt: Self = Self(TypeTag::BigInt);
-    pub const Str: Self = Self(TypeTag::Str);
-    pub const Char: Self = Self(TypeTag::Char);
-    pub const Bool: Self = Self(TypeTag::Bool);
-    pub const Symbol: Self = Self(TypeTag::Symbol);
-    pub const Null: Self = Self(TypeTag::Null);
-    pub const Array: Self = Self(TypeTag::Array);
-    pub const Object: Self = Self(TypeTag::Object);
-    pub const Fn: Self = Self(TypeTag::Function);
-    pub const Class: Self = Self(TypeTag::Class);
-    pub const Range: Self = Self(TypeTag::Range);
-    pub const Generator: Self = Self(TypeTag::Generator);
-    pub const AsyncQueue: Self = Self(TypeTag::AsyncQueue);
-    pub const Enum: Self = Self(TypeTag::Enum);
-
-    pub fn as_str(self) -> &'static str {
-        self.0.to_runtime_str()
-    }
-}
-
-impl std::fmt::Display for RuntimeTypeName {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
-    }
-}

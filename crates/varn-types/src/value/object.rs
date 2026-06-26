@@ -41,7 +41,7 @@ impl ObjData {
     pub fn class_name(&self) -> String {
         match &self.inner.shape.class {
             Some(c) => c.name.clone(),
-            None => "object".to_owned(),
+            None => varn_core::TypeTag::Object.name().to_owned(),
         }
     }
 

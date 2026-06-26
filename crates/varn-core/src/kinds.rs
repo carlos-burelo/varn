@@ -72,7 +72,7 @@ impl PrimitiveType {
     }
 
     pub fn as_str(&self) -> &'static str {
-        self.0.to_intrinsic_str()
+        self.0.name()
     }
 }
 

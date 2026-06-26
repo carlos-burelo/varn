@@ -114,7 +114,7 @@ pub fn fmt_num(n: usize) -> String {
     out.chars().rev().collect()
 }
 
-pub fn print_table(phases: &[PhaseStats], total_p50: Duration) {
+pub fn print_table(phases: &[PhaseStats], total_p50: Duration, extra: Option<&PhaseStats>) {
     use terminal::Align::{Left, Right};
 
     let mut table = terminal::Table::new(["Phase", "min", "p50", "mean", "max", "σ", "total", "%"])
@@ -134,6 +134,24 @@ pub fn print_table(phases: &[PhaseStats], total_p50: Duration) {
             fmt_dur(s.max),
             chalk(fmt_dur(s.stddev)).dim().to_string(),
             chalk(fmt_dur(s.total)).dim().to_string(),
+            chalk(format!("{:.1}%", share * 100.0)).dim().to_string(),
+        ]);
+    }
+
+    if let Some(e) = extra {
+        let share = if total_p50.as_nanos() > 0 {
+            e.p50.as_nanos() as f64 / total_p50.as_nanos() as f64
+        } else {
+            0.0
+        };
+        table.row([
+            chalk("e2e").bold().cyan().to_string(),
+            fmt_dur(e.min),
+            fmt_dur(e.p50),
+            chalk(fmt_dur(e.mean())).cyan().to_string(),
+            fmt_dur(e.max),
+            chalk(fmt_dur(e.stddev)).dim().to_string(),
+            chalk(fmt_dur(e.total)).dim().to_string(),
             chalk(format!("{:.1}%", share * 100.0)).dim().to_string(),
         ]);
     }

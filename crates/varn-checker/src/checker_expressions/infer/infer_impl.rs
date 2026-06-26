@@ -343,7 +343,7 @@ impl Checker {
                 Type::Str
             }
             TypeKind::Named(name, _)
-                if name.as_ref() == "str"
+                if name.as_ref() == IntrinsicType::Str.as_str()
                     && matches!(prop_ty.0, TypeKind::Intrinsic(TypeTag::Int)) =>
             {
                 Type::Str

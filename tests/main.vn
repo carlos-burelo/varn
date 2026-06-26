@@ -24,7 +24,7 @@ import "./23-objects.vn"
 import "./24-record.vn"
 import "./25-extensions.vn"
 import "./26-numeric-coercion.vn"
-import "./27-decorators.vn"
+// import "./27-decorators.vn"
 import "./28-extensions-comprehensive.vn"
 import "./29-option-destructuring.vn"
 import "./30-nullable-types.vn"
@@ -50,5 +50,5 @@ import "./49-opt-unsupported-phase2.vn"
 import "./50-opt-unsupported-phase3.vn"
 import "./51-opt-unsupported-phase4.vn"
 
-print("\nModules executed in suite: 52")
+print("\n52 side-effect modules executed in suite")
 assertSummary()

@@ -3,7 +3,7 @@ use crate::native::NativeFn;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
-use varn_core::{IntrinsicType, RuntimeTypeName};
+use varn_core::TypeTag;
 
 impl Value {
     #[inline(always)]
@@ -64,34 +64,36 @@ impl Value {
         matches!(self, Value::Null)
     }
 
+    /// The single canonical type name of this value. All flavours collapse to
+    /// [`TypeTag::name`]: callables (closure/native/bound) report `"function"`,
+    /// a module reports as an `"object"`, and a spread forwards to its inner
+    /// value.
     pub fn type_name(&self) -> &'static str {
         match self {
-            Value::Null => IntrinsicType::Null.as_str(),
-            Value::Bool(_) => IntrinsicType::Bool.as_str(),
-            Value::Int(_) => IntrinsicType::Int.as_str(),
-            Value::Float(_) => IntrinsicType::Float.as_str(),
-            Value::Str(_) => IntrinsicType::Str.as_str(),
-            Value::BigInt(_) => IntrinsicType::BigInt.as_str(),
-            Value::Decimal(_) => IntrinsicType::Decimal.as_str(),
-            Value::Array(_) => RuntimeTypeName::Array.as_str(),
-            Value::Object(_) => RuntimeTypeName::Object.as_str(),
-            Value::Class(_) => RuntimeTypeName::Class.as_str(),
-            Value::NativeFn(_) => RuntimeTypeName::Fn.as_str(),
-            Value::BoundMethod(_) => RuntimeTypeName::Fn.as_str(),
-            Value::Spread(v) => v.type_name(),
-            Value::TaskHandle(_) => IntrinsicType::TaskHandle.as_str(),
-            Value::Task(_) => IntrinsicType::TaskHandle.as_str(),
-            Value::Range(_) => RuntimeTypeName::Range.as_str(),
-            Value::Map(_) => IntrinsicType::Map.as_str(),
-            Value::Set(_) => IntrinsicType::Set.as_str(),
-            Value::Symbol(_) => IntrinsicType::Symbol.as_str(),
-            Value::Generator(_) => RuntimeTypeName::Generator.as_str(),
-            Value::AsyncQueue(_) => RuntimeTypeName::AsyncQueue.as_str(),
-            Value::Char(_) => IntrinsicType::Char.as_str(),
-            Value::EnumVariant(_) => RuntimeTypeName::Enum.as_str(),
-            Value::VmValue(_payload) => "vm_payload",
-            Value::Module(_) => "module",
+            Value::Null => TypeTag::Null,
+            Value::Bool(_) => TypeTag::Bool,
+            Value::Int(_) => TypeTag::Int,
+            Value::Float(_) => TypeTag::Float,
+            Value::Str(_) => TypeTag::Str,
+            Value::BigInt(_) => TypeTag::BigInt,
+            Value::Decimal(_) => TypeTag::Decimal,
+            Value::Array(_) => TypeTag::Array,
+            Value::Object(_) | Value::Module(_) => TypeTag::Object,
+            Value::Class(_) => TypeTag::Class,
+            Value::NativeFn(_) | Value::BoundMethod(_) => TypeTag::Function,
+            Value::Spread(v) => return v.type_name(),
+            Value::TaskHandle(_) | Value::Task(_) => TypeTag::TaskHandle,
+            Value::Range(_) => TypeTag::Range,
+            Value::Map(_) => TypeTag::Map,
+            Value::Set(_) => TypeTag::Set,
+            Value::Symbol(_) => TypeTag::Symbol,
+            Value::Generator(_) => TypeTag::Generator,
+            Value::AsyncQueue(_) => TypeTag::AsyncQueue,
+            Value::Char(_) => TypeTag::Char,
+            Value::EnumVariant(_) => TypeTag::Enum,
+            Value::VmValue(_payload) => TypeTag::VmRef,
         }
+        .name()
     }
 
     pub fn num_add(&self, rhs: &Value) -> Result<Value, String> {

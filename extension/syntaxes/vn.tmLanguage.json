@@ -3,14 +3,22 @@
 		"Hand-written, expressive grammar for Varn. Organized as small, single-purpose",
 		"repository rules composed via includes (scalable), using deterministic begin/end",
 		"contexts and keyword/':'/'<'/'.'-anchored matches. It intentionally avoids the",
-		"speculative look-ahead heuristics (arrow-fn detection, var-expr state machines)",
-		"that made the old TypeScript-derived grammar mis-classify tokens.",
+		"speculative look-ahead heuristics (arrow-fn detection, var-expr state machines,",
+		"regex-vs-division detection) that made the old TypeScript-derived grammar",
+		"mis-classify tokens.",
 		"",
 		"In a live .vn buffer the varn-lsp semantic tokens provider is authoritative and",
 		"overrides this grammar for identifiers it classifies. This grammar is what colors",
 		"hover signatures (rendered as ```Varn fences, where semantic tokens never apply)",
-		"and the brief window before the LSP responds. Keyword/type sets come from",
-		"varn-core TokenKind. The previous grammar is preserved at vn.tmLanguage.full.backup.json."
+		"and the brief window before the LSP responds.",
+		"",
+		"Token/keyword sets are mirrored from the authoritative sources, NOT guessed:",
+		"  - keywords:  crates/varn-lexer/src/keywords.rs (keyword_kind)",
+		"  - operators: crates/varn-core/src/token.rs (TokenKind)",
+		"  - builtin types: crates/varn-base/src/lib.rs (TypeTag::from_str)",
+		"Words that are NOT in keyword_kind (e.g. `spawn`, `parallel`, `start`, `method`,",
+		"`prop`) are plain identifiers and must never be colored as keywords.",
+		"The previous grammar is preserved at vn.tmLanguage.full.backup.json."
 	],
 	"name": "Varn",
 	"scopeName": "source.vn",
@@ -29,6 +37,9 @@
 		{ "include": "#expression" }
 	],
 	"repository": {
+
+		"___________________COMMENTS___________________": { "comment": "section marker" },
+
 		"shebang": {
 			"name": "comment.line.shebang.vn",
 			"match": "\\A#!.*$"
@@ -62,13 +73,15 @@
 
 		"hover-label": {
 			"comment": "Pseudo-labels emitted only in LSP hover signatures, e.g. (property), (method). Rendered muted like an annotation.",
-			"match": "(\\()(type parameter|enum member|property|method|param|this|getter|setter|constructor|namespace|interface|struct|class|enum|var|prop)(\\))",
+			"match": "(\\()(type parameter|enum member|property|method|param|this|getter|setter|constructor|destructor|namespace|interface|struct|class|enum|module|extension|var|let|const|prop)(\\))",
 			"captures": {
 				"1": { "name": "punctuation.definition.label.vn" },
 				"2": { "name": "comment.label.hover.vn" },
 				"3": { "name": "punctuation.definition.label.vn" }
 			}
 		},
+
+		"___________________IMPORTS___________________": { "comment": "section marker" },
 
 		"import-declaration": {
 			"begin": "(?<![._$[:alnum:]])(import)(?![_$[:alnum:]])",
@@ -94,6 +107,8 @@
 			"name": "keyword.control.export.vn"
 		},
 
+		"___________________DECORATORS___________________": { "comment": "section marker" },
+
 		"decorator": {
 			"match": "(@)([_$[:alpha:]][_$[:alnum:]]*)",
 			"captures": {
@@ -102,33 +117,41 @@
 			}
 		},
 
+		"___________________FUNCTIONS___________________": { "comment": "section marker" },
+
 		"function-declaration": {
 			"name": "meta.function.declaration.vn",
-			"begin": "(?<![._$[:alnum:]])(function|method)(?![_$[:alnum:]])(?:\\s+([_$[:alpha:]][_$[:alnum:]]*))?",
+			"comment": "`function`, `async function`, `function*` (generator) and `async function*`.",
+			"begin": "(?<![._$[:alnum:]])(?:(async)\\s+)?(function)\\b(\\s*\\*)?(?:\\s+([_$[:alpha:]][_$[:alnum:]]*))?",
 			"beginCaptures": {
-				"1": { "name": "storage.type.function.vn" },
-				"2": { "name": "entity.name.function.vn" }
+				"1": { "name": "storage.modifier.async.vn" },
+				"2": { "name": "storage.type.function.vn" },
+				"3": { "name": "keyword.generator.asterisk.vn" },
+				"4": { "name": "entity.name.function.vn" }
 			},
 			"end": "(?=[{;])|(?=$)",
 			"patterns": [
 				{ "include": "#comment" },
-				{ "include": "#generic-arguments" },
+				{ "include": "#generic-parameters" },
 				{ "include": "#parameter-list" },
 				{ "include": "#type-annotation" }
 			]
 		},
 
+		"___________________TYPES (CLASS/STRUCT/ETC)___________________": { "comment": "section marker" },
+
 		"class-declaration": {
 			"name": "meta.class.declaration.vn",
-			"begin": "(?<![._$[:alnum:]])(class|struct|interface|enum|namespace|module|extension)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
+			"begin": "(?<![._$[:alnum:]])(?:(abstract|declare)\\s+)?(class|struct|interface|enum|namespace|module|extension)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
 			"beginCaptures": {
-				"1": { "name": "storage.type.vn" },
-				"2": { "name": "entity.name.type.vn" }
+				"1": { "name": "storage.modifier.vn" },
+				"2": { "name": "storage.type.vn" },
+				"3": { "name": "entity.name.type.vn" }
 			},
 			"end": "(?<=\\})|(?=[;])",
 			"patterns": [
 				{ "include": "#comment" },
-				{ "include": "#generic-arguments" },
+				{ "include": "#generic-parameters" },
 				{ "include": "#heritage" },
 				{ "include": "#class-body" }
 			]
@@ -140,7 +163,11 @@
 				"1": { "name": "storage.modifier.vn" }
 			},
 			"end": "(?=[{=;])|$",
-			"patterns": [ { "include": "#type" } ]
+			"patterns": [
+				{ "include": "#comment" },
+				{ "match": ",", "name": "punctuation.separator.comma.vn" },
+				{ "include": "#type" }
+			]
 		},
 
 		"class-body": {
@@ -156,6 +183,7 @@
 				{ "include": "#comment" },
 				{ "include": "#decorator" },
 				{ "include": "#storage-modifier" },
+				{ "include": "#enum-member" },
 				{ "include": "#method-declaration" },
 				{ "include": "#property-declaration" },
 				{ "include": "#type-annotation" },
@@ -166,20 +194,23 @@
 
 		"method-declaration": {
 			"name": "meta.method.declaration.vn",
-			"begin": "([_$[:alpha:]][_$[:alnum:]]*)\\s*(?=[(<])",
+			"comment": "Class/interface member with a parameter list. Optional leading `*` for generator methods.",
+			"begin": "(\\*\\s*)?([_$[:alpha:]][_$[:alnum:]]*)\\s*(?=[(<])",
 			"beginCaptures": {
-				"1": { "name": "entity.name.function.vn" }
+				"1": { "name": "keyword.generator.asterisk.vn" },
+				"2": { "name": "entity.name.function.vn" }
 			},
-			"end": "(?=[{;,])|(?=$)",
+			"end": "(?=[{;,}])|(?=$)",
 			"patterns": [
 				{ "include": "#comment" },
-				{ "include": "#generic-arguments" },
+				{ "include": "#generic-parameters" },
 				{ "include": "#parameter-list" },
 				{ "include": "#type-annotation" }
 			]
 		},
 
 		"property-declaration": {
+			"comment": "Field with a type annotation: `name: T` / `name?: T`.",
 			"match": "([_$[:alpha:]][_$[:alnum:]]*)\\s*(\\?)?\\s*(?=:)",
 			"captures": {
 				"1": { "name": "variable.other.property.vn" },
@@ -187,31 +218,32 @@
 			}
 		},
 
-		"block": {
-			"begin": "\\{",
-			"beginCaptures": { "0": { "name": "punctuation.section.block.begin.vn" } },
-			"end": "\\}",
-			"endCaptures": { "0": { "name": "punctuation.section.block.end.vn" } },
-			"patterns": [
-				{ "include": "#block-statements" }
-			]
+		"enum-member": {
+			"comment": "Bare enum member with no type annotation (e.g. `North,` `GET = 0`). Capitalization-agnostic identifier directly followed by `,`, `=` or the closing brace.",
+			"match": "(?<![._$[:alnum:]])([_$[:alpha:]][_$[:alnum:]]*)\\s*(?=[,=}])",
+			"name": "variable.other.enummember.vn"
 		},
-		"block-statements": {
+
+		"type-alias": {
+			"begin": "(?<![._$[:alnum:]])(type)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
+			"beginCaptures": {
+				"1": { "name": "storage.type.vn" },
+				"2": { "name": "entity.name.type.vn" }
+			},
+			"end": "(?=[;])|$",
 			"patterns": [
 				{ "include": "#comment" },
-				{ "include": "#function-declaration" },
-				{ "include": "#class-declaration" },
-				{ "include": "#type-alias" },
-				{ "include": "#destructuring-declaration" },
-				{ "include": "#variable-declaration" },
-				{ "include": "#block" },
-				{ "include": "#expression" }
+				{ "include": "#generic-parameters" },
+				{ "match": "=", "name": "keyword.operator.assignment.vn" },
+				{ "include": "#type" }
 			]
 		},
 
+		"___________________DECLARATIONS (VAR/CONST/LET)___________________": { "comment": "section marker" },
+
 		"destructuring-declaration": {
 			"name": "meta.binding.destructuring.vn",
-			"begin": "(?<![._$[:alnum:]])(const|let|var)(?![_$[:alnum:]])(?=\\s*[{\\[])",
+			"begin": "(?<![._$[:alnum:]])(const|let|var|using)(?![_$[:alnum:]])(?=\\s*[{\\[])",
 			"beginCaptures": {
 				"1": { "name": "storage.type.vn" }
 			},
@@ -262,17 +294,6 @@
 			]
 		},
 
-		"type-alias": {
-			"begin": "(?<![._$[:alnum:]])(type)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)\\s*(=)",
-			"beginCaptures": {
-				"1": { "name": "storage.type.vn" },
-				"2": { "name": "entity.name.type.vn" },
-				"3": { "name": "keyword.operator.assignment.vn" }
-			},
-			"end": "(?=[;])|$",
-			"patterns": [ { "include": "#type" } ]
-		},
-
 		"variable-declaration": {
 			"patterns": [
 				{
@@ -283,7 +304,7 @@
 					}
 				},
 				{
-					"match": "(?<![._$[:alnum:]])(let|var|prop)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
+					"match": "(?<![._$[:alnum:]])(let|var|using)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
 					"captures": {
 						"1": { "name": "storage.type.vn" },
 						"2": { "name": "variable.other.readwrite.vn" }
@@ -291,6 +312,8 @@
 				}
 			]
 		},
+
+		"___________________PARAMETERS & TYPE ANNOTATIONS___________________": { "comment": "section marker" },
 
 		"parameter-list": {
 			"begin": "\\(",
@@ -305,6 +328,7 @@
 				{ "include": "#comment" },
 				{ "include": "#decorator" },
 				{ "include": "#storage-modifier" },
+				{ "match": "\\.\\.\\.", "name": "keyword.operator.rest.vn" },
 				{
 					"match": "([_$[:alpha:]][_$[:alnum:]]*)\\s*(\\?)?\\s*(?=:)",
 					"captures": {
@@ -313,7 +337,7 @@
 					}
 				},
 				{
-					"match": "([_$[:alpha:]][_$[:alnum:]]*)\\s*(?=[,)])",
+					"match": "([_$[:alpha:]][_$[:alnum:]]*)\\s*(?=[,)=])",
 					"name": "variable.parameter.vn"
 				},
 				{ "include": "#type-annotation" },
@@ -334,27 +358,48 @@
 			"patterns": [ { "include": "#type" } ]
 		},
 
+		"___________________TYPE EXPRESSIONS___________________": { "comment": "section marker" },
+
 		"type": {
 			"patterns": [
 				{ "include": "#comment" },
-				{ "include": "#builtin-type" },
+				{ "include": "#builtin-type-primitive" },
+				{ "include": "#builtin-type-object" },
 				{
-					"match": "(?<![._$[:alnum:]])(extends|keyof|infer|typeof|readonly|in)(?![_$[:alnum:]])",
+					"match": "(?<![._$[:alnum:]])(extends|keyof|infer|typeof|readonly|in|is)(?![_$[:alnum:]])",
 					"name": "keyword.operator.type.vn"
 				},
+				{ "include": "#string" },
+				{ "include": "#number" },
 				{ "include": "#generic-arguments" },
 				{ "match": "\\|", "name": "keyword.operator.type.union.vn" },
 				{ "match": "&", "name": "keyword.operator.type.intersection.vn" },
 				{ "match": "\\?", "name": "keyword.operator.type.optional.vn" },
 				{ "match": "\\[\\]", "name": "punctuation.definition.array.vn" },
 				{ "match": "=>", "name": "keyword.operator.type.arrow.vn" },
-				{ "match": "(?<![._$[:alnum:]])(void|null)(?![_$[:alnum:]])", "name": "support.type.primitive.vn" },
 				{ "match": "[_$[:alpha:]][_$[:alnum:]]*", "name": "entity.name.type.vn" },
 				{ "match": "[(),.]", "name": "punctuation.type.vn" }
 			]
 		},
 
+		"generic-parameters": {
+			"comment": "Declaration-site type parameter list, e.g. `<T, U extends X>`.",
+			"begin": "(?<=[_$[:alnum:]])(<)(?=[_$[:alpha:]\\s])",
+			"beginCaptures": {
+				"1": { "name": "punctuation.definition.typeparameters.begin.vn" }
+			},
+			"end": ">",
+			"endCaptures": {
+				"0": { "name": "punctuation.definition.typeparameters.end.vn" }
+			},
+			"patterns": [
+				{ "include": "#type" },
+				{ "include": "#punctuation-comma" }
+			]
+		},
+
 		"generic-arguments": {
+			"comment": "Use-site type argument list, e.g. `Box<int>`, `identity<str>(...)`.",
 			"begin": "(?<=[_$[:alnum:]])(<)(?=[_$[:alpha:](\\[])",
 			"beginCaptures": {
 				"1": { "name": "punctuation.definition.typeparameters.begin.vn" }
@@ -369,24 +414,30 @@
 			]
 		},
 
-		"builtin-type": {
+		"builtin-type-primitive": {
+			"comment": "Scalar primitives — mirror of varn-base TypeTag scalar tags.",
 			"name": "support.type.primitive.vn",
-			"match": "(?<![._$[:alnum:]])(int|str|bool|float|decimal|bigint|char|void|dynamic|symbol|never|Object|Task|Result|Array)(?![_$[:alnum:]])"
+			"match": "(?<![._$[:alnum:]])(int|float|bool|str|char|bigint|decimal|symbol|void|never|dynamic)(?![_$[:alnum:]])"
 		},
 
+		"builtin-type-object": {
+			"comment": "Built-in reference/container & error types — mirror of varn-base TypeTag reference tags (plus stdlib Result).",
+			"name": "support.type.builtin.vn",
+			"match": "(?<![._$[:alnum:]])(Object|Array|Map|Set|Tuple|Generator|Iterator|Range|Task|Result|Symbol|Error|TypeError|RangeError)(?![_$[:alnum:]])"
+		},
+
+		"___________________KEYWORDS___________________": { "comment": "section marker" },
+
 		"control-keyword": {
+			"comment": "keyword_kind control-flow & resource keywords.",
 			"name": "keyword.control.vn",
-			"match": "(?<![._$[:alnum:]])(if|else|switch|case|default|while|for|do|break|continue|return|throw|try|catch|finally|with|match|yield|await)(?![_$[:alnum:]])"
+			"match": "(?<![._$[:alnum:]])(if|else|switch|case|default|while|for|do|break|continue|return|throw|try|catch|finally|with|using|match|yield|await)(?![_$[:alnum:]])"
 		},
 
 		"storage-modifier": {
+			"comment": "keyword_kind modifiers usable on declarations and members.",
 			"name": "storage.modifier.vn",
 			"match": "(?<![._$[:alnum:]])(public|private|protected|static|abstract|override|readonly|declare|native|async|get|set)(?![_$[:alnum:]])"
-		},
-
-		"concurrency-keyword": {
-			"name": "keyword.control.concurrency.vn",
-			"match": "(?<![._$[:alnum:]])(spawn|parallel|start|using)(?![_$[:alnum:]])"
 		},
 
 		"new-expression": {
@@ -398,8 +449,9 @@
 		},
 
 		"word-operator": {
+			"comment": "keyword_kind operator-like keywords used in expressions.",
 			"name": "keyword.operator.expression.vn",
-			"match": "(?<![._$[:alnum:]])(typeof|instanceof|in|of|is|delete)(?![_$[:alnum:]])"
+			"match": "(?<![._$[:alnum:]])(typeof|instanceof|delete|is|in|of)(?![_$[:alnum:]])"
 		},
 
 		"variable-language": {
@@ -411,6 +463,8 @@
 			"name": "constant.language.vn",
 			"match": "(?<![._$[:alnum:]])(true|false|null)(?![_$[:alnum:]])"
 		},
+
+		"___________________LITERALS___________________": { "comment": "section marker" },
 
 		"string": {
 			"patterns": [
@@ -455,12 +509,85 @@
 		},
 
 		"number": {
+			"comment": "Suffixes: `n` = bigint, `m` = decimal. `_` digit separators allowed.",
 			"patterns": [
 				{ "name": "constant.numeric.hex.vn", "match": "\\b0[xX][0-9a-fA-F_]+n?\\b" },
 				{ "name": "constant.numeric.octal.vn", "match": "\\b0[oO][0-7_]+n?\\b" },
 				{ "name": "constant.numeric.binary.vn", "match": "\\b0[bB][01_]+n?\\b" },
 				{ "name": "constant.numeric.decimal.vn", "match": "\\b[0-9][0-9_]*(\\.[0-9_]+)?([eE][+-]?[0-9_]+)?[nm]?\\b" }
 			]
+		},
+
+		"___________________EXPRESSIONS___________________": { "comment": "section marker" },
+
+		"block": {
+			"begin": "\\{",
+			"beginCaptures": { "0": { "name": "punctuation.section.block.begin.vn" } },
+			"end": "\\}",
+			"endCaptures": { "0": { "name": "punctuation.section.block.end.vn" } },
+			"patterns": [
+				{ "include": "#block-statements" }
+			]
+		},
+		"block-statements": {
+			"patterns": [
+				{ "include": "#comment" },
+				{ "include": "#function-declaration" },
+				{ "include": "#class-declaration" },
+				{ "include": "#type-alias" },
+				{ "include": "#destructuring-declaration" },
+				{ "include": "#variable-declaration" },
+				{ "include": "#block" },
+				{ "include": "#expression" }
+			]
+		},
+
+		"expression": {
+			"patterns": [
+				{ "include": "#comment" },
+				{ "include": "#decorator" },
+				{ "include": "#cast-expression" },
+				{ "include": "#new-expression" },
+				{ "include": "#word-operator" },
+				{ "include": "#control-keyword" },
+				{ "include": "#storage-modifier" },
+				{ "include": "#variable-language" },
+				{ "include": "#match-wildcard" },
+				{ "include": "#constant" },
+				{ "include": "#string" },
+				{ "include": "#number" },
+				{ "include": "#object-key" },
+				{ "include": "#generic-arguments" },
+				{ "include": "#method-call" },
+				{ "include": "#member-access" },
+				{ "include": "#function-call" },
+				{ "include": "#builtin-type-primitive" },
+				{ "include": "#builtin-type-object" },
+				{ "include": "#type-name-reference" },
+				{ "include": "#operator" },
+				{ "include": "#punctuation" }
+			]
+		},
+
+		"cast-expression": {
+			"comment": "`expr as Type` cast. The `as` used in imports is handled inside #import-declaration.",
+			"match": "(?<![._$[:alnum:]])(as)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
+			"captures": {
+				"1": { "name": "keyword.control.cast.vn" },
+				"2": { "name": "entity.name.type.vn" }
+			}
+		},
+
+		"match-wildcard": {
+			"comment": "`_` placeholder in match arms, pipeline args and bindings (keyword_kind => PLACEHOLDER).",
+			"match": "(?<![._$[:alnum:]])_(?![_$[:alnum:]])",
+			"name": "constant.language.wildcard.vn"
+		},
+
+		"object-key": {
+			"comment": "Object-literal key or named call argument: `key:` written without a space before the colon (so ternary `a : b` is not matched).",
+			"match": "([_$[:alpha:]][_$[:alnum:]]*)(?=:)",
+			"name": "variable.other.property.vn"
 		},
 
 		"method-call": {
@@ -484,58 +611,12 @@
 			"name": "entity.name.type.vn"
 		},
 
-		"expression": {
-			"patterns": [
-				{ "include": "#comment" },
-				{ "include": "#decorator" },
-				{ "include": "#cast-expression" },
-				{ "include": "#new-expression" },
-				{ "include": "#word-operator" },
-				{ "include": "#concurrency-keyword" },
-				{ "include": "#control-keyword" },
-				{ "include": "#storage-modifier" },
-				{ "include": "#variable-language" },
-				{ "include": "#match-wildcard" },
-				{ "include": "#constant" },
-				{ "include": "#string" },
-				{ "include": "#number" },
-				{ "include": "#object-key" },
-				{ "include": "#generic-arguments" },
-				{ "include": "#method-call" },
-				{ "include": "#member-access" },
-				{ "include": "#function-call" },
-				{ "include": "#builtin-type" },
-				{ "include": "#type-name-reference" },
-				{ "include": "#operator" },
-				{ "include": "#punctuation" }
-			]
-		},
-
-		"cast-expression": {
-			"comment": "`expr as Type` cast. The `as` used in imports is handled inside #import-declaration.",
-			"match": "(?<![._$[:alnum:]])(as)(?![_$[:alnum:]])\\s+([_$[:alpha:]][_$[:alnum:]]*)",
-			"captures": {
-				"1": { "name": "keyword.control.cast.vn" },
-				"2": { "name": "entity.name.type.vn" }
-			}
-		},
-
-		"match-wildcard": {
-			"comment": "`_` placeholder in match arms / bindings.",
-			"match": "(?<![._$[:alnum:]])_(?![_$[:alnum:]])",
-			"name": "constant.language.wildcard.vn"
-		},
-
-		"object-key": {
-			"comment": "Object-literal key or named call argument: `key:` written without a space before the colon (so ternary `a : b` is not matched).",
-			"match": "([_$[:alpha:]][_$[:alnum:]]*)(?=:)",
-			"name": "variable.other.property.vn"
-		},
+		"___________________OPERATORS & PUNCTUATION___________________": { "comment": "section marker" },
 
 		"operator": {
 			"patterns": [
 				{ "name": "keyword.operator.arrow.vn", "match": "=>|->|\\|>" },
-				{ "name": "keyword.operator.range.vn", "match": "\\.\\.\\.|\\.\\.=|\\.\\." },
+				{ "name": "keyword.operator.range.vn", "match": "\\.\\.=|\\.\\.\\.|\\.\\." },
 				{ "name": "keyword.operator.comparison.vn", "match": "===|!==|==|!=|<=|>=" },
 				{ "name": "keyword.operator.assignment.vn", "match": ">>>=|<<=|>>=|\\*\\*=|&&=|\\|\\|=|\\?\\?=|\\+=|-=|\\*=|/=|%=|&=|\\|=|\\^=|=" },
 				{ "name": "keyword.operator.arithmetic.vn", "match": "\\+\\+|--|\\*\\*|\\+|-|\\*|/|%" },
@@ -547,9 +628,12 @@
 
 		"punctuation": {
 			"patterns": [
-				{ "name": "punctuation.accessor.vn", "match": "\\?\\.|\\." },
+				{ "name": "punctuation.accessor.optional.vn", "match": "\\?\\." },
+				{ "name": "punctuation.accessor.namespace.vn", "match": "::" },
+				{ "name": "punctuation.accessor.vn", "match": "\\." },
 				{ "name": "punctuation.terminator.statement.vn", "match": ";" },
 				{ "name": "punctuation.separator.comma.vn", "match": "," },
+				{ "name": "punctuation.separator.colon.vn", "match": ":" },
 				{ "name": "punctuation.section.braces.vn", "match": "[{}]" },
 				{ "name": "punctuation.section.brackets.vn", "match": "[\\[\\]]" },
 				{ "name": "punctuation.section.parens.vn", "match": "[()]" }

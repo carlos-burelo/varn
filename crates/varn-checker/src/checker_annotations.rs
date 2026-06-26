@@ -108,7 +108,9 @@ fn get_expr_type(expr: &Expr, ctx: &AnnotateCtx) -> Type {
 /// whose methods are natively registered (and thus op-id-addressable).
 fn core_class_of_type(ty: &Type) -> Option<&'static str> {
     match &ty.0 {
-        TypeKind::Array(_) => Some("Array"),
+        // `Array` types are structural (`T[]`), not `Named`, so they bypass the
+        // name lookup — resolve the class name from the canonical core table.
+        TypeKind::Array(_) => varn_core::op_id::core_class_name(varn_core::TypeTag::Array),
         TypeKind::Named(name, _) => varn_core::op_id::core_class(name.as_ref()),
         _ => None,
     }

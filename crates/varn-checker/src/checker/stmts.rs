@@ -220,8 +220,8 @@ impl Checker {
                             || name.as_ref() == "Iterator"
                             || name.as_ref() == "AsyncIterator"
                             || name.as_ref() == "List"
-                            || name.as_ref() == "Set"
-                            || name.as_ref() == "Generator")
+                            || name.as_ref() == IntrinsicType::Set.as_str()
+                            || name.as_ref() == IntrinsicType::Generator.as_str())
                             && args.len() == 1 =>
                     {
                         args[0].clone()

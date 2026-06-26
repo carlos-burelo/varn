@@ -129,7 +129,7 @@ impl super::super::Binder {
             .collect();
 
         let ret = if f.modifiers.is_generator {
-            Type::generic("Generator", vec![Type::Dynamic])
+            Type::generic(varn_core::IntrinsicType::Generator.as_str(), vec![Type::Dynamic])
         } else {
             f.return_type
                 .as_ref()

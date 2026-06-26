@@ -1,6 +1,21 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use varn_core::OpCode;
+use varn_core::{IntrinsicType, OpCode};
+
+/// Serde variant labels for [`Literal`], one per kind, sourced from the single
+/// canonical [`IntrinsicType`] names. Round-trip keys on the numeric index, so
+/// these are identifiers only — but they stay the one canonical representation.
+static LITERAL_VARIANTS: [&str; 9] = [
+    IntrinsicType::Null.as_str(),
+    IntrinsicType::Bool.as_str(),
+    IntrinsicType::Int.as_str(),
+    IntrinsicType::Float.as_str(),
+    IntrinsicType::Str.as_str(),
+    IntrinsicType::BigInt.as_str(),
+    IntrinsicType::Decimal.as_str(),
+    IntrinsicType::Symbol.as_str(),
+    IntrinsicType::Char.as_str(),
+];
 
 mod rc_str_serde {
     use serde::{Deserialize, Deserializer, Serializer};
@@ -66,18 +81,26 @@ impl Eq for Literal {}
 impl serde::Serialize for Literal {
     fn serialize<S: serde::Serializer>(&self, ser: S) -> Result<S::Ok, S::Error> {
         match self {
-            Literal::Null => ser.serialize_unit_variant("Literal", 0, "Null"),
-            Literal::Bool(b) => ser.serialize_newtype_variant("Literal", 1, "Bool", b),
-            Literal::Int(i) => ser.serialize_newtype_variant("Literal", 2, "Int", i),
-            Literal::Float(f) => ser.serialize_newtype_variant("Literal", 3, "Float", f),
-            Literal::Str(s) => ser.serialize_newtype_variant("Literal", 4, "Str", s.as_ref()),
-            Literal::BigInt(n) => ser.serialize_newtype_variant("Literal", 5, "BigInt", n),
+            Literal::Null => ser.serialize_unit_variant("Literal", 0, LITERAL_VARIANTS[0]),
+            Literal::Bool(b) => ser.serialize_newtype_variant("Literal", 1, LITERAL_VARIANTS[1], b),
+            Literal::Int(i) => ser.serialize_newtype_variant("Literal", 2, LITERAL_VARIANTS[2], i),
+            Literal::Float(f) => {
+                ser.serialize_newtype_variant("Literal", 3, LITERAL_VARIANTS[3], f)
+            }
+            Literal::Str(s) => {
+                ser.serialize_newtype_variant("Literal", 4, LITERAL_VARIANTS[4], s.as_ref())
+            }
+            Literal::BigInt(n) => {
+                ser.serialize_newtype_variant("Literal", 5, LITERAL_VARIANTS[5], n)
+            }
             Literal::Decimal(d) => {
                 let bits = d.serialize();
-                ser.serialize_newtype_variant("Literal", 6, "Decimal", &bits)
+                ser.serialize_newtype_variant("Literal", 6, LITERAL_VARIANTS[6], &bits)
             }
-            Literal::Symbol(s) => ser.serialize_newtype_variant("Literal", 7, "Symbol", s),
-            Literal::Char(c) => ser.serialize_newtype_variant("Literal", 8, "Char", c),
+            Literal::Symbol(s) => {
+                ser.serialize_newtype_variant("Literal", 7, LITERAL_VARIANTS[7], s)
+            }
+            Literal::Char(c) => ser.serialize_newtype_variant("Literal", 8, LITERAL_VARIANTS[8], c),
         }
     }
 }
@@ -120,13 +143,7 @@ impl<'de> serde::Deserialize<'de> for Literal {
             }
         }
 
-        de.deserialize_enum(
-            "Literal",
-            &[
-                "Null", "Bool", "Int", "Float", "Str", "BigInt", "Decimal", "Symbol", "Char",
-            ],
-            LiteralVisitor,
-        )
+        de.deserialize_enum("Literal", &LITERAL_VARIANTS, LiteralVisitor)
     }
 }
 
