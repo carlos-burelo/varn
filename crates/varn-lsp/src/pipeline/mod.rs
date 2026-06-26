@@ -352,7 +352,6 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     );
     let extension_members = extensions::build_extension_members(&result.bind);
 
-    let param_scopes = params::collect_param_scopes(&tokens);
     let (type_param_map, mut type_param_names) = params::collect_type_params(&tokens);
 
     for sym in &all_symbols {
@@ -398,7 +397,6 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         symbols: all_symbols,
         tokens,
         symbol_map,
-        param_scopes,
         type_param_names,
         db,
         import_paths,

@@ -51,17 +51,25 @@ impl DocumentState {
 
                     if is_member_kind {
                         let name = tok.lexeme.as_str();
-                        let member_pred = |m: &&MemberRecord| {
-                            m.name.as_str() == name
-                                && (m.symbol_id == Some(sid)
-                                    || (m.line == sym.line && m.col == sym.col))
+                        // SymbolId is authoritative; the (line, col) fallback is
+                        // only for members the binder left without an id, and is
+                        // kept after it so a cross-file positional coincidence
+                        // cannot win over the real member.
+                        let by_id =
+                            |m: &&MemberRecord| m.name.as_str() == name && m.symbol_id == Some(sid);
+                        let by_pos = |m: &&MemberRecord| {
+                            m.name.as_str() == name && m.line == sym.line && m.col == sym.col
                         };
-                        if let Some(s) = self
+                        let hit = self
                             .symbols
                             .iter()
-                            .find(|s| s.members.iter().any(|m| member_pred(&m)))
-                        {
-                            let member = s.members.iter().find(member_pred).unwrap();
+                            .find_map(|s| s.members.iter().find(by_id).map(|m| (s, m)))
+                            .or_else(|| {
+                                self.symbols
+                                    .iter()
+                                    .find_map(|s| s.members.iter().find(by_pos).map(|m| (s, m)))
+                            });
+                        if let Some((s, member)) = hit {
                             return Some(ChainResult::Member {
                                 member,
                                 parent_name: s.name.clone(),
@@ -292,17 +300,6 @@ impl DocumentState {
 
         None
     }
-    pub(crate) fn find_extension_member<'a>(
-        &'a self,
-        type_name: &str,
-        member_name: &str,
-    ) -> Option<&'a MemberRecord> {
-        self.db
-            .extension_members
-            .get(type_name)
-            .and_then(|members| members.iter().find(|m| m.name == member_name))
-    }
-
     pub(crate) fn expr_info_at_token(
         &self,
         tok: &super::TokenRecord,

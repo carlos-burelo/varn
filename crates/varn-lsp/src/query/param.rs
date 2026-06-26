@@ -8,27 +8,14 @@ pub struct ParamInfo {
     pub is_type_param: bool,
 }
 
+/// Parameters (declarations and usages) now resolve through the checker via
+/// `resolve_chain`, so the only case left here is a type-parameter reference,
+/// which the checker does not yet record per-offset.
 pub fn param_at(state: &DocumentState, line: u32, col: u32) -> Option<ParamInfo> {
-    if let Some(name) = state.type_param_at_pos(line, col) {
-        return Some(ParamInfo {
-            name,
-            type_str: String::new(),
-            is_type_param: true,
-        });
-    }
-    if let Some((name, type_str)) = state.param_decl_at_pos(line, col) {
-        return Some(ParamInfo {
-            name,
-            type_str,
-            is_type_param: false,
-        });
-    }
-    if let Some((name, type_str)) = state.param_usage_at_pos(line, col) {
-        return Some(ParamInfo {
-            name,
-            type_str,
-            is_type_param: false,
-        });
-    }
-    None
+    let name = state.type_param_at_pos(line, col)?;
+    Some(ParamInfo {
+        name,
+        type_str: String::new(),
+        is_type_param: true,
+    })
 }
