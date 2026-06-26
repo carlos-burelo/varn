@@ -123,7 +123,7 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
             ..
         } => {
             let ret = if *is_generator {
-                Type::generic("Generator", vec![Type::Dynamic])
+                Type::generic(varn_core::IntrinsicType::Generator.as_str(), vec![Type::Dynamic])
             } else {
                 Type::Dynamic
             };
@@ -157,7 +157,9 @@ fn infer_member(
         return match &obj_ty.0 {
             TypeKind::Array(inner) => (**inner).clone(),
             TypeKind::Intrinsic(varn_core::TypeTag::Str) => Type::Str,
-            TypeKind::Named(name, _) if name.as_ref() == "str" => Type::Str,
+            TypeKind::Named(name, _) if name.as_ref() == varn_core::IntrinsicType::Str.as_str() => {
+                Type::Str
+            }
             _ => Type::Dynamic,
         };
     }

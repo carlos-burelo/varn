@@ -789,33 +789,25 @@ impl ExecCtx {
     }
 
     pub(crate) fn exec_typeof(&self, v: VmValue) -> &'static str {
+        use varn_core::TypeTag;
         if v.is_null() {
-            return "null";
+            return TypeTag::Null.name();
         }
         if v.is_int() {
-            return "int";
+            return TypeTag::Int.name();
         }
         if v.is_f64() {
-            return "float";
+            return TypeTag::Float.name();
         }
         if v.is_bool() {
-            return "bool";
+            return TypeTag::Bool.name();
         }
         if !v.is_heap() {
             return "unknown";
         }
         match self.heap.get(v.as_heap_idx()) {
-            Some(crate::heap::HeapObj::Str(_)) => "str",
-            Some(crate::heap::HeapObj::Array(_)) => "array",
-            Some(crate::heap::HeapObj::Object(_)) => "object",
-            Some(crate::heap::HeapObj::NativeFn(..)) => "function",
-            Some(crate::heap::HeapObj::VmClosure(_)) => "function",
-            Some(crate::heap::HeapObj::Class(_)) => "class",
-            Some(crate::heap::HeapObj::Char(_)) => "char",
-            Some(crate::heap::HeapObj::BigInt(_)) => "bigint",
-            Some(crate::heap::HeapObj::Decimal(_)) => "decimal",
-            Some(crate::heap::HeapObj::Symbol(_)) => "symbol",
-            _ => "unknown",
+            Some(obj) => obj.tag().name(),
+            None => "unknown",
         }
     }
 }

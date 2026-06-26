@@ -69,7 +69,7 @@ let method_log: str[] = []
 function logMethod(fn: FunctionRef, ctx: MethodContext): FunctionRef {
     const name = ctx.name
     const isStatic = ctx.isStatic
-    return (...args: dynamic[]) => {
+    return (...args: int[]) => {
         method_log.push(name + ":static=" + isStatic)
         return fn(...args)
     }

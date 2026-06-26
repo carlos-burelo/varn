@@ -161,9 +161,24 @@ impl DocumentState {
                     }
 
                     if sid_matches {
-                        if let Some(s) = self.symbols.iter().find(|s| {
-                            s.symbol_id == Some(sid) || (s.line == sym.line && s.col == sym.col)
-                        }) {
+                        // SymbolId is the authoritative key. The (line, col)
+                        // fallback exists only for SymbolRecords that never got a
+                        // symbol_id, and must stay file-local: stdlib symbols carry
+                        // line/col from *their own* source file, so a positional
+                        // match against them is a cross-file coordinate collision
+                        // (e.g. a user param at l4c24 vs stdlib `input` at l4c24).
+                        let found = self
+                            .symbols
+                            .iter()
+                            .find(|s| s.symbol_id == Some(sid))
+                            .or_else(|| {
+                                self.symbols.iter().find(|s| {
+                                    !s.is_from_stdlib
+                                        && s.line == sym.line
+                                        && s.col == sym.col
+                                })
+                            });
+                        if let Some(s) = found {
                             return Some(ChainResult::Symbol(s));
                         }
                     }

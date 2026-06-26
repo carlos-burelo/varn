@@ -39,7 +39,8 @@ impl super::super::Binder {
                 let elem_ty = ty.as_ref().and_then(|t| match &t.0 {
                     varn_core::TypeKind::Array(inner) => Some((**inner).clone()),
                     varn_core::TypeKind::Generic(name, args, _)
-                        if name.as_ref() == "Array" && args.len() == 1 =>
+                        if name.as_ref() == varn_core::IntrinsicType::Array.as_str()
+                            && args.len() == 1 =>
                     {
                         Some(args[0].clone())
                     }

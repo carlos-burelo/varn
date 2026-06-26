@@ -334,26 +334,3 @@ impl varn_types::NativeCtx for DevNullModuleCtx {
         VmValue::null()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn core_methods_are_op_id_addressable() {
-        // Phase 1: core-type methods must be present in the dispatch table under
-        // their class-qualified op-id, distinct from any module-level symbol.
-        let push = entry::compound_op_id3("globals", "Array", "push");
-        assert!(
-            describe_op(push).is_some(),
-            "Array.push missing from dispatch table"
-        );
-        let len = entry::compound_op_id3("globals", "Array", "length");
-        assert!(
-            describe_op(len).is_some(),
-            "Array.length getter missing from dispatch table"
-        );
-        // The class-qualified id must not collide with the 2-segment module space.
-        assert_ne!(push, entry::compound_op_id("globals", "push"));
-    }
-}

@@ -55,7 +55,7 @@ pub struct BaseType {
 }
 
 impl TypeTag {
-    pub fn name(self) -> &'static str {
+    pub const fn name(self) -> &'static str {
         match self {
             Self::Null => "null",
             Self::Bool => "bool",
@@ -65,7 +65,7 @@ impl TypeTag {
             Self::BigInt => "bigint",
             Self::Decimal => "decimal",
             Self::Char => "char",
-            Self::Symbol => "symbol",
+            Self::Symbol => "Symbol",
             Self::Void => "void",
             Self::Never => "never",
             Self::Dynamic => "dynamic",
@@ -151,32 +151,6 @@ impl TypeTag {
                 TypeFlags::IS_REFERENCE | TypeFlags::HAS_VTABLE
             }
             Self::Dynamic => TypeFlags::NONE,
-        }
-    }
-
-    pub fn to_intrinsic_str(self) -> &'static str {
-        match self {
-            Self::Function => "function",
-            Self::Array => "Array",
-            Self::Map => "Map",
-            Self::Set => "Set",
-            Self::Task => "Task",
-            Self::Generator => "Generator",
-            Self::Range => "Range",
-            _ => self.name(),
-        }
-    }
-
-    pub fn to_runtime_str(self) -> &'static str {
-        match self {
-            Self::Array => "array",
-            Self::Object => "object",
-            Self::Function | Self::NativeFn => "fn",
-            Self::Class => "class",
-            Self::Generator => "generator",
-            Self::AsyncQueue => "asyncqueue",
-            Self::Enum => "enum",
-            _ => self.name(),
         }
     }
 

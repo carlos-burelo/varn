@@ -52,6 +52,39 @@ pub enum HeapObj {
     VmValue(Box<dyn VmValuePayload>),
 }
 
+impl HeapObj {
+    /// The single canonical [`TypeTag`] of this heap object. Callables
+    /// (closure / native fn / bound method) coalesce to `Function`; modules
+    /// present as `Object`; spreads as `Array`; opaque host payloads as `VmRef`.
+    /// All value-kind name rendering flows through this — see [`TypeTag::name`].
+    pub fn tag(&self) -> varn_base::TypeTag {
+        use varn_base::TypeTag;
+        match self {
+            HeapObj::Str(_) => TypeTag::Str,
+            HeapObj::Array(_) => TypeTag::Array,
+            HeapObj::Object(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) => TypeTag::Object,
+            HeapObj::VmClosure(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) => {
+                TypeTag::Function
+            }
+            HeapObj::Class(_) => TypeTag::Class,
+            HeapObj::Map(_) => TypeTag::Map,
+            HeapObj::Set(_) => TypeTag::Set,
+            HeapObj::Task(_) => TypeTag::Task,
+            HeapObj::TaskHandle(_) => TypeTag::TaskHandle,
+            HeapObj::Range(_) => TypeTag::Range,
+            HeapObj::Symbol(_) => TypeTag::Symbol,
+            HeapObj::EnumVariant(_) => TypeTag::Enum,
+            HeapObj::BigInt(_) => TypeTag::BigInt,
+            HeapObj::Decimal(_) => TypeTag::Decimal,
+            HeapObj::Char(_) => TypeTag::Char,
+            HeapObj::Generator(_) => TypeTag::Generator,
+            HeapObj::AsyncQueue(_) => TypeTag::AsyncQueue,
+            HeapObj::Spread(_) => TypeTag::Array,
+            HeapObj::VmValue(_) => TypeTag::VmRef,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct HeapInner {
     pub alloc_count: u64,
@@ -135,32 +168,7 @@ impl HeapInner {
 
     pub fn alloc(&mut self, obj: HeapObj) -> u32 {
         if let Some(ref h) = self.hotspot.clone() {
-            let type_name: &'static str = match &obj {
-                HeapObj::Str(_) => "String",
-                HeapObj::Array(_) => "Array",
-                HeapObj::Object(_) => "Object",
-                HeapObj::VmClosure(_) => "Closure",
-                HeapObj::BoundMethod(_) => "BoundMethod",
-                HeapObj::EnumVariant(_) => "EnumVariant",
-                HeapObj::Range(_) => "Range",
-                HeapObj::Char(_) => "Char",
-                HeapObj::Symbol(_) => "Symbol",
-                HeapObj::BigInt(_) => "BigInt",
-                HeapObj::Decimal(_) => "Decimal",
-                HeapObj::Map(_) => "Map",
-                HeapObj::Set(_) => "Set",
-                HeapObj::Task(_) => "Task",
-                HeapObj::TaskHandle(_) => "TaskHandle",
-                HeapObj::Generator(_) => "Generator",
-                HeapObj::AsyncQueue(_) => "AsyncQueue",
-                HeapObj::Spread(_) => "Spread",
-                HeapObj::Class(_) => "Class",
-                HeapObj::NativeFn(_, _) => "NativeFn",
-                HeapObj::Module(_) => "Module",
-                HeapObj::FrozenModule(_) => "FrozenModule",
-                HeapObj::VmValue(_) => "VmValue",
-            };
-            h.borrow_mut().record_alloc(type_name);
+            h.borrow_mut().record_alloc(obj.tag().name());
         }
         let mut obj = obj;
         match obj {

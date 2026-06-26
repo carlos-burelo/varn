@@ -118,10 +118,22 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
             .map(|t| t.kind == TokenKind::Colon)
             .unwrap_or(false);
 
+        // `get`/`set` are real keywords ONLY as accessor declarations
+        // (`get name()`, `set name(v)`), i.e. immediately followed by the
+        // accessor name identifier. Everywhere else (object key `get:`,
+        // variable `const set`, method `get()`, member `x.get`) they are plain
+        // identifiers and must be resolved as such, not painted as keywords.
+        let getset_as_ident = matches!(tok.kind, TokenKind::Get | TokenKind::Set)
+            && !prev_is_dot
+            && tokens
+                .get(i + 1)
+                .map(|t| t.kind != TokenKind::Identifier)
+                .unwrap_or(true);
+
         let mut token_type: Option<u32> = None;
         let mut modifier: u32 = 0;
 
-        if tok.kind.is_keyword() && !prev_is_dot {
+        if tok.kind.is_keyword() && !prev_is_dot && !getset_as_ident {
             token_type = classify::classify(
                 tok,
                 &state.symbol_map,
@@ -181,16 +193,35 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
                                 }
                             }
                         }
-                        crate::document::ChainResult::Member { member, .. } => {
+                        crate::document::ChainResult::Member {
+                            member,
+                            parent_name,
+                        } => {
                             if matches!(member.ty.0, varn_core::TypeKind::Fn(_)) {
                                 TT_FUNCTION
+                            } else if matches!(
+                                state.symbol_map.get(parent_name.as_str()),
+                                Some(SymbolKind::Enum)
+                            ) {
+                                // `Enum.Variant` value access: the binder models a
+                                // nullary variant as a Property of the enum type, but
+                                // visually it is an enum member.
+                                TT_ENUM_MEMBER
                             } else {
                                 classify::map_member_kind_to_tt(&member.kind)
                             }
                         }
-                        crate::document::ChainResult::DynamicMember { member, .. } => {
+                        crate::document::ChainResult::DynamicMember {
+                            member,
+                            parent_name,
+                        } => {
                             if matches!(member.ty.0, varn_core::TypeKind::Fn(_)) {
                                 TT_FUNCTION
+                            } else if matches!(
+                                state.symbol_map.get(parent_name.as_str()),
+                                Some(SymbolKind::Enum)
+                            ) {
+                                TT_ENUM_MEMBER
                             } else {
                                 classify::map_member_kind_to_tt(&member.kind)
                             }
@@ -278,6 +309,14 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
                 } else {
                     Some(TT_PARAMETER)
                 }
+            } else if getset_as_ident {
+                // Unresolved `get`/`set` used as an identifier (e.g. a bare
+                // binding name) — color it like any identifier, never a keyword.
+                Some(classify::classify_identifier(
+                    &tok.lexeme,
+                    &state.symbol_map,
+                    &state.type_param_names,
+                ))
             } else {
                 classify::classify(
                     tok,

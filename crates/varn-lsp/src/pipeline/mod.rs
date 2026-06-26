@@ -130,6 +130,30 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         });
     }
 
+    // Module origins of `import * as ns` aliases. A class/interface destructured
+    // out of such a namespace (`const { Duration } = ns`) is bound locally with no
+    // origin link, so its member table can only be recovered by resolving the name
+    // back through these modules.
+    let namespace_origins: Vec<String> = result
+        .bind
+        .arena
+        .all()
+        .iter()
+        .filter(|s| s.kind == SymbolKind::Namespace)
+        .filter_map(|s| s.origin_module.as_deref().map(str::to_string))
+        .collect();
+
+    fn resolve_bind_any(origin: &str) -> Option<std::rc::Rc<varn_checker::BindResult>> {
+        if origin.starts_with("std:")
+            || origin.starts_with("runtime:")
+            || origin.starts_with("core:")
+        {
+            module_resolver::resolve_stdlib_module_bind_ref(origin)
+        } else {
+            module_resolver::resolve_module_bind_ref(origin)
+        }
+    }
+
     let sym_records: Vec<SymbolRecord> = result
         .bind
         .arena
@@ -178,6 +202,20 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
                                 rb.get_flattened_members(name)
                                     .or_else(|| rb.get_class_entry(name).map(|e| &e.members))
                                     .or_else(|| rb.get_interface_members_local(name))
+                                    .map(|ms| symbols::map_members(ms, &tokens))
+                            })
+                        })
+                    })
+                    .or_else(|| {
+                        // Destructured from a namespace alias: resolve the class /
+                        // interface name through the imported modules.
+                        namespace_origins.iter().find_map(|origin| {
+                            resolve_bind_any(origin).and_then(|rb| {
+                                rb.get_flattened_members(&sym.name)
+                                    .or_else(|| {
+                                        rb.get_class_entry(&sym.name).map(|e| &e.members)
+                                    })
+                                    .or_else(|| rb.get_interface_members_local(&sym.name))
                                     .map(|ms| symbols::map_members(ms, &tokens))
                             })
                         })

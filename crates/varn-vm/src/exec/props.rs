@@ -2,6 +2,7 @@ use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use std::rc::Rc;
+use varn_core::IntrinsicType;
 use varn_types::{
     value::{find_method_with_owner, BoundMethod, ClassObj},
     NativeCtx, Value,
@@ -194,23 +195,23 @@ fn get_class_for_value(val: &Value, heap: &Heap) -> Option<Rc<ClassObj>> {
         Value::Object(o) => o.borrow().class(),
         Value::Class(cls) => Some(cls.clone()),
         _ => {
-            let type_name = match val {
-                Value::Null => "null",
-                Value::Bool(_) => "bool",
-                Value::Int(_) => "int",
-                Value::Float(_) => "float",
-                Value::Str(_) => "str",
-                Value::Symbol(_) => "symbol",
-                Value::BigInt(_) => "bigint",
-                Value::Array(_) => "Array",
-                Value::Map(_) => "Map",
-                Value::Set(_) => "Set",
-                Value::Range(_) => "Range",
-                Value::Char(_) => "char",
-                Value::Decimal(_) => "decimal",
+            let ty = match val {
+                Value::Null => IntrinsicType::Null,
+                Value::Bool(_) => IntrinsicType::Bool,
+                Value::Int(_) => IntrinsicType::Int,
+                Value::Float(_) => IntrinsicType::Float,
+                Value::Str(_) => IntrinsicType::Str,
+                Value::Symbol(_) => IntrinsicType::Symbol,
+                Value::BigInt(_) => IntrinsicType::BigInt,
+                Value::Array(_) => IntrinsicType::Array,
+                Value::Map(_) => IntrinsicType::Map,
+                Value::Set(_) => IntrinsicType::Set,
+                Value::Range(_) => IntrinsicType::Range,
+                Value::Char(_) => IntrinsicType::Char,
+                Value::Decimal(_) => IntrinsicType::Decimal,
                 _ => return None,
             };
-            heap.get_intrinsic_class(type_name)
+            heap.get_intrinsic_class(ty.as_str())
         }
     }
 }
@@ -343,8 +344,10 @@ pub fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
     // path would (`get_class_for_value` maps `Value::Array` -> intrinsic "Array").
     if val.is_heap() {
         match heap.get(val.as_heap_idx()) {
-            Some(HeapObj::Array(_)) => return heap.get_intrinsic_class("Array"),
-            Some(HeapObj::Str(_)) => return heap.get_intrinsic_class("str"),
+            Some(HeapObj::Array(_)) => {
+                return heap.get_intrinsic_class(IntrinsicType::Array.as_str())
+            }
+            Some(HeapObj::Str(_)) => return heap.get_intrinsic_class(IntrinsicType::Str.as_str()),
             _ => {}
         }
     }

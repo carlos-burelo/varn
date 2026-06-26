@@ -8,7 +8,7 @@ use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
-use varn_core::ModuleId;
+use varn_core::{IntrinsicType, ModuleId};
 use varn_types::value::LazyTask;
 use varn_types::{FunctionProto, NativeCtx};
 
@@ -146,20 +146,24 @@ impl ExecCtx {
     }
 
     fn init_intrinsics(&mut self) {
+        // Intrinsic classes the VM registers for property/method fallback
+        // dispatch. Names are sourced from the canonical `IntrinsicType` table
+        // (no raw literals). This set is broader than the op-id core classes:
+        // it includes the `Error` hierarchy but not `Symbol`/`bigint`.
         let names = [
-            "Array",
-            "str",
-            "int",
-            "float",
-            "decimal",
-            "bool",
-            "char",
-            "Map",
-            "Set",
-            "Range",
-            "Error",
-            "TypeError",
-            "RangeError",
+            IntrinsicType::Array.as_str(),
+            IntrinsicType::Str.as_str(),
+            IntrinsicType::Int.as_str(),
+            IntrinsicType::Float.as_str(),
+            IntrinsicType::Decimal.as_str(),
+            IntrinsicType::Bool.as_str(),
+            IntrinsicType::Char.as_str(),
+            IntrinsicType::Map.as_str(),
+            IntrinsicType::Set.as_str(),
+            IntrinsicType::Range.as_str(),
+            IntrinsicType::Error.as_str(),
+            IntrinsicType::TypeError.as_str(),
+            IntrinsicType::RangeError.as_str(),
         ];
         for name in names {
             if let Some(nv) = self.globals.get_by_name(name) {

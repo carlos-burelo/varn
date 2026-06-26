@@ -85,9 +85,9 @@ fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Durati
     Ok(samples)
 }
 
-pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliError> {
+pub fn run_bench(path: &str, runs: usize, show_output: bool, verbose: bool) -> Result<(), CliError> {
     if crate::pipeline::wrc::is_wrc(path) {
-        return run_bench_wrc(path, runs, show_output);
+        return run_bench_wrc(path, runs, show_output, verbose);
     }
 
     let canonical = crate::pipeline::canonicalize_path(path)?;
@@ -322,19 +322,66 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         res
     })?;
 
-    varn_vm::varn_jit::JIT_STATS.reset();
-    varn_builtins::reset_testing_counters();
-    varn_builtins::set_print_silent(true);
-    varn_builtins::set_testing_silent(true);
+    let e2e_samples = time_n(runs, || {
+        let source = crate::pipeline::read_source_file(path)
+            .map_err(|e| e.message.clone())?;
 
-    let (opcode_counts, mut vm_profile, jit_stats, hotspots) = {
-        let mut profile_vm = Vm::from_snapshot(
-            snap_globals.clone(),
-            snap_heap.clone(),
-            optimized_precompiled.clone(),
-            snap_modules.clone(),
+        let (tokens, lexeme_buf) = crate::pipeline::phase_lex(
+            &source,
+            path,
+            false,
+            &varn_debug::flags::DebugFlags::default(),
+        );
+
+        let (mut program, _) = varn_parser::parse_with_profile(tokens, lexeme_buf, path)
+            .map_err(|errs| {
+                let msgs: Vec<String> = errs
+                    .iter()
+                    .map(|e| {
+                        format!(
+                            "{}:{}:{}: {}",
+                            path, e.range.start.line, e.range.start.column, e.message
+                        )
+                    })
+                    .collect();
+                format!("parse errors:\n{}", msgs.join("\n"))
+            })?;
+
+        varn_core::assign_ast_ids(&mut program);
+
+        let check_result = Checker::check_with_profile(&program);
+
+        let exports = varn_checker::module_resolver::resolve_module_exports_ref(
+            &program.filename,
+            &mut vec![],
+        );
+        let mut export_names: Vec<std::rc::Rc<str>> = exports
+            .keys()
+            .map(|k| std::rc::Rc::from(k.as_str()))
+            .collect();
+        export_names.sort();
+
+        let proto = varn_compiler::compile_with_check_result(
+            &program,
+            &check_result.type_annotations,
+            &check_result.extension_calls,
+            &check_result.extension_members,
+            &check_result.extension_set_members,
+            export_names,
+        )
+        .map_err(|e| format!("compile failed: {}", e))?;
+
+        let proto_rc = Rc::new(proto);
+        varn_builtins::reset_testing_counters();
+
+        let mut machine = Vm::from_snapshot(
+            snap_globals_ref.clone(),
+            snap_heap_ref.clone(),
+            precompiled_ref.clone(),
+            snap_modules_ref.clone(),
         )
         .with_loader(loader.clone());
+
         let main_module_id = ModuleId::local_str(path);
         let mut export_map = FxHashMap::default();
         for (idx, name) in proto_rc.export_names.iter().enumerate() {
@@ -343,48 +390,15 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         let mut module_obj =
             varn_types::ModuleObj::new(main_module_id.clone(), proto_rc.export_names.len());
         module_obj.export_map = export_map;
-        let module_val = profile_vm.ctx.heap.alloc_module(Rc::new(module_obj));
-        profile_vm.ctx.modules.insert(main_module_id, module_val);
-        profile_vm.ctx.module_exports.insert(0, module_val);
+        let module_val = machine.ctx.heap.alloc_module(Rc::new(module_obj));
+        machine.ctx.modules.insert(main_module_id, module_val);
+        machine.ctx.module_exports.insert(0, module_val);
 
-        profile_vm.enable_opcode_profiling();
-        profile_vm.enable_profiling();
-        profile_vm.enable_hotspot_profiling();
         let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
-        run_vm_to_completion(&mut profile_vm, closure)
-            .map_err(|e| CliError::fatal(format!("profile run failed: {e}")))?;
-        profile_vm.collect_gc();
-        let counts = profile_vm.take_opcode_counts();
-        let profile = profile_vm.take_profile();
-        let stats = varn_vm::varn_jit::JIT_STATS.snapshot();
-        let hs = profile_vm.take_hotspots();
-        (counts, profile, stats, hs)
-    };
-    varn_builtins::set_print_silent(!show_output);
-    varn_builtins::set_testing_silent(!show_output);
+        run_vm_to_completion(&mut machine, closure)
+    })?;
 
-    if let Some(ref profile) = vm_profile {
-        if let Ok(mut f) = File::create("target/debug/vm_profile.txt") {
-            let _ = write!(f, "{:?}", profile);
-        }
-    }
-    if let Ok(mut f) = File::create("target/debug/opcode_counts.txt") {
-        let _ = write!(f, "{:?}", opcode_counts);
-    }
-
-    if let Ok(mut f) = File::create("target/debug/jit_profile.csv") {
-        let _ = write!(
-            f,
-            "phase,seconds\nread,{}\nlex,{}\nparse,{}\ncheck,{}\ncompile,{}\noptimize,{}\nexecute,{}\n",
-            timers.read.elapsed().as_secs_f64(),
-            timers.lex.elapsed().as_secs_f64(),
-            timers.parse.elapsed().as_secs_f64(),
-            timers.check.elapsed().as_secs_f64(),
-            timers.compile.elapsed().as_secs_f64(),
-            timers.optimize.elapsed().as_secs_f64(),
-            timers.execute.elapsed().as_secs_f64(),
-        );
-    }
+    let e2e_stats = PhaseStats::from_samples("e2e", |c| c.cyan(), &e2e_samples);
 
     let stats = vec![
         PhaseStats::from_samples("read", |c| c.white(), &read_samples),
@@ -397,8 +411,9 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
     ];
 
     let total_p50: Duration = stats.iter().map(|s| s.p50).sum();
-    let throughput = if total_p50.as_nanos() > 0 {
-        1_000_000_000.0 / total_p50.as_nanos() as f64
+    let e2e_p50 = e2e_stats.p50;
+    let throughput = if e2e_p50.as_nanos() > 0 {
+        1_000_000_000.0 / e2e_p50.as_nanos() as f64
     } else {
         f64::INFINITY
     };
@@ -424,7 +439,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         .dim()
     ));
     terminal::blank();
-    print_table(&stats, total_p50);
+    print_table(&stats, total_p50, Some(&e2e_stats));
     terminal::blank();
     let total_pipeline_dur: Duration = stats.iter().map(|s| s.total).sum();
     terminal::log(format!(
@@ -432,13 +447,14 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         chalk("").dim(),
         "",
         chalk(format!("{:.1} runs/s", throughput)).red(),
-        chalk(format!("(p50 end-to-end: {})", fmt_dur(total_p50))).dim()
+        chalk(format!("(p50: {} true e2e · {} sum phases)", fmt_dur(e2e_p50), fmt_dur(total_p50))).dim()
     ));
     terminal::log(format!(
-        "  {}Total pipeline time:{} {}",
+        "  {}Total pipeline time:{} {}  {}",
         chalk("").dim(),
         "",
-        chalk(fmt_dur(total_pipeline_dur)).cyan()
+        chalk(fmt_dur(total_pipeline_dur)).cyan(),
+        chalk("(sum of phases)").dim()
     ));
     terminal::log(format!(
         "  {}Module precompilation (cold startup):{} {}",
@@ -446,7 +462,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         "",
         chalk(fmt_dur(precompile_dur)).cyan()
     ));
-    let cold_start = precompile_dur + total_p50;
+    let cold_start = precompile_dur + e2e_p50;
     let cold_throughput = if cold_start.as_nanos() > 0 {
         1_000_000_000.0 / cold_start.as_nanos() as f64
     } else {
@@ -464,31 +480,96 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
             chalk("  Execution measured with stdout muted (--show-output to disable)").dim(),
         );
     }
-    print_parse_breakdown(&parse_profile);
-    print_check_breakdown(&check_result.profile);
-    print_opcode_hotspots(&opcode_counts);
-    if let Some(ref mut profile) = vm_profile {
-        let move_count = opcode_counts
-            .iter()
-            .find(|(op, _)| matches!(op, varn_core::OpCode::Move))
-            .map(|(_, n)| *n)
-            .unwrap_or(0);
-        profile.move_opcodes = move_count;
-        print_vm_profile(profile);
-    }
-    crate::bench_output::print_jit_stats(&jit_stats);
-    if let Some(ref hs) = hotspots {
-        print_hotspots(hs);
-    }
-    terminal::blank();
+    if verbose {
+        varn_vm::varn_jit::JIT_STATS.reset();
+        varn_builtins::reset_testing_counters();
+        varn_builtins::set_print_silent(true);
+        varn_builtins::set_testing_silent(true);
 
+        let (opcode_counts, mut vm_profile, jit_stats, hotspots) = {
+            let mut profile_vm = Vm::from_snapshot(
+                snap_globals.clone(),
+                snap_heap.clone(),
+                optimized_precompiled.clone(),
+                snap_modules.clone(),
+            )
+            .with_loader(loader.clone());
+            let main_module_id = ModuleId::local_str(path);
+            let mut export_map = FxHashMap::default();
+            for (idx, name) in proto_rc.export_names.iter().enumerate() {
+                export_map.insert(name.clone(), idx);
+            }
+            let mut module_obj =
+                varn_types::ModuleObj::new(main_module_id.clone(), proto_rc.export_names.len());
+            module_obj.export_map = export_map;
+            let module_val = profile_vm.ctx.heap.alloc_module(Rc::new(module_obj));
+            profile_vm.ctx.modules.insert(main_module_id, module_val);
+            profile_vm.ctx.module_exports.insert(0, module_val);
+
+            profile_vm.enable_opcode_profiling();
+            profile_vm.enable_profiling();
+            profile_vm.enable_hotspot_profiling();
+            let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
+            run_vm_to_completion(&mut profile_vm, closure)
+                .map_err(|e| CliError::fatal(format!("profile run failed: {e}")))?;
+            profile_vm.collect_gc();
+            let counts = profile_vm.take_opcode_counts();
+            let profile = profile_vm.take_profile();
+            let stats = varn_vm::varn_jit::JIT_STATS.snapshot();
+            let hs = profile_vm.take_hotspots();
+            (counts, profile, stats, hs)
+        };
+        varn_builtins::set_print_silent(!show_output);
+        varn_builtins::set_testing_silent(!show_output);
+
+        if let Some(ref profile) = vm_profile {
+            if let Ok(mut f) = File::create("target/debug/vm_profile.txt") {
+                let _ = write!(f, "{:?}", profile);
+            }
+        }
+        if let Ok(mut f) = File::create("target/debug/opcode_counts.txt") {
+            let _ = write!(f, "{:?}", opcode_counts);
+        }
+
+        if let Ok(mut f) = File::create("target/debug/jit_profile.csv") {
+            let _ = write!(
+                f,
+                "phase,seconds\nread,{}\nlex,{}\nparse,{}\ncheck,{}\ncompile,{}\noptimize,{}\nexecute,{}\n",
+                timers.read.elapsed().as_secs_f64(),
+                timers.lex.elapsed().as_secs_f64(),
+                timers.parse.elapsed().as_secs_f64(),
+                timers.check.elapsed().as_secs_f64(),
+                timers.compile.elapsed().as_secs_f64(),
+                timers.optimize.elapsed().as_secs_f64(),
+                timers.execute.elapsed().as_secs_f64(),
+            );
+        }
+
+        print_parse_breakdown(&parse_profile);
+        print_check_breakdown(&check_result.profile);
+        print_opcode_hotspots(&opcode_counts);
+        if let Some(ref mut profile) = vm_profile {
+            let move_count = opcode_counts
+                .iter()
+                .find(|(op, _)| matches!(op, varn_core::OpCode::Move))
+                .map(|(_, n)| *n)
+                .unwrap_or(0);
+            profile.move_opcodes = move_count;
+            print_vm_profile(profile);
+        }
+        crate::bench_output::print_jit_stats(&jit_stats);
+        if let Some(ref hs) = hotspots {
+            print_hotspots(hs);
+        }
+        terminal::blank();
+    }
     varn_builtins::set_print_silent(false);
     varn_builtins::set_testing_silent(false);
 
     Ok(())
 }
 
-fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliError> {
+fn run_bench_wrc(path: &str, runs: usize, show_output: bool, verbose: bool) -> Result<(), CliError> {
     let compiled = crate::pipeline::wrc::read_wrc(path)?;
     let compile_output = crate::pipeline::cache::compile_output_from_graph(compiled)?;
 
@@ -571,46 +652,6 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         run_vm_to_completion(&mut machine, closure)
     })?;
 
-    varn_vm::varn_jit::JIT_STATS.reset();
-    varn_builtins::reset_testing_counters();
-    varn_builtins::set_print_silent(true);
-    varn_builtins::set_testing_silent(true);
-    let (opcode_counts, mut vm_profile, jit_stats, hotspots) = {
-        let mut profile_vm = Vm::from_snapshot(
-            snap_globals.clone(),
-            snap_heap.clone(),
-            optimized_precompiled.clone(),
-            snap_modules.clone(),
-        )
-        .with_loader(loader.clone());
-        let main_module_id = ModuleId::local_str(path);
-        let mut export_map = FxHashMap::default();
-        for (idx, name) in proto_rc.export_names.iter().enumerate() {
-            export_map.insert(name.clone(), idx);
-        }
-        let mut module_obj =
-            varn_types::ModuleObj::new(main_module_id.clone(), proto_rc.export_names.len());
-        module_obj.export_map = export_map;
-        let module_val = profile_vm.ctx.heap.alloc_module(Rc::new(module_obj));
-        profile_vm.ctx.modules.insert(main_module_id, module_val);
-        profile_vm.ctx.module_exports.insert(0, module_val);
-
-        profile_vm.enable_opcode_profiling();
-        profile_vm.enable_profiling();
-        profile_vm.enable_hotspot_profiling();
-        let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
-        run_vm_to_completion(&mut profile_vm, closure)
-            .map_err(|e| CliError::fatal(format!("profile run failed: {e}")))?;
-        profile_vm.collect_gc();
-        let counts = profile_vm.take_opcode_counts();
-        let profile = profile_vm.take_profile();
-        let stats = varn_vm::varn_jit::JIT_STATS.snapshot();
-        let hs = profile_vm.take_hotspots();
-        (counts, profile, stats, hs)
-    };
-    varn_builtins::set_print_silent(!show_output);
-    varn_builtins::set_testing_silent(!show_output);
-
     let stats = vec![
         PhaseStats::from_samples("load", |c| c.white(), &load_samples),
         PhaseStats::from_samples("execute", |c| c.blue(), &exec_samples),
@@ -639,7 +680,7 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
         .dim()
     ));
     terminal::blank();
-    print_table(&stats, total_p50);
+    print_table(&stats, total_p50, None);
     terminal::blank();
     let total_pipeline_dur: Duration = stats.iter().map(|s| s.total).sum();
     terminal::log(format!(
@@ -660,21 +701,63 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool) -> Result<(), CliEr
             chalk("  Execution measured with stdout muted (--show-output to disable)").dim(),
         );
     }
-    print_opcode_hotspots(&opcode_counts);
-    if let Some(ref mut profile) = vm_profile {
-        let move_count = opcode_counts
-            .iter()
-            .find(|(op, _)| matches!(op, varn_core::OpCode::Move))
-            .map(|(_, n)| *n)
-            .unwrap_or(0);
-        profile.move_opcodes = move_count;
-        print_vm_profile(profile);
+    if verbose {
+        varn_vm::varn_jit::JIT_STATS.reset();
+        varn_builtins::reset_testing_counters();
+        varn_builtins::set_print_silent(true);
+        varn_builtins::set_testing_silent(true);
+        let (opcode_counts, mut vm_profile, jit_stats, hotspots) = {
+            let mut profile_vm = Vm::from_snapshot(
+                snap_globals.clone(),
+                snap_heap.clone(),
+                optimized_precompiled.clone(),
+                snap_modules.clone(),
+            )
+            .with_loader(loader.clone());
+            let main_module_id = ModuleId::local_str(path);
+            let mut export_map = FxHashMap::default();
+            for (idx, name) in proto_rc.export_names.iter().enumerate() {
+                export_map.insert(name.clone(), idx);
+            }
+            let mut module_obj =
+                varn_types::ModuleObj::new(main_module_id.clone(), proto_rc.export_names.len());
+            module_obj.export_map = export_map;
+            let module_val = profile_vm.ctx.heap.alloc_module(Rc::new(module_obj));
+            profile_vm.ctx.modules.insert(main_module_id, module_val);
+            profile_vm.ctx.module_exports.insert(0, module_val);
+
+            profile_vm.enable_opcode_profiling();
+            profile_vm.enable_profiling();
+            profile_vm.enable_hotspot_profiling();
+            let closure = Rc::new(Closure::new(proto_rc.clone(), Vec::new(), Vec::new()));
+            run_vm_to_completion(&mut profile_vm, closure)
+                .map_err(|e| CliError::fatal(format!("profile run failed: {e}")))?;
+            profile_vm.collect_gc();
+            let counts = profile_vm.take_opcode_counts();
+            let profile = profile_vm.take_profile();
+            let stats = varn_vm::varn_jit::JIT_STATS.snapshot();
+            let hs = profile_vm.take_hotspots();
+            (counts, profile, stats, hs)
+        };
+        varn_builtins::set_print_silent(!show_output);
+        varn_builtins::set_testing_silent(!show_output);
+
+        print_opcode_hotspots(&opcode_counts);
+        if let Some(ref mut profile) = vm_profile {
+            let move_count = opcode_counts
+                .iter()
+                .find(|(op, _)| matches!(op, varn_core::OpCode::Move))
+                .map(|(_, n)| *n)
+                .unwrap_or(0);
+            profile.move_opcodes = move_count;
+            print_vm_profile(profile);
+        }
+        crate::bench_output::print_jit_stats(&jit_stats);
+        if let Some(ref hs) = hotspots {
+            print_hotspots(hs);
+        }
+        terminal::blank();
     }
-    crate::bench_output::print_jit_stats(&jit_stats);
-    if let Some(ref hs) = hotspots {
-        print_hotspots(hs);
-    }
-    terminal::blank();
 
     varn_builtins::set_print_silent(false);
     varn_builtins::set_testing_silent(false);

@@ -2,46 +2,30 @@ use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use std::rc::Rc;
-use varn_core::{IntrinsicType, RuntimeTypeName};
+use varn_core::{IntrinsicType, TypeTag};
 use varn_types::value::{EnumVariantData, RuntimeSymbol};
 use varn_types::{NativeCtx, Value};
 
 pub fn typeof_val(val: VmValue, heap: &Heap) -> &'static str {
     if val.is_null() {
-        return IntrinsicType::Null.as_str();
+        return TypeTag::Null.name();
     }
     if val.is_bool() {
-        return IntrinsicType::Bool.as_str();
+        return TypeTag::Bool.name();
     }
     if val.is_int() {
-        return IntrinsicType::Int.as_str();
+        return TypeTag::Int.name();
     }
     if val.is_f64() {
-        return IntrinsicType::Float.as_str();
+        return TypeTag::Float.name();
     }
     if val.is_sso() {
-        return IntrinsicType::Str.as_str();
+        return TypeTag::Str.name();
     }
     if val.is_heap() {
         return match heap.get(val.as_heap_idx()) {
-            Some(HeapObj::Str(_)) => IntrinsicType::Str.as_str(),
-            Some(HeapObj::VmClosure(_))
-            | Some(HeapObj::NativeFn(..))
-            | Some(HeapObj::BoundMethod(..)) => "function",
-            Some(HeapObj::Class(_)) => RuntimeTypeName::Class.as_str(),
-            Some(HeapObj::Array(_)) => RuntimeTypeName::Array.as_str(),
-            Some(HeapObj::Object(_))
-            | Some(HeapObj::Module(_))
-            | Some(HeapObj::FrozenModule(_)) => RuntimeTypeName::Object.as_str(),
-            Some(HeapObj::Map(_)) => "map",
-            Some(HeapObj::Set(_)) => "set",
-            Some(HeapObj::BigInt(_)) => IntrinsicType::BigInt.as_str(),
-            Some(HeapObj::Decimal(_)) => IntrinsicType::Decimal.as_str(),
-            Some(HeapObj::Char(_)) => IntrinsicType::Char.as_str(),
-            Some(HeapObj::Symbol(_)) => IntrinsicType::Symbol.as_str(),
-            Some(HeapObj::EnumVariant(_)) => RuntimeTypeName::Enum.as_str(),
-            Some(HeapObj::Range(_)) => RuntimeTypeName::Range.as_str(),
-            _ => RuntimeTypeName::Object.as_str(),
+            Some(obj) => obj.tag().name(),
+            None => TypeTag::Object.name(),
         };
     }
     "unknown"
