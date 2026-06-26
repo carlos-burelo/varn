@@ -7,7 +7,11 @@ import {
     mathFloor,
     mathCeil,
     mathRound,
-    mathRandom
+    mathRandom,
+    mathAcos,
+    mathAsin,
+    mathAtan,
+    mathAtan2
 } from "runtime:math";
 
 export namespace Math {
@@ -57,16 +61,16 @@ export namespace Math {
     }
 
     export function acos(x: float): float {
-        return 0.0;
+        return mathAcos(x);
     }
     export function asin(x: float): float {
-        return 0.0;
+        return mathAsin(x);
     }
     export function atan(x: float): float {
-        return 0.0;
+        return mathAtan(x);
     }
     export function atan2(y: float, x: float): float {
-        return 0.0;
+        return mathAtan2(y, x);
     }
     export function exp(x: float): float {
         return 0.0;

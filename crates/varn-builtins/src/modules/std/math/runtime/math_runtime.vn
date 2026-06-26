@@ -9,3 +9,7 @@ export declare function mathFloor(x: float): float;
 export declare function mathCeil(x: float): float;
 export declare function mathRound(x: float): float;
 export declare function mathRandom(): float;
+export declare function mathAcos(x: float): float;
+export declare function mathAsin(x: float): float;
+export declare function mathAtan(x: float): float;
+export declare function mathAtan2(y: float, x: float): float;
