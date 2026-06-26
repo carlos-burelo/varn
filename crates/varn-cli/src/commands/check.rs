@@ -1,4 +1,5 @@
-use crate::{cli::CheckArgs, error::CliError, opts::RunOpts, pipeline};
+use crate::{cli::CheckArgs, error::CliError, pipeline};
+use varn_pipeline::RunOpts;
 
 pub fn execute(args: CheckArgs) -> Result<(), CliError> {
     pipeline::run(&RunOpts {

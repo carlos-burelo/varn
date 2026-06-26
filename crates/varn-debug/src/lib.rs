@@ -12,7 +12,6 @@ pub mod modules;
 pub mod scope;
 pub mod ssa;
 pub mod symbols;
-pub mod terminal;
 pub mod tokens;
 pub mod types;
 

@@ -1,9 +1,6 @@
-use crate::{
-    cli::ReplArgs,
-    error::CliError,
-    opts::{DebugFlags, RunOpts},
-};
+use crate::{cli::ReplArgs, error::CliError};
 use std::io::{self, Write};
+use varn_pipeline::{DebugFlags, RunOpts};
 use varn_utilities::terminal;
 
 pub fn execute(_args: ReplArgs) -> Result<(), CliError> {

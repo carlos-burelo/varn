@@ -79,7 +79,7 @@ pub fn compile(
         terminal::tagged("Varn", "resolving module graph...");
     }
     let graph_build =
-        crate::module_precompile::build_module_graph(program, source, &program.filename, &proto)
+        varn_pipeline::module_precompile::build_module_graph(program, source, &program.filename, &proto)
             .map_err(|e| CliError::fatal(format!("module graph error: {e}")))?;
 
     if debug.graph {
@@ -116,7 +116,7 @@ pub fn compile(
     })
 }
 
-fn print_module_graph(build: &crate::module_precompile::ModuleGraphBuild) {
+fn print_module_graph(build: &varn_pipeline::module_precompile::ModuleGraphBuild) {
     use varn_debug::colors::{BOLD, C_MODULES, R};
     println!("\n{BOLD}Module Dependency Graph{R}");
     println!("  Entry: {C_MODULES}{}{R}", shorten_path(&build.entry_path));

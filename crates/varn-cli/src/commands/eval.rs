@@ -1,4 +1,5 @@
-use crate::{cli::EvalArgs, error::CliError, opts::RunOpts, pipeline};
+use crate::{cli::EvalArgs, error::CliError, pipeline};
+use varn_pipeline::RunOpts;
 
 pub fn execute(args: EvalArgs) -> Result<(), CliError> {
     pipeline::run(&RunOpts {

@@ -6,8 +6,6 @@ mod cli;
 mod commands;
 mod doctor_impl;
 mod error;
-mod module_precompile;
-mod opts;
 mod pipeline;
 mod profiling;
 

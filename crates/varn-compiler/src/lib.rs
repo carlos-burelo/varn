@@ -1,7 +1,6 @@
-pub mod chunk;
 pub mod codegen;
 
-pub use chunk::{Chunk, FunctionProto, LineMapping, Literal, PoolEntry};
+pub use varn_types::chunk::{Chunk, FunctionProto, LineMapping, Literal, PoolEntry};
 
 use std::rc::Rc;
 pub type GlobalLayout = FxHashMap<Rc<str>, usize>;

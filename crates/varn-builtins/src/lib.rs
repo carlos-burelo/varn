@@ -13,8 +13,6 @@ pub mod dispatch;
 #[cfg(feature = "runtime")]
 pub mod modules;
 #[cfg(feature = "runtime")]
-pub mod resource;
-#[cfg(feature = "runtime")]
 pub mod runtime_ops;
 
 #[cfg(feature = "runtime")]
@@ -30,4 +28,4 @@ pub use modules::has_native_builder;
 #[cfg(feature = "runtime")]
 pub use modules::testing::{reset_testing_counters, set_testing_silent};
 #[cfg(feature = "runtime")]
-pub use resource::ResourceStore;
+pub use varn_types::ResourceStore;

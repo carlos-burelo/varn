@@ -1,7 +1,8 @@
-use crate::{cli::InspectArgs, error::CliError, opts::RunOpts, pipeline};
+use crate::{cli::InspectArgs, error::CliError, pipeline};
+use varn_pipeline::RunOpts;
 
 pub fn execute(args: InspectArgs) -> Result<(), CliError> {
-    let debug = crate::opts::parse_debug_opt(Some(&args.phases))?;
+    let debug = varn_pipeline::parse_debug_opt(Some(&args.phases))?;
 
     let (file_path, eval) = match (args.file, args.eval) {
         (_, Some(code)) => ("(eval)".to_owned(), Some(code)),
