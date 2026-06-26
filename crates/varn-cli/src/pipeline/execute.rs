@@ -1,6 +1,6 @@
 use super::core;
 use crate::error::CliError;
-use crate::opts::DebugFlags;
+use varn_pipeline::DebugFlags;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_compiler::FunctionProto;

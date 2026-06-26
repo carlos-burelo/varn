@@ -1,5 +1,5 @@
 use varn_checker::CheckResult;
-use crate::opts::DebugFlags;
+use varn_pipeline::DebugFlags;
 use varn_utilities::chalk::chalk;
 use varn_utilities::terminal::{Section, Table};
 

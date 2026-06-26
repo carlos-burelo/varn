@@ -228,7 +228,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool, verbose: bool) -> R
     .map_err(|e| CliError::fatal(format!("compile error: {e}")))?;
 
     let precompile_start = Instant::now();
-    let graph_build = crate::module_precompile::build_module_graph(&program, &source, path, &proto)
+    let graph_build = varn_pipeline::module_precompile::build_module_graph(&program, &source, path, &proto)
         .map_err(|e| CliError::fatal(format!("module graph build error: {e}")))?;
     let precompile_dur = precompile_start.elapsed();
     let precompiled = Rc::new(

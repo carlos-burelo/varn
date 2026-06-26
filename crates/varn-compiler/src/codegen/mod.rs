@@ -1,4 +1,4 @@
-use crate::chunk::FunctionProto;
+use crate::FunctionProto;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_core::ast::Program;
