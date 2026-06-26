@@ -102,13 +102,6 @@ pub struct TokenRecord {
     pub lexeme: String,
 }
 
-#[derive(Clone, Debug)]
-pub struct ParamScope {
-    pub body_start_line: u32,
-    pub body_end_line: u32,
-    pub params: Vec<(String, String)>,
-}
-
 #[derive(Debug)]
 pub enum ChainResult<'a> {
     Symbol(&'a SymbolRecord),
@@ -130,18 +123,6 @@ impl<'a> ChainResult<'a> {
             ChainResult::DynamicMember { member, .. } => &member.name,
         }
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct MethodHoverInfo {
-    pub receiver: String,
-    pub class_name: String,
-    pub method_name: String,
-    pub return_type: String,
-    pub params_str: String,
-    pub is_static: bool,
-    pub parent_kind: SymbolKind,
-    pub init_value: String,
 }
 
 #[derive(Debug, Clone)]
@@ -211,8 +192,6 @@ pub struct DocumentState {
     pub symbols: Vec<SymbolRecord>,
     pub tokens: Vec<TokenRecord>,
     pub symbol_map: HashMap<String, SymbolKind>,
-
-    pub param_scopes: Vec<ParamScope>,
 
     pub type_param_names: HashSet<String>,
 

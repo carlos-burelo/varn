@@ -228,6 +228,27 @@ impl Checker {
         checker.check_stmts(&program.body, &bind);
         profile.check_stmts = started.elapsed();
 
+        // Tooling pass (LSP only): some declarations (parameters, methods,
+        // getters/setters, fields) are bound by the binder but never visited as
+        // expressions, so they have no `expr_types` entry at their own offset.
+        // Record every local symbol at its declaration offset so its name token
+        // resolves to itself — exactly like every other binding, with no
+        // positional heuristic. `or_insert` keeps any finer entry the checker
+        // already produced. Skipped for normal compilation.
+        if record_expr_types {
+            for (id, sym) in bind.arena.all().iter().enumerate() {
+                if sym.origin_module.is_none() && sym.offset != 0 {
+                    checker
+                        .expr_types
+                        .entry(sym.offset)
+                        .or_insert_with(|| ExprInfo {
+                            ty: sym.ty.clone().unwrap_or(Type::Dynamic),
+                            symbol_id: Some(id),
+                        });
+                }
+            }
+        }
+
         let mut final_diagnostics = std::mem::take(&mut bind.diagnostics);
         final_diagnostics.extend(checker.diagnostics);
 
