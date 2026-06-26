@@ -49,6 +49,7 @@ import "./48-opt-unsupported-phase1.vn"
 import "./49-opt-unsupported-phase2.vn"
 import "./50-opt-unsupported-phase3.vn"
 import "./51-opt-unsupported-phase4.vn"
+import "./52-math-trig.vn"
 
-print("\n52 side-effect modules executed in suite")
+print("\n53 side-effect modules executed in suite")
 assertSummary()
