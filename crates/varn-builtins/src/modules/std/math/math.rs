@@ -19,5 +19,9 @@ varn_contract! {
             use rand::Rng;
             Ok(rand::thread_rng().gen())
         }
+        fn mathAcos(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.acos()) }
+        fn mathAsin(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.asin()) }
+        fn mathAtan(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.atan()) }
+        fn mathAtan2(_ctx: &mut dyn NativeCtx, y: f64, x: f64) -> Result<f64, String> { Ok(y.atan2(x)) }
     }
 }
