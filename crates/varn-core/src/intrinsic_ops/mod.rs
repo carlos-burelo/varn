@@ -1,8 +1,5 @@
-pub mod array;
 pub mod map;
 pub mod math;
-pub mod string;
-pub mod types;
 pub mod wire;
 
 pub use map::lookup as intrinsic_lookup;
