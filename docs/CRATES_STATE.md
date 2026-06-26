@@ -105,3 +105,7 @@ Reporte de errores con spans y subrayados. Formato CLI y LSP.
 
 ### `varn-base`
 Utilidades comunes compartidas.
+
+## Especificaciones relacionadas
+
+- `NATIVE_ABI_SPEC.md` — ABI de dispatch nativo: op-id, `NativeOpEntry`, wire de intrinsics, las dos capas de dispatch (op-id vs intrinsic), convención de llamada JIT, marshalling y garantías semánticas por op.
