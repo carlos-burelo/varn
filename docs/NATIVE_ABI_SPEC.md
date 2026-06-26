@@ -97,9 +97,14 @@ encode(domain, op) = (domain << 4) | (op & 0x0F)
 | Domain | id | ops |
 |---|---|---|
 | Math | `0x0` | Abs Sqrt Floor Ceil Round Sin Cos Tan Log Exp Pow Min Max (`0x0..0xC`) |
-| String | `0x1` | Len Contains StartsWith EndsWith ToUpperCase ToLowerCase Trim |
-| Array | `0x2` | Len Push Pop Contains |
-| TypeCheck | `0x3` | (type predicates) |
+
+**Math is the only live intrinsic domain.** String/Array/TypeCheck domains were
+once scaffolded but never reached (the checker only annotates intrinsics for
+origin-tagged `Named` receivers — `Math`; structural `arr: T[]` and `s: str`
+fall through to the op-id / `CallMethod` paths, and the snake_case map keys never
+matched the camelCase surface method names). They were removed as dead code
+(only Math is genuinely JIT-inlined). New domains may be re-added when an op both
+fits the 16-op cap AND the JIT can inline it.
 
 Lookup: `intrinsic_ops::map::lookup(binding_key)` over `MAP_ENTRIES` keyed by
 `"{origin}/{method}"` (e.g. `"std:math/pow"`). The 16-op cap is why long-tail
