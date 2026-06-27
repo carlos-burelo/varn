@@ -1,4 +1,4 @@
-use varn_compiler::{FunctionProto, Literal, PoolEntry};
+use varn_opt::{FunctionProto, Literal, PoolEntry};
 use varn_core::{IntrinsicType, TypeTag};
 use varn_utilities::chalk::chalk;
 use varn_utilities::terminal::{Section, Table};

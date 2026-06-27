@@ -95,22 +95,6 @@ impl Checker {
         body: &varn_core::ast::ArrowBody,
         bind: &BindResult,
     ) -> Type {
-        let ret_ty = if let Some(rt) = return_type {
-            self.resolve_type_node_cached(rt, bind)
-        } else {
-            match body {
-                varn_core::ast::ArrowBody::Expr(e) => self.infer_type(e, bind),
-                varn_core::ast::ArrowBody::Block(block) => {
-                    let return_tys = collect_checked_return_types(block, self, bind);
-                    match return_tys.len() {
-                        0 => Type::Void,
-                        1 => return_tys.into_iter().next().unwrap(),
-                        _ => Type::union(return_tys),
-                    }
-                }
-            }
-        };
-
         let expected_params: Vec<FunctionParam> = self
             .expected_type
             .as_ref()
@@ -123,7 +107,7 @@ impl Checker {
             })
             .unwrap_or_default();
 
-        let ps = params
+        let ps: Vec<FunctionParam> = params
             .iter()
             .enumerate()
             .map(|(i, p)| {
@@ -159,6 +143,47 @@ impl Checker {
                 }
             })
             .collect();
+
+        // Seed the parameter types into the arrow's scope BEFORE inferring the
+        // body's return type, so a block body that returns a parameter
+        // (`(n) => { return n }`) resolves it to its contextual type instead of
+        // `dynamic` (which would be dropped, collapsing the return type to
+        // `void`). Mirrors `infer_arrow_with_context` used by generic inference,
+        // keeping the two paths consistent.
+        let arrow_scope = crate::checker_generics::find_arrow_scope(self.current_scope, params, bind);
+        let saved_scope = self.current_scope;
+        if let Some(scope_id) = arrow_scope {
+            self.current_scope = scope_id;
+            for (p, fp) in params.iter().zip(ps.iter()) {
+                let name = crate::binder::pattern_lead_name(&p.pattern);
+                if name.is_empty() || name == "_" {
+                    continue;
+                }
+                if let Some(sym_id) = bind.scopes.get(scope_id).resolve(&name, &bind.scopes) {
+                    self.symbol_types.insert(sym_id, fp.ty.clone());
+                }
+            }
+        }
+
+        let ret_ty = if let Some(rt) = return_type {
+            self.resolve_type_node_cached(rt, bind)
+        } else {
+            match body {
+                varn_core::ast::ArrowBody::Expr(e) => self.infer_type(e, bind),
+                varn_core::ast::ArrowBody::Block(block) => {
+                    let return_tys = collect_checked_return_types(block, self, bind);
+                    match return_tys.len() {
+                        0 => Type::Void,
+                        1 => return_tys.into_iter().next().unwrap(),
+                        _ => Type::union(return_tys),
+                    }
+                }
+            }
+        };
+
+        if arrow_scope.is_some() {
+            self.current_scope = saved_scope;
+        }
 
         Type::fn_(FunctionType {
             params: ps,

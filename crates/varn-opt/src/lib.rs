@@ -3,7 +3,8 @@ use std::rc::Rc;
 use rustc_hash::FxHashMap;
 use varn_core::ast::Program;
 use varn_core::TypeAnnotations;
-use varn_types::FunctionProto;
+
+pub use varn_types::chunk::{Chunk, FunctionProto, LineMapping, Literal, PoolEntry};
 
 pub mod hir;
 pub mod lower;
@@ -22,6 +23,29 @@ pub struct OptInput<'a> {
 #[derive(Debug)]
 pub enum OptError {
     Unsupported(&'static str),
+}
+
+/// Ergonomic module-compilation entry point: builds [`OptInput`], compiles, and
+/// maps the backend error to a displayable string. This is the front door the
+/// pipeline/CLI use (previously the whole point of the varn-compiler shim).
+#[allow(clippy::too_many_arguments)]
+pub fn compile_module(
+    program: &Program,
+    annotations: &TypeAnnotations,
+    extension_calls: &FxHashMap<u32, Rc<str>>,
+    extension_members: &FxHashMap<u32, Rc<str>>,
+    extension_set_members: &FxHashMap<u32, Rc<str>>,
+    export_names: Vec<Rc<str>>,
+) -> Result<FunctionProto, Rc<str>> {
+    compile(OptInput {
+        program,
+        annotations,
+        extension_calls,
+        extension_members,
+        extension_set_members,
+        export_names,
+    })
+    .map_err(|e| -> Rc<str> { Rc::from(format!("varn-opt could not lower module: {e:?}")) })
 }
 
 pub fn compile(input: OptInput<'_>) -> Result<FunctionProto, OptError> {

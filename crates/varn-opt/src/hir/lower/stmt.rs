@@ -195,11 +195,34 @@ impl<'a> Lowerer<'a> {
             StmtKind::Decl(decl) => match decl.as_ref() {
                 Decl::Variable(v) => {
                     for d in &v.declarators {
-                        let value = match &d.init {
-                            Some(e) => self.lower_expr(e, scope)?,
-                            None => HirExpr::Null,
-                        };
-                        self.desugar_pattern_local(&d.id, value, scope, out)?;
+                        // A closure initializer may reference its own binding for
+                        // recursion (`const fib = (n) => fib(n - 1)`). Allocate the
+                        // slot before lowering the initializer so the closure
+                        // captures its own local — matching how function
+                        // declarations hoist their name. Non-closure initializers
+                        // keep the original order, so an initializer that reads an
+                        // outer binding of the same name is unaffected.
+                        let is_closure_init = matches!(
+                            d.init.as_ref().map(|e| &e.kind),
+                            Some(ExprKind::Arrow { .. } | ExprKind::Function { .. })
+                        );
+                        if let (true, Pattern::Identifier { name, .. }) =
+                            (is_closure_init, &d.id)
+                        {
+                            let local = scope.alloc_local(name.clone());
+                            let value = self.lower_expr(d.init.as_ref().unwrap(), scope)?;
+                            out.push(HirStmt::Let {
+                                local,
+                                value,
+                                ty: HirType::Dynamic,
+                            });
+                        } else {
+                            let value = match &d.init {
+                                Some(e) => self.lower_expr(e, scope)?,
+                                None => HirExpr::Null,
+                            };
+                            self.desugar_pattern_local(&d.id, value, scope, out)?;
+                        }
                     }
                 }
 

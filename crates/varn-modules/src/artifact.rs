@@ -6,7 +6,10 @@ pub const BYTECODE_DIR_NAME: &str = "bytecode";
 pub const TYPES_DIR_NAME: &str = "types";
 pub const PACKAGE_MANIFEST_FILE: &str = "varn.json";
 
-pub const COMPILER_CACHE_VERSION: u32 = 10;
+// Bump whenever bytecode/codegen semantics change so cached `.vnc` artifacts
+// produced by an older compiler are invalidated (a content-hash match alone does
+// not catch compiler-logic changes). 11: closure self-reference lowering fix.
+pub const COMPILER_CACHE_VERSION: u32 = 11;
 pub const TYPE_CACHE_VERSION: u32 = 1;
 
 pub const MAGIC_WRC: &[u8; 4] = b"WRC\0";
