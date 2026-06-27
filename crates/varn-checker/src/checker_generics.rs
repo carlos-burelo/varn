@@ -208,7 +208,7 @@ fn infer_arrow_with_context(
     }))
 }
 
-fn find_arrow_scope(
+pub(crate) fn find_arrow_scope(
     current_scope: crate::scope::ScopeId,
     params: &[Param],
     bind: &BindResult,

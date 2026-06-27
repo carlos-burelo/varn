@@ -11,7 +11,7 @@ use std::io::Write;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 use varn_checker::Checker;
-use varn_compiler::FunctionProto;
+use varn_opt::FunctionProto;
 use varn_core::ModuleId;
 use varn_types::value::Closure;
 use varn_utilities::chalk::chalk;
@@ -181,7 +181,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool, verbose: bool) -> R
             .collect();
         export_names.sort();
 
-        let res = varn_compiler::compile_with_check_result(
+        let res = varn_opt::compile_module(
             program_ref,
             &check_result.type_annotations,
             &check_result.extension_calls,
@@ -217,7 +217,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool, verbose: bool) -> R
         .collect();
     export_names.sort();
 
-    let proto = varn_compiler::compile_with_check_result(
+    let proto = varn_opt::compile_module(
         &program,
         &check_result.type_annotations,
         &check_result.extension_calls,
@@ -361,7 +361,7 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool, verbose: bool) -> R
             .collect();
         export_names.sort();
 
-        let proto = varn_compiler::compile_with_check_result(
+        let proto = varn_opt::compile_module(
             &program,
             &check_result.type_annotations,
             &check_result.extension_calls,
@@ -583,7 +583,7 @@ fn run_bench_wrc(path: &str, runs: usize, show_output: bool, verbose: bool) -> R
             .map_err(|e| e.message.clone())
     })?;
 
-    let builtin_protos: Vec<varn_compiler::FunctionProto> = crate::pipeline::core_protos_owned()?;
+    let builtin_protos: Vec<varn_opt::FunctionProto> = crate::pipeline::core_protos_owned()?;
 
     varn_builtins::set_print_silent(true);
     varn_builtins::set_testing_silent(true);

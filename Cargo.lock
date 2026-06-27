@@ -1876,30 +1876,18 @@ dependencies = [
  "varn-backend",
  "varn-builtins",
  "varn-checker",
- "varn-compiler",
  "varn-core",
  "varn-debug",
  "varn-lexer",
  "varn-lsp",
  "varn-modules",
+ "varn-opt",
  "varn-parser",
  "varn-pipeline",
  "varn-pm",
  "varn-types",
  "varn-utilities",
  "varn-vm",
-]
-
-[[package]]
-name = "varn-compiler"
-version = "0.1.0"
-dependencies = [
- "rust_decimal",
- "rustc-hash",
- "varn-core",
- "varn-diagnostics",
- "varn-opt",
- "varn-types",
 ]
 
 [[package]]
@@ -1918,7 +1906,6 @@ version = "0.1.0"
 dependencies = [
  "rustc-hash",
  "varn-checker",
- "varn-compiler",
  "varn-core",
  "varn-lexer",
  "varn-modules",
@@ -2020,13 +2007,13 @@ dependencies = [
  "tower-lsp",
  "varn-builtins",
  "varn-checker",
- "varn-compiler",
  "varn-core",
  "varn-debug",
  "varn-diagnostics",
  "varn-lexer",
  "varn-lsp",
  "varn-modules",
+ "varn-opt",
  "varn-parser",
  "varn-types",
  "varn-utilities",

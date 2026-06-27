@@ -1,4 +1,4 @@
-use varn_compiler::{FunctionProto, PoolEntry};
+use varn_opt::{FunctionProto, PoolEntry};
 use varn_utilities::chalk::chalk;
 use varn_utilities::terminal::Section;
 
@@ -30,7 +30,7 @@ fn print_fn_scope(proto: &FunctionProto, indent: &str, is_last: bool, count: &mu
         .constants
         .iter()
         .filter_map(|e| {
-            if let varn_compiler::PoolEntry::Literal(varn_compiler::Literal::Str(s)) = e {
+            if let varn_opt::PoolEntry::Literal(varn_opt::Literal::Str(s)) = e {
                 Some(s.as_ref())
             } else {
                 None

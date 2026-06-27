@@ -285,7 +285,12 @@ impl Checker {
                 if let Some(clause) = catch {
                     self.with_next_child_scope(bind, clause.body.range.start.offset, |checker| {
                         if let Some(param) = &clause.param {
-                            let catch_ty = Type::named(IntrinsicType::Error.as_str().to_owned());
+                            // The thrown type is not statically known, so the catch
+                            // binding is `dynamic` (a caught value may be narrowed or
+                            // assigned to any error-typed variable). Typing it as the
+                            // base `Error` wrongly rejected assigning the caught value
+                            // to a subclass-typed variable.
+                            let catch_ty = Type::Dynamic;
                             checker.check_pattern(param, &catch_ty, bind);
                         }
                         checker.check_stmt(&clause.body, bind);

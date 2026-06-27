@@ -98,7 +98,7 @@ fn compile_source(source: &str, path: &str) -> Result<FunctionProto, String> {
         .map(|k| std::rc::Rc::from(k.as_str()))
         .collect();
     export_names.sort();
-    varn_compiler::compile_with_check_result(
+    varn_opt::compile_module(
         &program,
         &check.type_annotations,
         &check.extension_calls,

@@ -12,7 +12,7 @@ varn-core        = { path = "../varn-core" }
 varn-lexer       = { path = "../varn-lexer" }
 varn-parser      = { path = "../varn-parser", features = ["profiling"] }
 varn-checker     = { path = "../varn-checker" }
-varn-compiler    = { path = "../varn-compiler" }
+varn-opt         = { path = "../varn-opt" }
 varn-vm          = { path = "../varn-vm" }
 varn-builtins    = { path = "../varn-builtins", features = ["runtime"] }
 varn-modules     = { path = "../varn-modules" }

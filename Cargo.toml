@@ -4,7 +4,6 @@ members = [
     "crates/varn-lexer",
     "crates/varn-parser",
     "crates/varn-checker",
-    "crates/varn-compiler",
     "crates/varn-types",
     "crates/varn-op-macros",
     "crates/varn-modules",

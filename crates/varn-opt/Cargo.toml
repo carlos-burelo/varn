@@ -4,10 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 # Optimizing backend: AST -> HIR -> SSA -> opt passes -> bytecode (FunctionProto).
-# Depends only on the AST (varn-core) and the bytecode/proto types (varn-types);
-# the register-allocation post-passes and the VM/JIT live in varn-compiler /
-# varn-vm / varn-jit and consume the FunctionProto this crate emits. Keeping the
-# dependency one-way (varn-compiler -> varn-opt) avoids a cycle.
+# Depends only on the AST (varn-core) and the bytecode/proto types (varn-types).
+# `compile_module` is the front door; the VM/JIT consume the FunctionProto it
+# emits. The register-allocation post-passes live in varn-backend.
 [dependencies]
 varn-core  = { path = "../varn-core" }
 varn-types = { path = "../varn-types" }

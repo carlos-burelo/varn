@@ -2,7 +2,7 @@ use crate::core;
 use crate::PipelineError;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
-use varn_compiler::FunctionProto;
+use varn_opt::FunctionProto;
 use varn_core::ModuleId;
 use varn_debug::flags::DebugFlags;
 use varn_types::value::Closure;
