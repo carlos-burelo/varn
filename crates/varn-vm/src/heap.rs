@@ -345,7 +345,6 @@ impl HeapInner {
             Value::Array(a) => {
                 let guard = a.borrow();
                 let vm_items: Vec<VmValue> = guard.iter().map(|v| self.intern(v.clone())).collect();
-                drop(guard);
                 let va = VmArray::new(vm_items);
                 let idx = self.alloc(HeapObj::Array(va));
                 VmValue::from_heap_idx(idx)
@@ -438,7 +437,6 @@ impl HeapInner {
                 HeapObj::Array(a) => {
                     let guard = a.borrow();
                     let val_items: Vec<Value> = guard.iter().map(|&nv| self.extract(nv)).collect();
-                    drop(guard);
                     Value::Array(varn_types::value::ArrayRef::new(val_items))
                 }
                 HeapObj::Object(o) => Value::Object(o.clone()),
@@ -1036,7 +1034,7 @@ impl NativeCtx for Heap {
     fn array_set(&mut self, arr: VmValue, idx: usize, val: VmValue) {
         if arr.is_heap() {
             if let Some(HeapObj::Array(a)) = self.get_by_idx(arr.as_heap_idx()) {
-                let mut g = a.borrow_mut();
+                let g = a.borrow_mut();
                 if idx < g.len() {
                     g[idx] = val;
                 }

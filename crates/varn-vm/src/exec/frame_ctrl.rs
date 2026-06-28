@@ -334,7 +334,7 @@ impl NativeCtx for ExecCtx {
     fn array_set(&mut self, arr: VmValue, idx: usize, val: VmValue) {
         if arr.is_heap() {
             if let Some(HeapObj::Array(a)) = self.heap.get(arr.as_heap_idx()) {
-                let mut g = a.borrow_mut();
+                let g = a.borrow_mut();
                 if idx < g.len() {
                     g[idx] = val;
                 }

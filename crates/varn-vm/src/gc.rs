@@ -199,7 +199,7 @@ impl TricolorMarker {
                     // the throwaway clones generated more garbage). `mark_gray`
                     // only mutates the marker, never this RefCell, so holding the
                     // borrow across the loop is sound.
-                    for nv in arr.0.borrow().iter() {
+                    for nv in arr.borrow().iter() {
                         if let Some(child_idx) = heap.get_heap_idx(*nv) {
                             self.mark_gray(child_idx);
                         }

@@ -670,7 +670,7 @@ pub extern "C" fn jit_get_property_ic_fast(
                         if let Some(crate::heap::HeapObj::Array(arr)) =
                             ctx_ref.heap.get(obj.as_heap_idx())
                         {
-                            let len = (&*arr.0.as_ptr()).len();
+                            let len = arr.len();
                             return VmValue::from_int(len as i64);
                         }
                     } else if entry.is_class == 9 && cls.id == entry.id {

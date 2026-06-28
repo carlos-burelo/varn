@@ -291,41 +291,41 @@ impl fmt::Display for VmValue {
     }
 }
 
-use std::cell::RefCell;
+use std::cell::UnsafeCell;
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
-pub struct VmArray(pub Rc<RefCell<Vec<VmValue>>>);
+pub struct VmArray(pub Rc<UnsafeCell<Vec<VmValue>>>);
 
 impl VmArray {
-    #[inline]
+    #[inline(always)]
     pub fn new(items: Vec<VmValue>) -> Self {
-        Self(Rc::new(RefCell::new(items)))
+        Self(Rc::new(UnsafeCell::new(items)))
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn empty() -> Self {
         Self::new(Vec::new())
     }
 
-    #[inline]
-    pub fn borrow(&self) -> std::cell::Ref<'_, Vec<VmValue>> {
-        self.0.borrow()
+    #[inline(always)]
+    pub fn borrow(&self) -> &Vec<VmValue> {
+        unsafe { &*self.0.get() }
     }
 
-    #[inline]
-    pub fn borrow_mut(&self) -> std::cell::RefMut<'_, Vec<VmValue>> {
-        self.0.borrow_mut()
+    #[inline(always)]
+    pub fn borrow_mut(&self) -> &mut Vec<VmValue> {
+        unsafe { &mut *self.0.get() }
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn len(&self) -> usize {
-        self.0.borrow().len()
+        self.borrow().len()
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.0.borrow().is_empty()
+        self.borrow().is_empty()
     }
 }
 

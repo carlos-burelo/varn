@@ -85,11 +85,10 @@ impl SendValue {
             SendValue::Char(c) => Value::Char(*c),
             SendValue::Array(items) => {
                 let array_ref = alloc_array();
-                let mut g = array_ref.write();
+                let g = array_ref.write();
                 for item in items {
                     g.push(item.to_value());
                 }
-                drop(g);
                 Value::Array(array_ref)
             }
             SendValue::Object(fields) => {

@@ -38,6 +38,13 @@ impl ExecCtx {
                         )))
                     }
                 };
+                let proto_ptr = std::rc::Rc::as_ptr(&proto) as usize;
+                if uv_count == 0 {
+                    if let Some(&cached_val) = self.static_closures.get(&proto_ptr) {
+                        self.stack[base + dest] = cached_val;
+                        return Ok(Some(ObjectFlow::ContinueInstruction));
+                    }
+                }
                 let mut upvalues = Vec::with_capacity(uv_count);
                 for _ in 0..uv_count {
                     let uv_desc = code[*ip];
@@ -50,7 +57,6 @@ impl ExecCtx {
                         upvalues.push(closure.upvalues[index].clone());
                     }
                 }
-                let proto_ptr = std::rc::Rc::as_ptr(&proto) as usize;
                 let constants = self
                     .proto_constants
                     .entry(proto_ptr)
@@ -64,7 +70,11 @@ impl ExecCtx {
                 let vm_closure = std::rc::Rc::new(crate::frame::VmClosure::with_upvalues(
                     proto, upvalues, constants,
                 ));
-                self.stack[base + dest] = self.heap.alloc_vm_closure(vm_closure);
+                let val = self.heap.alloc_vm_closure(vm_closure);
+                if uv_count == 0 {
+                    self.static_closures.insert(proto_ptr, val);
+                }
+                self.stack[base + dest] = val;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::GetProperty => {

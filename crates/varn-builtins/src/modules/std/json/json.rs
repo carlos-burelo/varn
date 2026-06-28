@@ -61,7 +61,6 @@ fn value_to_serde(val: &Value, ctx: &mut dyn NativeCtx) -> serde_json::Value {
         Value::Str(s) => serde_json::Value::String(s.to_string()),
         Value::Array(arr) => {
             let items = arr
-                .0
                 .borrow()
                 .iter()
                 .map(|v| value_to_serde(v, ctx))

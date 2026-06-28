@@ -459,7 +459,7 @@ impl ExecCtx {
             match self.heap.extract(nv) {
                 Value::Spread(inner) => match *inner {
                     Value::Array(arr) => {
-                        for v in arr.0.borrow().iter().cloned() {
+                        for v in arr.borrow().iter().cloned() {
                             expanded.push(self.heap.intern(v));
                         }
                     }

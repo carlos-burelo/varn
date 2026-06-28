@@ -405,7 +405,7 @@ pub fn emit_reload_all_except(asm: &mut Assembler, regmap: &RegMap, except: Opti
 #[inline]
 fn slot_is_immediate(meta: &[varn_types::register_meta::RegisterMeta], vreg: usize) -> bool {
     use varn_types::register_meta::SlotKind;
-    meta.get(vreg).map_or(false, |m| {
+    meta.get(vreg).map_or(true, |m| {
         matches!(m.kind, SlotKind::Int | SlotKind::Float | SlotKind::Bool)
     })
 }
