@@ -74,7 +74,7 @@ impl ExecCtx {
                                 if let Some(crate::heap::HeapObj::Array(arr)) =
                                     self.heap.get(obj.as_heap_idx())
                                 {
-                                    let len = unsafe { &*arr.0.as_ptr() }.len();
+                                    let len = arr.len();
                                     found_slot_val = Some(VmValue::from_int(len as i64));
                                     hit_found = true;
                                     break 'entries;

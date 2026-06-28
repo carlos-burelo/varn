@@ -381,28 +381,30 @@ fn emit_call_self(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.cmp_reg_imm32(Reg::R10, MAX_JIT_CALL_DEPTH as i32);
     let fallback_depth = asm.jmp_cond(Cond::GreaterEqual);
 
-    asm.mov_reg_reg(Reg::R10, ARG_BASE);
-    asm.add_reg_imm32(Reg::R10, (arg_start + register_count) as i32);
-    asm.mov_mem_reg(ARG_EXEC_CTX, 16, Reg::R10);
+    if !safe_opt {
+        asm.mov_reg_reg(Reg::R10, ARG_BASE);
+        asm.add_reg_imm32(Reg::R10, (arg_start + register_count) as i32);
+        asm.mov_mem_reg(ARG_EXEC_CTX, 16, Reg::R10);
 
-    asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, 40);
-    asm.mov_reg_imm64(Reg::R11, 48);
-    asm.imul_reg_reg(Reg::R10, Reg::R11);
-    asm.mov_reg_mem(Reg::R11, ARG_EXEC_CTX, 32);
-    asm.add_reg_reg(Reg::R10, Reg::R11);
+        asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, 40);
+        asm.mov_reg_imm64(Reg::R11, 48);
+        asm.imul_reg_reg(Reg::R10, Reg::R11);
+        asm.mov_reg_mem(Reg::R11, ARG_EXEC_CTX, 32);
+        asm.add_reg_reg(Reg::R10, Reg::R11);
 
-    asm.mov_mem_reg(Reg::R10, 0, ARG_CLOSURE);
-    asm.xor_reg_reg(Reg::R11, Reg::R11);
-    asm.mov_mem_reg(Reg::R10, 8, Reg::R11);
-    asm.mov_mem_reg(Reg::R10, 16, Reg::R11);
+        asm.mov_mem_reg(Reg::R10, 0, ARG_CLOSURE);
+        asm.xor_reg_reg(Reg::R11, Reg::R11);
+        asm.mov_mem_reg(Reg::R10, 8, Reg::R11);
+        asm.mov_mem_reg(Reg::R10, 16, Reg::R11);
 
-    asm.mov_reg_reg(Reg::R11, ARG_BASE);
-    asm.add_reg_imm32(Reg::R11, arg_start as i32);
-    asm.mov_mem_reg(Reg::R10, 24, Reg::R11);
+        asm.mov_reg_reg(Reg::R11, ARG_BASE);
+        asm.add_reg_imm32(Reg::R11, arg_start as i32);
+        asm.mov_mem_reg(Reg::R10, 24, Reg::R11);
 
-    asm.xor_reg_reg(Reg::R11, Reg::R11);
-    asm.mov_mem_reg(Reg::R10, 32, Reg::R11);
-    asm.mov_mem_reg(Reg::R10, 40, Reg::R11);
+        asm.xor_reg_reg(Reg::R11, Reg::R11);
+        asm.mov_mem_reg(Reg::R10, 32, Reg::R11);
+        asm.mov_mem_reg(Reg::R10, 40, Reg::R11);
+    }
 
     asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, 40);
     asm.add_reg_imm8(Reg::R10, 1);
@@ -484,58 +486,64 @@ fn emit_call_self(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.pop(ARG_EXEC_CTX);
     asm.pop(ARG_CTX);
 
-    asm.mov_reg_mem(
-        Reg::R10,
-        ARG_EXEC_CTX,
-        (helpers.open_upvalues_offset + 16) as i32,
-    );
-    asm.cmp_reg_imm32(Reg::R10, 0);
-    let fallback_post = asm.jmp_cond(Cond::NotEqual);
+    if safe_opt {
+        asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, 40);
+        asm.add_reg_imm8(Reg::R10, -1);
+        asm.mov_mem_reg(ARG_EXEC_CTX, 40, Reg::R10);
+    } else {
+        asm.mov_reg_mem(
+            Reg::R10,
+            ARG_EXEC_CTX,
+            (helpers.open_upvalues_offset + 16) as i32,
+        );
+        asm.cmp_reg_imm32(Reg::R10, 0);
+        let fallback_post = asm.jmp_cond(Cond::NotEqual);
 
-    asm.mov_reg_mem(
-        Reg::R10,
-        ARG_EXEC_CTX,
-        (helpers.pending_constructors_offset + 16) as i32,
-    );
-    asm.cmp_reg_imm32(Reg::R10, 0);
-    let fallback_post_2 = asm.jmp_cond(Cond::NotEqual);
+        asm.mov_reg_mem(
+            Reg::R10,
+            ARG_EXEC_CTX,
+            (helpers.pending_constructors_offset + 16) as i32,
+        );
+        asm.cmp_reg_imm32(Reg::R10, 0);
+        let fallback_post_2 = asm.jmp_cond(Cond::NotEqual);
 
-    asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, 40);
-    asm.add_reg_imm8(Reg::R10, -1);
-    asm.mov_mem_reg(ARG_EXEC_CTX, 40, Reg::R10);
+        asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, 40);
+        asm.add_reg_imm8(Reg::R10, -1);
+        asm.mov_mem_reg(ARG_EXEC_CTX, 40, Reg::R10);
 
-    let skip_fallback_post = asm.jmp_near();
+        let skip_fallback_post = asm.jmp_near();
 
-    let fallback_post_pos = asm.current_offset();
-    let disp_fallback_post = (fallback_post_pos as i64 - (fallback_post as i64 + 4)) as i32;
-    asm.patch_u32(fallback_post, disp_fallback_post as u32);
-    let disp_fallback_post_2 = (fallback_post_pos as i64 - (fallback_post_2 as i64 + 4)) as i32;
-    asm.patch_u32(fallback_post_2, disp_fallback_post_2 as u32);
+        let fallback_post_pos = asm.current_offset();
+        let disp_fallback_post = (fallback_post_pos as i64 - (fallback_post as i64 + 4)) as i32;
+        asm.patch_u32(fallback_post, disp_fallback_post as u32);
+        let disp_fallback_post_2 = (fallback_post_pos as i64 - (fallback_post_2 as i64 + 4)) as i32;
+        asm.patch_u32(fallback_post_2, disp_fallback_post_2 as u32);
 
-    asm.push(ARG_BASE);
-    asm.push(ARG_EXEC_CTX);
+        asm.push(ARG_BASE);
+        asm.push(ARG_EXEC_CTX);
 
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
-    asm.mov_reg_reg(ARG_CLOSURE, ARG_BASE);
-    asm.add_reg_imm32(ARG_CLOSURE, arg_start as i32);
-    asm.mov_reg_reg(ARG_BASE, Reg::Rax);
+        asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+        asm.mov_reg_reg(ARG_CLOSURE, ARG_BASE);
+        asm.add_reg_imm32(ARG_CLOSURE, arg_start as i32);
+        asm.mov_reg_reg(ARG_BASE, Reg::Rax);
 
-    #[cfg(target_os = "windows")]
-    asm.add_reg_imm8(Reg::Rsp, -32);
+        #[cfg(target_os = "windows")]
+        asm.add_reg_imm8(Reg::Rsp, -32);
 
-    asm.mov_reg_imm64(Reg::R10, helpers.jit_post_call as u64);
-    asm.call_reg(Reg::R10);
+        asm.mov_reg_imm64(Reg::R10, helpers.jit_post_call as u64);
+        asm.call_reg(Reg::R10);
 
-    #[cfg(target_os = "windows")]
-    asm.add_reg_imm8(Reg::Rsp, 32);
+        #[cfg(target_os = "windows")]
+        asm.add_reg_imm8(Reg::Rsp, 32);
 
-    asm.pop(ARG_EXEC_CTX);
-    asm.pop(ARG_BASE);
+        asm.pop(ARG_EXEC_CTX);
+        asm.pop(ARG_BASE);
 
-    let end_fast_path_post_pos = asm.current_offset();
-    let disp_skip_fallback_post =
-        (end_fast_path_post_pos as i64 - (skip_fallback_post as i64 + 4)) as i32;
-    asm.patch_u32(skip_fallback_post, disp_skip_fallback_post as u32);
+        let end_fast_path_post_pos = asm.current_offset();
+        let disp_skip_fallback_post =
+            (end_fast_path_post_pos as i64 - (skip_fallback_post as i64 + 4)) as i32;
+        asm.patch_u32(skip_fallback_post, disp_skip_fallback_post as u32);
+    }
 
     asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
 

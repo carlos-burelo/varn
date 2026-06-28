@@ -135,7 +135,7 @@ pub fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Heap) -> V
     match heap.get(obj.as_heap_idx()) {
         Some(HeapObj::Array(a)) => {
             let a = a.clone();
-            let mut g = a.borrow_mut();
+            let g = a.borrow_mut();
             if idx_i < g.len() {
                 g[idx_i] = val;
             } else if idx_i == g.len() {

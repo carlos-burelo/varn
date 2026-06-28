@@ -183,7 +183,7 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
         // array's Vec just to read its length — making `arr.length` O(n) and any
         // loop over it O(n²). (`heap.get(..).cloned()` only bumps the array's Rc.)
         Some(HeapObj::Array(a)) if key == "length" => {
-            Some(VmValue::from_int(a.0.borrow().len() as i64))
+            Some(VmValue::from_int(a.len() as i64))
         }
         _ => None,
     }
@@ -252,12 +252,11 @@ fn resolve_specialized_value_property(obj: &Value, key: &str) -> Option<Result<V
         }
         Value::Array(arr) => {
             if key == "length" {
-                return Some(Ok(Value::Int(arr.0.borrow().len() as i64)));
+                return Some(Ok(Value::Int(arr.len() as i64)));
             }
             if let Ok(n) = key.parse::<usize>() {
                 return Some(
-                    arr.0
-                        .borrow()
+                    arr.borrow()
                         .get(n)
                         .cloned()
                         .ok_or_else(|| format!("index {n} out of bounds for array")),

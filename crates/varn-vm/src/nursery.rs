@@ -179,7 +179,7 @@ impl Nursery {
         if let Some(obj) = old_gen.get_raw(raw_old) {
             match obj {
                 HeapObj::Array(arr) => {
-                    let g = arr.0.borrow();
+                    let g = arr.borrow();
                     for (i, &v) in g.iter().enumerate() {
                         if v.is_heap() && is_nursery_idx(v.as_heap_idx()) {
                             fixups.push((ChildSlot::ArrayItem(i), v.as_heap_idx()));
@@ -258,7 +258,7 @@ impl Nursery {
             };
             match (slot, obj) {
                 (ChildSlot::ArrayItem(i), HeapObj::Array(arr)) => {
-                    if let Some(s) = arr.0.borrow_mut().get_mut(i) {
+                    if let Some(s) = arr.borrow_mut().get_mut(i) {
                         *s = new_val;
                     }
                 }

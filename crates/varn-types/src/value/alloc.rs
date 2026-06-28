@@ -50,28 +50,38 @@ impl std::fmt::Debug for ObjRef {
     }
 }
 
+use std::cell::UnsafeCell;
+
 #[derive(Clone)]
-pub struct ArrayRef(pub Rc<RefCell<Vec<super::Value>>>);
+pub struct ArrayRef(pub Rc<UnsafeCell<Vec<super::Value>>>);
 
 impl ArrayRef {
     pub fn new(data: Vec<super::Value>) -> Self {
-        Self(Rc::new(RefCell::new(data)))
+        Self(Rc::new(UnsafeCell::new(data)))
     }
 
-    pub fn read(&self) -> std::cell::Ref<'_, Vec<super::Value>> {
-        self.0.borrow()
+    pub fn read(&self) -> &Vec<super::Value> {
+        unsafe { &*self.0.get() }
     }
 
-    pub fn write(&self) -> std::cell::RefMut<'_, Vec<super::Value>> {
-        self.0.borrow_mut()
+    pub fn write(&self) -> &mut Vec<super::Value> {
+        unsafe { &mut *self.0.get() }
     }
 
-    pub fn borrow(&self) -> std::cell::Ref<'_, Vec<super::Value>> {
-        self.0.borrow()
+    pub fn borrow(&self) -> &Vec<super::Value> {
+        unsafe { &*self.0.get() }
     }
 
-    pub fn borrow_mut(&self) -> std::cell::RefMut<'_, Vec<super::Value>> {
-        self.0.borrow_mut()
+    pub fn borrow_mut(&self) -> &mut Vec<super::Value> {
+        unsafe { &mut *self.0.get() }
+    }
+
+    pub fn len(&self) -> usize {
+        self.borrow().len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.borrow().is_empty()
     }
 }
 
