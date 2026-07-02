@@ -3,6 +3,7 @@ pub(crate) mod arrays;
 pub(crate) mod calls;
 pub(crate) mod closures;
 pub(crate) mod compare;
+pub(crate) mod ffi;
 pub(crate) mod globals;
 pub(crate) mod immediates;
 pub(crate) mod indexing;
