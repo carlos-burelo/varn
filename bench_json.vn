@@ -1,0 +1,17 @@
+import { JSON } from "std:json";
+
+let items = [];
+for (let i = 0; i < 50000; i = i + 1) {
+    items.push({
+        id: i,
+        name: "Item_" + i,
+        active: (i % 2) === 0,
+        score: (i % 100) * 1.25
+    });
+}
+
+let jsonStr = JSON.stringify(items);
+let parsed = JSON.parse(jsonStr) as any[];
+
+print(parsed.length);
+print(jsonStr.length);
