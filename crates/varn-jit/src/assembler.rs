@@ -242,6 +242,25 @@ impl Assembler {
         self.emit_modrm(0b11, dest as u8, src as u8);
     }
 
+    /// Sign-extend RAX into RDX:RAX (prefix for `idiv`).
+    pub fn cqo(&mut self) {
+        self.emit_byte(0x48);
+        self.emit_byte(0x99);
+    }
+
+    /// Signed divide RDX:RAX by `divisor`; quotient in RAX, remainder in RDX.
+    pub fn idiv_reg(&mut self, divisor: Reg) {
+        self.emit_rex(true, 0, 0, divisor as u8);
+        self.emit_byte(0xF7);
+        self.emit_modrm(0b11, 7, divisor as u8);
+    }
+
+    pub fn test_reg_reg(&mut self, lhs: Reg, rhs: Reg) {
+        self.emit_rex(true, rhs as u8, 0, lhs as u8);
+        self.emit_byte(0x85);
+        self.emit_modrm(0b11, rhs as u8, lhs as u8);
+    }
+
     pub fn cmp_reg_reg(&mut self, lhs: Reg, rhs: Reg) {
         self.emit_rex(true, rhs as u8, 0, lhs as u8);
         self.emit_byte(0x39);

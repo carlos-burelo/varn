@@ -676,6 +676,24 @@ different entry points poisons later runs with wrong global indices
 cache locations between compiler builds; longer term, key artifacts by
 (source hash, import-layout hash).
 
+## 2026-07-01 round 3 — inline ModInt + AddInt carry fix
+
+- `ModInt` with statically int-typed operands now compiles to a native
+  `idiv` (zero divisor falls back to the FFI helper, which raises the
+  proper error). Modest win — the FFI helper was cheaper than assumed:
+  alu_int ~5% (`idiv` itself costs ~10 ns). To match V8 on `x % CONST`,
+  the next step is strength reduction of constant divisors
+  (multiply-shift), which V8 applies and we don't yet.
+
+- **Correctness:** the inline both-int `Add`/`AddInt` paths did
+  `add; sub TAG` without re-masking, so a payload carry out of bit 47
+  (negative operands, e.g. `-1 + -1`) leaked into the NaN-box tag and
+  produced null/garbage. Pre-existing, but rarely hit before round 1
+  because register metadata was mostly absent; accurate metadata made the
+  inline path fire everywhere. Both sites now mask back to 48 bits like
+  `Sub`/`Mul` always did. (`emit_compare_inline` was already safe: it
+  shifts payloads to the top bits and compares signed.)
+
 ## Summary of actionable fixes (by leverage)
 
 1. **Compile `<module>` / promote module-private top-level vars to registers** —
