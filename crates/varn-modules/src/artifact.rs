@@ -10,7 +10,8 @@ pub const PACKAGE_MANIFEST_FILE: &str = "varn.json";
 // produced by an older compiler are invalidated. 13: class/object fixed field jit optimization update.
 // 15: removed unsound fib-recurrence rewrite; artifacts compiled by it are miscompiled.
 // 16: object literals always compile to BuildObjectWithShape.
-pub const COMPILER_CACHE_VERSION: u32 = 16;
+// 17: GetProperty on non-escaping object literals devirtualized to GetFixedField.
+pub const COMPILER_CACHE_VERSION: u32 = 17;
 pub const TYPE_CACHE_VERSION: u32 = 2;
 
 pub const MAGIC_WRC: &[u8; 4] = b"WRC\0";
