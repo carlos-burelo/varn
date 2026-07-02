@@ -1,5 +1,5 @@
 use crate::error::{RuntimeError, VmResult};
-use crate::frame::{CallFrame};
+use crate::frame::CallFrame;
 use crate::globals::GlobalStore;
 use crate::value::VmValue;
 

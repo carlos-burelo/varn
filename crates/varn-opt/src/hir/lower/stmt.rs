@@ -211,9 +211,7 @@ impl<'a> Lowerer<'a> {
                             d.init.as_ref().map(|e| &e.kind),
                             Some(ExprKind::Arrow { .. } | ExprKind::Function { .. })
                         );
-                        if let (true, Pattern::Identifier { name, .. }) =
-                            (is_closure_init, &d.id)
-                        {
+                        if let (true, Pattern::Identifier { name, .. }) = (is_closure_init, &d.id) {
                             let local = scope.alloc_local(name.clone());
                             let value = self.lower_expr(d.init.as_ref().unwrap(), scope)?;
                             out.push(HirStmt::Let {

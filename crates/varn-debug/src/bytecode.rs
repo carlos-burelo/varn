@@ -1,5 +1,5 @@
-use varn_opt::FunctionProto;
 use varn_core::OpCode;
+use varn_opt::FunctionProto;
 use varn_types::PoolEntry;
 use varn_utilities::chalk::chalk;
 use varn_utilities::terminal;

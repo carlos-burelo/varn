@@ -1,13 +1,12 @@
-use std::rc::Rc;
-use varn_types::FunctionProto;
 use crate::hir::{HirFunction, HirModule};
 use crate::OptError;
+use std::rc::Rc;
+use varn_types::FunctionProto;
 pub mod build;
 pub mod dump;
 pub mod emit;
 pub mod ir;
 pub mod verify;
-
 
 pub fn try_compile_function(
     f: &HirFunction,

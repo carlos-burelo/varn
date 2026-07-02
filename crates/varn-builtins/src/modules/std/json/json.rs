@@ -1,7 +1,7 @@
-use std::borrow::Cow;
-use std::fmt::Write;
 use serde::de::{DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use serde::Deserializer;
+use std::borrow::Cow;
+use std::fmt::Write;
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, Value, VmValue};
 

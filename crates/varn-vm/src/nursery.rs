@@ -153,7 +153,12 @@ impl Nursery {
     }
 
     #[inline]
-    fn update_value(&mut self, val: &mut VmValue, old_gen: &mut HeapInner, worklist: &mut Vec<u32>) {
+    fn update_value(
+        &mut self,
+        val: &mut VmValue,
+        old_gen: &mut HeapInner,
+        worklist: &mut Vec<u32>,
+    ) {
         if !val.is_heap() {
             return;
         }
@@ -165,7 +170,12 @@ impl Nursery {
         *val = VmValue::from_heap_idx(packed);
     }
 
-    fn evacuate(&mut self, nursery_idx: u32, old_gen: &mut HeapInner, worklist: &mut Vec<u32>) -> u32 {
+    fn evacuate(
+        &mut self,
+        nursery_idx: u32,
+        old_gen: &mut HeapInner,
+        worklist: &mut Vec<u32>,
+    ) -> u32 {
         if let Some(Some(fwd)) = self.forwarding.get(nursery_idx as usize) {
             return *fwd;
         }
@@ -182,7 +192,12 @@ impl Nursery {
         packed
     }
 
-    fn scan_and_fix_old_obj(&mut self, raw_old: u32, old_gen: &mut HeapInner, worklist: &mut Vec<u32>) {
+    fn scan_and_fix_old_obj(
+        &mut self,
+        raw_old: u32,
+        old_gen: &mut HeapInner,
+        worklist: &mut Vec<u32>,
+    ) {
         let mut fixups: Vec<(ChildSlot, u32)> = Vec::with_capacity(8);
 
         if let Some(obj) = old_gen.get_raw(raw_old) {

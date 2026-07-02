@@ -10,9 +10,27 @@ use super::ctx::ExecCtx;
 
 fn canonical_id_str(id: &ModuleId) -> String {
     match id {
-        ModuleId::Core(s) => if s.starts_with("core:") { s.to_string() } else { format!("core:{s}") },
-        ModuleId::Std(s) => if s.starts_with("std:") { s.to_string() } else { format!("std:{s}") },
-        ModuleId::Runtime(s) => if s.starts_with("runtime:") { s.to_string() } else { format!("runtime:{s}") },
+        ModuleId::Core(s) => {
+            if s.starts_with("core:") {
+                s.to_string()
+            } else {
+                format!("core:{s}")
+            }
+        }
+        ModuleId::Std(s) => {
+            if s.starts_with("std:") {
+                s.to_string()
+            } else {
+                format!("std:{s}")
+            }
+        }
+        ModuleId::Runtime(s) => {
+            if s.starts_with("runtime:") {
+                s.to_string()
+            } else {
+                format!("runtime:{s}")
+            }
+        }
         _ => id.as_str(),
     }
 }
@@ -68,7 +86,11 @@ impl ExecCtx {
         self.load_module_from_source(specifier, &source_file.to_string())
     }
 
-    pub fn load_module_from_source(&mut self, specifier: &str, source_file: &str) -> VmResult<VmValue> {
+    pub fn load_module_from_source(
+        &mut self,
+        specifier: &str,
+        source_file: &str,
+    ) -> VmResult<VmValue> {
         use crate::exec::modules;
 
         let resolved = modules::resolve_specifier_from_path(specifier, source_file)?;
@@ -92,18 +114,16 @@ impl ExecCtx {
         let spec_str = canonical_id_str(&resolved);
         let is_pure = varn_builtins::spec_for(&spec_str).map_or(false, |s| s.pure);
         let builtin_nv = if !is_pure {
-            varn_builtins::build_module(&spec_str, &mut self.heap).or_else(|| {
-                match &resolved {
-                    ModuleId::Std(name) | ModuleId::Core(name) | ModuleId::Runtime(name) => {
-                        let is_p = varn_builtins::spec_for(name.as_ref()).map_or(false, |s| s.pure);
-                        if !is_p {
-                            varn_builtins::build_module(name.as_ref(), &mut self.heap)
-                        } else {
-                            None
-                        }
+            varn_builtins::build_module(&spec_str, &mut self.heap).or_else(|| match &resolved {
+                ModuleId::Std(name) | ModuleId::Core(name) | ModuleId::Runtime(name) => {
+                    let is_p = varn_builtins::spec_for(name.as_ref()).map_or(false, |s| s.pure);
+                    if !is_p {
+                        varn_builtins::build_module(name.as_ref(), &mut self.heap)
+                    } else {
+                        None
                     }
-                    _ => None,
                 }
+                _ => None,
             })
         } else {
             None
@@ -221,7 +241,6 @@ pub fn freeze_module(
     }))
 }
 
-
 fn freeze_value(val: VmValue, heap: &crate::heap::HeapInner) -> Option<FrozenExport> {
     if !val.is_heap() {
         return Some(FrozenExport::Primitive(val));
@@ -268,7 +287,10 @@ fn thaw_export(export: &FrozenExport, heap: &mut crate::heap::HeapInner) -> VmVa
         FrozenExport::NativeFn(f, name) => heap.alloc_native_fn(*f, name),
         FrozenExport::Class(cls) => VmValue::from_heap_idx(heap.alloc(HeapObj::Class(cls.clone()))),
         FrozenExport::VmClosure(payload) => {
-            if let Some(wrapper) = payload.as_any().downcast_ref::<crate::frame::VmClosurePayload>() {
+            if let Some(wrapper) = payload
+                .as_any()
+                .downcast_ref::<crate::frame::VmClosurePayload>()
+            {
                 VmValue::from_heap_idx(heap.alloc(HeapObj::VmClosure(wrapper.0.clone())))
             } else {
                 VmValue::null()

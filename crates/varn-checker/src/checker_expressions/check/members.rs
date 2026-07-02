@@ -192,7 +192,9 @@ pub(crate) fn extension_type_name(ty: &Type) -> Option<std::rc::Rc<str>> {
         TypeKind::LiteralFloat(_) => {
             Some(std::rc::Rc::from(varn_core::IntrinsicType::Float.as_str()))
         }
-        TypeKind::LiteralBool(_) => Some(std::rc::Rc::from(varn_core::IntrinsicType::Bool.as_str())),
+        TypeKind::LiteralBool(_) => {
+            Some(std::rc::Rc::from(varn_core::IntrinsicType::Bool.as_str()))
+        }
         _ => None,
     }
 }

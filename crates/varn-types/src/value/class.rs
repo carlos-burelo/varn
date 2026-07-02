@@ -176,9 +176,7 @@ impl ClassObj {
         if !fields.contains(&name_rc) {
             fields.push(name_rc.clone());
         }
-        self.static_getter_map
-            .borrow_mut()
-            .insert(name_rc, value);
+        self.static_getter_map.borrow_mut().insert(name_rc, value);
     }
 
     pub fn add_static_setter(&self, name: impl Into<Rc<str>>, value: Value) {
@@ -187,9 +185,7 @@ impl ClassObj {
         if !fields.contains(&name_rc) {
             fields.push(name_rc.clone());
         }
-        self.static_setter_map
-            .borrow_mut()
-            .insert(name_rc, value);
+        self.static_setter_map.borrow_mut().insert(name_rc, value);
     }
 
     pub fn add_static(&self, name: impl Into<Rc<str>>, value: Value) {

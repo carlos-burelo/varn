@@ -120,7 +120,7 @@ pub fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Heap) -> V
 pub fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
         let idx = obj.as_heap_idx();
-        
+
         enum FoundField {
             Vm(VmValue),
             Val(Value),
@@ -166,7 +166,7 @@ pub fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmResult<V
 pub fn set_fixed_field(obj: VmValue, slot: usize, val: VmValue, heap: &mut Heap) -> VmResult<()> {
     if obj.is_heap() {
         let heap_idx = obj.as_heap_idx();
-        
+
         enum Target {
             Obj(varn_types::value::ObjRef),
             Class(Rc<ClassObj>),
@@ -209,7 +209,9 @@ pub fn set_fixed_field(obj: VmValue, slot: usize, val: VmValue, heap: &mut Heap)
             None => {}
         }
     }
-    Err(RuntimeError::new("OpSetFixedField: slot out of range or invalid target"))
+    Err(RuntimeError::new(
+        "OpSetFixedField: slot out of range or invalid target",
+    ))
 }
 
 fn get_property_value(obj: &Value, key: &str, heap: &mut Heap) -> Result<Value, String> {
@@ -242,9 +244,7 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
         // `heap.extract(obj)` in `resolve_property`, which clones the entire
         // array's Vec just to read its length — making `arr.length` O(n) and any
         // loop over it O(n²). (`heap.get(..).cloned()` only bumps the array's Rc.)
-        Some(HeapObj::Array(a)) if key == "length" => {
-            Some(VmValue::from_int(a.len() as i64))
-        }
+        Some(HeapObj::Array(a)) if key == "length" => Some(VmValue::from_int(a.len() as i64)),
         _ => None,
     }
 }

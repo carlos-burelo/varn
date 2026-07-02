@@ -32,8 +32,13 @@ pub fn run(func: &mut SsaFunc) -> bool {
                 target: entry_id,
                 args: call_args,
             };
-            if !func.blocks[entry_id.0 as usize].preds.contains(&crate::ssa::ir::BlockId(b_idx as u32)) {
-                func.blocks[entry_id.0 as usize].preds.push(crate::ssa::ir::BlockId(b_idx as u32));
+            if !func.blocks[entry_id.0 as usize]
+                .preds
+                .contains(&crate::ssa::ir::BlockId(b_idx as u32))
+            {
+                func.blocks[entry_id.0 as usize]
+                    .preds
+                    .push(crate::ssa::ir::BlockId(b_idx as u32));
             }
             changed = true;
         }

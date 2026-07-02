@@ -1,11 +1,11 @@
+use crate::exec::ctx;
 use crate::value::VmValue;
 use std::cell::RefCell;
 use std::rc::Rc;
 use varn_base::VmValuePayload;
 use varn_types::chunk::PolyICSlot;
+use varn_types::FunctionProto;
 pub use varn_types::VmValueRef;
-use varn_types::{FunctionProto};
-use crate::exec::ctx;
 
 #[derive(Debug, Clone)]
 pub struct VmUpvalue {
@@ -263,14 +263,6 @@ impl VmClosure {
             }
         }
     }
-
-    
-    
-    
-    
-    
-    
-    
 
     #[inline(always)]
     pub fn ic_cache_len(&self) -> usize {

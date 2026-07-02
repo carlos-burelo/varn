@@ -74,7 +74,14 @@ type Candidates = FxHashMap<Rc<str>, (usize, HirExpr)>;
 fn body_is_inlinable(e: &HirExpr) -> bool {
     use HirExpr::*;
     match e {
-        Int(_) | Float(_) | Str(_) | Bool(_) | Char(_) | Decimal(_) | BigInt(_) | Null
+        Int(_)
+        | Float(_)
+        | Str(_)
+        | Bool(_)
+        | Char(_)
+        | Decimal(_)
+        | BigInt(_)
+        | Null
         | Regex { .. } => true,
         Var(HirBinding::Param(_)) | Var(HirBinding::Global(_)) => true,
         Var(HirBinding::Local(_)) | Var(HirBinding::Upvalue(_)) => false,
@@ -93,8 +100,11 @@ fn body_is_inlinable(e: &HirExpr) -> bool {
         Call { callee, args, .. } => {
             body_is_inlinable(callee) && args.iter().all(body_is_inlinable)
         }
-        Member { object, .. } | MemberMaybe { object, .. } | GetFixedField { object, .. }
-        | ModuleSlot { object, .. } | ObjectRest { object, .. } => body_is_inlinable(object),
+        Member { object, .. }
+        | MemberMaybe { object, .. }
+        | GetFixedField { object, .. }
+        | ModuleSlot { object, .. }
+        | ObjectRest { object, .. } => body_is_inlinable(object),
         Index { object, index, .. } => body_is_inlinable(object) && body_is_inlinable(index),
         MethodCall { recv, args, .. } => {
             body_is_inlinable(recv) && args.iter().all(body_is_inlinable)
@@ -139,10 +149,23 @@ fn body_is_inlinable(e: &HirExpr) -> bool {
         }
 
         // Function-relative or environment-capturing constructs.
-        TryOp(_) | SelfCall { .. } | This | Super | SuperCall { .. }
-        | SuperMethodCall { .. } | SuperMember { .. } | Closure { .. } | Class(_) | Enum(_)
-        | Match { .. } | Await(_) | Spawn(_) | Yield(_) | TaggedTemplate { .. }
-        | Assign { .. } | Update { .. } => false,
+        TryOp(_)
+        | SelfCall { .. }
+        | This
+        | Super
+        | SuperCall { .. }
+        | SuperMethodCall { .. }
+        | SuperMember { .. }
+        | Closure { .. }
+        | Class(_)
+        | Enum(_)
+        | Match { .. }
+        | Await(_)
+        | Spawn(_)
+        | Yield(_)
+        | TaggedTemplate { .. }
+        | Assign { .. }
+        | Update { .. } => false,
     }
 }
 
@@ -166,11 +189,29 @@ fn walk_exprs(e: &HirExpr, f: &mut impl FnMut(&HirExpr)) {
     // a shared reference; mirror the child list instead.
     use HirExpr::*;
     match e {
-        Int(_) | Float(_) | Str(_) | Bool(_) | Char(_) | Decimal(_) | BigInt(_) | Null
-        | Regex { .. } | Var(_) | This | Super | SuperMember { .. } => {}
-        NonNull(x) | TryOp(x) | Spread(x) | Await(x) | Spawn(x) | Yield(x)
+        Int(_)
+        | Float(_)
+        | Str(_)
+        | Bool(_)
+        | Char(_)
+        | Decimal(_)
+        | BigInt(_)
+        | Null
+        | Regex { .. }
+        | Var(_)
+        | This
+        | Super
+        | SuperMember { .. } => {}
+        NonNull(x)
+        | TryOp(x)
+        | Spread(x)
+        | Await(x)
+        | Spawn(x)
+        | Yield(x)
         | TypeTest { value: x, .. } => walk_exprs(x, f),
-        Sequence(xs) | SelfCall { args: xs, .. } | SuperCall { args: xs }
+        Sequence(xs)
+        | SelfCall { args: xs, .. }
+        | SuperCall { args: xs }
         | SuperMethodCall { args: xs, .. } => {
             for x in xs {
                 walk_exprs(x, f);
@@ -200,8 +241,11 @@ fn walk_exprs(e: &HirExpr, f: &mut impl FnMut(&HirExpr)) {
                 walk_exprs(x, f);
             }
         }
-        Member { object, .. } | MemberMaybe { object, .. } | GetFixedField { object, .. }
-        | ModuleSlot { object, .. } | ObjectRest { object, .. } => walk_exprs(object, f),
+        Member { object, .. }
+        | MemberMaybe { object, .. }
+        | GetFixedField { object, .. }
+        | ModuleSlot { object, .. }
+        | ObjectRest { object, .. } => walk_exprs(object, f),
         Index { object, index, .. } => {
             walk_exprs(object, f);
             walk_exprs(index, f);
@@ -309,7 +353,12 @@ fn scan_stmts(stmts: &[HirStmt], out: &mut FxHashSet<Rc<str>>) {
                 }
                 HirExpr::Class(c) => {
                     scan_function(&c.ctor.func, out);
-                    for m in c.methods.iter().chain(&c.static_methods).chain(&c.static_blocks) {
+                    for m in c
+                        .methods
+                        .iter()
+                        .chain(&c.static_methods)
+                        .chain(&c.static_blocks)
+                    {
                         scan_function(&m.func, out);
                     }
                     for a in c.getters.iter().chain(&c.setters) {
@@ -466,11 +515,29 @@ fn substitute_params(e: &mut HirExpr, args: &[HirExpr]) {
 fn for_each_child_expr_mut(e: &mut HirExpr, f: &mut impl FnMut(&mut HirExpr)) {
     use HirExpr::*;
     match e {
-        Int(_) | Float(_) | Str(_) | Bool(_) | Char(_) | Decimal(_) | BigInt(_) | Null
-        | Regex { .. } | Var(_) | This | Super | SuperMember { .. } => {}
-        NonNull(x) | TryOp(x) | Spread(x) | Await(x) | Spawn(x) | Yield(x)
+        Int(_)
+        | Float(_)
+        | Str(_)
+        | Bool(_)
+        | Char(_)
+        | Decimal(_)
+        | BigInt(_)
+        | Null
+        | Regex { .. }
+        | Var(_)
+        | This
+        | Super
+        | SuperMember { .. } => {}
+        NonNull(x)
+        | TryOp(x)
+        | Spread(x)
+        | Await(x)
+        | Spawn(x)
+        | Yield(x)
         | TypeTest { value: x, .. } => f(x),
-        Sequence(xs) | SelfCall { args: xs, .. } | SuperCall { args: xs }
+        Sequence(xs)
+        | SelfCall { args: xs, .. }
+        | SuperCall { args: xs }
         | SuperMethodCall { args: xs, .. } => {
             for x in xs {
                 f(x);
@@ -503,8 +570,11 @@ fn for_each_child_expr_mut(e: &mut HirExpr, f: &mut impl FnMut(&mut HirExpr)) {
                 f(x);
             }
         }
-        Member { object, .. } | MemberMaybe { object, .. } | GetFixedField { object, .. }
-        | ModuleSlot { object, .. } | ObjectRest { object, .. } => f(object),
+        Member { object, .. }
+        | MemberMaybe { object, .. }
+        | GetFixedField { object, .. }
+        | ModuleSlot { object, .. }
+        | ObjectRest { object, .. } => f(object),
         Index { object, index, .. } => {
             f(object);
             f(index);
@@ -584,7 +654,8 @@ fn for_each_child_expr_mut(e: &mut HirExpr, f: &mut impl FnMut(&mut HirExpr)) {
 
 fn for_each_assign_target_expr_mut(t: &mut HirAssignTarget, f: &mut impl FnMut(&mut HirExpr)) {
     match t {
-        HirAssignTarget::Var(_) | HirAssignTarget::ModuleSlot { .. }
+        HirAssignTarget::Var(_)
+        | HirAssignTarget::ModuleSlot { .. }
         | HirAssignTarget::SuperMember { .. } => {}
         HirAssignTarget::Member { object, .. } | HirAssignTarget::SetFixedField { object, .. } => {
             f(object)
@@ -713,10 +784,7 @@ fn child_stmts_mut(s: &mut HirStmt) -> Vec<&mut HirStmt> {
         HirStmt::ForClassic { update, body, .. } => {
             update.iter_mut().chain(body.iter_mut()).collect()
         }
-        HirStmt::Switch { cases, .. } => cases
-            .iter_mut()
-            .flat_map(|c| c.body.iter_mut())
-            .collect(),
+        HirStmt::Switch { cases, .. } => cases.iter_mut().flat_map(|c| c.body.iter_mut()).collect(),
         HirStmt::Try {
             block,
             catch,

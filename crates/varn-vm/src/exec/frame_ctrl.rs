@@ -1,9 +1,9 @@
+use super::calls::PreparedCall;
+use super::ctx::ExecCtx;
 use crate::error::{RuntimeError, VmResult};
 use crate::heap::HeapObj;
 use crate::value::VmValue;
 use varn_types::{ClassObj, NativeCtx, NativeFn, ResourceStore};
-use super::calls::PreparedCall;
-use super::ctx::ExecCtx;
 
 impl ExecCtx {
     pub(crate) fn dispatch_prepared_call(&mut self, call: PreparedCall) -> VmResult<()> {
@@ -147,38 +147,6 @@ impl ExecCtx {
         }
         Ok(())
     }
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
 
     pub fn do_return(&mut self, result: VmValue) -> VmResult<VmValue> {
         let returning_frame_idx = self.frames.len().saturating_sub(1);
@@ -406,7 +374,11 @@ impl NativeCtx for ExecCtx {
         self.heap.alloc_object()
     }
 
-    fn alloc_object_with_shape(&mut self, shape: &std::rc::Rc<varn_types::Shape>, values: Vec<VmValue>) -> VmValue {
+    fn alloc_object_with_shape(
+        &mut self,
+        shape: &std::rc::Rc<varn_types::Shape>,
+        values: Vec<VmValue>,
+    ) -> VmValue {
         self.heap.alloc_object_with_shape(shape, values)
     }
 

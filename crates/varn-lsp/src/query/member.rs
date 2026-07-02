@@ -9,4 +9,3 @@ pub fn member_at(
 ) -> Option<(String, SymbolKind, &MemberRecord)> {
     state.member_at_pos(line, col)
 }
-

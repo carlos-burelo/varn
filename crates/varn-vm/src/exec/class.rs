@@ -154,15 +154,6 @@ pub fn new_instance(class_nv: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     Ok(VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref))))
 }
 
-
-
-
-
-
-
-
-
-
 fn get_class_arc(nv: VmValue, heap: &Heap) -> VmResult<Rc<ClassObj>> {
     if nv.is_heap() {
         if let Some(HeapObj::Class(c)) = heap.get(nv.as_heap_idx()) {
@@ -171,13 +162,3 @@ fn get_class_arc(nv: VmValue, heap: &Heap) -> VmResult<Rc<ClassObj>> {
     }
     Err(RuntimeError::new("expected class"))
 }
-
-
-
-
-
-
-
-
-
-

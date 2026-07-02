@@ -1,9 +1,7 @@
 use crate::error::{RuntimeError, VmResult};
 use crate::frame::{VmClosure, VmClosurePayload, VmValueRef};
 use crate::gc::GcCollector;
-use crate::nursery::{
-    is_nursery_idx, is_old_idx, old_idx_raw, pack_old_idx, Nursery,
-};
+use crate::nursery::{is_nursery_idx, is_old_idx, old_idx_raw, pack_old_idx, Nursery};
 use crate::profile::HotspotCounters;
 use crate::value::VmValue;
 use rustc_hash::FxHashMap;
@@ -508,8 +506,20 @@ impl HeapInner {
         match self.extract_val(nv) {
             Ok(v) => v,
             Err(e) => {
-                eprintln!("[GC DEBUG] heap.extract failed on nv=0x{:016x} (is_heap={}, heap_idx={})", nv.0, nv.is_heap(), if nv.is_heap() { nv.as_heap_idx() as i64 } else { -1 });
-                eprintln!("[GC DEBUG] Caller location: {}", std::panic::Location::caller());
+                eprintln!(
+                    "[GC DEBUG] heap.extract failed on nv=0x{:016x} (is_heap={}, heap_idx={})",
+                    nv.0,
+                    nv.is_heap(),
+                    if nv.is_heap() {
+                        nv.as_heap_idx() as i64
+                    } else {
+                        -1
+                    }
+                );
+                eprintln!(
+                    "[GC DEBUG] Caller location: {}",
+                    std::panic::Location::caller()
+                );
                 panic!("heap.extract: dangling or corrupted heap reference: {e}");
             }
         }
@@ -593,7 +603,10 @@ impl HeapInner {
             self.string_interner.remove(&rs);
         }
 
-        let idx = match self.nursery.try_alloc(HeapObj::Str(HeapStr::Shared(rs.clone()))) {
+        let idx = match self
+            .nursery
+            .try_alloc(HeapObj::Str(HeapStr::Shared(rs.clone())))
+        {
             Ok(ni) => ni,
             Err(obj) => {
                 let oi = alloc_into(
@@ -717,7 +730,11 @@ impl HeapInner {
         VmValue::from_heap_idx(self.alloc(HeapObj::Object(oref)))
     }
 
-    pub fn alloc_object_with_shape(&mut self, shape: &Rc<varn_types::Shape>, values: Vec<VmValue>) -> VmValue {
+    pub fn alloc_object_with_shape(
+        &mut self,
+        shape: &Rc<varn_types::Shape>,
+        values: Vec<VmValue>,
+    ) -> VmValue {
         let oref = ObjRef::new(ObjData::with_shape(Rc::clone(shape), values));
         VmValue::from_heap_idx(self.alloc(HeapObj::Object(oref)))
     }
@@ -1124,7 +1141,11 @@ impl NativeCtx for Heap {
         self.deref_mut().alloc_object()
     }
 
-    fn alloc_object_with_shape(&mut self, shape: &std::rc::Rc<varn_types::Shape>, values: Vec<VmValue>) -> VmValue {
+    fn alloc_object_with_shape(
+        &mut self,
+        shape: &std::rc::Rc<varn_types::Shape>,
+        values: Vec<VmValue>,
+    ) -> VmValue {
         self.deref_mut().alloc_object_with_shape(shape, values)
     }
 

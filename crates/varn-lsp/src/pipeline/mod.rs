@@ -212,9 +212,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
                         namespace_origins.iter().find_map(|origin| {
                             resolve_bind_any(origin).and_then(|rb| {
                                 rb.get_flattened_members(&sym.name)
-                                    .or_else(|| {
-                                        rb.get_class_entry(&sym.name).map(|e| &e.members)
-                                    })
+                                    .or_else(|| rb.get_class_entry(&sym.name).map(|e| &e.members))
                                     .or_else(|| rb.get_interface_members_local(&sym.name))
                                     .map(|ms| symbols::map_members(ms, &tokens))
                             })

@@ -1,6 +1,6 @@
 use std::mem::MaybeUninit;
 
-use crate::error::{ VmResult};
+use crate::error::VmResult;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use varn_types::{Value, VmArray};

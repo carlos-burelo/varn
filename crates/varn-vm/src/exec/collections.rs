@@ -74,7 +74,11 @@ pub fn build_object(stack: &mut Vec<VmValue>, count: usize, heap: &mut Heap) -> 
 pub fn array_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
         if let Some(HeapObj::Array(a)) = heap.get(obj.as_heap_idx()) {
-            let idx = if key.is_int() { key.as_int() as usize } else { key.to_i32() as usize };
+            let idx = if key.is_int() {
+                key.as_int() as usize
+            } else {
+                key.to_i32() as usize
+            };
             let val = unsafe {
                 let vec = &*a.0.get();
                 if idx < vec.len() {
@@ -94,7 +98,11 @@ pub fn array_set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Heap
     if obj.is_heap() {
         let heap_idx = obj.as_heap_idx();
         if let Some(HeapObj::Array(a)) = heap.get_mut(heap_idx) {
-            let idx = if key.is_int() { key.as_int() as usize } else { key.to_i32() as usize };
+            let idx = if key.is_int() {
+                key.as_int() as usize
+            } else {
+                key.to_i32() as usize
+            };
             let g = unsafe { &mut *a.0.get() };
             if idx < g.len() {
                 g[idx] = val;
@@ -246,7 +254,7 @@ pub fn array_extend(dst: VmValue, src: VmValue, heap: &Heap) -> VmResult<()> {
         {
             let items: Vec<VmValue> = sa.borrow().clone();
             da.borrow_mut().extend(items.clone());
-            let  heap_mut = unsafe { heap.inner_mut() };
+            let heap_mut = unsafe { heap.inner_mut() };
             for &item in &items {
                 heap_mut.write_barrier(dst.as_heap_idx(), item);
             }
