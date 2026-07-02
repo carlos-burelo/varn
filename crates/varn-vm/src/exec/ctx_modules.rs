@@ -8,6 +8,15 @@ use varn_types::ModuleObj;
 
 use super::ctx::ExecCtx;
 
+fn canonical_id_str(id: &ModuleId) -> String {
+    match id {
+        ModuleId::Core(s) => if s.starts_with("core:") { s.to_string() } else { format!("core:{s}") },
+        ModuleId::Std(s) => if s.starts_with("std:") { s.to_string() } else { format!("std:{s}") },
+        ModuleId::Runtime(s) => if s.starts_with("runtime:") { s.to_string() } else { format!("runtime:{s}") },
+        _ => id.as_str(),
+    }
+}
+
 impl ExecCtx {
     pub fn convert_to_module_obj(&mut self, id: ModuleId, val: VmValue) -> VmResult<VmValue> {
         if !val.is_heap() {
@@ -19,7 +28,7 @@ impl ExecCtx {
             Some(crate::heap::HeapObj::Object(obj)) => {
                 let obj_ref = obj.borrow();
 
-                let id_str = id.as_str();
+                let id_str = canonical_id_str(&id);
                 let expected_keys = get_cached_exports(&id_str);
 
                 let keys: Vec<std::rc::Rc<str>> = if let Some(parsed) = expected_keys {
@@ -51,14 +60,18 @@ impl ExecCtx {
     }
 
     pub fn load_module(&mut self, specifier: &str) -> VmResult<VmValue> {
-        use crate::exec::modules;
-
         let source_file = self
             .frames
             .last()
             .map(|f| f.closure().proto.chunk.source_file.clone())
             .unwrap_or_else(|| "".to_owned().into());
-        let resolved = modules::resolve_specifier_from_path(specifier, &source_file.to_string())?;
+        self.load_module_from_source(specifier, &source_file.to_string())
+    }
+
+    pub fn load_module_from_source(&mut self, specifier: &str, source_file: &str) -> VmResult<VmValue> {
+        use crate::exec::modules;
+
+        let resolved = modules::resolve_specifier_from_path(specifier, source_file)?;
 
         if let Some(cached) = self.linker.cached(&resolved) {
             return Ok(cached);
@@ -76,19 +89,30 @@ impl ExecCtx {
             return Ok(cached);
         }
 
-        let native_name = match &resolved {
-            ModuleId::Std(name) | ModuleId::Core(name) | ModuleId::Runtime(name) => {
-                Some(name.as_ref().to_owned())
-            }
-            _ => None,
+        let spec_str = canonical_id_str(&resolved);
+        let is_pure = varn_builtins::spec_for(&spec_str).map_or(false, |s| s.pure);
+        let builtin_nv = if !is_pure {
+            varn_builtins::build_module(&spec_str, &mut self.heap).or_else(|| {
+                match &resolved {
+                    ModuleId::Std(name) | ModuleId::Core(name) | ModuleId::Runtime(name) => {
+                        let is_p = varn_builtins::spec_for(name.as_ref()).map_or(false, |s| s.pure);
+                        if !is_p {
+                            varn_builtins::build_module(name.as_ref(), &mut self.heap)
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                }
+            })
+        } else {
+            None
         };
-        if let Some(ref name) = native_name {
-            if let Some(nv) = varn_builtins::build_module(name, &mut self.heap) {
-                let converted = self.convert_to_module_obj(resolved.clone(), nv)?;
-                self.modules.insert(resolved.clone(), converted);
-                self.linker.set_done(resolved, converted);
-                return Ok(converted);
-            }
+        if let Some(nv) = builtin_nv {
+            let converted = self.convert_to_module_obj(resolved.clone(), nv)?;
+            self.modules.insert(resolved.clone(), converted);
+            self.linker.set_done(resolved, converted);
+            return Ok(converted);
         }
 
         if self.linker.is_evaluating(&resolved) {
@@ -179,16 +203,24 @@ pub fn freeze_module(
         _ => return None,
     };
 
-    let mut frozen = FrozenModuleObj::new(id);
-
-    for (key, &slot) in &m.export_map {
-        let export_val = m.get_slot(slot).unwrap_or(VmValue::null());
+    let mut frozen_exports = Vec::with_capacity(m.exports.len());
+    for &export_val in &m.exports {
         let frozen_export = freeze_value(export_val, heap)?;
-        frozen.push(Arc::from(key.as_ref()), frozen_export);
+        frozen_exports.push(frozen_export);
     }
 
-    Some(Arc::new(frozen))
+    let mut frozen_export_map = rustc_hash::FxHashMap::default();
+    for (key, &slot) in &m.export_map {
+        frozen_export_map.insert(Arc::from(key.as_ref()), slot);
+    }
+
+    Some(Arc::new(FrozenModuleObj {
+        id,
+        exports: frozen_exports,
+        export_map: frozen_export_map,
+    }))
 }
+
 
 fn freeze_value(val: VmValue, heap: &crate::heap::HeapInner) -> Option<FrozenExport> {
     if !val.is_heap() {
@@ -198,6 +230,8 @@ fn freeze_value(val: VmValue, heap: &crate::heap::HeapInner) -> Option<FrozenExp
     match heap.get(val.as_heap_idx()) {
         Some(HeapObj::Str(s)) => Some(FrozenExport::Str(Arc::from(s.as_ref()))),
         Some(HeapObj::NativeFn(name, f)) => Some(FrozenExport::NativeFn(*f, name)),
+        Some(HeapObj::Class(_)) => None, // Cannot freeze Class safely across VM instances
+        Some(HeapObj::VmClosure(_)) => None, // Cannot freeze VmClosure safely across VM instances
         Some(HeapObj::Object(obj_ref)) => {
             let guard = obj_ref.borrow();
             let mut nested = FrozenModuleObj::new(ModuleId::local_str("<nested>"));
@@ -214,10 +248,10 @@ fn freeze_value(val: VmValue, heap: &crate::heap::HeapInner) -> Option<FrozenExp
 pub fn thaw_module(frozen: &FrozenModuleObj, heap: &mut crate::heap::HeapInner) -> VmValue {
     let n = frozen.exports.len();
     let mut module_obj = ModuleObj::new(frozen.id.clone(), n);
+    module_obj.exports.resize(n, VmValue::null());
 
     for (key, &slot) in &frozen.export_map {
         let nv = thaw_export(&frozen.exports[slot], heap);
-        module_obj.exports.resize(slot + 1, VmValue::null());
         module_obj.exports[slot] = nv;
         module_obj
             .export_map
@@ -232,6 +266,14 @@ fn thaw_export(export: &FrozenExport, heap: &mut crate::heap::HeapInner) -> VmVa
         FrozenExport::Primitive(v) => *v,
         FrozenExport::Str(s) => heap.alloc_str(s),
         FrozenExport::NativeFn(f, name) => heap.alloc_native_fn(*f, name),
+        FrozenExport::Class(cls) => VmValue::from_heap_idx(heap.alloc(HeapObj::Class(cls.clone()))),
+        FrozenExport::VmClosure(payload) => {
+            if let Some(wrapper) = payload.as_any().downcast_ref::<crate::frame::VmClosurePayload>() {
+                VmValue::from_heap_idx(heap.alloc(HeapObj::VmClosure(wrapper.0.clone())))
+            } else {
+                VmValue::null()
+            }
+        }
         FrozenExport::Nested(nested) => {
             let obj_val = heap.alloc_object();
             let raw_idx = obj_val.as_heap_idx();

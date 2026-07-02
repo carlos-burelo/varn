@@ -61,16 +61,24 @@ impl SsaFunc {
                         args.iter_mut().for_each(sub);
                     }
                     InstKind::SelfCall { args } => args.iter_mut().for_each(sub),
-                    InstKind::GetProperty { object, .. } => sub(object),
-                    InstKind::GetIndex { object, index } => {
+                    InstKind::GetProperty { object, .. }
+                    | InstKind::GetFixedField { object, .. } => sub(object),
+                    InstKind::GetIndex { object, index }
+                    | InstKind::ArrayGetIndex { object, index } => {
                         sub(object);
                         sub(index);
                     }
-                    InstKind::SetProperty { object, value, .. } => {
+                    InstKind::SetProperty { object, value, .. }
+                    | InstKind::SetFixedField { object, value, .. } => {
                         sub(object);
                         sub(value);
                     }
                     InstKind::SetIndex {
+                        object,
+                        index,
+                        value,
+                    }
+                    | InstKind::ArraySetIndex {
                         object,
                         index,
                         value,
@@ -268,7 +276,17 @@ pub enum InstKind {
         name: Rc<str>,
     },
 
+    GetFixedField {
+        object: Value,
+        slot: u16,
+    },
+
     GetIndex {
+        object: Value,
+        index: Value,
+    },
+
+    ArrayGetIndex {
         object: Value,
         index: Value,
     },
@@ -279,7 +297,19 @@ pub enum InstKind {
         value: Value,
     },
 
+    SetFixedField {
+        object: Value,
+        value: Value,
+        slot: u16,
+    },
+
     SetIndex {
+        object: Value,
+        index: Value,
+        value: Value,
+    },
+
+    ArraySetIndex {
         object: Value,
         index: Value,
         value: Value,

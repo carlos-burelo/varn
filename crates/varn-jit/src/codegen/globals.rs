@@ -22,9 +22,12 @@ pub(crate) fn emit_globals(
             let idx = code[*ip] as usize;
             *ip += 1;
 
-            asm.mov_reg_mem(Reg::R11, ARG_EXEC_CTX, 56);
-            asm.mov_reg_mem(Reg::R11, Reg::R11, (idx * 8) as i32);
-            emit_store(asm, Reg::R11, first_reg, regmap);
+            let dest = regmap.get(first_reg).unwrap_or(Reg::R11);
+            asm.mov_reg_mem(dest, ARG_EXEC_CTX, 56);
+            asm.mov_reg_mem(dest, dest, (idx * 8) as i32);
+            if dest == Reg::R11 {
+                emit_store(asm, Reg::R11, first_reg, regmap);
+            }
         }
         OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx => {
             let w1 = code[*ip];
@@ -33,10 +36,13 @@ pub(crate) fn emit_globals(
             let idx = code[*ip] as usize;
             *ip += 1;
 
-            emit_load(asm, Reg::Rax, src, regmap);
+            let val_reg = regmap.get(src).unwrap_or_else(|| {
+                emit_load(asm, Reg::Rax, src, regmap);
+                Reg::Rax
+            });
 
             asm.mov_reg_mem(Reg::R11, ARG_EXEC_CTX, 56);
-            asm.mov_mem_reg(Reg::R11, (idx * 8) as i32, Reg::Rax);
+            asm.mov_mem_reg(Reg::R11, (idx * 8) as i32, val_reg);
         }
         OpCode::LoadGlobal => {
             let idx = code[*ip] as usize;

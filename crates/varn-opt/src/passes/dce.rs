@@ -59,6 +59,7 @@ fn has_side_effects(kind: &InstKind) -> bool {
             | InstKind::SelfCall { .. }
             | InstKind::SetProperty { .. }
             | InstKind::SetIndex { .. }
+            | InstKind::ArraySetIndex { .. }
             | InstKind::ObjectMerge { .. }
             | InstKind::MethodCall { .. }
             | InstKind::IntrinsicCall { .. }

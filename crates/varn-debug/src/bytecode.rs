@@ -297,11 +297,11 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w1 = w!();
                 format!("r{} |= r{}", hi(w1), lo(w1))
             }
-            OpCode::GetIndex => {
+            OpCode::GetIndex | OpCode::ArrayGetIndex => {
                 let w1 = w!();
                 format!("r{} = r{}[r{}]", hi(op_val), hi(w1), lo(w1))
             }
-            OpCode::SetIndex => {
+            OpCode::SetIndex | OpCode::ArraySetIndex => {
                 let w1 = w!();
                 format!("r{}[r{}] = r{}", hi(op_val), hi(w1), lo(w1))
             }

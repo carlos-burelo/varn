@@ -208,6 +208,12 @@ pub fn prefill_native_modules(vm: &mut Vm) {
             continue;
         }
 
+        if let Some(spec) = varn_builtins::spec_for(&raw_id) {
+            if spec.pure {
+                continue;
+            }
+        }
+
         if let Some(nv) = varn_builtins::build_module(&raw_id, &mut vm.ctx.heap) {
             if let Ok(converted) = vm.ctx.convert_to_module_obj(resolved.clone(), nv) {
                 vm.ctx.modules.insert(resolved, converted);
@@ -383,6 +389,8 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
             | OpCode::Instanceof
             | OpCode::SetIndex
             | OpCode::GetIndex
+            | OpCode::ArraySetIndex
+            | OpCode::ArrayGetIndex
             | OpCode::LoadModule
             | OpCode::StoreModuleSlot
             | OpCode::LoadUpvalue

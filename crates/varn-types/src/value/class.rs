@@ -16,6 +16,7 @@ pub struct ClassObj {
     pub vtable_owners: RefCell<Vec<Option<Rc<ClassObj>>>>,
     pub method_map: RefCell<HashMap<RuntimeString, usize>>,
     pub statics: RefCell<HashMap<RuntimeString, Value>>,
+    pub static_fields: RefCell<Vec<RuntimeString>>,
     pub vtable_version: AtomicU32,
     pub root_shape: RefCell<Rc<super::shape::Shape>>,
     pub getter_map: RefCell<HashMap<RuntimeString, usize>>,
@@ -40,6 +41,7 @@ impl ClassObj {
             vtable_owners: RefCell::new(Vec::new()),
             method_map: RefCell::new(HashMap::new()),
             statics: RefCell::new(HashMap::new()),
+            static_fields: RefCell::new(Vec::new()),
             root_shape: RefCell::new(super::shape::root_shape()),
             getter_map: RefCell::new(HashMap::new()),
             getter_vtable: RefCell::new(Vec::new()),
@@ -169,19 +171,34 @@ impl ClassObj {
     }
 
     pub fn add_static_getter(&self, name: impl Into<Rc<str>>, value: Value) {
+        let name_rc = name.into();
+        let mut fields = self.static_fields.borrow_mut();
+        if !fields.contains(&name_rc) {
+            fields.push(name_rc.clone());
+        }
         self.static_getter_map
             .borrow_mut()
-            .insert(name.into(), value);
+            .insert(name_rc, value);
     }
 
     pub fn add_static_setter(&self, name: impl Into<Rc<str>>, value: Value) {
+        let name_rc = name.into();
+        let mut fields = self.static_fields.borrow_mut();
+        if !fields.contains(&name_rc) {
+            fields.push(name_rc.clone());
+        }
         self.static_setter_map
             .borrow_mut()
-            .insert(name.into(), value);
+            .insert(name_rc, value);
     }
 
     pub fn add_static(&self, name: impl Into<Rc<str>>, value: Value) {
-        self.statics.borrow_mut().insert(name.into(), value);
+        let name_rc = name.into();
+        let mut fields = self.static_fields.borrow_mut();
+        if !fields.contains(&name_rc) {
+            fields.push(name_rc.clone());
+        }
+        self.statics.borrow_mut().insert(name_rc, value);
     }
 
     pub fn get_static(&self, name: &str) -> Option<Value> {

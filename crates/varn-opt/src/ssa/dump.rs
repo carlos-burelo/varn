@@ -61,8 +61,12 @@ fn inst_kind(kind: &InstKind) -> String {
         InstKind::Call { callee, args } => format!("call {}{}", val(*callee), args_list(args)),
         InstKind::SelfCall { args } => format!("callself{}", args_list(args)),
         InstKind::GetProperty { object, name } => format!("getprop {}.{name}", val(*object)),
+        InstKind::GetFixedField { object, slot } => format!("getfixed {}[{slot}]", val(*object)),
         InstKind::GetIndex { object, index } => {
             format!("getindex {}[{}]", val(*object), val(*index))
+        }
+        InstKind::ArrayGetIndex { object, index } => {
+            format!("arraygetindex {}[{}]", val(*object), val(*index))
         }
         InstKind::SetProperty {
             object,
@@ -71,6 +75,13 @@ fn inst_kind(kind: &InstKind) -> String {
         } => {
             format!("setprop {}.{name} = {}", val(*object), val(*value))
         }
+        InstKind::SetFixedField {
+            object,
+            value,
+            slot,
+        } => {
+            format!("setfixed {}[{slot}] = {}", val(*object), val(*value))
+        }
         InstKind::SetIndex {
             object,
             index,
@@ -78,6 +89,18 @@ fn inst_kind(kind: &InstKind) -> String {
         } => {
             format!(
                 "setindex {}[{}] = {}",
+                val(*object),
+                val(*index),
+                val(*value)
+            )
+        }
+        InstKind::ArraySetIndex {
+            object,
+            index,
+            value,
+        } => {
+            format!(
+                "arraysetindex {}[{}] = {}",
                 val(*object),
                 val(*index),
                 val(*value)

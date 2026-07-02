@@ -22,12 +22,18 @@ pub trait NativeCtx {
     fn alloc_str_owned(&mut self, s: String) -> VmValue;
     fn alloc_array(&mut self, items: Vec<VmValue>) -> VmValue;
     fn alloc_object(&mut self) -> VmValue;
+    fn alloc_object_with_shape(&mut self, _shape: &Rc<crate::value::Shape>, _values: Vec<VmValue>) -> VmValue {
+        self.alloc_object()
+    }
     fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue;
     fn alloc_fn(&mut self, f: NativeFn, name: &'static str) -> VmValue;
     fn alloc_class(&mut self, class: Rc<ClassObj>) -> VmValue;
 
     fn is_string(&self, v: VmValue) -> bool;
     fn is_array(&self, v: VmValue) -> bool;
+    fn is_object(&self, _v: VmValue) -> bool {
+        false
+    }
     fn is_null(&self, v: VmValue) -> bool {
         v.is_null()
     }
@@ -46,6 +52,10 @@ pub trait NativeCtx {
 
     fn get_field(&self, obj: VmValue, key: &str) -> Option<VmValue>;
     fn set_field(&mut self, obj: VmValue, key: &str, val: VmValue);
+    fn object_for_each(&self, _obj: VmValue, _f: &mut dyn FnMut(&str, VmValue)) {}
+    fn get_object_shape(&self, _obj: VmValue) -> Option<Rc<crate::value::Shape>> {
+        None
+    }
 
     fn finalize(&mut self, obj: VmValue) -> VmValue {
         obj

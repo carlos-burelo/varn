@@ -212,6 +212,11 @@ impl TricolorMarker {
                             self.mark_gray(child_idx);
                         }
                     }
+                    if let Some(cls) = guard.class() {
+                        if let Some(ci) = heap.value_heap_idx(&varn_types::Value::Class(cls)) {
+                            self.mark_gray(ci);
+                        }
+                    }
                 }
                 HeapObj::VmClosure(clos) => {
                     for upval in &clos.upvalues {

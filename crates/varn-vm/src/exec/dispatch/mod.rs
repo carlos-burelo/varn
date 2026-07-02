@@ -440,6 +440,8 @@ impl ExecCtx {
                     | OpCode::DeclareField
                     | OpCode::GetIndex
                     | OpCode::SetIndex
+                    | OpCode::ArrayGetIndex
+                    | OpCode::ArraySetIndex
                     | OpCode::BuildArray
                     | OpCode::BuildObject
                     | OpCode::BuildObjectWithShape

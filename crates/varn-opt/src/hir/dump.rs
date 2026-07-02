@@ -106,6 +106,7 @@ fn dump_stmt(out: &mut String, stmt: &HirStmt, depth: usize) {
             object,
             index,
             value,
+            ..
         } => {
             let _ = writeln!(
                 out,
@@ -426,7 +427,10 @@ fn dump_expr(expr: &HirExpr) -> String {
                 HirAssignTarget::Member { object, name } => {
                     format!("{}.{CYAN}{name}{R}", dump_expr(object))
                 }
-                HirAssignTarget::Index { object, index } => {
+                HirAssignTarget::SetFixedField { object, slot } => {
+                    format!("{}.slot#{slot}", dump_expr(object))
+                }
+                HirAssignTarget::Index { object, index, .. } => {
                     format!("{}[{}]", dump_expr(object), dump_expr(index))
                 }
                 HirAssignTarget::ModuleSlot { slot } => {
@@ -485,6 +489,9 @@ fn dump_expr(expr: &HirExpr) -> String {
         HirExpr::Member { object, name, .. } => {
             format!("{}.{CYAN}{name}{R}", dump_expr(object))
         }
+        HirExpr::GetFixedField { object, slot, .. } => {
+            format!("{}.slot#{slot}", dump_expr(object))
+        }
         HirExpr::MemberMaybe { object, name, .. } => {
             format!("{}?.{CYAN}{name}{R}", dump_expr(object))
         }
@@ -514,7 +521,10 @@ fn dump_expr(expr: &HirExpr) -> String {
                 HirAssignTarget::Member { object, name } => {
                     format!("{}.{CYAN}{name}{R}", dump_expr(object))
                 }
-                HirAssignTarget::Index { object, index } => {
+                HirAssignTarget::SetFixedField { object, slot } => {
+                    format!("{}.slot#{slot}", dump_expr(object))
+                }
+                HirAssignTarget::Index { object, index, .. } => {
                     format!("{}[{}]", dump_expr(object), dump_expr(index))
                 }
                 HirAssignTarget::ModuleSlot { slot } => {

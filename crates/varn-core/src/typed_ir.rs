@@ -8,8 +8,13 @@ pub struct ExprAnnotation {
     pub type_only: bool,
     pub call_mapping: Option<Vec<Option<usize>>>,
     pub slot_idx: Option<usize>,
+    pub fixed_field_slot: Option<u16>,
     pub intrinsic: Option<u8>,
     pub native_op: Option<u64>,
+    /// Set when the object of a computed-member expression is a statically-known Array type.
+    /// Enables the compiler to emit `ArrayGetIndex`/`ArraySetIndex` instead of the generic
+    /// `GetIndex`/`SetIndex`, skipping the runtime heap-type dispatch.
+    pub array_index: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -88,6 +93,26 @@ impl TypeAnnotations {
 
     pub fn get_native_op(&self, offset: u32) -> Option<u64> {
         self.inner.get(&offset)?.native_op
+    }
+
+    /// Mark the computed-member expression at `offset` as a typed-array index access.
+    pub fn record_array_index(&mut self, offset: u32) {
+        self.inner.entry(offset).or_default().array_index = true;
+    }
+
+    /// Returns `true` when the object of the computed-member at `offset` is a known Array.
+    pub fn get_array_index(&self, offset: u32) -> bool {
+        self.inner.get(&offset).map_or(false, |a| a.array_index)
+    }
+
+    /// Mark the member expression at `offset` as a statically-known class fixed field slot access.
+    pub fn record_fixed_field_slot(&mut self, offset: u32, slot: u16) {
+        self.inner.entry(offset).or_default().fixed_field_slot = Some(slot);
+    }
+
+    /// Returns the fixed field slot index when the member expression at `offset` is on a known class type.
+    pub fn get_fixed_field_slot(&self, offset: u32) -> Option<u16> {
+        self.inner.get(&offset)?.fixed_field_slot
     }
 
     pub fn is_empty(&self) -> bool {

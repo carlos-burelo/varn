@@ -104,10 +104,10 @@ pub fn compile_proto(
             | OpCode::Ushr => {
                 ip += 1;
             }
-            OpCode::GetIndex => {
+            OpCode::GetIndex | OpCode::ArrayGetIndex => {
                 ip += 1;
             }
-            OpCode::SetIndex => {
+            OpCode::SetIndex | OpCode::ArraySetIndex => {
                 ip += 1;
             }
             OpCode::Typeof => {
@@ -362,9 +362,12 @@ pub fn compile_proto(
                 emit_strings(&mut cctx, op, first_reg)?
             }
 
-            OpCode::GetIndex | OpCode::SetIndex | OpCode::Typeof | OpCode::Instanceof => {
-                emit_indexing(&mut cctx, op, first_reg)?
-            }
+            OpCode::GetIndex
+            | OpCode::ArrayGetIndex
+            | OpCode::SetIndex
+            | OpCode::ArraySetIndex
+            | OpCode::Typeof
+            | OpCode::Instanceof => emit_indexing(&mut cctx, op, first_reg)?,
 
             OpCode::LoadModuleSlot | OpCode::BuildObjectWithShape | OpCode::InvokeRuntimeStatic => {
                 emit_modules(&mut cctx, op, first_reg)?

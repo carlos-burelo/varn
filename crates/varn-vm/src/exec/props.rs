@@ -116,16 +116,44 @@ pub fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Heap) -> V
     }
 }
 
+#[inline(always)]
 pub fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
-        let v = if let Some(HeapObj::Object(o)) = heap.get(obj.as_heap_idx()).cloned() {
-            let g = o.borrow();
-            g.inner.values.get(slot).cloned()
-        } else {
-            None
+        let idx = obj.as_heap_idx();
+        
+        enum FoundField {
+            Vm(VmValue),
+            Val(Value),
+        }
+
+        let found = match heap.get(idx) {
+            Some(HeapObj::Object(o)) => {
+                let g = o.borrow();
+                g.inner.values.get(slot).cloned().map(FoundField::Vm)
+            }
+            Some(HeapObj::EnumVariant(ev)) => {
+                if let Value::Object(o) = &ev.payload {
+                    let g = o.borrow();
+                    g.inner.values.get(slot).cloned().map(FoundField::Vm)
+                } else {
+                    None
+                }
+            }
+            Some(HeapObj::Class(cls)) => {
+                let fields = cls.static_fields.borrow();
+                if let Some(name) = fields.get(slot) {
+                    cls.statics.borrow().get(name).cloned().map(FoundField::Val)
+                } else {
+                    None
+                }
+            }
+            _ => None,
         };
-        if let Some(v) = v {
-            return Ok(v);
+
+        match found {
+            Some(FoundField::Vm(v)) => return Ok(v),
+            Some(FoundField::Val(v)) => return Ok(heap.intern(v)),
+            None => {}
         }
     }
     Err(RuntimeError::new(format!(
@@ -134,22 +162,54 @@ pub fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmResult<V
     )))
 }
 
+#[inline(always)]
 pub fn set_fixed_field(obj: VmValue, slot: usize, val: VmValue, heap: &mut Heap) -> VmResult<()> {
     if obj.is_heap() {
-        if let Some(HeapObj::Object(o)) = heap.get(obj.as_heap_idx()).cloned() {
-            let mut g = o.borrow_mut();
-            if slot < g.inner.values.len() {
-                g.inner.values[slot] = val;
-                heap.write_barrier(obj.as_heap_idx(), val);
-                return Ok(());
+        let heap_idx = obj.as_heap_idx();
+        
+        enum Target {
+            Obj(varn_types::value::ObjRef),
+            Class(Rc<ClassObj>),
+        }
+
+        let target = match heap.get(heap_idx) {
+            Some(HeapObj::Object(o)) => Some(Target::Obj(o.clone())),
+            Some(HeapObj::EnumVariant(ev)) => {
+                if let Value::Object(o) = &ev.payload {
+                    Some(Target::Obj(o.clone()))
+                } else {
+                    None
+                }
             }
-            return Err(RuntimeError::new(format!(
-                "OpSetFixedField: slot {} out of range",
-                slot
-            )));
+            Some(HeapObj::Class(cls)) => Some(Target::Class(cls.clone())),
+            _ => None,
+        };
+
+        match target {
+            Some(Target::Obj(o)) => {
+                let mut g = o.borrow_mut();
+                if slot < g.inner.values.len() {
+                    g.inner.values[slot] = val;
+                    drop(g);
+                    heap.write_barrier(heap_idx, val);
+                    return Ok(());
+                }
+            }
+            Some(Target::Class(cls)) => {
+                let name = {
+                    let fields = cls.static_fields.borrow();
+                    fields.get(slot).cloned()
+                };
+                if let Some(name) = name {
+                    let val_extracted = heap.extract(val);
+                    cls.statics.borrow_mut().insert(name, val_extracted);
+                    return Ok(());
+                }
+            }
+            None => {}
         }
     }
-    Err(RuntimeError::new("OpSetFixedField: not an object"))
+    Err(RuntimeError::new("OpSetFixedField: slot out of range or invalid target"))
 }
 
 fn get_property_value(obj: &Value, key: &str, heap: &mut Heap) -> Result<Value, String> {

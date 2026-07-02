@@ -55,15 +55,24 @@ impl Builder {
                 object,
                 index,
                 value,
+                is_array,
             } => {
                 let o = self.lower_expr(object)?;
                 let i = self.lower_expr(index)?;
                 let v = self.lower_expr(value)?;
-                self.emit_effect(InstKind::SetIndex {
-                    object: o,
-                    index: i,
-                    value: v,
-                });
+                if *is_array {
+                    self.emit_effect(InstKind::ArraySetIndex {
+                        object: o,
+                        index: i,
+                        value: v,
+                    });
+                } else {
+                    self.emit_effect(InstKind::SetIndex {
+                        object: o,
+                        index: i,
+                        value: v,
+                    });
+                }
                 Ok(())
             }
             HirStmt::Return(value) => {

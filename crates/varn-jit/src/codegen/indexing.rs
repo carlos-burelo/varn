@@ -14,8 +14,8 @@ pub(crate) fn emit_indexing(
     first_reg: usize,
 ) -> Result<(), String> {
     match op {
-        OpCode::GetIndex => emit_get_index(ctx, first_reg),
-        OpCode::SetIndex => emit_set_index(ctx, first_reg),
+        OpCode::GetIndex | OpCode::ArrayGetIndex => emit_get_index(ctx, first_reg),
+        OpCode::SetIndex | OpCode::ArraySetIndex => emit_set_index(ctx, first_reg),
         OpCode::Typeof => emit_typeof(ctx, first_reg),
         OpCode::Instanceof => emit_instanceof(ctx, first_reg),
         _ => unreachable!("emit_indexing called with {:?}", op),
@@ -35,9 +35,8 @@ fn emit_get_index(ctx: &mut CodegenCtx, first_reg: usize) {
     let obj_reg = (w1 >> 8) as usize;
     let key_reg = (w1 & 0xFF) as usize;
 
-    emit_flush_all(asm, regmap);
-
-    emit_load(asm, Reg::Rax, obj_reg, regmap);
+    // Load values into scratch regs BEFORE pushing live regs so we don't clobber them
+    emit_load(asm, Reg::R10, obj_reg, regmap);
     emit_load(asm, Reg::R11, key_reg, regmap);
 
     asm.push(ARG_CTX);
@@ -45,34 +44,27 @@ fn emit_get_index(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = (regmap.used_phys.len() + 3) % 2 == 0;
+    // Windows x64 ABI: rcx=ctx, rdx=obj, r8=key — RSP must be 16-byte aligned before call
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
 
-    asm.mov_reg_imm64(Reg::R10, first_reg as u64);
-    asm.push(Reg::R10);
-    asm.push(Reg::R11);
-    asm.push(Reg::Rax);
-
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
-    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rsp);
+    asm.mov_reg_reg(Reg::Rcx, ARG_EXEC_CTX);
+    asm.mov_reg_reg(Reg::Rdx, Reg::R10);
+    asm.mov_reg_reg(Reg::R8, Reg::R11);
 
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    asm.mov_reg_imm64(Reg::R10, helpers.get_index as u64);
+    asm.mov_reg_imm64(Reg::R10, helpers.jit_array_get_fast as u64);
     asm.call_reg(Reg::R10);
 
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, 32);
 
-    asm.mov_reg_reg(Reg::R11, Reg::Rax);
-
-    asm.add_reg_imm8(Reg::Rsp, 24);
-
     if need_dummy {
-        asm.pop(Reg::Rax);
+        asm.pop(Reg::R11);
     }
     asm.pop(ARG_EXEC_CTX);
     asm.pop(ARG_BASE);
@@ -85,8 +77,7 @@ fn emit_get_index(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
     asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
 
-    emit_store(asm, Reg::R11, first_reg, regmap);
-    emit_reload_all_except(asm, regmap, Some(first_reg));
+    emit_store(asm, Reg::Rax, first_reg, regmap);
 }
 
 fn emit_set_index(ctx: &mut CodegenCtx, first_reg: usize) {
@@ -103,8 +94,8 @@ fn emit_set_index(ctx: &mut CodegenCtx, first_reg: usize) {
     let obj_reg = first_reg;
 
     emit_flush_all(asm, regmap);
-
-    emit_load(asm, Reg::Rax, obj_reg, regmap);
+    // Load values into scratch regs BEFORE pushing live regs so we don't clobber them
+    emit_load(asm, Reg::R10, obj_reg, regmap);
     emit_load(asm, Reg::R11, idx_reg, regmap);
     emit_load(asm, Reg::R12, val_reg, regmap);
 
@@ -113,31 +104,28 @@ fn emit_set_index(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
     asm.push(ARG_EXEC_CTX);
 
-    let need_dummy = (regmap.used_phys.len() + 3) % 2 == 0;
+    // Windows x64 ABI: rcx=ctx, rdx=obj, r8=key, r9=val — RSP must be 16-byte aligned before call
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
     if need_dummy {
         asm.push(Reg::Rax);
     }
 
-    asm.push(Reg::R12);
-    asm.push(Reg::R11);
-    asm.push(Reg::Rax);
-
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
-    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rsp);
+    asm.mov_reg_reg(Reg::Rcx, ARG_EXEC_CTX);
+    asm.mov_reg_reg(Reg::Rdx, Reg::R10);
+    asm.mov_reg_reg(Reg::R8, Reg::R11);
+    asm.mov_reg_reg(Reg::R9, Reg::R12);
 
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    asm.mov_reg_imm64(Reg::R10, helpers.set_index as u64);
+    asm.mov_reg_imm64(Reg::R10, helpers.jit_array_set_fast as u64);
     asm.call_reg(Reg::R10);
 
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, 32);
 
-    asm.add_reg_imm8(Reg::Rsp, 24);
-
     if need_dummy {
-        asm.pop(Reg::Rax);
+        asm.pop(Reg::R11);
     }
     asm.pop(ARG_EXEC_CTX);
     asm.pop(ARG_BASE);

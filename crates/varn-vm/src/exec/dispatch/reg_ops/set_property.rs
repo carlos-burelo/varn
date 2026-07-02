@@ -105,6 +105,7 @@ impl ExecCtx {
                         } else {
                             guard.inner.values[slot] = val;
                         }
+                        self.heap.write_barrier(obj.as_heap_idx(), val);
                         return Ok(false);
                     }
                 }
@@ -150,6 +151,7 @@ impl ExecCtx {
                         guard.inner.values[slot] = val;
                         let shape_id = guard.inner.shape.id;
                         drop(guard);
+                        self.heap.write_barrier(obj.as_heap_idx(), val);
                         if cs_idx < cache_len && !is_megamorphic {
                             closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
                             closure.feedback.borrow_mut().observe(cs_idx, shape_id);
@@ -163,6 +165,7 @@ impl ExecCtx {
                 let new_slot = guard.inner.values.len().saturating_sub(1);
                 let new_shape_id = guard.inner.shape.id;
                 drop(guard);
+                self.heap.write_barrier(obj.as_heap_idx(), val);
                 if cs_idx < cache_len && !is_megamorphic {
                     let mut ic = closure.ic_cache.borrow_mut();
 

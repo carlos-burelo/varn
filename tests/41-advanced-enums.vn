@@ -66,6 +66,8 @@ enum HttpStatus {
     }
 }
 
+print("HttpStatus.Ok.code =", HttpStatus.Ok.code)
+print("HttpStatus.Ok.message =", HttpStatus.Ok.message)
 assert("shared field code Ok", HttpStatus.Ok.code === 200)
 assert("shared field message Ok", HttpStatus.Ok.message === "OK")
 assert("shared field code NotFound", HttpStatus.NotFound.code === 404)

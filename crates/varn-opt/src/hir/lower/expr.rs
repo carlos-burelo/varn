@@ -134,11 +134,19 @@ impl<'a> Lowerer<'a> {
                     let object_hir = self.lower_expr(object, scope)?;
                     if *computed {
                         let index = self.lower_expr(property, scope)?;
+                        let is_array = self.ann.get_array_index(expr.range.start.offset);
                         Ok(HirAssignTarget::Index {
                             object: object_hir,
                             index,
+                            is_array,
                         })
                     } else {
+                        if let Some(slot) = self.ann.get_fixed_field_slot(property.range.start.offset) {
+                            return Ok(HirAssignTarget::SetFixedField {
+                                object: object_hir,
+                                slot,
+                            });
+                        }
                         let name = match &property.kind {
                             ExprKind::Identifier { name } => name.clone(),
                             _ => {
@@ -370,10 +378,12 @@ impl<'a> Lowerer<'a> {
                 if *computed {
                     let object = Box::new(self.lower_expr(object, scope)?);
                     let index = Box::new(self.lower_expr(property, scope)?);
+                    let is_array = self.ann.get_array_index(offset);
                     return Ok(HirExpr::Index {
                         object,
                         index,
                         ty: HirType::Dynamic,
+                        is_array,
                     });
                 }
 
@@ -382,6 +392,15 @@ impl<'a> Lowerer<'a> {
                     return Ok(HirExpr::ModuleSlot {
                         object: Box::new(object_hir),
                         slot: slot_idx as u16,
+                        ty: HirType::Dynamic,
+                    });
+                }
+
+                if let Some(slot) = self.ann.get_fixed_field_slot(property.range.start.offset) {
+                    let object_hir = self.lower_expr(object, scope)?;
+                    return Ok(HirExpr::GetFixedField {
+                        object: Box::new(object_hir),
+                        slot,
                         ty: HirType::Dynamic,
                     });
                 }
@@ -686,6 +705,7 @@ impl<'a> Lowerer<'a> {
                                     object: Box::new(HirExpr::Super),
                                     index: Box::new(index.clone()),
                                     ty: HirType::Dynamic,
+                                    is_array: false,
                                 };
                                 let new_val = HirExpr::Binary {
                                     op: bop,
@@ -748,14 +768,17 @@ impl<'a> Lowerer<'a> {
                         if *computed {
                             let index = self.lower_expr(property, scope)?;
                             let value = self.lower_expr(value, scope)?;
+                            let is_arr = self.ann.get_array_index(target.range.start.offset);
                             let current_val = HirExpr::Index {
                                 object: Box::new(object_hir.clone()),
                                 index: Box::new(index.clone()),
                                 ty,
+                                is_array: is_arr,
                             };
                             let tgt = HirAssignTarget::Index {
                                 object: object_hir,
                                 index,
+                                is_array: is_arr,
                             };
                             let assign = HirExpr::Assign {
                                 target: Box::new(tgt),
@@ -803,10 +826,12 @@ impl<'a> Lowerer<'a> {
                         if *computed {
                             let index = self.lower_expr(property, scope)?;
                             let value = self.lower_expr(value, scope)?;
+                            let is_arr = self.ann.get_array_index(target.range.start.offset);
                             let current_val = HirExpr::Index {
                                 object: Box::new(object_hir.clone()),
                                 index: Box::new(index.clone()),
                                 ty,
+                                is_array: is_arr,
                             };
                             let new_val = HirExpr::Binary {
                                 op: bop,
@@ -817,6 +842,7 @@ impl<'a> Lowerer<'a> {
                             let tgt = HirAssignTarget::Index {
                                 object: object_hir,
                                 index,
+                                is_array: is_arr,
                             };
                             return Ok(HirExpr::Assign {
                                 target: Box::new(tgt),
@@ -856,9 +882,11 @@ impl<'a> Lowerer<'a> {
                     let object_hir = self.lower_expr(object, scope)?;
                     let tgt = if *computed {
                         let index = self.lower_expr(property, scope)?;
+                        let is_array = self.ann.get_array_index(target.range.start.offset);
                         HirAssignTarget::Index {
                             object: object_hir,
                             index,
+                            is_array,
                         }
                     } else {
                         let name = match &property.kind {
