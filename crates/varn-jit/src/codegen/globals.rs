@@ -2,7 +2,7 @@ use varn_core::OpCode;
 
 use crate::assembler::Reg;
 use crate::regalloc::{emit_load, emit_store};
-use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
+use crate::registers::ARG_EXEC_CTX;
 
 use super::CodegenCtx;
 
@@ -48,41 +48,21 @@ pub(crate) fn emit_globals(
             let idx = code[*ip] as usize;
             *ip += 1;
 
-            asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
-
-            asm.push(ARG_CTX);
-            asm.push(ARG_CLOSURE);
-            asm.push(ARG_BASE);
-            asm.push(ARG_EXEC_CTX);
-
-            let need_dummy = regmap.used_phys.len() % 2 == 0;
-            if need_dummy {
-                asm.push(Reg::Rax);
-            }
-
-            #[cfg(target_os = "windows")]
-            asm.add_reg_imm8(Reg::Rsp, -32);
-
-            asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
-            asm.mov_reg_imm64(ARG_BASE, idx as u64);
-
-            asm.mov_reg_imm64(Reg::R10, helpers.load_global as u64);
-            asm.call_reg(Reg::R10);
-
-            #[cfg(target_os = "windows")]
-            asm.add_reg_imm8(Reg::Rsp, 32);
-
-            asm.mov_reg_reg(Reg::R11, Reg::Rax);
-
-            if need_dummy {
-                asm.pop(Reg::Rax);
-            }
-            asm.pop(ARG_EXEC_CTX);
-            asm.pop(ARG_BASE);
-            asm.pop(ARG_CLOSURE);
-            asm.pop(ARG_CTX);
-
-            emit_store(asm, Reg::R11, first_reg, regmap);
+            super::ffi::emit_ffi_call(
+                asm,
+                regmap,
+                &super::ffi::FfiCallSpec {
+                    helper: helpers.load_global,
+                    args: &[
+                        super::ffi::FfiArg::SavedClosure,
+                        super::ffi::FfiArg::Imm(idx as u64),
+                    ],
+                    flush: false,
+                    dest: Some(first_reg),
+                    reload: false,
+                    recompute_frame: false,
+                },
+            );
         }
         _ => unreachable!("emit_globals called with {:?}", op),
     }
