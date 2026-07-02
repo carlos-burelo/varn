@@ -1,0 +1,25 @@
+let n = 150
+let size = n * n
+
+let a = []
+let b = []
+let c = []
+
+for (let i = 0; i < size; i = i + 1) {
+    a.push((i % 100) + 1)
+    b.push(((i * 3) % 100) + 1)
+    c.push(0)
+}
+
+for (let row = 0; row < n; row = row + 1) {
+    for (let col = 0; col < n; col = col + 1) {
+        let sum = 0
+        for (let k = 0; k < n; k = k + 1) {
+            sum = sum + a[row * n + k] * b[k * n + col]
+        }
+        c[row * n + col] = sum
+    }
+}
+
+print(c[0])
+print(c[size - 1])

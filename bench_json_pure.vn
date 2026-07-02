@@ -1,0 +1,22 @@
+import { JSON } from "std:json";
+
+let items = [];
+for (let i = 0; i < 50000; i = i + 1) {
+    items.push({
+        id: i,
+        name: "Item_" + i,
+        active: (i % 2) === 0,
+        score: (i % 100) * 1.25
+    });
+}
+
+let jsonStr = JSON.stringify(items);
+
+// Warmup and pure JSON.parse benchmark
+let iterations = 20;
+for (let k = 0; k < iterations; k = k + 1) {
+    let parsed = JSON.parse(jsonStr) as any[];
+    let s = JSON.stringify(parsed);
+}
+
+print("Pure JSON loop finished");
