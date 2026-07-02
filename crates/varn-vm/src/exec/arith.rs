@@ -16,12 +16,22 @@ pub fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
         return Ok(VmValue::from_f64(a.to_f64() + b.to_f64()));
     }
 
+    // Strings before anything that calls `extract_val`: extraction deep-copies
+    // extensible string views (O(len)), and concatenation must never enter the
+    // content interner (the Inv6 pathology). `str_concat` handles SSO inputs
+    // and the extensible-buffer accumulation fast path.
     if a.is_sso() || b.is_sso() {
-        let sa = heap.str_repr(a);
-        let sb = heap.str_repr(b);
-        return Ok(heap.alloc_str(format!("{}{}", sa, sb)));
+        return Ok(crate::exec::strings::str_concat(a, b, heap));
     }
     if a.is_heap() || b.is_heap() {
+        let a_is_str =
+            a.is_heap() && matches!(heap.get(a.as_heap_idx()), Some(crate::heap::HeapObj::Str(_)));
+        let b_is_str =
+            b.is_heap() && matches!(heap.get(b.as_heap_idx()), Some(crate::heap::HeapObj::Str(_)));
+        if a_is_str || b_is_str {
+            return Ok(crate::exec::strings::str_concat(a, b, heap));
+        }
+
         let av = heap.extract_val(a);
         let bv = heap.extract_val(b);
         match (&av, &bv) {
@@ -35,41 +45,6 @@ pub fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
                 return Ok(heap.alloc_decimal(rust_decimal::Decimal::from(a.as_i32()) + **db))
             }
             _ => {}
-        }
-
-        if a.is_heap() && b.is_heap() {
-            if let crate::heap::HeapObj::Str(sa) = heap
-                .get(a.as_heap_idx())
-                .expect("arith: invalid heap index a")
-            {
-                if let crate::heap::HeapObj::Str(sb) = heap
-                    .get(b.as_heap_idx())
-                    .expect("arith: invalid heap index b")
-                {
-                    let result = format!("{}{}", sa, sb);
-                    return Ok(heap.alloc_str(result));
-                }
-            }
-        }
-        if a.is_heap() {
-            if let crate::heap::HeapObj::Str(sa) = heap
-                .get(a.as_heap_idx())
-                .expect("arith: invalid heap index a")
-            {
-                let sb = heap.str_repr(b);
-                let result = format!("{}{}", sa, sb);
-                return Ok(heap.alloc_str(result));
-            }
-        }
-        if b.is_heap() {
-            if let crate::heap::HeapObj::Str(sb) = heap
-                .get(b.as_heap_idx())
-                .expect("arith: invalid heap index b")
-            {
-                let sa = heap.str_repr(a);
-                let result = format!("{}{}", sa, sb);
-                return Ok(heap.alloc_str(result));
-            }
         }
     }
     Ok(VmValue::from_f64(a.to_f64() + b.to_f64()))

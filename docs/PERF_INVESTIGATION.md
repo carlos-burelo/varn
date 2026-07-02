@@ -706,6 +706,34 @@ cache locations between compiler builds; longer term, key artifacts by
   constant-divisor strength reduction and inlined call sequences are the
   next round.
 
+## 2026-07-01 round 4 — extensible strings: str_build now beats Node
+
+`HeapObj::Str` payload changed from `Rc<str>` to `HeapStr`:
+`Shared(Rc<str>)` (immutable, interned/frozen) or
+`Ext { buf: Rc<UnsafeCell<String>>, len }` — a prefix view of a shared
+growable buffer (SpiderMonkey-style). `str_concat` on a view that is the
+buffer's tip appends in place and returns a longer view: O(1) amortized,
+and sound without any aliasing analysis because appending never changes an
+existing prefix — older views (aliases) keep reading `buf[..their_len]`.
+A non-tip view (branched history) copies out to a fresh buffer. Left
+operands under 16 bytes stay `Shared`, so one-off concats (map keys) don't
+pay copy-on-materialize.
+
+Two hidden costs found on the way, both in `arith::add`:
+* it had its own string-concat implementation that used **`alloc_str`
+  (the content interner)** — re-hashing and retaining every intermediate,
+  the exact Inv6 pathology, live again on the generic-Add path; and
+* it called `extract_val` on both operands (for the Decimal check) before
+  looking at strings — a full deep copy of the accumulator per add once
+  `Ext` views existed. Strings are now checked first and delegate to
+  `strings::str_concat`.
+
+Measured: 50k concats 1,428 ms -> **3 ms**; 100k benchmark **6 ms vs
+Node 7 ms** (was 350,361 ms at the start of the day — ~58,000x).
+Edge cases validated: alias before append stays intact, content equality
+across Shared/Ext, Ext views as Map keys, self-concat (`x + x`), slices;
+tests/main.vn 670/670.
+
 ## Summary of actionable fixes (by leverage)
 
 1. **Compile `<module>` / promote module-private top-level vars to registers** —
