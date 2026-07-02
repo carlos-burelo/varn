@@ -3,11 +3,11 @@ use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use varn_core::OpCode;
 pub mod modules;
-pub mod reg_ops;
 pub mod ops_control_calls;
 pub mod ops_literals_vars;
 pub mod ops_math_cmp;
 pub mod ops_objects_collections;
+pub mod reg_ops;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ControlSignal {
@@ -583,7 +583,7 @@ impl ExecCtx {
                     OpCode::Spawn => {
                         let w1 = code[ip];
                         ip += 1;
-                        let (dest, src) = (hi(w1), lo(w1));
+                        let (dest, src) = (first_reg, hi(w1));
 
                         let src_slot = base + src as usize;
                         if src_slot >= (*ctx).stack.len() {
@@ -766,7 +766,7 @@ impl ExecCtx {
             OpCode::Mul => arith::mul(a, b, &mut self.heap),
             OpCode::Div => arith::div(a, b, &mut self.heap),
             OpCode::Mod => arith::modulo(a, b, &mut self.heap),
-            OpCode::Pow => Ok(arith::pow(a, b)),
+            OpCode::Pow => arith::pow(a, b),
             OpCode::BitAnd => Ok(VmValue::from_int(a.as_int() & b.as_int())),
             OpCode::BitOr => Ok(VmValue::from_int(a.as_int() | b.as_int())),
             OpCode::BitXor => Ok(VmValue::from_int(a.as_int() ^ b.as_int())),

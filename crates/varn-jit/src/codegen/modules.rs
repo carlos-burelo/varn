@@ -14,7 +14,7 @@ pub(crate) fn emit_modules(
     match op {
         OpCode::LoadModuleSlot => emit_load_module_slot(ctx, first_reg),
         OpCode::BuildObjectWithShape => emit_build_object_with_shape(ctx, first_reg),
-        OpCode::InvokeRuntimeStatic => emit_invoke_runtime_static(ctx, first_reg),
+        OpCode::InvokeRuntimeStatic => return emit_invoke_runtime_static(ctx, first_reg),
         _ => unreachable!("emit_modules called with {:?}", op),
     }
     Ok(())
@@ -132,7 +132,7 @@ fn emit_build_object_with_shape(ctx: &mut CodegenCtx, first_reg: usize) {
     emit_reload_all_except(asm, regmap, Some(dest));
 }
 
-fn emit_invoke_runtime_static(ctx: &mut CodegenCtx, first_reg: usize) {
+fn emit_invoke_runtime_static(ctx: &mut CodegenCtx, first_reg: usize) -> Result<(), String> {
     let asm = &mut ctx.asm;
     let code = ctx.code;
     let ip = &mut ctx.ip;
@@ -142,8 +142,20 @@ fn emit_invoke_runtime_static(ctx: &mut CodegenCtx, first_reg: usize) {
     let w1 = code[*ip];
     *ip += 1;
     let dest = (w1 >> 8) as usize;
-    let _method_idx = code[*ip] as usize;
+    let method_idx = code[*ip] as usize;
     *ip += 1;
+    // The emitted call goes straight to the `__range__` helper; any other
+    // runtime-static method has no JIT lowering yet.
+    match ctx.proto.chunk.constants.get(method_idx) {
+        Some(varn_types::chunk::PoolEntry::Literal(varn_types::chunk::Literal::Str(s)))
+            if s.as_ref() == "__range__" => {}
+        _ => {
+            return Err(format!(
+                "JIT Bailout: InvokeRuntimeStatic with unsupported method (const {})",
+                method_idx
+            ));
+        }
+    }
     let w3 = code[*ip];
     *ip += 1;
     let w4 = code[*ip];
@@ -192,4 +204,5 @@ fn emit_invoke_runtime_static(ctx: &mut CodegenCtx, first_reg: usize) {
 
     emit_store(asm, Reg::R11, dest, regmap);
     emit_reload_all_except(asm, regmap, Some(dest));
+    Ok(())
 }

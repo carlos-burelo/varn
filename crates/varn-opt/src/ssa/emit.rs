@@ -1,13 +1,13 @@
-use std::cell::{Cell, RefCell};
-use std::rc::Rc;
-use rustc_hash::FxHashSet;
-use varn_core::OpCode;
-use varn_types::chunk::{Chunk, FeedbackVector, FunctionProto, Literal, PolyICSlot, PoolEntry};
-use varn_types::value::RuntimeSymbol;
+use super::ir::{Block, BlockId, Inst, InstKind, SsaFunc, Terminator, Value, VarId};
 use crate::hir::{HirFunction, HirUnOp, HirUpvalueSrc};
 use crate::lower::bin_opcode;
 use crate::OptError;
-use super::ir::{Block, BlockId, Inst, InstKind, SsaFunc, Terminator, Value, VarId};
+use rustc_hash::FxHashSet;
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
+use varn_core::OpCode;
+use varn_types::chunk::{Chunk, FeedbackVector, FunctionProto, Literal, PolyICSlot, PoolEntry};
+use varn_types::value::RuntimeSymbol;
 type Result<T> = std::result::Result<T, OptError>;
 
 const LINE: u32 = 0;
@@ -766,12 +766,7 @@ fn emit_inst(
                     start_reg = first;
                 } else {
                     for (i, (_, v)) in pairs.iter().enumerate() {
-                        chunk.emit_rr(
-                            OpCode::Move,
-                            call_base + i as u8,
-                            reg[v.0 as usize],
-                            LINE,
-                        );
+                        chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[v.0 as usize], LINE);
                     }
                 }
             }
@@ -1073,12 +1068,9 @@ fn emit_inst(
             chunk.emit_rr(OpCode::Await, d, reg[operand.0 as usize], LINE);
         }
         InstKind::Spawn { operand } => {
-            chunk.emit2(
-                OpCode::Spawn,
-                Chunk::pack(d, reg[operand.0 as usize]),
-                0,
-                LINE,
-            );
+            // Same 2-word shape as Await: dest in the opcode word, task
+            // register in the operand word (varn_types::bytecode).
+            chunk.emit_rr(OpCode::Spawn, d, reg[operand.0 as usize], LINE);
         }
         InstKind::Yield { operand } => {
             chunk.emit1(OpCode::Yield, Chunk::pack(d, reg[operand.0 as usize]), LINE);

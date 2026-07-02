@@ -1,3 +1,4 @@
+pub mod bytecode;
 pub mod chunk;
 pub mod generator;
 pub mod marshal;

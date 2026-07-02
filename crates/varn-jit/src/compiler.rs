@@ -24,223 +24,25 @@ pub fn compile_proto(
     // callee-saved register across a call" invariant, so it disables spill
     // elision around calls.
     let mut creates_closures = false;
+    // Walk the instruction stream with the shared decoder. Instruction
+    // shapes live ONLY in varn_types::bytecode::decode; whether an opcode
+    // is JIT-supported is decided by the codegen dispatch below, which
+    // bails out with Err for anything it cannot emit. There is no separate
+    // supported-opcode list to fall out of sync.
     let mut ip = 0;
     while ip < code.len() {
-        let raw_op = code[ip];
-        ip += 1;
-        let op =
-            OpCode::from_u8(raw_op as u8).ok_or_else(|| format!("Unknown opcode: {}", raw_op))?;
-
-        match op {
-            OpCode::Return => {
-                ip += 1;
-            }
-            OpCode::LoadNull
-            | OpCode::LoadTrue
-            | OpCode::LoadFalse
-            | OpCode::LoadIntZero
-            | OpCode::LoadIntOne
-            | OpCode::LoadIntMinusOne
-            | OpCode::PopTry
-            | OpCode::Nop => {}
-            OpCode::LoadInt => {
-                ip += 1;
-            }
-            OpCode::LoadConst
-            | OpCode::LoadGlobalIdx
-            | OpCode::LoadGlobal
-            | OpCode::LoadUpvalue
-            | OpCode::StoreUpvalue
-            | OpCode::LoadStaticFn => {
-                ip += 1;
-            }
-            OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx => {
-                ip += 2;
-            }
-            OpCode::Move => {
-                ip += 1;
-            }
-            OpCode::AddImm | OpCode::SubImm => {
-                ip += 1;
-            }
-            OpCode::Eq
-            | OpCode::Neq
-            | OpCode::Lt
-            | OpCode::Lte
-            | OpCode::Gt
-            | OpCode::Gte
-            | OpCode::EqFloat
-            | OpCode::NeqFloat
-            | OpCode::LtFloat
-            | OpCode::LteFloat
-            | OpCode::GtFloat
-            | OpCode::GteFloat
-            | OpCode::Add
-            | OpCode::Sub
-            | OpCode::Mul
-            | OpCode::Div
-            | OpCode::Mod
-            | OpCode::Pow
-            | OpCode::AddFloat
-            | OpCode::SubFloat
-            | OpCode::MulFloat
-            | OpCode::DivFloat
-            | OpCode::ToString
-            | OpCode::IsNull
-            | OpCode::Not
-            | OpCode::Negate
-            | OpCode::ArrayLength
-            | OpCode::ArrayPush
-            | OpCode::ArrayPop
-            | OpCode::ArrayExtend
-            | OpCode::StrConcat
-            | OpCode::StrSlice
-            | OpCode::StrLength
-            | OpCode::BitAnd
-            | OpCode::BitOr
-            | OpCode::BitXor
-            | OpCode::Shl
-            | OpCode::Shr
-            | OpCode::Ushr => {
-                ip += 1;
-            }
-            OpCode::GetIndex | OpCode::ArrayGetIndex => {
-                ip += 1;
-            }
-            OpCode::SetIndex | OpCode::ArraySetIndex => {
-                ip += 1;
-            }
-            OpCode::Typeof => {
-                ip += 1;
-            }
-            OpCode::Instanceof => {
-                ip += 1;
-            }
-            OpCode::MakeClosure => {
-                creates_closures = true;
-                let w1 = code[ip];
-                ip += 1;
-                let uv_count = (w1 & 0xFF) as usize;
-                ip += 1;
-                ip += uv_count;
-            }
-            OpCode::Intrinsic => {
-                ip += 1;
-            }
-            OpCode::CallNativeOp => {
-                ip += 2;
-            }
-            OpCode::AddInt
-            | OpCode::SubInt
-            | OpCode::MulInt
-            | OpCode::DivInt
-            | OpCode::LtInt
-            | OpCode::GtInt
-            | OpCode::LteInt
-            | OpCode::GteInt
-            | OpCode::EqInt
-            | OpCode::NeqInt => {
-                ip += 1;
-            }
-            OpCode::Jump | OpCode::Loop | OpCode::JumpIfFalse | OpCode::JumpIfTrue => {
-                ip += 2;
-            }
-            OpCode::GetProperty
-            | OpCode::SetProperty
-            | OpCode::Call
-            | OpCode::CallSelf
-            | OpCode::BuildArray => {
-                ip += 2;
-            }
-            OpCode::CallMethod | OpCode::InvokeVirtual | OpCode::Try => {
-                ip += 3;
-            }
-            OpCode::BuildStr => {
-                let w1 = code[ip];
-                let count = (w1 >> 8) as usize;
-                ip += 1 + count;
-            }
-            OpCode::LoadModuleSlot => {
-                ip += 2;
-            }
-            OpCode::BuildObjectWithShape => {
-                ip += 2;
-            }
-            OpCode::InvokeRuntimeStatic => {
-                let _w1 = code[ip];
-                ip += 1;
-                let method_idx = code[ip] as usize;
-                ip += 1;
-                ip += 2;
-                match proto.chunk.constants.get(method_idx) {
-                    Some(varn_types::chunk::PoolEntry::Literal(
-                        varn_types::chunk::Literal::Str(s),
-                    )) if s.as_ref() == "__range__" => {}
-                    _ => {
-                        return Err(format!(
-                            "JIT Bailout: InvokeRuntimeStatic with unsupported method"
-                        ));
-                    }
-                }
-            }
-            OpCode::AssertNotNull
-            | OpCode::CloseUpvalue
-            | OpCode::GetEnumTag
-            | OpCode::IsArray
-            | OpCode::WrapSpread
-            | OpCode::ObjectKeys
-            | OpCode::ObjectMerge
-            | OpCode::In
-            | OpCode::GetSuper
-            | OpCode::Inherit
-            | OpCode::LoadModule
-            | OpCode::StoreModuleSlot
-            | OpCode::Spawn
-            | OpCode::Throw
-            | OpCode::Await
-            | OpCode::Yield => {
-                ip += 1;
-            }
-            OpCode::GetFixedField
-            | OpCode::SetFixedField
-            | OpCode::GetPropertyMaybe
-            | OpCode::GetSymbol
-            | OpCode::BindMethod
-            | OpCode::DefineGlobal
-            | OpCode::StoreGlobal
-            | OpCode::DeclareField
-            | OpCode::MakeClass
-            | OpCode::Method
-            | OpCode::DefineStatic
-            | OpCode::DefineGetter
-            | OpCode::DefineSetter
-            | OpCode::DefineStaticGetter
-            | OpCode::DefineStaticSetter
-            | OpCode::MakeEnumVariant
-            | OpCode::CallSpread => {
-                ip += 2;
-            }
-            OpCode::BuildObject => {
-                let w1 = code[ip];
-                let count = (w1 & 0xFF) as usize;
-                ip += 1 + count * 2;
-            }
-            OpCode::ObjectRest => {
-                let w2 = code[ip + 1];
-                let skip_count = (w2 >> 8) as usize;
-                ip += 2 + skip_count;
-            }
-            _ => {
-                return Err(format!(
-                    "JIT Bailout: Opcode '{:?}' is not supported in the JIT compiler",
-                    op
-                ));
-            }
+        let op = OpCode::from_u16(code[ip])
+            .ok_or_else(|| format!("Unknown opcode: {}", code[ip]))?;
+        if op == OpCode::MakeClosure {
+            creates_closures = true;
         }
+        let info = varn_types::bytecode::decode(code, ip, &proto.chunk.constants)
+            .ok_or_else(|| format!("Undecodable instruction at ip {}", ip))?;
+        ip += info.len;
     }
 
     let mut asm = Assembler::new();
-    let regmap = RegMap::from_bytecode(code);
+    let regmap = RegMap::from_bytecode(code, &proto.chunk.constants);
     emit_prologue(&mut asm, &regmap, proto, &helpers);
     crate::regalloc::emit_reload_all(&mut asm, &regmap);
 
@@ -413,7 +215,15 @@ pub fn compile_proto(
 
             OpCode::Nop => {}
 
-            _ => unreachable!(),
+            // Codegen is the single authority on JIT support: anything
+            // without an emit arm bails the whole function back to the
+            // interpreter.
+            _ => {
+                return Err(format!(
+                    "JIT Bailout: Opcode '{:?}' is not supported in the JIT compiler",
+                    op
+                ));
+            }
         }
     }
 
