@@ -398,7 +398,12 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
 
             let is_arithmetic = matches!(
                 op,
-                BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div
+                BinaryOp::Add
+                    | BinaryOp::Sub
+                    | BinaryOp::Mul
+                    | BinaryOp::Div
+                    | BinaryOp::Mod
+                    | BinaryOp::Pow
             );
             let is_comparison = matches!(
                 op,
@@ -416,41 +421,27 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
             let l = get_expr_type(left, ctx);
             let r = get_expr_type(right, ctx);
 
-            use varn_core::TypeTag;
-            let is_int = |tk: &TypeKind<_, _, _, _, _, _>| {
-                matches!(
-                    tk,
-                    TypeKind::Intrinsic(TypeTag::Int) | TypeKind::LiteralInt(_)
-                )
-            };
-            let is_float = |tk: &TypeKind<_, _, _, _, _, _>| {
-                matches!(
-                    tk,
-                    TypeKind::Intrinsic(TypeTag::Float) | TypeKind::LiteralFloat(_)
-                )
+            // The numeric annotation records the OPERAND class of the
+            // operation (it drives typed-opcode selection). The result
+            // class — where `int / int → float` differs — comes from
+            // `varn_core::numeric::binary_result_kind` at HIR lowering.
+            use varn_core::{binary_operand_kind, NumericOperand, TypeTag};
+            let operand = |tk: &TypeKind<_, _, _, _, _, _>| match tk {
+                TypeKind::Intrinsic(TypeTag::Int) | TypeKind::LiteralInt(_) => {
+                    Some(NumericOperand::Int)
+                }
+                TypeKind::Intrinsic(TypeTag::Float) | TypeKind::LiteralFloat(_) => {
+                    Some(NumericOperand::Float)
+                }
+                TypeKind::Intrinsic(TypeTag::Decimal) => Some(NumericOperand::Decimal),
+                _ => None,
             };
 
-            let kind = if is_arithmetic {
-                if *op == BinaryOp::Div && is_int(&l.0) && is_int(&r.0) {
-                    Some(NumericKind::Float)
-                } else if is_int(&l.0) && is_int(&r.0) {
-                    Some(NumericKind::Int)
-                } else if is_float(&l.0) || is_float(&r.0) {
-                    Some(NumericKind::Float)
-                } else {
-                    None
-                }
-            } else {
-                if is_int(&l.0) && is_int(&r.0) {
-                    Some(NumericKind::Int)
-                } else if (is_float(&l.0) && is_int(&r.0))
-                    || (is_int(&l.0) && is_float(&r.0))
-                    || (is_float(&l.0) && is_float(&r.0))
-                {
-                    Some(NumericKind::Float)
-                } else {
-                    None
-                }
+            let kind = match binary_operand_kind(operand(&l.0), operand(&r.0)) {
+                Some(NumericOperand::Int) => Some(NumericKind::Int),
+                Some(NumericOperand::Float) => Some(NumericKind::Float),
+                // Decimal has no typed opcodes; the generic path handles it.
+                Some(NumericOperand::Decimal) | None => None,
             };
             if let Some(k) = kind {
                 ann.record_numeric(expr.range.start.offset, k);
@@ -545,7 +536,9 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                 let check_ty = obj_ty.non_nullified();
 
                 let class_name = match &check_ty.0 {
-                    TypeKind::Named(n, _origin) | TypeKind::Generic(n, _, _origin) => Some(n.as_ref()),
+                    TypeKind::Named(n, _origin) | TypeKind::Generic(n, _, _origin) => {
+                        Some(n.as_ref())
+                    }
                     _ => None,
                 };
                 if let Some(cn) = class_name {
@@ -558,37 +551,44 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                         }
                         hierarchy.reverse();
 
-                    let mut slot = 0u16;
-                    let mut known_props: rustc_hash::FxHashSet<std::rc::Rc<str>> = rustc_hash::FxHashSet::default();
-                    let mut found = false;
+                        let mut slot = 0u16;
+                        let mut known_props: rustc_hash::FxHashSet<std::rc::Rc<str>> =
+                            rustc_hash::FxHashSet::default();
+                        let mut found = false;
 
-                    for cls in &hierarchy {
-                        if let Some(entry) = ctx.bind.get_class_entry(cls) {
-                            for m in &entry.members {
-                                if !m.is_static && (m.kind == crate::types::ClassMemberKind::Property || m.kind == crate::types::ClassMemberKind::Variable) {
-                                    if known_props.insert(m.name.clone()) {
-                                        if m.name.as_ref() == prop_name.as_ref() {
-                                            // Key by the property identifier's offset, not the
-                                            // member expr's start offset. In a chain `a.b.c`, the
-                                            // outer member `(a.b).c` and inner `a.b` share the same
-                                            // start offset (`a`), so keying by start collides and the
-                                            // inner hop wrongly inherits the outer hop's slot.
-                                            ann.record_fixed_field_slot(property.range.start.offset, slot);
-                                            found = true;
-                                            break;
+                        for cls in &hierarchy {
+                            if let Some(entry) = ctx.bind.get_class_entry(cls) {
+                                for m in &entry.members {
+                                    if !m.is_static
+                                        && (m.kind == crate::types::ClassMemberKind::Property
+                                            || m.kind == crate::types::ClassMemberKind::Variable)
+                                    {
+                                        if known_props.insert(m.name.clone()) {
+                                            if m.name.as_ref() == prop_name.as_ref() {
+                                                // Key by the property identifier's offset, not the
+                                                // member expr's start offset. In a chain `a.b.c`, the
+                                                // outer member `(a.b).c` and inner `a.b` share the same
+                                                // start offset (`a`), so keying by start collides and the
+                                                // inner hop wrongly inherits the outer hop's slot.
+                                                ann.record_fixed_field_slot(
+                                                    property.range.start.offset,
+                                                    slot,
+                                                );
+                                                found = true;
+                                                break;
+                                            }
+                                            slot += 1;
                                         }
-                                        slot += 1;
                                     }
                                 }
                             }
-                        }
-                        if found {
-                            break;
+                            if found {
+                                break;
+                            }
                         }
                     }
                 }
             }
-        }
         }
 
         ExprKind::As { expression, .. } | ExprKind::Satisfies { expression, .. } => {

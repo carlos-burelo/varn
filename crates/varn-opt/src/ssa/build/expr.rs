@@ -547,6 +547,10 @@ impl Builder {
             HirExpr::Binary { op, lhs, rhs, ty } => {
                 let l = self.lower_expr(lhs)?;
                 let r = self.lower_expr(rhs)?;
+                // `ty` is the operand class (drives opcode selection); the
+                // value's type is the result class — they differ for
+                // `int / int → float` and for comparisons.
+                let result_ty = crate::hir::binary_result_ty(*op, *ty);
                 Ok(self.emit(
                     InstKind::Binary {
                         op: *op,
@@ -554,7 +558,7 @@ impl Builder {
                         rhs: r,
                         ty: *ty,
                     },
-                    *ty,
+                    result_ty,
                 ))
             }
             HirExpr::Unary { op, operand, ty } => {

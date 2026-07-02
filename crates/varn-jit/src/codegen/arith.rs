@@ -275,10 +275,11 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     }
 }
 
-/// `ModInt` with statically int-typed operands compiles to a native `idiv`;
-/// a zero divisor falls back to the FFI helper, which raises the proper
-/// runtime error. Operands the type system couldn't pin down take the
-/// generic FFI path unconditionally.
+/// `ModInt` compiles to a native `idiv`. Statically int-typed operands skip
+/// the tag guards; register reuse often demotes slots to `Dynamic`, so
+/// otherwise both operands are tag-checked at runtime and non-int values
+/// fall back to the FFI helper. A zero divisor also falls back to the
+/// helper, which raises the proper runtime error.
 fn emit_mod_int(ctx: &mut CodegenCtx, first_reg: usize) {
     let both_int = {
         let w1 = ctx.code[ctx.ip];
@@ -286,10 +287,6 @@ fn emit_mod_int(ctx: &mut CodegenCtx, first_reg: usize) {
         let src2 = (w1 & 0xFF) as usize;
         slot_is_int(&ctx.proto.register_meta, src1) && slot_is_int(&ctx.proto.register_meta, src2)
     };
-    if !both_int {
-        emit_binary_arith(ctx, OpCode::ModInt, first_reg);
-        return;
-    }
 
     let asm = &mut ctx.asm;
     let code = ctx.code;
@@ -305,11 +302,27 @@ fn emit_mod_int(ctx: &mut CodegenCtx, first_reg: usize) {
     emit_load(asm, Reg::Rax, src1, regmap);
     emit_load(asm, Reg::R11, src2, regmap);
 
+    let mut slow_patches: Vec<usize> = Vec::new();
+
+    if !both_int {
+        asm.mov_reg_reg(Reg::R10, Reg::Rax);
+        asm.mov_reg_imm64(Reg::Rcx, 0x7FFF_0000_0000_0000u64);
+        asm.and_reg_reg(Reg::R10, Reg::Rcx);
+        asm.cmp_reg_reg(Reg::R10, crate::registers::REG_INT_TAG);
+        slow_patches.push(asm.jmp_cond(crate::assembler::Cond::NotEqual));
+
+        asm.mov_reg_reg(Reg::R10, Reg::R11);
+        asm.mov_reg_imm64(Reg::Rcx, 0x7FFF_0000_0000_0000u64);
+        asm.and_reg_reg(Reg::R10, Reg::Rcx);
+        asm.cmp_reg_reg(Reg::R10, crate::registers::REG_INT_TAG);
+        slow_patches.push(asm.jmp_cond(crate::assembler::Cond::NotEqual));
+    }
+
     // Sign-extend the 48-bit divisor payload and guard against zero.
     asm.shl_reg_imm8(Reg::R11, 16);
     asm.sar_reg_imm8(Reg::R11, 16);
     asm.test_reg_reg(Reg::R11, Reg::R11);
-    let p_zero = asm.jmp_cond(crate::assembler::Cond::Equal);
+    slow_patches.push(asm.jmp_cond(crate::assembler::Cond::Equal));
 
     asm.shl_reg_imm8(Reg::Rax, 16);
     asm.sar_reg_imm8(Reg::Rax, 16);
@@ -327,9 +340,12 @@ fn emit_mod_int(ctx: &mut CodegenCtx, first_reg: usize) {
     emit_store(asm, Reg::Rax, first_reg, regmap);
     let p_done = asm.jmp_near();
 
-    // Zero divisor: the helper raises "modulo by zero".
+    // Non-int operand or zero divisor: the helper handles both (raising
+    // "modulo by zero" when applicable).
     let slow = asm.current_offset();
-    asm.patch_u32(p_zero, (slow as i32 - (p_zero as i32 + 4)) as u32);
+    for p in slow_patches {
+        asm.patch_u32(p, (slow as i32 - (p as i32 + 4)) as u32);
+    }
 
     emit_flush_all(asm, regmap);
     asm.push(ARG_CTX);

@@ -12,15 +12,14 @@
 //! register agrees on it; any disagreement or unanalysed definition degrades
 //! the register to `Dynamic`, which is always safe.
 //!
-//! Instruction boundaries come from [`regalloc_post::decode`] — the same
-//! decoder the register remapper relies on — so the two passes can never
-//! disagree about operand widths.
+//! Instruction boundaries come from `varn_types::bytecode::decode` — the
+//! same decoder the register remapper and the JIT rely on — so no two
+//! walkers can disagree about operand widths.
 
 use varn_core::OpCode;
+use varn_types::bytecode::decode;
 use varn_types::chunk::{FunctionProto, Literal, PoolEntry};
 use varn_types::register_meta::{RegisterMeta, SlotKind};
-
-use crate::regalloc_post::decode;
 
 /// How a single instruction defines its destination register.
 enum DefSrc {
@@ -58,7 +57,12 @@ pub fn infer(proto: &mut FunctionProto) {
         let Some(info) = decode(code, offset, constants) else {
             // Unknown opcode: the rest of the stream is unanalysable, so no
             // register may claim a skippable kind.
-            proto.register_meta = vec![RegisterMeta { kind: SlotKind::Dynamic }; n];
+            proto.register_meta = vec![
+                RegisterMeta {
+                    kind: SlotKind::Dynamic
+                };
+                n
+            ];
             return;
         };
 
@@ -115,20 +119,22 @@ fn classify_def(op: OpCode, w1: u16, constants: &[PoolEntry]) -> DefSrc {
         LoadIntZero | LoadIntOne | LoadIntMinusOne | LoadInt => DefSrc::Kind(SlotKind::Int),
         LoadTrue | LoadFalse => DefSrc::Kind(SlotKind::Bool),
 
-        // Int arithmetic that always yields an int (overflow promotes to f64,
-        // which is still a non-heap immediate). `DivInt`/`PowInt` are excluded:
-        // inexact division yields f64 and pow may overflow, so their result
-        // kind is input-dependent.
-        AddInt | SubInt | MulInt | ModInt | AddImm | SubImm => DefSrc::Kind(SlotKind::Int),
+        // Int arithmetic wraps at 48 bits (varn_core::numeric), so the
+        // result kind is deterministic: always an int. `DivInt` is the one
+        // int-operand op with a float result (`int / int → float`); `PowInt`
+        // wraps like the rest and raises on negative exponents.
+        AddInt | SubInt | MulInt | ModInt | PowInt | AddImm | SubImm => {
+            DefSrc::Kind(SlotKind::Int)
+        }
         StrLength | ArrayLength => DefSrc::Kind(SlotKind::Int),
 
-        AddFloat | SubFloat | MulFloat | DivFloat | ModFloat | PowFloat => {
+        AddFloat | SubFloat | MulFloat | DivFloat | ModFloat | PowFloat | DivInt => {
             DefSrc::Kind(SlotKind::Float)
         }
 
         Eq | Neq | Lt | Lte | Gt | Gte | EqInt | NeqInt | LtInt | LteInt | GtInt | GteInt
-        | EqFloat | NeqFloat | LtFloat | LteFloat | GtFloat | GteFloat | IsNull | IsArray
-        | Not | In | Instanceof => DefSrc::Kind(SlotKind::Bool),
+        | EqFloat | NeqFloat | LtFloat | LteFloat | GtFloat | GteFloat | IsNull | IsArray | Not
+        | In | Instanceof => DefSrc::Kind(SlotKind::Bool),
 
         StrConcat | ToString | StrSlice | BuildStr | Typeof => DefSrc::Kind(SlotKind::Str),
 

@@ -5,6 +5,7 @@ pub mod intrinsic_ops;
 pub mod intrinsics;
 pub mod kinds;
 pub mod module_id;
+pub mod numeric;
 pub mod op_id;
 pub mod op_meta;
 pub mod opcode;
@@ -27,12 +28,13 @@ pub use source::{SourceLocation, SourceRange};
 
 pub use intrinsics::{IntrinsicType, MemberKey};
 pub use module_id::{ImportSpecifier, ModuleId};
-pub use token::{ParsedNumber, Token, TokenKind};
-pub use typed_ir::{NumericKind, TypeAnnotations};
-pub use varn_base::TypeTag;
+pub use numeric::{binary_operand_kind, binary_result_kind, wrap_i48, NumericOperand};
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
+pub use token::{ParsedNumber, Token, TokenKind};
+pub use typed_ir::{NumericKind, TypeAnnotations};
+pub use varn_base::TypeTag;
 
 thread_local! {
     static INTERNER: RefCell<FxHashMap<Box<str>, Rc<str>>> = RefCell::new(FxHashMap::default());

@@ -6,11 +6,9 @@ use varn_types::Value;
 #[inline(always)]
 pub fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if a.is_int() && b.is_int() {
-        let (r, overflow) = a.as_int().overflowing_add(b.as_int());
-        if overflow {
-            return Ok(VmValue::from_f64(a.as_int() as f64 + b.as_int() as f64));
-        }
-        return Ok(VmValue::from_int(r));
+        // Integer arithmetic wraps at 48 bits (varn_core::numeric);
+        // `from_int` masks the payload, keeping all tiers bit-identical.
+        return Ok(VmValue::from_int(a.as_int().wrapping_add(b.as_int())));
     }
     if a.is_f64() || b.is_f64() {
         return Ok(VmValue::from_f64(a.to_f64() + b.to_f64()));
@@ -24,10 +22,16 @@ pub fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
         return Ok(crate::exec::strings::str_concat(a, b, heap));
     }
     if a.is_heap() || b.is_heap() {
-        let a_is_str =
-            a.is_heap() && matches!(heap.get(a.as_heap_idx()), Some(crate::heap::HeapObj::Str(_)));
-        let b_is_str =
-            b.is_heap() && matches!(heap.get(b.as_heap_idx()), Some(crate::heap::HeapObj::Str(_)));
+        let a_is_str = a.is_heap()
+            && matches!(
+                heap.get(a.as_heap_idx()),
+                Some(crate::heap::HeapObj::Str(_))
+            );
+        let b_is_str = b.is_heap()
+            && matches!(
+                heap.get(b.as_heap_idx()),
+                Some(crate::heap::HeapObj::Str(_))
+            );
         if a_is_str || b_is_str {
             return Ok(crate::exec::strings::str_concat(a, b, heap));
         }
@@ -63,11 +67,7 @@ pub fn add_f64(a: VmValue, b: VmValue) -> VmValue {
 #[inline(always)]
 pub fn sub(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if a.is_int() && b.is_int() {
-        let (r, overflow) = a.as_int().overflowing_sub(b.as_int());
-        if overflow {
-            return Ok(VmValue::from_f64(a.as_int() as f64 - b.as_int() as f64));
-        }
-        return Ok(VmValue::from_int(r));
+        return Ok(VmValue::from_int(a.as_int().wrapping_sub(b.as_int())));
     }
     let av = heap.extract_val(a);
     let bv = heap.extract_val(b);
@@ -99,11 +99,7 @@ pub fn sub_f64(a: VmValue, b: VmValue) -> VmValue {
 #[inline(always)]
 pub fn mul(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if a.is_int() && b.is_int() {
-        let (r, overflow) = a.as_int().overflowing_mul(b.as_int());
-        if overflow {
-            return Ok(VmValue::from_f64(a.as_int() as f64 * b.as_int() as f64));
-        }
-        return Ok(VmValue::from_int(r));
+        return Ok(VmValue::from_int(a.as_int().wrapping_mul(b.as_int())));
     }
     let av = heap.extract_val(a);
     let bv = heap.extract_val(b);
@@ -164,9 +160,7 @@ pub fn div(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if bv == 0.0 {
         return Err(RuntimeError::new("division by zero"));
     }
-    if a.is_int() && b.is_int() && a.as_int() % b.as_int() == 0 {
-        return Ok(VmValue::from_int(a.as_int() / b.as_int()));
-    }
+    // `int / int` always yields float (varn_core::numeric).
     Ok(VmValue::from_f64(a.to_f64() / bv))
 }
 
@@ -217,17 +211,19 @@ pub fn modulo(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
 }
 
 #[inline(always)]
-pub fn pow(a: VmValue, b: VmValue) -> VmValue {
+pub fn pow(a: VmValue, b: VmValue) -> VmResult<VmValue> {
     if a.is_int() && b.is_int() {
-        let base = a.as_int();
+        // `int ** int` stays integral and wraps at 48 bits; a negative
+        // exponent raises instead of silently producing a float
+        // (varn_core::numeric).
         let exp = b.as_int();
-        if exp >= 0 && exp <= 62 {
-            if let Some(r) = base.checked_pow(exp as u32) {
-                return VmValue::from_int(r);
-            }
+        if exp < 0 {
+            return Err(RuntimeError::new("negative exponent in integer power"));
         }
+        let e = u32::try_from(exp).unwrap_or(u32::MAX);
+        return Ok(VmValue::from_int(a.as_int().wrapping_pow(e)));
     }
-    VmValue::from_f64(a.to_f64().powf(b.to_f64()))
+    Ok(VmValue::from_f64(a.to_f64().powf(b.to_f64())))
 }
 
 #[inline(always)]
