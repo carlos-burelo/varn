@@ -30,7 +30,6 @@ pub(crate) fn emit_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) -> 
         | OpCode::ModFloat
         | OpCode::PowFloat
         | OpCode::DivInt
-        | OpCode::ModInt
         | OpCode::PowInt
         | OpCode::BitAnd
         | OpCode::BitOr
@@ -38,6 +37,7 @@ pub(crate) fn emit_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) -> 
         | OpCode::Shl
         | OpCode::Shr
         | OpCode::Ushr => emit_binary_arith(ctx, op, first_reg),
+        OpCode::ModInt => emit_mod_int(ctx, first_reg),
         OpCode::AddImm | OpCode::SubImm => emit_add_sub_imm(ctx, op, first_reg),
         OpCode::AddInt | OpCode::SubInt | OpCode::MulInt => emit_int_arith(ctx, op, first_reg),
         OpCode::ToString | OpCode::IsNull | OpCode::Not | OpCode::Negate => {
@@ -95,8 +95,13 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
         if both_int {
             match op {
                 OpCode::Add => {
+                    // Payload carry out of bit 47 (negative operands) would
+                    // leak into the NaN-box tag; mask back to 48 bits.
                     asm.add_reg_reg(Reg::Rax, Reg::R11);
                     asm.sub_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
+                    asm.shl_reg_imm8(Reg::Rax, 16);
+                    asm.shr_reg_imm8(Reg::Rax, 16);
+                    asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
                 }
                 OpCode::Sub => {
                     asm.sub_reg_reg(Reg::Rax, Reg::R11);
@@ -270,6 +275,97 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     }
 }
 
+/// `ModInt` with statically int-typed operands compiles to a native `idiv`;
+/// a zero divisor falls back to the FFI helper, which raises the proper
+/// runtime error. Operands the type system couldn't pin down take the
+/// generic FFI path unconditionally.
+fn emit_mod_int(ctx: &mut CodegenCtx, first_reg: usize) {
+    let both_int = {
+        let w1 = ctx.code[ctx.ip];
+        let src1 = (w1 >> 8) as usize;
+        let src2 = (w1 & 0xFF) as usize;
+        slot_is_int(&ctx.proto.register_meta, src1) && slot_is_int(&ctx.proto.register_meta, src2)
+    };
+    if !both_int {
+        emit_binary_arith(ctx, OpCode::ModInt, first_reg);
+        return;
+    }
+
+    let asm = &mut ctx.asm;
+    let code = ctx.code;
+    let ip = &mut ctx.ip;
+    let regmap = &ctx.regmap;
+    let helpers = ctx.helpers;
+
+    let w1 = code[*ip];
+    *ip += 1;
+    let src1 = (w1 >> 8) as usize;
+    let src2 = (w1 & 0xFF) as usize;
+
+    emit_load(asm, Reg::Rax, src1, regmap);
+    emit_load(asm, Reg::R11, src2, regmap);
+
+    // Sign-extend the 48-bit divisor payload and guard against zero.
+    asm.shl_reg_imm8(Reg::R11, 16);
+    asm.sar_reg_imm8(Reg::R11, 16);
+    asm.test_reg_reg(Reg::R11, Reg::R11);
+    let p_zero = asm.jmp_cond(crate::assembler::Cond::Equal);
+
+    asm.shl_reg_imm8(Reg::Rax, 16);
+    asm.sar_reg_imm8(Reg::Rax, 16);
+
+    // idiv writes RDX, which carries a live ABI register between ops.
+    asm.push(Reg::Rdx);
+    asm.cqo();
+    asm.idiv_reg(Reg::R11);
+    asm.mov_reg_reg(Reg::Rax, Reg::Rdx);
+    asm.pop(Reg::Rdx);
+
+    asm.shl_reg_imm8(Reg::Rax, 16);
+    asm.shr_reg_imm8(Reg::Rax, 16);
+    asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
+    emit_store(asm, Reg::Rax, first_reg, regmap);
+    let p_done = asm.jmp_near();
+
+    // Zero divisor: the helper raises "modulo by zero".
+    let slow = asm.current_offset();
+    asm.patch_u32(p_zero, (slow as i32 - (p_zero as i32 + 4)) as u32);
+
+    emit_flush_all(asm, regmap);
+    asm.push(ARG_CTX);
+    asm.push(ARG_CLOSURE);
+    asm.push(ARG_BASE);
+    asm.push(ARG_EXEC_CTX);
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
+    if need_dummy {
+        asm.push(Reg::Rax);
+    }
+    emit_load(asm, Reg::Rax, src1, regmap);
+    emit_load(asm, Reg::R11, src2, regmap);
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, -32);
+    asm.mov_reg_reg(ARG_BASE, Reg::R11);
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+    asm.mov_reg_imm64(Reg::R10, helpers.modulo as u64);
+    asm.call_reg(Reg::R10);
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, 32);
+    asm.mov_reg_reg(Reg::R11, Reg::Rax);
+    if need_dummy {
+        asm.pop(Reg::Rax);
+    }
+    asm.pop(ARG_EXEC_CTX);
+    asm.pop(ARG_BASE);
+    asm.pop(ARG_CLOSURE);
+    asm.pop(ARG_CTX);
+    emit_store(asm, Reg::R11, first_reg, regmap);
+    emit_reload_all_except(asm, regmap, Some(first_reg));
+
+    let end = asm.current_offset();
+    asm.patch_u32(p_done, (end as i32 - (p_done as i32 + 4)) as u32);
+}
+
 fn emit_add_sub_imm(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     let asm = &mut ctx.asm;
     let code = ctx.code;
@@ -312,8 +408,13 @@ fn emit_int_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
 
     match op {
         OpCode::AddInt => {
+            // Same masking as the generic both-int Add: a payload carry out
+            // of bit 47 must not leak into the NaN-box tag.
             asm.add_reg_reg(Reg::Rax, Reg::R11);
             asm.sub_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
+            asm.shl_reg_imm8(Reg::Rax, 16);
+            asm.shr_reg_imm8(Reg::Rax, 16);
+            asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
         }
         OpCode::SubInt => {
             asm.sub_reg_reg(Reg::Rax, Reg::R11);
