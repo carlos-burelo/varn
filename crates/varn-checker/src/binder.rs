@@ -11,7 +11,7 @@ mod decls;
 mod imports;
 mod inference_utils;
 mod interface;
-mod type_inference;
+pub(crate) mod type_inference;
 mod type_resolution;
 mod types;
 

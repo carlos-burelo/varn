@@ -14,10 +14,29 @@ Todos los valores caben en 64 bits reutilizando el espacio de Quiet NaN del est�
 | `null`     | 0    | `111...1` | `TAG_NULL` (`0x0001_0000_0000_0000`)       |
 | `false`    | 0    | `111...1` | `TAG_FALSE` (`0x0002_0000_0000_0000`)      |
 | `true`     | 0    | `111...1` | `TAG_TRUE` (`0x0003_0000_0000_0000`)       |
-| `int`      | 0    | `111...1` | `TAG_INT` + payload 32 bits                |
+| `int`      | 0    | `111...1` | `TAG_INT` + payload 48 bits                |
 | puntero    | **1**| `111...1` | `TAG_PTR` + heap index 32 bits             |
 
 El bit de signo encendido reserva los punteros fuera del espacio de Signalling NaN.
+
+### Semántica de enteros
+
+Fuente única de las reglas: `varn-core/src/numeric.rs`. Todos los tiers
+(const-folding en compile time, intérprete y JIT) deben ser bit-idénticos.
+
+- `int` es un entero de **48 bits** en complemento a dos (el payload del
+  NaN-box). Rango: `±140_737_488_355_327` (`±2^47 - 1`).
+- La aritmética entera (`+`, `-`, `*`, `**`) **envuelve (wrap) a 48 bits**.
+  No hay promoción silenciosa a `float` en overflow: el tipo estático `int`
+  es honesto y los fast paths tipados del JIT no necesitan guards de
+  overflow.
+- `int / int` produce **siempre `float`** (incluso si la división es
+  exacta). El híbrido histórico "exacto → int, inexacto → float" hacía que
+  el tipo del valor dependiera de los valores en runtime.
+- `int % int` produce `int` (resto truncado). Divisor cero: error de
+  runtime, igual que `int / 0`.
+- `int ** int` produce `int` (con wrap). Exponente negativo: error de
+  runtime (`negative exponent in integer power`).
 
 ### Tipos en heap
 `HeapObj` aloja lo que no cabe en 64 bits:

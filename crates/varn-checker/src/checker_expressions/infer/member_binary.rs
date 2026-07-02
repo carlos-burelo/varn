@@ -159,40 +159,12 @@ pub(super) fn infer_binary_type(
                     {
                         return Type::Str;
                     }
-                    if matches!(l.0, TypeKind::Intrinsic(TypeTag::Decimal))
-                        || matches!(r.0, TypeKind::Intrinsic(TypeTag::Decimal))
-                    {
-                        return Type::Decimal;
-                    }
-                    if matches!(l.0, TypeKind::Intrinsic(TypeTag::Float))
-                        || matches!(r.0, TypeKind::Intrinsic(TypeTag::Float))
-                    {
-                        return Type::Float;
-                    }
-                    if matches!(l.0, TypeKind::Intrinsic(TypeTag::Int))
-                        && matches!(r.0, TypeKind::Intrinsic(TypeTag::Int))
-                    {
-                        return Type::intrinsic(TypeTag::Int);
-                    }
-                    Type::Dynamic.tainted()
+                    crate::binder::type_inference::numeric_binary_type(*op, &l, &r)
+                        .unwrap_or_else(|| Type::Dynamic.tainted())
                 }
                 BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod | BinaryOp::Pow => {
-                    if matches!(l.0, TypeKind::Intrinsic(TypeTag::Decimal))
-                        || matches!(r.0, TypeKind::Intrinsic(TypeTag::Decimal))
-                    {
-                        return Type::Decimal;
-                    }
-                    if matches!(l.0, TypeKind::Intrinsic(TypeTag::Float))
-                        || matches!(r.0, TypeKind::Intrinsic(TypeTag::Float))
-                    {
-                        return Type::Float;
-                    }
-                    if matches!(l.0, TypeKind::Intrinsic(TypeTag::Int))
-                        && matches!(r.0, TypeKind::Intrinsic(TypeTag::Int))
-                    {
-                        return Type::intrinsic(TypeTag::Int);
-                    }
-                    Type::Dynamic.tainted()
+                    crate::binder::type_inference::numeric_binary_type(*op, &l, &r)
+                        .unwrap_or_else(|| Type::Dynamic.tainted())
                 }
                 BinaryOp::BitAnd
                 | BinaryOp::BitOr

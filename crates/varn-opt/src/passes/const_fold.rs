@@ -1,6 +1,7 @@
 use crate::hir::{HirBinOp, HirType, HirUnOp};
 use crate::ssa::ir::{BlockId, InstKind, SsaFunc, Terminator, Value};
 use rustc_hash::FxHashMap;
+use varn_core::wrap_i48;
 
 pub fn run(func: &mut SsaFunc) -> bool {
     let mut changed = false;
@@ -112,12 +113,15 @@ fn fold_binary(op: HirBinOp, lhs: &InstKind, rhs: &InstKind, _ty: HirType) -> Op
     use HirBinOp::*;
     match (lhs, rhs) {
         (InstKind::ConstInt(x), InstKind::ConstInt(y)) => match op {
-            Add => Some(InstKind::ConstInt(x.wrapping_add(*y))),
-            Sub => Some(InstKind::ConstInt(x.wrapping_sub(*y))),
-            Mul => Some(InstKind::ConstInt(x.wrapping_mul(*y))),
+            // Integer arithmetic wraps at 48 bits (varn_core::numeric),
+            // identically to the interpreter and the JIT.
+            Add => Some(InstKind::ConstInt(wrap_i48(x.wrapping_add(*y)))),
+            Sub => Some(InstKind::ConstInt(wrap_i48(x.wrapping_sub(*y)))),
+            Mul => Some(InstKind::ConstInt(wrap_i48(x.wrapping_mul(*y)))),
+            // `int / int` always yields float.
             Div => {
                 if *y != 0 {
-                    Some(InstKind::ConstInt(x / y))
+                    Some(InstKind::ConstFloat(*x as f64 / *y as f64))
                 } else {
                     None
                 }
@@ -129,9 +133,10 @@ fn fold_binary(op: HirBinOp, lhs: &InstKind, rhs: &InstKind, _ty: HirType) -> Op
                     None
                 }
             }
+            // Negative exponents raise at runtime; never fold them.
             Pow => {
                 if *y >= 0 && *y <= 30 {
-                    Some(InstKind::ConstInt(x.wrapping_pow(*y as u32)))
+                    Some(InstKind::ConstInt(wrap_i48(x.wrapping_pow(*y as u32))))
                 } else {
                     None
                 }

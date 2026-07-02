@@ -123,7 +123,10 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
             ..
         } => {
             let ret = if *is_generator {
-                Type::generic(varn_core::IntrinsicType::Generator.as_str(), vec![Type::Dynamic])
+                Type::generic(
+                    varn_core::IntrinsicType::Generator.as_str(),
+                    vec![Type::Dynamic],
+                )
             } else {
                 Type::Dynamic
             };
@@ -239,6 +242,27 @@ fn infer_member(
     Type::Dynamic
 }
 
+/// Numeric result type of a binary op, from the shared rules in
+/// `varn_core::numeric`. `None` when the operands have no common numeric
+/// class — the caller picks its own fallback.
+pub(crate) fn numeric_binary_type(op: BinaryOp, l: &Type, r: &Type) -> Option<Type> {
+    use varn_core::{binary_operand_kind, binary_result_kind, NumericOperand, TypeTag};
+    let operand = |t: &Type| match &t.0 {
+        TypeKind::Intrinsic(TypeTag::Int) | TypeKind::LiteralInt(_) => Some(NumericOperand::Int),
+        TypeKind::Intrinsic(TypeTag::Float) | TypeKind::LiteralFloat(_) => {
+            Some(NumericOperand::Float)
+        }
+        TypeKind::Intrinsic(TypeTag::Decimal) => Some(NumericOperand::Decimal),
+        _ => None,
+    };
+    let kind = binary_operand_kind(operand(l), operand(r))?;
+    Some(match binary_result_kind(op, kind) {
+        NumericOperand::Int => Type::Int,
+        NumericOperand::Float => Type::Float,
+        NumericOperand::Decimal => Type::Decimal,
+    })
+}
+
 fn infer_binary(
     op: &BinaryOp,
     left: &Expr,
@@ -252,27 +276,13 @@ fn infer_binary(
             match (&l.0, &r.0) {
                 (&TypeKind::Intrinsic(varn_core::TypeTag::Str), _)
                 | (_, &TypeKind::Intrinsic(varn_core::TypeTag::Str)) => Type::Str,
-                (&TypeKind::Intrinsic(varn_core::TypeTag::Float), _)
-                | (_, &TypeKind::Intrinsic(varn_core::TypeTag::Float)) => Type::Float,
-                (
-                    &TypeKind::Intrinsic(varn_core::TypeTag::Int),
-                    &TypeKind::Intrinsic(varn_core::TypeTag::Int),
-                ) => Type::Int,
-                _ => Type::Dynamic,
+                _ => numeric_binary_type(*op, &l, &r).unwrap_or(Type::Dynamic),
             }
         }
         BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod | BinaryOp::Pow => {
             let l = infer_expr_type(left, ctx);
             let r = infer_expr_type(right, ctx);
-            match (&l.0, &r.0) {
-                (&TypeKind::Intrinsic(varn_core::TypeTag::Float), _)
-                | (_, &TypeKind::Intrinsic(varn_core::TypeTag::Float)) => Type::Float,
-                (
-                    &TypeKind::Intrinsic(varn_core::TypeTag::Int),
-                    &TypeKind::Intrinsic(varn_core::TypeTag::Int),
-                ) => Type::Int,
-                _ => Type::Dynamic,
-            }
+            numeric_binary_type(*op, &l, &r).unwrap_or(Type::Dynamic)
         }
         BinaryOp::Eq
         | BinaryOp::NotEq

@@ -46,8 +46,14 @@ pub extern "C" fn jit_modulo(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmVal
     }
 }
 
-pub extern "C" fn jit_pow(_ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
-    crate::exec::arith::pow(a, b)
+pub extern "C" fn jit_pow(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        match crate::exec::arith::pow(a, b) {
+            Ok(v) => v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+    }
 }
 
 pub extern "C" fn jit_get_index(
@@ -85,7 +91,11 @@ pub unsafe extern "C" fn jit_array_get_fast(
         let heap_idx = obj.as_heap_idx();
         let ctx_ref = &*ctx;
         if let Some(crate::heap::HeapObj::Array(a)) = ctx_ref.heap.get(heap_idx) {
-            let idx = if key.is_int() { key.as_int() as usize } else { key.to_i32() as usize };
+            let idx = if key.is_int() {
+                key.as_int() as usize
+            } else {
+                key.to_i32() as usize
+            };
             let vec = &*a.0.get();
             if idx < vec.len() {
                 return *vec.get_unchecked(idx);
@@ -112,7 +122,11 @@ pub unsafe extern "C" fn jit_array_set_fast(
         let heap_idx = obj.as_heap_idx();
         let ctx_ref = &mut *ctx;
         if let Some(crate::heap::HeapObj::Array(a)) = ctx_ref.heap.get_mut(heap_idx) {
-            let idx = if key.is_int() { key.as_int() as usize } else { key.to_i32() as usize };
+            let idx = if key.is_int() {
+                key.as_int() as usize
+            } else {
+                key.to_i32() as usize
+            };
             let vec = &mut *a.0.get();
             if idx < vec.len() {
                 *vec.get_unchecked_mut(idx) = val;
@@ -911,7 +925,10 @@ pub extern "C" fn jit_load_module_by_idx(
         match ctx_ref.load_module_from_source(&spec, &closure_ref.proto.chunk.source_file) {
             Ok(v) => v,
             Err(e) => {
-                eprintln!("JIT load_module_by_idx spec='{}', src='{}', err={:?}", spec, closure_ref.proto.chunk.source_file, e);
+                eprintln!(
+                    "JIT load_module_by_idx spec='{}', src='{}', err={:?}",
+                    spec, closure_ref.proto.chunk.source_file, e
+                );
                 panic!("JIT load_module failed: {:?}", e);
             }
         }

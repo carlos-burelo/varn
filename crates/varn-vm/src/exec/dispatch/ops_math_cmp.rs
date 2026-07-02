@@ -99,44 +99,21 @@ impl ExecCtx {
                 let a = self.stack[base + src1];
                 let b = self.stack[base + src2];
                 let res = if a.is_int() && b.is_int() {
+                    // Integer semantics (varn_core::numeric): arithmetic
+                    // wraps at 48 bits — `from_int` masks the payload, so a
+                    // plain wrapping op is exact and tier-identical with the
+                    // JIT. `int / int` always yields float; `**` stays
+                    // integral and rejects negative exponents.
                     match op {
-                        OpCode::AddInt => {
-                            let (r, overflow) = a.as_int().overflowing_add(b.as_int());
-                            if overflow {
-                                VmValue::from_f64(a.as_int() as f64 + b.as_int() as f64)
-                            } else {
-                                VmValue::from_int(r)
-                            }
-                        }
-                        OpCode::SubInt => {
-                            let (r, overflow) = a.as_int().overflowing_sub(b.as_int());
-                            if overflow {
-                                VmValue::from_f64(a.as_int() as f64 - b.as_int() as f64)
-                            } else {
-                                VmValue::from_int(r)
-                            }
-                        }
-                        OpCode::MulInt => {
-                            let (r, overflow) = a.as_int().overflowing_mul(b.as_int());
-                            if overflow {
-                                VmValue::from_f64(a.as_int() as f64 * b.as_int() as f64)
-                            } else {
-                                VmValue::from_int(r)
-                            }
-                        }
+                        OpCode::AddInt => VmValue::from_int(a.as_int().wrapping_add(b.as_int())),
+                        OpCode::SubInt => VmValue::from_int(a.as_int().wrapping_sub(b.as_int())),
+                        OpCode::MulInt => VmValue::from_int(a.as_int().wrapping_mul(b.as_int())),
                         OpCode::DivInt => {
                             let bv = b.as_int();
                             if bv == 0 {
                                 return Err(crate::error::RuntimeError::new("division by zero"));
                             }
-                            let av = a.as_int();
-                            if av == i64::MIN && bv == -1 {
-                                VmValue::from_f64(av as f64 / bv as f64)
-                            } else if av % bv == 0 {
-                                VmValue::from_int(av / bv)
-                            } else {
-                                VmValue::from_f64(av as f64 / bv as f64)
-                            }
+                            VmValue::from_f64(a.as_int() as f64 / bv as f64)
                         }
                         OpCode::ModInt => {
                             let bv = b.as_int();
@@ -146,17 +123,14 @@ impl ExecCtx {
                             VmValue::from_int(a.as_int() % bv)
                         }
                         OpCode::PowInt => {
-                            let base = a.as_int();
                             let exp = b.as_int();
-                            if exp >= 0 && exp <= 62 {
-                                if let Some(r) = base.checked_pow(exp as u32) {
-                                    VmValue::from_int(r)
-                                } else {
-                                    VmValue::from_f64((a.as_int() as f64).powf(b.as_int() as f64))
-                                }
-                            } else {
-                                VmValue::from_f64((a.as_int() as f64).powf(b.as_int() as f64))
+                            if exp < 0 {
+                                return Err(crate::error::RuntimeError::new(
+                                    "negative exponent in integer power",
+                                ));
                             }
+                            let e = u32::try_from(exp).unwrap_or(u32::MAX);
+                            VmValue::from_int(a.as_int().wrapping_pow(e))
                         }
                         _ => unreachable!(),
                     }
