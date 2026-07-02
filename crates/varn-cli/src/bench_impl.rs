@@ -11,8 +11,8 @@ use std::io::Write;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 use varn_checker::Checker;
-use varn_opt::FunctionProto;
 use varn_core::ModuleId;
+use varn_opt::FunctionProto;
 use varn_types::value::Closure;
 use varn_utilities::chalk::chalk;
 use varn_utilities::terminal;
@@ -85,20 +85,40 @@ fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Durati
     Ok(samples)
 }
 
-pub fn run_bench(path: &str, runs: usize, show_output: bool, verbose: bool) -> Result<(), CliError> {
-    if crate::pipeline::wrc::is_wrc(path) {
+pub fn run_bench(
+    path: &str,
+    eval: Option<&str>,
+    runs: usize,
+    show_output: bool,
+    verbose: bool,
+) -> Result<(), CliError> {
+    if eval.is_none() && crate::pipeline::wrc::is_wrc(path) {
         return run_bench_wrc(path, runs, show_output, verbose);
     }
 
-    let canonical = crate::pipeline::canonicalize_path(path)?;
-    let path = canonical.as_str();
+    let canonical;
+    let path = if eval.is_some() {
+        "(eval)"
+    } else {
+        canonical = crate::pipeline::canonicalize_path(path)?;
+        canonical.as_str()
+    };
 
-    let source = crate::pipeline::read_source_file(path)?;
+    let source = match eval {
+        Some(code) => code.to_owned(),
+        None => crate::pipeline::read_source_file(path)?,
+    };
 
     let read_samples = time_n(runs, || {
-        crate::pipeline::read_source_file(path)
-            .map(|_| ())
-            .map_err(|e| e.message.clone())
+        match eval {
+            Some(code) => {
+                let _ = code.to_owned();
+            }
+            None => {
+                crate::pipeline::read_source_file(path).map_err(|e| e.message.clone())?;
+            }
+        }
+        Ok(())
     })?;
 
     let lex_samples = time_n(runs, || {
@@ -228,8 +248,9 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool, verbose: bool) -> R
     .map_err(|e| CliError::fatal(format!("compile error: {e}")))?;
 
     let precompile_start = Instant::now();
-    let graph_build = varn_pipeline::module_precompile::build_module_graph(&program, &source, path, &proto)
-        .map_err(|e| CliError::fatal(format!("module graph build error: {e}")))?;
+    let graph_build =
+        varn_pipeline::module_precompile::build_module_graph(&program, &source, path, &proto)
+            .map_err(|e| CliError::fatal(format!("module graph build error: {e}")))?;
     let precompile_dur = precompile_start.elapsed();
     let precompiled = Rc::new(
         graph_build
@@ -323,8 +344,10 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool, verbose: bool) -> R
     })?;
 
     let e2e_samples = time_n(runs, || {
-        let source = crate::pipeline::read_source_file(path)
-            .map_err(|e| e.message.clone())?;
+        let source = match eval {
+            Some(code) => code.to_owned(),
+            None => crate::pipeline::read_source_file(path).map_err(|e| e.message.clone())?,
+        };
 
         let (tokens, lexeme_buf) = crate::pipeline::phase_lex(
             &source,
@@ -333,8 +356,8 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool, verbose: bool) -> R
             &varn_debug::flags::DebugFlags::default(),
         );
 
-        let (mut program, _) = varn_parser::parse_with_profile(tokens, lexeme_buf, path)
-            .map_err(|errs| {
+        let (mut program, _) =
+            varn_parser::parse_with_profile(tokens, lexeme_buf, path).map_err(|errs| {
                 let msgs: Vec<String> = errs
                     .iter()
                     .map(|e| {
@@ -447,7 +470,12 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool, verbose: bool) -> R
         chalk("").dim(),
         "",
         chalk(format!("{:.1} runs/s", throughput)).red(),
-        chalk(format!("(p50: {} true e2e · {} sum phases)", fmt_dur(e2e_p50), fmt_dur(total_p50))).dim()
+        chalk(format!(
+            "(p50: {} true e2e · {} sum phases)",
+            fmt_dur(e2e_p50),
+            fmt_dur(total_p50)
+        ))
+        .dim()
     ));
     terminal::log(format!(
         "  {}Total pipeline time:{} {}  {}",
@@ -569,7 +597,12 @@ pub fn run_bench(path: &str, runs: usize, show_output: bool, verbose: bool) -> R
     Ok(())
 }
 
-fn run_bench_wrc(path: &str, runs: usize, show_output: bool, verbose: bool) -> Result<(), CliError> {
+fn run_bench_wrc(
+    path: &str,
+    runs: usize,
+    show_output: bool,
+    verbose: bool,
+) -> Result<(), CliError> {
     let compiled = crate::pipeline::wrc::read_wrc(path)?;
     let compile_output = crate::pipeline::cache::compile_output_from_graph(compiled)?;
 
