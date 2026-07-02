@@ -77,7 +77,19 @@ impl Nursery {
 
     #[inline(always)]
     pub fn is_full(&self) -> bool {
-        self.objects.len() >= NURSERY_CAPACITY * 3 / 4
+        self.objects.len() >= Self::FULL_THRESHOLD
+    }
+
+    /// Fill level at which [`is_full`] reports true. Exposed so the JIT
+    /// back-edge safepoint compares against the same limit.
+    pub const FULL_THRESHOLD: usize = NURSERY_CAPACITY * 3 / 4;
+
+    /// Byte offset of the live-object count (`objects.len()`) inside
+    /// `Nursery`, for the JIT back-edge safepoint. Relies on Vec's
+    /// (cap, ptr, len) word layout — the same assumption the JIT already
+    /// makes when it reads `ExecCtx.stack`/`ExecCtx.frames` lengths.
+    pub fn objects_len_byte_offset() -> usize {
+        std::mem::offset_of!(Nursery, objects) + 2 * std::mem::size_of::<usize>()
     }
 
     #[inline(always)]
@@ -99,14 +111,15 @@ impl Nursery {
         extra_root_packed: &[u32],
     ) {
         self.minor_gc_count += 1;
+        let mut worklist: Vec<u32> = Vec::with_capacity(NURSERY_CAPACITY);
 
         for slot in stack.iter_mut() {
-            self.update_value(slot, old_gen);
+            self.update_value(slot, old_gen, &mut worklist);
         }
 
         let old_indices_to_scan = std::mem::take(&mut self.remembered);
         for packed in old_indices_to_scan {
-            self.scan_and_fix_old_obj(old_idx_raw(packed), old_gen);
+            self.scan_and_fix_old_obj(old_idx_raw(packed), old_gen, &mut worklist);
         }
 
         for raw_idx in 0..old_gen.objects().len() {
@@ -115,7 +128,7 @@ impl Nursery {
                 | Some(HeapObj::BoundMethod(_))
                 | Some(HeapObj::Class(_))
                 | Some(HeapObj::Module(_)) => {
-                    self.scan_and_fix_old_obj(raw_idx as u32, old_gen);
+                    self.scan_and_fix_old_obj(raw_idx as u32, old_gen, &mut worklist);
                 }
                 _ => {}
             }
@@ -123,19 +136,14 @@ impl Nursery {
 
         for &packed in extra_root_packed {
             if is_old_idx(packed) {
-                self.scan_and_fix_old_obj(old_idx_raw(packed), old_gen);
+                self.scan_and_fix_old_obj(old_idx_raw(packed), old_gen, &mut worklist);
             } else {
-                self.evacuate(packed, old_gen);
+                self.evacuate(packed, old_gen, &mut worklist);
             }
         }
 
-        let promoted_raw: Vec<u32> = self
-            .forwarding
-            .iter()
-            .filter_map(|f| f.map(old_idx_raw))
-            .collect();
-        for raw in promoted_raw {
-            self.scan_and_fix_old_obj(raw, old_gen);
+        while let Some(raw) = worklist.pop() {
+            self.scan_and_fix_old_obj(raw, old_gen, &mut worklist);
         }
 
         let n_promoted = self.forwarding.iter().filter(|f| f.is_some()).count();
@@ -145,7 +153,7 @@ impl Nursery {
     }
 
     #[inline]
-    fn update_value(&mut self, val: &mut VmValue, old_gen: &mut HeapInner) {
+    fn update_value(&mut self, val: &mut VmValue, old_gen: &mut HeapInner, worklist: &mut Vec<u32>) {
         if !val.is_heap() {
             return;
         }
@@ -153,11 +161,11 @@ impl Nursery {
         if !is_nursery_idx(idx) {
             return;
         }
-        let packed = self.evacuate(idx, old_gen);
+        let packed = self.evacuate(idx, old_gen, worklist);
         *val = VmValue::from_heap_idx(packed);
     }
 
-    fn evacuate(&mut self, nursery_idx: u32, old_gen: &mut HeapInner) -> u32 {
+    fn evacuate(&mut self, nursery_idx: u32, old_gen: &mut HeapInner, worklist: &mut Vec<u32>) -> u32 {
         if let Some(Some(fwd)) = self.forwarding.get(nursery_idx as usize) {
             return *fwd;
         }
@@ -170,10 +178,11 @@ impl Nursery {
         if let Some(slot) = self.forwarding.get_mut(nursery_idx as usize) {
             *slot = Some(packed);
         }
+        worklist.push(raw_old);
         packed
     }
 
-    fn scan_and_fix_old_obj(&mut self, raw_old: u32, old_gen: &mut HeapInner) {
+    fn scan_and_fix_old_obj(&mut self, raw_old: u32, old_gen: &mut HeapInner, worklist: &mut Vec<u32>) {
         let mut fixups: Vec<(ChildSlot, u32)> = Vec::with_capacity(8);
 
         if let Some(obj) = old_gen.get_raw(raw_old) {
@@ -238,16 +247,24 @@ impl Nursery {
                         }
                     }
                 }
+                HeapObj::EnumVariant(ev) => {
+                    if let Some(idx) = old_gen.value_heap_idx(&ev.payload) {
+                        if is_nursery_idx(idx) {
+                            fixups.push((ChildSlot::EnumVariantPayload, idx));
+                        }
+                    }
+                }
                 _ => {}
             }
         }
 
         for (slot, nursery_idx) in fixups {
-            let packed = self.evacuate(nursery_idx, old_gen);
+            let packed = self.evacuate(nursery_idx, old_gen, worklist);
             let new_val = VmValue::from_heap_idx(packed);
             let extracted_val = if matches!(slot, ChildSlot::BoundMethodReceiver)
                 || matches!(slot, ChildSlot::ClassVtableItem(_))
                 || matches!(slot, ChildSlot::ClassStatic(_))
+                || matches!(slot, ChildSlot::EnumVariantPayload)
             {
                 Some(old_gen.extract(new_val))
             } else {
@@ -291,6 +308,9 @@ impl Nursery {
                         *s = new_val;
                     }
                 }
+                (ChildSlot::EnumVariantPayload, HeapObj::EnumVariant(ev)) => {
+                    ev.payload = extracted_val.unwrap();
+                }
                 _ => {}
             }
         }
@@ -307,4 +327,5 @@ enum ChildSlot {
     ClassVtableItem(usize),
     ClassStatic(std::rc::Rc<str>),
     ModuleExport(usize),
+    EnumVariantPayload,
 }

@@ -3,6 +3,18 @@ use crate::value::VmValue;
 use super::ctx::ExecCtx;
 use super::ctx_jit_values::jit_propagate_error;
 
+/// Loop back-edge safepoint. Mirrors the interpreter's `OpCode::Loop`
+/// handler: collect the nursery (and pace the major GC) so long call-free
+/// allocating loops don't overflow the nursery into the old generation.
+/// Takes no `VmValue` arguments by design — the caller has flushed every VM
+/// register to the stack, so all roots are visible and get reloaded after.
+pub extern "C" fn jit_gc_safepoint(ctx: *mut ExecCtx) {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        ctx_ref.gc_backedge_safepoint();
+    }
+}
+
 pub extern "C" fn jit_negate(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -60,6 +72,66 @@ pub extern "C" fn jit_set_index(ctx: *mut ExecCtx, args: *const varn_jit::JitSet
             Ok(()) => {}
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
+    }
+}
+
+pub unsafe extern "C" fn jit_array_get_fast(
+    ctx: *mut ExecCtx,
+    obj: VmValue,
+    key: VmValue,
+) -> VmValue {
+    // Fast path: heap array with integer key — no string allocation, no dispatch table
+    if obj.is_heap() {
+        let heap_idx = obj.as_heap_idx();
+        let ctx_ref = &*ctx;
+        if let Some(crate::heap::HeapObj::Array(a)) = ctx_ref.heap.get(heap_idx) {
+            let idx = if key.is_int() { key.as_int() as usize } else { key.to_i32() as usize };
+            let vec = &*a.0.get();
+            if idx < vec.len() {
+                return *vec.get_unchecked(idx);
+            }
+            return VmValue::null();
+        }
+    }
+    // Slow path: objects, strings, ranges, SSO strings — fall back to handler
+    let ctx_ref = &mut *ctx;
+    match crate::exec::collections::array_get_index(obj, key, &mut ctx_ref.heap) {
+        Ok(v) => v,
+        Err(e) => super::ctx_jit_values::jit_propagate_error(ctx_ref, e),
+    }
+}
+
+pub unsafe extern "C" fn jit_array_set_fast(
+    ctx: *mut ExecCtx,
+    obj: VmValue,
+    key: VmValue,
+    val: VmValue,
+) {
+    // Fast path: heap array with integer key — no string allocation, no dispatch
+    if obj.is_heap() {
+        let heap_idx = obj.as_heap_idx();
+        let ctx_ref = &mut *ctx;
+        if let Some(crate::heap::HeapObj::Array(a)) = ctx_ref.heap.get_mut(heap_idx) {
+            let idx = if key.is_int() { key.as_int() as usize } else { key.to_i32() as usize };
+            let vec = &mut *a.0.get();
+            if idx < vec.len() {
+                *vec.get_unchecked_mut(idx) = val;
+            } else if idx == vec.len() {
+                vec.push(val);
+            } else {
+                while vec.len() < idx {
+                    vec.push(VmValue::null());
+                }
+                vec.push(val);
+            }
+            ctx_ref.heap.write_barrier(heap_idx, val);
+            return;
+        }
+    }
+    // Slow path: objects and other types
+    let ctx_ref = &mut *ctx;
+    if let Err(e) = crate::exec::collections::array_set_index(obj, key, val, &mut ctx_ref.heap) {
+        super::ctx_jit_values::jit_propagate_error(ctx_ref, e);
     }
 }
 
@@ -186,7 +258,7 @@ pub extern "C" fn jit_load_module(
             Some(s) => s,
             None => return VmValue::null(),
         };
-        match ctx_ref.load_module(&spec) {
+        match ctx_ref.load_module_from_source(&spec, &closure_ref.proto.chunk.source_file) {
             Ok(v) => v,
             Err(e) => panic!("JIT load_module failed: {:?}", e),
         }
@@ -335,30 +407,23 @@ pub extern "C" fn jit_build_object_with_shape(
     unsafe {
         let ctx_ref = &mut *ctx;
         let closure_ref = &*closure;
-        let keys = match closure_ref.proto.chunk.constants.get(shape_idx) {
-            Some(varn_types::chunk::PoolEntry::Shape(k)) => k.clone(),
-            _ => return VmValue::null(),
+        let Some(shape) = closure_ref.proto.resolved_shape(shape_idx) else {
+            return VmValue::null();
         };
+        let count = shape.property_names.len();
         let frame_idx = ctx_ref.frames.len() - 1;
         let base = ctx_ref.frames[frame_idx].base;
 
-        let mut inner = varn_types::RuntimeObject::new();
-        for (i, key) in keys.iter().enumerate() {
-            let val_nv = ctx_ref.stack[base + start_reg + i];
-            if val_nv.is_heap() {
-                if let Some(crate::heap::HeapObj::VmClosure(nc)) =
-                    ctx_ref.heap.get(val_nv.as_heap_idx())
-                {
-                    let nc = nc.clone();
-                    for uv in &nc.upvalues {
-                        uv.close(&ctx_ref.stack);
-                    }
-                }
-            }
-            inner.insert(key.clone(), val_nv);
+        let required = base + start_reg + count;
+        if ctx_ref.stack.len() < required {
+            ctx_ref.stack.resize(required, VmValue::null());
         }
-        let oref = varn_types::value::ObjRef::new(varn_types::ObjData::from_inner(inner));
-        VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Object(oref)))
+        crate::exec::collections::build_object_with_shape(
+            &ctx_ref.stack,
+            base + start_reg,
+            shape,
+            &mut ctx_ref.heap,
+        )
     }
 }
 
@@ -843,9 +908,12 @@ pub extern "C" fn jit_load_module_by_idx(
             Some(s) => s,
             None => return VmValue::null(),
         };
-        match ctx_ref.load_module(&spec) {
+        match ctx_ref.load_module_from_source(&spec, &closure_ref.proto.chunk.source_file) {
             Ok(v) => v,
-            Err(e) => panic!("JIT load_module failed: {:?}", e),
+            Err(e) => {
+                eprintln!("JIT load_module_by_idx spec='{}', src='{}', err={:?}", spec, closure_ref.proto.chunk.source_file, e);
+                panic!("JIT load_module failed: {:?}", e);
+            }
         }
     }
 }

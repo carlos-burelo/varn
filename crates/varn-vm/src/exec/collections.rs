@@ -4,19 +4,20 @@ use crate::value::VmValue;
 use std::rc::Rc;
 use varn_types::{value::ObjRef, ObjData, RuntimeObject, Value, VmArray};
 
+/// Build an object literal from `count` contiguous stack values using a
+/// pre-resolved shape (see `FunctionProto::resolved_shape`), avoiding the
+/// per-key shape-transition lookups of the generic `build_object` path.
+/// Values are read in slot order, which matches the shape's key order.
 pub fn build_object_with_shape(
-    stack: &mut Vec<VmValue>,
-    keys: &[Rc<str>],
+    stack: &[VmValue],
+    values_start: usize,
+    shape: Rc<varn_types::Shape>,
     heap: &mut Heap,
 ) -> VmValue {
-    let count = keys.len();
-    let mut inner = RuntimeObject::new();
-    let len = stack.len();
-    let values_start = len.saturating_sub(count);
+    let count = shape.property_names.len();
 
-    for (i, key) in keys.iter().enumerate() {
+    for i in 0..count {
         let val_nv = stack[values_start + i];
-
         if val_nv.is_heap() {
             if let Some(crate::heap::HeapObj::VmClosure(nc)) = heap.get(val_nv.as_heap_idx()) {
                 let nc = nc.clone();
@@ -25,12 +26,10 @@ pub fn build_object_with_shape(
                 }
             }
         }
-
-        inner.insert(key.clone(), val_nv);
     }
 
-    stack.truncate(values_start);
-    let oref = ObjRef::new(ObjData::from_inner(inner));
+    let values = stack[values_start..values_start + count].to_vec();
+    let oref = ObjRef::new(ObjData::with_shape(shape, values));
     VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref)))
 }
 
@@ -71,7 +70,64 @@ pub fn build_object(stack: &mut Vec<VmValue>, count: usize, heap: &mut Heap) -> 
     VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref)))
 }
 
+#[inline(always)]
+pub fn array_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    if obj.is_heap() {
+        if let Some(HeapObj::Array(a)) = heap.get(obj.as_heap_idx()) {
+            let idx = if key.is_int() { key.as_int() as usize } else { key.to_i32() as usize };
+            let val = unsafe {
+                let vec = &*a.0.get();
+                if idx < vec.len() {
+                    *vec.get_unchecked(idx)
+                } else {
+                    VmValue::null()
+                }
+            };
+            return Ok(val);
+        }
+    }
+    get_index(obj, key, heap)
+}
+
+#[inline(always)]
+pub fn array_set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Heap) -> VmResult<()> {
+    if obj.is_heap() {
+        let heap_idx = obj.as_heap_idx();
+        if let Some(HeapObj::Array(a)) = heap.get_mut(heap_idx) {
+            let idx = if key.is_int() { key.as_int() as usize } else { key.to_i32() as usize };
+            let g = unsafe { &mut *a.0.get() };
+            if idx < g.len() {
+                g[idx] = val;
+            } else if idx == g.len() {
+                g.push(val);
+            } else {
+                while g.len() < idx {
+                    g.push(VmValue::null());
+                }
+                g.push(val);
+            }
+            heap.write_barrier(heap_idx, val);
+            return Ok(());
+        }
+    }
+    set_index(obj, key, val, heap)
+}
+
 pub fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    if obj.is_heap() {
+        if let Some(HeapObj::Array(a)) = heap.get(obj.as_heap_idx()) {
+            let idx = key.to_i32();
+            let val = unsafe {
+                let vec = &*a.0.get();
+                if (idx as usize) < vec.len() {
+                    *vec.get_unchecked(idx as usize)
+                } else {
+                    VmValue::null()
+                }
+            };
+            return Ok(val);
+        }
+    }
     if obj.is_sso() {
         let mut buf = [0u8; 5];
         let s_str = obj.sso_as_str(&mut buf);
@@ -85,14 +141,6 @@ pub fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValu
         return Err(RuntimeError::new("OpGetIndex: not indexable"));
     }
     match heap.get(obj.as_heap_idx()) {
-        Some(HeapObj::Array(a)) => {
-            let idx = key.to_i32();
-            let val = {
-                let g = a.borrow();
-                g.get(idx as usize).cloned().unwrap_or(VmValue::null())
-            };
-            Ok(val)
-        }
         Some(HeapObj::Object(o)) => {
             let key_s = heap.str_repr(key);
             Ok(o.borrow().get_field_nv(&key_s).unwrap_or(VmValue::null()))
@@ -130,12 +178,11 @@ pub fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Heap) -> V
     if !obj.is_heap() {
         return Err(RuntimeError::new("OpSetIndex: not indexable"));
     }
-    let key_s = heap.str_repr(key);
+    let heap_idx = obj.as_heap_idx();
     let idx_i = key.to_i32() as usize;
-    match heap.get(obj.as_heap_idx()) {
+    match heap.get(heap_idx) {
         Some(HeapObj::Array(a)) => {
-            let a = a.clone();
-            let g = a.borrow_mut();
+            let g = unsafe { &mut *a.0.get() };
             if idx_i < g.len() {
                 g[idx_i] = val;
             } else if idx_i == g.len() {
@@ -146,13 +193,13 @@ pub fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Heap) -> V
                 }
                 g.push(val);
             }
-            heap.write_barrier(obj.as_heap_idx(), val);
+            heap.write_barrier(heap_idx, val);
             Ok(())
         }
         Some(HeapObj::Object(o)) => {
-            let o = o.clone();
+            let key_s = heap.str_repr(key);
             o.borrow_mut().set_field_nv(Rc::from(key_s.as_str()), val);
-            heap.write_barrier(obj.as_heap_idx(), val);
+            heap.write_barrier(heap_idx, val);
             Ok(())
         }
         _ => Err(RuntimeError::new("OpSetIndex: not indexable")),

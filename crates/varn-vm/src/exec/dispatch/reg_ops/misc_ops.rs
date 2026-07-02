@@ -4,9 +4,9 @@ use crate::frame::VmClosure;
 use crate::heap::HeapObj;
 use crate::value::VmValue;
 use std::rc::Rc;
-use varn_types::PoolEntry;
 
 impl ExecCtx {
+    #[inline(always)]
     pub(in crate::exec::dispatch) fn exec_get_fixed_field(
         &mut self,
         obj: VmValue,
@@ -15,6 +15,7 @@ impl ExecCtx {
         crate::exec::props::get_fixed_field(obj, slot, &mut self.heap)
     }
 
+    #[inline(always)]
     pub(in crate::exec::dispatch) fn exec_set_fixed_field(
         &mut self,
         obj: VmValue,
@@ -95,6 +96,15 @@ impl ExecCtx {
         crate::exec::collections::get_index(obj, key_nv, &mut self.heap)
     }
 
+    #[inline(always)]
+    pub(in crate::exec::dispatch) fn exec_array_get_index(
+        &mut self,
+        obj: VmValue,
+        key_nv: VmValue,
+    ) -> VmResult<VmValue> {
+        crate::exec::collections::array_get_index(obj, key_nv, &mut self.heap)
+    }
+
     pub(in crate::exec::dispatch) fn exec_set_index(
         &mut self,
         obj: VmValue,
@@ -104,6 +114,16 @@ impl ExecCtx {
         crate::exec::collections::set_index(obj, idx, val, &mut self.heap)
     }
 
+    #[inline(always)]
+    pub(in crate::exec::dispatch) fn exec_array_set_index(
+        &mut self,
+        obj: VmValue,
+        idx: VmValue,
+        val: VmValue,
+    ) -> VmResult<()> {
+        crate::exec::collections::array_set_index(obj, idx, val, &mut self.heap)
+    }
+
     pub(in crate::exec::dispatch) fn exec_build_object_with_shape(
         &mut self,
         base: usize,
@@ -111,29 +131,20 @@ impl ExecCtx {
         shape_idx: usize,
         closure: &VmClosure,
     ) -> VmResult<VmValue> {
-        let keys = match closure.proto.chunk.constants.get(shape_idx) {
-            Some(PoolEntry::Shape(k)) => k.clone(),
-            _ => {
-                return Err(RuntimeError::new(
-                    "BuildObjectWithShape: invalid shape const",
-                ))
-            }
-        };
-        let count = keys.len();
-        let mut vals: Vec<VmValue> = Vec::with_capacity(count);
-        for i in 0..count {
-            vals.push(self.stack[base + start_reg + i]);
+        let shape = closure.proto.resolved_shape(shape_idx).ok_or_else(|| {
+            RuntimeError::new("BuildObjectWithShape: invalid shape const")
+        })?;
+        let count = shape.property_names.len();
+        let required = base + start_reg + count;
+        if self.stack.len() < required {
+            self.stack.resize(required, VmValue::null());
         }
-
-        for v in vals {
-            self.stack.push(v);
-        }
-        let result = crate::exec::collections::build_object_with_shape(
-            &mut self.stack,
-            &keys,
+        Ok(crate::exec::collections::build_object_with_shape(
+            &self.stack,
+            base + start_reg,
+            shape,
             &mut self.heap,
-        );
-        Ok(result)
+        ))
     }
 
     pub(crate) fn exec_object_rest(

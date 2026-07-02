@@ -91,6 +91,7 @@ pub fn emit_function(
         chunk,
         required_caps: Vec::new(),
         register_meta: Vec::new(),
+        resolved_shapes: RefCell::new(Vec::new()),
         jit_entry: Cell::new(None),
         jit_code: RefCell::new(None),
         jit_failed: Cell::new(false),
@@ -344,6 +345,9 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
                 InstKind::MethodCall { args, .. } => args.len() as u32,
 
                 InstKind::BuildArray { elements } => elements.len() as u32,
+                // Object literals stage non-contiguous values into the call
+                // area before BuildObjectWithShape.
+                InstKind::BuildObject { pairs } => pairs.len() as u32,
 
                 InstKind::IntrinsicCall { args, .. } => args.len() as u32 + 1,
                 InstKind::CallNativeOp { args, .. } => args.len() as u32 + 1,
@@ -416,6 +420,20 @@ fn emit_inst(
             );
             return Ok(());
         }
+        InstKind::SetFixedField {
+            object,
+            value,
+            slot,
+        } => {
+            chunk.emit_rrc(
+                OpCode::SetFixedField,
+                reg[object.0 as usize],
+                reg[value.0 as usize],
+                *slot,
+                LINE,
+            );
+            return Ok(());
+        }
         InstKind::SetIndex {
             object,
             index,
@@ -423,6 +441,20 @@ fn emit_inst(
         } => {
             chunk.emit_rrr(
                 OpCode::SetIndex,
+                reg[object.0 as usize],
+                reg[index.0 as usize],
+                reg[value.0 as usize],
+                LINE,
+            );
+            return Ok(());
+        }
+        InstKind::ArraySetIndex {
+            object,
+            index,
+            value,
+        } => {
+            chunk.emit_rrr(
+                OpCode::ArraySetIndex,
                 reg[object.0 as usize],
                 reg[index.0 as usize],
                 reg[value.0 as usize],
@@ -654,9 +686,27 @@ fn emit_inst(
                 LINE,
             );
         }
+        InstKind::GetFixedField { object, slot } => {
+            chunk.emit_rrc(
+                OpCode::GetFixedField,
+                d,
+                reg[object.0 as usize],
+                *slot,
+                LINE,
+            );
+        }
         InstKind::GetIndex { object, index } => {
             chunk.emit_rrr(
                 OpCode::GetIndex,
+                d,
+                reg[object.0 as usize],
+                reg[index.0 as usize],
+                LINE,
+            );
+        }
+        InstKind::ArrayGetIndex { object, index } => {
+            chunk.emit_rrr(
+                OpCode::ArrayGetIndex,
                 d,
                 reg[object.0 as usize],
                 reg[index.0 as usize],
@@ -696,13 +746,40 @@ fn emit_inst(
         }
 
         InstKind::BuildObject { pairs } => {
-            chunk.emit(OpCode::BuildObject, LINE);
-            chunk.write(Chunk::pack(d, pairs.len() as u8), LINE);
-            for (k, v) in pairs {
-                let key_idx = chunk.add_str(k);
-                chunk.write(key_idx, LINE);
-                chunk.write(Chunk::pack(reg[v.0 as usize], 0), LINE);
+            // Always take the shape path: the keys are compile-time constants,
+            // and the generic BuildObject pays a string materialisation plus a
+            // shape transition per key on every allocation. If the values are
+            // not already contiguous, stage them into the call area first —
+            // the same convention BuildArray and MethodCall use.
+            let count = pairs.len();
+            let mut is_contiguous = count > 0;
+            let mut start_reg = call_base;
+            if count > 0 {
+                let first = reg[pairs[0].1 .0 as usize];
+                for (i, (_, v)) in pairs.iter().enumerate() {
+                    if reg[v.0 as usize] != first + i as u8 {
+                        is_contiguous = false;
+                        break;
+                    }
+                }
+                if is_contiguous {
+                    start_reg = first;
+                } else {
+                    for (i, (_, v)) in pairs.iter().enumerate() {
+                        chunk.emit_rr(
+                            OpCode::Move,
+                            call_base + i as u8,
+                            reg[v.0 as usize],
+                            LINE,
+                        );
+                    }
+                }
             }
+            let keys = pairs.iter().map(|(k, _)| k.clone()).collect();
+            let shape_idx = chunk.add_shape(keys);
+            chunk.emit(OpCode::BuildObjectWithShape, LINE);
+            chunk.write(Chunk::pack(d, start_reg), LINE);
+            chunk.write(shape_idx, LINE);
         }
         InstKind::ToString { operand } => {
             chunk.emit_rr(OpCode::ToString, d, reg[operand.0 as usize], LINE);
@@ -1008,7 +1085,9 @@ fn emit_inst(
         }
 
         InstKind::SetProperty { .. }
+        | InstKind::SetFixedField { .. }
         | InstKind::SetIndex { .. }
+        | InstKind::ArraySetIndex { .. }
         | InstKind::ObjectMerge { .. }
         | InstKind::AssertNotNull { .. }
         | InstKind::StoreGlobal { .. }
