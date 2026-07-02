@@ -46,7 +46,10 @@ pub enum Commands {
 
 #[derive(Args)]
 pub struct RunArgs {
-    pub file: String,
+    pub file: Option<String>,
+
+    #[arg(short, long, value_name = "CODE")]
+    pub eval: Option<String>,
 
     #[arg(last = true, value_name = "ARGS")]
     pub script_args: Vec<String>,
@@ -99,7 +102,10 @@ pub struct ReplArgs {
 
 #[derive(Args)]
 pub struct BenchArgs {
-    pub file: String,
+    pub file: Option<String>,
+
+    #[arg(short, long, value_name = "CODE")]
+    pub eval: Option<String>,
 
     #[arg(long, default_value = "10", value_name = "N")]
     pub runs: usize,
