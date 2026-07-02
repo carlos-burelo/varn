@@ -11,224 +11,46 @@ pub struct RegMap {
 }
 
 impl RegMap {
-    pub fn from_bytecode(code: &[u16]) -> Self {
+    pub fn from_bytecode(code: &[u16], constants: &[varn_types::chunk::PoolEntry]) -> Self {
+        // Rank virtual registers by access frequency using the shared
+        // instruction decoder (varn_types::bytecode). Cheap moves and
+        // immediate loads weigh 1, normal defs/uses 2, branch conditions 3.
         let mut freq: HashMap<usize, u32> = HashMap::new();
 
         let mut ip = 0;
         while ip < code.len() {
-            let raw_op = code[ip];
-            ip += 1;
-            let first_reg = (raw_op >> 8) as usize;
-            let op = match OpCode::from_u8(raw_op as u8) {
-                Some(o) => o,
-                None => break,
+            let Some(op) = OpCode::from_u16(code[ip]) else {
+                break;
+            };
+            let Some(info) = varn_types::bytecode::decode(code, ip, constants) else {
+                break;
             };
 
-            match op {
-                OpCode::Return => {
-                    let w1 = code[ip];
-                    ip += 1;
-                    let src = (w1 & 0xFF) as usize;
-                    *freq.entry(src).or_insert(0) += 2;
-                }
+            let def_weight = match op {
                 OpCode::LoadNull
                 | OpCode::LoadTrue
                 | OpCode::LoadFalse
                 | OpCode::LoadIntZero
                 | OpCode::LoadIntOne
-                | OpCode::LoadIntMinusOne => {
-                    *freq.entry(first_reg).or_insert(0) += 1;
-                }
-                OpCode::LoadInt
-                | OpCode::LoadConst
-                | OpCode::LoadGlobalIdx
-                | OpCode::LoadGlobal
-                | OpCode::LoadUpvalue => {
-                    *freq.entry(first_reg).or_insert(0) += 2;
-                    ip += 1;
-                }
-                OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx => {
-                    let w1 = code[ip];
-                    ip += 1;
-                    let src = (w1 >> 8) as usize;
-                    *freq.entry(src).or_insert(0) += 2;
-                    ip += 1;
-                }
-                OpCode::StoreUpvalue => {
-                    let w1 = code[ip];
-                    ip += 1;
-                    let src = (w1 & 0xFF) as usize;
-                    *freq.entry(src).or_insert(0) += 2;
-                }
-                OpCode::Move => {
-                    let w1 = code[ip];
-                    ip += 1;
-                    let src = (w1 >> 8) as usize;
-                    *freq.entry(first_reg).or_insert(0) += 1;
-                    *freq.entry(src).or_insert(0) += 1;
-                }
-                OpCode::LoadStaticFn => {
-                    ip += 1;
-                    *freq.entry(first_reg).or_insert(0) += 1;
-                }
-                OpCode::AddImm | OpCode::SubImm => {
-                    let w1 = code[ip];
-                    ip += 1;
-                    let src = (w1 >> 8) as usize;
-                    *freq.entry(first_reg).or_insert(0) += 2;
-                    *freq.entry(src).or_insert(0) += 2;
-                }
-                OpCode::ToString
-                | OpCode::IsNull
-                | OpCode::ArrayLength
-                | OpCode::ArrayPush
-                | OpCode::ArrayPop
-                | OpCode::ArrayExtend
-                | OpCode::StrLength => {
-                    let w1 = code[ip];
-                    ip += 1;
-                    let src = (w1 >> 8) as usize;
-                    *freq.entry(first_reg).or_insert(0) += 2;
-                    *freq.entry(src).or_insert(0) += 2;
-                }
-                OpCode::MakeClosure => {
-                    let w1 = code[ip];
-                    ip += 1;
-                    let uv_count = (w1 & 0xFF) as usize;
-                    ip += 1;
-                    *freq.entry(first_reg).or_insert(0) += 2;
-                    for _ in 0..uv_count {
-                        let uv_desc = code[ip];
-                        ip += 1;
-                        let is_local = (uv_desc >> 8) != 0;
-                        let index = (uv_desc & 0xFF) as usize;
-                        if is_local {
-                            *freq.entry(index).or_insert(0) += 2;
-                        }
-                    }
-                }
-                OpCode::Eq
-                | OpCode::Neq
-                | OpCode::Lt
-                | OpCode::Lte
-                | OpCode::Gt
-                | OpCode::Gte
-                | OpCode::EqFloat
-                | OpCode::NeqFloat
-                | OpCode::LtFloat
-                | OpCode::LteFloat
-                | OpCode::GtFloat
-                | OpCode::GteFloat
-                | OpCode::Add
-                | OpCode::Sub
-                | OpCode::Mul
-                | OpCode::Div
-                | OpCode::Mod
-                | OpCode::Pow
-                | OpCode::AddInt
-                | OpCode::SubInt
-                | OpCode::MulInt
-                | OpCode::DivInt
-                | OpCode::ModInt
-                | OpCode::PowInt
-                | OpCode::LtInt
-                | OpCode::GtInt
-                | OpCode::LteInt
-                | OpCode::GteInt
-                | OpCode::EqInt
-                | OpCode::NeqInt
-                | OpCode::AddFloat
-                | OpCode::SubFloat
-                | OpCode::MulFloat
-                | OpCode::DivFloat
-                | OpCode::ModFloat
-                | OpCode::PowFloat
-                | OpCode::GetIndex
-                | OpCode::ArrayGetIndex
-                | OpCode::Instanceof
-                | OpCode::StrConcat
-                | OpCode::StrSlice
-                | OpCode::BitAnd
-                | OpCode::BitOr
-                | OpCode::BitXor
-                | OpCode::Shl
-                | OpCode::Shr
-                | OpCode::Ushr => {
-                    let w1 = code[ip];
-                    ip += 1;
-                    let src1 = (w1 >> 8) as usize;
-                    let src2 = (w1 & 0xFF) as usize;
-                    *freq.entry(first_reg).or_insert(0) += 2;
-                    *freq.entry(src1).or_insert(0) += 2;
-                    *freq.entry(src2).or_insert(0) += 2;
-                }
-                OpCode::SetIndex | OpCode::ArraySetIndex => {
-                    let w1 = code[ip];
-                    ip += 1;
-                    let idx_reg = (w1 >> 8) as usize;
-                    let val_reg = (w1 & 0xFF) as usize;
-                    *freq.entry(first_reg).or_insert(0) += 2;
-                    *freq.entry(idx_reg).or_insert(0) += 2;
-                    *freq.entry(val_reg).or_insert(0) += 2;
-                }
-                OpCode::Typeof => {
-                    let w1 = code[ip];
-                    ip += 1;
-                    let src = (w1 >> 8) as usize;
-                    *freq.entry(first_reg).or_insert(0) += 2;
-                    *freq.entry(src).or_insert(0) += 2;
-                }
-                OpCode::Jump | OpCode::Loop => {
-                    ip += 2;
-                }
-                OpCode::JumpIfFalse | OpCode::JumpIfTrue => {
-                    *freq.entry(first_reg).or_insert(0) += 3;
-                    ip += 2;
-                }
-                OpCode::AssertNotNull
-                | OpCode::CloseUpvalue
-                | OpCode::GetEnumTag
-                | OpCode::IsArray
-                | OpCode::WrapSpread
-                | OpCode::ObjectKeys
-                | OpCode::ObjectMerge
-                | OpCode::In
-                | OpCode::GetSuper
-                | OpCode::Inherit
-                | OpCode::LoadModule => {
-                    ip += 1;
-                }
-                OpCode::GetFixedField
-                | OpCode::SetFixedField
-                | OpCode::GetPropertyMaybe
-                | OpCode::GetSymbol
-                | OpCode::BindMethod
-                | OpCode::DefineGlobal
-                | OpCode::StoreGlobal
-                | OpCode::DeclareField
-                | OpCode::MakeClass
-                | OpCode::Method
-                | OpCode::DefineStatic
-                | OpCode::DefineGetter
-                | OpCode::DefineSetter
-                | OpCode::DefineStaticGetter
-                | OpCode::DefineStaticSetter
-                | OpCode::MakeEnumVariant
-                | OpCode::CallSpread => {
-                    ip += 2;
-                }
-                OpCode::BuildObject => {
-                    let w1 = code[ip];
-                    let count = (w1 & 0xFF) as usize;
-                    ip += 1 + count * 2;
-                }
-                OpCode::ObjectRest => {
-                    let w2 = code[ip + 1];
-                    let skip_count = (w2 >> 8) as usize;
-                    ip += 2 + skip_count;
-                }
-                _ => break,
+                | OpCode::LoadIntMinusOne
+                | OpCode::LoadStaticFn
+                | OpCode::Move => 1,
+                _ => 2,
+            };
+            let use_weight = match op {
+                OpCode::JumpIfFalse | OpCode::JumpIfTrue => 3,
+                OpCode::Move => 1,
+                _ => 2,
+            };
+
+            if let Some(d) = info.def {
+                *freq.entry(d as usize).or_insert(0) += def_weight;
             }
+            for u in &info.uses {
+                *freq.entry(*u as usize).or_insert(0) += use_weight;
+            }
+
+            ip += info.len;
         }
 
         let mut ranked: Vec<(usize, u32)> = freq.into_iter().collect();
