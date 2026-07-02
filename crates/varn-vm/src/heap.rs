@@ -46,7 +46,7 @@ impl HeapStr {
             HeapStr::Shared(s) => s,
             // Safety: single-threaded VM; the buffer is only appended to (via
             // `str_concat`), never while a borrow from this view is live.
-            HeapStr::Ext { buf, len } => unsafe { &(*buf.get())[..*len] },
+            HeapStr::Ext { buf, len } => unsafe { &(&*buf.get())[..*len] },
         }
     }
 
@@ -77,7 +77,7 @@ impl HeapStr {
     pub fn is_tip(&self) -> bool {
         match self {
             HeapStr::Shared(_) => false,
-            HeapStr::Ext { buf, len } => unsafe { (*buf.get()).len() == *len },
+            HeapStr::Ext { buf, len } => unsafe { (&*buf.get()).len() == *len },
         }
     }
 }

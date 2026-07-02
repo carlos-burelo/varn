@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use varn_op_macros::varn_contract;
 use varn_types::value::{MapRef, Value};
 use varn_types::{NativeCtx, VmValue, VnArray};
@@ -41,7 +40,7 @@ fn ensure_record_entries(ctx: &mut dyn NativeCtx, this: VmValue) -> MapRef {
     if let Some(map) = get_record_entries(ctx, this) {
         map
     } else {
-        let map = MapRef::new(HashMap::new());
+        let map = MapRef::new(varn_types::value::ValueMap::default());
         let entries = ctx.intern(Value::Map(map.clone()));
         ctx.set_field(this, "entries", entries);
         map
@@ -177,7 +176,7 @@ varn_contract! {
     contract: "src/modules/std/collections/collections.vn",
     impl Record {
         fn constructor(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
-            let map = MapRef::new(HashMap::new());
+            let map = MapRef::new(varn_types::value::ValueMap::default());
             let entries = ctx.intern(Value::Map(map));
             ctx.set_field(this, "entries", entries);
             this

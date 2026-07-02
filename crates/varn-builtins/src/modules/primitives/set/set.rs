@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use varn_op_macros::varn_contract;
 use varn_types::value::SetRef;
 use varn_types::{NativeCtx, Value, VmValue};
@@ -19,7 +18,7 @@ varn_contract! {
     contract: "src/modules/primitives/set/set.vn",
     impl Set {
         fn constructor(ctx: &mut dyn NativeCtx, _this: VmValue) -> VmValue {
-            ctx.intern(Value::Set(SetRef::new(HashSet::new())))
+            ctx.intern(Value::Set(SetRef::new(varn_types::value::ValueSet::default())))
         }
 
         fn add(ctx: &mut dyn NativeCtx, this: VmValue, value: VmValue) {

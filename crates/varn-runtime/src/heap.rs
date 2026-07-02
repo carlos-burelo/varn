@@ -1,8 +1,7 @@
 use varn_types::value::{
-    install_allocator, AllocVtable, ArrayRef, MapRef, ObjData, ObjRef, SetRef, Value,
+    install_allocator, AllocVtable, ArrayRef, MapRef, ObjData, ObjRef, SetRef, Value, ValueMap,
+    ValueSet,
 };
-
-use std::collections::{HashMap, HashSet};
 
 fn make_object() -> ObjRef {
     ObjRef::new(ObjData::new())
@@ -13,11 +12,11 @@ fn make_array() -> ArrayRef {
 }
 
 fn make_map() -> MapRef {
-    MapRef::new(HashMap::<Value, Value>::new())
+    MapRef::new(ValueMap::default())
 }
 
 fn make_set() -> SetRef {
-    SetRef::new(HashSet::<Value>::new())
+    SetRef::new(ValueSet::default())
 }
 
 static VTABLE: AllocVtable = AllocVtable {
