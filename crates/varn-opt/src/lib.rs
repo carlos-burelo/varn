@@ -51,7 +51,8 @@ pub fn compile_module(
 pub fn compile(input: OptInput<'_>) -> Result<FunctionProto, OptError> {
     let source_file = input.program.filename.clone();
     let export_names = input.export_names.clone();
-    let module = hir::lower::lower_program(&input)?;
+    let mut module = hir::lower::lower_program(&input)?;
+    hir::inline::run(&mut module);
     if std::env::var_os("VN_OPT_TRACE").is_some() {
         eprintln!(
             "[varn-opt] compiled module: {} fn(s) + top-level",
@@ -70,7 +71,8 @@ pub fn lower_to_hir(input: OptInput<'_>) -> Result<hir::HirModule, OptError> {
 pub fn lower_to_ssa(
     input: OptInput<'_>,
 ) -> Result<(Vec<ssa::ir::SsaFunc>, Vec<(Rc<str>, &'static str)>), OptError> {
-    let module = hir::lower::lower_program(&input)?;
+    let mut module = hir::lower::lower_program(&input)?;
+    hir::inline::run(&mut module);
     let mut funcs = Vec::new();
     let mut errors: Vec<(Rc<str>, &'static str)> = Vec::new();
 
