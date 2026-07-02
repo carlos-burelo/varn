@@ -89,8 +89,6 @@ pub struct TricolorMarker {
     marks: MarkBitmap,
     gray_queue: VecDeque<u32>,
     marked_count: usize,
-
-    
 }
 
 impl TricolorMarker {
@@ -99,7 +97,6 @@ impl TricolorMarker {
             marks: MarkBitmap::new(heap_capacity),
             gray_queue: VecDeque::new(),
             marked_count: 0,
-            
         }
     }
 

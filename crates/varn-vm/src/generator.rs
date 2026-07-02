@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use varn_types::generator::{GeneratorDriver};
+use varn_types::generator::GeneratorDriver;
 use varn_types::value::Value;
 
 use crate::exec::{ExecCtx, VmSuspend};

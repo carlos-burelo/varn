@@ -201,4 +201,3 @@ pub fn reexport(exports_nv: VmValue, name: &str, val_nv: VmValue, heap: &mut Hea
     }
     Err(RuntimeError::new("OpReexport: exports is not an object"))
 }
-

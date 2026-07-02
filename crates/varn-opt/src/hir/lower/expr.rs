@@ -141,7 +141,9 @@ impl<'a> Lowerer<'a> {
                             is_array,
                         })
                     } else {
-                        if let Some(slot) = self.ann.get_fixed_field_slot(property.range.start.offset) {
+                        if let Some(slot) =
+                            self.ann.get_fixed_field_slot(property.range.start.offset)
+                        {
                             return Ok(HirAssignTarget::SetFixedField {
                                 object: object_hir,
                                 slot,

@@ -22,7 +22,11 @@ pub trait NativeCtx {
     fn alloc_str_owned(&mut self, s: String) -> VmValue;
     fn alloc_array(&mut self, items: Vec<VmValue>) -> VmValue;
     fn alloc_object(&mut self) -> VmValue;
-    fn alloc_object_with_shape(&mut self, _shape: &Rc<crate::value::Shape>, _values: Vec<VmValue>) -> VmValue {
+    fn alloc_object_with_shape(
+        &mut self,
+        _shape: &Rc<crate::value::Shape>,
+        _values: Vec<VmValue>,
+    ) -> VmValue {
         self.alloc_object()
     }
     fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue;

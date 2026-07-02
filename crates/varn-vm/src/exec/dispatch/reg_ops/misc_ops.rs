@@ -131,9 +131,10 @@ impl ExecCtx {
         shape_idx: usize,
         closure: &VmClosure,
     ) -> VmResult<VmValue> {
-        let shape = closure.proto.resolved_shape(shape_idx).ok_or_else(|| {
-            RuntimeError::new("BuildObjectWithShape: invalid shape const")
-        })?;
+        let shape = closure
+            .proto
+            .resolved_shape(shape_idx)
+            .ok_or_else(|| RuntimeError::new("BuildObjectWithShape: invalid shape const"))?;
         let count = shape.property_names.len();
         let required = base + start_reg + count;
         if self.stack.len() < required {

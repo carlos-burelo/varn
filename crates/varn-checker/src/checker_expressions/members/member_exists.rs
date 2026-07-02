@@ -220,7 +220,10 @@ impl Checker {
             TypeKind::Object(members) => members.iter().any(|m| m.name() == key),
             TypeKind::Array(_) => {
                 if let Some(b) = &bind.core {
-                    if let Some(members) = b.class_members.get(varn_core::IntrinsicType::Array.as_str()) {
+                    if let Some(members) = b
+                        .class_members
+                        .get(varn_core::IntrinsicType::Array.as_str())
+                    {
                         return members.members.iter().any(|m| m.name.as_ref() == key);
                     }
                 }

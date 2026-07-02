@@ -181,9 +181,7 @@ impl DocumentState {
                             .find(|s| s.symbol_id == Some(sid))
                             .or_else(|| {
                                 self.symbols.iter().find(|s| {
-                                    !s.is_from_stdlib
-                                        && s.line == sym.line
-                                        && s.col == sym.col
+                                    !s.is_from_stdlib && s.line == sym.line && s.col == sym.col
                                 })
                             });
                         if let Some(s) = found {

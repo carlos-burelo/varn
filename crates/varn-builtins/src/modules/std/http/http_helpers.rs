@@ -2,7 +2,6 @@ use varn_types::Value;
 
 pub(crate) type RouteEntry = (String, String, Value);
 
-
 pub(crate) fn split_path_query(url: &str) -> (String, String) {
     match url.find('?') {
         Some(i) => (url[..i].to_owned(), url[i + 1..].to_owned()),

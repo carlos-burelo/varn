@@ -2,8 +2,8 @@ use crate::hash::fnv1a64;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
 
-use varn_opt::FunctionProto;
 use varn_core::ast::Program;
+use varn_opt::FunctionProto;
 use varn_types::PackageNode;
 
 const UNKNOWN_INTEGRITY_HASH: &str = "0000000000000000";

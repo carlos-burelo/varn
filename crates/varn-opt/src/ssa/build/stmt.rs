@@ -186,21 +186,6 @@ impl Builder {
         }
     }
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
     pub(super) fn lower_if(
         &mut self,
         test: &HirExpr,

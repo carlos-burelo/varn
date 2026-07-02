@@ -353,7 +353,14 @@ fn emit_call_self(ctx: &mut CodegenCtx, first_reg: usize) {
     // Immediate (`int`/`float`/`bool`) locals that aren't arguments stay in their
     // callee-saved registers across the recursive call; only pointer slots and the
     // arguments the callee reads from memory are spilled. See `emit_flush_for_call`.
-    emit_flush_for_call(asm, regmap, meta, safe_opt, arg_start, arg_start + arg_count);
+    emit_flush_for_call(
+        asm,
+        regmap,
+        meta,
+        safe_opt,
+        arg_start,
+        arg_start + arg_count,
+    );
 
     // NOTE: a former "is_pure" fast path emitted a bare native `call` to self with
     // no frame push and no depth check, so deep self-recursion overflowed the host

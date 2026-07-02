@@ -150,7 +150,8 @@ impl Checker {
         // `dynamic` (which would be dropped, collapsing the return type to
         // `void`). Mirrors `infer_arrow_with_context` used by generic inference,
         // keeping the two paths consistent.
-        let arrow_scope = crate::checker_generics::find_arrow_scope(self.current_scope, params, bind);
+        let arrow_scope =
+            crate::checker_generics::find_arrow_scope(self.current_scope, params, bind);
         let saved_scope = self.current_scope;
         if let Some(scope_id) = arrow_scope {
             self.current_scope = scope_id;
