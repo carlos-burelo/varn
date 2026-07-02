@@ -694,6 +694,18 @@ cache locations between compiler builds; longer term, key artifacts by
   `Sub`/`Mul` always did. (`emit_compare_inline` was already safe: it
   shifts payloads to the top bits and compares signed.)
 
+- New `passes/fixed_fields.rs`: `GetProperty` on object literals built in the
+  same function devirtualizes to `GetFixedField` (static slot) when the
+  literal never escapes and never receives a `SetProperty` — conservative:
+  any other use disqualifies. prop_mono now compiles to `GetFixedField 0/1/2`
+  with no IC sites. JIT time unchanged (~600 ms): `jit_get_fixed_field` is
+  still an FFI call with a register flush, which — not the IC lookup — is the
+  dominant cost. The static slot in the bytecode is the precondition for the
+  real win: inlining the slot load in JIT codegen (heap-layout offsets,
+  validated at startup like the nursery safepoint chain). That plus
+  constant-divisor strength reduction and inlined call sequences are the
+  next round.
+
 ## Summary of actionable fixes (by leverage)
 
 1. **Compile `<module>` / promote module-private top-level vars to registers** —
