@@ -403,10 +403,15 @@ impl HeapInner {
         }
     }
 
+    #[track_caller]
     pub fn extract(&self, nv: VmValue) -> Value {
         match self.extract_val(nv) {
             Ok(v) => v,
-            Err(e) => panic!("heap.extract: dangling or corrupted heap reference: {e}"),
+            Err(e) => {
+                eprintln!("[GC DEBUG] heap.extract failed on nv=0x{:016x} (is_heap={}, heap_idx={})", nv.0, nv.is_heap(), if nv.is_heap() { nv.as_heap_idx() as i64 } else { -1 });
+                eprintln!("[GC DEBUG] Caller location: {}", std::panic::Location::caller());
+                panic!("heap.extract: dangling or corrupted heap reference: {e}");
+            }
         }
     }
 
@@ -593,6 +598,11 @@ impl HeapInner {
 
     pub fn alloc_object(&mut self) -> VmValue {
         let oref = ObjRef::new(ObjData::new());
+        VmValue::from_heap_idx(self.alloc(HeapObj::Object(oref)))
+    }
+
+    pub fn alloc_object_with_shape(&mut self, shape: &Rc<varn_types::Shape>, values: Vec<VmValue>) -> VmValue {
+        let oref = ObjRef::new(ObjData::with_shape(Rc::clone(shape), values));
         VmValue::from_heap_idx(self.alloc(HeapObj::Object(oref)))
     }
 
@@ -941,6 +951,23 @@ impl Heap {
     pub unsafe fn inner_mut(&self) -> &mut HeapInner {
         &mut *self.inner.get()
     }
+
+    /// Byte offset from the `RcBox` pointer stored in `Heap.inner` to the
+    /// nursery's live-object count, for the JIT back-edge safepoint.
+    /// `RcBox` is `#[repr(C)] { strong, weak, value }`; the chain is
+    /// validated against a live heap in `ExecCtx::new`.
+    pub fn nursery_len_byte_offset_from_rcbox() -> usize {
+        2 * std::mem::size_of::<usize>()
+            + std::mem::offset_of!(HeapInner, nursery)
+            + crate::nursery::Nursery::objects_len_byte_offset()
+    }
+
+    /// Raw pointer to the `RcBox` behind `inner` (the address JIT code loads
+    /// from `ExecCtx.heap`), used only to validate the offset chain.
+    pub fn rcbox_ptr_for_validation(&self) -> *const u8 {
+        // Rc's data pointer is RcBox + 16; undo that to recover the box base.
+        (Rc::as_ptr(&self.inner) as *const u8).wrapping_sub(2 * std::mem::size_of::<usize>())
+    }
 }
 
 impl std::ops::Deref for Heap {
@@ -979,6 +1006,10 @@ impl NativeCtx for Heap {
 
     fn alloc_object(&mut self) -> VmValue {
         self.deref_mut().alloc_object()
+    }
+
+    fn alloc_object_with_shape(&mut self, shape: &std::rc::Rc<varn_types::Shape>, values: Vec<VmValue>) -> VmValue {
+        self.deref_mut().alloc_object_with_shape(shape, values)
     }
 
     fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue {
@@ -1033,10 +1064,12 @@ impl NativeCtx for Heap {
 
     fn array_set(&mut self, arr: VmValue, idx: usize, val: VmValue) {
         if arr.is_heap() {
-            if let Some(HeapObj::Array(a)) = self.get_by_idx(arr.as_heap_idx()) {
+            let raw_idx = arr.as_heap_idx();
+            if let Some(HeapObj::Array(a)) = self.get_by_idx(raw_idx) {
                 let g = a.borrow_mut();
                 if idx < g.len() {
                     g[idx] = val;
+                    self.write_barrier(raw_idx, val);
                 }
             }
         }
@@ -1044,8 +1077,10 @@ impl NativeCtx for Heap {
 
     fn array_push(&mut self, arr: VmValue, val: VmValue) {
         if arr.is_heap() {
-            if let Some(HeapObj::Array(a)) = self.get_by_idx(arr.as_heap_idx()) {
+            let raw_idx = arr.as_heap_idx();
+            if let Some(HeapObj::Array(a)) = self.get_by_idx(raw_idx) {
                 a.borrow_mut().push(val);
+                self.write_barrier(raw_idx, val);
             }
         }
     }
@@ -1070,6 +1105,34 @@ impl NativeCtx for Heap {
         }
     }
 
+    fn is_object(&self, v: VmValue) -> bool {
+        if v.is_heap() {
+            matches!(self.get_by_idx(v.as_heap_idx()), Some(HeapObj::Object(_)))
+        } else {
+            false
+        }
+    }
+
+    fn object_for_each(&self, obj: VmValue, f: &mut dyn FnMut(&str, VmValue)) {
+        if obj.is_heap() {
+            if let Some(HeapObj::Object(o)) = self.get_by_idx(obj.as_heap_idx()) {
+                let g = o.borrow();
+                for (k, v) in g.inner.iter() {
+                    f(k.as_ref(), v);
+                }
+            }
+        }
+    }
+
+    fn get_object_shape(&self, obj: VmValue) -> Option<std::rc::Rc<varn_types::Shape>> {
+        if obj.is_heap() {
+            if let Some(HeapObj::Object(o)) = self.get_by_idx(obj.as_heap_idx()) {
+                return Some(o.borrow().inner.shape.clone());
+            }
+        }
+        None
+    }
+
     fn get_field(&self, obj: VmValue, key: &str) -> Option<VmValue> {
         if obj.is_heap() {
             if let Some(HeapObj::Object(o)) = self.get_by_idx(obj.as_heap_idx()) {
@@ -1088,6 +1151,7 @@ impl NativeCtx for Heap {
             let raw_idx = obj.as_heap_idx();
             if let Some(HeapObj::Object(o)) = self.get_by_idx(raw_idx) {
                 o.borrow_mut().set_field_nv(Rc::from(key), val);
+                self.write_barrier(raw_idx, val);
             } else if let Some(HeapObj::Module(m)) = self.get_by_idx_mut(raw_idx) {
                 if let Some(s) = m.export_map.get(key).copied() {
                     Rc::make_mut(m).set_slot(s, val);
@@ -1097,6 +1161,7 @@ impl NativeCtx for Heap {
                     m.exports.push(val);
                     m.export_map.insert(Rc::from(key), slot);
                 }
+                self.write_barrier(raw_idx, val);
             }
         }
     }

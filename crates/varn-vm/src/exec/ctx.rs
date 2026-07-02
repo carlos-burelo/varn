@@ -18,12 +18,13 @@ use super::VmSuspend;
 use varn_types::generator::GenChannel;
 
 pub use super::ctx_jit_runtime::{
-    jit_array_extend, jit_array_length, jit_array_pop, jit_array_push, jit_assert_not_null,
-    jit_await, jit_bind_method, jit_bitand, jit_bitor, jit_bitxor, jit_build_object,
-    jit_build_object_with_shape, jit_call_spread, jit_class_member_op, jit_close_upvalue,
-    jit_declare_field, jit_define_global, jit_div, jit_get_enum_tag, jit_get_fixed_field,
-    jit_get_index, jit_get_property_maybe_stub, jit_get_super, jit_get_symbol, jit_inherit,
-    jit_instanceof, jit_is_array_stub, jit_load_module, jit_load_module_by_idx,
+    jit_array_extend, jit_array_get_fast, jit_array_length, jit_array_pop, jit_array_push,
+    jit_array_set_fast, jit_assert_not_null, jit_await, jit_bind_method, jit_bitand, jit_bitor,
+    jit_bitxor, jit_build_object, jit_build_object_with_shape, jit_call_spread, jit_class_member_op,
+    jit_close_upvalue, jit_declare_field, jit_define_global, jit_div, jit_gc_safepoint,
+    jit_get_enum_tag,
+    jit_get_fixed_field, jit_get_index, jit_get_property_maybe_stub, jit_get_super, jit_get_symbol,
+    jit_inherit, jit_instanceof, jit_is_array_stub, jit_load_module, jit_load_module_by_idx,
     jit_load_module_slot, jit_logical_not, jit_make_class, jit_make_enum_variant, jit_modulo,
     jit_negate, jit_object_keys_stub, jit_object_merge_stub, jit_object_rest, jit_op_in_stub,
     jit_pop_try, jit_pow, jit_push_try, jit_range, jit_set_fixed_field, jit_set_index, jit_shl,
@@ -118,7 +119,32 @@ impl ExecCtx {
             ctx.init_intrinsics();
             ctx.preload_strings();
         }
+
+        ctx.validate_jit_safepoint_offsets();
         ctx
+    }
+
+    /// The JIT back-edge safepoint reads the nursery fill level through raw
+    /// offsets (ExecCtx.heap -> RcBox -> HeapInner.nursery.objects.len). Those
+    /// offsets bake in Rc/Vec internal layout; verify the whole chain against
+    /// the live heap so a std layout change fails loudly at startup instead of
+    /// corrupting memory at runtime.
+    fn validate_jit_safepoint_offsets(&self) {
+        unsafe {
+            let base = self as *const ExecCtx as *const u8;
+            let rcbox = *(base.add(std::mem::offset_of!(ExecCtx, heap)) as *const *const u8);
+            assert_eq!(
+                rcbox,
+                self.heap.rcbox_ptr_for_validation(),
+                "JIT safepoint: ExecCtx.heap does not point at the expected RcBox"
+            );
+            let len = *(rcbox.add(Heap::nursery_len_byte_offset_from_rcbox()) as *const usize);
+            assert_eq!(
+                len,
+                self.heap.nursery.len(),
+                "JIT safepoint: nursery length offset chain is stale"
+            );
+        }
     }
 
     fn preload_strings(&mut self) {
@@ -233,7 +259,9 @@ impl ExecCtx {
                 + self.globals.values.len()
                 + self.modules.len()
                 + self.module_exports.len()
-                + self.static_closures.len(),
+                + self.static_closures.len()
+                + self.pending_constructors.len()
+                + self.pending_setters.len(),
         );
 
         all_vals.extend_from_slice(&self.stack);
@@ -249,6 +277,14 @@ impl ExecCtx {
         }
         let static_closures_start = all_vals.len();
         for v in self.static_closures.values() {
+            all_vals.push(*v);
+        }
+        let pending_ctors_start = all_vals.len();
+        for (_, v) in &self.pending_constructors {
+            all_vals.push(*v);
+        }
+        let pending_setters_start = all_vals.len();
+        for (_, v) in &self.pending_setters {
             all_vals.push(*v);
         }
 
@@ -282,9 +318,49 @@ impl ExecCtx {
                 si += 1;
             }
         }
+
+        {
+            let mut ci = pending_ctors_start;
+            for (_, v) in self.pending_constructors.iter_mut() {
+                *v = all_vals[ci];
+                ci += 1;
+            }
+        }
+
+        {
+            let mut sti = pending_setters_start;
+            for (_, v) in self.pending_setters.iter_mut() {
+                *v = all_vals[sti];
+                sti += 1;
+            }
+        }
+    }
+
+    /// Loop back-edge GC safepoint shared by the interpreter and the JIT.
+    ///
+    /// Nursery collection requires every live heap index to be visible in
+    /// `run_minor_gc`'s root set. Suspended async state (deferred tasks,
+    /// generator channels, pending suspends) can hold heap indices that the
+    /// root set does not yet trace, so while any such state is live,
+    /// back-edge collection is deferred to the call-boundary GC checks.
+    /// TODO(gc-roots): trace async state in run_minor_gc and drop this guard.
+    pub fn gc_backedge_safepoint(&mut self) {
+        let async_live = !self.deferred_tasks.is_empty()
+            || self.vm_suspend.is_some()
+            || self.gen_channel.is_some();
+        if async_live {
+            return;
+        }
+        if self.heap.needs_minor_gc() {
+            self.run_minor_gc();
+        }
+        if self.heap.needs_gc() {
+            self.trigger_gc();
+        }
     }
 
     pub fn trigger_gc(&mut self) {
+        self.run_minor_gc();
         let mut roots: Vec<u32> = Vec::with_capacity(256);
         for v in &self.stack {
             if v.is_heap() {
@@ -310,6 +386,16 @@ impl ExecCtx {
             }
         }
         for v in self.static_closures.values() {
+            if v.is_heap() {
+                roots.push(v.as_heap_idx());
+            }
+        }
+        for (_, v) in &self.pending_constructors {
+            if v.is_heap() {
+                roots.push(v.as_heap_idx());
+            }
+        }
+        for (_, v) in &self.pending_setters {
             if v.is_heap() {
                 roots.push(v.as_heap_idx());
             }

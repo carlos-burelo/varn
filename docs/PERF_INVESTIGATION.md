@@ -593,6 +593,89 @@ focused, separately-validated efforts rather than a single batch:
 * **Inv7** type-specialized JIT arithmetic (native `iadd` + deopt guard) to raise
   the call-threaded ceiling.
 
+## 2026-07-01 addendum — two correctness bugs fixed
+
+**1. `passes/recurrence.rs` removed (miscompilation).** The pass pattern-matched
+`f(n-1) + f(n-2)` and rewrote the whole function into canonical iterative
+Fibonacci *without validating the base case, the combining operator, or extra
+work in the recursive arm*. `lucas(10)` (base `2-n`) returned 55 (=fib(10))
+instead of 123; `t(n)=t(n-1)+t(n-2)+1` also returned fib. The "2100x over
+JS/TS" recursion claim came from this rewrite and is void: honest
+`fib(35)` is ~247 ms vs Node's ~120 ms (~2x). `COMPILER_CACHE_VERSION` bumped
+to 15 so miscompiled cached artifacts are invalidated.
+
+**2. `varn-backend/slot_kinds.rs` rewritten (JIT register corruption).** The
+old pass re-walked bytecode with its own instruction-width table that was wrong
+for `Jump`/`Loop`/`JumpIfFalse` (said 1 extra word, real 2), `Call`/`CallMethod`
+/`InvokeVirtual` (guessed from arg count, real fixed 2/3/3), `DefineGlobal`,
+`GetProperty`, `MakeClosure`, and more. After the first mismatch the scan
+desynced and parsed operands as opcodes, producing garbage `register_meta`.
+The JIT uses that metadata to *skip flush/reload of "immediate" registers
+around self-calls* (`emit_flush_for_call`), so heap-pointer registers
+misclassified as immediates were never spilled for the GC nor reloaded —
+values (Map keys, string accumulators) silently became stale/null inside JIT
+loops. Symptom: `m.get("k"+i)` missing 100% inside a loop while `m.keys()` was
+correct; a string accumulator turning `null`. The inference was also unsound
+by design: first-write-wins and `CallMethod`/`Move`/`LoadConst` never tainted
+their destination.
+
+The new pass shares `regalloc_post::decode` (the width table the register
+remapper already trusts) and runs a meet-over-defs fixpoint: a register keeps
+a kind only if *every* definition agrees; opaque defs (calls, globals,
+properties) and merges degrade to `Dynamic`. `slot_is_immediate` now treats
+missing metadata as pointer-bearing (cache-loaded protos have empty meta since
+`register_meta` is `#[serde(skip)]`).
+
+Validated: `tests/main.vn` 670/670; Map with 1M dynamic keys returns the same
+checksum as Node; lucas/tplus correct.
+
+**Honest head-to-head (2026-07-01, this machine, `vn run` wall-in-process
+timing vs Node v24.4.1):** fib35 2.1x slower, alu_int 4.7x, prop_mono 14.7x,
+array_sum 7x, obj_alloc 189x, call_direct 8.7x, call_closure 12x, str_build
+(20k concats) 805x, map_set 3x. Priorities: allocation path (obj_alloc),
+string accumulation (extensible string / rope — the O(n²)+GC-rescan combo),
+property access (`GetFixedField` emission), then call/arith paths.
+
+## 2026-07-01 round 2 — allocation-path fixes (measured)
+
+1. **JIT loop back-edge GC safepoint.** JIT'd loops never reached a GC check,
+   so the nursery filled once (4096 slots) and every later allocation went
+   straight to the old generation, forcing whole-heap major GCs. The JIT now
+   checks the nursery fill level on every `Loop` back-edge (two loads + a
+   compare via offsets carried in `JitHelpers`, validated at startup in
+   `ExecCtx::validate_jit_safepoint_offsets`) and calls
+   `ExecCtx::gc_backedge_safepoint`. obj-churn loop: 4,110 → 5,000,016 nursery
+   allocs, old-gen stays at ~124 live objects. `str_build` 50k concats:
+   24.1 s → 1.32 s (~18x); 100k: 350 s → ~5 s (~70x).
+   *Known gap:* `run_minor_gc`'s root set does not trace suspended async
+   state (deferred tasks, generator channels), so the safepoint defers
+   collection while any of it is live — see TODO(gc-roots) in `ctx.rs`.
+
+2. **Object literals always compile to `BuildObjectWithShape`.** The emitter
+   only used the shape path when values happened to land in contiguous
+   registers; otherwise it fell back to generic `BuildObject`, which pays a
+   string materialisation plus a shape-transition hash lookup per key on
+   every allocation (~340 ns/key measured). Non-contiguous values are now
+   staged into the call area (like `BuildArray`), and the call area is sized
+   for it in `assign_registers`. Shape constants resolve once per proto via
+   `FunctionProto::resolved_shape` (new runtime-only cache) instead of
+   re-deriving transitions per allocation. `{a,b,c}` allocation: 865 ns →
+   ~170 ns (5x); obj_alloc benchmark 4.28 s → 0.95 s.
+
+**Round-2 head-to-head (vn run vs Node v24, same machine, checksums equal):**
+fib35 ~parity (232 ms vs 120–314 ms) · map_set ~1.5–2x · alu_int 3–4x ·
+array_sum 5–7x · call_direct 6–8x · call_closure 7–10x · prop_mono 9–14x ·
+obj_alloc ~21x (was 189x) · str_build still ~400x (needs extensible strings).
+
+**Cache warning that cost hours:** `.vnc` artifacts bake in resolved
+`GlobalIdx` slots that depend on the whole import graph, but the cache key is
+per-file source hash only, and the cache lives in the *source file's own
+directory* (`tests/.vn`) plus `~/.varn/cache`. Running a module from two
+different entry points poisons later runs with wrong global indices
+("value is not callable: null" with no miscompilation present). Purge all
+cache locations between compiler builds; longer term, key artifacts by
+(source hash, import-layout hash).
+
 ## Summary of actionable fixes (by leverage)
 
 1. **Compile `<module>` / promote module-private top-level vars to registers** —

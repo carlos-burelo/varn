@@ -165,6 +165,8 @@ impl VmClosure {
             logical_not: ctx::jit_logical_not as usize,
             get_index: ctx::jit_get_index as usize,
             set_index: ctx::jit_set_index as usize,
+            jit_array_get_fast: ctx::jit_array_get_fast as usize,
+            jit_array_set_fast: ctx::jit_array_set_fast as usize,
             typeof_val: ctx::jit_typeof_val as usize,
             instanceof: ctx::jit_instanceof as usize,
             array_length: ctx::jit_array_length as usize,
@@ -242,6 +244,10 @@ impl VmClosure {
                         - (dummy_ptr as usize)
                 }
             },
+            gc_safepoint: ctx::jit_gc_safepoint as usize,
+            heap_field_offset: std::mem::offset_of!(ctx::ExecCtx, heap),
+            nursery_len_offset: crate::heap::Heap::nursery_len_byte_offset_from_rcbox(),
+            nursery_threshold: crate::nursery::Nursery::FULL_THRESHOLD,
         };
         match varn_jit::compile(&self.proto, &self.constants, helpers) {
             Ok((entry, code)) => {

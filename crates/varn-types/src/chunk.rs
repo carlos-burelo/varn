@@ -495,6 +495,13 @@ pub struct FunctionProto {
     #[serde(skip, default)]
     pub register_meta: Vec<crate::register_meta::RegisterMeta>,
 
+    /// Runtime cache: `PoolEntry::Shape` constants resolved to their
+    /// `Shape` in the (globally cached) transition tree, so object literals
+    /// don't re-derive the shape key-by-key on every allocation. Protos hold
+    /// at most a handful of shape constants, so a linear scan beats hashing.
+    #[serde(skip, default)]
+    pub resolved_shapes: RefCell<Vec<(u32, Rc<crate::Shape>)>>,
+
     #[serde(skip)]
     #[serde(default)]
     pub jit_entry: std::cell::Cell<Option<usize>>,
@@ -540,6 +547,32 @@ impl FunctionProto {
         if fb.sites.is_empty() {
             *fb = FeedbackVector::new(n);
         }
+    }
+
+    /// Resolve the `PoolEntry::Shape` at `idx` to its runtime `Shape`. The
+    /// first call derives it through the transition tree (which caches each
+    /// step globally); later calls hit the per-proto cache.
+    pub fn resolved_shape(&self, idx: usize) -> Option<Rc<crate::Shape>> {
+        if let Some((_, s)) = self
+            .resolved_shapes
+            .borrow()
+            .iter()
+            .find(|(i, _)| *i as usize == idx)
+        {
+            return Some(Rc::clone(s));
+        }
+        let keys = match self.chunk.constants.get(idx) {
+            Some(PoolEntry::Shape(k)) => k,
+            _ => return None,
+        };
+        let mut shape = crate::root_shape();
+        for k in keys {
+            shape = shape.transition(Rc::clone(k));
+        }
+        self.resolved_shapes
+            .borrow_mut()
+            .push((idx as u32, Rc::clone(&shape)));
+        Some(shape)
     }
 }
 
@@ -766,6 +799,10 @@ impl Chunk {
 
     pub fn add_str(&mut self, s: impl AsRef<str>) -> u16 {
         self.add_constant(PoolEntry::Literal(Literal::Str(Rc::from(s.as_ref()))))
+    }
+
+    pub fn add_shape(&mut self, keys: Vec<Rc<str>>) -> u16 {
+        self.add_constant(PoolEntry::Shape(keys))
     }
 
     pub fn add_int(&mut self, n: i64) -> u16 {

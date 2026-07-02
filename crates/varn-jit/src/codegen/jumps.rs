@@ -1,7 +1,8 @@
 use varn_core::OpCode;
 
 use crate::assembler::{Cond, Reg};
-use crate::regalloc::emit_load;
+use crate::regalloc::{emit_flush_all, emit_load, emit_reload_all};
+use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
 
 use super::{CodegenCtx, JumpPatch};
 
@@ -28,6 +29,45 @@ pub(crate) fn emit_jumps(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) -> 
             let offset = ((code[*ip] as u32) << 16 | code[*ip + 1] as u32) as usize;
             let target_bytecode_ip = *ip + 2 - offset;
             *ip += 2;
+
+            // GC safepoint on the back-edge, mirroring the interpreter's Loop
+            // handler: a long call-free allocating loop must still reach the
+            // collector before the nursery overflows into the old generation.
+            // Fast path: two loads + compare (nursery fill level).
+            let helpers = ctx.helpers;
+            asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, helpers.heap_field_offset as i32);
+            asm.mov_reg_mem(Reg::R10, Reg::R10, helpers.nursery_len_offset as i32);
+            asm.mov_reg_imm64(Reg::R11, helpers.nursery_threshold as u64);
+            asm.cmp_reg_reg(Reg::R10, Reg::R11);
+            let skip_gc = asm.jmp_cond(Cond::Less);
+
+            emit_flush_all(asm, regmap);
+            asm.push(ARG_CTX);
+            asm.push(ARG_CLOSURE);
+            asm.push(ARG_BASE);
+            asm.push(ARG_EXEC_CTX);
+            let need_dummy = regmap.used_phys.len() % 2 == 0;
+            if need_dummy {
+                asm.push(Reg::Rax);
+            }
+            asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+            #[cfg(target_os = "windows")]
+            asm.add_reg_imm8(Reg::Rsp, -32);
+            asm.mov_reg_imm64(Reg::R10, helpers.gc_safepoint as u64);
+            asm.call_reg(Reg::R10);
+            #[cfg(target_os = "windows")]
+            asm.add_reg_imm8(Reg::Rsp, 32);
+            if need_dummy {
+                asm.pop(Reg::Rax);
+            }
+            asm.pop(ARG_EXEC_CTX);
+            asm.pop(ARG_BASE);
+            asm.pop(ARG_CLOSURE);
+            asm.pop(ARG_CTX);
+            emit_reload_all(asm, regmap);
+
+            let after_gc = asm.current_offset();
+            asm.patch_u32(skip_gc, (after_gc as i32 - (skip_gc as i32 + 4)) as u32);
 
             let patch_pos = asm.jmp_near();
             jump_patches.push(JumpPatch {

@@ -53,6 +53,8 @@ pub struct JitHelpers {
     pub logical_not: usize,
     pub get_index: usize,
     pub set_index: usize,
+    pub jit_array_get_fast: usize,
+    pub jit_array_set_fast: usize,
     pub typeof_val: usize,
     pub instanceof: usize,
     pub array_length: usize,
@@ -117,6 +119,14 @@ pub struct JitHelpers {
     pub jit_call_native_op: usize,
     pub open_upvalues_offset: usize,
     pub pending_constructors_offset: usize,
+    /// `extern "C" fn(*mut ExecCtx)` — loop back-edge GC safepoint.
+    pub gc_safepoint: usize,
+    /// Byte offset of the heap field (an Rc, i.e. one pointer) inside ExecCtx.
+    pub heap_field_offset: usize,
+    /// Byte offset from the heap RcBox pointer to the nursery live-object count.
+    pub nursery_len_offset: usize,
+    /// Nursery fill level at which the safepoint must run.
+    pub nursery_threshold: usize,
 }
 
 #[derive(Debug, Clone, Copy)]

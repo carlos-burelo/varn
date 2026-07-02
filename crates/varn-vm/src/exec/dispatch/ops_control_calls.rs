@@ -39,12 +39,7 @@ impl ExecCtx {
                 // Collect on loop back-edges, not only at call boundaries. A long,
                 // call-free allocating loop (e.g. string concatenation) would
                 // otherwise never reach a GC check and exhaust memory.
-                if self.heap.needs_minor_gc() {
-                    self.run_minor_gc();
-                }
-                if self.heap.needs_gc() {
-                    self.trigger_gc();
-                }
+                self.gc_backedge_safepoint();
                 Ok(Some(ControlCallFlow::ContinueInstruction))
             }
             OpCode::JumpIfFalse => {
