@@ -7,10 +7,11 @@ pub const TYPES_DIR_NAME: &str = "types";
 pub const PACKAGE_MANIFEST_FILE: &str = "varn.json";
 
 // Bump whenever bytecode/codegen semantics change so cached `.vnc` artifacts
-// produced by an older compiler are invalidated (a content-hash match alone does
-// not catch compiler-logic changes). 11: closure self-reference lowering fix.
-pub const COMPILER_CACHE_VERSION: u32 = 11;
-pub const TYPE_CACHE_VERSION: u32 = 1;
+// produced by an older compiler are invalidated. 13: class/object fixed field jit optimization update.
+// 15: removed unsound fib-recurrence rewrite; artifacts compiled by it are miscompiled.
+// 16: object literals always compile to BuildObjectWithShape.
+pub const COMPILER_CACHE_VERSION: u32 = 16;
+pub const TYPE_CACHE_VERSION: u32 = 2;
 
 pub const MAGIC_WRC: &[u8; 4] = b"WRC\0";
 pub const MAGIC_VNC: &[u8; 4] = b"VNC\0";
