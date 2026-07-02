@@ -144,6 +144,7 @@ impl RegMap {
                 | OpCode::ModFloat
                 | OpCode::PowFloat
                 | OpCode::GetIndex
+                | OpCode::ArrayGetIndex
                 | OpCode::Instanceof
                 | OpCode::StrConcat
                 | OpCode::StrSlice
@@ -161,7 +162,7 @@ impl RegMap {
                     *freq.entry(src1).or_insert(0) += 2;
                     *freq.entry(src2).or_insert(0) += 2;
                 }
-                OpCode::SetIndex => {
+                OpCode::SetIndex | OpCode::ArraySetIndex => {
                     let w1 = code[ip];
                     ip += 1;
                     let idx_reg = (w1 >> 8) as usize;
@@ -405,7 +406,11 @@ pub fn emit_reload_all_except(asm: &mut Assembler, regmap: &RegMap, except: Opti
 #[inline]
 fn slot_is_immediate(meta: &[varn_types::register_meta::RegisterMeta], vreg: usize) -> bool {
     use varn_types::register_meta::SlotKind;
-    meta.get(vreg).map_or(true, |m| {
+    // Missing metadata (e.g. protos deserialized from the bytecode cache,
+    // where `register_meta` is #[serde(skip)]) must be treated as
+    // pointer-bearing: skipping the flush for an unknown slot hides live heap
+    // references from the GC.
+    meta.get(vreg).map_or(false, |m| {
         matches!(m.kind, SlotKind::Int | SlotKind::Float | SlotKind::Bool)
     })
 }

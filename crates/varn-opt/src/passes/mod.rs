@@ -1,7 +1,6 @@
 pub mod cfg;
 pub mod const_fold;
 pub mod dce;
-pub mod recurrence;
 pub mod tco;
 
 use crate::ssa::ir::SsaFunc;
@@ -10,8 +9,6 @@ pub fn optimize(func: &mut SsaFunc) {
     let mut iterations = 0;
     loop {
         let mut changed = false;
-
-        changed |= recurrence::run(func);
 
         changed |= tco::run(func);
 

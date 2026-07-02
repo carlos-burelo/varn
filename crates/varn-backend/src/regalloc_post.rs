@@ -2,7 +2,7 @@ use std::cell::Cell;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use varn_core::OpCode;
-use varn_types::FunctionProto;
+use varn_types::{chunk::PoolEntry, FunctionProto};
 
 thread_local! {
     pub static OPTIMIZE_TIME: Cell<Duration> = Cell::new(Duration::ZERO);
@@ -11,16 +11,16 @@ thread_local! {
 
 use crate::liveness::{LiveRange, LivenessAnalyzer};
 
-struct InstrInfo {
-    len: usize,
+pub(crate) struct InstrInfo {
+    pub(crate) len: usize,
 
-    def: Option<u8>,
+    pub(crate) def: Option<u8>,
 
-    uses: Vec<u8>,
+    pub(crate) uses: Vec<u8>,
 
-    call_args: Option<(u8, u8)>,
+    pub(crate) call_args: Option<(u8, u8)>,
 
-    opaque: bool,
+    pub(crate) opaque: bool,
 }
 
 impl InstrInfo {
@@ -44,7 +44,7 @@ impl InstrInfo {
     }
 }
 
-fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
+pub(crate) fn decode(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<InstrInfo> {
     let op = OpCode::from_u16(*code.get(offset)?)?;
 
     let get = |off: usize| code.get(offset + off).copied().unwrap_or(0);
@@ -175,7 +175,26 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
             }
         }
 
-        OpCode::BuildObjectWithShape => s(3, Some(hi1), vec![lo1]),
+        OpCode::BuildObjectWithShape => {
+            let start = lo1 as usize;
+            let shape_idx = w2 as usize;
+            let count = match constants.get(shape_idx) {
+                Some(PoolEntry::Shape(k)) => k.len(),
+                _ => 0,
+            };
+            let dest = hi1;
+            let mut uses = vec![];
+            for i in 0..count {
+                uses.push((start + i) as u8);
+            }
+            InstrInfo {
+                len: 3,
+                def: Some(dest),
+                uses,
+                call_args: None,
+                opaque: false,
+            }
+        }
 
         OpCode::BuildArray => {
             let start = lo1 as usize;
@@ -194,9 +213,9 @@ fn decode(code: &[u16], offset: usize) -> Option<InstrInfo> {
             }
         }
 
-        OpCode::GetIndex => s(2, Some(dest0), vec![hi1, lo1]),
+        OpCode::GetIndex | OpCode::ArrayGetIndex => s(2, Some(dest0), vec![hi1, lo1]),
 
-        OpCode::SetIndex => s(2, None, vec![dest0, hi1, lo1]),
+        OpCode::SetIndex | OpCode::ArraySetIndex => s(2, None, vec![dest0, hi1, lo1]),
 
         OpCode::ObjectMerge => s(2, Some(dest0), vec![hi1]),
 
@@ -389,7 +408,7 @@ struct ScanResult {
     call_sites: Vec<(usize, u8, u8)>,
 }
 
-fn scan_bytecode(code: &[u16]) -> ScanResult {
+fn scan_bytecode(code: &[u16], constants: &[PoolEntry]) -> ScanResult {
     let mut defs: HashMap<u8, usize> = HashMap::new();
     let mut uses: HashMap<u8, Vec<usize>> = HashMap::new();
     let mut call_sites: Vec<(usize, u8, u8)> = Vec::new();
@@ -399,7 +418,7 @@ fn scan_bytecode(code: &[u16]) -> ScanResult {
     let mut instr_idx = 0usize;
 
     while offset < code.len() {
-        let info = match decode(code, offset) {
+        let info = match decode(code, offset, constants) {
             Some(i) => i,
             None => break,
         };
@@ -491,10 +510,14 @@ fn color_with_base(ranges: &[LiveRange], base: u8, copies: &[(u8, u8)]) -> HashM
     coloring
 }
 
-fn verify_call_constraints(code: &[u16], mapping: &HashMap<u8, u8>) -> bool {
+fn verify_call_constraints(
+    code: &[u16],
+    constants: &[PoolEntry],
+    mapping: &HashMap<u8, u8>,
+) -> bool {
     let mut offset = 0;
     while offset < code.len() {
-        let info = match decode(code, offset) {
+        let info = match decode(code, offset, constants) {
             Some(i) => i,
             None => break,
         };
@@ -540,14 +563,14 @@ fn verify_callee_frame_constraints(scan: &ScanResult, mapping: &HashMap<u8, u8>)
     true
 }
 
-fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
+fn remap_bytecode(code: &mut Vec<u16>, constants: &[PoolEntry], mapping: &HashMap<u8, u8>) {
     fn m(mapping: &HashMap<u8, u8>, r: u8) -> u8 {
         mapping.get(&r).copied().unwrap_or(r)
     }
 
     let mut offset = 0;
     while offset < code.len() {
-        let info = match decode(code, offset) {
+        let info = match decode(code, offset, constants) {
             Some(i) => i,
             None => break,
         };
@@ -868,12 +891,12 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, start as u8));
                 }
 
-                OpCode::GetIndex => {
+                OpCode::GetIndex | OpCode::ArrayGetIndex => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
                 }
 
-                OpCode::SetIndex => {
+                OpCode::SetIndex | OpCode::ArraySetIndex => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
                 }
@@ -916,13 +939,13 @@ fn remap_bytecode(code: &mut Vec<u16>, mapping: &HashMap<u8, u8>) {
     }
 }
 
-fn collect_back_edges(code: &[u16]) -> Vec<(usize, usize)> {
+fn collect_back_edges(code: &[u16], constants: &[PoolEntry]) -> Vec<(usize, usize)> {
     let mut word_to_instr: HashMap<usize, usize> = HashMap::new();
     let mut offset = 0usize;
     let mut instr_idx = 0usize;
     while offset < code.len() {
         word_to_instr.insert(offset, instr_idx);
-        match decode(code, offset) {
+        match decode(code, offset, constants) {
             Some(info) => {
                 offset += info.len;
                 instr_idx += 1;
@@ -943,7 +966,7 @@ fn collect_back_edges(code: &[u16]) -> Vec<(usize, usize)> {
             let target_instr = word_to_instr.get(&target_word).copied().unwrap_or(0);
             edges.push((target_instr, instr_idx));
         }
-        match decode(code, offset) {
+        match decode(code, offset, constants) {
             Some(info) => {
                 offset += info.len;
                 instr_idx += 1;
@@ -981,8 +1004,8 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         return;
     }
 
-    let back_edges = collect_back_edges(&proto.chunk.code);
-    let scan = scan_bytecode(&proto.chunk.code);
+    let back_edges = collect_back_edges(&proto.chunk.code, &proto.chunk.constants);
+    let scan = scan_bytecode(&proto.chunk.code, &proto.chunk.constants);
 
     let all_regs: Vec<u16> = scan
         .defs
@@ -1023,7 +1046,7 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
     let mut copies = Vec::new();
     let mut offset = 0;
     while offset < proto.chunk.code.len() {
-        if let Some(info) = decode(&proto.chunk.code, offset) {
+        if let Some(info) = decode(&proto.chunk.code, offset, &proto.chunk.constants) {
             if OpCode::from_u16(proto.chunk.code[offset]) == Some(OpCode::Move) {
                 let w1 = proto.chunk.code[offset + 1];
                 let dest = (proto.chunk.code[offset] >> 8) as u8;
@@ -1049,7 +1072,7 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         return;
     }
 
-    if !verify_call_constraints(&proto.chunk.code, &mapping) {
+    if !verify_call_constraints(&proto.chunk.code, &proto.chunk.constants, &mapping) {
         return;
     }
 
@@ -1057,7 +1080,11 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         return;
     }
 
-    if !verify_build_array_constraints(&proto.chunk.code, &mapping) {
+    if !verify_build_array_constraints(&proto.chunk.code, &proto.chunk.constants, &mapping) {
+        return;
+    }
+
+    if !verify_build_object_with_shape_constraints(&proto.chunk.code, &proto.chunk.constants, &mapping) {
         return;
     }
 
@@ -1078,14 +1105,18 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         return;
     }
 
-    remap_bytecode(&mut proto.chunk.code, &mapping);
+    remap_bytecode(&mut proto.chunk.code, &proto.chunk.constants, &mapping);
     proto.register_count = new_register_count;
 }
 
-fn verify_build_array_constraints(code: &[u16], mapping: &HashMap<u8, u8>) -> bool {
+fn verify_build_array_constraints(
+    code: &[u16],
+    constants: &[PoolEntry],
+    mapping: &HashMap<u8, u8>,
+) -> bool {
     let mut offset = 0;
     while offset < code.len() {
-        let info = match decode(code, offset) {
+        let info = match decode(code, offset, constants) {
             Some(i) => i,
             None => break,
         };
@@ -1107,9 +1138,57 @@ fn verify_build_array_constraints(code: &[u16], mapping: &HashMap<u8, u8>) -> bo
                 if count > 1 {
                     let mapped_start = mapping.get(&start).copied().unwrap_or(start);
                     for i in 1..count {
-                        let orig = start.wrapping_add(i);
+                        let orig = start.wrapping_add(i as u8);
                         let mapped = mapping.get(&orig).copied().unwrap_or(orig);
-                        if mapped != mapped_start.wrapping_add(i) {
+                        if mapped != mapped_start.wrapping_add(i as u8) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        offset += info.len;
+    }
+    true
+}
+
+fn verify_build_object_with_shape_constraints(
+    code: &[u16],
+    constants: &[PoolEntry],
+    mapping: &HashMap<u8, u8>,
+) -> bool {
+    let mut offset = 0;
+    while offset < code.len() {
+        let info = match decode(code, offset, constants) {
+            Some(i) => i,
+            None => break,
+        };
+
+        if let Some(op) = OpCode::from_u16(code[offset]) {
+            if matches!(op, OpCode::BuildObjectWithShape) {
+                let w1 = if offset + 1 < code.len() {
+                    code[offset + 1]
+                } else {
+                    0
+                };
+                let w2 = if offset + 2 < code.len() {
+                    code[offset + 2]
+                } else {
+                    0
+                };
+                let start = (w1 & 0xff) as u8;
+                let shape_idx = w2 as usize;
+                let count = match constants.get(shape_idx) {
+                    Some(PoolEntry::Shape(k)) => k.len(),
+                    _ => 0,
+                };
+                if count > 1 {
+                    let mapped_start = mapping.get(&start).copied().unwrap_or(start);
+                    for i in 1..count {
+                        let orig = start.wrapping_add(i as u8);
+                        let mapped = mapping.get(&orig).copied().unwrap_or(orig);
+                        if mapped != mapped_start.wrapping_add(i as u8) {
                             return false;
                         }
                     }
