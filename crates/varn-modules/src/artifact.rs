@@ -11,7 +11,8 @@ pub const PACKAGE_MANIFEST_FILE: &str = "varn.json";
 // 15: removed unsound fib-recurrence rewrite; artifacts compiled by it are miscompiled.
 // 16: object literals always compile to BuildObjectWithShape.
 // 17: GetProperty on non-escaping object literals devirtualized to GetFixedField.
-pub const COMPILER_CACHE_VERSION: u32 = 17;
+// 18: single-expression function inlining at HIR level.
+pub const COMPILER_CACHE_VERSION: u32 = 18;
 pub const TYPE_CACHE_VERSION: u32 = 2;
 
 pub const MAGIC_WRC: &[u8; 4] = b"WRC\0";

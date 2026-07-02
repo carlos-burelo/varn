@@ -2,6 +2,7 @@ use rust_decimal::Decimal;
 use std::rc::Rc;
 
 pub mod dump;
+pub mod inline;
 pub mod lower;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
