@@ -23,9 +23,109 @@ use varn_types::{
     Value, VmArray,
 };
 
+/// Heap string payload. `Shared` is an immutable interned/frozen string;
+/// `Ext` is a prefix view (`buf[..len]`) of a shared growable buffer, the
+/// representation `str_concat` produces for accumulation patterns. Appending
+/// to the buffer's tip never changes an existing prefix, so older views stay
+/// valid without any aliasing analysis; a view that is no longer the tip is
+/// copied out before growing. Single-threaded interior mutability via
+/// `UnsafeCell` mirrors `ArrayRef`.
+#[derive(Clone)]
+pub enum HeapStr {
+    Shared(RuntimeString),
+    Ext {
+        buf: Rc<std::cell::UnsafeCell<String>>,
+        len: usize,
+    },
+}
+
+impl HeapStr {
+    #[inline]
+    pub fn as_str(&self) -> &str {
+        match self {
+            HeapStr::Shared(s) => s,
+            // Safety: single-threaded VM; the buffer is only appended to (via
+            // `str_concat`), never while a borrow from this view is live.
+            HeapStr::Ext { buf, len } => unsafe { &(*buf.get())[..*len] },
+        }
+    }
+
+    /// Materialize as an `Rc<str>` (copies `Ext` views).
+    pub fn to_shared(&self) -> RuntimeString {
+        match self {
+            HeapStr::Shared(s) => Rc::clone(s),
+            HeapStr::Ext { .. } => Rc::from(self.as_str()),
+        }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        match self {
+            HeapStr::Shared(s) => s.len(),
+            HeapStr::Ext { len, .. } => *len,
+        }
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// True when this view ends exactly at the buffer tip, i.e. appending to
+    /// the buffer extends this string without disturbing any other view.
+    #[inline]
+    pub fn is_tip(&self) -> bool {
+        match self {
+            HeapStr::Shared(_) => false,
+            HeapStr::Ext { buf, len } => unsafe { (*buf.get()).len() == *len },
+        }
+    }
+}
+
+impl std::fmt::Debug for HeapStr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("HeapStr").field(&self.as_str()).finish()
+    }
+}
+
+impl std::fmt::Display for HeapStr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl PartialEq for HeapStr {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_str() == other.as_str()
+    }
+}
+
+impl Eq for HeapStr {}
+
+impl std::ops::Deref for HeapStr {
+    type Target = str;
+    #[inline]
+    fn deref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl AsRef<str> for HeapStr {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl From<RuntimeString> for HeapStr {
+    fn from(s: RuntimeString) -> Self {
+        HeapStr::Shared(s)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum HeapObj {
-    Str(RuntimeString),
+    Str(HeapStr),
     Array(VmArray),
     Object(ObjRef),
 
@@ -438,7 +538,7 @@ impl HeapInner {
                 .get_by_idx(nv.as_heap_idx())
                 .ok_or_else(|| RuntimeError::new("invalid heap ref"))?;
             return Ok(match obj {
-                HeapObj::Str(s) => Value::Str(s.clone()),
+                HeapObj::Str(s) => Value::Str(s.to_shared()),
                 HeapObj::Array(a) => {
                     let guard = a.borrow();
                     let val_items: Vec<Value> = guard.iter().map(|&nv| self.extract(nv)).collect();
@@ -493,7 +593,7 @@ impl HeapInner {
             self.string_interner.remove(&rs);
         }
 
-        let idx = match self.nursery.try_alloc(HeapObj::Str(rs.clone())) {
+        let idx = match self.nursery.try_alloc(HeapObj::Str(HeapStr::Shared(rs.clone()))) {
             Ok(ni) => ni,
             Err(obj) => {
                 let oi = alloc_into(
@@ -534,7 +634,7 @@ impl HeapInner {
             &mut self.free,
             &mut self.alloc_count,
             &mut self.gc_alloc_since_collect,
-            HeapObj::Str(rs.clone()),
+            HeapObj::Str(HeapStr::Shared(rs.clone())),
         );
         let packed = pack_old_idx(oi);
         self.string_interner.insert(rs, packed);
@@ -556,7 +656,23 @@ impl HeapInner {
         }
 
         let rs: RuntimeString = Rc::from(s_ref);
-        let idx = match self.nursery.try_alloc(HeapObj::Str(rs)) {
+        let idx = match self.nursery.try_alloc(HeapObj::Str(HeapStr::Shared(rs))) {
+            Ok(ni) => ni,
+            Err(obj) => pack_old_idx(alloc_into(
+                &mut self.objects,
+                &mut self.free,
+                &mut self.alloc_count,
+                &mut self.gc_alloc_since_collect,
+                obj,
+            )),
+        };
+        VmValue::from_heap_idx(idx)
+    }
+
+    /// Allocate a heap slot for an arbitrary string payload (typically an
+    /// extensible-buffer view from `str_concat`). Never interned, never SSO.
+    pub fn alloc_str_view(&mut self, hs: HeapStr) -> VmValue {
+        let idx = match self.nursery.try_alloc(HeapObj::Str(hs)) {
             Ok(ni) => ni,
             Err(obj) => pack_old_idx(alloc_into(
                 &mut self.objects,
@@ -642,7 +758,7 @@ impl HeapInner {
             return None;
         }
         if let Some(HeapObj::Str(s)) = self.get_by_idx(nv.as_heap_idx()) {
-            return Some(s.clone());
+            return Some(s.to_shared());
         }
         None
     }

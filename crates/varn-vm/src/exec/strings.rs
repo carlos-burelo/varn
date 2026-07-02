@@ -1,6 +1,13 @@
 use crate::error::{RuntimeError, VmResult};
-use crate::heap::{Heap, HeapObj};
+use crate::heap::{Heap, HeapObj, HeapStr};
 use crate::value::VmValue;
+use std::rc::Rc;
+
+/// Left operands at or above this length seed an extensible buffer, so a
+/// `s = s + x` accumulation appends in place from then on. Shorter results
+/// stay `Shared` — one-off concats (e.g. map keys) shouldn't pay the
+/// copy-on-materialize of a buffer view.
+const EXT_SEED_LEN: usize = 16;
 
 pub fn str_length(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
     if val.is_sso() {
@@ -8,16 +15,48 @@ pub fn str_length(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
     }
     if val.is_heap() {
         if let Some(HeapObj::Str(s)) = heap.get(val.as_heap_idx()) {
-            return Ok(VmValue::from_i32(s.chars().count() as i32));
+            return Ok(VmValue::from_i32(s.as_str().chars().count() as i32));
         }
     }
     Err(RuntimeError::new("OpStrLength: not a string"))
 }
 
 pub fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
-    let sa = heap.str_repr(a);
+    // Accumulation fast path: `a` is the tip view of an extensible buffer.
+    // Appending never disturbs shorter views of the same buffer, so this is
+    // safe regardless of aliasing; the result is a longer view, O(1) amortized.
+    if a.is_heap() {
+        if let Some(HeapObj::Str(hs)) = heap.get(a.as_heap_idx()) {
+            if let HeapStr::Ext { buf, len } = hs {
+                if hs.is_tip() {
+                    let buf = Rc::clone(buf);
+                    let len = *len;
+                    // Own `b` first: it may be a view of the same buffer, and
+                    // push_str may reallocate it.
+                    let sb = heap.str_repr(b);
+                    unsafe { (*buf.get()).push_str(&sb) };
+                    return heap.alloc_str_view(HeapStr::Ext {
+                        buf,
+                        len: len + sb.len(),
+                    });
+                }
+            }
+        }
+    }
+
+    let sa = heap.str_repr_borrowed(a).into_owned();
     let sb = heap.str_repr(b);
-    let mut out = String::with_capacity(sa.len() + sb.len());
+    let total = sa.len() + sb.len();
+    if sa.len() >= EXT_SEED_LEN {
+        let mut buf = String::with_capacity(total * 2);
+        buf.push_str(&sa);
+        buf.push_str(&sb);
+        return heap.alloc_str_view(HeapStr::Ext {
+            buf: Rc::new(std::cell::UnsafeCell::new(buf)),
+            len: total,
+        });
+    }
+    let mut out = String::with_capacity(total);
     out.push_str(&sa);
     out.push_str(&sb);
     heap.alloc_str_dynamic(out)
