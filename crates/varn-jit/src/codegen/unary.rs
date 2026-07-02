@@ -18,56 +18,22 @@ pub(crate) fn emit_unary(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) -> 
 }
 
 fn emit_to_string(ctx: &mut CodegenCtx, first_reg: usize) {
-    let asm = &mut ctx.asm;
-    let code = ctx.code;
-    let ip = &mut ctx.ip;
-    let regmap = &ctx.regmap;
-    let helpers = ctx.helpers;
-
-    let w1 = code[*ip];
-    *ip += 1;
+    let w1 = ctx.code[ctx.ip];
+    ctx.ip += 1;
     let src = (w1 >> 8) as usize;
 
-    emit_flush_all(asm, regmap);
-
-    asm.push(ARG_CTX);
-    asm.push(ARG_CLOSURE);
-    asm.push(ARG_BASE);
-    asm.push(ARG_EXEC_CTX);
-
-    let need_dummy = regmap.used_phys.len() % 2 == 0;
-    if need_dummy {
-        asm.push(Reg::Rax);
-    }
-
-    emit_load(asm, Reg::Rax, src, regmap);
-
-    #[cfg(target_os = "windows")]
-    asm.add_reg_imm8(Reg::Rsp, -32);
-
-    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
-
-    let helper_addr = helpers.to_string;
-    asm.mov_reg_imm64(Reg::R10, helper_addr as u64);
-    asm.call_reg(Reg::R10);
-
-    #[cfg(target_os = "windows")]
-    asm.add_reg_imm8(Reg::Rsp, 32);
-
-    asm.mov_reg_reg(Reg::R11, Reg::Rax);
-
-    if need_dummy {
-        asm.pop(Reg::Rax);
-    }
-    asm.pop(ARG_EXEC_CTX);
-    asm.pop(ARG_BASE);
-    asm.pop(ARG_CLOSURE);
-    asm.pop(ARG_CTX);
-
-    emit_store(asm, Reg::R11, first_reg, regmap);
-
-    emit_reload_all_except(asm, regmap, Some(first_reg));
+    super::ffi::emit_ffi_call(
+        &mut ctx.asm,
+        &ctx.regmap,
+        &super::ffi::FfiCallSpec {
+            helper: ctx.helpers.to_string,
+            args: &[super::ffi::FfiArg::Vreg(src)],
+            flush: true,
+            dest: Some(first_reg),
+            reload: true,
+            recompute_frame: false,
+        },
+    );
 }
 
 fn emit_is_null(ctx: &mut CodegenCtx, first_reg: usize) {
