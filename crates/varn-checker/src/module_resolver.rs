@@ -62,8 +62,11 @@ fn try_load_cache(virtual_id: &str, source: &str) -> Option<CachedModule> {
         Ok(p) => p,
         Err(_) => return None,
     };
-    match postcard::from_bytes(payload) {
-        Ok(val) => Some(val),
+    match postcard::from_bytes::<CachedModule>(payload) {
+        Ok(mut val) => {
+            assign_slots(&mut val.exports);
+            Some(val)
+        }
         Err(_) => None,
     }
 }

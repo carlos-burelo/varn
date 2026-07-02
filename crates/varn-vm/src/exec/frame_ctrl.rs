@@ -333,10 +333,12 @@ impl NativeCtx for ExecCtx {
 
     fn array_set(&mut self, arr: VmValue, idx: usize, val: VmValue) {
         if arr.is_heap() {
-            if let Some(HeapObj::Array(a)) = self.heap.get(arr.as_heap_idx()) {
+            let raw_idx = arr.as_heap_idx();
+            if let Some(HeapObj::Array(a)) = self.heap.get(raw_idx) {
                 let g = a.borrow_mut();
                 if idx < g.len() {
                     g[idx] = val;
+                    self.heap.write_barrier(raw_idx, val);
                 }
             }
         }
@@ -344,8 +346,10 @@ impl NativeCtx for ExecCtx {
 
     fn array_push(&mut self, arr: VmValue, val: VmValue) {
         if arr.is_heap() {
-            if let Some(HeapObj::Array(a)) = self.heap.get(arr.as_heap_idx()) {
+            let raw_idx = arr.as_heap_idx();
+            if let Some(HeapObj::Array(a)) = self.heap.get(raw_idx) {
                 a.borrow_mut().push(val);
+                self.heap.write_barrier(raw_idx, val);
             }
         }
     }
@@ -370,8 +374,40 @@ impl NativeCtx for ExecCtx {
         }
     }
 
+    fn is_object(&self, v: VmValue) -> bool {
+        if v.is_heap() {
+            matches!(self.heap.get(v.as_heap_idx()), Some(HeapObj::Object(_)))
+        } else {
+            false
+        }
+    }
+
+    fn object_for_each(&self, obj: VmValue, f: &mut dyn FnMut(&str, VmValue)) {
+        if obj.is_heap() {
+            if let Some(HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
+                let g = o.borrow();
+                for (k, v) in g.inner.iter() {
+                    f(k.as_ref(), v);
+                }
+            }
+        }
+    }
+
+    fn get_object_shape(&self, obj: VmValue) -> Option<std::rc::Rc<varn_types::Shape>> {
+        if obj.is_heap() {
+            if let Some(HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
+                return Some(o.borrow().inner.shape.clone());
+            }
+        }
+        None
+    }
+
     fn alloc_object(&mut self) -> VmValue {
         self.heap.alloc_object()
+    }
+
+    fn alloc_object_with_shape(&mut self, shape: &std::rc::Rc<varn_types::Shape>, values: Vec<VmValue>) -> VmValue {
+        self.heap.alloc_object_with_shape(shape, values)
     }
 
     fn get_field(&self, obj: VmValue, key: &str) -> Option<VmValue> {

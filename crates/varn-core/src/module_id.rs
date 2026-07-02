@@ -51,6 +51,8 @@ impl ModuleId {
     pub fn stdlib(spec: &str) -> Self {
         if spec.starts_with("core:") {
             Self::Core(Arc::from(spec))
+        } else if spec.starts_with("runtime:") {
+            Self::Runtime(Arc::from(spec))
         } else {
             Self::Std(Arc::from(spec))
         }

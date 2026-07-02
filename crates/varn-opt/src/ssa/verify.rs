@@ -180,10 +180,18 @@ pub(crate) fn inst_uses(kind: &InstKind) -> Vec<Value> {
             v
         }
         InstKind::SelfCall { args } => args.clone(),
-        InstKind::GetProperty { object, .. } => vec![*object],
-        InstKind::GetIndex { object, index } => vec![*object, *index],
-        InstKind::SetProperty { object, value, .. } => vec![*object, *value],
+        InstKind::GetProperty { object, .. }
+        | InstKind::GetFixedField { object, .. } => vec![*object],
+        InstKind::GetIndex { object, index }
+        | InstKind::ArrayGetIndex { object, index } => vec![*object, *index],
+        InstKind::SetProperty { object, value, .. }
+        | InstKind::SetFixedField { object, value, .. } => vec![*object, *value],
         InstKind::SetIndex {
+            object,
+            index,
+            value,
+        }
+        | InstKind::ArraySetIndex {
             object,
             index,
             value,

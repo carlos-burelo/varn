@@ -474,6 +474,7 @@ impl<'a> Lowerer<'a> {
                             object: Box::new(tmp_expr.clone()),
                             index: Box::new(HirExpr::Int(i as i64)),
                             ty: HirType::Dynamic,
+                            is_array: true,
                         };
                         self.desugar_pattern_local(&elem.pattern, index_expr, scope, out)?;
                     }
@@ -573,6 +574,7 @@ impl<'a> Lowerer<'a> {
                             object: Box::new(tmp_expr.clone()),
                             index: Box::new(HirExpr::Int(i as i64)),
                             ty: HirType::Dynamic,
+                            is_array: true,
                         };
                         self.desugar_pattern_global(&elem.pattern, index_expr, scope, out)?;
                     }

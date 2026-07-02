@@ -405,6 +405,7 @@ pub fn prepare_call(
         Value::Class(ref c) => c.name.as_str(),
         ref other => other.type_name(),
     };
+    eprintln!("PREPARE_CALL FAILED: callee_nv={:?}, repr={}, type={}", callee_nv, callee_repr, type_name);
     Err(RuntimeError::new(format!(
         "value is not callable: {} (type: {})",
         callee_repr, type_name

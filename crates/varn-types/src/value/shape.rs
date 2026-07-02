@@ -96,6 +96,10 @@ impl RuntimeObject {
         }
     }
 
+    pub fn with_shape(shape: Rc<Shape>, values: Vec<VmValue>) -> Self {
+        Self { shape, values }
+    }
+
     #[inline]
     pub fn get(&self, name: &str) -> Option<VmValue> {
         let idx = self.shape.property_names.get(name).copied()?;

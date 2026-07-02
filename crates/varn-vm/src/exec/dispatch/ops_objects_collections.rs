@@ -202,6 +202,17 @@ impl ExecCtx {
                 self.stack[base + first_reg] = result;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
+            OpCode::ArrayGetIndex => {
+                let w1 = code[*ip];
+                *ip += 1;
+                let obj_reg = hi(w1);
+                let idx_reg = lo(w1);
+                let obj = self.stack[base + obj_reg];
+                let key_nv = self.stack[base + idx_reg];
+                let result = self.exec_array_get_index(obj, key_nv)?;
+                self.stack[base + first_reg] = result;
+                Ok(Some(ObjectFlow::ContinueInstruction))
+            }
             OpCode::SetIndex => {
                 let w1 = code[*ip];
                 *ip += 1;
@@ -211,6 +222,17 @@ impl ExecCtx {
                 let idx = self.stack[base + idx_reg];
                 let val = self.stack[base + val_reg];
                 self.exec_set_index(obj, idx, val)?;
+                Ok(Some(ObjectFlow::ContinueInstruction))
+            }
+            OpCode::ArraySetIndex => {
+                let w1 = code[*ip];
+                *ip += 1;
+                let idx_reg = hi(w1);
+                let val_reg = lo(w1);
+                let obj = self.stack[base + first_reg];
+                let idx = self.stack[base + idx_reg];
+                let val = self.stack[base + val_reg];
+                self.exec_array_set_index(obj, idx, val)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::BuildArray => {

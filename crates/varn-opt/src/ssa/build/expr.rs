@@ -213,16 +213,36 @@ impl Builder {
                     *ty,
                 ))
             }
-            HirExpr::Index { object, index, ty } => {
+            HirExpr::GetFixedField { object, slot, ty } => {
                 let o = self.lower_expr(object)?;
-                let i = self.lower_expr(index)?;
                 Ok(self.emit(
-                    InstKind::GetIndex {
+                    InstKind::GetFixedField {
                         object: o,
-                        index: i,
+                        slot: *slot,
                     },
                     *ty,
                 ))
+            }
+            HirExpr::Index {
+                object,
+                index,
+                ty,
+                is_array,
+            } => {
+                let o = self.lower_expr(object)?;
+                let i = self.lower_expr(index)?;
+                let kind = if *is_array {
+                    InstKind::ArrayGetIndex {
+                        object: o,
+                        index: i,
+                    }
+                } else {
+                    InstKind::GetIndex {
+                        object: o,
+                        index: i,
+                    }
+                };
+                Ok(self.emit(kind, *ty))
             }
             HirExpr::MethodCall {
                 recv,
@@ -565,15 +585,37 @@ impl Builder {
                     });
                     Ok(v)
                 }
-                HirAssignTarget::Index { object, index } => {
+                HirAssignTarget::SetFixedField { object, slot } => {
+                    let o = self.lower_expr(object)?;
+                    let v = self.lower_expr(value)?;
+                    self.emit_effect(InstKind::SetFixedField {
+                        object: o,
+                        value: v,
+                        slot: *slot,
+                    });
+                    Ok(v)
+                }
+                HirAssignTarget::Index {
+                    object,
+                    index,
+                    is_array,
+                } => {
                     let o = self.lower_expr(object)?;
                     let i = self.lower_expr(index)?;
                     let v = self.lower_expr(value)?;
-                    self.emit_effect(InstKind::SetIndex {
-                        object: o,
-                        index: i,
-                        value: v,
-                    });
+                    if *is_array {
+                        self.emit_effect(InstKind::ArraySetIndex {
+                            object: o,
+                            index: i,
+                            value: v,
+                        });
+                    } else {
+                        self.emit_effect(InstKind::SetIndex {
+                            object: o,
+                            index: i,
+                            value: v,
+                        });
+                    }
                     Ok(v)
                 }
                 HirAssignTarget::ModuleSlot { slot } => {
@@ -659,14 +701,12 @@ impl Builder {
                     });
                     Ok(if *prefix { new } else { old })
                 }
-
-                HirAssignTarget::Index { object, index } => {
+                HirAssignTarget::SetFixedField { object, slot } => {
                     let o = self.lower_expr(object)?;
-                    let i = self.lower_expr(index)?;
                     let old = self.emit(
-                        InstKind::GetIndex {
+                        InstKind::GetFixedField {
                             object: o,
-                            index: i,
+                            slot: *slot,
                         },
                         HirType::Dynamic,
                     );
@@ -684,11 +724,60 @@ impl Builder {
                         },
                         HirType::Dynamic,
                     );
-                    self.emit_effect(InstKind::SetIndex {
+                    self.emit_effect(InstKind::SetFixedField {
                         object: o,
-                        index: i,
                         value: new,
+                        slot: *slot,
                     });
+                    Ok(if *prefix { new } else { old })
+                }
+
+                HirAssignTarget::Index {
+                    object,
+                    index,
+                    is_array,
+                } => {
+                    let o = self.lower_expr(object)?;
+                    let i = self.lower_expr(index)?;
+                    let get_kind = if *is_array {
+                        InstKind::ArrayGetIndex {
+                            object: o,
+                            index: i,
+                        }
+                    } else {
+                        InstKind::GetIndex {
+                            object: o,
+                            index: i,
+                        }
+                    };
+                    let old = self.emit(get_kind, HirType::Dynamic);
+                    let one = self.emit(InstKind::ConstInt(1), HirType::Int);
+                    let bop = match op {
+                        HirUpdateOp::Inc => HirBinOp::Add,
+                        HirUpdateOp::Dec => HirBinOp::Sub,
+                    };
+                    let new = self.emit(
+                        InstKind::Binary {
+                            op: bop,
+                            lhs: old,
+                            rhs: one,
+                            ty: HirType::Dynamic,
+                        },
+                        HirType::Dynamic,
+                    );
+                    if *is_array {
+                        self.emit_effect(InstKind::ArraySetIndex {
+                            object: o,
+                            index: i,
+                            value: new,
+                        });
+                    } else {
+                        self.emit_effect(InstKind::SetIndex {
+                            object: o,
+                            index: i,
+                            value: new,
+                        });
+                    }
                     Ok(if *prefix { new } else { old })
                 }
                 HirAssignTarget::ModuleSlot { .. } => {

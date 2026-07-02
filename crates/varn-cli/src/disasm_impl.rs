@@ -162,7 +162,9 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
             | OpCode::ObjectKeys
             | OpCode::ObjectMerge
             | OpCode::GetIndex
-            | OpCode::SetIndex => {
+            | OpCode::SetIndex
+            | OpCode::ArrayGetIndex
+            | OpCode::ArraySetIndex => {
                 let w1 = code.get(offset + 1).copied().unwrap_or(0);
                 let src1 = (w1 >> 8) as usize;
                 let src2 = (w1 & 0xFF) as usize;

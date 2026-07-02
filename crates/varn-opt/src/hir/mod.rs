@@ -172,10 +172,18 @@ pub enum HirExpr {
         ty: HirType,
     },
 
+    GetFixedField {
+        object: Box<HirExpr>,
+        slot: u16,
+        ty: HirType,
+    },
+
     Index {
         object: Box<HirExpr>,
         index: Box<HirExpr>,
         ty: HirType,
+        /// True when the checker proved the object is a statically-typed Array.
+        is_array: bool,
     },
 
     MethodCall {
@@ -347,7 +355,14 @@ pub enum HirAssignTarget {
 
     Member { object: HirExpr, name: Rc<str> },
 
-    Index { object: HirExpr, index: HirExpr },
+    SetFixedField { object: HirExpr, slot: u16 },
+
+    Index {
+        object: HirExpr,
+        index: HirExpr,
+        /// True when the checker proved the object is a statically-typed Array.
+        is_array: bool,
+    },
 
     ModuleSlot { slot: u16 },
 
@@ -471,6 +486,8 @@ pub enum HirStmt {
         object: HirExpr,
         index: HirExpr,
         value: HirExpr,
+        /// True when the checker proved the object is a statically-typed Array.
+        is_array: bool,
     },
     Return(Option<HirExpr>),
     If {

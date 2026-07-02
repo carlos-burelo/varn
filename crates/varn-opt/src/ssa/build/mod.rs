@@ -285,6 +285,7 @@ fn scan_stmt(stmt: &HirStmt, pinned: &mut FxHashSet<VarId>, in_try: bool) {
             object,
             index,
             value,
+            ..
         } => {
             scan_expr(object, pinned, in_try);
             scan_expr(index, pinned, in_try);
@@ -430,7 +431,8 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
                 scan_expr(a, pinned, in_try);
             }
         }
-        HirExpr::Member { object, .. } => scan_expr(object, pinned, in_try),
+        HirExpr::Member { object, .. }
+        | HirExpr::GetFixedField { object, .. } => scan_expr(object, pinned, in_try),
         HirExpr::Index { object, index, .. } => {
             scan_expr(object, pinned, in_try);
             scan_expr(index, pinned, in_try);

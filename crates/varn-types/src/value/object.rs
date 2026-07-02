@@ -30,6 +30,12 @@ impl ObjData {
         }
     }
 
+    pub fn with_shape(shape: Rc<super::shape::Shape>, values: Vec<VmValue>) -> Self {
+        ObjData {
+            inner: RuntimeObject::with_shape(shape, values),
+        }
+    }
+
     pub fn is_instance(&self) -> bool {
         self.inner.shape.class.is_some()
     }

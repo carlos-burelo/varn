@@ -180,6 +180,9 @@ pub enum OpCode {
 
     Nop,
 
+    ArrayGetIndex,
+    ArraySetIndex,
+
     /// Direct dispatch of a statically-typed core-type method by stable op-id.
     /// Operands: `[op_id_const_idx: u16][arg_count: u16]` where `arg_count`
     /// includes the receiver. The receiver sits at the packed `call_base`

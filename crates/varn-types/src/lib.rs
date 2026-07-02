@@ -20,6 +20,6 @@ pub use resource::ResourceStore;
 pub use task::{reject_task, reject_value_task, resolve_task, AsyncTask, Poll, TaskState};
 pub use value::{
     find_method_with_owner, root_shape, ClassObj, Closure, LazyTask, ModuleObj, ObjData,
-    ResultType, RuntimeArray, RuntimeObject, RuntimeString, Upvalue, UpvalueInner, Value,
+    ResultType, RuntimeArray, RuntimeObject, RuntimeString, Shape, Upvalue, UpvalueInner, Value,
 };
 pub use vm_value::{VmArray, VmValue, VmValueRef};

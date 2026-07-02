@@ -532,27 +532,65 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
             ..
         } => {
             annotate_expr(object, ann, ctx);
-            if !computed {
-                if let ExprKind::Identifier { name: prop_name } = &property.kind {
-                    let obj_ty = get_expr_type(object, ctx);
-                    if let TypeKind::Named(_, Some(ref origin_path)) = &obj_ty.non_nullified().0 {
-                        let exports = if crate::module_resolver::is_known_module(origin_path) {
-                            crate::module_resolver::resolve_stdlib_module_exports_ref(origin_path)
-                        } else {
-                            crate::module_resolver::resolve_module_exports_ref(
-                                origin_path,
-                                &mut vec![],
-                            )
-                        };
-                        if let Some(sym) = exports.get(prop_name.as_ref()) {
-                            if let Some(slot_idx) = sym.slot_idx {
-                                ann.record_slot_idx(expr.range.start.offset, slot_idx);
+            if *computed {
+                // Recurse into the index expression
+                annotate_expr(property, ann, ctx);
+                // Annotate as a typed-array index when the object is statically known to be Array
+                let obj_ty = get_expr_type(object, ctx);
+                if matches!(obj_ty.non_nullified().0, TypeKind::Array(_)) {
+                    ann.record_array_index(expr.range.start.offset);
+                }
+            } else if let ExprKind::Identifier { name: prop_name } = &property.kind {
+                let obj_ty = get_expr_type(object, ctx);
+                let check_ty = obj_ty.non_nullified();
+
+                let class_name = match &check_ty.0 {
+                    TypeKind::Named(n, _origin) | TypeKind::Generic(n, _, _origin) => Some(n.as_ref()),
+                    _ => None,
+                };
+                if let Some(cn) = class_name {
+                    if ctx.bind.type_members.classes.contains_key(cn) {
+                        let mut hierarchy = Vec::new();
+                        let mut current: Option<std::rc::Rc<str>> = Some(std::rc::Rc::from(cn));
+                        while let Some(c) = current {
+                            hierarchy.push(c.clone());
+                            current = ctx.bind.class_parents.get(c.as_ref()).cloned();
+                        }
+                        hierarchy.reverse();
+
+                    let mut slot = 0u16;
+                    let mut known_props: rustc_hash::FxHashSet<std::rc::Rc<str>> = rustc_hash::FxHashSet::default();
+                    let mut found = false;
+
+                    for cls in &hierarchy {
+                        if let Some(entry) = ctx.bind.get_class_entry(cls) {
+                            for m in &entry.members {
+                                if !m.is_static && (m.kind == crate::types::ClassMemberKind::Property || m.kind == crate::types::ClassMemberKind::Variable) {
+                                    if known_props.insert(m.name.clone()) {
+                                        if m.name.as_ref() == prop_name.as_ref() {
+                                            // Key by the property identifier's offset, not the
+                                            // member expr's start offset. In a chain `a.b.c`, the
+                                            // outer member `(a.b).c` and inner `a.b` share the same
+                                            // start offset (`a`), so keying by start collides and the
+                                            // inner hop wrongly inherits the outer hop's slot.
+                                            ann.record_fixed_field_slot(property.range.start.offset, slot);
+                                            found = true;
+                                            break;
+                                        }
+                                        slot += 1;
+                                    }
+                                }
                             }
+                        }
+                        if found {
+                            break;
                         }
                     }
                 }
             }
         }
+        }
+
         ExprKind::As { expression, .. } | ExprKind::Satisfies { expression, .. } => {
             annotate_expr(expression, ann, ctx)
         }

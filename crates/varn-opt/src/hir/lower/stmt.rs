@@ -91,10 +91,12 @@ impl<'a> Lowerer<'a> {
                             if *computed {
                                 let index = self.lower_expr(property.as_ref(), scope)?;
                                 let value = self.lower_expr(value.as_ref(), scope)?;
+                                let is_arr = self.ann.get_array_index(target.range.start.offset);
                                 let current_val = HirExpr::Index {
                                     object: Box::new(object_hir.clone()),
                                     index: Box::new(index.clone()),
                                     ty,
+                                    is_array: is_arr,
                                 };
                                 let new_val = HirExpr::Binary {
                                     op: bop,
@@ -106,6 +108,7 @@ impl<'a> Lowerer<'a> {
                                     object: object_hir,
                                     index,
                                     value: new_val,
+                                    is_array: is_arr,
                                 });
                             } else {
                                 let name = match &property.kind {
@@ -140,10 +143,12 @@ impl<'a> Lowerer<'a> {
                         if *computed {
                             let index = self.lower_expr(property.as_ref(), scope)?;
                             let value = self.lower_expr(value.as_ref(), scope)?;
+                            let is_arr = self.ann.get_array_index(target.range.start.offset);
                             out.push(HirStmt::SetIndex {
                                 object: object_hir,
                                 index,
                                 value,
+                                is_array: is_arr,
                             });
                         } else {
                             let name = match &property.kind {
