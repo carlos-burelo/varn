@@ -1,9 +1,14 @@
 use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::OnceLock;
 
 pub type RuntimeString = Rc<str>;
+
+/// Backing storage for the language's `Map`/`Set`. FxHash: these are
+/// single-user, non-adversarial containers, and SipHash dominated lookup
+/// cost for string keys.
+pub type ValueMap = rustc_hash::FxHashMap<super::Value, super::Value>;
+pub type ValueSet = rustc_hash::FxHashSet<super::Value>;
 
 #[derive(Clone)]
 pub struct ObjRef(pub Rc<RefCell<super::ObjData>>);
@@ -106,26 +111,26 @@ impl std::fmt::Debug for ArrayRef {
 }
 
 #[derive(Clone)]
-pub struct MapRef(pub Rc<RefCell<HashMap<super::Value, super::Value>>>);
+pub struct MapRef(pub Rc<RefCell<ValueMap>>);
 
 impl MapRef {
-    pub fn new(data: HashMap<super::Value, super::Value>) -> Self {
+    pub fn new(data: ValueMap) -> Self {
         Self(Rc::new(RefCell::new(data)))
     }
 
-    pub fn read(&self) -> std::cell::Ref<'_, HashMap<super::Value, super::Value>> {
+    pub fn read(&self) -> std::cell::Ref<'_, ValueMap> {
         self.0.borrow()
     }
 
-    pub fn write(&self) -> std::cell::RefMut<'_, HashMap<super::Value, super::Value>> {
+    pub fn write(&self) -> std::cell::RefMut<'_, ValueMap> {
         self.0.borrow_mut()
     }
 
-    pub fn borrow(&self) -> std::cell::Ref<'_, HashMap<super::Value, super::Value>> {
+    pub fn borrow(&self) -> std::cell::Ref<'_, ValueMap> {
         self.0.borrow()
     }
 
-    pub fn borrow_mut(&self) -> std::cell::RefMut<'_, HashMap<super::Value, super::Value>> {
+    pub fn borrow_mut(&self) -> std::cell::RefMut<'_, ValueMap> {
         self.0.borrow_mut()
     }
 }
@@ -151,26 +156,26 @@ impl std::fmt::Debug for MapRef {
 }
 
 #[derive(Clone)]
-pub struct SetRef(pub Rc<RefCell<HashSet<super::Value>>>);
+pub struct SetRef(pub Rc<RefCell<ValueSet>>);
 
 impl SetRef {
-    pub fn new(data: HashSet<super::Value>) -> Self {
+    pub fn new(data: ValueSet) -> Self {
         Self(Rc::new(RefCell::new(data)))
     }
 
-    pub fn read(&self) -> std::cell::Ref<'_, HashSet<super::Value>> {
+    pub fn read(&self) -> std::cell::Ref<'_, ValueSet> {
         self.0.borrow()
     }
 
-    pub fn write(&self) -> std::cell::RefMut<'_, HashSet<super::Value>> {
+    pub fn write(&self) -> std::cell::RefMut<'_, ValueSet> {
         self.0.borrow_mut()
     }
 
-    pub fn borrow(&self) -> std::cell::Ref<'_, HashSet<super::Value>> {
+    pub fn borrow(&self) -> std::cell::Ref<'_, ValueSet> {
         self.0.borrow()
     }
 
-    pub fn borrow_mut(&self) -> std::cell::RefMut<'_, HashSet<super::Value>> {
+    pub fn borrow_mut(&self) -> std::cell::RefMut<'_, ValueSet> {
         self.0.borrow_mut()
     }
 }
