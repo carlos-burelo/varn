@@ -540,16 +540,11 @@ pub extern "C" fn jit_build_str(
     unsafe {
         let ctx_ref = &mut *ctx;
         let parts = std::slice::from_raw_parts(parts_ptr, count);
-        let mut total_len = 0;
-        let mut string_parts = Vec::with_capacity(count);
+        // Append each part directly: strings borrow, scalars format in
+        // place — no per-part String allocation.
+        let mut combined = String::new();
         for &v in parts {
-            let s = ctx_ref.heap.str_repr(v);
-            total_len += s.len();
-            string_parts.push(s);
-        }
-        let mut combined = String::with_capacity(total_len);
-        for s in &string_parts {
-            combined.push_str(s);
+            ctx_ref.heap.str_repr_into(v, &mut combined);
         }
         ctx_ref.heap.alloc_str(&combined)
     }

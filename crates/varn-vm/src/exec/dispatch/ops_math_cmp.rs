@@ -298,18 +298,15 @@ impl ExecCtx {
                 let count = hi(code[*ip]);
                 *ip += 1;
 
-                let parts: Vec<String> = (0..count)
-                    .map(|i| {
-                        let reg_idx = hi(code[*ip + i]);
-                        self.heap.str_repr(self.stack[base + reg_idx])
-                    })
-                    .collect();
-                *ip += count;
-                let total_len: usize = parts.iter().map(|s| s.len()).sum();
-                let mut combined = String::with_capacity(total_len);
-                for p in &parts {
-                    combined.push_str(p);
+                // Append each part directly into one buffer: strings borrow,
+                // ints/bools/null format in place — no per-part String alloc.
+                let mut combined = String::new();
+                for i in 0..count {
+                    let reg_idx = hi(code[*ip + i]);
+                    self.heap
+                        .str_repr_into(self.stack[base + reg_idx], &mut combined);
                 }
+                *ip += count;
                 self.stack[base + first_reg] = self.heap.alloc_str(combined);
             }
             OpCode::StrLength => {

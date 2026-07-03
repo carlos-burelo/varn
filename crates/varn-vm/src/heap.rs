@@ -816,6 +816,39 @@ impl HeapInner {
         std::borrow::Cow::Owned(self.str_repr(nv))
     }
 
+    /// Append a value's string form directly to `out`, allocating nothing of
+    /// its own for the common leaf cases (strings, ints, bools, null). Used
+    /// by `BuildStr` so concatenating template parts costs one output
+    /// allocation rather than one `String` per part.
+    pub fn str_repr_into(&self, nv: VmValue, out: &mut String) {
+        use std::fmt::Write;
+        if nv.is_null() {
+            out.push_str("null");
+        } else if nv.is_bool() {
+            out.push_str(if nv.as_bool() { "true" } else { "false" });
+        } else if nv.is_int() {
+            let _ = write!(out, "{}", nv.as_int());
+        } else if nv.is_f64() {
+            let f = nv.as_f64();
+            if f.fract() == 0.0 && f.abs() < 1e15 {
+                let _ = write!(out, "{}", f as i64);
+            } else {
+                let _ = write!(out, "{}", f);
+            }
+        } else if nv.is_sso() {
+            let mut buf = [0u8; 5];
+            out.push_str(nv.sso_as_str(&mut buf));
+        } else if nv.is_heap() {
+            if let Some(HeapObj::Str(s)) = self.get_by_idx(nv.as_heap_idx()) {
+                out.push_str(s.as_ref());
+                return;
+            }
+            out.push_str(&self.str_repr(nv));
+        } else {
+            out.push_str(&self.str_repr(nv));
+        }
+    }
+
     pub fn str_repr(&self, nv: VmValue) -> String {
         if nv.is_null() {
             return "null".into();
