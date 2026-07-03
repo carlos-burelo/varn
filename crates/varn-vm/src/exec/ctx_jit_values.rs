@@ -928,20 +928,46 @@ pub extern "C" fn jit_call_native_op(
                 crate::error::RuntimeError::new(format!("CallNativeOp: unknown op-id {op_id}")),
             ),
         };
-        ctx_ref.record_call_native();
-        let result = if total <= 16 {
-            let mut buf = [VmValue::null(); 16];
-            for i in 0..total {
-                buf[i] = ctx_ref.stack[args_start + i];
-            }
-            ctx_ref.invoke_native(f, &buf[..total])
-        } else {
-            let v: Vec<VmValue> = (0..total).map(|i| ctx_ref.stack[args_start + i]).collect();
-            ctx_ref.invoke_native(f, &v)
-        };
-        match result {
-            Ok(v) => v,
-            Err(msg) => jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg)),
-        }
+        call_native_from_stack(ctx_ref, f, args_start, total)
+    }
+}
+
+/// `CallNativeOp` with the target already resolved at JIT-compile time —
+/// no per-call op-id hash lookup.
+pub extern "C" fn jit_call_native_fnptr(
+    ctx: *mut ExecCtx,
+    fn_addr: usize,
+    args_start: usize,
+    total: usize,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let f: varn_types::NativeFn = std::mem::transmute(fn_addr);
+        call_native_from_stack(ctx_ref, f, args_start, total)
+    }
+}
+
+unsafe fn call_native_from_stack(
+    ctx_ref: &mut ExecCtx,
+    f: varn_types::NativeFn,
+    args_start: usize,
+    total: usize,
+) -> VmValue {
+    ctx_ref.record_call_native();
+    let result = if total <= 16 {
+        let mut buf = [VmValue::null(); 16];
+        std::ptr::copy_nonoverlapping(
+            ctx_ref.stack.as_ptr().add(args_start),
+            buf.as_mut_ptr(),
+            total,
+        );
+        ctx_ref.invoke_native(f, &buf[..total])
+    } else {
+        let v: Vec<VmValue> = (0..total).map(|i| ctx_ref.stack[args_start + i]).collect();
+        ctx_ref.invoke_native(f, &v)
+    };
+    match result {
+        Ok(v) => v,
+        Err(msg) => jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg)),
     }
 }

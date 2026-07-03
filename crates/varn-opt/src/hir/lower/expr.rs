@@ -224,7 +224,19 @@ impl<'a> Lowerer<'a> {
                         property: HirOptionalProperty::Call(hargs),
                     });
                 }
-                if let Some(wire_byte) = self.ann.get_intrinsic(offset) {
+                // Intrinsic / native-op annotations are keyed by the METHOD
+                // NAME offset: chained calls (`a.f().g()`) share their
+                // expression start offset, so keying by expr start let an
+                // outer call's annotation leak into the inner call.
+                let method_key = match &callee.kind {
+                    ExprKind::Member {
+                        property,
+                        computed: false,
+                        ..
+                    } => Some(property.range.start.offset),
+                    _ => None,
+                };
+                if let Some(wire_byte) = method_key.and_then(|o| self.ann.get_intrinsic(o)) {
                     if let ExprKind::Member {
                         object,
                         computed: false,
@@ -244,7 +256,7 @@ impl<'a> Lowerer<'a> {
                         }
                     }
                 }
-                if let Some(op_id) = self.ann.get_native_op(offset) {
+                if let Some(op_id) = method_key.and_then(|o| self.ann.get_native_op(o)) {
                     if let ExprKind::Member {
                         object,
                         computed: false,

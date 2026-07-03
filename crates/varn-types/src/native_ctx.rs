@@ -46,6 +46,12 @@ pub trait NativeCtx {
         Cow::Owned(self.str_repr(v))
     }
     fn str_owned(&self, v: VmValue) -> Option<String>;
+    /// Zero-copy string access: a refcount bump for heap strings instead of
+    /// an allocation + byte copy. Implementations back it with their shared
+    /// representation; the default falls back to copying.
+    fn str_shared(&self, v: VmValue) -> Option<std::rc::Rc<str>> {
+        self.str_owned(v).map(std::rc::Rc::from)
+    }
 
     fn array_len(&self, arr: VmValue) -> usize;
     fn array_get(&self, arr: VmValue, idx: usize) -> Option<VmValue>;

@@ -117,6 +117,13 @@ pub struct JitHelpers {
     pub jit_is_native_fn: usize,
     pub jit_call_native_fast: usize,
     pub jit_call_native_op: usize,
+    /// `extern "C" fn(*mut ExecCtx, fn_addr, args_start, total)` — direct
+    /// native call with the function pointer already resolved.
+    pub jit_call_native_fnptr: usize,
+    /// Compile-time op-id → native fn address resolution (0 = unknown).
+    /// Lets `CallNativeOp` embed the target directly instead of paying a
+    /// hash lookup on every runtime call.
+    pub resolve_native_op: fn(u64) -> usize,
     pub open_upvalues_offset: usize,
     pub pending_constructors_offset: usize,
     /// `extern "C" fn(*mut ExecCtx)` — loop back-edge GC safepoint.

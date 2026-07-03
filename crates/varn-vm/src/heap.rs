@@ -1181,6 +1181,19 @@ impl NativeCtx for Heap {
         self.deref().str_owned(v)
     }
 
+    fn str_shared(&self, v: VmValue) -> Option<std::rc::Rc<str>> {
+        if v.is_sso() {
+            let mut buf = [0u8; 5];
+            return Some(std::rc::Rc::from(v.sso_as_str(&mut buf)));
+        }
+        if v.is_heap() {
+            if let Some(HeapObj::Str(s)) = self.get_by_idx(v.as_heap_idx()) {
+                return Some(s.to_shared());
+            }
+        }
+        None
+    }
+
     fn array_len(&self, arr: VmValue) -> usize {
         if arr.is_heap() {
             if let Some(HeapObj::Array(a)) = self.get_by_idx(arr.as_heap_idx()) {

@@ -58,6 +58,43 @@ impl FromVm for String {
     }
 }
 
+/// Borrowed-string marshaling for native params: SSO payloads decode into an
+/// inline buffer and heap strings clone their `Rc<str>` — no allocation, no
+/// byte copy. The `Rc` keeps the string alive independently of the heap
+/// slot, so callee-side heap mutation (allocation, GC) cannot invalidate it.
+pub enum VnStr {
+    Sso { buf: [u8; 5], len: u8 },
+    Shared(std::rc::Rc<str>),
+}
+
+impl VnStr {
+    #[inline]
+    pub fn as_str(&self) -> &str {
+        match self {
+            // Valid UTF-8 by construction: the buffer was produced by
+            // `sso_as_str` at marshal time.
+            VnStr::Sso { buf, len } => unsafe {
+                std::str::from_utf8_unchecked(&buf[..*len as usize])
+            },
+            VnStr::Shared(s) => s,
+        }
+    }
+}
+
+impl FromVm for VnStr {
+    #[inline]
+    fn from_vm(ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, String> {
+        if v.is_sso() {
+            let mut buf = [0u8; 5];
+            let len = v.sso_as_str(&mut buf).len() as u8;
+            return Ok(VnStr::Sso { buf, len });
+        }
+        ctx.str_shared(v)
+            .map(VnStr::Shared)
+            .ok_or_else(|| format!("expected str, got {v:?}"))
+    }
+}
+
 impl FromVm for char {
     #[inline]
     fn from_vm(ctx: &dyn NativeCtx, v: VmValue) -> Result<Self, String> {
