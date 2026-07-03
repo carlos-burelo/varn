@@ -238,6 +238,7 @@ impl VmClosure {
             jit_call_native_op: ctx::jit_call_native_op as usize,
             jit_call_native_fnptr: ctx::jit_call_native_fnptr as usize,
             resolve_native_op: Self::resolve_native_op_addr,
+            array_layout: crate::heap::Heap::jit_array_layout(),
             open_upvalues_offset: {
                 let dummy = std::mem::MaybeUninit::<ctx::ExecCtx>::uninit();
                 let dummy_ptr = dummy.as_ptr();

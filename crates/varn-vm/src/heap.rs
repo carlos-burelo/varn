@@ -121,7 +121,10 @@ impl From<RuntimeString> for HeapStr {
     }
 }
 
+// `repr(u8)` pins the discriminant to the first byte with a defined layout
+// (RFC 2195), so JIT code can type-check a heap slot with one byte load.
 #[derive(Debug, Clone)]
+#[repr(u8)]
 pub enum HeapObj {
     Str(HeapStr),
     Array(VmArray),
@@ -1100,6 +1103,86 @@ impl Heap {
     pub fn rcbox_ptr_for_validation(&self) -> *const u8 {
         // Rc's data pointer is RcBox + 16; undo that to recover the box base.
         (Rc::as_ptr(&self.inner) as *const u8).wrapping_sub(2 * std::mem::size_of::<usize>())
+    }
+
+    /// Probed layout facts for the JIT's inline array-read fast path
+    /// (see `varn_jit::JitArrayLayout`). `Vec`'s field order is not
+    /// guaranteed by Rust, so the word offsets are discovered against
+    /// vectors with known contents; layouts are fixed for the lifetime of
+    /// one binary, which is exactly the lifetime of emitted JIT code.
+    pub fn jit_array_layout() -> varn_jit::JitArrayLayout {
+        // (ptr, len) word offsets inside a Vec<T>: len 3, capacity 7
+        // disambiguates all three words (a heap pointer can be neither).
+        fn vec_word_offsets<T>(v: &Vec<T>) -> (usize, usize) {
+            assert_eq!(v.len(), 3);
+            assert_eq!(v.capacity(), 7);
+            let words: [usize; 3] = unsafe { std::mem::transmute_copy(v) };
+            let ptr = v.as_ptr() as usize;
+            let mut ptr_off = usize::MAX;
+            let mut len_off = usize::MAX;
+            for (i, w) in words.iter().enumerate() {
+                if *w == ptr {
+                    ptr_off = i * 8;
+                } else if *w == 3 {
+                    len_off = i * 8;
+                }
+            }
+            assert!(
+                ptr_off != usize::MAX && len_off != usize::MAX,
+                "Vec layout probe failed"
+            );
+            (ptr_off, len_off)
+        }
+
+        let mut slots_probe: Vec<Option<HeapObj>> = Vec::with_capacity(7);
+        for _ in 0..3 {
+            slots_probe.push(None);
+        }
+        let (slots_ptr_off, _slots_len_off) = vec_word_offsets(&slots_probe);
+
+        let mut elems_probe: Vec<VmValue> = Vec::with_capacity(7);
+        for _ in 0..3 {
+            elems_probe.push(VmValue::null());
+        }
+        let (elems_ptr_off, elems_len_off) = vec_word_offsets(&elems_probe);
+
+        // Slot probe: discriminant byte and the offset of the payload's Rc
+        // pointer inside `Option<HeapObj>` (the Option uses the enum's spare
+        // discriminant values as its niche, so the tag byte is shared).
+        let arr = varn_types::vm_value::VmArray::new(vec![VmValue::null()]);
+        // Rc's data pointer is RcBox + 16; the word stored inside the slot
+        // is the RcBox base.
+        let rcbox = Rc::as_ptr(&arr.0) as usize - 2 * std::mem::size_of::<usize>();
+        let slot: Option<HeapObj> = Some(HeapObj::Array(arr));
+        let size = std::mem::size_of::<Option<HeapObj>>();
+        let bytes =
+            unsafe { std::slice::from_raw_parts(&slot as *const _ as *const u8, size) };
+        let array_tag = bytes[0] as usize;
+        let payload_off = (0..=size - 8)
+            .find(|&off| {
+                usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == rcbox
+            })
+            .expect("array payload probe failed");
+
+        // The niche assumption: None and non-Array variants must differ in
+        // the tag byte the fast path reads.
+        let none_slot: Option<HeapObj> = None;
+        let none_tag = unsafe { *(&none_slot as *const _ as *const u8) } as usize;
+        assert_ne!(array_tag, none_tag, "Option<HeapObj> niche probe failed");
+
+        varn_jit::JitArrayLayout {
+            slots_vec_off: 2 * std::mem::size_of::<usize>()
+                + std::mem::offset_of!(HeapInner, objects),
+            nursery_slots_vec_off: 2 * std::mem::size_of::<usize>()
+                + std::mem::offset_of!(HeapInner, nursery)
+                + crate::nursery::Nursery::objects_vec_byte_offset(),
+            slots_ptr_off,
+            slot_size: size,
+            array_tag,
+            payload_off,
+            elems_ptr_off,
+            elems_len_off,
+        }
     }
 }
 

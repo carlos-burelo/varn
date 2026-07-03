@@ -18,6 +18,39 @@ pub type JitFn = unsafe extern "C" fn(
     exec_ctx: *mut std::ffi::c_void,
 ) -> VmValue;
 
+/// Byte offsets and probed layout facts that let emitted code walk from a
+/// heap-tagged `VmValue` to an array element without any FFI call:
+///
+/// `[ExecCtx + heap_field] → RcBox → HeapInner.objects (Vec words) → slot
+/// (Option<HeapObj>, tag byte + payload Rc) → RcBox → Vec<VmValue> words →
+/// data[idx]`.
+///
+/// Rust does not guarantee `Vec`'s field order, so the ptr/len word offsets
+/// are PROBED at startup against vectors with known contents — stable for
+/// the lifetime of one binary, which is exactly the lifetime of any JIT
+/// code that embeds them.
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct JitArrayLayout {
+    /// RcBox base → the old-gen `objects` Vec's three words inside HeapInner.
+    pub slots_vec_off: usize,
+    /// RcBox base → the nursery's `objects` Vec's three words. Heap indices
+    /// use bit 31 to distinguish old gen (set) from nursery (clear).
+    pub nursery_slots_vec_off: usize,
+    /// Word offset of the data pointer inside `Vec<Option<HeapObj>>`.
+    pub slots_ptr_off: usize,
+    /// `size_of::<Option<HeapObj>>()` — slot stride.
+    pub slot_size: usize,
+    /// Discriminant byte value of `HeapObj::Array` (niche-shared by the
+    /// `Option` wrapper).
+    pub array_tag: usize,
+    /// Slot base → the array payload's Rc pointer.
+    pub payload_off: usize,
+    /// Word offsets of (data ptr, len) inside `Vec<VmValue>`.
+    pub elems_ptr_off: usize,
+    pub elems_len_off: usize,
+}
+
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct JitHelpers {
@@ -124,6 +157,8 @@ pub struct JitHelpers {
     /// Lets `CallNativeOp` embed the target directly instead of paying a
     /// hash lookup on every runtime call.
     pub resolve_native_op: fn(u64) -> usize,
+    /// Probed heap/array layout for the inline array-read fast path.
+    pub array_layout: JitArrayLayout,
     pub open_upvalues_offset: usize,
     pub pending_constructors_offset: usize,
     /// `extern "C" fn(*mut ExecCtx)` — loop back-edge GC safepoint.
