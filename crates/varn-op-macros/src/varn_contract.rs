@@ -147,7 +147,9 @@ fn param_ty(m: &Mapped) -> TS2 {
 
 fn owned_ty(m: &Mapped) -> TS2 {
     match m {
-        Mapped::Str => quote!(String),
+        // Zero-copy: Rc clone / inline SSO buffer instead of an owned
+        // String allocation per call.
+        Mapped::Str => quote!(::varn_types::VnStr),
         Mapped::Opt(inner) => {
             let i = owned_ty(inner);
             quote!(::core::option::Option<#i>)
@@ -170,8 +172,10 @@ fn ret_ty(m: &Mapped) -> TS2 {
 
 fn call_expr(binding: &Ident, m: &Mapped) -> TS2 {
     match m {
-        Mapped::Str => quote!(&#binding),
-        Mapped::Opt(inner) if matches!(**inner, Mapped::Str) => quote!(#binding.as_deref()),
+        Mapped::Str => quote!(#binding.as_str()),
+        Mapped::Opt(inner) if matches!(**inner, Mapped::Str) => {
+            quote!(#binding.as_ref().map(|s| s.as_str()))
+        }
         _ => quote!(#binding),
     }
 }

@@ -856,6 +856,16 @@ fn emit_call_native_op(ctx: &mut CodegenCtx, first_reg: usize) {
         _ => 0,
     };
 
+    // Resolve the target now so the runtime call skips the op-id hash
+    // lookup entirely. Unknown ids (0) keep the resolving helper, which
+    // raises the proper runtime error.
+    let fn_addr = (helpers.resolve_native_op)(op_id);
+    let (helper_addr, second_arg) = if fn_addr != 0 {
+        (helpers.jit_call_native_fnptr, fn_addr as u64)
+    } else {
+        (helpers.jit_call_native_op, op_id)
+    };
+
     let dest = first_reg;
 
     emit_flush_all(asm, regmap);
@@ -869,16 +879,16 @@ fn emit_call_native_op(ctx: &mut CodegenCtx, first_reg: usize) {
         asm.push(Reg::Rax);
     }
 
-    // jit_call_native_op(ctx, op_id, args_start = base + dest, total)
+    // helper(ctx, fn_addr | op_id, args_start = base + dest, total)
     asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
-    asm.mov_reg_imm64(ARG_CLOSURE, op_id);
+    asm.mov_reg_imm64(ARG_CLOSURE, second_arg);
     asm.add_reg_imm32(ARG_BASE, dest as i32);
     asm.mov_reg_imm64(ARG_EXEC_CTX, total as u64);
 
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
 
-    asm.mov_reg_imm64(Reg::R10, helpers.jit_call_native_op as u64);
+    asm.mov_reg_imm64(Reg::R10, helper_addr as u64);
     asm.call_reg(Reg::R10);
 
     #[cfg(target_os = "windows")]

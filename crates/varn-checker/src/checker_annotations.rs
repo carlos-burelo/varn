@@ -107,10 +107,24 @@ fn get_expr_type(expr: &Expr, ctx: &AnnotateCtx) -> Type {
 /// The native core class a receiver type belongs to, if any. Only core types
 /// whose methods are natively registered (and thus op-id-addressable).
 fn core_class_of_type(ty: &Type) -> Option<&'static str> {
+    use varn_core::op_id::core_class_name;
+    use varn_core::TypeTag;
     match &ty.0 {
         // `Array` types are structural (`T[]`), not `Named`, so they bypass the
         // name lookup — resolve the class name from the canonical core table.
-        TypeKind::Array(_) => varn_core::op_id::core_class_name(varn_core::TypeTag::Array),
+        TypeKind::Array(_) => core_class_name(TypeTag::Array),
+        // Primitive receivers are `Intrinsic`/literal types, not `Named`:
+        // without these arms every `s.includes(..)` on a statically-typed
+        // string fell back to the string-name + inline-cache path.
+        // `bigint` is excluded: `const b: bigint = i` coerces statically
+        // without changing the runtime representation (the value stays a
+        // NaN-boxed int), so its static type does not pick the wrapper.
+        TypeKind::Intrinsic(TypeTag::BigInt) => None,
+        TypeKind::Intrinsic(tag) => core_class_name(*tag),
+        TypeKind::LiteralInt(_) => core_class_name(TypeTag::Int),
+        TypeKind::LiteralFloat(_) => core_class_name(TypeTag::Float),
+        TypeKind::LiteralStr(_) | TypeKind::TemplateLiteral(_) => core_class_name(TypeTag::Str),
+        TypeKind::LiteralBool(_) => core_class_name(TypeTag::Bool),
         TypeKind::Named(name, _) => varn_core::op_id::core_class(name.as_ref()),
         _ => None,
     }
@@ -488,10 +502,14 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                     let obj_ty = get_expr_type(object, ctx);
                     let obj_ty_nn = obj_ty.non_nullified();
                     let mut recorded = false;
+                    // Keyed by the method-name offset (not the expression
+                    // start): chained calls share their start offset and the
+                    // outer annotation would leak into the inner call.
+                    let key_offset = property.range.start.offset;
                     if let TypeKind::Named(_, Some(ref origin_path)) = &obj_ty_nn.0 {
                         let key = format!("{}/{}", origin_path, prop_name);
                         if let Some(wire_byte) = intrinsic_lookup(&key) {
-                            ann.record_intrinsic(expr.range.start.offset, wire_byte);
+                            ann.record_intrinsic(key_offset, wire_byte);
                             recorded = true;
                         }
                     }
@@ -506,7 +524,7 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                             if let Some(class) = core_class_of_type(&obj_ty_nn) {
                                 if core_has_method(ctx.bind, class, prop_name) {
                                     ann.record_native_op(
-                                        expr.range.start.offset,
+                                        key_offset,
                                         varn_core::op_id::core_method_op_id(class, prop_name),
                                     );
                                 }

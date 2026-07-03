@@ -118,6 +118,13 @@ impl VmClosure {
         closure
     }
 
+    /// Compile-time op-id resolution for `CallNativeOp` codegen: returns the
+    /// native fn address, or 0 when the op-id is unknown (codegen then falls
+    /// back to the runtime-resolving helper, which raises the proper error).
+    fn resolve_native_op_addr(op_id: u64) -> usize {
+        varn_builtins::native_op_fn(op_id).map_or(0, |f| f as usize)
+    }
+
     pub fn compile_jit(&mut self) {
         if self.proto.jit_failed.get() {
             return;
@@ -229,6 +236,8 @@ impl VmClosure {
             jit_is_native_fn: ctx::jit_is_native_fn as usize,
             jit_call_native_fast: ctx::jit_call_native_fast as usize,
             jit_call_native_op: ctx::jit_call_native_op as usize,
+            jit_call_native_fnptr: ctx::jit_call_native_fnptr as usize,
+            resolve_native_op: Self::resolve_native_op_addr,
             open_upvalues_offset: {
                 let dummy = std::mem::MaybeUninit::<ctx::ExecCtx>::uninit();
                 let dummy_ptr = dummy.as_ptr();

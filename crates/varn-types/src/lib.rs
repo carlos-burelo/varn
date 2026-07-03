@@ -12,7 +12,7 @@ pub mod value;
 pub mod vm_value;
 pub use chunk::{Chunk, FunctionProto, Literal, PoolEntry};
 pub use generator::{AsyncQueue, GenChannel, GeneratorDriver, GeneratorObj};
-pub use marshal::{FromVm, IntoVm, VnArray};
+pub use marshal::{FromVm, IntoVm, VnArray, VnStr};
 pub use module_graph::{ModuleGraphArtifact, PackageNode};
 pub use native::{call_static_with, NativeFn, NativeOpEntry};
 pub use native_ctx::NativeCtx;
