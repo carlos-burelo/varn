@@ -15,6 +15,12 @@ impl RegMap {
         // Rank virtual registers by access frequency using the shared
         // instruction decoder (varn_types::bytecode). Cheap moves and
         // immediate loads weigh 1, normal defs/uses 2, branch conditions 3.
+        //
+        // Counting STOPS at the first call-shaped instruction: every
+        // allocated register must be flushed before and reloaded after
+        // each call, so in call-heavy code allocation is a net loss —
+        // ranking only the pre-call prefix keeps registers for leaf loops
+        // where they pay off.
         let mut freq: HashMap<usize, u32> = HashMap::new();
 
         let mut ip = 0;
@@ -25,6 +31,9 @@ impl RegMap {
             let Some(info) = varn_types::bytecode::decode(code, ip, constants) else {
                 break;
             };
+            if info.call_args.is_some() {
+                break;
+            }
 
             let def_weight = match op {
                 OpCode::LoadNull
