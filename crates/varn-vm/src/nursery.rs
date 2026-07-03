@@ -92,6 +92,12 @@ impl Nursery {
         std::mem::offset_of!(Nursery, objects) + 2 * std::mem::size_of::<usize>()
     }
 
+    /// Byte offset of the `objects` Vec's three words within `Nursery`,
+    /// for the JIT's inline array-read fast path.
+    pub fn objects_vec_byte_offset() -> usize {
+        std::mem::offset_of!(Nursery, objects)
+    }
+
     #[inline(always)]
     pub fn len(&self) -> usize {
         self.objects.len()
