@@ -52,6 +52,28 @@ fn emit_array_length(ctx: &mut CodegenCtx, first_reg: usize) {
     ctx.ip += 1;
     let src = (w1 >> 8) as usize;
 
+    let lay = ctx.helpers.array_layout;
+    let heap_off = ctx.helpers.heap_field_offset;
+
+    // Fast path: a heap array's length is a single Vec-len load, NaN-boxed
+    // as an int. Non-array receivers (strings, etc.) fall back.
+    let mut slow: Vec<usize> = Vec::new();
+    {
+        let asm = &mut ctx.asm;
+        let regmap = &ctx.regmap;
+
+        emit_load(asm, Reg::Rax, src, regmap);
+        super::array_fast::emit_resolve_array_payload(asm, &lay, heap_off, false, &mut slow);
+
+        // len (payload+16 + elems_len_off) → NaN-boxed int.
+        asm.mov_reg_mem(Reg::Rax, Reg::Rax, (16 + lay.elems_len_off) as i32);
+        asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
+        emit_store(asm, Reg::Rax, first_reg, regmap);
+    }
+    let done = ctx.asm.jmp_near();
+
+    super::array_fast::patch_all(&mut ctx.asm, slow);
+
     emit_ffi_call(
         &mut ctx.asm,
         &ctx.regmap,
@@ -64,6 +86,10 @@ fn emit_array_length(ctx: &mut CodegenCtx, first_reg: usize) {
             recompute_frame: false,
         },
     );
+
+    let end = ctx.asm.current_offset();
+    ctx.asm
+        .patch_u32(done, (end as i32 - (done as i32 + 4)) as u32);
 }
 
 fn emit_array_push(ctx: &mut CodegenCtx, first_reg: usize) {
