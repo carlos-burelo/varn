@@ -157,6 +157,90 @@ fn emit_set_index(ctx: &mut CodegenCtx, first_reg: usize) {
     let val_reg = (w1 & 0xFF) as usize;
     let obj_reg = first_reg;
 
+    let lay = ctx.helpers.array_layout;
+    let heap_off = ctx.helpers.heap_field_offset;
+
+    // Fast path: in-bounds int store into a NURSERY array. Nursery parents
+    // never need the write barrier (it only tracks old→nursery edges), so
+    // the store is a plain memory write. Old-gen parents, out-of-bounds
+    // stores (push/extend semantics) and non-array receivers fall back.
+    let mut slow: Vec<usize> = Vec::new();
+    {
+        let asm = &mut ctx.asm;
+        let regmap = &ctx.regmap;
+
+        emit_load(asm, Reg::Rax, obj_reg, regmap);
+        emit_load(asm, Reg::R11, idx_reg, regmap);
+
+        let heap_mask = varn_types::vm_value::SIGN
+            | varn_types::vm_value::QNAN
+            | varn_types::vm_value::MASK_TAG;
+        let heap_expect = varn_types::vm_value::SIGN
+            | varn_types::vm_value::QNAN
+            | varn_types::vm_value::TAG_PTR;
+        asm.mov_reg_reg(Reg::R10, Reg::Rax);
+        asm.mov_reg_imm64(Reg::Rcx, heap_mask);
+        asm.and_reg_reg(Reg::R10, Reg::Rcx);
+        asm.mov_reg_imm64(Reg::Rcx, heap_expect);
+        asm.cmp_reg_reg(Reg::R10, Reg::Rcx);
+        slow.push(asm.jmp_cond(Cond::NotEqual));
+
+        // Nursery parent only: bit 31 must be clear.
+        asm.mov_reg_imm64(Reg::R10, 0x8000_0000u64);
+        asm.test_reg_reg(Reg::Rax, Reg::R10);
+        slow.push(asm.jmp_cond(Cond::NotEqual));
+
+        // Key must be an int.
+        asm.mov_reg_reg(Reg::R10, Reg::R11);
+        asm.mov_reg_imm64(Reg::Rcx, 0x7FFF_0000_0000_0000u64);
+        asm.and_reg_reg(Reg::R10, Reg::Rcx);
+        asm.cmp_reg_reg(Reg::R10, REG_INT_TAG);
+        slow.push(asm.jmp_cond(Cond::NotEqual));
+
+        // slot = nursery.objects.ptr + idx * slot_size
+        asm.mov_reg_imm64(Reg::Rcx, 0xFFFF_FFFFu64);
+        asm.and_reg_reg(Reg::Rax, Reg::Rcx);
+        asm.mov_reg_mem(Reg::Rcx, ARG_EXEC_CTX, heap_off as i32);
+        asm.mov_reg_mem(
+            Reg::Rcx,
+            Reg::Rcx,
+            (lay.nursery_slots_vec_off + lay.slots_ptr_off) as i32,
+        );
+        asm.mov_reg_imm64(Reg::R10, lay.slot_size as u64);
+        asm.imul_reg_reg(Reg::Rax, Reg::R10);
+        asm.add_reg_reg(Reg::Rax, Reg::Rcx);
+
+        // The slot must hold an Array.
+        asm.mov_reg_mem(Reg::R10, Reg::Rax, 0);
+        asm.mov_reg_imm64(Reg::Rcx, 0xFF);
+        asm.and_reg_reg(Reg::R10, Reg::Rcx);
+        asm.mov_reg_imm64(Reg::Rcx, lay.array_tag as u64);
+        asm.cmp_reg_reg(Reg::R10, Reg::Rcx);
+        slow.push(asm.jmp_cond(Cond::NotEqual));
+
+        asm.mov_reg_mem(Reg::Rax, Reg::Rax, lay.payload_off as i32);
+
+        // Untag the key; unsigned bounds check (strictly below len — the
+        // idx == len append case belongs to the helper).
+        asm.shl_reg_imm8(Reg::R11, 16);
+        asm.sar_reg_imm8(Reg::R11, 16);
+        asm.mov_reg_mem(Reg::R10, Reg::Rax, (16 + lay.elems_len_off) as i32);
+        asm.cmp_reg_reg(Reg::R11, Reg::R10);
+        slow.push(asm.jmp_cond(Cond::AboveEqual));
+
+        asm.mov_reg_mem(Reg::Rax, Reg::Rax, (16 + lay.elems_ptr_off) as i32);
+        asm.shl_reg_imm8(Reg::R11, 3);
+        asm.add_reg_reg(Reg::Rax, Reg::R11);
+        emit_load(asm, Reg::R10, val_reg, regmap);
+        asm.mov_mem_reg(Reg::Rax, 0, Reg::R10);
+    }
+    let done = ctx.asm.jmp_near();
+
+    let slow_pos = ctx.asm.current_offset();
+    for p in slow {
+        ctx.asm.patch_u32(p, (slow_pos as i32 - (p as i32 + 4)) as u32);
+    }
+
     emit_ffi_call(
         &mut ctx.asm,
         &ctx.regmap,
@@ -173,6 +257,10 @@ fn emit_set_index(ctx: &mut CodegenCtx, first_reg: usize) {
             recompute_frame: true,
         },
     );
+
+    let end = ctx.asm.current_offset();
+    ctx.asm
+        .patch_u32(done, (end as i32 - (done as i32 + 4)) as u32);
 }
 
 fn emit_typeof(ctx: &mut CodegenCtx, first_reg: usize) {
