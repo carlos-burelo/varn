@@ -619,6 +619,16 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                 }
             }
         }
+        // Template interpolations were never visited, so arithmetic inside
+        // `${...}` (e.g. `${i % 10000}`) missed its numeric annotation and
+        // lowered to the generic FFI op instead of the typed int opcode.
+        ExprKind::Template { parts } => {
+            for part in parts {
+                if let varn_core::ast::TemplatePart::Interpolation(e) = part {
+                    annotate_expr(e, ann, ctx);
+                }
+            }
+        }
         _ => {}
     }
 }
