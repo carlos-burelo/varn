@@ -1,4 +1,5 @@
 pub(crate) mod arith;
+pub(crate) mod array_fast;
 pub(crate) mod arrays;
 pub(crate) mod calls;
 pub(crate) mod closures;
