@@ -386,8 +386,6 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         extension_members,
     };
 
-    module_resolver::invalidate_module_cache();
-
     DocumentAnalysis {
         source,
         uri,

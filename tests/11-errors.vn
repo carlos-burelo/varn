@@ -1,5 +1,5 @@
 
-function safeDivide(a: int, b: int): int {
+function safeDivide(a: int, b: int): float {
     try {
         if (b === 0) throw new RangeError("division by zero")
         return a / b

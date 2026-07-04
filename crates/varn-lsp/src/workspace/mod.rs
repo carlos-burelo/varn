@@ -23,6 +23,12 @@ impl Workspace {
     }
 
     pub fn update_file(&self, uri: String, source: String) {
+        let path = crate::document::uri_to_path(&uri);
+        let canonical = varn_modules::canonical_or_original(std::path::Path::new(&path));
+        varn_checker::module_resolver::invalidate_module(&varn_core::ModuleId::local_str(
+            &canonical,
+        ));
+
         let state = Arc::new(run_pipeline(source, uri.clone()));
 
         let dependents: Vec<(String, String)> = {

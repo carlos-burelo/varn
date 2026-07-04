@@ -2,6 +2,7 @@ use varn_core::OpCode;
 use varn_types::FunctionProto;
 
 use crate::assembler::Assembler;
+use crate::loop_hoist::plan_hoists;
 use crate::mem::JitBuffer;
 use crate::regalloc::{emit_prologue, RegMap};
 
@@ -41,8 +42,10 @@ pub fn compile_proto(
         ip += info.len;
     }
 
+    let hoist_plans = plan_hoists(code, &proto.chunk.constants);
+
     let mut asm = Assembler::new();
-    let regmap = RegMap::from_bytecode(code, &proto.chunk.constants);
+    let regmap = RegMap::from_bytecode(code, &proto.chunk.constants, !hoist_plans.is_empty());
     emit_prologue(&mut asm, &regmap, proto, &helpers);
     crate::regalloc::emit_reload_all(&mut asm, &regmap);
 
@@ -60,10 +63,35 @@ pub fn compile_proto(
         proto,
         helpers: &helpers,
         constants,
+        hoist_plans: &hoist_plans,
         safe_int_call_opt,
     };
 
     while cctx.ip < code_len {
+        if let Some(plan) = hoist_plans.iter().find(|p| p.header_offset == cctx.ip) {
+            // Force any pending collection to happen NOW, before caching —
+            // the loop body is provably allocation-free (see
+            // loop_hoist::body_is_alloc_free), so once nursery is fresh
+            // here nothing during the loop's execution can move or promote
+            // the cached array. No further GC-branch re-check is needed at
+            // the loop's own back-edge.
+            crate::codegen::jumps::emit_gc_safepoint_check(
+                &mut cctx.asm,
+                &cctx.regmap,
+                cctx.helpers,
+            );
+            let lay = cctx.helpers.array_layout;
+            let heap_off = cctx.helpers.heap_field_offset;
+            crate::codegen::array_fast::emit_resolve_into_cache(
+                &mut cctx.asm,
+                &lay,
+                heap_off,
+                &cctx.regmap,
+                plan.obj_vreg,
+                crate::loop_hoist::LOOP_ARRAY_CACHE_REG,
+            );
+        }
+
         let raw_op = cctx.code[cctx.ip];
         cctx.ip_to_asm_pos[cctx.ip] = cctx.asm.current_offset();
         cctx.ip += 1;

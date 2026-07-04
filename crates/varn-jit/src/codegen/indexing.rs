@@ -4,9 +4,10 @@ use crate::assembler::{Cond, Reg};
 use crate::regalloc::{emit_load, emit_store};
 use crate::registers::REG_INT_TAG;
 
-use super::array_fast::{emit_resolve_array_payload, patch_all};
+use super::array_fast::{emit_cached_or_fallthrough, emit_resolve_array_payload, patch_all};
 use super::ffi::{emit_ffi_call, FfiArg, FfiCallSpec};
 use super::CodegenCtx;
+use crate::loop_hoist::LOOP_ARRAY_CACHE_REG;
 
 /// Emit the "key in R11 must be an int" guard, pushing to the slow list.
 fn emit_int_key_guard(asm: &mut crate::assembler::Assembler, slow: &mut Vec<usize>) {
@@ -23,7 +24,7 @@ pub(crate) fn emit_indexing(
     first_reg: usize,
 ) -> Result<(), String> {
     match op {
-        OpCode::GetIndex | OpCode::ArrayGetIndex => emit_get_index(ctx, first_reg),
+        OpCode::GetIndex | OpCode::ArrayGetIndex => emit_get_index(ctx, op, first_reg),
         OpCode::SetIndex | OpCode::ArraySetIndex => emit_set_index(ctx, first_reg),
         OpCode::Typeof => emit_typeof(ctx, first_reg),
         OpCode::Instanceof => emit_instanceof(ctx, first_reg),
@@ -32,7 +33,8 @@ pub(crate) fn emit_indexing(
     Ok(())
 }
 
-fn emit_get_index(ctx: &mut CodegenCtx, first_reg: usize) {
+fn emit_get_index(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
+    let instr_start = ctx.ip - 1;
     let w1 = ctx.code[ctx.ip];
     ctx.ip += 1;
     let obj_reg = (w1 >> 8) as usize;
@@ -40,6 +42,15 @@ fn emit_get_index(ctx: &mut CodegenCtx, first_reg: usize) {
 
     let lay = ctx.helpers.array_layout;
     let heap_off = ctx.helpers.heap_field_offset;
+
+    // Only ArrayGetIndex is eligible: it is the opcode the checker proved
+    // statically Array-typed (GetIndex covers everything the checker could
+    // NOT narrow, so its receiver may not even be an array).
+    let hoisted = op == OpCode::ArrayGetIndex
+        && ctx
+            .hoist_plans
+            .iter()
+            .any(|p| p.obj_vreg as usize == obj_reg && p.contains(instr_start));
 
     // Fast path: heap array + in-bounds int key resolve to a single chain
     // of loads (VmValue → heap slot → element vec → data[idx]), no FFI.
@@ -54,7 +65,13 @@ fn emit_get_index(ctx: &mut CodegenCtx, first_reg: usize) {
         emit_load(asm, Reg::R11, key_reg, regmap);
 
         emit_int_key_guard(asm, &mut slow);
+
+        let cache_hit = hoisted.then(|| emit_cached_or_fallthrough(asm, LOOP_ARRAY_CACHE_REG));
         emit_resolve_array_payload(asm, &lay, heap_off, false, &mut slow);
+        if let Some(p) = cache_hit {
+            let after = asm.current_offset();
+            asm.patch_u32(p, (after as i32 - (p as i32 + 4)) as u32);
+        }
 
         // Untag the key (48-bit sign extend); unsigned bounds check also
         // rejects negative indices.

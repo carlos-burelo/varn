@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Instant;
 
 use tower_lsp::jsonrpc::Result as LspResult;
 use tower_lsp::lsp_types::*;
@@ -20,6 +21,8 @@ use crate::features::symbols::build_document_symbols;
 use crate::features::workspace_symbols::build_workspace_symbols;
 use crate::workspace::Workspace;
 
+const SLOW_REQUEST_MS: u128 = 30;
+
 pub struct Backend {
     pub client: Client,
     pub workspace: Arc<Workspace>,
@@ -33,9 +36,24 @@ impl Backend {
         }
     }
 
+    /// Surfaces slow LSP operations in the client's output channel as they
+    /// happen, instead of only being visible via external profiling.
+    async fn log_slow(&self, op: &str, elapsed: std::time::Duration) {
+        if elapsed.as_millis() >= SLOW_REQUEST_MS {
+            self.client
+                .log_message(
+                    MessageType::WARNING,
+                    format!("[perf] {op} took {}ms", elapsed.as_millis()),
+                )
+                .await;
+        }
+    }
+
     async fn analyze_and_publish(&self, uri: Url, source: String) {
         let uri_str = uri.to_string();
+        let start = Instant::now();
         self.workspace.update_file(uri_str.clone(), source);
+        self.log_slow("analyze", start.elapsed()).await;
 
         let analysis = match self.workspace.get(&uri_str) {
             Some(a) => a,
@@ -169,13 +187,27 @@ impl LanguageServer for Backend {
                 if let Ok(abs_path) = std::fs::canonicalize(&path) {
                     if let Ok(uri) = Url::from_file_path(&abs_path) {
                         if let Ok(source) = std::fs::read_to_string(&abs_path) {
-                            let _ = rt.block_on(client.log_message(
-                                MessageType::LOG,
-                                format!("[{}/{}] Indexing {}", idx + 1, total, abs_path.display()),
-                            ));
+                            let file_start = std::time::Instant::now();
                             workspace.update_file(uri.to_string(), source);
+                            let elapsed = file_start.elapsed();
+                            if elapsed.as_millis() >= SLOW_REQUEST_MS {
+                                let _ = rt.block_on(client.log_message(
+                                    MessageType::WARNING,
+                                    format!(
+                                        "[perf] slow index {} ({}ms)",
+                                        abs_path.display(),
+                                        elapsed.as_millis()
+                                    ),
+                                ));
+                            }
                         }
                     }
+                }
+                if (idx + 1) % 25 == 0 || idx + 1 == total {
+                    let _ = rt.block_on(client.log_message(
+                        MessageType::LOG,
+                        format!("[{}/{}] Indexing...", idx + 1, total),
+                    ));
                 }
             }
             let _ = rt.block_on(client.log_message(
@@ -214,6 +246,7 @@ impl LanguageServer for Backend {
     }
 
     async fn hover(&self, params: HoverParams) -> LspResult<Option<Hover>> {
+        let start = Instant::now();
         let uri = params
             .text_document_position_params
             .text_document
@@ -224,11 +257,12 @@ impl LanguageServer for Backend {
             .workspace
             .get(&uri)
             .and_then(|a| build_hover(&a, pos.line, pos.character));
-        varn_checker::module_resolver::invalidate_module_cache();
+        self.log_slow("hover", start.elapsed()).await;
         Ok(result)
     }
 
     async fn completion(&self, params: CompletionParams) -> LspResult<Option<CompletionResponse>> {
+        let start = Instant::now();
         let uri = params.text_document_position.text_document.uri.to_string();
         let pos = params.text_document_position.position;
         let trigger_char = params
@@ -252,10 +286,10 @@ impl LanguageServer for Backend {
                 index.as_deref(),
             )
         };
-        varn_checker::module_resolver::invalidate_module_cache();
         if let Some(msg) = log {
             self.client.log_message(MessageType::LOG, msg).await;
         }
+        self.log_slow("completion", start.elapsed()).await;
         Ok(resp)
     }
 
@@ -263,6 +297,7 @@ impl LanguageServer for Backend {
         &self,
         params: SignatureHelpParams,
     ) -> LspResult<Option<SignatureHelp>> {
+        let start = Instant::now();
         let uri = params
             .text_document_position_params
             .text_document
@@ -273,7 +308,7 @@ impl LanguageServer for Backend {
             .workspace
             .get(&uri)
             .and_then(|a| build_signature_help(&a, pos.line, pos.character));
-        varn_checker::module_resolver::invalidate_module_cache();
+        self.log_slow("signature_help", start.elapsed()).await;
         Ok(result)
     }
 
@@ -281,29 +316,33 @@ impl LanguageServer for Backend {
         &self,
         params: GotoDefinitionParams,
     ) -> LspResult<Option<GotoDefinitionResponse>> {
+        let start = Instant::now();
         let uri = params
             .text_document_position_params
             .text_document
             .uri
             .to_string();
         let pos = params.text_document_position_params.position;
-        let state = self.workspace.get(&uri);
-        let index = self.workspace.index.read().ok();
-        let result = state
-            .as_deref()
-            .and_then(|a| build_goto_definition(a, index.as_deref(), pos.line, pos.character));
-        varn_checker::module_resolver::invalidate_module_cache();
+        let result = {
+            let state = self.workspace.get(&uri);
+            let index = self.workspace.index.read().ok();
+            state
+                .as_deref()
+                .and_then(|a| build_goto_definition(a, index.as_deref(), pos.line, pos.character))
+        };
+        self.log_slow("goto_definition", start.elapsed()).await;
         Ok(result)
     }
 
     async fn references(&self, params: ReferenceParams) -> LspResult<Option<Vec<Location>>> {
+        let start = Instant::now();
         let uri = params.text_document_position.text_document.uri.to_string();
         let pos = params.text_document_position.position;
         let result = self
             .workspace
             .get(&uri)
             .and_then(|a| build_references(&a, &self.workspace, pos.line, pos.character));
-        varn_checker::module_resolver::invalidate_module_cache();
+        self.log_slow("references", start.elapsed()).await;
         Ok(result)
     }
 
@@ -311,29 +350,33 @@ impl LanguageServer for Backend {
         &self,
         params: TextDocumentPositionParams,
     ) -> LspResult<Option<PrepareRenameResponse>> {
+        let start = Instant::now();
         let uri = params.text_document.uri.to_string();
         let result = self.workspace.get(&uri).and_then(|a| {
             build_prepare_rename(&a, params.position.line, params.position.character)
         });
-        varn_checker::module_resolver::invalidate_module_cache();
+        self.log_slow("prepare_rename", start.elapsed()).await;
         Ok(result)
     }
 
     async fn rename(&self, params: RenameParams) -> LspResult<Option<WorkspaceEdit>> {
+        let start = Instant::now();
         let uri = params.text_document_position.text_document.uri.to_string();
         let pos = params.text_document_position.position;
-        let index = self.workspace.index.read().ok();
-        let result = self.workspace.get(&uri).and_then(|a| {
-            build_rename(
-                &a,
-                &self.workspace,
-                index.as_deref(),
-                pos.line,
-                pos.character,
-                params.new_name,
-            )
-        });
-        varn_checker::module_resolver::invalidate_module_cache();
+        let result = {
+            let index = self.workspace.index.read().ok();
+            self.workspace.get(&uri).and_then(|a| {
+                build_rename(
+                    &a,
+                    &self.workspace,
+                    index.as_deref(),
+                    pos.line,
+                    pos.character,
+                    params.new_name,
+                )
+            })
+        };
+        self.log_slow("rename", start.elapsed()).await;
         Ok(result)
     }
 
@@ -341,9 +384,10 @@ impl LanguageServer for Backend {
         &self,
         params: DocumentSymbolParams,
     ) -> LspResult<Option<DocumentSymbolResponse>> {
+        let start = Instant::now();
         let uri = params.text_document.uri.to_string();
         let result = self.workspace.get(&uri).map(|a| build_document_symbols(&a));
-        varn_checker::module_resolver::invalidate_module_cache();
+        self.log_slow("document_symbol", start.elapsed()).await;
         Ok(result)
     }
 
@@ -355,6 +399,7 @@ impl LanguageServer for Backend {
         &self,
         params: SemanticTokensParams,
     ) -> LspResult<Option<SemanticTokensResult>> {
+        let start = Instant::now();
         let uri = params.text_document.uri.to_string();
         let result = self.workspace.get(&uri).map(|a| {
             let raw = build_semantic_tokens(&a);
@@ -373,7 +418,7 @@ impl LanguageServer for Backend {
                 data: tokens,
             }
         });
-        varn_checker::module_resolver::invalidate_module_cache();
+        self.log_slow("semantic_tokens_full", start.elapsed()).await;
         Ok(result.map(SemanticTokensResult::Tokens))
     }
 
@@ -381,6 +426,7 @@ impl LanguageServer for Backend {
         &self,
         params: DocumentHighlightParams,
     ) -> LspResult<Option<Vec<DocumentHighlight>>> {
+        let start = Instant::now();
         let uri = params
             .text_document_position_params
             .text_document
@@ -391,7 +437,7 @@ impl LanguageServer for Backend {
             .workspace
             .get(&uri)
             .map(|a| build_document_highlights(&a, pos.line, pos.character));
-        varn_checker::module_resolver::invalidate_module_cache();
+        self.log_slow("document_highlight", start.elapsed()).await;
         Ok(result)
     }
 
@@ -399,9 +445,10 @@ impl LanguageServer for Backend {
         &self,
         params: FoldingRangeParams,
     ) -> LspResult<Option<Vec<FoldingRange>>> {
+        let start = Instant::now();
         let uri = params.text_document.uri.to_string();
         let result = self.workspace.get(&uri).map(|a| build_folding_ranges(&a));
-        varn_checker::module_resolver::invalidate_module_cache();
+        self.log_slow("folding_range", start.elapsed()).await;
         Ok(result)
     }
 
@@ -409,6 +456,7 @@ impl LanguageServer for Backend {
         &self,
         params: WorkspaceSymbolParams,
     ) -> LspResult<Option<Vec<SymbolInformation>>> {
+        let start = Instant::now();
         let results = self
             .workspace
             .index
@@ -416,7 +464,7 @@ impl LanguageServer for Backend {
             .ok()
             .map(|idx| build_workspace_symbols(&idx, &params.query))
             .unwrap_or_default();
-        varn_checker::module_resolver::invalidate_module_cache();
+        self.log_slow("symbol", start.elapsed()).await;
         Ok(if results.is_empty() {
             None
         } else {
@@ -425,9 +473,10 @@ impl LanguageServer for Backend {
     }
 
     async fn inlay_hint(&self, params: InlayHintParams) -> LspResult<Option<Vec<InlayHint>>> {
+        let start = Instant::now();
         let uri = params.text_document.uri.to_string();
         let result = self.workspace.get(&uri).map(|a| build_inlay_hints(&a));
-        varn_checker::module_resolver::invalidate_module_cache();
+        self.log_slow("inlay_hint", start.elapsed()).await;
         Ok(result)
     }
 }

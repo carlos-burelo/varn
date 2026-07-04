@@ -31,6 +31,7 @@ pub(crate) use properties::emit_properties;
 pub(crate) use strings::emit_strings;
 
 use crate::assembler::Assembler;
+use crate::loop_hoist::HoistPlan;
 use crate::regalloc::RegMap;
 use varn_types::FunctionProto;
 
@@ -49,6 +50,10 @@ pub(crate) struct CodegenCtx<'a> {
     pub proto: &'a FunctionProto,
     pub helpers: &'a crate::JitHelpers,
     pub constants: &'a [varn_types::VmValue],
+    /// Loop-invariant array-guard hoist plans for this function (see
+    /// `loop_hoist`). Empty for the overwhelming majority of functions —
+    /// only non-empty when `regmap.cache_reg` is also `Some`.
+    pub hoist_plans: &'a [HoistPlan],
     /// When true, immediate-typed (`int`/`float`/`bool`) locals may stay solely
     /// in their callee-saved physical register across a call: the function is
     /// pure (no upvalues / async / generator) and creates no closures, so no
