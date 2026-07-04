@@ -4,6 +4,7 @@
 //! anything the fast path does not handle.
 
 use crate::assembler::{Assembler, Cond, Reg};
+use crate::regalloc::{emit_load, RegMap};
 use crate::registers::ARG_EXEC_CTX;
 use crate::JitArrayLayout;
 
@@ -94,4 +95,53 @@ pub(crate) fn patch_all(asm: &mut Assembler, slow: Vec<usize>) {
     for p in slow {
         asm.patch_u32(p, (pos as i32 - (p as i32 + 4)) as u32);
     }
+}
+
+/// Resolve `obj_vreg`'s array-box pointer into `cache_reg`, or `0` if the
+/// guard chain rejects it (not a heap array — e.g. a nullable array-typed
+/// local holding `null`). Used both by a loop's preheader (first resolve)
+/// and by its back-edge GC safepoint (re-resolve after a collection may
+/// have moved the object — see `loop_hoist` module docs).
+///
+/// `0` is a safe sentinel: no live heap allocation is ever placed at
+/// address 0. Call sites that consume `cache_reg` must `test`/`jz` on it
+/// before trusting it — see `emit_cached_or` below. This keeps hoisting
+/// sound even though the *type* guarantee behind `ArrayGetIndex`/
+/// `ArrayLength` (checker proved the receiver statically Array) does NOT
+/// also guarantee non-null: `TypeKind::Array(_)` is checked past
+/// `non_nullified()` in `checker_annotations.rs`, so a `null`-valued
+/// nullable-array receiver reaches this guard too.
+pub(crate) fn emit_resolve_into_cache(
+    asm: &mut Assembler,
+    lay: &JitArrayLayout,
+    heap_off: usize,
+    regmap: &RegMap,
+    obj_vreg: u8,
+    cache_reg: Reg,
+) {
+    emit_load(asm, Reg::Rax, obj_vreg as usize, regmap);
+    let mut slow: Vec<usize> = Vec::new();
+    emit_resolve_array_payload(asm, lay, heap_off, false, &mut slow);
+    asm.mov_reg_reg(cache_reg, Reg::Rax);
+    let done = asm.jmp_near();
+    patch_all(asm, slow);
+    asm.mov_reg_imm64(cache_reg, 0);
+    let end = asm.current_offset();
+    asm.patch_u32(done, (end as i32 - (done as i32 + 4)) as u32);
+}
+
+/// At a hoisted `ArrayGetIndex`/`ArrayLength` site: if `cache_reg` holds a
+/// valid resolved pointer, copy it into `Rax` and skip the guard chain;
+/// otherwise fall through so the caller emits the normal, unhoisted
+/// resolve. Invariance guarantees `cache_reg`'s validity is the same on
+/// every iteration of one loop execution, so the branch is perfectly
+/// predicted after iteration one.
+pub(crate) fn emit_cached_or_fallthrough(asm: &mut Assembler, cache_reg: Reg) -> usize {
+    asm.test_reg_reg(cache_reg, cache_reg);
+    let invalid = asm.jmp_cond(Cond::Equal);
+    asm.mov_reg_reg(Reg::Rax, cache_reg);
+    let hit = asm.jmp_near();
+    let fallback_pos = asm.current_offset();
+    asm.patch_u32(invalid, (fallback_pos as i32 - (invalid as i32 + 4)) as u32);
+    hit
 }

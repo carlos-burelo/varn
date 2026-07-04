@@ -1,6 +1,6 @@
 # Optimizaciones estructurales de rendimiento — especificación
 
-Estado: **diseño, no implementado**. Fecha: 2026-07-02.
+Estado: **Proyecto A implementado** (2026-07-03) · Proyecto B diseño, no implementado.
 
 Este documento especifica los dos proyectos de optimización que cierran los
 gaps restantes >4x contra Node/V8. Ambos son estructurales (no peephole) y
@@ -133,8 +133,10 @@ cambios.
 
 ### Impacto esperado
 
-array_sum 6x → ~3x. Cualquier loop `for x of arr` / `while i<arr.length`
-sobre array invariante. Real-code: iteración de arrays es ubicua.
+array_sum 6x → ~3x (proyección original, **no confirmada empíricamente** —
+ver "Implementación" abajo: el bench pareado mide a la par de baseline en
+esta máquina). Cualquier loop `for x of arr` / `while i<arr.length` sobre
+array invariante. Real-code: iteración de arrays es ubicua.
 
 ### Validación
 
@@ -143,6 +145,123 @@ sobre array invariante. Real-code: iteración de arrays es ubicua.
 - Test específico: array que promueve a old-gen a mitad de loop (forzar GC)
   — debe seguir correcto (o tomar fallback).
 - `VARN_NO_JIT=1` idéntico bit-a-bit.
+
+### Implementación (2026-07-03)
+
+Implementado con desviaciones respecto al diseño original, todas
+encontradas durante la propia implementación/validación, no anticipadas
+arriba:
+
+1. **La regla estática "sin llamadas ni allocs" no cierra el hueco de GC —
+   pero la solución dinámica inicial (re-resolver en la rama "GC corrió"
+   del safepoint) resultó tener un costo oculto severo, descartada tras
+   medirla.** El back-edge `Loop` ya corre un safepoint en CADA iteración
+   (chequeo de nursery-fill) independientemente de si el cuerpo asigna algo
+   — puede disparar GC en la iteración 1 por presión de nursery generada
+   por código *anterior* al loop; un cuerpo sin llamadas ni mutación de
+   array no garantiza por sí solo "sin GC durante el loop". El primer
+   intento de cierre re-resolvía el puntero cacheado en la rama "GC corrió"
+   del safepoint del back-edge (`codegen/jumps.rs::OpCode::Loop`). Un bench
+   pareado a N grande (`arraySum` sobre 10k elementos, miles de llamadas)
+   mostró que esa rama, cuando se toma, es catastróficamente cara —
+   crecimiento **superlineal** en el número de llamadas (9.4x más iteraciones
+   → hasta 14x más tiempo, con varianza run-a-run de hasta 3.4x) — sin
+   causa raíz identificada a nivel de instrucción (una versión con un
+   placeholder trivial en la misma rama no mostraba el problema; solo la
+   cadena real de lectura de memoria del resolve lo disparaba). No se
+   invirtió más tiempo en diagnosticar el mecanismo exacto: el riesgo de
+   dejar semántica de GC no explicada en un hot path no es aceptable.
+
+   **Diseño final, más simple y sin ese hot path:** en vez de re-resolver
+   condicionalmente dentro del loop, el preheader fuerza el MISMO chequeo
+   de safepoint (`codegen/jumps::emit_gc_safepoint_check`, factorizado y
+   reusado desde el back-edge) una sola vez, antes de cachear. La
+   elegibilidad se endureció de "sin llamadas ni mutación de array" a
+   **allowlist explícita de opcodes probadamente libres de allocación**
+   (`loop_hoist::is_alloc_free_op` — aritmética, comparaciones, control de
+   flujo, lectura/escritura de array en rango; cualquier opcode fuera de la
+   lista descalifica el loop). Con nursery ya fresco al momento de cachear
+   y con el cuerpo del loop garantizado libre de allocación, ninguna
+   iteración puede disparar GC — el back-edge del loop no necesita volver a
+   chequear nada. Sin hot path nuevo, sin la patología: el mismo bench
+   pareado (N=9000 y N=15000 llamadas) mide a la par de baseline (variación
+   de ±5%, dentro del ruido de esta máquina), no la degradación superlineal
+   observada en el primer intento.
+
+2. **`OpCode::Loop` no es exclusivamente un back-edge real.** El backend SSA
+   (`varn-opt`) reutiliza `Loop` como "goto" genérico hacia atrás para
+   colapsar `break` seguido de `return` en un salto directo a un `Return`
+   compartido más temprano en el layout lineal — satisface la forma
+   numérica "target < esta instrucción" sin ser un loop. Inofensivo para el
+   uso original de `collect_back_edges` en el backend (solo ensancha
+   live-ranges, conservador por diseño), pero fatal para hoisting: el
+   preheader asume que el header se alcanza por fall-through en la primera
+   entrada, y ese "header" falso solo se alcanza por saltos explícitos — el
+   preheader queda como código muerto y el registro de cache llega sin
+   inicializar al sitio cacheado. Corrección: `loop_hoist::
+   header_reachable_by_fallthrough` exige que la instrucción previa al
+   header no sea `Jump`/`Loop`/`Return`/`Throw`/`Yield`; un "loop" falso
+   tampoco cuenta como anidado al decidir si otro loop es innermost.
+
+Además, un bug de alineación de stack encontrado en la primera validación
+(segfault inmediato): el registro de cache no puede empujarse/sacarse por
+separado del resto de `regmap.used_phys` — ~30 sitios en todo `codegen/`
+calculan alineación de 16 bytes antes de llamadas FFI/GC leyendo
+`regmap.used_phys.len()`; un push adicional fuera de esa cuenta desalinea
+la pila en cualquier función con hoisting activo. Fix: el registro de
+cache se añade a `used_phys` mismo (nunca a `map`, así que la lógica de
+spill de virtuales no lo toca), y viaja gratis por toda esa lógica.
+
+Elegibilidad restringida a **`ArrayGetIndex`/`ArrayLength` únicamente**
+(nunca `GetIndex` genérico): son las únicas formas con garantía estática de
+tipo Array, vía el flag `is_array` que el checker registra en
+`checker_annotations.rs`. Esa garantía es solo de *tipo*, no de
+no-nulidad (`is_array` se computa sobre `obj_ty.non_nullified()`) — un
+receptor `Array<T>?` con valor `null` sí puede llegar al guard. Por eso el
+resolve cachea `0` como sentinel de "no cacheable esta ejecución" en vez de
+asumir éxito incondicional; cada sitio hace `test`/`jz` antes de confiar en
+el cache (predicho perfectamente tras la primera iteración, ya que la
+invariancia del registro implica que el resultado del guard es idéntico en
+cada iteración de una misma ejecución del loop).
+
+Archivos: `varn-types/src/loop_analysis.rs` (análisis compartido con el
+backend), `varn-jit/src/loop_hoist.rs` (planificación de hoists +
+allowlist de opcodes libres de allocación), `codegen/array_fast.rs`
+(`emit_resolve_into_cache`, `emit_cached_or_fallthrough`),
+`codegen/indexing.rs` + `codegen/arrays.rs` (sitios cacheados),
+`codegen/jumps.rs` (`emit_gc_safepoint_check`, factorizado y compartido
+entre el back-edge y el preheader), `compiler.rs` (emisión del preheader:
+safepoint forzado + resolve), `regalloc.rs` (reserva condicional de
+`LOOP_ARRAY_CACHE_REG` = R14, plegado en `used_phys`).
+
+Validado: `tests/main.vn` 670/670 con JIT activo (también tras el
+descarte del re-resolve en el safepoint). Test dirigido de GC forzado
+antes de cada una de 5000 llamadas a una función con loop elegible —
+5000/5000 resultados correctos, confirma que el safepoint forzado del
+preheader deja el puntero cacheado consistente incluso cuando el heap
+tenía presión de nursery justo antes de entrar al loop. `VARN_NO_JIT=1`
+tiene una falla preexistente no relacionada en
+`42-stdlib-comprehensive-test.vn` (confirmada idéntica en baseline sin
+estos cambios) — el resto del intérprete coincide con el comportamiento
+del JIT.
+
+**Bench honesto (2026-07-03, esta máquina, `vn bench --runs 9`,
+`arraySum` sobre array de 10k elementos, 2500 llamadas, checksum con
+módulo para evitar DCE):** fase `execute`, mínimo de 9 corridas —
+baseline 8.74s vs hoisted 8.49s (~3% más rápido en el mejor caso; p50
+9.24s vs 9.72s, dentro del ruido — σ de esta máquina en corridas
+comparables va de 225ms a 1s sobre bases de 8-10s). **No se confirma la
+mejora ~2x que proyectaba el diseño original** (array_sum 6x→~3x); el
+costo de la cadena de guardas evitada (~8 instrucciones x86 por acceso)
+es una fracción demasiado pequeña del costo total observado por acceso
+(~350ns en este bench) para distinguirse del ruido de esta máquina con
+esta metodología. La ganancia teórica sigue siendo válida (menos
+instrucciones ejecutadas, confirmado por inspección del código emitido),
+pero no está confirmada empíricamente a un múltiplo claro — un
+micro-benchmark más aislado (sin la llamada de función ni el checksum
+envolvente, idealmente con el conteo de instrucciones/IC del propio
+`vn bench --profile` en vez de wall-clock) queda pendiente para medirla
+limpiamente.
 
 ---
 

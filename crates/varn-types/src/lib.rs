@@ -1,6 +1,7 @@
 pub mod bytecode;
 pub mod chunk;
 pub mod generator;
+pub mod loop_analysis;
 pub mod marshal;
 pub mod module_graph;
 pub mod native;

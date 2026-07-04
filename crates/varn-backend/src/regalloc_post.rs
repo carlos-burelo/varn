@@ -552,44 +552,6 @@ fn remap_bytecode(code: &mut Vec<u16>, constants: &[PoolEntry], mapping: &HashMa
     }
 }
 
-fn collect_back_edges(code: &[u16], constants: &[PoolEntry]) -> Vec<(usize, usize)> {
-    let mut word_to_instr: HashMap<usize, usize> = HashMap::new();
-    let mut offset = 0usize;
-    let mut instr_idx = 0usize;
-    while offset < code.len() {
-        word_to_instr.insert(offset, instr_idx);
-        match decode(code, offset, constants) {
-            Some(info) => {
-                offset += info.len;
-                instr_idx += 1;
-            }
-            None => break,
-        }
-    }
-
-    let mut edges = Vec::new();
-    let mut offset = 0usize;
-    let mut instr_idx = 0usize;
-    while offset < code.len() {
-        if OpCode::from_u16(code[offset]) == Some(OpCode::Loop) {
-            let hi = code.get(offset + 1).copied().unwrap_or(0) as usize;
-            let lo = code.get(offset + 2).copied().unwrap_or(0) as usize;
-            let back_offset = (hi << 16) | lo;
-            let target_word = (offset + 3).saturating_sub(back_offset);
-            let target_instr = word_to_instr.get(&target_word).copied().unwrap_or(0);
-            edges.push((target_instr, instr_idx));
-        }
-        match decode(code, offset, constants) {
-            Some(info) => {
-                offset += info.len;
-                instr_idx += 1;
-            }
-            None => break,
-        }
-    }
-    edges
-}
-
 pub fn optimize_function(proto: &mut FunctionProto) {
     let start = if OPTIMIZE_ENABLED.with(|e| e.get()) {
         Some(Instant::now())
@@ -617,7 +579,8 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         return;
     }
 
-    let back_edges = collect_back_edges(&proto.chunk.code, &proto.chunk.constants);
+    let back_edges =
+        varn_types::loop_analysis::collect_back_edges(&proto.chunk.code, &proto.chunk.constants);
     let scan = scan_bytecode(&proto.chunk.code, &proto.chunk.constants);
 
     let all_regs: Vec<u16> = scan

@@ -1,6 +1,7 @@
 pub mod assembler;
 pub(crate) mod codegen;
 pub mod compiler;
+pub(crate) mod loop_hoist;
 pub mod mem;
 pub mod regalloc;
 pub mod registers;

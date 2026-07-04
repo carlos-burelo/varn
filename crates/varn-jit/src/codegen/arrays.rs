@@ -4,8 +4,10 @@ use crate::assembler::Reg;
 use crate::regalloc::{emit_flush_all, emit_load, emit_reload_all_except, emit_store};
 use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
 
+use super::array_fast::emit_cached_or_fallthrough;
 use super::ffi::{emit_ffi_call, FfiArg, FfiCallSpec};
 use super::CodegenCtx;
+use crate::loop_hoist::LOOP_ARRAY_CACHE_REG;
 
 pub(crate) fn emit_arrays(
     ctx: &mut CodegenCtx,
@@ -48,12 +50,18 @@ fn emit_build_array(ctx: &mut CodegenCtx, _first_reg: usize) {
 }
 
 fn emit_array_length(ctx: &mut CodegenCtx, first_reg: usize) {
+    let instr_start = ctx.ip - 1;
     let w1 = ctx.code[ctx.ip];
     ctx.ip += 1;
     let src = (w1 >> 8) as usize;
 
     let lay = ctx.helpers.array_layout;
     let heap_off = ctx.helpers.heap_field_offset;
+
+    let hoisted = ctx
+        .hoist_plans
+        .iter()
+        .any(|p| p.obj_vreg as usize == src && p.contains(instr_start));
 
     // Fast path: a heap array's length is a single Vec-len load, NaN-boxed
     // as an int. Non-array receivers (strings, etc.) fall back.
@@ -63,7 +71,13 @@ fn emit_array_length(ctx: &mut CodegenCtx, first_reg: usize) {
         let regmap = &ctx.regmap;
 
         emit_load(asm, Reg::Rax, src, regmap);
+
+        let cache_hit = hoisted.then(|| emit_cached_or_fallthrough(asm, LOOP_ARRAY_CACHE_REG));
         super::array_fast::emit_resolve_array_payload(asm, &lay, heap_off, false, &mut slow);
+        if let Some(p) = cache_hit {
+            let after = asm.current_offset();
+            asm.patch_u32(p, (after as i32 - (p as i32 + 4)) as u32);
+        }
 
         // len (payload+16 + elems_len_off) → NaN-boxed int.
         asm.mov_reg_mem(Reg::Rax, Reg::Rax, (16 + lay.elems_len_off) as i32);
