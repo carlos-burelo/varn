@@ -704,6 +704,7 @@ pub extern "C" fn jit_prepare_call(
     ctx: *mut ExecCtx,
     callee: VmValue,
     callee_base: usize,
+    arg_count: usize,
 ) -> *const crate::frame::VmClosure {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -734,8 +735,37 @@ pub extern "C" fn jit_prepare_call(
                     return closure as *const crate::frame::VmClosure;
                 }
             }
-        } else if let Some(crate::heap::HeapObj::NativeFn(_, _)) = ctx_ref.heap.get(heap_idx) {
-            return 1 as *const crate::frame::VmClosure;
+        } else if let Some(crate::heap::HeapObj::NativeFn(_name, f)) = ctx_ref.heap.get(heap_idx) {
+            let f = *f;
+            ctx_ref.record_call_native();
+            let base = callee_base;
+            let result = if arg_count <= 1 {
+                ctx_ref.invoke_native(f, &[])
+            } else {
+                let actual_count = arg_count - 1;
+                if actual_count <= 8 {
+                    let mut buf = [VmValue::null(); 8];
+                    for i in 0..actual_count {
+                        buf[i] = ctx_ref.stack[base + 1 + i];
+                    }
+                    ctx_ref.invoke_native(f, &buf[..actual_count])
+                } else {
+                    let vargs: Vec<VmValue> = (1..=actual_count)
+                        .map(|i| ctx_ref.stack[base + i])
+                        .collect();
+                    ctx_ref.invoke_native(f, &vargs)
+                }
+            };
+            match result {
+                Ok(v) => {
+                    ctx_ref.jit_native_result = v;
+                    return 1 as *const crate::frame::VmClosure;
+                }
+                Err(msg) => {
+                    let e = crate::error::RuntimeError::new(msg);
+                    jit_propagate_error(ctx_ref, e);
+                }
+            }
         }
         std::ptr::null()
     }

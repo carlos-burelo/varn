@@ -258,6 +258,8 @@ impl VmClosure {
             heap_field_offset: std::mem::offset_of!(ctx::ExecCtx, heap),
             nursery_len_offset: crate::heap::Heap::nursery_len_byte_offset_from_rcbox(),
             nursery_threshold: crate::nursery::Nursery::FULL_THRESHOLD,
+            jit_native_result_offset: std::mem::offset_of!(ctx::ExecCtx, jit_native_result),
+            globals_offset: std::mem::offset_of!(ctx::ExecCtx, globals),
         };
         match varn_jit::compile(&self.proto, &self.constants, helpers) {
             Ok((entry, code)) => {

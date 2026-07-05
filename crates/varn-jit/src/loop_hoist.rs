@@ -35,7 +35,7 @@ use crate::assembler::Reg;
 /// general-purpose slot to make this available, and only does so for
 /// functions that actually have a hoist plan (see
 /// `RegMap::from_bytecode`'s `reserve_cache` parameter).
-pub(crate) const LOOP_ARRAY_CACHE_REG: Reg = Reg::R14;
+pub(crate) const LOOP_ARRAY_CACHE_REG: Reg = Reg::R13;
 
 /// One hoisted loop: `obj_vreg` is the sole invariant array touched in
 /// `[header_offset, latch_offset]` (inclusive, `chunk.code` word offsets).

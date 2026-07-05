@@ -3,7 +3,7 @@ use crate::safepoint::{emit_load_reg, emit_store_reg};
 use std::collections::HashMap;
 use varn_core::OpCode;
 
-const ALLOC_REGS: &[Reg] = &[Reg::Rbx, Reg::R12, Reg::R13, Reg::R14];
+const ALLOC_REGS: &[Reg] = &[Reg::Rbx, Reg::R12, Reg::R13];
 
 pub struct RegMap {
     map: HashMap<usize, Reg>,
@@ -80,8 +80,8 @@ impl RegMap {
         ranked.sort_by(|a, b| b.1.cmp(&a.1));
 
         let alloc_regs = if reserve_cache {
-            debug_assert_eq!(ALLOC_REGS[3], crate::loop_hoist::LOOP_ARRAY_CACHE_REG);
-            &ALLOC_REGS[..3]
+            debug_assert_eq!(ALLOC_REGS[2], crate::loop_hoist::LOOP_ARRAY_CACHE_REG);
+            &ALLOC_REGS[..2]
         } else {
             ALLOC_REGS
         };
@@ -196,6 +196,10 @@ pub fn emit_prologue(
     asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
     asm.add_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_CTX);
 
+    asm.push(crate::registers::REG_GLOBALS);
+    asm.push(crate::registers::REG_GLOBALS); // alignment dummy
+    asm.mov_reg_mem(crate::registers::REG_GLOBALS, crate::registers::ARG_EXEC_CTX, (helpers.globals_offset + 8) as i32);
+
     asm.push(crate::registers::REG_INT_TAG);
 
     for &phys in &regmap.used_phys {
@@ -221,6 +225,9 @@ pub fn emit_epilogue(asm: &mut Assembler, regmap: &RegMap) {
     }
 
     asm.pop(crate::registers::REG_INT_TAG);
+
+    asm.pop(Reg::R10); // pop alignment dummy
+    asm.pop(crate::registers::REG_GLOBALS);
 
     asm.pop(crate::registers::REG_FRAME_BASE);
 }
