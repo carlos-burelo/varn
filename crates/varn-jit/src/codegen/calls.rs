@@ -72,6 +72,9 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, 32);
 
+    asm.cmp_reg_imm32(Reg::Rax, 1);
+    let native_patch = asm.jmp_cond(Cond::Equal);
+
     asm.cmp_reg_imm32(Reg::Rax, 0);
     let fallback_patch = asm.jmp_cond(Cond::Equal);
 
@@ -161,6 +164,22 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
     emit_reload_all_except(asm, regmap, Some(dest));
     let end_patch = asm.jmp_near();
 
+    // Native JIT sentinel path (Rax was 1)
+    let native_pos = asm.current_offset();
+    let relative_native = (native_pos as i64 - (native_patch as i64 + 4)) as i32;
+    asm.patch_u32(native_patch, relative_native as u32);
+
+    asm.pop(ARG_BASE);
+    asm.pop(ARG_EXEC_CTX);
+    asm.pop(ARG_CTX);
+    if need_prepare_dummy {
+        asm.pop(Reg::R11);
+    }
+
+    emit_load(asm, Reg::Rax, callee_reg, regmap);
+    let run_native_patch = asm.jmp_near();
+
+    // Fallback path (Rax was 0)
     let fallback_pos = asm.current_offset();
     let relative_fallback = (fallback_pos as i64 - (fallback_patch as i64 + 4)) as i32;
     asm.patch_u32(fallback_patch, relative_fallback as u32);
@@ -206,6 +225,11 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
     if need_is_native_dummy {
         asm.pop(Reg::R11);
     }
+
+    // Run native path (both direct native sentinel jump and resolved native fallthrough land here)
+    let run_native_pos = asm.current_offset();
+    let relative_run_native = (run_native_pos as i64 - (run_native_patch as i64 + 4)) as i32;
+    asm.patch_u32(run_native_patch, relative_run_native as u32);
 
     let need_native_call_dummy = regmap.used_phys.len() % 2 != 0;
     if need_native_call_dummy {

@@ -711,7 +711,8 @@ pub extern "C" fn jit_prepare_call(
             return std::ptr::null();
         }
         jit_guard_call_depth(ctx_ref);
-        if let Some(closure) = ctx_ref.heap.get_closure(callee.as_heap_idx()) {
+        let heap_idx = callee.as_heap_idx();
+        if let Some(closure) = ctx_ref.heap.get_closure(heap_idx) {
             if !closure.proto.is_async && !closure.proto.is_generator {
                 if closure.jit_entry.is_some() {
                     let required_cap = callee_base + closure.proto.register_count as usize + 32;
@@ -733,6 +734,8 @@ pub extern "C" fn jit_prepare_call(
                     return closure as *const crate::frame::VmClosure;
                 }
             }
+        } else if let Some(crate::heap::HeapObj::NativeFn(_, _)) = ctx_ref.heap.get(heap_idx) {
+            return 1 as *const crate::frame::VmClosure;
         }
         std::ptr::null()
     }
