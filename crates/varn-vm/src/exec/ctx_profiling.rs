@@ -135,13 +135,47 @@ impl ExecCtx {
         if self.hotspot_counters.is_none() {
             return (f)(self as &mut dyn varn_types::NativeCtx, args);
         }
-        let start = std::time::Instant::now();
-        let r = (f)(self as &mut dyn varn_types::NativeCtx, args);
-        let ns = start.elapsed().as_nanos() as u64;
-        if let Some(ref h) = self.hotspot_counters {
-            h.borrow_mut().total_native_ns += ns;
+        
+        #[cfg(target_arch = "x86_64")]
+        {
+            static CYCLES_PER_NS: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+            let cycles_per_ns = *CYCLES_PER_NS.get_or_init(|| {
+                let start_time = std::time::Instant::now();
+                let start_cycles = unsafe { std::arch::x86_64::_rdtsc() };
+                let sleep_dur = std::time::Duration::from_millis(2);
+                while start_time.elapsed() < sleep_dur {
+                    std::hint::spin_loop();
+                }
+                let elapsed_ns = start_time.elapsed().as_nanos() as f64;
+                let elapsed_cycles = (unsafe { std::arch::x86_64::_rdtsc() } - start_cycles) as f64;
+                let val = elapsed_cycles / elapsed_ns;
+                if val > 0.01 && val < 100.0 {
+                    val
+                } else {
+                    2.5
+                }
+            });
+
+            let start = unsafe { std::arch::x86_64::_rdtsc() };
+            let r = (f)(self as &mut dyn varn_types::NativeCtx, args);
+            let end = unsafe { std::arch::x86_64::_rdtsc() };
+            let ns = ((end.saturating_sub(start)) as f64 / cycles_per_ns) as u64;
+            if let Some(ref h) = self.hotspot_counters {
+                h.borrow_mut().total_native_ns += ns;
+            }
+            r
         }
-        r
+
+        #[cfg(not(target_arch = "x86_64"))]
+        {
+            let start = std::time::Instant::now();
+            let r = (f)(self as &mut dyn varn_types::NativeCtx, args);
+            let ns = start.elapsed().as_nanos() as u64;
+            if let Some(ref h) = self.hotspot_counters {
+                h.borrow_mut().total_native_ns += ns;
+            }
+            r
+        }
     }
 
     #[inline(always)]
