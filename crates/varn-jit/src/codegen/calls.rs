@@ -51,88 +51,6 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
 
     emit_load(asm, Reg::Rax, callee_reg, regmap);
 
-    let need_is_native_dummy = regmap.used_phys.len() % 2 == 0;
-    if need_is_native_dummy {
-        asm.push(Reg::Rax);
-    }
-    asm.push(ARG_CTX);
-    asm.push(ARG_EXEC_CTX);
-    asm.push(ARG_BASE);
-    asm.push(Reg::Rax);
-
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
-    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
-
-    #[cfg(target_os = "windows")]
-    asm.add_reg_imm8(Reg::Rsp, -32);
-
-    asm.mov_reg_imm64(Reg::R10, helpers.jit_is_native_fn as u64);
-    asm.call_reg(Reg::R10);
-
-    #[cfg(target_os = "windows")]
-    asm.add_reg_imm8(Reg::Rsp, 32);
-
-    asm.cmp_reg_imm32(Reg::Rax, 0);
-    let not_native_patch = asm.jmp_cond(Cond::Equal);
-
-    asm.pop(Reg::Rax);
-    asm.pop(ARG_BASE);
-    asm.pop(ARG_EXEC_CTX);
-    asm.pop(ARG_CTX);
-    if need_is_native_dummy {
-        asm.pop(Reg::R11);
-    }
-
-    let need_native_call_dummy = regmap.used_phys.len() % 2 != 0;
-    if need_native_call_dummy {
-        asm.push(Reg::Rax);
-    }
-    asm.push(ARG_CTX);
-    asm.push(ARG_EXEC_CTX);
-    asm.push(ARG_BASE);
-
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
-    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
-    asm.mov_reg_imm64(ARG_BASE, arg_start as u64);
-    asm.mov_reg_imm64(ARG_EXEC_CTX, arg_count as u64);
-
-    #[cfg(target_os = "windows")]
-    asm.add_reg_imm8(Reg::Rsp, -32);
-
-    asm.mov_reg_imm64(Reg::R10, helpers.jit_call_native_fast as u64);
-    asm.call_reg(Reg::R10);
-
-    #[cfg(target_os = "windows")]
-    asm.add_reg_imm8(Reg::Rsp, 32);
-
-    asm.pop(ARG_BASE);
-    asm.pop(ARG_EXEC_CTX);
-    asm.pop(ARG_CTX);
-    if need_native_call_dummy {
-        asm.pop(Reg::R11);
-    }
-
-    asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
-    asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_BASE);
-    asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
-    asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
-
-    emit_store(asm, Reg::Rax, dest, regmap);
-    emit_reload_all_except(asm, regmap, Some(dest));
-    let end_native_patch = asm.jmp_near();
-
-    let not_native_pos = asm.current_offset();
-    let disp_not_native = (not_native_pos as i64 - (not_native_patch as i64 + 4)) as i32;
-    asm.patch_u32(not_native_patch, disp_not_native as u32);
-
-    asm.pop(Reg::Rax);
-    asm.pop(ARG_BASE);
-    asm.pop(ARG_EXEC_CTX);
-    asm.pop(ARG_CTX);
-    if need_is_native_dummy {
-        asm.pop(Reg::R11);
-    }
-
     let need_prepare_dummy = regmap.used_phys.len() % 2 != 0;
     if need_prepare_dummy {
         asm.push(Reg::Rax);
@@ -142,9 +60,7 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.push(ARG_BASE);
 
     asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
-
     asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
-
     asm.add_reg_imm32(ARG_BASE, arg_start as i32);
 
     #[cfg(target_os = "windows")]
@@ -253,6 +169,91 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.pop(ARG_EXEC_CTX);
     asm.pop(ARG_CTX);
     if need_prepare_dummy {
+        asm.pop(Reg::R11);
+    }
+
+    // Since Rax was overwritten by the 0 return of jit_prepare_call, reload callee:
+    emit_load(asm, Reg::Rax, callee_reg, regmap);
+
+    let need_is_native_dummy = regmap.used_phys.len() % 2 == 0;
+    if need_is_native_dummy {
+        asm.push(Reg::Rax);
+    }
+    asm.push(ARG_CTX);
+    asm.push(ARG_EXEC_CTX);
+    asm.push(ARG_BASE);
+    asm.push(Reg::Rax);
+
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, -32);
+
+    asm.mov_reg_imm64(Reg::R10, helpers.jit_is_native_fn as u64);
+    asm.call_reg(Reg::R10);
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, 32);
+
+    asm.cmp_reg_imm32(Reg::Rax, 0);
+    let not_native_patch = asm.jmp_cond(Cond::Equal);
+
+    asm.pop(Reg::Rax);
+    asm.pop(ARG_BASE);
+    asm.pop(ARG_EXEC_CTX);
+    asm.pop(ARG_CTX);
+    if need_is_native_dummy {
+        asm.pop(Reg::R11);
+    }
+
+    let need_native_call_dummy = regmap.used_phys.len() % 2 != 0;
+    if need_native_call_dummy {
+        asm.push(Reg::Rax);
+    }
+    asm.push(ARG_CTX);
+    asm.push(ARG_EXEC_CTX);
+    asm.push(ARG_BASE);
+
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
+    asm.mov_reg_imm64(ARG_BASE, arg_start as u64);
+    asm.mov_reg_imm64(ARG_EXEC_CTX, arg_count as u64);
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, -32);
+
+    asm.mov_reg_imm64(Reg::R10, helpers.jit_call_native_fast as u64);
+    asm.call_reg(Reg::R10);
+
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, 32);
+
+    asm.pop(ARG_BASE);
+    asm.pop(ARG_EXEC_CTX);
+    asm.pop(ARG_CTX);
+    if need_native_call_dummy {
+        asm.pop(Reg::R11);
+    }
+
+    asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
+    asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_BASE);
+    asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
+    asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
+
+    emit_store(asm, Reg::Rax, dest, regmap);
+    emit_reload_all_except(asm, regmap, Some(dest));
+    let end_native_patch = asm.jmp_near();
+
+    let not_native_pos = asm.current_offset();
+    let disp_not_native = (not_native_pos as i64 - (not_native_patch as i64 + 4)) as i32;
+    asm.patch_u32(not_native_patch, disp_not_native as u32);
+
+    asm.pop(Reg::Rax);
+    asm.pop(ARG_BASE);
+    asm.pop(ARG_EXEC_CTX);
+    asm.pop(ARG_CTX);
+    if need_is_native_dummy {
         asm.pop(Reg::R11);
     }
 

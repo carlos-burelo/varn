@@ -228,6 +228,13 @@ pub extern "C" fn jit_make_closure(
             _ => panic!("MakeClosure: invalid function proto"),
         };
 
+        let proto_ptr = std::rc::Rc::as_ptr(&proto) as usize;
+        if uv_count == 0 {
+            if let Some(&cached_val) = ctx_ref.static_closures.get(&proto_ptr) {
+                return cached_val;
+            }
+        }
+
         let mut upvalues = Vec::with_capacity(uv_count);
 
         for ___ in 0..uv_count {
@@ -252,8 +259,6 @@ pub extern "C" fn jit_make_closure(
             }
         }
 
-        let proto_ptr = std::rc::Rc::as_ptr(&proto) as usize;
-
         let constants = ctx_ref
             .proto_constants
             .entry(proto_ptr)
@@ -266,8 +271,11 @@ pub extern "C" fn jit_make_closure(
             .clone();
 
         let new_closure = crate::frame::VmClosure::with_upvalues(proto, upvalues, constants);
-
-        ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(new_closure))
+        let val = ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(new_closure));
+        if uv_count == 0 {
+            ctx_ref.static_closures.insert(proto_ptr, val);
+        }
+        val
     }
 }
 
