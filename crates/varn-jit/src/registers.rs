@@ -29,6 +29,7 @@ pub const REG_SCRATCH_2: Reg = Reg::R11;
 pub const REG_FRAME_BASE: Reg = Reg::Rbp;
 
 pub const REG_INT_TAG: Reg = Reg::R15;
+pub const REG_GLOBALS: Reg = Reg::R14;
 
 pub fn callee_saved_registers() -> &'static [Reg] {
     #[cfg(target_os = "windows")]

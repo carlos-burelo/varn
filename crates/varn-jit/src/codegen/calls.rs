@@ -62,6 +62,7 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
     asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
     asm.add_reg_imm32(ARG_BASE, arg_start as i32);
+    asm.mov_reg_imm64(ARG_EXEC_CTX, arg_count as u64);
 
     #[cfg(target_os = "windows")]
     asm.add_reg_imm8(Reg::Rsp, -32);
@@ -175,6 +176,13 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
     if need_prepare_dummy {
         asm.pop(Reg::R11);
     }
+
+    // Load result from ExecCtx.jit_native_result
+    asm.mov_reg_mem(Reg::Rax, ARG_EXEC_CTX, helpers.jit_native_result_offset as i32);
+
+    emit_store(asm, Reg::Rax, dest, regmap);
+    emit_reload_all_except(asm, regmap, Some(dest));
+    let end_native_patch_sentinel = asm.jmp_near();
 
     emit_load(asm, Reg::Rax, callee_reg, regmap);
     let run_native_patch = asm.jmp_near();
@@ -352,6 +360,9 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
 
     let relative_end_native = (end_pos as i64 - (end_native_patch as i64 + 4)) as i32;
     asm.patch_u32(end_native_patch, relative_end_native as u32);
+
+    let relative_end_sentinel = (end_pos as i64 - (end_native_patch_sentinel as i64 + 4)) as i32;
+    asm.patch_u32(end_native_patch_sentinel, relative_end_sentinel as u32);
 }
 
 fn emit_call_self(ctx: &mut CodegenCtx, first_reg: usize) {

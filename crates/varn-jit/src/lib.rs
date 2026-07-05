@@ -170,6 +170,8 @@ pub struct JitHelpers {
     pub nursery_len_offset: usize,
     /// Nursery fill level at which the safepoint must run.
     pub nursery_threshold: usize,
+    pub jit_native_result_offset: usize,
+    pub globals_offset: usize,
 }
 
 #[derive(Debug, Clone, Copy)]

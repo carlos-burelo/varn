@@ -72,6 +72,7 @@ pub struct ExecCtx {
     pub jit_panic_exception_error: Option<VmValue>,
     pub jit_panic_exception_err_obj: Option<crate::error::RuntimeError>,
     pub jit_panic_suspend_resume_ip: Option<usize>,
+    pub jit_native_result: VmValue,
 }
 
 impl ExecCtx {
@@ -113,6 +114,7 @@ impl ExecCtx {
             jit_panic_exception_error: None,
             jit_panic_exception_err_obj: None,
             jit_panic_suspend_resume_ip: None,
+            jit_native_result: VmValue::null(),
         };
 
         if fresh {
@@ -248,6 +250,7 @@ impl ExecCtx {
             jit_panic_exception_error: None,
             jit_panic_exception_err_obj: None,
             jit_panic_suspend_resume_ip: None,
+            jit_native_result: VmValue::null(),
         }
     }
 

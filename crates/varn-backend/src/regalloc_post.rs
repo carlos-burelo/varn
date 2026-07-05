@@ -79,46 +79,177 @@ fn scan_bytecode(code: &[u16], constants: &[PoolEntry]) -> ScanResult {
     }
 }
 
-fn color_with_base(ranges: &[LiveRange], base: u8, copies: &[(u8, u8)]) -> HashMap<u8, u8> {
+fn collect_consecutive_blocks(code: &[u16], constants: &[PoolEntry]) -> Vec<(u8, u8)> {
+    let mut blocks = Vec::new();
+    let mut offset = 0;
+    while offset < code.len() {
+        let info = match decode(code, offset, constants) {
+            Some(i) => i,
+            None => break,
+        };
+        if let Some((arg_start, arg_count)) = info.call_args {
+            if arg_count > 1 {
+                blocks.push((arg_start, arg_count));
+            }
+        }
+        if let Some(op) = OpCode::from_u16(code[offset]) {
+            match op {
+                OpCode::BuildArray => {
+                    let w1 = if offset + 1 < code.len() { code[offset + 1] } else { 0 };
+                    let w2 = if offset + 2 < code.len() { code[offset + 2] } else { 0 };
+                    let start = (w1 & 0xff) as u8;
+                    let count = (w2 >> 8) as u8;
+                    if count > 1 {
+                        blocks.push((start, count));
+                    }
+                }
+                OpCode::BuildObjectWithShape => {
+                    let w1 = if offset + 1 < code.len() { code[offset + 1] } else { 0 };
+                    let w2 = if offset + 2 < code.len() { code[offset + 2] } else { 0 };
+                    let start = (w1 & 0xff) as u8;
+                    let shape_idx = w2 as usize;
+                    let count = match constants.get(shape_idx) {
+                        Some(PoolEntry::Shape(k)) => k.len(),
+                        _ => 0,
+                    };
+                    if count > 1 {
+                        blocks.push((start, count as u8));
+                    }
+                }
+                _ => {}
+            }
+        }
+        offset += info.len;
+    }
+    blocks
+}
+
+fn color_with_base(
+    ranges: &[LiveRange],
+    base: u8,
+    copies: &[(u8, u8)],
+    scan: &ScanResult,
+    blocks: &[(u8, u8)],
+) -> HashMap<u8, u8> {
     let mut coloring: HashMap<u8, u8> = HashMap::new();
 
-    let mut sorted = ranges.to_vec();
-    sorted.sort_by_key(|r| r.start);
+    let ranges_by_vreg: HashMap<u8, &LiveRange> = ranges
+        .iter()
+        .map(|r| (r.vreg as u8, r))
+        .collect();
 
-    for range in &sorted {
+    let mut parent_of: HashMap<u8, (u8, u8)> = HashMap::new();
+    let mut block_count: HashMap<u8, u8> = HashMap::new();
+    for &(start, count) in blocks {
+        block_count.insert(start, count);
+        for i in 0..count {
+            parent_of.insert(start + i, (start, i));
+        }
+    }
+
+    let mut arg_starts = std::collections::HashSet::new();
+    for &(_, arg_start, _) in &scan.call_sites {
+        arg_starts.insert(arg_start);
+    }
+    for &(start, _) in blocks {
+        arg_starts.insert(start);
+    }
+
+    let mut sorted_representatives = Vec::new();
+    for range in ranges {
         let reg = range.vreg as u8;
-        let neighbor_colors: std::collections::HashSet<u8> = range
-            .interference
-            .iter()
-            .filter_map(|&n| coloring.get(&(n as u8)).copied())
-            .collect();
+        if let Some(&(_parent, offset)) = parent_of.get(&reg) {
+            if offset == 0 {
+                sorted_representatives.push(range);
+            }
+        } else {
+            sorted_representatives.push(range);
+        }
+    }
+
+    sorted_representatives.sort_by(|a, b| {
+        let a_reg = a.vreg as u8;
+        let b_reg = b.vreg as u8;
+        let a_is_arg = arg_starts.contains(&a_reg);
+        let b_is_arg = arg_starts.contains(&b_reg);
+        if a_is_arg != b_is_arg {
+            b_is_arg.cmp(&a_is_arg)
+        } else {
+            a.start.cmp(&b.start)
+        }
+    });
+
+    for range in sorted_representatives {
+        let reg = range.vreg as u8;
+        let count = block_count.get(&reg).copied().unwrap_or(1);
+
+        let mut neighbor_colors = std::collections::HashSet::new();
+        for offset in 0..count {
+            let child = reg + offset;
+            if let Some(child_range) = ranges_by_vreg.get(&child) {
+                for &n in &child_range.interference {
+                    if let Some(&c) = coloring.get(&(n as u8)) {
+                        if c >= offset {
+                            neighbor_colors.insert(c - offset);
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut max_allowed_color = 255;
+        for offset in 0..count {
+            let child = reg + offset;
+            for &(call_idx, arg_start, _) in &scan.call_sites {
+                let is_live_across = scan
+                    .defs
+                    .get(&child)
+                    .is_some_and(|&def| def < call_idx)
+                    && scan
+                        .uses
+                        .get(&child)
+                        .is_some_and(|us| us.iter().any(|&u| u > call_idx));
+                if is_live_across {
+                    if let Some(&c) = coloring.get(&arg_start) {
+                        if c > offset {
+                            max_allowed_color = max_allowed_color.min(c - 1 - offset);
+                        } else {
+                            max_allowed_color = 0;
+                        }
+                    }
+                }
+            }
+        }
 
         let mut color_opt = None;
         for &(u, v) in copies {
+            let mut target = None;
             if u == reg {
-                if let Some(&c) = coloring.get(&v) {
-                    if !neighbor_colors.contains(&c) {
-                        color_opt = Some(c);
-                        break;
-                    }
-                }
+                target = coloring.get(&v).copied();
             } else if v == reg {
-                if let Some(&c) = coloring.get(&u) {
-                    if !neighbor_colors.contains(&c) {
-                        color_opt = Some(c);
-                        break;
-                    }
+                target = coloring.get(&u).copied();
+            }
+            if let Some(c) = target {
+                if !neighbor_colors.contains(&c) && c >= base && c <= max_allowed_color {
+                    color_opt = Some(c);
+                    break;
                 }
             }
         }
 
         let color = color_opt.unwrap_or_else(|| {
             (base..)
+                .take_while(|&c| c <= max_allowed_color)
                 .find(|c| !neighbor_colors.contains(c))
                 .unwrap_or(base)
         });
-        coloring.insert(reg, color);
+
+        for offset in 0..count {
+            coloring.insert(reg + offset, color + offset);
+        }
     }
+
+
 
     coloring
 }
@@ -574,10 +705,11 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
 
     let fixed_count = proto.arity + if proto.has_this { 1 } else { 0 };
     let base = fixed_count as u8;
-
     if proto.chunk.code.is_empty() {
         return;
     }
+
+
 
     let back_edges =
         varn_types::loop_analysis::collect_back_edges(&proto.chunk.code, &proto.chunk.constants);
@@ -636,8 +768,8 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
             break;
         }
     }
-
-    let raw_mapping = color_with_base(&ranges, base, &copies);
+    let blocks = collect_consecutive_blocks(&proto.chunk.code, &proto.chunk.constants);
+    let raw_mapping = color_with_base(&ranges, base, &copies, &scan, &blocks);
 
     let mapping: HashMap<u8, u8> = raw_mapping
         .into_iter()
@@ -686,6 +818,7 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
     }
 
     remap_bytecode(&mut proto.chunk.code, &proto.chunk.constants, &mapping);
+
     proto.register_count = new_register_count;
 }
 
