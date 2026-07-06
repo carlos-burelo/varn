@@ -74,10 +74,10 @@ pub fn build_object(stack: &mut Vec<VmValue>, count: usize, heap: &mut Heap) -> 
 pub fn array_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
         if let Some(HeapObj::Array(a)) = heap.get(obj.as_heap_idx()) {
-            let idx = if key.is_int() {
-                key.as_int() as usize
+            let idx = if heap.is_int(key) {
+                heap.as_int(key) as usize
             } else {
-                key.to_i32() as usize
+                heap.to_f64_val(key) as usize
             };
             let val = unsafe {
                 let vec = &*a.0.get();
@@ -97,12 +97,12 @@ pub fn array_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<
 pub fn array_set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Heap) -> VmResult<()> {
     if obj.is_heap() {
         let heap_idx = obj.as_heap_idx();
+        let idx = if heap.is_int(key) {
+            heap.as_int(key) as usize
+        } else {
+            heap.to_f64_val(key) as usize
+        };
         if let Some(HeapObj::Array(a)) = heap.get_mut(heap_idx) {
-            let idx = if key.is_int() {
-                key.as_int() as usize
-            } else {
-                key.to_i32() as usize
-            };
             let g = unsafe { &mut *a.0.get() };
             if idx < g.len() {
                 g[idx] = val;
@@ -124,7 +124,7 @@ pub fn array_set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Heap
 pub fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
         if let Some(HeapObj::Array(a)) = heap.get(obj.as_heap_idx()) {
-            let idx = key.to_i32();
+            let idx = heap.as_int(key);
             let val = unsafe {
                 let vec = &*a.0.get();
                 if (idx as usize) < vec.len() {
@@ -139,7 +139,7 @@ pub fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValu
     if obj.is_sso() {
         let mut buf = [0u8; 5];
         let s_str = obj.sso_as_str(&mut buf);
-        let idx = key.to_i32() as usize;
+        let idx = heap.as_int(key) as usize;
         return match s_str.chars().nth(idx) {
             Some(c) => Ok(heap.alloc_str(c.to_string())),
             None => Ok(VmValue::null()),
@@ -154,7 +154,7 @@ pub fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValu
             Ok(o.borrow().get_field_nv(&key_s).unwrap_or(VmValue::null()))
         }
         Some(HeapObj::Str(s)) => {
-            let idx = key.to_i32();
+            let idx = heap.as_int(key);
             let c = s.chars().nth(idx as usize);
             match c {
                 Some(ch) => {
@@ -165,15 +165,17 @@ pub fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValu
             }
         }
         Some(HeapObj::Range(r)) => {
-            let idx = key.to_i32() as i64;
-            let diff = r.end - r.start;
-            let count = if r.inclusive {
-                (diff / r.step) + 1
+            let idx = heap.as_int(key);
+            let (start, end, step, inclusive) = (r.start, r.end, r.step, r.inclusive);
+            let diff = end - start;
+            let count = if inclusive {
+                (diff / step) + 1
             } else {
-                (diff + r.step - 1) / r.step
+                (diff + step - 1) / step
             };
             if idx >= 0 && idx < count {
-                Ok(VmValue::from_i32((r.start + idx * r.step) as i32))
+                let r = start + idx * step;
+                Ok(heap.make_int(r))
             } else {
                 Ok(VmValue::null())
             }
@@ -187,7 +189,7 @@ pub fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Heap) -> V
         return Err(RuntimeError::new("OpSetIndex: not indexable"));
     }
     let heap_idx = obj.as_heap_idx();
-    let idx_i = key.to_i32() as usize;
+    let idx_i = heap.as_int(key) as usize;
     match heap.get(heap_idx) {
         Some(HeapObj::Array(a)) => {
             let g = unsafe { &mut *a.0.get() };

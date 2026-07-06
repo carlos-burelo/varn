@@ -49,7 +49,7 @@ pub extern "C" fn jit_modulo(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmVal
 pub extern "C" fn jit_pow(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
-        match crate::exec::arith::pow(a, b) {
+        match crate::exec::arith::pow(a, b, &mut ctx_ref.heap) {
             Ok(v) => v,
             Err(e) => jit_propagate_error(ctx_ref, e),
         }
@@ -235,28 +235,28 @@ pub extern "C" fn jit_str_length(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
     }
 }
 
-pub extern "C" fn jit_bitand(_ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
-    crate::exec::arith::bit_and(a, b)
+pub extern "C" fn jit_bitand(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    unsafe { crate::exec::arith::bit_and(a, b, &mut (*ctx).heap) }
 }
 
-pub extern "C" fn jit_bitor(_ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
-    crate::exec::arith::bit_or(a, b)
+pub extern "C" fn jit_bitor(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    unsafe { crate::exec::arith::bit_or(a, b, &mut (*ctx).heap) }
 }
 
-pub extern "C" fn jit_bitxor(_ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
-    crate::exec::arith::bit_xor(a, b)
+pub extern "C" fn jit_bitxor(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    unsafe { crate::exec::arith::bit_xor(a, b, &mut (*ctx).heap) }
 }
 
-pub extern "C" fn jit_shl(_ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
-    crate::exec::arith::shl(a, b)
+pub extern "C" fn jit_shl(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    unsafe { crate::exec::arith::shl(a, b, &mut (*ctx).heap) }
 }
 
-pub extern "C" fn jit_shr(_ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
-    crate::exec::arith::shr(a, b)
+pub extern "C" fn jit_shr(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    unsafe { crate::exec::arith::shr(a, b, &mut (*ctx).heap) }
 }
 
-pub extern "C" fn jit_ushr(_ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
-    crate::exec::arith::ushr(a, b)
+pub extern "C" fn jit_ushr(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+    unsafe { crate::exec::arith::ushr(a, b, &mut (*ctx).heap) }
 }
 
 pub extern "C" fn jit_load_module(

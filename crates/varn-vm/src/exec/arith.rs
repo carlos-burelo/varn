@@ -5,19 +5,14 @@ use varn_types::Value;
 
 #[inline(always)]
 pub fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
-    if a.is_int() && b.is_int() {
-        // Integer arithmetic wraps at 48 bits (varn_core::numeric);
-        // `from_int` masks the payload, keeping all tiers bit-identical.
-        return Ok(VmValue::from_int(a.as_int().wrapping_add(b.as_int())));
+    if heap.is_int(a) && heap.is_int(b) {
+        let r = heap.as_int(a).wrapping_add(heap.as_int(b));
+        return Ok(heap.make_int(r));
     }
     if a.is_f64() || b.is_f64() {
-        return Ok(VmValue::from_f64(a.to_f64() + b.to_f64()));
+        return Ok(VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b)));
     }
 
-    // Strings before anything that calls `extract_val`: extraction deep-copies
-    // extensible string views (O(len)), and concatenation must never enter the
-    // content interner (the Inv6 pathology). `str_concat` handles SSO inputs
-    // and the extensible-buffer accumulation fast path.
     if a.is_sso() || b.is_sso() {
         return Ok(crate::exec::strings::str_concat(a, b, heap));
     }
@@ -42,32 +37,36 @@ pub fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
             (Ok(Value::Decimal(da)), Ok(Value::Decimal(db))) => {
                 return Ok(heap.alloc_decimal(**da + **db))
             }
-            (Ok(Value::Decimal(da)), _) if b.is_int() => {
-                return Ok(heap.alloc_decimal(**da + rust_decimal::Decimal::from(b.as_i32())))
+            (Ok(Value::Decimal(da)), _) if heap.is_int(b) => {
+                let bi = rust_decimal::Decimal::from(heap.as_int(b));
+                return Ok(heap.alloc_decimal(**da + bi))
             }
-            (_, Ok(Value::Decimal(db))) if a.is_int() => {
-                return Ok(heap.alloc_decimal(rust_decimal::Decimal::from(a.as_i32()) + **db))
+            (_, Ok(Value::Decimal(db))) if heap.is_int(a) => {
+                let ai = rust_decimal::Decimal::from(heap.as_int(a));
+                return Ok(heap.alloc_decimal(ai + **db))
             }
             _ => {}
         }
     }
-    Ok(VmValue::from_f64(a.to_f64() + b.to_f64()))
+    Ok(VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b)))
 }
 
 #[inline(always)]
-pub fn add_i32(a: VmValue, b: VmValue) -> VmValue {
-    VmValue::from_int(a.as_int().wrapping_add(b.as_int()))
+pub fn add_i32(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+    let r = heap.as_int(a).wrapping_add(heap.as_int(b));
+    heap.make_int(r)
 }
 
 #[inline(always)]
-pub fn add_f64(a: VmValue, b: VmValue) -> VmValue {
-    VmValue::from_f64(a.to_f64() + b.to_f64())
+pub fn add_f64(a: VmValue, b: VmValue, heap: &Heap) -> VmValue {
+    VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b))
 }
 
 #[inline(always)]
 pub fn sub(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
-    if a.is_int() && b.is_int() {
-        return Ok(VmValue::from_int(a.as_int().wrapping_sub(b.as_int())));
+    if heap.is_int(a) && heap.is_int(b) {
+        let r = heap.as_int(a).wrapping_sub(heap.as_int(b));
+        return Ok(heap.make_int(r));
     }
     let av = heap.extract_val(a);
     let bv = heap.extract_val(b);
@@ -75,31 +74,35 @@ pub fn sub(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
         (Ok(Value::Decimal(da)), Ok(Value::Decimal(db))) => {
             return Ok(heap.alloc_decimal(**da - **db))
         }
-        (Ok(Value::Decimal(da)), _) if b.is_int() => {
-            return Ok(heap.alloc_decimal(**da - rust_decimal::Decimal::from(b.as_i32())))
+        (Ok(Value::Decimal(da)), _) if heap.is_int(b) => {
+            let bi = rust_decimal::Decimal::from(heap.as_int(b));
+            return Ok(heap.alloc_decimal(**da - bi))
         }
-        (_, Ok(Value::Decimal(db))) if a.is_int() => {
-            return Ok(heap.alloc_decimal(rust_decimal::Decimal::from(a.as_i32()) - **db))
+        (_, Ok(Value::Decimal(db))) if heap.is_int(a) => {
+            let ai = rust_decimal::Decimal::from(heap.as_int(a));
+            return Ok(heap.alloc_decimal(ai - **db))
         }
         _ => {}
     }
-    Ok(VmValue::from_f64(a.to_f64() - b.to_f64()))
+    Ok(VmValue::from_f64(heap.to_f64_val(a) - heap.to_f64_val(b)))
 }
 
 #[inline(always)]
-pub fn sub_i32(a: VmValue, b: VmValue) -> VmValue {
-    VmValue::from_int(a.as_int().wrapping_sub(b.as_int()))
+pub fn sub_i32(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+    let r = heap.as_int(a).wrapping_sub(heap.as_int(b));
+    heap.make_int(r)
 }
 
 #[inline(always)]
-pub fn sub_f64(a: VmValue, b: VmValue) -> VmValue {
-    VmValue::from_f64(a.to_f64() - b.to_f64())
+pub fn sub_f64(a: VmValue, b: VmValue, heap: &Heap) -> VmValue {
+    VmValue::from_f64(heap.to_f64_val(a) - heap.to_f64_val(b))
 }
 
 #[inline(always)]
 pub fn mul(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
-    if a.is_int() && b.is_int() {
-        return Ok(VmValue::from_int(a.as_int().wrapping_mul(b.as_int())));
+    if heap.is_int(a) && heap.is_int(b) {
+        let r = heap.as_int(a).wrapping_mul(heap.as_int(b));
+        return Ok(heap.make_int(r));
     }
     let av = heap.extract_val(a);
     let bv = heap.extract_val(b);
@@ -107,25 +110,28 @@ pub fn mul(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
         (Ok(Value::Decimal(da)), Ok(Value::Decimal(db))) => {
             return Ok(heap.alloc_decimal(**da * **db))
         }
-        (Ok(Value::Decimal(da)), _) if b.is_int() => {
-            return Ok(heap.alloc_decimal(**da * rust_decimal::Decimal::from(b.as_i32())))
+        (Ok(Value::Decimal(da)), _) if heap.is_int(b) => {
+            let bi = rust_decimal::Decimal::from(heap.as_int(b));
+            return Ok(heap.alloc_decimal(**da * bi))
         }
-        (_, Ok(Value::Decimal(db))) if a.is_int() => {
-            return Ok(heap.alloc_decimal(rust_decimal::Decimal::from(a.as_i32()) * **db))
+        (_, Ok(Value::Decimal(db))) if heap.is_int(a) => {
+            let ai = rust_decimal::Decimal::from(heap.as_int(a));
+            return Ok(heap.alloc_decimal(ai * **db))
         }
         _ => {}
     }
-    Ok(VmValue::from_f64(a.to_f64() * b.to_f64()))
+    Ok(VmValue::from_f64(heap.to_f64_val(a) * heap.to_f64_val(b)))
 }
 
 #[inline(always)]
-pub fn mul_i32(a: VmValue, b: VmValue) -> VmValue {
-    VmValue::from_int(a.as_int().wrapping_mul(b.as_int()))
+pub fn mul_i32(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+    let r = heap.as_int(a).wrapping_mul(heap.as_int(b));
+    heap.make_int(r)
 }
 
 #[inline(always)]
-pub fn mul_f64(a: VmValue, b: VmValue) -> VmValue {
-    VmValue::from_f64(a.to_f64() * b.to_f64())
+pub fn mul_f64(a: VmValue, b: VmValue, heap: &Heap) -> VmValue {
+    VmValue::from_f64(heap.to_f64_val(a) * heap.to_f64_val(b))
 }
 
 #[inline(always)]
@@ -140,42 +146,42 @@ pub fn div(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
                 }
                 return Ok(heap.alloc_decimal(**da / **db));
             }
-            (Ok(Value::Decimal(da)), _) if b.is_int() => {
-                let di = rust_decimal::Decimal::from(b.as_i32());
+            (Ok(Value::Decimal(da)), _) if heap.is_int(b) => {
+                let di = rust_decimal::Decimal::from(heap.as_int(b));
                 if di == 0.into() {
                     return Err(RuntimeError::new("division by zero"));
                 }
                 return Ok(heap.alloc_decimal(**da / di));
             }
-            (_, Ok(Value::Decimal(db))) if a.is_int() => {
+            (_, Ok(Value::Decimal(db))) if heap.is_int(a) => {
                 if **db == 0.into() {
                     return Err(RuntimeError::new("division by zero"));
                 }
-                return Ok(heap.alloc_decimal(rust_decimal::Decimal::from(a.as_i32()) / **db));
+                let ai = rust_decimal::Decimal::from(heap.as_int(a));
+                return Ok(heap.alloc_decimal(ai / **db));
             }
             _ => {}
         }
     }
-    let bv = b.to_f64();
+    let bv = heap.to_f64_val(b);
     if bv == 0.0 {
         return Err(RuntimeError::new("division by zero"));
     }
-    // `int / int` always yields float (varn_core::numeric).
-    Ok(VmValue::from_f64(a.to_f64() / bv))
+    Ok(VmValue::from_f64(heap.to_f64_val(a) / bv))
 }
 
 #[inline(always)]
-pub fn div_i32(a: VmValue, b: VmValue) -> VmResult<VmValue> {
-    let bv = b.to_i32() as i64;
+pub fn div_i32(a: VmValue, b: VmValue, heap: &Heap) -> VmResult<VmValue> {
+    let bv = heap.as_int(b);
     if bv == 0 {
         return Err(RuntimeError::new("division by zero"));
     }
-    Ok(VmValue::from_int(a.as_int().wrapping_div(bv)))
+    Ok(heap.extract(a).as_int().map(|av| VmValue::from_f64(av as f64 / bv as f64)).unwrap_or_else(VmValue::null))
 }
 
 #[inline(always)]
-pub fn div_f64(a: VmValue, b: VmValue) -> VmValue {
-    VmValue::from_f64(a.to_f64() / b.to_f64())
+pub fn div_f64(a: VmValue, b: VmValue, heap: &Heap) -> VmValue {
+    VmValue::from_f64(heap.to_f64_val(a) / heap.to_f64_val(b))
 }
 
 #[inline(always)]
@@ -187,49 +193,51 @@ pub fn modulo(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
             (Ok(Value::Decimal(da)), Ok(Value::Decimal(db))) => {
                 return Ok(heap.alloc_decimal(**da % **db))
             }
-            (Ok(Value::Decimal(da)), _) if b.is_int() => {
-                return Ok(heap.alloc_decimal(**da % rust_decimal::Decimal::from(b.as_i32())))
+            (Ok(Value::Decimal(da)), _) if heap.is_int(b) => {
+                let bi = rust_decimal::Decimal::from(heap.as_int(b));
+                return Ok(heap.alloc_decimal(**da % bi))
             }
-            (_, Ok(Value::Decimal(db))) if a.is_int() => {
-                return Ok(heap.alloc_decimal(rust_decimal::Decimal::from(a.as_i32()) % **db))
+            (_, Ok(Value::Decimal(db))) if heap.is_int(a) => {
+                let ai = rust_decimal::Decimal::from(heap.as_int(a));
+                return Ok(heap.alloc_decimal(ai % **db))
             }
             _ => {}
         }
     }
-    let bv = b.to_f64();
+    let bv = heap.to_f64_val(b);
     if bv == 0.0 {
         return Err(RuntimeError::new("modulo by zero"));
     }
-    if a.is_int() && b.is_int() {
-        let bi = b.as_int();
+    if heap.is_int(a) && heap.is_int(b) {
+        let bi = heap.as_int(b);
         if bi == 0 {
             return Err(RuntimeError::new("modulo by zero"));
         }
-        return Ok(VmValue::from_int(a.as_int() % bi));
+        let r = heap.as_int(a) % bi;
+        return Ok(heap.make_int(r));
     }
-    Ok(VmValue::from_f64(a.to_f64() % bv))
+    Ok(VmValue::from_f64(heap.to_f64_val(a) % bv))
 }
 
 #[inline(always)]
-pub fn pow(a: VmValue, b: VmValue) -> VmResult<VmValue> {
-    if a.is_int() && b.is_int() {
-        // `int ** int` stays integral and wraps at 48 bits; a negative
-        // exponent raises instead of silently producing a float
-        // (varn_core::numeric).
-        let exp = b.as_int();
+pub fn pow(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+    if heap.is_int(a) && heap.is_int(b) {
+        let exp = heap.as_int(b);
         if exp < 0 {
             return Err(RuntimeError::new("negative exponent in integer power"));
         }
         let e = u32::try_from(exp).unwrap_or(u32::MAX);
-        return Ok(VmValue::from_int(a.as_int().wrapping_pow(e)));
+        let r = heap.as_int(a).wrapping_pow(e);
+        return Ok(heap.make_int(r));
     }
-    Ok(VmValue::from_f64(a.to_f64().powf(b.to_f64())))
+    Ok(VmValue::from_f64(heap.to_f64_val(a).powf(heap.to_f64_val(b))))
 }
 
 #[inline(always)]
 pub fn negate(a: VmValue, heap: &mut Heap) -> VmValue {
-    if a.is_int() {
-        return VmValue::from_int(-a.as_int());
+    if heap.is_int(a) {
+        let r = -heap.as_int(a);
+        return heap.make_int(r);
     }
     if a.is_f64() {
         return VmValue::from_f64(-a.as_f64());
@@ -237,35 +245,41 @@ pub fn negate(a: VmValue, heap: &mut Heap) -> VmValue {
     if let Ok(Value::Decimal(d)) = heap.extract_val(a) {
         return heap.alloc_decimal(-*d);
     }
-    VmValue::from_f64(-a.to_f64())
+    VmValue::from_f64(-heap.to_f64_val(a))
 }
 
 #[inline(always)]
-pub fn bit_and(a: VmValue, b: VmValue) -> VmValue {
-    VmValue::from_int(a.as_int() & b.as_int())
+pub fn bit_and(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+    let r = heap.as_int(a) & heap.as_int(b);
+    heap.make_int(r)
 }
 
 #[inline(always)]
-pub fn bit_or(a: VmValue, b: VmValue) -> VmValue {
-    VmValue::from_int(a.as_int() | b.as_int())
+pub fn bit_or(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+    let r = heap.as_int(a) | heap.as_int(b);
+    heap.make_int(r)
 }
 
 #[inline(always)]
-pub fn bit_xor(a: VmValue, b: VmValue) -> VmValue {
-    VmValue::from_int(a.as_int() ^ b.as_int())
+pub fn bit_xor(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+    let r = heap.as_int(a) ^ heap.as_int(b);
+    heap.make_int(r)
 }
 
 #[inline(always)]
-pub fn shl(a: VmValue, b: VmValue) -> VmValue {
-    VmValue::from_int(a.as_int().wrapping_shl(b.to_i32() as u32 & 63))
+pub fn shl(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+    let r = heap.as_int(a).wrapping_shl(heap.to_f64_val(b) as i32 as u32 & 63);
+    heap.make_int(r)
 }
 
 #[inline(always)]
-pub fn shr(a: VmValue, b: VmValue) -> VmValue {
-    VmValue::from_int(a.as_int().wrapping_shr(b.to_i32() as u32 & 63))
+pub fn shr(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+    let r = heap.as_int(a).wrapping_shr(heap.to_f64_val(b) as i32 as u32 & 63);
+    heap.make_int(r)
 }
 
 #[inline(always)]
-pub fn ushr(a: VmValue, b: VmValue) -> VmValue {
-    VmValue::from_int(((a.as_int() as u64).wrapping_shr(b.to_i32() as u32 & 63)) as i64)
+pub fn ushr(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+    let r = ((heap.as_int(a) as u64).wrapping_shr(heap.to_f64_val(b) as i32 as u32 & 63)) as i64;
+    heap.make_int(r)
 }
