@@ -4,6 +4,7 @@ use crate::frame::VmClosure;
 use crate::value::VmValue;
 use varn_core::OpCode;
 
+
 use super::{hi, lo};
 
 impl ExecCtx {
@@ -57,16 +58,17 @@ impl ExecCtx {
                 let src = hi(w1);
                 let imm = lo(w1) as i8 as i64;
                 let v = self.stack[base + src];
-                if v.is_int() {
-                    let (r, overflow) = v.as_int().overflowing_add(imm);
+                if self.heap.is_int(v) {
+                    let (r, overflow) = self.heap.as_int(v).overflowing_add(imm);
                     self.stack[base + first_reg] = if overflow {
-                        VmValue::from_f64(v.as_int() as f64 + imm as f64)
+                        VmValue::from_f64(self.heap.as_int(v) as f64 + imm as f64)
                     } else {
-                        VmValue::from_int(r)
+                        self.heap.make_int(r)
                     };
                 } else {
+                    let imm_v = self.heap.make_int(imm);
                     self.stack[base + first_reg] =
-                        crate::exec::arith::add(v, VmValue::from_int(imm), &mut self.heap)?;
+                        crate::exec::arith::add(v, imm_v, &mut self.heap)?;
                 }
             }
             OpCode::SubImm => {
@@ -75,16 +77,17 @@ impl ExecCtx {
                 let src = hi(w1);
                 let imm = lo(w1) as i8 as i64;
                 let v = self.stack[base + src];
-                if v.is_int() {
-                    let (r, overflow) = v.as_int().overflowing_sub(imm);
+                if self.heap.is_int(v) {
+                    let (r, overflow) = self.heap.as_int(v).overflowing_sub(imm);
                     self.stack[base + first_reg] = if overflow {
-                        VmValue::from_f64(v.as_int() as f64 - imm as f64)
+                        VmValue::from_f64(self.heap.as_int(v) as f64 - imm as f64)
                     } else {
-                        VmValue::from_int(r)
+                        self.heap.make_int(r)
                     };
                 } else {
+                    let imm_v = self.heap.make_int(imm);
                     self.stack[base + first_reg] =
-                        crate::exec::arith::sub(v, VmValue::from_int(imm), &mut self.heap)?;
+                        crate::exec::arith::sub(v, imm_v, &mut self.heap)?;
                 }
             }
             OpCode::AddInt
@@ -98,39 +101,33 @@ impl ExecCtx {
                 let (src1, src2) = (hi(w1), lo(w1));
                 let a = self.stack[base + src1];
                 let b = self.stack[base + src2];
-                let res = if a.is_int() && b.is_int() {
-                    // Integer semantics (varn_core::numeric): arithmetic
-                    // wraps at 48 bits — `from_int` masks the payload, so a
-                    // plain wrapping op is exact and tier-identical with the
-                    // JIT. `int / int` always yields float; `**` stays
-                    // integral and rejects negative exponents.
+                let res = if self.heap.is_int(a) && self.heap.is_int(b) {
+                    let a_val = self.heap.as_int(a);
+                    let b_val = self.heap.as_int(b);
                     match op {
-                        OpCode::AddInt => VmValue::from_int(a.as_int().wrapping_add(b.as_int())),
-                        OpCode::SubInt => VmValue::from_int(a.as_int().wrapping_sub(b.as_int())),
-                        OpCode::MulInt => VmValue::from_int(a.as_int().wrapping_mul(b.as_int())),
+                        OpCode::AddInt => self.heap.make_int(a_val.wrapping_add(b_val)),
+                        OpCode::SubInt => self.heap.make_int(a_val.wrapping_sub(b_val)),
+                        OpCode::MulInt => self.heap.make_int(a_val.wrapping_mul(b_val)),
                         OpCode::DivInt => {
-                            let bv = b.as_int();
-                            if bv == 0 {
+                            if b_val == 0 {
                                 return Err(crate::error::RuntimeError::new("division by zero"));
                             }
-                            VmValue::from_f64(a.as_int() as f64 / bv as f64)
+                            VmValue::from_f64(a_val as f64 / b_val as f64)
                         }
                         OpCode::ModInt => {
-                            let bv = b.as_int();
-                            if bv == 0 {
+                            if b_val == 0 {
                                 return Err(crate::error::RuntimeError::new("modulo by zero"));
                             }
-                            VmValue::from_int(a.as_int() % bv)
+                            self.heap.make_int(a_val % b_val)
                         }
                         OpCode::PowInt => {
-                            let exp = b.as_int();
-                            if exp < 0 {
+                            if b_val < 0 {
                                 return Err(crate::error::RuntimeError::new(
                                     "negative exponent in integer power",
                                 ));
                             }
-                            let e = u32::try_from(exp).unwrap_or(u32::MAX);
-                            VmValue::from_int(a.as_int().wrapping_pow(e))
+                            let e = u32::try_from(b_val).unwrap_or(u32::MAX);
+                            self.heap.make_int(a_val.wrapping_pow(e))
                         }
                         _ => unreachable!(),
                     }
@@ -159,14 +156,16 @@ impl ExecCtx {
                 let (src1, src2) = (hi(w1), lo(w1));
                 let a = self.stack[base + src1];
                 let b = self.stack[base + src2];
-                let res = if a.is_int() && b.is_int() {
+                let res = if self.heap.is_int(a) && self.heap.is_int(b) {
+                    let a_val = self.heap.as_int(a);
+                    let b_val = self.heap.as_int(b);
                     let cmp_res = match op {
-                        OpCode::LtInt => a.as_int() < b.as_int(),
-                        OpCode::GtInt => a.as_int() > b.as_int(),
-                        OpCode::LteInt => a.as_int() <= b.as_int(),
-                        OpCode::GteInt => a.as_int() >= b.as_int(),
-                        OpCode::EqInt => a.as_int() == b.as_int(),
-                        OpCode::NeqInt => a.as_int() != b.as_int(),
+                        OpCode::LtInt => a_val < b_val,
+                        OpCode::GtInt => a_val > b_val,
+                        OpCode::LteInt => a_val <= b_val,
+                        OpCode::GteInt => a_val >= b_val,
+                        OpCode::EqInt => a_val == b_val,
+                        OpCode::NeqInt => a_val != b_val,
                         _ => unreachable!(),
                     };
                     VmValue::from_bool(cmp_res)
@@ -195,26 +194,26 @@ impl ExecCtx {
                 let (src1, src2) = (hi(w1), lo(w1));
                 let a = self.stack[base + src1];
                 let b = self.stack[base + src2];
-                let res = if (a.is_f64() || a.is_int()) && (b.is_f64() || b.is_int()) {
+                let res = if (a.is_f64() || self.heap.is_int(a)) && (b.is_f64() || self.heap.is_int(b)) {
                     match op {
-                        OpCode::AddFloat => VmValue::from_f64(a.to_f64() + b.to_f64()),
-                        OpCode::SubFloat => VmValue::from_f64(a.to_f64() - b.to_f64()),
-                        OpCode::MulFloat => VmValue::from_f64(a.to_f64() * b.to_f64()),
+                        OpCode::AddFloat => VmValue::from_f64(self.heap.to_f64_val(a) + self.heap.to_f64_val(b)),
+                        OpCode::SubFloat => VmValue::from_f64(self.heap.to_f64_val(a) - self.heap.to_f64_val(b)),
+                        OpCode::MulFloat => VmValue::from_f64(self.heap.to_f64_val(a) * self.heap.to_f64_val(b)),
                         OpCode::DivFloat => {
-                            let bv = b.to_f64();
+                            let bv = self.heap.to_f64_val(b);
                             if bv == 0.0 {
                                 return Err(crate::error::RuntimeError::new("division by zero"));
                             }
-                            VmValue::from_f64(a.to_f64() / bv)
+                            VmValue::from_f64(self.heap.to_f64_val(a) / bv)
                         }
                         OpCode::ModFloat => {
-                            let bv = b.to_f64();
+                            let bv = self.heap.to_f64_val(b);
                             if bv == 0.0 {
                                 return Err(crate::error::RuntimeError::new("modulo by zero"));
                             }
-                            VmValue::from_f64(a.to_f64() % bv)
+                            VmValue::from_f64(self.heap.to_f64_val(a) % bv)
                         }
-                        OpCode::PowFloat => VmValue::from_f64(a.to_f64().powf(b.to_f64())),
+                        OpCode::PowFloat => VmValue::from_f64(self.heap.to_f64_val(a).powf(self.heap.to_f64_val(b))),
                         _ => unreachable!(),
                     }
                 } else {
@@ -242,14 +241,14 @@ impl ExecCtx {
                 let (src1, src2) = (hi(w1), lo(w1));
                 let a = self.stack[base + src1];
                 let b = self.stack[base + src2];
-                let res = if (a.is_f64() || a.is_int()) && (b.is_f64() || b.is_int()) {
+                let res = if (a.is_f64() || self.heap.is_int(a)) && (b.is_f64() || self.heap.is_int(b)) {
                     let cmp_res = match op {
-                        OpCode::LtFloat => a.to_f64() < b.to_f64(),
-                        OpCode::GtFloat => a.to_f64() > b.to_f64(),
-                        OpCode::LteFloat => a.to_f64() <= b.to_f64(),
-                        OpCode::GteFloat => a.to_f64() >= b.to_f64(),
-                        OpCode::EqFloat => a.to_f64() == b.to_f64(),
-                        OpCode::NeqFloat => a.to_f64() != b.to_f64(),
+                        OpCode::LtFloat => self.heap.to_f64_val(a) < self.heap.to_f64_val(b),
+                        OpCode::GtFloat => self.heap.to_f64_val(a) > self.heap.to_f64_val(b),
+                        OpCode::LteFloat => self.heap.to_f64_val(a) <= self.heap.to_f64_val(b),
+                        OpCode::GteFloat => self.heap.to_f64_val(a) >= self.heap.to_f64_val(b),
+                        OpCode::EqFloat => self.heap.to_f64_val(a) == self.heap.to_f64_val(b),
+                        OpCode::NeqFloat => self.heap.to_f64_val(a) != self.heap.to_f64_val(b),
                         _ => unreachable!(),
                     };
                     VmValue::from_bool(cmp_res)
@@ -281,7 +280,7 @@ impl ExecCtx {
                 *ip += 1;
                 let v = self.stack[base + src];
                 let s = self.heap.str_repr(v);
-                self.stack[base + first_reg] = self.heap.alloc_str(s);
+                self.stack[base + first_reg] = self.heap.alloc_str(&s);
             }
             OpCode::StrConcat => {
                 let w1 = code[*ip];
@@ -292,7 +291,7 @@ impl ExecCtx {
                 let sa = self.heap.str_repr(a);
                 let sb = self.heap.str_repr(b);
                 let combined = format!("{sa}{sb}");
-                self.stack[base + first_reg] = self.heap.alloc_str(combined);
+                self.stack[base + first_reg] = self.heap.alloc_str(&combined);
             }
             OpCode::BuildStr => {
                 let count = hi(code[*ip]);
@@ -307,7 +306,7 @@ impl ExecCtx {
                         .str_repr_into(self.stack[base + reg_idx], &mut combined);
                 }
                 *ip += count;
-                self.stack[base + first_reg] = self.heap.alloc_str(combined);
+                self.stack[base + first_reg] = self.heap.alloc_str(&combined);
             }
             OpCode::StrLength => {
                 let src = hi(code[*ip]);

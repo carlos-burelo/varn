@@ -1,19 +1,10 @@
 use varn_core::OpCode;
-use varn_types::register_meta::SlotKind;
 
 use crate::assembler::Reg;
 use crate::regalloc::{emit_flush_all, emit_load, emit_reload_all_except, emit_store};
 use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
 
 use super::CodegenCtx;
-
-fn slot_is_int(meta: &[varn_types::register_meta::RegisterMeta], reg: usize) -> bool {
-    meta.get(reg).map_or(false, |m| m.kind == SlotKind::Int)
-}
-
-fn slot_is_float(meta: &[varn_types::register_meta::RegisterMeta], reg: usize) -> bool {
-    meta.get(reg).map_or(false, |m| m.kind == SlotKind::Float)
-}
 
 pub(crate) fn emit_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) -> Result<(), String> {
     match op {
@@ -39,7 +30,15 @@ pub(crate) fn emit_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) -> 
         | OpCode::Ushr => emit_binary_arith(ctx, op, first_reg),
         OpCode::ModInt => emit_mod_int(ctx, first_reg),
         OpCode::AddImm | OpCode::SubImm => emit_add_sub_imm(ctx, op, first_reg),
-        OpCode::AddInt | OpCode::SubInt | OpCode::MulInt => emit_int_arith(ctx, op, first_reg),
+        OpCode::AddInt | OpCode::SubInt | OpCode::MulInt => {
+            let mapped_op = match op {
+                OpCode::AddInt => OpCode::Add,
+                OpCode::SubInt => OpCode::Sub,
+                OpCode::MulInt => OpCode::Mul,
+                _ => unreachable!(),
+            };
+            emit_binary_arith(ctx, mapped_op, first_reg);
+        }
         OpCode::ToString | OpCode::IsNull | OpCode::Not | OpCode::Negate => {
             return super::unary::emit_unary(ctx, op, first_reg);
         }
@@ -54,37 +53,9 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     let src1 = (w1 >> 8) as usize;
     let src2 = (w1 & 0xFF) as usize;
 
-    let is_float_op = matches!(op, OpCode::AddFloat | OpCode::SubFloat | OpCode::MulFloat);
-    if is_float_op
-        && slot_is_float(&ctx.proto.register_meta, src1)
-        && slot_is_float(&ctx.proto.register_meta, src2)
-    {
-        let asm = &mut ctx.asm;
-        let regmap = &ctx.regmap;
-        emit_load(asm, Reg::Rax, src1, regmap);
-        emit_load(asm, Reg::R11, src2, regmap);
-        asm.emit_debug_assert_not_int(Reg::Rax);
-        asm.emit_debug_assert_not_int(Reg::R11);
-        asm.movq_xmm_from_gpr(0, Reg::Rax);
-        asm.movq_xmm_from_gpr(1, Reg::R11);
-        match op {
-            OpCode::AddFloat => asm.addsd(0, 1),
-            OpCode::SubFloat => asm.subsd(0, 1),
-            OpCode::MulFloat => asm.mulsd(0, 1),
-            _ => unreachable!(),
-        }
-        asm.movq_gpr_from_xmm(Reg::Rax, 0);
-        asm.emit_nan_to_null(Reg::Rax, 0);
-        emit_store(asm, Reg::Rax, first_reg, regmap);
-        return;
-    }
-
     let is_fast_math = matches!(op, OpCode::Add | OpCode::Sub | OpCode::Mul);
 
     if is_fast_math {
-        let both_int = slot_is_int(&ctx.proto.register_meta, src1)
-            && slot_is_int(&ctx.proto.register_meta, src2);
-
         let asm = &mut ctx.asm;
         let regmap = &ctx.regmap;
         let helpers = ctx.helpers;
@@ -92,111 +63,102 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
         emit_load(asm, Reg::Rax, src1, regmap);
         emit_load(asm, Reg::R11, src2, regmap);
 
-        if both_int {
-            match op {
-                OpCode::Add => {
-                    // Payload carry out of bit 47 (negative operands) would
-                    // leak into the NaN-box tag; mask back to 48 bits.
-                    asm.add_reg_reg(Reg::Rax, Reg::R11);
-                    asm.sub_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
-                    asm.shl_reg_imm8(Reg::Rax, 16);
-                    asm.shr_reg_imm8(Reg::Rax, 16);
-                    asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
-                }
-                OpCode::Sub => {
-                    asm.sub_reg_reg(Reg::Rax, Reg::R11);
-                    asm.shl_reg_imm8(Reg::Rax, 16);
-                    asm.shr_reg_imm8(Reg::Rax, 16);
-                    asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
-                }
-                OpCode::Mul => {
-                    asm.shl_reg_imm8(Reg::Rax, 16);
-                    asm.sar_reg_imm8(Reg::Rax, 16);
-                    asm.shl_reg_imm8(Reg::R11, 16);
-                    asm.sar_reg_imm8(Reg::R11, 16);
-                    asm.imul_reg_reg(Reg::Rax, Reg::R11);
-                    asm.shl_reg_imm8(Reg::Rax, 16);
-                    asm.shr_reg_imm8(Reg::Rax, 16);
-                    asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
-                }
-                _ => unreachable!(),
-            }
-            emit_store(asm, Reg::Rax, first_reg, regmap);
-        } else {
-            asm.mov_reg_reg(Reg::R10, Reg::Rax);
-            asm.mov_reg_imm64(Reg::Rcx, 0x7FFF_0000_0000_0000u64);
-            asm.and_reg_reg(Reg::R10, Reg::Rcx);
-            asm.cmp_reg_reg(Reg::R10, crate::registers::REG_INT_TAG);
-            let p_fallback1 = asm.jmp_cond(crate::assembler::Cond::NotEqual);
+        // Check src1 tag
+        asm.mov_reg_reg(Reg::R10, Reg::Rax);
+        asm.push(Reg::Rcx);
+        asm.mov_reg_imm64(Reg::Rcx, 0x7FFF_0000_0000_0000u64);
+        asm.and_reg_reg(Reg::R10, Reg::Rcx);
+        asm.cmp_reg_reg(Reg::R10, crate::registers::REG_INT_TAG);
+        asm.pop(Reg::Rcx);
+        let p_fallback1 = asm.jmp_cond(crate::assembler::Cond::NotEqual);
 
-            asm.mov_reg_reg(Reg::R10, Reg::R11);
-            asm.mov_reg_imm64(Reg::Rcx, 0x7FFF_0000_0000_0000u64);
-            asm.and_reg_reg(Reg::R10, Reg::Rcx);
-            asm.cmp_reg_reg(Reg::R10, crate::registers::REG_INT_TAG);
-            let p_fallback2 = asm.jmp_cond(crate::assembler::Cond::NotEqual);
+        // Check src2 tag
+        asm.mov_reg_reg(Reg::R10, Reg::R11);
+        asm.push(Reg::Rcx);
+        asm.mov_reg_imm64(Reg::Rcx, 0x7FFF_0000_0000_0000u64);
+        asm.and_reg_reg(Reg::R10, Reg::Rcx);
+        asm.cmp_reg_reg(Reg::R10, crate::registers::REG_INT_TAG);
+        asm.pop(Reg::Rcx);
+        let p_fallback2 = asm.jmp_cond(crate::assembler::Cond::NotEqual);
 
-            asm.shl_reg_imm8(Reg::Rax, 16);
-            asm.sar_reg_imm8(Reg::Rax, 16);
-            asm.shl_reg_imm8(Reg::R11, 16);
-            asm.sar_reg_imm8(Reg::R11, 16);
-            match op {
-                OpCode::Add => asm.add_reg_reg(Reg::Rax, Reg::R11),
-                OpCode::Sub => asm.sub_reg_reg(Reg::Rax, Reg::R11),
-                OpCode::Mul => asm.imul_reg_reg(Reg::Rax, Reg::R11),
-                _ => unreachable!(),
-            }
-            asm.shl_reg_imm8(Reg::Rax, 16);
-            asm.shr_reg_imm8(Reg::Rax, 16);
-            asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
-            emit_store(asm, Reg::Rax, first_reg, regmap);
-            let p_skip_ffi = asm.jmp_near();
+        // Extract 48-bit integers to full 64-bit signed integers
+        asm.shl_reg_imm8(Reg::Rax, 16);
+        asm.sar_reg_imm8(Reg::Rax, 16);
+        asm.shl_reg_imm8(Reg::R11, 16);
+        asm.sar_reg_imm8(Reg::R11, 16);
 
-            let fallback_pos = asm.current_offset();
-            let disp1 = (fallback_pos as i32 - (p_fallback1 as i32 + 4)) as u32;
-            asm.patch_u32(p_fallback1, disp1);
-            let disp2 = (fallback_pos as i32 - (p_fallback2 as i32 + 4)) as u32;
-            asm.patch_u32(p_fallback2, disp2);
-
-            emit_flush_all(asm, regmap);
-            asm.push(ARG_CTX);
-            asm.push(ARG_CLOSURE);
-            asm.push(ARG_BASE);
-            asm.push(ARG_EXEC_CTX);
-            let need_dummy = regmap.used_phys.len() % 2 == 0;
-            if need_dummy {
-                asm.push(Reg::Rax);
-            }
-            emit_load(asm, Reg::Rax, src1, regmap);
-            emit_load(asm, Reg::R11, src2, regmap);
-            #[cfg(target_os = "windows")]
-            asm.add_reg_imm8(Reg::Rsp, -32);
-            asm.mov_reg_reg(ARG_BASE, Reg::R11);
-            asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
-            asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
-            let helper_addr = match op {
-                OpCode::Add => helpers.add,
-                OpCode::Sub => helpers.sub,
-                OpCode::Mul => helpers.mul,
-                _ => unreachable!(),
-            };
-            asm.mov_reg_imm64(Reg::R10, helper_addr as u64);
-            asm.call_reg(Reg::R10);
-            #[cfg(target_os = "windows")]
-            asm.add_reg_imm8(Reg::Rsp, 32);
-            asm.mov_reg_reg(Reg::R11, Reg::Rax);
-            if need_dummy {
-                asm.pop(Reg::Rax);
-            }
-            asm.pop(ARG_EXEC_CTX);
-            asm.pop(ARG_BASE);
-            asm.pop(ARG_CLOSURE);
-            asm.pop(ARG_CTX);
-            emit_store(asm, Reg::R11, first_reg, regmap);
-            emit_reload_all_except(asm, regmap, Some(first_reg));
-            let end_pos = asm.current_offset();
-            let disp_skip = (end_pos as i32 - (p_skip_ffi as i32 + 4)) as u32;
-            asm.patch_u32(p_skip_ffi, disp_skip);
+        // Perform arithmetic operation in 64-bit
+        match op {
+            OpCode::Add => asm.add_reg_reg(Reg::Rax, Reg::R11),
+            OpCode::Sub => asm.sub_reg_reg(Reg::Rax, Reg::R11),
+            OpCode::Mul => asm.imul_reg_reg(Reg::Rax, Reg::R11),
+            _ => unreachable!(),
         }
+
+        // Check if the 64-bit result fits in 48 bits (i.e. no overflow/underflow)
+        asm.mov_reg_reg(Reg::R10, Reg::Rax);
+        asm.shl_reg_imm8(Reg::Rax, 16);
+        asm.sar_reg_imm8(Reg::Rax, 16);
+        asm.cmp_reg_reg(Reg::Rax, Reg::R10);
+        let p_fallback3 = asm.jmp_cond(crate::assembler::Cond::NotEqual);
+
+        // It fits! Mask/tag and store.
+        asm.push(Reg::Rcx);
+        asm.mov_reg_imm64(Reg::Rcx, 0x0000_FFFF_FFFF_FFFFu64);
+        asm.and_reg_reg(Reg::Rax, Reg::Rcx);
+        asm.pop(Reg::Rcx);
+        asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
+        emit_store(asm, Reg::Rax, first_reg, regmap);
+        let p_skip_ffi = asm.jmp_near();
+
+        // Slow path: call FFI helper
+        let fallback_pos = asm.current_offset();
+        let disp1 = (fallback_pos as i32 - (p_fallback1 as i32 + 4)) as u32;
+        asm.patch_u32(p_fallback1, disp1);
+        let disp2 = (fallback_pos as i32 - (p_fallback2 as i32 + 4)) as u32;
+        asm.patch_u32(p_fallback2, disp2);
+        let disp3 = (fallback_pos as i32 - (p_fallback3 as i32 + 4)) as u32;
+        asm.patch_u32(p_fallback3, disp3);
+
+        emit_flush_all(asm, regmap);
+        asm.push(ARG_CTX);
+        asm.push(ARG_CLOSURE);
+        asm.push(ARG_BASE);
+        asm.push(ARG_EXEC_CTX);
+        let need_dummy = regmap.used_phys.len() % 2 == 0;
+        if need_dummy {
+            asm.push(Reg::Rax);
+        }
+        emit_load(asm, Reg::Rax, src1, regmap);
+        emit_load(asm, Reg::R11, src2, regmap);
+        #[cfg(target_os = "windows")]
+        asm.add_reg_imm8(Reg::Rsp, -32);
+        asm.mov_reg_reg(ARG_BASE, Reg::R11);
+        asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
+        asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+        let helper_addr = match op {
+            OpCode::Add => helpers.add,
+            OpCode::Sub => helpers.sub,
+            OpCode::Mul => helpers.mul,
+            _ => unreachable!(),
+        };
+        asm.mov_reg_imm64(Reg::R10, helper_addr as u64);
+        asm.call_reg(Reg::R10);
+        #[cfg(target_os = "windows")]
+        asm.add_reg_imm8(Reg::Rsp, 32);
+        asm.mov_reg_reg(Reg::R11, Reg::Rax);
+        if need_dummy {
+            asm.pop(Reg::Rax);
+        }
+        asm.pop(ARG_EXEC_CTX);
+        asm.pop(ARG_BASE);
+        asm.pop(ARG_CLOSURE);
+        asm.pop(ARG_CTX);
+        emit_store(asm, Reg::R11, first_reg, regmap);
+        emit_reload_all_except(asm, regmap, Some(first_reg));
+        let end_pos = asm.current_offset();
+        let disp_skip = (end_pos as i32 - (p_skip_ffi as i32 + 4)) as u32;
+        asm.patch_u32(p_skip_ffi, disp_skip);
     } else {
         let asm = &mut ctx.asm;
         let regmap = &ctx.regmap;
@@ -275,19 +237,7 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     }
 }
 
-/// `ModInt` compiles to a native `idiv`. Statically int-typed operands skip
-/// the tag guards; register reuse often demotes slots to `Dynamic`, so
-/// otherwise both operands are tag-checked at runtime and non-int values
-/// fall back to the FFI helper. A zero divisor also falls back to the
-/// helper, which raises the proper runtime error.
 fn emit_mod_int(ctx: &mut CodegenCtx, first_reg: usize) {
-    let both_int = {
-        let w1 = ctx.code[ctx.ip];
-        let src1 = (w1 >> 8) as usize;
-        let src2 = (w1 & 0xFF) as usize;
-        slot_is_int(&ctx.proto.register_meta, src1) && slot_is_int(&ctx.proto.register_meta, src2)
-    };
-
     let asm = &mut ctx.asm;
     let code = ctx.code;
     let ip = &mut ctx.ip;
@@ -304,19 +254,22 @@ fn emit_mod_int(ctx: &mut CodegenCtx, first_reg: usize) {
 
     let mut slow_patches: Vec<usize> = Vec::new();
 
-    if !both_int {
-        asm.mov_reg_reg(Reg::R10, Reg::Rax);
-        asm.mov_reg_imm64(Reg::Rcx, 0x7FFF_0000_0000_0000u64);
-        asm.and_reg_reg(Reg::R10, Reg::Rcx);
-        asm.cmp_reg_reg(Reg::R10, crate::registers::REG_INT_TAG);
-        slow_patches.push(asm.jmp_cond(crate::assembler::Cond::NotEqual));
+    // ALWAYS emit tag guards because of boxed integers
+    asm.mov_reg_reg(Reg::R10, Reg::Rax);
+    asm.push(Reg::Rcx);
+    asm.mov_reg_imm64(Reg::Rcx, 0x7FFF_0000_0000_0000u64);
+    asm.and_reg_reg(Reg::R10, Reg::Rcx);
+    asm.cmp_reg_reg(Reg::R10, crate::registers::REG_INT_TAG);
+    asm.pop(Reg::Rcx);
+    slow_patches.push(asm.jmp_cond(crate::assembler::Cond::NotEqual));
 
-        asm.mov_reg_reg(Reg::R10, Reg::R11);
-        asm.mov_reg_imm64(Reg::Rcx, 0x7FFF_0000_0000_0000u64);
-        asm.and_reg_reg(Reg::R10, Reg::Rcx);
-        asm.cmp_reg_reg(Reg::R10, crate::registers::REG_INT_TAG);
-        slow_patches.push(asm.jmp_cond(crate::assembler::Cond::NotEqual));
-    }
+    asm.mov_reg_reg(Reg::R10, Reg::R11);
+    asm.push(Reg::Rcx);
+    asm.mov_reg_imm64(Reg::Rcx, 0x7FFF_0000_0000_0000u64);
+    asm.and_reg_reg(Reg::R10, Reg::Rcx);
+    asm.cmp_reg_reg(Reg::R10, crate::registers::REG_INT_TAG);
+    asm.pop(Reg::Rcx);
+    slow_patches.push(asm.jmp_cond(crate::assembler::Cond::NotEqual));
 
     // Sign-extend the 48-bit divisor payload and guard against zero.
     asm.shl_reg_imm8(Reg::R11, 16);
@@ -387,6 +340,7 @@ fn emit_add_sub_imm(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     let code = ctx.code;
     let ip = &mut ctx.ip;
     let regmap = &ctx.regmap;
+    let helpers = ctx.helpers;
 
     let w1 = code[*ip];
     *ip += 1;
@@ -395,61 +349,81 @@ fn emit_add_sub_imm(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
 
     emit_load(asm, Reg::Rax, src, regmap);
 
+    // Check tag
+    asm.mov_reg_reg(Reg::R10, Reg::Rax);
+    asm.push(Reg::Rcx);
+    asm.mov_reg_imm64(Reg::Rcx, 0x7FFF_0000_0000_0000u64);
+    asm.and_reg_reg(Reg::R10, Reg::Rcx);
+    asm.cmp_reg_reg(Reg::R10, crate::registers::REG_INT_TAG);
+    asm.pop(Reg::Rcx);
+    let p_fallback = asm.jmp_cond(crate::assembler::Cond::NotEqual);
+
+    // Extract
     asm.shl_reg_imm8(Reg::Rax, 16);
     asm.sar_reg_imm8(Reg::Rax, 16);
 
     let adjust = if op == OpCode::SubImm { -imm } else { imm };
     asm.add_reg_imm32(Reg::Rax, adjust);
 
+    // Check if fits in 48 bits
+    asm.mov_reg_reg(Reg::R10, Reg::Rax);
     asm.shl_reg_imm8(Reg::Rax, 16);
-    asm.shr_reg_imm8(Reg::Rax, 16);
+    asm.sar_reg_imm8(Reg::Rax, 16);
+    asm.cmp_reg_reg(Reg::Rax, Reg::R10);
+    let p_fallback_overflow = asm.jmp_cond(crate::assembler::Cond::NotEqual);
+
+    // Mask and tag
+    asm.push(Reg::Rcx);
+    asm.mov_reg_imm64(Reg::Rcx, 0x0000_FFFF_FFFF_FFFFu64);
+    asm.and_reg_reg(Reg::Rax, Reg::Rcx);
+    asm.pop(Reg::Rcx);
     asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
-
     emit_store(asm, Reg::Rax, first_reg, regmap);
-}
+    let p_done = asm.jmp_near();
 
-fn emit_int_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
-    let asm = &mut ctx.asm;
-    let code = ctx.code;
-    let ip = &mut ctx.ip;
-    let regmap = &ctx.regmap;
+    // Slow path
+    let slow = asm.current_offset();
+    let disp1 = (slow as i32 - (p_fallback as i32 + 4)) as u32;
+    asm.patch_u32(p_fallback, disp1);
+    let disp2 = (slow as i32 - (p_fallback_overflow as i32 + 4)) as u32;
+    asm.patch_u32(p_fallback_overflow, disp2);
 
-    let w1 = code[*ip];
-    *ip += 1;
-    let src1 = (w1 >> 8) as usize;
-    let src2 = (w1 & 0xFF) as usize;
-
-    emit_load(asm, Reg::Rax, src1, regmap);
-    emit_load(asm, Reg::R11, src2, regmap);
-
-    match op {
-        OpCode::AddInt => {
-            // Same masking as the generic both-int Add: a payload carry out
-            // of bit 47 must not leak into the NaN-box tag.
-            asm.add_reg_reg(Reg::Rax, Reg::R11);
-            asm.sub_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
-            asm.shl_reg_imm8(Reg::Rax, 16);
-            asm.shr_reg_imm8(Reg::Rax, 16);
-            asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
-        }
-        OpCode::SubInt => {
-            asm.sub_reg_reg(Reg::Rax, Reg::R11);
-            asm.shl_reg_imm8(Reg::Rax, 16);
-            asm.shr_reg_imm8(Reg::Rax, 16);
-            asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
-        }
-        OpCode::MulInt => {
-            asm.shl_reg_imm8(Reg::Rax, 16);
-            asm.sar_reg_imm8(Reg::Rax, 16);
-            asm.shl_reg_imm8(Reg::R11, 16);
-            asm.sar_reg_imm8(Reg::R11, 16);
-            asm.imul_reg_reg(Reg::Rax, Reg::R11);
-            asm.shl_reg_imm8(Reg::Rax, 16);
-            asm.shr_reg_imm8(Reg::Rax, 16);
-            asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
-        }
-        _ => unreachable!(),
+    emit_flush_all(asm, regmap);
+    asm.push(ARG_CTX);
+    asm.push(ARG_CLOSURE);
+    asm.push(ARG_BASE);
+    asm.push(ARG_EXEC_CTX);
+    let need_dummy = regmap.used_phys.len() % 2 == 0;
+    if need_dummy {
+        asm.push(Reg::Rax);
     }
+    emit_load(asm, Reg::Rax, src, regmap);
+    
+    // Construct inline VmValue for immediate
+    let imm_vmvalue = (0x7FFC_0000_0000_0000u64) | ((imm as i64) as u64 & 0x0000_FFFF_FFFF_FFFFu64);
+    asm.mov_reg_imm64(Reg::R11, imm_vmvalue);
 
-    emit_store(asm, Reg::Rax, first_reg, regmap);
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, -32);
+    asm.mov_reg_reg(ARG_BASE, Reg::R11);
+    asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
+    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+    let helper_addr = if op == OpCode::SubImm { helpers.sub } else { helpers.add };
+    asm.mov_reg_imm64(Reg::R10, helper_addr as u64);
+    asm.call_reg(Reg::R10);
+    #[cfg(target_os = "windows")]
+    asm.add_reg_imm8(Reg::Rsp, 32);
+    asm.mov_reg_reg(Reg::R11, Reg::Rax);
+    if need_dummy {
+        asm.pop(Reg::Rax);
+    }
+    asm.pop(ARG_EXEC_CTX);
+    asm.pop(ARG_BASE);
+    asm.pop(ARG_CLOSURE);
+    asm.pop(ARG_CTX);
+    emit_store(asm, Reg::R11, first_reg, regmap);
+    emit_reload_all_except(asm, regmap, Some(first_reg));
+
+    let end = asm.current_offset();
+    asm.patch_u32(p_done, (end as i32 - (p_done as i32 + 4)) as u32);
 }

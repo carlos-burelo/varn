@@ -3,6 +3,7 @@ use crate::heap::{Heap, HeapObj, HeapStr};
 use crate::value::VmValue;
 use std::rc::Rc;
 
+
 /// Left operands at or above this length seed an extensible buffer, so a
 /// `s = s + x` accumulation appends in place from then on. Shorter results
 /// stay `Shared` — one-off concats (e.g. map keys) shouldn't pay the
@@ -88,11 +89,11 @@ pub fn str_slice(
     let chars: Vec<char> = s_owned.chars().collect();
     let len = chars.len() as i32;
 
-    let si = normalize_index(start.to_i32(), len);
+    let si = normalize_index(heap.as_int(start) as i32, len);
     let ei = if end.is_null() {
         len as usize
     } else {
-        normalize_index(end.to_i32(), len)
+        normalize_index(heap.as_int(end) as i32, len)
     };
 
     let si = si.min(chars.len());

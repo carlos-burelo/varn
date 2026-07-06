@@ -198,10 +198,9 @@ fn array_iter_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue,
         .copied()
         .ok_or("array_iter_next: missing receiver")?;
     let arr_nv = ctx.get_field(obj_nv, "__arr").unwrap_or(VmValue::null());
-    let idx = ctx
+    let idx = ctx.as_int(ctx
         .get_field(obj_nv, "__idx")
-        .unwrap_or(VmValue::null())
-        .to_i32();
+        .unwrap_or(VmValue::null()));
     let arr_len = ctx.array_len(arr_nv);
     let result_nv = ctx.get_field(obj_nv, "__res").unwrap_or_else(|| ctx.alloc_object());
     if idx as usize >= arr_len {
@@ -212,7 +211,8 @@ fn array_iter_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue,
     let item = ctx
         .array_get(arr_nv, idx as usize)
         .unwrap_or(VmValue::null());
-    ctx.set_field(obj_nv, "__idx", VmValue::from_int((idx + 1) as i64));
+    let idx_val = ctx.int_val(idx + 1);
+    ctx.set_field(obj_nv, "__idx", idx_val);
     ctx.set_field(result_nv, "value", item);
     ctx.set_field(result_nv, "done", VmValue::from_bool(false));
     Ok(result_nv)
@@ -249,16 +249,12 @@ fn range_iter_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue,
         .copied()
         .ok_or("range_iter_next: missing receiver")?;
     let cur = ctx
-        .get_field(obj_nv, "__cur")
-        .unwrap_or(VmValue::null())
-        .to_i32() as i64;
+        .as_int(ctx.get_field(obj_nv, "__cur").unwrap_or(VmValue::null()));
     let end = ctx
-        .get_field(obj_nv, "__end")
-        .unwrap_or(VmValue::null())
-        .to_i32() as i64;
+        .as_int(ctx.get_field(obj_nv, "__end").unwrap_or(VmValue::null()));
     let step = ctx
         .get_field(obj_nv, "__step")
-        .map(|v| v.to_i32() as i64)
+        .map(|v| ctx.as_int(v))
         .unwrap_or(1);
     let result_nv = ctx.get_field(obj_nv, "__res").unwrap_or_else(|| ctx.alloc_object());
     if cur >= end {
@@ -266,8 +262,10 @@ fn range_iter_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue,
         ctx.set_field(result_nv, "done", VmValue::from_bool(true));
         return Ok(result_nv);
     }
-    ctx.set_field(obj_nv, "__cur", VmValue::from_int(cur + step));
-    ctx.set_field(result_nv, "value", VmValue::from_int(cur));
+    let cur_next = ctx.int_val(cur + step);
+    ctx.set_field(obj_nv, "__cur", cur_next);
+    let cur_val = ctx.int_val(cur);
+    ctx.set_field(result_nv, "value", cur_val);
     ctx.set_field(result_nv, "done", VmValue::from_bool(false));
     Ok(result_nv)
 }
@@ -310,8 +308,8 @@ pub fn invoke_runtime_static(
                 .pop()
                 .ok_or_else(|| RuntimeError::new("range: stack empty"))?;
             let r = varn_types::value::RangeData {
-                start: start.to_i32() as i64,
-                end: end.to_i32() as i64,
+                start: heap.as_int(start),
+                end: heap.as_int(end),
                 inclusive: flag != 0,
                 step: 1,
             };

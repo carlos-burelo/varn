@@ -14,8 +14,37 @@ pub trait NativeCtx {
     fn bool_val(&self, b: bool) -> VmValue {
         VmValue::from_bool(b)
     }
-    fn int_val(&self, n: i64) -> VmValue {
-        VmValue::from_int(n)
+    fn int_val(&mut self, n: i64) -> VmValue {
+        self.intern(crate::Value::Int(n))
+    }
+
+    fn is_int(&self, v: VmValue) -> bool {
+        v.is_int() || (v.is_heap() && matches!(self.extract(v), crate::Value::Int(_)))
+    }
+
+    fn as_int(&self, v: VmValue) -> i64 {
+        if v.is_int() {
+            v.as_int()
+        } else {
+            match self.extract(v) {
+                crate::Value::Int(n) => n,
+                _ => 0,
+            }
+        }
+    }
+
+    fn to_f64(&self, v: VmValue) -> f64 {
+        if v.is_f64() {
+            v.as_f64()
+        } else if v.is_int() {
+            v.as_int() as f64
+        } else {
+            match self.extract(v) {
+                crate::Value::Int(n) => n as f64,
+                crate::Value::Float(f) => f,
+                _ => 0.0,
+            }
+        }
     }
 
     fn alloc_str(&mut self, s: &str) -> VmValue;
