@@ -1,0 +1,11 @@
+import { Record } from 'std:collections';
+
+async function runComprehensiveTest(): Task<void> {
+    let rec = new Record<str, int>();
+    print("created: " + rec)
+    // Call via property access instead of method syntax
+    let m = rec.has;
+    print("method: " + m)
+}
+await runComprehensiveTest()
+print("[PASSED]")
