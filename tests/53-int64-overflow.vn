@@ -1,0 +1,52 @@
+// Test 64-bit integer boxed representation and JIT execution
+
+// 1. Boundary constants
+let inline_max = 140737488355327 // 2^47 - 1
+let inline_min = -140737488355328 // -2^47
+
+let boxed_val1 = inline_max + 1 // 2^47 (should be boxed)
+let boxed_val2 = inline_min - 1 // -2^47 - 1 (should be boxed)
+
+assert("boxed_val1 is correct value", boxed_val1 === 140737488355328)
+assert("boxed_val2 is correct value", boxed_val2 === -140737488355329)
+
+// 2. Large arithmetic (which forces boxed path)
+let a = 1000000000000000 // 10^15
+let b = 2000000000000000 // 2 * 10^15
+let sum = a + b
+assert("Large sum", sum === 3000000000000000)
+
+let sub = a - b
+assert("Large sub", sub === -1000000000000000)
+
+let mul = a * 5
+assert("Large mul", mul === 5000000000000000)
+
+// 3. Comparisons (inline vs boxed, boxed vs boxed)
+assert("boxed vs inline gt", boxed_val1 > inline_max)
+assert("boxed vs inline lt", boxed_val2 < inline_min)
+assert("boxed vs boxed eq", (a + b) === 3000000000000000)
+assert("boxed vs boxed ne", boxed_val1 !== boxed_val2)
+
+// 4. Bitwise operations on 64-bit integers
+let mask = 108086391056891904 // 0x180000000000000 (out of 48-bit range)
+let val = 1152921504606846975 // 0xFFFFFFFFFFFFFFF
+let bit_and = val & mask
+print("val = ", val)
+print("mask = ", mask)
+print("bit_and = ", bit_and)
+assert("Large bitwise AND", bit_and === mask)
+
+// 5. JIT loop test with boxed transition
+function loop_test(start: int): int {
+    let current = start
+    for (let i = 0; i < 200; i = i + 1) {
+        current = current + 1000000000000 // 10^12
+    }
+    return current
+}
+
+let result = loop_test(140737488355000) // will transition to boxed in the loop
+assert("Boxed JIT loop transition", result === 140737488355000 + 200000000000000)
+
+print("[PASSED] 53. Boxed 64-bit integer overflows")

@@ -144,13 +144,24 @@ impl ExecCtx {
         }
 
         if let Some(proto) = self.precompiled.get(&resolved).cloned() {
-            return self.eval_module_proto(resolved, proto);
+            let result = self.eval_module_proto(resolved.clone(), proto);
+            // For pure modules, also run native class builders so that classes
+            // declared via `export declare class` (methods defined in Rust, not
+            // in Varn source) get their method tables populated.
+            if is_pure {
+                varn_builtins::build_module(&spec_str, &mut self.heap);
+            }
+            return result;
         }
 
         let loader = self.loader.clone();
         if let Some(loader) = loader {
             if let Ok(Some(proto)) = loader.load(&resolved) {
-                return self.eval_module_proto(resolved, proto);
+                let result = self.eval_module_proto(resolved.clone(), proto);
+                if is_pure {
+                    varn_builtins::build_module(&spec_str, &mut self.heap);
+                }
+                return result;
             }
         }
 

@@ -608,11 +608,13 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                 ctx: &mut dyn ::varn_types::NativeCtx,
                 _args: &[::varn_types::VmValue],
             ) -> ::core::result::Result<::varn_types::VmValue, String> {
-                let cls = ::varn_types::value::ClassObj::new_native_rc(#class);
+                let cls = ctx
+                    .get_class(#class)
+                    .unwrap_or_else(|| ::varn_types::value::ClassObj::new_native_rc(#class));
                 #superclass_setup
                 #(#setup_calls)*
                 ctx.register_class(#class, cls.clone());
-                Ok(ctx.alloc_class(cls))
+                Ok(ctx.alloc_class(cls.clone()))
             }
 
             #[used]
