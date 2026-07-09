@@ -110,21 +110,31 @@ Reusa el envelope existente de `varn-modules/src/artifact.rs` con nuevo `MAGIC_V
 
 ```
 header:  magic + format_version
-         std_version              (semver, str)
-         compiler_cache_version   (u32) — debe ser == COMPILER_CACHE_VERSION del vn que carga
-         host_api_version         (u32) — debe ser == HOST_API_VERSION del binario
+         std_version        (semver, str)
+         build_fingerprint  (u32) — debe ser == BUILD_FINGERPRINT del vn que carga
+         host_api_version   (u32) — debe ser == HOST_API_VERSION del binario
 index:   por módulo: id, offset/len del interface-blob, offset/len del bytecode-blob,
          hash fnv1a64 del contenido
 blobs:   interface = tabla de exports serializada para el checker
-                     (reusa la serialización del types-cache, TYPE_CACHE_VERSION)
+                     (reusa la serialización del types-cache .vnm)
          bytecode  = FunctionProto serializado (reusa el payload .vnc)
 ```
 
-**Regla de compatibilidad (honesta):** el bytecode está atado al ABI del compilador.
-Mismatch de `format_version`, `compiler_cache_version` o `host_api_version` = error
-claro e inmediato; **sin fallback silencioso**. En la práctica la std viaja con el
-toolchain (match por construcción); un override local se regenera con el `build-std`
-del mismo workspace.
+**`BUILD_FINGERPRINT` (decisión 2026-07-09, reemplaza versiones manuales):** los
+consts manuales `COMPILER_CACHE_VERSION`/`TYPE_CACHE_VERSION` fueron eliminados. El
+build.rs de `varn-modules` hashea las fuentes de los 8 crates con semántica de
+compilación (core, lexer, parser, checker, types, opt, backend, modules) y genera
+`BUILD_FINGERPRINT: u32`. Cualquier rebuild que pueda cambiar bytecode/codegen o la
+serialización de interfaces del checker invalida automáticamente `.vnc`/`.vnm`/`.vnb`
+— sin disciplina de bump manual, sin purgas manuales de cache. No captura cambios de
+toolchain (rustc, versiones de deps): subaproximación aceptada, las fuentes dominan
+el drift.
+
+**Regla de compatibilidad (honesta):** el bytecode está atado al build exacto del
+compilador. Mismatch de `format_version`, `build_fingerprint` o `host_api_version` =
+error claro e inmediato; **sin fallback silencioso**. En la práctica la std viaja con
+el toolchain (match por construcción); un override local se regenera con el
+`build-std` del mismo workspace.
 
 Caso residual: un cambio *aditivo* al host (símbolo nuevo, sin bump de
 `HOST_API_VERSION`) no lo detecta el check de versión — un bundle que use el símbolo
@@ -191,7 +201,7 @@ Hoy `resolve_stdlib_module_exports_ref` parsea la fuente `.vn` embebida.
   atrapa bugs de JIT/regalloc que run no detecta).
 - Benchmark de arranque antes/después (embedded-compile vs bundle-load) — medido,
   no asumido (`<performance_rules>`).
-- Test de rechazo: bundle con `compiler_cache_version` o `host_api_version` distinto →
+- Test de rechazo: bundle con `build_fingerprint` o `host_api_version` distinto →
   error claro.
 - Builtins se validan con `cargo check -p varn-builtins --features runtime`.
 
