@@ -16,6 +16,8 @@ include!(concat!(env!("OUT_DIR"), "/build_fingerprint.rs"));
 pub const MAGIC_WRC: &[u8; 4] = b"WRC\0";
 pub const MAGIC_VNC: &[u8; 4] = b"VNC\0";
 pub const MAGIC_VNM: &[u8; 4] = b"VNM\0";
+pub const MAGIC_VNB: &[u8; 4] = b"VNB\0";
+pub const VNB_FORMAT_VERSION: u32 = 1;
 
 pub fn find_project_root(start_path: &Path) -> PathBuf {
     start_path
