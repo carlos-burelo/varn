@@ -685,7 +685,8 @@ fn for_each_stmt_expr_mut(s: &mut HirStmt, f: &mut impl FnMut(&mut HirExpr)) {
         | HirStmt::ForIn { object: e, .. }
         | HirStmt::If { test: e, .. }
         | HirStmt::Switch { disc: e, .. } => f(e),
-        HirStmt::SetMember { object, value, .. } => {
+        HirStmt::SetMember { object, value, .. }
+        | HirStmt::SetFixedField { object, value, .. } => {
             f(object);
             f(value);
         }
@@ -736,7 +737,8 @@ fn for_each_stmt_expr(s: &HirStmt, f: &mut impl FnMut(&HirExpr)) {
         | HirStmt::ForIn { object: e, .. }
         | HirStmt::If { test: e, .. }
         | HirStmt::Switch { disc: e, .. } => apply(e),
-        HirStmt::SetMember { object, value, .. } => {
+        HirStmt::SetMember { object, value, .. }
+        | HirStmt::SetFixedField { object, value, .. } => {
             apply(object);
             apply(value);
         }

@@ -51,6 +51,20 @@ impl Builder {
                 });
                 Ok(())
             }
+            HirStmt::SetFixedField {
+                object,
+                slot,
+                value,
+            } => {
+                let o = self.lower_expr(object)?;
+                let v = self.lower_expr(value)?;
+                self.emit_effect(InstKind::SetFixedField {
+                    object: o,
+                    value: v,
+                    slot: *slot,
+                });
+                Ok(())
+            }
             HirStmt::SetIndex {
                 object,
                 index,

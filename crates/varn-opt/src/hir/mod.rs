@@ -527,6 +527,14 @@ pub enum HirStmt {
         value: HirExpr,
     },
 
+    /// Property store the checker resolved to a fixed slot (declared class
+    /// field on a statically-typed receiver) — compiles to SetFixedField.
+    SetFixedField {
+        object: HirExpr,
+        slot: u16,
+        value: HirExpr,
+    },
+
     SetIndex {
         object: HirExpr,
         index: HirExpr,

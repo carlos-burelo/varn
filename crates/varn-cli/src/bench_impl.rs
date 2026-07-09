@@ -384,7 +384,7 @@ pub fn run_bench(
             .collect();
         export_names.sort();
 
-        let proto = varn_opt::compile_module(
+        let mut proto = varn_opt::compile_module(
             &program,
             &check_result.type_annotations,
             &check_result.extension_calls,
@@ -394,7 +394,6 @@ pub fn run_bench(
         )
         .map_err(|e| format!("compile failed: {}", e))?;
 
-        let proto_rc = Rc::new(proto);
         varn_builtins::reset_testing_counters();
 
         let mut machine = Vm::from_snapshot(
@@ -404,6 +403,12 @@ pub fn run_bench(
             snap_modules_ref.clone(),
         )
         .with_loader(loader.clone());
+
+        // Real runs resolve global names to indices before executing
+        // (pipeline::execute); without this the e2e phase measures an
+        // unresolved-globals interpreter path no user ever hits.
+        machine.resolve_globals(&mut proto);
+        let proto_rc = Rc::new(proto);
 
         let main_module_id = ModuleId::local_str(path);
         let mut export_map = FxHashMap::default();

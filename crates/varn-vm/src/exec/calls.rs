@@ -317,7 +317,7 @@ pub fn prepare_call(
                 let data = varn_types::ObjData::new_instance(cls.clone());
                 let oref = varn_types::value::ObjRef::new(data);
                 let instance_nv = VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref)));
-                if let Some(ctor) = cls.find_method("constructor") {
+                if let Some(ctor) = cls.constructor() {
                     let mut full_arg_count = arg_count;
                     let base = stack.len() - arg_count;
                     if base >= stack.len() {

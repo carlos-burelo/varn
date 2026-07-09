@@ -27,6 +27,14 @@ pub struct ClassObj {
     pub setter_vtable_owners: RefCell<Vec<Option<Rc<ClassObj>>>>,
     pub static_getter_map: RefCell<HashMap<RuntimeString, Value>>,
     pub static_setter_map: RefCell<HashMap<RuntimeString, Value>>,
+    /// Cached `constructor` lookup keyed by vtable_version, so hot `new`
+    /// paths skip the method_map hash lookup on every instantiation.
+    pub ctor_cache: RefCell<Option<(u32, Option<Value>)>>,
+    /// VM-owned constructor cache keyed by vtable_version: the VM stores its
+    /// resolved closure here (`Rc<VmClosure>` as `Rc<dyn Any>`) so hot `new`
+    /// paths skip the `Value` box clone + downcast. `Some((v, None))` means
+    /// "class has no constructor". varn-types only provides the slot.
+    pub ctor_rt_cache: RefCell<Option<(u32, Option<Rc<dyn std::any::Any>>)>>,
 }
 
 impl ClassObj {
@@ -51,6 +59,8 @@ impl ClassObj {
             setter_vtable_owners: RefCell::new(Vec::new()),
             static_getter_map: RefCell::new(HashMap::new()),
             static_setter_map: RefCell::new(HashMap::new()),
+            ctor_cache: RefCell::new(None),
+            ctor_rt_cache: RefCell::new(None),
         }
     }
     pub fn new_native(name: impl Into<String>) -> Self {
@@ -237,6 +247,19 @@ impl ClassObj {
             return super_cls.find_method(name);
         }
         None
+    }
+
+    /// Cached `find_method("constructor")`, invalidated by vtable_version.
+    pub fn constructor(&self) -> Option<Value> {
+        let ver = self.vtable_version.load(Ordering::Relaxed);
+        if let Some((cached_ver, ctor)) = self.ctor_cache.borrow().as_ref() {
+            if *cached_ver == ver {
+                return ctor.clone();
+            }
+        }
+        let ctor = self.find_method("constructor");
+        *self.ctor_cache.borrow_mut() = Some((ver, ctor.clone()));
+        ctor
     }
 }
 

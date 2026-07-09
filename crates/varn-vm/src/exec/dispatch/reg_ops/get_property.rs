@@ -68,32 +68,6 @@ impl ExecCtx {
                                 }
                             }
                         }
-                    } else if entry.is_class == 8 {
-                        if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
-                            if cls.id == entry.id {
-                                if let Some(crate::heap::HeapObj::Array(arr)) =
-                                    self.heap.get(obj.as_heap_idx())
-                                {
-                                    let len = arr.len();
-                                    found_slot_val = Some(VmValue::from_int(len as i64));
-                                    hit_found = true;
-                                    break 'entries;
-                                }
-                            }
-                        }
-                    } else if entry.is_class == 9 {
-                        if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
-                            if cls.id == entry.id {
-                                if let Some(crate::heap::HeapObj::Str(s)) =
-                                    self.heap.get(obj.as_heap_idx())
-                                {
-                                    let len = s.len();
-                                    found_slot_val = Some(VmValue::from_int(len as i64));
-                                    hit_found = true;
-                                    break 'entries;
-                                }
-                            }
-                        }
                     } else if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
                         let slot = entry.slot as usize;
                         if entry.is_class == 2
@@ -146,6 +120,34 @@ impl ExecCtx {
             }
         }
 
+        // `.length` on str/Array: answer directly instead of dispatching the
+        // native getter (matches its semantics — see fast_length). The IC
+        // entry (9 = str, 8 = Array) lets jit_get_property_ic_fast take the
+        // same shortcut without re-resolving the receiver's class.
+        if name.as_ref() == "length" {
+            if let Some(v) = crate::exec::strings::fast_length(obj, &self.heap) {
+                self.stack[base + dest] = v;
+                if cs_idx < cache_len && !is_megamorphic {
+                    let is_str = obj.is_sso()
+                        || matches!(
+                            self.heap.get(obj.as_heap_idx()),
+                            Some(crate::heap::HeapObj::Str(_))
+                        );
+                    if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
+                        let entry = varn_types::chunk::CacheEntry {
+                            id: cls.id,
+                            slot: 0,
+                            is_class: if is_str { 9 } else { 8 },
+                            vtable_ver: 0,
+                        };
+                        closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
+                        closure.feedback.borrow_mut().observe(cs_idx, cls.id);
+                    }
+                }
+                return Ok(false);
+            }
+        }
+
         if let Some(getter_val) = crate::exec::props::find_getter(obj, &name, &self.heap) {
             if cs_idx < cache_len && !is_megamorphic {
                 if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
@@ -176,35 +178,6 @@ impl ExecCtx {
         }
 
         if cs_idx < cache_len && !is_megamorphic {
-            if name.as_ref() == "length" && obj.is_heap() {
-                if let Some(crate::heap::HeapObj::Array(_)) = self.heap.get(obj.as_heap_idx()) {
-                    if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
-                        let entry = varn_types::chunk::CacheEntry {
-                            id: cls.id,
-                            slot: 0,
-                            is_class: 8,
-                            vtable_ver: 0,
-                        };
-                        closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
-                        closure.feedback.borrow_mut().observe(cs_idx, cls.id);
-                        return Ok(false);
-                    }
-                } else if let Some(crate::heap::HeapObj::Str(_)) = self.heap.get(obj.as_heap_idx())
-                {
-                    if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
-                        let entry = varn_types::chunk::CacheEntry {
-                            id: cls.id,
-                            slot: 0,
-                            is_class: 9,
-                            vtable_ver: 0,
-                        };
-                        closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
-                        closure.feedback.borrow_mut().observe(cs_idx, cls.id);
-                        return Ok(false);
-                    }
-                }
-            }
-
             if obj.is_heap() {
                 if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
                     let guard = o.borrow();

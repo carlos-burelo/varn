@@ -400,8 +400,98 @@ fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                 }
             }
         }
+        Decl::Class(c) => {
+            let Some(class_name) = &c.id else {
+                return;
+            };
+            let this_ty = Type::named_with_origin(
+                class_name.clone(),
+                ctx.bind.source_file().map(std::rc::Rc::from),
+            );
+            for member in &c.body {
+                match member {
+                    varn_core::ast::ClassMember::Constructor { params, body, .. } => {
+                        annotate_method_body(params, body, Some(&this_ty), ann, ctx);
+                    }
+                    varn_core::ast::ClassMember::Method {
+                        params,
+                        body: Some(body),
+                        modifiers,
+                        ..
+                    } => {
+                        let this = (!modifiers.is_static).then_some(&this_ty);
+                        annotate_method_body(params, body, this, ann, ctx);
+                    }
+                    varn_core::ast::ClassMember::Getter {
+                        body: Some(body),
+                        modifiers,
+                        ..
+                    } => {
+                        let this = (!modifiers.is_static).then_some(&this_ty);
+                        annotate_method_body(&[], body, this, ann, ctx);
+                    }
+                    varn_core::ast::ClassMember::Setter {
+                        param,
+                        body: Some(body),
+                        modifiers,
+                        ..
+                    } => {
+                        let this = (!modifiers.is_static).then_some(&this_ty);
+                        annotate_method_body(std::slice::from_ref(param), body, this, ann, ctx);
+                    }
+                    varn_core::ast::ClassMember::Destructor { body, .. } => {
+                        annotate_method_body(&[], body, Some(&this_ty), ann, ctx);
+                    }
+                    varn_core::ast::ClassMember::StaticBlock { body, .. } => {
+                        annotate_method_body(&[], body, None, ann, ctx);
+                    }
+                    varn_core::ast::ClassMember::Property {
+                        init: Some(init), ..
+                    } => {
+                        annotate_expr(init, ann, ctx);
+                    }
+                    _ => {}
+                }
+            }
+        }
         _ => {}
     }
+}
+
+/// Annotate a class member body with `this` bound to the owning class and
+/// parameters bound to their declared types, mirroring `Decl::Function`.
+fn annotate_method_body(
+    params: &[varn_core::ast::Param],
+    body: &Stmt,
+    this_ty: Option<&Type>,
+    ann: &mut TypeAnnotations,
+    ctx: &AnnotateCtx,
+) {
+    let mut local_ctx = ctx.clone();
+    if let Some(ty) = this_ty {
+        local_ctx
+            .locals
+            .insert(std::rc::Rc::from("this"), ty.clone());
+    }
+    for p in params {
+        let name_opt = match &p.pattern {
+            varn_core::ast::Pattern::Identifier { name, .. } => Some(name.clone()),
+            _ => None,
+        };
+        if let Some(name) = name_opt {
+            let type_ann = p.type_ann.as_ref().or(match &p.pattern {
+                varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                _ => None,
+            });
+            let ty = if let Some(ann_node) = type_ann {
+                resolve_type_node(ann_node, Some(ctx.bind))
+            } else {
+                Type::Dynamic
+            };
+            local_ctx.locals.insert(name, ty);
+        }
+    }
+    annotate_stmt(body, ann, &mut local_ctx);
 }
 
 fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) {
@@ -568,6 +658,17 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                             current = ctx.bind.class_parents.get(c.as_ref()).cloned();
                         }
                         hierarchy.reverse();
+
+                        // Every ancestor must be a source-local class: core/
+                        // native ancestors (e.g. `extends Error`) lay out
+                        // instance storage at runtime, so a statically derived
+                        // slot index would not match the instance shape.
+                        if !hierarchy
+                            .iter()
+                            .all(|c| ctx.bind.type_members.classes.contains_key(c.as_ref()))
+                        {
+                            return;
+                        }
 
                         let mut slot = 0u16;
                         let mut known_props: rustc_hash::FxHashSet<std::rc::Rc<str>> =
