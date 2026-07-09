@@ -1,4 +1,5 @@
 use varn_op_macros::varn_contract;
+use varn_types::str_util::{byte_to_char_idx, char_len, char_range_to_bytes};
 use varn_types::{NativeCtx, NativeFnResult, VmValue};
 
 pub struct Str;
@@ -37,16 +38,24 @@ varn_contract! {
         fn join(ctx: &mut dyn NativeCtx, arr: ::varn_types::VnArray, sep: Option<&str>) -> String {
             let sep = sep.unwrap_or("");
             let len = arr.len(ctx);
-            let mut parts = Vec::with_capacity(len);
+            let mut vals = Vec::with_capacity(len);
             for i in 0..len {
-                let elem = arr.get(ctx, i).unwrap_or_else(VmValue::null);
-                parts.push(ctx.str_repr(elem));
+                vals.push(arr.get(ctx, i).unwrap_or_else(VmValue::null));
             }
-            parts.join(sep)
+            let mut out = String::new();
+            for (i, &v) in vals.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(sep);
+                }
+                out.push_str(&ctx.str_repr_borrowed(v));
+            }
+            out
         }
 
 
-        fn length(_ctx: &mut dyn NativeCtx, this: &str) -> i64 { this.chars().count() as i64 }
+        fn length(_ctx: &mut dyn NativeCtx, this: &str) -> i64 {
+            char_len(this, this.is_ascii()) as i64
+        }
 
 
         fn toString(_ctx: &mut dyn NativeCtx, this: &str) -> String { this.to_string() }
@@ -65,51 +74,52 @@ varn_contract! {
         fn endsWith(_ctx: &mut dyn NativeCtx, this: &str, search: &str) -> bool { this.ends_with(search) }
 
         fn indexOf(_ctx: &mut dyn NativeCtx, this: &str, search: &str) -> i64 {
-            let chars: Vec<char> = this.chars().collect();
-            let sc: Vec<char> = search.chars().collect();
-            if sc.is_empty() { return 0; }
-            chars.windows(sc.len()).position(|w| w == sc.as_slice()).map(|i| i as i64).unwrap_or(-1)
+            if search.is_empty() { return 0; }
+            let ascii = this.is_ascii();
+            this.find(search).map(|b| byte_to_char_idx(this, ascii, b)).unwrap_or(-1)
         }
         fn lastIndexOf(_ctx: &mut dyn NativeCtx, this: &str, search: &str) -> i64 {
-            let chars: Vec<char> = this.chars().collect();
-            let sc: Vec<char> = search.chars().collect();
-            if sc.is_empty() { return chars.len() as i64; }
-            chars.windows(sc.len()).rposition(|w| w == sc.as_slice()).map(|i| i as i64).unwrap_or(-1)
+            let ascii = this.is_ascii();
+            if search.is_empty() { return char_len(this, ascii) as i64; }
+            this.rfind(search).map(|b| byte_to_char_idx(this, ascii, b)).unwrap_or(-1)
         }
 
 
         fn substring(_ctx: &mut dyn NativeCtx, this: &str, start: i64, end: Option<i64>) -> String {
-            let chars: Vec<char> = this.chars().collect();
-            let len = chars.len();
+            let ascii = this.is_ascii();
+            let len = char_len(this, ascii);
             let s = (start.max(0) as usize).min(len);
             let e = end.map(|e| e.max(0) as usize).unwrap_or(len).min(len);
             let (si, ei) = if s <= e { (s, e) } else { (e, s) };
-            chars[si..ei].iter().collect()
+            let (bs, be) = char_range_to_bytes(this, ascii, si, ei);
+            this[bs..be].to_owned()
         }
         fn slice(_ctx: &mut dyn NativeCtx, this: &str, start: i64, end: Option<i64>) -> String {
-            let chars: Vec<char> = this.chars().collect();
-            let len = chars.len() as i64;
-            let si = normalize_idx(start, len).min(chars.len());
-            let ei = normalize_idx(end.unwrap_or(len), len).min(chars.len()).max(si);
-            chars[si..ei].iter().collect()
+            let ascii = this.is_ascii();
+            let len = char_len(this, ascii);
+            let si = normalize_idx(start, len as i64).min(len);
+            let ei = normalize_idx(end.unwrap_or(len as i64), len as i64).min(len).max(si);
+            let (bs, be) = char_range_to_bytes(this, ascii, si, ei);
+            this[bs..be].to_owned()
         }
         fn at(_ctx: &mut dyn NativeCtx, this: &str, index: i64) -> Option<String> {
-            let chars: Vec<char> = this.chars().collect();
-            let len = chars.len() as i64;
+            let ascii = this.is_ascii();
+            let len = char_len(this, ascii) as i64;
             let idx = if index < 0 { len + index } else { index };
-            if idx >= 0 && (idx as usize) < chars.len() {
-                Some(chars[idx as usize].to_string())
-            } else {
-                None
+            if idx < 0 || idx >= len {
+                return None;
             }
+            let (bs, be) = char_range_to_bytes(this, ascii, idx as usize, idx as usize + 1);
+            Some(this[bs..be].to_owned())
         }
         fn substr(_ctx: &mut dyn NativeCtx, this: &str, start: i64, length: Option<i64>) -> String {
-            let chars: Vec<char> = this.chars().collect();
-            let len = chars.len();
+            let ascii = this.is_ascii();
+            let len = char_len(this, ascii);
             let st = if start < 0 { (len as i64 + start).max(0) as usize } else { (start as usize).min(len) };
             let count = length.map(|c| c.max(0) as usize).unwrap_or(len - st);
             let end = (st + count).min(len);
-            chars[st..end].iter().collect()
+            let (bs, be) = char_range_to_bytes(this, ascii, st, end);
+            this[bs..be].to_owned()
         }
 
 
@@ -121,26 +131,29 @@ varn_contract! {
         }
         fn split(ctx: &mut dyn NativeCtx, this: &str, separator: Option<&str>) -> Vec<VmValue> {
             match separator {
-                Some(sep) => this.split(sep).map(|p| ctx.alloc_str_owned(p.to_owned())).collect(),
-                None => this.chars().map(|c| ctx.alloc_str_owned(c.to_string())).collect(),
+                Some(sep) => this.split(sep).map(|p| ctx.alloc_str(p)).collect(),
+                None => {
+                    let mut buf = [0u8; 4];
+                    this.chars().map(|c| ctx.alloc_str(c.encode_utf8(&mut buf))).collect()
+                }
             }
         }
         fn lines(ctx: &mut dyn NativeCtx, this: &str) -> Vec<VmValue> {
-            this.lines().map(|l| ctx.alloc_str_owned(l.to_owned())).collect()
+            this.lines().map(|l| ctx.alloc_str(l)).collect()
         }
         fn words(ctx: &mut dyn NativeCtx, this: &str) -> Vec<VmValue> {
-            this.split_whitespace().map(|w| ctx.alloc_str_owned(w.to_owned())).collect()
+            this.split_whitespace().map(|w| ctx.alloc_str(w)).collect()
         }
 
 
         fn charCodeAt(_ctx: &mut dyn NativeCtx, this: &str, pos: i64) -> i64 {
-            this.chars().nth(pos.max(0) as usize).map(|c| c as i64).unwrap_or(-1)
+            char_code_at(this, pos)
         }
         fn charCode(_ctx: &mut dyn NativeCtx, this: &str) -> i64 {
             this.chars().next().map(|c| c as i64).unwrap_or(-1)
         }
         fn codePointAt(_ctx: &mut dyn NativeCtx, this: &str, pos: i64) -> i64 {
-            this.chars().nth(pos.max(0) as usize).map(|c| c as i64).unwrap_or(-1)
+            char_code_at(this, pos)
         }
 
 
@@ -194,29 +207,39 @@ varn_contract! {
     }
 }
 
+/// `charCodeAt`/`codePointAt`: the ASCII-prefix fast path indexes bytes
+/// directly (char index == byte index while the prefix is ASCII); otherwise
+/// one forward char scan.
+fn char_code_at(s: &str, pos: i64) -> i64 {
+    let pos = pos.max(0) as usize;
+    let b = s.as_bytes();
+    if pos < b.len() && b[..=pos].is_ascii() {
+        return b[pos] as i64;
+    }
+    s.chars().nth(pos).map(|c| c as i64).unwrap_or(-1)
+}
+
 fn pad_start(s: &str, target: i64, pad: Option<&str>) -> String {
     let target = target.max(0) as usize;
     let pad = pad.filter(|p| !p.is_empty()).unwrap_or(" ");
-    let chars: Vec<char> = s.chars().collect();
-    if chars.len() >= target {
+    let len = char_len(s, s.is_ascii());
+    if len >= target {
         return s.to_string();
     }
-    let needed = target - chars.len();
-    let pad_chars: Vec<char> = pad.chars().collect();
-    let prefix: String = pad_chars.iter().cycle().take(needed).collect();
+    let needed = target - len;
+    let prefix: String = pad.chars().cycle().take(needed).collect();
     format!("{prefix}{s}")
 }
 
 fn pad_end(s: &str, target: i64, pad: Option<&str>) -> String {
     let target = target.max(0) as usize;
     let pad = pad.filter(|p| !p.is_empty()).unwrap_or(" ");
-    let chars: Vec<char> = s.chars().collect();
-    if chars.len() >= target {
+    let len = char_len(s, s.is_ascii());
+    if len >= target {
         return s.to_string();
     }
-    let needed = target - chars.len();
-    let pad_chars: Vec<char> = pad.chars().collect();
-    let suffix: String = pad_chars.iter().cycle().take(needed).collect();
+    let needed = target - len;
+    let suffix: String = pad.chars().cycle().take(needed).collect();
     format!("{s}{suffix}")
 }
 

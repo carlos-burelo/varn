@@ -2,6 +2,8 @@
 #[repr(u8)]
 pub enum IntrinsicDomain {
     Math = 0x0,
+    Str = 0x1,
+    Int = 0x2,
 }
 
 #[inline(always)]

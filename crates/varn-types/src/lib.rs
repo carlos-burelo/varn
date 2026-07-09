@@ -8,6 +8,7 @@ pub mod native;
 pub mod native_ctx;
 pub mod register_meta;
 pub mod resource;
+pub mod str_util;
 pub mod task;
 pub mod value;
 pub mod vm_value;

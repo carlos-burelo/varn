@@ -21,46 +21,104 @@ use varn_types::{
     Value, VmArray,
 };
 
+/// Lazily-computed ASCII cache for a `HeapStr`. The viewed content of a
+/// `HeapStr` is immutable (a `Shared` string is frozen; an `Ext` prefix view
+/// never changes once created), so once computed the answer is stable for the
+/// lifetime of the instance.
+pub mod ascii_flag {
+    pub const UNKNOWN: u8 = 0;
+    pub const YES: u8 = 1;
+    pub const NO: u8 = 2;
+}
+
+/// Byte length limit for `HeapStr::Slice` (30 bits); the two high bits of
+/// `len_ascii` hold the ASCII flag so the variant stays within the enum's
+/// existing payload size.
+const SLICE_LEN_MASK: u32 = 0x3FFF_FFFF;
+
 /// Heap string payload. `Shared` is an immutable interned/frozen string;
 /// `Ext` is a prefix view (`buf[..len]`) of a shared growable buffer, the
 /// representation `str_concat` produces for accumulation patterns. Appending
 /// to the buffer's tip never changes an existing prefix, so older views stay
 /// valid without any aliasing analysis; a view that is no longer the tip is
 /// copied out before growing. Single-threaded interior mutability via
-/// `UnsafeCell` mirrors `ArrayRef`.
+/// `UnsafeCell` mirrors `ArrayRef`. `Slice` is a zero-copy substring view of
+/// an immutable `Shared` buffer (`src[off..off+len]`), the representation
+/// `substring`/`slice` produce; note it retains the whole source buffer for
+/// its lifetime (the JS-engine substring-view trade-off).
 #[derive(Clone)]
 pub enum HeapStr {
-    Shared(RuntimeString),
+    Shared(RuntimeString, std::cell::Cell<u8>),
     Ext {
         buf: Rc<std::cell::UnsafeCell<String>>,
         len: usize,
+        ascii: std::cell::Cell<u8>,
+    },
+    Slice {
+        src: RuntimeString,
+        off: u32,
+        /// bits 0..30 = byte length, bits 30..32 = `ascii_flag` state.
+        len_ascii: std::cell::Cell<u32>,
     },
 }
 
 impl HeapStr {
     #[inline]
-    pub fn as_str(&self) -> &str {
-        match self {
-            HeapStr::Shared(s) => s,
-            // Safety: single-threaded VM; the buffer is only appended to (via
-            // `str_concat`), never while a borrow from this view is live.
-            HeapStr::Ext { buf, len } => unsafe { &(&*buf.get())[..*len] },
+    pub fn shared(s: RuntimeString) -> Self {
+        HeapStr::Shared(s, std::cell::Cell::new(ascii_flag::UNKNOWN))
+    }
+
+    #[inline]
+    pub fn ext(buf: Rc<std::cell::UnsafeCell<String>>, len: usize, ascii: u8) -> Self {
+        HeapStr::Ext {
+            buf,
+            len,
+            ascii: std::cell::Cell::new(ascii),
         }
     }
 
-    /// Materialize as an `Rc<str>` (copies `Ext` views).
+    /// Zero-copy substring view over an immutable shared buffer. Caller
+    /// guarantees `off..off+len` lies on char boundaries and `len` fits
+    /// [`SLICE_LEN_MASK`].
+    #[inline]
+    pub fn slice_of(src: RuntimeString, off: usize, len: usize, ascii: u8) -> Self {
+        debug_assert!(len as u32 <= SLICE_LEN_MASK);
+        HeapStr::Slice {
+            src,
+            off: off as u32,
+            len_ascii: std::cell::Cell::new(len as u32 | ((ascii as u32) << 30)),
+        }
+    }
+
+    #[inline]
+    pub fn as_str(&self) -> &str {
+        match self {
+            HeapStr::Shared(s, _) => s,
+            // Safety: single-threaded VM; the buffer is only appended to (via
+            // `str_concat`), never while a borrow from this view is live.
+            HeapStr::Ext { buf, len, .. } => unsafe { &(&*buf.get())[..*len] },
+            HeapStr::Slice { src, off, len_ascii } => {
+                let off = *off as usize;
+                let len = (len_ascii.get() & SLICE_LEN_MASK) as usize;
+                &src[off..off + len]
+            }
+        }
+    }
+
+    /// Materialize as an `Rc<str>` (copies `Ext` and `Slice` views).
     pub fn to_shared(&self) -> RuntimeString {
         match self {
-            HeapStr::Shared(s) => Rc::clone(s),
-            HeapStr::Ext { .. } => Rc::from(self.as_str()),
+            HeapStr::Shared(s, _) => Rc::clone(s),
+            _ => Rc::from(self.as_str()),
         }
     }
 
     #[inline]
     pub fn len(&self) -> usize {
         match self {
-            HeapStr::Shared(s) => s.len(),
+            HeapStr::Shared(s, _) => s.len(),
             HeapStr::Ext { len, .. } => *len,
+            HeapStr::Slice { len_ascii, .. } => (len_ascii.get() & SLICE_LEN_MASK) as usize,
         }
     }
 
@@ -69,13 +127,51 @@ impl HeapStr {
         self.len() == 0
     }
 
+    #[inline]
+    pub fn ascii_state(&self) -> u8 {
+        match self {
+            HeapStr::Shared(_, ascii) => ascii.get(),
+            HeapStr::Ext { ascii, .. } => ascii.get(),
+            HeapStr::Slice { len_ascii, .. } => (len_ascii.get() >> 30) as u8,
+        }
+    }
+
+    /// Whether the string is pure ASCII, computing and caching the answer on
+    /// first use. ASCII strings have char index == byte index, which turns
+    /// char-indexed ops (`charCodeAt`, `substring`, `length`, ...) into O(1)
+    /// byte addressing.
+    #[inline]
+    pub fn is_ascii_cached(&self) -> bool {
+        match self.ascii_state() {
+            ascii_flag::YES => true,
+            ascii_flag::NO => false,
+            _ => {
+                let a = self.as_str().is_ascii();
+                self.set_ascii_state(if a { ascii_flag::YES } else { ascii_flag::NO });
+                a
+            }
+        }
+    }
+
+    #[inline]
+    fn set_ascii_state(&self, state: u8) {
+        match self {
+            HeapStr::Shared(_, ascii) => ascii.set(state),
+            HeapStr::Ext { ascii, .. } => ascii.set(state),
+            HeapStr::Slice { len_ascii, .. } => {
+                let len = len_ascii.get() & SLICE_LEN_MASK;
+                len_ascii.set(len | ((state as u32) << 30));
+            }
+        }
+    }
+
     /// True when this view ends exactly at the buffer tip, i.e. appending to
     /// the buffer extends this string without disturbing any other view.
     #[inline]
     pub fn is_tip(&self) -> bool {
         match self {
-            HeapStr::Shared(_) => false,
-            HeapStr::Ext { buf, len } => unsafe { (&*buf.get()).len() == *len },
+            HeapStr::Ext { buf, len, .. } => unsafe { (&*buf.get()).len() == *len },
+            _ => false,
         }
     }
 }
@@ -117,7 +213,7 @@ impl AsRef<str> for HeapStr {
 
 impl From<RuntimeString> for HeapStr {
     fn from(s: RuntimeString) -> Self {
-        HeapStr::Shared(s)
+        HeapStr::shared(s)
     }
 }
 
@@ -658,7 +754,7 @@ impl HeapInner {
 
         let idx = match self
             .nursery
-            .try_alloc(HeapObj::Str(HeapStr::Shared(rs.clone())))
+            .try_alloc(HeapObj::Str(HeapStr::shared(rs.clone())))
         {
             Ok(ni) => ni,
             Err(obj) => {
@@ -700,7 +796,7 @@ impl HeapInner {
             &mut self.free,
             &mut self.alloc_count,
             &mut self.gc_alloc_since_collect,
-            HeapObj::Str(HeapStr::Shared(rs.clone())),
+            HeapObj::Str(HeapStr::shared(rs.clone())),
         );
         let packed = pack_old_idx(oi);
         self.string_interner.insert(rs, packed);
@@ -722,7 +818,7 @@ impl HeapInner {
         }
 
         let rs: RuntimeString = Rc::from(s_ref);
-        let idx = match self.nursery.try_alloc(HeapObj::Str(HeapStr::Shared(rs))) {
+        let idx = match self.nursery.try_alloc(HeapObj::Str(HeapStr::shared(rs))) {
             Ok(ni) => ni,
             Err(obj) => pack_old_idx(alloc_into(
                 &mut self.objects,
@@ -733,6 +829,40 @@ impl HeapInner {
             )),
         };
         VmValue::from_heap_idx(idx)
+    }
+
+    /// Allocate the substring `handle.as_str()[bs..be]` (byte offsets on char
+    /// boundaries). Short results become SSO values; longer results over an
+    /// immutable buffer become zero-copy `Slice` views (composing when the
+    /// source is itself a `Slice`); `Ext` sources copy, since their backing
+    /// buffer can reallocate on growth.
+    pub fn alloc_substring(&mut self, handle: &HeapStr, bs: usize, be: usize) -> VmValue {
+        let sub = &handle.as_str()[bs..be];
+        if let Some(sso) = VmValue::try_from_sso(sub) {
+            return sso;
+        }
+        // A substring of an ASCII string is ASCII; anything else is resolved
+        // lazily on first query.
+        let flag = if handle.ascii_state() == ascii_flag::YES {
+            ascii_flag::YES
+        } else {
+            ascii_flag::UNKNOWN
+        };
+        let len = be - bs;
+        if len as u64 <= SLICE_LEN_MASK as u64 {
+            match handle {
+                HeapStr::Shared(rc, _) => {
+                    let hs = HeapStr::slice_of(Rc::clone(rc), bs, len, flag);
+                    return self.alloc_str_view(hs);
+                }
+                HeapStr::Slice { src, off, .. } => {
+                    let hs = HeapStr::slice_of(Rc::clone(src), *off as usize + bs, len, flag);
+                    return self.alloc_str_view(hs);
+                }
+                HeapStr::Ext { .. } => {}
+            }
+        }
+        self.alloc_str_dynamic(sub)
     }
 
     /// Allocate a heap slot for an arbitrary string payload (typically an
@@ -1315,12 +1445,15 @@ impl NativeCtx for Heap {
         self.deref().to_f64_val(v)
     }
 
+    // Native results are runtime-produced values: allocate without interning
+    // (`alloc_str` would hash the full contents and retain a reference on the
+    // old-gen path — see `alloc_str_dynamic`'s contract).
     fn alloc_str(&mut self, s: &str) -> VmValue {
-        self.deref_mut().alloc_str(s)
+        self.deref_mut().alloc_str_dynamic(s)
     }
 
     fn alloc_str_owned(&mut self, s: String) -> VmValue {
-        self.deref_mut().alloc_str(&s)
+        self.deref_mut().alloc_str_dynamic(&s)
     }
 
     fn alloc_array(&mut self, items: Vec<VmValue>) -> VmValue {

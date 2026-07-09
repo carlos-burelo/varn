@@ -90,12 +90,20 @@ varn_contract! {
         fn join(ctx: &mut dyn NativeCtx, this: VnArray, separator: Option<&str>) -> String {
             let sep = separator.unwrap_or(",");
             let len = this.len(ctx);
-            let mut parts = Vec::with_capacity(len);
+            // Two passes: collect values first, then render borrowed reprs
+            // straight into one buffer — no per-element String allocation.
+            let mut vals = Vec::with_capacity(len);
             for i in 0..len {
-                let v = this.get(ctx, i).unwrap_or_else(VmValue::null);
-                parts.push(ctx.str_repr(v));
+                vals.push(this.get(ctx, i).unwrap_or_else(VmValue::null));
             }
-            parts.join(sep)
+            let mut out = String::new();
+            for (i, &v) in vals.iter().enumerate() {
+                if i > 0 {
+                    out.push_str(sep);
+                }
+                out.push_str(&ctx.str_repr_borrowed(v));
+            }
+            out
         }
         fn toString(ctx: &mut dyn NativeCtx, this: VnArray) -> String {
             let len = this.len(ctx);
