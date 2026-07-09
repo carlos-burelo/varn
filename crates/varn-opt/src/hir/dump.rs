@@ -102,6 +102,18 @@ fn dump_stmt(out: &mut String, stmt: &HirStmt, depth: usize) {
                 dump_expr(value)
             );
         }
+        HirStmt::SetFixedField {
+            object,
+            slot,
+            value,
+        } => {
+            let _ = writeln!(
+                out,
+                "{ind}{}.{CYAN}slot#{slot}{R} = {}",
+                dump_expr(object),
+                dump_expr(value)
+            );
+        }
         HirStmt::SetIndex {
             object,
             index,

@@ -22,6 +22,33 @@ pub fn str_length(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
     Err(RuntimeError::new("OpStrLength: not a string"))
 }
 
+/// `.length` for the property fast paths: str (char count) and Array
+/// (element count), matching the native getters in varn-builtins. `None`
+/// for any other receiver, which then takes the generic getter path.
+pub fn fast_length(val: VmValue, heap: &Heap) -> Option<VmValue> {
+    if val.is_sso() {
+        return Some(VmValue::from_i32(val.sso_len() as i32));
+    }
+    if val.is_heap() {
+        match heap.get(val.as_heap_idx()) {
+            Some(HeapObj::Str(s)) => {
+                let raw = s.as_str();
+                let n = if raw.is_ascii() {
+                    raw.len()
+                } else {
+                    raw.chars().count()
+                };
+                return Some(VmValue::from_i32(n as i32));
+            }
+            Some(HeapObj::Array(arr)) => {
+                return Some(VmValue::from_int(arr.len() as i64));
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
 pub fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
     // Accumulation fast path: `a` is the tip view of an extensible buffer.
     // Appending never disturbs shorter views of the same buffer, so this is
@@ -45,21 +72,20 @@ pub fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
         }
     }
 
-    let sa = heap.str_repr_borrowed(a).into_owned();
-    let sb = heap.str_repr(b);
-    let total = sa.len() + sb.len();
-    if sa.len() >= EXT_SEED_LEN {
-        let mut buf = String::with_capacity(total * 2);
-        buf.push_str(&sa);
-        buf.push_str(&sb);
+    // Render both operands straight into one output buffer: strings borrow,
+    // scalars format in place — no per-operand String allocation.
+    let mut out = String::with_capacity(24);
+    heap.str_repr_into(a, &mut out);
+    let a_len = out.len();
+    heap.str_repr_into(b, &mut out);
+    let total = out.len();
+    if a_len >= EXT_SEED_LEN {
+        out.reserve(total);
         return heap.alloc_str_view(HeapStr::Ext {
-            buf: Rc::new(std::cell::UnsafeCell::new(buf)),
+            buf: Rc::new(std::cell::UnsafeCell::new(out)),
             len: total,
         });
     }
-    let mut out = String::with_capacity(total);
-    out.push_str(&sa);
-    out.push_str(&sb);
     heap.alloc_str_dynamic(out)
 }
 

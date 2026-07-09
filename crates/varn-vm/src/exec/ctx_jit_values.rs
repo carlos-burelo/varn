@@ -40,6 +40,99 @@ fn resolve_constructor_return(
     }
 }
 
+/// Fast `new Class(...)` from JIT code: allocates the instance and invokes a
+/// JIT-compiled constructor directly (JIT2JIT), skipping the interpreter
+/// prepare_call path. Returns None to fall back to the slow path (native
+/// ctors, rest params, async/generator ctors, or no JIT entry).
+#[inline]
+fn jit_construct_fast(
+    ctx_ref: &mut ExecCtx,
+    cls: &std::rc::Rc<varn_types::ClassObj>,
+    base: usize,
+    args: &varn_jit::JitCallArgs,
+) -> Option<VmValue> {
+    let ver = cls
+        .vtable_version
+        .load(std::sync::atomic::Ordering::Relaxed);
+    let cached: Option<Option<std::rc::Rc<dyn std::any::Any>>> = match &*cls.ctor_rt_cache.borrow()
+    {
+        Some((cached_ver, entry)) if *cached_ver == ver => Some(entry.clone()),
+        _ => None,
+    };
+    let jit_ctor = match cached {
+        Some(None) => None,
+        Some(Some(any)) => {
+            let nc = any.downcast::<crate::frame::VmClosure>().ok()?;
+            let jit_fn = nc.jit_entry?;
+            Some((nc, jit_fn))
+        }
+        None => {
+            let ctor = cls.constructor();
+            match &ctor {
+                Some(varn_types::Value::VmValue(payload)) => {
+                    let wrapper = payload
+                        .as_any()
+                        .downcast_ref::<crate::frame::VmClosurePayload>()?;
+                    let nc = &wrapper.0;
+                    if nc.proto.is_async || nc.proto.is_generator || nc.proto.has_rest {
+                        return None;
+                    }
+                    let jit_fn = nc.jit_entry?;
+                    *cls.ctor_rt_cache.borrow_mut() = Some((
+                        ver,
+                        Some(nc.clone() as std::rc::Rc<dyn std::any::Any>),
+                    ));
+                    Some((nc.clone(), jit_fn))
+                }
+                Some(_) => return None,
+                None => {
+                    *cls.ctor_rt_cache.borrow_mut() = Some((ver, None));
+                    None
+                }
+            }
+        }
+    };
+
+    let data = varn_types::ObjData::new_instance(cls.clone());
+    let oref = varn_types::value::ObjRef::new(data);
+    let instance_nv =
+        VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Object(oref)));
+
+    let Some((closure, jit_fn)) = jit_ctor else {
+        ctx_ref.stack[base + args.dest] = instance_nv;
+        ctx_ref.record_call_vm_fast();
+        return Some(instance_nv);
+    };
+
+    let callee_base = base + args.arg_start;
+    let required = callee_base + closure.proto.register_count as usize + 32;
+    if ctx_ref.stack.len() < required {
+        ctx_ref.stack.resize(required, VmValue::null());
+    }
+    ctx_ref.stack[callee_base] = instance_nv;
+
+    let mut frame = crate::frame::CallFrame::new(&closure, callee_base);
+    frame.current_class = Some(cls.clone());
+    ctx_ref.frames.push(frame);
+
+    let res = unsafe {
+        (jit_fn)(
+            ctx_ref.stack.as_mut_ptr() as *mut std::ffi::c_void,
+            &*closure as *const crate::frame::VmClosure as *const std::ffi::c_void,
+            callee_base,
+            ctx_ref as *mut ExecCtx as *mut std::ffi::c_void,
+        )
+    };
+
+    ctx_ref.frames.pop();
+    ctx_ref.close_upvalues_above(callee_base);
+
+    let final_val = if res.is_null() { instance_nv } else { res };
+    ctx_ref.stack[base + args.dest] = final_val;
+    ctx_ref.record_call_vm_fast();
+    Some(final_val)
+}
+
 pub extern "C" fn jit_load_const(closure: *const crate::frame::VmClosure, idx: usize) -> VmValue {
     unsafe {
         let closure_ref = &*closure;
@@ -352,6 +445,11 @@ pub extern "C" fn jit_call(ctx: *mut ExecCtx, args: *const varn_jit::JitCallArgs
 
                     return final_val;
                 }
+            } else if let Some(crate::heap::HeapObj::Class(cls)) = heap_obj {
+                let cls = cls.clone();
+                if let Some(final_val) = jit_construct_fast(ctx_ref, &cls, base, args) {
+                    return final_val;
+                }
             } else if let Some(crate::heap::HeapObj::NativeFn(_, f)) = heap_obj {
                 let f = *f;
                 ctx_ref.record_call_native();
@@ -645,45 +743,37 @@ pub extern "C" fn jit_get_property_ic_fast(
     unsafe {
         let ctx_ref = &*ctx;
         let closure_ref = &*closure;
-        if cs_idx < closure_ref.ic_cache_len() && obj.is_heap() {
-            if let Some(crate::heap::HeapObj::Object(o)) = ctx_ref.heap.get(obj.as_heap_idx()) {
-                let guard = &*o.0.as_ptr();
-                let slot_cache = &*closure_ref.ic_cache.as_ptr();
-                let poly_slot = &slot_cache[cs_idx];
-                for entry in &poly_slot.entries {
-                    if entry.id != 0 && entry.is_class == 1 {
-                        if guard.inner.shape.id == entry.id {
-                            let slot = entry.slot as usize;
-                            if slot < guard.inner.values.len() {
-                                return guard.inner.values[slot];
+        if cs_idx < closure_ref.ic_cache_len() {
+            if obj.is_heap() {
+                if let Some(crate::heap::HeapObj::Object(o)) = ctx_ref.heap.get(obj.as_heap_idx())
+                {
+                    let guard = &*o.0.as_ptr();
+                    let slot_cache = &*closure_ref.ic_cache.as_ptr();
+                    let poly_slot = &slot_cache[cs_idx];
+                    for entry in &poly_slot.entries {
+                        if entry.id != 0 && entry.is_class == 1 {
+                            if guard.inner.shape.id == entry.id {
+                                let slot = entry.slot as usize;
+                                if slot < guard.inner.values.len() {
+                                    return guard.inner.values[slot];
+                                }
                             }
                         }
                     }
                 }
             }
 
-            if let Some(cls) = crate::exec::props::get_class(obj, &ctx_ref.heap) {
-                let slot_cache = &*closure_ref.ic_cache.as_ptr();
-                let poly_slot = &slot_cache[cs_idx];
-                for entry in &poly_slot.entries {
-                    if entry.id == 0 {
-                        continue;
+            // A `.length` IC entry (8 = Array, 9 = str) at this site means the
+            // interpreter already validated the semantics; the receiver's own
+            // tag is the guard, so no class resolution is needed.
+            let slot_cache = &*closure_ref.ic_cache.as_ptr();
+            let poly_slot = &slot_cache[cs_idx];
+            for entry in &poly_slot.entries {
+                if entry.id != 0 && (entry.is_class == 8 || entry.is_class == 9) {
+                    if let Some(v) = crate::exec::strings::fast_length(obj, &ctx_ref.heap) {
+                        return v;
                     }
-                    if entry.is_class == 8 && cls.id == entry.id {
-                        if let Some(crate::heap::HeapObj::Array(arr)) =
-                            ctx_ref.heap.get(obj.as_heap_idx())
-                        {
-                            let len = arr.len();
-                            return VmValue::from_int(len as i64);
-                        }
-                    } else if entry.is_class == 9 && cls.id == entry.id {
-                        if let Some(crate::heap::HeapObj::Str(s)) =
-                            ctx_ref.heap.get(obj.as_heap_idx())
-                        {
-                            let len = s.len();
-                            return VmValue::from_int(len as i64);
-                        }
-                    }
+                    break;
                 }
             }
         }

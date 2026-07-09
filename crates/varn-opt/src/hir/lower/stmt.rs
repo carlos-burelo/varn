@@ -160,11 +160,21 @@ impl<'a> Lowerer<'a> {
                                 }
                             };
                             let value = self.lower_expr(value.as_ref(), scope)?;
-                            out.push(HirStmt::SetMember {
-                                object: object_hir,
-                                name,
-                                value,
-                            });
+                            if let Some(slot) =
+                                self.ann.get_fixed_field_slot(property.range.start.offset)
+                            {
+                                out.push(HirStmt::SetFixedField {
+                                    object: object_hir,
+                                    slot,
+                                    value,
+                                });
+                            } else {
+                                out.push(HirStmt::SetMember {
+                                    object: object_hir,
+                                    name,
+                                    value,
+                                });
+                            }
                         }
                         return Ok(());
                     }
