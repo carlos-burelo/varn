@@ -1,0 +1,209 @@
+import { now } from "std:sys";
+
+// String operations micro-benchmark. Paired with bench_str_ops.ts (Bun).
+// Each section prints: name, checksum, time (ms). Checksums must match the TS side.
+
+function report(name: str, checksum: int, ms: float) {
+    print(name + " | checksum=" + checksum.toString() + " | ms=" + ms.toString());
+}
+
+// 1. Append concat: s = s + piece, N times
+function benchConcatAppend(): int {
+    let s = "";
+    let i = 0;
+    while (i < 20000) {
+        s = s + "abc";
+        i = i + 1;
+    }
+    return s.length;
+}
+
+// 2. Small concat parts: allocation-heavy short-lived strings
+function benchConcatParts(): int {
+    let total = 0;
+    let i = 0;
+    while (i < 200000) {
+        let piece = "a" + i.toString() + "b";
+        total = total + piece.length;
+        i = i + 1;
+    }
+    return total;
+}
+
+// 3. Array<str> build + join
+function benchJoin(): int {
+    let parts: str[] = [];
+    let i = 0;
+    while (i < 100000) {
+        parts.push("item" + i.toString());
+        i = i + 1;
+    }
+    let joined = parts.join(",");
+    return joined.length;
+}
+
+// 4. indexOf + includes over a large haystack
+function benchSearch(): int {
+    let haystack = "abcdefghij".repeat(1000) + "needle";
+    let total = 0;
+    let i = 0;
+    while (i < 2000) {
+        total = total + haystack.indexOf("needle");
+        if (haystack.includes("efgh")) {
+            total = total + 1;
+        }
+        i = i + 1;
+    }
+    return total;
+}
+
+// 5. split on a big CSV line
+function benchSplit(): int {
+    let parts: str[] = [];
+    let i = 0;
+    while (i < 10000) {
+        parts.push(i.toString());
+        i = i + 1;
+    }
+    let csv = parts.join(",");
+    let total = 0;
+    let r = 0;
+    while (r < 100) {
+        let fields = csv.split(",");
+        total = total + fields.length;
+        r = r + 1;
+    }
+    return total;
+}
+
+// 6. substring/slice windows over a large string
+function benchSlice(): int {
+    let base = "abcdefghijklmnopqrstuvwxyz".repeat(400);
+    let total = 0;
+    let i = 0;
+    while (i < 200000) {
+        let start = i % 10000;
+        let sub = base.substring(start, start + 10);
+        total = total + sub.length;
+        i = i + 1;
+    }
+    return total;
+}
+
+// 7. toUpperCase / toLowerCase on a 10k-char string
+function benchCase(): int {
+    let base = "AbCdEfGhIj".repeat(1000);
+    let total = 0;
+    let i = 0;
+    while (i < 500) {
+        total = total + base.toUpperCase().length;
+        total = total + base.toLowerCase().length;
+        i = i + 1;
+    }
+    return total;
+}
+
+// 8. replaceAll with growth
+function benchReplaceAll(): int {
+    let base = "the quick brown fox jumps over the lazy dog ".repeat(200);
+    let total = 0;
+    let i = 0;
+    while (i < 200) {
+        total = total + base.replaceAll("o", "00").length;
+        i = i + 1;
+    }
+    return total;
+}
+
+// 9. startsWith / endsWith over many strings
+function benchPrefixSuffix(): int {
+    let items: str[] = [];
+    let i = 0;
+    while (i < 100000) {
+        items.push("item" + i.toString() + "x");
+        i = i + 1;
+    }
+    let count = 0;
+    let j = 0;
+    while (j < 100000) {
+        if (items[j].startsWith("item1")) {
+            count = count + 1;
+        }
+        if (items[j].endsWith("9x")) {
+            count = count + 1;
+        }
+        j = j + 1;
+    }
+    return count;
+}
+
+// 10. charCodeAt scan
+function benchCharCode(): int {
+    let base = "abcdefghijklmnopqrstuvwxyz0123456789".repeat(2000);
+    let total = 0;
+    let r = 0;
+    while (r < 20) {
+        let i = 0;
+        let len = base.length;
+        while (i < len) {
+            total = total + base.charCodeAt(i);
+            i = i + 1;
+        }
+        r = r + 1;
+    }
+    return total;
+}
+
+// 11. string equality comparisons
+function benchEquality(): int {
+    let items: str[] = [];
+    let i = 0;
+    while (i < 1000) {
+        items.push("key" + (i % 100).toString());
+        i = i + 1;
+    }
+    let count = 0;
+    let r = 0;
+    while (r < 200) {
+        let j = 0;
+        while (j < 1000) {
+            if (items[j] == "key50") {
+                count = count + 1;
+            }
+            j = j + 1;
+        }
+        r = r + 1;
+    }
+    return count;
+}
+
+// 12. int -> str conversion
+function benchIntToStr(): int {
+    let total = 0;
+    let i = 0;
+    while (i < 200000) {
+        total = total + i.toString().length;
+        i = i + 1;
+    }
+    return total;
+}
+
+function runSection(name: str, f: () => int) {
+    let start = now();
+    let checksum = f();
+    let elapsed = now() - start;
+    report(name, checksum, elapsed);
+}
+
+runSection("concat_append", benchConcatAppend);
+runSection("concat_parts", benchConcatParts);
+runSection("join", benchJoin);
+runSection("search", benchSearch);
+runSection("split", benchSplit);
+runSection("slice", benchSlice);
+runSection("case", benchCase);
+runSection("replace_all", benchReplaceAll);
+runSection("prefix_suffix", benchPrefixSuffix);
+runSection("char_code", benchCharCode);
+runSection("equality", benchEquality);
+runSection("int_to_str", benchIntToStr);

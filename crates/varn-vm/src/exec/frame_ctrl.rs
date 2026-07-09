@@ -248,12 +248,15 @@ impl ExecCtx {
 }
 
 impl NativeCtx for ExecCtx {
+    // Native results are runtime-produced values: allocate without interning
+    // (`alloc_str` would hash the full contents and retain a reference on the
+    // old-gen path — see `alloc_str_dynamic`'s contract).
     fn alloc_str(&mut self, s: &str) -> VmValue {
-        self.heap.alloc_str(s)
+        self.heap.alloc_str_dynamic(s)
     }
 
     fn alloc_str_owned(&mut self, s: String) -> VmValue {
-        self.heap.alloc_str(&s)
+        self.heap.alloc_str_dynamic(&s)
     }
 
     fn str_repr(&self, v: VmValue) -> String {

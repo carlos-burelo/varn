@@ -607,12 +607,20 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                     // resolve directly to its native op-id so codegen can emit a
                     // direct dispatch, bypassing the string-name + inline-cache
                     // lookup. Only when the receiver is concretely a core class
-                    // and the member is one of its native methods.
+                    // and the member is one of its native methods. Hot char-indexed
+                    // `str` ops and `int.toString` upgrade further to intrinsics,
+                    // which dispatch with direct heap access in the VM.
                     if !recorded {
                         let has_spread = args.iter().any(|a| matches!(a, Arg::Spread(_)));
                         if !has_spread {
                             if let Some(class) = core_class_of_type(&obj_ty_nn) {
-                                if core_has_method(ctx.bind, class, prop_name) {
+                                if let Some(wire_byte) =
+                                    varn_core::intrinsic_ops::core_method_intrinsic(
+                                        class, prop_name,
+                                    )
+                                {
+                                    ann.record_intrinsic(key_offset, wire_byte);
+                                } else if core_has_method(ctx.bind, class, prop_name) {
                                     ann.record_native_op(
                                         key_offset,
                                         varn_core::op_id::core_method_op_id(class, prop_name),

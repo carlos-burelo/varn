@@ -97,19 +97,29 @@ encode(domain, op) = (domain << 4) | (op & 0x0F)
 | Domain | id | ops |
 |---|---|---|
 | Math | `0x0` | Abs Sqrt Floor Ceil Round Sin Cos Tan Log Exp Pow Min Max (`0x0..0xC`) |
+| Str | `0x1` | CharCodeAt CodePointAt Substring Slice Substr At IndexOf LastIndexOf StartsWith EndsWith Includes CharCode (`0x0..0xB`) |
+| Int | `0x2` | ToString (`0x0`) |
 
-**Math is the only live intrinsic domain.** String/Array/TypeCheck domains were
-once scaffolded but never reached (the checker only annotates intrinsics for
-origin-tagged `Named` receivers — `Math`; structural `arr: T[]` and `s: str`
-fall through to the op-id / `CallMethod` paths, and the snake_case map keys never
-matched the camelCase surface method names). They were removed as dead code
-(only Math is genuinely JIT-inlined). New domains may be re-added when an op both
-fits the 16-op cap AND the JIT can inline it.
+Two annotation routes feed `OpCode::Intrinsic`:
 
-Lookup: `intrinsic_ops::map::lookup(binding_key)` over `MAP_ENTRIES` keyed by
-`"{origin}/{method}"` (e.g. `"std:math/pow"`). The 16-op cap is why long-tail
-ops (e.g. `acos/asin/atan/atan2`) can NOT be intrinsics and must route through
-op-id / a native — see `docs/superpowers/plans/2026-06-26-modules-remaining-gaps.md`.
+- **Module functions** (`Math`): `intrinsic_ops::map::lookup(binding_key)` over
+  `MAP_ENTRIES` keyed by `"{origin}/{method}"` (e.g. `"std:math/pow"`), for
+  origin-tagged `Named` receivers.
+- **Core-class instance methods** (`str`/`int`): `core_method_intrinsic(class,
+  method)` keyed by the checker's `core_class_of_type` (which resolves
+  structural/intrinsic receivers like `s: str`), checked BEFORE the op-id
+  fallback in `checker_annotations.rs`. Methods listed there upgrade from
+  `CallNativeOp` to `Intrinsic`; everything else keeps the op-id path.
+
+Str intrinsics dispatch with direct `Heap` access, which is what lets them use
+the per-`HeapStr` cached ASCII state (char index == byte index) for O(1)
+`charCodeAt`/`substring` addressing, and allocate substring results as
+zero-copy `HeapStr::Slice` views. The native `varn-builtins` implementations
+remain the correctness fallback for dynamic receivers.
+
+The 16-op cap is why long-tail ops (e.g. `acos/asin/atan/atan2`) can NOT be
+intrinsics and must route through op-id / a native — see
+`docs/superpowers/plans/2026-06-26-modules-remaining-gaps.md`.
 
 ---
 
@@ -133,12 +143,15 @@ op-id / a native — see `docs/superpowers/plans/2026-06-26-modules-remaining-ga
 ### 5b. intrinsic (hot) — `OpCode::Intrinsic`
 
 - Operand: `[wire_byte << 8 | arg_count]` (single u16 word).
-- Annotated by the checker only when the receiver type is `Named(_, Some(origin))`
-  (true for `Math`; false for structural `arr: T[]`).
-- VM: `intrinsics::dispatch(wire, args, heap)` → per-domain dispatch.
+- Annotated by the checker for origin-tagged `Named` receivers (`Math`) and for
+  core-class receivers resolved via `core_class_of_type` + `core_method_intrinsic`
+  (`s: str`, `n: int` — including literal and structural types).
+- VM: `intrinsics::dispatch(wire, args, heap)` → per-domain dispatch
+  (`exec/intrinsics/{math,str,int}.rs`).
 - JIT (`emit_intrinsic`): **inlines** Math `abs`/`sqrt`/`floor` for float-typed
   args (`sqrtsd`, `roundsd`, sign-bit `and`); everything else falls through to
-  the `dispatch_intrinsic` helper call.
+  the `dispatch_intrinsic` helper call. Str/Int ops currently always take the
+  helper call — inlining ASCII `charCodeAt`/`startsWith` is the next tier.
 
 ---
 
