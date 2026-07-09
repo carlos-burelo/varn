@@ -1959,6 +1959,7 @@ dependencies = [
 name = "varn-modules"
 version = "0.1.0"
 dependencies = [
+ "postcard",
  "semver",
  "serde",
  "serde_json",
