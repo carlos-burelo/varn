@@ -56,7 +56,7 @@ fn try_load_cache(virtual_id: &str, source: &str) -> Option<CachedModule> {
     let bytes = std::fs::read(&cache_file).ok()?;
     let payload = match varn_modules::artifact::read_envelope(
         varn_modules::artifact::MAGIC_VNM,
-        varn_modules::artifact::TYPE_CACHE_VERSION,
+        varn_modules::artifact::BUILD_FINGERPRINT,
         &bytes,
     ) {
         Ok(p) => p,
@@ -95,7 +95,7 @@ fn save_to_cache(virtual_id: &str, source: &str, exports: &ExportMap, bind: &Bin
         Ok(payload) => {
             let bytes = varn_modules::artifact::write_envelope(
                 varn_modules::artifact::MAGIC_VNM,
-                varn_modules::artifact::TYPE_CACHE_VERSION,
+                varn_modules::artifact::BUILD_FINGERPRINT,
                 &payload,
             );
             let _ = std::fs::write(&cache_file, bytes);

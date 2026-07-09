@@ -7,7 +7,7 @@ use varn_debug::flags::DebugFlags;
 use varn_opt::FunctionProto;
 use varn_types::ModuleGraphArtifact;
 
-pub const CACHE_FORMAT_VERSION: u32 = varn_modules::artifact::COMPILER_CACHE_VERSION;
+pub const CACHE_FORMAT_VERSION: u32 = varn_modules::artifact::BUILD_FINGERPRINT;
 
 type PipelineResult<T> = Result<T, PipelineError>;
 
