@@ -31,7 +31,7 @@ tmp*.vn
 .claude/
 target/
 
-extension/node_modules/
+varn-extension/node_modules/
 *.rar
 *.zip
 .codegraph/
@@ -54,4 +54,4 @@ tests/.vn/**
 **/*.bin
 
 # xtask build-std artifact
-/std.vnb
+varn-lang/std.vnb

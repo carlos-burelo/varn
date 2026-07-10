@@ -2,7 +2,6 @@
   "terminal.integrated.env.windows": {
     "PATH": "${workspaceFolder}\\target\\debug;${workspaceFolder}\\target\\release;${env:PATH}"
   },
-  // "Varn.inlayHints.enabled": true,
   "Varn.run.verbose": false,
   "Varn.run.debugPhases": [],
   "Varn.codeLens.enabled": true,
