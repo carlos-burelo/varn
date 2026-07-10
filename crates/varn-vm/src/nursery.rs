@@ -103,11 +103,11 @@ impl Nursery {
         self.objects.len()
     }
 
+    /// Duplicates are allowed here — the write barrier is the hot path, so
+    /// dedup happens once per collection instead of O(n) per store.
     #[inline(always)]
     pub fn remember(&mut self, packed_old_idx: u32) {
-        if !self.remembered.contains(&packed_old_idx) {
-            self.remembered.push(packed_old_idx);
-        }
+        self.remembered.push(packed_old_idx);
     }
 
     pub fn collect(
@@ -126,7 +126,9 @@ impl Nursery {
             self.update_value(slot, old_gen, &mut worklist);
         }
 
-        let old_indices_to_scan = std::mem::take(&mut self.remembered);
+        let mut old_indices_to_scan = std::mem::take(&mut self.remembered);
+        old_indices_to_scan.sort_unstable();
+        old_indices_to_scan.dedup();
         for packed in old_indices_to_scan {
             self.scan_and_fix_old_obj(old_idx_raw(packed), old_gen, &mut worklist, &mut fixups);
         }
