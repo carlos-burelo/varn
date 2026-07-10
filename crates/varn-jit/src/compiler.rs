@@ -43,9 +43,14 @@ pub fn compile_proto(
     }
 
     let hoist_plans = plan_hoists(code, &proto.chunk.constants);
+    let cache_regs_needed = hoist_plans
+        .iter()
+        .map(|p| p.candidates.len())
+        .max()
+        .unwrap_or(0);
 
     let mut asm = Assembler::new();
-    let regmap = RegMap::from_bytecode(code, &proto.chunk.constants, !hoist_plans.is_empty());
+    let regmap = RegMap::from_bytecode(code, &proto.chunk.constants, cache_regs_needed);
     emit_prologue(&mut asm, &regmap, proto, &helpers);
     crate::regalloc::emit_reload_all(&mut asm, &regmap);
 
@@ -82,14 +87,44 @@ pub fn compile_proto(
             );
             let lay = cctx.helpers.array_layout;
             let heap_off = cctx.helpers.heap_field_offset;
-            crate::codegen::array_fast::emit_resolve_into_cache(
-                &mut cctx.asm,
-                &lay,
-                heap_off,
-                &cctx.regmap,
-                plan.obj_vreg,
-                crate::loop_hoist::LOOP_ARRAY_CACHE_REG,
-            );
+            for (slot, candidate) in plan.candidates.iter().enumerate() {
+                // GlobalInvariant candidates reload every iteration inside
+                // the loop body (that's *why* the register alone doesn't
+                // prove invariance) — at the point the preheader runs, the
+                // register may still hold whatever it had before the loop,
+                // so synthesize the same LoadGlobalIdx read here first.
+                // RegisterInvariant candidates skip this: their register
+                // already holds the right value on entry.
+                if let crate::loop_hoist::CacheSource::GlobalInvariant(global_idx) =
+                    candidate.source
+                {
+                    let dest = cctx
+                        .regmap
+                        .get(candidate.obj_vreg as usize)
+                        .unwrap_or(crate::assembler::Reg::R11);
+                    cctx.asm.mov_reg_mem(
+                        dest,
+                        crate::registers::REG_GLOBALS,
+                        (global_idx as i32) * 8,
+                    );
+                    if dest == crate::assembler::Reg::R11 {
+                        crate::regalloc::emit_store(
+                            &mut cctx.asm,
+                            crate::assembler::Reg::R11,
+                            candidate.obj_vreg as usize,
+                            &cctx.regmap,
+                        );
+                    }
+                }
+                crate::codegen::array_fast::emit_resolve_into_cache(
+                    &mut cctx.asm,
+                    &lay,
+                    heap_off,
+                    &cctx.regmap,
+                    candidate.obj_vreg,
+                    crate::loop_hoist::HoistPlan::reg_for_slot(slot),
+                );
+            }
         }
 
         let raw_op = cctx.code[cctx.ip];

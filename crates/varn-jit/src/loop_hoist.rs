@@ -1,11 +1,31 @@
 //! Loop-invariant array-guard hoisting (see `docs/PERF_STRUCTURAL_OPTS.md`,
-//! Proyecto A). Identifies innermost loops that index a single
-//! loop-invariant array through statically-array-typed opcodes
-//! (`ArrayGetIndex`/`ArrayLength` — never plain `GetIndex`, which is only
-//! emitted when the checker could NOT prove the receiver is an array) and
-//! plans a cached fast path: the receiver-guard chain
-//! (`array_fast::emit_resolve_array_payload`) is resolved once into a
-//! reserved register instead of on every iteration.
+//! Proyecto A). Identifies innermost loops that index loop-invariant
+//! arrays through statically-array-typed opcodes (`ArrayGetIndex`/
+//! `ArrayLength` — never plain `GetIndex`, which is only emitted when the
+//! checker could NOT prove the receiver is an array) and plans a cached
+//! fast path: the receiver-guard chain (`array_fast::
+//! emit_resolve_array_payload`) is resolved once into a reserved register
+//! instead of on every iteration.
+//!
+//! Two kinds of invariance are recognized per candidate site (see
+//! [`CacheSource`]):
+//!   - `RegisterInvariant`: the object register is never redefined between
+//!     the loop header and this use — its value at loop entry holds for
+//!     every iteration.
+//!   - `GlobalInvariant`: the object register IS redefined every iteration,
+//!     but always by `LoadGlobalIdx` of the same global slot, and nothing
+//!     in the loop stores to that slot — the *value* is loop-invariant even
+//!     though the *register* is not (e.g. `a[row*n+k]` inside a loop that
+//!     reloads global `a` every pass). The preheader must synthesize that
+//!     load once (see `compiler.rs`) since the register may hold stale
+//!     data at the point the preheader runs.
+//! Classification is per SITE, not per register: the same physical register
+//! can carry two different globals at different points in one iteration
+//! (seen in matrix-multiply inner loops — `a` then `b` both land in the
+//! same scratch vreg), so matching by register number alone would be
+//! ambiguous. `HoistPlan::cache_reg_for` re-derives the site's source the
+//! same way `plan_hoists` did and matches on the full (register, source)
+//! pair.
 //!
 //! GC safety: eligibility requires the entire loop body be **provably
 //! allocation-free** (see [`body_is_alloc_free`] — an allowlist, not a
@@ -19,7 +39,11 @@
 //! "GC ran" branch instead of upfront — sound in principle, but a paired
 //! benchmark showed a severe, GC-frequency-correlated slowdown from that
 //! code path that wasn't fully root-caused; this simpler, statically-proven
-//! design has no such path and measures at parity with baseline.)
+//! design has no such path and measures at parity with baseline.) The same
+//! allowlist rules out call-shaped instructions, which doubles as the
+//! safety net for `GlobalInvariant`: a call could mutate the cached global
+//! as a side effect, so a loop containing any call never reaches candidate
+//! collection at all.
 
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
@@ -28,26 +52,104 @@ use varn_types::loop_analysis::{instr_offsets, natural_loops, NaturalLoop};
 
 use crate::assembler::Reg;
 
-/// Reserved physical register for the active loop's cached array-box
-/// pointer. Not part of `regalloc::ALLOC_REGS` — see `registers.rs`: on
-/// non-Windows every other callee-saved register is already claimed (4 for
-/// general allocation + frame base + int tag), so `RegMap` must give up one
-/// general-purpose slot to make this available, and only does so for
-/// functions that actually have a hoist plan (see
-/// `RegMap::from_bytecode`'s `reserve_cache` parameter).
+/// Reserved physical register for the first cached array-box pointer. Not
+/// part of `regalloc::ALLOC_REGS` — see `registers.rs`: on non-Windows
+/// every other callee-saved register is already claimed (4 for general
+/// allocation + frame base + int tag + globals), so `RegMap` must give up
+/// one general-purpose slot to make this available, and only does so for
+/// functions that actually have a hoist plan (see `RegMap::from_bytecode`'s
+/// `cache_regs_needed` parameter).
 pub(crate) const LOOP_ARRAY_CACHE_REG: Reg = Reg::R13;
 
-/// One hoisted loop: `obj_vreg` is the sole invariant array touched in
+/// Second cache register, for loops with two simultaneously-invariant
+/// arrays (e.g. `a[..] * b[..]` in a matrix-multiply inner loop). Only
+/// available on Windows: its x64 ABI has two callee-saved registers (Rdi,
+/// Rsi) the JIT never assigns any fixed role — `ARG_CTX`/`ARG_CLOSURE` use
+/// Rcx/Rdx there. On SysV (non-Windows), Rdi/Rsi are volatile argument
+/// registers already spoken for by `ARG_CTX`/`ARG_CLOSURE`, and every other
+/// callee-saved register is claimed, so there is no free slot — loops
+/// needing a second candidate simply don't get one there (see
+/// `plan_hoists`, gated by `cfg(target_os = "windows")`).
+#[cfg(target_os = "windows")]
+pub(crate) const LOOP_ARRAY_CACHE_REG2: Reg = Reg::Rdi;
+
+/// Maximum simultaneously-cached arrays per loop, bounded by how many
+/// physical registers are actually available on the target ABI: 2 on
+/// Windows (see [`LOOP_ARRAY_CACHE_REG2`]), 1 everywhere else. Bumping the
+/// Windows side further requires a third reserved register, which no
+/// supported ABI has spare.
+#[cfg(target_os = "windows")]
+const MAX_CANDIDATES: usize = 2;
+#[cfg(not(target_os = "windows"))]
+const MAX_CANDIDATES: usize = 1;
+
+/// How a candidate site's array value is established to be the same across
+/// every iteration. See module docs.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum CacheSource {
+    RegisterInvariant,
+    GlobalInvariant(u16),
+}
+
+pub(crate) struct HoistCandidate {
+    pub obj_vreg: u8,
+    pub source: CacheSource,
+}
+
+/// One hoisted loop: up to [`MAX_CANDIDATES`] invariant arrays touched in
 /// `[header_offset, latch_offset]` (inclusive, `chunk.code` word offsets).
 pub(crate) struct HoistPlan {
-    pub obj_vreg: u8,
+    pub candidates: Vec<HoistCandidate>,
     pub header_offset: usize,
     pub latch_offset: usize,
+    /// One past the latch instruction's last word — the exclusive upper
+    /// bound used to scan the whole loop body for `Store/DefineGlobalIdx`
+    /// writes when validating a `GlobalInvariant` candidate.
+    latch_end_offset: usize,
 }
 
 impl HoistPlan {
     pub fn contains(&self, ip: usize) -> bool {
         ip >= self.header_offset && ip <= self.latch_offset
+    }
+
+    /// Physical register holding the resolved payload pointer for
+    /// candidate `i` (plan order == discovery order == register order:
+    /// first candidate gets `LOOP_ARRAY_CACHE_REG`, second — Windows only,
+    /// see [`LOOP_ARRAY_CACHE_REG2`] — gets the second slot).
+    pub(crate) fn reg_for_slot(i: usize) -> Reg {
+        match i {
+            0 => LOOP_ARRAY_CACHE_REG,
+            #[cfg(target_os = "windows")]
+            1 => LOOP_ARRAY_CACHE_REG2,
+            _ => unreachable!("HoistPlan candidates bounded by MAX_CANDIDATES"),
+        }
+    }
+
+    /// Which cache register (if any) holds the resolved payload for the
+    /// array read/length site at `site_offset` whose object register is
+    /// `obj_reg`. Re-derives the site's source via [`classify_site`] the
+    /// same way `plan_hoists` did, rather than matching on `obj_reg` alone
+    /// — see module docs on why register-only matching is ambiguous.
+    pub fn cache_reg_for(
+        &self,
+        code: &[u16],
+        constants: &[PoolEntry],
+        obj_reg: u8,
+        site_offset: usize,
+    ) -> Option<Reg> {
+        let source = classify_site(
+            code,
+            constants,
+            self.header_offset,
+            self.latch_end_offset,
+            site_offset,
+            obj_reg,
+        )?;
+        self.candidates
+            .iter()
+            .position(|c| c.obj_vreg == obj_reg && c.source == source)
+            .map(Self::reg_for_slot)
     }
 }
 
@@ -82,11 +184,15 @@ fn header_reachable_by_fallthrough(code: &[u16], offsets: &[usize], header_instr
 /// pure arithmetic/comparison/control-flow plus in-bounds array read/write
 /// (in-bounds `ArraySetIndex` never reallocates — only append/out-of-bounds
 /// stores do, and those fall to the FFI helper, which is call-shaped and
-/// already excluded). Anything not listed here — string ops, object/array
-/// construction, property access that could hit a user getter, calls,
-/// `ArrayPush`/`Pop`/`Extend` — is excluded, because ANY allocation inside
-/// the loop is a GC opportunity the preheader's one-time safepoint doesn't
-/// cover.
+/// already excluded), plus `LoadGlobalIdx`/`StoreGlobalIdx`/
+/// `DefineGlobalIdx` (needed for `GlobalInvariant` detection — these never
+/// allocate, they read/write a fixed slot in the globals array). Anything
+/// not listed here — string ops, object/array construction, property
+/// access that could hit a user getter, calls, `ArrayPush`/`Pop`/`Extend`
+/// — is excluded, because ANY allocation inside the loop is a GC
+/// opportunity the preheader's one-time safepoint doesn't cover. Excluding
+/// all call-shaped instructions also rules out a call mutating a globals
+/// slot as a side effect mid-loop, which `GlobalInvariant` depends on.
 fn is_alloc_free_op(op: OpCode) -> bool {
     matches!(
         op,
@@ -98,6 +204,9 @@ fn is_alloc_free_op(op: OpCode) -> bool {
             | OpCode::LoadIntOne
             | OpCode::LoadIntMinusOne
             | OpCode::LoadConst
+            | OpCode::LoadGlobalIdx
+            | OpCode::StoreGlobalIdx
+            | OpCode::DefineGlobalIdx
             | OpCode::Move
             | OpCode::Add
             | OpCode::Sub
@@ -165,13 +274,94 @@ fn body_is_alloc_free(code: &[u16], offsets: &[usize], lp: &NaturalLoop) -> bool
     })
 }
 
+/// Forward-scans `[start_offset, end_offset)` for a `Store/DefineGlobalIdx`
+/// targeting `target_idx`. Used to invalidate a `GlobalInvariant` candidate
+/// whose global IS written somewhere in the loop (by direct assignment —
+/// call-shaped mutation is already excluded by `body_is_alloc_free`).
+/// Conservative on decode failure: treats undecodable code as "written" so
+/// a candidate is dropped rather than wrongly trusted.
+fn global_stored_in_range(
+    code: &[u16],
+    constants: &[PoolEntry],
+    start_offset: usize,
+    end_offset: usize,
+    target_idx: u16,
+) -> bool {
+    let mut off = start_offset;
+    while off < end_offset {
+        let Some(op) = OpCode::from_u16(code[off]) else {
+            return true;
+        };
+        let Some(info) = decode(code, off, constants) else {
+            return true;
+        };
+        if matches!(op, OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx) {
+            // Encoding (see varn_types::bytecode::decode's StoreGlobalIdx/
+            // DefineGlobalIdx arm and codegen/globals.rs's mirrored read):
+            // word0 = opcode|src_reg, word1 unused-here, word2 = global idx.
+            // `decode` already validated the instruction's full length fits
+            // the buffer, so `off + 2` is in bounds here.
+            if code[off + 2] == target_idx {
+                return true;
+            }
+        }
+        off += info.len;
+    }
+    false
+}
+
+/// Determine how `obj_reg`'s value at `site_offset` was most recently
+/// established within `[header_offset, site_offset)`. Forward scan rather
+/// than backward: bytecode is variable-length, so walking forward from a
+/// known-good starting offset (the loop header) using each instruction's
+/// own decoded length is simpler and just as precise as a reverse walk,
+/// and produces the same "most recent def wins" result since later writes
+/// overwrite `last_def` as the scan proceeds.
+///
+/// Returns `None` when the register's value at this site cannot be proven
+/// loop-invariant: either it's redefined by something other than
+/// `LoadGlobalIdx`, or it's fed by `LoadGlobalIdx` of a global that's
+/// written somewhere else in the loop.
+fn classify_site(
+    code: &[u16],
+    constants: &[PoolEntry],
+    header_offset: usize,
+    latch_end_offset: usize,
+    site_offset: usize,
+    obj_reg: u8,
+) -> Option<CacheSource> {
+    let mut last_def: Option<(OpCode, usize)> = None;
+    let mut off = header_offset;
+    while off < site_offset {
+        let op = OpCode::from_u16(code[off])?;
+        let info = decode(code, off, constants)?;
+        if info.def == Some(obj_reg) {
+            last_def = Some((op, off));
+        }
+        off += info.len;
+    }
+    match last_def {
+        None => Some(CacheSource::RegisterInvariant),
+        Some((OpCode::LoadGlobalIdx, def_off)) => {
+            let idx = code[def_off + 1];
+            if global_stored_in_range(code, constants, header_offset, latch_end_offset, idx) {
+                None
+            } else {
+                Some(CacheSource::GlobalInvariant(idx))
+            }
+        }
+        Some(_) => None,
+    }
+}
+
 /// Plan hoists for every eligible innermost loop in `code`. Conservative by
 /// construction: skips loops with any instruction outside the
-/// allocation-free allowlist (see [`is_alloc_free_op`]), more than one
-/// candidate invariant array, a header with no fall-through predecessor
-/// (see `header_reachable_by_fallthrough`), or that themselves contain a
-/// nested loop (only the innermost loop of a nest gets the cache register —
-/// see the design doc's "Registro de cache" section).
+/// allocation-free allowlist (see [`is_alloc_free_op`]), more than
+/// [`MAX_CANDIDATES`] distinct invariant arrays, a header with no
+/// fall-through predecessor (see `header_reachable_by_fallthrough`), or
+/// that themselves contain a nested loop (only the innermost loop of a
+/// nest gets the cache registers — see the design doc's "Registro de
+/// cache" section).
 pub(crate) fn plan_hoists(code: &[u16], constants: &[PoolEntry]) -> Vec<HoistPlan> {
     let loops = natural_loops(code, constants);
     if loops.is_empty() {
@@ -203,7 +393,11 @@ pub(crate) fn plan_hoists(code: &[u16], constants: &[PoolEntry]) -> Vec<HoistPla
                 return None;
             }
 
-            let mut candidate: Option<u8> = None;
+            let header_offset = offsets[lp.header];
+            let latch_offset = offsets[lp.latch];
+            let latch_end_offset = latch_offset + decode(code, latch_offset, constants)?.len;
+
+            let mut candidates: Vec<HoistCandidate> = Vec::with_capacity(MAX_CANDIDATES);
             for instr_idx in lp.header..=lp.latch {
                 let instr_offset = offsets[instr_idx];
                 let op = OpCode::from_u16(code[instr_offset])?;
@@ -212,20 +406,54 @@ pub(crate) fn plan_hoists(code: &[u16], constants: &[PoolEntry]) -> Vec<HoistPla
                 }
                 let info = decode(code, instr_offset, constants)?;
                 let obj_reg = *info.uses.first()?;
-                if !lp.is_invariant(obj_reg) {
+
+                let source = if lp.is_invariant(obj_reg) {
+                    CacheSource::RegisterInvariant
+                } else {
+                    match classify_site(
+                        code,
+                        constants,
+                        header_offset,
+                        latch_end_offset,
+                        instr_offset,
+                        obj_reg,
+                    ) {
+                        Some(s) => s,
+                        None => continue, // this site isn't cacheable; not fatal to the loop
+                    }
+                };
+
+                if candidates
+                    .iter()
+                    .any(|c| c.obj_vreg == obj_reg && c.source == source)
+                {
+                    continue; // already tracked
+                }
+
+                if candidates.len() >= MAX_CANDIDATES {
+                    // More distinct invariant arrays than we have registers
+                    // for. Keep what's already found rather than bailing
+                    // the whole loop: sites past the register budget just
+                    // find no match in `cache_reg_for` and fall back to the
+                    // always-correct guarded path, same as any non-hoisted
+                    // site.
                     continue;
                 }
-                match candidate {
-                    None => candidate = Some(obj_reg),
-                    Some(c) if c == obj_reg => {}
-                    Some(_) => return None,
-                }
+                candidates.push(HoistCandidate {
+                    obj_vreg: obj_reg,
+                    source,
+                });
             }
 
-            candidate.map(|obj_vreg| HoistPlan {
-                obj_vreg,
-                header_offset: offsets[lp.header],
-                latch_offset: offsets[lp.latch],
+            if candidates.is_empty() {
+                return None;
+            }
+
+            Some(HoistPlan {
+                candidates,
+                header_offset,
+                latch_offset,
+                latch_end_offset,
             })
         })
         .collect()

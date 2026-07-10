@@ -14,17 +14,25 @@ pub struct RegMap {
     /// callee-saved register in use — `emit_prologue`/`emit_epilogue` do
     /// this automatically when the field is set.
     pub cache_reg: Option<Reg>,
+    /// Set only when some hoist plan in this function caches two
+    /// simultaneously-invariant arrays (Windows only — see
+    /// `loop_hoist::LOOP_ARRAY_CACHE_REG2`). Unlike `cache_reg`, this does
+    /// NOT come out of `ALLOC_REGS`: Rdi is free real estate on Windows's
+    /// callee-saved set, so reserving it costs general allocation nothing.
+    pub cache_reg2: Option<Reg>,
 }
 
 impl RegMap {
-    /// `reserve_cache`: when true, one slot of `ALLOC_REGS` is withheld from
-    /// general allocation and reserved as `loop_hoist::LOOP_ARRAY_CACHE_REG`.
-    /// Callers only set this when `loop_hoist::plan_hoists` found at least
-    /// one hoistable loop — functions with no hoisting pay nothing extra.
+    /// `cache_regs_needed`: how many of this function's hoist plans' cache
+    /// registers to reserve (0, 1, or 2 — the max any single plan uses; see
+    /// `loop_hoist::MAX_CANDIDATES`). Only the first slot comes out of
+    /// `ALLOC_REGS`; the second (Windows-only) is pure addition. Callers
+    /// only pass non-zero when `loop_hoist::plan_hoists` found at least one
+    /// hoistable loop — functions with no hoisting pay nothing extra.
     pub fn from_bytecode(
         code: &[u16],
         constants: &[varn_types::chunk::PoolEntry],
-        reserve_cache: bool,
+        cache_regs_needed: usize,
     ) -> Self {
         // Rank virtual registers by access frequency using the shared
         // instruction decoder (varn_types::bytecode). Cheap moves and
@@ -79,7 +87,7 @@ impl RegMap {
         let mut ranked: Vec<(usize, u32)> = freq.into_iter().collect();
         ranked.sort_by(|a, b| b.1.cmp(&a.1));
 
-        let alloc_regs = if reserve_cache {
+        let alloc_regs = if cache_regs_needed >= 1 {
             debug_assert_eq!(ALLOC_REGS[2], crate::loop_hoist::LOOP_ARRAY_CACHE_REG);
             &ALLOC_REGS[..2]
         } else {
@@ -96,21 +104,30 @@ impl RegMap {
             }
         }
 
-        // The cache register rides along in `used_phys` (pushed/popped by
+        // The cache register(s) ride along in `used_phys` (pushed/popped by
         // emit_prologue/emit_epilogue exactly like any other allocated
-        // register) rather than getting its own separate push. Every
+        // register) rather than getting their own separate push. Every
         // 16-byte stack-alignment computation ahead of an FFI/helper call
         // throughout codegen reads `regmap.used_phys.len()` to decide
         // whether a dummy push is needed — a register saved outside that
         // count would silently desync every one of those call sites.
-        let cache_reg = reserve_cache.then_some(crate::loop_hoist::LOOP_ARRAY_CACHE_REG);
+        let cache_reg = (cache_regs_needed >= 1).then_some(crate::loop_hoist::LOOP_ARRAY_CACHE_REG);
         if let Some(reg) = cache_reg {
+            used_phys.push(reg);
+        }
+        #[cfg(target_os = "windows")]
+        let cache_reg2 =
+            (cache_regs_needed >= 2).then_some(crate::loop_hoist::LOOP_ARRAY_CACHE_REG2);
+        #[cfg(not(target_os = "windows"))]
+        let cache_reg2: Option<Reg> = None;
+        if let Some(reg) = cache_reg2 {
             used_phys.push(reg);
         }
         Self {
             map,
             used_phys,
             cache_reg,
+            cache_reg2,
         }
     }
 

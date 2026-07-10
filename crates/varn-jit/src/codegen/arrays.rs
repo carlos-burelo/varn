@@ -7,7 +7,6 @@ use crate::registers::{ARG_BASE, ARG_CLOSURE, ARG_CTX, ARG_EXEC_CTX};
 use super::array_fast::emit_cached_or_fallthrough;
 use super::ffi::{emit_ffi_call, FfiArg, FfiCallSpec};
 use super::CodegenCtx;
-use crate::loop_hoist::LOOP_ARRAY_CACHE_REG;
 
 pub(crate) fn emit_arrays(
     ctx: &mut CodegenCtx,
@@ -58,10 +57,9 @@ fn emit_array_length(ctx: &mut CodegenCtx, first_reg: usize) {
     let lay = ctx.helpers.array_layout;
     let heap_off = ctx.helpers.heap_field_offset;
 
-    let hoisted = ctx
-        .hoist_plans
-        .iter()
-        .any(|p| p.obj_vreg as usize == src && p.contains(instr_start));
+    let cache_reg = ctx.hoist_plans.iter().find(|p| p.contains(instr_start)).and_then(|p| {
+        p.cache_reg_for(ctx.code, &ctx.proto.chunk.constants, src as u8, instr_start)
+    });
 
     // Fast path: a heap array's length is a single Vec-len load, NaN-boxed
     // as an int. Non-array receivers (strings, etc.) fall back.
@@ -72,7 +70,7 @@ fn emit_array_length(ctx: &mut CodegenCtx, first_reg: usize) {
 
         emit_load(asm, Reg::Rax, src, regmap);
 
-        let cache_hit = hoisted.then(|| emit_cached_or_fallthrough(asm, LOOP_ARRAY_CACHE_REG));
+        let cache_hit = cache_reg.map(|reg| emit_cached_or_fallthrough(asm, reg));
         super::array_fast::emit_resolve_array_payload(asm, &lay, heap_off, false, &mut slow);
         if let Some(p) = cache_hit {
             let after = asm.current_offset();

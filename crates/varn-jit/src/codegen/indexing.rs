@@ -7,7 +7,6 @@ use crate::registers::REG_INT_TAG;
 use super::array_fast::{emit_cached_or_fallthrough, emit_resolve_array_payload, patch_all};
 use super::ffi::{emit_ffi_call, FfiArg, FfiCallSpec};
 use super::CodegenCtx;
-use crate::loop_hoist::LOOP_ARRAY_CACHE_REG;
 
 /// Emit the "key in R11 must be an int" guard, pushing to the slow list.
 fn emit_int_key_guard(asm: &mut crate::assembler::Assembler, slow: &mut Vec<usize>) {
@@ -46,11 +45,13 @@ fn emit_get_index(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     // Only ArrayGetIndex is eligible: it is the opcode the checker proved
     // statically Array-typed (GetIndex covers everything the checker could
     // NOT narrow, so its receiver may not even be an array).
-    let hoisted = op == OpCode::ArrayGetIndex
-        && ctx
-            .hoist_plans
-            .iter()
-            .any(|p| p.obj_vreg as usize == obj_reg && p.contains(instr_start));
+    let cache_reg = (op == OpCode::ArrayGetIndex)
+        .then(|| {
+            ctx.hoist_plans.iter().find(|p| p.contains(instr_start)).and_then(|p| {
+                p.cache_reg_for(ctx.code, &ctx.proto.chunk.constants, obj_reg as u8, instr_start)
+            })
+        })
+        .flatten();
 
     // Fast path: heap array + in-bounds int key resolve to a single chain
     // of loads (VmValue → heap slot → element vec → data[idx]), no FFI.
@@ -66,7 +67,7 @@ fn emit_get_index(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
 
         emit_int_key_guard(asm, &mut slow);
 
-        let cache_hit = hoisted.then(|| emit_cached_or_fallthrough(asm, LOOP_ARRAY_CACHE_REG));
+        let cache_hit = cache_reg.map(|reg| emit_cached_or_fallthrough(asm, reg));
         emit_resolve_array_payload(asm, &lay, heap_off, false, &mut slow);
         if let Some(p) = cache_hit {
             let after = asm.current_offset();
