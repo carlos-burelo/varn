@@ -165,6 +165,27 @@ fn bind_cache_insert(key: String, bind: Rc<BindResult>) {
     });
 }
 
+/// Bundle-first resolution: if the active std bundle carries a precomputed
+/// interface blob for this module, decode it and populate both caches.
+/// Corrupt blob = hard error (no fallback), matching the bundle's compat gates.
+fn resolve_from_interface_blob(
+    specifier: &str,
+    key: &String,
+) -> Option<(Rc<ExportMap>, Rc<BindResult>)> {
+    let provider = varn_modules::provider::get()?;
+    let blob = provider.interface_blob(specifier)?;
+    match deserialize_module_interface(blob) {
+        Ok((exports, bind)) => {
+            let exports = Rc::new(exports);
+            let bind = Rc::new(bind);
+            export_cache_insert(key.clone(), Rc::clone(&exports));
+            bind_cache_insert(key.clone(), Rc::clone(&bind));
+            Some((exports, bind))
+        }
+        Err(e) => panic!("corrupt interface blob for {specifier}: {e}"),
+    }
+}
+
 fn record_dep(importer: &str, imported: &str) {
     REVERSE_DEPS.with(|r| {
         r.borrow_mut()
@@ -257,18 +278,8 @@ pub fn resolve_stdlib_module_exports_ref(specifier: &str) -> Rc<ExportMap> {
         }
     }
 
-    if let Some(provider) = varn_modules::provider::get() {
-        if let Some(blob) = provider.interface_blob(specifier) {
-            match deserialize_module_interface(blob) {
-                Ok((exports, bind)) => {
-                    let exports = Rc::new(exports);
-                    export_cache_insert(key.to_string(), Rc::clone(&exports));
-                    bind_cache_insert(key.to_string(), Rc::new(bind));
-                    return exports;
-                }
-                Err(e) => panic!("corrupt interface blob for {specifier}: {e}"),
-            }
-        }
+    if let Some((exports, _bind)) = resolve_from_interface_blob(specifier, &key) {
+        return exports;
     }
 
     if let Some(provider) = varn_modules::provider::get() {
@@ -298,19 +309,11 @@ pub fn resolve_stdlib_module_bind_ref(specifier: &str) -> Option<Rc<BindResult>>
         return Some(cached);
     }
 
-    let provider = varn_modules::provider::get()?;
-
-    if let Some(blob) = provider.interface_blob(specifier) {
-        match deserialize_module_interface(blob) {
-            Ok((exports, bind)) => {
-                let bind = Rc::new(bind);
-                bind_cache_insert(key.to_string(), Rc::clone(&bind));
-                export_cache_insert(key.to_string(), Rc::new(exports));
-                return Some(bind);
-            }
-            Err(e) => panic!("corrupt interface blob for {specifier}: {e}"),
-        }
+    if let Some((_exports, bind)) = resolve_from_interface_blob(specifier, &key) {
+        return Some(bind);
     }
+
+    let provider = varn_modules::provider::get()?;
 
     if let Some(source) = provider.embedded_source(specifier) {
         return bind_from_embedded_source(specifier, source);
