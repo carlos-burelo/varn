@@ -6,7 +6,7 @@ pub struct IoRuntime;
 
 varn_contract! {
     module: "runtime:io",
-    contract: "src/modules/std/io/runtime/io_runtime.vn",
+    contract: "src/modules/host/io/io_runtime.vn",
     impl IoRuntime {
         fn ioWrite(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<(), String> {
             if !crate::modules::globals::is_print_silent() {

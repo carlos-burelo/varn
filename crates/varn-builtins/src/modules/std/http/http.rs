@@ -69,7 +69,7 @@ fn build_headers_ctx(ctx: &mut dyn NativeCtx, headers: &[tiny_http::Header]) -> 
 
 varn_contract! {
     module: "runtime:http",
-    contract: "src/modules/std/http/runtime/http_runtime.vn",
+    contract: "src/modules/host/http/http_runtime.vn",
     impl HttpRuntime {
         fn httpFetch(
             ctx: &mut dyn NativeCtx,

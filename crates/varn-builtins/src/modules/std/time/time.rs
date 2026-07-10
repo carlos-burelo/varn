@@ -51,7 +51,7 @@ fn set_int(ctx: &mut dyn NativeCtx, obj: VmValue, key: &str, val: i64) {
 
 varn_contract! {
     module: "runtime:time",
-    contract: "src/modules/std/time/runtime/time_runtime.vn",
+    contract: "src/modules/host/time/time_runtime.vn",
     impl TimeRuntime {
         fn timeNowMs(_ctx: &mut dyn NativeCtx) -> Result<i64, String> {
             Ok(std::time::SystemTime::now()

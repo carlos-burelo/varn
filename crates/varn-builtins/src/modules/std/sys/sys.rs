@@ -9,7 +9,7 @@ static START_TIME: OnceLock<Instant> = OnceLock::new();
 
 varn_contract! {
     module: "runtime:process",
-    contract: "src/modules/std/sys/runtime/sys_runtime.vn",
+    contract: "src/modules/host/sys/sys_runtime.vn",
     impl SysRuntime {
         fn processPlatform(_ctx: &mut dyn NativeCtx) -> Result<String, String> {
             Ok(std::env::consts::OS.to_string())

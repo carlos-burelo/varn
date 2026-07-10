@@ -9,7 +9,7 @@ pub struct CryptoRuntime;
 
 varn_contract! {
     module: "runtime:crypto",
-    contract: "src/modules/std/crypto/runtime/crypto_runtime.vn",
+    contract: "src/modules/host/crypto/crypto_runtime.vn",
     impl CryptoRuntime {
         fn cryptoSha256(_ctx: &mut dyn NativeCtx, data: &str) -> Result<String, String> {
             Ok(hex::encode(Sha256::digest(data.as_bytes())))

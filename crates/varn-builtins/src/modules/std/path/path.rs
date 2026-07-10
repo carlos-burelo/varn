@@ -5,7 +5,7 @@ pub struct PathRuntime;
 
 varn_contract! {
     module: "runtime:path",
-    contract: "src/modules/std/path/runtime/path_runtime.vn",
+    contract: "src/modules/host/path/path_runtime.vn",
     impl PathRuntime {
         fn pathNormalize(_ctx: &mut dyn NativeCtx, path: &str) -> Result<String, String> {
             let p = std::path::Path::new(path);

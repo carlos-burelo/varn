@@ -6,7 +6,7 @@ pub struct FsRuntime;
 
 varn_contract! {
     module: "runtime:fs",
-    contract: "src/modules/std/fs/runtime/fs_runtime.vn",
+    contract: "src/modules/host/fs/fs_runtime.vn",
     impl FsRuntime {
         fn fsRead(_ctx: &mut dyn NativeCtx, path: &str) -> Result<String, String> {
             fs::read_to_string(path).map_err(|e| e.to_string())

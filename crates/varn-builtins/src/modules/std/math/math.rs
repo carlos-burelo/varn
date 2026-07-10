@@ -5,7 +5,7 @@ pub struct MathRuntime;
 
 varn_contract! {
     module: "runtime:math",
-    contract: "src/modules/std/math/runtime/math_runtime.vn",
+    contract: "src/modules/host/math/math_runtime.vn",
     impl MathRuntime {
         fn mathAbs(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.abs()) }
         fn mathSqrt(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.sqrt()) }

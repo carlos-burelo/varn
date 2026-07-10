@@ -1,0 +1,18 @@
+{
+    "version": "0.1.0",
+    "hostApi": 1,
+    "modules": [
+        { "id": "std:crypto" },
+        { "id": "std:dispose" },
+        { "id": "std:fs" },
+        { "id": "std:http" },
+        { "id": "std:io" },
+        { "id": "std:json", "pure": true },
+        { "id": "std:math", "pure": true },
+        { "id": "std:net" },
+        { "id": "std:path", "pure": true },
+        { "id": "std:sys" },
+        { "id": "std:test" },
+        { "id": "std:time" }
+    ]
+}

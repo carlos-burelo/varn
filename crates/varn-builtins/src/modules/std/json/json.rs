@@ -13,7 +13,7 @@ thread_local! {
 
 varn_contract! {
     module: "runtime:json",
-    contract: "src/modules/std/json/runtime/json_runtime.vn",
+    contract: "src/modules/host/json/json_runtime.vn",
     impl JsonRuntime {
         fn jsonParse(ctx: &mut dyn NativeCtx, text: &str) -> Result<VmValue, String> {
             JSON_SHAPE_CACHE.with(|c| *c.borrow_mut() = None);

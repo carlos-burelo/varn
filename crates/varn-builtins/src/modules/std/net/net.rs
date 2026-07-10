@@ -7,7 +7,7 @@ pub struct NetRuntime;
 
 varn_contract! {
     module: "runtime:net",
-    contract: "src/modules/std/net/runtime/net_runtime.vn",
+    contract: "src/modules/host/net/net_runtime.vn",
     impl NetRuntime {
         fn netIsIP(_ctx: &mut dyn NativeCtx, s: &str) -> Result<bool, String> {
             Ok(s.parse::<std::net::IpAddr>().is_ok())

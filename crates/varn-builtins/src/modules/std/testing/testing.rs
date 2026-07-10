@@ -44,7 +44,7 @@ pub fn summary(_ctx: &mut dyn NativeCtx, _args: &[VmValue]) -> Result<VmValue, S
 
 varn_contract! {
     module: "runtime:test",
-    contract: "src/modules/std/testing/runtime/test_runtime.vn",
+    contract: "src/modules/host/testing/test_runtime.vn",
     impl TestRuntime {
         fn testAssert(_ctx: &mut dyn NativeCtx, label: &str, condition: bool) -> Result<(), String> {
             if condition {
