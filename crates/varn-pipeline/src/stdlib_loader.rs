@@ -81,7 +81,8 @@ impl ModuleLoader for StdlibLoader {
     }
 }
 
-fn compile_source(source: &str, path: &str) -> Result<FunctionProto, String> {
+/// Compile one stdlib-namespace module source to a FunctionProto. Used by StdlibLoader and xtask build-std.
+pub fn compile_source(source: &str, path: &str) -> Result<FunctionProto, String> {
     let (tokens, lexeme_buf, _) = varn_lexer::scan(source, path);
     let mut program =
         varn_parser::parse(tokens, lexeme_buf, path).map_err(|errs| errs[0].message.clone())?;

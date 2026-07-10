@@ -52,3 +52,6 @@ tests/.vn/**
 # all .lock and all .bin files in any directory
 **/*.lock
 **/*.bin
+
+# xtask build-std artifact
+/std.vnb

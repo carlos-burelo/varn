@@ -2547,6 +2547,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "xtask"
+version = "0.0.0"
+dependencies = [
+ "postcard",
+ "serde",
+ "serde_json",
+ "varn-builtins",
+ "varn-checker",
+ "varn-core",
+ "varn-lexer",
+ "varn-modules",
+ "varn-parser",
+ "varn-pipeline",
+]
+
+[[package]]
 name = "yoke"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

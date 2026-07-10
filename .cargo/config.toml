@@ -3,3 +3,6 @@ linker = "rust-lld.exe"
 
 [env]
 VARN_STD = { value = "std", relative = true }
+
+[alias]
+xtask = "run -p xtask --"

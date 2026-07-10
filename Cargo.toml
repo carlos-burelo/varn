@@ -21,6 +21,7 @@ members = [
     "crates/varn-utilities",
     "crates/varn-opt",
     "crates/varn-backend",
+    "xtask",
 ]
 resolver = "2"
 
