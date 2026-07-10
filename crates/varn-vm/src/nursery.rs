@@ -118,6 +118,9 @@ impl Nursery {
     ) {
         self.minor_gc_count += 1;
         let mut worklist: Vec<u32> = Vec::with_capacity(NURSERY_CAPACITY);
+        // Reused across every scanned object: one promoted object per scan
+        // previously meant one fresh Vec allocation each.
+        let mut fixups: Vec<(ChildSlot, u32)> = Vec::with_capacity(8);
 
         for slot in stack.iter_mut() {
             self.update_value(slot, old_gen, &mut worklist);
@@ -125,16 +128,20 @@ impl Nursery {
 
         let old_indices_to_scan = std::mem::take(&mut self.remembered);
         for packed in old_indices_to_scan {
-            self.scan_and_fix_old_obj(old_idx_raw(packed), old_gen, &mut worklist);
+            self.scan_and_fix_old_obj(old_idx_raw(packed), old_gen, &mut worklist, &mut fixups);
         }
 
-        for raw_idx in 0..old_gen.objects().len() {
-            match old_gen.get_raw(raw_idx as u32) {
+        // Closures/classes/modules hold Rust-side `Value`s the write barrier
+        // does not cover; scan only the tracked candidates instead of the
+        // whole old gen (which made every minor GC O(old-gen size)).
+        let candidates: Vec<u32> = old_gen.scan_roots().to_vec();
+        for raw_idx in candidates {
+            match old_gen.get_raw(raw_idx) {
                 Some(HeapObj::VmClosure(_))
                 | Some(HeapObj::BoundMethod(_))
                 | Some(HeapObj::Class(_))
                 | Some(HeapObj::Module(_)) => {
-                    self.scan_and_fix_old_obj(raw_idx as u32, old_gen, &mut worklist);
+                    self.scan_and_fix_old_obj(raw_idx, old_gen, &mut worklist, &mut fixups);
                 }
                 _ => {}
             }
@@ -142,14 +149,14 @@ impl Nursery {
 
         for &packed in extra_root_packed {
             if is_old_idx(packed) {
-                self.scan_and_fix_old_obj(old_idx_raw(packed), old_gen, &mut worklist);
+                self.scan_and_fix_old_obj(old_idx_raw(packed), old_gen, &mut worklist, &mut fixups);
             } else {
                 self.evacuate(packed, old_gen, &mut worklist);
             }
         }
 
         while let Some(raw) = worklist.pop() {
-            self.scan_and_fix_old_obj(raw, old_gen, &mut worklist);
+            self.scan_and_fix_old_obj(raw, old_gen, &mut worklist, &mut fixups);
         }
 
         let n_promoted = self.forwarding.iter().filter(|f| f.is_some()).count();
@@ -203,8 +210,9 @@ impl Nursery {
         raw_old: u32,
         old_gen: &mut HeapInner,
         worklist: &mut Vec<u32>,
+        fixups: &mut Vec<(ChildSlot, u32)>,
     ) {
-        let mut fixups: Vec<(ChildSlot, u32)> = Vec::with_capacity(8);
+        fixups.clear();
 
         if let Some(obj) = old_gen.get_raw(raw_old) {
             match obj {
@@ -279,7 +287,7 @@ impl Nursery {
             }
         }
 
-        for (slot, nursery_idx) in fixups {
+        for (slot, nursery_idx) in fixups.drain(..) {
             let packed = self.evacuate(nursery_idx, old_gen, worklist);
             let new_val = VmValue::from_heap_idx(packed);
             let extracted_val = if matches!(slot, ChildSlot::BoundMethodReceiver)

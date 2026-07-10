@@ -305,6 +305,11 @@ pub struct HeapInner {
     char_interner: FxHashMap<char, u32>,
     gc_collector: Option<GcCollector>,
     pub hotspot: Option<Rc<RefCell<HotspotCounters>>>,
+    /// Raw old-gen indices of objects that hold Rust-side `Value`s the
+    /// remembered set cannot track (VmClosure, BoundMethod, Class, Module).
+    /// The minor GC scans only these instead of walking the whole old gen;
+    /// rebuilt after every major GC sweep to drop stale entries.
+    scan_roots: Vec<u32>,
 }
 
 #[inline]
@@ -349,6 +354,34 @@ impl HeapInner {
             gc_alloc_since_collect: 0,
             nursery: Nursery::new(),
             hotspot: None,
+            scan_roots: Vec::new(),
+        }
+    }
+
+    /// Whether the minor GC must scan this old-gen object for untracked
+    /// nursery references (see `scan_roots`).
+    #[inline(always)]
+    fn needs_minor_scan(obj: &HeapObj) -> bool {
+        matches!(
+            obj,
+            HeapObj::VmClosure(_) | HeapObj::BoundMethod(_) | HeapObj::Class(_) | HeapObj::Module(_)
+        )
+    }
+
+    pub fn scan_roots(&self) -> &[u32] {
+        &self.scan_roots
+    }
+
+    /// Rebuild `scan_roots` from the live old gen (after a major GC sweep
+    /// invalidated indices).
+    pub fn rebuild_scan_roots(&mut self) {
+        self.scan_roots.clear();
+        for (idx, obj) in self.objects.iter().enumerate() {
+            if let Some(obj) = obj {
+                if Self::needs_minor_scan(obj) {
+                    self.scan_roots.push(idx as u32);
+                }
+            }
         }
     }
 
@@ -427,25 +460,35 @@ impl HeapInner {
             },
             _ => {}
         }
-        pack_old_idx(alloc_into(
+        let track = Self::needs_minor_scan(&obj);
+        let raw = alloc_into(
             &mut self.objects,
             &mut self.free,
             &mut self.alloc_count,
             &mut self.gc_alloc_since_collect,
             obj,
-        ))
+        );
+        if track {
+            self.scan_roots.push(raw);
+        }
+        pack_old_idx(raw)
     }
 
     pub fn alloc_raw(&mut self, obj: HeapObj) -> u32 {
         self.alloc_count += 1;
-        if let Some(idx) = self.free.pop() {
+        let track = Self::needs_minor_scan(&obj);
+        let idx = if let Some(idx) = self.free.pop() {
             self.objects[idx as usize] = Some(obj);
             idx
         } else {
             let idx = self.objects.len() as u32;
             self.objects.push(Some(obj));
             idx
+        };
+        if track {
+            self.scan_roots.push(idx);
         }
+        idx
     }
 
     #[inline(always)]
@@ -1249,6 +1292,7 @@ impl HeapInner {
             let freed = collector.collect(self, roots)?;
             self.gc_collector = Some(collector);
             self.compact_interners();
+            self.rebuild_scan_roots();
             self.gc_collections += 1;
             self.gc_total_freed += freed as u64;
             self.gc_alloc_since_collect = 0;
