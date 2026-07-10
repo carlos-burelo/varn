@@ -8,8 +8,6 @@ runtime = [
     "dep:parking_lot",
     "dep:rust_decimal",
     "dep:mio",
-    "dep:serde",
-    "dep:serde_json",
     "dep:rand",
     "dep:sha2",
     "dep:hmac",
@@ -35,8 +33,8 @@ tokio          = { version = "1", features = ["rt"] }
 parking_lot  = { workspace = true, optional = true }
 rust_decimal = { workspace = true, optional = true }
 mio          = { version = "1", features = ["os-poll", "net"], optional = true }
-serde        = { workspace = true, optional = true }
-serde_json   = { workspace = true, optional = true }
+serde        = { workspace = true }
+serde_json   = { workspace = true }
 rand         = { version = "0.8", optional = true }
 sha2         = { version = "0.10", optional = true }
 hmac         = { version = "0.12", optional = true }

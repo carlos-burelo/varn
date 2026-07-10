@@ -57,6 +57,18 @@ pub fn load_cached_graph(
                     if cached_hash != current_hash {
                         return Ok(None);
                     }
+                } else if let Some(p) = provider.source_path(path) {
+                    // std served from a source tree: revalidate against disk
+                    // so editing std/*.vn invalidates dependent caches.
+                    match std::fs::read(&p) {
+                        Ok(src) => {
+                            let current_hash = crate::hash::fnv1a64(&src);
+                            if cached_hash != current_hash {
+                                return Ok(None);
+                            }
+                        }
+                        Err(_) => return Ok(None),
+                    }
                 }
             }
             continue;

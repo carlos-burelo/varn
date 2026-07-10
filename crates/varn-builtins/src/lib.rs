@@ -1,6 +1,7 @@
 pub mod loader;
 pub mod provider_impl;
 pub mod registry;
+mod std_manifest;
 
 pub use provider_impl::register_provider;
 

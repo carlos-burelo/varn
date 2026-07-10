@@ -47,4 +47,18 @@ impl ModuleSpec {
     pub fn source(&self) -> Option<&'static str> {
         self.embedded
     }
+
+    /// Materialize a spec whose strings live for the process lifetime.
+    /// Used for std modules loaded from a bundle/tree at startup; the std
+    /// set is small and lives as long as the VM, so leaking is correct.
+    pub fn leaked(id: String, kind: ModuleKind, vn_source: String, pure: bool) -> Self {
+        Self {
+            id: Box::leak(id.into_boxed_str()),
+            kind,
+            vn_source: Box::leak(vn_source.into_boxed_str()),
+            embedded: None,
+            exports: &[],
+            pure,
+        }
+    }
 }

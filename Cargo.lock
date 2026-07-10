@@ -1908,6 +1908,7 @@ dependencies = [
  "rustc-hash",
  "varn-checker",
  "varn-core",
+ "varn-jit",
  "varn-lexer",
  "varn-modules",
  "varn-opt",
