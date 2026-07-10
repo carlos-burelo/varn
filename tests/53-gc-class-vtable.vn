@@ -1,0 +1,41 @@
+// Regression: minor-GC vtable corruption (2026-07-09).
+// value_heap_idx returned RAW old-gen indices for Class/VmClosure/Task-like
+// values; the minor GC misread them as nursery indices and stamped an
+// unrelated evacuated object over class vtables. Symptom: the SECOND class
+// defined in a module lost its constructor after enough allocation pressure
+// (fields stayed null, no error). Needs: 2+ classes, GC pressure between
+// definition and construction.
+
+class GcVtA {
+    x: int
+    constructor(x: int) {
+        this.x = x
+    }
+}
+
+class GcVtB {
+    y: int
+    constructor(y: int) {
+        this.y = y
+    }
+}
+
+// Enough string allocations to force several minor GC cycles.
+let gcJunk = []
+for (let i = 0; i < 20000; i = i + 1) {
+    gcJunk.push("gc_" + i)
+}
+
+let gcAccA = 0
+let gcAccB = 0
+for (let i = 0; i < 5000; i = i + 1) {
+    let a = new GcVtA(i)
+    gcAccA = gcAccA + a.x
+    let b = new GcVtB(i)
+    gcAccB = gcAccB + b.y
+}
+
+assert("gc: first class ctor survives minor GC",  gcAccA === 12497500)
+assert("gc: second class ctor survives minor GC", gcAccB === 12497500)
+assert("gc: junk array intact after GC", gcJunk.length === 20000)
+assert("gc: junk content intact", gcJunk[19999] === "gc_19999")

@@ -1154,6 +1154,11 @@ impl HeapInner {
         &self.objects
     }
 
+    /// Resolves a `Value` to its packed heap index. All arms return PACKED
+    /// indices (old-gen bit set) — returning a raw old-gen index here made
+    /// the minor GC misread it as a nursery index and stamp an unrelated
+    /// evacuated object over class vtables/statics (second-class-ctor
+    /// corruption, 2026-07-09).
     pub fn value_heap_idx(&self, val: &varn_types::Value) -> Option<u32> {
         match val {
             varn_types::Value::Str(s) => self.string_interner.get(s).copied(),
@@ -1168,7 +1173,7 @@ impl HeapInner {
                 for (idx, obj) in self.objects.iter().enumerate() {
                     if let Some(HeapObj::Class(hc)) = obj {
                         if Rc::ptr_eq(c, hc) {
-                            return Some(idx as u32);
+                            return Some(pack_old_idx(idx as u32));
                         }
                     }
                 }
@@ -1178,7 +1183,7 @@ impl HeapInner {
                 for (idx, obj) in self.objects.iter().enumerate() {
                     if let Some(HeapObj::Task(ht)) = obj {
                         if Rc::ptr_eq(t, ht) {
-                            return Some(idx as u32);
+                            return Some(pack_old_idx(idx as u32));
                         }
                     }
                 }
@@ -1188,7 +1193,7 @@ impl HeapInner {
                 for (idx, obj) in self.objects.iter().enumerate() {
                     if let Some(HeapObj::TaskHandle(hth)) = obj {
                         if th == hth {
-                            return Some(idx as u32);
+                            return Some(pack_old_idx(idx as u32));
                         }
                     }
                 }
@@ -1198,7 +1203,7 @@ impl HeapInner {
                 for (idx, obj) in self.objects.iter().enumerate() {
                     if let Some(HeapObj::Generator(hg)) = obj {
                         if g == hg {
-                            return Some(idx as u32);
+                            return Some(pack_old_idx(idx as u32));
                         }
                     }
                 }
@@ -1208,7 +1213,7 @@ impl HeapInner {
                 for (idx, obj) in self.objects.iter().enumerate() {
                     if let Some(HeapObj::AsyncQueue(hq)) = obj {
                         if Rc::ptr_eq(&q.0, &hq.0) {
-                            return Some(idx as u32);
+                            return Some(pack_old_idx(idx as u32));
                         }
                     }
                 }
@@ -1220,7 +1225,7 @@ impl HeapInner {
                     for (idx, obj) in self.objects.iter().enumerate() {
                         if let Some(HeapObj::VmClosure(hc)) = obj {
                             if std::rc::Rc::as_ptr(hc) as *const () as usize == closure_ptr {
-                                return Some(idx as u32);
+                                return Some(pack_old_idx(idx as u32));
                             }
                         }
                     }

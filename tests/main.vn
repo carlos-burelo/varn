@@ -50,6 +50,7 @@ import "./49-opt-unsupported-phase2.vn"
 import "./50-opt-unsupported-phase3.vn"
 import "./51-opt-unsupported-phase4.vn"
 import "./52-math-trig.vn"
+import "./53-gc-class-vtable.vn"
 
-print("\n53 side-effect modules executed in suite")
+print("\n54 side-effect modules executed in suite")
 assertSummary()
