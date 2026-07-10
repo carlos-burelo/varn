@@ -16,6 +16,26 @@ struct CachedModule {
     bind: BindResult,
 }
 
+/// Serialize a module's checker interface for embedding in a std bundle.
+/// Format = the .vnm CachedModule payload (BUILD_FINGERPRINT governs it;
+/// the bundle records that version and vn rejects mismatches at load).
+pub fn serialize_module_interface(
+    exports: &ExportMap,
+    bind: &BindResult,
+) -> Result<Vec<u8>, String> {
+    let cached = CachedModule {
+        exports: exports.clone(),
+        bind: bind.clone(),
+    };
+    postcard::to_allocvec(&cached).map_err(|e| e.to_string())
+}
+
+pub fn deserialize_module_interface(bytes: &[u8]) -> Result<(ExportMap, BindResult), String> {
+    let mut cached: CachedModule = postcard::from_bytes(bytes).map_err(|e| e.to_string())?;
+    assign_slots(&mut cached.exports);
+    Ok((cached.exports, cached.bind))
+}
+
 fn compute_source_hash(source: &str) -> u64 {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     source.hash(&mut hasher);
@@ -238,6 +258,20 @@ pub fn resolve_stdlib_module_exports_ref(specifier: &str) -> Rc<ExportMap> {
     }
 
     if let Some(provider) = varn_modules::provider::get() {
+        if let Some(blob) = provider.interface_blob(specifier) {
+            match deserialize_module_interface(blob) {
+                Ok((exports, bind)) => {
+                    let exports = Rc::new(exports);
+                    export_cache_insert(key.to_string(), Rc::clone(&exports));
+                    bind_cache_insert(key.to_string(), Rc::new(bind));
+                    return exports;
+                }
+                Err(e) => panic!("corrupt interface blob for {specifier}: {e}"),
+            }
+        }
+    }
+
+    if let Some(provider) = varn_modules::provider::get() {
         if let Some(source) = provider.embedded_source(specifier) {
             let mut visiting = vec![];
             let result = resolve_from_embedded_source(specifier, source, &mut visiting);
@@ -257,7 +291,27 @@ pub fn resolve_stdlib_module_exports_ref(specifier: &str) -> Rc<ExportMap> {
 }
 
 pub fn resolve_stdlib_module_bind_ref(specifier: &str) -> Option<Rc<BindResult>> {
+    let id = ModuleId::stdlib(specifier);
+    let key = id.as_str();
+
+    if let Some(cached) = bind_cache_get(&key) {
+        return Some(cached);
+    }
+
     let provider = varn_modules::provider::get()?;
+
+    if let Some(blob) = provider.interface_blob(specifier) {
+        match deserialize_module_interface(blob) {
+            Ok((exports, bind)) => {
+                let bind = Rc::new(bind);
+                bind_cache_insert(key.to_string(), Rc::clone(&bind));
+                export_cache_insert(key.to_string(), Rc::new(exports));
+                return Some(bind);
+            }
+            Err(e) => panic!("corrupt interface blob for {specifier}: {e}"),
+        }
+    }
+
     if let Some(source) = provider.embedded_source(specifier) {
         return bind_from_embedded_source(specifier, source);
     }
@@ -752,5 +806,29 @@ fn resolve_relative(base_dir: &Path, specifier: &str) -> String {
         }
         _ => resolve_specifier_path(base_dir, specifier)
             .unwrap_or_else(|| base_dir.join(specifier).to_string_lossy().into_owned()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `BindResult` has no `Default` impl (its fields include arenas and a
+    /// source file `Rc<str>` with no zero-value meaning), so the cheapest
+    /// valid instance is binding an empty parsed program, matching how the
+    /// rest of this module constructs a `BindResult` from source.
+    fn empty_bind_result() -> BindResult {
+        let (tokens, lexeme_buf, _lex_errs) = varn_lexer::scan("", "<test>");
+        let program = varn_parser::parse(tokens, lexeme_buf, "<test>").unwrap();
+        Binder::bind(&program)
+    }
+
+    #[test]
+    fn interface_blob_roundtrip() {
+        let exports: ExportMap = FxHashMap::default();
+        let bind = empty_bind_result();
+        let bytes = serialize_module_interface(&exports, &bind).unwrap();
+        let (e2, _b2) = deserialize_module_interface(&bytes).unwrap();
+        assert_eq!(e2.len(), 0);
     }
 }
