@@ -86,12 +86,12 @@ const MAX_CANDIDATES: usize = 1;
 /// How a candidate site's array value is established to be the same across
 /// every iteration. See module docs.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(crate) enum CacheSource {
+pub enum CacheSource {
     RegisterInvariant,
     GlobalInvariant(u16),
 }
 
-pub(crate) struct HoistCandidate {
+pub struct HoistCandidate {
     pub obj_vreg: u8,
     pub source: CacheSource,
 }
@@ -193,7 +193,7 @@ fn header_reachable_by_fallthrough(code: &[u16], offsets: &[usize], header_instr
 /// opportunity the preheader's one-time safepoint doesn't cover. Excluding
 /// all call-shaped instructions also rules out a call mutating a globals
 /// slot as a side effect mid-loop, which `GlobalInvariant` depends on.
-fn is_alloc_free_op(op: OpCode) -> bool {
+pub fn is_alloc_free_op(op: OpCode) -> bool {
     matches!(
         op,
         OpCode::LoadNull
@@ -354,15 +354,41 @@ fn classify_site(
     }
 }
 
-/// Plan hoists for every eligible innermost loop in `code`. Conservative by
-/// construction: skips loops with any instruction outside the
-/// allocation-free allowlist (see [`is_alloc_free_op`]), more than
-/// [`MAX_CANDIDATES`] distinct invariant arrays, a header with no
-/// fall-through predecessor (see `header_reachable_by_fallthrough`), or
-/// that themselves contain a nested loop (only the innermost loop of a
-/// nest gets the cache registers — see the design doc's "Registro de
-/// cache" section).
-pub(crate) fn plan_hoists(code: &[u16], constants: &[PoolEntry]) -> Vec<HoistPlan> {
+/// Full eligibility report for one natural loop, independent of whether it
+/// ends up hoistable. `vn debug -p bytecode` renders this directly (see
+/// `varn-debug::loop_diagnostics`) so an agent reading the dump sees
+/// exactly what the JIT decided and why, instead of re-deriving it by hand
+/// from the raw instruction stream.
+pub struct LoopDiagnostic {
+    pub header_offset: usize,
+    pub latch_offset: usize,
+    latch_end_offset: usize,
+    /// Header has a genuine fall-through predecessor (see
+    /// `header_reachable_by_fallthrough`). `false` means this loop can
+    /// never be hoisted regardless of the other checks — Varn currently
+    /// lowers NESTED for-loops to a test-at-bottom shape (entered via an
+    /// explicit forward jump), which always fails this check; only
+    /// top-level loops pass it today.
+    pub is_real: bool,
+    /// Body contains only opcodes in the allocation-free allowlist (see
+    /// [`is_alloc_free_op`]) — required because the preheader's GC
+    /// safepoint runs once, not per iteration.
+    pub is_alloc_free: bool,
+    /// No other real loop is nested inside this one — only the innermost
+    /// loop of a nest gets the cache registers.
+    pub is_innermost: bool,
+    /// Populated only when `is_real && is_alloc_free && is_innermost`; one
+    /// entry per array the loop will actually cache. Empty (with the flags
+    /// above all true) means the loop qualified structurally but no
+    /// `ArrayGetIndex`/`ArrayLength` site inside it resolved to a provably
+    /// loop-invariant array.
+    pub candidates: Vec<HoistCandidate>,
+}
+
+/// Diagnose every natural loop in `code`, hoistable or not. `plan_hoists`
+/// is a thin filter over this — single source of truth, so the `vn debug`
+/// view can never drift from what the JIT actually decides.
+pub fn diagnose_loops(code: &[u16], constants: &[PoolEntry]) -> Vec<LoopDiagnostic> {
     let loops = natural_loops(code, constants);
     if loops.is_empty() {
         return Vec::new();
@@ -383,78 +409,96 @@ pub(crate) fn plan_hoists(code: &[u16], constants: &[PoolEntry]) -> Vec<HoistPla
         .iter()
         .enumerate()
         .filter_map(|(i, lp)| {
-            if !is_real[i] || !body_is_alloc_free(code, &offsets, lp) {
-                return None;
-            }
+            let alloc_free = body_is_alloc_free(code, &offsets, lp);
             let is_innermost = !loops.iter().enumerate().any(|(j, other)| {
                 j != i && is_real[j] && other.header >= lp.header && other.latch <= lp.latch
             });
-            if !is_innermost {
-                return None;
-            }
 
             let header_offset = offsets[lp.header];
             let latch_offset = offsets[lp.latch];
             let latch_end_offset = latch_offset + decode(code, latch_offset, constants)?.len;
 
             let mut candidates: Vec<HoistCandidate> = Vec::with_capacity(MAX_CANDIDATES);
-            for instr_idx in lp.header..=lp.latch {
-                let instr_offset = offsets[instr_idx];
-                let op = OpCode::from_u16(code[instr_offset])?;
-                if !matches!(op, OpCode::ArrayGetIndex | OpCode::ArrayLength) {
-                    continue;
-                }
-                let info = decode(code, instr_offset, constants)?;
-                let obj_reg = *info.uses.first()?;
-
-                let source = if lp.is_invariant(obj_reg) {
-                    CacheSource::RegisterInvariant
-                } else {
-                    match classify_site(
-                        code,
-                        constants,
-                        header_offset,
-                        latch_end_offset,
-                        instr_offset,
-                        obj_reg,
-                    ) {
-                        Some(s) => s,
-                        None => continue, // this site isn't cacheable; not fatal to the loop
+            if is_real[i] && alloc_free && is_innermost {
+                for instr_idx in lp.header..=lp.latch {
+                    let instr_offset = offsets[instr_idx];
+                    let op = OpCode::from_u16(code[instr_offset])?;
+                    if !matches!(op, OpCode::ArrayGetIndex | OpCode::ArrayLength) {
+                        continue;
                     }
-                };
+                    let info = decode(code, instr_offset, constants)?;
+                    let obj_reg = *info.uses.first()?;
 
-                if candidates
-                    .iter()
-                    .any(|c| c.obj_vreg == obj_reg && c.source == source)
-                {
-                    continue; // already tracked
-                }
+                    let source = if lp.is_invariant(obj_reg) {
+                        CacheSource::RegisterInvariant
+                    } else {
+                        match classify_site(
+                            code,
+                            constants,
+                            header_offset,
+                            latch_end_offset,
+                            instr_offset,
+                            obj_reg,
+                        ) {
+                            Some(s) => s,
+                            None => continue, // this site isn't cacheable; not fatal to the loop
+                        }
+                    };
 
-                if candidates.len() >= MAX_CANDIDATES {
-                    // More distinct invariant arrays than we have registers
-                    // for. Keep what's already found rather than bailing
-                    // the whole loop: sites past the register budget just
-                    // find no match in `cache_reg_for` and fall back to the
-                    // always-correct guarded path, same as any non-hoisted
-                    // site.
-                    continue;
+                    if candidates
+                        .iter()
+                        .any(|c| c.obj_vreg == obj_reg && c.source == source)
+                    {
+                        continue; // already tracked
+                    }
+
+                    if candidates.len() >= MAX_CANDIDATES {
+                        // More distinct invariant arrays than we have
+                        // registers for. Keep what's already found rather
+                        // than dropping everything: sites past the
+                        // register budget just find no match in
+                        // `cache_reg_for` and fall back to the
+                        // always-correct guarded path, same as any
+                        // non-hoisted site.
+                        continue;
+                    }
+                    candidates.push(HoistCandidate {
+                        obj_vreg: obj_reg,
+                        source,
+                    });
                 }
-                candidates.push(HoistCandidate {
-                    obj_vreg: obj_reg,
-                    source,
-                });
             }
 
-            if candidates.is_empty() {
-                return None;
-            }
-
-            Some(HoistPlan {
-                candidates,
+            Some(LoopDiagnostic {
                 header_offset,
                 latch_offset,
                 latch_end_offset,
+                is_real: is_real[i],
+                is_alloc_free: alloc_free,
+                is_innermost,
+                candidates,
             })
+        })
+        .collect()
+}
+
+/// Plan hoists for every eligible innermost loop in `code`. Conservative by
+/// construction: skips loops with any instruction outside the
+/// allocation-free allowlist (see [`is_alloc_free_op`]), more than
+/// [`MAX_CANDIDATES`] distinct invariant arrays, a header with no
+/// fall-through predecessor (see `header_reachable_by_fallthrough`), or
+/// that themselves contain a nested loop (only the innermost loop of a
+/// nest gets the cache registers — see the design doc's "Registro de
+/// cache" section).
+pub(crate) fn plan_hoists(code: &[u16], constants: &[PoolEntry]) -> Vec<HoistPlan> {
+    diagnose_loops(code, constants)
+        .into_iter()
+        .filter(|d| !d.candidates.is_empty())
+        .map(|d| HoistPlan {
+            candidates: d.candidates,
+            header_offset: d.header_offset,
+            latch_offset: d.latch_offset,
+            latch_end_offset: d.latch_end_offset,
         })
         .collect()
 }

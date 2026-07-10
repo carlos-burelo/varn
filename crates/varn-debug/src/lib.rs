@@ -8,6 +8,7 @@ pub mod error;
 pub mod expr;
 pub mod flags;
 pub mod hir;
+pub mod loop_diagnostics;
 pub mod modules;
 pub mod scope;
 pub mod ssa;

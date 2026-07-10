@@ -7,6 +7,12 @@ pub mod regalloc;
 pub mod registers;
 pub mod safepoint;
 
+/// Loop-invariant array-guard hoisting diagnostics — see
+/// `loop_hoist::diagnose_loops`'s docs. Exposed for `vn debug -p bytecode`
+/// (via `varn-debug`); the rest of `loop_hoist` (the actual codegen-facing
+/// `plan_hoists`/`HoistPlan`) stays crate-private.
+pub use loop_hoist::{diagnose_loops, is_alloc_free_op, CacheSource, HoistCandidate, LoopDiagnostic};
+
 use std::any::Any;
 use std::rc::Rc;
 use varn_types::FunctionProto;

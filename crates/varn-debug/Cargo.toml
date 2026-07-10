@@ -12,4 +12,5 @@ varn-checker  = { path = "../varn-checker" }
 varn-modules  = { path = "../varn-modules" }
 varn-types    = { path = "../varn-types" }
 varn-opt      = { path = "../varn-opt" }
+varn-jit      = { path = "../varn-jit" }
 rustc-hash    = "1"

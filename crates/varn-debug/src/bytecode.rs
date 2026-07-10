@@ -684,12 +684,16 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
         ));
     }
 
+    crate::loop_diagnostics::print_loop_diagnostics(
+        &proto.chunk.code,
+        &proto.chunk.constants,
+        &indent,
+    );
+    terminal::blank();
+
     for entry in &proto.chunk.constants {
         if let varn_types::PoolEntry::Function(nested) = entry {
-            terminal::blank();
             print_proto(nested, depth + 1, total);
         }
     }
-
-    terminal::blank();
 }
