@@ -64,6 +64,14 @@ impl ModuleLoader for StdlibLoader {
 
         let provider = varn_modules::provider::get()
             .ok_or_else(|| ModuleError::new("stdlib provider not registered"))?;
+
+        if let Some(blob) = provider.bytecode_blob(spec) {
+            let proto: FunctionProto = postcard::from_bytes(blob).map_err(|e| {
+                ModuleError::new(format!("corrupt std bundle bytecode for {spec}: {e}"))
+            })?;
+            return Ok(Some(Rc::new(proto)));
+        }
+
         let source = provider
             .embedded_source(spec)
             .map(|s| s.to_owned())

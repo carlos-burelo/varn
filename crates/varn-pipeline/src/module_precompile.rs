@@ -56,6 +56,13 @@ pub fn build_module_graph(
         }
         enqueued.insert(module_path.clone());
 
+        if let Some(provider) = varn_modules::provider::get() {
+            if provider.bytecode_blob(&module_path).is_some() {
+                graph.insert(module_path.clone(), Vec::new());
+                continue;
+            }
+        }
+
         let source = read_module_source(&module_path)
             .map_err(|e| format!("cannot read module '{module_path}': {e}"))?;
         source_hashes.insert(module_path.clone(), fnv1a64(source.as_bytes()));
@@ -252,6 +259,9 @@ pub fn resolve_import_specifier(
                 return Ok(Some(specifier.to_owned()));
             }
             if provider.source_path(specifier).is_some() {
+                return Ok(Some(specifier.to_owned()));
+            }
+            if provider.bytecode_blob(specifier).is_some() {
                 return Ok(Some(specifier.to_owned()));
             }
             Ok(None)

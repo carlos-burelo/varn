@@ -26,7 +26,7 @@ pub fn run_doctor() -> CliResult<()> {
         println!("  varn_STDLIB env: <not set>");
     }
 
-    if stdlib.exists() {
+    let stdlib_result = if stdlib.exists() {
         println!("  stdlib: {} (ok)", stdlib.display());
         Ok(())
     } else {
@@ -34,5 +34,19 @@ pub fn run_doctor() -> CliResult<()> {
         Err(CliError::fatal(
             "stdlib not found. Run installer script or set varn_STDLIB to a valid directory.",
         ))
+    };
+
+    match varn_modules::provider::get().and_then(|p| p.std_provenance()) {
+        Some((desc, prov)) => {
+            let origin = match prov {
+                varn_modules::std_root::StdProvenance::ProjectOverride => "varn.json override",
+                varn_modules::std_root::StdProvenance::Env => "VARN_STD",
+                varn_modules::std_root::StdProvenance::Toolchain => "toolchain",
+            };
+            println!("  std: {desc} (via {origin})");
+        }
+        None => println!("  std: embedded registry only (no std tree/bundle found)"),
     }
+
+    stdlib_result
 }
