@@ -4,13 +4,12 @@ Cómo `std:*` sale del binario `vn` y se distribuye como artefacto versionado
 independiente. Diseño completo: [superpowers/specs/2026-07-09-stdlib-package-system-design.md](superpowers/specs/2026-07-09-stdlib-package-system-design.md).
 Este documento describe el estado **implementado**, no el aspiracional.
 
-> **⚠️ Advertencia — modo bundle roto para módulos con intrinsics.**
-> `std.vnb` (modo bundle) tiene un bug de correctitud conocido, intermitente
-> y sin resolver: las llamadas a `std:math` fallan en runtime en el
-> ~60-90% de las corridas (y potencialmente otros módulos que usan
-> el opcode `Intrinsic`). **No distribuir `std.vnb` a usuarios finales
-> hasta que se corrija.** Detalle completo, diagnóstico y datos crudos en
-> [§8 — Known Issue](#known-issue--bundle-mode--intrinsics-de-stdmath-bloqueante)
+> **✅ Bug de bundle mode corregido.** `std.vnb` tuvo un bug de correctitud
+> intermitente (llamadas a `std:math` fallando en runtime) entre el
+> aterrizaje de este documento y su corrección. Root cause: puntero JIT
+> obsoleto (`REG_GLOBALS`) tras crecer la tabla de globals tras cargar un
+> módulo. Corregido — detalle completo en
+> [§8 — Known Issue (resuelto)](#known-issue-resuelto--bundle-mode--intrinsics-de-stdmath)
 > más abajo.
 
 ## 1. Tres niveles
@@ -155,44 +154,62 @@ crudos en el mensaje del commit que introduce este documento.
 | Árbol fuente (`VARN_STD=std/`) | compila on-demand + `.vnc` | ~41.5 ms | **11.20 ms** |
 | Bundle (`VARN_STD=std.vnb`) | carga directa del blob | ~40-43 ms | **10.36 ms**¹ |
 
-¹ Medido con `std:path` (`path.join(...)`), no con `std:math` — ver Known
-Issue abajo. Bundle mode es marginalmente más rápido que árbol/embedded en
+¹ Medido con `std:path` (`path.join(...)`), no con `std:math`, porque al
+momento de esta medición `std:math` disparaba el bug de bundle mode descrito
+(y ya corregido) en §8 más abajo. `std:math` ahora funciona de forma
+confiable en modo bundle (180 corridas consecutivas sin fallo tras el fix);
+esta tabla no se re-midió con las tres filas bajo condiciones idénticas
+tras la corrección, así que se deja como registro histórico de la medición
+original en vez de reemplazar una sola fila con un número no comparable.
+Bundle mode es marginalmente más rápido que árbol/embedded en
 este workload trivial (como es esperable: sin parse/check/compile), pero la
 diferencia es pequeña frente al costo fijo de arranque del proceso — no se
 reclama una mejora dramática, solo lo medido.
 
-### Known Issue — bundle mode + intrinsics de `std:math` (bloqueante)
+### Known Issue (resuelto) — bundle mode + intrinsics de `std:math`
 
 Al medir con el script exacto del plan (`Math.abs(-1)` en modo bundle), la
-ejecución falla intermitentemente (~60-90% de las corridas observadas, en
+ejecución fallaba intermitentemente (~60-90% de las corridas observadas, en
 tres series independientes de 10-15 corridas cada una) con
 `runtime error: value is not callable: <float basura> (type: float)` al
-invocar `Math.abs`. El mismo bytecode cacheado produce resultados distintos
-entre invocaciones de proceso idénticas — indica un bug de estado en tiempo
-de ejecución (no un error de compilación determinista).
+invocar el `Call` inmediatamente siguiente (típicamente `print`). El mismo
+bytecode cacheado producía resultados distintos entre invocaciones de
+proceso idénticas.
 
-Diagnóstico realizado (sin fix — fuera de alcance de esta tarea):
-- **No** reproduce en modo árbol (15/15 corridas OK) ni en el baseline
-  embebido pre-Task-4 (15/15 OK) con el script idéntico → regresión nueva,
-  no preexistente.
-- **No** reproduce con otro módulo std que usa el mismo patrón de namespace
-  (`std:path`, `path.join(...)`, 10/10 OK en modo bundle).
-- **No** reproduce corriendo `tests/main.vn` completo en modo bundle (10/10
-  OK) — y `tests/52-math-trig.vn` (parte de esa suite) importa `std:math` y
-  llama `Math.acos/asin/atan/atan2` con el mismo patrón. La falla solo se
-  observó en scripts aislados donde el import+llamada a `Math.*` ocurre
-  entre las primeras operaciones del proceso — sugiere una dependencia de
-  estado/timing (heap, shape cache o GC temprano) más que un error
-  determinista de compilación.
-- El loader (`StdlibLoader::load`) es puramente síncrono — se descarta una
-  condición de carrera en la carga del blob en sí.
-- Hipótesis más probable: interacción entre el opcode `Intrinsic` que el
-  compilador emite para llamadas reconocidas a `Math.*` (spec §5) y algo del
-  ciclo de vida runtime específico de bytecode cargado desde blob (shapes /
-  inline cache / GC) en las primeras ejecuciones del proceso. Sin confirmar
-  — requiere debugging dedicado de VM (no cubierto por esta tarea).
+**Root cause confirmado** (instrumentación directa en el intérprete +
+lectura del codegen JIT, `crates/varn-jit/src/codegen/misc/helpers.rs` /
+`regalloc.rs`): el prólogo de cada función JIT-compilada cachea, una sola
+vez, un puntero crudo (`REG_GLOBALS`, registro `R14`) al buffer interno de
+`ExecCtx.globals.values: Vec<VmValue>`. `emit_load_module` (codegen de
+`LoadModule`) ya recomputaba `REG_FRAME_BASE` tras la llamada FFI (vía
+`recompute_frame: true`, porque cargar un módulo puede crecer el stack de
+la VM) pero **no** recomputaba `REG_GLOBALS`. Cargar `std:math` por primera
+vez ejecuta el cuerpo entero de `std/math.vn`, que hace `DefineGlobal(Idx)`
+~40 veces (E, LN10, …, abs, sqrt, …, el objeto `Math`) — suficiente para
+que el `Vec` de globals reasigne su buffer. Toda lectura posterior de un
+global vía `LoadGlobalIdx` (p. ej. `print`, resuelto por índice fijo en
+tiempo de compilación) leía entonces a través de un puntero colgante hacia
+el buffer viejo, ya liberado — lectura de memoria liberada, con contenido
+no determinista según qué reutilizó esa página entre la liberación y la
+lectura. Esto también explica por qué modo árbol nunca fallaba: compila
+`std/math.vn` en el mismo proceso que corre el script, y el `Vec` de
+globals típicamente ya tenía suficiente capacidad reservada de antes,
+evitando la reasignación exacta en ese punto.
 
-**Esto bloquea el uso en producción de `std.vnb` para módulos con intrinsics
-reconocidos por el compilador hasta que se investigue y corrija.** Se deja
-registrado aquí en vez de ocultarlo; ver mensaje del commit para el detalle
-completo de las corridas.
+**Fix:** `emit_load_module` ahora re-emite la misma instrucción que usa el
+prólogo (`mov REG_GLOBALS, [ExecCtx + globals_offset + 8]`) inmediatamente
+después de la llamada FFI que carga el módulo — mismo patrón que
+`recompute_frame`, aplicado al puntero de globals. Cambio de ~10 líneas,
+un solo call site (`crates/varn-jit/src/codegen/misc/helpers.rs`).
+
+**Verificado:** 180 corridas consecutivas del script del plan en modo
+bundle, 0 fallos (vs. ~35-65% de fallo antes del fix); suite completa
+(`tests/main.vn`, 674 tests) y `vn bench` verdes en modo árbol y modo
+bundle tras el fix; suites de `varn-modules`/`varn-checker`/`varn-builtins`
+sin regresión.
+
+Nota para el futuro: otros call sites de FFI en el JIT con `reload: true`
+(p. ej. `CallSpread`, que recompone `REG_FRAME_BASE` a mano) no fueron
+auditados exhaustivamente por si alguno puede definir globals nuevos de
+forma transitiva — `LoadModule` es el único camino confirmado y corregido
+aquí.

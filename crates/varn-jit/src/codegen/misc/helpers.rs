@@ -264,6 +264,20 @@ pub(crate) fn emit_load_module(ctx: &mut CodegenCtx, first_reg: usize) {
             recompute_frame: true,
         },
     );
+
+    // Loading a module can run its entire init body, which may `DefineGlobal`
+    // many new entries and grow `ExecCtx.globals.values` (a Vec) past its
+    // current capacity. That reallocates the backing buffer, so REG_GLOBALS
+    // — cached once at this function's prologue — must be re-derived from
+    // ExecCtx here, exactly like REG_FRAME_BASE already is above. Without
+    // this, later LoadGlobalIdx/StoreGlobalIdx reads dereference a freed
+    // buffer (use-after-free: intermittent garbage values, worse on Windows
+    // where the freed page can be reused quickly).
+    ctx.asm.mov_reg_mem(
+        crate::registers::REG_GLOBALS,
+        ARG_EXEC_CTX,
+        (ctx.helpers.globals_offset + 8) as i32,
+    );
 }
 
 pub(crate) fn emit_store_module_slot(ctx: &mut CodegenCtx, first_reg: usize) {

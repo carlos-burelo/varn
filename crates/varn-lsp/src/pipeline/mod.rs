@@ -77,16 +77,23 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         .filter(|t| {
             !matches!(
                 t.kind,
-                TokenKind::Whitespace | TokenKind::Newline | TokenKind::EOF | TokenKind::DocComment
+                TokenKind::Whitespace
+                    | TokenKind::Newline
+                    | TokenKind::EOF
+                    | TokenKind::DocComment
+                    | TokenKind::Dynamic
             )
         })
         .map(|t| {
             let lex = t.get_lexeme(&lexeme_buf);
+            let start_byte = t.range.start.offset as usize;
+            let end_byte = t.range.end.offset as usize;
+            let line_start_byte = source[..start_byte].rfind('\n').map(|i| i + 1).unwrap_or(0);
             TokenRecord {
                 kind: t.kind,
                 line: t.range.start.line.saturating_sub(1),
-                col: t.range.start.column,
-                length: t.range.end.offset - t.range.start.offset,
+                col: source[line_start_byte..start_byte].chars().count() as u32,
+                length: source[start_byte..end_byte].chars().count() as u32,
                 offset: t.range.start.offset,
                 lexeme: lex.to_string(),
             }

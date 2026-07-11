@@ -222,6 +222,11 @@ impl DocumentState {
                         _ => (info.ty.to_string(), String::new()),
                     };
 
+                    if let Some(sid) = self.checker_symbol_id_at_token(tok) {
+                        if let Some(s) = self.symbols.iter().find(|s| s.symbol_id == Some(sid)) {
+                            return Some(ChainResult::Symbol(s));
+                        }
+                    }
                     return Some(ChainResult::DynamicMember {
                         member: MemberRecord {
                             name: tok.lexeme.clone(),
@@ -230,7 +235,7 @@ impl DocumentState {
                             is_static: false,
                             is_optional: false,
                             kind: if is_fn {
-                                MemberKind::Method
+                                MemberKind::Function
                             } else {
                                 MemberKind::Property
                             },
