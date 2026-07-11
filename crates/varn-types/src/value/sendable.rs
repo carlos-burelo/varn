@@ -1,4 +1,6 @@
-use crate::value::{alloc_array, alloc_map, alloc_object, alloc_set, nv_to_value, Value};
+use crate::value::{
+    alloc_array, alloc_map, alloc_object, alloc_set, new_object, nv_to_value, ObjData, Value,
+};
 use crate::vm_value::VmValue;
 use rust_decimal::Decimal;
 use std::rc::Rc;
@@ -17,6 +19,10 @@ pub enum SendValue {
     Object(std::collections::HashMap<String, SendValue>),
     Map(Vec<(SendValue, SendValue)>),
     Set(Vec<SendValue>),
+    /// Endpoint de canal (id en varn_runtime::channel). Se transfiere por
+    /// referencia: ambos lados comparten el mismo canal.
+    ChannelSender(u64),
+    ChannelReceiver(u64),
 }
 
 impl Value {
@@ -38,6 +44,24 @@ impl Value {
                 Ok(SendValue::Array(items))
             }
             Value::Object(obj) => {
+                {
+                    let guard = obj.read();
+                    if let Some(cls) = guard.class() {
+                        let cname = cls.name.as_str();
+                        if cname == "Sender" || cname == "Receiver" {
+                            if let Some(Value::Int(id)) =
+                                guard.inner.get("_chan").map(nv_to_value)
+                            {
+                                return Ok(if cname == "Sender" {
+                                    SendValue::ChannelSender(id as u64)
+                                } else {
+                                    SendValue::ChannelReceiver(id as u64)
+                                });
+                            }
+                            return Err(format!("{cname}: endpoint sin _chan"));
+                        }
+                    }
+                }
                 let mut map = std::collections::HashMap::new();
                 for (k, nv) in obj.read().inner.iter() {
                     let v = nv_to_value(nv);
@@ -70,6 +94,19 @@ impl Value {
             _ => Err(format!("Value cannot be sent to an isolate")),
         }
     }
+}
+
+/// Heap-independent marker object for a channel endpoint crossing an
+/// isolate boundary. `varn-vm` (Task 3) recognizes `__chanEndpoint` on
+/// materialization and mints a real `Sender`/`Receiver` instance from it.
+fn endpoint_marker(dir: &str, id: u64) -> Value {
+    let mut obj = ObjData::new();
+    obj.set_field(
+        std::rc::Rc::from("__chanEndpoint"),
+        Value::Str(std::rc::Rc::from(dir)),
+    );
+    obj.set_field(std::rc::Rc::from("__chanId"), Value::Int(id as i64));
+    new_object(obj)
 }
 
 impl SendValue {
@@ -118,6 +155,8 @@ impl SendValue {
                 drop(g);
                 Value::Set(set_ref)
             }
+            SendValue::ChannelSender(id) => endpoint_marker("tx", *id),
+            SendValue::ChannelReceiver(id) => endpoint_marker("rx", *id),
         }
     }
 
@@ -167,6 +206,35 @@ impl SendValue {
                 drop(g);
                 ctx.intern(Value::Set(set_ref))
             }
+            SendValue::ChannelSender(id) => endpoint_marker_ctx(ctx, "tx", *id),
+            SendValue::ChannelReceiver(id) => endpoint_marker_ctx(ctx, "rx", *id),
         }
+    }
+}
+
+/// `to_value_ctx` counterpart of [`endpoint_marker`]: same marker shape, but
+/// built through `NativeCtx` since the destination heap is context-owned.
+/// Task 3 replaces this with real instance minting once the VM hook exists.
+fn endpoint_marker_ctx(ctx: &mut dyn crate::NativeCtx, dir: &str, id: u64) -> VmValue {
+    let obj = ctx.alloc_object();
+    let dir_val = ctx.alloc_str(dir);
+    ctx.set_field(obj, "__chanEndpoint", dir_val);
+    let id_val = ctx.int_val(id as i64);
+    ctx.set_field(obj, "__chanId", id_val);
+    obj
+}
+
+#[cfg(test)]
+mod channel_endpoint_tests {
+    use super::*;
+
+    #[test]
+    fn endpoint_variants_roundtrip_marker() {
+        let tx = SendValue::ChannelSender(42);
+        let v = tx.to_value();
+        let Value::Object(o) = &v else { panic!("marker must be object") };
+        let guard = o.read();
+        assert!(guard.inner.contains_key("__chanEndpoint"));
+        assert!(guard.inner.contains_key("__chanId"));
     }
 }
