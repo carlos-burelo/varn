@@ -4,6 +4,15 @@ Cómo `std:*` sale del binario `vn` y se distribuye como artefacto versionado
 independiente. Diseño completo: [superpowers/specs/2026-07-09-stdlib-package-system-design.md](superpowers/specs/2026-07-09-stdlib-package-system-design.md).
 Este documento describe el estado **implementado**, no el aspiracional.
 
+> **⚠️ Advertencia — modo bundle roto para módulos con intrinsics.**
+> `std.vnb` (modo bundle) tiene un bug de correctitud conocido, intermitente
+> y sin resolver: las llamadas a `std:math` fallan en runtime en el
+> ~60-90% de las corridas (y potencialmente otros módulos que usan
+> el opcode `Intrinsic`). **No distribuir `std.vnb` a usuarios finales
+> hasta que se corrija.** Detalle completo, diagnóstico y datos crudos en
+> [§8 — Known Issue](#known-issue--bundle-mode--intrinsics-de-stdmath-bloqueante)
+> más abajo.
+
 ## 1. Tres niveles
 
 | Nivel | Dónde vive | Ejemplos | Empaquetado |
