@@ -80,13 +80,16 @@ VM register-based con NaN-boxing. Inline Cache (GetProp/SetProp por clase+slot),
 Scheduler async sobre runtime Tokio multi-thread. Las tareas Varn `!Send` viven en `LocalSet`; `spawnIsolate` levanta workers en hilos separados y se comunica por `IsolatePort`.
 
 ### `varn-builtins`
-Implementaciones nativas de stdlib. LBI: `#[varn_module]` + `#[varn_fn]`/`#[varn_class]` inyectan `NativeOpEntry` en secciones del linker. `build_module()` ensambla el objeto Varn en startup.
+Implementaciones nativas de `core:`/`runtime:`/globals (host boundary). LBI: `#[varn_module]` + `#[varn_fn]`/`#[varn_class]` inyectan `NativeOpEntry` en secciones del linker. `build_module()` ensambla el objeto Varn en startup. Ya **no** embebe fuentes `std:*` — esas viven en el árbol top-level `std/` (ver [STDLIB_ARCHITECTURE.md](STDLIB_ARCHITECTURE.md)); `build.rs` rechaza cualquier `module.json` con `"kind": "stdlib"` fuera de los 4 ids deferred (`std:collections`, `std:reflect`, `std:task`, `std:types`).
 
 ### `varn-op-macros`
 Proc macros: `#[varn_module]`, `#[varn_fn]`, `#[varn_class]`, `#[varn_constructor]`, `#[varn_method]`, `#[varn_getter]`, `#[varn_static]`, `#[varn_extends]`, `#[varn_namespace]`.
 
 ### `varn-modules`
-Registro canónico de módulos (`MODULE_REGISTRY`). Resolución topológica. Especificadores `std:*`, `builtin:*`.
+Registro canónico de módulos (`MODULE_REGISTRY`). Resolución topológica. Especificadores `std:*`, `builtin:*`. `bundle` (formato `.vnb`) y `std_root` (resolución de la std activa: `varn.json` override → `VARN_STD` → `<exe>/std.vnb`) — ver [STDLIB_ARCHITECTURE.md](STDLIB_ARCHITECTURE.md).
+
+### `xtask`
+Crate de tooling del repo (no se publica, no es dependencia de `vn`). `cargo xtask build-std` compila `std/` a `std.vnb` versionado para release/CI.
 
 ### `varn-cli`
 Binario `vn`. Pipeline completo: `run`, `check`, `eval`, `repl`, `bench`, `debug`, `build`, `pkg`, `init`, `doctor`, `cache`, `lsp`, `completions`.

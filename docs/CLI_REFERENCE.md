@@ -168,6 +168,16 @@ Flags:
 
 - `--name <NAME>`: nombre del proyecto.
 
+`varn.json` acepta la clave opcional `"std"` para fijar la std del proyecto
+(anula `VARN_STD` y el default del toolchain):
+
+```json
+{ "name": "mi-proyecto", "std": "../otra-std/std.vnb" }
+```
+
+La ruta apunta a un `.vnb` o a un árbol con `std.json`; relativa al directorio
+de `varn.json`. Ver [STDLIB_ARCHITECTURE.md](STDLIB_ARCHITECTURE.md).
+
 ### `doctor`
 
 Ejecuta diagnósticos del sistema y configuración.
@@ -175,6 +185,18 @@ Ejecuta diagnósticos del sistema y configuración.
 ```bash
 vn doctor
 ```
+
+Entre otras cosas, reporta la std activa y su procedencia (resolución:
+`varn.json` `"std"` → env `VARN_STD` → `<exe_dir>/std.vnb`):
+
+```
+std: bundle C:\...\std.vnb v0.1.0 (via toolchain)
+std: source tree C:\...\std v0.1.0 (via VARN_STD)
+std: embedded registry only (no std tree/bundle found)
+```
+
+Ver [STDLIB_ARCHITECTURE.md](STDLIB_ARCHITECTURE.md) para el detalle de
+formato `.vnb`, resolución y dev workflow.
 
 ### `cache`
 

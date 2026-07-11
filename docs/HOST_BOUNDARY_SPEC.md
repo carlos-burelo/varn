@@ -112,3 +112,19 @@ dispatch_host_op(id, ctx, args)
 ```
 
 Ver detalles de implementación en [LBI_ARCHITECTURE.md](LBI_ARCHITECTURE.md).
+
+## Versionado: `HOST_API_VERSION`
+
+`varn_core::HOST_API_VERSION: u32` versiona la superficie `runtime:*` como
+unidad — es lo que hace posible distribuir `std.vnb` desacoplado del binario
+`vn` (ver [STDLIB_ARCHITECTURE.md](STDLIB_ARCHITECTURE.md)).
+
+- **Breaking change** (firma de un native cambia, símbolo se elimina/renombra)
+  → **bump obligatorio** de `HOST_API_VERSION`. `StdBundle::validate_compat_with`
+  rechaza en carga cualquier bundle cuyo `host_api_version` no calce
+  exactamente con el del binario — error inmediato, sin fallback silencioso.
+- **Cambio aditivo** (símbolo nuevo, sin tocar los existentes) → **no** bump.
+  Un bundle que use el símbolo nuevo sobre un binario viejo no lo detecta el
+  check de versión; falla al resolver ese import puntual con un error de
+  módulo claro (`runtime:x tiene un import no resuelto`). El check de versión
+  cubre breaking changes; la resolución de imports cubre los aditivos.

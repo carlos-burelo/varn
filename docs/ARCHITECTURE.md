@@ -136,6 +136,13 @@ Tres espacios de nombres:
 
 Resolución centralizada en `varn-modules`. Caché de bytecode en `.vn/cache/` invalidado por hash de contenido.
 
+`std:*` ya no vive embebido en el binario: sus fuentes están en el árbol
+top-level `std/` (fuera de `varn-builtins`) y se compilan a un artefacto
+versionado `std.vnb` vía `cargo xtask build-std`. `core:`/`runtime:`/globals
+siguen embebidos — son el host. Detalle completo del empaquetado, formato
+`.vnb`, resolución (`varn.json` → `VARN_STD` → toolchain) y startup medido en
+[STDLIB_ARCHITECTURE.md](STDLIB_ARCHITECTURE.md).
+
 ---
 
 ## 8. Formato `.vnc`

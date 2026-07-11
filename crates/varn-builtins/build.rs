@@ -2,6 +2,13 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 
+/// std ids still embedded in the registry: they share source with `core:`
+/// ids or need special checker handling, and migrate out in the Host API
+/// reshape follow-up plan (see docs/STDLIB_ARCHITECTURE.md). Every other
+/// `"kind": "stdlib"` module.json belongs in the top-level `std/` tree.
+const DEFERRED_STDLIB_IDS: &[&str] =
+    &["std:collections", "std:reflect", "std:task", "std:types"];
+
 fn main() {
     println!("cargo:rerun-if-changed=src/modules");
 
@@ -123,6 +130,11 @@ fn emit_spec_entry(
     _capabilities: &[String],
     pure_module: bool,
 ) {
+    if kind == "stdlib" && !DEFERRED_STDLIB_IDS.contains(&id) {
+        panic!(
+            "std module {id} must live in the top-level std/ tree, not in varn-builtins (see docs/STDLIB_ARCHITECTURE.md)"
+        );
+    }
     let kind_expr = match kind {
         "core" => "ModuleKind::Core",
         "stdlib" => "ModuleKind::Stdlib",
