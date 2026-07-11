@@ -2,13 +2,15 @@
 //! `std:` imports. One mechanism, two storage forms (spec §4).
 //!
 //! Order: project varn.json `"std"` override → VARN_STD env (dev/CI) →
-//! `std.vnb` next to the executable.
+//! this checkout's `std/` tree (any binary built under `target/`, however
+//! it's launched) → `std.vnb` next to the executable.
 
 use std::path::{Path, PathBuf};
 
 pub const ENV_VARN_STD: &str = "VARN_STD";
 pub const STD_MANIFEST_FILE: &str = "std.json";
 pub const STD_BUNDLE_FILE: &str = "std.vnb";
+pub const STD_DIR_NAME: &str = "std";
 
 #[derive(Debug, Clone)]
 pub enum StdSource {
@@ -20,6 +22,11 @@ pub enum StdSource {
 pub enum StdProvenance {
     ProjectOverride,
     Env,
+    /// This checkout's own `std/` tree, found by walking up from the running
+    /// binary's location. Covers any launcher (editor, debugger, direct exe)
+    /// without needing cargo to inject `VARN_STD` — that only reaches
+    /// `cargo run`/`test`, not a subprocess spawned straight off disk.
+    DevCheckout,
     Toolchain,
 }
 
@@ -73,6 +80,9 @@ fn resolve_uncached() -> Option<(StdSource, StdProvenance)> {
             return Some((src, StdProvenance::Env));
         }
     }
+    if let Some(src) = dev_checkout_std() {
+        return Some((src, StdProvenance::DevCheckout));
+    }
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             if let Some(src) = classify(&dir.join(STD_BUNDLE_FILE)) {
@@ -116,6 +126,21 @@ pub fn in_source_tree(file: &str) -> bool {
     verdict
 }
 
+/// Walks up from the running binary looking for a sibling `std/` tree
+/// (`std/std.json`) — the layout of this repo's own `target/<profile>/`.
+/// Released binaries ship without a `std/` dir next to them, so this is a
+/// no-op there and resolution falls through to the bundle tier.
+fn dev_checkout_std() -> Option<StdSource> {
+    let exe = std::env::current_exe().ok()?;
+    find_dev_std_from(&exe)
+}
+
+fn find_dev_std_from(start: &Path) -> Option<StdSource> {
+    start
+        .ancestors()
+        .find_map(|dir| classify(&dir.join(STD_DIR_NAME)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -133,6 +158,35 @@ mod tests {
 
         let missing = std::env::temp_dir().join("varn_stdroot_missing_xyz");
         assert!(classify(&missing).is_none());
+    }
+
+    #[test]
+    fn finds_dev_checkout_std_by_walking_up_from_the_binary() {
+        let root = std::env::temp_dir().join("varn_stdroot_test_checkout");
+        let std_dir = root.join("std");
+        let _ = std::fs::create_dir_all(&std_dir);
+        std::fs::write(std_dir.join("std.json"), "{}").unwrap();
+
+        // Mirrors this repo's layout: target/<profile>/<exe> sits two levels
+        // below the checkout root that also holds `std/`.
+        let fake_exe = root.join("target").join("debug").join("vn-lsp.exe");
+        let _ = std::fs::create_dir_all(fake_exe.parent().unwrap());
+
+        match find_dev_std_from(&fake_exe) {
+            Some(StdSource::SourceTree(p)) => assert_eq!(p, std_dir),
+            other => panic!("expected SourceTree({}), got {other:?}", std_dir.display()),
+        }
+    }
+
+    #[test]
+    fn no_dev_checkout_std_when_none_present_up_the_tree() {
+        let fake_exe = std::env::temp_dir()
+            .join("varn_stdroot_test_no_checkout")
+            .join("target")
+            .join("debug")
+            .join("vn-lsp.exe");
+        let _ = std::fs::create_dir_all(fake_exe.parent().unwrap());
+        assert!(find_dev_std_from(&fake_exe).is_none());
     }
 
     #[test]

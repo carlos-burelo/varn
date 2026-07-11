@@ -41,6 +41,7 @@ pub fn run_doctor() -> CliResult<()> {
             let origin = match prov {
                 varn_modules::std_root::StdProvenance::ProjectOverride => "varn.json override",
                 varn_modules::std_root::StdProvenance::Env => "VARN_STD",
+                varn_modules::std_root::StdProvenance::DevCheckout => "dev checkout (std/ next to binary)",
                 varn_modules::std_root::StdProvenance::Toolchain => "toolchain",
             };
             println!("  std: {desc} (via {origin})");

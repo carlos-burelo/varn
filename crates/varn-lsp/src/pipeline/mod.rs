@@ -137,6 +137,35 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         });
     }
 
+    // `cannot resolve module 'std:*'` on every stdlib import usually means no
+    // active std was found at all (missing std/, corrupt bundle, bad install)
+    // rather than N unrelated typos — surface that as one clear diagnostic
+    // instead of leaving the user to guess from the per-import spam.
+    if diagnostics
+        .iter()
+        .any(|d| d.message.starts_with("cannot resolve module 'std:"))
+        && varn_modules::provider::get()
+            .and_then(|p| p.std_provenance())
+            .is_none()
+    {
+        diagnostics.insert(
+            0,
+            LspDiag {
+                message: "no standard library found for this workspace (checked varn.json \
+                    'std', VARN_STD, this checkout's std/ tree, and the toolchain's std.vnb) \
+                    — run `cargo xtask build-std` or reinstall the vn toolchain"
+                    .to_string(),
+                line: 0,
+                col: 0,
+                end_line: 0,
+                end_col: 0,
+                severity: SEVERITY_ERROR,
+                related: Vec::new(),
+                suggestions: Vec::new(),
+            },
+        );
+    }
+
     // Module origins of `import * as ns` aliases. A class/interface destructured
     // out of such a namespace (`const { Duration } = ns`) is bound locally with no
     // origin link, so its member table can only be recovered by resolving the name

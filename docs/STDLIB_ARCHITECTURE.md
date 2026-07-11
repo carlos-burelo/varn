@@ -82,11 +82,15 @@ Orden (`varn_modules::std_root::resolve`), primer hit gana:
 1. **Project override**: `varn.json` → `"std": "<ruta>"` (a un `.vnb` o a un
    árbol con `std.json`).
 2. **Env**: `VARN_STD` (dev/CI) — mismo formato de ruta.
-3. **Toolchain default**: `<exe_dir>/std.vnb`.
+3. **Dev checkout**: sube por los ancestros del propio ejecutable buscando un
+   `std/std.json` hermano — el layout de `target/<profile>/` de este repo.
+   Cubre cualquier lanzador (editor, debugger, exe directo) sin depender de
+   que `VARN_STD` viaje con el proceso.
+4. **Toolchain default**: `<exe_dir>/std.vnb`.
 
 `classify()` decide bundle vs árbol: directorio con `std.json` → `SourceTree`;
-archivo → `Bundle`. `StdProvenance` (`ProjectOverride` / `Env` / `Toolchain`)
-viaja hasta `vn doctor` para diagnóstico.
+archivo → `Bundle`. `StdProvenance` (`ProjectOverride` / `Env` / `DevCheckout`
+/ `Toolchain`) viaja hasta `vn doctor` para diagnóstico.
 
 - **Modo bundle**: `StdlibLoader::load` consulta `provider.bytecode_blob(id)`
   primero — deserializa `FunctionProto` directo del blob, sin parse/check/compile.
@@ -107,10 +111,14 @@ viaja hasta `vn doctor` para diagnóstico.
 VARN_STD = { value = "std", relative = true }
 ```
 
-`cargo build`/`run`/`test` ven automáticamente el árbol `std/` del repo.
-Invocar el binario compilado directamente (`./target/debug/vn`, fuera de
-`cargo`) no hereda esa env — exportar `VARN_STD` manualmente o depender del
-fallback a `<exe_dir>/std.vnb`. Editar `std/*.vn` invalida el cache `.vnc`
+`cargo build`/`run`/`test` ven automáticamente el árbol `std/` del repo vía
+esa env. Invocar el binario compilado directamente (`./target/debug/vn`,
+`vn-lsp` lanzado por un editor, un debugger) no hereda esa env — pero como
+todo binario de este repo vive bajo `target/<profile>/`, el tier **dev
+checkout** (§4.3) lo encuentra igual subiendo por los ancestros del exe hasta
+dar con `std/`. `VARN_STD` sigue siendo útil para apuntar a un árbol/bundle
+distinto al del propio checkout (p. ej. probar modo bundle sin salir del
+repo). Editar `std/*.vn` invalida el cache `.vnc`
 del módulo afectado por hash de contenido (sin purga manual salvo al cambiar
 de modo bundle↔árbol).
 
