@@ -23,6 +23,19 @@ pub enum SendValue {
     /// referencia: ambos lados comparten el mismo canal.
     ChannelSender(u64),
     ChannelReceiver(u64),
+    EnumVariant(Box<SendEnumVariant>),
+}
+
+/// Heap-independent enum variant: self-describing (name + tag + payload), so
+/// the consumer mints a `Value::EnumVariant` directly — `match` on the
+/// receiving side works without loading the enum's defining module.
+#[derive(Clone, Debug)]
+pub struct SendEnumVariant {
+    pub enum_name: String,
+    pub variant_name: String,
+    pub variant_tag: u8,
+    pub fields: Vec<String>,
+    pub payload: SendValue,
 }
 
 impl SendValue {
@@ -107,6 +120,13 @@ impl Value {
                 fields.insert("step".to_string(), SendValue::Int(r.step));
                 Ok(SendValue::Object(fields))
             }
+            Value::EnumVariant(d) => Ok(SendValue::EnumVariant(Box::new(SendEnumVariant {
+                enum_name: d.enum_name.to_string(),
+                variant_name: d.variant_name.to_string(),
+                variant_tag: d.variant_tag,
+                fields: d.fields.iter().map(|f| f.to_string()).collect(),
+                payload: d.payload.to_sendable()?,
+            }))),
             _ => Err(format!("Value cannot be sent to an isolate")),
         }
     }
@@ -187,6 +207,15 @@ impl SendValue {
             }
             SendValue::ChannelSender(id) => endpoint_marker("tx", *id),
             SendValue::ChannelReceiver(id) => endpoint_marker("rx", *id),
+            SendValue::EnumVariant(ev) => {
+                Value::EnumVariant(Box::new(crate::value::EnumVariantData {
+                    enum_name: Rc::from(ev.enum_name.as_str()),
+                    variant_name: Rc::from(ev.variant_name.as_str()),
+                    variant_tag: ev.variant_tag,
+                    fields: ev.fields.iter().map(|f| Rc::from(f.as_str())).collect(),
+                    payload: ev.payload.to_value(),
+                }))
+            }
         }
     }
 
@@ -238,6 +267,18 @@ impl SendValue {
             }
             SendValue::ChannelSender(id) => endpoint_marker_ctx(ctx, "tx", *id),
             SendValue::ChannelReceiver(id) => endpoint_marker_ctx(ctx, "rx", *id),
+            SendValue::EnumVariant(ev) => {
+                let payload_nv = ev.payload.to_value_ctx(ctx);
+                ctx.intern(Value::EnumVariant(Box::new(
+                    crate::value::EnumVariantData {
+                        enum_name: Rc::from(ev.enum_name.as_str()),
+                        variant_name: Rc::from(ev.variant_name.as_str()),
+                        variant_tag: ev.variant_tag,
+                        fields: ev.fields.iter().map(|f| Rc::from(f.as_str())).collect(),
+                        payload: ctx.extract(payload_nv),
+                    },
+                )))
+            }
         }
     }
 }
@@ -356,6 +397,30 @@ mod channel_endpoint_tests {
         let got = SendEnvelope::from_value(&env).expect("must be envelope");
         assert!(!got.wrap);
         assert!(matches!(&got.sv, SendValue::Array(items) if items.len() == 2));
+    }
+
+    #[test]
+    fn enum_variant_roundtrips_through_sendable() {
+        let original = Value::EnumVariant(Box::new(crate::value::EnumVariantData {
+            enum_name: Rc::from("Msg"),
+            variant_name: Rc::from("Val"),
+            variant_tag: 0,
+            fields: vec![],
+            payload: Value::Int(7),
+        }));
+        let sv = original.to_sendable().expect("enum must be sendable");
+        let SendValue::EnumVariant(ev) = &sv else {
+            panic!("must convert to SendValue::EnumVariant")
+        };
+        assert_eq!(ev.enum_name, "Msg");
+        assert_eq!(ev.variant_name, "Val");
+        assert_eq!(ev.variant_tag, 0);
+        let back = sv.to_value();
+        let Value::EnumVariant(d) = &back else {
+            panic!("must materialize as Value::EnumVariant")
+        };
+        assert_eq!(d.enum_name.as_ref(), "Msg");
+        assert!(matches!(d.payload, Value::Int(7)));
     }
 
     #[test]

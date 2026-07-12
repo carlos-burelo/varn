@@ -791,6 +791,20 @@ impl NativeCtx for ExecCtx {
                 Some(HeapObj::BigInt(b)) => Ok(varn_types::value::SendValue::BigInt(*b)),
                 Some(HeapObj::Decimal(d)) => Ok(varn_types::value::SendValue::Decimal(**d)),
                 Some(HeapObj::Char(c)) => Ok(varn_types::value::SendValue::Char(*c)),
+                Some(HeapObj::EnumVariant(d)) => {
+                    // Payload may hold heap refs — walk it with the
+                    // heap-aware converter, not `Value::to_sendable`.
+                    let payload = self.value_to_sendable(&d.payload)?;
+                    Ok(varn_types::value::SendValue::EnumVariant(Box::new(
+                        varn_types::value::SendEnumVariant {
+                            enum_name: d.enum_name.to_string(),
+                            variant_name: d.variant_name.to_string(),
+                            variant_tag: d.variant_tag,
+                            fields: d.fields.iter().map(|f| f.to_string()).collect(),
+                            payload,
+                        },
+                    )))
+                }
                 Some(HeapObj::Range(r)) => {
                     let mut fields = std::collections::HashMap::new();
                     fields.insert(
@@ -876,6 +890,20 @@ impl ExecCtx {
                 } else {
                     Err("Value cannot be sent to an isolate".to_string())
                 }
+            }
+            varn_types::Value::EnumVariant(d) => {
+                // Payload may hold heap refs — walk it here instead of
+                // delegating to the self-contained `Value::to_sendable`.
+                let payload = self.value_to_sendable(&d.payload)?;
+                Ok(varn_types::value::SendValue::EnumVariant(Box::new(
+                    varn_types::value::SendEnumVariant {
+                        enum_name: d.enum_name.to_string(),
+                        variant_name: d.variant_name.to_string(),
+                        variant_tag: d.variant_tag,
+                        fields: d.fields.iter().map(|f| f.to_string()).collect(),
+                        payload,
+                    },
+                )))
             }
             // Scalars and Range are self-contained: one shared conversion.
             _ => val.to_sendable(),

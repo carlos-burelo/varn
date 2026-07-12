@@ -22,7 +22,7 @@ pub use constructors::{new_array, new_object};
 pub use module::{FrozenExport, FrozenModuleObj, ModuleObj};
 pub use object::{nv_to_value, value_to_nv, ObjData};
 use rust_decimal::Decimal;
-pub use sendable::{HostError, SendEnvelope, SendValue};
+pub use sendable::{HostError, SendEnumVariant, SendEnvelope, SendValue};
 pub use shape::{root_shape, RuntimeObject, Shape};
 use std::rc::Rc;
 pub use task::{reject_task, reject_value_task, resolve_task, Poll, TaskState};
