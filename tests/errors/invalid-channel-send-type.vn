@@ -1,0 +1,8 @@
+// expect: error[Varn3001]
+import { channel } from "std:task";
+
+async function main(): void {
+    const ch = channel<int>(1)
+    await ch.tx.send("not an int")
+}
+main()

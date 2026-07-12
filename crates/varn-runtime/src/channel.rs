@@ -3,8 +3,9 @@
 //! Los endpoints Varn (`Sender<T>`/`Receiver<T>`, contrato runtime:task) guardan
 //! solo el `u64` de esta tabla. Todo valor que se entrega desde otro thread es
 //! heap-independiente (`SendValue` / `ObjData`). Valores compuestos (Array/Object/Map/Set)
-//! entregados por direct handoff al receiver se convierten en el thread del sender (igual
-//! que en IsolatePort); la materialización en el heap del consumidor se cablea en Task 3.
+//! entregados por direct handoff al receiver se convierten en el thread del sender;
+//! la materialización en el heap del consumidor vive en el hook de await-resume
+//! del VM (`host_values::open_resolved`).
 
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
@@ -53,9 +54,8 @@ struct ChannelCore {
     state: Mutex<ChannelState>,
 }
 
-// AsyncTask viaja entre threads igual que en IsolatePort (ver isolate.rs):
-// solo se toca bajo el Mutex de state y resolve() es el mismo mecanismo que
-// ya usa el waker del puerto.
+// AsyncTask viaja entre threads: solo se toca bajo el Mutex de state y
+// resolve() despierta al consumidor parked en el otro thread.
 struct Table(Mutex<HashMap<u64, std::sync::Arc<ChannelCore>>>);
 
 static REGISTRY: OnceLock<Table> = OnceLock::new();

@@ -3,8 +3,6 @@ use varn_types::{NativeCtx, Value, VmValue};
 
 pub struct TaskRuntime;
 
-pub struct IsolatePortImpl;
-
 pub struct IsolateHandleImpl;
 
 varn_contract! {
@@ -145,54 +143,6 @@ varn_contract! {
             ctx.set_field(ch_nv, "tx", tx_nv);
             ctx.set_field(ch_nv, "rx", rx_nv);
             Ok(ch_nv)
-        }
-    }
-}
-
-varn_contract! {
-    module: "runtime:task",
-    class: "IsolatePort",
-    contract: "src/modules/std/task/runtime/task_runtime.vn",
-    impl IsolatePortImpl {
-        fn send(ctx: &mut dyn NativeCtx, this: VmValue, msg: VmValue) {
-            let Ok(send_val) = ctx.to_sendable(msg) else { return };
-            let Some(port_nv) = ctx.get_field(this, "_port") else { return };
-            if let Value::VmValue(payload) = ctx.extract(port_nv) {
-                if let Some(port) =
-                    payload.as_any().downcast_ref::<varn_runtime::isolate::IsolatePort>()
-                {
-                    let _ = port.send(send_val);
-                }
-            }
-        }
-
-        fn receive(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
-            let Some(port_nv) = ctx.get_field(this, "_port") else {
-                return VmValue::null();
-            };
-            if let Value::VmValue(payload) = ctx.extract(port_nv) {
-                if let Some(port) =
-                    payload.as_any().downcast_ref::<varn_runtime::isolate::IsolatePort>()
-                {
-                    let rx_guard = port.rx.lock().unwrap();
-                    let async_task = varn_types::AsyncTask::pending();
-                    match rx_guard.try_recv() {
-                        Ok(send_val) => {
-                            let val_nv = send_val.to_value_ctx(ctx);
-                            let v = ctx.extract(val_nv);
-                            async_task.resolve(v);
-                        }
-                        Err(std::sync::mpsc::TryRecvError::Empty) => {
-                            *port.waker.lock().unwrap() = Some(async_task.clone());
-                        }
-                        Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                            async_task.resolve(Value::Null);
-                        }
-                    }
-                    return ctx.intern(Value::TaskHandle(async_task));
-                }
-            }
-            VmValue::null()
         }
     }
 }

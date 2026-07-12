@@ -1,6 +1,6 @@
 {
-    "version": "0.1.0",
-    "hostApi": 1,
+    "version": "0.2.0",
+    "hostApi": 2,
     "modules": [
         { "id": "std:crypto" },
         { "id": "std:dispose" },

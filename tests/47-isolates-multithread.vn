@@ -1,110 +1,108 @@
-import { spawnIsolate, sleep } from "std:task";
+import { spawnIsolate, sleep, channel, Sender, Receiver, ChannelClosed } from "std:task";
 
-// 1. Worker simple (ping-pong)
-export async function workerMain(port: dynamic) {
-    const data = await port.receive();
+enum Msg { Val(int), Exit }
+
+type ValueMsg = { value: int }
+
+// 1. ping-pong básico
+export async function workerMain(rx: Receiver<ValueMsg>, tx: Sender<int>) {
+    const data = await rx.receive();
     assert("msg in child", data.value === 10);
-    port.send(data.value * 2);
+    await tx.send(data.value * 2);
 }
 
-// 2. Worker con múltiples argumentos de inicio
-export async function workerArgs(port: dynamic, num: int, text: str, arr: Array<dynamic>, obj: dynamic) {
+// 2. args múltiples de inicio (sin canal de entrada)
+export async function workerArgs(tx: Sender<str>, num: int, text: str, arr: Array<int>, obj: { x: str }) {
     assert("num arg", num === 42);
     assert("text arg", text === "hello");
     assert("arr arg length", arr.length === 3);
     assert("arr arg item", arr[1] === 2);
     assert("obj arg item", obj.x === "nested");
-    
-    // Mandar confirmación
-    port.send("args_ok");
+    await tx.send("args_ok");
 }
 
-// 3. Worker con bucle de diálogo (diálogo continuo)
-export async function workerDialog(port: dynamic) {
-    while (true) {
-        const msg = await port.receive();
-        if (msg === "exit") {
-            port.send("bye");
-            break;
+// 3. diálogo continuo con protocolo enum y cierre real (sin centinela string)
+export async function workerDialog(rx: Receiver<Msg>, tx: Sender<int>) {
+    let open = true
+    for await (const msg of rx) {
+        match (msg) {
+            Val(n) => await tx.send(n + 1),
+            Msg.Exit => open = false,
         }
-        port.send({ reply: msg.val + 1 });
+        if (!open) {
+            break
+        }
     }
+    tx.close()
 }
 
-// 4. Worker para prueba paralela
-export async function workerParallel(port: dynamic, id: int, delayMs: int) {
+// 4. paralelo
+export async function workerParallel(tx: Sender<int>, id: int, delayMs: int) {
     await sleep(delayMs);
-    port.send(id * 10);
+    await tx.send(id * 10);
 }
 
-// Función local no exportada (para probar caso de error de carga en el hijo)
-function localUnexported(port: dynamic) {
-    port.send("should not be called");
-}
+function localUnexported(tx: Sender<str>) {}
 
 async function testIsolates() {
-    // ---- CASO 1: Test básico original ----
-    const port1 = await spawnIsolate(workerMain, []);
-    port1.send({ value: 10 });
-    const res1: dynamic = await port1.receive();
-    assert("response from basic worker", res1 === 20);
+    // ---- 1 ----
+    const in1 = channel<ValueMsg>(1)
+    const out1 = channel<int>(1)
+    const h1 = await spawnIsolate(workerMain, [in1.rx, out1.tx])
+    await in1.tx.send({ value: 10 })
+    assert("response from basic worker", await out1.rx.receive() === 20)
+    await h1.join()
 
-    // ---- CASO 2: Múltiples argumentos complejos ----
-    const port2 = await spawnIsolate(workerArgs, [42, "hello", [1, 2, 3], { x: "nested" }]);
-    const res2: dynamic = await port2.receive();
-    assert("response from args worker", res2 === "args_ok");
+    // ---- 2 ----
+    const out2 = channel<str>(1)
+    await spawnIsolate(workerArgs, [out2.tx, 42, "hello", [1, 2, 3], { x: "nested" }])
+    assert("response from args worker", await out2.rx.receive() === "args_ok")
 
-    // ---- CASO 3: Diálogo continuo de mensajes (Ping-Pong) ----
-    const port3 = await spawnIsolate(workerDialog, []);
-    
-    port3.send({ val: 1 });
-    const reply1: dynamic = await port3.receive();
-    assert("dialog 1", reply1.reply === 2);
+    // ---- 3 ----
+    const in3 = channel<Msg>(2)
+    const out3 = channel<int>(2)
+    const h3 = await spawnIsolate(workerDialog, [in3.rx, out3.tx])
+    await in3.tx.send(Msg.Val(1))
+    assert("dialog 1", await out3.rx.receive() === 2)
+    await in3.tx.send(Msg.Val(100))
+    assert("dialog 2", await out3.rx.receive() === 101)
+    await in3.tx.send(Msg.Exit)
+    await h3.join()
+    let dialogClosed = false
+    try { await out3.rx.receive() } catch (e) { dialogClosed = e instanceof ChannelClosed }
+    assert("dialog closed", dialogClosed)
 
-    port3.send({ val: 100 });
-    const reply2: dynamic = await port3.receive();
-    assert("dialog 2", reply2.reply === 101);
+    // ---- 4 ----
+    const c1 = channel<int>(1)
+    const c2 = channel<int>(1)
+    const c3 = channel<int>(1)
+    await spawnIsolate(workerParallel, [c1.tx, 1, 30])
+    await spawnIsolate(workerParallel, [c2.tx, 2, 0])
+    await spawnIsolate(workerParallel, [c3.tx, 3, 10])
+    assert("w2 result", await c2.rx.receive() === 20)
+    assert("w3 result", await c3.rx.receive() === 30)
+    assert("w1 result", await c1.rx.receive() === 10)
 
-    port3.send("exit");
-    const reply3: dynamic = await port3.receive();
-    assert("dialog exit", reply3 === "bye");
-
-    // ---- CASO 4: Ejecución paralela / concurrente ----
-    const w1 = await spawnIsolate(workerParallel, [1, 0]);
-    const w2 = await spawnIsolate(workerParallel, [2, 0]);
-    const w3 = await spawnIsolate(workerParallel, [3, 0]);
-
-    // w2 termina primero (10ms delay), luego w3 (20ms), luego w1 (30ms)
-    const r2: dynamic = await w2.receive();
-    assert("w2 finish first", r2 === 20);
-
-    const r3: dynamic = await w3.receive();
-    assert("w3 finish second", r3 === 30);
-
-    const r1: dynamic = await w1.receive();
-    assert("w1 finish third", r1 === 10);
-
-    // ---- CASO 5: Error al pasar función anónima (clausura local) ----
-    let threwAnon = false;
+    // ---- 5/6: errores de spawn (igual que antes) ----
+    let threwAnon = false
     try {
-        await spawnIsolate((p: dynamic) => {}, []);
+        await spawnIsolate((tx: Sender<str>) => {}, [])
     } catch (e) {
-        threwAnon = true;
-        assert("error message for anon function", e.message.indexOf("must be a function reference") >= 0);
+        threwAnon = true
+        assert("error message for anon function", e.message.indexOf("must be a function reference") >= 0)
     }
-    assert("should throw for anon function", threwAnon);
+    assert("should throw for anon function", threwAnon)
 
-    // ---- CASO 6: Error al pasar función local no exportada ----
-    let threwUnexported = false;
+    let threwUnexported = false
     try {
-        await spawnIsolate(localUnexported, []);
+        await spawnIsolate(localUnexported, [])
     } catch (e) {
-        threwUnexported = true;
-        assert("error message for unexported function", e.message.indexOf("is not a top-level exported function") >= 0);
+        threwUnexported = true
+        assert("error message for unexported function", e.message.indexOf("is not a top-level exported function") >= 0)
     }
-    assert("should throw for unexported function", threwUnexported);
+    assert("should throw for unexported function", threwUnexported)
 
-    print("[PASSED] 47. Isolates Multi-Thread");
+    print("[PASSED] 47. Isolates + typed channels")
 }
 
 if (!isIsolate) {

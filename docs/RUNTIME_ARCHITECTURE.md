@@ -9,7 +9,7 @@ El scheduler crea un runtime Tokio multi-thread compartido (`Builder::new_multi_
 Eso da un modelo híbrido:
 
 - **Concurrencia local**: `spawn`, `parallel`, timers y generators viven dentro del `LocalSet` del isolate/raíz actual.
-- **Paralelismo real**: `spawnIsolate(...)` levanta otro worker con `std::thread::spawn`, su propia VM y un canal bidireccional `IsolatePort`.
+- **Paralelismo real**: `spawnIsolate(...)` levanta otro worker con `std::thread::spawn` y su propia VM; la mensajería es por channels tipados `Sender<T>`/`Receiver<T>` transferidos como argumentos.
 - **Boundary de memoria**: no hay heap mutable compartido entre isolates; solo cruzan valores sendables.
 
 ---
@@ -65,7 +65,28 @@ const [a, b] = await parallel([fetchA(), fetchB()])
 
 - `spawn`: crea nueva tarea en el `LocalSet`, retorna handle `Task<T>`.
 - `parallel([...])`: dispara varios children sobre el scheduler actual y resuelve un array cuando terminan.
-- `spawnIsolate(fn, args)`: inicia otro hilo, carga el módulo del `fn` exportado y retorna un `IsolatePort` para mensajería.
+- `spawnIsolate(fn, args)`: inicia otro hilo, carga el módulo del `fn` exportado y retorna un `IsolateHandle` (`join()` espera al worker; rechaza con `Error` tipado si el worker lanzó).
+
+### Channels tipados
+
+Mensajería entre isolates (y dentro de uno): `channel<T>(capacity)` retorna
+`{ tx: Sender<T>, rx: Receiver<T> }`.
+
+- **Tabla global de canales** (`varn-runtime::channel`): cada canal es una cola
+  mpmc bounded (`capacity >= 1`) identificada por `u64`; los endpoints Varn solo
+  llevan ese id (`_chan`), por eso transferirlos a otro isolate es copiar un
+  entero — ambos lados comparten el mismo canal.
+- **Backpressure**: `send` sobre cola llena parkea al productor (resuelve `true`
+  al entrar el mensaje, `false` si el canal cierra antes); `receive` sobre cola
+  vacía parkea al consumidor.
+- **Valores cross-thread**: siempre heap-independientes (`SendValue`, incluidos
+  enums vía `SendEnumVariant` y endpoints anidados). La materialización en el
+  heap del consumidor ocurre en un único hook del await-resume del VM
+  (`host_values::open_resolved` / `open_rejected`), que también mintea errores
+  tipados (`ChannelClosed extends Error`).
+- **Cierre real**: `close()` despierta a todos los waiters; lo encolado se
+  drena, después `receive()` rechaza con `ChannelClosed` y
+  `for await (const v of rx)` termina el loop.
 
 ---
 

@@ -258,6 +258,36 @@ async function processFile(path: str): void {
 }
 ```
 
+### Channels e isolates
+
+```Varn
+import { channel, spawnIsolate, Sender, Receiver, ChannelClosed } from "std:task";
+
+// El worker corre en otro isolate (thread + VM + heap propios). Los endpoints
+// se transfieren como argumentos; ambos isolates comparten el mismo canal.
+export async function doubler(rx: Receiver<int>, tx: Sender<int>) {
+    for await (const v of rx) {   // termina cuando el canal de entrada cierra
+        await tx.send(v * 2)      // bounded: parkea si la cola está llena
+    }
+    tx.close()
+}
+
+async function main(): void {
+    const a = channel<int>(4)
+    const b = channel<int>(4)
+    const handle = await spawnIsolate(doubler, [a.rx, b.tx])
+    await a.tx.send(21)
+    print(await b.rx.receive())   // 42
+    a.tx.close()
+    await handle.join()           // rechaza con Error tipado si el worker lanzó
+    try {
+        await b.rx.receive()
+    } catch (e) {
+        print(e instanceof ChannelClosed)  // true — cierre real, sin centinelas
+    }
+}
+```
+
 ---
 
 ## Generators

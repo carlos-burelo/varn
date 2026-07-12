@@ -4,11 +4,6 @@ export declare function taskSpawn<T>(target: Task<T> | ((...args: dynamic[]) => 
 export declare function taskSleep(ms: int): TaskHandle<void>;
 export declare function taskParallel<T>(tasks: Array<Task<T> >): Task<Array<T> >;
 
-export declare class IsolatePort {
-    send(msg: dynamic): void;
-    receive(): Task<dynamic>;
-}
-
 export declare class IsolateHandle {
     join(): Task<void>;
 }
