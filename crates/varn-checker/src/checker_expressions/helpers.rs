@@ -103,6 +103,26 @@ impl Checker {
         }
     }
 
+    /// A value may be thrown only when it is (or could be) an `Error`
+    /// subclass. `dynamic` stays throwable so untyped values (FFI, isolate
+    /// payloads) don't cascade into throw errors.
+    pub(crate) fn is_throwable(&self, ty: &Type, bind: &crate::binder::BindResult) -> bool {
+        match &ty.0 {
+            varn_core::TypeKind::Named(name, _) => self.is_subclass_or_same(name, "Error", bind),
+            varn_core::TypeKind::Generic(name, _, _) => {
+                self.is_subclass_or_same(name, "Error", bind)
+            }
+            varn_core::TypeKind::Union(members) => {
+                members.iter().all(|m| self.is_throwable(m, bind))
+            }
+            varn_core::TypeKind::This => self
+                .current_class
+                .as_deref()
+                .is_some_and(|c| self.is_subclass_or_same(c, "Error", bind)),
+            _ => ty.is_dynamic(),
+        }
+    }
+
     pub(crate) fn record_type(&mut self, offset: u32, ty: Type) {
         if self.record_expr_types {
             self.expr_types.insert(

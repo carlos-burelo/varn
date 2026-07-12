@@ -286,12 +286,10 @@ impl Checker {
                 if let Some(clause) = catch {
                     self.with_next_child_scope(bind, clause.body.range.start.offset, |checker| {
                         if let Some(param) = &clause.param {
-                            // The thrown type is not statically known, so the catch
-                            // binding is `dynamic` (a caught value may be narrowed or
-                            // assigned to any error-typed variable). Typing it as the
-                            // base `Error` wrongly rejected assigning the caught value
-                            // to a subclass-typed variable.
-                            let catch_ty = Type::Dynamic;
+                            // `throw` only accepts `Error` subclasses, so the caught
+                            // value is soundly typed as the base `Error`. Accessing a
+                            // subclass requires an `instanceof` narrowing.
+                            let catch_ty = Type::named("Error");
                             checker.check_pattern(param, &catch_ty, bind);
                         }
                         checker.check_stmt(&clause.body, bind);
@@ -304,6 +302,18 @@ impl Checker {
 
             StmtKind::Throw { argument } => {
                 self.check_expr(argument, bind);
+                let thrown = self.infer_type(argument, bind);
+                if !self.is_throwable(&thrown, bind) {
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::InvalidThrowOperand,
+                            format!(
+                                "cannot throw a value of type `{thrown}`: thrown values must be `Error` or a subclass"
+                            ),
+                        )
+                        .with_range(argument.range),
+                    );
+                }
             }
 
             StmtKind::Labeled { body, .. } => {

@@ -56,12 +56,11 @@ function testUsingDestructure(): void {
     assert("disposable disposed", resource.disposed);
 }
 
-// 3. catch block parameter destructuring
-class CustomError {
-    message: str;
+// 3. destructuring a caught error after instanceof narrowing
+class CustomError extends Error {
     code: int;
     constructor(message: str, code: int) {
-        this.message = message;
+        super(message);
         this.code = code;
     }
 }
@@ -69,9 +68,12 @@ class CustomError {
 function testCatchDestructure(): void {
     try {
         throw new CustomError("process failed", 500);
-    } catch ({ message, code }) {
-        assert("catch destructure message", message === "process failed");
-        assert("catch destructure code", code === 500);
+    } catch (e) {
+        if (e instanceof CustomError) {
+            const { message, code } = e;
+            assert("catch destructure message", message === "process failed");
+            assert("catch destructure code", code === 500);
+        }
     }
 }
 

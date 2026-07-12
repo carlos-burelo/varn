@@ -1,0 +1,5 @@
+// expect: error[Varn4008]
+function boom(): void {
+    throw 42
+}
+boom()

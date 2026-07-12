@@ -209,16 +209,20 @@ match (val) {
     _       => print("other"),
 }
 
-// try/catch/finally
+// try/catch/finally — the caught value is typed `Error`; use `instanceof`
+// to narrow it to a subclass before accessing subclass members.
 try {
     const data = riskyOp()
 } catch (e) {
     print(`Error: ${e.message}`)
+    if (e instanceof RangeError) {
+        print("out of range")
+    }
 } finally {
     cleanup()
 }
 
-// throw
+// throw — only `Error` (or a subclass) can be thrown
 throw new Error("something went wrong")
 ```
 

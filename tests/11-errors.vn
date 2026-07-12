@@ -54,7 +54,9 @@ let ve: ValidationError | null = null
 try {
     throw new ValidationError("email", "invalid format")
 } catch (e) {
-    ve = e
+    if (e instanceof ValidationError) {
+        ve = e
+    }
 }
 assert("custom error name",    ve?.name === "ValidationError")
 assert("custom error message", ve?.message === "invalid format")
