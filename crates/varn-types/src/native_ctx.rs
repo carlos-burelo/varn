@@ -142,14 +142,17 @@ pub trait NativeCtx {
         None
     }
 
+    /// Spawn the worker isolate and return a join task. The task resolves
+    /// `Null` when the worker finishes, or rejects with a heap-independent
+    /// typed error (`HostError`) if the worker threw. No port is injected —
+    /// endpoints are passed in `args` and transfer by reference.
     fn spawn_isolate(
         &mut self,
         _module_path: &str,
         _export_name: &str,
         _args: Vec<crate::value::SendValue>,
-        _port: Box<dyn varn_base::VmValuePayload + Send + Sync>,
-    ) -> Result<(), String> {
-        Err("spawn_isolate not supported".to_string())
+    ) -> Result<crate::AsyncTask, String> {
+        Err("spawn_isolate: unsupported in this context".into())
     }
 
     fn alloc_instance(&mut self, _class_name: &str) -> Option<VmValue> {

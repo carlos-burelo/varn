@@ -2,9 +2,9 @@
 
 import { taskSpawn, taskSleep, taskParallel, channel,
          Sender, Receiver, Channel, ChannelClosed,
-         IsolatePort, spawnIsolate as nativeSpawnIsolate } from "runtime:task";
+         IsolateHandle, spawnIsolate as nativeSpawnIsolate } from "runtime:task";
 
-export { channel, Sender, Receiver, Channel, ChannelClosed };
+export { channel, Sender, Receiver, Channel, ChannelClosed, IsolateHandle };
 
 export declare class Generator<T> {
     next(value?: dynamic): { value: T; done: bool; };
@@ -46,7 +46,7 @@ export function sleep(ms: int): TaskHandle<void> {
 export function spawnIsolate(
     fn: dynamic,
     args: Array<dynamic>
-): Task<IsolatePort> {
+): Task<IsolateHandle> {
     return nativeSpawnIsolate(fn, args);
 }
 

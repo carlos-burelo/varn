@@ -1,4 +1,4 @@
-import { channel, ChannelClosed } from "std:task";
+import { channel, ChannelClosed, spawnIsolate, Sender, Receiver } from "std:task";
 
 async function testBasics(): void {
     const ch = channel<int>(2)
@@ -52,15 +52,44 @@ async function testUsingDispose(): void {
     assert("closed after dispose", closed)
 }
 
+// Runs in the child isolate: doubles each received value and echoes it back
+// on the reply channel, then closes the reply channel when the input closes.
+// The endpoints (rx, tx) arrive via cross-isolate transfer — both isolates
+// share the same underlying channel ids.
+export async function echoWorker(rx: Receiver<int>, tx: Sender<int>) {
+    for await (const v of rx) {
+        await tx.send(v * 2)
+    }
+    tx.close()
+}
+
+async function testCrossIsolate(): void {
+    const a = channel<int>(4)
+    const b = channel<int>(4)
+    const handle = await spawnIsolate(echoWorker, [a.rx, b.tx])
+    await a.tx.send(21)
+    assert("cross-isolate echo", await b.rx.receive() === 42)
+    a.tx.close()
+    await handle.join()
+    let done = false
+    try { await b.rx.receive() } catch (e) { done = e instanceof ChannelClosed }
+    assert("worker closed reply channel", done)
+}
+
 async function main(): void {
     await testBasics()
     await testTypedClose()
     await testForAwait()
     await testUsingDispose()
+    await testCrossIsolate()
     print("[PASSED] 54. Typed channels")
 }
 
 // Deviation from the brief's bare `main()`: async calls are lazy tasks in
 // Varn — an unawaited call never executes (probe-verified). Top-level await
 // matches the established pattern in tests/47-isolates-multithread.vn.
-await main()
+// Guarded on `isIsolate`: the child worker re-loads this module to reach
+// `echoWorker`, and must NOT re-run the suite (which would spawn again).
+if (!isIsolate) {
+    await main()
+}

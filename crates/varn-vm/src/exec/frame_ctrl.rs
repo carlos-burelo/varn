@@ -585,12 +585,25 @@ impl NativeCtx for ExecCtx {
         module_path: &str,
         export_name: &str,
         args: Vec<varn_types::value::SendValue>,
-        port: Box<dyn varn_base::VmValuePayload + Send + Sync>,
-    ) -> Result<(), String> {
+    ) -> Result<varn_types::AsyncTask, String> {
+        // Heap-independent typed reject payload; the parent's await-resume hook
+        // (`host_values::open_rejected`) mints it into a real `Error` on the
+        // parent heap so `instanceof Error` works and the message survives (a
+        // bare ObjData cannot embed non-SSO strings — see `HostError`).
+        fn worker_error(msg: &str) -> varn_types::Value {
+            varn_types::value::HostError::to_value("Error", msg)
+        }
+
         let loader = self.loader.clone();
 
         let module_path_str = module_path.to_string();
         let export_name_str = export_name.to_string();
+
+        // Join task: resolves `Null` when the worker finishes, rejects with a
+        // typed error if it threw. Returned to the caller (wrapped in an
+        // `IsolateHandle`); no port is injected into the worker.
+        let done = varn_types::AsyncTask::pending();
+        let done_t = done.clone();
 
         std::thread::spawn(move || {
             let mut machine = crate::Vm::new(std::rc::Rc::new(rustc_hash::FxHashMap::default()));
@@ -603,20 +616,20 @@ impl NativeCtx for ExecCtx {
             }
 
             if let Err(e) = machine.ctx.load_module("std:task") {
-                varn_utilities::terminal::tagged(
-                    "isolate worker",
-                    format_args!("Failed to load std:task: {:?}", e),
-                );
+                done_t.reject(worker_error(&format!(
+                    "isolate worker: failed to load std:task: {:?}",
+                    e
+                )));
                 return;
             }
 
             let module_val = match machine.ctx.load_module(&module_path_str) {
                 Ok(m) => m,
                 Err(e) => {
-                    varn_utilities::terminal::tagged(
-                        "isolate worker",
-                        format_args!("Failed to load module {}: {:?}", module_path_str, e),
-                    );
+                    done_t.reject(worker_error(&format!(
+                        "isolate worker: failed to load module {}: {:?}",
+                        module_path_str, e
+                    )));
                     return;
                 }
             };
@@ -624,46 +637,26 @@ impl NativeCtx for ExecCtx {
             let func_nv = match machine.ctx.get_field(module_val, &export_name_str) {
                 Some(f) => f,
                 None => {
-                    varn_utilities::terminal::tagged(
-                        "isolate worker",
-                        format_args!(
-                            "Export '{}' not found in module {}",
-                            export_name_str, module_path_str
-                        ),
-                    );
+                    done_t.reject(worker_error(&format!(
+                        "isolate worker: export '{}' not found in module {}",
+                        export_name_str, module_path_str
+                    )));
                     return;
                 }
             };
 
-            let class_obj = match machine.ctx.get_class("IsolatePort") {
-                Some(cls) => cls,
-                None => {
-                    varn_utilities::terminal::tagged(
-                        "isolate worker",
-                        format_args!("Class IsolatePort not found"),
-                    );
-                    return;
-                }
-            };
-            let instance_nv = machine.ctx.heap.alloc_object();
-            if let Some(crate::heap::HeapObj::Object(o)) =
-                machine.ctx.heap.get_mut(instance_nv.as_heap_idx())
-            {
-                o.borrow_mut().set_class(class_obj);
-            }
-            let port_value = varn_types::Value::VmValue(port);
-            let port_nv = machine.ctx.heap.intern(port_value);
-            if let Some(crate::heap::HeapObj::Object(o)) =
-                machine.ctx.heap.get_mut(instance_nv.as_heap_idx())
-            {
-                o.borrow_mut()
-                    .set_field_nv(std::rc::Rc::from("_port"), port_nv);
-            }
-
-            let mut vm_args = vec![instance_nv];
+            // Endpoints arrive as `SendValue::Channel{Sender,Receiver}`;
+            // `to_value_ctx` emits `__chanEndpoint` markers, which
+            // `host_values::open_resolved` mints into real Sender/Receiver
+            // instances (one minting definition, shared with the same-thread
+            // await-resume path). std:task is already loaded above, so the
+            // endpoint classes exist on this worker's heap.
+            let mut vm_args = Vec::new();
             for arg in args {
                 let v_nv = arg.to_value_ctx(&mut machine.ctx);
-                vm_args.push(v_nv);
+                let val = machine.ctx.heap.extract(v_nv);
+                let opened = crate::exec::host_values::open_resolved(&mut machine.ctx, val);
+                vm_args.push(machine.ctx.heap.intern(opened));
             }
 
             match machine.ctx.call_vm(func_nv, &vm_args) {
@@ -672,23 +665,17 @@ impl NativeCtx for ExecCtx {
                     if let varn_types::Value::Task(lazy) = val {
                         let handle = machine.ctx.run_lazy_task_sync(lazy.as_ref());
                         if let varn_types::task::TaskState::Rejected(e) = handle.peek_state() {
-                            varn_utilities::terminal::tagged(
-                                "isolate worker",
-                                format_args!("Task failed: {}", e),
-                            );
+                            done_t.reject(worker_error(&format!("{e}")));
+                            return;
                         }
                     }
+                    done_t.resolve(varn_types::Value::Null);
                 }
-                Err(e) => {
-                    varn_utilities::terminal::tagged(
-                        "isolate worker",
-                        format_args!("Execution failed: {}", e),
-                    );
-                }
+                Err(e) => done_t.reject(worker_error(&format!("{e}"))),
             }
         });
 
-        Ok(())
+        Ok(done)
     }
 
     fn alloc_instance(&mut self, class_name: &str) -> Option<VmValue> {

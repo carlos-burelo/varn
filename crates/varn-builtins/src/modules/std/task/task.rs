@@ -5,6 +5,8 @@ pub struct TaskRuntime;
 
 pub struct IsolatePortImpl;
 
+pub struct IsolateHandleImpl;
+
 varn_contract! {
     module: "runtime:task",
     contract: "src/modules/std/task/runtime/task_runtime.vn",
@@ -121,15 +123,13 @@ varn_contract! {
                 }
             }
 
-            let (port_parent, port_child) = varn_runtime::isolate::IsolatePort::new();
-            ctx.spawn_isolate(&resolved_path, &export_name, worker_args, Box::new(port_child))?;
-
-            let instance_nv = ctx
-                .alloc_instance("IsolatePort")
-                .ok_or("Failed to instantiate IsolatePort")?;
-            let port_nv = ctx.intern(Value::VmValue(Box::new(port_parent)));
-            ctx.set_field(instance_nv, "_port", port_nv);
-            Ok(instance_nv)
+            let done = ctx.spawn_isolate(&resolved_path, &export_name, worker_args)?;
+            let handle_nv = ctx
+                .alloc_instance("IsolateHandle")
+                .ok_or("spawnIsolate: IsolateHandle class not registered")?;
+            let done_nv = ctx.intern(Value::TaskHandle(done));
+            ctx.set_field(handle_nv, "_done", done_nv);
+            Ok(handle_nv)
         }
 
         fn channel(ctx: &mut dyn NativeCtx, capacity: i64) -> Result<VmValue, String> {
@@ -193,6 +193,20 @@ varn_contract! {
                 }
             }
             VmValue::null()
+        }
+    }
+}
+
+varn_contract! {
+    module: "runtime:task",
+    class: "IsolateHandle",
+    contract: "src/modules/std/task/runtime/task_runtime.vn",
+    impl IsolateHandleImpl {
+        // `join()` yields the worker's join task (resolves `Null` on normal
+        // completion, rejects a typed `Error` if the worker threw). `_done`
+        // holds a `Value::TaskHandle`, so `await handle.join()` drives it.
+        fn join(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
+            ctx.get_field(this, "_done").unwrap_or(VmValue::null())
         }
     }
 }
