@@ -161,6 +161,18 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         }
     }
 
+    // Membership in the global scope, precomputed once: scanning the global
+    // bindings per symbol is quadratic and dominates analysis of files with
+    // many top-level declarations.
+    let global_ids: rustc_hash::FxHashSet<usize> = result
+        .bind
+        .scopes
+        .get(result.bind.global_scope)
+        .bindings
+        .values()
+        .copied()
+        .collect();
+
     let sym_records: Vec<SymbolRecord> = result
         .bind
         .arena
@@ -268,13 +280,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
                 _ => sym.ty.clone(),
             };
             let symbol_id = Some(id);
-            let is_global = result
-                .bind
-                .scopes
-                .get(result.bind.global_scope)
-                .bindings
-                .values()
-                .any(|&sid| sid == id);
+            let is_global = global_ids.contains(&id);
             let global_key = stable_global_key(
                 &uri,
                 sym.name.as_ref(),
