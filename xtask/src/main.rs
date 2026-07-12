@@ -22,7 +22,7 @@ fn main() {
 
 fn build_std(args: Vec<String>) {
     let mut std_dir = PathBuf::from("std");
-    let mut out = PathBuf::from("std.vnb");
+    let mut out = PathBuf::from("target/std.vnb");
     let mut it = args.into_iter();
     while let Some(a) = it.next() {
         match a.as_str() {
@@ -102,6 +102,10 @@ fn build_std(args: Vec<String>) {
         modules,
     };
     let bytes = write_bundle(&bundle);
+    if let Some(parent) = out.parent().filter(|p| !p.as_os_str().is_empty()) {
+        std::fs::create_dir_all(parent)
+            .unwrap_or_else(|e| panic!("cannot create {}: {e}", parent.display()));
+    }
     std::fs::write(&out, &bytes).unwrap_or_else(|e| panic!("cannot write {}: {e}", out.display()));
     println!(
         "std v{} → {} ({} modules, {} KiB)",

@@ -1,57 +1,46 @@
-node_modules
-.claude
-.archive
-tests/node_modules/@tsn/
+# Build artifacts
 target/
-docs/tasks/
-.idea/
-.DS_Store
-Thumbs.db
-*.log
-*.tmp
-*.bak
-*.swp
-.env
-.env.*
-coverage/
 dist/
+coverage/
 *.profraw
 *.profdata
 *.gcda
 *.gcno
 
-# Warp lockfiles and testing artifacts
+# std bundle: `cargo xtask build-std` escribe target/std.vnb;
+# esta entrada evita commitear copias sueltas en raíz.
+std.vnb
+
+# Varn caches y lockfiles
+**/.vn/
+**/*.bin
 warp.lock
+
+# Scratch de testing (los sources reales de builtins llamados test_*.vn se conservan)
 test_*.vn
 tmp*.vn
-# ...but builtin module sources named test_*.vn are real, required by build.rs
 !crates/varn-builtins/src/modules/**/test_*.vn
 
-.agents/
+# Tooling de agentes / índices locales
 .claude/
-target/
-
-varn-extension/node_modules/
-*.rar
-*.zip
 .codegraph/
+.superpowers/
+.agents/
 
-# remove all *.bin files (cache files) in any directory
-**/*.bin
-.codegraph/codegraph.db
-.codegraph/codegraph.db-shm
-.codegraph/codegraph.db-wal
-docs/OPTIMIZATIONS.md
-tests/.vn/**
+# JS tooling
+node_modules/
 
-# all .vn/ folder in any directory
-**/.vn/
-*.txt
+# Editor / OS
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Env y temporales
+.env
+.env.*
 *.log
-
-# all .lock and all .bin files in any directory
-**/*.lock
-**/*.bin
-
-# xtask build-std artifact
-std.vnb
+*.tmp
+*.bak
+*.zip
+*.rar

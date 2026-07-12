@@ -96,7 +96,7 @@ Cada op declara la capability que requiere:
 | `crypto.random` | Generación de aleatoriedad |
 | `time.now` | Leer tiempo del sistema |
 
-> **Estado actual**: `has_capability()` retorna `true` siempre. Enforcement real está pendiente — ver [NEXT_STEPS.md](NEXT_STEPS.md).
+> **Estado actual**: `has_capability()` retorna `true` siempre. Enforcement real está pendiente.
 
 ## Dispatch
 

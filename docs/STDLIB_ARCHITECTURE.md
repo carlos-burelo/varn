@@ -124,8 +124,8 @@ de modo bundle↔árbol).
 ## 6. `cargo xtask build-std`
 
 ```powershell
-cargo xtask build-std                              # std/ → ./std.vnb
-cargo xtask build-std --std-dir std --out std.vnb   # explícito
+cargo xtask build-std                                     # std/ → target/std.vnb
+cargo xtask build-std --std-dir std --out target/std.vnb   # explícito
 ```
 
 Sirve la resolución `std:` desde `--std-dir` durante la build (vía

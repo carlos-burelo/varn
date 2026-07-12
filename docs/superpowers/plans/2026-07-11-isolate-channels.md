@@ -16,7 +16,7 @@
 - Todo valor que cruza threads debe ser heap-independiente (`SendValue`, `ObjData` via `varn_types::value::new_object`). Nunca `VmValue` de otro heap.
 - `capacity >= 1` obligatorio; `channel(0)` → error en runtime con mensaje `channel: capacity must be >= 1`.
 - Validación estándar del repo: `./target/release/vn.exe run tests/main.vn` debe terminar `ALL TESTS PASSED`.
-- Tras cambiar cualquier contrato `.vn` de builtins: `cargo xtask build-std && cp std.vnb target/release/std.vnb && cp std.vnb target/debug/std.vnb` y `./target/release/vn.exe cache clean` antes de validar.
+- Tras cambiar cualquier contrato `.vn` de builtins: `cargo xtask build-std && cp target/std.vnb target/release/std.vnb && cp target/std.vnb target/debug/std.vnb` y `./target/release/vn.exe cache clean` antes de validar.
 - Commits: NO commitear cambios que no sean de tu task (hay trabajo de throw/catch sin commitear en el working tree — `git add` selectivo por archivo, nunca `git add -A`).
 
 ---
@@ -870,7 +870,7 @@ export { Sender, Receiver, Channel, ChannelClosed };
 ```bash
 cargo build --release -p varn-cli &&
 cargo xtask build-std &&
-cp std.vnb target/release/std.vnb && cp std.vnb target/debug/std.vnb &&
+cp target/std.vnb target/release/std.vnb && cp target/std.vnb target/debug/std.vnb &&
 ./target/release/vn.exe cache clean &&
 ./target/release/vn.exe run tests/54-channels.vn
 ```
@@ -1225,7 +1225,7 @@ Run: `./target/release/vn.exe check tests/errors/invalid-channel-send-type.vn` �
 cargo build --release -p varn-cli -p varn-lsp &&
 cargo build -p varn-cli -p varn-lsp &&
 cargo xtask build-std &&
-cp std.vnb target/release/std.vnb && cp std.vnb target/debug/std.vnb &&
+cp target/std.vnb target/release/std.vnb && cp target/std.vnb target/debug/std.vnb &&
 ./target/release/vn.exe cache clean &&
 cargo test -p varn-runtime -p varn-types -p varn-lsp &&
 ./target/release/vn.exe run tests/main.vn

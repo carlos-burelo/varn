@@ -1,4 +1,4 @@
-//! Loop-invariant array-guard hoisting (see `docs/PERF_STRUCTURAL_OPTS.md`,
+//! Loop-invariant array-guard hoisting (see `docs/notes/PERF_STRUCTURAL_OPTS.md`,
 //! Proyecto A). Identifies innermost loops that index loop-invariant
 //! arrays through statically-array-typed opcodes (`ArrayGetIndex`/
 //! `ArrayLength` — never plain `GetIndex`, which is only emitted when the
