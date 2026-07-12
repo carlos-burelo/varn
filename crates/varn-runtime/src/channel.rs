@@ -12,8 +12,21 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use varn_types::task::AsyncTask;
-use varn_types::value::{new_object, ObjData, SendValue};
+use varn_types::value::{new_object, ObjData, SendEnvelope, SendValue};
 use varn_types::Value;
+
+/// Direct/parked receiver handoff value. Scalar payloads ride inside a plain
+/// `{value, done:false}` object (heap-independent, embeddable by
+/// `ObjData::set_field`); non-scalars are wrapped in a [`SendEnvelope`] so the
+/// producing thread never allocates on the consumer's GC heap — the consumer's
+/// await-resume hook materializes them. See `SendValue::is_direct_scalar`.
+fn deliver_direct(val: SendValue) -> Value {
+    if val.is_direct_scalar() {
+        next_obj(val.to_value(), false)
+    } else {
+        SendEnvelope::deliver(val)
+    }
+}
 
 pub enum SendOutcome {
     Sent,
@@ -86,7 +99,7 @@ pub fn send(id: u64, val: SendValue) -> SendOutcome {
     // Entrega directa a un receiver parkeado (la cola está vacía si hay waiters).
     if let Some(w) = st.recv_waiters.pop_front() {
         drop(st);
-        w.resolve(next_obj(val.to_value(), false));
+        w.resolve(deliver_direct(val));
         return SendOutcome::Sent;
     }
     if st.queue.len() < core.capacity {
@@ -241,6 +254,47 @@ mod tests {
         // había en cola, solo queda Closed.
         let RecvOutcome::Item(SendValue::Int(1)) = try_receive(sid) else { panic!("drain") };
         assert!(matches!(try_receive(sid), RecvOutcome::Closed));
+    }
+
+    #[test]
+    fn parked_receiver_gets_scalar_as_value_done_object() {
+        // Scalar payloads keep the plain `{value, done:false}` handoff.
+        let id = create(1);
+        let RecvOutcome::Parked(task) = try_receive(id) else { panic!("must park") };
+        assert!(matches!(send(id, SendValue::Int(42)), SendOutcome::Sent));
+        match task.peek_state() {
+            varn_types::task::TaskState::Resolved(v) => {
+                assert_eq!(as_done(&v), Some(false));
+                if let Value::Object(o) = &v {
+                    assert!(matches!(
+                        o.read().inner.get("value").map(nv_to_value),
+                        Some(Value::Int(42))
+                    ));
+                } else {
+                    panic!("scalar handoff must be a {{value,done}} object");
+                }
+            }
+            s => panic!("parked recv should resolve, got {s:?}"),
+        }
+    }
+
+    #[test]
+    fn parked_receiver_gets_composite_as_send_envelope() {
+        // Non-scalar payloads are carried heap-independently for consumer-side
+        // materialization — never allocated on the producer's GC heap.
+        use varn_types::value::SendEnvelope;
+        let id = create(1);
+        let RecvOutcome::Parked(task) = try_receive(id) else { panic!("must park") };
+        let payload = SendValue::Array(vec![SendValue::Int(1), SendValue::Int(2)]);
+        assert!(matches!(send(id, payload), SendOutcome::Sent));
+        match task.peek_state() {
+            varn_types::task::TaskState::Resolved(v) => {
+                let env = SendEnvelope::from_value(&v).expect("composite must be a SendEnvelope");
+                assert!(!env.wrap, "channel delivers bare (wrap=false)");
+                assert!(matches!(&env.sv, SendValue::Array(items) if items.len() == 2));
+            }
+            s => panic!("parked recv should resolve, got {s:?}"),
+        }
     }
 
     #[test]

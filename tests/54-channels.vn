@@ -1,0 +1,66 @@
+import { channel, ChannelClosed } from "std:task";
+
+async function testBasics(): void {
+    const ch = channel<int>(2)
+    await ch.tx.send(1)
+    await ch.tx.send(2)
+    assert("ch recv 1", await ch.rx.receive() === 1)
+    assert("ch recv 2", await ch.rx.receive() === 2)
+}
+
+async function testTypedClose(): void {
+    const ch = channel<str>(1)
+    ch.tx.close()
+    let typed = false
+    let sendClosed = false
+    try {
+        await ch.rx.receive()
+    } catch (e) {
+        typed = e instanceof ChannelClosed
+    }
+    try {
+        await ch.tx.send("nope")
+    } catch (e) {
+        sendClosed = e instanceof ChannelClosed
+    }
+    assert("recv closed typed", typed)
+    assert("send closed typed", sendClosed)
+}
+
+async function testForAwait(): void {
+    const ch = channel<int>(4)
+    await ch.tx.send(10)
+    await ch.tx.send(20)
+    ch.tx.close()
+    let sum = 0
+    for await (const v of ch.rx) {
+        sum = sum + v
+    }
+    assert("for-await drains then ends", sum === 30)
+}
+
+async function testUsingDispose(): void {
+    const ch = channel<int>(1)
+    {
+        using tx = ch.tx
+        await tx.send(5)
+    }
+    // dispose cerró el canal: drena y termina
+    assert("drained after dispose", await ch.rx.receive() === 5)
+    let closed = false
+    try { await ch.rx.receive() } catch (e) { closed = e instanceof ChannelClosed }
+    assert("closed after dispose", closed)
+}
+
+async function main(): void {
+    await testBasics()
+    await testTypedClose()
+    await testForAwait()
+    await testUsingDispose()
+    print("[PASSED] 54. Typed channels")
+}
+
+// Deviation from the brief's bare `main()`: async calls are lazy tasks in
+// Varn — an unawaited call never executes (probe-verified). Top-level await
+// matches the established pattern in tests/47-isolates-multithread.vn.
+await main()

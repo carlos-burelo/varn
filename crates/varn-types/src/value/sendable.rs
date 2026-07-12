@@ -25,6 +25,28 @@ pub enum SendValue {
     ChannelReceiver(u64),
 }
 
+impl SendValue {
+    /// Single source of channel-endpoint detection. Given an object's class
+    /// name and its `_chan` id, produce the transferable endpoint variant.
+    /// `Ok(None)` for non-endpoint classes; `Err` if the class *is* an endpoint
+    /// but its `_chan` field is missing. Shared by [`Value::to_sendable`] and
+    /// the VM's `ExecCtx` heap-walking converters so endpoint detection lives
+    /// in exactly one place.
+    pub fn endpoint_for(
+        class_name: &str,
+        chan_id: Option<i64>,
+    ) -> Result<Option<SendValue>, String> {
+        match class_name {
+            "Sender" | "Receiver" => match chan_id {
+                Some(id) if class_name == "Sender" => Ok(Some(SendValue::ChannelSender(id as u64))),
+                Some(id) => Ok(Some(SendValue::ChannelReceiver(id as u64))),
+                None => Err(format!("{class_name}: endpoint sin _chan")),
+            },
+            _ => Ok(None),
+        }
+    }
+}
+
 impl Value {
     pub fn to_sendable(&self) -> Result<SendValue, String> {
         match self {
@@ -47,18 +69,12 @@ impl Value {
                 {
                     let guard = obj.read();
                     if let Some(cls) = guard.class() {
-                        let cname = cls.name.as_str();
-                        if cname == "Sender" || cname == "Receiver" {
-                            if let Some(Value::Int(id)) =
-                                guard.inner.get("_chan").map(nv_to_value)
-                            {
-                                return Ok(if cname == "Sender" {
-                                    SendValue::ChannelSender(id as u64)
-                                } else {
-                                    SendValue::ChannelReceiver(id as u64)
-                                });
-                            }
-                            return Err(format!("{cname}: endpoint sin _chan"));
+                        let chan_id = match guard.inner.get("_chan").map(nv_to_value) {
+                            Some(Value::Int(id)) => Some(id),
+                            _ => None,
+                        };
+                        if let Some(sv) = SendValue::endpoint_for(cls.name.as_str(), chan_id)? {
+                            return Ok(sv);
                         }
                     }
                 }
@@ -110,6 +126,20 @@ fn endpoint_marker(dir: &str, id: u64) -> Value {
 }
 
 impl SendValue {
+    /// True for values that `ObjData::set_field` / [`value_to_nv`] can embed
+    /// heap-independently, so the channel's parked-receiver handoff can keep
+    /// delivering them inside a plain `{value, done}` object. Everything else
+    /// (strings, composites, endpoints, decimals, …) is carried by
+    /// [`SendEnvelope`] and materialized on the consumer's heap. Kept
+    /// deliberately narrow — matches exactly the arms `value_to_nv` handles
+    /// without a fallible SSO / interning step.
+    pub fn is_direct_scalar(&self) -> bool {
+        matches!(
+            self,
+            SendValue::Null | SendValue::Bool(_) | SendValue::Int(_) | SendValue::Float(_)
+        )
+    }
+
     pub fn to_value(&self) -> Value {
         match self {
             SendValue::Null => Value::Null,
@@ -224,9 +254,109 @@ fn endpoint_marker_ctx(ctx: &mut dyn crate::NativeCtx, dir: &str, id: u64) -> Vm
     obj
 }
 
+/// Heap-independent carrier for a non-scalar payload delivered by a channel's
+/// direct/parked receiver handoff. The producing thread never touches the
+/// consumer's GC heap; the consumer's await-resume hook (`varn-vm`
+/// `host_values::open_resolved`) materializes `sv` via
+/// [`SendValue::to_value_ctx`] on its own heap.
+///
+/// `wrap` distinguishes the two consumer shapes that share one channel task:
+/// `Receiver::next` needs a `{value, done:false}` object (for-await protocol),
+/// while `Receiver::receive` wants the bare value. The channel produces
+/// `wrap:false`; `next` re-wraps to `wrap:true`.
+#[derive(Debug, Clone)]
+pub struct SendEnvelope {
+    pub sv: SendValue,
+    pub wrap: bool,
+}
+
+impl varn_base::VmValuePayload for SendEnvelope {
+    fn clone_payload(&self) -> Box<dyn varn_base::VmValuePayload> {
+        Box::new(self.clone())
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+impl SendEnvelope {
+    /// Wrap a non-scalar payload for delivery (consumer materializes later).
+    pub fn deliver(sv: SendValue) -> Value {
+        Value::VmValue(Box::new(SendEnvelope { sv, wrap: false }))
+    }
+
+    /// Borrow the envelope out of a resolved `Value`, if it is one.
+    pub fn from_value(v: &Value) -> Option<&SendEnvelope> {
+        if let Value::VmValue(payload) = v {
+            payload.as_any().downcast_ref::<SendEnvelope>()
+        } else {
+            None
+        }
+    }
+}
+
+/// Heap-independent typed host error. Builtins reject tasks with this payload
+/// when no consumer ctx is available (e.g. inside `on_settle` callbacks); the
+/// VM's await-resume hook (`host_values::open_rejected`) mints a real instance
+/// of the named intrinsic class on the consumer's heap so `instanceof` works.
+///
+/// Note: this deliberately replaces the `{__hostErrorClass, message}` marker
+/// *object* — a bare `ObjData` cannot embed non-SSO strings (`value_to_nv`
+/// nulls them in release builds), so class names >5 bytes would be lost.
+#[derive(Debug, Clone)]
+pub struct HostError {
+    pub class: String,
+    pub message: String,
+}
+
+impl varn_base::VmValuePayload for HostError {
+    fn clone_payload(&self) -> Box<dyn varn_base::VmValuePayload> {
+        Box::new(self.clone())
+    }
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
+impl HostError {
+    pub fn to_value(class: &str, message: &str) -> Value {
+        Value::VmValue(Box::new(HostError {
+            class: class.to_string(),
+            message: message.to_string(),
+        }))
+    }
+
+    pub fn from_value(v: &Value) -> Option<&HostError> {
+        if let Value::VmValue(payload) = v {
+            payload.as_any().downcast_ref::<HostError>()
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod channel_endpoint_tests {
     use super::*;
+
+    #[test]
+    fn host_error_roundtrips() {
+        let v = HostError::to_value("ChannelClosed", "channel closed");
+        let he = HostError::from_value(&v).expect("must downcast");
+        assert_eq!(he.class, "ChannelClosed");
+        assert_eq!(he.message, "channel closed");
+    }
+
+    #[test]
+    fn send_envelope_roundtrips_payload() {
+        let env = SendEnvelope::deliver(SendValue::Array(vec![
+            SendValue::Int(1),
+            SendValue::Int(2),
+        ]));
+        let got = SendEnvelope::from_value(&env).expect("must be envelope");
+        assert!(!got.wrap);
+        assert!(matches!(&got.sv, SendValue::Array(items) if items.len() == 2));
+    }
 
     #[test]
     fn endpoint_variants_roundtrip_marker() {

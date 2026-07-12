@@ -8,11 +8,18 @@ use super::VmSuspend;
 
 impl ExecCtx {
     pub fn wait_task_handle(task: varn_types::AsyncTask) -> Result<varn_types::Value, String> {
+        Self::wait_task_handle_value(task).map_err(|v| format!("{v}"))
+    }
+
+    /// Like [`Self::wait_task_handle`] but preserves the rejection `Value`
+    /// instead of stringifying it — required so typed payloads (e.g.
+    /// `HostError`) survive to the await-resume hook (`host_values`).
+    pub fn wait_task_handle_value(
+        task: varn_types::AsyncTask,
+    ) -> Result<varn_types::Value, varn_types::Value> {
         match task.peek_state() {
             varn_types::task::TaskState::Resolved(v) => return Ok(v),
-            varn_types::task::TaskState::Rejected(v) => {
-                return Err(format!("{v}"));
-            }
+            varn_types::task::TaskState::Rejected(v) => return Err(v),
             varn_types::task::TaskState::Pending => {}
         }
 
@@ -23,8 +30,8 @@ impl ExecCtx {
 
         match rx.recv() {
             Ok(Ok(v)) => Ok(v),
-            Ok(Err(v)) => Err(format!("{v}")),
-            Err(_) => Err("task dropped".to_owned()),
+            Ok(Err(v)) => Err(v),
+            Err(_) => Err(varn_types::Value::Str(std::rc::Rc::from("task dropped"))),
         }
     }
 
@@ -115,18 +122,15 @@ impl ExecCtx {
                             varn_types::Value::TaskHandle(handle) => match handle.peek_state() {
                                 varn_types::task::TaskState::Resolved(v) => Ok(v),
                                 varn_types::task::TaskState::Rejected(v) => Err(v),
-                                _ => match ExecCtx::wait_task_handle(handle.clone()) {
-                                    Ok(v) => Ok(v),
-                                    Err(e) => {
-                                        Err(varn_types::Value::Str(std::rc::Rc::from(e.as_str())))
-                                    }
-                                },
+                                _ => ExecCtx::wait_task_handle_value(handle.clone()),
                             },
                             other => Ok(other),
                         };
 
                         match res_val {
                             Ok(resolved) => {
+                                let resolved =
+                                    crate::exec::host_values::open_resolved(&mut fork, resolved);
                                 let resolved_nv = fork.heap.intern(resolved);
                                 if let Some(frame) = fork.frames.last() {
                                     let base = frame.base;
@@ -140,6 +144,8 @@ impl ExecCtx {
                                 }
                             }
                             Err(thrown) => {
+                                let thrown =
+                                    crate::exec::host_values::open_rejected(&mut fork, thrown);
                                 let thrown_nv = fork.heap.intern(thrown.clone());
                                 let err = crate::exec::exceptions::build_thrown_error(
                                     thrown_nv,

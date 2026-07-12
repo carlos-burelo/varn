@@ -10,3 +10,24 @@ export declare class IsolatePort {
 }
 
 export declare function spawnIsolate(fn: dynamic, args: Array<dynamic>): Task<IsolatePort>;
+
+export declare class ChannelClosed extends Error {}
+
+export declare class Sender<T = dynamic> {
+    send(msg: T): Task<void>;
+    close(): void;
+    dispose(): void;
+}
+
+export declare class Receiver<T = dynamic> {
+    receive(): Task<T>;
+    next(): Task<{ value: T?, done: bool }>;
+    dispose(): void;
+}
+
+export declare class Channel<T = dynamic> {
+    tx: Sender<T>;
+    rx: Receiver<T>;
+}
+
+export declare function channel<T = dynamic>(capacity: int): Channel<T>;

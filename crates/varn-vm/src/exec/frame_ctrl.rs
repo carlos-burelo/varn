@@ -766,8 +766,23 @@ impl NativeCtx for ExecCtx {
                     Ok(varn_types::value::SendValue::Array(items))
                 }
                 Some(HeapObj::Object(obj)) => {
+                    let borrow = obj.borrow();
+                    // Channel endpoints (Sender/Receiver instances) transfer by
+                    // reference — detected once, in `SendValue::endpoint_for`.
+                    if let Some(cls) = borrow.class() {
+                        let chan_id = match borrow.get_field("_chan") {
+                            Some(varn_types::Value::Int(id)) => Some(id),
+                            _ => None,
+                        };
+                        if let Some(sv) = varn_types::value::SendValue::endpoint_for(
+                            cls.name.as_str(),
+                            chan_id,
+                        )? {
+                            return Ok(sv);
+                        }
+                    }
                     let mut map = std::collections::HashMap::new();
-                    for (k, nv) in obj.borrow().inner.iter() {
+                    for (k, nv) in borrow.inner.iter() {
                         map.insert(k.to_string(), self.to_sendable(nv)?);
                     }
                     Ok(varn_types::value::SendValue::Object(map))
@@ -815,32 +830,44 @@ impl NativeCtx for ExecCtx {
 }
 
 impl ExecCtx {
+    /// Convert a materialized `Value` (e.g. a Map/Set entry) into a
+    /// `SendValue`. Self-contained values route through the single shared
+    /// `Value::to_sendable` (which also performs channel-endpoint detection);
+    /// objects/arrays/maps/sets and heap refs may hold unresolved `VmValue`
+    /// fields, so they walk this heap via [`Self::to_sendable`] — the varn-types
+    /// path cannot resolve raw heap indices (`heap.extract` yields a
+    /// `Value::Object` whose fields are still `VmValue`s).
     fn value_to_sendable(
         &self,
         val: &varn_types::Value,
     ) -> Result<varn_types::value::SendValue, String> {
         match val {
-            varn_types::Value::Null => Ok(varn_types::value::SendValue::Null),
-            varn_types::Value::Bool(b) => Ok(varn_types::value::SendValue::Bool(*b)),
-            varn_types::Value::Int(n) => Ok(varn_types::value::SendValue::Int(*n)),
-            varn_types::Value::Float(f) => Ok(varn_types::value::SendValue::Float(f.to_bits())),
-            varn_types::Value::Str(s) => Ok(varn_types::value::SendValue::Str(s.to_string())),
-            varn_types::Value::BigInt(b) => Ok(varn_types::value::SendValue::BigInt(**b)),
-            varn_types::Value::Decimal(d) => Ok(varn_types::value::SendValue::Decimal(**d)),
-            varn_types::Value::Char(c) => Ok(varn_types::value::SendValue::Char(*c)),
+            varn_types::Value::Object(obj) => {
+                let borrow = obj.read();
+                if let Some(cls) = borrow.class() {
+                    let chan_id = match borrow.get_field("_chan") {
+                        Some(varn_types::Value::Int(id)) => Some(id),
+                        _ => None,
+                    };
+                    if let Some(sv) = varn_types::value::SendValue::endpoint_for(
+                        cls.name.as_str(),
+                        chan_id,
+                    )? {
+                        return Ok(sv);
+                    }
+                }
+                let mut map = std::collections::HashMap::new();
+                for (k, nv) in borrow.inner.iter() {
+                    map.insert(k.to_string(), self.to_sendable(nv)?);
+                }
+                Ok(varn_types::value::SendValue::Object(map))
+            }
             varn_types::Value::Array(arr) => {
                 let mut items = Vec::new();
                 for item in arr.read().iter() {
                     items.push(self.value_to_sendable(item)?);
                 }
                 Ok(varn_types::value::SendValue::Array(items))
-            }
-            varn_types::Value::Object(obj) => {
-                let mut map = std::collections::HashMap::new();
-                for (k, nv) in obj.read().inner.iter() {
-                    map.insert(k.to_string(), self.to_sendable(nv)?);
-                }
-                Ok(varn_types::value::SendValue::Object(map))
             }
             varn_types::Value::Map(map_ref) => {
                 let mut items = Vec::new();
@@ -856,23 +883,6 @@ impl ExecCtx {
                 }
                 Ok(varn_types::value::SendValue::Set(items))
             }
-            varn_types::Value::Range(r) => {
-                let mut fields = std::collections::HashMap::new();
-                fields.insert(
-                    "start".to_string(),
-                    varn_types::value::SendValue::Int(r.start),
-                );
-                fields.insert("end".to_string(), varn_types::value::SendValue::Int(r.end));
-                fields.insert(
-                    "inclusive".to_string(),
-                    varn_types::value::SendValue::Bool(r.inclusive),
-                );
-                fields.insert(
-                    "step".to_string(),
-                    varn_types::value::SendValue::Int(r.step),
-                );
-                Ok(varn_types::value::SendValue::Object(fields))
-            }
             varn_types::Value::VmValue(payload) => {
                 if let Some(vr) = payload.as_any().downcast_ref::<varn_types::VmValueRef>() {
                     self.to_sendable(vr.0)
@@ -880,7 +890,8 @@ impl ExecCtx {
                     Err("Value cannot be sent to an isolate".to_string())
                 }
             }
-            _ => Err("Value cannot be sent to an isolate".to_string()),
+            // Scalars and Range are self-contained: one shared conversion.
+            _ => val.to_sendable(),
         }
     }
 

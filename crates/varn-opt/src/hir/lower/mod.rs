@@ -273,6 +273,12 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                 Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
 
                 Decl::Namespace(_) | Decl::Extension(_) => {}
+                // Re-exports (`export { a, b }` / `export { a } from "m"` /
+                // `export * from "m"`) introduce no local binding to hoist; the
+                // main lowering pass drives them via `lower_export`.
+                Decl::Export(
+                    ExportDecl::Named { .. } | ExportDecl::All { .. } | ExportDecl::Default { .. },
+                ) => {}
                 _ => return Err(OptError::Unsupported("hir: top-level decl (hoist)")),
             }
         }

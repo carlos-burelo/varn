@@ -131,6 +131,21 @@ varn_contract! {
             ctx.set_field(instance_nv, "_port", port_nv);
             Ok(instance_nv)
         }
+
+        fn channel(ctx: &mut dyn NativeCtx, capacity: i64) -> Result<VmValue, String> {
+            if capacity < 1 {
+                return Err("channel: capacity must be >= 1".to_string());
+            }
+            let id = varn_runtime::channel::create(capacity as usize);
+            let ch_nv = ctx
+                .alloc_instance("Channel")
+                .ok_or("channel: Channel class not registered")?;
+            let tx_nv = alloc_endpoint(ctx, "Sender", id)?;
+            let rx_nv = alloc_endpoint(ctx, "Receiver", id)?;
+            ctx.set_field(ch_nv, "tx", tx_nv);
+            ctx.set_field(ch_nv, "rx", rx_nv);
+            Ok(ch_nv)
+        }
     }
 }
 
@@ -180,4 +195,244 @@ varn_contract! {
             VmValue::null()
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Typed channels: Sender / Receiver / Channel / ChannelClosed (runtime:task).
+// ---------------------------------------------------------------------------
+
+pub struct SenderImpl;
+pub struct ReceiverImpl;
+pub struct ChannelImpl;
+pub struct ChannelClosedImpl;
+
+/// Allocate a `Sender`/`Receiver` instance holding only the channel `_chan` id.
+/// A `Receiver` also gets a self-returning `Symbol.asyncIterator` so `for await`
+/// drives it directly through its own `next()`. Shared with the VM's
+/// `host_values::mint_endpoint` (cross-isolate materialization) so both minting
+/// paths produce identical instances.
+pub fn alloc_endpoint(
+    ctx: &mut dyn NativeCtx,
+    class_name: &str,
+    id: u64,
+) -> Result<VmValue, String> {
+    let nv = ctx
+        .alloc_instance(class_name)
+        .ok_or_else(|| format!("channel: {class_name} class not registered"))?;
+    ctx.set_field(nv, "_chan", VmValue::from_int(id as i64));
+    if class_name == "Receiver" {
+        // for-await: Symbol.asyncIterator returns the receiver itself
+        // (self-iterator), whose `next()` yields `{value, done}`.
+        let self_val = ctx.extract(nv);
+        let iter_nv = ctx.intern(Value::native_bound(
+            self_val,
+            receiver_self_iterator,
+            "[Symbol.asyncIterator]",
+        ));
+        ctx.set_field(nv, "Symbol.asyncIterator", iter_nv);
+    }
+    Ok(nv)
+}
+
+fn receiver_self_iterator(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+    args.first()
+        .copied()
+        .ok_or_else(|| "receiver iterator: missing self".to_string())
+}
+
+fn chan_id(ctx: &mut dyn NativeCtx, this: VmValue) -> Option<u64> {
+    let nv = ctx.get_field(this, "_chan")?;
+    match ctx.extract(nv) {
+        Value::Int(i) => Some(i as u64),
+        _ => None,
+    }
+}
+
+/// Heap-independent typed error payload; the VM's `host_values::open_rejected`
+/// mints it as a real `ChannelClosed` instance on the consumer's heap (works
+/// same-thread and cross-thread). A marker *object* would lose its strings:
+/// bare `ObjData::set_field` cannot embed non-SSO strings — see
+/// `varn_types::value::HostError`.
+fn closed_error_obj(msg: &str) -> Value {
+    varn_types::value::HostError::to_value("ChannelClosed", msg)
+}
+
+/// Build a `{value, done}` result object on the consumer's heap. Unlike
+/// `channel::next_obj`, this routes through `ctx` so composite values embed
+/// correctly (a bare `ObjData::set_field` only accepts scalars).
+fn next_result(ctx: &mut dyn NativeCtx, value_nv: VmValue, done: bool) -> VmValue {
+    let obj = ctx.alloc_object();
+    ctx.set_field(obj, "value", value_nv);
+    let done_nv = ctx.bool_val(done);
+    ctx.set_field(obj, "done", done_nv);
+    obj
+}
+
+varn_contract! {
+    module: "runtime:task",
+    class: "Sender",
+    contract: "src/modules/std/task/runtime/task_runtime.vn",
+    impl SenderImpl {
+        fn send(ctx: &mut dyn NativeCtx, this: VmValue, msg: VmValue) -> VmValue {
+            let out = varn_types::AsyncTask::pending();
+            let Some(id) = chan_id(ctx, this) else {
+                out.reject(closed_error_obj("channel closed"));
+                return ctx.intern(Value::TaskHandle(out));
+            };
+            let send_val = match ctx.to_sendable(msg) {
+                Ok(v) => v,
+                Err(e) => {
+                    out.reject_msg(format!("send: {e}"));
+                    return ctx.intern(Value::TaskHandle(out));
+                }
+            };
+            match varn_runtime::channel::send(id, send_val) {
+                varn_runtime::channel::SendOutcome::Sent => out.resolve(Value::Null),
+                varn_runtime::channel::SendOutcome::Closed => {
+                    out.reject(closed_error_obj("channel closed"));
+                }
+                varn_runtime::channel::SendOutcome::Parked(task) => {
+                    let out2 = out.clone();
+                    task.on_settle(move |res| match res {
+                        Ok(Value::Bool(true)) => out2.resolve(Value::Null),
+                        _ => out2.reject(closed_error_obj("channel closed")),
+                    });
+                }
+            }
+            ctx.intern(Value::TaskHandle(out))
+        }
+
+        fn close(ctx: &mut dyn NativeCtx, this: VmValue) {
+            if let Some(id) = chan_id(ctx, this) {
+                varn_runtime::channel::close(id);
+            }
+        }
+
+        fn dispose(ctx: &mut dyn NativeCtx, this: VmValue) {
+            if let Some(id) = chan_id(ctx, this) {
+                varn_runtime::channel::close(id);
+            }
+        }
+    }
+}
+
+varn_contract! {
+    module: "runtime:task",
+    class: "Receiver",
+    contract: "src/modules/std/task/runtime/task_runtime.vn",
+    impl ReceiverImpl {
+        fn next(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
+            let out = varn_types::AsyncTask::pending();
+            let Some(id) = chan_id(ctx, this) else {
+                out.resolve(varn_runtime::channel::next_obj(Value::Null, true));
+                return ctx.intern(Value::TaskHandle(out));
+            };
+            match varn_runtime::channel::try_receive(id) {
+                varn_runtime::channel::RecvOutcome::Item(v) => {
+                    let val_nv = v.to_value_ctx(ctx);
+                    let res_nv = next_result(ctx, val_nv, false);
+                    let res = ctx.extract(res_nv);
+                    out.resolve(res);
+                }
+                varn_runtime::channel::RecvOutcome::Closed => {
+                    out.resolve(varn_runtime::channel::next_obj(Value::Null, true));
+                }
+                varn_runtime::channel::RecvOutcome::Parked(task) => {
+                    let out2 = out.clone();
+                    task.on_settle(move |res| {
+                        if let Ok(v) = res {
+                            // Re-wrap a composite envelope so `open_resolved`
+                            // materializes it into `{value, done:false}`; a
+                            // `{value, done}` scalar/close object passes through.
+                            let rewrapped = varn_types::value::SendEnvelope::from_value(&v)
+                                .map(|env| env.sv.clone());
+                            let out_val = match rewrapped {
+                                Some(sv) => Value::VmValue(Box::new(
+                                    varn_types::value::SendEnvelope { sv, wrap: true },
+                                )),
+                                None => v,
+                            };
+                            out2.resolve(out_val);
+                        }
+                    });
+                }
+            }
+            ctx.intern(Value::TaskHandle(out))
+        }
+
+        fn receive(ctx: &mut dyn NativeCtx, this: VmValue) -> VmValue {
+            let out = varn_types::AsyncTask::pending();
+            let Some(id) = chan_id(ctx, this) else {
+                out.reject(closed_error_obj("channel closed"));
+                return ctx.intern(Value::TaskHandle(out));
+            };
+            match varn_runtime::channel::try_receive(id) {
+                varn_runtime::channel::RecvOutcome::Item(v) => {
+                    let val_nv = v.to_value_ctx(ctx);
+                    let val = ctx.extract(val_nv);
+                    out.resolve(val);
+                }
+                varn_runtime::channel::RecvOutcome::Closed => {
+                    out.reject(closed_error_obj("channel closed"));
+                }
+                varn_runtime::channel::RecvOutcome::Parked(task) => {
+                    let out2 = out.clone();
+                    task.on_settle(move |res| match res {
+                        Ok(v) => {
+                            if varn_types::value::SendEnvelope::from_value(&v).is_some() {
+                                // Composite delivery (done implied false):
+                                // forward the bare envelope; `open_resolved`
+                                // materializes the value.
+                                out2.resolve(v);
+                            } else {
+                                // `{value, done}` scalar/close object.
+                                let done = matches!(
+                                    &v,
+                                    Value::Object(o) if matches!(
+                                        o.read().inner.get("done")
+                                            .map(varn_types::value::nv_to_value),
+                                        Some(Value::Bool(true))
+                                    )
+                                );
+                                if done {
+                                    out2.reject(closed_error_obj("channel closed"));
+                                } else if let Value::Object(o) = &v {
+                                    let inner_val = o
+                                        .read()
+                                        .inner
+                                        .get("value")
+                                        .map(varn_types::value::nv_to_value)
+                                        .unwrap_or(Value::Null);
+                                    out2.resolve(inner_val);
+                                }
+                            }
+                        }
+                        Err(e) => out2.reject(e),
+                    });
+                }
+            }
+            ctx.intern(Value::TaskHandle(out))
+        }
+
+        fn dispose(ctx: &mut dyn NativeCtx, this: VmValue) {
+            if let Some(id) = chan_id(ctx, this) {
+                varn_runtime::channel::close(id);
+            }
+        }
+    }
+}
+
+varn_contract! {
+    module: "runtime:task",
+    class: "Channel",
+    contract: "src/modules/std/task/runtime/task_runtime.vn",
+    impl ChannelImpl {}
+}
+
+varn_contract! {
+    module: "runtime:task",
+    class: "ChannelClosed",
+    extends: "Error",
+    contract: "src/modules/std/task/runtime/task_runtime.vn",
+    impl ChannelClosedImpl {}
 }

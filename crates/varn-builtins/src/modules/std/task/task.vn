@@ -1,6 +1,10 @@
 // std:task - pure Varn facade over runtime concurrency host operations.
 
-import { taskSpawn, taskSleep, taskParallel, IsolatePort, spawnIsolate as nativeSpawnIsolate } from "runtime:task";
+import { taskSpawn, taskSleep, taskParallel, channel,
+         Sender, Receiver, Channel, ChannelClosed,
+         IsolatePort, spawnIsolate as nativeSpawnIsolate } from "runtime:task";
+
+export { channel, Sender, Receiver, Channel, ChannelClosed };
 
 export declare class Generator<T> {
     next(value?: dynamic): { value: T; done: bool; };

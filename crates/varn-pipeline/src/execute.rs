@@ -114,6 +114,10 @@ pub fn execute(
                         },
                         other => other,
                     };
+                    // Materialize host markers/envelopes (channel endpoints,
+                    // composite payloads) on this heap before delivery.
+                    let resolved =
+                        varn_vm::exec::host_values::open_resolved(&mut machine.ctx, resolved);
                     let resolved_nv = machine.ctx.heap.intern(resolved);
 
                     if let Some(frame) = machine.ctx.frames.last() {
