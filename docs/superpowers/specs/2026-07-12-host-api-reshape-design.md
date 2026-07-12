@@ -18,7 +18,7 @@ capas sin rutas duales.
 - Nuevo módulo embebido contract-only `core:intrinsics`.
 - Renombrar ~67 natives en 11 módulos host + `runtime:task`/`runtime:reflect` (convención sin prefijo).
 - API pública `std:*` plana (muere `export namespace` como fachada).
-- Bump `HOST_API_VERSION` 1 → 2, `std.json` 0.1.0 → 0.2.0.
+- Bump `HOST_API_VERSION` 2 → 3, `std.json` 0.2.0 → 0.3.0 (isolate-channels ya tomó v2/0.2.0).
 - Limpieza: ids muertos (`core:collections`, `core:reflect`, `core:async`, `core:iterators`), constantes `CORE_*` huérfanas, `DEFERRED_STDLIB_IDS`, fallback stdlib del provider.
 
 **Fuera de alcance:**
@@ -128,8 +128,8 @@ conservan su nombre — solo funciones renombradas.
 
 ## 7. Versionado y compatibilidad
 
-- `HOST_API_VERSION` 1 → 2 (renames = breaking en contratos `runtime:*`).
-- `std.json` `version` 0.1.0 → 0.2.0.
+- `HOST_API_VERSION` 2 → 3 (renames = breaking en contratos `runtime:*`).
+- `std.json` `version` 0.2.0 → 0.3.0.
 - Bundle viejo contra binario nuevo (o viceversa): rechazo duro existente
   (`validate_compat_with`) con hint `cargo xtask build-std`. Sin fallback
   silencioso.
