@@ -20,6 +20,8 @@ warp.lock
 test_*.vn
 tmp*.vn
 !crates/varn-builtins/src/modules/**/test_*.vn
+# artefacto de tests/45-simple-file-test.vn (escribe en CWD)
+temp_simple.txt
 
 # Tooling de agentes / índices locales
 .claude/
