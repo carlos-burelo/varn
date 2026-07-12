@@ -219,6 +219,7 @@ impl Checker {
                         if (name.as_ref() == IntrinsicType::Array.as_str()
                             || name.as_ref() == "Iterator"
                             || name.as_ref() == "AsyncIterator"
+                            || name.as_ref() == "Receiver"
                             || name.as_ref() == "List"
                             || name.as_ref() == IntrinsicType::Set.as_str()
                             || name.as_ref() == IntrinsicType::Generator.as_str())
