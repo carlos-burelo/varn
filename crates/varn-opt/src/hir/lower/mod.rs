@@ -273,12 +273,14 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                 Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
 
                 Decl::Namespace(_) | Decl::Extension(_) => {}
-                // Re-exports (`export { a, b }` / `export { a } from "m"` /
-                // `export * from "m"`) introduce no local binding to hoist; the
-                // main lowering pass drives them via `lower_export`.
-                Decl::Export(
-                    ExportDecl::Named { .. } | ExportDecl::All { .. } | ExportDecl::Default { .. },
-                ) => {}
+                // Sourceless re-export (`export { a, b };`) introduces no local
+                // binding to hoist; the main lowering pass drives it via
+                // `lower_export`. `export { a } from "m"`, `export * from "m"`,
+                // and `export default ...` are NOT hoist-safe: the
+                // checker/SSA export-slot wiring for those forms is known to
+                // mismatch (silently reads the wrong slot), so they must keep
+                // failing loudly here rather than lower incorrectly.
+                Decl::Export(ExportDecl::Named { source: None, .. }) => {}
                 _ => return Err(OptError::Unsupported("hir: top-level decl (hoist)")),
             }
         }

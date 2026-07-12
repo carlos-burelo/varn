@@ -339,8 +339,8 @@ varn_contract! {
                 }
                 varn_runtime::channel::RecvOutcome::Parked(task) => {
                     let out2 = out.clone();
-                    task.on_settle(move |res| {
-                        if let Ok(v) = res {
+                    task.on_settle(move |res| match res {
+                        Ok(v) => {
                             // Re-wrap a composite envelope so `open_resolved`
                             // materializes it into `{value, done:false}`; a
                             // `{value, done}` scalar/close object passes through.
@@ -354,6 +354,7 @@ varn_contract! {
                             };
                             out2.resolve(out_val);
                         }
+                        Err(e) => out2.reject(e),
                     });
                 }
             }
@@ -404,6 +405,13 @@ varn_contract! {
                                         .map(varn_types::value::nv_to_value)
                                         .unwrap_or(Value::Null);
                                     out2.resolve(inner_val);
+                                } else {
+                                    // Neither a SendEnvelope nor a `{value, done}`
+                                    // object: violates the channel wake-payload
+                                    // invariant. Reject loudly instead of leaving
+                                    // `out2` (and the awaiting task) pending
+                                    // forever.
+                                    out2.reject_msg("receive: unexpected wake payload");
                                 }
                             }
                         }
