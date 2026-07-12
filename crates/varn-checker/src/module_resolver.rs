@@ -683,7 +683,14 @@ fn collect_exports(
                     if let Some(sym) = lookup_global(bind, &spec.local) {
                         let mut s = sym.clone();
                         s.name = spec.exported.clone();
-                        s.origin_module = Some(abs_path.to_owned().into());
+                        // A re-exported import keeps its DECLARING module as
+                        // origin (member lookup resolves the class there);
+                        // only locally-declared symbols get stamped with this
+                        // module. Mirrors the `export { x } from "src"` arm.
+                        s.origin_module = s
+                            .origin_module
+                            .take()
+                            .or_else(|| Some(abs_path.to_owned().into()));
                         out.insert(spec.exported.to_string(), s);
                     }
                 }

@@ -58,11 +58,19 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
                 return ty;
             }
 
-            Type::generic_with_origin(
-                name.clone(),
-                resolved_args,
-                ctx.and_then(|c| c.source_file()).map(|s| Rc::from(s)),
-            )
+            // Origin must point at the DECLARING module, not the file that
+            // wrote the annotation: member lookup resolves the class through
+            // it (`check_origin_module`). An imported symbol carries its
+            // declaring origin; fall back to the current file only for
+            // locally-declared (or unresolvable) names.
+            let origin = ctx
+                .and_then(|c| c.resolve_symbol(name.as_ref()))
+                .and_then(|t| match t.0 {
+                    TypeKind::Named(_, o) | TypeKind::Generic(_, _, o) => o,
+                    _ => None,
+                })
+                .or_else(|| ctx.and_then(|c| c.source_file()).map(Rc::from));
+            Type::generic_with_origin(name.clone(), resolved_args, origin)
         }
         TypeKind::Named(name, __origin) => {
             let prim = resolve_primitive(name.as_ref(), ctx);
