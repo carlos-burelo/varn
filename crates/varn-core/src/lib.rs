@@ -40,7 +40,7 @@ pub use varn_base::TypeTag;
 /// (signature change, symbol removal). Additive changes do NOT bump — a std
 /// bundle using a new symbol on an old binary fails at import resolution
 /// with a clear module error (spec §3).
-pub const HOST_API_VERSION: u32 = 2;
+pub const HOST_API_VERSION: u32 = 3;
 
 thread_local! {
     static INTERNER: RefCell<FxHashMap<Box<str>, Rc<str>>> = RefCell::new(FxHashMap::default());

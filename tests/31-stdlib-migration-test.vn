@@ -1,10 +1,8 @@
-
 import { List } from "std:collections";
 import { Http } from "std:http";
-import { JSON as json } from "std:json";
-import { crypto } from "std:crypto";
-import * as time_mod from "std:time";
-const { Duration, PlainDateTime, Now, Instant } = time_mod;
+import { parse, stringify } from "std:json";
+import { uuid, sha256 } from "std:crypto";
+import { Duration, PlainDateTime, nowInstant, Instant } from "std:time";
 
 // ── std:time / Duration ───────────────────────────────────────────
 let d = Duration.from("PT1H30M");
@@ -12,8 +10,6 @@ assert("Duration totalMilliseconds", d.totalMilliseconds === 5400000)
 assert("Duration hours",             d.hours === 1)
 assert("Duration minutes",           d.minutes === 30)
 assert("Duration seconds",           d.seconds === 5400)
-
-
 
 let d2 = Duration.from("P1DT2H30M10S");
 assert("Duration days+time ms",      d2.totalMilliseconds === 95410000)
@@ -27,8 +23,8 @@ assert("PlainDateTime hour",         now.hour === 10)
 assert("PlainDateTime toString",     now.toString() === "2026-04-21T10:00:00.000")
 
 // ── std:time / Instant ────────────────────────────────────────────
-let t1 = Now.instant();
-let t2 = Now.instant();
+let t1 = nowInstant();
+let t2 = nowInstant();
 
 assert("Instant toString non-empty", t1.toString().length > 0)
 assert("Instant compare equal",      Instant.compare(t1, t1) === 0)
@@ -71,24 +67,24 @@ assert("List last",                  list.toArray()[2] === "C")
 
 // ── std:json ──────────────────────────────────────────────────────
 let obj = { name: "Varn", version: 1 };
-let json_str = json.stringify(obj);
+let json_str = stringify(obj);
 assert("JSON stringify non-empty",   json_str.length > 0)
 assert("JSON stringify content",     json_str.includes("Varn"))
 
-let back = json.parse(json_str);
+let back = parse(json_str);
 assert("JSON parse name",            back["name"] === "Varn")
 assert("JSON parse version",         back["version"] === 1)
 
 // ── std:crypto / uuid ─────────────────────────────────────────────
-let uuid = crypto.uuid();
-assert("UUID length",                uuid.length === 36)
-assert("UUID dash at 8",             uuid[8] === "-")
-assert("UUID dash at 13",            uuid[13] === "-")
-assert("UUID dash at 18",            uuid[18] === "-")
-assert("UUID dash at 23",            uuid[23] === "-")
+let u = uuid();
+assert("UUID length",                u.length === 36)
+assert("UUID dash at 8",             u[8] === "-")
+assert("UUID dash at 13",            u[13] === "-")
+assert("UUID dash at 18",            u[18] === "-")
+assert("UUID dash at 23",            u[23] === "-")
 
 // ── std:crypto / sha256 ───────────────────────────────────────────
-let hash = crypto.sha256("Hello Varn");
+let hash = sha256("Hello Varn");
 assert("SHA-256 length",             hash.length === 64)
 let allHex = true;
 let hi = 0;

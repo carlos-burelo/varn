@@ -36,10 +36,11 @@ struct Builder {
     current: BlockId,
     pinned_vars: FxHashSet<VarId>,
     finally_stack: Vec<Vec<HirStmt>>,
+    source_file: Option<Rc<str>>,
 }
 
 impl Builder {
-    fn new(pinned_vars: FxHashSet<VarId>) -> Self {
+    fn new(pinned_vars: FxHashSet<VarId>, source_file: Option<Rc<str>>) -> Self {
         let mut b = Builder {
             blocks: Vec::new(),
             values: Vec::new(),
@@ -52,6 +53,7 @@ impl Builder {
             current: BlockId(0),
             pinned_vars,
             finally_stack: Vec::new(),
+            source_file,
         };
         let entry = b.new_block();
         b.sealed[entry.0 as usize] = true;
@@ -779,9 +781,13 @@ fn scan_pinned_vars(func: &HirFunction) -> FxHashSet<VarId> {
     pinned
 }
 
-pub fn build_function(func: &HirFunction, module_funcs: &[HirFunction]) -> Result<SsaFunc> {
+pub fn build_function(
+    func: &HirFunction,
+    module_funcs: &[HirFunction],
+    source_file: Option<Rc<str>>,
+) -> Result<SsaFunc> {
     let pinned = scan_pinned_vars(func);
-    let mut b = Builder::new(pinned);
+    let mut b = Builder::new(pinned, source_file.clone());
 
     b.next_synthetic = func.locals;
     let entry = b.current;
@@ -801,8 +807,13 @@ pub fn build_function(func: &HirFunction, module_funcs: &[HirFunction]) -> Resul
             },
             HirType::Ref,
         );
+        let name = if let Some(ref src) = source_file {
+            Rc::from(format!("{}::{}", src.replace('\\', "/"), f.name))
+        } else {
+            f.name.clone()
+        };
         b.emit_effect(InstKind::StoreGlobal {
-            name: f.name.clone(),
+            name,
             value: fn_val,
         });
     }

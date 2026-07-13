@@ -977,7 +977,7 @@ impl<'a> Lowerer<'a> {
                 let value = Box::new(self.lower_expr(expression, scope)?);
                 Ok(HirExpr::TypeTest {
                     value,
-                    kind: type_test_of(type_ann),
+                    kind: self.type_test_of(type_ann),
                 })
             }
             ExprKind::Pipeline { left, right } => {
@@ -1110,27 +1110,44 @@ impl<'a> Lowerer<'a> {
         if let Some(b) = scope.resolve(name) {
             b
         } else {
-            HirBinding::Global(name.clone())
+            self.global_binding(name.clone())
         }
     }
-}
 
-fn type_test_of(type_ann: &varn_core::ast::types::TypeNode) -> HirTypeTest {
-    use varn_core::{IntrinsicType, TypeKind, TypeTag};
-    match &type_ann.kind {
-        TypeKind::Intrinsic(TypeTag::Null) => HirTypeTest::IsNull,
-        TypeKind::Intrinsic(TypeTag::Array) | TypeKind::Array(_) => HirTypeTest::IsArray,
-        TypeKind::Generic(n, _, _) if n.as_str() == IntrinsicType::Array.as_str() => {
-            HirTypeTest::IsArray
+    pub(super) fn global_binding(&self, name: Rc<str>) -> HirBinding {
+        if self.local_globals.contains(&name) {
+            let qualified = format!("{}::{}", self.source_file, name);
+            HirBinding::Global(Rc::from(qualified))
+        } else {
+            HirBinding::Global(name)
         }
-        TypeKind::Intrinsic(tt) => {
-            HirTypeTest::TypeofEq(Rc::from(IntrinsicType::from(*tt).as_str()))
+    }
+
+    fn type_test_of(&self, type_ann: &varn_core::ast::types::TypeNode) -> HirTypeTest {
+        use varn_core::{IntrinsicType, TypeKind, TypeTag};
+        match &type_ann.kind {
+            TypeKind::Intrinsic(TypeTag::Null) => HirTypeTest::IsNull,
+            TypeKind::Intrinsic(TypeTag::Array) | TypeKind::Array(_) => HirTypeTest::IsArray,
+            TypeKind::Generic(n, _, _) if n.as_str() == IntrinsicType::Array.as_str() => {
+                HirTypeTest::IsArray
+            }
+            TypeKind::Intrinsic(tt) => {
+                HirTypeTest::TypeofEq(Rc::from(IntrinsicType::from(*tt).as_str()))
+            }
+            TypeKind::Named(name, _) => match IntrinsicType::from_str(name) {
+                Some(it) if it.is_scalar_primitive() => HirTypeTest::TypeofEq(Rc::from(it.as_str())),
+                _ => {
+                    let name_rc = Rc::from(name.as_str());
+                    let binding = self.global_binding(name_rc);
+                    let final_name = match binding {
+                        HirBinding::Global(n) => n,
+                        _ => Rc::from(name.as_str()),
+                    };
+                    HirTypeTest::Instanceof(final_name)
+                }
+            },
+            _ => HirTypeTest::AlwaysFalse,
         }
-        TypeKind::Named(name, _) => match IntrinsicType::from_str(name) {
-            Some(it) if it.is_scalar_primitive() => HirTypeTest::TypeofEq(Rc::from(it.as_str())),
-            _ => HirTypeTest::Instanceof(Rc::from(name.as_str())),
-        },
-        _ => HirTypeTest::AlwaysFalse,
     }
 }
 

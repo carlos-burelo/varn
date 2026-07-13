@@ -7,14 +7,14 @@ export interface RawStats {
     mtime: int;
 }
 
-export declare function fsRead(path: str): str;
-export declare function fsWrite(path: str, content: str): void;
-export declare function fsExists(path: str): bool;
-export declare function fsStat(path: str): RawStats;
-export declare function fsMkdir(path: str): void;
-export declare function fsMkdirAll(path: str): void;
-export declare function fsReadDir(path: str): str[];
-export declare function fsRemove(path: str): void;
-export declare function fsRemoveAll(path: str): void;
-export declare function fsRename(from: str, to: str): void;
-export declare function fsTempDir(): str;
+export declare function read(path: str): str;
+export declare function write(path: str, content: str): void;
+export declare function exists(path: str): bool;
+export declare function stat(path: str): RawStats;
+export declare function mkdir(path: str): void;
+export declare function mkdirAll(path: str): void;
+export declare function readDir(path: str): str[];
+export declare function remove(path: str): void;
+export declare function removeAll(path: str): void;
+export declare function rename(from: str, to: str): void;
+export declare function tempDir(): str;

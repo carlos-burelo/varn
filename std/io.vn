@@ -1,4 +1,4 @@
-import { ioWrite, ioWriteln, ioFlush, ioReadLine } from "runtime:io";
+import { write as nativeWrite, writeln as nativeWriteln, flush as nativeFlush, readLine as nativeReadLine } from "runtime:io";
 
 export interface Writer {
     write(content: str): void
@@ -10,27 +10,21 @@ export interface Reader {
     pipeTo(dst: Writer): void
 }
 
-export namespace io {
-    // Direct native aliases: calling these dispatches straight to the host
-    // native (arg slice) instead of a VM forwarder that bundles a rest array
-    // and re-spreads it (`WrapSpread`/`CallSpread`) — one fewer heap alloc per
-    // call.
-    export const write = ioWrite;
-    export const writeln = ioWriteln;
-    export const print = ioWriteln;
+export const write = nativeWrite;
+export const writeln = nativeWriteln;
+export const print = nativeWriteln;
 
-    export function flush(): void {
-        ioFlush();
-    }
+export function flush(): void {
+    nativeFlush();
+}
 
-    export function readLine(prompt?: str): str {
-        if (prompt === null) {
-            return ioReadLine("");
-        }
-        return ioReadLine(prompt);
+export function readLine(prompt?: str): str {
+    if (prompt === null) {
+        return nativeReadLine("");
     }
+    return nativeReadLine(prompt);
+}
 
-    export function readAll(): str {
-        return "";
-    }
+export function readAll(): str {
+    return "";
 }

@@ -1,7 +1,8 @@
 {
-    "version": "0.2.0",
-    "hostApi": 2,
+    "version": "0.3.0",
+    "hostApi": 3,
     "modules": [
+        { "id": "std:collections", "pure": true },
         { "id": "std:crypto" },
         { "id": "std:dispose" },
         { "id": "std:fs" },
@@ -11,8 +12,11 @@
         { "id": "std:math", "pure": true },
         { "id": "std:net" },
         { "id": "std:path", "pure": true },
+        { "id": "std:reflect" },
         { "id": "std:sys" },
+        { "id": "std:task" },
         { "id": "std:test" },
-        { "id": "std:time" }
+        { "id": "std:time" },
+        { "id": "std:types", "pure": true }
     ]
 }

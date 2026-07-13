@@ -1,19 +1,19 @@
-import { testAssert, testAssertEqual, testSummary } from "runtime:test";
+import { assert as nativeAssert, assertEqual as nativeAssertEqual, summary as nativeSummary } from "runtime:testing";
 
 export function assert(label: str, condition: bool): void {
-    testAssert(label, condition);
+    nativeAssert(label, condition);
 }
 
 export function assertEqual<T>(actual: T, expected: T, message?: str): void {
-    testAssertEqual(actual, expected, message);
+    nativeAssertEqual(actual, expected, message);
 }
 
 export function assertTrue(cond: bool, message?: str): void {
-    testAssert(message ?? "assertTrue", cond);
+    nativeAssert(message ?? "assertTrue", cond);
 }
 
 export function summary(): void {
-    testSummary();
+    nativeSummary();
 }
 
 const testImpl = {

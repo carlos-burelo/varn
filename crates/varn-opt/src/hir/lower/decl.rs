@@ -310,8 +310,9 @@ impl<'a> Lowerer<'a> {
                     upvalues: Vec::new(),
                 };
                 if is_global {
+                    let target = self.global_binding(f.id.clone());
                     out.push(HirStmt::Assign {
-                        target: HirBinding::Global(f.id.clone()),
+                        target,
                         value,
                     });
                 } else {
@@ -329,8 +330,9 @@ impl<'a> Lowerer<'a> {
                 let hir_class = self.lower_class(cl, scope)?;
                 let value = HirExpr::Class(Box::new(hir_class));
                 if is_global {
+                    let target = self.global_binding(name.clone());
                     out.push(HirStmt::Assign {
-                        target: HirBinding::Global(name.clone()),
+                        target,
                         value,
                     });
                 } else {
@@ -347,8 +349,9 @@ impl<'a> Lowerer<'a> {
                 let hir_enum = self.lower_enum(en, scope)?;
                 let value = HirExpr::Enum(Box::new(hir_enum));
                 if is_global {
+                    let target = self.global_binding(en.id.clone());
                     out.push(HirStmt::Assign {
-                        target: HirBinding::Global(en.id.clone()),
+                        target,
                         value,
                     });
                 } else {
@@ -366,15 +369,18 @@ impl<'a> Lowerer<'a> {
                 let value = HirExpr::Enum(Box::new(hir_enum));
                 let mut bound = vec![st.id.clone()];
                 if is_global {
+                    let target = self.global_binding(st.id.clone());
                     out.push(HirStmt::Assign {
-                        target: HirBinding::Global(st.id.clone()),
+                        target,
                         value,
                     });
                     for v in &st.variants {
+                        let target = self.global_binding(v.name.clone());
+                        let st_global = self.global_binding(st.id.clone());
                         out.push(HirStmt::Assign {
-                            target: HirBinding::Global(v.name.clone()),
+                            target,
                             value: HirExpr::Member {
-                                object: Box::new(HirExpr::Var(HirBinding::Global(st.id.clone()))),
+                                object: Box::new(HirExpr::Var(st_global)),
                                 name: v.name.clone(),
                                 ty: HirType::Dynamic,
                             },
@@ -465,7 +471,7 @@ impl<'a> Lowerer<'a> {
             .map(|name| {
                 let binding = scope
                     .resolve_in_current_frame(&name)
-                    .unwrap_or(HirBinding::Global(name.clone()));
+                    .unwrap_or_else(|| self.global_binding(name.clone()));
                 let value = HirExpr::Var(binding);
                 HirObjectProp::Property {
                     key: HirPropKey::Static(name),
@@ -476,8 +482,9 @@ impl<'a> Lowerer<'a> {
         scope.pop_block();
         let value = HirExpr::Object { properties };
         if is_global {
+            let target = self.global_binding(ns.id.clone());
             out.push(HirStmt::Assign {
-                target: HirBinding::Global(ns.id.clone()),
+                target,
                 value,
             });
         } else {
@@ -556,8 +563,9 @@ impl<'a> Lowerer<'a> {
             &[],
             scope,
         )?;
+        let target = self.global_binding(name);
         out.push(HirStmt::Assign {
-            target: HirBinding::Global(name),
+            target,
             value: HirExpr::Closure {
                 func: Box::new(func),
                 upvalues,
@@ -649,8 +657,9 @@ impl<'a> Lowerer<'a> {
                         let hir_class = self.lower_class(cl, scope)?;
                         let value = HirExpr::Class(Box::new(hir_class));
                         if scope.is_global() {
+                            let target = self.global_binding(name.clone());
                             out.push(HirStmt::Assign {
-                                target: HirBinding::Global(name.clone()),
+                                target,
                                 value,
                             });
                         } else {

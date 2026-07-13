@@ -129,8 +129,8 @@ fn validate_imports(id: &str, source: &str) {
         Err(errs) => panic!("{id}: parse error: {}", errs[0].message),
     };
     for spec in varn_pipeline::import_collector::collect_imports(&program) {
-        if !(spec.starts_with("runtime:") || spec.starts_with("std:")) {
-            panic!("{id}: forbidden import \"{spec}\" — std may only import runtime:*/std:*");
+        if !(spec.starts_with("runtime:") || spec.starts_with("std:") || spec == "core:intrinsics") {
+            panic!("{id}: forbidden import \"{spec}\" — std may only import runtime:*/std:* or core:intrinsics");
         }
     }
 }

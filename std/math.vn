@@ -1,115 +1,113 @@
 import {
-    mathAbs,
-    mathSqrt,
-    mathSin,
-    mathCos,
-    mathTan,
-    mathFloor,
-    mathCeil,
-    mathRound,
-    mathRandom,
-    mathAcos,
-    mathAsin,
-    mathAtan,
-    mathAtan2
+    abs as nativeAbs,
+    sqrt as nativeSqrt,
+    sin as nativeSin,
+    cos as nativeCos,
+    tan as nativeTan,
+    floor as nativeFloor,
+    ceil as nativeCeil,
+    round as nativeRound,
+    random as nativeRandom,
+    acos as nativeAcos,
+    asin as nativeAsin,
+    atan as nativeAtan,
+    atan2 as nativeAtan2
 } from "runtime:math";
 
-export namespace Math {
-    export const E: float = 2.718281828459045;
-    export const LN10: float = 2.302585092994046;
-    export const LN2: float = 0.6931471805599453;
-    export const LOG10E: float = 0.4342944819032518;
-    export const LOG2E: float = 1.4426950408889634;
-    export const PI: float = 3.141592653589793;
-    export const SQRT1_2: float = 0.7071067811865476;
-    export const SQRT2: float = 1.4142135623730951;
+export const E: float = 2.718281828459045;
+export const LN10: float = 2.302585092994046;
+export const LN2: float = 0.6931471805599453;
+export const LOG10E: float = 0.4342944819032518;
+export const LOG2E: float = 1.4426950408889634;
+export const PI: float = 3.141592653589793;
+export const SQRT1_2: float = 0.7071067811865476;
+export const SQRT2: float = 1.4142135623730951;
 
-    export function abs(x: float): float {
-        return mathAbs(x);
-    }
+export function abs(x: float): float {
+    return nativeAbs(x);
+}
 
-    export function sqrt(x: float): float {
-        return mathSqrt(x);
-    }
+export function sqrt(x: float): float {
+    return nativeSqrt(x);
+}
 
-    export function sin(x: float): float {
-        return mathSin(x);
-    }
+export function sin(x: float): float {
+    return nativeSin(x);
+}
 
-    export function cos(x: float): float {
-        return mathCos(x);
-    }
+export function cos(x: float): float {
+    return nativeCos(x);
+}
 
-    export function tan(x: float): float {
-        return mathTan(x);
-    }
+export function tan(x: float): float {
+    return nativeTan(x);
+}
 
-    export function floor(x: float): float {
-        return mathFloor(x);
-    }
+export function floor(x: float): float {
+    return nativeFloor(x);
+}
 
-    export function ceil(x: float): float {
-        return mathCeil(x);
-    }
+export function ceil(x: float): float {
+    return nativeCeil(x);
+}
 
-    export function round(x: float): float {
-        return mathRound(x);
-    }
+export function round(x: float): float {
+    return nativeRound(x);
+}
 
-    export function random(): float {
-        return mathRandom();
-    }
+export function random(): float {
+    return nativeRandom();
+}
 
-    export function acos(x: float): float {
-        return mathAcos(x);
-    }
-    export function asin(x: float): float {
-        return mathAsin(x);
-    }
-    export function atan(x: float): float {
-        return mathAtan(x);
-    }
-    export function atan2(y: float, x: float): float {
-        return mathAtan2(y, x);
-    }
-    export function exp(x: float): float {
-        return 0.0;
-    }
-    export function log(x: float): float {
-        return 0.0;
-    }
-    export function max(...args: float[]): float {
-        let current = -1000000000.0;
-        for (let i = 0; i < args.length; i = i + 1) {
-            let v = args[i];
-            if (v > current) {
-                current = v;
-            }
+export function acos(x: float): float {
+    return nativeAcos(x);
+}
+export function asin(x: float): float {
+    return nativeAsin(x);
+}
+export function atan(x: float): float {
+    return nativeAtan(x);
+}
+export function atan2(y: float, x: float): float {
+    return nativeAtan2(y, x);
+}
+export function exp(x: float): float {
+    return 0.0;
+}
+export function log(x: float): float {
+    return 0.0;
+}
+export function max(...args: float[]): float {
+    let current = -1000000000.0;
+    for (let i = 0; i < args.length; i = i + 1) {
+        let v = args[i];
+        if (v > current) {
+            current = v;
         }
-        return current;
     }
-    export function min(...args: float[]): float {
-        let current = 1000000000.0;
-        for (let i = 0; i < args.length; i = i + 1) {
-            let v = args[i];
-            if (v < current) {
-                current = v;
-            }
+    return current;
+}
+export function min(...args: float[]): float {
+    let current = 1000000000.0;
+    for (let i = 0; i < args.length; i = i + 1) {
+        let v = args[i];
+        if (v < current) {
+            current = v;
         }
-        return current;
     }
-    export function pow(x: float, y: float): float {
-        return 0.0;
+    return current;
+}
+export function pow(x: float, y: float): float {
+    return 0.0;
+}
+export function sign(x: float): float {
+    if (x > 0.0) return 1.0;
+    if (x < 0.0) return -1.0;
+    return 0.0;
+}
+export function trunc(x: float): float {
+    if (x >= 0.0) {
+        return nativeFloor(x);
     }
-    export function sign(x: float): float {
-        if (x > 0.0) return 1.0;
-        if (x < 0.0) return -1.0;
-        return 0.0;
-    }
-    export function trunc(x: float): float {
-        if (x >= 0.0) {
-            return mathFloor(x);
-        }
-        return mathCeil(x);
-    }
+    return nativeCeil(x);
 }

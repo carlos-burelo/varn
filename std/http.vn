@@ -1,15 +1,15 @@
 // std:http — Clean, modern, object-oriented HTTP client and server APIs for Varn.
 
 import {
-    httpFetch,
-    httpCreateServer,
-    httpAddRoute,
-    httpListen,
-    httpSendResponse,
-    httpClose
+    fetch as nativeFetch,
+    createServer as nativeCreateServer,
+    addRoute as nativeAddRoute,
+    listen as nativeListen,
+    sendResponse as nativeSendResponse,
+    close as nativeClose
 } from "runtime:http";
 
-import { JSON, Json } from "std:json";
+import { parse as jsonParse, stringify as jsonStringify, Json } from "std:json";
 
 /**
  * HttpRequest represents an incoming client HTTP request in Varn.
@@ -26,7 +26,7 @@ export class HttpRequest {
      * Parses the incoming request body from raw string into dynamic JSON.
      */
     json(): Json {
-        return JSON.parse(this.body);
+        return jsonParse(this.body);
     }
 }
 
@@ -69,7 +69,7 @@ export class HttpResponse {
      */
     send(body: str): void {
         if (this.isSent) return;
-        httpSendResponse(this.statusCode, body, this.responseContentType, this.responseHeaders);
+        nativeSendResponse(this.statusCode, body, this.responseContentType, this.responseHeaders);
         this.isSent = true;
     }
 
@@ -77,7 +77,7 @@ export class HttpResponse {
      * Serializes dynamic data into JSON and sends it.
      */
     json(data: Json): void {
-        this.type("application/json").send(JSON.stringify(data));
+        this.type("application/json").send(jsonStringify(data));
     }
 
     /**
@@ -97,14 +97,14 @@ export class HttpServer {
     private isListening: bool = false;
 
     constructor() {
-        this.id = httpCreateServer();
+        this.id = nativeCreateServer();
     }
 
     /**
      * Registers a GET route.
      */
     get(pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
-        httpAddRoute(this.id, "GET", pattern, handler);
+        nativeAddRoute(this.id, "GET", pattern, handler);
         return this;
     }
 
@@ -112,7 +112,7 @@ export class HttpServer {
      * Registers a POST route.
      */
     post(pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
-        httpAddRoute(this.id, "POST", pattern, handler);
+        nativeAddRoute(this.id, "POST", pattern, handler);
         return this;
     }
 
@@ -120,7 +120,7 @@ export class HttpServer {
      * Registers a PUT route.
      */
     put(pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
-        httpAddRoute(this.id, "PUT", pattern, handler);
+        nativeAddRoute(this.id, "PUT", pattern, handler);
         return this;
     }
 
@@ -128,7 +128,7 @@ export class HttpServer {
      * Registers a DELETE route.
      */
     delete(pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
-        httpAddRoute(this.id, "DELETE", pattern, handler);
+        nativeAddRoute(this.id, "DELETE", pattern, handler);
         return this;
     }
 
@@ -136,7 +136,7 @@ export class HttpServer {
      * Registers a route for any specific HTTP method.
      */
     route(method: str, pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
-        httpAddRoute(this.id, method.toUpperCase(), pattern, handler);
+        nativeAddRoute(this.id, method.toUpperCase(), pattern, handler);
         return this;
     }
 
@@ -146,7 +146,7 @@ export class HttpServer {
     listen(port: int): void {
         if (this.isListening) return;
         this.isListening = true;
-        httpListen(this.id, port, HttpResponse);
+        nativeListen(this.id, port, HttpResponse);
     }
 
     /**
@@ -154,7 +154,7 @@ export class HttpServer {
      */
     close(): void {
         if (!this.isListening) return;
-        httpClose(this.id);
+        nativeClose(this.id);
         this.isListening = false;
     }
 }
@@ -188,7 +188,7 @@ export class Response {
      * Parses the response body as JSON.
      */
     json(): Json {
-        return JSON.parse(this.body);
+        return jsonParse(this.body);
     }
 }
 
@@ -202,7 +202,7 @@ export async function fetch(
     body: str = "",
     timeoutMs: int = 5000
 ): Task<Response> {
-    let response_body = await httpFetch(url, method, headers, body, timeoutMs);
+    let response_body = await nativeFetch(url, method, headers, body, timeoutMs);
     return new Response(
         200,
         "OK",

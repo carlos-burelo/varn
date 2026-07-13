@@ -9,9 +9,9 @@ export interface ParsedUrl {
     fragment: str;
 }
 
-export declare function netIsIP(s: str): bool;
-export declare function netIsIPv4(s: str): bool;
-export declare function netIsIPv6(s: str): bool;
-export declare function netParseUrl(url: str): ParsedUrl;
-export declare function netEncodeURIComponent(value: str): str;
-export declare function netDecodeURIComponent(value: str): str;
+export declare function isIP(s: str): bool;
+export declare function isIPv4(s: str): bool;
+export declare function isIPv6(s: str): bool;
+export declare function parseUrl(url: str): ParsedUrl;
+export declare function encodeURIComponent(value: str): str;
+export declare function decodeURIComponent(value: str): str;

@@ -7,8 +7,9 @@ use crate::symbol::{Symbol, SymbolKind};
 
 impl super::Binder {
     pub(super) fn bind_import(&mut self, i: &ImportDecl) {
-        let in_stdlib_context =
-            self.source_file.starts_with("core:") || self.source_file.starts_with("std:");
+        let in_stdlib_context = self.source_file.starts_with("core:")
+            || self.source_file.starts_with("std:")
+            || varn_modules::std_root::in_source_tree(self.source_file.as_ref());
         if i.source.starts_with("core:") && !in_stdlib_context {
             self.diagnostics.push(
                 Diagnostic::error(

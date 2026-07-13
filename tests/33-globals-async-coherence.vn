@@ -1,4 +1,4 @@
-import { sleep } from "std:task"
+import { sleep, parallel } from "std:task"
 
 
 let shared = 0

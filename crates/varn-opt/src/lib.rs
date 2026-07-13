@@ -76,7 +76,8 @@ pub fn lower_to_ssa(
     let mut funcs = Vec::new();
     let mut errors: Vec<(Rc<str>, &'static str)> = Vec::new();
 
-    match ssa::build::build_function(&module.top_level, &module.functions) {
+    let source_file = Some(input.program.filename.clone());
+    match ssa::build::build_function(&module.top_level, &module.functions, source_file.clone()) {
         Ok(mut f) => {
             crate::passes::optimize(&mut f);
             funcs.push(f);
@@ -87,7 +88,7 @@ pub fn lower_to_ssa(
     }
 
     for f in &module.functions {
-        match ssa::build::build_function(f, &[]) {
+        match ssa::build::build_function(f, &[], source_file.clone()) {
             Ok(mut sf) => {
                 crate::passes::optimize(&mut sf);
                 funcs.push(sf);

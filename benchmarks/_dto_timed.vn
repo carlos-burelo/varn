@@ -1,0 +1,46 @@
+import { now } from "std:time"
+class User {
+    id: int
+    name: str
+    age: int
+    isActive: bool
+    score: float
+    constructor(id: int, name: str, age: int, isActive: bool, score: float) {
+        this.id = id
+        this.name = name
+        this.age = age
+        this.isActive = isActive
+        this.score = score
+    }
+}
+class UserDTO {
+    id: int
+    displayName: str
+    score: float
+    constructor(id: int, displayName: str, score: float) {
+        this.id = id
+        this.displayName = displayName
+        this.score = score
+    }
+}
+let count = 100000
+let t0 = now()
+let users = []
+for (let i = 0; i < count; i = i + 1) {
+    users.push(new User(i, "User_" + i, (i % 60) + 10, (i % 2) === 0, (i % 100) * 1.5))
+}
+let t1 = now()
+let activeAdults = []
+let totalScore = 0.0
+for (let i = 0; i < count; i = i + 1) {
+    let u = users[i]
+    if (u.isActive && u.age >= 18) {
+        let dto = new UserDTO(u.id, u.name, u.score)
+        activeAdults.push(dto)
+        totalScore = totalScore + u.score
+    }
+}
+let t2 = now()
+print("build_ms=" + (t1 - t0))
+print("transform_ms=" + (t2 - t1))
+print("check=" + activeAdults.length + "/" + totalScore)

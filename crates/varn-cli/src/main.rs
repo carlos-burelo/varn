@@ -17,6 +17,22 @@ use varn_utilities::terminal;
 fn main() {
     varn_builtins::register_provider();
 
+    if std::env::var("VARN_DEBUG_OPS").is_ok() {
+        println!("DEBUG std resolved: {:?}", varn_modules::std_root::resolve());
+        println!("--- CLI NATIVE OPERATIONS ---");
+        for entry in varn_builtins::dispatch::iter_native_ops() {
+            println!(
+                "module: {} | ns: {} | symbol: {} | func_ptr: {:?}",
+                entry.module_id(),
+                entry.namespace_path(),
+                entry.symbol_name(),
+                entry.func_ptr
+            );
+        }
+        println!("-------------------------");
+    }
+
+
     let raw: Vec<String> = std::env::args().collect();
     let effective = implicit_run(raw);
 

@@ -1221,6 +1221,18 @@ impl Builder {
             )?;
         }
 
+        if !cls.static_blocks.is_empty() {
+            let qualified_name = if let Some(ref src) = self.source_file {
+                Rc::from(format!("{}::{}", src.replace('\\', "/"), cls.name))
+            } else {
+                cls.name.clone()
+            };
+            self.emit_effect(InstKind::StoreGlobal {
+                name: qualified_name,
+                value: class_val,
+            });
+        }
+
         for b in &cls.static_blocks {
             let fn_val = self.lower_closure(&b.func, &b.upvalues)?;
             self.emit(
@@ -1336,8 +1348,13 @@ impl Builder {
         }
 
         if !en.static_blocks.is_empty() {
+            let qualified_name = if let Some(ref src) = self.source_file {
+                Rc::from(format!("{}::{}", src.replace('\\', "/"), en.name))
+            } else {
+                en.name.clone()
+            };
             self.emit_effect(InstKind::StoreGlobal {
-                name: en.name.clone(),
+                name: qualified_name,
                 value: class_val,
             });
         }

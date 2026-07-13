@@ -1,7 +1,13 @@
-import { File, fs } from "std:fs";
+import { File, exists as fsExists, remove as fsRemove } from "std:fs";
 import { Reader, Writer } from "std:io";
 
+import * as fsMod from "runtime:fs";
+import * as ioMod from "runtime:io";
+
 function runTest(): void {
+    print("DEBUG TEST: fsMod.fsWrite =", fsMod.fsWrite);
+    print("DEBUG TEST: fsMod.write =", fsMod.write);
+    print("DEBUG TEST: ioMod.write =", ioMod.write);
 
     let testFile = "./temp_implicit_ext.txt";
     let backupFile = "./temp_implicit_ext.bak";
@@ -13,7 +19,7 @@ function runTest(): void {
     }
 
     // Verificar que el archivo existe por el namespace normal
-    assert("File exists", fs.exists(testFile));
+    assert("File exists", fsExists(testFile));
 
     // 2. Leer del archivo usando el método de extensión implícito .readAll()
     let content = "";
@@ -42,8 +48,8 @@ function runTest(): void {
     assert("Backup content matches", backupContent === "Maestría de Greenfield en Varn!");
 
     // Limpieza
-    fs.remove(testFile);
-    fs.remove(backupFile);
+    fsRemove(testFile);
+    fsRemove(backupFile);
 
 }
 

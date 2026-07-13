@@ -1,15 +1,15 @@
 import {
-    fsRead,
-    fsWrite,
-    fsExists,
-    fsStat,
-    fsMkdir,
-    fsMkdirAll,
-    fsReadDir,
-    fsRemove,
-    fsRemoveAll,
-    fsRename,
-    fsTempDir,
+    read as nativeRead,
+    write as nativeWrite,
+    exists as nativeExists,
+    stat as nativeStat,
+    mkdir as nativeMkdir,
+    mkdirAll as nativeMkdirAll,
+    readDir as nativeReadDir,
+    remove as nativeRemove,
+    removeAll as nativeRemoveAll,
+    rename as nativeRename,
+    tempDir as nativeTempDir,
     RawStats
 } from "runtime:fs";
 
@@ -29,69 +29,67 @@ export class Stats {
     }
 }
 
-export namespace fs {
-    export function read(path: str): str {
-        return fsRead(path);
-    }
+export function read(path: str): str {
+    return nativeRead(path);
+}
 
-    export function write(path: str, content: str): void {
-        fsWrite(path, content);
-    }
+export function write(path: str, content: str): void {
+    nativeWrite(path, content);
+}
 
-    export function appendText(path: str, content: str): void {
-        let existing = "";
-        if (fsExists(path)) {
-            existing = fsRead(path);
-        }
-        fsWrite(path, existing + content);
+export function appendText(path: str, content: str): void {
+    let existing = "";
+    if (nativeExists(path)) {
+        existing = nativeRead(path);
     }
+    nativeWrite(path, existing + content);
+}
 
-    export function exists(path: str): bool {
-        return fsExists(path);
-    }
+export function exists(path: str): bool {
+    return nativeExists(path);
+}
 
-    export function stat(path: str): Stats {
-        let raw = fsStat(path);
-        return new Stats(
-            raw.size,
-            raw.isDir,
-            raw.isFile,
-            raw.mtime
-        );
-    }
+export function stat(path: str): Stats {
+    let raw = nativeStat(path);
+    return new Stats(
+        raw.size,
+        raw.isDir,
+        raw.isFile,
+        raw.mtime
+    );
+}
 
-    export function mkdir(path: str): void {
-        fsMkdir(path);
-    }
+export function mkdir(path: str): void {
+    nativeMkdir(path);
+}
 
-    export function mkdirAll(path: str): void {
-        fsMkdirAll(path);
-    }
+export function mkdirAll(path: str): void {
+    nativeMkdirAll(path);
+}
 
-    export function readDir(path: str): str[] {
-        return fsReadDir(path) as str[];
-    }
+export function readDir(path: str): str[] {
+    return nativeReadDir(path) as str[];
+}
 
-    export function remove(path: str): void {
-        fsRemove(path);
-    }
+export function remove(path: str): void {
+    nativeRemove(path);
+}
 
-    export function removeAll(path: str): void {
-        fsRemoveAll(path);
-    }
+export function removeAll(path: str): void {
+    nativeRemoveAll(path);
+}
 
-    export function rename(from: str, to: str): void {
-        fsRename(from, to);
-    }
+export function rename(from: str, to: str): void {
+    nativeRename(from, to);
+}
 
-    export function copy(from: str, to: str): void {
-        let content = fsRead(from);
-        fsWrite(to, content);
-    }
+export function copy(from: str, to: str): void {
+    let content = nativeRead(from);
+    nativeWrite(to, content);
+}
 
-    export function tempDir(): str {
-        return fsTempDir();
-    }
+export function tempDir(): str {
+    return nativeTempDir();
 }
 
 export class File {
@@ -109,19 +107,19 @@ export class File {
 
     write(content: str): void {
         if (this._mode === "a") {
-            const existing = fsExists(this._path) ? fsRead(this._path) : "";
-            fsWrite(this._path, existing + content);
+            const existing = nativeExists(this._path) ? nativeRead(this._path) : "";
+            nativeWrite(this._path, existing + content);
         } else {
-            fsWrite(this._path, content);
+            nativeWrite(this._path, content);
         }
     }
 
     read(size?: int): str {
-        return fsRead(this._path);
+        return nativeRead(this._path);
     }
 
     readAll(): str {
-        return fsRead(this._path);
+        return nativeRead(this._path);
     }
 
     pipeTo(dst: Writer): void {

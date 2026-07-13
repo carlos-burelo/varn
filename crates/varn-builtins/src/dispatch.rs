@@ -40,7 +40,7 @@ static __VARN_OPS_START_MARKER: NativeOpEntry = unsafe { std::mem::zeroed() };
 #[link_section = ".varn_ops$C"]
 static __VARN_OPS_END_MARKER: NativeOpEntry = unsafe { std::mem::zeroed() };
 
-pub(crate) fn iter_native_ops() -> impl Iterator<Item = &'static NativeOpEntry> {
+pub fn iter_native_ops() -> impl Iterator<Item = &'static NativeOpEntry> {
     unsafe {
         let start = &__varn_OPS_START as *const NativeOpEntry;
         let end = &__varn_OPS_END as *const NativeOpEntry;

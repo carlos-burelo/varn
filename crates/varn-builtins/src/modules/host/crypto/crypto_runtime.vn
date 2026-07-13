@@ -1,10 +1,10 @@
 // runtime:crypto — low-level host cryptographic operations.
 
-export declare function cryptoSha256(data: str): str;
-export declare function cryptoSha512(data: str): str;
-export declare function cryptoUuid(): str;
-export declare function cryptoRandomBytes(size: int): int[];
-export declare function cryptoRandomHex(size: int): str;
-export declare function cryptoBase64Enc(data: str): str;
-export declare function cryptoBase64Dec(data: str): str;
-export declare function cryptoHmac(algo: str, key: str, data: str): str;
+export declare function sha256(data: str): str;
+export declare function sha512(data: str): str;
+export declare function uuid(): str;
+export declare function randomBytes(size: int): int[];
+export declare function randomHex(size: int): str;
+export declare function base64Enc(data: str): str;
+export declare function base64Dec(data: str): str;
+export declare function hmac(algo: str, key: str, data: str): str;

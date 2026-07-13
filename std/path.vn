@@ -1,55 +1,53 @@
 // std:path — Pure Varn facade over runtime path host operations.
 
 import {
-    pathNormalize,
-    pathDirname,
-    pathBasename
+    normalize as nativeNormalize,
+    dirname as nativeDirname,
+    basename as nativeBasename
 } from "runtime:path";
 
-export namespace path {
-    export const sep = "/";
-    export const delimiter = ":";
+export const sep = "/";
+export const delimiter = ":";
 
-    export function normalize(p: str): str {
-        return pathNormalize(p);
+export function normalize(p: str): str {
+    return nativeNormalize(p);
+}
+
+export function dirname(p: str): str {
+    return nativeDirname(p);
+}
+
+export function basename(p: str, ext?: str): str {
+    let base = nativeBasename(p);
+    if (ext !== null && ext !== undefined && base.endsWith(ext)) {
+        return base.slice(0, base.length - ext.length);
     }
+    return base;
+}
 
-    export function dirname(p: str): str {
-        return pathDirname(p);
+export function extname(p: str): str {
+    let base = nativeBasename(p);
+    let idx = base.lastIndexOf(".");
+    if (idx >= 0) {
+        return base.slice(idx);
     }
+    return "";
+}
 
-    export function basename(p: str, ext?: str): str {
-        let base = pathBasename(p);
-        if (ext !== null && ext !== undefined && base.endsWith(ext)) {
-            return base.slice(0, base.length - ext.length);
-        }
-        return base;
-    }
+export function isAbsolute(p: str): bool {
+    return p.startsWith("/") || p.startsWith("\\") || (p.length >= 2 && p[1] === ":");
+}
 
-    export function extname(p: str): str {
-        let base = pathBasename(p);
-        let idx = base.lastIndexOf(".");
-        if (idx >= 0) {
-            return base.slice(idx);
-        }
-        return "";
-    }
-
-    export function isAbsolute(p: str): bool {
-        return p.startsWith("/") || p.startsWith("\\") || (p.length >= 2 && p[1] === ":");
-    }
-
-    export function join(...segments: str[]): str {
-        let out = "";
-        for (let segment of segments) {
-            if (segment.length > 0) {
-                if (out.length > 0 && !out.endsWith("/") && !segment.startsWith("/")) {
-                    out = out + "/" + segment;
-                } else {
-                    out = out + segment;
-                }
+export function join(...segments: str[]): str {
+    let out = "";
+    for (let segment of segments) {
+        if (segment.length > 0) {
+            if (out.length > 0 && !out.endsWith("/") && !segment.startsWith("/")) {
+                out = out + "/" + segment;
+            } else {
+                out = out + segment;
             }
         }
-        return pathNormalize(out);
     }
+    return nativeNormalize(out);
 }

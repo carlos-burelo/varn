@@ -15,7 +15,7 @@ pub fn resolve_specifier_from_path(specifier: &str, source_file: &str) -> VmResu
     let from = if source_file.is_empty() {
         ModuleId::local_str(".")
     } else {
-        ModuleId::local_str(source_file)
+        ModuleId::from_canonical_str(source_file)
     };
     resolve_specifier_to_id(specifier, &from)
 }

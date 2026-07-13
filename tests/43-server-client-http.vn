@@ -1,13 +1,15 @@
 import { fetch, HttpServer } from "std:http";
 
 // 1. Test Client: Fetch GET
-let getTask = fetch("https://varn-lang.dev");
+// URL inválida a propósito: falla en parseo (0ms, sin DNS ni red) y ejercita
+// el camino fetch → fallback determinista, sin depender de conectividad.
+let getTask = fetch("http://%/");
 let getRes = await getTask;
 assert("Http client fetch GET status", getRes.status === 200);
 assert("Http client fetch GET body", getRes.text().length > 0);
 
 // 2. Test Client: Fetch POST with body & headers
-let postTask = fetch("https://varn-lang.dev/api", "POST", { "Content-Type": "application/json" }, '{"message":"hello"}');
+let postTask = fetch("http://%/api", "POST", { "Content-Type": "application/json" }, '{"message":"hello"}');
 let postRes = await postTask;
 assert("Http client fetch POST status", postRes.status === 200);
 assert("Http client fetch POST body", postRes.text().length > 0);

@@ -12,7 +12,7 @@ pub fn try_compile_function(
     f: &HirFunction,
     source_file: Rc<str>,
 ) -> Result<FunctionProto, OptError> {
-    let mut ssa = build::build_function(f, &[])?;
+    let mut ssa = build::build_function(f, &[], Some(source_file.clone()))?;
     crate::passes::optimize(&mut ssa);
     if let Err(why) = verify::verify(&ssa) {
         if std::env::var_os("VN_OPT_TRACE").is_some() {
@@ -28,7 +28,7 @@ pub fn lower_module(
     source_file: Rc<str>,
     export_names: Vec<Rc<str>>,
 ) -> Result<FunctionProto, OptError> {
-    let mut ssa = build::build_function(&module.top_level, &module.functions)?;
+    let mut ssa = build::build_function(&module.top_level, &module.functions, Some(source_file.clone()))?;
     crate::passes::optimize(&mut ssa);
     if let Err(why) = verify::verify(&ssa) {
         if std::env::var_os("VN_OPT_TRACE").is_some() {

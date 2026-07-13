@@ -50,7 +50,17 @@ pub fn project_std_override(project_root: &Path) -> Option<PathBuf> {
     Some(if p.is_absolute() { p } else { project_root.join(p) })
 }
 
+/// The active std is process-fixed (same contract as the provider's
+/// `ACTIVE_STD` OnceLock): resolution walks the filesystem once and the
+/// result is cached. Callers on hot paths (binder, resolver) may call this
+/// freely.
 pub fn resolve() -> Option<(StdSource, StdProvenance)> {
+    static RESOLVED: std::sync::OnceLock<Option<(StdSource, StdProvenance)>> =
+        std::sync::OnceLock::new();
+    RESOLVED.get_or_init(resolve_uncached).clone()
+}
+
+fn resolve_uncached() -> Option<(StdSource, StdProvenance)> {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let project_root = crate::artifact::find_project_root(&cwd);
     if let Some(p) = project_std_override(&project_root) {
@@ -71,6 +81,39 @@ pub fn resolve() -> Option<(StdSource, StdProvenance)> {
         }
     }
     None
+}
+
+/// True when `file` sits inside the active std source tree (dev mode only;
+/// bundle mode is always false). Grants stdlib context — `core:` imports —
+/// to files compiled straight from the tree. Canonicalized tree root is
+/// cached; per-file verdicts are memoized per thread.
+pub fn in_source_tree(file: &str) -> bool {
+    static TREE_ROOT: std::sync::OnceLock<Option<(PathBuf, Option<PathBuf>)>> =
+        std::sync::OnceLock::new();
+    let Some((root, canon_root)) = TREE_ROOT.get_or_init(|| match resolve() {
+        Some((StdSource::SourceTree(p), _)) => {
+            let canon = std::fs::canonicalize(&p).ok();
+            Some((p, canon))
+        }
+        _ => None,
+    }) else {
+        return false;
+    };
+
+    thread_local! {
+        static MEMO: std::cell::RefCell<std::collections::HashMap<Box<str>, bool>> =
+            std::cell::RefCell::new(std::collections::HashMap::new());
+    }
+    if let Some(hit) = MEMO.with(|m| m.borrow().get(file).copied()) {
+        return hit;
+    }
+    let path = Path::new(file);
+    let verdict = match (std::fs::canonicalize(path).ok(), canon_root) {
+        (Some(p), Some(r)) => p.starts_with(r),
+        _ => path.starts_with(root),
+    };
+    MEMO.with(|m| m.borrow_mut().insert(Box::from(file), verdict));
+    verdict
 }
 
 #[cfg(test)]

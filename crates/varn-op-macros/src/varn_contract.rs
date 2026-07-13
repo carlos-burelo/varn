@@ -400,6 +400,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     // a stable op-id (`module::class::symbol`) for direct dispatch — in addition
     // to living in the class vtable via `setup_calls`.
     let mut method_entries: Vec<TS2> = Vec::new();
+    let mut generated_entry_idents: Vec<syn::Ident> = Vec::new();
 
     for m in &members {
         let sym = &m.symbol;
@@ -411,6 +412,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
         let mut call_args: Vec<TS2> = Vec::new();
 
         let mut arg_base = 0usize;
+        let mut arg_base_is_dynamic = false;
 
         match m.kind {
             Kind::Method | Kind::Getter => {
@@ -437,17 +439,42 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                 call_args.push(quote!(#b));
                 arg_base = 1;
             }
-            Kind::StaticMethod | Kind::StaticGetter | Kind::Function => {}
+            Kind::StaticMethod | Kind::StaticGetter | Kind::Function => {
+                arg_base_is_dynamic = true;
+            }
+        }
+
+        if arg_base_is_dynamic {
+            let expected_len = m.params.len();
+            decode.push(quote! {
+                let arg_base = if args.len() > #expected_len {
+                    if let Some(&first) = args.first() {
+                        match ctx.extract(first) {
+                            ::varn_types::Value::Null | ::varn_types::Value::Class(_) | ::varn_types::Value::Module(_) => 1usize,
+                            _ => 0usize,
+                        }
+                    } else {
+                        0usize
+                    }
+                } else {
+                    0usize
+                };
+            });
         }
 
         for (i, p) in m.params.iter().enumerate() {
             let pname = format_ident!("__p{}", i);
-            let arg_idx = arg_base + i;
+            let arg_idx_expr = if arg_base_is_dynamic {
+                quote!(arg_base + #i)
+            } else {
+                let val = arg_base + i;
+                quote!(#val)
+            };
             if p.is_rest {
                 sig_params.push(quote!(#pname: &[::varn_types::VmValue]));
                 decode.push(quote! {
                     let #pname: &[::varn_types::VmValue] =
-                        if args.len() > #arg_idx { &args[#arg_idx..] } else { &[] };
+                        if args.len() > #arg_idx_expr { &args[#arg_idx_expr..] } else { &[] };
                 });
                 call_args.push(quote!(#pname));
             } else {
@@ -457,7 +484,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                 decode.push(quote! {
                     let #pname = <#oty as ::varn_types::marshal::FromVm>::from_vm(
                         ctx,
-                        args.get(#arg_idx).copied().unwrap_or(::varn_types::VmValue::null()),
+                        args.get(#arg_idx_expr).copied().unwrap_or(::varn_types::VmValue::null()),
                     )?;
                 });
                 call_args.push(call_expr(&pname, &p.mapped));
@@ -516,6 +543,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                 sanitize(&prefix).to_uppercase(),
                 sanitize(sym).to_uppercase()
             );
+            generated_entry_idents.push(fn_entry_ident.clone());
             fn_entries.push(quote! {
                 #[used]
                 #[cfg_attr(target_os = "windows", link_section = ".varn_ops$B")]
@@ -564,6 +592,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                     sanitize(&prefix).to_uppercase(),
                     sanitize(sym).to_uppercase()
                 );
+                generated_entry_idents.push(mentry_ident.clone());
                 method_entries.push(quote! {
                     #[used]
                     #[cfg_attr(target_os = "windows", link_section = ".varn_ops$B")]
@@ -592,6 +621,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     let registration = if let Some(class) = &input.class {
         let builder_ident = format_ident!("__varn_build_{}", sanitize(class));
         let entry_ident = format_ident!("__VARN_OP_{}", sanitize(class).to_uppercase());
+        generated_entry_idents.push(entry_ident.clone());
         let superclass_setup = if let Some(parent) = &input.extends {
             quote! {
                 if let Some(parent) = ctx.get_class(#parent) {
@@ -641,6 +671,13 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
         quote! { #(#fn_entries)* }
     };
 
+    let marker_name = if let Some(class) = &input.class {
+        format!("__VARN_LINK_MARKER_{}", sanitize(class).to_uppercase())
+    } else {
+        format!("__VARN_LINK_MARKER_{}", sanitize(&input.module).to_uppercase())
+    };
+    let link_marker_ident = format_ident!("{}", marker_name);
+
     let out = quote! {
 
         const _: &[u8] = include_bytes!(#abs_lit);
@@ -657,8 +694,14 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
 
         #(#wrappers)*
 
+        pub static #link_marker_ident: &[&::varn_types::NativeOpEntry] = &[
+            #(&#generated_entry_idents),*
+        ];
+
         #registration
     };
+
+
 
     out.into()
 }

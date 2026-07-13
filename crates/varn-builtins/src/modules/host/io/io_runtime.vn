@@ -1,6 +1,6 @@
 // runtime:io — low-level host I/O operations.
 
-export declare function ioWrite(...args: dynamic[]): void;
-export declare function ioWriteln(...args: dynamic[]): void;
-export declare function ioFlush(): void;
-export declare function ioReadLine(prompt?: str): str;
+export declare function write(...args: dynamic[]): void;
+export declare function writeln(...args: dynamic[]): void;
+export declare function flush(): void;
+export declare function readLine(prompt?: str): str;

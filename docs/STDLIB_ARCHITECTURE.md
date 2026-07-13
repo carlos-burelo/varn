@@ -16,20 +16,13 @@ Este documento describe el estado **implementado**, no el aspiracional.
 
 | Nivel | Dónde vive | Ejemplos | Empaquetado |
 |-------|-----------|----------|-------------|
-| **Core embebido** | `varn-builtins` (Rust, `MODULE_REGISTRY`) | `core:*`, `globals` | Siempre en el binario `vn` |
+| **Core embebido** | `varn-builtins` (Rust, `MODULE_REGISTRY`) | `core:global`, `core:int`, `core:array`, `core:intrinsics` | Siempre en el binario `vn` |
 | **Host API** | `varn-builtins/src/modules/host/<m>/` | `runtime:math`, `runtime:fs`, … | Siempre en el binario `vn` — es la frontera con Rust |
 | **Std packages** | `std/*.vn` (top-level, fuera de builtins) | `std:math`, `std:fs`, `std:json`, … | Compilado a `std.vnb`, distribuido junto a `vn` |
 
 `core:`/`runtime:`/globals siguen embebidos porque son el host: viajan con el
-binario por definición. Los 12 módulos std migrados (`crypto, dispose, fs,
-http, io, json, math, net, path, sys, test, time`) viven en `std/`.
-
-**Deferred (no migrados en este plan):** `std:collections`, `std:reflect`,
-`std:task`, `std:types` — comparten fuente con ids `core:*` o requieren
-manejo especial del checker. Siguen embebidos en `MODULE_REGISTRY`; el
-provider compuesto cae de vuelta al registro para estos 4. Migran en el plan
-de seguimiento **Host API reshape** (renombrar natives, clases-recurso,
-migración de estos 4 fuera del registro).
+binario por definición. Los 16 módulos std migrados (`collections, crypto, dispose, fs,
+http, io, json, math, net, path, reflect, sys, task, test, time, types`) viven en `std/`.
 
 ## 2. `std/` tree y `std.json`
 

@@ -1,15 +1,15 @@
 // runtime:math — low-level host math operations.
 
-export declare function mathAbs(x: float): float;
-export declare function mathSqrt(x: float): float;
-export declare function mathSin(x: float): float;
-export declare function mathCos(x: float): float;
-export declare function mathTan(x: float): float;
-export declare function mathFloor(x: float): float;
-export declare function mathCeil(x: float): float;
-export declare function mathRound(x: float): float;
-export declare function mathRandom(): float;
-export declare function mathAcos(x: float): float;
-export declare function mathAsin(x: float): float;
-export declare function mathAtan(x: float): float;
-export declare function mathAtan2(y: float, x: float): float;
+export declare function abs(x: float): float;
+export declare function sqrt(x: float): float;
+export declare function sin(x: float): float;
+export declare function cos(x: float): float;
+export declare function tan(x: float): float;
+export declare function floor(x: float): float;
+export declare function ceil(x: float): float;
+export declare function round(x: float): float;
+export declare function random(): float;
+export declare function acos(x: float): float;
+export declare function asin(x: float): float;
+export declare function atan(x: float): float;
+export declare function atan2(y: float, x: float): float;

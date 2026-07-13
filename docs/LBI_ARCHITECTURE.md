@@ -12,15 +12,12 @@ Sin LBI, cada función nativa requiere añadirse a un mapa global. Esto genera a
 
 Los natives `runtime:*` (frontera host, ver [HOST_BOUNDARY_SPEC.md](HOST_BOUNDARY_SPEC.md))
 viven en `crates/varn-builtins/src/modules/host/<m>/` — cada uno con su
-`module.json` (`"kind": "runtime"`) y el contrato `.vn` (`<m>_runtime.vn`).
-La implementación Rust del native (macro `varn_contract!`/LBI) puede seguir
-declarada bajo `modules/std/<m>/<m>.rs` con `#[path = "..."]` en `mod.rs` —
-LBI no exige que el árbol de módulos Rust espeje el árbol de `module.json`.
+`module.json` (`"kind": "runtime"`), el contrato `.vn` (`<m>_runtime.vn`) y
+su implementación de Rust (`<m>.rs`) en el mismo directorio.
 Las fuentes **`std:*`** (la API pública en Varn que compone estos natives)
-ya no viven en `varn-builtins`: están en el árbol top-level `std/`, fuera del
-binario — ver [STDLIB_ARCHITECTURE.md](STDLIB_ARCHITECTURE.md). `build.rs`
-de `varn-builtins` rechaza (panic) cualquier `module.json` con
-`"kind": "stdlib"` que no sea uno de los 4 ids deferred.
+están en el árbol top-level `std/`, fuera del binario — ver [STDLIB_ARCHITECTURE.md](STDLIB_ARCHITECTURE.md).
+El `build.rs` de `varn-builtins` rechaza (panic) cualquier `module.json` con
+`"kind": "stdlib"`.
 
 ---
 

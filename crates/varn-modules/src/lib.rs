@@ -15,10 +15,7 @@ pub const CORE_BIGINT: &str = "core:bigint";
 pub const CORE_MAP: &str = "core:map";
 pub const CORE_SET: &str = "core:set";
 pub const CORE_SYMBOL: &str = "core:symbol";
-pub const CORE_COLLECTIONS: &str = "core:collections";
-pub const CORE_ASYNC: &str = "core:async";
-pub const CORE_ITERATORS: &str = "core:iterators";
-pub const CORE_REFLECT: &str = "core:reflect";
+
 
 pub const PKG_PREFIX: &str = "pkg:";
 pub const ENV_DIR_NAME: &str = ".vn";
@@ -59,14 +56,14 @@ pub const RUNTIME_FS: &str = "runtime:fs";
 pub const RUNTIME_IO: &str = "runtime:io";
 pub const RUNTIME_TIME: &str = "runtime:time";
 pub const RUNTIME_NET: &str = "runtime:net";
-pub const RUNTIME_PROCESS: &str = "runtime:process";
+pub const RUNTIME_SYS: &str = "runtime:sys";
 pub const RUNTIME_CRYPTO: &str = "runtime:crypto";
 pub const RUNTIME_TASK: &str = "runtime:task";
 pub const RUNTIME_HTTP: &str = "runtime:http";
 pub const RUNTIME_REFLECT: &str = "runtime:reflect";
 pub const RUNTIME_JSON: &str = "runtime:json";
 pub const RUNTIME_PATH: &str = "runtime:path";
-pub const RUNTIME_TEST: &str = "runtime:test";
+pub const RUNTIME_TESTING: &str = "runtime:testing";
 
 fn module_ids_of_kind(kind: ModuleKind) -> Vec<&'static str> {
     provider::get()

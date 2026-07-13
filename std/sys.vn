@@ -1,45 +1,39 @@
-// std:sys — Pure Varn facade over runtime process host operations.
+// std:sys — Pure Varn facade over runtime sys host operations.
 
 import {
-    processPlatform,
-    processCwd,
-    processArgs,
-    processExit,
-    processEnv,
-    processSetEnv,
-    processNow
-} from "runtime:process";
+    platform as nativePlatform,
+    cwd as nativeCwd,
+    args as nativeArgs,
+    exit as nativeExit,
+    env as nativeEnv,
+    setEnv as nativeSetEnv,
+    now as nativeNow
+} from "runtime:sys";
 
-export function now(): float {
-    return processNow();
+export function platform(): str {
+    return nativePlatform();
 }
 
-export namespace sys {
-    export function platform(): str {
-        return processPlatform();
-    }
+export function cwd(): str {
+    return nativeCwd();
+}
 
-    export function cwd(): str {
-        return processCwd();
-    }
+export function args(): str[] {
+    return nativeArgs();
+}
 
-    export function args(): str[] {
-        return processArgs();
-    }
+export function exit(code?: int): void {
+    nativeExit(code);
+}
 
-    export function exit(code?: int): void {
-        processExit(code);
-    }
+export function env(key: str): str {
+    return nativeEnv(key);
+}
 
-    export function env(key: str): str {
-        return processEnv(key);
-    }
+export function setEnv(key: str, val: str): void {
+    nativeSetEnv(key, val);
+}
 
-    export function setEnv(key: str, val: str): void {
-        processSetEnv(key, val);
-    }
-
-    export function now(): float {
-        return processNow();
-    }
+export function now(): float {
+    return nativeNow();
 }

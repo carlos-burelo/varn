@@ -1,12 +1,12 @@
 // std:net — host-backed network primitives and URL/query value types.
 
 import {
-    netIsIP,
-    netIsIPv4,
-    netIsIPv6,
-    netParseUrl,
-    netEncodeURIComponent,
-    netDecodeURIComponent,
+    isIP as nativeIsIP,
+    isIPv4 as nativeIsIPv4,
+    isIPv6 as nativeIsIPv6,
+    parseUrl as nativeParseUrl,
+    encodeURIComponent as nativeEncodeURIComponent,
+    decodeURIComponent as nativeDecodeURIComponent,
     ParsedUrl
 } from "runtime:net";
 
@@ -37,7 +37,7 @@ export class Query {
             const rawKey = eq >= 0 ? entry.slice(0, eq) : entry;
             const rawValue = eq >= 0 ? entry.slice(eq + 1) : "";
 
-            query.append(netDecodeURIComponent(rawKey), netDecodeURIComponent(rawValue));
+            query.append(nativeDecodeURIComponent(rawKey), nativeDecodeURIComponent(rawValue));
         }
 
         return query;
@@ -94,10 +94,10 @@ export class Query {
     toString(): str {
         const parts: str[] = [];
         for (const key in this.values) {
-            const encodedKey = netEncodeURIComponent(key);
+            const encodedKey = nativeEncodeURIComponent(key);
             const bucket = this.values[key];
             for (const value of bucket) {
-                parts.push(encodedKey + "=" + netEncodeURIComponent(value));
+                parts.push(encodedKey + "=" + nativeEncodeURIComponent(value));
             }
         }
         return str.join(parts, "&");
@@ -113,7 +113,7 @@ export class Url {
     fragment: str = "";
 
     static parse(url: str): Url {
-        const parts = netParseUrl(url);
+        const parts = nativeParseUrl(url);
         const out = new Url();
         out.protocol = parts.protocol ?? "";
         out.host = parts.host ?? "";
@@ -160,38 +160,36 @@ export class Url {
     }
 }
 
-export namespace Net {
-    export function isIP(s: str): bool {
-        return netIsIP(s);
+export function isIP(s: str): bool {
+    return nativeIsIP(s);
+}
+
+export function isIPv4(s: str): bool {
+    return nativeIsIPv4(s);
+}
+
+export function isIPv6(s: str): bool {
+    return nativeIsIPv6(s);
+}
+
+export function parseURL(url: str): Url {
+    return Url.parse(url);
+}
+
+export function parseQuery(s: str): Query {
+    return Query.parse(s);
+}
+
+export function buildQuery(q: { [key: str]: str | str[] }): str {
+    return Query.fromObject(q).toString();
+}
+
+export function appendQuery(url: str, q: { [key: str]: str | str[] }): str {
+    const query = buildQuery(q);
+    if (query.length == 0) {
+        return url;
     }
 
-    export function isIPv4(s: str): bool {
-        return netIsIPv4(s);
-    }
-
-    export function isIPv6(s: str): bool {
-        return netIsIPv6(s);
-    }
-
-    export function parseURL(url: str): Url {
-        return Url.parse(url);
-    }
-
-    export function parseQuery(s: str): Query {
-        return Query.parse(s);
-    }
-
-    export function buildQuery(q: { [key: str]: str | str[] }): str {
-        return Query.fromObject(q).toString();
-    }
-
-    export function appendQuery(url: str, q: { [key: str]: str | str[] }): str {
-        const query = buildQuery(q);
-        if (query.length == 0) {
-            return url;
-        }
-
-        const parsed = Url.parse(url);
-        return parsed.withQuery(Query.parse(query)).toString();
-    }
+    const parsed = Url.parse(url);
+    return parsed.withQuery(Query.parse(query)).toString();
 }

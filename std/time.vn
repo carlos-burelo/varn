@@ -1,4 +1,10 @@
-import { timeNowMs, timeParseIsoDuration, timeMsToParts, timePartsToMs, RuntimeTimeParts } from "runtime:time";
+import {
+    nowMs as nativeNowMs,
+    parseIsoDuration as nativeParseIsoDuration,
+    msToParts as nativeMsToParts,
+    partsToMs as nativePartsToMs,
+    RuntimeTimeParts
+} from "runtime:time";
 
 export type TimeParts = {
     year: int;
@@ -28,93 +34,85 @@ let int_div = function(a: int, b: int): int {
     return (a - (a % b)) / b;
 };
 
-export namespace Time {
-    export function now(): int {
-        return timeNowMs();
-    }
-
-    export function toISOString(ms: int): str {
-        let parts = timeMsToParts(ms);
-        let pad2 = function(n: int): str {
-            if (n < 10) return "0" + n;
-            return "" + n;
-        };
-        let pad3 = function(n: int): str {
-            if (n < 10) return "00" + n;
-            if (n < 100) return "0" + n;
-            return "" + n;
-        };
-        let pad4 = function(n: int): str {
-            if (n < 10) return "000" + n;
-            if (n < 100) return "00" + n;
-            if (n < 1000) return "0" + n;
-            return "" + n;
-        };
-        return pad4(parts.year) + "-" + pad2(parts.month) + "-" + pad2(parts.day) + "T" + pad2(parts.hour) + ":" + pad2(parts.minute) + ":" + pad2(parts.second) + "." + pad3(parts.millisecond) + "Z";
-    }
-
-    export function fromISO(iso: str): int {
-        return timeParseIsoDuration(iso);
-    }
-
-    export function toParts(ms: int): TimeParts {
-        let parts = timeMsToParts(ms);
-        return {
-            year: parts.year,
-            month: parts.month,
-            day: parts.day,
-            hour: parts.hour,
-            minute: parts.minute,
-            second: parts.second,
-            millisecond: parts.millisecond
-        };
-    }
-
-    export function fromParts(parts: TimeParts): int {
-        return timePartsToMs(parts);
-    }
-
-    export function durationFromString(s: str): int {
-        return timeParseIsoDuration(s);
-    }
-
-    export function durationToString(ms: int): str {
-        return "Duration(" + ms + "ms)";
-    }
-
-    export function durationParts(ms: int): DurationParts {
-        let total_s = int_div(ms, 1000);
-        return {
-            days: int_div(total_s, 86400),
-            hours: int_div(total_s % 86400, 3600),
-            minutes: int_div(total_s % 3600, 60),
-            seconds: (total_s % 60),
-            milliseconds: (ms % 1000)
-        };
-    }
+export function now(): int {
+    return nativeNowMs();
 }
 
-export namespace Now {
-    export function now(): int {
-        return timeNowMs();
-    }
+export function toISOString(ms: int): str {
+    let parts = nativeMsToParts(ms);
+    let pad2 = function(n: int): str {
+        if (n < 10) return "0" + n;
+        return "" + n;
+    };
+    let pad3 = function(n: int): str {
+        if (n < 10) return "00" + n;
+        if (n < 100) return "0" + n;
+        return "" + n;
+    };
+    let pad4 = function(n: int): str {
+        if (n < 10) return "000" + n;
+        if (n < 100) return "00" + n;
+        if (n < 1000) return "0" + n;
+        return "" + n;
+    };
+    return pad4(parts.year) + "-" + pad2(parts.month) + "-" + pad2(parts.day) + "T" + pad2(parts.hour) + ":" + pad2(parts.minute) + ":" + pad2(parts.second) + "." + pad3(parts.millisecond) + "Z";
+}
 
-    export function instant(): Instant {
-        return new Instant(timeNowMs());
-    }
+export function fromISO(iso: str): int {
+    return nativeParseIsoDuration(iso);
+}
 
-    export function plainDateTimeISO(): PlainDateTime {
-        let parts = timeMsToParts(timeNowMs());
-        return new PlainDateTime(
-            parts.year,
-            parts.month,
-            parts.day,
-            parts.hour,
-            parts.minute,
-            parts.second,
-            parts.millisecond
-        );
-    }
+export function toParts(ms: int): TimeParts {
+    let parts = nativeMsToParts(ms);
+    return {
+        year: parts.year,
+        month: parts.month,
+        day: parts.day,
+        hour: parts.hour,
+        minute: parts.minute,
+        second: parts.second,
+        millisecond: parts.millisecond
+    };
+}
+
+export function fromParts(parts: TimeParts): int {
+    return nativePartsToMs(parts);
+}
+
+export function durationFromString(s: str): int {
+    return nativeParseIsoDuration(s);
+}
+
+export function durationToString(ms: int): str {
+    return "Duration(" + ms + "ms)";
+}
+
+export function durationParts(ms: int): DurationParts {
+    let total_s = int_div(ms, 1000);
+    return {
+        days: int_div(total_s, 86400),
+        hours: int_div(total_s % 86400, 3600),
+        minutes: int_div(total_s % 3600, 60),
+        seconds: (total_s % 60),
+        milliseconds: (ms % 1000)
+    };
+}
+
+export function nowInstant(): Instant {
+    return new Instant(nativeNowMs());
+}
+
+export function nowPlainDateTimeISO(): PlainDateTime {
+    let parts = nativeMsToParts(nativeNowMs());
+    return new PlainDateTime(
+        parts.year,
+        parts.month,
+        parts.day,
+        parts.hour,
+        parts.minute,
+        parts.second,
+        parts.millisecond
+    );
 }
 
 export class Instant {
@@ -211,7 +209,7 @@ export class Duration {
 
     static from(input: DurationLike): Duration {
         if (input instanceof str) {
-            let ms = timeParseIsoDuration(input);
+            let ms = nativeParseIsoDuration(input);
             return new Duration(ms);
         } else if (input instanceof int) {
             return new Duration(input);

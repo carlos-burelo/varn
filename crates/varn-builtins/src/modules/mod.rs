@@ -1,36 +1,35 @@
-#[path = "std/collections/collections.rs"]
-pub mod collections;
-#[path = "std/crypto/crypto.rs"]
+
+#[path = "host/crypto/crypto.rs"]
 pub mod crypto;
-#[path = "std/fs/fs.rs"]
+#[path = "host/fs/fs.rs"]
 pub mod fs;
 #[path = "globals/globals.rs"]
 pub mod globals;
-#[path = "std/http/http.rs"]
+#[path = "host/http/http.rs"]
 pub mod http;
-#[path = "std/http/http_helpers.rs"]
+#[path = "host/http/http_helpers.rs"]
 mod http_helpers;
-#[path = "std/io/io.rs"]
+#[path = "host/io/io.rs"]
 pub mod io;
-#[path = "std/json/json.rs"]
+#[path = "host/json/json.rs"]
 pub mod json;
-#[path = "std/math/math.rs"]
+#[path = "host/math/math.rs"]
 pub mod math;
-#[path = "std/net/net.rs"]
+#[path = "host/net/net.rs"]
 pub mod net;
-#[path = "std/path/path.rs"]
+#[path = "host/path/path.rs"]
 pub mod path;
 #[path = "primitives/mod.rs"]
 pub mod primitives;
-#[path = "std/reflect/reflect.rs"]
+#[path = "host/reflect/reflect.rs"]
 pub mod reflect;
-#[path = "std/sys/sys.rs"]
+#[path = "host/sys/sys.rs"]
 pub mod sys;
-#[path = "std/task/task.rs"]
+#[path = "host/task/task.rs"]
 pub mod task;
-#[path = "std/testing/testing.rs"]
+#[path = "host/testing/testing.rs"]
 pub mod testing;
-#[path = "std/time/time.rs"]
+#[path = "host/time/time.rs"]
 pub mod time;
 
 use varn_types::{NativeCtx, VmValue};
@@ -42,3 +41,24 @@ pub fn build_module(id: &str, ctx: &mut dyn NativeCtx) -> Option<VmValue> {
 pub fn has_native_builder(id: &str) -> bool {
     crate::dispatch::has_native_module_id(id)
 }
+
+pub fn force_link_builtins() -> usize {
+    let dummy = std::env::var("VARN_DUMMY_LINK").is_ok() as usize;
+    let mut sum = 0;
+    sum += std::hint::black_box(crypto::__VARN_LINK_MARKER_RUNTIME_CRYPTO).as_ptr() as usize;
+    sum += std::hint::black_box(fs::__VARN_LINK_MARKER_RUNTIME_FS).as_ptr() as usize;
+    sum += std::hint::black_box(globals::__VARN_LINK_MARKER_GLOBALS).as_ptr() as usize;
+    sum += std::hint::black_box(http::__VARN_LINK_MARKER_RUNTIME_HTTP).as_ptr() as usize;
+    sum += std::hint::black_box(io::__VARN_LINK_MARKER_RUNTIME_IO).as_ptr() as usize;
+    sum += std::hint::black_box(json::__VARN_LINK_MARKER_RUNTIME_JSON).as_ptr() as usize;
+    sum += std::hint::black_box(math::__VARN_LINK_MARKER_RUNTIME_MATH).as_ptr() as usize;
+    sum += std::hint::black_box(net::__VARN_LINK_MARKER_RUNTIME_NET).as_ptr() as usize;
+    sum += std::hint::black_box(path::__VARN_LINK_MARKER_RUNTIME_PATH).as_ptr() as usize;
+    sum += std::hint::black_box(reflect::__VARN_LINK_MARKER_RUNTIME_REFLECT).as_ptr() as usize;
+    sum += std::hint::black_box(sys::__VARN_LINK_MARKER_RUNTIME_SYS).as_ptr() as usize;
+    sum += std::hint::black_box(task::__VARN_LINK_MARKER_RUNTIME_TASK).as_ptr() as usize;
+    sum += std::hint::black_box(testing::__VARN_LINK_MARKER_RUNTIME_TESTING).as_ptr() as usize;
+    sum += std::hint::black_box(time::__VARN_LINK_MARKER_RUNTIME_TIME).as_ptr() as usize;
+    sum + dummy
+}
+

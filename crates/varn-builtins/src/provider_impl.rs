@@ -139,10 +139,17 @@ fn combined_specs() -> &'static [ModuleSpec] {
 
 impl StdlibProvider for BuiltinsProvider {
     fn spec_for(&self, specifier: &str) -> Option<&'static ModuleSpec> {
-        std_spec(specifier).or_else(|| spec_for(specifier))
+        if specifier.starts_with("std:") {
+            std_spec(specifier)
+        } else {
+            std_spec(specifier).or_else(|| spec_for(specifier))
+        }
     }
 
     fn embedded_source(&self, specifier: &str) -> Option<&'static str> {
+        if specifier.starts_with("std:") {
+            return None;
+        }
         if std_spec(specifier).is_some() {
             return None; // active std serves via source_path or blobs
         }
@@ -187,5 +194,8 @@ impl StdlibProvider for BuiltinsProvider {
 static PROVIDER: BuiltinsProvider = BuiltinsProvider;
 
 pub fn register_provider() {
+    let total = crate::modules::force_link_builtins();
+    std::hint::black_box(total);
     varn_modules::provider::register(&PROVIDER);
 }
+

@@ -1,35 +1,21 @@
-import { cryptoSha256, cryptoSha512, cryptoUuid, cryptoRandomBytes, cryptoRandomHex, cryptoBase64Enc, cryptoBase64Dec, cryptoHmac } from "runtime:crypto";
+import {
+    sha256,
+    sha512,
+    uuid,
+    randomBytes,
+    randomHex,
+    base64Enc,
+    base64Dec,
+    hmac
+} from "runtime:crypto";
 
-export namespace crypto {
-    export function sha256(data: str): str {
-        return cryptoSha256(data);
-    }
-
-    export function sha512(data: str): str {
-        return cryptoSha512(data);
-    }
-
-    export function randomBytes(size: int): int[] {
-        return cryptoRandomBytes(size);
-    }
-
-    export function randomHex(size: int): str {
-        return cryptoRandomHex(size);
-    }
-
-    export function base64_enc(data: str): str {
-        return cryptoBase64Enc(data);
-    }
-
-    export function base64_dec(data: str): str {
-        return cryptoBase64Dec(data);
-    }
-
-    export function uuid(): str {
-        return cryptoUuid();
-    }
-
-    export function hmac(algo: str, key: str, data: str): str {
-        return cryptoHmac(algo, key, data);
-    }
-}
+export {
+    sha256,
+    sha512,
+    uuid,
+    randomBytes,
+    randomHex,
+    base64Enc,
+    base64Dec,
+    hmac
+};

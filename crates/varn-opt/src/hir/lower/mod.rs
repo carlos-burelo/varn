@@ -201,6 +201,8 @@ pub struct Lowerer<'a> {
     extension_set_members: &'a rustc_hash::FxHashMap<u32, Rc<str>>,
 
     export_names: &'a [Rc<str>],
+    local_globals: rustc_hash::FxHashSet<Rc<str>>,
+    source_file: Rc<str>,
 }
 
 enum BodyRef<'b> {
@@ -210,80 +212,64 @@ enum BodyRef<'b> {
     Empty,
 }
 
+fn collect_decl_names(decl: &Decl, names: &mut Vec<Rc<str>>) {
+    match decl {
+        Decl::Function(f) => {
+            names.push(f.id.clone());
+        }
+        Decl::Variable(v) => {
+            for d in &v.declarators {
+                collect_pattern_identifiers(&d.id, names);
+            }
+        }
+        Decl::Class(c) => {
+            let id = c.id.clone().unwrap_or_else(|| Rc::from("anonymous"));
+            names.push(id);
+        }
+        Decl::Enum(e) => {
+            names.push(e.id.clone());
+        }
+        Decl::Import(i) => {
+            for spec in &i.specifiers {
+                let local = match spec {
+                    ImportSpecifier::Default { local, .. }
+                    | ImportSpecifier::Named { local, .. }
+                    | ImportSpecifier::Namespace { local, .. } => local.clone(),
+                };
+                names.push(local);
+            }
+        }
+        Decl::Export(ExportDecl::Decl { declaration, .. }) => {
+            collect_decl_names(declaration, names);
+        }
+        Decl::Namespace(ns) => {
+            names.push(ns.id.clone());
+            for d in &ns.body {
+                collect_decl_names(d, names);
+            }
+        }
+        _ => {}
+    }
+}
+
 pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
     let program = input.program;
     let mut globals = rustc_hash::FxHashMap::default();
+    let mut names = Vec::new();
 
     for stmt in &program.body {
         if let StmtKind::Decl(decl) = &stmt.kind {
-            match decl.as_ref() {
-                Decl::Function(f) => {
-                    globals.insert(f.id.clone(), ());
-                }
-                Decl::Variable(v) => {
-                    for d in &v.declarators {
-                        let mut names = Vec::new();
-                        collect_pattern_identifiers(&d.id, &mut names);
-                        for name in names {
-                            globals.insert(name, ());
-                        }
-                    }
-                }
-                Decl::Class(c) => {
-                    let id = c.id.clone().unwrap_or_else(|| Rc::from("anonymous"));
-                    globals.insert(id, ());
-                }
-                Decl::Enum(e) => {
-                    globals.insert(e.id.clone(), ());
-                }
-                Decl::Import(i) => {
-                    for spec in &i.specifiers {
-                        let local = match spec {
-                            ImportSpecifier::Default { local, .. }
-                            | ImportSpecifier::Named { local, .. }
-                            | ImportSpecifier::Namespace { local, .. } => local.clone(),
-                        };
-                        globals.insert(local, ());
-                    }
-                }
-                Decl::Export(ExportDecl::Decl { declaration, .. }) => match declaration.as_ref() {
-                    Decl::Function(f) => {
-                        globals.insert(f.id.clone(), ());
-                    }
-                    Decl::Class(c) => {
-                        if let Some(id) = &c.id {
-                            globals.insert(id.clone(), ());
-                        }
-                    }
-                    Decl::Enum(en) => {
-                        globals.insert(en.id.clone(), ());
-                    }
-                    Decl::Variable(v) => {
-                        for d in &v.declarators {
-                            let mut names = Vec::new();
-                            collect_pattern_identifiers(&d.id, &mut names);
-                            for name in names {
-                                globals.insert(name, ());
-                            }
-                        }
-                    }
-                    _ => {}
-                },
-
-                Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => {}
-
-                Decl::Namespace(_) | Decl::Extension(_) => {}
-                // Sourceless re-export (`export { a, b };`) introduces no local
-                // binding to hoist; the main lowering pass drives it via
-                // `lower_export`. `export { a } from "m"`, `export * from "m"`,
-                // and `export default ...` are NOT hoist-safe: the
-                // checker/SSA export-slot wiring for those forms is known to
-                // mismatch (silently reads the wrong slot), so they must keep
-                // failing loudly here rather than lower incorrectly.
-                Decl::Export(ExportDecl::Named { source: None, .. }) => {}
-                _ => return Err(OptError::Unsupported("hir: top-level decl (hoist)")),
-            }
+            collect_decl_names(decl.as_ref(), &mut names);
         }
+    }
+
+    for name in names {
+        globals.insert(name, ());
+    }
+
+    let mut local_globals = rustc_hash::FxHashSet::default();
+    for name in globals.keys() {
+        local_globals.insert(name.clone());
     }
 
     let mut lo = Lowerer {
@@ -293,6 +279,8 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
         extension_members: input.extension_members,
         extension_set_members: input.extension_set_members,
         export_names: &input.export_names,
+        local_globals,
+        source_file: Rc::from(input.program.filename.replace('\\', "/")),
     };
 
     let mut functions = Vec::new();
@@ -318,15 +306,17 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                 Decl::Class(cl) => {
                     let name = cl.id.clone().unwrap_or_else(|| Rc::from("anonymous"));
                     let hir_class = lo.lower_class(cl, &mut module_scope)?;
+                    let target = lo.global_binding(name);
                     top_body.push(HirStmt::Assign {
-                        target: HirBinding::Global(name),
+                        target,
                         value: HirExpr::Class(Box::new(hir_class)),
                     });
                 }
                 Decl::Enum(en) => {
                     let hir_enum = lo.lower_enum(en, &mut module_scope)?;
+                    let target = lo.global_binding(en.id.clone());
                     top_body.push(HirStmt::Assign {
-                        target: HirBinding::Global(en.id.clone()),
+                        target,
                         value: HirExpr::Enum(Box::new(hir_enum)),
                     });
                 }
@@ -563,8 +553,9 @@ impl<'a> Lowerer<'a> {
     ) -> R<()> {
         match pat {
             Pattern::Identifier { name, .. } => {
+                let target = self.global_binding(name.clone());
                 out.push(HirStmt::Assign {
-                    target: HirBinding::Global(name.clone()),
+                    target,
                     value: src,
                 });
             }

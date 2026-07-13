@@ -66,3 +66,19 @@ fn host_api_mismatch_bundle_hard_errors_through_real_provider_chain() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn debug_list_native_ops() {
+    println!("--- NATIVE OPERATIONS ---");
+    for entry in varn_builtins::dispatch::iter_native_ops() {
+        println!(
+            "module: {} | ns: {} | symbol: {} | func_ptr: {:?}",
+            entry.module_id(),
+            entry.namespace_path(),
+            entry.symbol_name(),
+            entry.func_ptr
+        );
+    }
+    println!("-------------------------");
+}
+

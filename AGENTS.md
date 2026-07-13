@@ -242,7 +242,9 @@ Evitar:
 
 Cambios de parser/checker/compiler/vm:
 
-* validar contra tests/main.vn
+* Validar contra tests/main.vn. Nota: `cargo test` no es un indicador de correctitud absoluta ni la verdad definitiva de estabilidad. Las pruebas reales de estabilidad del sistema que cubren ~95% de las features son:
+  1. `cargo run --release --bin vn -- bench .\tests\main.vn -v`
+  2. `cargo run --release --bin vn -- run .\tests\main.vn`
 
 Cambios de CLI:
 

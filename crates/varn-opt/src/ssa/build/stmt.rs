@@ -934,10 +934,15 @@ impl Builder {
         );
         if !is_type {
             for spec in specs {
+                let name = if let Some(ref src) = self.source_file {
+                    Rc::from(format!("{}::{}", src.replace('\\', "/"), spec.local))
+                } else {
+                    spec.local.clone()
+                };
                 match &spec.kind {
                     HirImportKind::Namespace => {
                         self.emit_effect(InstKind::StoreGlobal {
-                            name: spec.local.clone(),
+                            name,
                             value: mod_val,
                         });
                     }
@@ -964,7 +969,7 @@ impl Builder {
                             )
                         };
                         self.emit_effect(InstKind::StoreGlobal {
-                            name: spec.local.clone(),
+                            name,
                             value: val,
                         });
                     }
@@ -975,7 +980,12 @@ impl Builder {
     }
 
     fn lower_store_export(&mut self, name: &Rc<str>, slot: u16) -> Result<()> {
-        let val = self.emit(InstKind::LoadGlobal(name.clone()), HirType::Dynamic);
+        let qualified_name = if let Some(ref src) = self.source_file {
+            Rc::from(format!("{}::{}", src.replace('\\', "/"), name))
+        } else {
+            name.clone()
+        };
+        let val = self.emit(InstKind::LoadGlobal(qualified_name), HirType::Dynamic);
         self.emit_effect(InstKind::StoreModuleSlot { value: val, slot });
         Ok(())
     }

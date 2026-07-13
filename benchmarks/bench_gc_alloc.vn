@@ -1,0 +1,41 @@
+// GC allocation-pressure benchmark (same shape as tests/53-gc-class-vtable):
+// string churn to force minor GCs, then class allocation + field reads.
+import { now } from "std:time"
+
+class GcVtA {
+    x: int
+    constructor(x: int) {
+        this.x = x
+    }
+}
+
+class GcVtB {
+    y: int
+    constructor(y: int) {
+        this.y = y
+    }
+}
+
+let t0 = now()
+
+let gcJunk = []
+for (let i = 0; i < 400000; i = i + 1) {
+    gcJunk.push("gc_" + i)
+}
+
+let t1 = now()
+
+let gcAccA = 0
+let gcAccB = 0
+for (let i = 0; i < 100000; i = i + 1) {
+    let a = new GcVtA(i)
+    gcAccA = gcAccA + a.x
+    let b = new GcVtB(i)
+    gcAccB = gcAccB + b.y
+}
+
+let t2 = now()
+
+print("junk_ms=" + (t1 - t0))
+print("alloc_ms=" + (t2 - t1))
+print("check=" + gcAccA + "/" + gcAccB + "/" + gcJunk.length)

@@ -25,7 +25,13 @@ impl ModuleResolver {
         match ImportSpecifier::parse(spec) {
             ImportSpecifier::Stdlib(s) => Ok(ModuleId::Std(s)),
             ImportSpecifier::Core(s) => {
-                let in_intrinsic_context = matches!(referrer, ModuleId::Core(_) | ModuleId::Std(_));
+                let in_intrinsic_context = matches!(referrer, ModuleId::Core(_) | ModuleId::Std(_))
+                    || match referrer {
+                        ModuleId::Local(ref_path) => {
+                            super::std_root::in_source_tree(ref_path.as_ref())
+                        }
+                        _ => false,
+                    };
                 if !in_intrinsic_context {
                     return Err(format!(
                         "'{}' is an intrinsic module and cannot be imported; use 'std:' equivalents",

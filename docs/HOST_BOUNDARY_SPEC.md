@@ -15,44 +15,45 @@ Cómo Varn conecta su stdlib pública con el host sin contaminar la API del leng
 ### 1. Declaración en Rust
 
 ```rust
-#[varn_module("std:crypto")]
-pub mod crypto_impl {
-    #[varn_fn("sha256", cap = "crypto.random")]
-    pub fn sha256(_ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
-        let input = /* extraer str de args[0] */;
-        Ok(/* VmValue con el digest */)
-    }
-
-    #[varn_fn("randomBytes", cap = "crypto.random")]
-    pub fn random_bytes(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> NativeFnResult {
-        // ...
+varn_contract! {
+    module: "runtime:crypto",
+    contract: "src/modules/host/crypto/crypto_runtime.vn",
+    impl CryptoRuntime {
+        fn sha256(_ctx: &mut dyn NativeCtx, data: &str) -> Result<String, String> {
+            Ok(hex::encode(Sha256::digest(data.as_bytes())))
+        }
+        fn randomBytes(_ctx: &mut dyn NativeCtx, size: i64) -> Result<Vec<VmValue>, String> {
+            // ...
+        }
     }
 }
 ```
 
-La macro `#[varn_module]` genera `NativeOpEntry` en secciones del linker. Al arrancar, `build_module("std:crypto", ctx)` ensambla el objeto Varn completo.
+La macro `varn_contract!` registra los natives asociados al contrato `runtime:crypto`.
 
 ### 2. API pública en Varn (archivo `.vn`)
 
 ```Varn
-// crates/varn-builtins/src/modules/std/crypto/crypto.vn
-export namespace crypto {
-    export type HexDigest = str
+// std/crypto.vn
+import {
+    sha256,
+    randomBytes,
+    uuid
+} from "runtime:crypto";
 
-    export function sha256(input: str): HexDigest
-    export function randomBytes(count: int): str
-    export function uuid(): str
-    export function base64Encode(data: str): str
-    export function base64Decode(data: str): str
-}
+export {
+    sha256,
+    randomBytes,
+    uuid
+};
 ```
 
 ### 3. Uso desde código Varn
 
 ```Varn
-import { crypto } from "std:crypto"
+import { sha256 } from "std:crypto"
 
-const digest = crypto.sha256("hola mundo")
+const digest = sha256("hola mundo")
 print(digest)
 ```
 
