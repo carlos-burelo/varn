@@ -17,7 +17,7 @@ use varn_types::{
         ArrayRef, BoundMethod, EnumVariantData, FrozenModuleObj, MapRef, ModuleObj, ObjRef,
         RangeData, RuntimeSymbol, SetRef,
     },
-    AsyncTask, ClassObj, LazyTask, NativeCtx, NativeFn, ObjData, ResourceStore, RuntimeString,
+    AsyncTask, ClassObj, LazyTask, NativeCtx, NativeFn, ResourceStore, RuntimeString,
     Value, VmArray,
 };
 
@@ -952,7 +952,7 @@ impl HeapInner {
     }
 
     pub fn alloc_object(&mut self) -> VmValue {
-        let oref = ObjRef::new(ObjData::new());
+        let oref = ObjRef::empty();
         VmValue::from_heap_idx(self.alloc(HeapObj::Object(oref)))
     }
 
@@ -961,7 +961,7 @@ impl HeapInner {
         shape: &Rc<varn_types::Shape>,
         values: Vec<VmValue>,
     ) -> VmValue {
-        let oref = ObjRef::new(ObjData::with_shape(Rc::clone(shape), values));
+        let oref = ObjRef::with_shape(Rc::clone(shape), values);
         VmValue::from_heap_idx(self.alloc(HeapObj::Object(oref)))
     }
     
@@ -1454,6 +1454,90 @@ impl Heap {
             elems_len_off,
         }
     }
+
+    /// Probed layout facts for the JIT's inline property fast paths (see
+    /// [`varn_jit::JitObjectLayout`]).
+    ///
+    /// Everything is discovered against a real object built with sentinel
+    /// values rather than assumed: `#[repr(C)]` pins `ObjData`'s field order,
+    /// but the `Rc` header size and the enum's niche placement are still the
+    /// compiler's business. The old fast paths hardcoded these as 32/40/48 and
+    /// would have kept "working" — into freed memory — after any layout change.
+    pub fn jit_object_layout() -> varn_jit::JitObjectLayout {
+        // Sentinels chosen so no legitimate pointer, length, or shape id can be
+        // confused with them while scanning the block.
+        const SENTINEL_FIELD: u64 = 0xFEED_BEEF_CAFE_1234;
+        const TAIL: usize = 3;
+
+        let shape = varn_types::Shape::create(None, std::collections::HashMap::new());
+        let shape_id = shape.id;
+        let oref = ObjRef::with_shape(
+            Rc::clone(&shape),
+            vec![VmValue(SENTINEL_FIELD); TAIL],
+        );
+
+        // What the heap slot stores is the `Rc`'s internal pointer — the RcBox
+        // base, which sits two words below the value. Every offset below is
+        // relative to that, because that is what the JIT loads from the slot.
+        let rcbox = Rc::as_ptr(&oref.0) as *const u8 as usize - 2 * std::mem::size_of::<usize>();
+        // Same for the shape: the `Rc<Shape>` stored in the header holds the
+        // shape's RcBox base, which is the pointer the JIT will dereference.
+        let shape_ptr =
+            Rc::as_ptr(&shape) as *const u8 as usize - 2 * std::mem::size_of::<usize>();
+
+        // Read the object's own block: find the tail (the sentinel run), the
+        // inline length, and the shape pointer.
+        let block = unsafe { std::slice::from_raw_parts(rcbox as *const u8, 80) };
+        let word_at = |off: usize| -> u64 {
+            u64::from_ne_bytes(block[off..off + 8].try_into().unwrap())
+        };
+
+        let values_off = (0..=72)
+            .step_by(8)
+            .find(|&off| word_at(off) == SENTINEL_FIELD)
+            .expect("object tail probe failed: no sentinel field found");
+        let shape_off = (0..=72)
+            .step_by(8)
+            .find(|&off| word_at(off) as usize == shape_ptr)
+            .expect("object shape probe failed");
+        let len_off = (0..=72)
+            .step_by(8)
+            .find(|&off| (word_at(off) & 0xFFFF_FFFF) as usize == TAIL && off != values_off)
+            .expect("object inline_len probe failed");
+
+        // `Shape.id` is a public field, so its offset is exact rather than
+        // scanned for; the RcBox header still has to be added, because what the
+        // JIT holds is the box base.
+        let shape_id_off =
+            2 * std::mem::size_of::<usize>() + std::mem::offset_of!(varn_types::Shape, id);
+        assert_eq!(
+            unsafe { *((shape_ptr + shape_id_off) as *const u32) },
+            shape_id,
+            "shape id offset does not resolve to Shape.id"
+        );
+
+        // Where the object's RcBox pointer sits inside an `Option<HeapObj>` slot.
+        let slot: Option<HeapObj> = Some(HeapObj::Object(oref.clone()));
+        let size = std::mem::size_of::<Option<HeapObj>>();
+        let bytes =
+            unsafe { std::slice::from_raw_parts(&slot as *const _ as *const u8, size) };
+        let object_tag = bytes[0] as usize;
+        let payload_off = (0..=size - 8)
+            .find(|&off| usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == rcbox)
+            .expect("object payload probe failed");
+
+        let none_tag = unsafe { *(&(None::<HeapObj>) as *const _ as *const u8) } as usize;
+        assert_ne!(object_tag, none_tag, "Option<HeapObj> niche probe failed");
+
+        varn_jit::JitObjectLayout {
+            object_tag,
+            payload_off,
+            len_off,
+            values_off,
+            shape_off,
+            shape_id_off,
+        }
+    }
 }
 
 impl std::ops::Deref for Heap {
@@ -1639,7 +1723,7 @@ impl NativeCtx for Heap {
         if obj.is_heap() {
             if let Some(HeapObj::Object(o)) = self.get_by_idx(obj.as_heap_idx()) {
                 let g = o.borrow();
-                for (k, v) in g.inner.iter() {
+                for (k, v) in g.iter() {
                     f(k.as_ref(), v);
                 }
             }
@@ -1649,7 +1733,7 @@ impl NativeCtx for Heap {
     fn get_object_shape(&self, obj: VmValue) -> Option<std::rc::Rc<varn_types::Shape>> {
         if obj.is_heap() {
             if let Some(HeapObj::Object(o)) = self.get_by_idx(obj.as_heap_idx()) {
-                return Some(o.borrow().inner.shape.clone());
+                return Some(Rc::clone(o.borrow().shape()));
             }
         }
         None
@@ -1672,7 +1756,7 @@ impl NativeCtx for Heap {
         if obj.is_heap() {
             let raw_idx = obj.as_heap_idx();
             if let Some(HeapObj::Object(o)) = self.get_by_idx(raw_idx) {
-                o.borrow_mut().set_field_nv(Rc::from(key), val);
+                o.set_field_nv(Rc::from(key), val);
                 self.write_barrier(raw_idx, val);
             } else if let Some(HeapObj::Module(m)) = self.get_by_idx_mut(raw_idx) {
                 if let Some(s) = m.export_map.get(key).copied() {
@@ -1740,5 +1824,55 @@ impl NativeCtx for Heap {
 
     fn register_class(&mut self, name: &str, cls: std::rc::Rc<ClassObj>) {
         self.set_intrinsic_class(name, cls);
+    }
+}
+
+#[cfg(test)]
+mod jit_object_layout_tests {
+    use super::*;
+
+    /// Walks the exact pointer chain the JIT emits, using only the probed
+    /// offsets, and checks it lands on the real field values. A wrong offset
+    /// fails here instead of faulting inside generated code.
+    #[test]
+    fn probed_offsets_reach_the_real_fields() {
+        varn_runtime::init_heap();
+        let lay = Heap::jit_object_layout();
+
+        let shape = varn_types::Shape::create(None, std::collections::HashMap::new());
+        let oref = ObjRef::with_shape(
+            Rc::clone(&shape),
+            vec![VmValue::from_int(11), VmValue::from_int(22)],
+        );
+        let slot: Option<HeapObj> = Some(HeapObj::Object(oref.clone()));
+
+        let slot_bytes = unsafe {
+            std::slice::from_raw_parts(
+                &slot as *const _ as *const u8,
+                std::mem::size_of::<Option<HeapObj>>(),
+            )
+        };
+        assert_eq!(slot_bytes[0] as usize, lay.object_tag, "tag byte");
+
+        // slot -> RcBox
+        let rc = usize::from_ne_bytes(
+            slot_bytes[lay.payload_off..lay.payload_off + 8]
+                .try_into()
+                .unwrap(),
+        );
+
+        let read_u64 = |addr: usize| unsafe { *(addr as *const u64) };
+        let read_u32 = |addr: usize| unsafe { *(addr as *const u32) };
+
+        // inline_len, the JIT's bounds check
+        assert_eq!(read_u32(rc + lay.len_off) as usize, 2, "inline_len");
+
+        // shape -> shape.id
+        let shape_ptr = read_u64(rc + lay.shape_off) as usize;
+        assert_eq!(read_u32(shape_ptr + lay.shape_id_off), shape.id, "shape id");
+
+        // values[i] via a constant lea off the data pointer
+        assert_eq!(read_u64(rc + lay.values_off), VmValue::from_int(11).0);
+        assert_eq!(read_u64(rc + lay.values_off + 8), VmValue::from_int(22).0);
     }
 }

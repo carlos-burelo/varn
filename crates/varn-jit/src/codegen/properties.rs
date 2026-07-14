@@ -35,6 +35,7 @@ fn emit_get_property(ctx: &mut CodegenCtx, first_reg: usize) {
     *ip += 1;
 
     let lay = helpers.array_layout;
+    let obj_lay = helpers.object_layout;
     let heap_off = helpers.heap_field_offset;
 
     let mut done_ic: Vec<usize> = Vec::new();
@@ -94,26 +95,32 @@ fn emit_get_property(ctx: &mut CodegenCtx, first_reg: usize) {
         asm.imul_reg_reg(Reg::Rax, Reg::R11);
         asm.add_reg_reg(Reg::Rax, Reg::R10);
 
-        // 4. Check tag == 2 (HeapObj::Object)
+        // 4. Check tag == HeapObj::Object
         asm.mov_reg_mem(Reg::R10, Reg::Rax, 0);
         asm.mov_reg_imm64(Reg::R11, 0xFF);
         asm.and_reg_reg(Reg::R10, Reg::R11);
-        asm.cmp_reg_imm32(Reg::R10, 2);
+        asm.cmp_reg_imm32(Reg::R10, obj_lay.object_tag as i32);
         let p_not_obj = asm.jmp_cond(Cond::NotEqual);
 
-        // 5. Load rc_ptr from [Rax + 8] (payload_off is 8)
-        asm.mov_reg_mem(Reg::Rax, Reg::Rax, lay.payload_off as i32);
+        // 5. Load the object's Rc pointer out of the slot.
+        asm.mov_reg_mem(Reg::Rax, Reg::Rax, obj_lay.payload_off as i32);
 
-        // 6. Load values_buffer_ptr (from [Rax + 32]) and push it
-        asm.mov_reg_mem(Reg::R10, Reg::Rax, 32);
+        // 6. The fields are a tail inside this same allocation, so their base is
+        //    a constant displacement — there is no separate buffer to load.
+        asm.mov_reg_reg(Reg::R10, Reg::Rax);
+        asm.add_reg_imm32(Reg::R10, obj_lay.values_off as i32);
         asm.push(Reg::R10);
 
-        // 7. Load values_len (from [Rax + 40]) into R11
-        asm.mov_reg_mem(Reg::R11, Reg::Rax, 40);
+        // 7. Load inline_len (u32) into R11. This is the bound that keeps the
+        //    fast path off overflowed slots, which live outside the tail and can
+        //    only be reached by the interpreter helper.
+        asm.mov_reg_mem(Reg::R11, Reg::Rax, obj_lay.len_off as i32);
+        asm.mov_reg_imm64(Reg::R10, 0xFFFFFFFFu64);
+        asm.and_reg_reg(Reg::R11, Reg::R10);
 
         // 8. Load shape_id (u32) into Rax
-        asm.mov_reg_mem(Reg::Rax, Reg::Rax, 48); // Rax has shape_rc_ptr
-        asm.mov_reg_mem(Reg::Rax, Reg::Rax, 16); // Rax has shape_id (u32)
+        asm.mov_reg_mem(Reg::Rax, Reg::Rax, obj_lay.shape_off as i32); // shape Rc ptr
+        asm.mov_reg_mem(Reg::Rax, Reg::Rax, obj_lay.shape_id_off as i32);
         asm.mov_reg_imm64(Reg::R10, 0xFFFFFFFFu64);
         asm.and_reg_reg(Reg::Rax, Reg::R10); // Rax has shape_id
 
@@ -343,6 +350,7 @@ fn emit_set_property(ctx: &mut CodegenCtx, first_reg: usize) {
     let obj_reg = first_reg;
 
     let lay = helpers.array_layout;
+    let obj_lay = helpers.object_layout;
     let heap_off = helpers.heap_field_offset;
 
     // Fast path: monomorphic-shape slot store into a NURSERY instance.
@@ -396,26 +404,32 @@ fn emit_set_property(ctx: &mut CodegenCtx, first_reg: usize) {
         asm.imul_reg_reg(Reg::Rax, Reg::R11);
         asm.add_reg_reg(Reg::Rax, Reg::R10);
 
-        // 4. Check tag == 2 (HeapObj::Object)
+        // 4. Check tag == HeapObj::Object
         asm.mov_reg_mem(Reg::R10, Reg::Rax, 0);
         asm.mov_reg_imm64(Reg::R11, 0xFF);
         asm.and_reg_reg(Reg::R10, Reg::R11);
-        asm.cmp_reg_imm32(Reg::R10, 2);
+        asm.cmp_reg_imm32(Reg::R10, obj_lay.object_tag as i32);
         let p_not_obj = asm.jmp_cond(Cond::NotEqual);
 
-        // 5. Load rc_ptr from [Rax + 8] (payload_off is 8)
-        asm.mov_reg_mem(Reg::Rax, Reg::Rax, lay.payload_off as i32);
+        // 5. Load the object's Rc pointer out of the slot.
+        asm.mov_reg_mem(Reg::Rax, Reg::Rax, obj_lay.payload_off as i32);
 
-        // 6. Load values_buffer_ptr (from [Rax + 32]) and push it
-        asm.mov_reg_mem(Reg::R10, Reg::Rax, 32);
+        // 6. The fields are a tail inside this same allocation, so their base is
+        //    a constant displacement — there is no separate buffer to load.
+        asm.mov_reg_reg(Reg::R10, Reg::Rax);
+        asm.add_reg_imm32(Reg::R10, obj_lay.values_off as i32);
         asm.push(Reg::R10);
 
-        // 7. Load values_len (from [Rax + 40]) into R11
-        asm.mov_reg_mem(Reg::R11, Reg::Rax, 40);
+        // 7. Load inline_len (u32) into R11. This is the bound that keeps the
+        //    fast path off overflowed slots, which live outside the tail and can
+        //    only be reached by the interpreter helper.
+        asm.mov_reg_mem(Reg::R11, Reg::Rax, obj_lay.len_off as i32);
+        asm.mov_reg_imm64(Reg::R10, 0xFFFFFFFFu64);
+        asm.and_reg_reg(Reg::R11, Reg::R10);
 
         // 8. Load shape_id (u32) into Rax
-        asm.mov_reg_mem(Reg::Rax, Reg::Rax, 48); // Rax has shape_rc_ptr
-        asm.mov_reg_mem(Reg::Rax, Reg::Rax, 16); // Rax has shape_id (u32)
+        asm.mov_reg_mem(Reg::Rax, Reg::Rax, obj_lay.shape_off as i32); // shape Rc ptr
+        asm.mov_reg_mem(Reg::Rax, Reg::Rax, obj_lay.shape_id_off as i32);
         asm.mov_reg_imm64(Reg::R10, 0xFFFFFFFFu64);
         asm.and_reg_reg(Reg::Rax, Reg::R10); // Rax has shape_id
 

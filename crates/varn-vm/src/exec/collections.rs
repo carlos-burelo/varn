@@ -2,7 +2,7 @@ use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use std::rc::Rc;
-use varn_types::{value::ObjRef, ObjData, RuntimeObject, Value, VmArray};
+use varn_types::{value::ObjRef, Value, VmArray};
 
 /// Build an object literal from `count` contiguous stack values using a
 /// pre-resolved shape (see `FunctionProto::resolved_shape`), avoiding the
@@ -29,7 +29,7 @@ pub fn build_object_with_shape(
     }
 
     let values = stack[values_start..values_start + count].to_vec();
-    let oref = ObjRef::new(ObjData::with_shape(shape, values));
+    let oref = ObjRef::with_shape(shape, values);
     VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref)))
 }
 
@@ -42,7 +42,6 @@ pub fn build_array(stack: &mut Vec<VmValue>, count: usize, heap: &mut Heap) -> V
 }
 
 pub fn build_object(stack: &mut Vec<VmValue>, count: usize, heap: &mut Heap) -> VmValue {
-    let mut obj = RuntimeObject::new();
     let len = stack.len();
     let pairs_start = len.saturating_sub(count * 2);
 
@@ -59,14 +58,14 @@ pub fn build_object(stack: &mut Vec<VmValue>, count: usize, heap: &mut Heap) -> 
     }
 
     let pairs: Vec<VmValue> = stack.drain(pairs_start..).collect();
-    for chunk in pairs.chunks_exact(2) {
-        let key_nv = chunk[0];
-        let val_nv = chunk[1];
-        let key = heap.str_repr(key_nv);
-
-        obj.insert(Rc::from(key.as_str()), val_nv);
-    }
-    let oref = ObjRef::new(ObjData::from_inner(obj));
+    let fields: Vec<(Rc<str>, VmValue)> = pairs
+        .chunks_exact(2)
+        .map(|chunk| {
+            let key = heap.str_repr(chunk[0]);
+            (Rc::from(key.as_str()), chunk[1])
+        })
+        .collect();
+    let oref = ObjRef::from_pairs(fields);
     VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref)))
 }
 
@@ -208,7 +207,7 @@ pub fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Heap) -> V
         }
         Some(HeapObj::Object(o)) => {
             let key_s = heap.str_repr(key);
-            o.borrow_mut().set_field_nv(Rc::from(key_s.as_str()), val);
+            o.set_field_nv(Rc::from(key_s.as_str()), val);
             heap.write_barrier(heap_idx, val);
             Ok(())
         }
@@ -271,7 +270,6 @@ pub fn object_keys(obj: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
         if let Some(HeapObj::Object(o)) = heap.get(obj.as_heap_idx()) {
             let keys: Vec<Value> = o
                 .borrow()
-                .inner
                 .keys()
                 .map(|k| Value::Str(k.clone().into()))
                 .collect();
@@ -284,13 +282,12 @@ pub fn object_keys(obj: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
 pub fn object_rest(obj: VmValue, exclude: &[String], heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
         if let Some(HeapObj::Object(o)) = heap.get(obj.as_heap_idx()) {
-            let mut new_inner = RuntimeObject::new();
-            for (k, v) in o.borrow().inner.iter() {
-                if !exclude.iter().any(|e| e.as_str() == k.as_ref()) {
-                    new_inner.insert(k.clone(), v.clone());
-                }
-            }
-            let oref = ObjRef::new(ObjData::from_inner(new_inner));
+            let kept: Vec<(Rc<str>, VmValue)> = o
+                .borrow()
+                .iter()
+                .filter(|(k, _)| !exclude.iter().any(|e| e.as_str() == k.as_ref()))
+                .collect();
+            let oref = ObjRef::from_pairs(kept);
             return Ok(VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref))));
         }
     }
@@ -308,16 +305,9 @@ pub fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) -> VmResu
     };
     match spread_val {
         Value::Object(src) => {
-            let src_guard = src.borrow();
-            let pairs: Vec<(Rc<str>, VmValue)> = src_guard
-                .inner
-                .iter()
-                .map(|(k, nv)| (k.clone(), nv))
-                .collect();
-            drop(src_guard);
-            let mut dst = target_obj.borrow_mut();
+            let pairs: Vec<(Rc<str>, VmValue)> = src.borrow().iter().collect();
             for (k, nv) in pairs {
-                dst.inner.insert(k, nv);
+                target_obj.insert(k, nv);
             }
         }
         _ => {}

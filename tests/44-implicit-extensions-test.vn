@@ -5,10 +5,6 @@ import * as fsMod from "runtime:fs";
 import * as ioMod from "runtime:io";
 
 function runTest(): void {
-    print("DEBUG TEST: fsMod.fsWrite =", fsMod.fsWrite);
-    print("DEBUG TEST: fsMod.write =", fsMod.write);
-    print("DEBUG TEST: ioMod.write =", ioMod.write);
-
     let testFile = "./temp_implicit_ext.txt";
     let backupFile = "./temp_implicit_ext.bak";
 

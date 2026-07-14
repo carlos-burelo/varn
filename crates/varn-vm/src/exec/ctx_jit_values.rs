@@ -93,8 +93,7 @@ fn jit_construct_fast(
         }
     };
 
-    let data = varn_types::ObjData::new_instance(cls.clone());
-    let oref = varn_types::value::ObjRef::new(data);
+    let oref = varn_types::value::ObjRef::instance(cls.clone());
     let instance_nv =
         VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Object(oref)));
 
@@ -747,15 +746,14 @@ pub extern "C" fn jit_get_property_ic_fast(
             if obj.is_heap() {
                 if let Some(crate::heap::HeapObj::Object(o)) = ctx_ref.heap.get(obj.as_heap_idx())
                 {
-                    let guard = &*o.0.as_ptr();
+                    let guard = o.read();
                     let slot_cache = &*closure_ref.ic_cache.as_ptr();
                     let poly_slot = &slot_cache[cs_idx];
                     for entry in &poly_slot.entries {
                         if entry.id != 0 && entry.is_class == 1 {
-                            if guard.inner.shape.id == entry.id {
-                                let slot = entry.slot as usize;
-                                if slot < guard.inner.values.len() {
-                                    return guard.inner.values[slot];
+                            if guard.shape().id == entry.id {
+                                if let Some(v) = guard.field_at(entry.slot as usize) {
+                                    return v;
                                 }
                             }
                         }

@@ -7,10 +7,10 @@ use crate::exec::{ExecCtx, VmSuspend};
 use crate::value::VmValue;
 
 fn make_iter_result(value: Value, done: bool) -> Value {
-    let mut obj = varn_types::value::ObjData::new();
-    obj.set_field(Rc::from("value"), value);
-    obj.set_field(Rc::from("done"), Value::Bool(done));
-    varn_types::value::new_object(obj)
+    varn_types::value::new_object(varn_types::value::ObjRef::from_pairs([
+        (Rc::from("value"), varn_types::value::value_to_nv(&value)),
+        (Rc::from("done"), varn_types::VmValue::from_bool(done)),
+    ]))
 }
 
 struct NanSyncGenInner {

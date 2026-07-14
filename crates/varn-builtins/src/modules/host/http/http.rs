@@ -86,7 +86,7 @@ varn_contract! {
 
             if let Some(hv) = headers {
                 if let Value::Object(obj) = ctx.extract(hv) {
-                    for (k, v_nv) in obj.borrow().inner.iter() {
+                    for (k, v_nv) in obj.borrow().iter() {
                         let v_str = ctx.str_repr(v_nv);
                         req = req.set(k.as_ref(), &v_str);
                     }
@@ -229,7 +229,7 @@ varn_contract! {
                     response = response.with_header(hdr);
                 }
                 if let Value::Object(obj) = ctx.extract(headers) {
-                    for (k, v_nv) in obj.borrow().inner.iter() {
+                    for (k, v_nv) in obj.borrow().iter() {
                         let v_str = ctx.str_repr(v_nv);
                         if let Ok(hdr) = format!("{k}: {v_str}").parse::<tiny_http::Header>() {
                             response = response.with_header(hdr);

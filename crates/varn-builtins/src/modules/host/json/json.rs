@@ -117,7 +117,7 @@ fn write_value_json(val: &Value, ctx: &dyn NativeCtx, out: &mut String) {
             out.push('{');
             let mut first = true;
             let guard = o.borrow();
-            for (k, nv) in guard.inner.iter() {
+            for (k, nv) in guard.iter() {
                 if !first {
                     out.push(',');
                 }

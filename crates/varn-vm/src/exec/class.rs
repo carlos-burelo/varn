@@ -3,7 +3,7 @@ use crate::exec::props::bind_method_to_receiver;
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use std::rc::Rc;
-use varn_types::{value::ObjRef, ClassObj, ObjData};
+use varn_types::{value::ObjRef, ClassObj};
 
 pub fn op_class(name: &str, heap: &mut Heap) -> VmValue {
     let cls = ClassObj::new_rc(name);
@@ -149,8 +149,7 @@ pub fn op_get_super(
 
 pub fn new_instance(class_nv: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     let cls = get_class_arc(class_nv, heap)?;
-    let data = ObjData::new_instance(cls);
-    let oref = ObjRef::new(data);
+    let oref = ObjRef::instance(cls);
     Ok(VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref))))
 }
 

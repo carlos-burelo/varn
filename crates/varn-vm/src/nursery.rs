@@ -227,12 +227,11 @@ impl Nursery {
                     }
                 }
                 HeapObj::Object(obj_ref) => {
-                    let g = obj_ref.borrow();
-                    for (i, &v) in g.inner.values.iter().enumerate() {
+                    obj_ref.borrow().for_each_field(|i, v| {
                         if v.is_heap() && is_nursery_idx(v.as_heap_idx()) {
                             fixups.push((ChildSlot::ObjField(i), v.as_heap_idx()));
                         }
-                    }
+                    });
                 }
                 HeapObj::VmClosure(clos) => {
                     for (i, uv) in clos.upvalues.iter().enumerate() {
@@ -311,9 +310,7 @@ impl Nursery {
                     }
                 }
                 (ChildSlot::ObjField(i), HeapObj::Object(obj_ref)) => {
-                    if let Some(s) = obj_ref.borrow_mut().inner.values.get_mut(i) {
-                        *s = new_val;
-                    }
+                    obj_ref.set_field_at(i, new_val);
                 }
                 (ChildSlot::Upvalue(i), HeapObj::VmClosure(clos)) => {
                     if let Some(uv) = clos.upvalues.get(i) {

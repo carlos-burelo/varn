@@ -234,9 +234,7 @@ impl ExecCtx {
                 variant_name: Rc::from(variant_name_str),
                 variant_tag: tag,
                 fields,
-                payload: varn_types::Value::Object(varn_types::value::ObjRef::new(
-                    varn_types::value::ObjData::new(),
-                )),
+                payload: varn_types::Value::Object(varn_types::value::ObjRef::empty()),
             }));
         self.stack[base + dest] = self.heap.intern(variant);
         self.frames[frame_idx].ip = *ip;

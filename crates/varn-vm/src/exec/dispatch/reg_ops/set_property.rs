@@ -55,15 +55,15 @@ impl ExecCtx {
                         if let Some(crate::heap::HeapObj::Object(o)) =
                             self.heap.get(obj.as_heap_idx())
                         {
-                            let guard = unsafe { &*o.0.as_ptr() };
+                            let guard = o.read();
                             if entry.is_class == 1
-                                && guard.inner.shape.id == entry.id
-                                && slot < guard.inner.values.len()
+                                && guard.shape().id == entry.id
+                                && slot < guard.slot_count()
                             {
                                 found_slot = Some((slot, 1));
                                 hit_found = true;
                                 break 'entries;
-                            } else if entry.is_class == 5 && guard.inner.shape.id == entry.id {
+                            } else if entry.is_class == 5 && guard.shape().id == entry.id {
                                 found_slot = Some((slot, 5));
                                 hit_found = true;
                                 break 'entries;
@@ -99,11 +99,11 @@ impl ExecCtx {
                 if obj.is_heap() {
                     if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx())
                     {
-                        let guard = unsafe { &mut *o.0.as_ptr() };
+                        let o = o.clone();
                         if kind == 5 {
-                            guard.inner.insert(Rc::from(name.as_ref()), val);
+                            o.insert(Rc::from(name.as_ref()), val);
                         } else {
-                            guard.inner.values[slot] = val;
+                            o.set_field_at(slot, val);
                         }
                         self.heap.write_barrier(obj.as_heap_idx(), val);
                         return Ok(false);
@@ -139,18 +139,17 @@ impl ExecCtx {
 
         if obj.is_heap() {
             if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
-                let mut guard = o.borrow_mut();
-                if let Some(&slot) = guard.inner.shape.property_names.get(name.as_ref()) {
-                    if slot < guard.inner.values.len() {
+                let o = o.clone();
+                if let Some(&slot) = o.shape().property_names.get(name.as_ref()) {
+                    if slot < o.slot_count() {
+                        let shape_id = o.shape().id;
                         let entry = varn_types::chunk::CacheEntry {
-                            id: guard.inner.shape.id,
+                            id: shape_id,
                             slot: slot as u16,
                             is_class: 1,
                             vtable_ver: 0,
                         };
-                        guard.inner.values[slot] = val;
-                        let shape_id = guard.inner.shape.id;
-                        drop(guard);
+                        o.set_field_at(slot, val);
                         self.heap.write_barrier(obj.as_heap_idx(), val);
                         if cs_idx < cache_len && !is_megamorphic {
                             closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
@@ -160,11 +159,12 @@ impl ExecCtx {
                     }
                 }
 
-                let old_shape_id = guard.inner.shape.id;
-                guard.inner.insert(Rc::from(name.as_ref()), val);
-                let new_slot = guard.inner.values.len().saturating_sub(1);
-                let new_shape_id = guard.inner.shape.id;
-                drop(guard);
+                // The field is new: `insert` transitions the shape and spills
+                // the value into the overflow store if the tail is full.
+                let old_shape_id = o.shape().id;
+                o.insert(Rc::from(name.as_ref()), val);
+                let new_shape_id = o.shape().id;
+                let new_slot = o.shape().property_names[name.as_ref()];
                 self.heap.write_barrier(obj.as_heap_idx(), val);
                 if cs_idx < cache_len && !is_megamorphic {
                     let mut ic = closure.ic_cache.borrow_mut();

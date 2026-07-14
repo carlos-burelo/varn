@@ -9,7 +9,10 @@ pub fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
         let r = heap.as_int(a).wrapping_add(heap.as_int(b));
         return Ok(heap.make_int(r));
     }
-    if a.is_f64() || b.is_f64() {
+    // Both sides numeric → float add. A bare `is_f64() || is_f64()` here is
+    // wrong: `str + float` must fall through to the concat checks below, not
+    // coerce the string operand to 0.0.
+    if (a.is_f64() || heap.is_int(a)) && (b.is_f64() || heap.is_int(b)) {
         return Ok(VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b)));
     }
 

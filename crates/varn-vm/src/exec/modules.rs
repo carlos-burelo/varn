@@ -31,13 +31,8 @@ pub fn merge_exports(exports_nv: VmValue, src_nv: VmValue, heap: &mut Heap) -> V
     let dst_val = heap.extract(exports_nv);
 
     if let (Value::Object(src_obj), Value::Object(dst_obj)) = (src_val, dst_val) {
-        let src_fields: Vec<(Rc<str>, VmValue)> = src_obj
-            .borrow()
-            .inner
-            .iter()
-            .map(|(k, nv)| (k.clone(), nv))
-            .collect();
-        let mut dst_guard = dst_obj.borrow_mut();
+        let src_fields: Vec<(Rc<str>, VmValue)> = src_obj.borrow().iter().collect();
+        let dst_guard = dst_obj.read();
         for (name, src_nv) in src_fields {
             let src_val = heap.extract(src_nv);
             let dst_nv = dst_guard.get_field_nv(&name);
@@ -49,12 +44,8 @@ pub fn merge_exports(exports_nv: VmValue, src_nv: VmValue, heap: &mut Heap) -> V
                     merge_exports(d_nv, s_nv, heap)?;
                 }
                 (Some(Value::Class(dst_cls)), Value::Object(src_obj)) => {
-                    let src_static_fields: Vec<(Rc<str>, VmValue)> = src_obj
-                        .borrow()
-                        .inner
-                        .iter()
-                        .map(|(k, nv)| (k.clone(), nv))
-                        .collect();
+                    let src_static_fields: Vec<(Rc<str>, VmValue)> =
+                        src_obj.borrow().iter().collect();
                     for (sname, snv) in src_static_fields {
                         if !dst_cls.statics.borrow().contains_key(&sname) {
                             dst_cls
@@ -69,7 +60,7 @@ pub fn merge_exports(exports_nv: VmValue, src_nv: VmValue, heap: &mut Heap) -> V
                     for (sname, sval) in src_statics {
                         if dst_obj.borrow().get_field_nv(&sname).is_none() {
                             let snv = heap.intern(sval);
-                            dst_obj.borrow_mut().set_field_nv(sname, snv);
+                            dst_obj.set_field_nv(sname, snv);
                         }
                     }
                     dst_guard.set_field_nv(name.clone(), heap.intern(src_val));
@@ -161,11 +152,7 @@ pub fn reexport(exports_nv: VmValue, name: &str, val_nv: VmValue, heap: &mut Hea
             }
             (Some(Value::Class(dst_cls)), Value::Object(src_obj)) => {
                 let src_static_fields: Vec<(Rc<str>, VmValue)> = src_obj
-                    .borrow()
-                    .inner
-                    .iter()
-                    .map(|(k, nv)| (k.clone(), nv))
-                    .collect();
+                    .borrow().iter().collect();
                 for (sname, snv) in src_static_fields {
                     if !dst_cls.statics.borrow().contains_key(&sname) {
                         dst_cls
@@ -188,13 +175,13 @@ pub fn reexport(exports_nv: VmValue, name: &str, val_nv: VmValue, heap: &mut Hea
                 for (sname, sval) in src_statics {
                     if dst_obj.borrow().get_field_nv(&sname).is_none() {
                         let snv = heap.intern(sval);
-                        dst_obj.borrow_mut().set_field_nv(sname, snv);
+                        dst_obj.set_field_nv(sname, snv);
                     }
                 }
-                o.borrow_mut().set_field_nv(Rc::from(name), val_nv);
+                o.set_field_nv(Rc::from(name), val_nv);
             }
             _ => {
-                o.borrow_mut().set_field_nv(Rc::from(name), val_nv);
+                o.set_field_nv(Rc::from(name), val_nv);
             }
         }
         return Ok(());

@@ -1,4 +1,4 @@
-use super::{ArrayRef, ObjData, ObjRef, Value};
+use super::{ArrayRef, ObjRef, Value};
 
 #[inline(always)]
 pub fn new_array(v: Vec<Value>) -> Value {
@@ -7,7 +7,6 @@ pub fn new_array(v: Vec<Value>) -> Value {
 }
 
 #[inline(always)]
-pub fn new_object(obj: ObjData) -> Value {
-    let obj_ref = ObjRef::new(obj);
-    Value::Object(obj_ref)
+pub fn new_object(obj: ObjRef) -> Value {
+    Value::Object(obj)
 }

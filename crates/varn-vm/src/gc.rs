@@ -205,10 +205,14 @@ impl TricolorMarker {
                 }
                 HeapObj::Object(obj_ref) => {
                     let guard = obj_ref.borrow();
-                    for nv in guard.inner.values.iter() {
-                        if let Some(child_idx) = heap.get_heap_idx(*nv) {
-                            self.mark_gray(child_idx);
+                    let mut children = Vec::new();
+                    guard.for_each_field(|_, nv| {
+                        if let Some(child_idx) = heap.get_heap_idx(nv) {
+                            children.push(child_idx);
                         }
+                    });
+                    for child_idx in children {
+                        self.mark_gray(child_idx);
                     }
                     if let Some(cls) = guard.class() {
                         if let Some(ci) = heap.value_heap_idx(&varn_types::Value::Class(cls)) {

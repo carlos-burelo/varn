@@ -93,13 +93,13 @@ pub fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Heap) -> V
     let idx = obj.as_heap_idx();
     match heap.get(idx).cloned() {
         Some(HeapObj::Object(o)) => {
-            o.borrow_mut().set_field_nv(Rc::from(key), val);
+            o.set_field_nv(Rc::from(key), val);
             heap.write_barrier(idx, val);
             Ok(())
         }
         Some(HeapObj::EnumVariant(ev)) => {
             if let Value::Object(o) = &ev.payload {
-                o.borrow_mut().set_field_nv(Rc::from(key), val);
+                o.set_field_nv(Rc::from(key), val);
                 heap.write_barrier(idx, val);
             }
             Ok(())
@@ -128,13 +128,11 @@ pub fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmResult<V
 
         let found = match heap.get(idx) {
             Some(HeapObj::Object(o)) => {
-                let g = o.borrow();
-                g.inner.values.get(slot).cloned().map(FoundField::Vm)
+                o.field_at(slot).map(FoundField::Vm)
             }
             Some(HeapObj::EnumVariant(ev)) => {
                 if let Value::Object(o) = &ev.payload {
-                    let g = o.borrow();
-                    g.inner.values.get(slot).cloned().map(FoundField::Vm)
+                    o.field_at(slot).map(FoundField::Vm)
                 } else {
                     None
                 }
@@ -187,10 +185,7 @@ pub fn set_fixed_field(obj: VmValue, slot: usize, val: VmValue, heap: &mut Heap)
 
         match target {
             Some(Target::Obj(o)) => {
-                let mut g = o.borrow_mut();
-                if slot < g.inner.values.len() {
-                    g.inner.values[slot] = val;
-                    drop(g);
+                if o.set_field_at(slot, val) {
                     heap.write_barrier(heap_idx, val);
                     return Ok(());
                 }
@@ -236,10 +231,7 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
     }
     let idx = obj.as_heap_idx();
     match heap.get(idx).cloned() {
-        Some(HeapObj::Object(o)) => {
-            let guard = o.borrow();
-            guard.inner.get(key)
-        }
+        Some(HeapObj::Object(o)) => o.get(key),
         // O(1) array length. Without this, `arr.length` falls through to
         // `heap.extract(obj)` in `resolve_property`, which clones the entire
         // array's Vec just to read its length — making `arr.length` O(n) and any

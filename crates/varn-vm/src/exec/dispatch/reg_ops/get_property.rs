@@ -57,11 +57,10 @@ impl ExecCtx {
                             if let Some(crate::heap::HeapObj::Object(o)) =
                                 self.heap.get(obj.as_heap_idx())
                             {
-                                let guard = unsafe { &*o.0.as_ptr() };
-                                if guard.inner.shape.id == entry.id {
-                                    let slot = entry.slot as usize;
-                                    if slot < guard.inner.values.len() {
-                                        found_slot_val = Some(guard.inner.values[slot]);
+                                let guard = o.read();
+                                if guard.shape().id == entry.id {
+                                    if let Some(v) = guard.field_at(entry.slot as usize) {
+                                        found_slot_val = Some(v);
                                         hit_found = true;
                                         break 'entries;
                                     }
@@ -180,17 +179,16 @@ impl ExecCtx {
         if cs_idx < cache_len && !is_megamorphic {
             if obj.is_heap() {
                 if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
-                    let guard = o.borrow();
-                    if let Some(&slot) = guard.inner.shape.property_names.get(name.as_ref()) {
-                        if slot < guard.inner.values.len() {
+                    let guard = o.read();
+                    if let Some(&slot) = guard.shape().property_names.get(name.as_ref()) {
+                        if slot < guard.slot_count() {
+                            let shape_id = guard.shape().id;
                             let entry = varn_types::chunk::CacheEntry {
-                                id: guard.inner.shape.id,
+                                id: shape_id,
                                 slot: slot as u16,
                                 is_class: 1,
                                 vtable_ver: 0,
                             };
-                            let shape_id = guard.inner.shape.id;
-                            drop(guard);
                             closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
                             closure.feedback.borrow_mut().observe(cs_idx, shape_id);
                             return Ok(false);

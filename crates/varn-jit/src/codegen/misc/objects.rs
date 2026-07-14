@@ -58,6 +58,7 @@ pub(crate) fn emit_get_fixed_field(ctx: &mut CodegenCtx, first_reg: usize) {
     ctx.ip += 1;
 
     let lay = ctx.helpers.array_layout;
+    let obj_lay = ctx.helpers.object_layout;
     let heap_off = ctx.helpers.heap_field_offset;
 
     let mut slow: Vec<usize> = Vec::new();
@@ -112,26 +113,26 @@ pub(crate) fn emit_get_fixed_field(ctx: &mut CodegenCtx, first_reg: usize) {
         asm.imul_reg_reg(Reg::Rax, Reg::R10);
         asm.add_reg_reg(Reg::Rax, Reg::Rcx);
 
-        // Check if it is an Object (tag == 2)
+        // Check if it is an Object
         asm.mov_reg_mem(Reg::R10, Reg::Rax, 0);
         asm.mov_reg_imm64(Reg::Rcx, 0xFF);
         asm.and_reg_reg(Reg::R10, Reg::Rcx);
-        asm.cmp_reg_imm32(Reg::R10, 2); // 2 is HeapObj::Object tag
+        asm.cmp_reg_imm32(Reg::R10, obj_lay.object_tag as i32);
         slow.push(asm.jmp_cond(Cond::NotEqual));
 
-        // Load rc_ptr from [Rax + 8] (payload_off is 8)
-        asm.mov_reg_mem(Reg::Rax, Reg::Rax, lay.payload_off as i32);
+        // Load the object's Rc pointer out of the slot.
+        asm.mov_reg_mem(Reg::Rax, Reg::Rax, obj_lay.payload_off as i32);
 
-        // Verify slot < length (from [Rax + 40])
-        asm.mov_reg_mem(Reg::R10, Reg::Rax, 40);
+        // Verify slot < inline_len. Fields past the tail spilled to the overflow
+        // store, which only the interpreter helper knows how to read.
+        asm.mov_reg_mem(Reg::R10, Reg::Rax, obj_lay.len_off as i32);
+        asm.mov_reg_imm64(Reg::Rcx, 0xFFFFFFFFu64);
+        asm.and_reg_reg(Reg::R10, Reg::Rcx);
         asm.cmp_reg_imm32(Reg::R10, slot as i32);
         slow.push(asm.jmp_cond(Cond::BelowEqual));
 
-        // Load values_buffer_ptr from [Rax + 32]
-        asm.mov_reg_mem(Reg::Rax, Reg::Rax, 32);
-
-        // Load VmValue at slot from [Rax + slot * 8]
-        asm.mov_reg_mem(Reg::Rax, Reg::Rax, (slot * 8) as i32);
+        // The fields are inline in this same allocation: one constant-offset load.
+        asm.mov_reg_mem(Reg::Rax, Reg::Rax, (obj_lay.values_off + slot * 8) as i32);
 
         emit_store(asm, Reg::Rax, first_reg, regmap);
     }
@@ -168,6 +169,7 @@ pub(crate) fn emit_set_fixed_field(ctx: &mut CodegenCtx, first_reg: usize) {
     let obj_reg = first_reg;
 
     let lay = ctx.helpers.array_layout;
+    let obj_lay = ctx.helpers.object_layout;
     let heap_off = ctx.helpers.heap_field_offset;
 
     let mut slow: Vec<usize> = Vec::new();
@@ -210,27 +212,27 @@ pub(crate) fn emit_set_fixed_field(ctx: &mut CodegenCtx, first_reg: usize) {
         asm.imul_reg_reg(Reg::Rax, Reg::R10);
         asm.add_reg_reg(Reg::Rax, Reg::Rcx);
 
-        // Check if it is an Object (tag == 2)
+        // Check if it is an Object
         asm.mov_reg_mem(Reg::R10, Reg::Rax, 0);
         asm.mov_reg_imm64(Reg::Rcx, 0xFF);
         asm.and_reg_reg(Reg::R10, Reg::Rcx);
-        asm.cmp_reg_imm32(Reg::R10, 2); // 2 is HeapObj::Object tag
+        asm.cmp_reg_imm32(Reg::R10, obj_lay.object_tag as i32);
         slow.push(asm.jmp_cond(Cond::NotEqual));
 
-        // Load rc_ptr from [Rax + 8] (payload_off is 8)
-        asm.mov_reg_mem(Reg::Rax, Reg::Rax, lay.payload_off as i32);
+        // Load the object's Rc pointer out of the slot.
+        asm.mov_reg_mem(Reg::Rax, Reg::Rax, obj_lay.payload_off as i32);
 
-        // Verify slot < length (from [Rax + 40])
-        asm.mov_reg_mem(Reg::R10, Reg::Rax, 40);
+        // Verify slot < inline_len. Fields past the tail spilled to the overflow
+        // store, which only the interpreter helper knows how to write.
+        asm.mov_reg_mem(Reg::R10, Reg::Rax, obj_lay.len_off as i32);
+        asm.mov_reg_imm64(Reg::Rcx, 0xFFFFFFFFu64);
+        asm.and_reg_reg(Reg::R10, Reg::Rcx);
         asm.cmp_reg_imm32(Reg::R10, slot as i32);
         slow.push(asm.jmp_cond(Cond::BelowEqual));
 
-        // Load values_buffer_ptr from [Rax + 32]
-        asm.mov_reg_mem(Reg::Rax, Reg::Rax, 32);
-
-        // Write value from val_reg to [Rax + slot * 8]
+        // The fields are inline in this same allocation: one constant-offset store.
         emit_load(asm, Reg::R10, val_reg, regmap);
-        asm.mov_mem_reg(Reg::Rax, (slot * 8) as i32, Reg::R10);
+        asm.mov_mem_reg(Reg::Rax, (obj_lay.values_off + slot * 8) as i32, Reg::R10);
     }
     let done = ctx.asm.jmp_near();
 

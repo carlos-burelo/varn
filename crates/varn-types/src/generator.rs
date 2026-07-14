@@ -121,10 +121,10 @@ impl AsyncQueue {
 }
 
 fn make_iter_result(value: Value, done: bool) -> Value {
-    use crate::value::{value_to_nv, ObjData, ObjRef};
+    use crate::value::{value_to_nv, ObjRef};
     use crate::vm_value::VmValue;
-    let mut obj = ObjData::new();
-    obj.inner.insert(Rc::from("value"), value_to_nv(&value));
-    obj.inner.insert(Rc::from("done"), VmValue::from_bool(done));
-    Value::Object(ObjRef::new(obj))
+    Value::Object(ObjRef::from_pairs([
+        (Rc::from("value"), value_to_nv(&value)),
+        (Rc::from("done"), VmValue::from_bool(done)),
+    ]))
 }

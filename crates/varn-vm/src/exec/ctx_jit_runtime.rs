@@ -869,9 +869,7 @@ pub extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usize) -> 
                 variant_name: std::rc::Rc::from(variant_name_str),
                 variant_tag: tag,
                 fields,
-                payload: varn_types::Value::Object(varn_types::value::ObjRef::new(
-                    varn_types::value::ObjData::new(),
-                )),
+                payload: varn_types::Value::Object(varn_types::value::ObjRef::empty()),
             }));
         ctx_ref.heap.intern(variant)
     }

@@ -1,4 +1,4 @@
-use super::{ArrayRef, BoundMethod, BoundMethodTarget, ObjData, ObjRef, Value, VmValuePayload};
+use super::{ArrayRef, BoundMethod, BoundMethodTarget, ObjRef, Value, VmValuePayload};
 use crate::native::NativeFn;
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -35,12 +35,12 @@ impl Value {
     }
 
     pub fn instance(class: Rc<super::ClassObj>) -> Self {
-        let obj_ref = ObjRef::new(ObjData::new_instance(class));
+        let obj_ref = ObjRef::instance(class);
         Value::Object(obj_ref)
     }
 
     pub fn plain_object() -> Self {
-        Value::Object(ObjRef::new(ObjData::new()))
+        Value::Object(ObjRef::empty())
     }
 
     #[inline(always)]
@@ -372,7 +372,7 @@ impl fmt::Display for Value {
                     write!(f, "[object {}]", class.name)
                 } else {
                     write!(f, "{{ ")?;
-                    for (i, (k, v)) in obj.inner.iter().enumerate() {
+                    for (i, (k, v)) in obj.iter().enumerate() {
                         if i > 0 {
                             write!(f, ", ")?;
                         }

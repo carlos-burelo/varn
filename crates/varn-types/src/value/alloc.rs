@@ -10,28 +10,47 @@ pub type RuntimeString = Rc<str>;
 pub type ValueMap = rustc_hash::FxHashMap<super::Value, super::Value>;
 pub type ValueSet = rustc_hash::FxHashSet<super::Value>;
 
+/// Handle to a property object. The fields live inside this same allocation
+/// (see `ObjData`), so there is no inner `RefCell` and no second buffer:
+/// mutation goes through `ObjData`'s cells on `&self`.
 #[derive(Clone)]
-pub struct ObjRef(pub Rc<RefCell<super::ObjData>>);
+pub struct ObjRef(pub Rc<super::ObjData>);
 
 impl ObjRef {
-    pub fn new(data: super::ObjData) -> Self {
-        Self(Rc::new(RefCell::new(data)))
+    /// Empty object on the root shape.
+    pub fn empty() -> Self {
+        Self(super::ObjData::new())
     }
 
-    pub fn read(&self) -> std::cell::Ref<'_, super::ObjData> {
-        self.0.borrow()
+    pub fn instance(class: Rc<super::ClassObj>) -> Self {
+        Self(super::ObjData::new_instance(class))
     }
 
-    pub fn write(&self) -> std::cell::RefMut<'_, super::ObjData> {
-        self.0.borrow_mut()
+    pub fn with_shape(shape: Rc<super::Shape>, values: Vec<crate::vm_value::VmValue>) -> Self {
+        Self(super::ObjData::with_shape(shape, values))
     }
 
-    pub fn borrow(&self) -> std::cell::Ref<'_, super::ObjData> {
-        self.0.borrow()
+    pub fn from_pairs<I>(pairs: I) -> Self
+    where
+        I: IntoIterator<Item = (RuntimeString, crate::vm_value::VmValue)>,
+    {
+        Self(super::ObjData::from_pairs(pairs))
     }
 
-    pub fn borrow_mut(&self) -> std::cell::RefMut<'_, super::ObjData> {
-        self.0.borrow_mut()
+    pub fn read(&self) -> &super::ObjData {
+        &self.0
+    }
+
+    pub fn borrow(&self) -> &super::ObjData {
+        &self.0
+    }
+}
+
+impl std::ops::Deref for ObjRef {
+    type Target = super::ObjData;
+    #[inline(always)]
+    fn deref(&self) -> &super::ObjData {
+        &self.0
     }
 }
 
@@ -45,13 +64,13 @@ impl Eq for ObjRef {}
 
 impl std::hash::Hash for ObjRef {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        Rc::as_ptr(&self.0).hash(state);
+        (Rc::as_ptr(&self.0) as *const u8).hash(state);
     }
 }
 
 impl std::fmt::Debug for ObjRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ObjRef({:p})", self.0)
+        write!(f, "ObjRef({:p})", Rc::as_ptr(&self.0) as *const u8)
     }
 }
 

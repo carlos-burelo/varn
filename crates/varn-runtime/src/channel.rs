@@ -13,8 +13,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 use varn_types::task::AsyncTask;
-use varn_types::value::{new_object, ObjData, SendEnvelope, SendValue};
-use varn_types::Value;
+use varn_types::value::{new_object, value_to_nv, ObjRef, SendEnvelope, SendValue};
+use varn_types::{Value, VmValue};
 
 /// Direct/parked receiver handoff value. Scalar payloads ride inside a plain
 /// `{value, done:false}` object (heap-independent, embeddable by
@@ -72,10 +72,10 @@ fn core_of(id: u64) -> Option<std::sync::Arc<ChannelCore>> {
 /// Objeto `{value, done}` heap-independiente (mismo patrón que el error de
 /// spawnIsolate en task.rs).
 pub fn next_obj(value: Value, done: bool) -> Value {
-    let mut obj = ObjData::new();
-    obj.set_field(Rc::from("value"), value);
-    obj.set_field(Rc::from("done"), Value::Bool(done));
-    new_object(obj)
+    new_object(ObjRef::from_pairs([
+        (Rc::from("value"), value_to_nv(&value)),
+        (Rc::from("done"), VmValue::from_bool(done)),
+    ]))
 }
 
 pub fn create(capacity: usize) -> u64 {
@@ -158,7 +158,7 @@ mod tests {
 
     fn as_done(v: &Value) -> Option<bool> {
         if let Value::Object(o) = v {
-            if let Some(Value::Bool(b)) = o.read().inner.get("done").map(nv_to_value) {
+            if let Some(Value::Bool(b)) = o.read().get("done").map(nv_to_value) {
                 return Some(b);
             }
         }
@@ -267,7 +267,7 @@ mod tests {
                 assert_eq!(as_done(&v), Some(false));
                 if let Value::Object(o) = &v {
                     assert!(matches!(
-                        o.read().inner.get("value").map(nv_to_value),
+                        o.read().get("value").map(nv_to_value),
                         Some(Value::Int(42))
                     ));
                 } else {

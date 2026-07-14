@@ -84,11 +84,12 @@ varn_contract! {
                 Ok(m) => m,
                 Err(e) => {
                     let async_task = varn_types::AsyncTask::pending();
-                    let mut obj = varn_types::value::ObjData::new();
                     let err_msg = format!("spawnIsolate: failed to load module '{resolved_path}': {e}");
                     let err_msg_nv = ctx.alloc_str(&err_msg);
-                    let err_msg_val = Value::VmValue(Box::new(varn_types::VmValueRef(err_msg_nv)));
-                    obj.set_field(std::rc::Rc::from("message"), err_msg_val);
+                    let obj = varn_types::value::ObjRef::from_pairs([(
+                        std::rc::Rc::from("message"),
+                        err_msg_nv,
+                    )]);
                     async_task.reject(varn_types::value::new_object(obj));
                     return Ok(ctx.intern(Value::TaskHandle(async_task)));
                 }
@@ -97,15 +98,16 @@ varn_contract! {
             let exported_fn = ctx.get_field(module_val, &export_name);
             if exported_fn != Some(func) {
                 let async_task = varn_types::AsyncTask::pending();
-                let mut obj = varn_types::value::ObjData::new();
                 let err_msg = if export_name.starts_with('<') {
                     "spawnIsolate: first argument must be a function reference, not an anonymous closure".to_string()
                 } else {
                     format!("spawnIsolate: function '{export_name}' is not a top-level exported function of module '{resolved_path}'")
                 };
                 let err_msg_nv = ctx.alloc_str(&err_msg);
-                let err_msg_val = Value::VmValue(Box::new(varn_types::VmValueRef(err_msg_nv)));
-                obj.set_field(std::rc::Rc::from("message"), err_msg_val);
+                let obj = varn_types::value::ObjRef::from_pairs([(
+                    std::rc::Rc::from("message"),
+                    err_msg_nv,
+                )]);
                 async_task.reject(varn_types::value::new_object(obj));
                 return Ok(ctx.intern(Value::TaskHandle(async_task)));
             }
@@ -354,7 +356,7 @@ varn_contract! {
                                 let done = matches!(
                                     &v,
                                     Value::Object(o) if matches!(
-                                        o.read().inner.get("done")
+                                        o.read().get("done")
                                             .map(varn_types::value::nv_to_value),
                                         Some(Value::Bool(true))
                                     )
@@ -364,7 +366,6 @@ varn_contract! {
                                 } else if let Value::Object(o) = &v {
                                     let inner_val = o
                                         .read()
-                                        .inner
                                         .get("value")
                                         .map(varn_types::value::nv_to_value)
                                         .unwrap_or(Value::Null);

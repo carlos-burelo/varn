@@ -22,7 +22,7 @@ use crate::value::VmValue;
 
 fn marker_str(val: &Value, key: &str) -> Option<String> {
     if let Value::Object(o) = val {
-        if let Some(Value::Str(s)) = o.read().inner.get(key).map(nv_to_value) {
+        if let Some(Value::Str(s)) = o.read().get(key).map(nv_to_value) {
             return Some(s.to_string());
         }
     }
@@ -31,7 +31,7 @@ fn marker_str(val: &Value, key: &str) -> Option<String> {
 
 fn marker_int(val: &Value, key: &str) -> Option<i64> {
     if let Value::Object(o) = val {
-        if let Some(Value::Int(i)) = o.read().inner.get(key).map(nv_to_value) {
+        if let Some(Value::Int(i)) = o.read().get(key).map(nv_to_value) {
             return Some(i);
         }
     }

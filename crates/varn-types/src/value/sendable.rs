@@ -1,5 +1,5 @@
 use crate::value::{
-    alloc_array, alloc_map, alloc_object, alloc_set, new_object, nv_to_value, ObjData, Value,
+    alloc_array, alloc_map, alloc_set, new_object, nv_to_value, value_to_nv, ObjRef, Value,
 };
 use crate::vm_value::VmValue;
 use rust_decimal::Decimal;
@@ -82,7 +82,7 @@ impl Value {
                 {
                     let guard = obj.read();
                     if let Some(cls) = guard.class() {
-                        let chan_id = match guard.inner.get("_chan").map(nv_to_value) {
+                        let chan_id = match guard.get("_chan").map(nv_to_value) {
                             Some(Value::Int(id)) => Some(id),
                             _ => None,
                         };
@@ -92,7 +92,7 @@ impl Value {
                     }
                 }
                 let mut map = std::collections::HashMap::new();
-                for (k, nv) in obj.read().inner.iter() {
+                for (k, nv) in obj.read().iter() {
                     let v = nv_to_value(nv);
                     map.insert(k.to_string(), v.to_sendable()?);
                 }
@@ -136,12 +136,16 @@ impl Value {
 /// isolate boundary. `varn-vm` (Task 3) recognizes `__chanEndpoint` on
 /// materialization and mints a real `Sender`/`Receiver` instance from it.
 fn endpoint_marker(dir: &str, id: u64) -> Value {
-    let mut obj = ObjData::new();
-    obj.set_field(
-        std::rc::Rc::from("__chanEndpoint"),
-        Value::Str(std::rc::Rc::from(dir)),
-    );
-    obj.set_field(std::rc::Rc::from("__chanId"), Value::Int(id as i64));
+    let obj = ObjRef::from_pairs([
+        (
+            std::rc::Rc::from("__chanEndpoint"),
+            value_to_nv(&Value::Str(std::rc::Rc::from(dir))),
+        ),
+        (
+            std::rc::Rc::from("__chanId"),
+            value_to_nv(&Value::Int(id as i64)),
+        ),
+    ]);
     new_object(obj)
 }
 
@@ -178,15 +182,11 @@ impl SendValue {
                 }
                 Value::Array(array_ref)
             }
-            SendValue::Object(fields) => {
-                let obj_ref = alloc_object();
-                let mut g = obj_ref.write();
-                for (k, v) in fields {
-                    g.set_field(Rc::from(k.as_str()), v.to_value());
-                }
-                drop(g);
-                Value::Object(obj_ref)
-            }
+            SendValue::Object(fields) => Value::Object(ObjRef::from_pairs(
+                fields
+                    .iter()
+                    .map(|(k, v)| (Rc::from(k.as_str()), value_to_nv(&v.to_value()))),
+            )),
             SendValue::Map(entries) => {
                 let map_ref = alloc_map();
                 let mut g = map_ref.write();
@@ -429,7 +429,7 @@ mod channel_endpoint_tests {
         let v = tx.to_value();
         let Value::Object(o) = &v else { panic!("marker must be object") };
         let guard = o.read();
-        assert!(guard.inner.contains_key("__chanEndpoint"));
-        assert!(guard.inner.contains_key("__chanId"));
+        assert!(guard.contains_key("__chanEndpoint"));
+        assert!(guard.contains_key("__chanId"));
     }
 }

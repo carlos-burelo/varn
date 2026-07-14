@@ -356,8 +356,7 @@ impl NativeCtx for ExecCtx {
     fn object_for_each(&self, obj: VmValue, f: &mut dyn FnMut(&str, VmValue)) {
         if obj.is_heap() {
             if let Some(HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
-                let g = o.borrow();
-                for (k, v) in g.inner.iter() {
+                for (k, v) in o.borrow().iter() {
                     f(k.as_ref(), v);
                 }
             }
@@ -367,7 +366,7 @@ impl NativeCtx for ExecCtx {
     fn get_object_shape(&self, obj: VmValue) -> Option<std::rc::Rc<varn_types::Shape>> {
         if obj.is_heap() {
             if let Some(HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
-                return Some(o.borrow().inner.shape.clone());
+                return Some(std::rc::Rc::clone(o.borrow().shape()));
             }
         }
         None
@@ -402,7 +401,7 @@ impl NativeCtx for ExecCtx {
     fn set_field(&mut self, obj: VmValue, key: &str, val: VmValue) {
         if obj.is_heap() {
             if let Some(HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
-                o.borrow_mut().set_field_nv(std::rc::Rc::from(key), val);
+                o.set_field_nv(std::rc::Rc::from(key), val);
                 self.heap.write_barrier(obj.as_heap_idx(), val);
             } else if let Some(HeapObj::Module(m)) = self.heap.get_mut(obj.as_heap_idx()) {
                 if let Some(s) = m.export_map.get(key).copied() {
@@ -598,6 +597,11 @@ impl NativeCtx for ExecCtx {
 
         let module_path_str = module_path.to_string();
         let export_name_str = export_name.to_string();
+        // The worker gets a fresh VM, so execution settings do not carry over
+        // on their own. `no_jit` has to: otherwise VARN_NO_JIT silently fails
+        // to disable the JIT inside isolates, and an interpreter-only run is
+        // not actually interpreter-only.
+        let no_jit = self.no_jit;
 
         // Join task: resolves `Null` when the worker finishes, rejects with a
         // typed error if it threw. Returned to the caller (wrapped in an
@@ -607,6 +611,7 @@ impl NativeCtx for ExecCtx {
 
         std::thread::spawn(move || {
             let mut machine = crate::Vm::new(std::rc::Rc::new(rustc_hash::FxHashMap::default()));
+            machine.set_no_jit(no_jit);
             machine
                 .ctx
                 .globals
@@ -683,7 +688,7 @@ impl NativeCtx for ExecCtx {
         let instance_nv = self.heap.alloc_object();
         if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get_mut(instance_nv.as_heap_idx())
         {
-            o.borrow_mut().set_class(class_obj);
+            o.set_class(class_obj);
         }
         Some(instance_nv)
     }
@@ -769,7 +774,7 @@ impl NativeCtx for ExecCtx {
                         }
                     }
                     let mut map = std::collections::HashMap::new();
-                    for (k, nv) in borrow.inner.iter() {
+                    for (k, nv) in borrow.iter() {
                         map.insert(k.to_string(), self.to_sendable(nv)?);
                     }
                     Ok(varn_types::value::SendValue::Object(map))
@@ -858,7 +863,7 @@ impl ExecCtx {
                     }
                 }
                 let mut map = std::collections::HashMap::new();
-                for (k, nv) in borrow.inner.iter() {
+                for (k, nv) in borrow.iter() {
                     map.insert(k.to_string(), self.to_sendable(nv)?);
                 }
                 Ok(varn_types::value::SendValue::Object(map))

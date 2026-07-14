@@ -52,7 +52,7 @@ impl ExecCtx {
                 let keys: Vec<std::rc::Rc<str>> = if let Some(parsed) = expected_keys {
                     parsed
                 } else {
-                    let mut k: Vec<std::rc::Rc<str>> = obj_ref.inner.keys().collect();
+                    let mut k: Vec<std::rc::Rc<str>> = obj_ref.keys().collect();
                     k.sort();
                     k
                 };
@@ -64,7 +64,6 @@ impl ExecCtx {
                     let val = obj_ref.get_field_nv(key).unwrap_or(VmValue::null());
                     exports.push(val);
                 }
-                drop(obj_ref);
 
                 let mut module_obj = ModuleObj::new(id, keys.len());
                 module_obj.exports = exports;
@@ -265,7 +264,7 @@ fn freeze_value(val: VmValue, heap: &crate::heap::HeapInner) -> Option<FrozenExp
         Some(HeapObj::Object(obj_ref)) => {
             let guard = obj_ref.borrow();
             let mut nested = FrozenModuleObj::new(ModuleId::local_str("<nested>"));
-            for (key, nv) in guard.inner.iter() {
+            for (key, nv) in guard.iter() {
                 let child = freeze_value(nv, heap)?;
                 nested.push(Arc::from(key.as_ref()), child);
             }
@@ -319,8 +318,7 @@ fn thaw_export(export: &FrozenExport, heap: &mut crate::heap::HeapInner) -> VmVa
             for (key, child_export) in fields {
                 let child_nv = thaw_export(&child_export, heap);
                 if let Some(HeapObj::Object(o)) = heap.get_by_idx_mut(raw_idx) {
-                    o.borrow_mut()
-                        .set_field_nv(std::rc::Rc::from(key.as_ref()), child_nv);
+                    o.set_field_nv(std::rc::Rc::from(key.as_ref()), child_nv);
                 }
             }
             obj_val

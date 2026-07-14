@@ -58,6 +58,39 @@ pub struct JitArrayLayout {
     pub elems_len_off: usize,
 }
 
+/// Probed layout facts for the JIT's inline property fast paths.
+///
+/// `[slot + object_payload_off] → ObjData` — the object's fields live in the
+/// same allocation as its header (a DST tail), so the field buffer is reached
+/// with a constant `lea` off the data pointer instead of loading a separate
+/// `Vec` pointer.
+///
+/// Every offset here is PROBED against a real object at startup rather than
+/// hardcoded: the previous fast paths baked in `Vec`'s field order as the magic
+/// constants 32/40/48, which is exactly the kind of assumption that turns a
+/// representation change into a silent segfault.
+#[derive(Debug, Clone, Copy, Default)]
+#[repr(C)]
+pub struct JitObjectLayout {
+    /// Discriminant byte value of `HeapObj::Object`.
+    pub object_tag: usize,
+    /// Slot base → the object's `Rc<ObjData>` data pointer. `ObjRef` is a fat
+    /// pointer, so the slot also carries a length word; the fast paths read the
+    /// tail length from the header instead and ignore it.
+    pub payload_off: usize,
+    /// Data pointer → `ObjData.inline_len` (u32): how many fields live in the
+    /// tail. Fields past it spilled to the overflow store, which the JIT does
+    /// not know how to read — the bounds check against this value is what sends
+    /// those slots to the interpreter helper.
+    pub len_off: usize,
+    /// Data pointer → `ObjData.values[0]`. Constant, because the tail is inline.
+    pub values_off: usize,
+    /// Data pointer → `ObjData.shape` (an `Rc<Shape>`).
+    pub shape_off: usize,
+    /// Shape pointer → `Shape.id` (u32).
+    pub shape_id_off: usize,
+}
+
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct JitHelpers {
@@ -166,6 +199,8 @@ pub struct JitHelpers {
     pub resolve_native_op: fn(u64) -> usize,
     /// Probed heap/array layout for the inline array-read fast path.
     pub array_layout: JitArrayLayout,
+    /// Probed object layout for the inline property get/set fast paths.
+    pub object_layout: JitObjectLayout,
     pub open_upvalues_offset: usize,
     pub pending_constructors_offset: usize,
     /// `extern "C" fn(*mut ExecCtx)` — loop back-edge GC safepoint.

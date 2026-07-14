@@ -1,10 +1,9 @@
 use varn_types::value::{
-    install_allocator, AllocVtable, ArrayRef, MapRef, ObjData, ObjRef, SetRef, Value, ValueMap,
-    ValueSet,
+    install_allocator, AllocVtable, ArrayRef, MapRef, ObjRef, SetRef, Value, ValueMap, ValueSet,
 };
 
 fn make_object() -> ObjRef {
-    ObjRef::new(ObjData::new())
+    ObjRef::empty()
 }
 
 fn make_array() -> ArrayRef {

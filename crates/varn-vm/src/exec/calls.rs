@@ -314,8 +314,7 @@ pub fn prepare_call(
             }
             HeapObj::Class(cls) => {
                 let cls = cls.clone();
-                let data = varn_types::ObjData::new_instance(cls.clone());
-                let oref = varn_types::value::ObjRef::new(data);
+                let oref = varn_types::value::ObjRef::instance(cls.clone());
                 let instance_nv = VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref)));
                 if let Some(ctor) = cls.constructor() {
                     let mut full_arg_count = arg_count;
@@ -366,16 +365,12 @@ pub fn prepare_call(
                 }
 
                 let payload = if !data.fields.is_empty() {
-                    let mut obj_data = varn_types::value::ObjData::new();
-                    for (idx, field_name) in data.fields.iter().enumerate() {
-                        let nv = if idx < args.len() {
-                            args[idx]
-                        } else {
-                            VmValue::null()
-                        };
-                        obj_data.set_field_nv(field_name.clone(), nv);
-                    }
-                    Value::Object(varn_types::value::ObjRef::new(obj_data))
+                    Value::Object(varn_types::value::ObjRef::from_pairs(
+                        data.fields.iter().enumerate().map(|(idx, field_name)| {
+                            let nv = args.get(idx).copied().unwrap_or(VmValue::null());
+                            (field_name.clone(), nv)
+                        }),
+                    ))
                 } else if args.len() == 1 {
                     heap.extract(args[0])
                 } else if args.len() > 1 {
