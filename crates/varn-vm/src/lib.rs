@@ -10,6 +10,7 @@ pub mod loader;
 pub mod nursery;
 pub mod profile;
 pub mod settings;
+pub mod strbuf;
 pub mod value;
 pub mod vm;
 

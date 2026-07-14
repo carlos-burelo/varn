@@ -1051,32 +1051,38 @@ impl HeapInner {
     /// its own for the common leaf cases (strings, ints, bools, null). Used
     /// by `BuildStr` so concatenating template parts costs one output
     /// allocation rather than one `String` per part.
-    pub fn str_repr_into(&self, nv: VmValue, out: &mut String) {
-        use std::fmt::Write;
+    /// Renders `nv` into any string sink. Generic so a concat can render
+    /// straight into a stack buffer ([`crate::strbuf::StrBuf`]) instead of a
+    /// heap-allocated `String`; integers go through [`crate::strbuf::itoa`]
+    /// rather than `core::fmt`, which dominated integer concatenation.
+    pub fn str_repr_into<W: std::fmt::Write>(&self, nv: VmValue, out: &mut W) {
+        use crate::strbuf::{itoa, INT_MAX_DIGITS};
         if nv.is_null() {
-            out.push_str("null");
+            let _ = out.write_str("null");
         } else if nv.is_bool() {
-            out.push_str(if nv.as_bool() { "true" } else { "false" });
+            let _ = out.write_str(if nv.as_bool() { "true" } else { "false" });
         } else if nv.is_int() {
-            let _ = write!(out, "{}", nv.as_int());
+            let mut buf = [0u8; INT_MAX_DIGITS];
+            let _ = out.write_str(itoa(nv.as_int(), &mut buf));
         } else if nv.is_f64() {
             let f = nv.as_f64();
             if f.fract() == 0.0 && f.abs() < 1e15 {
-                let _ = write!(out, "{}", f as i64);
+                let mut buf = [0u8; INT_MAX_DIGITS];
+                let _ = out.write_str(itoa(f as i64, &mut buf));
             } else {
                 let _ = write!(out, "{}", f);
             }
         } else if nv.is_sso() {
             let mut buf = [0u8; 5];
-            out.push_str(nv.sso_as_str(&mut buf));
+            let _ = out.write_str(nv.sso_as_str(&mut buf));
         } else if nv.is_heap() {
             if let Some(HeapObj::Str(s)) = self.get_by_idx(nv.as_heap_idx()) {
-                out.push_str(s.as_ref());
+                let _ = out.write_str(s.as_ref());
                 return;
             }
-            out.push_str(&self.str_repr(nv));
+            let _ = out.write_str(&self.str_repr(nv));
         } else {
-            out.push_str(&self.str_repr(nv));
+            let _ = out.write_str(&self.str_repr(nv));
         }
     }
 

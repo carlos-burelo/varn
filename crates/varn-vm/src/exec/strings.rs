@@ -2,6 +2,7 @@ use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj, HeapStr};
 use crate::value::VmValue;
 use std::rc::Rc;
+use crate::strbuf::StrBuf;
 use varn_types::str_util::{char_len, char_range_to_bytes};
 
 
@@ -85,27 +86,32 @@ pub fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
         }
     }
 
-    // Render both operands straight into one output buffer: strings borrow,
-    // scalars format in place — no per-operand String allocation.
-    let mut out = String::with_capacity(24);
+    // Render both operands into one buffer that starts on the stack: strings
+    // borrow, scalars format in place. A short result (the common
+    // `"prefix" + int`) therefore costs a single allocation — the `Rc<str>`
+    // handed back — where it used to cost a scratch `String` plus a copy into
+    // that `Rc<str>`.
+    let mut out = StrBuf::new();
     heap.str_repr_into(a, &mut out);
     let a_len = out.len();
     heap.str_repr_into(b, &mut out);
     let total = out.len();
     if a_len >= EXT_SEED_LEN {
-        out.reserve(total);
-        let flag = if out.is_ascii() {
+        // Seeding an extensible buffer: this one has to be owned and growable.
+        let flag = if out.as_str().is_ascii() {
             crate::heap::ascii_flag::YES
         } else {
             crate::heap::ascii_flag::NO
         };
+        let mut owned = out.into_string();
+        owned.reserve(total);
         return heap.alloc_str_view(HeapStr::ext(
-            Rc::new(std::cell::UnsafeCell::new(out)),
+            Rc::new(std::cell::UnsafeCell::new(owned)),
             total,
             flag,
         ));
     }
-    heap.alloc_str_dynamic(out)
+    heap.alloc_str_dynamic(out.as_str())
 }
 
 pub fn to_string(val: VmValue, heap: &mut Heap) -> VmValue {
