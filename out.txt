@@ -1,0 +1,10 @@
+[PASSED] 1. Arithmetic edge cases
+[PASSED] 2. Boolean edge cases
+[PASSED] 3. String methods 
+[PASSED] 4. Template literals 
+[PASSED] 5. Array methods 
+[PASSED] 6. Destructuring 
+[PASSED] 7. Closures 
+[PASSED] 8. Null safety 
+[PASSED] 9. Control flow 
+[PASSED] 10. Match expressions 

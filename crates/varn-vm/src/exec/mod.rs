@@ -12,6 +12,7 @@ pub mod ctx_jit_values;
 pub mod ctx_modules;
 pub mod ctx_profiling;
 pub mod ctx_tasks;
+pub mod ctx_json;
 pub mod dispatch;
 pub mod exceptions;
 pub mod frame_ctrl;

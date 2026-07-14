@@ -170,6 +170,14 @@ pub trait NativeCtx {
     fn to_sendable(&self, _val: VmValue) -> Result<SendValue, String> {
         Err("to_sendable not supported".to_string())
     }
+
+    fn parse_json(&mut self, _text: &str) -> Result<VmValue, String> {
+        Err("parse_json not supported in this context".to_string())
+    }
+
+    fn stringify_json(&mut self, _value: VmValue) -> Result<String, String> {
+        Err("stringify_json not supported in this context".to_string())
+    }
 }
 
 pub type NativeFnResult = Result<VmValue, String>;

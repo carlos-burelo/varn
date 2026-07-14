@@ -115,6 +115,12 @@ pub fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<VmValue> 
         .copied()
         .ok_or_else(|| RuntimeError::new("str intrinsic: missing receiver"))?;
 
+    if recv.is_heap() {
+        if let Some(HeapObj::Str(h)) = heap.get(recv.as_heap_idx()) {
+            h.is_ascii_cached();
+        }
+    }
+
     // Non-allocating ops: borrow the operands directly from the heap.
     let mut recv_buf = [0u8; 5];
     let mut needle_buf = [0u8; 5];

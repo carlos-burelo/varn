@@ -886,7 +886,7 @@ impl HeapInner {
         }
         // A substring of an ASCII string is ASCII; anything else is resolved
         // lazily on first query.
-        let flag = if handle.ascii_state() == ascii_flag::YES {
+        let flag = if handle.is_ascii_cached() {
             ascii_flag::YES
         } else {
             ascii_flag::UNKNOWN

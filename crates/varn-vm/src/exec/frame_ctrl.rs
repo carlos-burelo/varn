@@ -832,6 +832,14 @@ impl NativeCtx for ExecCtx {
             Err("Value cannot be sent to an isolate".to_string())
         }
     }
+
+    fn parse_json(&mut self, text: &str) -> Result<VmValue, String> {
+        self.json_parse(text)
+    }
+
+    fn stringify_json(&mut self, value: VmValue) -> Result<String, String> {
+        self.json_stringify(value)
+    }
 }
 
 impl ExecCtx {
