@@ -1,5 +1,12 @@
 # VARN REFACTOR PLAN — "Lo que TypeScript no puede ser"
 
+> **Nota de estado (2026-07-13).** Estas son notas de trabajo, no documentación
+> normativa. Las rutas que mencionan `crates/varn-compiler/` son de antes de la
+> migración: **ese crate ya no existe**. El compilador es `varn-opt` y los
+> post-passes viven en `varn-backend`. Para la arquitectura actual, ver
+> [ARCHITECTURE.md](../ARCHITECTURE.md) y
+> [COMPILER_ARCHITECTURE.md](../COMPILER_ARCHITECTURE.md).
+
 > **Objetivo central**: el type system de Varn debe tener efectos directos sobre el código generado —
 > no solo sobre el frontend de type checking. Código completamente tipado debe compilar sin
 > overhead polimórfico, sin capas de indirección, sin boxing innecesario.

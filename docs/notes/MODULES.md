@@ -1,5 +1,12 @@
 # Resumen Ejecutivo
 
+> **Nota de estado (2026-07-13).** Estas son notas de trabajo, no documentación
+> normativa. Las rutas que mencionan `crates/varn-compiler/` son de antes de la
+> migración: **ese crate ya no existe**. El compilador es `varn-opt` y los
+> post-passes viven en `varn-backend`. Para la arquitectura actual, ver
+> [ARCHITECTURE.md](../ARCHITECTURE.md) y
+> [COMPILER_ARCHITECTURE.md](../COMPILER_ARCHITECTURE.md).
+
 Este informe analiza cómo distintos lenguajes reales (Rust, Swift, Zig, V8/JavaScript, CPython, Java/HotSpot, .NET/CLR y Go) separan **tipos core**, **builtins/intrinsics** y **librerías estándar**, para proponer un diseño arquitectónico óptimo para Varn. Se estudian fuentes primarias (documentación oficial, RFCs, papers, blogs de expertos) y se extraen patrones comunes. A partir de este estudio se proponen decisiones de diseño claras: qué funcionalidades se implementan a nivel de *Core Type* (mapeadas a tipos primitivos del lenguaje), a nivel de *Contrato/Intrinsic* (operaciones primitivas o enlaces a funciones nativas), o en la *Stdlib* (biblioteca estándar). Se define un conjunto mínimo de *opcodes* e *IntrinsicId*, una ABI de runtime, llamadas nativas (`NativeCtx`), y hooks para el JIT. 
 
 Además, se presenta un plan de migración agresivo con pasos detallados (reorganización de crates, eliminación de duplicados, pruebas unitarias, benchmarks, estrategias de rollback), ilustrado con pseudo-código (ejemplos de *lowering* de AST → HIR → bytecode → VM/JIT). Se discuten métricas esperadas (reducción de llamadas nativas, número de asignaciones, hotspots) y micro-benchmarks para validar mejoras. Se incluyen tablas comparativas y diagramas (Mermaid) que describen la arquitectura propuesta, el flujo de compilación y la propiedad semántica entre componentes. Todas las afirmaciones técnicas se fundamentan en referencias oficiales y literatura especializada.

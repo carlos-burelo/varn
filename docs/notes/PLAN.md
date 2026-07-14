@@ -1,5 +1,12 @@
 # PLAN — `varn-opt`: the optimizing backend (AST → HIR → SSA → opt → bytecode)
 
+> **Nota de estado (2026-07-13).** Estas son notas de trabajo, no documentación
+> normativa. Las rutas que mencionan `crates/varn-compiler/` son de antes de la
+> migración: **ese crate ya no existe**. El compilador es `varn-opt` y los
+> post-passes viven en `varn-backend`. Para la arquitectura actual, ver
+> [ARCHITECTURE.md](../ARCHITECTURE.md) y
+> [COMPILER_ARCHITECTURE.md](../COMPILER_ARCHITECTURE.md).
+
 Living roadmap. **`varn-opt` is now the sole codegen backend** — the legacy
 direct AST→bytecode codegen has been deleted (Hito A, §4). What remains is to
 grow the SSA layer to full coverage and then land the optimization passes that
