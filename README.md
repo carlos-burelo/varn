@@ -374,7 +374,7 @@ assert("isolate reply", await port.receive() === 42)
 ```
 
 - `spawn` y `parallel` corren tareas Varn sobre el scheduler async.
-- `spawnIsolate` lanza un worker en otro hilo con paso de mensajes vía `IsolatePort`.
+- `spawnIsolate` lanza un worker en otro hilo (VM y heap propios); la comunicación es por canales tipados (`channel<T>` → `Sender`/`Receiver`).
 - Los isolates no comparten heap mutable; cruzan el boundary solo valores sendables.
 
 ### Decoradores
@@ -595,11 +595,13 @@ fuente .vn
     ├── varn-lexer      → tokens
     ├── varn-parser     → AST
     ├── varn-checker    → type checking + resolución de módulos
-    ├── varn-compiler   → bytecode (FunctionProto / Chunk)
-    └── varn-vm         → register-based VM, NaN-boxing, IC
+    ├── varn-opt        → HIR → SSA → passes → bytecode (FunctionProto)
+    ├── varn-backend    → liveness, register allocation, slot kinds
+    └── varn-vm         → VM register-based, NaN-boxing, GC generacional, IC
             │
+            ├── varn-jit        → JIT x86-64 (compilación eager)
             ├── varn-builtins   → stdlib nativa en Rust
-            └── varn-runtime    → scheduler async + runtime Tokio + isolates
+            └── varn-runtime    → scheduler async (Tokio) + isolates
 ```
 
 | Crate | Rol |
@@ -608,9 +610,12 @@ fuente .vn
 | `varn-lexer` | Tokenizer |
 | `varn-parser` | Parser → AST |
 | `varn-checker` | Type checker, resolución de módulos |
-| `varn-compiler` | Codegen → `FunctionProto` / bytecode |
-| `varn-vm` | VM register-based, NaN-boxing, Inline Cache |
-| `varn-types` | `VmValue`, `Chunk`, `FunctionProto`, `Value` |
+| `varn-opt` | **El compilador**: HIR → SSA → passes → bytecode |
+| `varn-backend` | Post-passes de bytecode: liveness, regalloc, slot kinds |
+| `varn-vm` | VM register-based, NaN-boxing, GC generacional, Inline Cache |
+| `varn-jit` | JIT x86-64 |
+| `varn-pipeline` | Orquesta las fases + caché de bytecode |
+| `varn-types` | `VmValue`, `Chunk`, `FunctionProto`, `ObjData`, `Shape` |
 | `varn-builtins` | Stdlib nativa |
 | `varn-modules` | Resolución de paquetes, manifests |
 | `varn-pm` | Package manager (add/install/update/remove) |
@@ -620,8 +625,11 @@ fuente .vn
 
 ### VM — características
 
-- **NaN-Boxing**: null, bool, int, float, puntero — todo en 64 bits, sin boxing
-- **Inline Cache**: property access y method dispatch cacheados por clase y slot
+- **NaN-Boxing**: null, bool, int (48 bits), float, strings de ≤5 bytes y punteros — todo en 64 bits, sin boxing
+- **GC generacional**: nursery con promoción al old-gen, más mark-and-sweep tricolor y write barrier
+- **Objetos en una sola allocation**: cabecera y campos comparten el bloque `Rc` (cola DST dimensionada a la shape)
+- **Inline Cache**: polimórfico, hasta 8 entradas por site, indexado por shape id y compartido con el JIT
+- **JIT x86-64**: compila eager al construir el closure; lo que no compila, se interpreta
 - **Fast-path calls**: rutas rápidas para closures y natives cuando el call-site lo permite
 - **Upvalues**: closures con captura correcta (open/closed)
 - **Async**: VM suspendible, `await` pausa el frame, runtime lo reanuda

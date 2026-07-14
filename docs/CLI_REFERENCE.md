@@ -236,3 +236,20 @@ Shells soportados: `bash`, `zsh`, `fish`, `power-shell`, `elvish`.
 
 - `vn help <subcomando>`: ayuda específica del subcomando.
 - `vn --help`: vista general del CLI.
+
+---
+
+## Variables de entorno
+
+| Variable | Efecto |
+|----------|--------|
+| `VARN_NO_JIT=1` | Apaga el JIT **por completo**: no compila (0 B de código máquina) y no entra a código compilado. Se propaga por construcción a isolates, generadores y a las VMs del bench. Es la herramienta para partir un fallo en "¿representación o codegen?" — corre la suite en los dos modos. |
+| `VN_OPT_TRACE=1` | Traza del compilador (`varn-opt`): módulos y funciones compiladas. |
+| `VARN_STD` | Ruta a la stdlib activa (`std.vnb` o árbol `std/`). Orden de resolución: `varn.json` → `VARN_STD` → `<exe>/std.vnb`. Ver [STDLIB_ARCHITECTURE.md](STDLIB_ARCHITECTURE.md). |
+| `VARN_HOME` | Directorio raíz de la toolchain (caché de paquetes, stdlib instalada). |
+| `VARN_LOCK_UPDATE=1` | Permite reescribir `varn.lock` durante la resolución de dependencias. |
+| `VARN_DEBUG_OPS=1` | Vuelca el registro de ops nativas (LBI) al arrancar. |
+
+Nota operativa: tras recompilar `vn`, hay que regenerar el bundle de la stdlib
+(`cargo xtask build-std` y copiar `target/std.vnb` junto al ejecutable) o `vn` aborta
+con *"std bundle was built by a different compiler build"*.

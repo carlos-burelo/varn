@@ -4,6 +4,8 @@ Descripción técnica de la implementación del lenguaje Varn, escrito completam
 
 ## 1. Pipeline de Compilación y Ejecución
 
+`varn-pipeline` orquesta las fases (son las que reporta `vn bench`):
+
 ```text
 Código Fuente (.vn)
       │
@@ -17,45 +19,81 @@ Código Fuente (.vn)
 [ varn-checker ]  → TypedAST + SemanticDB (inferencia, CFA, narrowing)
       │
       ▼
-[ varn-compiler ] → FunctionProto / Bytecode (Chunks)
+[ varn-opt ]      → HIR → SSA → passes → FunctionProto (bytecode)
       │
       ▼
-[ varn-vm ]       → VM register-based con NaN-Boxing
+[ varn-backend ]  → post-passes: liveness, register allocation, slot kinds
+      │
+      ├──────────────► [ varn-jit ]  → código máquina x86-64 (compilación eager)
+      ▼
+[ varn-vm ]       → VM register-based, NaN-boxing, GC generacional, inline caches
       │
       ▼
-[ varn-runtime ]  → Scheduler asíncrono, runtime Tokio multi-thread e isolates
+[ varn-runtime ]  → Scheduler async (Tokio + LocalSet) e isolates en hilos
 ```
+
+> No existe ningún crate `varn-compiler` ni `varn-ir`. La generación de bytecode
+> vive en `varn-opt`; los post-passes en `varn-backend`.
 
 ---
 
 ## 2. Crates y Responsabilidades
 
 ### Base
-- **`varn-core`**: AST, OpCode, ModuleId, Span, constantes. Sin dependencias internas.
-- **`varn-types`**: VmValue, Chunk, FunctionProto, ClassObj, Closure, ResourceStore. Tipos compartidos por VM y builtins.
-- **`varn-diagnostics`**: Reportes de errores con spans, subrayados, integración LSP.
+- **`varn-core`**: AST, OpCode (134, sin prefijo `Op`), ModuleId, Span, y las reglas
+  numéricas (`numeric.rs` — fuente única para const-folding, intérprete y JIT). Sin
+  dependencias internas.
+- **`varn-types`**: `VmValue`, `Chunk`, `FunctionProto`, `ClassObj`, `Closure`,
+  `ObjData`/`ObjRef`, `Shape`, `ResourceStore`. Tipos compartidos por VM y builtins.
+- **`varn-base`** / **`varn-utilities`**: utilidades compartidas (la segunda incluye
+  el formato de terminal y colores).
+- **`varn-diagnostics`**: errores con spans y subrayados; formato CLI y LSP.
 
 ### Frontend
-- **`varn-lexer`**: Tokenizer. UTF-8, escape sequences, ASI (Automatic Semicolon Insertion).
-- **`varn-parser`**: Parser Recursive-Descent + Pratt para precedencia de operadores. Incluye `|>`, ternarios, named arguments.
-- **`varn-checker`**: Type checker multi-fase. Hoisting, inferencia, CFA, narrowing, resolución de módulos.
+- **`varn-lexer`**: Tokenizer. UTF-8, escapes, ASI (Automatic Semicolon Insertion).
+- **`varn-parser`**: Recursive-Descent + Pratt para precedencia. `|>`, ternarios,
+  argumentos nombrados.
+- **`varn-checker`**: Type checker multi-fase. Hoisting, inferencia, CFA, narrowing,
+  resolución de módulos. Produce TypedAST + SemanticDB.
 
-### Backend
-- **`varn-compiler`**: Lowering de AST a bytecode. Slots estáticos, upvalues, constant pool, back-patching.
-- **`varn-vm`**: VM register-based con NaN-boxing, Inline Cache, fast-path calls, upvalues open/closed.
-- **`varn-runtime`**: scheduler async sobre runtime Tokio multi-thread. Ejecuta tareas `!Send` en `LocalSet` y isolates en hilos separados con paso de mensajes.
+### Compilación
+- **`varn-opt`**: **el compilador**. TypedAST → HIR → inlining → SSA → passes
+  (`tco`, `const_fold`, `fixed_fields`, `dce`, `cfg`, en bucle de punto fijo) →
+  bytecode. Ver [COMPILER_ARCHITECTURE.md](COMPILER_ARCHITECTURE.md).
+- **`varn-backend`**: post-passes sobre el bytecode ya emitido — `liveness`,
+  `regalloc_post`, `slot_kinds` (este último alimenta el `register_meta` del que
+  depende el JIT).
+
+### Ejecución
+- **`varn-vm`**: VM register-based con NaN-boxing, heap con **GC generacional**
+  (nursery + promoción) y mark-and-sweep en old-gen, inline caches polimórficos de 8
+  entradas, upvalues open/closed. Ver [VM_ARCHITECTURE.md](VM_ARCHITECTURE.md).
+- **`varn-jit`**: JIT x86-64. Ensamblador propio, register allocation, hoisting de
+  loops, safepoints. Compila **eager** al construir el closure (sin umbral de calor);
+  si declina una función, esa función se interpreta. Los layouts de memoria que emite
+  se **prueban al arrancar**, no se hardcodean.
+- **`varn-runtime`**: scheduler async sobre Tokio multi-thread. Las tareas Varn
+  `!Send` corren en un `LocalSet`; los isolates son hilos con su propia VM y se
+  comunican por canales de mensajes sendables.
 
 ### Stdlib y Host
-- **`varn-builtins`**: Implementaciones nativas (Rust) de stdlib. Usa LBI (Linker-Bound Interface) para autodescubrimiento. Ver [LBI_ARCHITECTURE.md](LBI_ARCHITECTURE.md).
-- **`varn-op-macros`**: Proc macros `#[varn_module]`, `#[varn_fn]`, `#[varn_class]`, etc. para registrar ops nativas.
-- **`varn-modules`**: Registro canónico de módulos, resolución topológica, caché de bytecode.
-- **`varn-base`**: Utilidades compartidas.
+- **`varn-builtins`**: implementaciones nativas (Rust) de `core:`/`runtime:`/globals.
+  Usa LBI (Linker-Bound Interface) para autodescubrimiento. Ver
+  [LBI_ARCHITECTURE.md](LBI_ARCHITECTURE.md).
+- **`varn-op-macros`**: proc macros `#[varn_module]`, `#[varn_fn]`, `#[varn_class]`, …
+- **`varn-modules`**: registro canónico de módulos, resolución topológica, bundle
+  `.vnb` y resolución de la std activa.
 
 ### Herramientas
-- **`varn-cli`**: Binario `vn`. Orquesta el pipeline completo. Comandos: `run`, `check`, `eval`, `repl`, `bench`, `debug`, `build`, `pkg`, `init`, `doctor`, `lsp`, `completions`.
-- **`varn-lsp`**: Language Server Protocol (tower-lsp + tokio). Consulta SemanticDB del checker. Hover, completions, go-to-definition.
-- **`varn-pm`**: Package manager. Resolución semver sobre git tags, caché global `~/.vn/cache/`, SHA256 integrity.
-- **`varn-debug`**: Profiling, bytecode, inspección de fases.
+- **`varn-pipeline`**: orquesta las fases (read, lex, parse, check, compile, optimize,
+  execute), caché de bytecode, carga de la stdlib.
+- **`varn-cli`**: binario `vn`. Comandos: `run`, `check`, `eval`, `repl`, `bench`,
+  `debug`, `build`, `pkg`, `init`, `doctor`, `cache`, `lsp`, `completions`.
+- **`varn-lsp`**: LSP (tower-lsp + tokio). Consulta la SemanticDB del checker.
+- **`varn-pm`**: package manager. Semver sobre tags git, caché `~/.vn/cache/`, SHA256.
+- **`varn-debug`**: volcado de fases (tokens, ast, hir, ssa, bytecode, types, …) y
+  profiling.
+- **`xtask`**: tooling del repo. `cargo xtask build-std` compila `std/` a `std.vnb`.
 
 ---
 
@@ -85,11 +123,19 @@ Todos los valores caben en 64 bits aprovechando el espacio de Quiet NaN del IEEE
 | `null`     | QNAN + TAG_NULL                                 |
 | `false`    | QNAN + TAG_FALSE                                |
 | `true`     | QNAN + TAG_TRUE                                 |
-| `int`      | QNAN + TAG_INT + payload 32 bits                |
+| `int`      | QNAN + TAG_INT + payload **48 bits** (wrap a 48) |
 | puntero    | SIGN + QNAN + TAG_PTR + heap index 32 bits      |
 
-### Heap y Free List
-Objetos complejos (strings, arrays, closures, clases) viven en el heap. El heap usa un **Free List** (`free: Vec<u32>`) para reusar slots sin llamar al sistema operativo en cada alloc.
+### Heap y GC
+Objetos complejos (strings, arrays, objetos, closures, clases) viven en el heap, que es
+**generacional**: los objetos nacen en un nursery de 4096 slots y el GC menor promueve
+los vivos al old-gen, donde corre un mark-and-sweep tricolor sobre un `Vec<Option<HeapObj>>`
+con free list. Escribir una referencia a nursery dentro de un objeto de old-gen requiere
+**write barrier** (remembered set).
+
+Un objeto es **una sola allocation**: cabecera y campos comparten el mismo bloque `Rc`
+(cola DST dimensionada a la shape). La dirección de esa allocation *es* la identidad del
+objeto, así que nunca se mueve.
 
 ### CallFrames
 Las variables locales son offsets numéricos sobre el registro base del frame actual (`registers[base + slot]`). Acceso O(1) sin hashmaps.
@@ -98,13 +144,16 @@ Las variables locales son offsets numéricos sobre el registro base del frame ac
 Variables capturadas por closures. **Abiertas**: índice en registros del frame padre. **Cerradas**: copiadas al heap cuando el frame padre termina.
 
 ### Inline Cache
-`GetProp`/`SetProp` y llamadas a métodos se cachean por clase y slot. Las tasas de hit y el peso de fast-path dependen del workload; ya no se documentan como una cifra global única.
+Cada IC site guarda hasta **8 entradas** (polimórfico) indexadas por **shape id**, no por
+"class_id". Un site que ve demasiadas shapes se marca megamórfico y deja de cachear.
+Intérprete y JIT comparten el mismo IC. Las tasas de hit dependen del workload: medir con
+`vn bench -v`, no citar cifras.
 
 ---
 
 ## 5. Runtime Asíncrono
 
-`varn-runtime` usa un runtime Tokio multi-thread compartido, pero cada VM/closure `!Send` se ejecuta en un `tokio::task::LocalSet`. Para paralelismo entre hilos, Varn expone isolates que cruzan mensajes sendables por `IsolatePort`.
+`varn-runtime` usa un runtime Tokio multi-thread compartido, pero cada VM/closure `!Send` se ejecuta en un `tokio::task::LocalSet`. Para paralelismo entre hilos, Varn expone **isolates**: cada uno es un hilo con su propia VM y su propio heap, y se comunican por **canales tipados** (`channel<T>(n)` → `Sender`/`Receiver`). Los valores cruzan como `SendValue` (representación independiente del heap); los compuestos van envueltos en un `SendEnvelope` y se materializan en el heap del receptor.
 
 - **`await`**: La VM emite `Suspend::Task`. El scheduler cede al Tokio event-loop hasta que la promesa se resuelve.
 - **`spawn`**: Crea una nueva tarea en el LocalSet.

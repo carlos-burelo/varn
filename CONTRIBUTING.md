@@ -32,22 +32,29 @@ cargo run --bin vn -- tests/main.vn   # suite completa
 
 ```
 crates/
-├── varn-core        # AST, OpCode, ModuleId — sin dependencias internas
+├── varn-core        # AST, OpCode (134), ModuleId, reglas numéricas — sin deps internas
 ├── varn-lexer       # Tokenizer
 ├── varn-parser      # Parser → AST
-├── varn-checker     # Type checker + resolución de módulos
-├── varn-compiler    # Codegen → FunctionProto / bytecode
-├── varn-vm          # VM register-based
-├── varn-types       # Tipos compartidos: VmValue, Chunk, FunctionProto, Value
-├── varn-builtins    # Stdlib nativa en Rust (str, array, math, fs, http…)
-├── varn-modules     # Resolución de paquetes y manifests
+├── varn-checker     # Type checker + resolución de módulos → TypedAST + SemanticDB
+├── varn-opt         # EL COMPILADOR: HIR → SSA → passes → bytecode (FunctionProto)
+├── varn-backend     # Post-passes de bytecode: liveness, regalloc, slot_kinds
+├── varn-vm          # VM register-based, NaN-boxing, GC generacional, inline caches
+├── varn-jit         # JIT x86-64 (compilación eager)
+├── varn-types       # Tipos compartidos: VmValue, Chunk, FunctionProto, ObjData, Shape
+├── varn-builtins    # Host nativo en Rust (core:/runtime:/globals)
+├── varn-modules     # Resolución de módulos, bundle .vnb de la stdlib
 ├── varn-pm          # Package manager (add/install/update/remove)
 ├── varn-op-macros   # Proc macros para bindings nativos
-├── varn-cli         # Binario `vn`, pipeline completo
-├── varn-debug       # Inspección de fases, profiling, bytecode
+├── varn-pipeline    # Orquesta las fases + caché de bytecode
+├── varn-cli         # Binario `vn`
+├── varn-debug       # Inspección de fases (tokens, ast, hir, ssa, bytecode…), profiling
+├── varn-lsp         # Language server
 ├── varn-diagnostics # Reporte de errores
-├── varn-runtime     # Async runtime
+├── varn-runtime     # Runtime async (Tokio) + isolates
+├── varn-utilities   # Terminal, colores
 └── varn-base        # Utilidades base
+
+No existe ningún crate `varn-compiler` ni `varn-ir`.
 ```
 
 La jerarquía de dependencias es estricta: `varn-core` no depende de ningún crate interno. Los crates de más alto nivel (`varn-cli`, `varn-vm`) dependen de los de más bajo nivel, nunca al revés.

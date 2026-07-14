@@ -156,5 +156,5 @@ Instalar: `vn pkg install`
 
 1. [WARP-SPEC.md](WARP-SPEC.md) — referencia del lenguaje
 2. [ARCHITECTURE.md](ARCHITECTURE.md) — arquitectura interna
-3. [LBI_ARCHITECTURE.md](LBI_ARCHITECTURE.md) — sistema de bindings nativos
-4. [ROADMAP.md](ROADMAP.md) — hoja de ruta
+3. [CLI_REFERENCE.md](CLI_REFERENCE.md) — comandos y variables de entorno
+4. [LBI_ARCHITECTURE.md](LBI_ARCHITECTURE.md) — sistema de bindings nativos

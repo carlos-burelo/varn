@@ -6,12 +6,12 @@ Cada fase del pipeline vive en su propio crate. La jerarquía de dependencias es
 
 ```mermaid
 graph TD
-    SourceText["Código Fuente (.vn)"] --> Parser
+    SourceText["Código Fuente (.vn)"] --> Lexer
 
     subgraph Frontend
-        Lexer["varn-lexer (Tokenizer)"]
+        Lexer["varn-lexer (Tokens)"]
         Parser["varn-parser (AST)"]
-        Core["varn-core (AST nodes, OpCode)"]
+        Core["varn-core (AST, OpCode, numeric)"]
         Lexer --> Parser
         Parser -.usa.-> Core
     end
@@ -23,33 +23,39 @@ graph TD
 
     Parser -- AST --> Checker
 
-    subgraph Backend["Compilación"]
-        Compiler["varn-compiler (bytecode, FunctionProto)"]
-        Types["varn-types (VmValue, Chunk, ClassObj)"]
-        Compiler -.usa.-> Types
+    subgraph Compilacion["Compilación"]
+        Opt["varn-opt (HIR → SSA → passes → bytecode)"]
+        BackEnd["varn-backend (liveness, regalloc, slot_kinds)"]
+        Types["varn-types (VmValue, Chunk, ObjData, Shape)"]
+        Opt --> BackEnd
+        Opt -.usa.-> Types
     end
 
-    Checker -- TypedAST --> Compiler
+    Checker -- TypedAST + anotaciones --> Opt
 
     subgraph Execution["Ejecución"]
-        VM["varn-vm (register-based, NaN-boxing, IC)"]
-        Runtime["varn-runtime (Tokio multi-thread + LocalSet + isolates)"]
-        Builtins["varn-builtins (stdlib nativa Rust, LBI)"]
+        VM["varn-vm (register-based, NaN-boxing, GC generacional, IC)"]
+        Jit["varn-jit (x86-64, compilación eager)"]
+        Runtime["varn-runtime (Tokio + LocalSet + isolates)"]
+        Builtins["varn-builtins (host nativo, LBI)"]
+        VM <--> Jit
         Runtime --> VM
         VM -.usa.-> Types
         VM -.usa.-> Builtins
     end
 
-    Compiler -- FunctionProto --> Runtime
+    BackEnd -- FunctionProto --> VM
 
     subgraph Tools["Herramientas"]
+        Pipeline["varn-pipeline (orquesta fases + caché)"]
         CLI["varn-cli (binario vn)"]
-        LSP["varn-lsp (IDE integration)"]
-        PM["varn-pm (package manager)"]
-        Debug["varn-debug (profiling, disasm)"]
+        LSP["varn-lsp"]
+        PM["varn-pm"]
+        Debug["varn-debug (volcado de fases)"]
     end
 
-    CLI --> Runtime
+    CLI --> Pipeline
+    Pipeline --> Runtime
     LSP --> Checker
 ```
 
@@ -70,14 +76,45 @@ Type checker multi-fase: hoisting, inferencia, CFA, narrowing. Produce TypedAST 
 ### `varn-types`
 Tipos compartidos por VM y builtins: `VmValue`, `Chunk`, `FunctionProto`, `ClassObj`, `Closure`, `ResourceStore`, `NativeCtx`.
 
-### `varn-compiler`
-Lowering de AST a bytecode. Slots estáticos, upvalues, constant pool, back-patching, peephole optimizations.
+### `varn-opt`
+**El compilador.** TypedAST + anotaciones → HIR → inlining → SSA → passes en bucle de
+punto fijo (`tco`, `const_fold`, `fixed_fields`, `dce`, `cfg`) → bytecode
+(`FunctionProto`). Slots estáticos, upvalues, constant pool, back-patching.
+Traza: `VN_OPT_TRACE=1`. Ver [COMPILER_ARCHITECTURE.md](COMPILER_ARCHITECTURE.md).
+
+> No existe ningún crate `varn-compiler` ni `varn-ir`. Este documento los listó hasta
+> 2026-07-13.
+
+### `varn-backend`
+Post-passes sobre el bytecode ya emitido: `liveness`, `regalloc_post` (asignación de
+registros) y `slot_kinds` (infiere el tipo de cada slot). `slot_kinds` alimenta el
+`register_meta` del que depende el JIT para saber qué registros puede mantener sin
+flush — desincronizarlos corrompe el código generado en silencio.
 
 ### `varn-vm`
-VM register-based con NaN-boxing. Inline Cache (GetProp/SetProp por clase+slot), fast-path calls (~60%), upvalues open/closed.
+VM register-based con NaN-boxing (`int` = 48 bits, SSO ≤ 5 bytes). Heap con **GC
+generacional** (nursery de 4096 slots + promoción) y mark-and-sweep tricolor en old-gen.
+Inline caches **polimórficos de 8 entradas** por shape id, compartidos con el JIT.
+Upvalues open/closed. Objetos en **una sola allocation** (cola DST). `ExecSettings` se
+pasa por constructor — nada de defaults silenciosos. Ver
+[VM_ARCHITECTURE.md](VM_ARCHITECTURE.md).
+
+### `varn-jit`
+JIT x86-64: ensamblador propio, register allocation, hoisting de loops, safepoints.
+Compila **eager** al construir el closure (no hay umbral de calor); si declina una
+función, esa función se interpreta — el intérprete es el tier base, no legacy.
+Los offsets de memoria que emite se **prueban al arrancar** (`jit_object_layout`,
+`jit_array_layout`), no se hardcodean. `VARN_NO_JIT=1` lo apaga por completo (ni compila).
+
+### `varn-pipeline`
+Orquesta las fases que reporta `vn bench` (read, lex, parse, check, compile, optimize,
+execute), la caché de bytecode y la carga de la stdlib.
+
+### `varn-utilities`
+Formato de terminal, colores, helpers de salida del CLI.
 
 ### `varn-runtime`
-Scheduler async sobre runtime Tokio multi-thread. Las tareas Varn `!Send` viven en `LocalSet`; `spawnIsolate` levanta workers en hilos separados y se comunica por `IsolatePort`.
+Scheduler async sobre runtime Tokio multi-thread. Las tareas Varn `!Send` viven en un `LocalSet`; `spawnIsolate` levanta un worker en otro hilo, con su propia VM y su propio heap. La comunicación es por **canales tipados** (`channel<T>`, `Sender`/`Receiver`), y los valores cruzan como `SendValue` / `SendEnvelope`.
 
 ### `varn-builtins`
 Implementaciones nativas de `core:`/`runtime:`/globals (host boundary). LBI: `#[varn_module]` + `#[varn_fn]`/`#[varn_class]` inyectan `NativeOpEntry` en secciones del linker. `build_module()` ensambla el objeto Varn en startup. Ya **no** embebe fuentes `std:*` — esas viven en el árbol top-level `std/` (ver [STDLIB_ARCHITECTURE.md](STDLIB_ARCHITECTURE.md)); `build.rs` rechaza cualquier `module.json` con `"kind": "stdlib"`.

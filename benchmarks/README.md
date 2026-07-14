@@ -1,27 +1,57 @@
 # Benchmarks
 
-Standalone `.vn` micro-benchmarks and their JavaScript counterparts
-(`.ts`/`.js`) for paired comparison against Node.
-
-Run one with the CLI's timing harness:
-
-```
-vn bench benchmarks/bench_fib.vn
-```
-
-Or run and compare against the JS baseline manually:
+Micro-benchmarks `.vn` con su contraparte TypeScript (`.ts`) para comparación
+pareada. La referencia es **Bun** (JavaScriptCore), no Node: los `.ts` se corren
+directamente sin transpilar.
 
 ```
-vn run benchmarks/bench_fib.vn
-node benchmarks/bench_fib.ts   # if a paired baseline exists
+vn bench benchmarks/bench_fib.vn        # arnés de medición del CLI
+vn bench benchmarks/bench_fib.vn -v     # + IC, GC, JIT, hotspots de opcodes
 ```
 
-## Measurement discipline
+Comparación pareada:
 
-The machine throttles ~2x under sustained load (a `cargo build` heats it),
-so only same-moment paired runs are comparable. Take a cold reading first
-as a thermal canary before trusting absolute numbers, and always run the
-Varn and Node sides back-to-back.
+```
+vn run  benchmarks/bench_fib.vn
+bun run benchmarks/bench_fib.ts
+```
 
-The broad correctness + timing suite lives in `tests/main.vn`
-(`vn bench tests/main.vn`), not here.
+---
+
+## Disciplina de medición
+
+**Primero la salida, después el tiempo.** Un benchmark que imprime un resultado
+distinto al de su par `.ts` no está midiendo el mismo trabajo, y su número es
+basura. Ya pasó: durante semanas `bench_dto` construía 664 DTOs en vez de 43 332
+y por eso "ganaba". Antes de citar un tiempo, comprobar que `vn` y `bun` imprimen
+lo mismo.
+
+**Ojo con el escape analysis de Bun.** JavaScriptCore elimina por completo las
+allocations que no escapan del bucle. Un micro que hace `new Obj(...)` y solo
+suma un campo puede reportar ~0.07 ms en Bun: no es que sea rápido asignando, es
+que **no asignó nada**. Para medir allocation de verdad, los objetos tienen que
+escapar (guardarlos en un array que siga vivo). Si el número de Bun parece
+imposible, lo es.
+
+**Térmica.** La máquina baja ~2x bajo carga sostenida (un `cargo build` la
+calienta). Solo son comparables las corridas pareadas en el mismo momento. Tomar
+una lectura en frío como canario antes de confiar en números absolutos.
+
+**No copiar números históricos.** Medir de nuevo. Ver `<performance_rules>` en
+`CLAUDE.md`.
+
+---
+
+## Intérprete vs JIT
+
+```
+VARN_NO_JIT=1 vn bench benchmarks/bench_fib.vn -v
+```
+
+Apaga el JIT por completo (0 funciones compiladas, 0 B de código máquina). Sirve
+para saber cuánto del tiempo es codegen y cuánto es representación.
+
+---
+
+La suite amplia de correctitud + timing vive en `tests/main.vn`
+(`vn bench tests/main.vn`), no aquí.

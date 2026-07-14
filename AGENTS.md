@@ -33,35 +33,46 @@ Consultar primero:
 
 Según el dominio:
 
-CLI
+CLI y orquestación del pipeline
 
-* crates/varn-cli
+* crates/varn-cli (binario `vn`)
+* crates/varn-pipeline (fases: read, lex, parse, check, compile, optimize, execute)
 * docs/CLI_REFERENCE.md
 
-Parser
+Lexer y Parser
 
+* crates/varn-lexer
 * crates/varn-parser
 
 Checker
 
 * crates/varn-checker
 
-Compiler
+Compilador (AST → HIR → SSA → bytecode)
 
-* crates/varn-compiler
+* crates/varn-opt
 * docs/COMPILER_ARCHITECTURE.md
 
-VM
+Backend de bytecode (liveness, register allocation, post-passes)
+
+* crates/varn-backend
+
+JIT (x86-64)
+
+* crates/varn-jit
+* docs/VM_ARCHITECTURE.md
+
+VM (intérprete, heap, GC generacional, inline caches)
 
 * crates/varn-vm
 * docs/VM_ARCHITECTURE.md
 
-Runtime
+Runtime asíncrono e isolates
 
 * crates/varn-runtime
 * docs/RUNTIME_ARCHITECTURE.md
 
-Builtins
+Builtins nativos
 
 * crates/varn-builtins
 * docs/LBI_ARCHITECTURE.md
@@ -69,6 +80,15 @@ Builtins
 Host boundary
 
 * docs/HOST_BOUNDARY_SPEC.md
+
+Stdlib (`std/*.vn`, bundle `.vnb`)
+
+* std/
+* crates/varn-modules
+* docs/STDLIB_ARCHITECTURE.md
+
+NOTA: no existe ningún crate `varn-compiler` ni `varn-ir`. La generación de bytecode
+vive en `varn-opt`; los post-passes en `varn-backend`.
 
 </workspace_map>
 
@@ -243,8 +263,9 @@ Evitar:
 Cambios de parser/checker/compiler/vm:
 
 * Validar contra tests/main.vn. Nota: `cargo test` no es un indicador de correctitud absoluta ni la verdad definitiva de estabilidad. Las pruebas reales de estabilidad del sistema que cubren ~95% de las features son:
-  1. `cargo run --release --bin vn -- bench .\tests\main.vn -v`
-  2. `cargo run --release --bin vn -- run .\tests\main.vn`
+  1. `cargo run --release --bin vn -- bench ./tests/main.vn -v`
+  2. `cargo run --release --bin vn -- run ./tests/main.vn`
+* Validar también con `VARN_NO_JIT=1` para cubrir intérprete y JIT por separado (el flag ya se propaga a isolates, generadores y bench).
 
 Cambios de CLI:
 

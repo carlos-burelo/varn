@@ -1,143 +1,227 @@
-# Arquitectura de la VM (varn-vm)
+# Arquitectura de la VM (`varn-vm`)
 
-Implementación de la máquina virtual register-based de Varn.
+VM register-based con NaN-boxing, GC generacional e inline caches, más un JIT
+x86-64 (`varn-jit`) que comparte con el intérprete los mismos caches y el mismo
+heap.
 
-## 1. VmValue y NaN-Boxing
+El intérprete **no** es una ruta legacy: es el tier base. Cualquier función que el
+JIT declina compilar corre ahí, y en una corrida típica de `tests/main.vn`
+alrededor del 6% de las entradas a función se interpretan aun con el JIT activo.
 
-Todos los valores caben en 64 bits reutilizando el espacio de Quiet NaN del estándar IEEE 754.
+---
 
-### Esquema de bits
+## 1. `VmValue` y NaN-boxing
 
-| Tipo       | Sign | Exponente | Payload (52 bits)                         |
-|------------|------|-----------|-------------------------------------------|
-| `float`    | ±    | IEEE 754  | Valor fraccionario (cualquier patrón no-QNAN) |
-| `null`     | 0    | `111...1` | `TAG_NULL` (`0x0001_0000_0000_0000`)       |
-| `false`    | 0    | `111...1` | `TAG_FALSE` (`0x0002_0000_0000_0000`)      |
-| `true`     | 0    | `111...1` | `TAG_TRUE` (`0x0003_0000_0000_0000`)       |
-| `int`      | 0    | `111...1` | `TAG_INT` + payload 48 bits                |
-| puntero    | **1**| `111...1` | `TAG_PTR` + heap index 32 bits             |
+Todo valor cabe en 64 bits reutilizando el espacio de Quiet NaN de IEEE 754.
 
-El bit de signo encendido reserva los punteros fuera del espacio de Signalling NaN.
+| Tipo     | Sign  | Exponente | Payload                                  |
+|----------|-------|-----------|------------------------------------------|
+| `float`  | ±     | IEEE 754  | Valor real (cualquier patrón no-QNAN)    |
+| `null`   | 0     | `111...1` | `TAG_NULL`                               |
+| `false`  | 0     | `111...1` | `TAG_FALSE`                              |
+| `true`   | 0     | `111...1` | `TAG_TRUE`                               |
+| `int`    | 0     | `111...1` | `TAG_INT` + payload de **48 bits**       |
+| SSO      | 0     | `111...1` | string de **≤ 5 bytes** inline           |
+| puntero  | **1** | `111...1` | `TAG_PTR` + índice de heap de 32 bits    |
+
+El bit de signo encendido mantiene los punteros fuera del espacio de Signalling NaN.
+
+Los punteros guardan un **índice de heap**, no una dirección: el bit 31 distingue
+nursery (0) de old-gen (1), de modo que el GC puede promover un objeto entre
+generaciones sin reescribir todos los `VmValue` que lo referencian.
 
 ### Semántica de enteros
 
-Fuente única de las reglas: `varn-core/src/numeric.rs`. Todos los tiers
+Fuente única de las reglas: `crates/varn-core/src/numeric.rs`. Los tres tiers
 (const-folding en compile time, intérprete y JIT) deben ser bit-idénticos.
 
-- `int` es un entero de **48 bits** en complemento a dos (el payload del
-  NaN-box). Rango: `±140_737_488_355_327` (`±2^47 - 1`).
-- La aritmética entera (`+`, `-`, `*`, `**`) **envuelve (wrap) a 48 bits**.
-  No hay promoción silenciosa a `float` en overflow: el tipo estático `int`
-  es honesto y los fast paths tipados del JIT no necesitan guards de
-  overflow.
-- `int / int` produce **siempre `float`** (incluso si la división es
-  exacta). El híbrido histórico "exacto → int, inexacto → float" hacía que
-  el tipo del valor dependiera de los valores en runtime.
-- `int % int` produce `int` (resto truncado). Divisor cero: error de
-  runtime, igual que `int / 0`.
-- `int ** int` produce `int` (con wrap). Exponente negativo: error de
-  runtime (`negative exponent in integer power`).
-
-### Tipos en heap
-`HeapObj` aloja lo que no cabe en 64 bits:
-- `Str(RuntimeString)` — string interned o owned
-- `Array(RuntimeArray)`
-- `Object(RuntimeObject)`
-- `Closure(Rc<Closure>)`
-- `NativeFn(name, NativeFn)`
-- `Class(Rc<ClassObj>)`
-- `Generator`, `Task`, `Map`, `Set`, `Decimal`, `Range`, etc.
+- `int` es de **48 bits** en complemento a dos. Rango `±2^47 - 1`.
+- La aritmética entera (`+`, `-`, `*`, `**`) **envuelve a 48 bits**. No hay
+  promoción silenciosa a `float` en overflow, así que los fast paths tipados del
+  JIT no necesitan guards.
+- `int / int` produce **siempre `float`**, incluso si la división es exacta. El
+  híbrido histórico (exacto → `int`, inexacto → `float`) hacía que el tipo del
+  valor dependiera de los valores en runtime.
+- `int % int` produce `int` (resto truncado). Divisor cero: error de runtime.
+- `int ** int` produce `int` (con wrap). Exponente negativo: error de runtime.
 
 ---
 
-## 2. Heap y Free List
+## 2. Heap
 
-El heap es un `Vec<Option<HeapObj>>` con un `Vec<u32>` de slots libres.
+`HeapObj` (`crates/varn-vm/src/heap.rs`) aloja lo que no cabe en 64 bits:
+`Str`, `Array`, `Object`, `Module`, `FrozenModule`, `VmClosure`, `Class`,
+`NativeFn`, `BoundMethod`, `Map`, `Set`, `Task`, `TaskHandle`, `Range`, `Symbol`,
+`EnumVariant`, `BigInt`, `Int64`, `Decimal`, `Char`, `Generator`, `AsyncQueue`,
+`Spread`, `VmValue`.
 
-- **Alloc**: `free.pop()` reutiliza slot existente; si vacío, `push` al final.
-- **Free**: slot devuelto a `free`. Sin GC mark-and-sweep. Gestión determinista por `Rc<RefCell<T>>`.
+### Objetos: una sola allocation
 
----
+Un objeto es un `Rc<ObjData>` donde `ObjData` es un DST `#[repr(C)]`: la cabecera
+(shape, longitud inline, overflow) y los campos comparten **la misma allocation**,
+con los campos como cola `[Cell<VmValue>]` dimensionada a la shape con la que se
+construyó el objeto (modelo de in-object slots de V8).
 
-## 3. VM Register-Based
+- Instancias de clase y object literals conocen su número de campos al construirse
+  → **1 malloc**.
+- Los campos añadidos *después* no pueden extender la cola y caen en un **overflow
+  store** lazy. La allocation **nunca se mueve**: la identidad de un objeto (`===`,
+  clave de `Map`/`Set`) *es* la dirección de su `Rc`, así que realocarlo rompería en
+  silencio la igualdad consigo mismo, las claves de `Map` y los clones retenidos
+  dentro de payloads de enum.
+- No hay `RefCell` en el camino de objeto: `VmValue` es `Copy`, así que la cola es
+  de `Cell` y la mutación va sobre `&self`.
 
-La VM es register-based, no stack-based. Las variables locales son registros en un frame de registros plano.
+### Strings
 
-### Registros y frames
-Cada `CallFrame` contiene:
-- `ip`: instruction pointer (índice local en el chunk del closure)
-- `base`: offset en el array global de registros donde empiezan los registros locales de este frame
-- `closure`: puntero `Rc<Closure>` al código y upvalues
+`HeapStr` tiene tres formas:
 
-Variable local en slot `k` → `registers[frame.base + k]`. Acceso O(1).
+- `Shared(Rc<str>)` — string inmutable.
+- `Ext { buf, len }` — buffer extensible; una acumulación `s = s + x` sobre la punta
+  del buffer hace append en O(1) amortizado. Se siembra cuando el operando izquierdo
+  tiene ≥ 16 bytes (`EXT_SEED_LEN`).
+- `Slice { src, off, len }` — vista zero-copy sobre un buffer inmutable.
 
-### Registros vs stack
-Las instrucciones operan sobre slots explícitos (`OpLoad r0, r1`, `OpAdd dst, r0, r1`), no sobre un stack implícito. Elimina push/pop redundantes.
-
----
-
-## 4. Upvalues (Closures)
-
-Variables capturadas por funciones internas:
-
-1. **Abierto**: mientras el frame padre está vivo, el upvalue apunta al slot en los registros del padre. Lecturas/escrituras se reflejan en tiempo real.
-2. **Cerrado**: cuando el frame padre termina, `OpCloseUpvalue` copia el valor del registro al heap. La closure retiene el valor indefinidamente.
-
----
-
-## 5. Inline Cache
-
-`GetProp` y `SetProp` se optimizan por clase + slot:
-
-- Primera vez: lookup en la shape del objeto. Guarda `(class_id, slot_index)` en el IC del opcode.
-- Siguiente vez con mismo objeto de misma clase: acceso directo por slot, sin hash lookup.
-
-La eficacia del IC depende del workload. En algunos programas pequeños el perfil puede mostrar `0` hits simplemente porque casi no hay sites calientes; en workloads orientados a objetos el beneficio aparece en steady state.
+Los strings de ≤ 5 bytes no llegan al heap: viven inline en el `VmValue` (SSO). Esa
+es la razón de que `"User_" + i` **no** active el fast path de acumulación —
+`"User_"` son exactamente 5 bytes, o sea SSO, no `Ext`. Ese concat va por el camino
+genérico, que construye el resultado en un buffer de pila
+(`crates/varn-vm/src/strbuf.rs`) y formatea enteros con un `itoa` propio en lugar de
+`core::fmt`.
 
 ---
 
-## 6. Fast-Path Calls
+## 3. GC: generacional + mark-and-sweep
 
-`OpCall` tiene tres rutas:
+**Hay GC.** Este documento afirmó durante meses lo contrario ("sin GC, gestión
+determinista por `Rc<RefCell<T>>`"); era falso.
 
-1. **VM fast-path** (~60%): closure sencillo sin generators, sin rest params complejos. Salta directo al frame hijo sin preparación completa.
-2. **Native fast-path** (~38%): `NativeFn` — llama el puntero Rust directamente.
-3. **Slow path** (~2%): generators, async, bound methods complejos.
+### Nursery (`crates/varn-vm/src/nursery.rs`)
 
----
+- `NURSERY_CAPACITY = 4096` slots; se considera lleno a 3/4.
+- Los objetos nacen aquí. El GC menor **evacúa** los vivos al old-gen (promoción) y
+  deja una tabla de forwarding para reparar los índices.
+- **Write barrier**: escribir una referencia a nursery dentro de un objeto de old-gen
+  lo anota en un remembered set; sin eso el GC menor no vería esa arista.
 
-## 7. Excepciones y Try/Catch
+### Old-gen (`crates/varn-vm/src/gc.rs`)
 
-La VM rastrea bloques try sin desenrollar el stack nativo de Rust. Guarda `(frame_depth, register_depth, catch_ip)` en un `TryHandler`. Si surge `OpThrow`, la VM rebobina hasta las profundidades guardadas y salta al `catch_ip`.
-
----
-
-## 8. Async y Suspend
-
-La VM es síncrona por diseño. Operaciones asíncronas emiten un `VmSuspend`:
-
-- `Suspend::Task(AsyncTask)` — `await` sobre una promesa
-- `Suspend::Timer(Duration)` — `sleep`
-- `Suspend::Yield(VmValue)` — valor de generator
-
-El frame queda "congelado". `varn-runtime` (Tokio) lo reanuda cuando la tarea resuelve.
+- Mark-and-sweep tricolor (`mark_gray` / `mark_black`) sobre un
+  `Vec<Option<HeapObj>>` con free list de slots.
+- Raíces: registros del stack, globals, constantes de los frames vivos y módulos.
 
 ---
 
-## 9. Métricas de Performance
+## 4. VM register-based
 
-No hay una sola cifra honesta para "la VM de Varn" porque el benchmark actual mide más fases y más métricas que antes, y la mezcla cambia mucho entre workloads.
+Las locales son registros en un array plano: la local del slot `k` está en
+`registers[frame.base + k]` — O(1), sin hashmaps.
 
-Ejemplos reales del repo actual (`--runs 10`, build `dev`, 2026-06-05):
+Cada `CallFrame` guarda `ip` (índice dentro del chunk), `base` y un puntero al
+`VmClosure`. Las instrucciones operan sobre slots explícitos (`Add dst, a, b`), no
+sobre un stack implícito.
 
-- `tests/45-simple-file-test.vn`: p50 end-to-end `912 µs`
-- `tests/21-async.vn`: p50 end-to-end `1.901 ms`
-- `tests/47-isolates-multithread.vn`: p50 end-to-end `33.16 ms`
+---
 
-El CLI ya imprime además:
+## 5. Upvalues
+
+- **Abierto**: mientras el frame padre vive, el upvalue apunta a su registro; las
+  lecturas y escrituras se ven en tiempo real.
+- **Cerrado**: al terminar el frame padre, el valor se copia al heap y la closure lo
+  retiene.
+
+---
+
+## 6. Inline caches
+
+Un IC site guarda hasta **8 entradas** — es polimórfico, no monomórfico:
+
+```rust
+CacheEntry { id: u32, slot: u16, is_class: u8, vtable_ver: u8 }
+```
+
+- `id` es el **shape id** del objeto (o el id de clase, según `is_class`), no un
+  "class_id" a secas.
+- `is_class` discrimina el tipo de hit: campo por slot, método, getter, setter,
+  `.length` de array/string, transición de shape.
+- `vtable_ver` invalida entradas de método cuando la clase muta su vtable.
+- Un site que ve demasiadas shapes se marca **megamórfico** y deja de cachear.
+
+Intérprete y JIT **comparten el mismo IC**: el JIT emite el escaneo de las 8 entradas
+inline en el código máquina, así que un site calentado por el intérprete ya sirve al
+JIT y viceversa.
+
+---
+
+## 7. JIT (`varn-jit`)
+
+- **Compilación eager, no tiered**: `VmClosure::new` / `with_upvalues` compilan la
+  función al construir el closure. No hay contador de calor. El resultado se cachea
+  en el `FunctionProto`, así que otro closure del mismo proto reusa el código.
+- Si la compilación falla, `jit_entry` queda en `None` y esa función **se
+  interpreta** — por eso el intérprete es obligatorio, no opcional.
+- Se entra al código compilado en la primera instrucción del frame (`ip == 0`,
+  `crates/varn-vm/src/exec/dispatch/mod.rs`). Las llamadas JIT→JIT saltan directo a
+  la entrada del callee sin volver al dispatch.
+- Fast paths inline: get/set de propiedades y de campos fijos, acceso a arrays,
+  aritmética entera tipada.
+
+### Los layouts se prueban, no se hardcodean
+
+El código generado necesita conocer el layout en memoria de los objetos del heap.
+Esos offsets se **prueban en el arranque** contra objetos reales
+(`Heap::jit_object_layout`, `Heap::jit_array_layout`) y se pasan al codegen vía
+`JitHelpers`. Un offset equivocado revienta en un `assert!` al arrancar, no dentro
+del código máquina.
+
+No es ceremonia: la versión anterior llevaba los offsets del `Vec` de campos escritos
+a mano (32/40/48), y cualquier cambio de representación los convertía en lecturas a
+memoria liberada.
+
+### `VARN_NO_JIT=1`
+
+Apaga el JIT por completo: no compila (0 B de código máquina) y no entra a código
+compilado. Es la herramienta para partir un fallo en "¿representación o codegen?".
+
+Se propaga **por construcción** vía `ExecSettings` (`crates/varn-vm/src/settings.rs`)
+a todo VM y contexto que se cree: isolates, cuerpos de generador, forks de task y las
+VMs del bench harness. Antes eran campos con default `false` y el flag mentía en esos
+tres sitios.
+
+---
+
+## 8. Excepciones
+
+La VM rastrea bloques `try` sin desenrollar el stack nativo de Rust: guarda
+`(frame_depth, register_depth, catch_ip)` en un `TryHandler`. Al lanzarse una
+excepción, rebobina hasta esas profundidades y salta al `catch_ip`.
+
+---
+
+## 9. Async y suspensión
+
+La VM es síncrona por diseño. Las operaciones asíncronas emiten un `VmSuspend`:
+
+- `Await` — sobre un `Task` / `TaskHandle`
+- `Yield` — valor de generador, enviado por el `GenChannel`
+
+El frame queda congelado y `varn-runtime` lo reanuda cuando la tarea resuelve. Ver
+[RUNTIME_ARCHITECTURE.md](RUNTIME_ARCHITECTURE.md).
+
+---
+
+## 10. Medición
+
+No hay una cifra única honesta para "la VM de Varn": depende del workload.
+
+`vn bench <archivo> -v` imprime lo que sí es medible:
 
 - hits/misses de IC por operación
-- distribución `vm-fast` / `slow` / `native`
-- allocations y GC
+- distribución de llamadas `vm-fast` / `slow` / `native`
+- allocations, promociones y corridas de GC menor/mayor
 - hotspots de opcodes
-- stats de JIT
+- stats de JIT (funciones compiladas, bytes de código máquina, corridas JIT vs
+  interpretadas)
+
+**No copiar números de este documento a un reporte.** Medir. Ver
+`<performance_rules>` en `CLAUDE.md`.
