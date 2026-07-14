@@ -25,18 +25,11 @@ pub struct Vm {
 impl Vm {
     pub fn new(
         precompiled: Rc<rustc_hash::FxHashMap<ModuleId, Rc<varn_types::FunctionProto>>>,
+        settings: crate::settings::ExecSettings,
     ) -> Self {
-        let mut ctx = ExecCtx::new(GlobalStore::new());
+        let mut ctx = ExecCtx::new(GlobalStore::new(), settings);
         ctx.precompiled = precompiled;
         Self { ctx }
-    }
-
-    pub fn set_trace(&mut self, v: bool) {
-        self.ctx.trace = v;
-    }
-
-    pub fn set_no_jit(&mut self, v: bool) {
-        self.ctx.no_jit = v;
     }
 
     pub fn with_loader(mut self, loader: std::sync::Arc<dyn ModuleLoader + Send + Sync>) -> Self {
@@ -49,8 +42,9 @@ impl Vm {
         heap: Heap,
         precompiled: Rc<rustc_hash::FxHashMap<ModuleId, Rc<varn_types::FunctionProto>>>,
         modules: rustc_hash::FxHashMap<ModuleId, VmValue>,
+        settings: crate::settings::ExecSettings,
     ) -> Self {
-        let mut ctx = ExecCtx::new(globals);
+        let mut ctx = ExecCtx::new(globals, settings);
         ctx.heap = heap.deep_clone();
         ctx.precompiled = precompiled;
         ctx.modules = modules;
@@ -77,6 +71,7 @@ impl Vm {
             closure.proto.clone(),
             upvalues,
             Rc::new(constants),
+            self.ctx.settings,
         ));
 
         if self.ctx.frames.is_empty() {
@@ -235,7 +230,7 @@ fn freeze_pure_modules(vm: &mut Vm) {
         return;
     }
 
-    let mut scratch = Vm::new(vm.ctx.precompiled.clone());
+    let mut scratch = Vm::new(vm.ctx.precompiled.clone(), vm.ctx.settings);
     if let Some(loader) = &vm.ctx.loader {
         scratch.ctx.loader = Some(loader.clone());
     }

@@ -189,7 +189,7 @@ impl ExecCtx {
 
         self.linker.set_evaluating(resolved.clone());
 
-        let closure = crate::exec::calls::build_closure(proto, &mut self.heap);
+        let closure = crate::exec::calls::build_closure(proto, &mut self.heap, self.settings);
         self.push_frame(closure)?;
         let frame_idx = self.frames.len() - 1;
         self.module_exports.insert(frame_idx, module_val);

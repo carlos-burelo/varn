@@ -51,7 +51,13 @@ impl ExecCtx {
         }
 
         self.record_call_slow();
-        let res = super::calls::prepare_call(callee_nv, arg_count, &mut self.stack, &mut self.heap);
+        let res = super::calls::prepare_call(
+            callee_nv,
+            arg_count,
+            &mut self.stack,
+            &mut self.heap,
+            self.settings,
+        );
         if let Err(ref e) = res {
             if let Some(f) = self.frames.last() {
                 let code = &f.closure().proto.chunk.code;

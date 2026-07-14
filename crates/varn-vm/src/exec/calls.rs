@@ -45,9 +45,13 @@ pub fn resolve_constants(proto: &FunctionProto, heap: &mut Heap) -> Vec<VmValue>
         .collect()
 }
 
-pub fn build_closure(proto: Rc<FunctionProto>, heap: &mut Heap) -> Rc<VmClosure> {
+pub fn build_closure(
+    proto: Rc<FunctionProto>,
+    heap: &mut Heap,
+    settings: crate::settings::ExecSettings,
+) -> Rc<VmClosure> {
     let constants = resolve_constants(&proto, heap);
-    Rc::new(VmClosure::new(proto, constants))
+    Rc::new(VmClosure::new(proto, constants, settings))
 }
 
 #[inline(always)]
@@ -107,6 +111,7 @@ pub fn prepare_call(
     arg_count: usize,
     stack: &mut Vec<VmValue>,
     heap: &mut Heap,
+    settings: crate::settings::ExecSettings,
 ) -> VmResult<PreparedCall> {
     let mut arg_count = arg_count;
 
@@ -121,9 +126,8 @@ pub fn prepare_call(
                 if nc.proto.is_generator {
                     let args_start = stack.len() - arg_count;
                     let arg_nvs: Vec<VmValue> = stack.drain(args_start..).collect();
-                    let mut gen_ctx = Box::new(ExecCtx::new(GlobalStore::new()));
+                    let mut gen_ctx = Box::new(ExecCtx::new(GlobalStore::new(), settings));
                     gen_ctx.heap = heap.clone();
-                    gen_ctx.trace = false;
                     gen_ctx.stack.clear();
                     gen_ctx.stack.extend(arg_nvs);
                     let constants = resolve_constants(&nc.proto, heap);
@@ -139,6 +143,7 @@ pub fn prepare_call(
                         nc.proto.clone(),
                         upvalues,
                         Rc::new(constants),
+                        settings,
                     ));
                     let required = nc.proto.register_count as usize;
                     if gen_ctx.stack.len() < required {
@@ -236,9 +241,8 @@ pub fn prepare_call(
                         if nc.proto.is_generator {
                             let args_start = stack.len() - full_arg_count;
                             let arg_nvs: Vec<VmValue> = stack.drain(args_start..).collect();
-                            let mut gen_ctx = Box::new(ExecCtx::new(GlobalStore::new()));
+                            let mut gen_ctx = Box::new(ExecCtx::new(GlobalStore::new(), settings));
                             gen_ctx.heap = heap.clone();
-                            gen_ctx.trace = false;
                             gen_ctx.stack.clear();
                             gen_ctx.stack.extend(arg_nvs);
                             let constants = resolve_constants(&nc.proto, heap);
@@ -254,6 +258,7 @@ pub fn prepare_call(
                                 nc.proto.clone(),
                                 upvalues,
                                 Rc::new(constants),
+                                settings,
                             ));
                             let required = nc.proto.register_count as usize;
                             if gen_ctx.stack.len() < required {

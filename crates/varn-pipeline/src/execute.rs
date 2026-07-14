@@ -22,11 +22,8 @@ pub fn execute(
         Box::new(crate::stdlib_loader::FileLoader),
         Box::new(crate::stdlib_loader::StdlibLoader),
     ]));
-    let mut machine = Vm::new(precompiled.clone()).with_loader(loader);
-    if std::env::var("VARN_NO_JIT").is_ok() {
-        machine.set_no_jit(true);
-    }
-    machine.set_trace(_debug.trace);
+    let settings = varn_vm::ExecSettings::from_env(_debug.trace);
+    let mut machine = Vm::new(precompiled.clone(), settings).with_loader(loader);
 
     if _debug.trace {
         varn_utilities::terminal::tagged("pipeline:execute", "starting builtin initialization");

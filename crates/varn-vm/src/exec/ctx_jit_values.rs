@@ -362,7 +362,8 @@ pub extern "C" fn jit_make_closure(
             })
             .clone();
 
-        let new_closure = crate::frame::VmClosure::with_upvalues(proto, upvalues, constants);
+        let new_closure =
+            crate::frame::VmClosure::with_upvalues(proto, upvalues, constants, ctx_ref.settings);
         let val = ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(new_closure));
         if uv_count == 0 {
             ctx_ref.static_closures.insert(proto_ptr, val);
@@ -929,7 +930,12 @@ pub extern "C" fn jit_load_static_fn(
                 ))
             })
             .clone();
-        let new_closure = crate::frame::VmClosure::with_upvalues(proto.clone(), vec![], constants);
+        let new_closure = crate::frame::VmClosure::with_upvalues(
+            proto.clone(),
+            vec![],
+            constants,
+            ctx_ref.settings,
+        );
         let val = ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(new_closure));
         ctx_ref.static_closures.insert(proto_ptr, val);
         val

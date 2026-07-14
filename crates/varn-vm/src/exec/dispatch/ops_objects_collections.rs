@@ -68,7 +68,10 @@ impl ExecCtx {
                     })
                     .clone();
                 let vm_closure = std::rc::Rc::new(crate::frame::VmClosure::with_upvalues(
-                    proto, upvalues, constants,
+                    proto,
+                    upvalues,
+                    constants,
+                    self.settings,
                 ));
                 let val = self.heap.alloc_vm_closure(vm_closure);
                 if uv_count == 0 {

@@ -9,6 +9,7 @@ pub mod linker;
 pub mod loader;
 pub mod nursery;
 pub mod profile;
+pub mod settings;
 pub mod value;
 pub mod vm;
 
@@ -17,6 +18,7 @@ pub use globals::GlobalStore;
 pub use heap::{Heap, HeapObj};
 pub use loader::{CompositeLoader, ModuleError, ModuleLoader};
 pub use profile::{CallEntry, HotspotCounters, ProfileCounters, VmProfile};
+pub use settings::ExecSettings;
 pub use value::VmValue;
 pub use varn_jit;
 pub use vm::{prefill_native_modules, Vm};

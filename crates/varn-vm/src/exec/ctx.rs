@@ -52,7 +52,7 @@ pub struct ExecCtx {
     pub modules: FxHashMap<ModuleId, VmValue>,
     pub precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
     pub loader: Option<std::sync::Arc<dyn ModuleLoader + Send + Sync>>,
-    pub trace: bool,
+    pub settings: crate::settings::ExecSettings,
     pub open_upvalues: Vec<(usize, VmUpvalue)>,
     pub pending_constructors: Vec<(usize, VmValue)>,
     pub pending_setters: Vec<(usize, VmValue)>,
@@ -65,7 +65,6 @@ pub struct ExecCtx {
     pub hotspot_counters: Option<Rc<RefCell<HotspotCounters>>>,
     pub proto_constants: FxHashMap<usize, Rc<Vec<VmValue>>>,
     pub static_closures: FxHashMap<usize, VmValue>,
-    pub no_jit: bool,
     pub linker: Linker,
     pub jit_jmp_buf: *mut JmpBuf,
     pub jit_panic_exception_handler: Option<crate::frame::TryHandler>,
@@ -76,7 +75,7 @@ pub struct ExecCtx {
 }
 
 impl ExecCtx {
-    pub fn new(mut globals: GlobalStore) -> Self {
+    pub fn new(mut globals: GlobalStore, settings: crate::settings::ExecSettings) -> Self {
         varn_runtime::init_heap();
         let mut heap = Heap::new();
 
@@ -94,7 +93,7 @@ impl ExecCtx {
             modules: FxHashMap::default(),
             precompiled: Rc::new(FxHashMap::default()),
             loader: None,
-            trace: false,
+            settings,
             open_upvalues: Vec::new(),
             pending_constructors: Vec::new(),
             pending_setters: Vec::new(),
@@ -107,7 +106,6 @@ impl ExecCtx {
             hotspot_counters: None,
             proto_constants: FxHashMap::default(),
             static_closures: FxHashMap::default(),
-            no_jit: false,
             linker: Linker::new(),
             jit_jmp_buf: std::ptr::null_mut(),
             jit_panic_exception_handler: None,
@@ -230,7 +228,7 @@ impl ExecCtx {
             modules: self.modules.clone(),
             precompiled: Rc::clone(&self.precompiled),
             loader: self.loader.clone(),
-            trace: self.trace,
+            settings: self.settings,
             open_upvalues: Vec::new(),
             pending_constructors: Vec::new(),
             pending_setters: Vec::new(),
@@ -243,7 +241,6 @@ impl ExecCtx {
             hotspot_counters: None,
             proto_constants: FxHashMap::default(),
             static_closures: FxHashMap::default(),
-            no_jit: self.no_jit,
             linker: self.linker.clone_state(),
             jit_jmp_buf: std::ptr::null_mut(),
             jit_panic_exception_handler: None,

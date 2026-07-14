@@ -43,7 +43,7 @@ impl ExecCtx {
         op_ip: usize,
         op: Option<varn_core::OpCode>,
     ) {
-        if !self.trace {
+        if !self.settings.trace {
             return;
         }
 
@@ -88,6 +88,7 @@ impl ExecCtx {
             Rc::clone(&task.closure.proto),
             upvalues,
             Rc::new(constants),
+            fork.settings,
         ));
         let stack_values: Vec<VmValue> = task
             .args

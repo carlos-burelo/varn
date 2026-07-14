@@ -95,14 +95,14 @@ impl ExecCtx {
 
             let is_first_entry = (*ctx).frames[frame_idx].ip == 0;
 
-            if !(*ctx).no_jit && closure.jit_entry.is_some() && is_first_entry {
+            if !(*ctx).settings.no_jit && closure.jit_entry.is_some() && is_first_entry {
                 let jit_fn = closure.jit_entry.unwrap();
                 if is_first_entry {
                     varn_jit::JIT_STATS
                         .jit_runs
                         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 }
-                if (*ctx).trace {
+                if (*ctx).settings.trace {
                     (*ctx).trace_event("JIT ENTRY", frame_idx, closure, 0, None);
                 }
 
@@ -157,7 +157,7 @@ impl ExecCtx {
                         }
                     }
                 };
-                if (*ctx).trace {
+                if (*ctx).settings.trace {
                     (*ctx).trace_event("JIT EXIT", frame_idx, closure, 0, None);
                 }
 
@@ -692,6 +692,7 @@ impl ExecCtx {
                                     proto.clone(),
                                     vec![],
                                     constants,
+                                    (*ctx).settings,
                                 ));
                             let val = (*ctx).heap.alloc_vm_closure(vm_closure);
                             (*ctx).static_closures.insert(proto_ptr, val);

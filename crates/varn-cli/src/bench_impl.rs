@@ -282,7 +282,9 @@ pub fn run_bench(
         Box::new(varn_pipeline::stdlib_loader::StdlibLoader),
     ]));
 
-    let mut init_vm = Vm::new(optimized_precompiled_base.clone()).with_loader(loader.clone());
+    let settings = varn_vm::ExecSettings::from_env(false);
+    let mut init_vm =
+        Vm::new(optimized_precompiled_base.clone(), settings).with_loader(loader.clone());
     for bp in &builtin_protos {
         let closure = Rc::new(Closure::new(Rc::new(bp.clone()), Vec::new(), Vec::new()));
         init_vm
@@ -326,6 +328,7 @@ pub fn run_bench(
             snap_heap_ref.clone(),
             precompiled_ref.clone(),
             snap_modules_ref.clone(),
+            varn_vm::ExecSettings::from_env(false),
         )
         .with_loader(loader.clone());
         let main_module_id = ModuleId::local_str(path);
@@ -405,6 +408,7 @@ pub fn run_bench(
             snap_heap_ref.clone(),
             precompiled_ref.clone(),
             snap_modules_ref.clone(),
+            varn_vm::ExecSettings::from_env(false),
         )
         .with_loader(loader.clone());
 
@@ -529,6 +533,7 @@ pub fn run_bench(
                 snap_heap.clone(),
                 optimized_precompiled.clone(),
                 snap_modules.clone(),
+                varn_vm::ExecSettings::from_env(false),
             )
             .with_loader(loader.clone());
             let main_module_id = ModuleId::local_str(path);
@@ -637,7 +642,8 @@ fn run_bench_wrc(
         Box::new(varn_pipeline::stdlib_loader::StdlibLoader),
     ]));
 
-    let mut init_vm = Vm::new(precompiled_base.clone()).with_loader(loader.clone());
+    let settings = varn_vm::ExecSettings::from_env(false);
+    let mut init_vm = Vm::new(precompiled_base.clone(), settings).with_loader(loader.clone());
     for bp in &builtin_protos {
         let closure = Rc::new(Closure::new(Rc::new(bp.clone()), Vec::new(), Vec::new()));
         init_vm
@@ -676,6 +682,7 @@ fn run_bench_wrc(
             snap_heap_ref.clone(),
             precompiled_ref.clone(),
             snap_modules_ref.clone(),
+            varn_vm::ExecSettings::from_env(false),
         )
         .with_loader(loader.clone());
         let main_module_id = ModuleId::local_str(path);
@@ -754,6 +761,7 @@ fn run_bench_wrc(
                 snap_heap.clone(),
                 optimized_precompiled.clone(),
                 snap_modules.clone(),
+                varn_vm::ExecSettings::from_env(false),
             )
             .with_loader(loader.clone());
             let main_module_id = ModuleId::local_str(path);

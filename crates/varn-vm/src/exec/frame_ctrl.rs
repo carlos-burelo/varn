@@ -163,7 +163,7 @@ impl ExecCtx {
         {
             self.try_handlers.pop();
         }
-        if self.trace {
+        if self.settings.trace {
             varn_utilities::terminal::tagged(
                 "vm:return",
                 format_args!(
@@ -226,7 +226,7 @@ impl ExecCtx {
             Ok(result)
         } else {
             self.push(result);
-            if self.trace {
+            if self.settings.trace {
                 varn_utilities::terminal::tagged(
                     "vm:return",
                     format_args!(
@@ -597,11 +597,10 @@ impl NativeCtx for ExecCtx {
 
         let module_path_str = module_path.to_string();
         let export_name_str = export_name.to_string();
-        // The worker gets a fresh VM, so execution settings do not carry over
-        // on their own. `no_jit` has to: otherwise VARN_NO_JIT silently fails
-        // to disable the JIT inside isolates, and an interpreter-only run is
-        // not actually interpreter-only.
-        let no_jit = self.no_jit;
+        // The worker gets a fresh VM, so it must be handed this VM's settings;
+        // otherwise an interpreter-only run is not actually interpreter-only
+        // inside isolates.
+        let settings = self.settings;
 
         // Join task: resolves `Null` when the worker finishes, rejects with a
         // typed error if it threw. Returned to the caller (wrapped in an
@@ -610,8 +609,8 @@ impl NativeCtx for ExecCtx {
         let done_t = done.clone();
 
         std::thread::spawn(move || {
-            let mut machine = crate::Vm::new(std::rc::Rc::new(rustc_hash::FxHashMap::default()));
-            machine.set_no_jit(no_jit);
+            let mut machine =
+                crate::Vm::new(std::rc::Rc::new(rustc_hash::FxHashMap::default()), settings);
             machine
                 .ctx
                 .globals

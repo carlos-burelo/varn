@@ -80,7 +80,11 @@ pub struct VmClosure {
 }
 
 impl VmClosure {
-    pub fn new(proto: Rc<FunctionProto>, constants: Vec<VmValue>) -> Self {
+    pub fn new(
+        proto: Rc<FunctionProto>,
+        constants: Vec<VmValue>,
+        settings: crate::settings::ExecSettings,
+    ) -> Self {
         proto.ensure_ic();
         let ic_cache = Rc::clone(&proto.ic_cache);
         let feedback = Rc::clone(&proto.feedback);
@@ -93,7 +97,12 @@ impl VmClosure {
             jit_entry: None,
             jit_code: None,
         };
-        closure.compile_jit();
+        // `no_jit` means the JIT does not run at all, not merely that its
+        // output goes unused: a run meant to isolate a codegen bug should not
+        // be invoking codegen.
+        if !settings.no_jit {
+            closure.compile_jit();
+        }
         closure
     }
 
@@ -101,6 +110,7 @@ impl VmClosure {
         proto: Rc<FunctionProto>,
         upvalues: Vec<VmUpvalue>,
         constants: Rc<Vec<VmValue>>,
+        settings: crate::settings::ExecSettings,
     ) -> Self {
         proto.ensure_ic();
         let ic_cache = Rc::clone(&proto.ic_cache);
@@ -114,7 +124,12 @@ impl VmClosure {
             jit_entry: None,
             jit_code: None,
         };
-        closure.compile_jit();
+        // `no_jit` means the JIT does not run at all, not merely that its
+        // output goes unused: a run meant to isolate a codegen bug should not
+        // be invoking codegen.
+        if !settings.no_jit {
+            closure.compile_jit();
+        }
         closure
     }
 
