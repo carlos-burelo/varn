@@ -824,6 +824,87 @@ pub extern "C" fn jit_prepare_call(
                     return closure as *const crate::frame::VmClosure;
                 }
             }
+        } else if let Some(crate::heap::HeapObj::Class(cls)) = ctx_ref.heap.get(heap_idx) {
+            let cls = cls.clone();
+            let oref = varn_types::value::ObjRef::instance(cls.clone());
+            let instance_nv = VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Object(oref)));
+            ctx_ref.stack[callee_base] = instance_nv;
+            if let Some(ctor) = cls.constructor() {
+                match ctor {
+                    varn_types::Value::VmValue(ref payload) => {
+                        if let Some(wrapper) =
+                            payload.as_any().downcast_ref::<crate::frame::VmClosurePayload>()
+                        {
+                            let closure = wrapper.0.clone();
+                            if !closure.proto.is_async && !closure.proto.is_generator {
+                                if closure.jit_entry.is_some() {
+                                    let required_cap =
+                                        callee_base + closure.proto.register_count as usize + 32;
+                                    let required_len =
+                                        callee_base + closure.proto.register_count as usize;
+                                    let stack_len = ctx_ref.stack.len();
+                                    if ctx_ref.stack.capacity() < required_cap {
+                                        ctx_ref.stack.reserve(required_cap - stack_len);
+                                    }
+                                    if stack_len < required_len {
+                                        ctx_ref.stack.set_len(required_len);
+                                        let ptr = ctx_ref.stack.as_mut_ptr();
+                                        for i in stack_len..required_len {
+                                            std::ptr::write(ptr.add(i), VmValue::null());
+                                        }
+                                    }
+                                    let ctor_closure_ptr = &*closure as *const crate::frame::VmClosure;
+                                    let returning_frame_idx = ctx_ref.frames.len();
+                                    ctx_ref.pending_constructors.push((returning_frame_idx, instance_nv));
+                                    ctx_ref
+                                        .frames
+                                        .push(crate::frame::CallFrame::new(&closure, callee_base));
+                                    return ctor_closure_ptr;
+                                }
+                            }
+                        }
+                    }
+                    varn_types::Value::NativeFn(ref b) => {
+                        let (f, _) = **b;
+                        ctx_ref.record_call_native();
+                        let result = if arg_count == 0 {
+                            ctx_ref.invoke_native(f, &[])
+                        } else {
+                            if arg_count <= 8 {
+                                let mut buf = [VmValue::null(); 8];
+                                for i in 0..arg_count {
+                                    buf[i] = ctx_ref.stack[callee_base + i];
+                                }
+                                ctx_ref.invoke_native(f, &buf[..arg_count])
+                            } else {
+                                let vargs: Vec<VmValue> = (0..arg_count)
+                                    .map(|i| ctx_ref.stack[callee_base + i])
+                                    .collect();
+                                ctx_ref.invoke_native(f, &vargs)
+                            }
+                        };
+                        match result {
+                            Ok(v) => {
+                                let nv = if v.is_null() {
+                                    instance_nv
+                                } else {
+                                    v
+                                };
+                                ctx_ref.jit_native_result = nv;
+                                return 1 as *const crate::frame::VmClosure;
+                            }
+                            Err(msg) => {
+                                let e = crate::error::RuntimeError::new(msg);
+                                jit_propagate_error(ctx_ref, e);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            } else {
+                ctx_ref.jit_native_result = instance_nv;
+                return 1 as *const crate::frame::VmClosure;
+            }
         } else if let Some(crate::heap::HeapObj::NativeFn(_name, f)) = ctx_ref.heap.get(heap_idx) {
             let f = *f;
             ctx_ref.record_call_native();

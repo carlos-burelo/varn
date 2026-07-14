@@ -3,7 +3,7 @@ use crate::value::VmValue;
 use std::rc::Rc;
 
 pub const OLD_GEN_FLAG: u32 = 0x8000_0000;
-pub const NURSERY_CAPACITY: usize = 4096;
+pub const NURSERY_CAPACITY: usize = 16384;
 
 #[inline(always)]
 pub fn is_nursery_idx(idx: u32) -> bool {
@@ -44,8 +44,8 @@ impl Default for Nursery {
 impl Nursery {
     pub fn new() -> Self {
         Self {
-            objects: Vec::with_capacity(NURSERY_CAPACITY),
-            forwarding: Vec::with_capacity(NURSERY_CAPACITY),
+            objects: Vec::with_capacity(4096.min(NURSERY_CAPACITY)),
+            forwarding: Vec::with_capacity(4096.min(NURSERY_CAPACITY)),
             remembered: Vec::new(),
             alloc_count: 0,
             minor_gc_count: 0,

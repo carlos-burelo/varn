@@ -1161,7 +1161,8 @@ impl HeapInner {
 
     #[inline(always)]
     pub fn needs_gc(&self) -> bool {
-        self.gc_alloc_since_collect >= 4096
+        let live_count = (self.objects.len() - self.free.len()) as u64;
+        self.gc_alloc_since_collect >= 16384.max(live_count)
     }
 
     pub fn compact_interners(&mut self) {
