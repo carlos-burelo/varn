@@ -197,6 +197,7 @@ pub struct JitHelpers {
     /// Lets `CallNativeOp` embed the target directly instead of paying a
     /// hash lookup on every runtime call.
     pub resolve_native_op: fn(u64) -> usize,
+    pub resolve_native_op_v2: fn(u64) -> (usize, usize, varn_types::SignatureDescriptor),
     /// Probed heap/array layout for the inline array-read fast path.
     pub array_layout: JitArrayLayout,
     /// Probed object layout for the inline property get/set fast paths.

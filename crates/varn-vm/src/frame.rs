@@ -140,6 +140,13 @@ impl VmClosure {
         varn_builtins::native_op_fn(op_id).map_or(0, |f| f as usize)
     }
 
+    fn resolve_native_op_addr_v2(op_id: u64) -> (usize, usize, varn_types::SignatureDescriptor) {
+        varn_builtins::find_native_op_entry(op_id).map_or(
+            (0, 0, varn_types::SignatureDescriptor::empty()),
+            |e| (e.func_ptr as usize, e.raw_func_ptr as usize, e.signature)
+        )
+    }
+
     pub fn compile_jit(&mut self) {
         if self.proto.jit_failed.get() {
             return;
@@ -253,6 +260,7 @@ impl VmClosure {
             jit_call_native_op: ctx::jit_call_native_op as usize,
             jit_call_native_fnptr: ctx::jit_call_native_fnptr as usize,
             resolve_native_op: Self::resolve_native_op_addr,
+            resolve_native_op_v2: Self::resolve_native_op_addr_v2,
             array_layout: crate::heap::Heap::jit_array_layout(),
             object_layout: crate::heap::Heap::jit_object_layout(),
             open_upvalues_offset: {

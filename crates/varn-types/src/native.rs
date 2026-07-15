@@ -30,6 +30,37 @@ pub enum EntryKind {
     NamespaceDef = 0x1B,
 }
 
+#[repr(u8)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ArgType {
+    Void = 0,
+    Int = 1,
+    Float = 2,
+    Bool = 3,
+    Char = 4,
+    Str = 5,
+    Context = 6,
+    Generic = 7,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct SignatureDescriptor {
+    pub return_type: ArgType,
+    pub param_count: u8,
+    pub param_types: [ArgType; 7],
+}
+
+impl SignatureDescriptor {
+    pub const fn empty() -> Self {
+        Self {
+            return_type: ArgType::Void,
+            param_count: 0,
+            param_types: [ArgType::Void; 7],
+        }
+    }
+}
+
 #[repr(C, align(16))]
 pub struct NativeOpEntry {
     pub module_id: *const u8,
@@ -42,6 +73,8 @@ pub struct NativeOpEntry {
     pub symbol_name_len: u32,
 
     pub func_ptr: *const u8,
+    pub raw_func_ptr: *const u8,
+    pub signature: SignatureDescriptor,
     pub capability_mask: u64,
 
     pub entry_kind: u8,
@@ -81,6 +114,40 @@ impl NativeOpEntry {
 }
 
 use crate::resource::ResourceStore;
+
+pub struct DummyCtx;
+
+impl NativeCtx for DummyCtx {
+    fn intern(&mut self, _v: Value) -> VmValue { VmValue::null() }
+    fn intern_value(&mut self, _v: Value) -> VmValue { VmValue::null() }
+    fn alloc_str(&mut self, _s: &str) -> VmValue { VmValue::null() }
+    fn alloc_str_owned(&mut self, _s: String) -> VmValue { VmValue::null() }
+    fn str_repr(&self, _v: VmValue) -> String { String::new() }
+    fn str_owned(&self, _v: VmValue) -> Option<String> { None }
+    fn is_string(&self, _v: VmValue) -> bool { false }
+    fn is_array(&self, _v: VmValue) -> bool { false }
+    fn alloc_array(&mut self, _items: Vec<VmValue>) -> VmValue { VmValue::null() }
+    fn array_len(&self, _arr: VmValue) -> usize { 0 }
+    fn array_get(&self, _arr: VmValue, _idx: usize) -> Option<VmValue> { None }
+    fn array_set(&mut self, _arr: VmValue, _idx: usize, _val: VmValue) {}
+    fn array_push(&mut self, _arr: VmValue, _val: VmValue) {}
+    fn array_pop(&mut self, _arr: VmValue) -> Option<VmValue> { None }
+    fn array_for_each(&self, _arr: VmValue, _f: &mut dyn FnMut(VmValue, usize)) {}
+    fn alloc_object(&mut self) -> VmValue { VmValue::null() }
+    fn get_field(&self, _obj: VmValue, _key: &str) -> Option<VmValue> { None }
+    fn set_field(&mut self, _obj: VmValue, _key: &str, _val: VmValue) {}
+    fn alloc_fn(&mut self, _f: NativeFn, _name: &'static str) -> VmValue { VmValue::null() }
+    fn alloc_class(&mut self, _class: Rc<crate::ClassObj>) -> VmValue { VmValue::null() }
+    fn alloc_range(&mut self, _start: i64, _end: i64, _inclusive: bool) -> VmValue { VmValue::null() }
+    fn call_vm(&mut self, _callee: VmValue, _args: &[VmValue]) -> Result<VmValue, String> { Err("DummyCtx".into()) }
+    fn spawn_vm(&mut self, _callee: VmValue, _args: &[VmValue]) -> Result<VmValue, String> { Err("DummyCtx".into()) }
+    fn set_timer(&mut self, _ms: u64, _repeat: bool, _callee: VmValue, _args: &[VmValue]) -> Result<usize, String> { Err("DummyCtx".into()) }
+    fn clear_timer(&mut self, _id: usize) -> Result<(), String> { Err("DummyCtx".into()) }
+    fn suspend_timer(&mut self, _ms: u64) -> VmValue { VmValue::null() }
+    fn resources(&mut self) -> &mut ResourceStore { panic!("DummyCtx") }
+    fn extract(&self, _v: VmValue) -> Value { Value::Null }
+    fn call_static(&mut self, _f: NativeFn) -> VmValue { VmValue::null() }
+}
 
 struct StaticInitCtx<'a>(&'a mut dyn NativeCtx);
 

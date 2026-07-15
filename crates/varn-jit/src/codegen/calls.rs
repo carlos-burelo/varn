@@ -872,6 +872,93 @@ fn emit_intrinsic(ctx: &mut CodegenCtx, first_reg: usize) {
     emit_reload_all_except(asm, regmap, Some(dest));
 }
 
+fn load_fast_arg(
+    asm: &mut crate::assembler::Assembler,
+    regmap: &crate::regalloc::RegMap,
+    arg_idx: usize,
+    vreg: usize,
+    arg_type: varn_types::ArgType,
+    _next_int_idx: &mut usize,
+    _next_float_idx: &mut usize,
+) {
+    let is_float = arg_type == varn_types::ArgType::Float;
+    
+    #[cfg(target_os = "windows")]
+    {
+        let slot = arg_idx;
+        if is_float {
+            emit_load(asm, Reg::Rax, vreg, regmap);
+            asm.movq_xmm_from_gpr(slot as u8, Reg::Rax);
+        } else {
+            let target_gpr = match slot {
+                0 => Reg::Rcx,
+                1 => Reg::Rdx,
+                2 => Reg::R8,
+                3 => Reg::R9,
+                _ => panic!("Varn fast-call supports up to 4 arguments on Windows"),
+            };
+            emit_load(asm, target_gpr, vreg, regmap);
+            if arg_type == varn_types::ArgType::Int {
+                asm.shl_reg_imm8(target_gpr, 16);
+                asm.sar_reg_imm8(target_gpr, 16);
+            } else if arg_type == varn_types::ArgType::Bool {
+                asm.mov_reg_imm64(Reg::R11, 0x7FFB_0000_0000_0000u64);
+                asm.cmp_reg_reg(target_gpr, Reg::R11);
+                let patch_true = asm.jmp_cond(crate::assembler::Cond::Equal);
+                asm.mov_reg_imm64(target_gpr, 0);
+                let patch_end = asm.jmp_near();
+                let true_pos = asm.current_offset();
+                asm.mov_reg_imm64(target_gpr, 1);
+                let end_pos = asm.current_offset();
+                let disp_true = (true_pos as i32 - (patch_true as i32 + 4)) as u32;
+                asm.patch_u32(patch_true, disp_true);
+                let disp_end = (end_pos as i32 - (patch_end as i32 + 4)) as u32;
+                asm.patch_u32(patch_end, disp_end);
+            }
+        }
+    }
+    
+    #[cfg(not(target_os = "windows"))]
+    {
+        if is_float {
+            let slot = *_next_float_idx;
+            *_next_float_idx += 1;
+            emit_load(asm, Reg::Rax, vreg, regmap);
+            asm.movq_xmm_from_gpr(slot as u8, Reg::Rax);
+        } else {
+            let slot = *_next_int_idx;
+            *_next_int_idx += 1;
+            let target_gpr = match slot {
+                0 => Reg::Rdi,
+                1 => Reg::Rsi,
+                2 => Reg::Rdx,
+                3 => Reg::Rcx,
+                4 => Reg::R8,
+                5 => Reg::R9,
+                _ => panic!("Varn fast-call supports up to 6 GPR arguments on SysV"),
+            };
+            emit_load(asm, target_gpr, vreg, regmap);
+            if arg_type == varn_types::ArgType::Int {
+                asm.shl_reg_imm8(target_gpr, 16);
+                asm.sar_reg_imm8(target_gpr, 16);
+            } else if arg_type == varn_types::ArgType::Bool {
+                asm.mov_reg_imm64(Reg::R11, 0x7FFB_0000_0000_0000u64);
+                asm.cmp_reg_reg(target_gpr, Reg::R11);
+                let patch_true = asm.jmp_cond(crate::assembler::Cond::Equal);
+                asm.mov_reg_imm64(target_gpr, 0);
+                let patch_end = asm.jmp_near();
+                let true_pos = asm.current_offset();
+                asm.mov_reg_imm64(target_gpr, 1);
+                let end_pos = asm.current_offset();
+                let disp_true = (true_pos as i32 - (patch_true as i32 + 4)) as u32;
+                asm.patch_u32(patch_true, disp_true);
+                let disp_end = (end_pos as i32 - (patch_end as i32 + 4)) as u32;
+                asm.patch_u32(patch_end, disp_end);
+            }
+        }
+    }
+}
+
 fn emit_call_native_op(ctx: &mut CodegenCtx, first_reg: usize) {
     let asm = &mut ctx.asm;
     let code = ctx.code;
@@ -884,7 +971,7 @@ fn emit_call_native_op(ctx: &mut CodegenCtx, first_reg: usize) {
     let total = code[*ip + 1] as usize; // receiver + args
     *ip += 2;
 
-    // Op-id is known at JIT-compile time (constants hold a full i64).
+    // Op-id is known at JIT-compile time.
     let op_id = match proto.chunk.constants.get(cidx) {
         Some(varn_types::chunk::PoolEntry::Literal(varn_types::chunk::Literal::Int(i))) => {
             *i as u64
@@ -892,58 +979,138 @@ fn emit_call_native_op(ctx: &mut CodegenCtx, first_reg: usize) {
         _ => 0,
     };
 
-    // Resolve the target now so the runtime call skips the op-id hash
-    // lookup entirely. Unknown ids (0) keep the resolving helper, which
-    // raises the proper runtime error.
-    let fn_addr = (helpers.resolve_native_op)(op_id);
-    let (helper_addr, second_arg) = if fn_addr != 0 {
-        (helpers.jit_call_native_fnptr, fn_addr as u64)
-    } else {
-        (helpers.jit_call_native_op, op_id)
-    };
-
+    let (slow_addr, fast_addr, signature) = (helpers.resolve_native_op_v2)(op_id);
     let dest = first_reg;
 
-    emit_flush_all(asm, regmap);
+    if fast_addr != 0 {
+        // --- FAST PATH (Varn ABI v2) ---
+        emit_flush_all(asm, regmap);
 
-    asm.push(ARG_CTX);
-    asm.push(ARG_EXEC_CTX);
-    asm.push(ARG_BASE);
+        // Save caller-saved registers and align stack to 16 bytes.
+        asm.push(Reg::Rax); 
+        asm.push(ARG_CTX);
+        asm.push(ARG_EXEC_CTX);
+        asm.push(ARG_BASE);
 
-    let need_align = (regmap.used_phys.len() + 4) % 2 != 0;
-    if need_align {
-        asm.push(Reg::Rax);
+        let mut next_int_idx = 0usize;
+        let mut next_float_idx = 0usize;
+
+        for i in 0..total {
+            let arg_vreg = dest + i;
+            let arg_type = signature.param_types.get(i).copied().unwrap_or(varn_types::ArgType::Void);
+            if arg_type == varn_types::ArgType::Void {
+                break;
+            }
+            load_fast_arg(asm, regmap, i, arg_vreg, arg_type, &mut next_int_idx, &mut next_float_idx);
+        }
+
+        #[cfg(target_os = "windows")]
+        asm.add_reg_imm8(Reg::Rsp, -32); // shadow space
+
+        asm.mov_reg_imm64(Reg::R10, fast_addr as u64);
+        asm.call_reg(Reg::R10);
+
+        #[cfg(target_os = "windows")]
+        asm.add_reg_imm8(Reg::Rsp, 32);
+
+        // Pop back caller-saved registers and alignment
+        asm.pop(ARG_BASE);
+        asm.pop(ARG_EXEC_CTX);
+        asm.pop(ARG_CTX);
+        asm.pop(Reg::R11); // pop alignment dummy
+
+        // Box the return value in Reg::Rax
+        let ret_type = signature.return_type;
+        match ret_type {
+            varn_types::ArgType::Void => {
+                asm.mov_reg_imm64(Reg::Rax, 0x7FF9_0000_0000_0000u64); // null
+            }
+            varn_types::ArgType::Int => {
+                // Mask to 48-bit and OR with TAG_INT
+                asm.push(Reg::R11);
+                asm.mov_reg_imm64(Reg::R11, 0x0000_FFFF_FFFF_FFFFu64);
+                asm.and_reg_reg(Reg::Rax, Reg::R11);
+                asm.pop(Reg::R11);
+                asm.or_reg_reg(Reg::Rax, crate::registers::REG_INT_TAG);
+            }
+            varn_types::ArgType::Float => {
+                // Move float from Xmm0 back to Rax
+                asm.movq_gpr_from_xmm(Reg::Rax, 0);
+            }
+            varn_types::ArgType::Bool => {
+                // Box returned 0/1 back to bool VmValue
+                asm.cmp_reg_imm32(Reg::Rax, 1);
+                let patch_true = asm.jmp_cond(crate::assembler::Cond::Equal);
+                
+                // False path
+                asm.mov_reg_imm64(Reg::Rax, 0x7FFA_0000_0000_0000u64);
+                let patch_end = asm.jmp_near();
+                
+                // True path
+                let true_pos = asm.current_offset();
+                asm.mov_reg_imm64(Reg::Rax, 0x7FFB_0000_0000_0000u64);
+                
+                let end_pos = asm.current_offset();
+                let disp_true = (true_pos as i32 - (patch_true as i32 + 4)) as u32;
+                asm.patch_u32(patch_true, disp_true);
+                let disp_end = (end_pos as i32 - (patch_end as i32 + 4)) as u32;
+                asm.patch_u32(patch_end, disp_end);
+            }
+            _ => {} // Generic/VmValue is already boxed in Rax
+        }
+
+        emit_store(asm, Reg::Rax, dest, regmap);
+        emit_reload_all_except(asm, regmap, Some(dest));
+    } else {
+        // --- SLOW PATH FALLBACK ---
+        let fn_addr = slow_addr;
+        let (helper_addr, second_arg) = if fn_addr != 0 {
+            (helpers.jit_call_native_fnptr, fn_addr as u64)
+        } else {
+            (helpers.jit_call_native_op, op_id)
+        };
+
+        emit_flush_all(asm, regmap);
+
+        asm.push(ARG_CTX);
+        asm.push(ARG_EXEC_CTX);
+        asm.push(ARG_BASE);
+
+        let need_align = (regmap.used_phys.len() + 4) % 2 != 0;
+        if need_align {
+            asm.push(Reg::Rax);
+        }
+
+        // helper(ctx, fn_addr | op_id, args_start = base + dest, total)
+        asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+        asm.mov_reg_imm64(ARG_CLOSURE, second_arg);
+        asm.add_reg_imm32(ARG_BASE, dest as i32);
+        asm.mov_reg_imm64(ARG_EXEC_CTX, total as u64);
+
+        #[cfg(target_os = "windows")]
+        asm.add_reg_imm8(Reg::Rsp, -32);
+
+        asm.mov_reg_imm64(Reg::R10, helper_addr as u64);
+        asm.call_reg(Reg::R10);
+
+        #[cfg(target_os = "windows")]
+        asm.add_reg_imm8(Reg::Rsp, 32);
+
+        if need_align {
+            asm.pop(Reg::R11);
+        }
+
+        asm.pop(ARG_BASE);
+        asm.pop(ARG_EXEC_CTX);
+        asm.pop(ARG_CTX);
+
+        asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
+
+        asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_BASE);
+        asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
+        asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
+
+        emit_store(asm, Reg::Rax, dest, regmap);
+        emit_reload_all_except(asm, regmap, Some(dest));
     }
-
-    // helper(ctx, fn_addr | op_id, args_start = base + dest, total)
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
-    asm.mov_reg_imm64(ARG_CLOSURE, second_arg);
-    asm.add_reg_imm32(ARG_BASE, dest as i32);
-    asm.mov_reg_imm64(ARG_EXEC_CTX, total as u64);
-
-    #[cfg(target_os = "windows")]
-    asm.add_reg_imm8(Reg::Rsp, -32);
-
-    asm.mov_reg_imm64(Reg::R10, helper_addr as u64);
-    asm.call_reg(Reg::R10);
-
-    #[cfg(target_os = "windows")]
-    asm.add_reg_imm8(Reg::Rsp, 32);
-
-    if need_align {
-        asm.pop(Reg::R11);
-    }
-
-    asm.pop(ARG_BASE);
-    asm.pop(ARG_EXEC_CTX);
-    asm.pop(ARG_CTX);
-
-    asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
-
-    asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, crate::registers::ARG_BASE);
-    asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
-    asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
-
-    emit_store(asm, Reg::Rax, dest, regmap);
-    emit_reload_all_except(asm, regmap, Some(dest));
 }

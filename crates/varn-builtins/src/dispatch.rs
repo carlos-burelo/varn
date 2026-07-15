@@ -93,6 +93,26 @@ fn build_module_ops_index() -> FxHashMap<String, Vec<&'static NativeOpEntry>> {
     map
 }
 
+pub fn find_native_op_entry(op_id: u64) -> Option<&'static NativeOpEntry> {
+    static ENTRIES_MAP: OnceLock<FxHashMap<u64, &'static NativeOpEntry>> = OnceLock::new();
+    let map = ENTRIES_MAP.get_or_init(|| {
+        let mut m = FxHashMap::with_capacity_and_hasher(512, Default::default());
+        for entry in iter_native_ops() {
+            let module = entry.module_id();
+            let symbol = entry.symbol_name();
+            let ns = entry.namespace_path();
+            let id = if ns.is_empty() {
+                entry::compound_op_id(module, symbol)
+            } else {
+                entry::compound_op_id3(module, ns, symbol)
+            };
+            m.insert(id, entry);
+        }
+        m
+    });
+    map.get(&op_id).copied()
+}
+
 pub fn describe_op(id: u64) -> Option<OpMeta> {
     let table = TABLE.get_or_init(build_table);
     let entry = table.get(&id)?;

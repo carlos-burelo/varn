@@ -406,6 +406,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
         let sym = &m.symbol;
         let method_ident = format_ident!("{}", sym);
         let wrap_ident = format_ident!("__varn_wrap_{}_{}", sanitize(&prefix), sanitize(sym));
+        let fast_wrap_ident = format_ident!("__varn_fast_wrap_{}_{}", sanitize(&prefix), sanitize(sym));
 
         let mut sig_params: Vec<TS2> = Vec::new();
         let mut decode: Vec<TS2> = Vec::new();
@@ -537,6 +538,77 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
             }
         });
 
+        // Fast path wrapper generation
+        let is_fast = is_fast_eligible(m);
+        let (fast_wrapper, raw_func_val, sig_val) = if is_fast {
+            let mut fast_sig_params = Vec::new();
+            let mut fast_call_args = Vec::new();
+            let mut fast_decode = Vec::new();
+            let fallback = default_value_token(&m.ret);
+            
+            if m.kind == Kind::Method {
+                fast_sig_params.push(quote!(this: ::varn_types::VmValue));
+                let recv = receiver_mapped(&prefix);
+                let oty = owned_ty(&recv);
+                fast_decode.push(quote! {
+                    let __this = match <#oty as ::varn_types::marshal::FromVm>::from_vm(&mut dummy_ctx, this) {
+                        Ok(v) => v,
+                        Err(_) => return #fallback,
+                    };
+                });
+                fast_call_args.push(call_expr(&format_ident!("__this"), &recv));
+            }
+            
+            for (i, p) in m.params.iter().enumerate() {
+                let pname = format_ident!("__p{}", i);
+                let pty = param_ty(&p.mapped);
+                fast_sig_params.push(quote!(#pname: #pty));
+                fast_call_args.push(call_expr(&pname, &p.mapped));
+            }
+            
+            let fast_ret = ret_ty(&m.ret);
+            let is_fn = m.kind == Kind::Function;
+            
+            let call = quote!(<__T>::#method_ident(&mut dummy_ctx, #(#fast_call_args),*));
+            let fast_body = if is_fn {
+                quote! {
+                    let mut dummy_ctx = ::varn_types::native::DummyCtx;
+                    #(#fast_decode)*
+                    match #call {
+                        Ok(v) => v,
+                        Err(_) => #fallback,
+                    }
+                }
+            } else {
+                quote! {
+                    let mut dummy_ctx = ::varn_types::native::DummyCtx;
+                    #(#fast_decode)*
+                    #call
+                }
+            };
+            
+            let wrapper = quote! {
+                #[allow(non_snake_case)]
+                pub extern "C" fn #fast_wrap_ident<__T: #trait_ident>(
+                    #(#fast_sig_params),*
+                ) -> #fast_ret {
+                    #fast_body
+                }
+            };
+            
+            let raw_ptr = quote!(#fast_wrap_ident::<#self_ty> as *const u8);
+            let sig = signature_token(m);
+            (wrapper, raw_ptr, sig)
+        } else {
+            (
+                quote!(),
+                quote!(::core::ptr::null()),
+                quote!(::varn_types::SignatureDescriptor::empty()),
+            )
+        };
+
+        wrappers.push(fast_wrapper);
+
         if m.kind == Kind::Function {
             let fn_entry_ident = format_ident!(
                 "__VARN_OP_{}_{}",
@@ -557,6 +629,8 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                     symbol_name: #sym.as_ptr(),
                     symbol_name_len: #sym.len() as u32,
                     func_ptr: #wrap_ident::<#self_ty> as *const u8,
+                    raw_func_ptr: #raw_func_val,
+                    signature: #sig_val,
                     capability_mask: 0,
                     entry_kind: 0x01,
                     flags: 0,
@@ -606,6 +680,8 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                         symbol_name: #sym.as_ptr(),
                         symbol_name_len: #sym.len() as u32,
                         func_ptr: #wrap_ident::<#self_ty> as *const u8,
+                        raw_func_ptr: #raw_func_val,
+                        signature: #sig_val,
                         capability_mask: 0,
                         entry_kind: #mkind,
                         flags: 0,
@@ -659,6 +735,8 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                 symbol_name: #class.as_ptr(),
                 symbol_name_len: #class.len() as u32,
                 func_ptr: #builder_ident as *const u8,
+                raw_func_ptr: ::core::ptr::null(),
+                signature: ::varn_types::SignatureDescriptor::empty(),
                 capability_mask: 0,
                 entry_kind: 0x10,
                 flags: 0,
@@ -739,5 +817,69 @@ fn class_from_decl(decl: &Decl, name: &str) -> Option<ClassDecl> {
         }
         Decl::Export(ExportDecl::Decl { declaration, .. }) => class_from_decl(declaration, name),
         _ => None,
+    }
+}
+
+fn map_to_arg_type_token(m: &Mapped) -> TS2 {
+    match m {
+        Mapped::Int => quote!(::varn_types::ArgType::Int),
+        Mapped::Float => quote!(::varn_types::ArgType::Float),
+        Mapped::Bool => quote!(::varn_types::ArgType::Bool),
+        Mapped::Char => quote!(::varn_types::ArgType::Char),
+        Mapped::Str => quote!(::varn_types::ArgType::Str),
+        Mapped::Array => quote!(::varn_types::ArgType::Generic),
+        Mapped::Dynamic => quote!(::varn_types::ArgType::Generic),
+        Mapped::Void => quote!(::varn_types::ArgType::Void),
+        Mapped::Opt(_) => quote!(::varn_types::ArgType::Generic),
+    }
+}
+
+fn is_scalar(m: &Mapped) -> bool {
+    matches!(m, Mapped::Int | Mapped::Float | Mapped::Bool | Mapped::Void | Mapped::Dynamic)
+}
+
+fn is_fast_eligible(m: &Member) -> bool {
+    if !matches!(m.kind, Kind::Function | Kind::StaticMethod) {
+        return false;
+    }
+    if !is_scalar(&m.ret) {
+        return false;
+    }
+    for p in &m.params {
+        if p.is_rest || !is_scalar(&p.mapped) {
+            return false;
+        }
+    }
+    true
+}
+
+fn signature_token(m: &Member) -> TS2 {
+    let ret_token = map_to_arg_type_token(&m.ret);
+    let mut param_tokens = Vec::new();
+    
+    if m.kind == Kind::Method {
+        param_tokens.push(quote!(::varn_types::ArgType::Generic));
+    }
+    
+    for p in m.params.iter().take(7) {
+        param_tokens.push(map_to_arg_type_token(&p.mapped));
+    }
+    while param_tokens.len() < 7 {
+        param_tokens.push(quote!(::varn_types::ArgType::Void));
+    }
+    let count = (m.params.len() + if m.kind == Kind::Method { 1 } else { 0 }) as u8;
+    quote! {
+        ::varn_types::SignatureDescriptor {
+            return_type: #ret_token,
+            param_count: #count,
+            param_types: [ #(#param_tokens),* ],
+        }
+    }
+}
+
+fn default_value_token(m: &Mapped) -> TS2 {
+    match m {
+        Mapped::Dynamic => quote!(::varn_types::VmValue::null()),
+        _ => quote!(Default::default()),
     }
 }
