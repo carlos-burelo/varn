@@ -1,6 +1,8 @@
 use std::fs::read_to_string;
 
 fn main() {
+    const STDLIB_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/std.vnb"));
+    varn_builtins::register_embedded_stdlib(STDLIB_BYTES);
     varn_builtins::register_provider();
 
     let filename = "tests/47-isolates-multithread.vn";

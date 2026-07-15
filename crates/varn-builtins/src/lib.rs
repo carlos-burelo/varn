@@ -3,7 +3,7 @@ pub mod provider_impl;
 pub mod registry;
 mod std_manifest;
 
-pub use provider_impl::register_provider;
+pub use provider_impl::{register_embedded_stdlib, register_provider};
 
 pub use loader::CoreSourceLocator;
 pub use registry::{is_known, spec_for, MODULE_REGISTRY};

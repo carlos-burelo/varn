@@ -1,19 +1,43 @@
-import { assert as nativeAssert, assertEqual as nativeAssertEqual, summary as nativeSummary } from "runtime:testing";
+// std:test — Pure Varn self-hosted testing operations.
+
+let passed = 0;
+let failed = 0;
 
 export function assert(label: str, condition: bool): void {
-    nativeAssert(label, condition);
+    if (condition) {
+        passed = passed + 1;
+    } else {
+        failed = failed + 1;
+        print("FAIL: " + label);
+    }
 }
 
 export function assertEqual<T>(actual: T, expected: T, message?: str): void {
-    nativeAssertEqual(actual, expected, message);
+    if (actual === expected) {
+        passed = passed + 1;
+    } else {
+        failed = failed + 1;
+        let msg = message;
+        if (msg === null) {
+            msg = "expected " + expected + " but got " + actual;
+        }
+        print("FAIL: " + msg);
+    }
 }
 
 export function assertTrue(cond: bool, message?: str): void {
-    nativeAssert(message ?? "assertTrue", cond);
+    assert(message ?? "assertTrue", cond);
 }
 
 export function summary(): void {
-    nativeSummary();
+    print("\n════════════════════════════════════════");
+    print("PASSED: " + passed);
+    print("FAILED: " + failed);
+    if (failed === 0) {
+        print("ALL TESTS PASSED");
+    } else {
+        print("SOME TESTS FAILED");
+    }
 }
 
 const testImpl = {

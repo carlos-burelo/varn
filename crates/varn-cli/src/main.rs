@@ -15,6 +15,8 @@ use std::process;
 use varn_utilities::terminal;
 
 fn main() {
+    const STDLIB_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/std.vnb"));
+    varn_builtins::register_embedded_stdlib(STDLIB_BYTES);
     varn_builtins::register_provider();
 
     if std::env::var("VARN_DEBUG_OPS").is_ok() {

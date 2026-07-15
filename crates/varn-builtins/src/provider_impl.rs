@@ -22,17 +22,61 @@ struct ActiveStd {
 }
 
 static ACTIVE_STD: OnceLock<Option<ActiveStd>> = OnceLock::new();
+static EMBEDDED_STDLIB_BYTES: OnceLock<&'static [u8]> = OnceLock::new();
+
+pub fn register_embedded_stdlib(bytes: &'static [u8]) {
+    let _ = EMBEDDED_STDLIB_BYTES.set(bytes);
+}
 
 fn active_std() -> Option<&'static ActiveStd> {
     ACTIVE_STD
         .get_or_init(|| {
-            let (source, provenance) = resolve()?;
-            match source {
-                StdSource::Bundle(path) => load_bundle_std(&path, provenance),
-                StdSource::SourceTree(root) => load_tree_std(&root, provenance),
+            if let Some((source, provenance)) = resolve() {
+                match source {
+                    StdSource::Bundle(path) => load_bundle_std(&path, provenance),
+                    StdSource::SourceTree(root) => load_tree_std(&root, provenance),
+                }
+            } else if let Some(bytes) = EMBEDDED_STDLIB_BYTES.get() {
+                load_embedded_std(bytes)
+            } else {
+                None
             }
         })
         .as_ref()
+}
+
+fn load_embedded_std(bytes: &'static [u8]) -> Option<ActiveStd> {
+    let bundle: StdBundle = match read_bundle(bytes) {
+        Ok(b) => b,
+        Err(e) => {
+            panic!("embedded stdlib corrupt: {e}");
+        }
+    };
+    if let Err(e) = bundle.validate_compat_with(varn_core::HOST_API_VERSION) {
+        panic!("embedded stdlib incompatible: {e}");
+    }
+    let mut specs = Vec::new();
+    let mut blobs = Vec::new();
+    for m in bundle.modules {
+        specs.push(ModuleSpec::leaked(
+            m.id.clone(),
+            ModuleKind::Stdlib,
+            String::new(),
+            m.pure,
+        ));
+        blobs.push((
+            m.id,
+            &*Box::leak(m.interface.into_boxed_slice()),
+            &*Box::leak(m.bytecode.into_boxed_slice()),
+        ));
+    }
+    Some(ActiveStd {
+        specs: Box::leak(specs.into_boxed_slice()),
+        blobs: Box::leak(blobs.into_boxed_slice()),
+        tree_root: None,
+        description: format!("embedded stdlib v{}", bundle.std_version),
+        provenance: StdProvenance::Toolchain,
+    })
 }
 
 fn load_bundle_std(path: &std::path::Path, provenance: StdProvenance) -> Option<ActiveStd> {

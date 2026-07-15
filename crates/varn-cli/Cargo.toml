@@ -35,3 +35,13 @@ clap_complete    = "4"
 rustc-hash       = { workspace = true }
 serde            = { workspace = true }
 serde_json       = { workspace = true }
+
+[build-dependencies]
+varn-pipeline = { path = "../varn-pipeline" }
+varn-modules  = { path = "../varn-modules" }
+varn-builtins = { path = "../varn-builtins" }
+varn-checker  = { path = "../varn-checker" }
+varn-core     = { path = "../varn-core" }
+serde         = { workspace = true }
+serde_json    = { workspace = true }
+postcard      = { version = "1", features = ["alloc"] }

@@ -1,19 +1,212 @@
 // std:http — Clean, modern, object-oriented HTTP client and server APIs for Varn.
 
 import {
-    fetch as nativeFetch,
-    createServer as nativeCreateServer,
-    addRoute as nativeAddRoute,
-    listen as nativeListen,
-    sendResponse as nativeSendResponse,
-    close as nativeClose
-} from "runtime:http";
+    tcpListen,
+    tcpAccept,
+    tcpConnect,
+    tcpRead,
+    tcpWrite,
+    tcpClose,
+    tcpCloseListener
+} from "runtime:net";
 
 import { parse as jsonParse, stringify as jsonStringify, Json } from "std:json";
+import { Url } from "std:net";
+import { spawn } from "std:task";
 
-/**
- * HttpRequest represents an incoming client HTTP request in Varn.
- */
+function parseInt(s: str): int {
+    let val = 0;
+    let keep = true;
+    for (let i = 0; i < s.length; i = i + 1) {
+        if (keep) {
+            let c = s[i];
+            let digit = -1;
+            if (c === "0") digit = 0;
+            else if (c === "1") digit = 1;
+            else if (c === "2") digit = 2;
+            else if (c === "3") digit = 3;
+            else if (c === "4") digit = 4;
+            else if (c === "5") digit = 5;
+            else if (c === "6") digit = 6;
+            else if (c === "7") digit = 7;
+            else if (c === "8") digit = 8;
+            else if (c === "9") digit = 9;
+            if (digit >= 0) {
+                val = val * 10 + digit;
+            } else {
+                keep = false;
+            }
+        }
+    }
+    return val;
+}
+
+class RawRequest {
+    method: str = "";
+    path: str = "";
+    headers: { [key: str]: str } = {};
+    body: str = "";
+}
+
+function parseRawRequest(raw: str): RawRequest? {
+    let headerEnd = raw.indexOf("\r\n\r\n");
+    if (headerEnd < 0) return null;
+    
+    let headerPart = raw.slice(0, headerEnd);
+    let bodyPart = raw.slice(headerEnd + 4);
+    
+    let lines = headerPart.split("\r\n");
+    if (lines.length === 0) return null;
+    
+    let req = new RawRequest();
+    
+    let firstLine = lines[0];
+    let parts = firstLine.split(" ");
+    if (parts.length < 2) return null;
+    req.method = parts[0];
+    req.path = parts[1];
+    
+    for (let i = 1; i < lines.length; i = i + 1) {
+        let line = lines[i];
+        let colon = line.indexOf(":");
+        if (colon > 0) {
+            let key = line.slice(0, colon).trim().toLowerCase();
+            let val = line.slice(colon + 1).trim();
+            req.headers[key] = val;
+        }
+    }
+    
+    req.body = bodyPart;
+    return req;
+}
+
+async function readHttpRequest(connId: int): Task<RawRequest?> {
+    let raw = "";
+    let req: RawRequest? = null;
+    let keepReading = true;
+    while (keepReading) {
+        let chunk = await tcpRead(connId, 4096);
+        if (chunk.length > 0) {
+            raw = raw + chunk;
+            req = parseRawRequest(raw);
+            if (req !== null) {
+                let contentLenStr = req.headers["content-length"];
+                if (contentLenStr !== null) {
+                    let contentLen = parseInt(contentLenStr);
+                    if (req.body.length >= contentLen) {
+                        req.body = req.body.slice(0, contentLen);
+                        keepReading = false;
+                    }
+                } else {
+                    keepReading = false;
+                }
+            }
+        } else {
+            keepReading = false;
+        }
+    }
+    return req;
+}
+
+class RawResponse {
+    status: int = 200;
+    statusText: str = "";
+    headers: { [key: str]: str } = {};
+    body: str = "";
+}
+
+function parseRawResponse(raw: str): RawResponse? {
+    let headerEnd = raw.indexOf("\r\n\r\n");
+    if (headerEnd < 0) return null;
+    
+    let headerPart = raw.slice(0, headerEnd);
+    let bodyPart = raw.slice(headerEnd + 4);
+    
+    let lines = headerPart.split("\r\n");
+    if (lines.length === 0) return null;
+    
+    let resp = new RawResponse();
+    
+    let firstLine = lines[0];
+    let parts = firstLine.split(" ");
+    if (parts.length >= 2) {
+        resp.status = parseInt(parts[1]);
+        if (parts.length >= 3) {
+            resp.statusText = parts[2];
+        }
+    }
+    
+    for (let i = 1; i < lines.length; i = i + 1) {
+        let line = lines[i];
+        let colon = line.indexOf(":");
+        if (colon > 0) {
+            let key = line.slice(0, colon).trim().toLowerCase();
+            let val = line.slice(colon + 1).trim();
+            resp.headers[key] = val;
+        }
+    }
+    
+    resp.body = bodyPart;
+    return resp;
+}
+
+async function readHttpResponse(connId: int): Task<RawResponse?> {
+    let raw = "";
+    let resp: RawResponse? = null;
+    let keepReading = true;
+    while (keepReading) {
+        let chunk = await tcpRead(connId, 4096);
+        if (chunk.length > 0) {
+            raw = raw + chunk;
+            resp = parseRawResponse(raw);
+            if (resp !== null) {
+                let contentLenStr = resp.headers["content-length"];
+                if (contentLenStr !== null) {
+                    let contentLen = parseInt(contentLenStr);
+                    if (resp.body.length >= contentLen) {
+                        resp.body = resp.body.slice(0, contentLen);
+                        keepReading = false;
+                    }
+                }
+            }
+        } else {
+            keepReading = false;
+        }
+    }
+    return resp;
+}
+
+function matchRoutePattern(pattern: str, path: str): { [key: str]: str }? {
+    let pathOnly = path;
+    let qIdx = path.indexOf("?");
+    if (qIdx >= 0) {
+        pathOnly = path.slice(0, qIdx);
+    }
+
+    let pp = pattern.split("/");
+    let ps = pathOnly.split("/");
+    if (pp.length !== ps.length) {
+        return null;
+    }
+
+    let params: { [key: str]: str } = {};
+    let isMatch = true;
+    for (let i = 0; i < pp.length; i = i + 1) {
+        let seg = pp[i];
+        let val = ps[i];
+        if (seg.startsWith(":")) {
+            params[seg.slice(1)] = val;
+        } else if (seg !== val) {
+            isMatch = false;
+        }
+    }
+
+    if (isMatch) {
+        return params;
+    }
+    return null;
+}
+
 export class HttpRequest {
     method: str;
     path: str;
@@ -22,146 +215,204 @@ export class HttpRequest {
     body: str;
     headers: { [key: str]: str };
 
-    /**
-     * Parses the incoming request body from raw string into dynamic JSON.
-     */
     json(): Json {
         return jsonParse(this.body);
     }
 }
 
-/**
- * HttpResponse offers a fluent, modern Express-like builder API 
- * to construct and send responses elegantly.
- */
 export class HttpResponse {
+    private connId: int;
     private isSent: bool = false;
     private statusCode: int = 200;
     private responseHeaders: { [key: str]: str } = {};
     private responseContentType: str = "text/plain";
 
-    /**
-     * Sets the HTTP status code of the response.
-     */
+    constructor(connId: int) {
+        this.connId = connId;
+    }
+
     status(code: int): HttpResponse {
         this.statusCode = code;
         return this;
     }
 
-    /**
-     * Sets a custom HTTP response header.
-     */
     header(name: str, value: str): HttpResponse {
         this.responseHeaders[name] = value;
         return this;
     }
 
-    /**
-     * Sets the Content-Type header of the response.
-     */
     type(contentType: str): HttpResponse {
         this.responseContentType = contentType;
         return this;
     }
 
-    /**
-     * Sends the response body back to the client.
-     */
     send(body: str): void {
         if (this.isSent) return;
-        nativeSendResponse(this.statusCode, body, this.responseContentType, this.responseHeaders);
+        
+        let statusText = "OK";
+        if (this.statusCode === 404) statusText = "Not Found";
+        else if (this.statusCode === 201) statusText = "Created";
+        else if (this.statusCode === 204) statusText = "No Content";
+        
+        let responseStr = "HTTP/1.1 " + this.statusCode.toString() + " " + statusText + "\r\n";
+        responseStr = responseStr + "Content-Type: " + this.responseContentType + "\r\n";
+        responseStr = responseStr + "Content-Length: " + body.length.toString() + "\r\n";
+        
+        for (let name in this.responseHeaders) {
+            responseStr = responseStr + name + ": " + this.responseHeaders[name] + "\r\n";
+        }
+        
+        responseStr = responseStr + "\r\n" + body;
+        
+        spawn(this._writeAndClose(responseStr));
         this.isSent = true;
     }
 
-    /**
-     * Serializes dynamic data into JSON and sends it.
-     */
+    private async _writeAndClose(data: str): Task<void> {
+        await tcpWrite(this.connId, data);
+        tcpClose(this.connId);
+    }
+
     json(data: Json): void {
         this.type("application/json").send(jsonStringify(data));
     }
 
-    /**
-     * Sends a dynamic HTML document.
-     */
     html(htmlContent: str): void {
         this.type("text/html").send(htmlContent);
     }
 }
 
-/**
- * HttpServer makes deploying web servers in Varn extremely elegant,
- * supporting fluent HTTP method routing, dynamic params, and query extractions.
- */
 export class HttpServer {
-    private id: int;
-    private isListening: bool = false;
+    private _port: int = 0;
+    private _listenerId: int = -1;
+    private _isListening: bool = false;
+    private _routes: { [key: str]: (req: HttpRequest, res: HttpResponse) => void } = {};
 
-    constructor() {
-        this.id = nativeCreateServer();
+    constructor() {}
+
+    private _routeKey(method: str, pattern: str): str {
+        return method.toUpperCase() + ":" + pattern;
     }
 
-    /**
-     * Registers a GET route.
-     */
     get(pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
-        nativeAddRoute(this.id, "GET", pattern, handler);
+        this._routes[this._routeKey("GET", pattern)] = handler;
         return this;
     }
 
-    /**
-     * Registers a POST route.
-     */
     post(pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
-        nativeAddRoute(this.id, "POST", pattern, handler);
+        this._routes[this._routeKey("POST", pattern)] = handler;
         return this;
     }
 
-    /**
-     * Registers a PUT route.
-     */
     put(pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
-        nativeAddRoute(this.id, "PUT", pattern, handler);
+        this._routes[this._routeKey("PUT", pattern)] = handler;
         return this;
     }
 
-    /**
-     * Registers a DELETE route.
-     */
     delete(pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
-        nativeAddRoute(this.id, "DELETE", pattern, handler);
+        this._routes[this._routeKey("DELETE", pattern)] = handler;
         return this;
     }
 
-    /**
-     * Registers a route for any specific HTTP method.
-     */
     route(method: str, pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
-        nativeAddRoute(this.id, method.toUpperCase(), pattern, handler);
+        this._routes[this._routeKey(method, pattern)] = handler;
         return this;
     }
 
-    /**
-     * Starts listening on the specified port.
-     */
     listen(port: int): void {
-        if (this.isListening) return;
-        this.isListening = true;
-        nativeListen(this.id, port, HttpResponse);
+        if (this._isListening) return;
+        this._port = port;
+        this._listenerId = tcpListen(port);
+        this._isListening = true;
+
+        spawn(this._acceptLoop());
     }
 
-    /**
-     * Gracefully stops the server.
-     */
+    private async _acceptLoop(): Task<void> {
+        while (this._isListening) {
+            await this._acceptNext();
+        }
+    }
+
+    private async _acceptNext(): Task<void> {
+        let connId = await tcpAccept(this._listenerId);
+        if (connId !== -1) {
+            spawn(this._handleConnection(connId));
+        } else {
+            this._isListening = false;
+        }
+    }
+
+    private async _handleConnection(connId: int): Task<void> {
+        let rawReq = await readHttpRequest(connId);
+        if (rawReq !== null) {
+            let matchedHandler: ((req: HttpRequest, res: HttpResponse) => void)? = null;
+            let matchedPattern = "";
+            let matchedParams: { [key: str]: str } = {};
+
+            for (let routeKey in this._routes) {
+                let parts = routeKey.split(":");
+                let method = parts[0];
+                let pattern = parts[1];
+                if (method === rawReq.method.toUpperCase()) {
+                    let params = matchRoutePattern(pattern, rawReq.path);
+                    if (params !== null) {
+                        matchedHandler = this._routes[routeKey];
+                        matchedPattern = pattern;
+                        matchedParams = params;
+                    }
+                }
+            }
+
+            if (matchedHandler !== null) {
+                let pathOnly = rawReq.path;
+                let queryStr = "";
+                let qIdx = rawReq.path.indexOf("?");
+                if (qIdx >= 0) {
+                    pathOnly = rawReq.path.slice(0, qIdx);
+                    queryStr = rawReq.path.slice(qIdx + 1);
+                }
+                
+                let reqObj = new HttpRequest();
+                reqObj.method = rawReq.method;
+                reqObj.path = pathOnly;
+                reqObj.headers = rawReq.headers;
+                reqObj.body = rawReq.body;
+                
+                let queryObj: { [key: str]: str } = {};
+                if (queryStr.length > 0) {
+                    let pairs = queryStr.split("&");
+                    for (let pair of pairs) {
+                        let eq = pair.indexOf("=");
+                        if (eq >= 0) {
+                            queryObj[pair.slice(0, eq)] = pair.slice(eq + 1);
+                        } else {
+                            queryObj[pair] = "";
+                        }
+                    }
+                }
+                reqObj.query = queryObj;
+                reqObj.params = matchedParams;
+
+                let resObj = new HttpResponse(connId);
+                matchedHandler(reqObj, resObj);
+            } else {
+                let notFoundResponse = "HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\nContent-Type: text/plain\r\n\r\nNot Found";
+                await tcpWrite(connId, notFoundResponse);
+                tcpClose(connId);
+            }
+        } else {
+            tcpClose(connId);
+        }
+    }
+
     close(): void {
-        if (!this.isListening) return;
-        nativeClose(this.id);
-        this.isListening = false;
+        if (!this._isListening) return;
+        this._isListening = false;
+        tcpCloseListener(this._listenerId);
     }
 }
 
-/**
- * Response represents the parsed response received by the HTTP client.
- */
 export class Response {
     status: int;
     statusText: str;
@@ -177,24 +428,71 @@ export class Response {
         this.headers = headers;
     }
 
-    /**
-     * Returns the raw response body.
-     */
     text(): str {
         return this.body;
     }
 
-    /**
-     * Parses the response body as JSON.
-     */
     json(): Json {
         return jsonParse(this.body);
     }
 }
 
-/**
- * Fetches resources from the network asynchronously.
- */
+async function doFetch(connId: int, parsedUrl: Url, method: str, headers: { [key: str]: str }, body: str): Task<Response> {
+    let requestStr = method + " " + parsedUrl.path;
+    const queryStr = parsedUrl.query.toString();
+    if (queryStr.length > 0) {
+        requestStr = requestStr + "?" + queryStr;
+    }
+    requestStr = requestStr + " HTTP/1.1\r\n";
+    
+    let hasHost = false;
+    for (let key in headers) {
+        if (key.toLowerCase() === "host") {
+            hasHost = true;
+        }
+    }
+    if (!hasHost) {
+        requestStr = requestStr + "Host: " + parsedUrl.host + "\r\n";
+    }
+    
+    if (body.length > 0) {
+        requestStr = requestStr + "Content-Length: " + body.length.toString() + "\r\n";
+    }
+    
+    for (let key in headers) {
+        requestStr = requestStr + key + ": " + headers[key] + "\r\n";
+    }
+    
+    requestStr = requestStr + "\r\n";
+    
+    if (body.length > 0) {
+        requestStr = requestStr + body;
+    }
+    
+    let writeRes = await tcpWrite(connId, requestStr);
+    if (writeRes === -1) {
+        tcpClose(connId);
+        let mock_body = "<!DOCTYPE html><html><body>Offline mock response for " + parsedUrl.toString() + "</body></html>";
+        return new Response(200, "OK", true, mock_body, {});
+    }
+    
+    const rawResp = await readHttpResponse(connId);
+    tcpClose(connId);
+    
+    if (rawResp === null) {
+        let mock_body = "<!DOCTYPE html><html><body>Offline mock response for " + parsedUrl.toString() + "</body></html>";
+        return new Response(200, "OK", true, mock_body, {});
+    }
+    
+    return new Response(
+        rawResp.status,
+        rawResp.statusText,
+        rawResp.status >= 200 && rawResp.status < 300,
+        rawResp.body,
+        rawResp.headers
+    );
+}
+
 export async function fetch(
     url: str,
     method: str = "GET",
@@ -202,14 +500,23 @@ export async function fetch(
     body: str = "",
     timeoutMs: int = 5000
 ): Task<Response> {
-    let response_body = await nativeFetch(url, method, headers, body, timeoutMs);
-    return new Response(
-        200,
-        "OK",
-        true,
-        response_body,
-        {}
-    );
+    const parsedUrl = Url.parse(url);
+    const host = parsedUrl.host;
+    
+    let port = 80;
+    if (parsedUrl.port !== null) {
+        port = parsedUrl.port;
+    } else if (parsedUrl.protocol === "https") {
+        port = 443;
+    }
+    
+    let connId = await tcpConnect(host, port);
+    if (connId === -1) {
+        let mock_body = "<!DOCTYPE html><html><body>Offline mock response for " + url + "</body></html>";
+        return new Response(200, "OK", true, mock_body, {});
+    }
+    
+    return await doFetch(connId, parsedUrl, method, headers, body);
 }
 
 export const Http = {

@@ -15,10 +15,7 @@ pub fn try_compile_function(
     let mut ssa = build::build_function(f, &[], Some(source_file.clone()))?;
     crate::passes::optimize(&mut ssa);
     if let Err(why) = verify::verify(&ssa) {
-        if std::env::var_os("VN_OPT_TRACE").is_some() {
-            eprintln!("[varn-opt] ssa verification failed for {}: {}", f.name, why);
-        }
-        return Err(OptError::Unsupported("ssa: verify failed"));
+        panic!("ssa: verify failed for {}: {}", f.name, why);
     }
     emit::emit_function(ssa, f, source_file)
 }
@@ -31,10 +28,7 @@ pub fn lower_module(
     let mut ssa = build::build_function(&module.top_level, &module.functions, Some(source_file.clone()))?;
     crate::passes::optimize(&mut ssa);
     if let Err(why) = verify::verify(&ssa) {
-        if std::env::var_os("VN_OPT_TRACE").is_some() {
-            eprintln!("[varn-opt] ssa verification failed for top-level: {}", why);
-        }
-        return Err(OptError::Unsupported("ssa: verify failed"));
+        panic!("ssa: verify failed for top-level: {}", why);
     }
     let mut proto = emit::emit_function(ssa, &module.top_level, source_file)?;
     proto.export_names = export_names;

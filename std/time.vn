@@ -30,9 +30,27 @@ export type DurationParts = {
 
 export type DurationLike = str | int | DurationParts;
 
-let int_div = function(a: int, b: int): int {
+function int_div(a: int, b: int): int {
     return (a - (a % b)) / b;
-};
+}
+
+function pad2(n: int): str {
+    if (n < 10) return "0" + n;
+    return "" + n;
+}
+
+function pad3(n: int): str {
+    if (n < 10) return "00" + n;
+    if (n < 100) return "0" + n;
+    return "" + n;
+}
+
+function pad4(n: int): str {
+    if (n < 10) return "000" + n;
+    if (n < 100) return "00" + n;
+    if (n < 1000) return "0" + n;
+    return "" + n;
+}
 
 export function now(): int {
     return nativeNowMs();
@@ -40,21 +58,6 @@ export function now(): int {
 
 export function toISOString(ms: int): str {
     let parts = nativeMsToParts(ms);
-    let pad2 = function(n: int): str {
-        if (n < 10) return "0" + n;
-        return "" + n;
-    };
-    let pad3 = function(n: int): str {
-        if (n < 10) return "00" + n;
-        if (n < 100) return "0" + n;
-        return "" + n;
-    };
-    let pad4 = function(n: int): str {
-        if (n < 10) return "000" + n;
-        if (n < 100) return "00" + n;
-        if (n < 1000) return "0" + n;
-        return "" + n;
-    };
     return pad4(parts.year) + "-" + pad2(parts.month) + "-" + pad2(parts.day) + "T" + pad2(parts.hour) + ":" + pad2(parts.minute) + ":" + pad2(parts.second) + "." + pad3(parts.millisecond) + "Z";
 }
 
@@ -158,22 +161,6 @@ export class PlainDateTime {
         let mn = this.minute;
         let sc = this.second;
         let ms = this.millisecond;
-
-        let pad2 = function(n: int): str {
-            if (n < 10) return "0" + n;
-            return "" + n;
-        };
-        let pad3 = function(n: int): str {
-            if (n < 10) return "00" + n;
-            if (n < 100) return "0" + n;
-            return "" + n;
-        };
-        let pad4 = function(n: int): str {
-            if (n < 10) return "000" + n;
-            if (n < 100) return "00" + n;
-            if (n < 1000) return "0" + n;
-            return "" + n;
-        };
 
         return pad4(yr) + "-" + pad2(mo) + "-" + pad2(dy) + "T" + pad2(hr) + ":" + pad2(mn) + ":" + pad2(sc) + "." + pad3(ms);
     }

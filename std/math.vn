@@ -78,8 +78,11 @@ export function log(x: float): float {
     return 0.0;
 }
 export function max(...args: float[]): float {
-    let current = -1000000000.0;
-    for (let i = 0; i < args.length; i = i + 1) {
+    if (args.length === 0) {
+        throw new Error("max() requires at least one argument");
+    }
+    let current = args[0];
+    for (let i = 1; i < args.length; i = i + 1) {
         let v = args[i];
         if (v > current) {
             current = v;
@@ -88,8 +91,11 @@ export function max(...args: float[]): float {
     return current;
 }
 export function min(...args: float[]): float {
-    let current = 1000000000.0;
-    for (let i = 0; i < args.length; i = i + 1) {
+    if (args.length === 0) {
+        throw new Error("min() requires at least one argument");
+    }
+    let current = args[0];
+    for (let i = 1; i < args.length; i = i + 1) {
         let v = args[i];
         if (v < current) {
             current = v;

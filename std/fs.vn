@@ -1,6 +1,9 @@
 import {
-    read as nativeRead,
-    write as nativeWrite,
+    open as nativeOpen,
+    readFd as nativeReadFd,
+    writeFd as nativeWriteFd,
+    seek as nativeSeek,
+    close as nativeClose,
     exists as nativeExists,
     stat as nativeStat,
     mkdir as nativeMkdir,
@@ -30,19 +33,22 @@ export class Stats {
 }
 
 export function read(path: str): str {
-    return nativeRead(path);
+    let file = File.open(path, "r");
+    let content = file.readAll();
+    file.close();
+    return content;
 }
 
 export function write(path: str, content: str): void {
-    nativeWrite(path, content);
+    let file = File.open(path, "w");
+    file.write(content);
+    file.close();
 }
 
 export function appendText(path: str, content: str): void {
-    let existing = "";
-    if (nativeExists(path)) {
-        existing = nativeRead(path);
-    }
-    nativeWrite(path, existing + content);
+    let file = File.open(path, "a");
+    file.write(content);
+    file.close();
 }
 
 export function exists(path: str): bool {
@@ -84,8 +90,19 @@ export function rename(from: str, to: str): void {
 }
 
 export function copy(from: str, to: str): void {
-    let content = nativeRead(from);
-    nativeWrite(to, content);
+    let src = File.open(from, "r");
+    let dst = File.open(to, "w");
+    let keepCopying = true;
+    while (keepCopying) {
+        let chunk = src.read(8192);
+        if (chunk.length > 0) {
+            dst.write(chunk);
+        } else {
+            keepCopying = false;
+        }
+    }
+    src.close();
+    dst.close();
 }
 
 export function tempDir(): str {
@@ -93,39 +110,65 @@ export function tempDir(): str {
 }
 
 export class File {
+    private _fd: int;
     private _path: str;
     private _mode: str;
 
-    constructor(path: str, mode: str) {
+    constructor(fd: int, path: str, mode: str) {
+        this._fd = fd;
         this._path = path;
         this._mode = mode;
     }
 
     static open(path: str, mode: str): File {
-        return new File(path, mode);
+        let fd = nativeOpen(path, mode);
+        return new File(fd, path, mode);
     }
 
-    write(content: str): void {
-        if (this._mode === "a") {
-            const existing = nativeExists(this._path) ? nativeRead(this._path) : "";
-            nativeWrite(this._path, existing + content);
-        } else {
-            nativeWrite(this._path, content);
-        }
+    write(content: str): int {
+        return nativeWriteFd(this._fd, content);
     }
 
     read(size?: int): str {
-        return nativeRead(this._path);
+        let readSize = size ?? 4096;
+        return nativeReadFd(this._fd, readSize);
     }
 
     readAll(): str {
-        return nativeRead(this._path);
+        let out = "";
+        let keepReading = true;
+        while (keepReading) {
+            let chunk = nativeReadFd(this._fd, 8192);
+            if (chunk.length > 0) {
+                out = out + chunk;
+            } else {
+                keepReading = false;
+            }
+        }
+        return out;
+    }
+
+    seek(offset: int, whence: int): int {
+        return nativeSeek(this._fd, offset, whence);
+    }
+
+    close(): void {
+        nativeClose(this._fd);
     }
 
     pipeTo(dst: Writer): void {
-        const content = this.readAll();
-        dst.write(content);
+        let keepReading = true;
+        while (keepReading) {
+            let chunk = nativeReadFd(this._fd, 8192);
+            if (chunk.length > 0) {
+                dst.write(chunk);
+            } else {
+                keepReading = false;
+            }
+        }
     }
 
-    dispose(): void {}
+    dispose(): void {
+        this.close();
+    }
 }

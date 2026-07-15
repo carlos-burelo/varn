@@ -5,10 +5,6 @@ pub mod crypto;
 pub mod fs;
 #[path = "globals/globals.rs"]
 pub mod globals;
-#[path = "host/http/http.rs"]
-pub mod http;
-#[path = "host/http/http_helpers.rs"]
-mod http_helpers;
 #[path = "host/io/io.rs"]
 pub mod io;
 #[path = "host/json/json.rs"]
@@ -17,8 +13,6 @@ pub mod json;
 pub mod math;
 #[path = "host/net/net.rs"]
 pub mod net;
-#[path = "host/path/path.rs"]
-pub mod path;
 #[path = "primitives/mod.rs"]
 pub mod primitives;
 #[path = "host/reflect/reflect.rs"]
@@ -48,16 +42,13 @@ pub fn force_link_builtins() -> usize {
     sum += std::hint::black_box(crypto::__VARN_LINK_MARKER_RUNTIME_CRYPTO).as_ptr() as usize;
     sum += std::hint::black_box(fs::__VARN_LINK_MARKER_RUNTIME_FS).as_ptr() as usize;
     sum += std::hint::black_box(globals::__VARN_LINK_MARKER_GLOBALS).as_ptr() as usize;
-    sum += std::hint::black_box(http::__VARN_LINK_MARKER_RUNTIME_HTTP).as_ptr() as usize;
     sum += std::hint::black_box(io::__VARN_LINK_MARKER_RUNTIME_IO).as_ptr() as usize;
     sum += std::hint::black_box(json::__VARN_LINK_MARKER_RUNTIME_JSON).as_ptr() as usize;
     sum += std::hint::black_box(math::__VARN_LINK_MARKER_RUNTIME_MATH).as_ptr() as usize;
     sum += std::hint::black_box(net::__VARN_LINK_MARKER_RUNTIME_NET).as_ptr() as usize;
-    sum += std::hint::black_box(path::__VARN_LINK_MARKER_RUNTIME_PATH).as_ptr() as usize;
     sum += std::hint::black_box(reflect::__VARN_LINK_MARKER_RUNTIME_REFLECT).as_ptr() as usize;
     sum += std::hint::black_box(sys::__VARN_LINK_MARKER_RUNTIME_SYS).as_ptr() as usize;
     sum += std::hint::black_box(task::__VARN_LINK_MARKER_RUNTIME_TASK).as_ptr() as usize;
-    sum += std::hint::black_box(testing::__VARN_LINK_MARKER_RUNTIME_TESTING).as_ptr() as usize;
     sum += std::hint::black_box(time::__VARN_LINK_MARKER_RUNTIME_TIME).as_ptr() as usize;
     sum + dummy
 }

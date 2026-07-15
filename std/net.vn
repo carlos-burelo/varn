@@ -4,10 +4,8 @@ import {
     isIP as nativeIsIP,
     isIPv4 as nativeIsIPv4,
     isIPv6 as nativeIsIPv6,
-    parseUrl as nativeParseUrl,
     encodeURIComponent as nativeEncodeURIComponent,
-    decodeURIComponent as nativeDecodeURIComponent,
-    ParsedUrl
+    decodeURIComponent as nativeDecodeURIComponent
 } from "runtime:net";
 
 function trimPrefixQ(s: str): str {
@@ -113,14 +111,80 @@ export class Url {
     fragment: str = "";
 
     static parse(url: str): Url {
-        const parts = nativeParseUrl(url);
         const out = new Url();
-        out.protocol = parts.protocol ?? "";
-        out.host = parts.host ?? "";
-        out.port = parts.port;
-        out.path = parts.path ?? "";
-        out.query = Query.parse(parts.query ?? "");
-        out.fragment = parts.fragment ?? "";
+        
+        let rest = url;
+        
+        // 1. Extract protocol
+        let protoIdx = rest.indexOf("://");
+        if (protoIdx >= 0) {
+            out.protocol = rest.slice(0, protoIdx);
+            rest = rest.slice(protoIdx + 3);
+        }
+        
+        // 2. Extract fragment
+        let fragIdx = rest.indexOf("#");
+        if (fragIdx >= 0) {
+            out.fragment = rest.slice(fragIdx + 1);
+            rest = rest.slice(0, fragIdx);
+        }
+        
+        // 3. Extract query
+        let queryIdx = rest.indexOf("?");
+        let queryStr = "";
+        if (queryIdx >= 0) {
+            queryStr = rest.slice(queryIdx + 1);
+            rest = rest.slice(0, queryIdx);
+        }
+        out.query = Query.parse(queryStr);
+        
+        // 4. Extract path and host/port
+        let pathIdx = rest.indexOf("/");
+        let hostAndPort = rest;
+        if (pathIdx >= 0) {
+            out.path = rest.slice(pathIdx);
+            hostAndPort = rest.slice(0, pathIdx);
+        } else {
+            out.path = "/";
+        }
+        
+        // 5. Extract host and port
+        let portIdx = hostAndPort.indexOf(":");
+        if (portIdx >= 0) {
+            out.host = hostAndPort.slice(0, portIdx);
+            let portStr = hostAndPort.slice(portIdx + 1);
+            
+            // Convert portStr to integer
+            let portVal = 0;
+            let keepParsing = true;
+            for (let i = 0; i < portStr.length; i = i + 1) {
+                if (keepParsing) {
+                    let c = portStr[i];
+                    let digit = -1;
+                    if (c === "0") digit = 0;
+                    else if (c === "1") digit = 1;
+                    else if (c === "2") digit = 2;
+                    else if (c === "3") digit = 3;
+                    else if (c === "4") digit = 4;
+                    else if (c === "5") digit = 5;
+                    else if (c === "6") digit = 6;
+                    else if (c === "7") digit = 7;
+                    else if (c === "8") digit = 8;
+                    else if (c === "9") digit = 9;
+                    
+                    if (digit >= 0) {
+                        portVal = portVal * 10 + digit;
+                    } else {
+                        keepParsing = false;
+                    }
+                }
+            }
+            out.port = portVal;
+        } else {
+            out.host = hostAndPort;
+            out.port = null;
+        }
+        
         return out;
     }
 
@@ -185,11 +249,25 @@ export function buildQuery(q: { [key: str]: str | str[] }): str {
 }
 
 export function appendQuery(url: str, q: { [key: str]: str | str[] }): str {
-    const query = buildQuery(q);
-    if (query.length == 0) {
+    let hasKeys = false;
+    for (const key in q) {
+        hasKeys = true;
+        break;
+    }
+    if (!hasKeys) {
         return url;
     }
 
     const parsed = Url.parse(url);
-    return parsed.withQuery(Query.parse(query)).toString();
+    for (const key in q) {
+        const value = q[key];
+        if (Array.isArray(value)) {
+            for (const item of value) {
+                parsed.query.append(key, item);
+            }
+        } else {
+            parsed.query.append(key, value);
+        }
+    }
+    return parsed.toString();
 }

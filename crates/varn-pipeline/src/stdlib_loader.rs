@@ -199,3 +199,63 @@ pub fn compile_source(source: &str, path: &str) -> Result<FunctionProto, String>
     )
     .map_err(|e| e.to_string())
 }
+
+/// Compiles the entire stdlib directory into a single serialized VNB bytes buffer.
+/// Used by Cargo build.rs scripts to embed the stdlib.
+pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, String> {
+    let manifest_raw = std::fs::read_to_string(std_dir.join("std.json"))
+        .map_err(|e| format!("cannot read {}/std.json: {e}", std_dir.display()))?;
+
+    #[derive(serde::Deserialize)]
+    struct ManifestModule {
+        id: String,
+        #[serde(default)]
+        pure: bool,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct Manifest {
+        version: String,
+        #[allow(dead_code)]
+        #[serde(rename = "hostApi")]
+        host_api: u32,
+        modules: Vec<ManifestModule>,
+    }
+
+    let manifest: Manifest = serde_json::from_str(&manifest_raw)
+        .map_err(|e| format!("invalid std.json: {e}"))?;
+
+    let mut modules = Vec::new();
+    for m in &manifest.modules {
+        let file = std_dir.join(format!("{}.vn", m.id.strip_prefix("std:").ok_or("invalid std: prefix")?));
+        let source = std::fs::read_to_string(&file)
+            .map_err(|e| format!("cannot read {}: {e}", file.display()))?;
+
+        let exports = varn_checker::module_resolver::resolve_stdlib_module_exports_ref(&m.id);
+        let bind = varn_checker::module_resolver::resolve_stdlib_module_bind_ref(&m.id)
+            .ok_or_else(|| format!("cannot bind {}", m.id))?;
+        let interface = varn_checker::module_resolver::serialize_module_interface(&exports, &bind)
+            .map_err(|e| format!("interface serialization failed for {}: {e}", m.id))?;
+
+        let proto = compile_source(&source, &m.id)
+            .map_err(|e| format!("compile error in {}: {e}", m.id))?;
+        let bytecode = postcard::to_allocvec(&proto)
+            .map_err(|e| format!("bytecode serialization failed for {}: {e}", m.id))?;
+
+        modules.push(varn_modules::bundle::BundleModule {
+            id: m.id.clone(),
+            pure: m.pure,
+            interface,
+            bytecode,
+        });
+    }
+
+    let bundle = varn_modules::bundle::StdBundle {
+        std_version: manifest.version,
+        build_fingerprint: varn_modules::artifact::BUILD_FINGERPRINT,
+        host_api_version: varn_core::HOST_API_VERSION,
+        modules,
+    };
+
+    Ok(varn_modules::bundle::write_bundle(&bundle))
+}

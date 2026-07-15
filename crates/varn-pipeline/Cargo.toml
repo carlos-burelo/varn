@@ -14,7 +14,6 @@ varn-parser      = { path = "../varn-parser", features = ["profiling"] }
 varn-checker     = { path = "../varn-checker" }
 varn-opt         = { path = "../varn-opt" }
 varn-vm          = { path = "../varn-vm" }
-varn-builtins    = { path = "../varn-builtins", features = ["runtime"] }
 varn-modules     = { path = "../varn-modules" }
 varn-types       = { path = "../varn-types" }
 varn-debug       = { path = "../varn-debug" }

@@ -1,5 +1,0 @@
-// runtime:path — low-level host path operations.
-
-export declare function normalize(path: str): str;
-export declare function dirname(path: str): str;
-export declare function basename(path: str): str;

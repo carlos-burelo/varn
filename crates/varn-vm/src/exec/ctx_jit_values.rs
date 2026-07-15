@@ -409,7 +409,7 @@ pub extern "C" fn jit_call(ctx: *mut ExecCtx, args: *const varn_jit::JitCallArgs
             let heap_obj = ctx_ref.heap.get(args.callee.as_heap_idx());
 
             if let Some(crate::heap::HeapObj::VmClosure(closure)) = heap_obj {
-                let is_eligible = !closure.proto.is_async && !closure.proto.is_generator;
+                let is_eligible = !closure.proto.is_async && !closure.proto.is_generator && !closure.proto.has_rest;
 
                 if let Some(jit_fn) = closure.jit_entry.filter(|_| is_eligible) {
                     let callee_base = base + args.arg_start;
@@ -803,7 +803,7 @@ pub extern "C" fn jit_prepare_call(
         jit_guard_call_depth(ctx_ref);
         let heap_idx = callee.as_heap_idx();
         if let Some(closure) = ctx_ref.heap.get_closure(heap_idx) {
-            if !closure.proto.is_async && !closure.proto.is_generator {
+            if !closure.proto.is_async && !closure.proto.is_generator && !closure.proto.has_rest {
                 if closure.jit_entry.is_some() {
                     let required_cap = callee_base + closure.proto.register_count as usize + 32;
                     let required_len = callee_base + closure.proto.register_count as usize;
