@@ -72,6 +72,15 @@ pub struct ExecCtx {
     pub jit_panic_exception_err_obj: Option<crate::error::RuntimeError>,
     pub jit_panic_suspend_resume_ip: Option<usize>,
     pub jit_native_result: VmValue,
+    /// Caller→JIT-prologue frame handshake. Every path that invokes a
+    /// `jit_fn` after having pushed the activation's CallFrame itself
+    /// (interpreter dispatch, `jit_call`, `jit_invoke_virtual`,
+    /// `jit_construct_fast`, the `Call` opcode's asm site after
+    /// `jit_prepare_call`) sets this to 1 immediately before the call; a
+    /// bare recursive `CallSelf` does not. Every JIT prologue reads and
+    /// clears it, pushing its own frame only when entered self-called, so
+    /// each activation owns exactly one logical frame.
+    pub jit_frame_prepushed: usize,
 }
 
 impl ExecCtx {
@@ -113,6 +122,7 @@ impl ExecCtx {
             jit_panic_exception_err_obj: None,
             jit_panic_suspend_resume_ip: None,
             jit_native_result: VmValue::null(),
+            jit_frame_prepushed: 0,
         };
 
         if fresh {
@@ -248,6 +258,7 @@ impl ExecCtx {
             jit_panic_exception_err_obj: None,
             jit_panic_suspend_resume_ip: None,
             jit_native_result: VmValue::null(),
+            jit_frame_prepushed: 0,
         }
     }
 

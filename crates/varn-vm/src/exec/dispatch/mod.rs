@@ -65,6 +65,7 @@ impl ExecCtx {
             if is_outer {
                 (*ctx).jit_jmp_buf = &mut jmp_buf as *mut super::ctx::JmpBuf;
             }
+            (*ctx).jit_frame_prepushed = 1;
             let val = (jit_fn)(
                 (*ctx).stack.as_mut_ptr() as *mut std::ffi::c_void,
                 closure_ptr as *const std::ffi::c_void,

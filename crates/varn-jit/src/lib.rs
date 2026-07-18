@@ -214,6 +214,9 @@ pub struct JitHelpers {
     pub nursery_threshold: usize,
     pub jit_native_result_offset: usize,
     pub globals_offset: usize,
+    /// Byte offset of ExecCtx.jit_frame_prepushed — the caller→prologue
+    /// frame handshake word (see its doc in varn-vm).
+    pub frame_prepushed_offset: usize,
 }
 
 #[derive(Debug, Clone, Copy)]

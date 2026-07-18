@@ -114,6 +114,7 @@ fn jit_construct_fast(
     frame.current_class = Some(cls.clone());
     ctx_ref.frames.push(frame);
 
+    ctx_ref.jit_frame_prepushed = 1;
     let res = unsafe {
         (jit_fn)(
             ctx_ref.stack.as_mut_ptr() as *mut std::ffi::c_void,
@@ -424,6 +425,7 @@ pub extern "C" fn jit_call(ctx: *mut ExecCtx, args: *const varn_jit::JitCallArgs
                         .frames
                         .push(crate::frame::CallFrame::new(&**closure, callee_base));
 
+                    ctx_ref.jit_frame_prepushed = 1;
                     let res = (jit_fn)(
                         ctx_ref.stack.as_mut_ptr() as *mut std::ffi::c_void,
                         &**closure as *const crate::frame::VmClosure as *const std::ffi::c_void,
@@ -694,6 +696,7 @@ pub extern "C" fn jit_invoke_virtual(
                     ctx_ref
                         .frames
                         .push(crate::frame::CallFrame::new(&**closure, callee_base));
+                    ctx_ref.jit_frame_prepushed = 1;
                     let res = (jit_fn)(
                         ctx_ref.stack.as_mut_ptr() as *mut std::ffi::c_void,
                         &**closure as *const crate::frame::VmClosure as *const std::ffi::c_void,

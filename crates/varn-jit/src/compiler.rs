@@ -49,13 +49,13 @@ pub fn compile_proto(
         .max()
         .unwrap_or(0);
 
-    let mut asm = Assembler::new();
-    let regmap = RegMap::from_bytecode(code, &proto.chunk.constants, cache_regs_needed);
-    emit_prologue(&mut asm, &regmap, proto, &helpers);
-    crate::regalloc::emit_reload_all(&mut asm, &regmap);
-
     let is_pure = proto.upvalue_count == 0 && !proto.is_async && !proto.is_generator;
     let safe_int_call_opt = is_pure && !creates_closures;
+
+    let mut asm = Assembler::new();
+    let regmap = RegMap::from_bytecode(code, &proto.chunk.constants, cache_regs_needed);
+    emit_prologue(&mut asm, &regmap, proto, &helpers, safe_int_call_opt);
+    crate::regalloc::emit_reload_all(&mut asm, &regmap);
 
     let code_len = code.len();
     let mut cctx = CodegenCtx {
@@ -132,6 +132,7 @@ pub fn compile_proto(
         cctx.ip += 1;
         let first_reg = (raw_op >> 8) as usize;
         let op = OpCode::from_u8(raw_op as u8).unwrap();
+
         match op {
             OpCode::LoadNull
             | OpCode::LoadTrue

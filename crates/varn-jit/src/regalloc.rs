@@ -150,11 +150,25 @@ pub fn emit_prologue(
     regmap: &RegMap,
     proto: &varn_types::FunctionProto,
     helpers: &crate::JitHelpers,
+    safe_int_call_opt: bool,
 ) {
     let is_pure = proto.upvalue_count == 0 && !proto.is_async && !proto.is_generator;
+    if !safe_int_call_opt {
+        // Boundary callers set the prepush handshake unconditionally (they
+        // cannot know how the callee was compiled). A function outside the
+        // protocol must still clear it, or a stale flag would make a later
+        // safe-compiled prologue skip a frame push it owes.
+        asm.xor_reg_reg(Reg::R10, Reg::R10);
+        asm.mov_mem_reg(
+            crate::registers::ARG_EXEC_CTX,
+            helpers.frame_prepushed_offset as i32,
+            Reg::R10,
+        );
+    }
     if is_pure {
         use crate::assembler::Cond;
 
+        // Stack capacity check
         asm.mov_reg_mem(Reg::R10, crate::registers::ARG_EXEC_CTX, 0);
 
         asm.mov_reg_reg(Reg::R11, crate::registers::ARG_BASE);
@@ -202,6 +216,134 @@ pub fn emit_prologue(
         let disp = (post_grow_pos as i32 - (skip_grow as i32 + 4)) as u32;
         asm.patch_u32(skip_grow, disp);
 
+        let mut skip_frame_ops = None;
+        if safe_int_call_opt {
+            // Prepush handshake: read and clear the flag. When set, the
+            // caller (interpreter dispatch, jit_prepare_call's asm site,
+            // jit_call, jit_invoke_virtual, jit_construct_fast) already
+            // pushed — and will pop — this activation's frame, and already
+            // ran its own depth guard; skip the frame ops entirely. When
+            // clear, this is a bare CallSelf entry and the frame push,
+            // depth guard and capacity check below are ours.
+            asm.mov_reg_mem(
+                Reg::R10,
+                crate::registers::ARG_EXEC_CTX,
+                helpers.frame_prepushed_offset as i32,
+            );
+            asm.xor_reg_reg(Reg::R11, Reg::R11);
+            asm.mov_mem_reg(
+                crate::registers::ARG_EXEC_CTX,
+                helpers.frame_prepushed_offset as i32,
+                Reg::R11,
+            );
+            asm.cmp_reg_imm32(Reg::R10, 0);
+            skip_frame_ops = Some(asm.jmp_cond(Cond::NotEqual));
+        }
+
+        let mut skip_depth = None;
+        if safe_int_call_opt {
+            // Call-depth guard in prologue
+            asm.mov_reg_mem(Reg::R10, crate::registers::ARG_EXEC_CTX, 40); // ExecCtx.frames.len()
+            asm.cmp_reg_imm32(
+                Reg::R10,
+                crate::codegen::calls::MAX_JIT_CALL_DEPTH as i32,
+            );
+            let patch = asm.jmp_cond(Cond::Less);
+            skip_depth = Some(patch);
+
+            // Call depth exceeded: call jit_push_self_frame helper to raise runtime error
+            asm.push(crate::registers::ARG_CTX);
+            asm.push(crate::registers::ARG_CLOSURE);
+            asm.push(crate::registers::ARG_BASE);
+            asm.push(crate::registers::ARG_EXEC_CTX);
+            asm.push(Reg::Rax); // alignment dummy
+
+            asm.mov_reg_reg(crate::registers::ARG_CTX, crate::registers::ARG_EXEC_CTX);
+            asm.mov_reg_reg(crate::registers::ARG_CLOSURE, crate::registers::ARG_BASE);
+            #[cfg(target_os = "windows")]
+            asm.add_reg_imm8(Reg::Rsp, -32);
+            asm.mov_reg_imm64(Reg::R10, helpers.jit_push_self_frame as u64);
+            asm.call_reg(Reg::R10);
+            #[cfg(target_os = "windows")]
+            asm.add_reg_imm8(Reg::Rsp, 32);
+
+            asm.pop(Reg::R11);
+            asm.pop(crate::registers::ARG_EXEC_CTX);
+            asm.pop(crate::registers::ARG_BASE);
+            asm.pop(crate::registers::ARG_CLOSURE);
+            asm.pop(crate::registers::ARG_CTX);
+        }
+
+        if let Some(patch) = skip_depth {
+            let current_pos = asm.current_offset();
+            let disp = (current_pos as i32 - (patch as i32 + 4)) as u32;
+            asm.patch_u32(patch, disp);
+        }
+
+        // Frame capacity check & grow (only when safe_int_call_opt is true)
+        if safe_int_call_opt {
+            asm.mov_reg_mem(Reg::R10, crate::registers::ARG_EXEC_CTX, 40); // frames.len()
+            asm.mov_reg_mem(Reg::R11, crate::registers::ARG_EXEC_CTX, 24); // frames.capacity()
+            asm.cmp_reg_reg(Reg::R10, Reg::R11);
+            let skip_grow_frames = asm.jmp_cond(Cond::Less);
+
+            // Fallback: frames capacity exceeded -> call jit_push_self_frame
+            asm.push(crate::registers::ARG_CTX);
+            asm.push(crate::registers::ARG_CLOSURE);
+            asm.push(crate::registers::ARG_BASE);
+            asm.push(crate::registers::ARG_EXEC_CTX);
+            asm.push(Reg::Rax);
+
+            asm.mov_reg_reg(crate::registers::ARG_CTX, crate::registers::ARG_EXEC_CTX);
+            asm.mov_reg_reg(crate::registers::ARG_CLOSURE, crate::registers::ARG_BASE);
+            #[cfg(target_os = "windows")]
+            asm.add_reg_imm8(Reg::Rsp, -32);
+            asm.mov_reg_imm64(Reg::R10, helpers.jit_push_self_frame as u64);
+            asm.call_reg(Reg::R10);
+            #[cfg(target_os = "windows")]
+            asm.add_reg_imm8(Reg::Rsp, 32);
+
+            asm.pop(Reg::R11);
+            asm.pop(crate::registers::ARG_EXEC_CTX);
+            asm.pop(crate::registers::ARG_BASE);
+            asm.pop(crate::registers::ARG_CLOSURE);
+            asm.pop(crate::registers::ARG_CTX);
+
+            let skip_fast_init = asm.jmp_near();
+
+            // Target for Cond::Less (fast path: capacity is sufficient)
+            let fast_path_pos = asm.current_offset();
+            let disp_fast = (fast_path_pos as i32 - (skip_grow_frames as i32 + 4)) as u32;
+            asm.patch_u32(skip_grow_frames, disp_fast);
+
+            // Fast path: bump frames.len() WITHOUT writing the CallFrame
+            // slot (same contract the call-site protocol has always used
+            // for safe functions): nothing in a safe function's body reads
+            // its own logical frame, only the depth matters. The slot's
+            // stale bytes are never dropped by this path — the matching
+            // decrement at the CallSelf site just lowers len again.
+            asm.mov_reg_mem(Reg::R10, crate::registers::ARG_EXEC_CTX, 40);
+            asm.add_reg_imm8(Reg::R10, 1);
+            asm.mov_mem_reg(crate::registers::ARG_EXEC_CTX, 40, Reg::R10);
+
+            // Target for skip_fast_init
+            let end_init_pos = asm.current_offset();
+            let disp_skip_init = (end_init_pos as i32 - (skip_fast_init as i32 + 4)) as u32;
+            asm.patch_u32(skip_fast_init, disp_skip_init);
+        }
+
+        // Prepushed entries land here, past all frame ops.
+        if let Some(patch) = skip_frame_ops {
+            let pos = asm.current_offset();
+            let disp = (pos as i32 - (patch as i32 + 4)) as u32;
+            asm.patch_u32(patch, disp);
+        }
+
+        // Update stack top. ARG_CTX is NOT reloaded here: the incoming
+        // stack pointer is valid on the fast path, and the grow path above
+        // already refreshed it after a possible reallocation. An extra
+        // dependent load here sits on the REG_FRAME_BASE critical path of
+        // every activation and costs ~2x on call-dense recursion.
         asm.mov_reg_reg(Reg::R10, crate::registers::ARG_BASE);
         asm.add_reg_imm32(Reg::R10, proto.register_count as i32);
         asm.mov_mem_reg(crate::registers::ARG_EXEC_CTX, 16, Reg::R10);
@@ -230,6 +372,10 @@ pub fn emit_prologue(
 }
 
 pub fn emit_epilogue(asm: &mut Assembler, regmap: &RegMap) {
+    // Frame accounting is symmetric with whoever pushed: boundary callers
+    // pop the frame they prepushed, and a CallSelf site pops the frame the
+    // callee prologue pushed, right after the call returns. The epilogue
+    // itself never touches ExecCtx.frames.
     for (&vreg, &phys) in &regmap.map {
         emit_store_phys_to_mem(asm, phys, vreg);
     }
@@ -357,3 +503,4 @@ pub fn emit_reload_after_call(
 fn emit_store_phys_to_mem(asm: &mut Assembler, phys: Reg, vreg: usize) {
     emit_store_reg(asm, phys, vreg);
 }
+

@@ -166,6 +166,31 @@ JIT y viceversa.
 - Fast paths inline: get/set de propiedades y de campos fijos, acceso a arrays,
   aritmética entera tipada.
 
+### Frames lógicos: handshake caller→prologue
+
+Cada activación tiene exactamente **un** CallFrame lógico en `ExecCtx.frames`, y
+quién lo empuja se negocia con `ExecCtx.jit_frame_prepushed`: todo camino que
+invoca un `jit_fn` habiendo empujado ya el frame (dispatch del intérprete,
+`jit_call`, `jit_invoke_virtual`, `jit_construct_fast`, el sitio de `Call` tras
+`jit_prepare_call`) pone el flag a 1 justo antes de la llamada; el prólogo lo lee
+y lo limpia, y solo empuja cuando entró por un `CallSelf` puro (flag a 0). Todo
+prólogo limpia el flag aunque no participe del protocolo — un flag rancio haría
+que un prólogo safe posterior saltara un push que le toca.
+
+`CallSelf` en funciones *safe* (puras, sin closures) es así una `call` de hardware
+casi desnuda: el prólogo del callee hace depth-guard + chequeo de capacidad +
+`frames.len()++` **sin escribir el contenido del slot** (nada en el cuerpo de una
+función safe lee su propio frame), y el sitio de llamada decrementa al volver.
+Dos reglas de hot-path pagadas con sangre en `bench_fib` (30M llamadas): no
+recargar `ARG_CTX` desde `ExecCtx` en el camino común del prólogo (solo el
+grow-path lo necesita) y no escribir el CallFrame — juntas costaban 2×.
+
+Tras un longjmp de suspensión (§9), los frames lógicos con `ip == 0` que quedan
+por debajo **son el mecanismo de reanudación**: el dispatch los re-ejecuta desde
+cero y los `import` ya cacheados los vuelven no-ops. Por eso el balance
+un-frame-por-activación es un invariante duro: un frame duplicado significa una
+re-ejecución de más.
+
 ### Los layouts se prueban, no se hardcodean
 
 El código generado necesita conocer el layout en memoria de los objetos del heap.

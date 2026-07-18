@@ -12,7 +12,7 @@ use super::CodegenCtx;
 /// Maximum self-call depth before the JIT diverts to the helper that raises a
 /// catchable runtime error. Kept in sync with the interpreter / `ctx_jit_values`
 /// guard (`MAX_CALL_DEPTH = 10000`).
-const MAX_JIT_CALL_DEPTH: usize = 10000;
+pub(crate) const MAX_JIT_CALL_DEPTH: usize = 10000;
 
 pub(crate) fn emit_calls(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) -> Result<(), String> {
     match op {
@@ -107,6 +107,11 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
     asm.mov_reg_reg(ARG_CLOSURE, Reg::Rax);
 
     asm.mov_reg_reg(ARG_BASE, Reg::R11);
+
+    // jit_prepare_call already pushed the callee's frame — tell the callee
+    // prologue via the prepush handshake so it does not push a duplicate.
+    asm.mov_reg_imm64(Reg::R10, 1);
+    asm.mov_mem_reg(ARG_EXEC_CTX, helpers.frame_prepushed_offset as i32, Reg::R10);
 
     asm.mov_reg_mem(Reg::R10, ARG_CLOSURE, 56);
 
@@ -386,9 +391,6 @@ fn emit_call_self(ctx: &mut CodegenCtx, first_reg: usize) {
     let _ = first_reg;
     let _ = callee_dummy;
 
-    // Immediate (`int`/`float`/`bool`) locals that aren't arguments stay in their
-    // callee-saved registers across the recursive call; only pointer slots and the
-    // arguments the callee reads from memory are spilled. See `emit_flush_for_call`.
     emit_flush_for_call(
         asm,
         regmap,
@@ -398,33 +400,65 @@ fn emit_call_self(ctx: &mut CodegenCtx, first_reg: usize) {
         arg_start + arg_count,
     );
 
-    // NOTE: a former "is_pure" fast path emitted a bare native `call` to self with
-    // no frame push and no depth check, so deep self-recursion overflowed the host
-    // stack (hard abort). All self-calls now go through the frame-tracking path
-    // below, which enforces the call-depth guard (see `fallback_depth`).
     let register_count = ctx.proto.register_count as usize;
 
-    asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, 0);
+    if safe_opt {
+        // --- INLINED CALLSELF FAST PATH (Varn ABI v2) ---
+        // The callee's own prologue/epilogue handle the logical VM frame,
+        // the depth guard and stack growth; this site is a raw hardware call.
+        // The callee prologue records ARG_CLOSURE as the new frame's
+        // closure_ptr, and the register is scratch by now — reload the
+        // closure our own prologue saved at [rsp+8].
+        asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
 
-    asm.mov_reg_reg(Reg::R11, ARG_BASE);
-    asm.add_reg_imm32(Reg::R11, (arg_start + register_count + 32) as i32);
+        // Save caller-saved registers and align stack to 16 bytes.
+        let need_align = regmap.used_phys.len() % 2 != 0;
+        if need_align {
+            asm.push(Reg::Rax);
+        }
+        asm.push(ARG_CTX);
+        asm.push(ARG_EXEC_CTX);
+        asm.push(ARG_BASE);
 
-    asm.cmp_reg_reg(Reg::R10, Reg::R11);
-    let fallback_grow = asm.jmp_cond(Cond::Less);
+        asm.add_reg_imm32(ARG_BASE, arg_start as i32);
 
-    asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, 40);
-    asm.mov_reg_mem(Reg::R11, ARG_EXEC_CTX, 24);
-    asm.cmp_reg_reg(Reg::R10, Reg::R11);
-    let fallback_grow_frames = asm.jmp_cond(Cond::GreaterEqual);
+        // Recursive self-call (native hardware call back to the JIT start of ourselves, i.e. offset 0)
+        let call_patch = asm.call_near();
+        let displacement = (0 as isize - (call_patch + 4) as isize) as i32;
+        asm.patch_u32(call_patch, displacement as u32);
 
-    // Call-depth guard: when frames.len() reaches the limit, divert to the helper
-    // path (jit_push_self_frame), which raises a catchable runtime error rather
-    // than letting native self-recursion overflow the host stack.
-    asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, 40);
-    asm.cmp_reg_imm32(Reg::R10, MAX_JIT_CALL_DEPTH as i32);
-    let fallback_depth = asm.jmp_cond(Cond::GreaterEqual);
+        // Restore caller-saved registers and align
+        asm.pop(ARG_BASE);
+        asm.pop(ARG_EXEC_CTX);
+        asm.pop(ARG_CTX);
+        if need_align {
+            asm.pop(Reg::R11); // Pop dummy
+        }
 
-    if !safe_opt {
+        // Pop the logical frame the callee's prologue pushed for this
+        // self-call (no prepush flag was set, so it pushed its own).
+        asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, 40); // frames.len()
+        asm.add_reg_imm8(Reg::R10, -1);
+        asm.mov_mem_reg(ARG_EXEC_CTX, 40, Reg::R10);
+    } else {
+        // --- ORIGINAL SLOW PATH (FALLBACK) ---
+        asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, 0);
+
+        asm.mov_reg_reg(Reg::R11, ARG_BASE);
+        asm.add_reg_imm32(Reg::R11, (arg_start + register_count + 32) as i32);
+
+        asm.cmp_reg_reg(Reg::R10, Reg::R11);
+        let fallback_grow = asm.jmp_cond(Cond::Less);
+
+        asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, 40);
+        asm.mov_reg_mem(Reg::R11, ARG_EXEC_CTX, 24);
+        asm.cmp_reg_reg(Reg::R10, Reg::R11);
+        let fallback_grow_frames = asm.jmp_cond(Cond::GreaterEqual);
+
+        asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, 40);
+        asm.cmp_reg_imm32(Reg::R10, MAX_JIT_CALL_DEPTH as i32);
+        let fallback_depth = asm.jmp_cond(Cond::GreaterEqual);
+
         asm.mov_reg_reg(Reg::R10, ARG_BASE);
         asm.add_reg_imm32(Reg::R10, (arg_start + register_count) as i32);
         asm.mov_mem_reg(ARG_EXEC_CTX, 16, Reg::R10);
@@ -447,93 +481,87 @@ fn emit_call_self(ctx: &mut CodegenCtx, first_reg: usize) {
         asm.xor_reg_reg(Reg::R11, Reg::R11);
         asm.mov_mem_reg(Reg::R10, 32, Reg::R11);
         asm.mov_mem_reg(Reg::R10, 40, Reg::R11);
-    }
 
-    asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, 40);
-    asm.add_reg_imm8(Reg::R10, 1);
-    asm.mov_mem_reg(ARG_EXEC_CTX, 40, Reg::R10);
-
-    let skip_fallback = asm.jmp_near();
-
-    let fallback_pos = asm.current_offset();
-    let disp_fallback_grow = (fallback_pos as i64 - (fallback_grow as i64 + 4)) as i32;
-    asm.patch_u32(fallback_grow, disp_fallback_grow as u32);
-    let disp_fallback_grow_frames =
-        (fallback_pos as i64 - (fallback_grow_frames as i64 + 4)) as i32;
-    asm.patch_u32(fallback_grow_frames, disp_fallback_grow_frames as u32);
-    let disp_fallback_depth = (fallback_pos as i64 - (fallback_depth as i64 + 4)) as i32;
-    asm.patch_u32(fallback_depth, disp_fallback_depth as u32);
-
-    let need_dummy_push = regmap.used_phys.len() % 2 != 0;
-    if need_dummy_push {
-        asm.push(Reg::Rax);
-    }
-    asm.push(ARG_CTX);
-    asm.push(ARG_EXEC_CTX);
-    asm.push(ARG_BASE);
-
-    asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
-    asm.mov_reg_reg(ARG_CLOSURE, ARG_BASE);
-    asm.add_reg_imm32(ARG_CLOSURE, arg_start as i32);
-
-    #[cfg(target_os = "windows")]
-    asm.add_reg_imm8(Reg::Rsp, -32);
-
-    asm.mov_reg_imm64(Reg::R10, helpers.jit_push_self_frame as u64);
-    asm.call_reg(Reg::R10);
-
-    #[cfg(target_os = "windows")]
-    asm.add_reg_imm8(Reg::Rsp, 32);
-
-    asm.pop(ARG_BASE);
-    asm.pop(ARG_EXEC_CTX);
-    asm.pop(ARG_CTX);
-    if need_dummy_push {
-        asm.pop(Reg::Rax);
-    }
-
-    asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
-    asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, ARG_BASE);
-    asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
-    asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
-
-    let end_fast_path_pos = asm.current_offset();
-    let disp_skip_fallback = (end_fast_path_pos as i64 - (skip_fallback as i64 + 4)) as i32;
-    asm.patch_u32(skip_fallback, disp_skip_fallback as u32);
-
-    asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
-
-    asm.push(ARG_CTX);
-    asm.push(ARG_EXEC_CTX);
-    asm.push(ARG_BASE);
-
-    let need_align = regmap.used_phys.len() % 2 != 0;
-    if need_align {
-        asm.push(Reg::Rax);
-    }
-
-    asm.mov_reg_reg(Reg::R11, ARG_BASE);
-    asm.add_reg_imm32(Reg::R11, arg_start as i32);
-
-    asm.mov_reg_reg(ARG_BASE, Reg::R11);
-
-    let call_patch = asm.call_near();
-    let displacement = (0 as isize - (call_patch + 4) as isize) as i32;
-    asm.patch_u32(call_patch, displacement as u32);
-
-    if need_align {
-        asm.pop(Reg::R11);
-    }
-
-    asm.pop(ARG_BASE);
-    asm.pop(ARG_EXEC_CTX);
-    asm.pop(ARG_CTX);
-
-    if safe_opt {
         asm.mov_reg_mem(Reg::R10, ARG_EXEC_CTX, 40);
-        asm.add_reg_imm8(Reg::R10, -1);
+        asm.add_reg_imm8(Reg::R10, 1);
         asm.mov_mem_reg(ARG_EXEC_CTX, 40, Reg::R10);
-    } else {
+
+        let skip_fallback = asm.jmp_near();
+
+        let fallback_pos = asm.current_offset();
+        let disp_fallback_grow = (fallback_pos as i64 - (fallback_grow as i64 + 4)) as i32;
+        asm.patch_u32(fallback_grow, disp_fallback_grow as u32);
+        let disp_fallback_grow_frames =
+            (fallback_pos as i64 - (fallback_grow_frames as i64 + 4)) as i32;
+        asm.patch_u32(fallback_grow_frames, disp_fallback_grow_frames as u32);
+        let disp_fallback_depth = (fallback_pos as i64 - (fallback_depth as i64 + 4)) as i32;
+        asm.patch_u32(fallback_depth, disp_fallback_depth as u32);
+
+        let need_dummy_push = regmap.used_phys.len() % 2 != 0;
+        if need_dummy_push {
+            asm.push(Reg::Rax);
+        }
+        asm.push(ARG_CTX);
+        asm.push(ARG_EXEC_CTX);
+        asm.push(ARG_BASE);
+
+        asm.mov_reg_reg(ARG_CTX, ARG_EXEC_CTX);
+        asm.mov_reg_reg(ARG_CLOSURE, ARG_BASE);
+        asm.add_reg_imm32(ARG_CLOSURE, arg_start as i32);
+
+        #[cfg(target_os = "windows")]
+        asm.add_reg_imm8(Reg::Rsp, -32);
+
+        asm.mov_reg_imm64(Reg::R10, helpers.jit_push_self_frame as u64);
+        asm.call_reg(Reg::R10);
+
+        #[cfg(target_os = "windows")]
+        asm.add_reg_imm8(Reg::Rsp, 32);
+
+        asm.pop(ARG_BASE);
+        asm.pop(ARG_EXEC_CTX);
+        asm.pop(ARG_CTX);
+        if need_dummy_push {
+            asm.pop(Reg::Rax);
+        }
+
+        asm.mov_reg_mem(ARG_CTX, ARG_EXEC_CTX, 8);
+        asm.mov_reg_reg(crate::registers::REG_FRAME_BASE, ARG_BASE);
+        asm.shl_reg_imm8(crate::registers::REG_FRAME_BASE, 3);
+        asm.add_reg_reg(crate::registers::REG_FRAME_BASE, ARG_CTX);
+
+        let end_fast_path_pos = asm.current_offset();
+        let disp_skip_fallback = (end_fast_path_pos as i64 - (skip_fallback as i64 + 4)) as i32;
+        asm.patch_u32(skip_fallback, disp_skip_fallback as u32);
+
+        asm.mov_reg_mem(ARG_CLOSURE, Reg::Rsp, 8);
+
+        asm.push(ARG_CTX);
+        asm.push(ARG_EXEC_CTX);
+        asm.push(ARG_BASE);
+
+        let need_align = regmap.used_phys.len() % 2 != 0;
+        if need_align {
+            asm.push(Reg::Rax);
+        }
+
+        asm.mov_reg_reg(Reg::R11, ARG_BASE);
+        asm.add_reg_imm32(Reg::R11, arg_start as i32);
+
+        asm.mov_reg_reg(ARG_BASE, Reg::R11);
+
+        let call_patch = asm.call_near();
+        let displacement = (0 as isize - (call_patch + 4) as isize) as i32;
+        asm.patch_u32(call_patch, displacement as u32);
+
+        if need_align {
+            asm.pop(Reg::R11);
+        }
+
+        asm.pop(ARG_BASE);
+        asm.pop(ARG_EXEC_CTX);
+        asm.pop(ARG_CTX);
+
         asm.mov_reg_mem(
             Reg::R10,
             ARG_EXEC_CTX,

@@ -284,6 +284,7 @@ impl VmClosure {
             nursery_threshold: crate::nursery::Nursery::FULL_THRESHOLD,
             jit_native_result_offset: std::mem::offset_of!(ctx::ExecCtx, jit_native_result),
             globals_offset: std::mem::offset_of!(ctx::ExecCtx, globals),
+            frame_prepushed_offset: std::mem::offset_of!(ctx::ExecCtx, jit_frame_prepushed),
         };
         match varn_jit::compile(&self.proto, &self.constants, helpers) {
             Ok((entry, code)) => {
