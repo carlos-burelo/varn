@@ -95,14 +95,8 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
             _ => unreachable!(),
         }
 
-        // Check if the 64-bit result fits in 48 bits (i.e. no overflow/underflow)
-        asm.mov_reg_reg(Reg::R10, Reg::Rax);
-        asm.shl_reg_imm8(Reg::Rax, 16);
-        asm.sar_reg_imm8(Reg::Rax, 16);
-        asm.cmp_reg_reg(Reg::Rax, Reg::R10);
-        let p_fallback3 = asm.jmp_cond(crate::assembler::Cond::NotEqual);
-
-        // It fits! Mask/tag and store.
+        // Mask to 48 bits and tag. The mask IS the i48 wrap semantics
+        // (varn_core::numeric): no overflow guard, no boxed fallback.
         asm.push(Reg::Rcx);
         asm.mov_reg_imm64(Reg::Rcx, 0x0000_FFFF_FFFF_FFFFu64);
         asm.and_reg_reg(Reg::Rax, Reg::Rcx);
@@ -117,8 +111,6 @@ fn emit_binary_arith(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
         asm.patch_u32(p_fallback1, disp1);
         let disp2 = (fallback_pos as i32 - (p_fallback2 as i32 + 4)) as u32;
         asm.patch_u32(p_fallback2, disp2);
-        let disp3 = (fallback_pos as i32 - (p_fallback3 as i32 + 4)) as u32;
-        asm.patch_u32(p_fallback3, disp3);
 
         emit_flush_all(asm, regmap);
         asm.push(ARG_CTX);
@@ -365,14 +357,8 @@ fn emit_add_sub_imm(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     let adjust = if op == OpCode::SubImm { -imm } else { imm };
     asm.add_reg_imm32(Reg::Rax, adjust);
 
-    // Check if fits in 48 bits
-    asm.mov_reg_reg(Reg::R10, Reg::Rax);
-    asm.shl_reg_imm8(Reg::Rax, 16);
-    asm.sar_reg_imm8(Reg::Rax, 16);
-    asm.cmp_reg_reg(Reg::Rax, Reg::R10);
-    let p_fallback_overflow = asm.jmp_cond(crate::assembler::Cond::NotEqual);
-
-    // Mask and tag
+    // Mask to 48 bits and tag — the mask IS the i48 wrap semantics
+    // (varn_core::numeric): no overflow guard, no boxed fallback.
     asm.push(Reg::Rcx);
     asm.mov_reg_imm64(Reg::Rcx, 0x0000_FFFF_FFFF_FFFFu64);
     asm.and_reg_reg(Reg::Rax, Reg::Rcx);
@@ -385,8 +371,6 @@ fn emit_add_sub_imm(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
     let slow = asm.current_offset();
     let disp1 = (slow as i32 - (p_fallback as i32 + 4)) as u32;
     asm.patch_u32(p_fallback, disp1);
-    let disp2 = (slow as i32 - (p_fallback_overflow as i32 + 4)) as u32;
-    asm.patch_u32(p_fallback_overflow, disp2);
 
     emit_flush_all(asm, regmap);
     asm.push(ARG_CTX);

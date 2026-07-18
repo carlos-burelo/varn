@@ -176,7 +176,6 @@ impl TricolorMarker {
                 | HeapObj::Symbol(_)
                 | HeapObj::Char(_)
                 | HeapObj::BigInt(_)
-                | HeapObj::Int64(_)
                 | HeapObj::Decimal(_)
                 | HeapObj::Range(_)
                 | HeapObj::NativeFn(_, _)

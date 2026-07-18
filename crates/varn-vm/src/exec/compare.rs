@@ -69,7 +69,6 @@ pub fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
                 (Some(HeapObj::Str(sa)), Some(HeapObj::Str(sb))) => return sa == sb,
                 (Some(HeapObj::Char(ca)), Some(HeapObj::Char(cb))) => return ca == cb,
                 (Some(HeapObj::BigInt(a)), Some(HeapObj::BigInt(b))) => return a == b,
-                (Some(HeapObj::Int64(a)), Some(HeapObj::Int64(b))) => return a == b,
                 (Some(HeapObj::EnumVariant(ea)), Some(HeapObj::EnumVariant(eb))) => {
                     return ea.variant_tag == eb.variant_tag;
                 }
@@ -80,7 +79,6 @@ pub fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
         if heap.is_int(a) && b.is_heap() {
             match heap.get(b.as_heap_idx()) {
                 Some(HeapObj::BigInt(bv)) => return *bv == heap.as_int(a) as i128,
-                Some(HeapObj::Int64(bv)) => return *bv == heap.as_int(a),
                 Some(HeapObj::EnumVariant(ev)) => return ev.variant_tag as i64 == heap.as_int(a),
                 _ => {}
             }
@@ -88,7 +86,6 @@ pub fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
         if a.is_heap() && heap.is_int(b) {
             match heap.get(a.as_heap_idx()) {
                 Some(HeapObj::BigInt(av)) => return *av == heap.as_int(b) as i128,
-                Some(HeapObj::Int64(av)) => return *av == heap.as_int(b),
                 Some(HeapObj::EnumVariant(ev)) => return ev.variant_tag as i64 == heap.as_int(b),
                 _ => {}
             }
@@ -157,7 +154,6 @@ pub fn lt_heap(a: VmValue, b: VmValue, heap: &Heap) -> bool {
                 let bi = b.as_heap_idx();
                 match (heap.get(ai), heap.get(bi)) {
                     (Some(HeapObj::BigInt(ba)), Some(HeapObj::BigInt(bb))) => return ba < bb,
-                    (Some(HeapObj::Int64(ba)), Some(HeapObj::Int64(bb))) => return ba < bb,
                     _ => {}
                 }
             }

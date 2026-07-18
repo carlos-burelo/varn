@@ -31,7 +31,7 @@ use crate::ast::operators::BinaryOp;
 /// interpreter and the JIT must all agree with it bit for bit.
 #[inline(always)]
 pub fn wrap_i48(v: i64) -> i64 {
-    v
+    (v << 16) >> 16
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -241,7 +241,6 @@ pub enum HeapObj {
     Symbol(RuntimeSymbol),
     EnumVariant(Box<EnumVariantData>),
     BigInt(i128),
-    Int64(i64),
     Decimal(Box<rust_decimal::Decimal>),
     Char(char),
     Generator(GeneratorObj),
@@ -273,7 +272,6 @@ impl HeapObj {
             HeapObj::Symbol(_) => TypeTag::Symbol,
             HeapObj::EnumVariant(_) => TypeTag::Enum,
             HeapObj::BigInt(_) => TypeTag::BigInt,
-            HeapObj::Int64(_) => TypeTag::Int,
             HeapObj::Decimal(_) => TypeTag::Decimal,
             HeapObj::Char(_) => TypeTag::Char,
             HeapObj::Generator(_) => TypeTag::Generator,
@@ -385,39 +383,31 @@ impl HeapInner {
         }
     }
 
-    /// Check if a VmValue represents an integer (inline 48-bit or boxed Int64).
+    /// Check if a VmValue represents an integer. `int` is a pure inline i48;
+    /// there is no boxed integer form (out-of-range values wrap, per
+    /// `varn_core::numeric`).
     #[inline(always)]
     pub fn is_int(&self, v: VmValue) -> bool {
-        v.is_int() || (v.is_heap() && matches!(self.get(v.as_heap_idx()), Some(HeapObj::Int64(_))))
+        v.is_int()
     }
 
-    /// Extract the i64 value from an inline or boxed integer.
+    /// Extract the i64 value from an inline integer.
     #[inline(always)]
     pub fn as_int(&self, v: VmValue) -> i64 {
         if v.is_int() {
             v.as_int()
-        } else if v.is_heap() {
-            match self.get(v.as_heap_idx()) {
-                Some(HeapObj::Int64(n)) => *n,
-                _ => 0,
-            }
         } else {
             0
         }
     }
 
-    /// Convert a VmValue to f64 (handles inline int, boxed int, and f64).
+    /// Convert a VmValue to f64 (handles inline int and f64).
     #[inline(always)]
     pub fn to_f64_val(&self, v: VmValue) -> f64 {
         if v.is_f64() {
             v.as_f64()
         } else if v.is_int() {
             v.as_int() as f64
-        } else if v.is_heap() {
-            match self.get(v.as_heap_idx()) {
-                Some(HeapObj::Int64(n)) => *n as f64,
-                _ => 0.0,
-            }
         } else {
             0.0
         }
@@ -577,17 +567,9 @@ impl HeapInner {
         match val {
             Value::Null => VmValue::null(),
             Value::Bool(b) => VmValue::from_bool(b),
-            Value::Int(n) if n >= -(1i64 << 47) && n <= (1i64 << 47) - 1 => VmValue::from_int(n),
-            Value::Int(n) => {
-                let packed = pack_old_idx(alloc_into(
-                    &mut self.objects,
-                    &mut self.free,
-                    &mut self.alloc_count,
-                    &mut self.gc_alloc_since_collect,
-                    HeapObj::Int64(n),
-                ));
-                VmValue::from_heap_idx(packed)
-            }
+            // `int` is i48: host-supplied values outside the range wrap, the
+            // same rule every tier applies (varn_core::numeric).
+            Value::Int(n) => VmValue::from_int(n),
             Value::Float(f) => VmValue::from_f64(f),
             Value::Char(c) => {
                 let packed = match self.char_interner.entry(c) {
@@ -758,7 +740,6 @@ impl HeapInner {
                 HeapObj::Symbol(s) => Value::Symbol(s.clone()),
                 HeapObj::EnumVariant(data) => Value::EnumVariant(data.clone()),
                 HeapObj::BigInt(n) => Value::BigInt(Box::new(*n)),
-                HeapObj::Int64(n) => Value::Int(*n),
                 HeapObj::Decimal(d) => Value::Decimal(d.clone()),
                 HeapObj::Char(c) => Value::Char(*c),
                 HeapObj::Generator(g) => Value::Generator(g.clone()),
@@ -966,11 +947,7 @@ impl HeapInner {
     }
     
     pub fn make_int(&mut self, n: i64) -> VmValue {
-        if n >= -(1i64 << 47) && n <= (1i64 << 47) - 1 {
-            VmValue::from_int(n)
-        } else {
-            VmValue::from_heap_idx(self.alloc(HeapObj::Int64(n)))
-        }
+        VmValue::from_int(n)
     }
 
     pub fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue {

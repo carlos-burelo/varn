@@ -52,8 +52,12 @@ Fuente única de las reglas: `crates/varn-core/src/numeric.rs`. Los tres tiers
 `HeapObj` (`crates/varn-vm/src/heap.rs`) aloja lo que no cabe en 64 bits:
 `Str`, `Array`, `Object`, `Module`, `FrozenModule`, `VmClosure`, `Class`,
 `NativeFn`, `BoundMethod`, `Map`, `Set`, `Task`, `TaskHandle`, `Range`, `Symbol`,
-`EnumVariant`, `BigInt`, `Int64`, `Decimal`, `Char`, `Generator`, `AsyncQueue`,
+`EnumVariant`, `BigInt`, `Decimal`, `Char`, `Generator`, `AsyncQueue`,
 `Spread`, `VmValue`.
+
+No existe un entero boxeado: `int` es i48 inline puro y todo valor fuera de
+rango envuelve (wrap mod 2^48, `varn_core::numeric`). Los enteros grandes son
+del tipo `bigint`.
 
 ### Objetos: una sola allocation
 
