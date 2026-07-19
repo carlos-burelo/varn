@@ -60,6 +60,16 @@ impl Drop for AsyncTask {
     }
 }
 
+impl AsyncTask {
+    /// Stable identity of this task while any clone is alive (the pooled
+    /// `Inner` pointer). Only meaningful as a map key alongside an owning
+    /// clone — the pool reuses the allocation once every clone drops.
+    #[inline(always)]
+    pub fn identity(&self) -> usize {
+        self.0 as usize
+    }
+}
+
 impl PartialEq for AsyncTask {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0

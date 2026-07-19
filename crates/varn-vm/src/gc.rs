@@ -341,13 +341,8 @@ impl TricolorMarker {
                     gen.0.trace_vm_values(&mut visit);
 
                     let mut visit_closure = |closure_ptr: usize| {
-                        for (idx, obj) in heap.objects().iter().enumerate() {
-                            if let Some(HeapObj::VmClosure(hc)) = obj {
-                                if std::rc::Rc::as_ptr(hc) as *const () as usize == closure_ptr {
-                                    self.mark_gray(idx as u32);
-                                    break;
-                                }
-                            }
+                        if let Some(&packed) = heap.identity_index().get(&closure_ptr) {
+                            self.mark_gray(packed);
                         }
                     };
                     gen.0.trace_closures(&mut visit_closure);

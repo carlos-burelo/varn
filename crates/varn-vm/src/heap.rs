@@ -308,6 +308,14 @@ pub struct HeapInner {
     /// The minor GC scans only these instead of walking the whole old gen;
     /// rebuilt after every major GC sweep to drop stale entries.
     scan_roots: Vec<u32>,
+    /// Identity pointer → packed old-gen index, for heap objects that
+    /// Rust-side `Value`s reference by identity instead of through a content
+    /// interner (Class, Task, TaskHandle, Generator, AsyncQueue, VmClosure).
+    /// Replaces the full-heap scans `value_heap_idx` used to do. Entries
+    /// cannot go stale between sweeps: the heap slot itself owns a clone of
+    /// the Rc/task, so the pointer is never reused while the slot is live,
+    /// and `compact_interners` purges dead slots right after every sweep.
+    identity_index: FxHashMap<usize, u32>,
 }
 
 #[inline]
@@ -353,6 +361,22 @@ impl HeapInner {
             nursery: Nursery::new(),
             hotspot: None,
             scan_roots: Vec::new(),
+            identity_index: FxHashMap::default(),
+        }
+    }
+
+    /// Stable identity pointer for heap objects resolvable only by identity
+    /// (see `identity_index`). Returns `None` for everything else.
+    #[inline]
+    fn identity_key(obj: &HeapObj) -> Option<usize> {
+        match obj {
+            HeapObj::Class(c) => Some(Rc::as_ptr(c) as usize),
+            HeapObj::Task(t) => Some(Rc::as_ptr(t) as usize),
+            HeapObj::TaskHandle(th) => Some(th.identity()),
+            HeapObj::Generator(g) => Some(Rc::as_ptr(&g.0) as *const () as usize),
+            HeapObj::AsyncQueue(q) => Some(Rc::as_ptr(&q.0) as usize),
+            HeapObj::VmClosure(c) => Some(Rc::as_ptr(c) as usize),
+            _ => None,
         }
     }
 
@@ -451,6 +475,7 @@ impl HeapInner {
             _ => {}
         }
         let track = Self::needs_minor_scan(&obj);
+        let identity = Self::identity_key(&obj);
         let raw = alloc_into(
             &mut self.objects,
             &mut self.free,
@@ -461,12 +486,16 @@ impl HeapInner {
         if track {
             self.scan_roots.push(raw);
         }
+        if let Some(key) = identity {
+            self.identity_index.insert(key, pack_old_idx(raw));
+        }
         pack_old_idx(raw)
     }
 
     pub fn alloc_raw(&mut self, obj: HeapObj) -> u32 {
         self.alloc_count += 1;
         let track = Self::needs_minor_scan(&obj);
+        let identity = Self::identity_key(&obj);
         let idx = if let Some(idx) = self.free.pop() {
             self.objects[idx as usize] = Some(obj);
             idx
@@ -477,6 +506,9 @@ impl HeapInner {
         };
         if track {
             self.scan_roots.push(idx);
+        }
+        if let Some(key) = identity {
+            self.identity_index.insert(key, pack_old_idx(idx));
         }
         idx
     }
@@ -1175,10 +1207,16 @@ impl HeapInner {
             .retain(|_, &mut packed| check(packed, &self.objects));
         self.set_interner
             .retain(|_, &mut packed| check(packed, &self.objects));
+        self.identity_index
+            .retain(|_, &mut packed| check(packed, &self.objects));
     }
 
     pub fn objects(&self) -> &Vec<Option<HeapObj>> {
         &self.objects
+    }
+
+    pub fn identity_index(&self) -> &FxHashMap<usize, u32> {
+        &self.identity_index
     }
 
     /// Resolves a `Value` to its packed heap index. All arms return PACKED
@@ -1196,72 +1234,38 @@ impl HeapInner {
             varn_types::Value::BigInt(b) => self.bigint_interner.get(b.as_ref()).copied(),
             varn_types::Value::Decimal(d) => self.decimal_interner.get(d.as_ref()).copied(),
             varn_types::Value::Char(c) => self.char_interner.get(c).copied(),
-            varn_types::Value::Class(c) => {
-                for (idx, obj) in self.objects.iter().enumerate() {
-                    if let Some(HeapObj::Class(hc)) = obj {
-                        if Rc::ptr_eq(c, hc) {
-                            return Some(pack_old_idx(idx as u32));
-                        }
-                    }
-                }
-                None
-            }
-            varn_types::Value::Task(t) => {
-                for (idx, obj) in self.objects.iter().enumerate() {
-                    if let Some(HeapObj::Task(ht)) = obj {
-                        if Rc::ptr_eq(t, ht) {
-                            return Some(pack_old_idx(idx as u32));
-                        }
-                    }
-                }
-                None
-            }
+            varn_types::Value::Class(c) => self
+                .identity_index
+                .get(&(Rc::as_ptr(c) as usize))
+                .copied(),
+            varn_types::Value::Task(t) => self
+                .identity_index
+                .get(&(Rc::as_ptr(t) as usize))
+                .copied(),
             varn_types::Value::TaskHandle(th) => {
-                for (idx, obj) in self.objects.iter().enumerate() {
-                    if let Some(HeapObj::TaskHandle(hth)) = obj {
-                        if th == hth {
-                            return Some(pack_old_idx(idx as u32));
-                        }
-                    }
-                }
-                None
+                self.identity_index.get(&th.identity()).copied()
             }
-            varn_types::Value::Generator(g) => {
-                for (idx, obj) in self.objects.iter().enumerate() {
-                    if let Some(HeapObj::Generator(hg)) = obj {
-                        if g == hg {
-                            return Some(pack_old_idx(idx as u32));
-                        }
-                    }
-                }
-                None
-            }
-            varn_types::Value::AsyncQueue(q) => {
-                for (idx, obj) in self.objects.iter().enumerate() {
-                    if let Some(HeapObj::AsyncQueue(hq)) = obj {
-                        if Rc::ptr_eq(&q.0, &hq.0) {
-                            return Some(pack_old_idx(idx as u32));
-                        }
-                    }
-                }
-                None
-            }
+            varn_types::Value::Generator(g) => self
+                .identity_index
+                .get(&(Rc::as_ptr(&g.0) as *const () as usize))
+                .copied(),
+            varn_types::Value::AsyncQueue(q) => self
+                .identity_index
+                .get(&(Rc::as_ptr(&q.0) as usize))
+                .copied(),
             varn_types::Value::VmValue(payload) => {
                 if let Some(wrapper) = payload.as_any().downcast_ref::<VmClosurePayload>() {
                     let closure_ptr = std::rc::Rc::as_ptr(&wrapper.0) as *const () as usize;
-                    for (idx, obj) in self.objects.iter().enumerate() {
-                        if let Some(HeapObj::VmClosure(hc)) = obj {
-                            if std::rc::Rc::as_ptr(hc) as *const () as usize == closure_ptr {
-                                return Some(pack_old_idx(idx as u32));
-                            }
-                        }
-                    }
+                    self.identity_index.get(&closure_ptr).copied()
                 } else if let Some(vr) = payload.as_any().downcast_ref::<VmValueRef>() {
                     if vr.0.is_heap() {
-                        return Some(vr.0.as_heap_idx());
+                        Some(vr.0.as_heap_idx())
+                    } else {
+                        None
                     }
+                } else {
+                    None
                 }
-                None
             }
             _ => None,
         }
