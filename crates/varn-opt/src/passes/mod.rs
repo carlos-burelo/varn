@@ -2,6 +2,7 @@ pub mod cfg;
 pub mod const_fold;
 pub mod dce;
 pub mod fixed_fields;
+pub mod licm;
 pub mod tco;
 
 use crate::ssa::ir::SsaFunc;
@@ -16,6 +17,8 @@ pub fn optimize(func: &mut SsaFunc) {
         changed |= const_fold::run(func);
 
         changed |= fixed_fields::run(func);
+
+        changed |= licm::run(func);
 
         changed |= dce::run(func);
 
