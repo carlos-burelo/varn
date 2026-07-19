@@ -335,11 +335,12 @@ impl<'a> Lowerer<'a> {
                                     property: HirOptionalProperty::MethodCall(name.clone(), hargs),
                                 });
                             }
+                            let ty = self.value_ty(property.range.start.offset);
                             return Ok(HirExpr::MethodCall {
                                 recv,
                                 name: name.clone(),
                                 args: hargs,
-                                ty: HirType::Dynamic,
+                                ty,
                             });
                         }
                     }
@@ -352,11 +353,12 @@ impl<'a> Lowerer<'a> {
                         ty: HirType::Dynamic,
                     });
                 }
+                let call_ty = self.value_ty(offset);
                 let callee = Box::new(self.lower_expr(callee, scope)?);
                 Ok(HirExpr::Call {
                     callee,
                     args: hargs,
-                    ty: HirType::Dynamic,
+                    ty: call_ty,
                 })
             }
             ExprKind::Member {
@@ -390,13 +392,14 @@ impl<'a> Lowerer<'a> {
                     });
                 }
                 if *computed {
+                    let ty = self.value_ty(property.range.start.offset);
                     let object = Box::new(self.lower_expr(object, scope)?);
                     let index = Box::new(self.lower_expr(property, scope)?);
                     let is_array = self.ann.get_array_index(offset);
                     return Ok(HirExpr::Index {
                         object,
                         index,
-                        ty: HirType::Dynamic,
+                        ty,
                         is_array,
                     });
                 }
@@ -411,11 +414,12 @@ impl<'a> Lowerer<'a> {
                 }
 
                 if let Some(slot) = self.ann.get_fixed_field_slot(property.range.start.offset) {
+                    let ty = self.value_ty(property.range.start.offset);
                     let object_hir = self.lower_expr(object, scope)?;
                     return Ok(HirExpr::GetFixedField {
                         object: Box::new(object_hir),
                         slot,
-                        ty: HirType::Dynamic,
+                        ty,
                     });
                 }
 
@@ -436,12 +440,9 @@ impl<'a> Lowerer<'a> {
                     ExprKind::Identifier { name } => name.clone(),
                     _ => return Err(OptError::Unsupported("hir: non-identifier property")),
                 };
+                let ty = self.value_ty(property.range.start.offset);
                 let object = Box::new(self.lower_expr(object, scope)?);
-                Ok(HirExpr::Member {
-                    object,
-                    name,
-                    ty: HirType::Dynamic,
-                })
+                Ok(HirExpr::Member { object, name, ty })
             }
             ExprKind::Logical { op, left, right } => {
                 let lhs = Box::new(self.lower_expr(left, scope)?);

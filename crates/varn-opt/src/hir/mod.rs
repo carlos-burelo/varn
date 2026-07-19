@@ -5,7 +5,15 @@ pub mod dump;
 pub mod inline;
 pub mod lower;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Interned handle to a nested `HirType` in the module's [`TyTable`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TyId(pub u32);
+
+/// Interned handle to a class name in the module's [`TyTable`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ClassId(pub u32);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HirType {
     Int,
     Float,
@@ -13,6 +21,98 @@ pub enum HirType {
     Str,
     Ref,
     Dynamic,
+    /// `Array<T>`; element type behind a [`TyId`] to keep `HirType` `Copy`.
+    Array(TyId),
+    Map(TyId, TyId),
+    Set(TyId),
+    /// Instance of a source-declared class.
+    Class(ClassId),
+    /// `T?` — payload type plus null.
+    Nullable(TyId),
+}
+
+/// Module-wide intern table resolving the [`TyId`]/[`ClassId`] handles that
+/// structured [`HirType`]s carry. One per lowered module; shared onward so
+/// SSA passes and emission can resolve nesting.
+#[derive(Debug, Default)]
+pub struct TyTable {
+    entries: Vec<HirType>,
+    dedup: rustc_hash::FxHashMap<HirType, u32>,
+    class_names: Vec<Rc<str>>,
+    class_dedup: rustc_hash::FxHashMap<Rc<str>, u32>,
+}
+
+impl TyTable {
+    pub fn intern(&mut self, ty: HirType) -> TyId {
+        if let Some(&i) = self.dedup.get(&ty) {
+            return TyId(i);
+        }
+        let i = self.entries.len() as u32;
+        self.entries.push(ty);
+        self.dedup.insert(ty, i);
+        TyId(i)
+    }
+
+    pub fn get(&self, id: TyId) -> HirType {
+        self.entries[id.0 as usize]
+    }
+
+    pub fn class_id(&mut self, name: &Rc<str>) -> ClassId {
+        if let Some(&i) = self.class_dedup.get(name) {
+            return ClassId(i);
+        }
+        let i = self.class_names.len() as u32;
+        self.class_names.push(name.clone());
+        self.class_dedup.insert(name.clone(), i);
+        ClassId(i)
+    }
+
+    pub fn class_name(&self, id: ClassId) -> &Rc<str> {
+        &self.class_names[id.0 as usize]
+    }
+
+    /// Import a checker-side [`varn_core::CgTy`] projection. Kinds the
+    /// backend has no representation for yet (char/decimal/bigint/fn)
+    /// stay `Dynamic` — conservative, never wrong.
+    pub fn from_cg(&mut self, cg: &varn_core::CgTy) -> HirType {
+        use varn_core::CgTy;
+        match cg {
+            CgTy::Int => HirType::Int,
+            CgTy::Float => HirType::Float,
+            CgTy::Bool => HirType::Bool,
+            CgTy::Str => HirType::Str,
+            CgTy::Array(el) => {
+                let e = self.from_cg(el);
+                let id = self.intern(e);
+                HirType::Array(id)
+            }
+            CgTy::Map(k, v) => {
+                let kt = self.from_cg(k);
+                let vt = self.from_cg(v);
+                let ki = self.intern(kt);
+                let vi = self.intern(vt);
+                HirType::Map(ki, vi)
+            }
+            CgTy::Set(el) => {
+                let e = self.from_cg(el);
+                let id = self.intern(e);
+                HirType::Set(id)
+            }
+            CgTy::Class(name) => HirType::Class(self.class_id(name)),
+            CgTy::Nullable(inner) => {
+                let t = self.from_cg(inner);
+                if t == HirType::Dynamic {
+                    HirType::Dynamic
+                } else {
+                    let id = self.intern(t);
+                    HirType::Nullable(id)
+                }
+            }
+            CgTy::Char | CgTy::Decimal | CgTy::BigInt | CgTy::Fn | CgTy::Dynamic => {
+                HirType::Dynamic
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -695,4 +795,7 @@ pub struct HirFunction {
 pub struct HirModule {
     pub top_level: HirFunction,
     pub functions: Vec<HirFunction>,
+    /// Resolves the `TyId`/`ClassId` handles inside this module's
+    /// structured `HirType`s. Frozen after lowering.
+    pub ty_table: Rc<TyTable>,
 }

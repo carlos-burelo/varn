@@ -681,6 +681,13 @@ fn hir_ty(ty: HirType) -> &'static str {
         HirType::Str => IntrinsicType::Str.as_str(),
         HirType::Ref => "ref",
         HirType::Dynamic => "dyn",
+        // Nested TyIds need the module's TyTable to render; the dump shows
+        // the shape only.
+        HirType::Array(_) => "array",
+        HirType::Map(_, _) => "map",
+        HirType::Set(_) => "set",
+        HirType::Class(_) => "class",
+        HirType::Nullable(_) => "nullable",
     }
 }
 

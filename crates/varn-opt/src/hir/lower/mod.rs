@@ -203,6 +203,19 @@ pub struct Lowerer<'a> {
     export_names: &'a [Rc<str>],
     local_globals: rustc_hash::FxHashSet<Rc<str>>,
     source_file: Rc<str>,
+    ty_table: TyTable,
+}
+
+impl<'a> Lowerer<'a> {
+    /// The codegen value type the checker recorded at `offset`
+    /// (see the key convention in `checker_annotations`), interned into
+    /// this module's `TyTable`. Absent annotation means `Dynamic`.
+    pub(super) fn value_ty(&mut self, offset: u32) -> HirType {
+        match self.ann.get_cg_ty(offset) {
+            Some(cg) => self.ty_table.from_cg(cg),
+            None => HirType::Dynamic,
+        }
+    }
 }
 
 enum BodyRef<'b> {
@@ -281,6 +294,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
         export_names: &input.export_names,
         local_globals,
         source_file: Rc::from(input.program.filename.replace('\\', "/")),
+        ty_table: TyTable::default(),
     };
 
     let mut functions = Vec::new();
@@ -357,6 +371,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
     Ok(HirModule {
         top_level,
         functions,
+        ty_table: Rc::new(lo.ty_table),
     })
 }
 

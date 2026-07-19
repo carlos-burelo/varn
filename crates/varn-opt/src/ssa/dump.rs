@@ -22,8 +22,13 @@ fn dump_block(out: &mut String, func: &SsaFunc, id: u32, block: &Block) {
         .join(", ");
     let _ = writeln!(out, "  b{id}({params}):");
     for inst in &block.insts {
+        // Non-Dynamic result types are printed so typed-value coverage is
+        // verifiable from the dump.
         let lhs = match inst.dest {
-            Some(v) => format!("{} = ", val(v)),
+            Some(v) => match func.value_ty(v) {
+                HirType::Dynamic => format!("{} = ", val(v)),
+                t => format!("{}: {} = ", val(v), ty(t)),
+            },
             None => String::new(),
         };
         let _ = writeln!(out, "    {lhs}{}", inst_kind(&inst.kind));
@@ -315,6 +320,13 @@ fn ty(t: HirType) -> &'static str {
         HirType::Str => IntrinsicType::Str.as_str(),
         HirType::Ref => "ref",
         HirType::Dynamic => "dyn",
+        // Nested TyIds need the module's TyTable to render; the dump shows
+        // the shape only.
+        HirType::Array(_) => "array",
+        HirType::Map(_, _) => "map",
+        HirType::Set(_) => "set",
+        HirType::Class(_) => "class",
+        HirType::Nullable(_) => "nullable",
     }
 }
 
