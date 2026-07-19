@@ -1,4 +1,5 @@
 pub mod assembler;
+pub mod clif;
 pub(crate) mod codegen;
 pub mod compiler;
 pub(crate) mod loop_hoist;
