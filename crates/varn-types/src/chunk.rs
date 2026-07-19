@@ -504,6 +504,11 @@ pub struct FunctionProto {
     #[serde(default)]
     pub param_kinds: Vec<crate::register_meta::SlotKind>,
 
+    /// Declared return slot kind. `Dynamic` when unannotated — the
+    /// Cranelift wrapper may only re-tag when this proves Int.
+    #[serde(default = "slot_kind_dynamic")]
+    pub return_kind: crate::register_meta::SlotKind,
+
     /// Runtime cache: `PoolEntry::Shape` constants resolved to their
     /// `Shape` in the (globally cached) transition tree, so object literals
     /// don't re-derive the shape key-by-key on every allocation. Protos hold
@@ -532,6 +537,10 @@ pub struct FunctionProto {
     #[serde(skip)]
     #[serde(default)]
     pub static_closure_val: std::cell::Cell<u64>,
+}
+
+fn slot_kind_dynamic() -> crate::register_meta::SlotKind {
+    crate::register_meta::SlotKind::Dynamic
 }
 
 fn proto_ic_default() -> Rc<RefCell<Vec<PolyICSlot>>> {

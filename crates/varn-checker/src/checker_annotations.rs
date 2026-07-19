@@ -359,6 +359,12 @@ fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
         }
         Decl::Function(f) => {
             if !f.modifiers.is_declare {
+                // Declared return type, keyed at the function name offset
+                // (decl-space, disjoint from expression keys).
+                if let Some(rt) = &f.return_type {
+                    let ty = resolve_type_node(rt, Some(ctx.bind));
+                    record_cg_ty_at(f.id_offset, &ty, ann, ctx);
+                }
                 let mut local_ctx = ctx.clone();
                 for p in &f.params {
                     let name_opt = match &p.pattern {

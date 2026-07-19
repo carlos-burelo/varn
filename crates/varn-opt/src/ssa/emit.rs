@@ -23,6 +23,7 @@ pub fn emit_function(
     let (reg, scratch, null_reg, call_base, register_count) = assign_registers(&ssa, nparams)?;
     let register_meta = derive_register_meta(&ssa, &reg, register_count, nparams, f.has_this);
     let param_kinds: Vec<_> = f.params.iter().map(|p| slot_kind_of(p.ty)).collect();
+    let return_kind = slot_kind_of(f.return_ty);
 
     let n = ssa.blocks.len();
     let mut chunk = Chunk::new();
@@ -101,6 +102,7 @@ pub fn emit_function(
         required_caps: Vec::new(),
         register_meta,
         param_kinds,
+        return_kind,
         resolved_shapes: RefCell::new(Vec::new()),
         jit_entry: Cell::new(None),
         jit_code: RefCell::new(None),

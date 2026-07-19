@@ -17,7 +17,7 @@ impl<'a> Lowerer<'a> {
         f: &FunctionDecl,
         scope: &mut Scope,
     ) -> R<(HirFunction, Vec<HirUpvalueSrc>)> {
-        self.lower_function_like(
+        let (mut func, upvalues) = self.lower_function_like(
             f.id.clone(),
             &f.params,
             f.modifiers.is_async,
@@ -27,7 +27,11 @@ impl<'a> Lowerer<'a> {
             BodyRef::Block(&f.body),
             &[],
             scope,
-        )
+        )?;
+        // Declared return type, recorded by the checker at the function's
+        // name offset.
+        func.return_ty = self.value_ty(f.id_offset);
+        Ok((func, upvalues))
     }
 
     pub(super) fn lower_class(&mut self, decl: &ClassDecl, scope: &mut Scope) -> R<HirClass> {

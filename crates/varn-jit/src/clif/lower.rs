@@ -192,6 +192,60 @@ fn lower_raw(
     block_starts.sort_unstable();
     block_starts.dedup();
 
+    // ---- loop hoisting plan ----
+    // Post-linearization (loop-aware RPO in ssa/emit) loops are CONTIGUOUS:
+    // a `Loop` op at L targeting T delimits the region [T, L). For each
+    // region, array receivers that are never redefined inside it get their
+    // payload pointer resolved ONCE in the fall-through preheader into a
+    // cache variable (0 = invalid — matching the template's loop_hoist
+    // sentinel; no live allocation sits at address 0). Accesses test the
+    // cache and skip the whole tag/generation/slot walk on hit. Sound for
+    // the routed subset: nothing under a routed frame can run a GC, and an
+    // append only mutates the payload's inner words, never the payload
+    // pointer itself.
+    let mut regions: Vec<(usize, usize, Vec<usize>)> = Vec::new();
+    {
+        let mut ip = 0usize;
+        while ip < code.len() {
+            let info = decode(code, ip, pool).ok_or("clif: undecodable opcode")?;
+            if OpCode::from_u8(code[ip] as u8) == Some(OpCode::Loop) {
+                let off = ((code[ip + 1] as u32) << 16 | code[ip + 2] as u32) as usize;
+                let header = (ip + 3) - off;
+                if header > 0 {
+                    let mut receivers: Vec<usize> = Vec::new();
+                    let mut redefined: Vec<usize> = Vec::new();
+                    let mut j = header;
+                    while j < ip {
+                        let jinfo = decode(code, j, pool).ok_or("clif: undecodable opcode")?;
+                        let jop = OpCode::from_u8(code[j] as u8).ok_or("clif: unknown opcode")?;
+                        let dest = (code[j] >> 8) as usize;
+                        match jop {
+                            OpCode::ArrayGetIndex | OpCode::ArrayLength => {
+                                receivers.push((code[j + 1] >> 8) as usize);
+                                redefined.push(dest);
+                            }
+                            OpCode::ArraySetIndex => receivers.push(dest),
+                            OpCode::CallSelf => redefined.push((code[j + 1] >> 8) as usize),
+                            _ => {
+                                if jinfo.def.is_some() {
+                                    redefined.push(dest);
+                                }
+                            }
+                        }
+                        j += jinfo.len;
+                    }
+                    receivers.sort_unstable();
+                    receivers.dedup();
+                    receivers.retain(|r| !redefined.contains(r));
+                    if !receivers.is_empty() {
+                        regions.push((header, ip, receivers));
+                    }
+                }
+            }
+            ip += info.len;
+        }
+    }
+
     // ---- build ----
     let mut func = Function::with_name_signature(
         UserFuncName::user(0, 0),
@@ -210,6 +264,14 @@ fn lower_raw(
     let mut b = FunctionBuilder::new(&mut func, &mut fb_ctx);
 
     let vars: Vec<Variable> = (0..nregs).map(|_| b.declare_var(types::I64)).collect();
+    // One payload-cache variable per (loop region, receiver register).
+    // Zero-defined at entry like every var, and 0 means "not resolved":
+    // the frontend's all-paths-defined rule and the sentinel share a def.
+    let cache_vars: HashMap<(usize, usize), Variable> = regions
+        .iter()
+        .flat_map(|(h, _, regs)| regs.iter().map(move |r| (*h, *r)))
+        .map(|k| (k, b.declare_var(types::I64)))
+        .collect();
 
     let entry = b.create_block();
     b.append_block_params_for_function_params(entry);
@@ -219,6 +281,9 @@ fn lower_raw(
     // every path; Cranelift's DCE removes the dead zeros.
     let zero = b.ins().iconst(types::I64, 0);
     for v in &vars {
+        b.def_var(*v, zero);
+    }
+    for v in cache_vars.values() {
         b.def_var(*v, zero);
     }
     let exec_ctx = b.block_params(entry)[0];
@@ -252,6 +317,37 @@ fn lower_raw(
     while ip < code.len() {
         if let Some(blk) = blocks.get(&ip) {
             if !terminated {
+                // Falling through into a loop header: this block is the
+                // preheader — resolve each planned receiver's payload into
+                // its cache (sentinel 0 when the guard chain rejects).
+                for (h, _, regs) in regions.iter().filter(|(h, _, _)| *h == ip) {
+                    for &r in regs {
+                        if state[r] != K::Boxed {
+                            continue;
+                        }
+                        let obj = b.use_var(vars[r]);
+                        let cache = cache_vars[&(*h, r)];
+                        let invalid = b.create_block();
+                        let done = b.create_block();
+                        b.append_block_param(done, types::I64);
+                        let payload = emit_array_payload(
+                            &mut b,
+                            exec_ctx,
+                            obj,
+                            &helpers.array_layout,
+                            helpers.heap_field_offset,
+                            invalid,
+                            false,
+                        );
+                        b.ins().jump(done, &[payload.into()]);
+                        b.switch_to_block(invalid);
+                        let z = b.ins().iconst(types::I64, 0);
+                        b.ins().jump(done, &[z.into()]);
+                        b.switch_to_block(done);
+                        let resolved = b.block_params(done)[0];
+                        b.def_var(cache, resolved);
+                    }
+                }
                 b.ins().jump(*blk, &[]);
             }
             match entries.get(&ip) {
@@ -391,15 +487,19 @@ fn lower_raw(
             OpCode::Return => {
                 let src = (code[ip + 1] & 0xFF) as usize;
                 // The wrapper re-tags the raw result as an int, so the
-                // source must be PROVEN Int — a Boxed source here could be
-                // any value (an untyped identity function returns its
-                // argument), and coercing it would forge an int from a
-                // heap reference. FunctionProto carries no return kind
-                // yet; until it does, only Int-kind returns route.
-                if state[src] != K::Int {
-                    return Err("clif: unproven return kind".into());
-                }
-                let v = b.use_var(vars[src]);
+                // source must be int by PROOF: either the kind lattice
+                // shows Int, or the value is boxed and the DECLARED return
+                // type is int (checker-enforced at every typed call site).
+                // An untyped identity arrow has neither and bails — a
+                // coerced arbitrary Boxed return would forge an int from a
+                // heap reference.
+                let v = match state[src] {
+                    K::Int => b.use_var(vars[src]),
+                    K::Boxed if proto.return_kind == SlotKind::Int => {
+                        use_int(&mut b, &vars, &state, src)?
+                    }
+                    k => return Err(format!("clif: unproven return kind ({k:?})")),
+                };
                 b.ins().return_(&[v]);
                 terminated = true;
             }
@@ -478,14 +578,15 @@ fn lower_raw(
                 let slow = b.create_block();
                 let merge = b.create_block();
                 b.append_block_param(merge, types::I64); // unboxed len
-                let payload = emit_array_payload(
+                let cache = find_cache(&regions, &cache_vars, ip, src);
+                let payload = cached_payload(
                     &mut b,
                     exec_ctx,
                     obj,
                     &helpers.array_layout,
                     helpers.heap_field_offset,
                     slow,
-                    false,
+                    cache,
                 );
                 let len = b.ins().load(
                     types::I64,
@@ -513,14 +614,15 @@ fn lower_raw(
                 let slow = b.create_block();
                 let merge = b.create_block();
                 b.append_block_param(merge, types::I64); // boxed element
-                let payload = emit_array_payload(
+                let cache = find_cache(&regions, &cache_vars, ip, obj_r);
+                let payload = cached_payload(
                     &mut b,
                     exec_ctx,
                     obj,
                     &helpers.array_layout,
                     helpers.heap_field_offset,
                     slow,
-                    false,
+                    cache,
                 );
                 let lay = &helpers.array_layout;
                 let len = b.ins().load(
@@ -584,14 +686,15 @@ fn lower_raw(
                 let val = box_int(&mut b, raw_val);
                 let slow = b.create_block();
                 let merge = b.create_block();
-                let payload = emit_array_payload(
+                let cache = find_cache(&regions, &cache_vars, ip, obj_r);
+                let payload = cached_payload(
                     &mut b,
                     exec_ctx,
                     obj,
                     &helpers.array_layout,
                     helpers.heap_field_offset,
                     slow,
-                    false,
+                    cache,
                 );
                 let lay = &helpers.array_layout;
                 let len = b.ins().load(
@@ -878,6 +981,20 @@ fn state_meta_int(meta: &[varn_types::register_meta::RegisterMeta], r: usize) ->
     meta.get(r).map_or(false, |m| m.kind == SlotKind::Int)
 }
 
+/// Innermost loop region containing `ip` with a hoisted cache for `r`.
+fn find_cache(
+    regions: &[(usize, usize, Vec<usize>)],
+    cache_vars: &HashMap<(usize, usize), Variable>,
+    ip: usize,
+    r: usize,
+) -> Option<Variable> {
+    regions
+        .iter()
+        .filter(|(h, e, regs)| *h <= ip && ip < *e && regs.contains(&r))
+        .min_by_key(|(h, e, _)| e - h)
+        .map(|(h, _, _)| cache_vars[&(*h, r)])
+}
+
 /// Indirect call to a template-JIT runtime helper
 /// (`extern "C" fn(exec_ctx, VmValue…) -> VmValue`). The admitted helpers
 /// never allocate on the VM heap (no GC can run under a clif frame) and
@@ -898,6 +1015,37 @@ fn call_helper(
     let ptr = b.ins().iconst(types::I64, helper as i64);
     let call = b.ins().call_indirect(sig_ref, ptr, args);
     b.inst_results(call)[0]
+}
+
+/// Payload via the loop cache when one exists for this access: cache != 0
+/// short-circuits the whole guard walk (one test + branch, perfectly
+/// predicted after iteration one); cache == 0 — or no cache — takes the
+/// full resolve.
+#[allow(clippy::too_many_arguments)]
+fn cached_payload(
+    b: &mut FunctionBuilder,
+    exec_ctx: cranelift_codegen::ir::Value,
+    obj: cranelift_codegen::ir::Value,
+    lay: &crate::JitArrayLayout,
+    heap_off: usize,
+    slow: cranelift_codegen::ir::Block,
+    cache: Option<Variable>,
+) -> cranelift_codegen::ir::Value {
+    match cache {
+        Some(cv) => {
+            let c = b.use_var(cv);
+            let full = b.create_block();
+            let ready = b.create_block();
+            b.append_block_param(ready, types::I64);
+            b.ins().brif(c, ready, &[c.into()], full, &[]);
+            b.switch_to_block(full);
+            let p = emit_array_payload(b, exec_ctx, obj, lay, heap_off, slow, false);
+            b.ins().jump(ready, &[p.into()]);
+            b.switch_to_block(ready);
+            b.block_params(ready)[0]
+        }
+        None => emit_array_payload(b, exec_ctx, obj, lay, heap_off, slow, false),
+    }
 }
 
 /// Resolve a boxed receiver down to its array payload pointer (the three
