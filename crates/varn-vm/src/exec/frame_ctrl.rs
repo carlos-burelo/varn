@@ -255,6 +255,26 @@ impl NativeCtx for ExecCtx {
         self.heap.alloc_str_dynamic(s)
     }
 
+    fn map_key(&mut self, v: VmValue) -> varn_types::value::MapKey {
+        self.heap.canonical_map_key(v)
+    }
+
+    // Map keys MUST canonicalize through the content interner —
+    // `alloc_str_dynamic` (and the trait default's `intern`) would mint a
+    // fresh index per call and break key equality.
+    fn str_map_key(&mut self, s: &str) -> varn_types::value::MapKey {
+        match VmValue::try_from_sso(s) {
+            Some(v) => varn_types::value::MapKey(v),
+            None => varn_types::value::MapKey(self.heap.alloc_str_interned(s)),
+        }
+    }
+
+    fn collection_write_barrier(&mut self, parent: VmValue, child: VmValue) {
+        if parent.is_heap() {
+            self.heap.write_barrier(parent.as_heap_idx(), child);
+        }
+    }
+
     fn alloc_str_owned(&mut self, s: String) -> VmValue {
         self.heap.alloc_str_dynamic(&s)
     }
@@ -779,16 +799,18 @@ impl NativeCtx for ExecCtx {
                     Ok(varn_types::value::SendValue::Object(map))
                 }
                 Some(HeapObj::Map(map_ref)) => {
+                    let map_ref = map_ref.clone();
                     let mut items = Vec::new();
                     for (k, v) in map_ref.read().iter() {
-                        items.push((self.value_to_sendable(k)?, self.value_to_sendable(v)?));
+                        items.push((self.to_sendable(k.0)?, self.to_sendable(*v)?));
                     }
                     Ok(varn_types::value::SendValue::Map(items))
                 }
                 Some(HeapObj::Set(set_ref)) => {
+                    let set_ref = set_ref.clone();
                     let mut items = Vec::new();
                     for v in set_ref.read().iter() {
-                        items.push(self.value_to_sendable(v)?);
+                        items.push(self.to_sendable(v.0)?);
                     }
                     Ok(varn_types::value::SendValue::Set(items))
                 }
@@ -885,14 +907,14 @@ impl ExecCtx {
             varn_types::Value::Map(map_ref) => {
                 let mut items = Vec::new();
                 for (k, v) in map_ref.read().iter() {
-                    items.push((self.value_to_sendable(k)?, self.value_to_sendable(v)?));
+                    items.push((self.to_sendable(k.0)?, self.to_sendable(*v)?));
                 }
                 Ok(varn_types::value::SendValue::Map(items))
             }
             varn_types::Value::Set(set_ref) => {
                 let mut items = Vec::new();
-                for v in set_ref.read().iter() {
-                    items.push(self.value_to_sendable(v)?);
+                for k in set_ref.read().iter() {
+                    items.push(self.to_sendable(k.0)?);
                 }
                 Ok(varn_types::value::SendValue::Set(items))
             }

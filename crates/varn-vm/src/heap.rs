@@ -840,8 +840,9 @@ impl HeapInner {
         if let Some(sso) = VmValue::try_from_sso(s_ref) {
             return sso;
         }
-        let rs: RuntimeString = Rc::from(s_ref);
-        if let Some(&packed) = self.string_interner.get(&rs) {
+        // Borrowed lookup first: the hot path (already-interned key) must
+        // not allocate an Rc<str> just to probe the map.
+        if let Some(&packed) = self.string_interner.get(s_ref) {
             let raw = old_idx_raw(packed);
             if self
                 .objects
@@ -851,8 +852,9 @@ impl HeapInner {
             {
                 return VmValue::from_heap_idx(packed);
             }
-            self.string_interner.remove(&rs);
+            self.string_interner.remove(s_ref);
         }
+        let rs: RuntimeString = Rc::from(s_ref);
         let oi = alloc_into(
             &mut self.objects,
             &mut self.free,
@@ -986,6 +988,91 @@ impl HeapInner {
     
     pub fn make_int(&mut self, n: i64) -> VmValue {
         VmValue::from_int(n)
+    }
+
+    /// Read-only canonical map key for a borrowed string: `None` means the
+    /// string was never interned, so no map can contain it as a key
+    /// (insertion canonicalizes through the interner).
+    pub fn lookup_str_map_key(&self, s: &str) -> Option<varn_types::value::MapKey> {
+        if let Some(sso) = VmValue::try_from_sso(s) {
+            return Some(varn_types::value::MapKey(sso));
+        }
+        self.string_interner
+            .get(s)
+            .map(|&packed| varn_types::value::MapKey(VmValue::from_heap_idx(packed)))
+    }
+
+    /// Read-only counterpart of [`Self::canonical_map_key`] for lookups:
+    /// `None` means "definitely not a key of any map" (its canonical form
+    /// was never interned), so `get`/`has`/`delete` need no allocation.
+    pub fn lookup_map_key(&self, v: VmValue) -> Option<varn_types::value::MapKey> {
+        use varn_types::value::MapKey;
+        if v.is_f64() {
+            if v.as_f64() == 0.0 {
+                return Some(MapKey(VmValue::from_f64(0.0)));
+            }
+            return Some(MapKey(v));
+        }
+        if !v.is_heap() {
+            return Some(MapKey(v));
+        }
+        match self.get_by_idx(v.as_heap_idx()) {
+            Some(HeapObj::Str(s)) => self.lookup_str_map_key(s.as_str()),
+            Some(HeapObj::Char(c)) => self
+                .char_interner
+                .get(c)
+                .map(|&p| MapKey(VmValue::from_heap_idx(p))),
+            Some(HeapObj::BigInt(b)) => self
+                .bigint_interner
+                .get(b)
+                .map(|&p| MapKey(VmValue::from_heap_idx(p))),
+            Some(HeapObj::Decimal(d)) => self
+                .decimal_interner
+                .get(d)
+                .map(|&p| MapKey(VmValue::from_heap_idx(p))),
+            _ => Some(MapKey(v)),
+        }
+    }
+
+    /// Canonicalize a value for `Map`/`Set` keying: content-equal keys must
+    /// be bit-equal (see `varn_types::value::MapKey`). SSO/int/bool/null/
+    /// symbol are canonical by representation; heap strings, chars,
+    /// decimals and bigints canonicalize through the content interners
+    /// (old-gen allocations, so minor GC never moves a canonical key);
+    /// floats normalize `-0.0` (SameValueZero); everything else keys by
+    /// identity.
+    pub fn canonical_map_key(&mut self, v: VmValue) -> varn_types::value::MapKey {
+        use varn_types::value::MapKey;
+        if v.is_f64() {
+            if v.as_f64() == 0.0 {
+                return MapKey(VmValue::from_f64(0.0));
+            }
+            return MapKey(v);
+        }
+        if !v.is_heap() {
+            return MapKey(v);
+        }
+        enum Canon {
+            Str(String),
+            Char(char),
+            BigInt(i128),
+            Decimal(rust_decimal::Decimal),
+            Identity,
+        }
+        let canon = match self.get_by_idx(v.as_heap_idx()) {
+            Some(HeapObj::Str(s)) => Canon::Str(s.as_str().to_owned()),
+            Some(HeapObj::Char(c)) => Canon::Char(*c),
+            Some(HeapObj::BigInt(b)) => Canon::BigInt(*b),
+            Some(HeapObj::Decimal(d)) => Canon::Decimal(**d),
+            _ => Canon::Identity,
+        };
+        match canon {
+            Canon::Str(s) => MapKey(self.alloc_str_interned(s)),
+            Canon::Char(c) => MapKey(self.intern(Value::Char(c))),
+            Canon::BigInt(b) => MapKey(self.intern(Value::BigInt(Box::new(b)))),
+            Canon::Decimal(d) => MapKey(self.intern(Value::Decimal(Box::new(d)))),
+            Canon::Identity => MapKey(v),
+        }
     }
 
     pub fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue {
@@ -1806,6 +1893,26 @@ impl NativeCtx for Heap {
 
     fn intern(&mut self, v: Value) -> VmValue {
         self.deref_mut().intern(v)
+    }
+
+    fn map_key(&mut self, v: VmValue) -> varn_types::value::MapKey {
+        self.deref_mut().canonical_map_key(v)
+    }
+
+    // See ExecCtx's impl: keys must canonicalize through the content
+    // interner, not the trait default's `intern` (which allocates
+    // dynamically for strings).
+    fn str_map_key(&mut self, s: &str) -> varn_types::value::MapKey {
+        match VmValue::try_from_sso(s) {
+            Some(v) => varn_types::value::MapKey(v),
+            None => varn_types::value::MapKey(self.deref_mut().alloc_str_interned(s)),
+        }
+    }
+
+    fn collection_write_barrier(&mut self, parent: VmValue, child: VmValue) {
+        if parent.is_heap() {
+            self.deref_mut().write_barrier(parent.as_heap_idx(), child);
+        }
     }
 
     fn call_static(&mut self, f: NativeFn) -> VmValue {

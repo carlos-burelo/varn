@@ -12,13 +12,6 @@ fn get_map(ctx: &dyn NativeCtx, this: VmValue) -> Option<MapRef> {
     }
 }
 
-// Map keys hash by content; routing them through `ctx.alloc_str` would
-// intern every dynamic key (retaining it forever) and pay an extra heap
-// allocation per lookup.
-fn str_key(key: &str) -> Value {
-    Value::Str(std::rc::Rc::from(key))
-}
-
 varn_contract! {
     module: "globals",
     class: "Map",
@@ -30,22 +23,23 @@ varn_contract! {
 
         fn get(ctx: &mut dyn NativeCtx, this: VmValue, key: &str) -> Option<VmValue> {
             let m = get_map(ctx, this)?;
-            let key_val = str_key(key);
-            let found = m.borrow().get(&key_val).cloned();
-            found.map(|v| ctx.intern(v))
+            let k = ctx.str_map_key(key);
+            let found = m.borrow().get(&k).copied();
+            found
         }
         fn set(ctx: &mut dyn NativeCtx, this: VmValue, key: &str, value: VmValue) {
             if let Some(m) = get_map(ctx, this) {
-                let key_val = str_key(key);
-                let val = ctx.extract(value);
-                m.borrow_mut().insert(key_val, val);
+                let k = ctx.str_map_key(key);
+                m.borrow_mut().insert(k, value);
+                // Interior-mutability store: no opcode barrier sees it.
+                ctx.collection_write_barrier(this, value);
             }
         }
         fn has(ctx: &mut dyn NativeCtx, this: VmValue, key: &str) -> bool {
             match get_map(ctx, this) {
                 Some(m) => {
-                    let key_val = str_key(key);
-                    m.borrow().contains_key(&key_val)
+                    let k = ctx.str_map_key(key);
+                    m.borrow().contains_key(&k)
                 }
                 None => false,
             }
@@ -53,8 +47,8 @@ varn_contract! {
         fn delete(ctx: &mut dyn NativeCtx, this: VmValue, key: &str) -> bool {
             match get_map(ctx, this) {
                 Some(m) => {
-                    let key_val = str_key(key);
-                    m.borrow_mut().remove(&key_val).is_some()
+                    let k = ctx.str_map_key(key);
+                    m.borrow_mut().remove(&k).is_some()
                 }
                 None => false,
             }
@@ -66,34 +60,24 @@ varn_contract! {
         }
         fn keys(ctx: &mut dyn NativeCtx, this: VmValue) -> Vec<VmValue> {
             match get_map(ctx, this) {
-                Some(m) => {
-                    let ks: Vec<Value> = m.borrow().keys().cloned().collect();
-                    ks.into_iter().map(|k| ctx.intern(k)).collect()
-                }
+                Some(m) => m.borrow().keys().map(|k| k.0).collect(),
                 None => Vec::new(),
             }
         }
         fn values(ctx: &mut dyn NativeCtx, this: VmValue) -> Vec<VmValue> {
             match get_map(ctx, this) {
-                Some(m) => {
-                    let vs: Vec<Value> = m.borrow().values().cloned().collect();
-                    vs.into_iter().map(|v| ctx.intern(v)).collect()
-                }
+                Some(m) => m.borrow().values().copied().collect(),
                 None => Vec::new(),
             }
         }
         fn entries(ctx: &mut dyn NativeCtx, this: VmValue) -> Vec<VmValue> {
             match get_map(ctx, this) {
                 Some(m) => {
-                    let pairs: Vec<(Value, Value)> =
-                        m.borrow().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                    let pairs: Vec<(VmValue, VmValue)> =
+                        m.borrow().iter().map(|(k, v)| (k.0, *v)).collect();
                     pairs
                         .into_iter()
-                        .map(|(k, v)| {
-                            let kn = ctx.intern(k);
-                            let vn = ctx.intern(v);
-                            ctx.alloc_array(vec![kn, vn])
-                        })
+                        .map(|(k, v)| ctx.alloc_array(vec![k, v]))
                         .collect()
                 }
                 None => Vec::new(),
@@ -101,12 +85,10 @@ varn_contract! {
         }
         fn forEach(ctx: &mut dyn NativeCtx, this: VmValue, callback: VmValue) {
             if let Some(m) = get_map(ctx, this) {
-                let pairs: Vec<(Value, Value)> =
-                    m.borrow().iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+                let pairs: Vec<(VmValue, VmValue)> =
+                    m.borrow().iter().map(|(k, v)| (k.0, *v)).collect();
                 for (k, v) in pairs {
-                    let kn = ctx.intern(k);
-                    let vn = ctx.intern(v);
-                    let _ = ctx.call_vm(callback, &[vn, kn, this]);
+                    let _ = ctx.call_vm(callback, &[v, k, this]);
                 }
             }
         }

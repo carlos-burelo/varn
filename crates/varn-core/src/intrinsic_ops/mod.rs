@@ -1,3 +1,4 @@
+pub mod collections;
 pub mod int;
 pub mod map;
 pub mod math;
@@ -14,6 +15,8 @@ pub fn core_method_intrinsic(class: &str, method: &str) -> Option<u8> {
     let entries: &[(&str, u8)] = match class {
         "str" => self::str::METHOD_ENTRIES,
         "int" => self::int::METHOD_ENTRIES,
+        "Map" => self::collections::MAP_METHOD_ENTRIES,
+        "Set" => self::collections::SET_METHOD_ENTRIES,
         _ => return None,
     };
     entries

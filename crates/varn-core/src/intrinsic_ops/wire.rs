@@ -4,6 +4,8 @@ pub enum IntrinsicDomain {
     Math = 0x0,
     Str = 0x1,
     Int = 0x2,
+    Map = 0x3,
+    Set = 0x4,
 }
 
 #[inline(always)]

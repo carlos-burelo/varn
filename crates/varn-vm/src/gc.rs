@@ -259,18 +259,18 @@ impl TricolorMarker {
                 HeapObj::Map(map_ref) => {
                     let m = map_ref.0.borrow();
                     for (k, v) in m.iter() {
-                        if let Some(ci) = heap.value_heap_idx(k) {
+                        if let Some(ci) = heap.get_heap_idx(k.0) {
                             self.mark_gray(ci);
                         }
-                        if let Some(ci) = heap.value_heap_idx(v) {
+                        if let Some(ci) = heap.get_heap_idx(*v) {
                             self.mark_gray(ci);
                         }
                     }
                 }
                 HeapObj::Set(set_ref) => {
                     let s = set_ref.0.borrow();
-                    for v in s.iter() {
-                        if let Some(ci) = heap.value_heap_idx(v) {
+                    for k in s.iter() {
+                        if let Some(ci) = heap.get_heap_idx(k.0) {
                             self.mark_gray(ci);
                         }
                     }

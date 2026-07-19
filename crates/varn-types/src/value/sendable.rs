@@ -98,17 +98,22 @@ impl Value {
                 }
                 Ok(SendValue::Object(map))
             }
+            // Map/Set entries are raw VmValues; without a heap only
+            // scalar/SSO entries convert (`nv_to_value` wraps heap refs as
+            // opaque payloads, which the catch-all below rejects). The
+            // heap-aware channel path (`NativeCtx::to_sendable` in the VM)
+            // handles arbitrary entries and is what `send` actually uses.
             Value::Map(map_ref) => {
                 let mut items = Vec::new();
                 for (k, v) in map_ref.read().iter() {
-                    items.push((k.to_sendable()?, v.to_sendable()?));
+                    items.push((nv_to_value(k.0).to_sendable()?, nv_to_value(*v).to_sendable()?));
                 }
                 Ok(SendValue::Map(items))
             }
             Value::Set(set_ref) => {
                 let mut items = Vec::new();
                 for v in set_ref.read().iter() {
-                    items.push(v.to_sendable()?);
+                    items.push(nv_to_value(v.0).to_sendable()?);
                 }
                 Ok(SendValue::Set(items))
             }
@@ -187,11 +192,17 @@ impl SendValue {
                     .iter()
                     .map(|(k, v)| (Rc::from(k.as_str()), value_to_nv(&v.to_value()))),
             )),
+            // Heap-free materialization only round-trips scalar/SSO entries
+            // (all `value_to_nv` handles); the ctx variant below covers the
+            // rest and is what channel delivery uses.
             SendValue::Map(entries) => {
                 let map_ref = alloc_map();
                 let mut g = map_ref.write();
                 for (k, v) in entries {
-                    g.insert(k.to_value(), v.to_value());
+                    g.insert(
+                        crate::value::MapKey(value_to_nv(&k.to_value())),
+                        value_to_nv(&v.to_value()),
+                    );
                 }
                 drop(g);
                 Value::Map(map_ref)
@@ -200,7 +211,7 @@ impl SendValue {
                 let set_ref = alloc_set();
                 let mut g = set_ref.write();
                 for item in items {
-                    g.insert(item.to_value());
+                    g.insert(crate::value::MapKey(value_to_nv(&item.to_value())));
                 }
                 drop(g);
                 Value::Set(set_ref)
@@ -250,7 +261,8 @@ impl SendValue {
                 for (k, v) in entries {
                     let k_nv = k.to_value_ctx(ctx);
                     let v_nv = v.to_value_ctx(ctx);
-                    g.insert(ctx.extract(k_nv), ctx.extract(v_nv));
+                    let key = ctx.map_key(k_nv);
+                    g.insert(key, v_nv);
                 }
                 drop(g);
                 ctx.intern(Value::Map(map_ref))
@@ -260,7 +272,8 @@ impl SendValue {
                 let mut g = set_ref.write();
                 for item in items {
                     let item_nv = item.to_value_ctx(ctx);
-                    g.insert(ctx.extract(item_nv));
+                    let key = ctx.map_key(item_nv);
+                    g.insert(key);
                 }
                 drop(g);
                 ctx.intern(Value::Set(set_ref))

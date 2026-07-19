@@ -214,7 +214,7 @@ fn get_property_value(obj: &Value, key: &str, heap: &mut Heap) -> Result<Value, 
         return Ok(v);
     }
 
-    if let Some(v) = resolve_specialized_value_property(obj, key) {
+    if let Some(v) = resolve_specialized_value_property(obj, key, heap) {
         return v;
     }
 
@@ -291,7 +291,11 @@ fn resolve_intrinsic_method_property(obj: &Value, key: &str, heap: &mut Heap) ->
     None
 }
 
-fn resolve_specialized_value_property(obj: &Value, key: &str) -> Option<Result<Value, String>> {
+fn resolve_specialized_value_property(
+    obj: &Value,
+    key: &str,
+    heap: &Heap,
+) -> Option<Result<Value, String>> {
     match obj {
         Value::Class(cls) => {
             if let Some(v) = cls.get_static(key) {
@@ -323,10 +327,10 @@ fn resolve_specialized_value_property(obj: &Value, key: &str) -> Option<Result<V
             None
         }
         Value::Map(m) => {
-            m.0.borrow()
-                .get(&Value::Str(Rc::from(key)))
-                .cloned()
-                .map(Ok)
+            let found = heap
+                .lookup_str_map_key(key)
+                .and_then(|k| m.0.borrow().get(&k).copied());
+            found.map(|nv| Ok(heap.extract(nv)))
         }
         Value::Set(_) => {
             if key == "size" || key == "length" {

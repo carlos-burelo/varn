@@ -23,15 +23,18 @@ varn_contract! {
 
         fn add(ctx: &mut dyn NativeCtx, this: VmValue, value: VmValue) {
             if let Some(s) = get_set(ctx, this) {
-                let val = ctx.extract(value);
-                s.borrow_mut().insert(val);
+                let k = ctx.map_key(value);
+                s.borrow_mut().insert(k);
+                // Identity keys can hold nursery indices; interior-mutability
+                // store, so no opcode barrier sees it.
+                ctx.collection_write_barrier(this, k.0);
             }
         }
         fn has(ctx: &mut dyn NativeCtx, this: VmValue, value: VmValue) -> bool {
             match get_set(ctx, this) {
                 Some(s) => {
-                    let val = ctx.extract(value);
-                    s.borrow().contains(&val)
+                    let k = ctx.map_key(value);
+                    s.borrow().contains(&k)
                 }
                 None => false,
             }
@@ -39,8 +42,8 @@ varn_contract! {
         fn delete(ctx: &mut dyn NativeCtx, this: VmValue, value: VmValue) -> bool {
             match get_set(ctx, this) {
                 Some(s) => {
-                    let val = ctx.extract(value);
-                    s.borrow_mut().remove(&val)
+                    let k = ctx.map_key(value);
+                    s.borrow_mut().remove(&k)
                 }
                 None => false,
             }
@@ -52,19 +55,15 @@ varn_contract! {
         }
         fn values(ctx: &mut dyn NativeCtx, this: VmValue) -> Vec<VmValue> {
             match get_set(ctx, this) {
-                Some(s) => {
-                    let items: Vec<Value> = s.borrow().iter().cloned().collect();
-                    items.into_iter().map(|v| ctx.intern(v)).collect()
-                }
+                Some(s) => s.borrow().iter().map(|k| k.0).collect(),
                 None => Vec::new(),
             }
         }
         fn forEach(ctx: &mut dyn NativeCtx, this: VmValue, callback: VmValue) {
             if let Some(s) = get_set(ctx, this) {
-                let items: Vec<Value> = s.borrow().iter().cloned().collect();
+                let items: Vec<VmValue> = s.borrow().iter().map(|k| k.0).collect();
                 for v in items {
-                    let v_nv = ctx.intern(v);
-                    let _ = ctx.call_vm(callback, &[v_nv, v_nv, this]);
+                    let _ = ctx.call_vm(callback, &[v, v, this]);
                 }
             }
         }

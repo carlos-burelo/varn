@@ -4,11 +4,28 @@ use std::sync::OnceLock;
 
 pub type RuntimeString = Rc<str>;
 
+/// Canonicalized `Map`/`Set` key. The wrapped `VmValue`'s bit pattern is
+/// content-canonical — produced by `Heap::canonical_map_key`: SSO/int/bool/
+/// null/float(-0 normalized) are canonical by representation; heap strings,
+/// chars, decimals and bigints canonicalize through the content interners
+/// (old-gen, so minor GC never moves them); everything else keys by
+/// identity (its packed heap index). Hash and equality are therefore plain
+/// u64 operations — no heap access, no fat-enum walk.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct MapKey(pub crate::vm_value::VmValue);
+
+impl std::hash::Hash for MapKey {
+    #[inline(always)]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0 .0.hash(state);
+    }
+}
+
 /// Backing storage for the language's `Map`/`Set`. FxHash: these are
 /// single-user, non-adversarial containers, and SipHash dominated lookup
-/// cost for string keys.
-pub type ValueMap = rustc_hash::FxHashMap<super::Value, super::Value>;
-pub type ValueSet = rustc_hash::FxHashSet<super::Value>;
+/// cost. Keys are canonicalized `VmValue`s; values are raw `VmValue`s.
+pub type ValueMap = rustc_hash::FxHashMap<MapKey, crate::vm_value::VmValue>;
+pub type ValueSet = rustc_hash::FxHashSet<MapKey>;
 
 /// Handle to a property object. The fields live inside this same allocation
 /// (see `ObjData`), so there is no inner `RefCell` and no second buffer:

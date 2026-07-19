@@ -126,6 +126,29 @@ pub trait NativeCtx {
         self.intern(v)
     }
 
+    /// Canonicalize a value for use as a `Map`/`Set` key (see
+    /// `varn_types::value::MapKey`). The default is bit-identity — correct
+    /// for SSO/int/bool/null/symbol; heap-backed contexts override it to
+    /// content-intern heap strings/chars/decimals/bigints and to normalize
+    /// `-0.0`.
+    fn map_key(&mut self, v: VmValue) -> crate::value::MapKey {
+        crate::value::MapKey(v)
+    }
+
+    /// Canonical map key for a borrowed string: SSO when short-ASCII,
+    /// content-interned otherwise (`intern(Value::Str)` is content-unique).
+    fn str_map_key(&mut self, s: &str) -> crate::value::MapKey {
+        match VmValue::try_from_sso(s) {
+            Some(v) => crate::value::MapKey(v),
+            None => crate::value::MapKey(self.intern(crate::Value::Str(std::rc::Rc::from(s)))),
+        }
+    }
+
+    /// Record an old→young edge after storing `child` inside `parent`
+    /// (collections mutated through interior mutability, which no opcode
+    /// barrier sees). No-op for heap-less contexts.
+    fn collection_write_barrier(&mut self, _parent: VmValue, _child: VmValue) {}
+
     fn alloc_obj(&mut self) -> VmValue {
         self.alloc_object()
     }

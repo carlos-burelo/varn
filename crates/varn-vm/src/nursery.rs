@@ -232,6 +232,52 @@ impl Nursery {
             return;
         }
 
+        // Map/Set entries are raw VmValues mutated through interior
+        // mutability (the write barrier remembers the collection). Values
+        // rewrite in place; canonical keys (interned strings, scalars) are
+        // old-gen-stable, but identity keys can move — their hash is their
+        // bit pattern, so the table is rebuilt when any key evacuates.
+        let map_ref = match old_gen.get_raw(raw_old) {
+            Some(HeapObj::Map(m)) => Some(m.clone()),
+            _ => None,
+        };
+        if let Some(m) = map_ref {
+            let mut g = m.borrow_mut();
+            for v in g.values_mut() {
+                self.update_value(v, old_gen, worklist);
+            }
+            let any_key_moved = g
+                .keys()
+                .any(|k| k.0.is_heap() && is_nursery_idx(k.0.as_heap_idx()));
+            if any_key_moved {
+                let entries: Vec<(VmValue, VmValue)> =
+                    g.drain().map(|(k, v)| (k.0, v)).collect();
+                for (mut k, v) in entries {
+                    self.update_value(&mut k, old_gen, worklist);
+                    g.insert(varn_types::value::MapKey(k), v);
+                }
+            }
+            return;
+        }
+        let set_ref = match old_gen.get_raw(raw_old) {
+            Some(HeapObj::Set(s)) => Some(s.clone()),
+            _ => None,
+        };
+        if let Some(s) = set_ref {
+            let mut g = s.borrow_mut();
+            let any_key_moved = g
+                .iter()
+                .any(|k| k.0.is_heap() && is_nursery_idx(k.0.as_heap_idx()));
+            if any_key_moved {
+                let items: Vec<VmValue> = g.drain().map(|k| k.0).collect();
+                for mut k in items {
+                    self.update_value(&mut k, old_gen, worklist);
+                    g.insert(varn_types::value::MapKey(k));
+                }
+            }
+            return;
+        }
+
         if let Some(obj) = old_gen.get_raw(raw_old) {
             match obj {
                 HeapObj::Array(arr) => {
