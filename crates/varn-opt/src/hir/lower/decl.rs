@@ -1139,9 +1139,10 @@ impl<'a> Lowerer<'a> {
                 }
             };
             scope.define(pname.clone(), HirBinding::Param(i as u32));
+            let ty = self.value_ty(p.range.start.offset);
             params.push(HirParam {
                 name: pname,
-                ty: param_ty(p),
+                ty,
                 default: None,
             });
         }

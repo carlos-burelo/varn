@@ -377,6 +377,10 @@ fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                         } else {
                             Type::Dynamic
                         };
+                        // Declared parameter type, keyed at the param range
+                        // start (a decl-space offset, disjoint from every
+                        // expression key).
+                        record_cg_ty_at(p.range.start.offset, &ty, ann, ctx);
                         local_ctx.locals.insert(name, ty);
                     }
                 }
@@ -558,6 +562,7 @@ fn annotate_method_body(
             } else {
                 Type::Dynamic
             };
+            record_cg_ty_at(p.range.start.offset, &ty, ann, ctx);
             local_ctx.locals.insert(name, ty);
         }
     }

@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use varn_core::ast::decl::{ExportDecl, ImportSpecifier};
 use varn_core::ast::operators::{AssignOp, BinaryOp, LogicalOp, UnaryOp, UpdateOp};
-use varn_core::ast::{Decl, Expr, Param, Pattern, Stmt, StmtKind};
+use varn_core::ast::{Decl, Expr, Pattern, Stmt, StmtKind};
 use varn_core::{NumericKind, TypeAnnotations};
 
 use crate::hir::*;
@@ -375,9 +375,6 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
     })
 }
 
-fn param_ty(_p: &Param) -> HirType {
-    HirType::Dynamic
-}
 
 fn numeric_ty(ann: &TypeAnnotations, offset: u32) -> HirType {
     match ann.get_numeric(offset) {
