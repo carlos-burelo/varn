@@ -1,4 +1,5 @@
 pub mod ast;
+pub mod cg_ty;
 pub mod doc;
 pub mod error;
 pub mod intrinsic_ops;
@@ -32,6 +33,7 @@ pub use numeric::{binary_operand_kind, binary_result_kind, wrap_i48, NumericOper
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
+pub use cg_ty::CgTy;
 pub use token::{ParsedNumber, Token, TokenKind};
 pub use typed_ir::{NumericKind, TypeAnnotations};
 pub use varn_base::TypeTag;

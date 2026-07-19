@@ -15,6 +15,10 @@ pub struct ExprAnnotation {
     /// Enables the compiler to emit `ArrayGetIndex`/`ArraySetIndex` instead of the generic
     /// `GetIndex`/`SetIndex`, skipping the runtime heap-type dispatch.
     pub array_index: bool,
+    /// Codegen projection of this expression's checker-inferred VALUE type
+    /// (see `crate::cg_ty`). Recorded where the value's type matters
+    /// downstream (loads, calls, identifiers); absent means Dynamic.
+    pub cg_ty: Option<crate::cg_ty::CgTy>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -103,6 +107,15 @@ impl TypeAnnotations {
     /// Returns `true` when the object of the computed-member at `offset` is a known Array.
     pub fn get_array_index(&self, offset: u32) -> bool {
         self.inner.get(&offset).map_or(false, |a| a.array_index)
+    }
+
+    /// Record the codegen projection of the expression's value type.
+    pub fn record_cg_ty(&mut self, offset: u32, ty: crate::cg_ty::CgTy) {
+        self.inner.entry(offset).or_default().cg_ty = Some(ty);
+    }
+
+    pub fn get_cg_ty(&self, offset: u32) -> Option<&crate::cg_ty::CgTy> {
+        self.inner.get(&offset)?.cg_ty.as_ref()
     }
 
     /// Mark the member expression at `offset` as a statically-known class fixed field slot access.

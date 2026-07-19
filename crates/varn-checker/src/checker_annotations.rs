@@ -104,6 +104,76 @@ fn get_expr_type(expr: &Expr, ctx: &AnnotateCtx) -> Type {
     }
 }
 
+/// Project a checker type down to the closed codegen vocabulary
+/// (`varn_core::CgTy`). Anything the projection cannot express is
+/// `Dynamic` — never guessed. Class-ness is confirmed against the binder
+/// so interfaces and aliases don't masquerade as concrete classes.
+fn project_cg_ty(ty: &Type, ctx: &AnnotateCtx) -> varn_core::CgTy {
+    use varn_core::CgTy;
+    use varn_core::TypeTag;
+    match &ty.0 {
+        TypeKind::Intrinsic(TypeTag::Int) | TypeKind::LiteralInt(_) => CgTy::Int,
+        TypeKind::Intrinsic(TypeTag::Float) | TypeKind::LiteralFloat(_) => CgTy::Float,
+        TypeKind::Intrinsic(TypeTag::Bool) | TypeKind::LiteralBool(_) => CgTy::Bool,
+        TypeKind::Intrinsic(TypeTag::Str)
+        | TypeKind::LiteralStr(_)
+        | TypeKind::TemplateLiteral(_) => CgTy::Str,
+        TypeKind::Intrinsic(TypeTag::Char) => CgTy::Char,
+        TypeKind::Intrinsic(TypeTag::Decimal) => CgTy::Decimal,
+        TypeKind::Intrinsic(TypeTag::BigInt) => CgTy::BigInt,
+        TypeKind::Array(el) => CgTy::Array(Box::new(project_cg_ty(el, ctx))),
+        TypeKind::Generic(name, args, _) => match (name.as_ref(), args.as_slice()) {
+            ("Array", [el]) => CgTy::Array(Box::new(project_cg_ty(el, ctx))),
+            ("Map", [k, v]) => CgTy::Map(
+                Box::new(project_cg_ty(k, ctx)),
+                Box::new(project_cg_ty(v, ctx)),
+            ),
+            ("Set", [el]) => CgTy::Set(Box::new(project_cg_ty(el, ctx))),
+            _ => CgTy::Dynamic,
+        },
+        TypeKind::Named(name, origin) => match name.as_ref() {
+            "Map" => CgTy::Map(Box::new(CgTy::Dynamic), Box::new(CgTy::Dynamic)),
+            "Set" => CgTy::Set(Box::new(CgTy::Dynamic)),
+            _ => {
+                if ctx
+                    .get_class_members(name, origin.as_ref().map(|o| o.as_ref()))
+                    .is_some()
+                {
+                    CgTy::Class(name.clone())
+                } else {
+                    CgTy::Dynamic
+                }
+            }
+        },
+        TypeKind::Fn(_) => CgTy::Fn,
+        TypeKind::Union(members) => {
+            let non_null: Vec<&Type> = members.iter().filter(|m| !m.is_nullable()).collect();
+            let has_null = non_null.len() < members.len();
+            match (has_null, non_null.as_slice()) {
+                (true, [single]) => {
+                    let inner = project_cg_ty(single, ctx);
+                    if inner == CgTy::Dynamic {
+                        CgTy::Dynamic
+                    } else {
+                        CgTy::Nullable(Box::new(inner))
+                    }
+                }
+                _ => CgTy::Dynamic,
+            }
+        }
+        _ => CgTy::Dynamic,
+    }
+}
+
+/// Record the codegen value type of an expression at `offset`, skipping
+/// `Dynamic` (absence already means Dynamic downstream).
+fn record_cg_ty_at(offset: u32, ty: &Type, ann: &mut TypeAnnotations, ctx: &AnnotateCtx) {
+    let cg = project_cg_ty(ty, ctx);
+    if cg != varn_core::CgTy::Dynamic {
+        ann.record_cg_ty(offset, cg);
+    }
+}
+
 /// The native core class a receiver type belongs to, if any. Only core types
 /// whose methods are natively registered (and thus op-id-addressable).
 fn core_class_of_type(ty: &Type) -> Option<&'static str> {
@@ -631,6 +701,22 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                     }
                 }
             }
+
+            // Value type of the call result. Method calls key at the
+            // method-name offset (call exprs in a chain share their start
+            // offset); plain calls key at the expression start.
+            let result_ty = get_expr_type(expr, ctx);
+            let result_key = if let ExprKind::Member {
+                property,
+                computed: false,
+                ..
+            } = &callee.kind
+            {
+                property.range.start.offset
+            } else {
+                expr.range.start.offset
+            };
+            record_cg_ty_at(result_key, &result_ty, ann, ctx);
         }
         ExprKind::Member {
             object,
@@ -647,9 +733,18 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                 if matches!(obj_ty.non_nullified().0, TypeKind::Array(_)) {
                     ann.record_array_index(expr.range.start.offset);
                 }
+                // Value type of the loaded element, keyed at the index
+                // expression's offset (nested index chains share the
+                // expression start offset).
+                let elem_ty = get_expr_type(expr, ctx);
+                record_cg_ty_at(property.range.start.offset, &elem_ty, ann, ctx);
             } else if let ExprKind::Identifier { name: prop_name } = &property.kind {
                 let obj_ty = get_expr_type(object, ctx);
                 let check_ty = obj_ty.non_nullified();
+                // Value type of the property load, keyed at the property
+                // name offset (chained members share the expression start).
+                let member_ty = get_expr_type(expr, ctx);
+                record_cg_ty_at(property.range.start.offset, &member_ty, ann, ctx);
 
                 let class_name = match &check_ty.0 {
                     TypeKind::Named(n, _origin) | TypeKind::Generic(n, _, _origin) => {
