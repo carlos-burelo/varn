@@ -207,6 +207,45 @@ No es ceremonia: la versión anterior llevaba los offsets del `Vec` de campos es
 a mano (32/40/48), y cualquier cambio de representación los convertía en lecturas a
 memoria liberada.
 
+### Backend Cranelift (`varn-jit/src/clif/`)
+
+El backend optimizante. En `varn_jit::compile` el router intenta primero
+Cranelift; cualquier bail cae al template JIT y de ahí al intérprete — tres
+tiers semánticamente idénticos, y el `match` de `clif/lower.rs` es la
+autoridad de soporte igual que `compile_proto` lo es del template.
+
+- **Lowering desde bytecode**, no desde SSA (los runs cacheados `.vnc` solo
+  tienen bytecode). Los opcodes tipados (`AddInt`, `LtInt`, …) son las
+  pruebas del checker serializadas; `cranelift-frontend` reconstruye SSA con
+  una Variable I64 por registro VM.
+- **Dos funciones por compilación en un solo `JitBuffer` W^X propio** (nada
+  de `cranelift-jit`): la RAW — `fn(exec_ctx, args…) -> i64` con el interior
+  100% unboxed (wrap i48 = shl16/sar16 fusionado tras cada aritmética;
+  recursión = `call` de hardware directa a su propia entrada) — y el WRAPPER
+  con el ABI `JitFn` del template, que consume el flag de prepush, desboxea
+  los args declarados `int` y re-taggea el retorno. Las únicas relocations
+  admitidas (self-call y wrapper→raw) se parchean a mano.
+- **Soundness por prueba, no por especulación**: `FunctionProto` lleva
+  `param_kinds` y `return_kind` serializados (tipos declarados, del checker);
+  un lattice de kinds flow-sensitive por punto del programa
+  (`clif/kinds.rs`) valida cada lectura — el regalloc reusa un registro como
+  bool aquí e int allá, así que la validación es por punto, no por registro.
+  Sin deopt, sin patching, sin invalidación: nada compilado es una apuesta.
+- **Arrays/globals**: walk de heap inline (espejo de `array_fast.rs` con los
+  layouts probados); los rechazos van por `call_indirect` a los MISMOS
+  helpers del template — ninguno de los admitidos aloca en heap VM, de modo
+  que **ningún GC puede correr bajo un frame ruteado** (por eso el subset
+  tampoco necesita safepoints ni stack maps todavía). Los loops (contiguos
+  post-linearización) cachean el puntero de payload por receiver invariante
+  en el preheader (centinela 0), y cada acceso lo testea y salta el walk.
+- Límite v1 documentado: sin guard de stack nativo (recursión más profunda
+  que el stack del SO aborta en vez del error limpio de la VM).
+
+`VARN_NO_CLIF=1` apaga solo Cranelift (todo va por el template);
+`VARN_CLIF_TRACE=1` loguea cada decisión route/bail con su razón — **ante un
+timing plano, trazar el ruteo antes de tocar codegen**: un bail silencioso se
+disfraza exactamente de "optimización que no funcionó".
+
 ### `VARN_NO_JIT=1`
 
 Apaga el JIT por completo: no compila (0 B de código máquina) y no entra a código

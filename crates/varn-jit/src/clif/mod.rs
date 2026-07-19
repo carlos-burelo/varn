@@ -9,6 +9,7 @@
 //! stack walks (errors, debugger, GC) through an RBP chain plus a
 //! return-address side table.
 
+pub(crate) mod kinds;
 pub mod lower;
 
 use cranelift_codegen::control::ControlPlane;
