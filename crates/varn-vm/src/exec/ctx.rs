@@ -81,6 +81,16 @@ pub struct ExecCtx {
     /// clears it, pushing its own frame only when entered self-called, so
     /// each activation owns exactly one logical frame.
     pub jit_frame_prepushed: usize,
+    /// Nested contexts (sync-generator bodies) share the heap but own a
+    /// private stack the outer context's GC roots cannot see in the other
+    /// direction: a collection triggered from *inside* the nested context
+    /// would never root the suspended outer stack. Such contexts must never
+    /// initiate a collection — allocation overflows to the old gen when the
+    /// nursery is full, and the owning context collects (tracing the
+    /// generator's saved state via `GeneratorDriver::trace_vm_values_mut`)
+    /// at its next safepoint. Keep this LAST: `ExecCtx` is `#[repr(C)]` and
+    /// JIT code addresses leading fields by raw offset.
+    pub gc_inhibited: bool,
 }
 
 impl ExecCtx {
@@ -123,6 +133,7 @@ impl ExecCtx {
             jit_panic_suspend_resume_ip: None,
             jit_native_result: VmValue::null(),
             jit_frame_prepushed: 0,
+            gc_inhibited: false,
         };
 
         if fresh {
@@ -259,6 +270,7 @@ impl ExecCtx {
             jit_panic_suspend_resume_ip: None,
             jit_native_result: VmValue::null(),
             jit_frame_prepushed: 0,
+            gc_inhibited: false,
         }
     }
 
@@ -297,6 +309,10 @@ impl ExecCtx {
         let pending_setters_start = all_vals.len();
         for (_, v) in &self.pending_setters {
             all_vals.push(*v);
+        }
+        let vm_suspend_start = all_vals.len();
+        if let Some(VmSuspend::Yield { value, .. }) = &self.vm_suspend {
+            all_vals.push(*value);
         }
 
         self.heap.minor_gc(&mut all_vals, &[]);
@@ -345,21 +361,20 @@ impl ExecCtx {
                 sti += 1;
             }
         }
+
+        if let Some(VmSuspend::Yield { value, .. }) = &mut self.vm_suspend {
+            *value = all_vals[vm_suspend_start];
+        }
     }
 
     /// Loop back-edge GC safepoint shared by the interpreter and the JIT.
     ///
-    /// Nursery collection requires every live heap index to be visible in
-    /// `run_minor_gc`'s root set. Suspended async state (deferred tasks,
-    /// generator channels, pending suspends) can hold heap indices that the
-    /// root set does not yet trace, so while any such state is live,
-    /// back-edge collection is deferred to the call-boundary GC checks.
-    /// TODO(gc-roots): trace async state in run_minor_gc and drop this guard.
+    /// Suspended generator state is traced by the collectors themselves
+    /// (`scan_and_fix_old_obj`'s Generator arm / the marker's Generator arm),
+    /// so async liveness no longer defers collection. Only nested contexts
+    /// (`gc_inhibited`) never initiate one — see that field's invariant.
     pub fn gc_backedge_safepoint(&mut self) {
-        let async_live = !self.deferred_tasks.is_empty()
-            || self.vm_suspend.is_some()
-            || self.gen_channel.is_some();
-        if async_live {
+        if self.gc_inhibited {
             return;
         }
         if self.heap.needs_minor_gc() {
@@ -371,6 +386,9 @@ impl ExecCtx {
     }
 
     pub fn trigger_gc(&mut self) {
+        if self.gc_inhibited {
+            return;
+        }
         self.run_minor_gc();
         let mut roots: Vec<u32> = Vec::with_capacity(256);
         for v in &self.stack {

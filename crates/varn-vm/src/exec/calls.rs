@@ -128,6 +128,7 @@ pub fn prepare_call(
                     let arg_nvs: Vec<VmValue> = stack.drain(args_start..).collect();
                     let mut gen_ctx = Box::new(ExecCtx::new(GlobalStore::new(), settings));
                     gen_ctx.heap = heap.clone();
+                    gen_ctx.gc_inhibited = true;
                     gen_ctx.stack.clear();
                     gen_ctx.stack.extend(arg_nvs);
                     let constants = resolve_constants(&nc.proto, heap);
@@ -243,6 +244,7 @@ pub fn prepare_call(
                             let arg_nvs: Vec<VmValue> = stack.drain(args_start..).collect();
                             let mut gen_ctx = Box::new(ExecCtx::new(GlobalStore::new(), settings));
                             gen_ctx.heap = heap.clone();
+                            gen_ctx.gc_inhibited = true;
                             gen_ctx.stack.clear();
                             gen_ctx.stack.extend(arg_nvs);
                             let constants = resolve_constants(&nc.proto, heap);

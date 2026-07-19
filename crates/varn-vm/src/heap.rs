@@ -381,12 +381,18 @@ impl HeapInner {
     }
 
     /// Whether the minor GC must scan this old-gen object for untracked
-    /// nursery references (see `scan_roots`).
+    /// nursery references (see `scan_roots`). Generators qualify because a
+    /// suspended body writes fresh nursery indices into its saved stack
+    /// between collections and no write barrier covers those Rust-side Vecs.
     #[inline(always)]
     fn needs_minor_scan(obj: &HeapObj) -> bool {
         matches!(
             obj,
-            HeapObj::VmClosure(_) | HeapObj::BoundMethod(_) | HeapObj::Class(_) | HeapObj::Module(_)
+            HeapObj::VmClosure(_)
+                | HeapObj::BoundMethod(_)
+                | HeapObj::Class(_)
+                | HeapObj::Module(_)
+                | HeapObj::Generator(_)
         )
     }
 

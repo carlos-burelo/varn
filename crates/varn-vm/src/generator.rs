@@ -132,6 +132,40 @@ impl GeneratorDriver for NanSyncGenDriver {
         }
     }
 
+    fn trace_vm_values_mut(&self, callback: &mut dyn FnMut(&mut varn_types::VmValue)) {
+        let mut inner = self.inner.borrow_mut();
+        let ctx = &mut *inner.ctx;
+
+        for nv in ctx.stack.iter_mut() {
+            callback(nv);
+        }
+
+        // Closure constants are interned (old gen) and never hold nursery
+        // indices; upvalues can.
+        for frame in &ctx.frames {
+            for uv in &frame.closure().upvalues {
+                if let Ok(mut upval_inner) = uv.inner.try_borrow_mut() {
+                    callback(&mut upval_inner.value);
+                }
+            }
+        }
+        for (_, uv) in &ctx.open_upvalues {
+            if let Ok(mut upval_inner) = uv.inner.try_borrow_mut() {
+                callback(&mut upval_inner.value);
+            }
+        }
+
+        for (_, nv) in ctx.pending_constructors.iter_mut() {
+            callback(nv);
+        }
+        for (_, nv) in ctx.pending_setters.iter_mut() {
+            callback(nv);
+        }
+        if let Some(VmSuspend::Yield { value, .. }) = &mut ctx.vm_suspend {
+            callback(value);
+        }
+    }
+
     fn trace_closures(&self, callback: &mut dyn FnMut(usize)) {
         let inner = self.inner.borrow();
         for frame in &inner.ctx.frames {

@@ -22,11 +22,11 @@ impl ExecCtx {
                 self.record_frame_push();
                 self.frames.push(frame);
 
-                if self.heap.needs_minor_gc() {
+                if !self.gc_inhibited && self.heap.needs_minor_gc() {
                     self.run_minor_gc();
                 }
 
-                if self.heap.needs_gc() {
+                if !self.gc_inhibited && self.heap.needs_gc() {
                     let mut roots: Vec<u32> = Vec::with_capacity(256);
                     for v in &self.stack {
                         if v.is_heap() {

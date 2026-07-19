@@ -257,13 +257,8 @@ impl TricolorMarker {
                     }
                 }
                 HeapObj::Map(map_ref) => {
-                    let entries: Vec<(varn_types::Value, varn_types::Value)> = map_ref
-                        .0
-                        .borrow()
-                        .iter()
-                        .map(|(k, v)| (k.clone(), v.clone()))
-                        .collect();
-                    for (k, v) in &entries {
+                    let m = map_ref.0.borrow();
+                    for (k, v) in m.iter() {
                         if let Some(ci) = heap.value_heap_idx(k) {
                             self.mark_gray(ci);
                         }
@@ -273,9 +268,8 @@ impl TricolorMarker {
                     }
                 }
                 HeapObj::Set(set_ref) => {
-                    let items: Vec<varn_types::Value> =
-                        set_ref.0.borrow().iter().cloned().collect();
-                    for v in &items {
+                    let s = set_ref.0.borrow();
+                    for v in s.iter() {
                         if let Some(ci) = heap.value_heap_idx(v) {
                             self.mark_gray(ci);
                         }

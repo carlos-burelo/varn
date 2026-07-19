@@ -142,7 +142,8 @@ impl Nursery {
                 Some(HeapObj::VmClosure(_))
                 | Some(HeapObj::BoundMethod(_))
                 | Some(HeapObj::Class(_))
-                | Some(HeapObj::Module(_)) => {
+                | Some(HeapObj::Module(_))
+                | Some(HeapObj::Generator(_)) => {
                     self.scan_and_fix_old_obj(raw_idx, old_gen, &mut worklist, &mut fixups);
                 }
                 _ => {}
@@ -215,6 +216,21 @@ impl Nursery {
         fixups: &mut Vec<(ChildSlot, u32)>,
     ) {
         fixups.clear();
+
+        // A generator carries a whole suspended ExecCtx (stack, frames,
+        // upvalues, pending suspends) whose slots hold raw heap indices;
+        // rewrite them in place through the driver's mutable trace. Clone
+        // the Rc first so the borrow of `old_gen` ends before evacuating.
+        let gen_driver = match old_gen.get_raw(raw_old) {
+            Some(HeapObj::Generator(g)) => Some(g.0.clone()),
+            _ => None,
+        };
+        if let Some(driver) = gen_driver {
+            driver.trace_vm_values_mut(&mut |val| {
+                self.update_value(val, old_gen, worklist);
+            });
+            return;
+        }
 
         if let Some(obj) = old_gen.get_raw(raw_old) {
             match obj {
