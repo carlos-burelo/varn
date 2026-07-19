@@ -9,11 +9,33 @@
 //! stack walks (errors, debugger, GC) through an RBP chain plus a
 //! return-address side table.
 
+pub mod lower;
+
 use cranelift_codegen::control::ControlPlane;
 use cranelift_codegen::ir::Function;
 use cranelift_codegen::isa::{OwnedTargetIsa, TargetIsa};
 use cranelift_codegen::settings::{self, Configurable};
 use cranelift_codegen::Context;
+use std::sync::OnceLock;
+
+/// Escape hatch while the backend matures: `VARN_NO_CLIF=1` routes
+/// everything back through the template JIT. Read once per process.
+pub fn enabled() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| std::env::var("VARN_NO_CLIF").is_err())
+}
+
+/// `VARN_CLIF_TRACE=1` logs each route/bail decision with its reason.
+pub fn trace() -> bool {
+    static ON: OnceLock<bool> = OnceLock::new();
+    *ON.get_or_init(|| std::env::var("VARN_CLIF_TRACE").is_ok())
+}
+
+/// The host ISA is immutable for the process lifetime; build it once.
+pub fn shared_isa() -> Result<&'static OwnedTargetIsa, String> {
+    static ISA: OnceLock<Result<OwnedTargetIsa, String>> = OnceLock::new();
+    ISA.get_or_init(host_isa).as_ref().map_err(|e| e.clone())
+}
 
 /// Host ISA configured for Varn: speed-optimized, frame pointers kept.
 pub fn host_isa() -> Result<OwnedTargetIsa, String> {

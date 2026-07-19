@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SlotKind {
     Int,
     Float,
@@ -8,7 +8,7 @@ pub enum SlotKind {
     Dynamic,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct RegisterMeta {
     pub kind: SlotKind,
 }

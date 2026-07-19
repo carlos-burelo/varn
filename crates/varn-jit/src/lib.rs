@@ -306,6 +306,32 @@ pub fn compile(
     if proto.chunk.code.len() > 250 {
         return Err("JIT Bailout: function too large".to_owned());
     }
+
+    // Typed alloc-free functions route through the Cranelift backend; any
+    // bail falls back to the template JIT, then the interpreter.
+    if clif::enabled() {
+        if let Ok(isa) = clif::shared_isa() {
+            match clif::lower::try_compile(proto, constants, &helpers, isa) {
+                Ok(art) => {
+                    if clif::trace() {
+                        eprintln!("CLIF ROUTE {:?}", proto.name);
+                    }
+                    JIT_STATS.compile_success.fetch_add(1, Ordering::Relaxed);
+                    JIT_STATS
+                        .total_code_size_bytes
+                        .fetch_add(art.buffer.size() as u64, Ordering::Relaxed);
+                    let jit_fn: JitFn = unsafe { std::mem::transmute(art.entry) };
+                    return Ok((jit_fn, Rc::new(art) as Rc<dyn Any>));
+                }
+                Err(e) => {
+                    if clif::trace() {
+                        eprintln!("CLIF BAIL  {:?}: {e}", proto.name);
+                    }
+                }
+            }
+        }
+    }
+
     let start = std::time::Instant::now();
     let res = compiler::compile_proto(proto, constants, helpers);
     let elapsed = start.elapsed().as_nanos() as u64;

@@ -492,8 +492,17 @@ pub struct FunctionProto {
     #[serde(default)]
     pub required_caps: Vec<std::rc::Rc<str>>,
 
-    #[serde(skip, default)]
+    /// Checker-derived per-register slot kinds (see ssa/emit). Serialized:
+    /// cached runs used to lose this (it was `serde(skip)`), silently
+    /// disabling every typed JIT gate on `.vnc`-loaded code.
+    #[serde(default)]
     pub register_meta: Vec<crate::register_meta::RegisterMeta>,
+
+    /// Declared parameter slot kinds, in parameter order (from the checker
+    /// via HirParam). The Cranelift router requires all-Int parameters
+    /// before it may emit unboxed entry code.
+    #[serde(default)]
+    pub param_kinds: Vec<crate::register_meta::SlotKind>,
 
     /// Runtime cache: `PoolEntry::Shape` constants resolved to their
     /// `Shape` in the (globally cached) transition tree, so object literals
