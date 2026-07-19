@@ -42,6 +42,12 @@ use crate::JitHelpers;
 
 const INT_TAG: i64 = 0x7FFC_0000_0000_0000u64 as i64;
 const MASK_48: i64 = 0x0000_FFFF_FFFF_FFFFu64 as i64;
+const HEAP_MASK: i64 =
+    (varn_types::vm_value::SIGN | varn_types::vm_value::QNAN | varn_types::vm_value::MASK_TAG)
+        as i64;
+const HEAP_EXPECT: i64 =
+    (varn_types::vm_value::SIGN | varn_types::vm_value::QNAN | varn_types::vm_value::TAG_PTR)
+        as i64;
 
 /// Compiled artifact: `entry` (the wrapper, `JitFn` ABI) points into
 /// `buffer`.
@@ -63,16 +69,15 @@ pub fn try_compile(
         return Err("clif: upvalues not supported".into());
     }
     let nparams = proto.arity.saturating_sub(1);
-    // Unboxed entry code is only sound when the checker declared every
-    // parameter `int` (the wrapper unboxes blindly).
-    if proto.param_kinds.len() != nparams
-        || proto.param_kinds.iter().any(|k| *k != SlotKind::Int)
-    {
-        return Err("clif: non-int parameters".into());
+    // Int params enter unboxed; anything else passes through boxed
+    // (`K::Boxed`). No declared kinds at all (pre-param_kinds caches)
+    // means we cannot prove the entry contract.
+    if proto.param_kinds.len() != nparams {
+        return Err("clif: missing param kinds".into());
     }
 
-    let raw = lower_raw(proto, constants, isa)?;
-    let wrapper = build_wrapper(nparams, helpers, isa)?;
+    let raw = lower_raw(proto, constants, helpers, isa)?;
+    let wrapper = build_wrapper(proto, helpers, isa)?;
 
     // Concatenate: raw at 0, wrapper 16-aligned after it, then resolve the
     // only two relocation targets we admit (self-recursion inside raw, and
@@ -135,10 +140,13 @@ fn compile_piece(func: Function, isa: &OwnedTargetIsa) -> Result<CompiledPiece, 
     })
 }
 
-/// Raw unboxed signature: `fn(i64 × nparams) -> i64`.
+/// Raw signature: `fn(exec_ctx, arg × nparams) -> i64`. Int-declared args
+/// arrive unboxed; everything else arrives as its boxed VmValue bits.
+/// `exec_ctx` is only dereferenced by the heap-walking ops and the slow
+/// helpers.
 fn raw_signature(nparams: usize, isa: &OwnedTargetIsa) -> Signature {
     let mut sig = Signature::new(isa.default_call_conv());
-    for _ in 0..nparams {
+    for _ in 0..=nparams {
         sig.params.push(AbiParam::new(types::I64));
     }
     sig.returns.push(AbiParam::new(types::I64));
@@ -148,12 +156,14 @@ fn raw_signature(nparams: usize, isa: &OwnedTargetIsa) -> Signature {
 fn lower_raw(
     proto: &FunctionProto,
     constants: &[VmValue],
+    helpers: &JitHelpers,
     isa: &OwnedTargetIsa,
 ) -> Result<CompiledPiece, String> {
     let code = &proto.chunk.code;
     let pool = &proto.chunk.constants;
     let nparams = proto.arity.saturating_sub(1);
     let nregs = proto.register_count as usize;
+    let cc = isa.default_call_conv();
 
     // ---- scan: instruction starts, block starts (jump targets +
     // fall-through after conditional jumps) ----
@@ -211,8 +221,9 @@ fn lower_raw(
     for v in &vars {
         b.def_var(*v, zero);
     }
+    let exec_ctx = b.block_params(entry)[0];
     for i in 0..nparams {
-        let p = b.block_params(entry)[i];
+        let p = b.block_params(entry)[1 + i];
         b.def_var(vars[1 + i], p);
     }
 
@@ -224,7 +235,15 @@ fn lower_raw(
         b.ins().jump(*first, &[]);
     }
 
-    let entries = kind_flow(code, pool, constants, &block_starts, nregs, nparams)?;
+    let entries = kind_flow(
+        code,
+        pool,
+        constants,
+        &block_starts,
+        nregs,
+        &proto.param_kinds,
+        &proto.register_meta,
+    )?;
 
     let mut state: Vec<K> = entries[&0].clone();
     let mut filled: Vec<usize> = Vec::new();
@@ -297,11 +316,8 @@ fn lower_raw(
             OpCode::AddInt | OpCode::SubInt | OpCode::MulInt => {
                 let w1 = code[ip + 1];
                 let (r1, r2) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
-                if state[r1] != K::Int || state[r2] != K::Int {
-                    return Err("clif: arith on non-int".into());
-                }
-                let s1 = b.use_var(vars[r1]);
-                let s2 = b.use_var(vars[r2]);
+                let s1 = use_int(&mut b, &vars, &state, r1)?;
+                let s2 = use_int(&mut b, &vars, &state, r2)?;
                 let r = match op {
                     OpCode::AddInt => b.ins().iadd(s1, s2),
                     OpCode::SubInt => b.ins().isub(s1, s2),
@@ -313,11 +329,8 @@ fn lower_raw(
             OpCode::AddImm | OpCode::SubImm => {
                 let w1 = code[ip + 1];
                 let src = (w1 >> 8) as usize;
-                if state[src] != K::Int {
-                    return Err("clif: imm arith on non-int".into());
-                }
                 let imm = (w1 & 0xFF) as i8 as i64;
-                let s = b.use_var(vars[src]);
+                let s = use_int(&mut b, &vars, &state, src)?;
                 let r = if op == OpCode::AddImm {
                     b.ins().iadd_imm(s, imm)
                 } else {
@@ -334,11 +347,8 @@ fn lower_raw(
             | OpCode::NeqInt => {
                 let w1 = code[ip + 1];
                 let (r1, r2) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
-                if state[r1] != K::Int || state[r2] != K::Int {
-                    return Err("clif: compare on non-int".into());
-                }
-                let s1 = b.use_var(vars[r1]);
-                let s2 = b.use_var(vars[r2]);
+                let s1 = use_int(&mut b, &vars, &state, r1)?;
+                let s2 = use_int(&mut b, &vars, &state, r2)?;
                 let cc = match op {
                     OpCode::LtInt => IntCC::SignedLessThan,
                     OpCode::LteInt => IntCC::SignedLessThanOrEqual,
@@ -380,10 +390,14 @@ fn lower_raw(
             }
             OpCode::Return => {
                 let src = (code[ip + 1] & 0xFF) as usize;
-                // The wrapper re-tags the raw result as an int; any other
-                // return kind must take the template path.
+                // The wrapper re-tags the raw result as an int, so the
+                // source must be PROVEN Int — a Boxed source here could be
+                // any value (an untyped identity function returns its
+                // argument), and coercing it would forge an int from a
+                // heap reference. FunctionProto carries no return kind
+                // yet; until it does, only Int-kind returns route.
                 if state[src] != K::Int {
-                    return Err("clif: non-int return".into());
+                    return Err("clif: unproven return kind".into());
                 }
                 let v = b.use_var(vars[src]);
                 b.ins().return_(&[v]);
@@ -399,22 +413,226 @@ fn lower_raw(
                 if arg_count != nparams + 1 {
                     return Err("clif: CallSelf arity mismatch".into());
                 }
+                // Raw self-args must match the entry contract: unboxed for
+                // Int-declared params, boxed bits otherwise.
+                let mut args = Vec::with_capacity(1 + nparams);
+                args.push(exec_ctx);
                 for i in 0..nparams {
-                    if state[arg_start + 1 + i] != K::Int {
-                        return Err("clif: non-int self-call arg".into());
-                    }
+                    let r = arg_start + 1 + i;
+                    let v = if proto.param_kinds[i] == SlotKind::Int {
+                        use_int(&mut b, &vars, &state, r)?
+                    } else {
+                        use_boxed(&mut b, &vars, &state, r)?
+                    };
+                    args.push(v);
                 }
-                let args: Vec<_> = (0..nparams)
-                    .map(|i| b.use_var(vars[arg_start + 1 + i]))
-                    .collect();
                 let call = b.ins().call(self_ref, &args);
                 let res = b.inst_results(call)[0];
                 b.def_var(vars[dest], res);
             }
+            OpCode::LoadGlobalIdx => {
+                let idx = code[ip + 1] as usize;
+                let gbase = b.ins().load(
+                    types::I64,
+                    MemFlags::trusted(),
+                    exec_ctx,
+                    helpers.globals_offset as i32,
+                );
+                let v =
+                    b.ins()
+                        .load(types::I64, MemFlags::trusted(), gbase, (idx * 8) as i32);
+                if state_meta_int(&proto.register_meta, first_reg) {
+                    let s = b.ins().ishl_imm(v, 16);
+                    let un = b.ins().sshr_imm(s, 16);
+                    b.def_var(vars[first_reg], un);
+                } else {
+                    b.def_var(vars[first_reg], v);
+                }
+            }
+            OpCode::StoreGlobalIdx => {
+                let src = (code[ip + 1] >> 8) as usize;
+                let idx = code[ip + 2] as usize;
+                // Globals are always in the GC root set — a plain boxed
+                // store, no barrier. (DefineGlobalIdx is NOT admitted: it
+                // can grow the globals vec and move its base.)
+                let v = match state[src] {
+                    K::Int => {
+                        let raw = b.use_var(vars[src]);
+                        box_int(&mut b, raw)
+                    }
+                    K::Boxed => b.use_var(vars[src]),
+                    k => return Err(format!("clif: global store of {k:?}")),
+                };
+                let gbase = b.ins().load(
+                    types::I64,
+                    MemFlags::trusted(),
+                    exec_ctx,
+                    helpers.globals_offset as i32,
+                );
+                b.ins()
+                    .store(MemFlags::trusted(), v, gbase, (idx * 8) as i32);
+            }
+            OpCode::ArrayLength => {
+                let src = (code[ip + 1] >> 8) as usize;
+                let obj = use_boxed(&mut b, &vars, &state, src)?;
+                let slow = b.create_block();
+                let merge = b.create_block();
+                b.append_block_param(merge, types::I64); // unboxed len
+                let payload = emit_array_payload(
+                    &mut b,
+                    exec_ctx,
+                    obj,
+                    &helpers.array_layout,
+                    helpers.heap_field_offset,
+                    slow,
+                    false,
+                );
+                let len = b.ins().load(
+                    types::I64,
+                    MemFlags::trusted(),
+                    payload,
+                    (16 + helpers.array_layout.elems_len_off) as i32,
+                );
+                b.ins().jump(merge, &[len.into()]);
+                // slow: generic helper returns a boxed int; unbox.
+                b.switch_to_block(slow);
+                let boxed = call_helper(&mut b, cc, helpers.array_length, &[exec_ctx, obj]);
+                let s = b.ins().ishl_imm(boxed, 16);
+                let un = b.ins().sshr_imm(s, 16);
+                b.ins().jump(merge, &[un.into()]);
+                b.switch_to_block(merge);
+                let res = b.block_params(merge)[0];
+                b.def_var(vars[first_reg], res);
+            }
+            OpCode::ArrayGetIndex => {
+                let w1 = code[ip + 1];
+                let obj_r = (w1 >> 8) as usize;
+                let key_r = (w1 & 0xFF) as usize;
+                let obj = use_boxed(&mut b, &vars, &state, obj_r)?;
+                let key = use_int(&mut b, &vars, &state, key_r)?;
+                let slow = b.create_block();
+                let merge = b.create_block();
+                b.append_block_param(merge, types::I64); // boxed element
+                let payload = emit_array_payload(
+                    &mut b,
+                    exec_ctx,
+                    obj,
+                    &helpers.array_layout,
+                    helpers.heap_field_offset,
+                    slow,
+                    false,
+                );
+                let lay = &helpers.array_layout;
+                let len = b.ins().load(
+                    types::I64,
+                    MemFlags::trusted(),
+                    payload,
+                    (16 + lay.elems_len_off) as i32,
+                );
+                // Unsigned compare also rejects negative keys.
+                let oob = b
+                    .ins()
+                    .icmp(IntCC::UnsignedGreaterThanOrEqual, key, len);
+                let inb = b.create_block();
+                b.ins().brif(oob, slow, &[], inb, &[]);
+                b.switch_to_block(inb);
+                let data = b.ins().load(
+                    types::I64,
+                    MemFlags::trusted(),
+                    payload,
+                    (16 + lay.elems_ptr_off) as i32,
+                );
+                let off = b.ins().ishl_imm(key, 3);
+                let addr = b.ins().iadd(data, off);
+                let elem = b.ins().load(types::I64, MemFlags::trusted(), addr, 0);
+                b.ins().jump(merge, &[elem.into()]);
+                // slow: same generic helper as the template (returns null
+                // out of bounds; allocates nothing).
+                b.switch_to_block(slow);
+                let boxed_key = box_int(&mut b, key);
+                let r = call_helper(
+                    &mut b,
+                    cc,
+                    helpers.jit_array_get_fast,
+                    &[exec_ctx, obj, boxed_key],
+                );
+                b.ins().jump(merge, &[r.into()]);
+                b.switch_to_block(merge);
+                let res = b.block_params(merge)[0];
+                if state_meta_int(&proto.register_meta, first_reg) {
+                    let s = b.ins().ishl_imm(res, 16);
+                    let un = b.ins().sshr_imm(s, 16);
+                    b.def_var(vars[first_reg], un);
+                } else {
+                    b.def_var(vars[first_reg], res);
+                }
+            }
+            OpCode::ArraySetIndex => {
+                let w1 = code[ip + 1];
+                let idx_r = (w1 >> 8) as usize;
+                let val_r = (w1 & 0xFF) as usize;
+                let obj_r = first_reg;
+                let obj = use_boxed(&mut b, &vars, &state, obj_r)?;
+                let key = use_int(&mut b, &vars, &state, idx_r)?;
+                // Only int stores are admitted: a boxed int child is never
+                // a heap reference, so no generation write barrier is
+                // needed for ANY parent generation.
+                if state[val_r] != K::Int {
+                    return Err("clif: non-int array store".into());
+                }
+                let raw_val = b.use_var(vars[val_r]);
+                let val = box_int(&mut b, raw_val);
+                let slow = b.create_block();
+                let merge = b.create_block();
+                let payload = emit_array_payload(
+                    &mut b,
+                    exec_ctx,
+                    obj,
+                    &helpers.array_layout,
+                    helpers.heap_field_offset,
+                    slow,
+                    false,
+                );
+                let lay = &helpers.array_layout;
+                let len = b.ins().load(
+                    types::I64,
+                    MemFlags::trusted(),
+                    payload,
+                    (16 + lay.elems_len_off) as i32,
+                );
+                let oob = b
+                    .ins()
+                    .icmp(IntCC::UnsignedGreaterThanOrEqual, key, len);
+                let inb = b.create_block();
+                b.ins().brif(oob, slow, &[], inb, &[]);
+                b.switch_to_block(inb);
+                let data = b.ins().load(
+                    types::I64,
+                    MemFlags::trusted(),
+                    payload,
+                    (16 + lay.elems_ptr_off) as i32,
+                );
+                let off = b.ins().ishl_imm(key, 3);
+                let addr = b.ins().iadd(data, off);
+                b.ins().store(MemFlags::trusted(), val, addr, 0);
+                b.ins().jump(merge, &[]);
+                // slow: append/OOB/non-array semantics live in the helper
+                // (grows the Rust vec — no VM-heap allocation, no GC).
+                b.switch_to_block(slow);
+                let boxed_key = box_int(&mut b, key);
+                let _ = call_helper(
+                    &mut b,
+                    cc,
+                    helpers.jit_array_set_fast,
+                    &[exec_ctx, obj, boxed_key, val],
+                );
+                b.ins().jump(merge, &[]);
+                b.switch_to_block(merge);
+            }
             OpCode::Nop => {}
             _ => return Err(format!("clif: unsupported opcode {op:?}")),
         }
-        apply_kinds(&mut state, code, ip, op, constants);
+        apply_kinds(&mut state, code, ip, op, constants, &proto.register_meta);
         ip = next_ip;
     }
     if !terminated {
@@ -449,6 +667,10 @@ pub(crate) enum K {
     Unset,
     Int,
     Bool,
+    /// A NaN-boxed VmValue carried as raw bits (heap refs, non-int params,
+    /// untyped loads). Coerces to Int at use via the i48 sign-extend — the
+    /// same read the interpreter's typed ops perform.
+    Boxed,
     Poison,
     Mixed,
 }
@@ -469,8 +691,10 @@ fn apply_kinds(
     ip: usize,
     op: OpCode,
     constants: &[VmValue],
+    meta: &[varn_types::register_meta::RegisterMeta],
 ) {
     let dest = (code[ip] >> 8) as usize;
+    let meta_int = |r: usize| meta.get(r).map_or(false, |m| m.kind == SlotKind::Int);
     match op {
         OpCode::LoadIntZero
         | OpCode::LoadIntOne
@@ -480,7 +704,8 @@ fn apply_kinds(
         | OpCode::SubInt
         | OpCode::MulInt
         | OpCode::AddImm
-        | OpCode::SubImm => state[dest] = K::Int,
+        | OpCode::SubImm
+        | OpCode::ArrayLength => state[dest] = K::Int,
         OpCode::CallSelf => {
             let dest = (code[ip + 1] >> 8) as usize;
             state[dest] = K::Int;
@@ -503,6 +728,12 @@ fn apply_kinds(
             let src = (code[ip + 1] >> 8) as usize;
             state[dest] = state[src];
         }
+        // Loads from the heap/globals produce boxed values; when the
+        // checker-derived register meta proves the slot Int, the lowering
+        // unboxes at the load and the var carries Int.
+        OpCode::ArrayGetIndex | OpCode::LoadGlobalIdx => {
+            state[dest] = if meta_int(dest) { K::Int } else { K::Boxed };
+        }
         _ => {}
     }
 }
@@ -514,12 +745,13 @@ fn kind_flow(
     constants: &[VmValue],
     block_starts: &[usize],
     nregs: usize,
-    nparams: usize,
+    param_kinds: &[SlotKind],
+    meta: &[varn_types::register_meta::RegisterMeta],
 ) -> Result<HashMap<usize, Vec<K>>, String> {
     let mut entry0 = vec![K::Unset; nregs];
-    for i in 0..nparams {
+    for (i, pk) in param_kinds.iter().enumerate() {
         if 1 + i < nregs {
-            entry0[1 + i] = K::Int;
+            entry0[1 + i] = if *pk == SlotKind::Int { K::Int } else { K::Boxed };
         }
     }
     let mut entries: HashMap<usize, Vec<K>> = HashMap::new();
@@ -559,7 +791,7 @@ fn kind_flow(
                 }
                 OpCode::Return => break,
                 _ => {
-                    apply_kinds(&mut state, code, ip, op, constants);
+                    apply_kinds(&mut state, code, ip, op, constants, meta);
                 }
             }
             ip += info.len;
@@ -600,6 +832,148 @@ fn def_const(b: &mut FunctionBuilder, vars: &[Variable], reg: usize, v: i64) {
     b.def_var(vars[reg], c);
 }
 
+/// Read a register as an unboxed int. `Int` vars are already raw; `Boxed`
+/// vars coerce via the i48 sign-extend — bit-identical to the
+/// interpreter's typed-op read of the payload.
+fn use_int(
+    b: &mut FunctionBuilder,
+    vars: &[Variable],
+    state: &[K],
+    r: usize,
+) -> Result<cranelift_codegen::ir::Value, String> {
+    match state[r] {
+        K::Int => Ok(b.use_var(vars[r])),
+        K::Boxed => {
+            let v = b.use_var(vars[r]);
+            let s = b.ins().ishl_imm(v, 16);
+            Ok(b.ins().sshr_imm(s, 16))
+        }
+        k => Err(format!("clif: int use of {k:?} register")),
+    }
+}
+
+/// Read a register as boxed VmValue bits (heap receivers).
+fn use_boxed(
+    b: &mut FunctionBuilder,
+    vars: &[Variable],
+    state: &[K],
+    r: usize,
+) -> Result<cranelift_codegen::ir::Value, String> {
+    match state[r] {
+        K::Boxed => Ok(b.use_var(vars[r])),
+        k => Err(format!("clif: boxed use of {k:?} register")),
+    }
+}
+
+/// Re-tag an unboxed int as a VmValue.
+fn box_int(
+    b: &mut FunctionBuilder,
+    v: cranelift_codegen::ir::Value,
+) -> cranelift_codegen::ir::Value {
+    let m = b.ins().band_imm(v, MASK_48);
+    b.ins().bor_imm(m, INT_TAG)
+}
+
+fn state_meta_int(meta: &[varn_types::register_meta::RegisterMeta], r: usize) -> bool {
+    meta.get(r).map_or(false, |m| m.kind == SlotKind::Int)
+}
+
+/// Indirect call to a template-JIT runtime helper
+/// (`extern "C" fn(exec_ctx, VmValue…) -> VmValue`). The admitted helpers
+/// never allocate on the VM heap (no GC can run under a clif frame) and
+/// raise VM errors by longjmp'ing to the outer setjmp, exactly like the
+/// template's slow paths.
+fn call_helper(
+    b: &mut FunctionBuilder,
+    cc: cranelift_codegen::isa::CallConv,
+    helper: usize,
+    args: &[cranelift_codegen::ir::Value],
+) -> cranelift_codegen::ir::Value {
+    let mut sig = Signature::new(cc);
+    for _ in 0..args.len() {
+        sig.params.push(AbiParam::new(types::I64));
+    }
+    sig.returns.push(AbiParam::new(types::I64));
+    let sig_ref = b.import_signature(sig);
+    let ptr = b.ins().iconst(types::I64, helper as i64);
+    let call = b.ins().call_indirect(sig_ref, ptr, args);
+    b.inst_results(call)[0]
+}
+
+/// Resolve a boxed receiver down to its array payload pointer (the three
+/// `Vec<VmValue>` words live at payload+16). Mirrors the template's
+/// `emit_resolve_array_payload`: heap-tag check, generation select on bit
+/// 31 of the index, slot tag check. Any rejection branches to `slow`; on
+/// return the builder is positioned in a fresh block where the payload is
+/// valid.
+fn emit_array_payload(
+    b: &mut FunctionBuilder,
+    exec_ctx: cranelift_codegen::ir::Value,
+    obj: cranelift_codegen::ir::Value,
+    lay: &crate::JitArrayLayout,
+    heap_off: usize,
+    slow: cranelift_codegen::ir::Block,
+    nursery_only: bool,
+) -> cranelift_codegen::ir::Value {
+    // The chain down to the payload pointer is `readonly` FOR THE DURATION
+    // OF ONE ROUTED ACTIVATION: heap indices only get rebound by a GC
+    // move or slot reuse, and no op in the routed subset (including the
+    // admitted slow helpers) can allocate on the VM heap, so no collection
+    // can run underneath us. Marking them readonly lets Cranelift's
+    // mid-end hoist the whole resolve out of loops. The element Vec's
+    // data/len words are NOT readonly — an out-of-bounds store's append
+    // path reallocates them.
+    let ro = MemFlags::trusted().with_readonly().with_can_move();
+    let tag = b.ins().band_imm(obj, HEAP_MASK);
+    let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_EXPECT);
+    let chk = b.create_block();
+    b.ins().brif(is_heap, chk, &[], slow, &[]);
+    b.switch_to_block(chk);
+
+    let raw = b.ins().band_imm(obj, 0xFFFF_FFFF);
+    let rc = b.ins().load(types::I64, ro, exec_ctx, heap_off as i32);
+    let old_bit = b.ins().band_imm(raw, 0x8000_0000);
+
+    let (base, idx) = if nursery_only {
+        let cont = b.create_block();
+        b.ins().brif(old_bit, slow, &[], cont, &[]);
+        b.switch_to_block(cont);
+        let base = b.ins().load(
+            types::I64,
+            ro,
+            rc,
+            (lay.nursery_slots_vec_off + lay.slots_ptr_off) as i32,
+        );
+        (base, raw)
+    } else {
+        let base_old = b.ins().load(
+            types::I64,
+            ro,
+            rc,
+            (lay.slots_vec_off + lay.slots_ptr_off) as i32,
+        );
+        let base_nur = b.ins().load(
+            types::I64,
+            ro,
+            rc,
+            (lay.nursery_slots_vec_off + lay.slots_ptr_off) as i32,
+        );
+        let idx_old = b.ins().band_imm(raw, 0x7FFF_FFFF);
+        let base = b.ins().select(old_bit, base_old, base_nur);
+        let idx = b.ins().select(old_bit, idx_old, raw);
+        (base, idx)
+    };
+
+    let byte_off = b.ins().imul_imm(idx, lay.slot_size as i64);
+    let slot = b.ins().iadd(base, byte_off);
+    let tagb = b.ins().uload8(types::I64, ro, slot, 0);
+    let is_arr = b.ins().icmp_imm(IntCC::Equal, tagb, lay.array_tag as i64);
+    let ok = b.create_block();
+    b.ins().brif(is_arr, ok, &[], slow, &[]);
+    b.switch_to_block(ok);
+    b.ins().load(types::I64, ro, slot, lay.payload_off as i32)
+}
+
 /// `(v << 16) >> 16` — the canonical i48 wrap (varn_core::numeric), which
 /// is also exactly the unboxing of an int-tagged VmValue payload.
 fn wrap_i48(b: &mut FunctionBuilder, v: cranelift_codegen::ir::Value) -> cranelift_codegen::ir::Value {
@@ -610,10 +984,11 @@ fn wrap_i48(b: &mut FunctionBuilder, v: cranelift_codegen::ir::Value) -> craneli
 /// Wrapper with the template `JitFn` ABI:
 /// `(stack_ptr, closure, base, exec_ctx) -> boxed VmValue`.
 fn build_wrapper(
-    nparams: usize,
+    proto: &FunctionProto,
     helpers: &JitHelpers,
     isa: &OwnedTargetIsa,
 ) -> Result<CompiledPiece, String> {
+    let nparams = proto.arity.saturating_sub(1);
     let mut sig = Signature::new(isa.default_call_conv());
     for _ in 0..4 {
         sig.params.push(AbiParam::new(types::I64));
@@ -651,20 +1026,24 @@ fn build_wrapper(
         helpers.frame_prepushed_offset as i32,
     );
 
-    // Boxed args live at stack[base + 1 + i]; the shl/sar pair both unboxes
-    // an int payload and applies the i48 wrap to anything else — matching
-    // the interpreter's typed-op reads on checker-rejected inputs closely
-    // enough, and never touching memory it shouldn't.
+    // Boxed args live at stack[base + 1 + i]. Int-declared params unbox
+    // (the shl/sar pair is exactly the interpreter's typed read); anything
+    // else passes through as boxed bits per the raw entry contract.
     let base_bytes = b.ins().imul_imm(base, 8);
     let arg_base = b.ins().iadd(stack_ptr, base_bytes);
-    let mut args = Vec::with_capacity(nparams);
+    let mut args = Vec::with_capacity(1 + nparams);
+    args.push(exec_ctx);
     for i in 0..nparams {
         let boxed = b
             .ins()
             .load(types::I64, MemFlags::trusted(), arg_base, ((1 + i) * 8) as i32);
-        let sh = b.ins().ishl_imm(boxed, 16);
-        let un = b.ins().sshr_imm(sh, 16);
-        args.push(un);
+        if proto.param_kinds[i] == SlotKind::Int {
+            let sh = b.ins().ishl_imm(boxed, 16);
+            let un = b.ins().sshr_imm(sh, 16);
+            args.push(un);
+        } else {
+            args.push(boxed);
+        }
     }
 
     let call = b.ins().call(raw_ref, &args);
