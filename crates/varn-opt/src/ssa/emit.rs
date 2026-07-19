@@ -31,7 +31,13 @@ pub fn emit_function(
 
     let mut cache_count: u16 = 0;
 
-    for b in 0..n {
+    let order = emission_order(&ssa);
+    let mut pos_of = vec![usize::MAX; n];
+    for (i, &b) in order.iter().enumerate() {
+        pos_of[b] = i;
+    }
+
+    for (i, &b) in order.iter().enumerate() {
         block_offset[b] = chunk.code.len();
         let insts = std::mem::take(&mut ssa.blocks[b].insts);
         for inst in &insts {
@@ -52,7 +58,8 @@ pub fn emit_function(
             &mut chunk,
             &ssa,
             &reg,
-            b,
+            i,
+            &pos_of,
             &term,
             null_reg,
             scratch,
@@ -101,6 +108,53 @@ pub fn emit_function(
         feedback: Rc::new(RefCell::new(FeedbackVector::new(cache_count as usize))),
         static_closure_val: Cell::new(0),
     })
+}
+
+/// Loop-aware emission order: reverse postorder from the entry, visiting
+/// `else` before `then` so a loop header's body lands immediately after the
+/// header (fall-through entry) and the exit lands after the whole body.
+/// Nested loop bodies stay contiguous because the DFS nests. Plain
+/// `0..n` order emitted inner-loop headers behind a forward `Jump`, which
+/// disqualified every nested loop from the JIT's loop-invariant hoisting
+/// (`header_reachable_by_fallthrough`). Unreachable blocks are appended in
+/// numeric order so every block is still emitted.
+fn emission_order(ssa: &SsaFunc) -> Vec<usize> {
+    let n = ssa.blocks.len();
+    let mut visited = vec![false; n];
+    let mut post: Vec<usize> = Vec::with_capacity(n);
+    let mut stack: Vec<(usize, u8)> = Vec::with_capacity(n);
+    let entry = ssa.entry.0 as usize;
+    visited[entry] = true;
+    stack.push((entry, 0));
+    while let Some(top) = stack.last_mut() {
+        let (b, stage) = *top;
+        top.1 += 1;
+        let succ = match &ssa.blocks[b].term {
+            Terminator::Jump { target, .. } if stage == 0 => Some(target.0 as usize),
+            Terminator::Branch { else_blk, .. } if stage == 0 => Some(else_blk.0 as usize),
+            Terminator::Branch { then_blk, .. } if stage == 1 => Some(then_blk.0 as usize),
+            _ => None,
+        };
+        match succ {
+            Some(s) => {
+                if !visited[s] {
+                    visited[s] = true;
+                    stack.push((s, 0));
+                }
+            }
+            None => {
+                post.push(b);
+                stack.pop();
+            }
+        }
+    }
+    let mut order: Vec<usize> = post.into_iter().rev().collect();
+    for (b, seen) in visited.iter().enumerate() {
+        if !seen {
+            order.push(b);
+        }
+    }
+    order
 }
 
 fn split_phi_edges(ssa: &mut SsaFunc) {
@@ -1116,7 +1170,8 @@ fn emit_terminator(
     chunk: &mut Chunk,
     ssa: &SsaFunc,
     reg: &[u8],
-    b: usize,
+    cur_pos: usize,
+    pos_of: &[usize],
     term: &Terminator,
     null_reg: u8,
     scratch: u8,
@@ -1136,7 +1191,7 @@ fn emit_terminator(
         }
         Terminator::Jump { target, args } => {
             emit_edge_copies(chunk, ssa, reg, *target, args, scratch);
-            emit_goto(chunk, b, *target, block_offset, fixups);
+            emit_goto(chunk, cur_pos, pos_of, *target, block_offset, fixups);
         }
         Terminator::Branch {
             cond,
@@ -1152,7 +1207,8 @@ fn emit_terminator(
             }
             emit_branch(
                 chunk,
-                b,
+                cur_pos,
+                pos_of,
                 reg[cond.0 as usize],
                 *then_blk,
                 *else_blk,
@@ -1201,26 +1257,29 @@ fn emit_edge_copies(
 
 fn emit_goto(
     chunk: &mut Chunk,
-    b: usize,
+    cur_pos: usize,
+    pos_of: &[usize],
     target: BlockId,
     block_offset: &[usize],
     fixups: &mut Vec<(usize, BlockId)>,
 ) {
-    let tb = target.0 as usize;
-    if tb == b + 1 {
+    let tp = pos_of[target.0 as usize];
+    if tp == cur_pos + 1 {
         return;
     }
-    if tb <= b {
-        chunk.emit_loop(block_offset[tb], LINE);
+    if tp <= cur_pos {
+        chunk.emit_loop(block_offset[target.0 as usize], LINE);
     } else {
         let pos = chunk.emit_jump(OpCode::Jump, LINE);
         fixups.push((pos, target));
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn emit_branch(
     chunk: &mut Chunk,
-    b: usize,
+    cur_pos: usize,
+    pos_of: &[usize],
     cond: u8,
     then_blk: BlockId,
     else_blk: BlockId,
@@ -1229,15 +1288,15 @@ fn emit_branch(
 ) -> Result<()> {
     let tb = then_blk.0 as usize;
     let eb = else_blk.0 as usize;
-    let then_fwd = tb > b;
-    let else_fwd = eb > b;
+    let then_fwd = pos_of[tb] > cur_pos;
+    let else_fwd = pos_of[eb] > cur_pos;
 
     match (then_fwd, else_fwd) {
         (true, true) => {
-            if tb == b + 1 {
+            if pos_of[tb] == cur_pos + 1 {
                 let pos = chunk.emit_cond_jump(OpCode::JumpIfFalse, cond, LINE);
                 fixups.push((pos, else_blk));
-            } else if eb == b + 1 {
+            } else if pos_of[eb] == cur_pos + 1 {
                 let pos = chunk.emit_cond_jump(OpCode::JumpIfTrue, cond, LINE);
                 fixups.push((pos, then_blk));
             } else {
