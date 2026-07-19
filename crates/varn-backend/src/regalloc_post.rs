@@ -819,6 +819,32 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
 
     remap_bytecode(&mut proto.chunk.code, &proto.chunk.constants, &mapping);
 
+    // register_meta was derived per pre-coalescing register (ssa/emit);
+    // permute it through the same mapping, meeting kinds when two old
+    // registers merge into one.
+    if !proto.register_meta.is_empty() {
+        use varn_types::register_meta::{RegisterMeta, SlotKind};
+        let mut merged: Vec<Option<SlotKind>> = vec![None; new_register_count as usize];
+        for (old, meta) in proto.register_meta.iter().enumerate() {
+            let old8 = old as u8;
+            let new = mapping.get(&old8).copied().unwrap_or(old8) as usize;
+            let Some(slot) = merged.get_mut(new) else {
+                continue;
+            };
+            *slot = Some(match *slot {
+                None => meta.kind,
+                Some(cur) if cur == meta.kind => cur,
+                Some(_) => SlotKind::Dynamic,
+            });
+        }
+        proto.register_meta = merged
+            .into_iter()
+            .map(|k| RegisterMeta {
+                kind: k.unwrap_or(SlotKind::Dynamic),
+            })
+            .collect();
+    }
+
     proto.register_count = new_register_count;
 }
 

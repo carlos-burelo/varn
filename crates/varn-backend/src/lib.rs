@@ -1,7 +1,6 @@
 pub mod ir;
 pub mod liveness;
 pub mod regalloc_post;
-pub mod slot_kinds;
 
 use std::rc::Rc;
 use varn_types::FunctionProto;
@@ -23,5 +22,4 @@ pub fn run_post_passes(proto: &mut FunctionProto) {
     }
 
     regalloc_post::optimize_function(proto);
-    slot_kinds::infer(proto);
 }
