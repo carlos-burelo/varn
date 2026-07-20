@@ -70,11 +70,17 @@ pub(crate) fn apply_kinds(
         | OpCode::SubImm
         | OpCode::ModInt
         | OpCode::ArrayLength => state[dest] = K::Int,
-        // Both self-calls and static calls produce the callee's return
-        // value; the lowering only routes int-returning callees.
-        OpCode::CallSelf | OpCode::Call => {
+        // A self-call routes only on an int contract.
+        OpCode::CallSelf => {
             let dest = (code[ip + 1] >> 8) as usize;
             state[dest] = K::Int;
+        }
+        // A static call's result is int on the fast int-contract path, but a
+        // generic call (`new`, heap-returning callee) yields a boxed value —
+        // let the register meta decide.
+        OpCode::Call => {
+            let dest = (code[ip + 1] >> 8) as usize;
+            state[dest] = if meta_int(dest) { K::Int } else { K::Boxed };
         }
         OpCode::LoadConst => {
             let idx = code[ip + 1] as usize;

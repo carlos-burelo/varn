@@ -789,14 +789,17 @@ fn lower_raw(
             OpCode::SetFixedField => {
                 fields::emit_set_fixed_field(&mut b, &fld, &state, code, ip, first_reg)?;
             }
+            OpCode::Call if !calls_allowed => {
+                // `new` / non-int-contract call in a frame-aware fn: the
+                // fallback runs the callee (maybe a constructor) and can GC.
+                let actx = actx.as_ref().ok_or("clif: call in non-frame-aware fn")?;
+                alloc::emit_generic_call(&mut b, actx, &state, &proto.register_meta, code, ip)?;
+            }
             OpCode::Call => {
-                // Static cross-function call via a guarded monomorphic IC.
-                // w1 = pack(dest, callee_reg); w2 = pack(total, call_base)
-                // where total counts the staged null callee slot, so there
-                // are total-1 real args at call_base+1..
-                if !calls_allowed {
-                    return Err("clif: call in array/boxed-param function".into());
-                }
+                // Static cross-function call via a guarded monomorphic IC
+                // (calls_allowed). w1 = pack(dest, callee_reg);
+                // w2 = pack(total, call_base); total-1 real args at
+                // call_base+1.. (total counts the staged null callee slot).
                 let w1 = code[ip + 1];
                 let w2 = code[ip + 2];
                 let dest = (w1 >> 8) as usize;

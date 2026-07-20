@@ -154,25 +154,92 @@ pub(super) fn emit_backedge_safepoint(b: &mut FunctionBuilder, actx: &AllocCtx, 
     b.ins().brif(over, slow, &[], cont, &[]);
 
     b.switch_to_block(slow);
-    // Flush every register that could hold a heap reference to its home slot
-    // so the collector roots (and rewrites) it. Ints are GC-irrelevant and
-    // stay in registers.
-    let boxed: Vec<usize> = (0..actx.nregs).filter(|&r| is_boxed_kind(state[r])).collect();
-    let fb = frame_base_addr(b, actx);
-    for &r in &boxed {
-        store_home(b, actx, state, fb, r);
-    }
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
     call_helper_void(b, actx.cc, h.gc_safepoint, &[actx.exec_ctx]);
-    // The collection may have grown/moved `ctx.stack`; recompute the base.
-    let fb2 = frame_base_addr(b, actx);
-    for &r in &boxed {
-        let v = b
-            .ins()
-            .load(types::I64, MemFlags::trusted(), fb2, (r * 8) as i32);
-        b.def_var(actx.vars[r], v);
-    }
+    reload_boxed(b, actx, &regs);
     b.ins().jump(cont, &[]);
     b.switch_to_block(cont);
+}
+
+/// Registers that could hold a heap reference at this program point — the
+/// set to root across a collection.
+fn live_boxed(actx: &AllocCtx, state: &[K]) -> Vec<usize> {
+    (0..actx.nregs).filter(|&r| is_boxed_kind(state[r])).collect()
+}
+
+/// Spill `regs` to their `ctx.stack` home slots so the collector roots (and
+/// rewrites) them. Ints are GC-irrelevant and stay in registers.
+fn flush_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K], regs: &[usize]) {
+    let fb = frame_base_addr(b, actx);
+    for &r in regs {
+        store_home(b, actx, state, fb, r);
+    }
+}
+
+/// Reload `regs` from their home slots after a collection may have moved
+/// their indices (and grown/moved `ctx.stack`, so recompute the base).
+fn reload_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, regs: &[usize]) {
+    let fb = frame_base_addr(b, actx);
+    for &r in regs {
+        let v = b
+            .ins()
+            .load(types::I64, MemFlags::trusted(), fb, (r * 8) as i32);
+        b.def_var(actx.vars[r], v);
+    }
+}
+
+/// Generic cross-function `Call` — the callee is a class (`new`) or any
+/// non-int-contract value, so it can't use the clif→clif fast IC. Dispatch
+/// through `clif_call_fallback` (which runs the callee, possibly a
+/// constructor, in the interpreter and can therefore trigger a GC): flush
+/// live heap refs to their home slots first, box the callee+args, call, then
+/// reload. Result is unboxed to int only when the register meta proves it.
+pub(super) fn emit_generic_call(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    meta: &[varn_types::register_meta::RegisterMeta],
+    code: &[u16],
+    ip: usize,
+) -> Result<(), String> {
+    let w1 = code[ip + 1];
+    let w2 = code[ip + 2];
+    let dest = (w1 >> 8) as usize;
+    let callee_reg = (w1 & 0xFF) as usize;
+    let total = (w2 >> 8) as usize;
+    let call_base = (w2 & 0xFF) as usize;
+    let argc = total.saturating_sub(1);
+    if argc > 4 {
+        return Err("clif: generic call arity > 4".into());
+    }
+
+    let callee = box_or_pass(b, actx, state, callee_reg);
+    let arg_vals: Vec<cranelift_codegen::ir::Value> = (0..argc)
+        .map(|i| box_or_pass(b, actx, state, call_base + 1 + i))
+        .collect();
+
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+
+    let argc_v = b.ins().iconst(types::I64, argc as i64);
+    let zero = b.ins().iconst(types::I64, 0);
+    let mut args = vec![actx.exec_ctx, callee, argc_v];
+    for i in 0..4 {
+        args.push(if i < argc { arg_vals[i] } else { zero });
+    }
+    let res = call_helper(b, actx.cc, actx.helpers.clif_call_fallback, &args);
+
+    reload_boxed(b, actx, &regs);
+
+    if meta.get(dest).map_or(false, |m| m.kind == varn_types::register_meta::SlotKind::Int) {
+        let s = b.ins().ishl_imm(res, 16);
+        let un = b.ins().sshr_imm(s, 16);
+        b.def_var(actx.vars[dest], un);
+    } else {
+        b.def_var(actx.vars[dest], res);
+    }
+    Ok(())
 }
 
 /// `BuildArray dest, start, count` — materialize the `count` element
