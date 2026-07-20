@@ -132,6 +132,23 @@ pub(super) fn call_helper(
     b.inst_results(call)[0]
 }
 
+/// Like [`call_helper`] but for a `-> ()` helper (`gc_safepoint`,
+/// `array_push`, `set_fixed_field`).
+pub(super) fn call_helper_void(
+    b: &mut FunctionBuilder,
+    cc: cranelift_codegen::isa::CallConv,
+    helper: usize,
+    args: &[cranelift_codegen::ir::Value],
+) {
+    let mut sig = Signature::new(cc);
+    for _ in 0..args.len() {
+        sig.params.push(AbiParam::new(types::I64));
+    }
+    let sig_ref = b.import_signature(sig);
+    let ptr = b.ins().iconst(types::I64, helper as i64);
+    b.ins().call_indirect(sig_ref, ptr, args);
+}
+
 /// Payload via the loop cache when one exists for this access: cache != 0
 /// short-circuits the whole guard walk (one test + branch, perfectly
 /// predicted after iteration one); cache == 0 — or no cache — takes the

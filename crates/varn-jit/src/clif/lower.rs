@@ -44,8 +44,8 @@ use crate::JitHelpers;
 use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::emit::{
-    box_int, call_helper, code_has_array_ops, def_const, emit_array_payload, state_meta_int,
-    use_boxed, use_int, wrap_i48, INT_TAG, MASK_48,
+    box_int, call_helper, call_helper_void, code_has_array_ops, def_const, emit_array_payload,
+    state_meta_int, use_boxed, use_int, wrap_i48, INT_TAG, MASK_48,
 };
 
 /// Compiled artifact: `entry` (the wrapper, `JitFn` ABI) and `raw` (the
@@ -725,6 +725,43 @@ fn lower_raw(
             }
             OpCode::ArraySetIndex => {
                 arrays::emit_array_set_index(&mut b, &arr, &state, code, ip, first_reg)?;
+            }
+            OpCode::GetFixedField => {
+                // Plain slot read (class-typed field): no getter, no alloc,
+                // no GC — a bare helper call in either lowering.
+                let obj_r = (code[ip + 1] >> 8) as usize;
+                let slot = code[ip + 2] as usize;
+                let obj = use_boxed(&mut b, &vars, &state, obj_r)?;
+                let slot_v = b.ins().iconst(types::I64, slot as i64);
+                let res =
+                    call_helper(&mut b, cc, helpers.get_fixed_field, &[exec_ctx, obj, slot_v]);
+                if state_meta_int(&proto.register_meta, first_reg) {
+                    let s = b.ins().ishl_imm(res, 16);
+                    let un = b.ins().sshr_imm(s, 16);
+                    b.def_var(vars[first_reg], un);
+                } else {
+                    b.def_var(vars[first_reg], res);
+                }
+            }
+            OpCode::SetFixedField => {
+                // Slot write; the helper carries the old←young write barrier.
+                let val_r = (code[ip + 1] >> 8) as usize;
+                let slot = code[ip + 2] as usize;
+                let obj = use_boxed(&mut b, &vars, &state, first_reg)?;
+                let val = match state[val_r] {
+                    K::Int => {
+                        let raw = b.use_var(vars[val_r]);
+                        box_int(&mut b, raw)
+                    }
+                    _ => use_boxed(&mut b, &vars, &state, val_r)?,
+                };
+                let slot_v = b.ins().iconst(types::I64, slot as i64);
+                call_helper_void(
+                    &mut b,
+                    cc,
+                    helpers.set_fixed_field,
+                    &[exec_ctx, obj, slot_v, val],
+                );
             }
             OpCode::Call => {
                 // Static cross-function call via a guarded monomorphic IC.

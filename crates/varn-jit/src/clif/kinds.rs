@@ -97,8 +97,9 @@ pub(crate) fn apply_kinds(
             let src = (code[ip + 1] >> 8) as usize;
             state[dest] = state[src];
         }
-        // Array loads produce boxed values (int-unboxed when meta proves).
-        OpCode::ArrayGetIndex => {
+        // Array element / fixed-field loads produce boxed values, unboxed to
+        // int when the register meta proves it.
+        OpCode::ArrayGetIndex | OpCode::GetFixedField => {
             state[dest] = if meta_int(dest) { K::Int } else { K::Boxed };
         }
         // `BuildArray`/`BuildObjectWithShape` encode their destination in the

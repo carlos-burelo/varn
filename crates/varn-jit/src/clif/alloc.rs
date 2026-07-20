@@ -19,14 +19,14 @@
 //! on entry, so home slots hold only null or valid VmValues (never stale
 //! heap-looking garbage the collector could root). See the plan's Fase 5b.
 
-use cranelift_codegen::ir::{condcodes::IntCC, types, AbiParam, InstBuilder, MemFlags, Signature};
+use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::chunk::{Literal, PoolEntry};
 
-use super::emit::{box_int, call_helper};
+use super::emit::{box_int, call_helper, call_helper_void};
 use super::kinds::{is_boxed_kind, K};
 use crate::JitHelpers;
 
@@ -123,22 +123,6 @@ fn store_home(
     b.ins().store(MemFlags::trusted(), v, fb, (reg * 8) as i32);
 }
 
-/// Void-returning indirect helper call (`gc_safepoint`, `array_push`).
-fn call_void(
-    b: &mut FunctionBuilder,
-    cc: CallConv,
-    helper: usize,
-    args: &[cranelift_codegen::ir::Value],
-) {
-    let mut sig = Signature::new(cc);
-    for _ in 0..args.len() {
-        sig.params.push(AbiParam::new(types::I64));
-    }
-    let sig_ref = b.import_signature(sig);
-    let ptr = b.ins().iconst(types::I64, helper as i64);
-    b.ins().call_indirect(sig_ref, ptr, args);
-}
-
 /// Loop back-edge GC safepoint, positioned in the block that ends the loop
 /// body. On return the builder sits in a fresh continuation block, ready
 /// for the caller to emit the actual back-edge jump. Mirrors the template's
@@ -168,7 +152,7 @@ pub(super) fn emit_backedge_safepoint(b: &mut FunctionBuilder, actx: &AllocCtx, 
     for &r in &boxed {
         store_home(b, actx, state, fb, r);
     }
-    call_void(b, actx.cc, h.gc_safepoint, &[actx.exec_ctx]);
+    call_helper_void(b, actx.cc, h.gc_safepoint, &[actx.exec_ctx]);
     // The collection may have grown/moved `ctx.stack`; recompute the base.
     let fb2 = frame_base_addr(b, actx);
     for &r in &boxed {
@@ -225,7 +209,7 @@ pub(super) fn emit_array_push(
     let val_r = (code[ip + 1] >> 8) as usize;
     let arr = box_or_pass(b, actx, state, arr_r);
     let val = box_or_pass(b, actx, state, val_r);
-    call_void(b, actx.cc, actx.helpers.array_push, &[actx.exec_ctx, arr, val]);
+    call_helper_void(b, actx.cc, actx.helpers.array_push, &[actx.exec_ctx, arr, val]);
 }
 
 /// `StrConcat dest, a, b` — allocate the concatenation. Result is a boxed
