@@ -218,6 +218,10 @@ pub struct JitHelpers {
     /// Byte offset of ExecCtx.jit_frame_prepushed — the caller→prologue
     /// frame handshake word (see its doc in varn-vm).
     pub frame_prepushed_offset: usize,
+    /// `extern "C" fn(*mut ExecCtx, callee: VmValue, argc, a0..a3) -> VmValue`
+    /// — the CLIF static-call IC miss path: dispatch the (rebound or
+    /// GC-moved) callee through the interpreter/JIT with boxed args.
+    pub clif_call_fallback: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -302,6 +306,7 @@ pub fn compile(
     proto: &FunctionProto,
     constants: &[VmValue],
     helpers: JitHelpers,
+    linker: &dyn clif::lower::ClifLinker,
 ) -> Result<(JitFn, Rc<dyn Any>), String> {
     if proto.chunk.code.len() > 250 {
         return Err("JIT Bailout: function too large".to_owned());
@@ -311,7 +316,7 @@ pub fn compile(
     // bail falls back to the template JIT, then the interpreter.
     if clif::enabled() {
         if let Ok(isa) = clif::shared_isa() {
-            match clif::lower::try_compile(proto, constants, &helpers, isa) {
+            match clif::lower::try_compile(proto, constants, &helpers, isa, linker) {
                 Ok(art) => {
                     if clif::trace() {
                         eprintln!("CLIF ROUTE {:?}", proto.name);

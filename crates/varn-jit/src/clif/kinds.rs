@@ -22,14 +22,26 @@ pub(crate) enum K {
     /// untyped loads). Coerces to Int at use via the i48 sign-extend — the
     /// same read the interpreter's typed ops perform.
     Boxed,
+    /// A value freshly loaded from global slot `idx` — a `Boxed` refinement
+    /// that additionally records the origin, so a `Call` on it can ask the
+    /// linker for a static target. Any reuse as a plain boxed value treats
+    /// it as `Boxed`; two different origins meet to `Boxed`.
+    Global(u32),
     Poison,
     Mixed,
+}
+
+/// Whether `k` can be read as a boxed VmValue (heap receiver / call arg).
+pub(crate) fn is_boxed_kind(k: K) -> bool {
+    matches!(k, K::Boxed | K::Global(_))
 }
 
 fn merge(cur: K, k: K) -> K {
     match (cur, k) {
         (K::Unset, x) | (x, K::Unset) => x,
         (a, b) if a == b => a,
+        // Two boxed-ish kinds (incl. distinct global origins) stay boxed.
+        (a, b) if is_boxed_kind(a) && is_boxed_kind(b) => K::Boxed,
         _ => K::Mixed,
     }
 }
@@ -56,8 +68,11 @@ pub(crate) fn apply_kinds(
         | OpCode::MulInt
         | OpCode::AddImm
         | OpCode::SubImm
+        | OpCode::ModInt
         | OpCode::ArrayLength => state[dest] = K::Int,
-        OpCode::CallSelf => {
+        // Both self-calls and static calls produce the callee's return
+        // value; the lowering only routes int-returning callees.
+        OpCode::CallSelf | OpCode::Call => {
             let dest = (code[ip + 1] >> 8) as usize;
             state[dest] = K::Int;
         }
@@ -79,11 +94,18 @@ pub(crate) fn apply_kinds(
             let src = (code[ip + 1] >> 8) as usize;
             state[dest] = state[src];
         }
-        // Loads from the heap/globals produce boxed values; when the
-        // checker-derived register meta proves the slot Int, the lowering
-        // unboxes at the load and the var carries Int.
-        OpCode::ArrayGetIndex | OpCode::LoadGlobalIdx => {
+        // Array loads produce boxed values (int-unboxed when meta proves).
+        OpCode::ArrayGetIndex => {
             state[dest] = if meta_int(dest) { K::Int } else { K::Boxed };
+        }
+        // A global load records its origin so a `Call` on it can link
+        // statically; int-typed globals still unbox to Int.
+        OpCode::LoadGlobalIdx => {
+            state[dest] = if meta_int(dest) {
+                K::Int
+            } else {
+                K::Global(code[ip + 1] as u32)
+            };
         }
         _ => {}
     }

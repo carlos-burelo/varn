@@ -50,11 +50,43 @@ const HEAP_EXPECT: i64 =
     (varn_types::vm_value::SIGN | varn_types::vm_value::QNAN | varn_types::vm_value::TAG_PTR)
         as i64;
 
-/// Compiled artifact: `entry` (the wrapper, `JitFn` ABI) points into
-/// `buffer`.
+/// Compiled artifact: `entry` (the wrapper, `JitFn` ABI) and `raw` (the
+/// unboxed body, callable clif→clif) both point into `buffer`, which lives
+/// as long as the owning `FunctionProto` — raw addresses handed to other
+/// compilations stay valid.
 pub struct ClifArtifact {
     pub buffer: JitBuffer,
     pub entry: *const u8,
+    pub raw: *const u8,
+}
+
+/// A statically linkable call target: the CURRENT closure a global slot
+/// holds, when that closure is clif-compiled with an Int-proven contract.
+pub struct ClifTarget {
+    /// Raw-function entry address.
+    pub raw: usize,
+    /// The exact boxed `VmValue` bits of the closure the link was made
+    /// against. The call site guards on equality: a rebound (or GC-moved)
+    /// global mismatches and takes the generic fallback — never a wrong
+    /// call, at worst a slow one.
+    pub expected_bits: u64,
+    pub param_kinds: Vec<SlotKind>,
+    pub return_kind: SlotKind,
+}
+
+/// VM-side resolver for clif→clif static calls. Implemented over the live
+/// `ExecCtx` at compile time (globals are runtime state, so the JIT crate
+/// cannot see them itself).
+pub trait ClifLinker {
+    fn static_target(&self, global_idx: usize) -> Option<ClifTarget>;
+}
+
+/// Linker that never links — used by paths without a VM context.
+pub struct NoLinker;
+impl ClifLinker for NoLinker {
+    fn static_target(&self, _global_idx: usize) -> Option<ClifTarget> {
+        None
+    }
 }
 
 pub fn try_compile(
@@ -62,6 +94,7 @@ pub fn try_compile(
     constants: &[VmValue],
     helpers: &JitHelpers,
     isa: &OwnedTargetIsa,
+    linker: &dyn ClifLinker,
 ) -> Result<ClifArtifact, String> {
     if proto.is_generator || proto.is_async || proto.has_this || proto.has_rest {
         return Err("clif: unsupported function kind".into());
@@ -77,7 +110,7 @@ pub fn try_compile(
         return Err("clif: missing param kinds".into());
     }
 
-    let raw = lower_raw(proto, constants, helpers, isa)?;
+    let raw = lower_raw(proto, constants, helpers, isa, linker)?;
     let wrapper = build_wrapper(proto, helpers, isa)?;
 
     // Concatenate: raw at 0, wrapper 16-aligned after it, then resolve the
@@ -98,8 +131,13 @@ pub fn try_compile(
         }
     }
     buf.make_executable()?;
+    let raw_ptr = buf.as_ptr();
     let entry = unsafe { buf.as_ptr().add(wrapper_off) };
-    Ok(ClifArtifact { buffer: buf, entry })
+    Ok(ClifArtifact {
+        buffer: buf,
+        entry,
+        raw: raw_ptr,
+    })
 }
 
 /// `site` is the buffer offset of the rel32 field; `target` the buffer
@@ -159,12 +197,23 @@ fn lower_raw(
     constants: &[VmValue],
     helpers: &JitHelpers,
     isa: &OwnedTargetIsa,
+    linker: &dyn ClifLinker,
 ) -> Result<CompiledPiece, String> {
     let code = &proto.chunk.code;
     let pool = &proto.chunk.constants;
     let nparams = proto.arity.saturating_sub(1);
     let nregs = proto.register_count as usize;
     let cc = isa.default_call_conv();
+
+    // Cross-function static calls (the `Call` arm) are only sound when no
+    // heap pointer is live across the call — a GC under the fallback could
+    // move it. In the routed subset, the only boxed values are callee-fn
+    // loads consumed immediately by their own call; the presence of ANY
+    // array op (whose payload pointers are cached across loop bodies) or a
+    // boxed parameter breaks that, so we forbid `Call` in those functions.
+    let array_free = !code_has_array_ops(code, pool)?;
+    let all_int_params = proto.param_kinds.iter().all(|k| *k == SlotKind::Int);
+    let calls_allowed = array_free && all_int_params;
 
     // ---- scan: instruction starts, block starts (jump targets +
     // fall-through after conditional jumps) ----
@@ -436,6 +485,36 @@ fn lower_raw(
                 let w = wrap_i48(&mut b, r);
                 b.def_var(vars[first_reg], w);
             }
+            OpCode::ModInt => {
+                // Inline signed remainder. i48 operands can't hit the one
+                // trapping case (i64::MIN % -1), so only a zero divisor
+                // needs a guard: the cold branch calls the runtime helper,
+                // which raises the proper VM error via longjmp.
+                let w1 = code[ip + 1];
+                let (r1, r2) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
+                let a = use_int(&mut b, &vars, &state, r1)?;
+                let d = use_int(&mut b, &vars, &state, r2)?;
+                let is_zero = b.ins().icmp_imm(IntCC::Equal, d, 0);
+                let raise = b.create_block();
+                let ok = b.create_block();
+                let merge = b.create_block();
+                b.append_block_param(merge, types::I64);
+                b.ins().brif(is_zero, raise, &[], ok, &[]);
+                b.switch_to_block(raise);
+                let ba = box_int(&mut b, a);
+                let bd = box_int(&mut b, d);
+                let _ = call_helper(&mut b, cc, helpers.modulo, &[exec_ctx, ba, bd]);
+                // helpers.modulo longjmps on a zero divisor and never
+                // returns; the jump keeps the block well-formed.
+                let z = b.ins().iconst(types::I64, 0);
+                b.ins().jump(merge, &[z.into()]);
+                b.switch_to_block(ok);
+                let r = b.ins().srem(a, d);
+                b.ins().jump(merge, &[r.into()]);
+                b.switch_to_block(merge);
+                let res = b.block_params(merge)[0];
+                b.def_var(vars[first_reg], res);
+            }
             OpCode::LtInt
             | OpCode::LteInt
             | OpCode::GtInt
@@ -533,11 +612,15 @@ fn lower_raw(
             }
             OpCode::LoadGlobalIdx => {
                 let idx = code[ip + 1] as usize;
+                // The globals data pointer lives at `globals_offset + 8`
+                // (the `values` Vec's ptr word inside GlobalStore — Rust
+                // reorders the fields, hence the +8; the template loads it
+                // at the same offset).
                 let gbase = b.ins().load(
                     types::I64,
                     MemFlags::trusted(),
                     exec_ctx,
-                    helpers.globals_offset as i32,
+                    (helpers.globals_offset + 8) as i32,
                 );
                 let v =
                     b.ins()
@@ -568,7 +651,7 @@ fn lower_raw(
                     types::I64,
                     MemFlags::trusted(),
                     exec_ctx,
-                    helpers.globals_offset as i32,
+                    (helpers.globals_offset + 8) as i32,
                 );
                 b.ins()
                     .store(MemFlags::trusted(), v, gbase, (idx * 8) as i32);
@@ -733,6 +816,100 @@ fn lower_raw(
                 b.ins().jump(merge, &[]);
                 b.switch_to_block(merge);
             }
+            OpCode::Call => {
+                // Static cross-function call via a guarded monomorphic IC.
+                // w1 = pack(dest, callee_reg); w2 = pack(total, call_base)
+                // where total counts the staged null callee slot, so there
+                // are total-1 real args at call_base+1..
+                if !calls_allowed {
+                    return Err("clif: call in array/boxed-param function".into());
+                }
+                let w1 = code[ip + 1];
+                let w2 = code[ip + 2];
+                let dest = (w1 >> 8) as usize;
+                let callee_reg = (w1 & 0xFF) as usize;
+                let total = (w2 >> 8) as usize;
+                let call_base = (w2 & 0xFF) as usize;
+                let argc = total.saturating_sub(1);
+
+                // The callee must be a global-loaded function (guarded);
+                // the linker must have a clif target with a matching int
+                // contract; ≤4 args for the by-value fallback.
+                let gidx = match state[callee_reg] {
+                    K::Global(i) => i as usize,
+                    _ => return Err("clif: non-global-fn callee".into()),
+                };
+                let target = linker
+                    .static_target(gidx)
+                    .ok_or("clif: no static target for callee")?;
+                if target.param_kinds.len() != argc
+                    || target.param_kinds.iter().any(|k| *k != SlotKind::Int)
+                    || target.return_kind != SlotKind::Int
+                    || argc > 4
+                {
+                    return Err("clif: callee contract unsupported".into());
+                }
+                for i in 0..argc {
+                    let r = call_base + 1 + i;
+                    if !matches!(state[r], K::Int | K::Boxed) {
+                        return Err("clif: non-int call arg".into());
+                    }
+                }
+
+                let callee = b.use_var(vars[callee_reg]);
+                let expected = b.ins().iconst(types::I64, target.expected_bits as i64);
+                let same = b.ins().icmp(IntCC::Equal, callee, expected);
+                let fast = b.create_block();
+                let slow = b.create_block();
+                let merge = b.create_block();
+                b.append_block_param(merge, types::I64); // unboxed int result
+                b.ins().brif(same, fast, &[], slow, &[]);
+
+                // fast: direct clif->clif raw call (unboxed int in and out).
+                b.switch_to_block(fast);
+                let mut raw_args = Vec::with_capacity(1 + argc);
+                raw_args.push(exec_ctx);
+                for i in 0..argc {
+                    raw_args.push(use_int(&mut b, &vars, &state, call_base + 1 + i)?);
+                }
+                let raw_sig = {
+                    let mut s = Signature::new(cc);
+                    for _ in 0..=argc {
+                        s.params.push(AbiParam::new(types::I64));
+                    }
+                    s.returns.push(AbiParam::new(types::I64));
+                    b.import_signature(s)
+                };
+                let raw_ptr = b.ins().iconst(types::I64, target.raw as i64);
+                let rc = b.ins().call_indirect(raw_sig, raw_ptr, &raw_args);
+                let rfast = b.inst_results(rc)[0];
+                b.ins().jump(merge, &[rfast.into()]);
+
+                // slow: box args, dispatch through the interpreter/JIT via
+                // the fallback helper, whose extern "C" signature is fixed at
+                // (ctx, callee, argc, a0, a1, a2, a3) — pass exactly seven,
+                // padding the unused arg slots with zero.
+                b.switch_to_block(slow);
+                let argc_v = b.ins().iconst(types::I64, argc as i64);
+                let zero_arg = b.ins().iconst(types::I64, 0);
+                let mut fb = vec![exec_ctx, callee, argc_v];
+                for i in 0..4 {
+                    if i < argc {
+                        let a = use_int(&mut b, &vars, &state, call_base + 1 + i)?;
+                        fb.push(box_int(&mut b, a));
+                    } else {
+                        fb.push(zero_arg);
+                    }
+                }
+                let boxed = call_helper(&mut b, cc, helpers.clif_call_fallback, &fb);
+                let s = b.ins().ishl_imm(boxed, 16);
+                let rslow = b.ins().sshr_imm(s, 16);
+                b.ins().jump(merge, &[rslow.into()]);
+
+                b.switch_to_block(merge);
+                let res = b.block_params(merge)[0];
+                b.def_var(vars[dest], res);
+            }
             OpCode::Nop => {}
             _ => return Err(format!("clif: unsupported opcode {op:?}")),
         }
@@ -776,7 +953,7 @@ fn use_int(
 ) -> Result<cranelift_codegen::ir::Value, String> {
     match state[r] {
         K::Int => Ok(b.use_var(vars[r])),
-        K::Boxed => {
+        k if super::kinds::is_boxed_kind(k) => {
             let v = b.use_var(vars[r]);
             let s = b.ins().ishl_imm(v, 16);
             Ok(b.ins().sshr_imm(s, 16))
@@ -785,17 +962,39 @@ fn use_int(
     }
 }
 
-/// Read a register as boxed VmValue bits (heap receivers).
+/// Read a register as boxed VmValue bits (heap receivers, call args).
 fn use_boxed(
     b: &mut FunctionBuilder,
     vars: &[Variable],
     state: &[K],
     r: usize,
 ) -> Result<cranelift_codegen::ir::Value, String> {
-    match state[r] {
-        K::Boxed => Ok(b.use_var(vars[r])),
-        k => Err(format!("clif: boxed use of {k:?} register")),
+    if super::kinds::is_boxed_kind(state[r]) {
+        Ok(b.use_var(vars[r]))
+    } else {
+        Err(format!("clif: boxed use of {:?} register", state[r]))
     }
+}
+
+/// Whether the function contains any array opcode. Functions that both
+/// call and touch arrays are rejected: a payload pointer cached across a
+/// loop body would dangle if the call's fallback triggers a GC.
+fn code_has_array_ops(
+    code: &[u16],
+    pool: &[varn_types::chunk::PoolEntry],
+) -> Result<bool, String> {
+    let mut ip = 0usize;
+    while ip < code.len() {
+        let info = decode(code, ip, pool).ok_or("clif: undecodable opcode")?;
+        if matches!(
+            OpCode::from_u8(code[ip] as u8),
+            Some(OpCode::ArrayGetIndex | OpCode::ArraySetIndex | OpCode::ArrayLength)
+        ) {
+            return Ok(true);
+        }
+        ip += info.len;
+    }
+    Ok(false)
 }
 
 /// Re-tag an unboxed int as a VmValue.

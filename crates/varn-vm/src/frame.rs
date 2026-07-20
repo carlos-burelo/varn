@@ -285,8 +285,10 @@ impl VmClosure {
             jit_native_result_offset: std::mem::offset_of!(ctx::ExecCtx, jit_native_result),
             globals_offset: std::mem::offset_of!(ctx::ExecCtx, globals),
             frame_prepushed_offset: std::mem::offset_of!(ctx::ExecCtx, jit_frame_prepushed),
+            clif_call_fallback: ctx::clif_call_fallback as usize,
         };
-        match varn_jit::compile(&self.proto, &self.constants, helpers) {
+        let linker = crate::clif_link::CtxLinker::current();
+        match varn_jit::compile(&self.proto, &self.constants, helpers, &linker) {
             Ok((entry, code)) => {
                 self.jit_entry = Some(entry);
                 self.jit_code = Some(code.clone());

@@ -157,6 +157,36 @@ pub extern "C" fn jit_typeof_val(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
     }
 }
 
+/// CLIF static-call IC miss path: the guarded callee bits didn't match the
+/// linked target (rebound global, or GC-moved closure), so dispatch the
+/// actual runtime callee through the interpreter/JIT with the (already
+/// boxed) argument values. Up to 4 args — the lowering bails a `Call` with
+/// more, so `a0..a3` beyond `argc` are ignored.
+///
+/// Errors propagate through the same longjmp path as every other JIT
+/// helper, unwinding to the outer `setjmp` in `execute_jit_frame`.
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn clif_call_fallback(
+    ctx: *mut ExecCtx,
+    callee: VmValue,
+    argc: usize,
+    a0: VmValue,
+    a1: VmValue,
+    a2: VmValue,
+    a3: VmValue,
+) -> VmValue {
+    unsafe {
+        use varn_types::NativeCtx;
+        let ctx_ref = &mut *ctx;
+        let all = [a0, a1, a2, a3];
+        let args = &all[..argc.min(4)];
+        match ctx_ref.call_vm(callee, args) {
+            Ok(v) => v,
+            Err(msg) => jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg)),
+        }
+    }
+}
+
 pub extern "C" fn jit_instanceof(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &*ctx;

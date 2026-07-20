@@ -42,6 +42,11 @@ impl ExecCtx {
     }
 
     pub(crate) fn run_until_inner(&mut self, depth: usize) -> VmResult<VmValue> {
+        // Record this context as the CLIF static-call linking context for the
+        // duration of the run: closures constructed here (and thus
+        // clif-compiled) can then resolve their cross-function callees
+        // against the live globals. Restored on exit so nested runs compose.
+        let _link = crate::clif_link::CtxGuard::enter(self as *const ExecCtx);
         unsafe { Self::run_until_inner_raw(self as *mut ExecCtx, depth) }
     }
 
