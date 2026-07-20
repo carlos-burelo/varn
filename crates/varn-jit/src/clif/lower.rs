@@ -44,9 +44,10 @@ use crate::JitHelpers;
 use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::emit::{
-    box_int, call_helper, call_helper_void, code_has_array_ops, def_const, emit_array_payload,
-    state_meta_int, use_boxed, use_int, wrap_i48, INT_TAG, MASK_48,
+    box_int, call_helper, code_has_array_ops, def_const, emit_array_payload, state_meta_int,
+    use_boxed, use_int, wrap_i48, INT_TAG, MASK_48,
 };
+use super::fields;
 
 /// Compiled artifact: `entry` (the wrapper, `JitFn` ABI) and `raw` (the
 /// unboxed body, callable clif→clif) both point into `buffer`, which lives
@@ -56,6 +57,11 @@ pub struct ClifArtifact {
     pub buffer: JitBuffer,
     pub entry: *const u8,
     pub raw: *const u8,
+    /// Whether `raw` takes the frame-aware ABI (extra base+closure params).
+    /// Such a function must NOT be called through the clif→clif fast path
+    /// (which assumes the bare `(exec_ctx, args)` ABI); the linker rejects it
+    /// so the call takes the wrapper-based fallback instead.
+    pub frame_aware: bool,
 }
 
 /// A statically linkable call target: the CURRENT closure a global slot
@@ -94,7 +100,7 @@ pub fn try_compile(
     isa: &OwnedTargetIsa,
     linker: &dyn ClifLinker,
 ) -> Result<ClifArtifact, String> {
-    if proto.is_generator || proto.is_async || proto.has_this || proto.has_rest {
+    if proto.is_generator || proto.is_async || proto.has_rest {
         return Err("clif: unsupported function kind".into());
     }
     if proto.upvalue_count > 0 {
@@ -109,8 +115,9 @@ pub fn try_compile(
     }
 
     let has_alloc = alloc::has_alloc(&proto.chunk.code, &proto.chunk.constants)?;
+    let frame_aware = proto.has_this || has_alloc;
     let raw = lower_raw(proto, constants, helpers, isa, linker, has_alloc)?;
-    let wrapper = build_wrapper(proto, helpers, isa, has_alloc)?;
+    let wrapper = build_wrapper(proto, helpers, isa, frame_aware)?;
 
     // Concatenate: raw at 0, wrapper 16-aligned after it, then resolve the
     // only two relocation targets we admit (self-recursion inside raw, and
@@ -136,6 +143,7 @@ pub fn try_compile(
         buffer: buf,
         entry,
         raw: raw_ptr,
+        frame_aware,
     })
 }
 
@@ -181,13 +189,15 @@ fn compile_piece(func: Function, isa: &OwnedTargetIsa) -> Result<CompiledPiece, 
 /// Raw signature: `fn(exec_ctx, [base, closure], arg × nparams) -> i64`.
 /// Int-declared args arrive unboxed; everything else arrives as its boxed
 /// VmValue bits. `exec_ctx` is only dereferenced by the heap-walking ops and
-/// the slow helpers. Allocating functions carry two extra parameters: `base`
-/// (this frame's register-0 index into `ctx.stack`, for flushing heap-typed
-/// registers to their home slots at a safepoint) and `closure` (this
-/// function's `VmClosure*`, needed by shape-driven object construction).
-fn raw_signature(nparams: usize, isa: &OwnedTargetIsa, has_alloc: bool) -> Signature {
+/// the slow helpers. Frame-aware functions (they allocate and/or take a
+/// `this` receiver) carry two extra parameters: `base` (this frame's
+/// register-0 index into `ctx.stack`, for flushing heap-typed registers to
+/// their home slots at a safepoint and for reading the receiver from
+/// `stack[base+0]`) and `closure` (this function's `VmClosure*`, needed by
+/// shape-driven object construction).
+fn raw_signature(nparams: usize, isa: &OwnedTargetIsa, frame_aware: bool) -> Signature {
     let mut sig = Signature::new(isa.default_call_conv());
-    let extra = if has_alloc { 2 } else { 0 };
+    let extra = if frame_aware { 2 } else { 0 };
     for _ in 0..(1 + extra + nparams) {
         sig.params.push(AbiParam::new(types::I64));
     }
@@ -208,6 +218,11 @@ fn lower_raw(
     let nparams = proto.arity.saturating_sub(1);
     let nregs = proto.register_count as usize;
     let cc = isa.default_call_conv();
+    // Frame-aware functions carry (base, closure) so they can flush heap refs
+    // to ctx.stack home slots at a safepoint and read the `this` receiver
+    // from stack[base+0]. A method/constructor needs it for the receiver even
+    // when it never allocates.
+    let frame_aware = proto.has_this || has_alloc;
 
     // Cross-function static calls (the `Call` arm) are only sound when no
     // heap pointer is live across the call — a GC under the fallback could
@@ -311,9 +326,9 @@ fn lower_raw(
     // ---- build ----
     let mut func = Function::with_name_signature(
         UserFuncName::user(0, 0),
-        raw_signature(nparams, isa, has_alloc),
+        raw_signature(nparams, isa, frame_aware),
     );
-    let self_sig_ref = func.import_signature(raw_signature(nparams, isa, has_alloc));
+    let self_sig_ref = func.import_signature(raw_signature(nparams, isa, frame_aware));
     let self_name =
         func.declare_imported_user_function(cranelift_codegen::ir::UserExternalName::new(0, 0));
     let self_ref = func.import_function(cranelift_codegen::ir::ExtFuncData {
@@ -349,14 +364,14 @@ fn lower_raw(
         b.def_var(*v, zero);
     }
     let exec_ctx = b.block_params(entry)[0];
-    // Allocating functions carry `base` and `closure` as the second and third
-    // raw parameters; args follow them.
-    let alloc_env = if has_alloc {
+    // Frame-aware functions carry `base` and `closure` as the second and
+    // third raw parameters; args follow them.
+    let alloc_env = if frame_aware {
         Some((b.block_params(entry)[1], b.block_params(entry)[2]))
     } else {
         None
     };
-    let arg_off = if has_alloc { 3 } else { 1 };
+    let arg_off = if frame_aware { 3 } else { 1 };
     for i in 0..nparams {
         let p = b.block_params(entry)[arg_off + i];
         b.def_var(vars[1 + i], p);
@@ -371,6 +386,14 @@ fn lower_raw(
         closure,
         nregs,
     });
+    // A method/constructor receives `this` at register 0 — read it from its
+    // ctx.stack home slot (stack[base+0]); the caller placed it there.
+    if proto.has_this {
+        if let Some(actx) = actx.as_ref() {
+            let this = alloc::load_receiver(&mut b, actx);
+            b.def_var(vars[0], this);
+        }
+    }
     let arr = arrays::ArrCtx {
         vars: vars.as_slice(),
         helpers,
@@ -380,6 +403,13 @@ fn lower_raw(
         cache_vars: &cache_vars,
         register_meta: &proto.register_meta,
         has_alloc,
+    };
+    let fld = fields::FldCtx {
+        vars: vars.as_slice(),
+        helpers,
+        cc,
+        exec_ctx,
+        register_meta: &proto.register_meta,
     };
 
     let blocks: HashMap<usize, cranelift_codegen::ir::Block> = block_starts
@@ -398,6 +428,7 @@ fn lower_raw(
         nregs,
         &proto.param_kinds,
         &proto.register_meta,
+        proto.has_this,
     )?;
 
     let mut state: Vec<K> = entries[&0].clone();
@@ -600,9 +631,13 @@ fn lower_raw(
                 let target = blocks[&((ip + 3) - off)];
                 // Allocating functions run a GC safepoint at the back-edge,
                 // flushing live heap refs to their ctx.stack home slots so
-                // the collector can root and rewrite them.
-                if let Some(actx) = actx.as_ref() {
-                    alloc::emit_backedge_safepoint(&mut b, actx, &state);
+                // the collector can root and rewrite them. (A frame-aware but
+                // non-allocating function — e.g. a method — never fills the
+                // nursery, so it skips this.)
+                if has_alloc {
+                    if let Some(actx) = actx.as_ref() {
+                        alloc::emit_backedge_safepoint(&mut b, actx, &state);
+                    }
                 }
                 b.ins().jump(target, &[]);
                 terminated = true;
@@ -624,7 +659,13 @@ fn lower_raw(
             }
             OpCode::Return => {
                 let src = (code[ip + 1] & 0xFF) as usize;
-                let v = match proto.return_kind {
+                // A reachable null return (a constructor's implicit
+                // `return null`; the int-return tail's LoadNull;Return is dead
+                // and trap-filled, never reaching here). Emit the null bits.
+                let v = if state[src] == K::Poison {
+                    b.ins().iconst(types::I64, VmValue::null().0 as i64)
+                } else {
+                    match proto.return_kind {
                     // Int return: the raw yields an unboxed i48 payload, which
                     // the wrapper (and the clif→clif fast call) re-tag. The
                     // source must be int by PROOF — kind Int, or boxed with a
@@ -649,13 +690,17 @@ fn lower_raw(
                         }
                     }
                     k => return Err(format!("clif: unsupported return kind {k:?}")),
+                    }
                 };
                 b.ins().return_(&[v]);
                 terminated = true;
             }
             OpCode::CallSelf => {
-                if has_alloc {
-                    return Err("clif: CallSelf in alloc fn unsupported".into());
+                // A frame-aware self-call would need its extra ABI params
+                // (base/closure) threaded through, which the raw self-call
+                // path does not do — bail so it never mis-calls.
+                if frame_aware {
+                    return Err("clif: CallSelf in frame-aware fn unsupported".into());
                 }
                 let w1 = code[ip + 1];
                 let w2 = code[ip + 2];
@@ -739,41 +784,10 @@ fn lower_raw(
                 arrays::emit_array_set_index(&mut b, &arr, &state, code, ip, first_reg)?;
             }
             OpCode::GetFixedField => {
-                // Plain slot read (class-typed field): no getter, no alloc,
-                // no GC — a bare helper call in either lowering.
-                let obj_r = (code[ip + 1] >> 8) as usize;
-                let slot = code[ip + 2] as usize;
-                let obj = use_boxed(&mut b, &vars, &state, obj_r)?;
-                let slot_v = b.ins().iconst(types::I64, slot as i64);
-                let res =
-                    call_helper(&mut b, cc, helpers.get_fixed_field, &[exec_ctx, obj, slot_v]);
-                if state_meta_int(&proto.register_meta, first_reg) {
-                    let s = b.ins().ishl_imm(res, 16);
-                    let un = b.ins().sshr_imm(s, 16);
-                    b.def_var(vars[first_reg], un);
-                } else {
-                    b.def_var(vars[first_reg], res);
-                }
+                fields::emit_get_fixed_field(&mut b, &fld, &state, code, ip, first_reg)?;
             }
             OpCode::SetFixedField => {
-                // Slot write; the helper carries the old←young write barrier.
-                let val_r = (code[ip + 1] >> 8) as usize;
-                let slot = code[ip + 2] as usize;
-                let obj = use_boxed(&mut b, &vars, &state, first_reg)?;
-                let val = match state[val_r] {
-                    K::Int => {
-                        let raw = b.use_var(vars[val_r]);
-                        box_int(&mut b, raw)
-                    }
-                    _ => use_boxed(&mut b, &vars, &state, val_r)?,
-                };
-                let slot_v = b.ins().iconst(types::I64, slot as i64);
-                call_helper_void(
-                    &mut b,
-                    cc,
-                    helpers.set_fixed_field,
-                    &[exec_ctx, obj, slot_v, val],
-                );
+                fields::emit_set_fixed_field(&mut b, &fld, &state, code, ip, first_reg)?;
             }
             OpCode::Call => {
                 // Static cross-function call via a guarded monomorphic IC.
@@ -939,7 +953,7 @@ fn build_wrapper(
     proto: &FunctionProto,
     helpers: &JitHelpers,
     isa: &OwnedTargetIsa,
-    has_alloc: bool,
+    frame_aware: bool,
 ) -> Result<CompiledPiece, String> {
     let nparams = proto.arity.saturating_sub(1);
     let mut sig = Signature::new(isa.default_call_conv());
@@ -949,7 +963,7 @@ fn build_wrapper(
     sig.returns.push(AbiParam::new(types::I64));
 
     let mut func = Function::with_name_signature(UserFuncName::user(0, 1), sig);
-    let raw_sig = func.import_signature(raw_signature(nparams, isa, has_alloc));
+    let raw_sig = func.import_signature(raw_signature(nparams, isa, frame_aware));
     let raw_name =
         func.declare_imported_user_function(cranelift_codegen::ir::UserExternalName::new(0, 0));
     let raw_ref = func.import_function(cranelift_codegen::ir::ExtFuncData {
@@ -986,10 +1000,11 @@ fn build_wrapper(
     let arg_base = b.ins().iadd(stack_ptr, base_bytes);
     let mut args = Vec::with_capacity(3 + nparams);
     args.push(exec_ctx);
-    // Allocating raw functions take `base` (frame register-0 index) and
+    // Frame-aware raw functions take `base` (frame register-0 index) and
     // `closure` (this VmClosure*) next, so they can address ctx.stack home
-    // slots at safepoints and drive shape-based object construction.
-    if has_alloc {
+    // slots at safepoints, read the receiver, and drive shape-based object
+    // construction.
+    if frame_aware {
         args.push(base);
         args.push(closure);
     }
@@ -1009,14 +1024,15 @@ fn build_wrapper(
     let call = b.ins().call(raw_ref, &args);
     let raw_res = b.inst_results(call)[0];
 
-    // Int returns come back as an unboxed i48 payload to re-tag; heap
-    // (string/ref) returns are already boxed VmValue bits — pass through.
-    let result = match proto.return_kind {
-        SlotKind::Str | SlotKind::Ref => raw_res,
-        _ => {
-            let masked = b.ins().band_imm(raw_res, MASK_48);
-            b.ins().bor_imm(masked, INT_TAG)
-        }
+    // Only an int return comes back as an unboxed i48 payload to re-tag.
+    // Every other admitted return (string/ref, or a constructor's null) is
+    // already boxed VmValue bits — pass through. Re-tagging a null would
+    // forge a non-null value and defeat jit_construct_fast's null check.
+    let result = if proto.return_kind == SlotKind::Int {
+        let masked = b.ins().band_imm(raw_res, MASK_48);
+        b.ins().bor_imm(masked, INT_TAG)
+    } else {
+        raw_res
     };
     b.ins().return_(&[result]);
     b.finalize();

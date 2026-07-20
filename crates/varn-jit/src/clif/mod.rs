@@ -12,6 +12,7 @@
 pub(crate) mod alloc;
 pub(crate) mod arrays;
 pub(crate) mod emit;
+pub(crate) mod fields;
 pub(crate) mod kinds;
 pub mod lower;
 

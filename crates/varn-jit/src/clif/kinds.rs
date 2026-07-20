@@ -134,6 +134,7 @@ pub(crate) fn apply_kinds(
 }
 
 /// Kind state at every block entry, to a fixpoint over the bytecode CFG.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn kind_flow(
     code: &[u16],
     pool: &[varn_types::chunk::PoolEntry],
@@ -142,8 +143,14 @@ pub(crate) fn kind_flow(
     nregs: usize,
     param_kinds: &[SlotKind],
     meta: &[varn_types::register_meta::RegisterMeta],
+    has_this: bool,
 ) -> Result<HashMap<usize, Vec<K>>, String> {
     let mut entry0 = vec![K::Unset; nregs];
+    // A method/constructor receives its `this` receiver (a heap object) in
+    // register 0; every other function leaves r0 as the unused callee slot.
+    if has_this && nregs > 0 {
+        entry0[0] = K::Boxed;
+    }
     for (i, pk) in param_kinds.iter().enumerate() {
         if 1 + i < nregs {
             entry0[1 + i] = if *pk == SlotKind::Int { K::Int } else { K::Boxed };

@@ -111,6 +111,16 @@ fn box_or_pass(
     }
 }
 
+/// Load the `this` receiver from register 0's home slot (`stack[base+0]`),
+/// where the caller placed it before invoking a method/constructor.
+pub(super) fn load_receiver(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+) -> cranelift_codegen::ir::Value {
+    let fb = frame_base_addr(b, actx);
+    b.ins().load(types::I64, MemFlags::trusted(), fb, 0)
+}
+
 /// Store `reg`'s current value into its `ctx.stack` home slot.
 fn store_home(
     b: &mut FunctionBuilder,

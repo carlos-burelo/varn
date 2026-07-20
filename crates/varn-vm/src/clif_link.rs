@@ -67,6 +67,12 @@ impl ClifLinker for CtxLinker {
         let proto = &closure.proto;
         let borrow = proto.jit_code.borrow();
         let art = borrow.as_ref()?.downcast_ref::<ClifArtifact>()?;
+        // Frame-aware raws take extra (base, closure) params; the clif→clif
+        // fast path can't supply them, so decline and let the guarded call
+        // take the wrapper-based fallback (always correct, just slower).
+        if art.frame_aware {
+            return None;
+        }
         Some(ClifTarget {
             raw: art.raw as usize,
             expected_bits: gv.0,
