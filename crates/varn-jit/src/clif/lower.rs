@@ -37,7 +37,7 @@ use varn_types::bytecode::decode;
 use varn_types::register_meta::SlotKind;
 use varn_types::{FunctionProto, VmValue};
 
-use super::kinds::{apply_kinds, kind_flow, K};
+use super::kinds::{apply_kinds, is_boxed_kind, kind_flow, K};
 use crate::mem::JitBuffer;
 use crate::JitHelpers;
 
@@ -624,19 +624,31 @@ fn lower_raw(
             }
             OpCode::Return => {
                 let src = (code[ip + 1] & 0xFF) as usize;
-                // The wrapper re-tags the raw result as an int, so the
-                // source must be int by PROOF: either the kind lattice
-                // shows Int, or the value is boxed and the DECLARED return
-                // type is int (checker-enforced at every typed call site).
-                // An untyped identity arrow has neither and bails — a
-                // coerced arbitrary Boxed return would forge an int from a
-                // heap reference.
-                let v = match state[src] {
-                    K::Int => b.use_var(vars[src]),
-                    K::Boxed if proto.return_kind == SlotKind::Int => {
-                        use_int(&mut b, &vars, &state, src)?
+                let v = match proto.return_kind {
+                    // Int return: the raw yields an unboxed i48 payload, which
+                    // the wrapper (and the clif→clif fast call) re-tag. The
+                    // source must be int by PROOF — kind Int, or boxed with a
+                    // DECLARED int return (checker-enforced at typed call
+                    // sites). An untyped identity arrow has neither and bails,
+                    // so a Boxed return can't forge an int from a heap ref.
+                    SlotKind::Int => match state[src] {
+                        K::Int => b.use_var(vars[src]),
+                        K::Boxed => use_int(&mut b, &vars, &state, src)?,
+                        k => return Err(format!("clif: unproven int return ({k:?})")),
+                    },
+                    // Heap return (string/ref): the raw yields the boxed
+                    // VmValue bits and the wrapper passes them through. Only
+                    // reachable via the wrapper — the fast call path requires
+                    // an int contract, so no clif→clif caller sees these bits
+                    // as an unboxed int.
+                    SlotKind::Str | SlotKind::Ref => {
+                        if is_boxed_kind(state[src]) {
+                            b.use_var(vars[src])
+                        } else {
+                            return Err(format!("clif: non-boxed heap return ({:?})", state[src]));
+                        }
                     }
-                    k => return Err(format!("clif: unproven return kind ({k:?})")),
+                    k => return Err(format!("clif: unsupported return kind {k:?}")),
                 };
                 b.ins().return_(&[v]);
                 terminated = true;
@@ -997,9 +1009,16 @@ fn build_wrapper(
     let call = b.ins().call(raw_ref, &args);
     let raw_res = b.inst_results(call)[0];
 
-    let masked = b.ins().band_imm(raw_res, MASK_48);
-    let boxed = b.ins().bor_imm(masked, INT_TAG);
-    b.ins().return_(&[boxed]);
+    // Int returns come back as an unboxed i48 payload to re-tag; heap
+    // (string/ref) returns are already boxed VmValue bits — pass through.
+    let result = match proto.return_kind {
+        SlotKind::Str | SlotKind::Ref => raw_res,
+        _ => {
+            let masked = b.ins().band_imm(raw_res, MASK_48);
+            b.ins().bor_imm(masked, INT_TAG)
+        }
+    };
+    b.ins().return_(&[result]);
     b.finalize();
     compile_piece(func, isa)
 }
