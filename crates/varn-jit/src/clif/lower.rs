@@ -666,22 +666,17 @@ fn lower_raw(
                     b.ins().iconst(types::I64, VmValue::null().0 as i64)
                 } else {
                     match proto.return_kind {
-                    // Int return: the raw yields an unboxed i48 payload, which
-                    // the wrapper (and the clif→clif fast call) re-tag. The
-                    // source must be int by PROOF — kind Int, or boxed with a
-                    // DECLARED int return (checker-enforced at typed call
-                    // sites). An untyped identity arrow has neither and bails,
-                    // so a Boxed return can't forge an int from a heap ref.
+                    // Int return: raw yields an unboxed i48 payload the
+                    // wrapper/fast-call re-tag; source must be int by proof
+                    // (kind Int, or boxed with a declared int return).
                     SlotKind::Int => match state[src] {
                         K::Int => b.use_var(vars[src]),
                         K::Boxed => use_int(&mut b, &vars, &state, src)?,
                         k => return Err(format!("clif: unproven int return ({k:?})")),
                     },
-                    // Heap return (string/ref): the raw yields the boxed
-                    // VmValue bits and the wrapper passes them through. Only
-                    // reachable via the wrapper — the fast call path requires
-                    // an int contract, so no clif→clif caller sees these bits
-                    // as an unboxed int.
+                    // Heap return (string/ref): raw yields boxed bits, wrapper
+                    // passes through (only reachable via the wrapper, whose
+                    // caller never reads them as an unboxed int).
                     SlotKind::Str | SlotKind::Ref => {
                         if is_boxed_kind(state[src]) {
                             b.use_var(vars[src])
@@ -785,6 +780,10 @@ fn lower_raw(
             }
             OpCode::GetFixedField => {
                 fields::emit_get_fixed_field(&mut b, &fld, &state, code, ip, first_reg)?;
+            }
+            OpCode::GetProperty => {
+                let actx = actx.as_ref().ok_or("clif: GetProperty outside frame-aware fn")?;
+                alloc::emit_get_property(&mut b, actx, &state, &proto.register_meta, code, ip);
             }
             OpCode::SetFixedField => {
                 fields::emit_set_fixed_field(&mut b, &fld, &state, code, ip, first_reg)?;

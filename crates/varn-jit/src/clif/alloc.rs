@@ -59,6 +59,9 @@ pub(super) fn has_alloc(
                     // Generic `Add` handles string concatenation, which
                     // allocates a heap string.
                     | OpCode::Add
+                    // A property read may invoke a getter (arbitrary VM code
+                    // that can allocate); it also needs the closure param.
+                    | OpCode::GetProperty
             )
         ) {
             return Ok(true);
@@ -240,6 +243,53 @@ pub(super) fn emit_generic_call(
         b.def_var(actx.vars[dest], res);
     }
     Ok(())
+}
+
+/// `BuildArray dest, start, count` — materialize the `count` element
+/// `GetProperty first_reg, obj, cs_idx, name_idx` — dynamic/generic property
+/// read (`.length`, monomorphic fields, getters). Dispatched through the
+/// flat helper, which may run a getter and therefore GC — so live heap refs
+/// are flushed/reloaded around it. Result unboxed to int only when the meta
+/// proves it. `ip` (next instruction) is handed to the helper for the
+/// caller's frame position on the getter path.
+pub(super) fn emit_get_property(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    meta: &[varn_types::register_meta::RegisterMeta],
+    code: &[u16],
+    ip: usize,
+) {
+    let dest = (code[ip] >> 8) as usize;
+    let obj_r = (code[ip + 1] >> 8) as usize;
+    let cs_idx = (code[ip + 1] & 0xFF) as usize;
+    let name_idx = code[ip + 2] as usize;
+    let next_ip = ip + 3;
+
+    let obj = box_or_pass(b, actx, state, obj_r);
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+
+    let ni = b.ins().iconst(types::I64, name_idx as i64);
+    let ci = b.ins().iconst(types::I64, cs_idx as i64);
+    let de = b.ins().iconst(types::I64, dest as i64);
+    let ipv = b.ins().iconst(types::I64, next_ip as i64);
+    let res = call_helper(
+        b,
+        actx.cc,
+        actx.helpers.get_property_flat,
+        &[actx.exec_ctx, actx.closure, obj, ni, ci, de, ipv],
+    );
+
+    reload_boxed(b, actx, &regs);
+
+    if meta.get(dest).map_or(false, |m| m.kind == varn_types::register_meta::SlotKind::Int) {
+        let s = b.ins().ishl_imm(res, 16);
+        let un = b.ins().sshr_imm(s, 16);
+        b.def_var(actx.vars[dest], un);
+    } else {
+        b.def_var(actx.vars[dest], res);
+    }
 }
 
 /// `BuildArray dest, start, count` — materialize the `count` element

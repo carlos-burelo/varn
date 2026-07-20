@@ -589,6 +589,29 @@ pub extern "C" fn jit_get_property(
     }
 }
 
+/// Flat-argument shim over [`jit_get_property`] so the CLIF backend can call
+/// it with plain scalars instead of building a `JitGetPropertyArgs` struct in
+/// a stack slot. Same semantics (may run a getter, hence may GC).
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn jit_get_property_flat(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    obj: VmValue,
+    name_idx: usize,
+    cs_idx: usize,
+    dest: usize,
+    ip: usize,
+) -> VmValue {
+    let args = varn_jit::JitGetPropertyArgs {
+        obj,
+        name_idx,
+        cs_idx,
+        dest,
+        ip,
+    };
+    jit_get_property(ctx, closure, &args)
+}
+
 pub extern "C" fn jit_set_property(
     ctx: *mut ExecCtx,
     closure: *const crate::frame::VmClosure,

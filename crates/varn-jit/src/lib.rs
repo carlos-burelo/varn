@@ -120,6 +120,9 @@ pub struct JitHelpers {
     pub call: usize,
     pub call_method: usize,
     pub get_property: usize,
+    /// Flat-args variant of `get_property` for the CLIF backend:
+    /// `fn(ctx, closure, obj, name_idx, cs_idx, dest, ip) -> VmValue`.
+    pub get_property_flat: usize,
     pub set_property: usize,
     pub build_array: usize,
     pub build_str: usize,
