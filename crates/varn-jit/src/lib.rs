@@ -215,6 +215,12 @@ pub struct JitHelpers {
     pub nursery_threshold: usize,
     pub jit_native_result_offset: usize,
     pub globals_offset: usize,
+    /// Byte offset within `ExecCtx` of the `stack` `Vec<VmValue>`'s data
+    /// pointer word (`offset_of!(ExecCtx, stack) + elems_ptr_off`). The
+    /// allocating clif path loads this fresh each time it addresses a
+    /// register's `ctx.stack` home slot, so a stack reallocation can never
+    /// leave a stale base.
+    pub stack_data_offset: usize,
     /// Byte offset of ExecCtx.jit_frame_prepushed — the caller→prologue
     /// frame handshake word (see its doc in varn-vm).
     pub frame_prepushed_offset: usize,

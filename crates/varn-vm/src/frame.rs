@@ -161,6 +161,9 @@ impl VmClosure {
             return;
         }
 
+        let array_layout = crate::heap::Heap::jit_array_layout();
+        let stack_data_offset =
+            std::mem::offset_of!(ctx::ExecCtx, stack) + array_layout.elems_ptr_off;
         let helpers = varn_jit::JitHelpers {
             load_const: ctx::jit_load_const as usize,
             load_global_idx: ctx::jit_load_global_idx as usize,
@@ -261,7 +264,7 @@ impl VmClosure {
             jit_call_native_fnptr: ctx::jit_call_native_fnptr as usize,
             resolve_native_op: Self::resolve_native_op_addr,
             resolve_native_op_v2: Self::resolve_native_op_addr_v2,
-            array_layout: crate::heap::Heap::jit_array_layout(),
+            array_layout,
             object_layout: crate::heap::Heap::jit_object_layout(),
             open_upvalues_offset: {
                 let dummy = std::mem::MaybeUninit::<ctx::ExecCtx>::uninit();
@@ -284,6 +287,7 @@ impl VmClosure {
             nursery_threshold: crate::nursery::Nursery::FULL_THRESHOLD,
             jit_native_result_offset: std::mem::offset_of!(ctx::ExecCtx, jit_native_result),
             globals_offset: std::mem::offset_of!(ctx::ExecCtx, globals),
+            stack_data_offset,
             frame_prepushed_offset: std::mem::offset_of!(ctx::ExecCtx, jit_frame_prepushed),
             clif_call_fallback: ctx::clif_call_fallback as usize,
         };

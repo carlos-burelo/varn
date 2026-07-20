@@ -80,7 +80,10 @@ pub(crate) fn apply_kinds(
             let idx = code[ip + 1] as usize;
             state[dest] = match constants.get(idx) {
                 Some(c) if c.is_int() => K::Int,
-                _ => K::Mixed,
+                // A non-int constant (string, float, null) is carried as its
+                // boxed VmValue bits; the lowering embeds them directly.
+                Some(_) => K::Boxed,
+                None => K::Mixed,
             };
         }
         OpCode::LtInt
@@ -98,6 +101,24 @@ pub(crate) fn apply_kinds(
         OpCode::ArrayGetIndex => {
             state[dest] = if meta_int(dest) { K::Int } else { K::Boxed };
         }
+        // `BuildArray`/`BuildObjectWithShape` encode their destination in the
+        // FIRST operand word (`w1 >> 8`), not the opcode word — unlike the
+        // ops below whose dest is the standard `first_reg`.
+        OpCode::BuildArray | OpCode::BuildObjectWithShape => {
+            state[(code[ip + 1] >> 8) as usize] = K::Boxed
+        }
+        // Other heap-producing ops yield a boxed reference in `first_reg`.
+        // A native op / generic Add result kind is unknown here; treat it as
+        // boxed bits (an int result still unboxes correctly at an int use).
+        OpCode::BuildObject
+        | OpCode::StrConcat
+        | OpCode::BuildStr
+        | OpCode::MakeEnumVariant
+        | OpCode::CallNativeOp
+        | OpCode::Add
+        | OpCode::Sub
+        | OpCode::Mul
+        | OpCode::Div => state[dest] = K::Boxed,
         // A global load records its origin so a `Call` on it can link
         // statically; int-typed globals still unbox to Int.
         OpCode::LoadGlobalIdx => {

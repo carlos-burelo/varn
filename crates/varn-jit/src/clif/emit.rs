@@ -58,7 +58,7 @@ pub(super) fn use_boxed(
     if is_boxed_kind(state[r]) {
         Ok(b.use_var(vars[r]))
     } else {
-        Err(format!("clif: boxed use of {:?} register", state[r]))
+        Err(format!("clif: boxed use of {:?} register r{r}", state[r]))
     }
 }
 
@@ -145,6 +145,7 @@ pub(super) fn cached_payload(
     heap_off: usize,
     slow: cranelift_codegen::ir::Block,
     cache: Option<Variable>,
+    readonly: bool,
 ) -> cranelift_codegen::ir::Value {
     match cache {
         Some(cv) => {
@@ -154,12 +155,12 @@ pub(super) fn cached_payload(
             b.append_block_param(ready, types::I64);
             b.ins().brif(c, ready, &[c.into()], full, &[]);
             b.switch_to_block(full);
-            let p = emit_array_payload(b, exec_ctx, obj, lay, heap_off, slow, false);
+            let p = emit_array_payload(b, exec_ctx, obj, lay, heap_off, slow, false, readonly);
             b.ins().jump(ready, &[p.into()]);
             b.switch_to_block(ready);
             b.block_params(ready)[0]
         }
-        None => emit_array_payload(b, exec_ctx, obj, lay, heap_off, slow, false),
+        None => emit_array_payload(b, exec_ctx, obj, lay, heap_off, slow, false, readonly),
     }
 }
 
@@ -169,6 +170,7 @@ pub(super) fn cached_payload(
 /// 31 of the index, slot tag check. Any rejection branches to `slow`; on
 /// return the builder is positioned in a fresh block where the payload is
 /// valid.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn emit_array_payload(
     b: &mut FunctionBuilder,
     exec_ctx: cranelift_codegen::ir::Value,
@@ -177,16 +179,23 @@ pub(super) fn emit_array_payload(
     heap_off: usize,
     slow: cranelift_codegen::ir::Block,
     nursery_only: bool,
+    readonly: bool,
 ) -> cranelift_codegen::ir::Value {
     // The chain down to the payload pointer is `readonly` FOR THE DURATION
     // OF ONE ROUTED ACTIVATION: heap indices only get rebound by a GC
-    // move or slot reuse, and no op in the routed subset (including the
-    // admitted slow helpers) can allocate on the VM heap, so no collection
-    // can run underneath us. Marking them readonly lets Cranelift's
-    // mid-end hoist the whole resolve out of loops. The element Vec's
-    // data/len words are NOT readonly — an out-of-bounds store's append
-    // path reallocates them.
-    let ro = MemFlags::trusted().with_readonly().with_can_move();
+    // move or slot reuse, and in the ALLOC-FREE subset no op can allocate
+    // on the VM heap, so no collection can run underneath us — marking the
+    // chain readonly lets Cranelift's mid-end hoist the whole resolve out
+    // of loops. In an ALLOCATING function a back-edge safepoint CAN move
+    // these indices and grow the old-gen Vec, so `readonly` is false there:
+    // every access re-resolves from the (reloaded) receiver. The element
+    // Vec's data/len words are never readonly — an out-of-bounds store's
+    // append path reallocates them.
+    let ro = if readonly {
+        MemFlags::trusted().with_readonly().with_can_move()
+    } else {
+        MemFlags::trusted()
+    };
     let tag = b.ins().band_imm(obj, HEAP_MASK);
     let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_EXPECT);
     let chk = b.create_block();

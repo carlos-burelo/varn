@@ -41,9 +41,11 @@ use super::kinds::{apply_kinds, kind_flow, K};
 use crate::mem::JitBuffer;
 use crate::JitHelpers;
 
+use super::alloc::{self, AllocCtx};
+use super::arrays;
 use super::emit::{
-    box_int, cached_payload, call_helper, code_has_array_ops, def_const, emit_array_payload,
-    find_cache, state_meta_int, use_boxed, use_int, wrap_i48, INT_TAG, MASK_48,
+    box_int, call_helper, code_has_array_ops, def_const, emit_array_payload, state_meta_int,
+    use_boxed, use_int, wrap_i48, INT_TAG, MASK_48,
 };
 
 /// Compiled artifact: `entry` (the wrapper, `JitFn` ABI) and `raw` (the
@@ -106,8 +108,9 @@ pub fn try_compile(
         return Err("clif: missing param kinds".into());
     }
 
-    let raw = lower_raw(proto, constants, helpers, isa, linker)?;
-    let wrapper = build_wrapper(proto, helpers, isa)?;
+    let has_alloc = alloc::has_alloc(&proto.chunk.code, &proto.chunk.constants)?;
+    let raw = lower_raw(proto, constants, helpers, isa, linker, has_alloc)?;
+    let wrapper = build_wrapper(proto, helpers, isa, has_alloc)?;
 
     // Concatenate: raw at 0, wrapper 16-aligned after it, then resolve the
     // only two relocation targets we admit (self-recursion inside raw, and
@@ -175,13 +178,17 @@ fn compile_piece(func: Function, isa: &OwnedTargetIsa) -> Result<CompiledPiece, 
     })
 }
 
-/// Raw signature: `fn(exec_ctx, arg × nparams) -> i64`. Int-declared args
-/// arrive unboxed; everything else arrives as its boxed VmValue bits.
-/// `exec_ctx` is only dereferenced by the heap-walking ops and the slow
-/// helpers.
-fn raw_signature(nparams: usize, isa: &OwnedTargetIsa) -> Signature {
+/// Raw signature: `fn(exec_ctx, [base, closure], arg × nparams) -> i64`.
+/// Int-declared args arrive unboxed; everything else arrives as its boxed
+/// VmValue bits. `exec_ctx` is only dereferenced by the heap-walking ops and
+/// the slow helpers. Allocating functions carry two extra parameters: `base`
+/// (this frame's register-0 index into `ctx.stack`, for flushing heap-typed
+/// registers to their home slots at a safepoint) and `closure` (this
+/// function's `VmClosure*`, needed by shape-driven object construction).
+fn raw_signature(nparams: usize, isa: &OwnedTargetIsa, has_alloc: bool) -> Signature {
     let mut sig = Signature::new(isa.default_call_conv());
-    for _ in 0..=nparams {
+    let extra = if has_alloc { 2 } else { 0 };
+    for _ in 0..(1 + extra + nparams) {
         sig.params.push(AbiParam::new(types::I64));
     }
     sig.returns.push(AbiParam::new(types::I64));
@@ -194,6 +201,7 @@ fn lower_raw(
     helpers: &JitHelpers,
     isa: &OwnedTargetIsa,
     linker: &dyn ClifLinker,
+    has_alloc: bool,
 ) -> Result<CompiledPiece, String> {
     let code = &proto.chunk.code;
     let pool = &proto.chunk.constants;
@@ -209,7 +217,11 @@ fn lower_raw(
     // boxed parameter breaks that, so we forbid `Call` in those functions.
     let array_free = !code_has_array_ops(code, pool)?;
     let all_int_params = proto.param_kinds.iter().all(|k| *k == SlotKind::Int);
-    let calls_allowed = array_free && all_int_params;
+    // Cross-function static calls are not yet threaded through the
+    // frame-aware safepoint discipline, so an allocating function forbids
+    // them (they bail to the template) alongside the existing array/boxed
+    // constraints.
+    let calls_allowed = array_free && all_int_params && !has_alloc;
 
     // ---- scan: instruction starts, block starts (jump targets +
     // fall-through after conditional jumps) ----
@@ -249,8 +261,12 @@ fn lower_raw(
     // the routed subset: nothing under a routed frame can run a GC, and an
     // append only mutates the payload's inner words, never the payload
     // pointer itself.
+    // Loop payload caching is unsound in an allocating function: a
+    // back-edge safepoint can grow the old-gen Vec or move the array, so
+    // a cached data pointer would dangle. Such functions re-resolve every
+    // access instead (see `readonly = !has_alloc` below).
     let mut regions: Vec<(usize, usize, Vec<usize>)> = Vec::new();
-    {
+    if !has_alloc {
         let mut ip = 0usize;
         while ip < code.len() {
             let info = decode(code, ip, pool).ok_or("clif: undecodable opcode")?;
@@ -295,9 +311,9 @@ fn lower_raw(
     // ---- build ----
     let mut func = Function::with_name_signature(
         UserFuncName::user(0, 0),
-        raw_signature(nparams, isa),
+        raw_signature(nparams, isa, has_alloc),
     );
-    let self_sig_ref = func.import_signature(raw_signature(nparams, isa));
+    let self_sig_ref = func.import_signature(raw_signature(nparams, isa, has_alloc));
     let self_name =
         func.declare_imported_user_function(cranelift_codegen::ir::UserExternalName::new(0, 0));
     let self_ref = func.import_function(cranelift_codegen::ir::ExtFuncData {
@@ -333,10 +349,38 @@ fn lower_raw(
         b.def_var(*v, zero);
     }
     let exec_ctx = b.block_params(entry)[0];
+    // Allocating functions carry `base` and `closure` as the second and third
+    // raw parameters; args follow them.
+    let alloc_env = if has_alloc {
+        Some((b.block_params(entry)[1], b.block_params(entry)[2]))
+    } else {
+        None
+    };
+    let arg_off = if has_alloc { 3 } else { 1 };
     for i in 0..nparams {
-        let p = b.block_params(entry)[1 + i];
+        let p = b.block_params(entry)[arg_off + i];
         b.def_var(vars[1 + i], p);
     }
+
+    let actx = alloc_env.map(|(base, closure)| AllocCtx {
+        vars: vars.as_slice(),
+        helpers,
+        cc,
+        exec_ctx,
+        base,
+        closure,
+        nregs,
+    });
+    let arr = arrays::ArrCtx {
+        vars: vars.as_slice(),
+        helpers,
+        cc,
+        exec_ctx,
+        regions: &regions,
+        cache_vars: &cache_vars,
+        register_meta: &proto.register_meta,
+        has_alloc,
+    };
 
     let blocks: HashMap<usize, cranelift_codegen::ir::Block> = block_starts
         .iter()
@@ -384,6 +428,7 @@ fn lower_raw(
                             helpers.heap_field_offset,
                             invalid,
                             false,
+                            true,
                         );
                         b.ins().jump(done, &[payload.into()]);
                         b.switch_to_block(invalid);
@@ -437,10 +482,19 @@ fn lower_raw(
             OpCode::LoadConst => {
                 let idx = code[ip + 1] as usize;
                 let c = *constants.get(idx).ok_or("clif: constant index")?;
-                if !c.is_int() {
-                    return Err("clif: non-int constant".into());
+                if c.is_int() {
+                    def_const(&mut b, &vars, first_reg, c.as_int());
+                } else if c.is_heap() && (c.as_heap_idx() & 0x8000_0000 == 0) {
+                    // A nursery heap constant could be evacuated under a
+                    // safepoint, invalidating an embedded index. Module
+                    // constants are old-gen (bit 31 set) and stable; a
+                    // nursery one is unexpected, so bail.
+                    return Err("clif: nursery heap constant".into());
+                } else {
+                    // Stable value — an old-gen heap ref rooted by the module,
+                    // or a non-heap immediate — embed its boxed bits directly.
+                    def_const(&mut b, &vars, first_reg, c.0 as i64);
                 }
-                def_const(&mut b, &vars, first_reg, c.as_int());
             }
             OpCode::LoadNull => {
                 // Call-staging callee slot; Poison in the kind lattice, so
@@ -449,7 +503,9 @@ fn lower_raw(
             }
             OpCode::Move => {
                 let src = (code[ip + 1] >> 8) as usize;
-                if !matches!(state[src], K::Int | K::Bool) {
+                // Any concrete kind copies by bits (ints, bools, and boxed
+                // heap refs alike); only bottom/top/poison are unmovable.
+                if matches!(state[src], K::Unset | K::Poison | K::Mixed) {
                     return Err("clif: move of untracked kind".into());
                 }
                 let v = b.use_var(vars[src]);
@@ -542,6 +598,12 @@ fn lower_raw(
             OpCode::Loop => {
                 let off = ((code[ip + 1] as u32) << 16 | code[ip + 2] as u32) as usize;
                 let target = blocks[&((ip + 3) - off)];
+                // Allocating functions run a GC safepoint at the back-edge,
+                // flushing live heap refs to their ctx.stack home slots so
+                // the collector can root and rewrite them.
+                if let Some(actx) = actx.as_ref() {
+                    alloc::emit_backedge_safepoint(&mut b, actx, &state);
+                }
                 b.ins().jump(target, &[]);
                 terminated = true;
             }
@@ -580,6 +642,9 @@ fn lower_raw(
                 terminated = true;
             }
             OpCode::CallSelf => {
+                if has_alloc {
+                    return Err("clif: CallSelf in alloc fn unsupported".into());
+                }
                 let w1 = code[ip + 1];
                 let w2 = code[ip + 2];
                 let dest = (w1 >> 8) as usize;
@@ -653,164 +718,13 @@ fn lower_raw(
                     .store(MemFlags::trusted(), v, gbase, (idx * 8) as i32);
             }
             OpCode::ArrayLength => {
-                let src = (code[ip + 1] >> 8) as usize;
-                let obj = use_boxed(&mut b, &vars, &state, src)?;
-                let slow = b.create_block();
-                let merge = b.create_block();
-                b.append_block_param(merge, types::I64); // unboxed len
-                let cache = find_cache(&regions, &cache_vars, ip, src);
-                let payload = cached_payload(
-                    &mut b,
-                    exec_ctx,
-                    obj,
-                    &helpers.array_layout,
-                    helpers.heap_field_offset,
-                    slow,
-                    cache,
-                );
-                let len = b.ins().load(
-                    types::I64,
-                    MemFlags::trusted(),
-                    payload,
-                    (16 + helpers.array_layout.elems_len_off) as i32,
-                );
-                b.ins().jump(merge, &[len.into()]);
-                // slow: generic helper returns a boxed int; unbox.
-                b.switch_to_block(slow);
-                let boxed = call_helper(&mut b, cc, helpers.array_length, &[exec_ctx, obj]);
-                let s = b.ins().ishl_imm(boxed, 16);
-                let un = b.ins().sshr_imm(s, 16);
-                b.ins().jump(merge, &[un.into()]);
-                b.switch_to_block(merge);
-                let res = b.block_params(merge)[0];
-                b.def_var(vars[first_reg], res);
+                arrays::emit_array_length(&mut b, &arr, &state, code, ip, first_reg)?;
             }
             OpCode::ArrayGetIndex => {
-                let w1 = code[ip + 1];
-                let obj_r = (w1 >> 8) as usize;
-                let key_r = (w1 & 0xFF) as usize;
-                let obj = use_boxed(&mut b, &vars, &state, obj_r)?;
-                let key = use_int(&mut b, &vars, &state, key_r)?;
-                let slow = b.create_block();
-                let merge = b.create_block();
-                b.append_block_param(merge, types::I64); // boxed element
-                let cache = find_cache(&regions, &cache_vars, ip, obj_r);
-                let payload = cached_payload(
-                    &mut b,
-                    exec_ctx,
-                    obj,
-                    &helpers.array_layout,
-                    helpers.heap_field_offset,
-                    slow,
-                    cache,
-                );
-                let lay = &helpers.array_layout;
-                let len = b.ins().load(
-                    types::I64,
-                    MemFlags::trusted(),
-                    payload,
-                    (16 + lay.elems_len_off) as i32,
-                );
-                // Unsigned compare also rejects negative keys.
-                let oob = b
-                    .ins()
-                    .icmp(IntCC::UnsignedGreaterThanOrEqual, key, len);
-                let inb = b.create_block();
-                b.ins().brif(oob, slow, &[], inb, &[]);
-                b.switch_to_block(inb);
-                let data = b.ins().load(
-                    types::I64,
-                    MemFlags::trusted(),
-                    payload,
-                    (16 + lay.elems_ptr_off) as i32,
-                );
-                let off = b.ins().ishl_imm(key, 3);
-                let addr = b.ins().iadd(data, off);
-                let elem = b.ins().load(types::I64, MemFlags::trusted(), addr, 0);
-                b.ins().jump(merge, &[elem.into()]);
-                // slow: same generic helper as the template (returns null
-                // out of bounds; allocates nothing).
-                b.switch_to_block(slow);
-                let boxed_key = box_int(&mut b, key);
-                let r = call_helper(
-                    &mut b,
-                    cc,
-                    helpers.jit_array_get_fast,
-                    &[exec_ctx, obj, boxed_key],
-                );
-                b.ins().jump(merge, &[r.into()]);
-                b.switch_to_block(merge);
-                let res = b.block_params(merge)[0];
-                if state_meta_int(&proto.register_meta, first_reg) {
-                    let s = b.ins().ishl_imm(res, 16);
-                    let un = b.ins().sshr_imm(s, 16);
-                    b.def_var(vars[first_reg], un);
-                } else {
-                    b.def_var(vars[first_reg], res);
-                }
+                arrays::emit_array_get_index(&mut b, &arr, &state, code, ip, first_reg)?;
             }
             OpCode::ArraySetIndex => {
-                let w1 = code[ip + 1];
-                let idx_r = (w1 >> 8) as usize;
-                let val_r = (w1 & 0xFF) as usize;
-                let obj_r = first_reg;
-                let obj = use_boxed(&mut b, &vars, &state, obj_r)?;
-                let key = use_int(&mut b, &vars, &state, idx_r)?;
-                // Only int stores are admitted: a boxed int child is never
-                // a heap reference, so no generation write barrier is
-                // needed for ANY parent generation.
-                if state[val_r] != K::Int {
-                    return Err("clif: non-int array store".into());
-                }
-                let raw_val = b.use_var(vars[val_r]);
-                let val = box_int(&mut b, raw_val);
-                let slow = b.create_block();
-                let merge = b.create_block();
-                let cache = find_cache(&regions, &cache_vars, ip, obj_r);
-                let payload = cached_payload(
-                    &mut b,
-                    exec_ctx,
-                    obj,
-                    &helpers.array_layout,
-                    helpers.heap_field_offset,
-                    slow,
-                    cache,
-                );
-                let lay = &helpers.array_layout;
-                let len = b.ins().load(
-                    types::I64,
-                    MemFlags::trusted(),
-                    payload,
-                    (16 + lay.elems_len_off) as i32,
-                );
-                let oob = b
-                    .ins()
-                    .icmp(IntCC::UnsignedGreaterThanOrEqual, key, len);
-                let inb = b.create_block();
-                b.ins().brif(oob, slow, &[], inb, &[]);
-                b.switch_to_block(inb);
-                let data = b.ins().load(
-                    types::I64,
-                    MemFlags::trusted(),
-                    payload,
-                    (16 + lay.elems_ptr_off) as i32,
-                );
-                let off = b.ins().ishl_imm(key, 3);
-                let addr = b.ins().iadd(data, off);
-                b.ins().store(MemFlags::trusted(), val, addr, 0);
-                b.ins().jump(merge, &[]);
-                // slow: append/OOB/non-array semantics live in the helper
-                // (grows the Rust vec — no VM-heap allocation, no GC).
-                b.switch_to_block(slow);
-                let boxed_key = box_int(&mut b, key);
-                let _ = call_helper(
-                    &mut b,
-                    cc,
-                    helpers.jit_array_set_fast,
-                    &[exec_ctx, obj, boxed_key, val],
-                );
-                b.ins().jump(merge, &[]);
-                b.switch_to_block(merge);
+                arrays::emit_array_set_index(&mut b, &arr, &state, code, ip, first_reg)?;
             }
             OpCode::Call => {
                 // Static cross-function call via a guarded monomorphic IC.
@@ -906,6 +820,43 @@ fn lower_raw(
                 let res = b.block_params(merge)[0];
                 b.def_var(vars[dest], res);
             }
+            OpCode::BuildArray => {
+                let actx = actx.as_ref().ok_or("clif: BuildArray outside alloc fn")?;
+                alloc::emit_build_array(&mut b, actx, &state, code, ip);
+            }
+            OpCode::ArrayPush => {
+                let actx = actx.as_ref().ok_or("clif: ArrayPush outside alloc fn")?;
+                alloc::emit_array_push(&mut b, actx, &state, code, ip);
+            }
+            OpCode::StrConcat => {
+                let actx = actx.as_ref().ok_or("clif: StrConcat outside alloc fn")?;
+                alloc::emit_str_concat(&mut b, actx, &state, code, ip);
+            }
+            OpCode::CallNativeOp => {
+                let actx = actx.as_ref().ok_or("clif: CallNativeOp outside alloc fn")?;
+                alloc::emit_call_native_op(&mut b, actx, &state, code, pool, ip)?;
+            }
+            OpCode::BuildObjectWithShape => {
+                let actx = actx
+                    .as_ref()
+                    .ok_or("clif: BuildObjectWithShape outside alloc fn")?;
+                let shape_idx = code[ip + 2] as usize;
+                let count = proto
+                    .resolved_shape(shape_idx)
+                    .map(|s| s.property_names.len())
+                    .ok_or("clif: unresolved object shape")?;
+                alloc::emit_build_object_with_shape(&mut b, actx, &state, code, ip, count);
+            }
+            OpCode::Add | OpCode::Sub | OpCode::Mul | OpCode::Div => {
+                let actx = actx.as_ref().ok_or("clif: generic binop outside alloc fn")?;
+                let helper = match op {
+                    OpCode::Add => helpers.add,
+                    OpCode::Sub => helpers.sub,
+                    OpCode::Mul => helpers.mul,
+                    _ => helpers.div,
+                };
+                alloc::emit_binop(&mut b, actx, &state, code, ip, helper);
+            }
             OpCode::Nop => {}
             _ => return Err(format!("clif: unsupported opcode {op:?}")),
         }
@@ -939,6 +890,7 @@ fn build_wrapper(
     proto: &FunctionProto,
     helpers: &JitHelpers,
     isa: &OwnedTargetIsa,
+    has_alloc: bool,
 ) -> Result<CompiledPiece, String> {
     let nparams = proto.arity.saturating_sub(1);
     let mut sig = Signature::new(isa.default_call_conv());
@@ -948,7 +900,7 @@ fn build_wrapper(
     sig.returns.push(AbiParam::new(types::I64));
 
     let mut func = Function::with_name_signature(UserFuncName::user(0, 1), sig);
-    let raw_sig = func.import_signature(raw_signature(nparams, isa));
+    let raw_sig = func.import_signature(raw_signature(nparams, isa, has_alloc));
     let raw_name =
         func.declare_imported_user_function(cranelift_codegen::ir::UserExternalName::new(0, 0));
     let raw_ref = func.import_function(cranelift_codegen::ir::ExtFuncData {
@@ -964,9 +916,9 @@ fn build_wrapper(
     b.switch_to_block(block);
     b.seal_block(block);
 
-    let (stack_ptr, base, exec_ctx) = {
+    let (stack_ptr, closure, base, exec_ctx) = {
         let p = b.block_params(block);
-        (p[0], p[2], p[3])
+        (p[0], p[1], p[2], p[3])
     };
 
     // Protocol: every JIT prologue consumes the caller-prepush flag.
@@ -983,8 +935,15 @@ fn build_wrapper(
     // else passes through as boxed bits per the raw entry contract.
     let base_bytes = b.ins().imul_imm(base, 8);
     let arg_base = b.ins().iadd(stack_ptr, base_bytes);
-    let mut args = Vec::with_capacity(1 + nparams);
+    let mut args = Vec::with_capacity(3 + nparams);
     args.push(exec_ctx);
+    // Allocating raw functions take `base` (frame register-0 index) and
+    // `closure` (this VmClosure*) next, so they can address ctx.stack home
+    // slots at safepoints and drive shape-based object construction.
+    if has_alloc {
+        args.push(base);
+        args.push(closure);
+    }
     for i in 0..nparams {
         let boxed = b
             .ins()
