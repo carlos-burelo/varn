@@ -612,6 +612,28 @@ pub extern "C" fn jit_get_property_flat(
     jit_get_property(ctx, closure, &args)
 }
 
+/// Flat-argument shim over [`jit_set_property`] for the CLIF backend (may run
+/// a setter, hence may GC).
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn jit_set_property_flat(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    obj: VmValue,
+    val: VmValue,
+    name_idx: usize,
+    cs_idx: usize,
+    ip: usize,
+) {
+    let args = varn_jit::JitSetPropertyArgs {
+        obj,
+        val,
+        name_idx,
+        cs_idx,
+        ip,
+    };
+    jit_set_property(ctx, closure, &args)
+}
+
 pub extern "C" fn jit_set_property(
     ctx: *mut ExecCtx,
     closure: *const crate::frame::VmClosure,

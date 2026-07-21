@@ -124,6 +124,9 @@ pub struct JitHelpers {
     /// `fn(ctx, closure, obj, name_idx, cs_idx, dest, ip) -> VmValue`.
     pub get_property_flat: usize,
     pub set_property: usize,
+    /// Flat-args variant of `set_property` for the CLIF backend:
+    /// `fn(ctx, closure, obj, val, name_idx, cs_idx, ip)`.
+    pub set_property_flat: usize,
     pub build_array: usize,
     pub build_str: usize,
     pub negate: usize,

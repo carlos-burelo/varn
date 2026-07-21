@@ -44,10 +44,11 @@ use crate::JitHelpers;
 use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::emit::{
-    box_int, call_helper, code_has_array_ops, def_const, emit_array_payload, state_meta_int,
-    use_boxed, use_int, wrap_i48, INT_TAG, MASK_48,
+    box_int, call_helper, code_has_array_ops, def_const, emit_array_payload, use_boxed, use_int,
+    wrap_i48, INT_TAG, MASK_48,
 };
 use super::fields;
+use super::globals;
 
 /// Compiled artifact: `entry` (the wrapper, `JitFn` ABI) and `raw` (the
 /// unboxed body, callable clif→clif) both point into `buffer`, which lives
@@ -411,6 +412,12 @@ fn lower_raw(
         exec_ctx,
         register_meta: &proto.register_meta,
     };
+    let gbl = globals::GblCtx {
+        vars: vars.as_slice(),
+        helpers,
+        exec_ctx,
+        register_meta: &proto.register_meta,
+    };
 
     let blocks: HashMap<usize, cranelift_codegen::ir::Block> = block_starts
         .iter()
@@ -724,50 +731,10 @@ fn lower_raw(
                 b.def_var(vars[dest], res);
             }
             OpCode::LoadGlobalIdx => {
-                let idx = code[ip + 1] as usize;
-                // The globals data pointer lives at `globals_offset + 8`
-                // (the `values` Vec's ptr word inside GlobalStore — Rust
-                // reorders the fields, hence the +8; the template loads it
-                // at the same offset).
-                let gbase = b.ins().load(
-                    types::I64,
-                    MemFlags::trusted(),
-                    exec_ctx,
-                    (helpers.globals_offset + 8) as i32,
-                );
-                let v =
-                    b.ins()
-                        .load(types::I64, MemFlags::trusted(), gbase, (idx * 8) as i32);
-                if state_meta_int(&proto.register_meta, first_reg) {
-                    let s = b.ins().ishl_imm(v, 16);
-                    let un = b.ins().sshr_imm(s, 16);
-                    b.def_var(vars[first_reg], un);
-                } else {
-                    b.def_var(vars[first_reg], v);
-                }
+                globals::emit_load_global_idx(&mut b, &gbl, code, ip, first_reg);
             }
             OpCode::StoreGlobalIdx => {
-                let src = (code[ip + 1] >> 8) as usize;
-                let idx = code[ip + 2] as usize;
-                // Globals are always in the GC root set — a plain boxed
-                // store, no barrier. (DefineGlobalIdx is NOT admitted: it
-                // can grow the globals vec and move its base.)
-                let v = match state[src] {
-                    K::Int => {
-                        let raw = b.use_var(vars[src]);
-                        box_int(&mut b, raw)
-                    }
-                    K::Boxed => b.use_var(vars[src]),
-                    k => return Err(format!("clif: global store of {k:?}")),
-                };
-                let gbase = b.ins().load(
-                    types::I64,
-                    MemFlags::trusted(),
-                    exec_ctx,
-                    (helpers.globals_offset + 8) as i32,
-                );
-                b.ins()
-                    .store(MemFlags::trusted(), v, gbase, (idx * 8) as i32);
+                globals::emit_store_global_idx(&mut b, &gbl, &state, code, ip)?;
             }
             OpCode::ArrayLength => {
                 arrays::emit_array_length(&mut b, &arr, &state, code, ip, first_reg)?;
@@ -784,6 +751,10 @@ fn lower_raw(
             OpCode::GetProperty => {
                 let actx = actx.as_ref().ok_or("clif: GetProperty outside frame-aware fn")?;
                 alloc::emit_get_property(&mut b, actx, &state, &proto.register_meta, code, ip);
+            }
+            OpCode::SetProperty => {
+                let actx = actx.as_ref().ok_or("clif: SetProperty outside frame-aware fn")?;
+                alloc::emit_set_property(&mut b, actx, &state, code, ip);
             }
             OpCode::SetFixedField => {
                 fields::emit_set_fixed_field(&mut b, &fld, &state, code, ip, first_reg)?;

@@ -192,6 +192,7 @@ impl VmClosure {
             get_property: ctx::jit_get_property as usize,
             get_property_flat: ctx::jit_get_property_flat as usize,
             set_property: ctx::jit_set_property as usize,
+            set_property_flat: ctx::jit_set_property_flat as usize,
             build_array: ctx::jit_build_array as usize,
             build_str: ctx::jit_build_str as usize,
             negate: ctx::jit_negate as usize,

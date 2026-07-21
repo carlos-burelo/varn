@@ -59,9 +59,10 @@ pub(super) fn has_alloc(
                     // Generic `Add` handles string concatenation, which
                     // allocates a heap string.
                     | OpCode::Add
-                    // A property read may invoke a getter (arbitrary VM code
-                    // that can allocate); it also needs the closure param.
+                    // A property read/write may invoke a getter/setter
+                    // (arbitrary VM code that can allocate); needs closure.
                     | OpCode::GetProperty
+                    | OpCode::SetProperty
             )
         ) {
             return Ok(true);
@@ -290,6 +291,40 @@ pub(super) fn emit_get_property(
     } else {
         b.def_var(actx.vars[dest], res);
     }
+}
+
+/// `SetProperty obj(=first_reg), val, cs_idx, name_idx` — dynamic/generic
+/// property write (may run a setter → may GC). Same flush/reload discipline
+/// as GetProperty; no result.
+pub(super) fn emit_set_property(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+) {
+    let obj_r = (code[ip] >> 8) as usize;
+    let val_r = (code[ip + 1] >> 8) as usize;
+    let cs_idx = (code[ip + 1] & 0xFF) as usize;
+    let name_idx = code[ip + 2] as usize;
+    let next_ip = ip + 3;
+
+    let obj = box_or_pass(b, actx, state, obj_r);
+    let val = box_or_pass(b, actx, state, val_r);
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+
+    let ni = b.ins().iconst(types::I64, name_idx as i64);
+    let ci = b.ins().iconst(types::I64, cs_idx as i64);
+    let ipv = b.ins().iconst(types::I64, next_ip as i64);
+    call_helper_void(
+        b,
+        actx.cc,
+        actx.helpers.set_property_flat,
+        &[actx.exec_ctx, actx.closure, obj, val, ni, ci, ipv],
+    );
+
+    reload_boxed(b, actx, &regs);
 }
 
 /// `BuildArray dest, start, count` — materialize the `count` element
