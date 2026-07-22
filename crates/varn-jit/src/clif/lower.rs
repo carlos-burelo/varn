@@ -48,6 +48,7 @@ use super::emit::{
     use_int, wrap_i48, INT_TAG, MASK_48,
 };
 use super::fields;
+use super::generic;
 use super::globals;
 
 /// Compiled artifact: `entry` (the wrapper, `JitFn` ABI) and `raw` (the
@@ -418,6 +419,11 @@ fn lower_raw(
         exec_ctx,
         register_meta: &proto.register_meta,
     };
+    let gen = generic::GenCtx {
+        vars: vars.as_slice(),
+        cc,
+        exec_ctx,
+    };
 
     let blocks: HashMap<usize, cranelift_codegen::ir::Block> = block_starts
         .iter()
@@ -513,8 +519,7 @@ fn lower_raw(
             OpCode::LoadIntZero => def_const(&mut b, &vars, first_reg, 0),
             OpCode::LoadIntOne => def_const(&mut b, &vars, first_reg, 1),
             OpCode::LoadIntMinusOne => def_const(&mut b, &vars, first_reg, -1),
-            // Bools live as unboxed 0/1 (like comparison results); boxed only
-            // at storage/return boundaries via box_bool.
+            // Bools: unboxed 0/1; boxed at storage/return boundaries.
             OpCode::LoadTrue => def_const(&mut b, &vars, first_reg, 1),
             OpCode::LoadFalse => def_const(&mut b, &vars, first_reg, 0),
             OpCode::LoadInt => {
@@ -539,9 +544,9 @@ fn lower_raw(
                 }
             }
             OpCode::LoadNull => {
-                // Call-staging callee slot; Poison in the kind lattice, so
-                // any real read of it bails.
-                def_const(&mut b, &vars, first_reg, 0);
+                // Real null VmValue (K::Boxed): call-staging slot (never read)
+                // AND a genuine null operand, e.g. `x === null`.
+                def_const(&mut b, &vars, first_reg, VmValue::null().0 as i64);
             }
             OpCode::Move => {
                 let src = (code[ip + 1] >> 8) as usize;
@@ -678,16 +683,14 @@ fn lower_raw(
                 } else {
                     match proto.return_kind {
                     // Int return: raw yields an unboxed i48 payload the
-                    // wrapper/fast-call re-tag; source must be int by proof
-                    // (kind Int, or boxed with a declared int return).
+                    // wrapper/fast-call re-tag; source must be int by proof.
                     SlotKind::Int => match state[src] {
                         K::Int => b.use_var(vars[src]),
                         K::Boxed => use_int(&mut b, &vars, &state, src)?,
                         k => return Err(format!("clif: unproven int return ({k:?})")),
                     },
                     // Heap return (string/ref): raw yields boxed bits, wrapper
-                    // passes through (only reachable via the wrapper, whose
-                    // caller never reads them as an unboxed int).
+                    // passes through (only reachable via the wrapper).
                     SlotKind::Str | SlotKind::Ref => {
                         if is_boxed_kind(state[src]) {
                             b.use_var(vars[src])
@@ -695,9 +698,8 @@ fn lower_raw(
                             return Err(format!("clif: non-boxed heap return ({:?})", state[src]));
                         }
                     }
-                    // Dynamic (`any`) return: box whatever representation the
-                    // value has to a well-formed VmValue; wrapper passes it
-                    // through (also only reachable via the wrapper).
+                    // Dynamic (`any`) return: box the value's representation
+                    // to a VmValue; wrapper passes it through.
                     SlotKind::Dynamic => match state[src] {
                         K::Int => {
                             let raw = b.use_var(vars[src]);
@@ -717,9 +719,8 @@ fn lower_raw(
                 terminated = true;
             }
             OpCode::CallSelf => {
-                // A frame-aware self-call would need its extra ABI params
-                // (base/closure) threaded through, which the raw self-call
-                // path does not do — bail so it never mis-calls.
+                // A frame-aware self-call's extra ABI params (base/closure)
+                // aren't threaded through the raw self-call path — bail.
                 if frame_aware {
                     return Err("clif: CallSelf in frame-aware fn unsupported".into());
                 }
@@ -779,8 +780,7 @@ fn lower_raw(
                 fields::emit_set_fixed_field(&mut b, &fld, &state, code, ip, first_reg)?;
             }
             OpCode::Call if !calls_allowed => {
-                // `new` / non-int-contract call in a frame-aware fn: the
-                // fallback runs the callee (maybe a constructor) and can GC.
+                // `new` / non-int-contract call: fallback runs the callee (maybe a ctor) and can GC.
                 let actx = actx.as_ref().ok_or("clif: call in non-frame-aware fn")?;
                 alloc::emit_generic_call(&mut b, actx, &state, &proto.register_meta, code, ip)?;
             }
@@ -902,15 +902,26 @@ fn lower_raw(
                     .ok_or("clif: unresolved object shape")?;
                 alloc::emit_build_object_with_shape(&mut b, actx, &state, code, ip, count);
             }
-            OpCode::Add | OpCode::Sub | OpCode::Mul | OpCode::Div => {
-                let actx = actx.as_ref().ok_or("clif: generic binop outside alloc fn")?;
+            OpCode::Add | OpCode::Sub | OpCode::Mul | OpCode::Div | OpCode::Mod => {
                 let helper = match op {
                     OpCode::Add => helpers.add,
                     OpCode::Sub => helpers.sub,
                     OpCode::Mul => helpers.mul,
-                    _ => helpers.div,
+                    OpCode::Div => helpers.div,
+                    _ => helpers.modulo,
                 };
-                alloc::emit_binop(&mut b, actx, &state, code, ip, helper);
+                generic::emit_binop(&mut b, &gen, &state, code, ip, helper);
+            }
+            OpCode::Eq | OpCode::Neq | OpCode::Lt | OpCode::Gt | OpCode::Lte | OpCode::Gte => {
+                let helper = match op {
+                    OpCode::Eq => helpers.eq,
+                    OpCode::Neq => helpers.neq,
+                    OpCode::Lt => helpers.lt,
+                    OpCode::Gt => helpers.gt,
+                    OpCode::Lte => helpers.lte,
+                    _ => helpers.gte,
+                };
+                generic::emit_compare(&mut b, &gen, &state, code, ip, helper);
             }
             OpCode::Nop => {}
             _ => return Err(format!("clif: unsupported opcode {op:?}")),

@@ -26,7 +26,7 @@ use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::chunk::{Literal, PoolEntry};
 
-use super::emit::{box_bool, box_int, call_helper, call_helper_void};
+use super::emit::{box_or_pass, call_helper, call_helper_void};
 use super::kinds::{is_boxed_kind, K};
 use crate::JitHelpers;
 
@@ -98,23 +98,6 @@ fn frame_base_addr(b: &mut FunctionBuilder, actx: &AllocCtx) -> cranelift_codege
     b.ins().iadd(sp, base_bytes)
 }
 
-/// Read a register as boxed VmValue bits: an int is re-tagged, boxed kinds
-/// pass through. Used both for helper arguments and home-slot flushes so a
-/// well-formed VmValue always reaches the collector / the runtime.
-fn box_or_pass(
-    b: &mut FunctionBuilder,
-    actx: &AllocCtx,
-    state: &[K],
-    r: usize,
-) -> cranelift_codegen::ir::Value {
-    let raw = b.use_var(actx.vars[r]);
-    match state[r] {
-        K::Int => box_int(b, raw),
-        K::Bool => box_bool(b, raw),
-        _ => raw,
-    }
-}
-
 /// Load the `this` receiver from register 0's home slot (`stack[base+0]`),
 /// where the caller placed it before invoking a method/constructor.
 pub(super) fn load_receiver(
@@ -133,7 +116,7 @@ fn store_home(
     fb: cranelift_codegen::ir::Value,
     reg: usize,
 ) {
-    let v = box_or_pass(b, actx, state, reg);
+    let v = box_or_pass(b, actx.vars, state, reg);
     b.ins().store(MemFlags::trusted(), v, fb, (reg * 8) as i32);
 }
 
@@ -218,9 +201,9 @@ pub(super) fn emit_generic_call(
         return Err("clif: generic call arity > 4".into());
     }
 
-    let callee = box_or_pass(b, actx, state, callee_reg);
+    let callee = box_or_pass(b, actx.vars, state, callee_reg);
     let arg_vals: Vec<cranelift_codegen::ir::Value> = (0..argc)
-        .map(|i| box_or_pass(b, actx, state, call_base + 1 + i))
+        .map(|i| box_or_pass(b, actx.vars, state, call_base + 1 + i))
         .collect();
 
     let regs = live_boxed(actx, state);
@@ -267,7 +250,7 @@ pub(super) fn emit_get_property(
     let name_idx = code[ip + 2] as usize;
     let next_ip = ip + 3;
 
-    let obj = box_or_pass(b, actx, state, obj_r);
+    let obj = box_or_pass(b, actx.vars, state, obj_r);
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
 
@@ -309,8 +292,8 @@ pub(super) fn emit_set_property(
     let name_idx = code[ip + 2] as usize;
     let next_ip = ip + 3;
 
-    let obj = box_or_pass(b, actx, state, obj_r);
-    let val = box_or_pass(b, actx, state, val_r);
+    let obj = box_or_pass(b, actx.vars, state, obj_r);
+    let val = box_or_pass(b, actx.vars, state, val_r);
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
 
@@ -369,8 +352,8 @@ pub(super) fn emit_array_push(
 ) {
     let arr_r = (code[ip] >> 8) as usize;
     let val_r = (code[ip + 1] >> 8) as usize;
-    let arr = box_or_pass(b, actx, state, arr_r);
-    let val = box_or_pass(b, actx, state, val_r);
+    let arr = box_or_pass(b, actx.vars, state, arr_r);
+    let val = box_or_pass(b, actx.vars, state, val_r);
     call_helper_void(b, actx.cc, actx.helpers.array_push, &[actx.exec_ctx, arr, val]);
 }
 
@@ -386,8 +369,8 @@ pub(super) fn emit_str_concat(
     let dest = (code[ip] >> 8) as usize;
     let a_r = (code[ip + 1] >> 8) as usize;
     let b_r = (code[ip + 1] & 0xFF) as usize;
-    let a = box_or_pass(b, actx, state, a_r);
-    let bb = box_or_pass(b, actx, state, b_r);
+    let a = box_or_pass(b, actx.vars, state, a_r);
+    let bb = box_or_pass(b, actx.vars, state, b_r);
     let res = call_helper(b, actx.cc, actx.helpers.str_concat, &[actx.exec_ctx, a, bb]);
     b.def_var(actx.vars[dest], res);
 }
@@ -459,26 +442,5 @@ pub(super) fn emit_build_object_with_shape(
         actx.helpers.build_object_with_shape,
         &[actx.exec_ctx, actx.closure, start_v, shape_v],
     );
-    b.def_var(actx.vars[dest], res);
-}
-
-/// Generic binary op `dest, a, b` dispatched through a runtime helper
-/// (`Add`/`Sub`/`Mul`/`Div` on values of not-statically-proven-int type —
-/// e.g. feeding an untyped object field). Operands pass by value; `Add`
-/// allocates on the string-concat path. Result is boxed bits.
-pub(super) fn emit_binop(
-    b: &mut FunctionBuilder,
-    actx: &AllocCtx,
-    state: &[K],
-    code: &[u16],
-    ip: usize,
-    helper: usize,
-) {
-    let dest = (code[ip] >> 8) as usize;
-    let a_r = (code[ip + 1] >> 8) as usize;
-    let b_r = (code[ip + 1] & 0xFF) as usize;
-    let a = box_or_pass(b, actx, state, a_r);
-    let bb = box_or_pass(b, actx, state, b_r);
-    let res = call_helper(b, actx.cc, helper, &[actx.exec_ctx, a, bb]);
     b.def_var(actx.vars[dest], res);
 }

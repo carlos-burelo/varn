@@ -102,6 +102,34 @@ pub(super) fn box_bool(
     b.ins().bor_imm(shifted, 0x7FFA_0000_0000_0000u64 as i64)
 }
 
+/// Unbox a boxed bool VmValue (TAG_TRUE=0x7FFB…, TAG_FALSE=0x7FFA…) to 0/1:
+/// the two tags differ only in bit 48, so `(v >> 48) & 1`.
+pub(super) fn unbox_bool(
+    b: &mut FunctionBuilder,
+    v: cranelift_codegen::ir::Value,
+) -> cranelift_codegen::ir::Value {
+    let s = b.ins().ushr_imm(v, 48);
+    b.ins().band_imm(s, 1)
+}
+
+/// Read a register as boxed VmValue bits regardless of its representation:
+/// int → `box_int`, bool → `box_bool`, already-boxed (or any other tracked
+/// kind) → the raw bits. Callers pass registers whose lattice kind the flow
+/// has already proven to hold a real value.
+pub(super) fn box_or_pass(
+    b: &mut FunctionBuilder,
+    vars: &[Variable],
+    state: &[K],
+    r: usize,
+) -> cranelift_codegen::ir::Value {
+    let raw = b.use_var(vars[r]);
+    match state[r] {
+        K::Int => box_int(b, raw),
+        K::Bool => box_bool(b, raw),
+        _ => raw,
+    }
+}
+
 pub(super) fn state_meta_int(meta: &[varn_types::register_meta::RegisterMeta], r: usize) -> bool {
     meta.get(r).map_or(false, |m| m.kind == SlotKind::Int)
 }

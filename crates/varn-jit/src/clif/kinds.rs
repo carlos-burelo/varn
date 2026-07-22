@@ -98,8 +98,15 @@ pub(crate) fn apply_kinds(
         | OpCode::GtInt
         | OpCode::GteInt
         | OpCode::EqInt
-        | OpCode::NeqInt => state[dest] = K::Bool,
-        OpCode::LoadNull => state[dest] = K::Poison,
+        | OpCode::NeqInt
+        // Generic comparisons unbox their boxed-bool result to 0/1.
+        | OpCode::Lt
+        | OpCode::Lte
+        | OpCode::Gt
+        | OpCode::Gte
+        | OpCode::Eq
+        | OpCode::Neq => state[dest] = K::Bool,
+        OpCode::LoadNull => state[dest] = K::Boxed,
         OpCode::Move => {
             let src = (code[ip + 1] >> 8) as usize;
             state[dest] = state[src];
@@ -126,7 +133,8 @@ pub(crate) fn apply_kinds(
         | OpCode::Add
         | OpCode::Sub
         | OpCode::Mul
-        | OpCode::Div => state[dest] = K::Boxed,
+        | OpCode::Div
+        | OpCode::Mod => state[dest] = K::Boxed,
         // A global load records its origin so a `Call` on it can link
         // statically; int-typed globals still unbox to Int.
         OpCode::LoadGlobalIdx => {
