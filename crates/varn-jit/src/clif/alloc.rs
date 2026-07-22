@@ -26,7 +26,7 @@ use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::chunk::{Literal, PoolEntry};
 
-use super::emit::{box_int, call_helper, call_helper_void};
+use super::emit::{box_bool, box_int, call_helper, call_helper_void};
 use super::kinds::{is_boxed_kind, K};
 use crate::JitHelpers;
 
@@ -108,10 +108,10 @@ fn box_or_pass(
     r: usize,
 ) -> cranelift_codegen::ir::Value {
     let raw = b.use_var(actx.vars[r]);
-    if state[r] == K::Int {
-        box_int(b, raw)
-    } else {
-        raw
+    match state[r] {
+        K::Int => box_int(b, raw),
+        K::Bool => box_bool(b, raw),
+        _ => raw,
     }
 }
 

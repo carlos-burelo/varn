@@ -70,6 +70,7 @@ pub(crate) fn apply_kinds(
         | OpCode::SubImm
         | OpCode::ModInt
         | OpCode::ArrayLength => state[dest] = K::Int,
+        OpCode::LoadTrue | OpCode::LoadFalse => state[dest] = K::Bool,
         // A self-call routes only on an int contract.
         OpCode::CallSelf => {
             let dest = (code[ip + 1] >> 8) as usize;

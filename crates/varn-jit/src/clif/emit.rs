@@ -92,6 +92,16 @@ pub(super) fn box_int(
     b.ins().bor_imm(m, INT_TAG)
 }
 
+/// Box an unboxed 0/1 bool as a VmValue: `false` = 0x7FFA…, `true` = 0x7FFB…
+/// (`0x7FFA_0000_0000_0000 | (v << 48)`, valid because v ∈ {0,1}).
+pub(super) fn box_bool(
+    b: &mut FunctionBuilder,
+    v: cranelift_codegen::ir::Value,
+) -> cranelift_codegen::ir::Value {
+    let shifted = b.ins().ishl_imm(v, 48);
+    b.ins().bor_imm(shifted, 0x7FFA_0000_0000_0000u64 as i64)
+}
+
 pub(super) fn state_meta_int(meta: &[varn_types::register_meta::RegisterMeta], r: usize) -> bool {
     meta.get(r).map_or(false, |m| m.kind == SlotKind::Int)
 }

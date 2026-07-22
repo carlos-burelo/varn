@@ -44,8 +44,8 @@ use crate::JitHelpers;
 use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::emit::{
-    box_int, call_helper, code_has_array_ops, def_const, emit_array_payload, use_boxed, use_int,
-    wrap_i48, INT_TAG, MASK_48,
+    box_bool, box_int, call_helper, code_has_array_ops, def_const, emit_array_payload, use_boxed,
+    use_int, wrap_i48, INT_TAG, MASK_48,
 };
 use super::fields;
 use super::globals;
@@ -513,6 +513,10 @@ fn lower_raw(
             OpCode::LoadIntZero => def_const(&mut b, &vars, first_reg, 0),
             OpCode::LoadIntOne => def_const(&mut b, &vars, first_reg, 1),
             OpCode::LoadIntMinusOne => def_const(&mut b, &vars, first_reg, -1),
+            // Bools live as unboxed 0/1 (like comparison results); boxed only
+            // at storage/return boundaries via box_bool.
+            OpCode::LoadTrue => def_const(&mut b, &vars, first_reg, 1),
+            OpCode::LoadFalse => def_const(&mut b, &vars, first_reg, 0),
             OpCode::LoadInt => {
                 let v = code[ip + 1] as i16 as i64;
                 def_const(&mut b, &vars, first_reg, v);
@@ -691,6 +695,21 @@ fn lower_raw(
                             return Err(format!("clif: non-boxed heap return ({:?})", state[src]));
                         }
                     }
+                    // Dynamic (`any`) return: box whatever representation the
+                    // value has to a well-formed VmValue; wrapper passes it
+                    // through (also only reachable via the wrapper).
+                    SlotKind::Dynamic => match state[src] {
+                        K::Int => {
+                            let raw = b.use_var(vars[src]);
+                            box_int(&mut b, raw)
+                        }
+                        K::Bool => {
+                            let raw = b.use_var(vars[src]);
+                            box_bool(&mut b, raw)
+                        }
+                        k if is_boxed_kind(k) => b.use_var(vars[src]),
+                        k => return Err(format!("clif: unproven dynamic return ({k:?})")),
+                    },
                     k => return Err(format!("clif: unsupported return kind {k:?}")),
                     }
                 };
@@ -998,9 +1017,9 @@ fn build_wrapper(
     let raw_res = b.inst_results(call)[0];
 
     // Only an int return comes back as an unboxed i48 payload to re-tag.
-    // Every other admitted return (string/ref, or a constructor's null) is
-    // already boxed VmValue bits — pass through. Re-tagging a null would
-    // forge a non-null value and defeat jit_construct_fast's null check.
+    // Every other admitted return (string/ref/dynamic, or a constructor's
+    // null) is already boxed VmValue bits — pass through. Re-tagging a null
+    // would forge a non-null value and defeat jit_construct_fast's null check.
     let result = if proto.return_kind == SlotKind::Int {
         let masked = b.ins().band_imm(raw_res, MASK_48);
         b.ins().bor_imm(masked, INT_TAG)

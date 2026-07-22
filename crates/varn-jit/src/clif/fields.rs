@@ -9,7 +9,7 @@ use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_types::register_meta::RegisterMeta;
 
-use super::emit::{box_int, call_helper, call_helper_void, state_meta_int, use_boxed};
+use super::emit::{box_bool, box_int, call_helper, call_helper_void, state_meta_int, use_boxed};
 use super::kinds::K;
 use crate::JitHelpers;
 
@@ -64,6 +64,10 @@ pub(super) fn emit_set_fixed_field(
         K::Int => {
             let raw = b.use_var(c.vars[val_r]);
             box_int(b, raw)
+        }
+        K::Bool => {
+            let raw = b.use_var(c.vars[val_r]);
+            box_bool(b, raw)
         }
         _ => use_boxed(b, c.vars, state, val_r)?,
     };
