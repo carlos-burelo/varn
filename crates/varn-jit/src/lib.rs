@@ -14,6 +14,10 @@ pub mod safepoint;
 /// `plan_hoists`/`HoistPlan`) stays crate-private.
 pub use loop_hoist::{diagnose_loops, is_alloc_free_op, CacheSource, HoistCandidate, LoopDiagnostic};
 
+/// Re-exported so `varn-debug` can name the host ISA type (from
+/// `clif::shared_isa()`) without taking a direct `cranelift-codegen` dep.
+pub use cranelift_codegen::isa::OwnedTargetIsa;
+
 use std::any::Any;
 use std::rc::Rc;
 use varn_types::FunctionProto;

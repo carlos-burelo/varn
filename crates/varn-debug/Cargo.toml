@@ -14,3 +14,4 @@ varn-types    = { path = "../varn-types" }
 varn-opt      = { path = "../varn-opt" }
 varn-jit      = { path = "../varn-jit" }
 rustc-hash    = "1"
+iced-x86      = "1"

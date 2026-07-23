@@ -2,6 +2,7 @@ pub mod ast;
 pub mod binds;
 pub mod bytecode;
 pub mod cap_trace;
+pub mod clif;
 pub mod colors;
 pub mod consts;
 pub mod error;
