@@ -27,6 +27,7 @@ vn debug -p bytecode archivo.vn
 | `ast` | AST (Abstract Syntax Tree) |
 | `check` | TypedAST con tipos inferidos |
 | `bytecode` | Bytecode / FunctionProto |
+| `clif` | Backend Cranelift (ROUTE/BAIL, kinds, CLIF IR, disasm x86-64) |
 | `all` | Todas las fases (default) |
 
 Otros valores disponibles: `symbols`, `binds`, `types[:N]`, `expr`, `modules`, `graph`, `caps`, `scope`, `errors`, `trace`, `info` y `lsp[:sub]`.
@@ -52,6 +53,19 @@ Disassembly de las instrucciones generadas. Equivalente a `vn debug -p bytecode`
 
 **Cuándo usarlo:** Optimizar código, verificar que peephole optimizations se apliquen, contar instrucciones.
 
+### `clif` — Backend Cranelift
+Por función: decisión ROUTE/BAIL + razón, lattice de kinds, CLIF IR textual y
+disasm x86-64 del código generado. Estático (no ejecuta).
+
+Sub-fases: `clif:route`, `clif:kinds`, `clif:ir`, `clif:asm`, `clif:all`.
+`clif` a secas = las cuatro.
+
+    vn debug -p clif      -e "function f(a:int, b:int):int { return a*b+1; }"
+    vn debug -p clif:asm  src/hot.vn
+
+**Cuándo usarlo:** verificar por qué una función rutea o bailea, revisar el
+lowering a CLIF, cazar bugs de codegen/regalloc.
+
 ## Ejemplos
 
 ```bash
@@ -75,6 +89,7 @@ vn debug tests/01-arithmetic.vn
 | `vn debug -p ast` | AST jerárquico |
 | `vn debug -p check` | Tipos y SemanticDB |
 | `vn debug -p bytecode` | Solo bytecode (más compacto) |
+| `vn debug -p clif` | Backend Cranelift: ROUTE/BAIL, kinds, CLIF IR, disasm |
 | `vn debug -p tokens` | Tokens del lexer |
 | `vn run --trace` | Debug inline durante ejecución |
 | `vn check` | Solo errores de tipos, sin output de estructuras |

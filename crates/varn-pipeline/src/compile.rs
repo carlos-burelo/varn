@@ -55,6 +55,11 @@ pub fn compile(
         varn_debug::bytecode::debug_bytecode(&proto, debug);
     }
 
+    if debug.clif {
+        let helpers = varn_vm::frame::build_jit_helpers();
+        varn_debug::clif::debug_clif(&proto, debug, &helpers);
+    }
+
     if debug.hir {
         varn_debug::hir::debug_hir(
             program,
@@ -107,6 +112,16 @@ pub fn compile(
             if path != &graph_build.entry_path {
                 println!("\n=== MODULE BYTECODE: {} ===", path);
                 varn_debug::bytecode::debug_bytecode(module_proto, debug);
+            }
+        }
+    }
+
+    if debug.clif {
+        let helpers = varn_vm::frame::build_jit_helpers();
+        for (path, module_proto) in graph_build.modules.iter() {
+            if path != &graph_build.entry_path {
+                println!("\n=== MODULE CLIF: {} ===", path);
+                varn_debug::clif::debug_clif(module_proto, debug, &helpers);
             }
         }
     }
