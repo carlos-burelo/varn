@@ -517,6 +517,7 @@ New `varn-debug/src/clif.rs`: walk protos recursively, call `inspect`, print the
 
 **Files:**
 - Create: `crates/varn-debug/src/clif.rs`
+- Modify: `crates/varn-jit/src/lib.rs` (add `pub use cranelift_codegen::isa::OwnedTargetIsa;` re-export — Step 0)
 - Modify: `crates/varn-debug/src/lib.rs` (add `pub mod clif;`)
 - Modify: `crates/varn-debug/Cargo.toml` (add `iced-x86`)
 
@@ -575,15 +576,45 @@ fn render_recursive(
     proto: &FunctionProto,
     flags: &DebugFlags,
     helpers: &JitHelpers,
-    isa: &varn_jit::cranelift_isa::OwnedTargetIsa,
+    isa: &varn_jit::OwnedTargetIsa,
 ) {
-    let insp = inspect(proto, &proto.chunk.constants_values(), helpers, isa, &NoLinker);
+    let constants = constants_for_inspect(proto);
+    let insp = inspect(proto, &constants, helpers, isa, &NoLinker);
     render_one(&insp, flags);
     for entry in &proto.chunk.constants {
         if let PoolEntry::Function(f) = entry {
             render_recursive(f, flags, helpers, isa);
         }
     }
+}
+
+/// Heap-free constant resolution for inspection. Only `is_int()` fidelity
+/// matters to the lowering's kind classification, so scalar literals map
+/// exactly (mirroring `varn_vm::exec::calls::resolve_constants`) and heap
+/// literals (strings, bigints, symbols, chars) plus function/shape entries
+/// become `null` placeholders — they are non-int, which is the correct kind,
+/// and their real heap bits are irrelevant to a static, non-executing view.
+/// (Consequence: a string constant shows as `null` in the IR/disasm — see
+/// the phase limitations.)
+fn constants_for_inspect(proto: &FunctionProto) -> Vec<VmValue> {
+    const I48_MIN: i64 = -(1_i64 << 47);
+    const I48_MAX: i64 = (1_i64 << 47) - 1;
+    proto
+        .chunk
+        .constants
+        .iter()
+        .map(|entry| match entry {
+            PoolEntry::Literal(Literal::Null) => VmValue::null(),
+            PoolEntry::Literal(Literal::Bool(b)) => VmValue::from_bool(*b),
+            PoolEntry::Literal(Literal::Int(n)) if *n >= I48_MIN && *n <= I48_MAX => {
+                VmValue::from_int(*n)
+            }
+            PoolEntry::Literal(Literal::Int(n)) => VmValue::from_f64(*n as f64),
+            PoolEntry::Literal(Literal::Float(f)) => VmValue::from_f64(*f),
+            // Heap literals + function/shape entries: non-int placeholder.
+            _ => VmValue::null(),
+        })
+        .collect()
 }
 
 fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
@@ -640,7 +671,23 @@ fn disasm(bytes: &[u8], rip: u64) -> String {
 }
 ```
 
-> If `proto.chunk` exposes its constant `VmValue`s under a different accessor than `constants_values()`, use the real one (check `Chunk` in `varn-types`); the `constants` field iterated for nested protos is the `PoolEntry` list. If `varn_jit` does not re-export the ISA type as `cranelift_isa::OwnedTargetIsa`, import it from `cranelift_codegen::isa::OwnedTargetIsa` directly and add `cranelift-codegen` to `varn-debug`'s deps, OR change `render_recursive` to take `&dyn` — prefer adding a `pub use cranelift_codegen::isa::OwnedTargetIsa;` re-export in `varn-jit` to avoid a new dep.
+The imports block at the top of `clif.rs` must include the constant types:
+`use varn_types::{FunctionProto, PoolEntry, VmValue, chunk::Literal};` (verify the
+`Literal` path against `crates/varn-types/src/chunk.rs` — the enum is defined there;
+adjust the `use` path if it is re-exported at the crate root as `varn_types::Literal`).
+
+The ISA type is named via a re-export added to `varn-jit` in Step 0 below
+(`varn_jit::OwnedTargetIsa`), so `varn-debug` needs no `cranelift-codegen` dependency.
+
+- [ ] **Step 0: Re-export the ISA type from varn-jit** (so `varn-debug` can name it without a new dep)
+
+In `crates/varn-jit/src/lib.rs`, add near the top-level re-exports:
+
+```rust
+pub use cranelift_codegen::isa::OwnedTargetIsa;
+```
+
+Verify with `cargo build -p varn-jit` (fast). Commit this tiny change with the Task 5 commit (Step 5).
 
 - [ ] **Step 3: Register the module**
 
@@ -653,12 +700,12 @@ pub mod clif;
 - [ ] **Step 4: Build to verify it compiles**
 
 Run: `cargo build --release -p varn-debug`
-Expected: compiles, 0 warnings. Resolve the two accessor notes above if the build errors on `constants_values()` or the ISA type.
+Expected: compiles, 0 warnings. (If `Literal` is not at `varn_types::chunk::Literal`, fix the `use` path per Step 2's note — that is the only expected snag.)
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/varn-debug/src/clif.rs crates/varn-debug/src/lib.rs crates/varn-debug/Cargo.toml Cargo.lock
+git add crates/varn-jit/src/lib.rs crates/varn-debug/src/clif.rs crates/varn-debug/src/lib.rs crates/varn-debug/Cargo.toml Cargo.lock
 git commit -m "feat(debug): clif renderer + iced-x86 disassembler
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
