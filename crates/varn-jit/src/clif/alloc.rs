@@ -63,6 +63,12 @@ pub(super) fn has_alloc(
                     // (arbitrary VM code that can allocate); needs closure.
                     | OpCode::GetProperty
                     | OpCode::SetProperty
+                    // These allocate a heap string / bind a method / make a
+                    // BigInt — force the safepoint discipline in loops.
+                    | OpCode::ToString
+                    | OpCode::Typeof
+                    | OpCode::Negate
+                    | OpCode::GetSymbol
             )
         ) {
             return Ok(true);

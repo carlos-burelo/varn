@@ -7,11 +7,15 @@
 //! function. Comparison results are unboxed to 0/1 so branches read them
 //! directly; arithmetic results stay boxed (unboxed at an int use).
 
+use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::{FunctionBuilder, Variable};
+use varn_core::OpCode;
+use varn_types::VmValue;
 
 use super::emit::{box_or_pass, call_helper, unbox_bool};
 use super::kinds::K;
+use crate::JitHelpers;
 
 /// General lowering context (not frame-specific). Helper addresses are passed
 /// per-op, so this only carries the operand/dispatch essentials.
@@ -37,6 +41,112 @@ pub(super) fn emit_binop(
     let a = box_or_pass(b, g.vars, state, a_r);
     let bb = box_or_pass(b, g.vars, state, b_r);
     let res = call_helper(b, g.cc, helper, &[g.exec_ctx, a, bb]);
+    b.def_var(g.vars[dest], res);
+}
+
+/// `IsNull dest, src` — compare against the null VmValue bits (0/1 result).
+pub(super) fn emit_is_null(
+    b: &mut FunctionBuilder,
+    g: &GenCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+) {
+    let dest = (code[ip] >> 8) as usize;
+    let src = (code[ip + 1] >> 8) as usize;
+    let v = box_or_pass(b, g.vars, state, src);
+    let is_null = b.ins().icmp_imm(IntCC::Equal, v, VmValue::null().0 as i64);
+    let ext = b.ins().uextend(types::I64, is_null);
+    b.def_var(g.vars[dest], ext);
+}
+
+/// Dispatch a generic (helper-based) op. Returns `true` if `op` was one of
+/// them and has been emitted, `false` otherwise (the caller then bails).
+/// Keeps the whole family — arithmetic, comparisons, unary — in one place.
+pub(super) fn try_emit(
+    b: &mut FunctionBuilder,
+    g: &GenCtx,
+    h: &JitHelpers,
+    state: &[K],
+    op: OpCode,
+    code: &[u16],
+    ip: usize,
+) -> bool {
+    match op {
+        OpCode::Add => emit_binop(b, g, state, code, ip, h.add),
+        OpCode::Sub => emit_binop(b, g, state, code, ip, h.sub),
+        OpCode::Mul => emit_binop(b, g, state, code, ip, h.mul),
+        OpCode::Div => emit_binop(b, g, state, code, ip, h.div),
+        OpCode::Mod => emit_binop(b, g, state, code, ip, h.modulo),
+        OpCode::Eq => emit_compare(b, g, state, code, ip, h.eq),
+        OpCode::Neq => emit_compare(b, g, state, code, ip, h.neq),
+        OpCode::Lt => emit_compare(b, g, state, code, ip, h.lt),
+        OpCode::Gt => emit_compare(b, g, state, code, ip, h.gt),
+        OpCode::Lte => emit_compare(b, g, state, code, ip, h.lte),
+        OpCode::Gte => emit_compare(b, g, state, code, ip, h.gte),
+        OpCode::Instanceof => emit_compare(b, g, state, code, ip, h.instanceof),
+        OpCode::Negate => emit_unary(b, g, state, code, ip, h.negate),
+        OpCode::Typeof => emit_unary(b, g, state, code, ip, h.typeof_val),
+        OpCode::ToString => emit_unary(b, g, state, code, ip, h.to_string),
+        OpCode::Not => emit_unary_bool(b, g, state, code, ip, h.logical_not),
+        OpCode::GetSymbol => emit_get_symbol(b, g, state, code, ip, h.get_symbol),
+        OpCode::IsNull => emit_is_null(b, g, state, code, ip),
+        _ => return false,
+    }
+    true
+}
+
+/// `dest, src` generic unary via `helper(ctx, v) -> VmValue` (Negate,
+/// Typeof, ToString). Result is boxed bits.
+pub(super) fn emit_unary(
+    b: &mut FunctionBuilder,
+    g: &GenCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+    helper: usize,
+) {
+    let dest = (code[ip] >> 8) as usize;
+    let src = (code[ip + 1] >> 8) as usize;
+    let v = box_or_pass(b, g.vars, state, src);
+    let res = call_helper(b, g.cc, helper, &[g.exec_ctx, v]);
+    b.def_var(g.vars[dest], res);
+}
+
+/// `dest, src` unary producing a boxed bool (`Not` = logical_not); unboxed to
+/// 0/1 (`K::Bool`).
+pub(super) fn emit_unary_bool(
+    b: &mut FunctionBuilder,
+    g: &GenCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+    helper: usize,
+) {
+    let dest = (code[ip] >> 8) as usize;
+    let src = (code[ip + 1] >> 8) as usize;
+    let v = box_or_pass(b, g.vars, state, src);
+    let res = call_helper(b, g.cc, helper, &[g.exec_ctx, v]);
+    let cond = unbox_bool(b, res);
+    b.def_var(g.vars[dest], cond);
+}
+
+/// `GetSymbol dest, obj, sym_idx` — well-known symbol property access;
+/// `jit_get_symbol` reads the symbol from the current frame's closure.
+pub(super) fn emit_get_symbol(
+    b: &mut FunctionBuilder,
+    g: &GenCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+    get_symbol: usize,
+) {
+    let dest = (code[ip] >> 8) as usize;
+    let obj_r = (code[ip + 1] >> 8) as usize;
+    let sym_idx = code[ip + 2] as usize;
+    let obj = box_or_pass(b, g.vars, state, obj_r);
+    let sym = b.ins().iconst(types::I64, sym_idx as i64);
+    let res = call_helper(b, g.cc, get_symbol, &[g.exec_ctx, obj, sym]);
     b.def_var(g.vars[dest], res);
 }
 

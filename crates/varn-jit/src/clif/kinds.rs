@@ -105,7 +105,10 @@ pub(crate) fn apply_kinds(
         | OpCode::Gt
         | OpCode::Gte
         | OpCode::Eq
-        | OpCode::Neq => state[dest] = K::Bool,
+        | OpCode::Neq
+        | OpCode::Not
+        | OpCode::IsNull
+        | OpCode::Instanceof => state[dest] = K::Bool,
         OpCode::LoadNull => state[dest] = K::Boxed,
         OpCode::Move => {
             let src = (code[ip + 1] >> 8) as usize;
@@ -134,7 +137,11 @@ pub(crate) fn apply_kinds(
         | OpCode::Sub
         | OpCode::Mul
         | OpCode::Div
-        | OpCode::Mod => state[dest] = K::Boxed,
+        | OpCode::Mod
+        | OpCode::Negate
+        | OpCode::Typeof
+        | OpCode::ToString
+        | OpCode::GetSymbol => state[dest] = K::Boxed,
         // A global load records its origin so a `Call` on it can link
         // statically; int-typed globals still unbox to Int.
         OpCode::LoadGlobalIdx => {

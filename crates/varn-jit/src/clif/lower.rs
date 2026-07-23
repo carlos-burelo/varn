@@ -44,8 +44,8 @@ use crate::JitHelpers;
 use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::emit::{
-    box_bool, box_int, call_helper, code_has_array_ops, def_const, emit_array_payload, use_boxed,
-    use_int, wrap_i48, INT_TAG, MASK_48,
+    box_bool, box_int, call_helper, code_has_array_ops, def_const, emit_array_payload, unbox_bool,
+    use_boxed, use_int, wrap_i48, INT_TAG, MASK_48,
 };
 use super::fields;
 use super::generic;
@@ -659,13 +659,22 @@ fn lower_raw(
                 terminated = true;
             }
             OpCode::JumpIfFalse | OpCode::JumpIfTrue => {
-                if state[first_reg] != K::Bool {
-                    return Err("clif: branch on non-bool".into());
-                }
+                // brif tests non-zero, so an unboxed bool/int condition is used
+                // directly; a boxed condition's truthiness is `!is_falsy` via
+                // the logical_not helper.
+                let cond = match state[first_reg] {
+                    K::Bool | K::Int => b.use_var(vars[first_reg]),
+                    k if is_boxed_kind(k) => {
+                        let v = b.use_var(vars[first_reg]);
+                        let falsy_boxed = call_helper(&mut b, cc, helpers.logical_not, &[exec_ctx, v]);
+                        let falsy = unbox_bool(&mut b, falsy_boxed);
+                        b.ins().bxor_imm(falsy, 1)
+                    }
+                    _ => return Err("clif: branch on untracked cond".into()),
+                };
                 let off = ((code[ip + 1] as u32) << 16 | code[ip + 2] as u32) as usize;
                 let target = blocks[&(ip + 3 + off)];
                 let fall = blocks[&next_ip];
-                let cond = b.use_var(vars[first_reg]);
                 if op == OpCode::JumpIfFalse {
                     b.ins().brif(cond, fall, &[], target, &[]);
                 } else {
@@ -902,28 +911,9 @@ fn lower_raw(
                     .ok_or("clif: unresolved object shape")?;
                 alloc::emit_build_object_with_shape(&mut b, actx, &state, code, ip, count);
             }
-            OpCode::Add | OpCode::Sub | OpCode::Mul | OpCode::Div | OpCode::Mod => {
-                let helper = match op {
-                    OpCode::Add => helpers.add,
-                    OpCode::Sub => helpers.sub,
-                    OpCode::Mul => helpers.mul,
-                    OpCode::Div => helpers.div,
-                    _ => helpers.modulo,
-                };
-                generic::emit_binop(&mut b, &gen, &state, code, ip, helper);
-            }
-            OpCode::Eq | OpCode::Neq | OpCode::Lt | OpCode::Gt | OpCode::Lte | OpCode::Gte => {
-                let helper = match op {
-                    OpCode::Eq => helpers.eq,
-                    OpCode::Neq => helpers.neq,
-                    OpCode::Lt => helpers.lt,
-                    OpCode::Gt => helpers.gt,
-                    OpCode::Lte => helpers.lte,
-                    _ => helpers.gte,
-                };
-                generic::emit_compare(&mut b, &gen, &state, code, ip, helper);
-            }
             OpCode::Nop => {}
+            // Generic (helper-based) arithmetic / comparisons / unary ops.
+            _ if generic::try_emit(&mut b, &gen, helpers, &state, op, code, ip) => {}
             _ => return Err(format!("clif: unsupported opcode {op:?}")),
         }
         apply_kinds(&mut state, code, ip, op, constants, &proto.register_meta);
