@@ -73,17 +73,23 @@ pub(super) fn try_emit(
     ip: usize,
 ) -> bool {
     match op {
-        OpCode::Add => emit_binop(b, g, state, code, ip, h.add),
-        OpCode::Sub => emit_binop(b, g, state, code, ip, h.sub),
-        OpCode::Mul => emit_binop(b, g, state, code, ip, h.mul),
-        OpCode::Div => emit_binop(b, g, state, code, ip, h.div),
-        OpCode::Mod => emit_binop(b, g, state, code, ip, h.modulo),
-        OpCode::Eq => emit_compare(b, g, state, code, ip, h.eq),
-        OpCode::Neq => emit_compare(b, g, state, code, ip, h.neq),
-        OpCode::Lt => emit_compare(b, g, state, code, ip, h.lt),
-        OpCode::Gt => emit_compare(b, g, state, code, ip, h.gt),
-        OpCode::Lte => emit_compare(b, g, state, code, ip, h.lte),
-        OpCode::Gte => emit_compare(b, g, state, code, ip, h.gte),
+        // Numeric/string/float arithmetic — the runtime helpers dispatch by
+        // operand type, so the typed *Float variants share them (operands are
+        // boxed float VmValues here; native f64 is a future perf lever).
+        OpCode::Add | OpCode::AddFloat => emit_binop(b, g, state, code, ip, h.add),
+        OpCode::Sub | OpCode::SubFloat => emit_binop(b, g, state, code, ip, h.sub),
+        OpCode::Mul | OpCode::MulFloat => emit_binop(b, g, state, code, ip, h.mul),
+        OpCode::Div | OpCode::DivFloat => emit_binop(b, g, state, code, ip, h.div),
+        OpCode::Mod | OpCode::ModFloat => emit_binop(b, g, state, code, ip, h.modulo),
+        OpCode::Pow | OpCode::PowInt | OpCode::PowFloat => {
+            emit_binop(b, g, state, code, ip, h.pow)
+        }
+        OpCode::Eq | OpCode::EqFloat => emit_compare(b, g, state, code, ip, h.eq),
+        OpCode::Neq | OpCode::NeqFloat => emit_compare(b, g, state, code, ip, h.neq),
+        OpCode::Lt | OpCode::LtFloat => emit_compare(b, g, state, code, ip, h.lt),
+        OpCode::Gt | OpCode::GtFloat => emit_compare(b, g, state, code, ip, h.gt),
+        OpCode::Lte | OpCode::LteFloat => emit_compare(b, g, state, code, ip, h.lte),
+        OpCode::Gte | OpCode::GteFloat => emit_compare(b, g, state, code, ip, h.gte),
         OpCode::Instanceof => emit_compare(b, g, state, code, ip, h.instanceof),
         OpCode::Negate => emit_unary(b, g, state, code, ip, h.negate),
         OpCode::Typeof => emit_unary(b, g, state, code, ip, h.typeof_val),

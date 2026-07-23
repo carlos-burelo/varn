@@ -44,8 +44,8 @@ use crate::JitHelpers;
 use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::emit::{
-    box_bool, box_int, call_helper, code_has_array_ops, def_const, emit_array_payload, unbox_bool,
-    use_boxed, use_int, wrap_i48, INT_TAG, MASK_48,
+    box_int, call_helper, code_has_array_ops, def_const, emit_array_payload, emit_return_value,
+    unbox_bool, use_boxed, use_int, wrap_i48, INT_TAG, MASK_48,
 };
 use super::fields;
 use super::generic;
@@ -684,46 +684,7 @@ fn lower_raw(
             }
             OpCode::Return => {
                 let src = (code[ip + 1] & 0xFF) as usize;
-                // A reachable null return (a constructor's implicit
-                // `return null`; the int-return tail's LoadNull;Return is dead
-                // and trap-filled, never reaching here). Emit the null bits.
-                let v = if state[src] == K::Poison {
-                    b.ins().iconst(types::I64, VmValue::null().0 as i64)
-                } else {
-                    match proto.return_kind {
-                    // Int return: raw yields an unboxed i48 payload the
-                    // wrapper/fast-call re-tag; source must be int by proof.
-                    SlotKind::Int => match state[src] {
-                        K::Int => b.use_var(vars[src]),
-                        K::Boxed => use_int(&mut b, &vars, &state, src)?,
-                        k => return Err(format!("clif: unproven int return ({k:?})")),
-                    },
-                    // Heap return (string/ref): raw yields boxed bits, wrapper
-                    // passes through (only reachable via the wrapper).
-                    SlotKind::Str | SlotKind::Ref => {
-                        if is_boxed_kind(state[src]) {
-                            b.use_var(vars[src])
-                        } else {
-                            return Err(format!("clif: non-boxed heap return ({:?})", state[src]));
-                        }
-                    }
-                    // Dynamic (`any`) return: box the value's representation
-                    // to a VmValue; wrapper passes it through.
-                    SlotKind::Dynamic => match state[src] {
-                        K::Int => {
-                            let raw = b.use_var(vars[src]);
-                            box_int(&mut b, raw)
-                        }
-                        K::Bool => {
-                            let raw = b.use_var(vars[src]);
-                            box_bool(&mut b, raw)
-                        }
-                        k if is_boxed_kind(k) => b.use_var(vars[src]),
-                        k => return Err(format!("clif: unproven dynamic return ({k:?})")),
-                    },
-                    k => return Err(format!("clif: unsupported return kind {k:?}")),
-                    }
-                };
+                let v = emit_return_value(&mut b, &vars, &state, proto.return_kind, src)?;
                 b.ins().return_(&[v]);
                 terminated = true;
             }

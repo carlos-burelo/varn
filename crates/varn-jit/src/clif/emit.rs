@@ -11,6 +11,7 @@ use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::register_meta::SlotKind;
+use varn_types::VmValue;
 
 use super::kinds::{is_boxed_kind, K};
 
@@ -60,6 +61,59 @@ pub(super) fn use_boxed(
     } else {
         Err(format!("clif: boxed use of {:?} register r{r}", state[r]))
     }
+}
+
+/// The value a `Return src` yields, coerced to the raw function's return
+/// convention: an int return stays an unboxed i48 payload (the wrapper and
+/// the clif→clif fast call re-tag it); every other return kind yields boxed
+/// VmValue bits that the wrapper passes through. A reachable `null` (a
+/// constructor's implicit `return null`) short-circuits to the null bits.
+pub(super) fn emit_return_value(
+    b: &mut FunctionBuilder,
+    vars: &[Variable],
+    state: &[K],
+    return_kind: SlotKind,
+    src: usize,
+) -> Result<cranelift_codegen::ir::Value, String> {
+    if state[src] == K::Poison {
+        return Ok(b.ins().iconst(types::I64, VmValue::null().0 as i64));
+    }
+    Ok(match return_kind {
+        SlotKind::Int => match state[src] {
+            K::Int => b.use_var(vars[src]),
+            K::Boxed => use_int(b, vars, state, src)?,
+            k => return Err(format!("clif: unproven int return ({k:?})")),
+        },
+        // string/ref/float: already boxed bits, passed through by the wrapper.
+        SlotKind::Str | SlotKind::Ref | SlotKind::Float => {
+            if is_boxed_kind(state[src]) {
+                b.use_var(vars[src])
+            } else {
+                return Err(format!("clif: non-boxed heap return ({:?})", state[src]));
+            }
+        }
+        SlotKind::Bool => match state[src] {
+            K::Bool => {
+                let raw = b.use_var(vars[src]);
+                box_bool(b, raw)
+            }
+            k if is_boxed_kind(k) => b.use_var(vars[src]),
+            k => return Err(format!("clif: unproven bool return ({k:?})")),
+        },
+        // Dynamic (`any`): box whatever representation the value holds.
+        SlotKind::Dynamic => match state[src] {
+            K::Int => {
+                let raw = b.use_var(vars[src]);
+                box_int(b, raw)
+            }
+            K::Bool => {
+                let raw = b.use_var(vars[src]);
+                box_bool(b, raw)
+            }
+            k if is_boxed_kind(k) => b.use_var(vars[src]),
+            k => return Err(format!("clif: unproven dynamic return ({k:?})")),
+        },
+    })
 }
 
 /// Whether the function contains any array opcode. Functions that both
