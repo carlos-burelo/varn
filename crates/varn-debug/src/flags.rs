@@ -34,6 +34,12 @@ pub struct DebugFlags {
     pub hir: bool,
 
     pub ssa: bool,
+
+    pub clif: bool,
+    pub clif_route: bool,
+    pub clif_kinds: bool,
+    pub clif_ir: bool,
+    pub clif_asm: bool,
 }
 
 pub fn parse_line_range(s: &str) -> Result<(u32, u32), CliError> {
@@ -107,6 +113,23 @@ impl DebugFlags {
                         }
                     }
                 }
+            } else if let Some(sub) = phase.strip_prefix("clif:") {
+                flags.clif = true;
+                for sub_part in sub.split('+') {
+                    match sub_part {
+                        "route" => flags.clif_route = true,
+                        "kinds" => flags.clif_kinds = true,
+                        "ir" => flags.clif_ir = true,
+                        "asm" => flags.clif_asm = true,
+                        "all" => flags.clif_all(),
+                        unknown => {
+                            return Err(CliError::usage(format!(
+                                "unknown clif debug sub-phase: '{unknown}'\n\
+                                 Valid sub-phases: route, kinds, ir, asm, all"
+                            )));
+                        }
+                    }
+                }
             } else {
                 match phase {
                     "tokens" => flags.tokens = true,
@@ -136,6 +159,7 @@ impl DebugFlags {
                     "lsp" => flags.lsp = true,
                     "hir" => flags.hir = true,
                     "ssa" => flags.ssa = true,
+                    "clif" => flags.clif_all_on(),
                     "all" => {
                         flags.tokens = true;
                         flags.ast = true;
@@ -154,12 +178,14 @@ impl DebugFlags {
                         flags.lsp_all();
                         flags.hir = true;
                         flags.ssa = true;
+                        flags.clif_all_on();
                     }
                     unknown => {
                         return Err(CliError::usage(format!(
                             "unknown debug phase: '{unknown}'\n\
-                             Valid phases: tokens, ast, check, bytecode, graph, caps, info, hir, ssa, all\n\
+                             Valid phases: tokens, ast, check, bytecode, graph, caps, info, hir, ssa, clif, all\n\
                              LSP sub-phases: lsp:hovers, lsp:semantic, lsp:types, lsp:completions, lsp:symbols, lsp:colorize, lsp:hints, lsp:all\n\
+                             clif sub-phases: clif:route, clif:kinds, clif:ir, clif:asm, clif:all\n\
                              Line range filter: types:N  types:all  expr:N"
                         )));
                     }
@@ -189,6 +215,7 @@ impl DebugFlags {
             || self.lsp
             || self.hir
             || self.ssa
+            || self.clif
     }
 
     pub fn lsp_all(&mut self) {
@@ -199,5 +226,49 @@ impl DebugFlags {
         self.lsp_symbols = true;
         self.lsp_colorize = true;
         self.lsp_hints = true;
+    }
+
+    pub fn clif_all(&mut self) {
+        self.clif_route = true;
+        self.clif_kinds = true;
+        self.clif_ir = true;
+        self.clif_asm = true;
+    }
+
+    /// Bare `clif` = the phase plus all four views.
+    pub fn clif_all_on(&mut self) {
+        self.clif = true;
+        self.clif_all();
+    }
+}
+
+#[cfg(test)]
+mod clif_flag_tests {
+    use super::DebugFlags;
+
+    #[test]
+    fn bare_clif_enables_all_four_views() {
+        let f = DebugFlags::parse("clif").unwrap();
+        assert!(f.clif && f.clif_route && f.clif_kinds && f.clif_ir && f.clif_asm);
+        assert!(f.any());
+    }
+
+    #[test]
+    fn clif_ir_enables_only_ir() {
+        let f = DebugFlags::parse("clif:ir").unwrap();
+        assert!(f.clif && f.clif_ir);
+        assert!(!f.clif_route && !f.clif_kinds && !f.clif_asm);
+    }
+
+    #[test]
+    fn clif_multi_sub_via_comma() {
+        let f = DebugFlags::parse("clif:kinds,clif:asm").unwrap();
+        assert!(f.clif && f.clif_kinds && f.clif_asm);
+        assert!(!f.clif_ir && !f.clif_route);
+    }
+
+    #[test]
+    fn unknown_clif_sub_errors() {
+        assert!(DebugFlags::parse("clif:bogus").is_err());
     }
 }
