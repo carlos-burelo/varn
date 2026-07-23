@@ -37,7 +37,7 @@ use varn_types::bytecode::decode;
 use varn_types::register_meta::SlotKind;
 use varn_types::{FunctionProto, VmValue};
 
-use super::debug::{ClifDebugSink, CodeBytes, KindReport};
+use super::debug::ClifDebugSink;
 use super::kinds::{apply_kinds, is_boxed_kind, kind_flow, K};
 use crate::mem::JitBuffer;
 use crate::JitHelpers;
@@ -46,7 +46,7 @@ use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::emit::{
     box_int, call_helper, code_has_array_ops, def_const, emit_array_payload, emit_return_value,
-    unbox_bool, use_boxed, use_int, wrap_i48, INT_TAG, MASK_48,
+    patch_rel32, unbox_bool, use_boxed, use_int, wrap_i48, INT_TAG, MASK_48,
 };
 use super::fields;
 use super::generic;
@@ -140,13 +140,7 @@ pub fn try_compile(
             patch_rel32(slice, wrapper_off + *r, 0);
         }
     }
-    if let Some(sink) = debug.as_deref_mut() {
-        sink.code = Some(CodeBytes {
-            bytes: buf.as_mut_slice().to_vec(),
-            raw_off: 0,
-            entry_off: wrapper_off,
-        });
-    }
+    super::debug::capture_code(&mut debug, &mut buf, wrapper_off);
     buf.make_executable()?;
     let raw_ptr = buf.as_ptr();
     let entry = unsafe { buf.as_ptr().add(wrapper_off) };
@@ -156,14 +150,6 @@ pub fn try_compile(
         raw: raw_ptr,
         frame_aware,
     })
-}
-
-/// `site` is the buffer offset of the rel32 field; `target` the buffer
-/// offset the call must reach.
-fn patch_rel32(buf: &mut [u8], site: usize, target: usize) {
-    let disp = target as i64 - (site as i64 + 4);
-    let disp = i32::try_from(disp).expect("clif: rel32 out of range");
-    buf[site..site + 4].copy_from_slice(&disp.to_le_bytes());
 }
 
 struct CompiledPiece {
@@ -454,14 +440,7 @@ fn lower_raw(
         proto.has_this,
     )?;
 
-    if let Some(sink) = debug.as_deref_mut() {
-        let mut blocks: Vec<(usize, Vec<String>)> = entries
-            .iter()
-            .map(|(start, ks)| (*start, ks.iter().map(|k| format!("{k:?}")).collect()))
-            .collect();
-        blocks.sort_by_key(|(s, _)| *s);
-        sink.kinds = Some(KindReport { nregs, blocks });
-    }
+    super::debug::capture_kinds(&mut debug, &entries, nregs);
 
     let mut state: Vec<K> = entries[&0].clone();
     let mut filled: Vec<usize> = Vec::new();
@@ -916,9 +895,7 @@ fn lower_raw(
 
     b.seal_all_blocks();
     b.finalize();
-    if let Some(sink) = debug.as_deref_mut() {
-        sink.clif_ir = Some(func.display().to_string());
-    }
+    super::debug::capture_ir(&mut debug, &func);
     compile_piece(func, isa)
 }
 

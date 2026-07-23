@@ -24,6 +24,14 @@ pub(super) const HEAP_EXPECT: i64 =
     (varn_types::vm_value::SIGN | varn_types::vm_value::QNAN | varn_types::vm_value::TAG_PTR)
         as i64;
 
+/// `site` is the buffer offset of the rel32 field; `target` the buffer
+/// offset the call must reach.
+pub(super) fn patch_rel32(buf: &mut [u8], site: usize, target: usize) {
+    let disp = target as i64 - (site as i64 + 4);
+    let disp = i32::try_from(disp).expect("clif: rel32 out of range");
+    buf[site..site + 4].copy_from_slice(&disp.to_le_bytes());
+}
+
 pub(super) fn def_const(b: &mut FunctionBuilder, vars: &[Variable], reg: usize, v: i64) {
     let c = b.ins().iconst(types::I64, v);
     b.def_var(vars[reg], c);
