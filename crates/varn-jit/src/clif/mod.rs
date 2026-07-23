@@ -11,6 +11,7 @@
 
 pub(crate) mod alloc;
 pub(crate) mod arrays;
+pub mod debug;
 pub(crate) mod emit;
 pub(crate) mod fields;
 pub(crate) mod generic;

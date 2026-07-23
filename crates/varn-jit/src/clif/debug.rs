@@ -1,0 +1,31 @@
+//! Static introspection of the Cranelift lowering for `vn debug -p clif`.
+//!
+//! Reuses `try_compile` as the single source of truth: a `ClifDebugSink`
+//! is threaded in and the lowering records the kind lattice, the textual
+//! CLIF IR, and the finalized code bytes as it goes. The production path
+//! passes `None`, so this adds nothing to normal compilation.
+
+/// Kind lattice at each block entry (from `kind_flow`). `blocks[i] =
+/// (block_start_ip, [K per register as text])`.
+#[derive(Debug, Default, Clone)]
+pub struct KindReport {
+    pub nregs: usize,
+    pub blocks: Vec<(usize, Vec<String>)>,
+}
+
+/// Finalized machine code for one function's buffer (raw fn at `raw_off`,
+/// wrapper at `entry_off`).
+#[derive(Debug, Default, Clone)]
+pub struct CodeBytes {
+    pub bytes: Vec<u8>,
+    pub raw_off: usize,
+    pub entry_off: usize,
+}
+
+/// Capture slots populated by `try_compile` when inspection is active.
+#[derive(Debug, Default)]
+pub struct ClifDebugSink {
+    pub kinds: Option<KindReport>,
+    pub clif_ir: Option<String>,
+    pub code: Option<CodeBytes>,
+}

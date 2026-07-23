@@ -37,6 +37,7 @@ use varn_types::bytecode::decode;
 use varn_types::register_meta::SlotKind;
 use varn_types::{FunctionProto, VmValue};
 
+use super::debug::{ClifDebugSink, CodeBytes, KindReport};
 use super::kinds::{apply_kinds, is_boxed_kind, kind_flow, K};
 use crate::mem::JitBuffer;
 use crate::JitHelpers;
@@ -101,6 +102,7 @@ pub fn try_compile(
     helpers: &JitHelpers,
     isa: &OwnedTargetIsa,
     linker: &dyn ClifLinker,
+    mut debug: Option<&mut ClifDebugSink>,
 ) -> Result<ClifArtifact, String> {
     if proto.is_generator || proto.is_async || proto.has_rest {
         return Err("clif: unsupported function kind".into());
@@ -118,7 +120,7 @@ pub fn try_compile(
 
     let has_alloc = alloc::has_alloc(&proto.chunk.code, &proto.chunk.constants)?;
     let frame_aware = proto.has_this || has_alloc;
-    let raw = lower_raw(proto, constants, helpers, isa, linker, has_alloc)?;
+    let raw = lower_raw(proto, constants, helpers, isa, linker, has_alloc, debug.as_deref_mut())?;
     let wrapper = build_wrapper(proto, helpers, isa, frame_aware)?;
 
     // Concatenate: raw at 0, wrapper 16-aligned after it, then resolve the
@@ -137,6 +139,13 @@ pub fn try_compile(
         for r in &wrapper.call_reloc_offsets {
             patch_rel32(slice, wrapper_off + *r, 0);
         }
+    }
+    if let Some(sink) = debug.as_deref_mut() {
+        sink.code = Some(CodeBytes {
+            bytes: buf.as_mut_slice().to_vec(),
+            raw_off: 0,
+            entry_off: wrapper_off,
+        });
     }
     buf.make_executable()?;
     let raw_ptr = buf.as_ptr();
@@ -214,6 +223,7 @@ fn lower_raw(
     isa: &OwnedTargetIsa,
     linker: &dyn ClifLinker,
     has_alloc: bool,
+    mut debug: Option<&mut ClifDebugSink>,
 ) -> Result<CompiledPiece, String> {
     let code = &proto.chunk.code;
     let pool = &proto.chunk.constants;
@@ -443,6 +453,15 @@ fn lower_raw(
         &proto.register_meta,
         proto.has_this,
     )?;
+
+    if let Some(sink) = debug.as_deref_mut() {
+        let mut blocks: Vec<(usize, Vec<String>)> = entries
+            .iter()
+            .map(|(start, ks)| (*start, ks.iter().map(|k| format!("{k:?}")).collect()))
+            .collect();
+        blocks.sort_by_key(|(s, _)| *s);
+        sink.kinds = Some(KindReport { nregs, blocks });
+    }
 
     let mut state: Vec<K> = entries[&0].clone();
     let mut filled: Vec<usize> = Vec::new();
@@ -897,6 +916,9 @@ fn lower_raw(
 
     b.seal_all_blocks();
     b.finalize();
+    if let Some(sink) = debug.as_deref_mut() {
+        sink.clif_ir = Some(func.display().to_string());
+    }
     compile_piece(func, isa)
 }
 

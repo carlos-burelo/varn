@@ -328,7 +328,7 @@ pub fn compile(
     // bail falls back to the template JIT, then the interpreter.
     if clif::enabled() {
         if let Ok(isa) = clif::shared_isa() {
-            match clif::lower::try_compile(proto, constants, &helpers, isa, linker) {
+            match clif::lower::try_compile(proto, constants, &helpers, isa, linker, None) {
                 Ok(art) => {
                     if clif::trace() {
                         eprintln!("CLIF ROUTE {:?}", proto.name);
