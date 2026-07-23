@@ -66,6 +66,16 @@ Sub-fases: `clif:route`, `clif:kinds`, `clif:ir`, `clif:asm`, `clif:all`.
 **Cuándo usarlo:** verificar por qué una función rutea o bailea, revisar el
 lowering a CLIF, cazar bugs de codegen/regalloc.
 
+**Limitaciones (v1):** la inspección es estática y sin heap, así que las
+constantes de heap (strings, bigint, símbolos) aparecen como `null` en el IR/disasm
+y las llamadas a helpers no están simbolizadas (direcciones crudas). En
+consecuencia, una función cuyo único obstáculo sería una constante de heap
+residente en el nursery puede mostrarse como `ROUTE` aunque en ejecución real
+haría `BAIL` (`clif: nursery heap constant`) — caso raro y marcado como
+"inesperado" por el propio codegen. El disasm de la función `raw` (el cuerpo, lo
+relevante) es siempre fiel; el del `wrapper` (glue de ABI) puede desincronizarse
+en el relleno de alineación.
+
 ## Ejemplos
 
 ```bash
