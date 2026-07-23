@@ -74,3 +74,43 @@ pub(super) fn capture_code(
         });
     }
 }
+
+use varn_types::{FunctionProto, VmValue};
+use cranelift_codegen::isa::OwnedTargetIsa;
+use crate::JitHelpers;
+use super::lower::{try_compile, ClifLinker};
+
+/// Everything `vn debug -p clif` shows for one function.
+pub struct ClifInspection {
+    pub name: String,
+    /// `Ok(())` = ROUTE; `Err(reason)` = BAIL.
+    pub route: Result<(), String>,
+    pub kinds: Option<KindReport>,
+    pub clif_ir: Option<String>,
+    pub code: Option<CodeBytes>,
+    pub frame_aware: bool,
+}
+
+/// Run the clif lowering for `proto` with capture active, without executing.
+pub fn inspect(
+    proto: &FunctionProto,
+    constants: &[VmValue],
+    helpers: &JitHelpers,
+    isa: &OwnedTargetIsa,
+    linker: &dyn ClifLinker,
+) -> ClifInspection {
+    let mut sink = ClifDebugSink::default();
+    let result = try_compile(proto, constants, helpers, isa, linker, Some(&mut sink));
+    let (route, frame_aware) = match &result {
+        Ok(art) => (Ok(()), art.frame_aware),
+        Err(e) => (Err(e.clone()), false),
+    };
+    ClifInspection {
+        name: proto.name.as_deref().unwrap_or("<top-level>").to_string(),
+        route,
+        kinds: sink.kinds,
+        clif_ir: sink.clif_ir,
+        code: sink.code,
+        frame_aware,
+    }
+}
