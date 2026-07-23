@@ -69,6 +69,9 @@ pub(super) fn has_alloc(
                     | OpCode::Typeof
                     | OpCode::Negate
                     | OpCode::GetSymbol
+                    // A string slice allocates a Slice HeapStr (and it's not
+                    // an int-contract callee, so no fast-IC regression).
+                    | OpCode::StrSlice
             )
         ) {
             return Ok(true);

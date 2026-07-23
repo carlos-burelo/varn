@@ -109,6 +109,8 @@ pub(crate) fn apply_kinds(
         | OpCode::Not
         | OpCode::IsNull
         | OpCode::Instanceof
+        | OpCode::In
+        | OpCode::IsArray
         | OpCode::LtFloat
         | OpCode::GtFloat
         | OpCode::LteFloat
@@ -155,7 +157,16 @@ pub(crate) fn apply_kinds(
         | OpCode::ModFloat
         | OpCode::PowFloat
         | OpCode::Pow
-        | OpCode::PowInt => state[dest] = K::Boxed,
+        | OpCode::PowInt
+        | OpCode::BitAnd
+        | OpCode::BitOr
+        | OpCode::BitXor
+        | OpCode::Shl
+        | OpCode::Shr
+        | OpCode::Ushr
+        | OpCode::StrSlice
+        | OpCode::StrLength
+        | OpCode::ArrayPop => state[dest] = K::Boxed,
         // A global load records its origin so a `Call` on it can link
         // statically; int-typed globals still unbox to Int.
         OpCode::LoadGlobalIdx => {

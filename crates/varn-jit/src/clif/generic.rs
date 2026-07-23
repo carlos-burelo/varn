@@ -91,10 +91,25 @@ pub(super) fn try_emit(
         OpCode::Lte | OpCode::LteFloat => emit_compare(b, g, state, code, ip, h.lte),
         OpCode::Gte | OpCode::GteFloat => emit_compare(b, g, state, code, ip, h.gte),
         OpCode::Instanceof => emit_compare(b, g, state, code, ip, h.instanceof),
+        OpCode::In => emit_compare(b, g, state, code, ip, h.op_in),
+        // NB: DivInt is deliberately NOT routed. It is int/int -> float, but
+        // stdlib code (`int_div`) relies on the interpreter coercing the
+        // whole-number float back to an int at an `int` return; clif's typed
+        // int-return unbox would misread the float bits. Let it bail.
+        OpCode::BitAnd => emit_binop(b, g, state, code, ip, h.bit_and),
+        OpCode::BitOr => emit_binop(b, g, state, code, ip, h.bit_or),
+        OpCode::BitXor => emit_binop(b, g, state, code, ip, h.bit_xor),
+        OpCode::Shl => emit_binop(b, g, state, code, ip, h.shl),
+        OpCode::Shr => emit_binop(b, g, state, code, ip, h.shr),
+        OpCode::Ushr => emit_binop(b, g, state, code, ip, h.ushr),
+        OpCode::StrSlice => emit_binop(b, g, state, code, ip, h.str_slice),
+        OpCode::StrLength => emit_unary(b, g, state, code, ip, h.str_length),
+        OpCode::ArrayPop => emit_unary(b, g, state, code, ip, h.array_pop),
         OpCode::Negate => emit_unary(b, g, state, code, ip, h.negate),
         OpCode::Typeof => emit_unary(b, g, state, code, ip, h.typeof_val),
         OpCode::ToString => emit_unary(b, g, state, code, ip, h.to_string),
         OpCode::Not => emit_unary_bool(b, g, state, code, ip, h.logical_not),
+        OpCode::IsArray => emit_unary_bool(b, g, state, code, ip, h.is_array),
         OpCode::GetSymbol => emit_get_symbol(b, g, state, code, ip, h.get_symbol),
         OpCode::IsNull => emit_is_null(b, g, state, code, ip),
         _ => return false,
