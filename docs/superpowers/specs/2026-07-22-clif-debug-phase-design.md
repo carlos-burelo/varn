@@ -80,9 +80,16 @@ solamente (no llegó a haber IR ni buffer). ROUTE muestra las 4.
 
 ## Arquitectura
 
-Todo vive en `varn-jit` (produce los datos) y `varn-debug` (los renderiza). **No
-se toca `varn-vm`**: la inspección no ejecuta, así que no necesita las
-direcciones reales de los helpers ni un `ExecCtx` vivo.
+`varn-jit` produce los datos, `varn-debug` los renderiza, `varn-pipeline`
+orquesta (ya depende de ambos + `varn-vm`). La inspección **no ejecuta**, pero sí
+usa los helpers **reales** (direcciones de función + layouts probados) para que
+el IR/disasm sean fieles a producción. Esos helpers son estáticos —no requieren
+un `ExecCtx` vivo—, así que se construyen con un builder libre extraído del
+bloque ya existente en `varn-vm::frame::compile_jit` (mejora DRY: hoy ese literal
+está inline). Actualización sobre la decisión inicial de "helpers dummy": se
+descartó porque un `dummy()` de ~110 campos es frágil y volvería el codegen de
+ops de array/objeto/native-op no-fiel (offsets a cero); el builder real es más
+simple y fiel, y `varn-pipeline` ya enlaza `varn-vm`.
 
 ### Componente A — `varn-jit/src/clif/debug.rs` (nuevo)
 
@@ -120,19 +127,25 @@ pub fn inspect(
   `try_compile`:
   `try_compile(..., debug: Option<&mut ClifDebugSink>)`. El path de producción
   pasa `None` (coste cero, sin drift). Cuando es `Some`, registra el `KindReport`
-  (ya computado internamente por `kind_flow`) y `ctx.func.display()` justo antes
-  del codegen. `inspect` corre `try_compile` con el sink activo, y capta también
-  el `Result` (route/bail) y, en ROUTE, los bytes del `ClifArtifact.buffer`.
-- Añade `JitHelpers::dummy()` — constructor con todas las direcciones en
-  centinela (0 o índice de campo). Suficiente porque no se ejecuta.
+  (ya computado por `kind_flow` en `lower.rs:436`), `ctx.func.display()` justo
+  antes del codegen (`lower.rs:900`), y los bytes del buffer tras la
+  concatenación raw+wrapper (`try_compile`, antes de `make_executable`).
+  `inspect` corre `try_compile` con el sink activo y capta también el `Result`
+  (route/bail).
+- Helpers: **reales**, vía `varn-vm::frame::build_jit_helpers()` (nuevo builder
+  libre extraído del literal inline de `compile_jit`; `compile_jit` pasa a
+  llamarlo — DRY). No requiere `ExecCtx` vivo.
 - Linker: el `impl` unitario existente (`lower.rs:93`, `static_target -> None`)
-  sirve como dummy; toda cross-call toma el fallback, irrelevante en inspección.
+  sirve como linker de inspección; toda cross-call toma el fallback, irrelevante
+  en inspección.
 
 ### Componente B — `varn-debug/src/clif.rs` (nuevo)
 
+- Entrada: `debug_clif(proto: &FunctionProto, flags: &DebugFlags, helpers: &JitHelpers)`
+  (mismo patrón que `debug_bytecode`; el pipeline inyecta los helpers reales).
 - Recorre los protos (recursivo por `chunk.constants`).
-- Por cada proto: construye `JitHelpers::dummy()`, obtiene `isa` de
-  `clif::shared_isa()`, usa el linker unitario, llama a `clif::debug::inspect`.
+- Por cada proto: obtiene `isa` de `clif::shared_isa()`, usa el linker unitario,
+  llama a `clif::debug::inspect(proto, consts, helpers, isa, &linker)`.
 - Renderiza las 4 secciones según los sub-flags activos.
 - **Disasm x86-64**: nueva dependencia **`iced-x86`** (Rust puro, sin C, limpia
   en Windows), confinada a `varn-debug` (crate solo-debug) para no engordar el
@@ -148,9 +161,10 @@ pub fn inspect(
 
 ### Componente D — pipeline
 
-- La etapa de debug ya tiene el proto compilado y respeta `no_run`. Cuando
-  `flags.clif`, invoca el renderer de `varn-debug::clif`, pasándole el proto.
-  `isa` sale de `varn_jit::clif::shared_isa()`.
+- `varn-pipeline/src/compile.rs`, junto al dispatch de `debug.bytecode`
+  (línea 54) y en el bucle de módulos (línea 105): cuando `debug.clif`, construye
+  `let helpers = varn_vm::frame::build_jit_helpers();` y llama
+  `varn_debug::clif::debug_clif(&proto, debug, &helpers)`. Respeta `no_run`.
 
 ## Flujo de datos
 
@@ -205,9 +219,13 @@ vn debug -p clif file.vn
 2. **`iced-x86`** vs feature `disas`/capstone de `cranelift-codegen`. Elegido
    `iced-x86`: Rust puro, sin toolchain C, build limpio en Windows; y confinado
    al crate solo-debug.
-3. **Helpers dummy (cero-exec)** vs construir helpers reales desde `varn-vm`.
-   Elegido dummy: elimina la dependencia a `varn-vm` y a un `ExecCtx` vivo; la
-   inspección no ejecuta, así que las direcciones son irrelevantes.
+3. **Helpers reales vía builder extraído** vs `JitHelpers::dummy()` de ~110
+   campos. Elegido el builder real: (a) el pipeline ya enlaza `varn-vm`, así que
+   no hay dependencia nueva; (b) no requiere `ExecCtx` vivo (los helpers son
+   direcciones estáticas + layouts probados); (c) IR/disasm fieles a producción
+   (un dummy dejaría el codegen de array/objeto/native-op con offsets a cero);
+   (d) DRY — hoy el literal de helpers está inline en `compile_jit`; extraerlo a
+   `build_jit_helpers()` lo comparte con la ruta de debug.
 4. **Fase de `vn debug`** vs comando nuevo. Elegido fase: reusa toda la
    plomería (`-e`, `no_run`, parsing de fases, recursión por protos).
 
@@ -215,13 +233,14 @@ vn debug -p clif file.vn
 
 | archivo | cambio |
 |---------|--------|
-| `crates/varn-jit/src/clif/debug.rs` | **nuevo** — `inspect`, `ClifInspection`, `KindReport`, `CodeBytes` |
-| `crates/varn-jit/src/clif/lower.rs` | `try_compile` gana param `Option<&mut ClifDebugSink>`; captura kinds+IR |
-| `crates/varn-jit/src/lib.rs` | `JitHelpers::dummy()`; re-export de `clif::debug` |
-| `crates/varn-debug/src/clif.rs` | **nuevo** — renderer + disasm iced-x86 |
+| `crates/varn-jit/src/clif/debug.rs` | **nuevo** — `inspect`, `ClifInspection`, `KindReport`, `CodeBytes`, `ClifDebugSink` |
+| `crates/varn-jit/src/clif/mod.rs` | `pub mod debug;` |
+| `crates/varn-jit/src/clif/lower.rs` | `try_compile`/`lower_raw` ganan param `Option<&mut ClifDebugSink>`; captura kinds (l.436) + IR (l.900) + bytes |
+| `crates/varn-vm/src/frame.rs` | extraer `pub fn build_jit_helpers() -> JitHelpers` del literal inline de `compile_jit`; `compile_jit` pasa a llamarlo (DRY) |
+| `crates/varn-debug/src/clif.rs` | **nuevo** — `debug_clif` renderer + disasm iced-x86 |
 | `crates/varn-debug/src/flags.rs` | `clif` + sub-flags, parse, `any`/`all`/ayuda |
-| `crates/varn-debug/src/lib.rs` | `mod clif` |
+| `crates/varn-debug/src/lib.rs` | `pub mod clif;` |
 | `crates/varn-debug/Cargo.toml` | dep `iced-x86` |
-| `crates/varn-pipeline/*` (etapa debug) | wire de `flags.clif` |
+| `crates/varn-pipeline/src/compile.rs` | wire de `debug.clif` (2 sitios: proto principal l.54, bucle de módulos l.105) |
 | `docs/CLI_INSPECT.md` | documentar la fase `clif` y sus sub-fases |
 ```
