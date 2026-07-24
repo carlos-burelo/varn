@@ -95,11 +95,51 @@ function evolveMatmulShape(): int {
     return c[0] + c[n * n - 1]
 }
 
+// --- Rule-4 regression coverage (A0.3' review) ------------------------
+// Each of these PROVED that routing the evolved element type into
+// diagnostic typing turned a previously-valid program into a `vn check`
+// failure: the element `int` reaching an argument position, a return
+// position, and a member-existence check. Post-fix the evolved type is an
+// OPTIMIZATION-ONLY annotation and never reaches a diagnostic, so all three
+// must type-check with 0 errors. They are exercised through `if (false)`
+// so they type-check AND compile but do not execute at runtime —
+// `rule4ReturnPosition` deliberately returns an `int` from a `: str`
+// function (legal because the element stays `Dynamic` for diagnostics), so
+// actually running it would surface a runtime int-where-str.
+
+function rule4Label(prefix: str): str { return "item:" + prefix }
+
+function rule4ArgPosition(): str {
+    let ids = []
+    ids.push(100)
+    ids.push(200)
+    return rule4Label(ids[0])
+}
+
+function rule4ReturnPosition(): str {
+    let a = []
+    a.push(1)
+    return a[0]
+}
+
+function rule4MemberExists(): int {
+    let a = []
+    a.push(1)
+    return a[0].toUpperCase() == "" ? 0 : 1
+}
+
 assert("evolve push-int sum",        evolvePushInt() === 6)
 assert("evolve index-write sum",     evolveIndexWrite() === 20)
 assert("evolve mixed stays runnable", evolveMixedStaysPermissive() === "1-two")
 assert("annotated int[] unchanged",  annotatedUnchanged() === 30)
 assert("evolve escape stays runnable", evolveEscapeStaysPermissive() === 6)
 assert("evolve matmul shape",        evolveMatmulShape() === 690)
+
+// Compile the Rule-4 regression shapes without executing them (see above).
+if (false) {
+    rule4ArgPosition()
+    rule4ReturnPosition()
+    rule4MemberExists()
+}
 
 print("[PASSED] 55. Array element-type inference")

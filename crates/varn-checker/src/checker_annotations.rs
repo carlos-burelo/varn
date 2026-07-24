@@ -14,6 +14,14 @@ struct AnnotateCtx<'a> {
     bind: &'a BindResult,
     locals: rustc_hash::FxHashMap<std::rc::Rc<str>, Type>,
     resolved_expr_types: &'a rustc_hash::FxHashMap<u32, Type>,
+    /// Names currently bound to an evolving empty-array local whose element
+    /// type the binder proved (Task A0.3'). Their entry in `locals` holds
+    /// the advisory `Array<T>`; `resolved_expr_types` deliberately kept them
+    /// (and their `x[i]` reads) `Dynamic` for diagnostics, so `get_expr_type`
+    /// must recompute governed expressions from `locals` instead. Kept in
+    /// lockstep with `locals` (save/restore at block/for boundaries,
+    /// cleared when entering a nested closure body).
+    evolved_locals: rustc_hash::FxHashSet<std::rc::Rc<str>>,
 }
 
 impl<'a> AnnotateCtx<'a> {
@@ -25,6 +33,43 @@ impl<'a> AnnotateCtx<'a> {
             bind,
             locals: rustc_hash::FxHashMap::default(),
             resolved_expr_types,
+            evolved_locals: rustc_hash::FxHashSet::default(),
+        }
+    }
+
+    /// Whether `expr`'s value type is (transitively) governed by an evolving
+    /// empty-array local (Task A0.3'). The checker recorded a deliberately
+    /// `Dynamic` diagnostic type for these expressions in
+    /// `resolved_expr_types` (design rule 4), so `get_expr_type` must
+    /// recompute the more precise, codegen-only type from the `locals`
+    /// overlay via `infer_expr_type`. Restricted to exactly the shapes the
+    /// overlay can answer soundly — an evolved-array identifier, an `x[i]`
+    /// index read or `x.length` on one, and arithmetic/paren/unary built
+    /// from those — so no other expression's checker-derived type is ever
+    /// overridden.
+    fn is_overlay_governed(&self, expr: &Expr) -> bool {
+        match &expr.kind {
+            ExprKind::Identifier { name } => self.evolved_locals.contains(name.as_ref()),
+            ExprKind::Paren { expression } => self.is_overlay_governed(expression),
+            ExprKind::Unary { operand, .. } => self.is_overlay_governed(operand),
+            ExprKind::Member {
+                object,
+                computed: true,
+                ..
+            } => self.is_overlay_governed(object),
+            ExprKind::Member {
+                object,
+                property,
+                computed: false,
+                ..
+            } => {
+                matches!(&property.kind, ExprKind::Identifier { name } if name.as_ref() == "length")
+                    && self.is_overlay_governed(object)
+            }
+            ExprKind::Binary { left, right, .. } => {
+                self.is_overlay_governed(left) || self.is_overlay_governed(right)
+            }
+            _ => false,
         }
     }
 }
@@ -97,6 +142,17 @@ fn extract_caps_from_decorators(decorators: &[varn_core::ast::Decorator]) -> Vec
 }
 
 fn get_expr_type(expr: &Expr, ctx: &AnnotateCtx) -> Type {
+    // Advisory evolved-array overlay (Task A0.3', optimization-only). For
+    // expressions governed by an evolving empty-array local the checker
+    // deliberately left `resolved_expr_types` at `Dynamic` (design rule 4),
+    // so recompute the codegen type from the `locals` overlay instead of
+    // trusting that entry — this is what keeps `x[i]` projecting `int` and
+    // hot-loop arithmetic getting typed opcodes after the decoupling. This
+    // path is annotation-only: `collect_type_annotations` runs after
+    // checking, so it can never influence a diagnostic.
+    if !ctx.evolved_locals.is_empty() && ctx.is_overlay_governed(expr) {
+        return infer_expr_type(expr, Some(ctx));
+    }
     if let Some(ty) = ctx.resolved_expr_types.get(&expr.id) {
         ty.clone()
     } else {
@@ -257,10 +313,12 @@ fn annotate_stmt(stmt: &Stmt, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
         StmtKind::Return { .. } => {}
         StmtKind::Block { stmts } => {
             let old_locals = ctx.locals.clone();
+            let old_evolved = ctx.evolved_locals.clone();
             for s in stmts {
                 annotate_stmt(s, ann, ctx);
             }
             ctx.locals = old_locals;
+            ctx.evolved_locals = old_evolved;
         }
         StmtKind::If {
             test,
@@ -284,6 +342,7 @@ fn annotate_stmt(stmt: &Stmt, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
             body,
         } => {
             let old_locals = ctx.locals.clone();
+            let old_evolved = ctx.evolved_locals.clone();
             if let Some(init_box) = init {
                 match init_box.as_ref() {
                     ForInit::Expr(e) => annotate_expr(e, ann, ctx),
@@ -305,6 +364,11 @@ fn annotate_stmt(stmt: &Stmt, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                                     }
                                     _ => None,
                                 });
+                                // For-init declarators are never evolving
+                                // empty-array candidates (only `bind_variable`
+                                // registers those), so drop any stale evolved
+                                // governance a same-named outer binding left.
+                                ctx.evolved_locals.remove(name.as_ref());
                                 if let Some(ann_node) = type_ann {
                                     let ty = resolve_type_node(ann_node, Some(ctx.bind));
                                     ctx.locals.insert(name, ty);
@@ -325,6 +389,7 @@ fn annotate_stmt(stmt: &Stmt, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
             }
             annotate_stmt(body, ann, ctx);
             ctx.locals = old_locals;
+            ctx.evolved_locals = old_evolved;
         }
         StmtKind::Decl(decl) => annotate_decl(decl, ann, ctx),
         _ => {}
@@ -338,20 +403,35 @@ fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                 if let Some(init) = &d.init {
                     annotate_expr(init, ann, ctx);
                 }
-                let name_opt = match &d.id {
-                    varn_core::ast::Pattern::Identifier { name, .. } => Some(name.clone()),
+                let id_info = match &d.id {
+                    varn_core::ast::Pattern::Identifier { name, range, .. } => {
+                        Some((name.clone(), range.start.offset))
+                    }
                     _ => None,
                 };
-                if let Some(name) = name_opt {
+                if let Some((name, id_offset)) = id_info {
                     let type_ann = d.type_ann.as_ref().or(match &d.id {
                         varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
                         _ => None,
                     });
                     if let Some(ann_node) = type_ann {
                         let ty = resolve_type_node(ann_node, Some(ctx.bind));
+                        ctx.evolved_locals.remove(name.as_ref());
                         ctx.locals.insert(name, ty);
+                    } else if let Some(evolved) =
+                        ctx.bind.evolved_array_types.get(&id_offset).cloned()
+                    {
+                        // Task A0.3': the binder proved a concrete element
+                        // type for this unannotated `let x = []`. Overlay it
+                        // (optimization-only) so `x[i]` projects a typed
+                        // element and hot-loop arithmetic emits typed opcodes,
+                        // without the checker ever having narrowed `x` in a
+                        // diagnostic (design rule 4 — see array_evolve.rs).
+                        ctx.evolved_locals.insert(name.clone());
+                        ctx.locals.insert(name, evolved);
                     } else if let Some(init) = &d.init {
                         let ty = get_expr_type(init, ctx);
+                        ctx.evolved_locals.remove(name.as_ref());
                         ctx.locals.insert(name, ty);
                     }
                 }
@@ -366,6 +446,10 @@ fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                     record_cg_ty_at(f.id_offset, &ty, ann, ctx);
                 }
                 let mut local_ctx = ctx.clone();
+                // An evolving empty-array local never crosses a closure
+                // boundary (the binder escapes any candidate reachable from a
+                // nested function), so no outer governance carries in here.
+                local_ctx.evolved_locals.clear();
                 for p in &f.params {
                     let name_opt = match &p.pattern {
                         varn_core::ast::Pattern::Identifier { name, .. } => Some(name.clone()),
@@ -548,6 +632,9 @@ fn annotate_method_body(
     ctx: &AnnotateCtx,
 ) {
     let mut local_ctx = ctx.clone();
+    // See `Decl::Function`: evolved-array governance never enters a nested
+    // method/getter/setter body.
+    local_ctx.evolved_locals.clear();
     if let Some(ty) = this_ty {
         local_ctx
             .locals

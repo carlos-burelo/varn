@@ -47,13 +47,20 @@
 //!    soundness bug (the CLIF backend trusts the checker's proof and
 //!    skips guards), not merely a missed optimization. The blanket rule
 //!    can't have that failure mode, so it's the one implemented here.
-//! 4. Zero new type errors: the only element types ever produced are
-//!    Int or Float, and they're fixed only after the whole declaring
-//!    block has been scanned and only written back when nothing
-//!    disqualified the candidate. A program that type-checked with
-//!    `Dynamic` for `x` can only ever have `x` become a more specific,
-//!    *internally consistent* type here — Dynamic remains the fallback
-//!    for every case this pass isn't sure about.
+//! 4. Zero new type errors — enforced *structurally* by decoupling
+//!    optimization-typing from diagnostic-typing. A proved element type is
+//!    recorded into `BindResult::evolved_array_types` (an offset-keyed,
+//!    optimization-only map consumed solely by `collect_type_annotations`),
+//!    and is **never** written onto the symbol's `ty` nor into the
+//!    checker's `symbol_types` / `resolved_expr_types`. So for every
+//!    diagnostic the checker still sees `x` (and therefore `x[i]`) as
+//!    `Dynamic` exactly as it did before this feature existed — the
+//!    inference cannot turn a previously-valid program into a type error,
+//!    regardless of what it proves. The evolved type surfaces only as
+//!    codegen annotations (typed opcodes / CgTy), where being wrong would
+//!    at worst be a missed optimization, not a miscompile (the only element
+//!    types produced are Int or Float, fixed after the whole block is
+//!    scanned and only when nothing disqualified the candidate).
 
 use std::rc::Rc;
 use varn_core::TypeKind;
@@ -164,11 +171,19 @@ impl Binder {
     /// candidate exits (in practice: `StmtKind::Block`; a few other
     /// scope-restoring sites call this too, defensively, for shapes like
     /// an unbraced loop body). Finalizes every candidate whose
-    /// `owner_scope` is exactly `scope`: writes the evolved `Array<T>`
-    /// back onto the symbol so the checker's `resolved_expr_types` /
-    /// `get_expr_type` / `record_cg_ty_at` pick it up, or leaves the
-    /// symbol untouched (still Dynamic, from `bind_variable`'s normal
-    /// path) if it never got a consistent write or escaped.
+    /// `owner_scope` is exactly `scope`.
+    ///
+    /// A proved element type is recorded into `evolved_array_types` (keyed
+    /// by the declarator identifier's source offset), NOT written back onto
+    /// the symbol's `ty`. This is deliberate and load-bearing for design
+    /// rule 4: the symbol's `ty` is read by the checker's diagnostic typing
+    /// (`infer_type_impl` reads `bind.arena.get(sid).ty`), so narrowing it
+    /// here would make previously-valid programs fail `vn check` (e.g.
+    /// `let a = []; a.push(1); return a[0]` from a `: str` function). The
+    /// offset-keyed map is instead an optimization-only channel consumed
+    /// solely by `collect_type_annotations`. Candidates that escaped,
+    /// conflicted, or never got a consistent write are dropped (the symbol
+    /// stays Dynamic, exactly as before this feature existed).
     pub(crate) fn finalize_array_watch(&mut self, scope: ScopeId) {
         if self.array_watch.is_empty() {
             return;
@@ -179,7 +194,9 @@ impl Binder {
                 let c = self.array_watch.remove(i);
                 if !c.escaped && !c.conflict {
                     if let Some(elem) = c.elem_ty {
-                        self.arena.get_mut(c.sym_id).ty = Some(Type::array(elem));
+                        let offset = self.arena.get(c.sym_id).offset;
+                        self.evolved_array_types
+                            .insert(offset, Type::array(elem));
                     }
                 }
             } else {

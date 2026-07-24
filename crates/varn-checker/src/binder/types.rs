@@ -79,6 +79,19 @@ pub struct BindResult {
     pub core: Option<Rc<CoreMembers>>,
     #[serde(skip)]
     pub pending_enrich: Vec<PendingEnrich>,
+    /// Advisory element types for evolving empty-array locals (Task A0.3'),
+    /// keyed by the declarator identifier's source offset → the proved
+    /// `Array<T>`. This is an OPTIMIZATION-ONLY channel: it feeds codegen
+    /// type annotations (`collect_type_annotations`) and NOTHING ELSE —
+    /// never `symbol_types`, `resolved_expr_types`, `types_compatible`, or
+    /// member-existence reads. Keeping it out of the diagnostic path is what
+    /// guarantees design rule 4 ("zero new type errors"): narrowing an
+    /// `x[i]` read from `Dynamic` to `int` can never make a previously-valid
+    /// program fail `vn check`. Not serialized — it is consumed in-process
+    /// immediately after binding, and function-local evolved arrays are
+    /// never exported, so a reloaded (cached) `BindResult` needs no entries.
+    #[serde(skip, default)]
+    pub evolved_array_types: FxHashMap<u32, Type>,
 }
 
 impl BindResult {

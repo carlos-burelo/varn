@@ -39,6 +39,9 @@ pub struct Binder {
     pub(crate) extensions: Extensions,
     pub(crate) pending_enrich: Vec<PendingEnrich>,
     pub(crate) array_watch: Vec<array_evolve::ArrayCandidate>,
+    /// Optimization-only element types proved for evolving empty-array
+    /// locals (Task A0.3'); moved into `BindResult::evolved_array_types`.
+    pub(crate) evolved_array_types: FxHashMap<u32, Type>,
 }
 
 impl TypeContext for Binder {
@@ -159,6 +162,7 @@ impl Binder {
             extensions: Extensions::default(),
             pending_enrich: Vec::new(),
             array_watch: Vec::new(),
+            evolved_array_types: FxHashMap::default(),
         };
 
         let global = b.scopes.push(CheckerScope::new(ScopeKind::Global, None));
@@ -186,6 +190,7 @@ impl Binder {
             extensions: b.extensions,
             core: None,
             pending_enrich: b.pending_enrich,
+            evolved_array_types: b.evolved_array_types,
         }
     }
 

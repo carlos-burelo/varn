@@ -42,41 +42,24 @@ impl Checker {
                             }
                             self.check_pattern(&d.id, ann_ty, bind);
                         } else {
+                            // Task A0.3': the binder's array_evolve pass may
+                            // have proved a concrete element type for an
+                            // unannotated `let x = []`, but that result is
+                            // OPTIMIZATION-ONLY and lives in
+                            // `bind.evolved_array_types` — it must NOT be
+                            // pulled into `symbol_types` here. Doing so would
+                            // narrow `x[i]` reads from `Dynamic` to `int` in
+                            // the diagnostic path and break design rule 4
+                            // (previously-valid programs failing `vn check`,
+                            // e.g. `return a[0]` from a `: str` function).
+                            // The evolved type is overlaid only in
+                            // `collect_type_annotations`.
                             let init_ty = self.infer_type(init_expr, bind);
-                            let mut final_ty = if v.kind == varn_core::ast::VarKind::Let {
+                            let final_ty = if v.kind == varn_core::ast::VarKind::Let {
                                 crate::binder::widen_literal(init_ty)
                             } else {
                                 init_ty
                             };
-                            // Task A0.3': `infer_type` above re-derives the
-                            // type from `init_expr` alone, so an empty
-                            // array literal always comes back as
-                            // `Array<Dynamic>` here (see
-                            // `infer_impl.rs`'s `ExprKind::Array` arm) —
-                            // NOT bare `Dynamic` — even when the binder's
-                            // array_evolve pass (crate::binder::
-                            // array_evolve) separately proved a more
-                            // specific element type by scanning the whole
-                            // declaring scope's `x.push(e)` / `x[i] = e`
-                            // writes *after* this declarator was bound.
-                            // Pick that result up from `bind.arena` so it
-                            // flows into `symbol_types` /
-                            // `resolved_expr_types` for every later use
-                            // (`x[i]` reads, arithmetic, CgTy projection).
-                            let unresolved_elem = final_ty.is_dynamic()
-                                || matches!(&final_ty.0, varn_core::TypeKind::Array(inner) if inner.is_dynamic());
-                            if unresolved_elem {
-                                if let varn_core::ast::Pattern::Identifier { name, .. } = &d.id {
-                                    let scope = bind.scopes.get(self.current_scope);
-                                    if let Some(sym_id) = scope.resolve(name, &bind.scopes) {
-                                        if let Some(evolved) = &bind.arena.get(sym_id).ty {
-                                            if !evolved.is_dynamic() {
-                                                final_ty = evolved.clone();
-                                            }
-                                        }
-                                    }
-                                }
-                            }
                             self.check_pattern(&d.id, &final_ty, bind);
                         }
                     }

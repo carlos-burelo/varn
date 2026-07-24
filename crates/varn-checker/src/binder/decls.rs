@@ -299,7 +299,7 @@ impl super::Binder {
         let ExprKind::Member {
             object,
             property,
-            computed: false,
+            computed,
             ..
         } = &callee.kind
         else {
@@ -308,10 +308,24 @@ impl super::Binder {
         let ExprKind::Identifier { name } = &object.kind else {
             return false;
         };
+        if !self.array_candidate_active(name) {
+            return false;
+        }
+        // A computed callee (`x["push"](e)`, `x[m](e)`) is a method call
+        // spelled through bracket access — never a whitelisted `x.push(v)`.
+        // We can't tell which method it resolves to (it could push an
+        // incompatible element, `unshift`, `splice`, ...), so escape rather
+        // than mistake it for a safe `x[i]` read.
+        if *computed {
+            self.escape_array_candidate(name);
+            self.bind_expr(property);
+            self.bind_args(args);
+            return true;
+        }
         let ExprKind::Identifier { name: prop_name } = &property.kind else {
             return false;
         };
-        if prop_name.as_ref() != "push" || !self.array_candidate_active(name) {
+        if prop_name.as_ref() != "push" {
             return false;
         }
         match args {
@@ -334,9 +348,10 @@ impl super::Binder {
     /// expressions, returning `true`. Compound assignment (`+=` etc.) on a
     /// watched candidate's index is an implicit read-modify-write we can't
     /// safely unify without re-deriving the *current* element type, so it
-    /// escapes instead of risking an unsound guess. Returns `false` when
-    /// `target` isn't a computed-index write on a watched candidate at
-    /// all.
+    /// escapes instead of risking an unsound guess. A non-computed member
+    /// write (`x.length = n`) mutates the array through a named member and
+    /// also escapes. Returns `false` when `target` isn't a member write on a
+    /// watched candidate at all.
     fn bind_array_index_write(
         &mut self,
         op: varn_core::ast::operators::AssignOp,
@@ -348,7 +363,7 @@ impl super::Binder {
         let ExprKind::Member {
             object,
             property,
-            computed: true,
+            computed,
             ..
         } = &target.kind
         else {
@@ -359,6 +374,15 @@ impl super::Binder {
         };
         if !self.array_candidate_active(name) {
             return false;
+        }
+        // A non-computed member write (`x.length = n`, a resize; or any
+        // other `x.<name> = v`) mutates the array through a named member,
+        // not a whitelisted `x[i] = v` element write, and its effect on the
+        // element type can't be unified — escape.
+        if !*computed {
+            self.escape_array_candidate(name);
+            self.bind_expr(value);
+            return true;
         }
         if op != AssignOp::Assign {
             self.escape_array_candidate(name);
@@ -376,11 +400,12 @@ impl super::Binder {
     /// Whitelisted `x[i]` (read) and `x.length` (array_evolve rule 3): if
     /// `object` is a watched candidate identifier, handles it without
     /// recursing into it generically (which would flag an escape) and
-    /// returns `true`. A computed access is always treated as a safe
-    /// index read — still binds `property` for its own nested candidate
-    /// uses. A non-computed access is safe only for `.length`; any other
-    /// property name (`.pop`, `.map`, ...) is not on the whitelist and
-    /// escapes. Returns `false` when `object` isn't a watched candidate,
+    /// returns `true`. A computed access with an integer/dynamic index is a
+    /// safe read (still binds `property` for its own nested candidate uses),
+    /// but a string-literal key (`x["push"]`) is a disguised named-member
+    /// access and escapes. A non-computed access is safe only for `.length`;
+    /// any other property name (`.pop`, `.map`, ...) is not on the whitelist
+    /// and escapes. Returns `false` when `object` isn't a watched candidate,
     /// so the caller falls back to normal traversal.
     fn bind_array_whitelisted_member(&mut self, object: &Expr, property: &Expr, computed: bool) -> bool {
         let ExprKind::Identifier { name } = &object.kind else {
@@ -390,6 +415,16 @@ impl super::Binder {
             return false;
         }
         if computed {
+            // A string-literal key is never a real element index — it's a
+            // named member/method spelled in bracket form (`x["push"]`,
+            // `x["length"]`), e.g. a method extracted as a value. Treating it
+            // as a safe `x[i]` read would let an incompatible element slip
+            // past the scan, so escape. Genuine integer/dynamic index reads
+            // (`x[i]`) stay whitelisted — the element-type optimization
+            // depends on them (matmul reads `a[row*n+k]` this way).
+            if matches!(&property.kind, ExprKind::StrLiteral { .. }) {
+                self.escape_array_candidate(name);
+            }
             self.bind_expr(property);
         } else if !matches!(&property.kind, ExprKind::Identifier { name: p } if p.as_ref() == "length")
         {
