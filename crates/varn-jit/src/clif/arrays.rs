@@ -14,7 +14,7 @@ use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_types::register_meta::RegisterMeta;
 
 use super::emit::{
-    box_int, cached_payload, call_helper, find_cache, state_meta_int, use_boxed, use_int,
+    box_bool, box_int, cached_payload, call_helper, find_cache, state_meta_int, use_boxed, use_int,
 };
 use super::kinds::K;
 use crate::JitHelpers;
@@ -151,9 +151,14 @@ pub(super) fn emit_array_get_index(
     Ok(())
 }
 
-/// `ArraySetIndex obj(=first_reg), idx, val` — bounds-checked inline int
-/// store; append/OOB/non-array falls to the helper. Only int stores admitted
-/// (a boxed int is never a heap ref, so no write barrier needed).
+/// `ArraySetIndex obj(=first_reg), idx, val` — bounds-checked inline store
+/// on the proven-`K::Int` fast path (an unboxed int is never a heap ref, so
+/// no write barrier needed); append/OOB/non-array falls to the helper from
+/// there too. Any other value kind — proven boxed/bool, or a flow-merge the
+/// dataflow couldn't resolve to one representation — skips the inline path
+/// entirely: storing a value that might be a heap reference needs the write
+/// barrier only the helper carries, so this one instruction routes straight
+/// to the same helper instead of bailing the whole function out of clif.
 pub(super) fn emit_array_set_index(
     b: &mut FunctionBuilder,
     c: &ArrCtx,
@@ -169,7 +174,25 @@ pub(super) fn emit_array_set_index(
     let obj = use_boxed(b, c.vars, state, obj_r)?;
     let key = use_int(b, c.vars, state, idx_r)?;
     if state[val_r] != K::Int {
-        return Err("clif: non-int array store".into());
+        // Unproven kind: box it (bool needs re-tagging; boxed/global kinds
+        // are already the right bits — `use_boxed` still bails on a truly
+        // unrepresentable merge, same as it would for any other read) and
+        // hand the whole store to the generic helper, no inline attempt.
+        let val = match state[val_r] {
+            K::Bool => {
+                let raw = b.use_var(c.vars[val_r]);
+                box_bool(b, raw)
+            }
+            _ => use_boxed(b, c.vars, state, val_r)?,
+        };
+        let boxed_key = box_int(b, key);
+        let _ = call_helper(
+            b,
+            c.cc,
+            c.helpers.jit_array_set_fast,
+            &[c.exec_ctx, obj, boxed_key, val],
+        );
+        return Ok(());
     }
     let raw_val = b.use_var(c.vars[val_r]);
     let val = box_int(b, raw_val);
