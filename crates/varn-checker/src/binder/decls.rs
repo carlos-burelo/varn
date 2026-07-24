@@ -125,13 +125,17 @@ impl super::Binder {
                 self.bind_expr(left);
                 self.bind_expr(right);
             }
-            ExprKind::Assign { target, value, .. } => {
-                self.bind_expr(target);
-                self.bind_expr(value);
+            ExprKind::Assign { op, target, value } => {
+                if !self.bind_array_index_write(*op, target, value) {
+                    self.bind_expr(target);
+                    self.bind_expr(value);
+                }
             }
             ExprKind::Call { callee, args, .. } => {
-                self.bind_expr(callee);
-                self.bind_args(args);
+                if !self.bind_array_push_call(callee, args) {
+                    self.bind_expr(callee);
+                    self.bind_args(args);
+                }
             }
             ExprKind::New { callee, args, .. } => {
                 self.bind_expr(callee);
@@ -152,9 +156,11 @@ impl super::Binder {
                 computed,
                 ..
             } => {
-                self.bind_expr(object);
-                if *computed {
-                    self.bind_expr(property);
+                if !self.bind_array_whitelisted_member(object, property, *computed) {
+                    self.bind_expr(object);
+                    if *computed {
+                        self.bind_expr(property);
+                    }
                 }
             }
             ExprKind::Paren { expression } => self.bind_expr(expression),
@@ -188,9 +194,15 @@ impl super::Binder {
                             );
                         }
                         ObjectProp::Getter { body, .. } => {
+                            // Getter/setter bodies don't route through
+                            // `bind_inline_function` (no dedicated Function
+                            // scope is created for them), so the closure
+                            // escape has to be applied here explicitly too.
+                            self.escape_all_open_array_candidates();
                             self.bind_stmt(body);
                         }
                         ObjectProp::Setter { body, .. } => {
+                            self.escape_all_open_array_candidates();
                             self.bind_stmt(body);
                         }
                         ObjectProp::Spread { argument, .. } => self.bind_expr(argument),
@@ -230,6 +242,7 @@ impl super::Binder {
                         MatchBody::Expr(e) => self.bind_expr(e),
                         MatchBody::Block(stmt) => self.bind_stmt(stmt),
                     }
+                    self.finalize_array_watch(child);
                     self.current = saved;
                 }
             }
@@ -248,8 +261,18 @@ impl super::Binder {
                 self.bind_expr(template);
             }
 
-            ExprKind::Identifier { .. }
-            | ExprKind::IntLiteral { .. }
+            ExprKind::Identifier { name } => {
+                // Any bare reference to a watched array-literal candidate
+                // that reaches this generic path is, by construction, NOT
+                // one of the whitelisted patterns (those are intercepted
+                // and return early before recursing into a plain
+                // `bind_expr` of the identifier — see
+                // `bind_array_push_call` / `bind_array_index_write` /
+                // `bind_array_whitelisted_member`). Default-deny: escape
+                // it (array_evolve rule 3). A no-op for every other name.
+                self.escape_array_candidate(name);
+            }
+            ExprKind::IntLiteral { .. }
             | ExprKind::FloatLiteral { .. }
             | ExprKind::BigIntLiteral { .. }
             | ExprKind::DecimalLiteral { .. }
@@ -261,6 +284,118 @@ impl super::Binder {
             | ExprKind::Super
             | ExprKind::This => {}
         }
+    }
+
+    /// Whitelisted `x.push(value)` (array_evolve rule 2/3): if `callee` is
+    /// exactly `<watched identifier>.push` and `args` is exactly one
+    /// positional argument, records the write and binds the argument,
+    /// returning `true` (caller must skip its generic handling — visiting
+    /// the `x` in `x.push` generically would flag it as an escape). Any
+    /// other shape (0/2+ args, spread, named) that is still a `.push` call
+    /// on a watched candidate is treated as an escape rather than guessed
+    /// at. Returns `false` when this isn't a push call on a watched
+    /// candidate at all, so the caller falls back to normal traversal.
+    fn bind_array_push_call(&mut self, callee: &Expr, args: &[Arg]) -> bool {
+        let ExprKind::Member {
+            object,
+            property,
+            computed: false,
+            ..
+        } = &callee.kind
+        else {
+            return false;
+        };
+        let ExprKind::Identifier { name } = &object.kind else {
+            return false;
+        };
+        let ExprKind::Identifier { name: prop_name } = &property.kind else {
+            return false;
+        };
+        if prop_name.as_ref() != "push" || !self.array_candidate_active(name) {
+            return false;
+        }
+        match args {
+            [Arg::Positional(value)] => {
+                let value_ty = super::type_inference::infer_expr_type(value, Some(self));
+                self.record_array_write(name, &value_ty);
+                self.bind_expr(value);
+            }
+            _ => {
+                self.escape_array_candidate(name);
+                self.bind_args(args);
+            }
+        }
+        true
+    }
+
+    /// Whitelisted `x[i] = value` (array_evolve rule 2/3): if `target` is
+    /// exactly a computed member on a watched candidate identifier and
+    /// `op` is plain `=`, records the write and binds the index + value
+    /// expressions, returning `true`. Compound assignment (`+=` etc.) on a
+    /// watched candidate's index is an implicit read-modify-write we can't
+    /// safely unify without re-deriving the *current* element type, so it
+    /// escapes instead of risking an unsound guess. Returns `false` when
+    /// `target` isn't a computed-index write on a watched candidate at
+    /// all.
+    fn bind_array_index_write(
+        &mut self,
+        op: varn_core::ast::operators::AssignOp,
+        target: &Expr,
+        value: &Expr,
+    ) -> bool {
+        use varn_core::ast::operators::AssignOp;
+
+        let ExprKind::Member {
+            object,
+            property,
+            computed: true,
+            ..
+        } = &target.kind
+        else {
+            return false;
+        };
+        let ExprKind::Identifier { name } = &object.kind else {
+            return false;
+        };
+        if !self.array_candidate_active(name) {
+            return false;
+        }
+        if op != AssignOp::Assign {
+            self.escape_array_candidate(name);
+            self.bind_expr(property);
+            self.bind_expr(value);
+            return true;
+        }
+        let value_ty = super::type_inference::infer_expr_type(value, Some(self));
+        self.record_array_write(name, &value_ty);
+        self.bind_expr(property);
+        self.bind_expr(value);
+        true
+    }
+
+    /// Whitelisted `x[i]` (read) and `x.length` (array_evolve rule 3): if
+    /// `object` is a watched candidate identifier, handles it without
+    /// recursing into it generically (which would flag an escape) and
+    /// returns `true`. A computed access is always treated as a safe
+    /// index read — still binds `property` for its own nested candidate
+    /// uses. A non-computed access is safe only for `.length`; any other
+    /// property name (`.pop`, `.map`, ...) is not on the whitelist and
+    /// escapes. Returns `false` when `object` isn't a watched candidate,
+    /// so the caller falls back to normal traversal.
+    fn bind_array_whitelisted_member(&mut self, object: &Expr, property: &Expr, computed: bool) -> bool {
+        let ExprKind::Identifier { name } = &object.kind else {
+            return false;
+        };
+        if !self.array_candidate_active(name) {
+            return false;
+        }
+        if computed {
+            self.bind_expr(property);
+        } else if !matches!(&property.kind, ExprKind::Identifier { name: p } if p.as_ref() == "length")
+        {
+            self.escape_array_candidate(name);
+        }
+        true
     }
 
     pub(super) fn bind_inline_function(
@@ -275,6 +410,13 @@ impl super::Binder {
 
         let line = range.start.line;
 
+        // Any array-literal candidate still open in an enclosing scope is
+        // now reachable from a closure that can run at an arbitrary later
+        // time relative to the rest of that scope — escape it rather than
+        // risk trusting a write we can't safely order (see array_evolve
+        // module docs, rule 3).
+        self.escape_all_open_array_candidates();
+
         let child = self.scopes.child(ScopeKind::Function, self.current);
         let saved = self.current;
         self.current = child;
@@ -283,6 +425,7 @@ impl super::Binder {
         self.bind_function_params(params, line);
 
         self.bind_stmt(body);
+        self.finalize_array_watch(child);
         self.current = saved;
     }
 
@@ -294,11 +437,14 @@ impl super::Binder {
     ) {
         use crate::scope::ScopeKind;
 
+        self.escape_all_open_array_candidates();
+
         let child = self.scopes.child(ScopeKind::Function, self.current);
         let saved = self.current;
         self.current = child;
         self.bind_function_params(params, range.start.line);
         self.bind_expr(body);
+        self.finalize_array_watch(child);
         self.current = saved;
     }
 

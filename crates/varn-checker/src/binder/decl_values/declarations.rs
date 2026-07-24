@@ -87,6 +87,26 @@ impl super::super::Binder {
                             init: init_expr as *const Expr,
                         });
                     }
+                } else if !has_explicit_ann
+                    && matches!(&init_expr.kind, ExprKind::Array { elements } if elements.is_empty())
+                {
+                    // Task A0.3': `let`/`const x = []` (empty literal, no
+                    // annotation) — register as a candidate for evolving
+                    // element-type inference (see
+                    // `binder::array_evolve`). Module top-level is
+                    // deliberately excluded (design rule 1): top-level
+                    // bindings can be observed by other modules / hoisted
+                    // callers in ways a single-file scan doesn't account
+                    // for, and the feature's critical-path use case
+                    // (matmul) is function-local anyway.
+                    if self.scopes.get(self.current).kind != ScopeKind::Global {
+                        if let Pattern::Identifier { name, .. } = &d.id {
+                            let scope = self.scopes.get(self.current);
+                            if let Some(sym_id) = scope.lookup(name.as_ref()) {
+                                self.register_array_candidate(sym_id, name.clone());
+                            }
+                        }
+                    }
                 }
                 self.bind_expr(init_expr);
             }
@@ -411,6 +431,10 @@ impl super::super::Binder {
                             body: body as *const Stmt,
                         });
                     }
+                    // See array_evolve rule 3: getters/setters are closures
+                    // but don't create their own Function scope, so the
+                    // escape has to be applied explicitly.
+                    self.escape_all_open_array_candidates();
                     self.bind_stmt(body);
                 }
                 ClassMember::Setter {
@@ -426,6 +450,7 @@ impl super::super::Binder {
                         key: key_rc,
                         body: body as *const Stmt,
                     });
+                    self.escape_all_open_array_candidates();
                     self.bind_stmt(body);
                     self.bind_pattern(
                         &param.pattern,

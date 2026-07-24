@@ -52,6 +52,7 @@ import "./51-opt-unsupported-phase4.vn"
 import "./52-math-trig.vn"
 import "./53-gc-class-vtable.vn"
 import "./54-channels.vn"
+import "./55-array-element-inference.vn"
 
-print("\n56 side-effect modules executed in suite")
+print("\n57 side-effect modules executed in suite")
 assertSummary()

@@ -105,6 +105,11 @@ impl super::Binder {
                             body: body as *const Stmt,
                         });
                     }
+                    // Getters/setters don't route through
+                    // `bind_inline_function` (no dedicated Function scope),
+                    // so the closure escape (array_evolve rule 3) is
+                    // applied explicitly here too.
+                    self.escape_all_open_array_candidates();
                     self.bind_stmt(body);
                 }
                 ClassMember::Setter {
@@ -120,6 +125,7 @@ impl super::Binder {
                         key: key_rc,
                         body: body as *const Stmt,
                     });
+                    self.escape_all_open_array_candidates();
                     self.bind_stmt(body);
                     self.bind_pattern(
                         &param.pattern,

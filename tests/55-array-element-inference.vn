@@ -1,0 +1,105 @@
+// Task A0.3': evolving element-type inference for `let x = []` (empty
+// array literal, no annotation). These asserts must hold identically
+// whether the checker inferred `Array<int>` for `a` below or left it
+// `Dynamic` (the whole point of the design's "escape/conflict => Dynamic,
+// never guess" rule): runtime behavior never depends on which one it
+// picked, only whether hot-loop arithmetic gets typed opcodes.
+
+function evolvePushInt(): int {
+    let a = []
+    a.push(1)
+    a.push(2)
+    a.push(3)
+    let sum = 0
+    for (let i = 0; i < a.length; i = i + 1) {
+        sum = sum + a[i]
+    }
+    return sum
+}
+
+function evolveIndexWrite(): int {
+    let a = []
+    for (let i = 0; i < 5; i = i + 1) {
+        a.push(0)
+    }
+    for (let i = 0; i < 5; i = i + 1) {
+        a[i] = i * 2
+    }
+    let sum = 0
+    for (let i = 0; i < a.length; i = i + 1) {
+        sum = sum + a[i]
+    }
+    return sum
+}
+
+// push int then push str: conflicting writes must fall back to Dynamic
+// rather than error or silently pick one type — the program still has to
+// run correctly with mixed contents.
+function evolveMixedStaysPermissive(): str {
+    let a = []
+    a.push(1)
+    a.push("two")
+    return `${a[0]}-${a[1]}`
+}
+
+// The existing `let a: int[] = []` annotated path must be completely
+// unaffected by this feature.
+function annotatedUnchanged(): int {
+    let a: int[] = []
+    a.push(10)
+    a.push(20)
+    return a[0] + a[1]
+}
+
+function sumOf(arr): int {
+    let total = 0
+    for (let i = 0; i < arr.length; i = i + 1) {
+        total = total + arr[i]
+    }
+    return total
+}
+
+// Passing the array to another function is an escape (rule 3): the
+// binding must stay permissive (Dynamic), and the program must still run
+// correctly.
+function evolveEscapeStaysPermissive(): int {
+    let a = []
+    a.push(1)
+    a.push(2)
+    a.push(3)
+    return sumOf(a)
+}
+
+// matmul-shaped nested-loop pattern (see benchmarks/bench_matrix.vn):
+// push to grow, then index-write to mutate in a later pass, reading two
+// other evolved arrays via `x[i]` inside the inner accumulation loop.
+function evolveMatmulShape(): int {
+    let n = 4
+    let a = []
+    let b = []
+    let c = []
+    for (let i = 0; i < n * n; i = i + 1) {
+        a.push(i + 1)
+        b.push(i + 1)
+        c.push(0)
+    }
+    for (let row = 0; row < n; row = row + 1) {
+        for (let col = 0; col < n; col = col + 1) {
+            let sum = 0
+            for (let k = 0; k < n; k = k + 1) {
+                sum = sum + a[row * n + k] * b[k * n + col]
+            }
+            c[row * n + col] = sum
+        }
+    }
+    return c[0] + c[n * n - 1]
+}
+
+assert("evolve push-int sum",        evolvePushInt() === 6)
+assert("evolve index-write sum",     evolveIndexWrite() === 20)
+assert("evolve mixed stays runnable", evolveMixedStaysPermissive() === "1-two")
+assert("annotated int[] unchanged",  annotatedUnchanged() === 30)
+assert("evolve escape stays runnable", evolveEscapeStaysPermissive() === 6)
+assert("evolve matmul shape",        evolveMatmulShape() === 690)
+
+print("[PASSED] 55. Array element-type inference")

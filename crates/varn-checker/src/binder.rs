@@ -5,6 +5,7 @@ use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_core::ast::{ExprKind, ForInit, Program, Stmt, StmtKind, VarDeclarator};
 
+mod array_evolve;
 mod class;
 mod decl_values;
 mod decls;
@@ -37,6 +38,7 @@ pub struct Binder {
     pub(crate) sum_variant_fields: FxHashMap<Rc<str>, Vec<(Rc<str>, Type)>>,
     pub(crate) extensions: Extensions,
     pub(crate) pending_enrich: Vec<PendingEnrich>,
+    pub(crate) array_watch: Vec<array_evolve::ArrayCandidate>,
 }
 
 impl TypeContext for Binder {
@@ -156,6 +158,7 @@ impl Binder {
             sum_variant_fields: FxHashMap::default(),
             extensions: Extensions::default(),
             pending_enrich: Vec::new(),
+            array_watch: Vec::new(),
         };
 
         let global = b.scopes.push(CheckerScope::new(ScopeKind::Global, None));
@@ -254,6 +257,7 @@ impl Binder {
                 let saved = self.current;
                 self.current = child;
                 self.bind_stmts(stmts);
+                self.finalize_array_watch(child);
                 self.current = saved;
             }
             StmtKind::If {
@@ -297,6 +301,7 @@ impl Binder {
                     self.bind_expr(u);
                 }
                 self.bind_stmt(body);
+                self.finalize_array_watch(child);
                 self.current = saved;
             }
             StmtKind::ForIn {
@@ -311,6 +316,7 @@ impl Binder {
                 self.bind_pattern(left, SymbolKind::Let, right.range.start.line, None, None);
                 self.bind_expr(right);
                 self.bind_stmt(body);
+                self.finalize_array_watch(child);
                 self.current = saved;
             }
             StmtKind::Switch {
@@ -339,6 +345,7 @@ impl Binder {
                         self.bind_pattern(p, SymbolKind::Let, block.range.start.line, None, None);
                     }
                     self.bind_stmt(&clause.body);
+                    self.finalize_array_watch(child);
                     self.current = saved;
                 }
                 if let Some(fin) = finally {
