@@ -115,18 +115,29 @@ El cambio estructural: `Array<int>` respaldado por `Vec<i64>` crudo, `Array<floa
 - Modify: `crates/varn-jit/src/clif/arrays.rs` — load/store crudo por variante (sin box/unbox).
 - Modify: `crates/varn-jit/src/clif/lower.rs` — `array_layout` probe extendido con discriminante de variante.
 
-### Diseño de la representación
+### Diseño de la representación (v2 — resuelve identidad y layout)
 
 ```rust
 // crates/varn-types/src/vm_value.rs  (reemplaza el struct actual)
-pub enum VmArray {
-    I64(Rc<UnsafeCell<Vec<i64>>>),   // Array<int>   — sin refs, GC omite
-    F64(Rc<UnsafeCell<Vec<f64>>>),   // Array<float> — sin refs, GC omite
-    Boxed(Rc<UnsafeCell<Vec<VmValue>>>), // str/obj/heterogéneo — como hoy
+// UN solo Rc — la identidad y todos los clones comparten la MISMA celda,
+// así una migración de variante es visible para todo alias. repr(C,u8) da
+// layout definido: discriminante u8 al inicio, payload Vec en offsets
+// estables por variante → probe-able desde el JIT.
+pub struct VmArray(pub Rc<UnsafeCell<ArrayRepr>>);
+
+#[repr(C, u8)]
+pub enum ArrayRepr {
+    Boxed(Vec<VmValue>) = 0,  // str/obj/heterogéneo/Dynamic — como hoy
+    I64(Vec<i64>) = 1,        // Array<int>   — sin refs, GC omite
+    F64(Vec<f64>) = 2,        // Array<float> — sin refs, GC omite
 }
 ```
 
-Decisión de tipo en compile-time: el compilador conoce `CgTy::Array(el)` en el sitio de `BuildArray`/literal. `el == Int` → `I64`, `el == Float` → `F64`, resto → `Boxed`. Si el tipo es `Dynamic` (no probado), `Boxed` (nunca adivinar). El **runtime layout** (offset de len/ptr) se mantiene homogéneo para que el probe de clif (`array_layout`) lea el discriminante + ptr + len uniformemente.
+Decisión de tipo en compile-time: el compilador conoce `CgTy::Array(el)` en el sitio de `BuildArray`/literal. `el == Int` → `I64`, `el == Float` → `F64`, resto → `Boxed`. Si el tipo es `Dynamic` (no probado), `Boxed` (nunca adivinar).
+
+**Regla de migración (cero errores nuevos):** un write con tipo no coincidente sobre una variante tipada (posible vía alias Dynamic: `function f(x){x.push("s")}; f(a)` con `a: int[]`) NO es error de runtime — el runtime **migra en el acto** la repr a `Boxed` (boxea todos los elementos, swap dentro de la MISMA celda `UnsafeCell`, mismo `Rc`, misma identidad/heap idx). Todos los alias ven la migración porque comparten la celda. Los fast paths JIT llevan **guard de discriminante**: si la variante ya no es la esperada, caen al helper genérico — una migración nunca invalida código compilado.
+
+**Invariante de layout para el JIT:** `ArrayRepr` es `repr(C,u8)` — el probe (`JitArrayLayout` del template y `cached_payload`/`array_layout` de clif) lee: discriminante en offset 0 del `ArrayRepr`, y ptr/len del `Vec` de cada variante en offsets fijos verificados por probe empírico al arranque (técnica existente). Los inline paths actuales deben añadir el guard `discriminante == Boxed` en A.1 (comportamiento idéntico: hasta A.4 solo existen Boxed).
 
 ### Task A.1: `VmArray` como enum de tres variantes
 
