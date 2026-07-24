@@ -511,6 +511,34 @@ El benchmark actual también reporta `Module precompilation (cold startup)`, bre
 
 `tests/main.vn` es una suite de integración, no un benchmark canónico único. Para comparar rendimiento usa programas focalizados y, si vas a publicar cifras, indica archivo, build (`dev`/`release`) y número de runs.
 
+#### Varn vs Node/Bun (2026-07-23)
+
+Head-to-head en la misma máquina (release), Varn `bench` (execute) vs los `.ts`
+pareados en `benchmarks/` corridos con `bun` (JavaScriptCore) y `node` v24 (V8).
+Números **relativos** (la máquina estaba con throttling térmico; los absolutos
+están inflados ~1.6x pero los ratios se mantienen).
+
+| bench      | backend Varn | Varn   | Bun    | Node   | resultado        |
+|------------|--------------|--------|--------|--------|------------------|
+| **fib(35)**| **Cranelift**| ~64 ms | ~75 ms | ~108 ms| **gana 1.2–1.7×**|
+| matrix 150 | template     | ~57 ms | ~12 ms | ~11 ms | pierde ~5×       |
+| gc_alloc   | template     | ~127 ms| ~53 ms | ~60 ms | pierde ~2.4×     |
+| math loop  | template*    | ~49 ms | ~11 ms | ~9 ms  | pierde ~5×       |
+
+**Dónde gana Varn hoy: `fib`** — el único bench que rutea **completo** por
+Cranelift (`CLIF ROUTE fib`). Ahí Varn supera a V8 y JSC.
+
+El resto **cae al template JIT / intérprete** porque Cranelift aún hace *bail*:
+`matmul` → `non-int array store`, `math` → opcode `Intrinsic`, y el código a nivel
+de módulo (>250 palabras de bytecode) ni siquiera se JIT-compila. Esos son los
+huecos activos de la migración a Cranelift (Fase 5); a medida que crece la
+cobertura de clif, más benches deberían voltear a "gana". La cifra histórica
+"matmul 3.4×" fue del *spike* de Cranelift, no del template JIT actual.
+
+Metodología: `vn bench <f>.vn` (execute p50, 10 runs, JIT caliente) vs el `.ts`
+midiendo su región de cómputo con `performance.now()` (best-of-N). Ports JS en
+`benchmarks/js/`.
+
 ### Debug e inspección
 
 ```bash
