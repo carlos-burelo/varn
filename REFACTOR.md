@@ -324,4 +324,18 @@ A0 (desbloqueo barato, valida la tesis) → A (buffers typed, mayor ROI) → B (
 
 ## Notas A0
 
-_(rellenar en Task A0.1 con el motivo exacto del bail de matmul)_
+**A0.1 COMPLETADA (2026-07-23).** El bail `non-int array store` en matmul NO es un bug de propagación en `clif/kinds.rs`: el checker nunca prueba el tipo de elemento de `let a = []` (literal vacío sin anotación — `infer_expr_type` ExprKind::Array devuelve `Dynamic`, binder/type_inference.rs:80-90), así que `a[k]` es `Dynamic`, el compilador emite `Mul`/`Add` genéricos (no `MulInt`/`AddInt`), `register_meta` no puede probar Int para el acumulador, y `kinds.rs` hace exactamente lo correcto con la info que tiene. Confirmado experimental: anotar `let a: int[] = []` hace rutear la función entera en CLIF **sin tocar el JIT** → matmul 53ms (template) → **24.7ms** (clif, aún boxed) vs JS ~10ms. Ruteo clif ≈ mitad del gap; el resto es el boxing (Fase A). Bails restantes reales: `LoadStaticFn`/`DefineGlobalIdx` a nivel módulo (Fase C) y `unproven int return (Mixed)` (mismo origen Dynamic).
+
+**Consecuencia: A0.2/A0.3 originales sustituidas** (la propagación de kinds no era el problema; la admisión de float-store no aplica al caso Boxed/Mixed):
+
+### Task A0.2′ (sustituye A0.2): store no-probado → helper inline, no bail de función entera
+
+**Files:** Modify: `crates/varn-jit/src/clif/arrays.rs:157-223` (`emit_array_set_index`).
+
+En vez de `Err("clif: non-int array store")` cuando `state[val_r] != K::Int`, emitir una llamada inline al helper existente `jit_array_set_fast(exec_ctx, obj, boxed_key, boxed_val)` (el mismo del slow path actual, que maneja barrier/append/OOB). La función deja de bailar completa por UN store no probado; el resto del cuerpo sigue en clif. Gate: suite JIT+NO_JIT verde; `VARN_CLIF_TRACE` confirma que funciones antes bailadas por este motivo ahora rutean.
+
+### Task A0.3′ (sustituye A0.3): inferencia de tipo de elemento para literales vacíos
+
+**Files:** Modify: `crates/varn-checker/src/binder/type_inference.rs` (ExprKind::Array vacío) + flujo de asignación/push en el checker.
+
+`let a = []` seguido de `a.push(int-expr)` (sin ningún push de otro tipo en el scope) debe inferir `Array<int>` — flow-based element inference, o al mínimo: propagar la anotación del declarador (`let a: int[] = []` ya funciona) Y el caso `let a = [1,2,3]` homogéneo. Esto está en el camino crítico de Fase A: si `CgTy::Array(Dynamic)`, el BuildArray de A.4 elegirá la variante Boxed y no habrá win. Diseño concreto a decidir al despachar (opciones: unificación en el binder al ver el primer push tipado; o retro-anotación en checker_annotations al cerrar el scope). Gate: matmul/array_ops SIN anotaciones rutean clif con `MulInt`/`AddInt` emitidos (verificar con `vn debug -p bytecode`).
