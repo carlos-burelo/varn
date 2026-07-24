@@ -84,6 +84,20 @@ pub struct ExecCtx {
     /// clears it, pushing its own frame only when entered self-called, so
     /// each activation owns exactly one logical frame.
     pub jit_frame_prepushed: usize,
+    /// Post-call resume ip a JIT caller records (via `jit_prepare_call`)
+    /// before a fast JIT→JIT call. If the callee (or a deeper frame) throws
+    /// and the exception is caught below this caller, its native JIT frame is
+    /// unwound by the longjmp; on re-entry the interpreter uses this ip to
+    /// resume the caller *interpreted* from just after the call, instead of
+    /// re-executing its JIT body from ip=0 (which loops forever). Written on
+    /// the fast path where `jit_call` isn't involved.
+    pub jit_resume_ip: usize,
+    /// Caller destination register for the pending fast JIT→JIT call, written
+    /// alongside [`Self::jit_resume_ip`]. `jit_prepare_call` stamps it as the
+    /// callee frame's `return_reg` so that, if the callee is later resumed
+    /// *interpreted* after an exception unwind, its `Return` writes the result
+    /// to the caller's slot (the fast path's machine-return store never ran).
+    pub jit_call_dest: usize,
     /// Nested contexts (sync-generator bodies) share the heap but own a
     /// private stack the outer context's GC roots cannot see in the other
     /// direction: a collection triggered from *inside* the nested context
@@ -136,6 +150,8 @@ impl ExecCtx {
             jit_panic_suspend_resume_ip: None,
             jit_native_result: VmValue::null(),
             jit_frame_prepushed: 0,
+            jit_resume_ip: 0,
+            jit_call_dest: 0,
             gc_inhibited: false,
         };
 
@@ -273,6 +289,8 @@ impl ExecCtx {
             jit_panic_suspend_resume_ip: None,
             jit_native_result: VmValue::null(),
             jit_frame_prepushed: 0,
+            jit_resume_ip: 0,
+            jit_call_dest: 0,
             gc_inhibited: false,
         }
     }

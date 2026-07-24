@@ -214,6 +214,8 @@ pub fn build_jit_helpers() -> varn_jit::JitHelpers {
         globals_offset: std::mem::offset_of!(ctx::ExecCtx, globals),
         stack_data_offset,
         frame_prepushed_offset: std::mem::offset_of!(ctx::ExecCtx, jit_frame_prepushed),
+        jit_resume_ip_offset: std::mem::offset_of!(ctx::ExecCtx, jit_resume_ip),
+        jit_call_dest_offset: std::mem::offset_of!(ctx::ExecCtx, jit_call_dest),
         clif_call_fallback: ctx::clif_call_fallback as usize,
     }
 }

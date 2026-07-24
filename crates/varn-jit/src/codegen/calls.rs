@@ -42,12 +42,23 @@ fn emit_call(ctx: &mut CodegenCtx, first_reg: usize) {
     let callee_reg = (w1 & 0xFF) as usize;
     let arg_count = (w2 >> 8) as usize;
     let arg_start = (w2 & 0xFF) as usize;
+    // Bytecode ip immediately after this Call — the caller's resume point.
+    let resume_ip = *ip;
 
     let _ = first_reg;
 
     use crate::assembler::Cond;
 
     emit_flush_all(asm, regmap);
+
+    // Record the caller resume ip + dest register so an exception unwinding
+    // through this frame resumes it interpreted with the callee's result in
+    // place (see ExecCtx::jit_resume_ip / jit_call_dest). ARG_EXEC_CTX still
+    // holds the ExecCtx pointer here (clobbered below with arg_count).
+    asm.mov_reg_imm64(Reg::R10, resume_ip as u64);
+    asm.mov_mem_reg(ARG_EXEC_CTX, helpers.jit_resume_ip_offset as i32, Reg::R10);
+    asm.mov_reg_imm64(Reg::R10, dest as u64);
+    asm.mov_mem_reg(ARG_EXEC_CTX, helpers.jit_call_dest_offset as i32, Reg::R10);
 
     emit_load(asm, Reg::Rax, callee_reg, regmap);
 

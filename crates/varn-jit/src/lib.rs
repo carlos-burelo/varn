@@ -234,6 +234,13 @@ pub struct JitHelpers {
     /// Byte offset of ExecCtx.jit_frame_prepushed — the caller→prologue
     /// frame handshake word (see its doc in varn-vm).
     pub frame_prepushed_offset: usize,
+    /// Byte offset of ExecCtx.jit_resume_ip — the caller's post-call resume
+    /// ip, written before a fast JIT→JIT call so an exception unwinding
+    /// through this caller can resume it interpreted (see its doc in varn-vm).
+    pub jit_resume_ip_offset: usize,
+    /// Byte offset of ExecCtx.jit_call_dest — the caller dest register stamped
+    /// as the callee frame's return_reg for correct interpreted-resume returns.
+    pub jit_call_dest_offset: usize,
     /// `extern "C" fn(*mut ExecCtx, callee: VmValue, argc, a0..a3) -> VmValue`
     /// — the CLIF static-call IC miss path: dispatch the (rebound or
     /// GC-moved) callee through the interpreter/JIT with boxed args.

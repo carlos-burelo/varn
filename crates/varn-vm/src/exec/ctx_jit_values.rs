@@ -845,6 +845,17 @@ pub extern "C" fn jit_prepare_call(
 ) -> *const crate::frame::VmClosure {
     unsafe {
         let ctx_ref = &mut *ctx;
+        // Record the caller's post-call resume ip (written to `jit_resume_ip`
+        // by the JIT call site). If the callee — or anything it calls — throws
+        // and the exception is caught below this caller, the longjmp unwinds
+        // this caller's native JIT frame; the interpreter then resumes it from
+        // this ip instead of re-executing its JIT body from ip=0 (infinite
+        // loop). Mirrors what `jit_call` does on the slow path.
+        let resume_ip = ctx_ref.jit_resume_ip;
+        let call_dest = ctx_ref.jit_call_dest as u16;
+        if let Some(caller) = ctx_ref.frames.last_mut() {
+            caller.ip = resume_ip;
+        }
         if !callee.is_heap() {
             return std::ptr::null();
         }
@@ -866,9 +877,12 @@ pub extern "C" fn jit_prepare_call(
                             std::ptr::write(ptr.add(i), VmValue::null());
                         }
                     }
-                    ctx_ref
-                        .frames
-                        .push(crate::frame::CallFrame::new(closure, callee_base));
+                    let mut frame = crate::frame::CallFrame::new(closure, callee_base);
+                    // Return destination for a possible interpreted resume after
+                    // an exception unwind (fast machine-return store is skipped
+                    // in that case).
+                    frame.return_reg = Some(call_dest);
+                    ctx_ref.frames.push(frame);
                     return closure as *const crate::frame::VmClosure;
                 }
             }
@@ -904,9 +918,9 @@ pub extern "C" fn jit_prepare_call(
                                     let ctor_closure_ptr = &*closure as *const crate::frame::VmClosure;
                                     let returning_frame_idx = ctx_ref.frames.len();
                                     ctx_ref.pending_constructors.push((returning_frame_idx, instance_nv));
-                                    ctx_ref
-                                        .frames
-                                        .push(crate::frame::CallFrame::new(&closure, callee_base));
+                                    let mut frame = crate::frame::CallFrame::new(&closure, callee_base);
+                                    frame.return_reg = Some(call_dest);
+                                    ctx_ref.frames.push(frame);
                                     return ctor_closure_ptr;
                                 }
                             }
