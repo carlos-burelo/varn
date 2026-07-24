@@ -95,6 +95,36 @@ function evolveMatmulShape(): int {
     return c[0] + c[n * n - 1]
 }
 
+// --- Pattern-shadowing governance (A0.3 review finding) ----------------
+// A destructuring declarator that reuses an evolving array's name must
+// un-govern it from the annotation overlay: without the fix, `a[i]` in
+// the shadowed region below stayed typed against the OUTER `Array<int>`
+// (from `let a = []; a.push(1)`), compiling `AddInt` over what is
+// actually a float array — wrong result, and a miscompile in release
+// builds where the guard is trusted. Array-pattern variant:
+function staleB(): float {
+    let a = []
+    a.push(1)
+    let r = 0.0
+    {
+        let [a] = [[2.5, 3.5]]
+        r = a[0] + a[1]
+    }
+    return r
+}
+
+// Same shape, object-pattern variant.
+function staleC(): float {
+    let a = []
+    a.push(1)
+    let r = 0.0
+    {
+        let { a } = { a: [2.5, 3.5] }
+        r = a[0] + a[1]
+    }
+    return r
+}
+
 // --- Rule-4 regression coverage (A0.3' review) ------------------------
 // Each of these PROVED that routing the evolved element type into
 // diagnostic typing turned a previously-valid program into a `vn check`
@@ -134,6 +164,8 @@ assert("evolve mixed stays runnable", evolveMixedStaysPermissive() === "1-two")
 assert("annotated int[] unchanged",  annotatedUnchanged() === 30)
 assert("evolve escape stays runnable", evolveEscapeStaysPermissive() === 6)
 assert("evolve matmul shape",        evolveMatmulShape() === 690)
+assert("pattern-shadowed [a] un-governed", staleB() === 6.0)
+assert("pattern-shadowed {a} un-governed", staleC() === 6.0)
 
 // Compile the Rule-4 regression shapes without executing them (see above).
 if (false) {

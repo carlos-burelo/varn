@@ -304,6 +304,51 @@ pub fn collect_type_annotations(
     ann
 }
 
+/// Collects every name a (possibly destructuring) pattern binds, mirroring
+/// the traversal `Binder::bind_pattern` uses (identifier / array / object /
+/// assignment-default / rest). Used to un-govern names a shadowing
+/// destructuring declarator hides from the evolved-array overlay (Task
+/// A0.3 finding: a pattern that isn't a plain identifier still shadows
+/// same-named outer locals, including ones the overlay was governing).
+fn collect_pattern_names(pattern: &varn_core::ast::Pattern, out: &mut Vec<std::rc::Rc<str>>) {
+    use varn_core::ast::Pattern;
+    match pattern {
+        Pattern::Identifier { name, .. } => out.push(name.clone()),
+        Pattern::Array { elements, rest, .. } => {
+            for el in elements.iter().flatten() {
+                collect_pattern_names(&el.pattern, out);
+            }
+            if let Some(r) = rest {
+                collect_pattern_names(r, out);
+            }
+        }
+        Pattern::Object {
+            properties, rest, ..
+        } => {
+            for prop in properties {
+                collect_pattern_names(&prop.value, out);
+            }
+            if let Some(r) = rest {
+                collect_pattern_names(r, out);
+            }
+        }
+        Pattern::Assignment { left, .. } => collect_pattern_names(left, out),
+        Pattern::Rest { argument, .. } => collect_pattern_names(argument, out),
+    }
+}
+
+/// Removes every name `pattern` binds from both `evolved_locals` and
+/// `locals` — the un-governance half of the destructuring-declarator fix.
+/// Shared by the for-init and `Decl::Variable` sites.
+fn ungovern_pattern_names(pattern: &varn_core::ast::Pattern, ctx: &mut AnnotateCtx) {
+    let mut bound = Vec::new();
+    collect_pattern_names(pattern, &mut bound);
+    for name in bound {
+        ctx.evolved_locals.remove(name.as_ref());
+        ctx.locals.remove(name.as_ref());
+    }
+}
+
 fn annotate_stmt(stmt: &Stmt, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) {
     match &stmt.kind {
         StmtKind::Expr { expression } => annotate_expr(expression, ann, ctx),
@@ -376,6 +421,14 @@ fn annotate_stmt(stmt: &Stmt, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                                     let ty = get_expr_type(init_expr, ctx);
                                     ctx.locals.insert(name, ty);
                                 }
+                            } else {
+                                // Destructuring for-init declarator (`for
+                                // (let [a] = ...; ...)`): every bound name
+                                // shadows whatever same-named outer binding
+                                // — evolving or not — is currently in
+                                // scope, so drop stale governance for each
+                                // one (Task A0.3 finding).
+                                ungovern_pattern_names(&d.id, ctx);
                             }
                         }
                     }
@@ -434,6 +487,16 @@ fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                         ctx.evolved_locals.remove(name.as_ref());
                         ctx.locals.insert(name, ty);
                     }
+                } else {
+                    // Destructuring declarator (`let [a] = ...` / `let {a}
+                    // = ...`): each bound name shadows whatever same-named
+                    // outer binding is currently in scope, including an
+                    // evolving empty-array local the overlay was
+                    // governing. Left ungoverned, `a[i]` inside the
+                    // shadowed region would stay typed against the OUTER
+                    // array's element type (Task A0.3 finding — proven by
+                    // `staleB` in tests/55-array-element-inference.vn).
+                    ungovern_pattern_names(&d.id, ctx);
                 }
             }
         }
@@ -446,9 +509,23 @@ fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                     record_cg_ty_at(f.id_offset, &ty, ann, ctx);
                 }
                 let mut local_ctx = ctx.clone();
-                // An evolving empty-array local never crosses a closure
-                // boundary (the binder escapes any candidate reachable from a
-                // nested function), so no outer governance carries in here.
+                // Reset the overlay before descending into this function's
+                // body. This is NOT mirroring a binder-side blanket escape —
+                // `bind_function` (named function declarations) applies no
+                // such escape; only closure boundaries (arrow bodies,
+                // function expressions, class/object methods,
+                // getters/setters) get one, via
+                // `escape_all_open_array_candidates` (array_evolve.rs rule
+                // 3). Soundness for a named nested function instead comes
+                // from the binder's write/escape recording being name-based
+                // rather than scope-based: `record_array_write` /
+                // `escape_array_candidate` match the innermost open
+                // candidate by name alone, so a write reached from inside
+                // the nested body — visited during the same linear bind
+                // pass — is folded into the outer candidate's verdict
+                // before `evolved_array_types` is ever populated. This
+                // `clear()` is this annotation pass's own guarantee that no
+                // overlay type crosses into a nested function body.
                 local_ctx.evolved_locals.clear();
                 for p in &f.params {
                     let name_opt = match &p.pattern {

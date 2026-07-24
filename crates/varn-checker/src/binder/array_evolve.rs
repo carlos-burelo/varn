@@ -37,16 +37,33 @@
 //!    Dynamic (never guess).
 //! 3. Escape == Dynamic. Any occurrence of the name that isn't exactly
 //!    `x.push(e)`, `x[i]` (read), `x[i] = e` (write), or `x.length`
-//!    marks it escaped. Closures get a **blanket** rule instead of a
-//!    precise free-variable scan: entering *any* closure boundary
-//!    (arrow/function body, object or class getter/setter) escapes
-//!    *every* currently open candidate, whether or not the closure
+//!    marks it escaped. Anonymous closures get a **blanket** rule instead
+//!    of a precise free-variable scan: entering any closure boundary —
+//!    an arrow function body, a function expression, a class/object
+//!    method, or a getter/setter (all routed through
+//!    `bind_inline_function`/`bind_inline_function_expr`) — escapes
+//!    *every* currently open candidate via
+//!    `escape_all_open_array_candidates`, whether or not the closure
 //!    actually mentions it. A free-variable scan would recover more
 //!    cases, but a false negative there — failing to notice a closure
 //!    captures and later pushes an incompatible value — would be a
 //!    soundness bug (the CLIF backend trusts the checker's proof and
 //!    skips guards), not merely a missed optimization. The blanket rule
 //!    can't have that failure mode, so it's the one implemented here.
+//!
+//!    Named function declarations (`function f() {...}`, bound via
+//!    `bind_function`) get **no** blanket escape — entering one isn't a
+//!    tracked boundary event at all. Soundness there instead falls out
+//!    of the write/escape recording being name-based rather than
+//!    scope-based: `record_array_write`/`escape_array_candidate` match
+//!    the innermost open candidate by name alone, so a write or
+//!    escaping use reached from inside a nested named function's body —
+//!    visited during the very same linear bind pass — is folded into
+//!    the outer candidate's verdict exactly as if it had appeared
+//!    inline, before `finalize_array_watch` ever runs on the owning
+//!    scope. (Verified sound; do not "fix" by adding a blanket escape
+//!    to `bind_function` — see checker_annotations.rs's `Decl::Function`
+//!    handling for the annotation-layer side of this.)
 //! 4. Zero new type errors — enforced *structurally* by decoupling
 //!    optimization-typing from diagnostic-typing. A proved element type is
 //!    recorded into `BindResult::evolved_array_types` (an offset-keyed,
