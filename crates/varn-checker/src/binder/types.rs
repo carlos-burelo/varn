@@ -143,6 +143,16 @@ impl BindResult {
         })
     }
 
+    /// Wire byte if `name` resolves (in global scope) to a free-function
+    /// intrinsic import — e.g. `abs` imported from `std:math`. Lets bare
+    /// `abs(x)` calls lower to `OpCode::Intrinsic`, the same path as the
+    /// method form. Returns `None` for locals or non-intrinsic imports.
+    pub fn intrinsic_import_wire(&self, name: &str) -> Option<u8> {
+        let scope = self.scopes.get(self.global_scope);
+        let id = scope.resolve(name, &self.scopes)?;
+        self.arena.get(id).intrinsic_wire
+    }
+
     pub fn has_named_type(&self, name: &str) -> bool {
         self.type_members.classes.contains_key(name)
             || self.type_members.interfaces.contains_key(name)

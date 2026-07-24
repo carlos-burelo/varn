@@ -713,6 +713,18 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                 }
             }
 
+            // Free-function intrinsic: `abs`/`sqrt`/`floor`/... imported from
+            // `std:math` and called bare (`abs(x)`). Lowers to
+            // `OpCode::Intrinsic` with a null receiver — same machinery as the
+            // `math.abs()` method form. Skip if shadowed by a tracked local.
+            if let ExprKind::Identifier { name } = &callee.kind {
+                if !ctx.locals.contains_key(name.as_ref()) {
+                    if let Some(wire_byte) = ctx.bind.intrinsic_import_wire(name) {
+                        ann.record_intrinsic(callee.range.start.offset, wire_byte);
+                    }
+                }
+            }
+
             // Value type of the call result. Method calls key at the
             // method-name offset (call exprs in a chain share their start
             // offset); plain calls key at the expression start.

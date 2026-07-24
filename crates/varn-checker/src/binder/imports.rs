@@ -140,6 +140,16 @@ impl super::Binder {
                             {
                                 *ty = ty.clone().with_origin(origin.clone());
                             }
+                            // Free-function intrinsic import (e.g. `abs` from
+                            // `std:math`): stamp the wire byte now, while the
+                            // module specifier is in hand. `origin_module` is the
+                            // resolved file path, so the call site can't rebuild
+                            // the `std:math/abs` key on its own.
+                            if let Some(mp) = &module_path {
+                                s.intrinsic_wire = varn_core::intrinsic_ops::intrinsic_lookup(
+                                    &format!("{}/{}", mp, imported),
+                                );
+                            }
                             s
                         }
                         None => {

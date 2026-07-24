@@ -224,6 +224,27 @@ impl<'a> Lowerer<'a> {
                         property: HirOptionalProperty::Call(hargs),
                     });
                 }
+                // Free-function intrinsic (`abs(x)` from `std:math`): lower to
+                // IntrinsicCall with a synthetic null receiver so it reuses the
+                // method-form codegen (VM reads args[1]; JIT inlines
+                // fabs/sqrtsd/roundsd). Keyed at the callee identifier offset.
+                if let ExprKind::Identifier { .. } = &callee.kind {
+                    if let Some(wire_byte) =
+                        self.ann.get_intrinsic(callee.range.start.offset)
+                    {
+                        let has_spread = args.iter().any(|a| matches!(a, Arg::Spread(_)));
+                        if !has_spread {
+                            let hargs = self.lower_call_args(args, offset, scope)?;
+                            return Ok(HirExpr::IntrinsicCall {
+                                object: Box::new(HirExpr::Null),
+                                args: hargs,
+                                wire_byte,
+                                ty: HirType::Dynamic,
+                            });
+                        }
+                    }
+                }
+
                 // Intrinsic / native-op annotations are keyed by the METHOD
                 // NAME offset: chained calls (`a.f().g()`) share their
                 // expression start offset, so keying by expr start let an
