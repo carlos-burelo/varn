@@ -89,6 +89,26 @@ fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Durati
     Ok(samples)
 }
 
+/// Like [`time_n`], but samples CPU frequency immediately after each run
+/// (CPU still warm from the just-finished work) and keeps the peak — so the
+/// output can show whether the bench ran at turbo or was throttled to base.
+fn time_n_freq<F: Fn() -> Result<(), String>>(
+    runs: usize,
+    f: F,
+) -> Result<(Vec<Duration>, Option<crate::cpu_freq::CpuFreq>), CliError> {
+    f().map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
+
+    let mut samples = Vec::with_capacity(runs);
+    let mut peak = None;
+    for _ in 0..runs {
+        let start = Instant::now();
+        f().map_err(|e| CliError::fatal(format!("bench run failed: {e}")))?;
+        samples.push(start.elapsed());
+        peak = crate::cpu_freq::keep_peak(peak, crate::cpu_freq::sample());
+    }
+    Ok((samples, peak))
+}
+
 pub fn run_bench(
     path: &str,
     eval: Option<&str>,
@@ -319,7 +339,7 @@ pub fn run_bench(
     let snap_globals_ref = &snap_globals;
     let snap_heap_ref = &snap_heap;
     let snap_modules_ref = &snap_modules;
-    let exec_samples = time_n(runs, || {
+    let (exec_samples, cpu_freq) = time_n_freq(runs, || {
         timers.execute.start();
         varn_builtins::reset_testing_counters();
 
@@ -497,6 +517,29 @@ pub fn run_bench(
         chalk(fmt_dur(total_pipeline_dur)).cyan(),
         chalk("(sum of phases)").dim()
     ));
+    if let Some(cf) = cpu_freq {
+        let base = if cf.max_mhz > 0 {
+            let pct = 100.0 * cf.cur_mhz as f64 / cf.max_mhz as f64;
+            let tag = if cf.cur_mhz > cf.max_mhz {
+                "turbo"
+            } else if pct < 90.0 {
+                "throttled"
+            } else {
+                "base"
+            };
+            format!(" (base {} MHz · {:.0}% · {})", cf.max_mhz, pct, tag)
+        } else {
+            String::new()
+        };
+        terminal::log(format!(
+            "  {}Peak CPU freq under load:{} {}{}  {}",
+            chalk("").dim(),
+            "",
+            chalk(format!("{} MHz", cf.cur_mhz)).green(),
+            chalk(base).dim(),
+            chalk("(temp n/a — needs kernel driver)").dim()
+        ));
+    }
     terminal::log(format!(
         "  {}Module precompilation (cold startup):{} {}",
         chalk("").dim(),
@@ -675,7 +718,7 @@ fn run_bench_wrc(
     let snap_heap_ref = &snap_heap;
     let snap_modules_ref = &snap_modules;
 
-    let exec_samples = time_n(runs, || {
+    let (exec_samples, cpu_freq) = time_n_freq(runs, || {
         varn_builtins::reset_testing_counters();
         let mut machine = Vm::from_snapshot(
             snap_globals_ref.clone(),
@@ -745,6 +788,29 @@ fn run_bench_wrc(
         "",
         chalk(fmt_dur(total_pipeline_dur)).cyan()
     ));
+    if let Some(cf) = cpu_freq {
+        let base = if cf.max_mhz > 0 {
+            let pct = 100.0 * cf.cur_mhz as f64 / cf.max_mhz as f64;
+            let tag = if cf.cur_mhz > cf.max_mhz {
+                "turbo"
+            } else if pct < 90.0 {
+                "throttled"
+            } else {
+                "base"
+            };
+            format!(" (base {} MHz · {:.0}% · {})", cf.max_mhz, pct, tag)
+        } else {
+            String::new()
+        };
+        terminal::log(format!(
+            "  {}Peak CPU freq under load:{} {}{}  {}",
+            chalk("").dim(),
+            "",
+            chalk(format!("{} MHz", cf.cur_mhz)).green(),
+            chalk(base).dim(),
+            chalk("(temp n/a — needs kernel driver)").dim()
+        ));
+    }
     if !show_output {
         terminal::log(
             chalk("  Execution measured with stdout muted (--show-output to disable)").dim(),

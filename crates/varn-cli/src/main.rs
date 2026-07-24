@@ -4,6 +4,7 @@ mod bench_output;
 mod bench_phase;
 mod cli;
 mod commands;
+mod cpu_freq;
 mod doctor_impl;
 mod error;
 mod pipeline;
