@@ -13,12 +13,16 @@ pub struct KindReport {
     pub blocks: Vec<(usize, Vec<String>)>,
 }
 
-/// Finalized machine code for one function's buffer (raw fn at `raw_off`,
-/// wrapper at `entry_off`).
+/// Finalized machine code for one function's buffer (raw fn at `raw_off`
+/// spanning `raw_len` bytes, wrapper at `entry_off`). The two are separate
+/// code ranges with up-to-15 bytes of alignment padding between them; a
+/// disassembler must decode each range independently or the padding desyncs
+/// it.
 #[derive(Debug, Default, Clone)]
 pub struct CodeBytes {
     pub bytes: Vec<u8>,
     pub raw_off: usize,
+    pub raw_len: usize,
     pub entry_off: usize,
 }
 
@@ -60,16 +64,24 @@ pub(super) fn capture_ir(debug: &mut Option<&mut ClifDebugSink>, func: &Function
     }
 }
 
-/// Record the finalized code bytes (raw fn at 0, wrapper at `wrapper_off`).
+/// Record the finalized code bytes: raw fn at 0 spanning `raw_len` bytes,
+/// wrapper at `wrapper_off` (16-aligned, so `[raw_len, wrapper_off)` is padding),
+/// wrapper ending at `total`. The buffer is page-rounded, so the capture is
+/// truncated to `total` — everything past it is zero-fill page tail, not code.
 pub(super) fn capture_code(
     debug: &mut Option<&mut ClifDebugSink>,
     buf: &mut JitBuffer,
+    raw_len: usize,
     wrapper_off: usize,
+    total: usize,
 ) {
     if let Some(sink) = debug.as_deref_mut() {
+        let slice = buf.as_mut_slice();
+        let end = total.min(slice.len());
         sink.code = Some(CodeBytes {
-            bytes: buf.as_mut_slice().to_vec(),
+            bytes: slice[..end].to_vec(),
             raw_off: 0,
+            raw_len,
             entry_off: wrapper_off,
         });
     }

@@ -108,8 +108,17 @@ fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
 
     if flags.clif_asm {
         if let Some(code) = &insp.code {
-            eprintln!("    {DIM}x86-64 (raw@{} wrapper@{}):{R}", code.raw_off, code.entry_off);
-            eprint!("{}", disasm(&code.bytes, code.raw_off as u64));
+            // Decode the raw fn and the ABI wrapper in two independent passes.
+            // They are separate code ranges with alignment padding between
+            // them; decoding the whole buffer linearly lets the padding
+            // desync the decoder and corrupt the wrapper's instructions.
+            let n = code.bytes.len();
+            let raw_end = (code.raw_off + code.raw_len).min(n);
+            let entry = code.entry_off.min(n);
+            eprintln!("    {DIM}x86-64 raw@{}:{R}", code.raw_off);
+            eprint!("{}", disasm(&code.bytes[code.raw_off.min(n)..raw_end], code.raw_off as u64));
+            eprintln!("    {DIM}x86-64 wrapper@{}:{R}", code.entry_off);
+            eprint!("{}", disasm(&code.bytes[entry..], entry as u64));
         }
     }
 }

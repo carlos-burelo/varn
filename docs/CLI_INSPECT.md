@@ -72,9 +72,13 @@ y las llamadas a helpers no están simbolizadas (direcciones crudas). En
 consecuencia, una función cuyo único obstáculo sería una constante de heap
 residente en el nursery puede mostrarse como `ROUTE` aunque en ejecución real
 haría `BAIL` (`clif: nursery heap constant`) — caso raro y marcado como
-"inesperado" por el propio codegen. El disasm de la función `raw` (el cuerpo, lo
-relevante) es siempre fiel; el del `wrapper` (glue de ABI) puede desincronizarse
-en el relleno de alineación.
+"inesperado" por el propio codegen. El disasm decodifica la función `raw` (el
+cuerpo) y el `wrapper` (glue de ABI) en pasadas independientes, cada una desde su
+propia base, así que el relleno entre ambos ya no desincroniza al decodificador —
+las instrucciones de ambos son fieles. Nota: el `wrapper` puede terminar con su
+pool de constantes embebido (p.ej. las máscaras NaN-box que Cranelift emite como
+rodata tras el código); esos bytes finales se muestran como pseudo-instrucciones
+tras el `ret` del wrapper — son datos, no código.
 
 ## Ejemplos
 

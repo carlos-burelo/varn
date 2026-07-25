@@ -140,7 +140,7 @@ pub fn try_compile(
             patch_rel32(slice, wrapper_off + *r, 0);
         }
     }
-    super::debug::capture_code(&mut debug, &mut buf, wrapper_off);
+    super::debug::capture_code(&mut debug, &mut buf, raw.code.len(), wrapper_off, total);
     buf.make_executable()?;
     let raw_ptr = buf.as_ptr();
     let entry = unsafe { buf.as_ptr().add(wrapper_off) };
