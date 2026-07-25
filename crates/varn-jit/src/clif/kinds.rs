@@ -17,6 +17,10 @@ use varn_types::VmValue;
 pub(crate) enum K {
     Unset,
     Int,
+    /// An unboxed `f64` in an `F64` Cranelift Variable. Static per register:
+    /// a register is `Float` iff `register_meta[r].kind == SlotKind::Float`,
+    /// seeded at entry and preserved by the flow (see `clif::floats`).
+    Float,
     Bool,
     /// A NaN-boxed VmValue carried as raw bits (heap refs, non-int params,
     /// untyped loads). Coerces to Int at use via the i48 sign-extend — the
@@ -58,6 +62,7 @@ pub(crate) fn apply_kinds(
 ) {
     let dest = (code[ip] >> 8) as usize;
     let meta_int = |r: usize| meta.get(r).map_or(false, |m| m.kind == SlotKind::Int);
+    let meta_float = |r: usize| meta.get(r).map_or(false, |m| m.kind == SlotKind::Float);
     match op {
         OpCode::LoadIntZero
         | OpCode::LoadIntOne
@@ -85,13 +90,29 @@ pub(crate) fn apply_kinds(
         }
         OpCode::LoadConst => {
             let idx = code[ip + 1] as usize;
-            state[dest] = match constants.get(idx) {
-                Some(c) if c.is_int() => K::Int,
-                // A non-int constant (string, float, null) is carried as its
-                // boxed VmValue bits; the lowering embeds them directly.
-                Some(_) => K::Boxed,
-                None => K::Mixed,
+            state[dest] = if meta_float(dest) {
+                // A float-typed sink: the constant loads as an unboxed f64
+                // (a float literal, or an int literal widened to float).
+                K::Float
+            } else {
+                match constants.get(idx) {
+                    Some(c) if c.is_int() => K::Int,
+                    // A non-int constant (string, float, null) is carried as its
+                    // boxed VmValue bits; the lowering embeds them directly.
+                    Some(_) => K::Boxed,
+                    None => K::Mixed,
+                }
             };
+        }
+        // Typed float arithmetic yields an unboxed f64 in a Float register; a
+        // non-float (untyped) sink keeps boxed bits and routes to the helper.
+        OpCode::AddFloat
+        | OpCode::SubFloat
+        | OpCode::MulFloat
+        | OpCode::DivFloat
+        | OpCode::ModFloat
+        | OpCode::PowFloat => {
+            state[dest] = if meta_float(dest) { K::Float } else { K::Boxed };
         }
         OpCode::LtInt
         | OpCode::LteInt
@@ -150,12 +171,6 @@ pub(crate) fn apply_kinds(
         | OpCode::Typeof
         | OpCode::ToString
         | OpCode::GetSymbol
-        | OpCode::AddFloat
-        | OpCode::SubFloat
-        | OpCode::MulFloat
-        | OpCode::DivFloat
-        | OpCode::ModFloat
-        | OpCode::PowFloat
         | OpCode::Pow
         | OpCode::PowInt
         | OpCode::BitAnd
@@ -201,6 +216,14 @@ pub(crate) fn kind_flow(
     for (i, pk) in param_kinds.iter().enumerate() {
         if 1 + i < nregs {
             entry0[1 + i] = if *pk == SlotKind::Int { K::Int } else { K::Boxed };
+        }
+    }
+    // A float-typed register is an F64 Variable for the whole function (static
+    // representation), so seed it `Float` at entry — params (overriding the
+    // boxed default above) and locals alike; the flow preserves it.
+    for (r, e) in entry0.iter_mut().enumerate() {
+        if meta.get(r).map_or(false, |m| m.kind == SlotKind::Float) {
+            *e = K::Float;
         }
     }
     let mut entries: HashMap<usize, Vec<K>> = HashMap::new();

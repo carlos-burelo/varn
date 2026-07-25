@@ -46,9 +46,11 @@ use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::emit::{
     box_int, call_helper, code_has_array_ops, def_const, emit_array_payload, emit_return_value,
-    patch_rel32, unbox_bool, use_boxed, use_int, wrap_i48, INT_TAG, MASK_48,
+    meta_is_float, patch_rel32, unbox_bool, unbox_f64, use_boxed, use_int, wrap_i48, INT_TAG,
+    MASK_48,
 };
 use super::fields;
+use super::floats;
 use super::generic;
 use super::globals;
 
@@ -117,6 +119,10 @@ pub fn try_compile(
     if proto.param_kinds.len() != nparams {
         return Err("clif: missing param kinds".into());
     }
+    // Reject any Float register written by an op the float lowering can't
+    // place as an unboxed f64 (loads, calls, generic arithmetic into a float
+    // sink), so every def on an F64 Variable stays type-consistent.
+    floats::check_float_writes(&proto.chunk.code, &proto.chunk.constants, &proto.register_meta)?;
 
     let has_alloc = alloc::has_alloc(&proto.chunk.code, &proto.chunk.constants)?;
     let frame_aware = proto.has_this || has_alloc;
@@ -338,7 +344,18 @@ fn lower_raw(
     let mut fb_ctx = FunctionBuilderContext::new();
     let mut b = FunctionBuilder::new(&mut func, &mut fb_ctx);
 
-    let vars: Vec<Variable> = (0..nregs).map(|_| b.declare_var(types::I64)).collect();
+    // A float-typed register (`register_meta[r] == Float`) is an unboxed f64
+    // in an `F64` Variable; every other register is a boxed/unboxed i64.
+    let vars: Vec<Variable> = (0..nregs)
+        .map(|r| {
+            let ty = if meta_is_float(&proto.register_meta, r) {
+                types::F64
+            } else {
+                types::I64
+            };
+            b.declare_var(ty)
+        })
+        .collect();
     // One payload-cache variable per (loop region, receiver register).
     // Zero-defined at entry like every var, and 0 means "not resolved":
     // the frontend's all-paths-defined rule and the sentinel share a def.
@@ -355,8 +372,14 @@ fn lower_raw(
     // never reads uninitialized slots, but the frontend requires a def on
     // every path; Cranelift's DCE removes the dead zeros.
     let zero = b.ins().iconst(types::I64, 0);
-    for v in &vars {
-        b.def_var(*v, zero);
+    let zero_f = b.ins().f64const(0.0);
+    for (r, v) in vars.iter().enumerate() {
+        // An F64 Variable must be zero-defined with an f64; DCE removes both.
+        if meta_is_float(&proto.register_meta, r) {
+            b.def_var(*v, zero_f);
+        } else {
+            b.def_var(*v, zero);
+        }
     }
     for v in cache_vars.values() {
         b.def_var(*v, zero);
@@ -372,7 +395,14 @@ fn lower_raw(
     let arg_off = if frame_aware { 3 } else { 1 };
     for i in 0..nparams {
         let p = b.block_params(entry)[arg_off + i];
-        b.def_var(vars[1 + i], p);
+        // A float param arrives as its boxed VmValue bits (i64); unbox to the
+        // F64 Variable. Everything else is already the right i64 representation.
+        if meta_is_float(&proto.register_meta, 1 + i) {
+            let f = unbox_f64(&mut b, p);
+            b.def_var(vars[1 + i], f);
+        } else {
+            b.def_var(vars[1 + i], p);
+        }
     }
 
     let actx = alloc_env.map(|(base, closure)| AllocCtx {
@@ -527,7 +557,18 @@ fn lower_raw(
             OpCode::LoadConst => {
                 let idx = code[ip + 1] as usize;
                 let c = *constants.get(idx).ok_or("clif: constant index")?;
-                if c.is_int() {
+                if meta_is_float(&proto.register_meta, first_reg) {
+                    // A float-typed sink: load the constant as an unboxed f64
+                    // (a float literal, or an int literal widened).
+                    let f = if c.is_f64() {
+                        b.ins().f64const(c.as_f64())
+                    } else if c.is_int() {
+                        b.ins().f64const(c.as_int() as f64)
+                    } else {
+                        return Err("clif: non-numeric const into float reg".into());
+                    };
+                    b.def_var(vars[first_reg], f);
+                } else if c.is_int() {
                     def_const(&mut b, &vars, first_reg, c.as_int());
                 } else if c.is_heap() && (c.as_heap_idx() & 0x8000_0000 == 0) {
                     // A nursery heap constant could be evacuated under a
@@ -552,6 +593,13 @@ fn lower_raw(
                 // heap refs alike); only bottom/top/poison are unmovable.
                 if matches!(state[src], K::Unset | K::Poison | K::Mixed) {
                     return Err("clif: move of untracked kind".into());
+                }
+                // Source and dest must share representation (both F64 or both
+                // I64), else the copy would be a Cranelift type mismatch.
+                if meta_is_float(&proto.register_meta, src)
+                    != meta_is_float(&proto.register_meta, first_reg)
+                {
+                    return Err("clif: move across float/int representation".into());
                 }
                 let v = b.use_var(vars[src]);
                 b.def_var(vars[first_reg], v);
@@ -871,6 +919,37 @@ fn lower_raw(
                 alloc::emit_build_object_with_shape(&mut b, actx, &state, code, ip, count);
             }
             OpCode::Nop => {}
+            // Typed float ops: native fadd/fsub/fmul/fdiv/fcmp when operands
+            // are float (or int-coercible); Mod/Pow via the float-boxing
+            // helper. A non-eligible case falls back to the generic helper.
+            OpCode::AddFloat
+            | OpCode::SubFloat
+            | OpCode::MulFloat
+            | OpCode::DivFloat
+            | OpCode::ModFloat
+            | OpCode::PowFloat
+            | OpCode::LtFloat
+            | OpCode::GtFloat
+            | OpCode::LteFloat
+            | OpCode::GteFloat
+            | OpCode::EqFloat
+            | OpCode::NeqFloat => {
+                if !floats::emit_float_op(
+                    &mut b,
+                    &vars,
+                    &state,
+                    &proto.register_meta,
+                    code,
+                    ip,
+                    op,
+                    cc,
+                    exec_ctx,
+                    helpers,
+                )? && !generic::try_emit(&mut b, &gen, helpers, &state, op, code, ip)
+                {
+                    return Err(format!("clif: unsupported opcode {op:?}"));
+                }
+            }
             // Generic (helper-based) arithmetic / comparisons / unary ops.
             _ if generic::try_emit(&mut b, &gen, helpers, &state, op, code, ip) => {}
             _ => return Err(format!("clif: unsupported opcode {op:?}")),

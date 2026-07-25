@@ -14,6 +14,7 @@ pub(crate) mod arrays;
 pub mod debug;
 pub(crate) mod emit;
 pub(crate) mod fields;
+pub(crate) mod floats;
 pub(crate) mod generic;
 pub(crate) mod globals;
 pub(crate) mod kinds;

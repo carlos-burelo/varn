@@ -92,8 +92,24 @@ pub(super) fn emit_return_value(
             K::Boxed => use_int(b, vars, state, src)?,
             k => return Err(format!("clif: unproven int return ({k:?})")),
         },
-        // string/ref/float: already boxed bits, passed through by the wrapper.
-        SlotKind::Str | SlotKind::Ref | SlotKind::Float => {
+        // A float return: an F64 register boxes (with NaN canonicalization);
+        // an int coerces int→float then boxes; already-boxed float bits pass
+        // through.
+        SlotKind::Float => match state[src] {
+            K::Float => {
+                let f = b.use_var(vars[src]);
+                box_f64(b, f)
+            }
+            K::Int => {
+                let iv = b.use_var(vars[src]);
+                let f = b.ins().fcvt_from_sint(types::F64, iv);
+                box_f64(b, f)
+            }
+            k if is_boxed_kind(k) => b.use_var(vars[src]),
+            k => return Err(format!("clif: unproven float return ({k:?})")),
+        },
+        // string/ref: already boxed bits, passed through by the wrapper.
+        SlotKind::Str | SlotKind::Ref => {
             if is_boxed_kind(state[src]) {
                 b.use_var(vars[src])
             } else {
@@ -174,10 +190,59 @@ pub(super) fn unbox_bool(
     b.ins().band_imm(s, 1)
 }
 
+/// Box an unboxed `f64` as a VmValue, replicating `VmValue::from_f64`: a
+/// float is stored as its raw bits EXCEPT a quiet-NaN-range result
+/// (`bits & QNAN == QNAN`) canonicalizes to `null`. This keeps a native float
+/// result byte-identical to the interpreter, which routes every float op
+/// through `from_f64`.
+pub(super) fn box_f64(
+    b: &mut FunctionBuilder,
+    v: cranelift_codegen::ir::Value,
+) -> cranelift_codegen::ir::Value {
+    let bits = b.ins().bitcast(types::I64, MemFlags::new(), v);
+    let q = b.ins().band_imm(bits, varn_types::vm_value::QNAN as i64);
+    let is_qnan = b.ins().icmp_imm(IntCC::Equal, q, varn_types::vm_value::QNAN as i64);
+    let null = b.ins().iconst(types::I64, VmValue::null().0 as i64);
+    b.ins().select(is_qnan, null, bits)
+}
+
+/// Unbox a boxed float VmValue to a raw `f64` — a pure bitcast, since a float
+/// VmValue's bits ARE the `f64` (canonical NaN-boxing).
+pub(super) fn unbox_f64(
+    b: &mut FunctionBuilder,
+    v: cranelift_codegen::ir::Value,
+) -> cranelift_codegen::ir::Value {
+    b.ins().bitcast(types::F64, MemFlags::new(), v)
+}
+
+/// Read a register as a raw `f64`: a `Float` var is already `F64`; an `Int`
+/// var coerces via `fcvt_from_sint` (the interpreter's `to_f64_val` does the
+/// same int→float widening in a mixed float op).
+pub(super) fn use_f64(
+    b: &mut FunctionBuilder,
+    vars: &[Variable],
+    state: &[K],
+    r: usize,
+) -> Result<cranelift_codegen::ir::Value, String> {
+    match state[r] {
+        K::Float => Ok(b.use_var(vars[r])),
+        K::Int => {
+            let iv = b.use_var(vars[r]);
+            Ok(b.ins().fcvt_from_sint(types::F64, iv))
+        }
+        k => Err(format!("clif: f64 use of {k:?} register")),
+    }
+}
+
+/// Whether register `r` is float-typed (its Variable is declared `F64`).
+pub(super) fn meta_is_float(meta: &[varn_types::register_meta::RegisterMeta], r: usize) -> bool {
+    meta.get(r).map_or(false, |m| m.kind == SlotKind::Float)
+}
+
 /// Read a register as boxed VmValue bits regardless of its representation:
-/// int → `box_int`, bool → `box_bool`, already-boxed (or any other tracked
-/// kind) → the raw bits. Callers pass registers whose lattice kind the flow
-/// has already proven to hold a real value.
+/// int → `box_int`, bool → `box_bool`, float → `box_f64`, already-boxed (or
+/// any other tracked kind) → the raw bits. Callers pass registers whose
+/// lattice kind the flow has already proven to hold a real value.
 pub(super) fn box_or_pass(
     b: &mut FunctionBuilder,
     vars: &[Variable],
@@ -188,6 +253,7 @@ pub(super) fn box_or_pass(
     match state[r] {
         K::Int => box_int(b, raw),
         K::Bool => box_bool(b, raw),
+        K::Float => box_f64(b, raw),
         _ => raw,
     }
 }
