@@ -84,13 +84,12 @@ fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
         let mut first = true;
         if val.is_heap() {
             if let Some(HeapObj::Array(a)) = ctx.heap.get(val.as_heap_idx()) {
-                let guard = a.borrow();
-                for item in guard.iter() {
+                for i in 0..a.len() {
                     if !first {
                         out.push(',');
                     }
                     first = false;
-                    write_json_vm(ctx, *item, out);
+                    write_json_vm(ctx, a.get_vm(i).unwrap(), out);
                 }
             }
         }

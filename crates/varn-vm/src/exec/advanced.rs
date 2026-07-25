@@ -90,7 +90,7 @@ pub fn op_in(key: VmValue, obj: VmValue, heap: &Heap) -> bool {
         Some(HeapObj::Object(o)) => o.borrow().get_field(&key_s).is_some(),
         Some(HeapObj::Array(a)) => {
             if let Ok(idx) = key_s.parse::<usize>() {
-                return idx < a.borrow().len();
+                return idx < a.len();
             }
             false
         }

@@ -761,8 +761,9 @@ impl HeapInner {
             return Ok(match obj {
                 HeapObj::Str(s) => Value::Str(s.to_shared()),
                 HeapObj::Array(a) => {
-                    let guard = a.borrow();
-                    let val_items: Vec<Value> = guard.iter().map(|&nv| self.extract(nv)).collect();
+                    let val_items: Vec<Value> = (0..a.len())
+                        .map(|i| self.extract(a.get_vm(i).unwrap()))
+                        .collect();
                     Value::Array(varn_types::value::ArrayRef::new(val_items))
                 }
                 HeapObj::Object(o) => Value::Object(o.clone()),
@@ -1214,8 +1215,9 @@ impl HeapInner {
                 Some(HeapObj::Str(s)) => s.to_string(),
                 Some(HeapObj::Char(c)) => c.to_string(),
                 Some(HeapObj::Array(a)) => {
-                    let g = a.borrow();
-                    let parts: Vec<_> = g.iter().map(|&v| self.str_repr(v)).collect();
+                    let parts: Vec<_> = (0..a.len())
+                        .map(|i| self.str_repr(a.get_vm(i).unwrap()))
+                        .collect();
                     format!("[{}]", parts.join(", "))
                 }
                 Some(HeapObj::Object(_)) => "[object Object]".into(),
@@ -1838,7 +1840,7 @@ impl NativeCtx for Heap {
     fn array_len(&self, arr: VmValue) -> usize {
         if arr.is_heap() {
             if let Some(HeapObj::Array(a)) = self.get_by_idx(arr.as_heap_idx()) {
-                return a.borrow().len();
+                return a.len();
             }
         }
         0
@@ -1847,7 +1849,7 @@ impl NativeCtx for Heap {
     fn array_get(&self, arr: VmValue, idx: usize) -> Option<VmValue> {
         if arr.is_heap() {
             if let Some(HeapObj::Array(a)) = self.get_by_idx(arr.as_heap_idx()) {
-                return a.borrow().get(idx).copied();
+                return a.get_vm(idx);
             }
         }
         None
@@ -1857,9 +1859,7 @@ impl NativeCtx for Heap {
         if arr.is_heap() {
             let raw_idx = arr.as_heap_idx();
             if let Some(HeapObj::Array(a)) = self.get_by_idx(raw_idx) {
-                let g = a.borrow_mut();
-                if idx < g.len() {
-                    g[idx] = val;
+                if a.set_vm(idx, val) {
                     self.write_barrier(raw_idx, val);
                 }
             }
@@ -1870,7 +1870,7 @@ impl NativeCtx for Heap {
         if arr.is_heap() {
             let raw_idx = arr.as_heap_idx();
             if let Some(HeapObj::Array(a)) = self.get_by_idx(raw_idx) {
-                a.borrow_mut().push(val);
+                a.push_vm(val);
                 self.write_barrier(raw_idx, val);
             }
         }
@@ -1879,7 +1879,7 @@ impl NativeCtx for Heap {
     fn array_pop(&mut self, arr: VmValue) -> Option<VmValue> {
         if arr.is_heap() {
             if let Some(HeapObj::Array(a)) = self.get_by_idx(arr.as_heap_idx()) {
-                return a.borrow_mut().pop();
+                return a.pop_vm();
             }
         }
         None
@@ -1888,9 +1888,8 @@ impl NativeCtx for Heap {
     fn array_for_each(&self, arr: VmValue, f: &mut dyn FnMut(VmValue, usize)) {
         if arr.is_heap() {
             if let Some(HeapObj::Array(a)) = self.get_by_idx(arr.as_heap_idx()) {
-                let g = a.borrow();
-                for (i, &v) in g.iter().enumerate() {
-                    f(v, i);
+                for i in 0..a.len() {
+                    f(a.get_vm(i).unwrap(), i);
                 }
             }
         }
@@ -2079,5 +2078,155 @@ mod jit_object_layout_tests {
         // values[i] via a constant lea off the data pointer
         assert_eq!(read_u64(rc + lay.values_off), VmValue::from_int(11).0);
         assert_eq!(read_u64(rc + lay.values_off + 8), VmValue::from_int(22).0);
+    }
+}
+
+/// A.3: exercises the `NativeCtx` `array_*` entry points — the single funnel
+/// every interpreter opcode, native builtin (via `VnArray`), and JIT slow
+/// path uses to reach array elements — against each `ArrayRepr` variant.
+/// Before this task these methods called `VmArray::borrow()/borrow_mut()`,
+/// which panics on a typed repr; these tests prove the total-accessor
+/// (`get_vm`/`set_vm`/`push_vm`/`pop_vm`/`len`) rewrite is variant-safe and
+/// that the Boxed path is unchanged.
+#[cfg(test)]
+mod array_variant_runtime_tests {
+    use super::*;
+
+    fn array_discriminant(heap: &Heap, nv: VmValue) -> u8 {
+        match heap.get(nv.as_heap_idx()) {
+            Some(HeapObj::Array(a)) => a.discriminant(),
+            other => panic!("expected Array, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn array_helpers_i64_variant_get_set_push_pop() {
+        let mut heap = Heap::new();
+        let raw = unsafe { heap.inner_mut() }
+            .alloc_raw(HeapObj::Array(VmArray::new_i64(vec![1, 2, 3])));
+        let arr_nv = VmValue::from_heap_idx(pack_old_idx(raw));
+
+        assert_eq!(heap.array_len(arr_nv), 3);
+        assert_eq!(heap.array_get(arr_nv, 1).unwrap().as_int(), 2);
+        assert!(heap.array_get(arr_nv, 99).is_none());
+
+        // Matching-typed set/push stay I64 — no migration.
+        heap.array_set(arr_nv, 0, VmValue::from_int(100));
+        assert_eq!(heap.array_get(arr_nv, 0).unwrap().as_int(), 100);
+        assert_eq!(array_discriminant(&heap, arr_nv), 1);
+
+        heap.array_push(arr_nv, VmValue::from_int(4));
+        assert_eq!(heap.array_len(arr_nv), 4);
+        assert_eq!(array_discriminant(&heap, arr_nv), 1);
+
+        let popped = heap.array_pop(arr_nv).unwrap();
+        assert_eq!(popped.as_int(), 4);
+        assert_eq!(heap.array_len(arr_nv), 3);
+
+        let mut seen = Vec::new();
+        heap.array_for_each(arr_nv, &mut |v, i| seen.push((i, v.as_int())));
+        assert_eq!(seen, vec![(0, 100), (1, 2), (2, 3)]);
+    }
+
+    #[test]
+    fn array_helpers_f64_variant_get_set_push_pop() {
+        let mut heap = Heap::new();
+        let raw = unsafe { heap.inner_mut() }
+            .alloc_raw(HeapObj::Array(VmArray::new_f64(vec![1.5, 2.5])));
+        let arr_nv = VmValue::from_heap_idx(pack_old_idx(raw));
+
+        assert_eq!(heap.array_len(arr_nv), 2);
+        assert_eq!(heap.array_get(arr_nv, 1).unwrap().as_f64(), 2.5);
+
+        // Matching-typed set/push stay F64 — no migration.
+        heap.array_set(arr_nv, 0, VmValue::from_f64(9.5));
+        assert_eq!(heap.array_get(arr_nv, 0).unwrap().as_f64(), 9.5);
+        assert_eq!(array_discriminant(&heap, arr_nv), 2);
+
+        heap.array_push(arr_nv, VmValue::from_f64(3.5));
+        assert_eq!(heap.array_len(arr_nv), 3);
+        assert_eq!(array_discriminant(&heap, arr_nv), 2);
+
+        let popped = heap.array_pop(arr_nv).unwrap();
+        assert_eq!(popped.as_f64(), 3.5);
+    }
+
+    #[test]
+    fn array_helpers_boxed_variant_unchanged() {
+        let mut heap = Heap::new();
+        let arr_nv = heap.alloc_array_vm(vec![VmValue::from_int(10), VmValue::from_int(20)]);
+
+        assert_eq!(heap.array_len(arr_nv), 2);
+        assert_eq!(heap.array_get(arr_nv, 1).unwrap().as_int(), 20);
+        heap.array_set(arr_nv, 0, VmValue::from_int(99));
+        assert_eq!(heap.array_get(arr_nv, 0).unwrap().as_int(), 99);
+        heap.array_push(arr_nv, VmValue::from_int(7));
+        assert_eq!(heap.array_len(arr_nv), 3);
+        assert_eq!(heap.array_pop(arr_nv).unwrap().as_int(), 7);
+        assert_eq!(array_discriminant(&heap, arr_nv), 0);
+    }
+
+    /// A.2/A.3 binding contract: a type-mismatched `array_set` into a typed
+    /// repr migrates the array to `Boxed` in place (identity preserved) and
+    /// must still fire the write barrier exactly as the pre-existing Boxed
+    /// `array_set` path does — the accessor swap must not silently drop the
+    /// barrier call for the migration case.
+    #[test]
+    fn array_set_migration_preserves_write_barrier_semantics() {
+        let mut heap = Heap::new();
+
+        // Old-gen typed array (bypasses the nursery, like a promoted array
+        // would be) so `write_barrier`'s `is_old_idx(parent)` check is live.
+        let arr_raw = unsafe { heap.inner_mut() }
+            .alloc_raw(HeapObj::Array(VmArray::new_i64(vec![1, 2, 3])));
+        let arr_packed = pack_old_idx(arr_raw);
+        assert!(is_old_idx(arr_packed));
+        let arr_nv = VmValue::from_heap_idx(arr_packed);
+
+        // A nursery-allocated string: writing it into the array is both a
+        // type mismatch (forces migration to Boxed) and a nursery child of
+        // an old-gen parent (must be remembered by the barrier).
+        let child_nv = heap.alloc_str_dynamic("a string longer than five bytes");
+        assert!(child_nv.is_heap());
+        assert!(is_nursery_idx(child_nv.as_heap_idx()));
+
+        heap.array_set(arr_nv, 1, child_nv);
+
+        // Migrated to Boxed; identity and the other elements are preserved.
+        assert_eq!(array_discriminant(&heap, arr_nv), 0);
+        assert_eq!(heap.array_get(arr_nv, 0).unwrap().as_int(), 1);
+        assert_eq!(heap.array_get(arr_nv, 1).unwrap(), child_nv);
+        assert_eq!(heap.array_get(arr_nv, 2).unwrap().as_int(), 3);
+
+        // The write barrier ran: the old-gen array's slot is in the
+        // nursery's remembered set, so a minor GC (which only walks
+        // remembered old-gen slots, not every old-gen object) still finds
+        // the array->string edge and keeps the string alive.
+        let remembered = unsafe { heap.inner_mut() }.nursery.remembered.clone();
+        assert!(
+            remembered.contains(&arr_packed),
+            "write_barrier did not remember the migrated array's old-gen slot; \
+             a nursery-promoted GC pass would miss the array->string edge"
+        );
+    }
+
+    /// OOB `array_set` must not fire the write barrier — matches the
+    /// pre-existing Boxed behavior (`idx < len` gate) exactly, now driven by
+    /// `set_vm`'s bool return instead of a manual length check.
+    #[test]
+    fn array_set_out_of_bounds_does_not_migrate_or_remember() {
+        let mut heap = Heap::new();
+        let arr_raw = unsafe { heap.inner_mut() }
+            .alloc_raw(HeapObj::Array(VmArray::new_i64(vec![1, 2, 3])));
+        let arr_packed = pack_old_idx(arr_raw);
+        let arr_nv = VmValue::from_heap_idx(arr_packed);
+
+        let child_nv = heap.alloc_str_dynamic("a string longer than five bytes");
+        heap.array_set(arr_nv, 99, child_nv); // OOB: no-op
+
+        assert_eq!(array_discriminant(&heap, arr_nv), 1); // still I64
+        assert_eq!(heap.array_len(arr_nv), 3);
+        let remembered = unsafe { heap.inner_mut() }.nursery.remembered.clone();
+        assert!(!remembered.contains(&arr_packed));
     }
 }

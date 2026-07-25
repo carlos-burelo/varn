@@ -307,7 +307,7 @@ impl NativeCtx for ExecCtx {
     fn array_len(&self, arr: VmValue) -> usize {
         if arr.is_heap() {
             if let Some(HeapObj::Array(a)) = self.heap.get(arr.as_heap_idx()) {
-                return a.borrow().len();
+                return a.len();
             }
         }
         0
@@ -316,7 +316,7 @@ impl NativeCtx for ExecCtx {
     fn array_get(&self, arr: VmValue, idx: usize) -> Option<VmValue> {
         if arr.is_heap() {
             if let Some(HeapObj::Array(a)) = self.heap.get(arr.as_heap_idx()) {
-                return a.borrow().get(idx).copied();
+                return a.get_vm(idx);
             }
         }
         None
@@ -326,9 +326,7 @@ impl NativeCtx for ExecCtx {
         if arr.is_heap() {
             let raw_idx = arr.as_heap_idx();
             if let Some(HeapObj::Array(a)) = self.heap.get(raw_idx) {
-                let g = a.borrow_mut();
-                if idx < g.len() {
-                    g[idx] = val;
+                if a.set_vm(idx, val) {
                     self.heap.write_barrier(raw_idx, val);
                 }
             }
@@ -339,7 +337,7 @@ impl NativeCtx for ExecCtx {
         if arr.is_heap() {
             let raw_idx = arr.as_heap_idx();
             if let Some(HeapObj::Array(a)) = self.heap.get(raw_idx) {
-                a.borrow_mut().push(val);
+                a.push_vm(val);
                 self.heap.write_barrier(raw_idx, val);
             }
         }
@@ -348,7 +346,7 @@ impl NativeCtx for ExecCtx {
     fn array_pop(&mut self, arr: VmValue) -> Option<VmValue> {
         if arr.is_heap() {
             if let Some(HeapObj::Array(a)) = self.heap.get(arr.as_heap_idx()) {
-                return a.borrow_mut().pop();
+                return a.pop_vm();
             }
         }
         None
@@ -357,9 +355,8 @@ impl NativeCtx for ExecCtx {
     fn array_for_each(&self, arr: VmValue, f: &mut dyn FnMut(VmValue, usize)) {
         if arr.is_heap() {
             if let Some(HeapObj::Array(a)) = self.heap.get(arr.as_heap_idx()) {
-                let g = a.borrow();
-                for (i, &v) in g.iter().enumerate() {
-                    f(v, i);
+                for i in 0..a.len() {
+                    f(a.get_vm(i).unwrap(), i);
                 }
             }
         }
@@ -770,9 +767,12 @@ impl NativeCtx for ExecCtx {
             match self.heap.get_by_idx(val.as_heap_idx()) {
                 Some(HeapObj::Str(s)) => Ok(varn_types::value::SendValue::Str(s.to_string())),
                 Some(HeapObj::Array(arr)) => {
-                    let mut items = Vec::new();
-                    for &item in arr.borrow().iter() {
-                        items.push(self.to_sendable(item)?);
+                    let mut items = Vec::with_capacity(arr.len());
+                    for i in 0..arr.len() {
+                        // `get_vm` boxes on read for typed reprs — a typed
+                        // array crossing an isolate boundary serializes the
+                        // same as a Boxed one; no migration, read-only.
+                        items.push(self.to_sendable(arr.get_vm(i).unwrap())?);
                     }
                     Ok(varn_types::value::SendValue::Array(items))
                 }
