@@ -281,10 +281,14 @@ impl Nursery {
         if let Some(obj) = old_gen.get_raw(raw_old) {
             match obj {
                 HeapObj::Array(arr) => {
-                    let g = arr.borrow();
-                    for (i, &v) in g.iter().enumerate() {
-                        if v.is_heap() && is_nursery_idx(v.as_heap_idx()) {
-                            fixups.push((ChildSlot::ArrayItem(i), v.as_heap_idx()));
+                    // Variant-aware: I64/F64 elements are raw numeric words,
+                    // never a nursery heap ref, so there is nothing to scan
+                    // or fix up. Only `Boxed` can hold a moved child.
+                    if let Some(items) = arr.as_boxed() {
+                        for (i, &v) in items.iter().enumerate() {
+                            if v.is_heap() && is_nursery_idx(v.as_heap_idx()) {
+                                fixups.push((ChildSlot::ArrayItem(i), v.as_heap_idx()));
+                            }
                         }
                     }
                 }
@@ -367,8 +371,14 @@ impl Nursery {
             };
             match (slot, obj) {
                 (ChildSlot::ArrayItem(i), HeapObj::Array(arr)) => {
-                    if let Some(s) = arr.borrow_mut().get_mut(i) {
-                        *s = new_val;
+                    // `ArrayItem` fixups are only ever pushed for a `Boxed`
+                    // array (see the scan above), but use the total accessor
+                    // rather than `borrow_mut()` anyway — never assume a
+                    // repr invariant here that isn't locally re-checked.
+                    if let Some(v) = arr.as_boxed_mut() {
+                        if let Some(s) = v.get_mut(i) {
+                            *s = new_val;
+                        }
                     }
                 }
                 (ChildSlot::ObjField(i), HeapObj::Object(obj_ref)) => {
@@ -403,6 +413,71 @@ impl Nursery {
                 }
                 _ => {}
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod array_scan_tests {
+    use super::*;
+    use varn_types::VmArray;
+
+    /// A.2: `scan_and_fix_old_obj`'s `HeapObj::Array` arm must branch on the
+    /// repr (`as_boxed()`), never call the Boxed-only `borrow()` — that
+    /// panics on a typed repr. I64/F64 elements are raw numeric words, never
+    /// a nursery heap ref, so scanning either must not panic and must not
+    /// evacuate anything (nothing pushed onto `worklist`).
+    #[test]
+    fn scan_skips_typed_array_reprs_without_panicking() {
+        let mut old_gen = HeapInner::new();
+        let raw_i64 = old_gen.alloc_raw(HeapObj::Array(VmArray::new_i64(vec![1, 2, 3])));
+        let raw_f64 = old_gen.alloc_raw(HeapObj::Array(VmArray::new_f64(vec![1.0, 2.0])));
+
+        let mut nursery = Nursery::new();
+        let mut worklist = Vec::new();
+        let mut fixups = Vec::new();
+
+        nursery.scan_and_fix_old_obj(raw_i64, &mut old_gen, &mut worklist, &mut fixups);
+        nursery.scan_and_fix_old_obj(raw_f64, &mut old_gen, &mut worklist, &mut fixups);
+
+        assert!(worklist.is_empty());
+    }
+
+    /// Control case: a `Boxed` array element pointing into the nursery is
+    /// still evacuated and the array slot rewritten in place — the
+    /// variant-aware rewrite must not regress the path every existing test
+    /// in the suite exercises.
+    #[test]
+    fn scan_still_evacuates_and_fixes_up_boxed_array_nursery_refs() {
+        let mut old_gen = HeapInner::new();
+        let mut nursery = Nursery::new();
+
+        let child_nursery_idx = nursery
+            .try_alloc(HeapObj::Str(crate::heap::HeapStr::shared(std::rc::Rc::from(
+                "child",
+            ))))
+            .expect("fresh nursery has room");
+        let child_val = VmValue::from_heap_idx(child_nursery_idx);
+        assert!(is_nursery_idx(child_val.as_heap_idx()));
+
+        let raw_arr = old_gen.alloc_raw(HeapObj::Array(VmArray::new(vec![child_val])));
+
+        let mut worklist = Vec::new();
+        let mut fixups = Vec::new();
+        nursery.scan_and_fix_old_obj(raw_arr, &mut old_gen, &mut worklist, &mut fixups);
+
+        // The nursery child was evacuated into the old gen...
+        assert_eq!(worklist.len(), 1);
+        // ...and the fixup loop rewrote the array slot in place to point at
+        // its new old-gen (packed) index.
+        match old_gen.get_raw(raw_arr) {
+            Some(HeapObj::Array(arr)) => {
+                let items = arr.as_boxed().expect("array stays Boxed");
+                assert_eq!(items.len(), 1);
+                assert!(items[0].is_heap());
+                assert!(is_old_idx(items[0].as_heap_idx()));
+            }
+            other => panic!("expected Array, got {other:?}"),
         }
     }
 }

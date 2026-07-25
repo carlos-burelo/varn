@@ -1543,6 +1543,63 @@ impl Heap {
             (0usize, ptr_off, len_off)
         };
 
+        // A.2 / I1: the JIT's array fast path reads `disc_off` to branch on
+        // the repr, then (for the typed arms) reads `elems_ptr_off` /
+        // `elems_len_off` — offsets measured above against `ArrayRepr::Boxed`
+        // only. Task A.4 will start constructing `I64`/`F64` arrays, so
+        // check NOW, at startup, that those same offsets also land on the
+        // `Vec` payload for the typed variants — turning a layout
+        // *assumption* the later phase would otherwise silently rely on into
+        // a checked invariant here, before any typed array exists.
+        {
+            let mut i64_vec: Vec<i64> = Vec::with_capacity(7);
+            for _ in 0..3 {
+                i64_vec.push(0);
+            }
+            let i64_ptr = i64_vec.as_ptr() as usize;
+            let repr = varn_types::vm_value::ArrayRepr::I64(i64_vec);
+            let base = &repr as *const _ as *const u8;
+            let disc = unsafe { *base.add(disc_off) };
+            assert_eq!(
+                disc, 1,
+                "ArrayRepr::I64 discriminant must read as 1 at the probed disc_off"
+            );
+            let probed_ptr = unsafe { *(base.add(elems_ptr_off) as *const usize) };
+            let probed_len = unsafe { *(base.add(elems_len_off) as *const usize) };
+            assert_eq!(
+                probed_ptr, i64_ptr,
+                "ArrayRepr::I64 Vec ptr does not land at the Boxed-probed elems_ptr_off"
+            );
+            assert_eq!(
+                probed_len, 3,
+                "ArrayRepr::I64 Vec len does not land at the Boxed-probed elems_len_off"
+            );
+        }
+        {
+            let mut f64_vec: Vec<f64> = Vec::with_capacity(7);
+            for _ in 0..3 {
+                f64_vec.push(0.0);
+            }
+            let f64_ptr = f64_vec.as_ptr() as usize;
+            let repr = varn_types::vm_value::ArrayRepr::F64(f64_vec);
+            let base = &repr as *const _ as *const u8;
+            let disc = unsafe { *base.add(disc_off) };
+            assert_eq!(
+                disc, 2,
+                "ArrayRepr::F64 discriminant must read as 2 at the probed disc_off"
+            );
+            let probed_ptr = unsafe { *(base.add(elems_ptr_off) as *const usize) };
+            let probed_len = unsafe { *(base.add(elems_len_off) as *const usize) };
+            assert_eq!(
+                probed_ptr, f64_ptr,
+                "ArrayRepr::F64 Vec ptr does not land at the Boxed-probed elems_ptr_off"
+            );
+            assert_eq!(
+                probed_len, 3,
+                "ArrayRepr::F64 Vec len does not land at the Boxed-probed elems_len_off"
+            );
+        }
+
         // Slot probe: discriminant byte and the offset of the payload's Rc
         // pointer inside `Option<HeapObj>` (the Option uses the enum's spare
         // discriminant values as its niche, so the tag byte is shared).
