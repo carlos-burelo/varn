@@ -96,11 +96,7 @@ pub unsafe extern "C" fn jit_array_get_fast(
             } else {
                 key.to_i32() as usize
             };
-            let vec = &*a.0.get();
-            if idx < vec.len() {
-                return *vec.get_unchecked(idx);
-            }
-            return VmValue::null();
+            return a.get_vm(idx).unwrap_or(VmValue::null());
         }
     }
     // Slow path: objects, strings, ranges, SSO strings — fall back to handler
@@ -127,16 +123,16 @@ pub unsafe extern "C" fn jit_array_set_fast(
             } else {
                 key.to_i32() as usize
             };
-            let vec = &mut *a.0.get();
-            if idx < vec.len() {
-                *vec.get_unchecked_mut(idx) = val;
-            } else if idx == vec.len() {
-                vec.push(val);
+            let len = a.len();
+            if idx < len {
+                a.set_vm(idx, val);
+            } else if idx == len {
+                a.push_vm(val);
             } else {
-                while vec.len() < idx {
-                    vec.push(VmValue::null());
+                while a.len() < idx {
+                    a.push_vm(VmValue::null());
                 }
-                vec.push(val);
+                a.push_vm(val);
             }
             ctx_ref.heap.write_barrier(heap_idx, val);
             return;

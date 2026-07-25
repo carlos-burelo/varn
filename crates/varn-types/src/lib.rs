@@ -25,4 +25,4 @@ pub use value::{
     find_method_with_owner, root_shape, ClassObj, Closure, LazyTask, ModuleObj, ObjData,
     ResultType, RuntimeArray, RuntimeString, Shape, Upvalue, UpvalueInner, Value,
 };
-pub use vm_value::{VmArray, VmValue, VmValueRef};
+pub use vm_value::{ArrayRepr, VmArray, VmValue, VmValueRef};

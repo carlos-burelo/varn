@@ -78,14 +78,7 @@ pub fn array_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<
             } else {
                 heap.to_f64_val(key) as usize
             };
-            let val = unsafe {
-                let vec = &*a.0.get();
-                if idx < vec.len() {
-                    *vec.get_unchecked(idx)
-                } else {
-                    VmValue::null()
-                }
-            };
+            let val = a.get_vm(idx).unwrap_or(VmValue::null());
             return Ok(val);
         }
     }
@@ -102,16 +95,16 @@ pub fn array_set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Heap
             heap.to_f64_val(key) as usize
         };
         if let Some(HeapObj::Array(a)) = heap.get_mut(heap_idx) {
-            let g = unsafe { &mut *a.0.get() };
-            if idx < g.len() {
-                g[idx] = val;
-            } else if idx == g.len() {
-                g.push(val);
+            let len = a.len();
+            if idx < len {
+                a.set_vm(idx, val);
+            } else if idx == len {
+                a.push_vm(val);
             } else {
-                while g.len() < idx {
-                    g.push(VmValue::null());
+                while a.len() < idx {
+                    a.push_vm(VmValue::null());
                 }
-                g.push(val);
+                a.push_vm(val);
             }
             heap.write_barrier(heap_idx, val);
             return Ok(());
@@ -124,14 +117,7 @@ pub fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValu
     if obj.is_heap() {
         if let Some(HeapObj::Array(a)) = heap.get(obj.as_heap_idx()) {
             let idx = heap.as_int(key);
-            let val = unsafe {
-                let vec = &*a.0.get();
-                if (idx as usize) < vec.len() {
-                    *vec.get_unchecked(idx as usize)
-                } else {
-                    VmValue::null()
-                }
-            };
+            let val = a.get_vm(idx as usize).unwrap_or(VmValue::null());
             return Ok(val);
         }
     }
@@ -191,16 +177,16 @@ pub fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Heap) -> V
     let idx_i = heap.as_int(key) as usize;
     match heap.get(heap_idx) {
         Some(HeapObj::Array(a)) => {
-            let g = unsafe { &mut *a.0.get() };
-            if idx_i < g.len() {
-                g[idx_i] = val;
-            } else if idx_i == g.len() {
-                g.push(val);
+            let len = a.len();
+            if idx_i < len {
+                a.set_vm(idx_i, val);
+            } else if idx_i == len {
+                a.push_vm(val);
             } else {
-                while g.len() < idx_i {
-                    g.push(VmValue::null());
+                while a.len() < idx_i {
+                    a.push_vm(VmValue::null());
                 }
-                g.push(val);
+                a.push_vm(val);
             }
             heap.write_barrier(heap_idx, val);
             Ok(())
@@ -218,7 +204,7 @@ pub fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Heap) -> V
 pub fn array_length(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
     if val.is_heap() {
         if let Some(HeapObj::Array(a)) = heap.get(val.as_heap_idx()) {
-            return Ok(VmValue::from_i32(a.borrow().len() as i32));
+            return Ok(VmValue::from_i32(a.len() as i32));
         }
         if let Some(HeapObj::Str(s)) = heap.get(val.as_heap_idx()) {
             return Ok(VmValue::from_i32(s.chars().count() as i32));
@@ -230,7 +216,7 @@ pub fn array_length(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
 pub fn array_push(arr: VmValue, val: VmValue, heap: &mut Heap) -> VmResult<()> {
     if arr.is_heap() {
         if let Some(HeapObj::Array(a)) = heap.get(arr.as_heap_idx()) {
-            a.borrow_mut().push(val);
+            a.push_vm(val);
             heap.write_barrier(arr.as_heap_idx(), val);
             return Ok(());
         }
@@ -241,7 +227,7 @@ pub fn array_push(arr: VmValue, val: VmValue, heap: &mut Heap) -> VmResult<()> {
 pub fn array_pop(arr: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if arr.is_heap() {
         if let Some(HeapObj::Array(a)) = heap.get(arr.as_heap_idx()) {
-            let v = a.borrow_mut().pop().unwrap_or(VmValue::null());
+            let v = a.pop_vm().unwrap_or(VmValue::null());
             return Ok(v);
         }
     }
@@ -253,8 +239,16 @@ pub fn array_extend(dst: VmValue, src: VmValue, heap: &Heap) -> VmResult<()> {
         if let (Some(HeapObj::Array(da)), Some(HeapObj::Array(sa))) =
             (heap.get(dst.as_heap_idx()), heap.get(src.as_heap_idx()))
         {
-            let items: Vec<VmValue> = sa.borrow().clone();
-            da.borrow_mut().extend(items.clone());
+            // Snapshot source elements first (a copy, so dst == src is safe),
+            // then append boxed into the destination.
+            let n = sa.len();
+            let mut items: Vec<VmValue> = Vec::with_capacity(n);
+            for i in 0..n {
+                items.push(sa.get_vm(i).unwrap_or(VmValue::null()));
+            }
+            for &item in &items {
+                da.push_vm(item);
+            }
             let heap_mut = unsafe { heap.inner_mut() };
             for &item in &items {
                 heap_mut.write_barrier(dst.as_heap_idx(), item);

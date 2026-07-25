@@ -1491,11 +1491,57 @@ impl Heap {
         }
         let (slots_ptr_off, _slots_len_off) = vec_word_offsets(&slots_probe);
 
-        let mut elems_probe: Vec<VmValue> = Vec::with_capacity(7);
-        for _ in 0..3 {
-            elems_probe.push(VmValue::null());
-        }
-        let (elems_ptr_off, elems_len_off) = vec_word_offsets(&elems_probe);
+        // Element (data ptr, len) offsets are measured INSIDE an
+        // `ArrayRepr::Boxed`, not a bare `Vec`: the JIT reaches the payload at
+        // `RcBox + 16`, which now points at the `ArrayRepr` (u8 tag +
+        // alignment padding + `Vec`). Measuring against the wrapped repr folds
+        // the tag/padding into the offsets, so `payload + 16 + off` lands on
+        // the `Vec`'s words exactly as before the wrapping.
+        let (disc_off, elems_ptr_off, elems_len_off) = {
+            let mut boxed_vec: Vec<VmValue> = Vec::with_capacity(7);
+            for _ in 0..3 {
+                boxed_vec.push(VmValue::null());
+            }
+            let vec_ptr = boxed_vec.as_ptr() as usize;
+            let repr = varn_types::vm_value::ArrayRepr::Boxed(boxed_vec);
+            let repr_size = std::mem::size_of::<varn_types::vm_value::ArrayRepr>();
+            let base = &repr as *const _ as *const u8;
+            let word = std::mem::size_of::<usize>();
+
+            // `#[repr(C, u8)]`: discriminant is a u8 at offset 0, and Boxed == 0.
+            let disc = unsafe { *base };
+            assert_eq!(disc, 0, "ArrayRepr::Boxed discriminant must be 0");
+
+            // Scan word-aligned slots from the payload region (skip the tag
+            // word to avoid interpreting alignment padding). len 3 / capacity 7
+            // disambiguates the three Vec words, exactly as the bare-Vec probe.
+            let mut ptr_off = usize::MAX;
+            let mut len_off = usize::MAX;
+            let mut off = word;
+            while off + word <= repr_size {
+                let w = unsafe { *(base.add(off) as *const usize) };
+                if w == vec_ptr {
+                    ptr_off = off;
+                } else if w == 3 {
+                    len_off = off;
+                }
+                off += word;
+            }
+            assert!(
+                ptr_off != usize::MAX && len_off != usize::MAX,
+                "ArrayRepr::Boxed Vec layout probe failed"
+            );
+
+            // Verify: reading back through the probed offsets recovers the real
+            // ptr/len. `RcBox + 16` == `&ArrayRepr` (UnsafeCell is transparent),
+            // so this exactly mirrors the load the JIT emits.
+            let probed_ptr = unsafe { *(base.add(ptr_off) as *const usize) };
+            let probed_len = unsafe { *(base.add(len_off) as *const usize) };
+            assert_eq!(probed_ptr, vec_ptr, "elems_ptr_off probe read-back mismatch");
+            assert_eq!(probed_len, 3, "elems_len_off probe read-back mismatch");
+
+            (0usize, ptr_off, len_off)
+        };
 
         // Slot probe: discriminant byte and the offset of the payload's Rc
         // pointer inside `Option<HeapObj>` (the Option uses the enum's spare
@@ -1531,6 +1577,7 @@ impl Heap {
             slot_size: size,
             array_tag,
             payload_off,
+            disc_off,
             elems_ptr_off,
             elems_len_off,
         }

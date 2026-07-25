@@ -85,8 +85,15 @@ pub struct VmClosure {
 /// share this single source of truth.
 pub fn build_jit_helpers() -> varn_jit::JitHelpers {
     let array_layout = crate::heap::Heap::jit_array_layout();
+    // `ExecCtx.stack` is a BARE `Vec<VmValue>`, so its data-pointer word is at
+    // the bare-`Vec` ptr offset — NOT `elems_ptr_off`, which since the
+    // `ArrayRepr` wrapping is measured relative to the `ArrayRepr` (tag +
+    // padding + `Vec`) and so includes the wrapper. `slots_ptr_off` is that
+    // bare offset (a `Vec`'s field layout is element-type-independent, so the
+    // `Vec<Option<HeapObj>>` probe yields the same ptr offset as a
+    // `Vec<VmValue>`).
     let stack_data_offset =
-        std::mem::offset_of!(ctx::ExecCtx, stack) + array_layout.elems_ptr_off;
+        std::mem::offset_of!(ctx::ExecCtx, stack) + array_layout.slots_ptr_off;
     varn_jit::JitHelpers {
         load_const: ctx::jit_load_const as usize,
         load_global_idx: ctx::jit_load_global_idx as usize,

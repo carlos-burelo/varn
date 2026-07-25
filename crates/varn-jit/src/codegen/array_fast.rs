@@ -87,6 +87,19 @@ pub(crate) fn emit_resolve_array_payload(
 
     // Element `Vec`'s words live at payload RcBox + 16.
     asm.mov_reg_mem(Reg::Rax, Reg::Rax, lay.payload_off as i32);
+
+    // Discriminant guard: the `ArrayRepr` tag byte sits at `RcBox + 16 +
+    // disc_off`. Only `Boxed` (0) may take the raw-`Vec` inline path — a typed
+    // (`I64`/`F64`) repr has no NaN-boxed elements at these offsets, so it
+    // diverts to the generic helper. Before Task A.4 every array is Boxed, so
+    // this branch is never taken; it keeps the fast path sound the instant
+    // typed reprs (or an in-place migration) appear. `Rax` (the payload
+    // pointer the callers consume) is left untouched.
+    asm.mov_reg_mem(Reg::R10, Reg::Rax, (16 + lay.disc_off) as i32);
+    asm.mov_reg_imm64(Reg::Rcx, 0xFF);
+    asm.and_reg_reg(Reg::R10, Reg::Rcx);
+    asm.test_reg_reg(Reg::R10, Reg::R10);
+    slow.push(asm.jmp_cond(Cond::NotEqual));
 }
 
 /// Patch every offset in `slow` to point at the current assembler position.

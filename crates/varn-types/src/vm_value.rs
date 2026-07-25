@@ -295,39 +295,400 @@ impl fmt::Display for VmValue {
 use std::cell::UnsafeCell;
 use std::rc::Rc;
 
-#[derive(Clone, Debug)]
-pub struct VmArray(pub Rc<UnsafeCell<Vec<VmValue>>>);
+use crate::register_meta::SlotKind;
 
-impl VmArray {
+/// Backing representation of a [`VmArray`]'s element buffer.
+///
+/// `#[repr(C, u8)]` pins a *defined* layout so the JIT can probe it: the
+/// discriminant is a `u8` at offset 0, and each variant's `Vec` payload sits
+/// at a fixed offset after the tag + alignment padding (8 on 64-bit targets).
+/// The template and CLIF backends read the discriminant to guard their inline
+/// fast paths and read the `Vec` words directly — see
+/// `Heap::jit_array_layout` and the `discriminant() == Boxed` guards in the
+/// JIT array paths.
+///
+/// A `VmArray` owns exactly one `Rc<UnsafeCell<ArrayRepr>>`, so every clone
+/// and alias shares this single cell. An in-place migration (typed → `Boxed`
+/// on a type-mismatched write) is therefore visible to *all* aliases and
+/// never changes the array's identity — the `Rc` address (and thus the heap
+/// index / `===` semantics / `Map` key) is preserved because only the cell's
+/// *contents* are swapped, never the cell itself.
+///
+/// A.1 note: only `Boxed` is ever constructed by the compiler/runtime today;
+/// the typed variants exist in the type system but are not produced until
+/// Task A.4. The migration and typed accessors are implemented and unit
+/// tested now so the machinery is proven before it goes live.
+#[repr(C, u8)]
+#[derive(Debug)]
+pub enum ArrayRepr {
+    /// str / object / heterogeneous / `Dynamic` elements — NaN-boxed, as today.
+    Boxed(Vec<VmValue>) = 0,
+    /// `Array<int>` — raw `i64` buffer, holds no heap refs (GC skips it in A.2).
+    I64(Vec<i64>) = 1,
+    /// `Array<float>` — raw `f64` buffer, holds no heap refs.
+    F64(Vec<f64>) = 2,
+}
+
+impl ArrayRepr {
+    /// The `repr(C, u8)` discriminant (0 = Boxed, 1 = I64, 2 = F64). Matches
+    /// the byte the JIT reads at offset 0 of the `ArrayRepr`.
     #[inline(always)]
-    pub fn new(items: Vec<VmValue>) -> Self {
-        Self(Rc::new(UnsafeCell::new(items)))
+    pub fn discriminant(&self) -> u8 {
+        match self {
+            ArrayRepr::Boxed(_) => 0,
+            ArrayRepr::I64(_) => 1,
+            ArrayRepr::F64(_) => 2,
+        }
     }
 
+    #[inline(always)]
+    pub fn len(&self) -> usize {
+        match self {
+            ArrayRepr::Boxed(v) => v.len(),
+            ArrayRepr::I64(v) => v.len(),
+            ArrayRepr::F64(v) => v.len(),
+        }
+    }
+
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+/// A reference-counted, interior-mutable array whose element storage is one
+/// of three representations (see [`ArrayRepr`]). Identity is the `Rc` address;
+/// see the type-level docs on `ArrayRepr` for the single-cell / migration
+/// invariant.
+#[derive(Clone, Debug)]
+pub struct VmArray(pub Rc<UnsafeCell<ArrayRepr>>);
+
+impl VmArray {
+    // ---- constructors -----------------------------------------------------
+
+    /// Boxed array from NaN-boxed values. This is the ubiquitous constructor
+    /// every current call site uses; it keeps building `Boxed` arrays exactly
+    /// as before A.1.
+    #[inline(always)]
+    pub fn new(items: Vec<VmValue>) -> Self {
+        Self(Rc::new(UnsafeCell::new(ArrayRepr::Boxed(items))))
+    }
+
+    /// Empty `Boxed` array.
     #[inline(always)]
     pub fn empty() -> Self {
         Self::new(Vec::new())
     }
 
+    /// `Array<int>` backed by a raw `i64` buffer. Not produced by the
+    /// compiler until Task A.4; available now for tests and future phases.
     #[inline(always)]
-    pub fn borrow(&self) -> &Vec<VmValue> {
+    pub fn new_i64(items: Vec<i64>) -> Self {
+        Self(Rc::new(UnsafeCell::new(ArrayRepr::I64(items))))
+    }
+
+    /// `Array<float>` backed by a raw `f64` buffer. See [`Self::new_i64`].
+    #[inline(always)]
+    pub fn new_f64(items: Vec<f64>) -> Self {
+        Self(Rc::new(UnsafeCell::new(ArrayRepr::F64(items))))
+    }
+
+    // ---- repr access (internal) ------------------------------------------
+
+    /// Shared view of the repr.
+    ///
+    /// SAFETY: as with the old `borrow`, callers must not create a `&mut`
+    /// alias into the same cell while the returned reference is live. The VM
+    /// is single-threaded and never re-enters an array mutation underneath a
+    /// live read, so this holds by construction.
+    #[inline(always)]
+    fn repr(&self) -> &ArrayRepr {
         unsafe { &*self.0.get() }
     }
 
+    /// Exclusive view of the repr. SAFETY: see [`Self::repr`]; no other live
+    /// reference (shared or exclusive) into the same cell may exist.
     #[inline(always)]
-    pub fn borrow_mut(&self) -> &mut Vec<VmValue> {
+    #[allow(clippy::mut_from_ref)]
+    fn repr_mut(&self) -> &mut ArrayRepr {
         unsafe { &mut *self.0.get() }
+    }
+
+    // ---- generic queries --------------------------------------------------
+
+    /// The current representation's discriminant (0/1/2). Used by the JIT
+    /// probe and by dispatch that must branch on element kind.
+    #[inline(always)]
+    pub fn discriminant(&self) -> u8 {
+        self.repr().discriminant()
+    }
+
+    /// Element kind as a [`SlotKind`]: Boxed → `Dynamic`, I64 → `Int`,
+    /// F64 → `Float`.
+    #[inline(always)]
+    pub fn element_slotkind(&self) -> SlotKind {
+        match self.repr() {
+            ArrayRepr::Boxed(_) => SlotKind::Dynamic,
+            ArrayRepr::I64(_) => SlotKind::Int,
+            ArrayRepr::F64(_) => SlotKind::Float,
+        }
     }
 
     #[inline(always)]
     pub fn len(&self) -> usize {
-        self.borrow().len()
+        self.repr().len()
     }
 
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
-        self.borrow().is_empty()
+        self.repr().is_empty()
     }
+
+    // ---- Boxed-variant projections (legacy call sites) -------------------
+
+    /// Boxed-variant vector, or `None` for a typed repr. Total and panic-free.
+    #[inline(always)]
+    pub fn as_boxed(&self) -> Option<&Vec<VmValue>> {
+        match self.repr() {
+            ArrayRepr::Boxed(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    /// Mutable Boxed-variant vector, or `None` for a typed repr.
+    #[inline(always)]
+    #[allow(clippy::mut_from_ref)]
+    pub fn as_boxed_mut(&self) -> Option<&mut Vec<VmValue>> {
+        match self.repr_mut() {
+            ArrayRepr::Boxed(v) => Some(v),
+            _ => None,
+        }
+    }
+
+    /// Legacy `&Vec<VmValue>` projection for call sites that structurally only
+    /// ever hold `Boxed` arrays (they built the array boxed, or reached it
+    /// from a path where no typed repr exists — true of every site before
+    /// Task A.4). A typed repr here is a bug, not a reachable state; the cold
+    /// panic makes that explicit rather than corrupting memory. Sites that
+    /// could see typed variants must use the total `*_vm` accessors instead.
+    #[inline(always)]
+    pub fn borrow(&self) -> &Vec<VmValue> {
+        match self.repr() {
+            ArrayRepr::Boxed(v) => v,
+            _ => unreachable_typed("borrow"),
+        }
+    }
+
+    /// Mutable counterpart of [`Self::borrow`]; same Boxed-only contract.
+    #[inline(always)]
+    #[allow(clippy::mut_from_ref)]
+    pub fn borrow_mut(&self) -> &mut Vec<VmValue> {
+        match self.repr_mut() {
+            ArrayRepr::Boxed(v) => v,
+            _ => unreachable_typed("borrow_mut"),
+        }
+    }
+
+    // ---- total VmValue-level accessors (work on any variant) -------------
+
+    /// Read element `idx` as a `VmValue`, boxing on read from a typed repr.
+    /// `None` if out of bounds.
+    #[inline]
+    pub fn get_vm(&self, idx: usize) -> Option<VmValue> {
+        match self.repr() {
+            ArrayRepr::Boxed(v) => v.get(idx).copied(),
+            ArrayRepr::I64(v) => v.get(idx).map(|&n| VmValue::from_int(n)),
+            ArrayRepr::F64(v) => v.get(idx).map(|&f| VmValue::from_f64(f)),
+        }
+    }
+
+    /// Store `val` at `idx`. A type-mismatched store into a typed repr
+    /// migrates the array to `Boxed` in place (see [`ArrayRepr`]) and then
+    /// stores boxed. Returns `false` only when `idx` is out of bounds.
+    ///
+    /// The common `Boxed` case is a single repr projection + bounds check; the
+    /// typed arms fall out of the match (releasing the borrow) before the cold
+    /// migration re-borrows, so there is no double projection on the hot path.
+    #[inline]
+    pub fn set_vm(&self, idx: usize, val: VmValue) -> bool {
+        {
+            match self.repr_mut() {
+                ArrayRepr::Boxed(v) => {
+                    return if idx < v.len() {
+                        v[idx] = val;
+                        true
+                    } else {
+                        false
+                    };
+                }
+                ArrayRepr::I64(v) => {
+                    if idx >= v.len() {
+                        return false;
+                    }
+                    if val.is_int() {
+                        v[idx] = val.as_int();
+                        return true;
+                    }
+                }
+                ArrayRepr::F64(v) => {
+                    if idx >= v.len() {
+                        return false;
+                    }
+                    if val.is_f64() {
+                        v[idx] = val.as_f64();
+                        return true;
+                    }
+                }
+            }
+        }
+        // Cold: type-mismatched store into a typed repr → migrate, store boxed.
+        self.migrate_to_boxed()[idx] = val;
+        true
+    }
+
+    /// Append `val`. A type-mismatched push into a typed repr migrates the
+    /// array to `Boxed` in place, then pushes boxed. Single repr projection on
+    /// the hot (`Boxed`/matching-typed) path.
+    #[inline]
+    pub fn push_vm(&self, val: VmValue) {
+        {
+            match self.repr_mut() {
+                ArrayRepr::Boxed(v) => {
+                    v.push(val);
+                    return;
+                }
+                ArrayRepr::I64(v) => {
+                    if val.is_int() {
+                        v.push(val.as_int());
+                        return;
+                    }
+                }
+                ArrayRepr::F64(v) => {
+                    if val.is_f64() {
+                        v.push(val.as_f64());
+                        return;
+                    }
+                }
+            }
+        }
+        // Cold: type-mismatched push into a typed repr → migrate, push boxed.
+        self.migrate_to_boxed().push(val);
+    }
+
+    /// Remove and return the last element as a `VmValue` (boxing from typed
+    /// reprs). `None` when empty. No migration — a pop never changes type.
+    #[inline]
+    pub fn pop_vm(&self) -> Option<VmValue> {
+        match self.repr_mut() {
+            ArrayRepr::Boxed(v) => v.pop(),
+            ArrayRepr::I64(v) => v.pop().map(VmValue::from_int),
+            ArrayRepr::F64(v) => v.pop().map(VmValue::from_f64),
+        }
+    }
+
+    /// Box every element of a typed repr and swap the repr to `Boxed` through
+    /// the *same* cell (identity preserved; all aliases observe the change).
+    /// Returns a mutable view of the resulting `Boxed` vec. No-op if already
+    /// `Boxed`. Cold: only reached on a type-mismatched typed write, which is
+    /// itself unreachable before Task A.4.
+    #[cold]
+    #[allow(clippy::mut_from_ref)]
+    fn migrate_to_boxed(&self) -> &mut Vec<VmValue> {
+        {
+            let repr = self.repr_mut();
+            if !matches!(repr, ArrayRepr::Boxed(_)) {
+                let boxed: Vec<VmValue> = match repr {
+                    ArrayRepr::I64(v) => v.iter().map(|&n| VmValue::from_int(n)).collect(),
+                    ArrayRepr::F64(v) => v.iter().map(|&f| VmValue::from_f64(f)).collect(),
+                    ArrayRepr::Boxed(_) => unreachable!(),
+                };
+                *repr = ArrayRepr::Boxed(boxed);
+            }
+        }
+        match self.repr_mut() {
+            ArrayRepr::Boxed(v) => v,
+            _ => unreachable!(),
+        }
+    }
+
+    // ---- raw typed accessors (later phases; total, panic-free) -----------
+
+    /// Element `idx` as a raw `i64`, or `None` for a non-`I64` repr / OOB.
+    #[inline]
+    pub fn get_i64(&self, idx: usize) -> Option<i64> {
+        match self.repr() {
+            ArrayRepr::I64(v) => v.get(idx).copied(),
+            _ => None,
+        }
+    }
+
+    /// Store raw `i64` at `idx`; `false` on a non-`I64` repr or OOB.
+    #[inline]
+    pub fn set_i64(&self, idx: usize, val: i64) -> bool {
+        match self.repr_mut() {
+            ArrayRepr::I64(v) if idx < v.len() => {
+                v[idx] = val;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Append raw `i64`; `false` on a non-`I64` repr.
+    #[inline]
+    pub fn push_i64(&self, val: i64) -> bool {
+        match self.repr_mut() {
+            ArrayRepr::I64(v) => {
+                v.push(val);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Element `idx` as a raw `f64`, or `None` for a non-`F64` repr / OOB.
+    #[inline]
+    pub fn get_f64(&self, idx: usize) -> Option<f64> {
+        match self.repr() {
+            ArrayRepr::F64(v) => v.get(idx).copied(),
+            _ => None,
+        }
+    }
+
+    /// Store raw `f64` at `idx`; `false` on a non-`F64` repr or OOB.
+    #[inline]
+    pub fn set_f64(&self, idx: usize, val: f64) -> bool {
+        match self.repr_mut() {
+            ArrayRepr::F64(v) if idx < v.len() => {
+                v[idx] = val;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Append raw `f64`; `false` on a non-`F64` repr.
+    #[inline]
+    pub fn push_f64(&self, val: f64) -> bool {
+        match self.repr_mut() {
+            ArrayRepr::F64(v) => {
+                v.push(val);
+                true
+            }
+            _ => false,
+        }
+    }
+}
+
+/// Cold panic for a Boxed-only projection reached with a typed repr. Kept out
+/// of line so the fast projection stays a single branch.
+#[cold]
+#[inline(never)]
+fn unreachable_typed(op: &str) -> ! {
+    panic!(
+        "VmArray::{op} called on a non-Boxed repr — typed arrays are not \
+         constructed before Task A.4; this projection is Boxed-only"
+    )
 }
 
 impl PartialEq for VmArray {
@@ -341,5 +702,163 @@ impl Eq for VmArray {}
 impl std::hash::Hash for VmArray {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         Rc::as_ptr(&self.0).hash(state);
+    }
+}
+
+#[cfg(test)]
+mod array_repr_tests {
+    use super::*;
+    use crate::register_meta::SlotKind;
+
+    #[test]
+    fn discriminants_are_0_1_2() {
+        assert_eq!(VmArray::new(vec![]).discriminant(), 0);
+        assert_eq!(VmArray::new_i64(vec![]).discriminant(), 1);
+        assert_eq!(VmArray::new_f64(vec![]).discriminant(), 2);
+        // ArrayRepr::discriminant() agrees with the enum-level value.
+        assert_eq!(ArrayRepr::Boxed(vec![]).discriminant(), 0);
+        assert_eq!(ArrayRepr::I64(vec![]).discriminant(), 1);
+        assert_eq!(ArrayRepr::F64(vec![]).discriminant(), 2);
+    }
+
+    #[test]
+    fn element_slotkind_per_variant() {
+        assert_eq!(VmArray::new(vec![]).element_slotkind(), SlotKind::Dynamic);
+        assert_eq!(VmArray::new_i64(vec![]).element_slotkind(), SlotKind::Int);
+        assert_eq!(VmArray::new_f64(vec![]).element_slotkind(), SlotKind::Float);
+    }
+
+    #[test]
+    fn repr_c_u8_layout_discriminant_at_offset_0() {
+        // `#[repr(C, u8)]` guarantees the tag is a u8 at offset 0; the JIT
+        // probe and the inline guards depend on exactly this.
+        let boxed = ArrayRepr::Boxed(vec![VmValue::null()]);
+        let i64r = ArrayRepr::I64(vec![1]);
+        let f64r = ArrayRepr::F64(vec![1.0]);
+        let tag = |r: &ArrayRepr| unsafe { *(r as *const ArrayRepr as *const u8) };
+        assert_eq!(tag(&boxed), 0);
+        assert_eq!(tag(&i64r), 1);
+        assert_eq!(tag(&f64r), 2);
+
+        // The Vec payload is 8-byte aligned, so ArrayRepr is one tag word +
+        // three Vec words. Sanity-check the size is a multiple of the word
+        // size and large enough to hold the tag + a Vec (ptr,cap,len).
+        let word = std::mem::size_of::<usize>();
+        assert!(std::mem::size_of::<ArrayRepr>() >= word * 4);
+        assert_eq!(std::mem::align_of::<ArrayRepr>(), word);
+    }
+
+    #[test]
+    fn total_accessors_boxed() {
+        let a = VmArray::new(vec![VmValue::from_int(10), VmValue::from_int(20)]);
+        assert_eq!(a.len(), 2);
+        assert_eq!(a.get_vm(0).unwrap().as_int(), 10);
+        assert_eq!(a.get_vm(1).unwrap().as_int(), 20);
+        assert!(a.get_vm(2).is_none());
+        assert!(a.set_vm(1, VmValue::from_int(99)));
+        assert_eq!(a.get_vm(1).unwrap().as_int(), 99);
+        assert!(!a.set_vm(5, VmValue::from_int(0))); // OOB
+        a.push_vm(VmValue::from_int(30));
+        assert_eq!(a.len(), 3);
+        assert_eq!(a.pop_vm().unwrap().as_int(), 30);
+        assert_eq!(a.len(), 2);
+        // Boxed projections available; typed raw accessors reject.
+        assert!(a.as_boxed().is_some());
+        assert!(a.get_i64(0).is_none());
+        assert!(a.get_f64(0).is_none());
+    }
+
+    #[test]
+    fn total_accessors_i64() {
+        let a = VmArray::new_i64(vec![1, 2, 3]);
+        assert_eq!(a.len(), 3);
+        assert_eq!(a.get_vm(0).unwrap().as_int(), 1);
+        assert_eq!(a.get_i64(2), Some(3));
+        assert!(a.set_i64(0, 100));
+        assert_eq!(a.get_i64(0), Some(100));
+        // Matching-typed VmValue store stays I64 (no migration).
+        assert!(a.set_vm(1, VmValue::from_int(222)));
+        assert_eq!(a.discriminant(), 1);
+        assert_eq!(a.get_i64(1), Some(222));
+        // Matching-typed push stays I64.
+        a.push_vm(VmValue::from_int(444));
+        assert_eq!(a.discriminant(), 1);
+        assert_eq!(a.get_i64(3), Some(444));
+        assert_eq!(a.pop_vm().unwrap().as_int(), 444);
+        // Boxed projection is None for a typed repr.
+        assert!(a.as_boxed().is_none());
+    }
+
+    #[test]
+    fn total_accessors_f64() {
+        let a = VmArray::new_f64(vec![1.5, 2.5]);
+        assert_eq!(a.len(), 2);
+        assert_eq!(a.get_vm(0).unwrap().as_f64(), 1.5);
+        assert_eq!(a.get_f64(1), Some(2.5));
+        assert!(a.set_f64(0, 9.5));
+        assert_eq!(a.get_f64(0), Some(9.5));
+        assert!(a.set_vm(1, VmValue::from_f64(8.25)));
+        assert_eq!(a.discriminant(), 2);
+        assert_eq!(a.get_f64(1), Some(8.25));
+        a.push_vm(VmValue::from_f64(3.75));
+        assert_eq!(a.discriminant(), 2);
+        assert_eq!(a.get_f64(2), Some(3.75));
+    }
+
+    #[test]
+    fn push_vm_migrates_i64_to_boxed_preserving_identity_and_elements() {
+        let a = VmArray::new_i64(vec![7, 8, 9]);
+        let cell_before = Rc::as_ptr(&a.0);
+        assert_eq!(a.discriminant(), 1);
+
+        // Pushing a non-int VmValue (a heap-tagged "string" stand-in) forces
+        // the in-place migration to Boxed.
+        let str_like = VmValue::from_heap_idx(42);
+        assert!(!str_like.is_int());
+        a.push_vm(str_like);
+
+        // Repr is now Boxed…
+        assert_eq!(a.discriminant(), 0);
+        // …the SAME cell (identity preserved — Rc::ptr_eq on the cell)…
+        let cell_after = Rc::as_ptr(&a.0);
+        assert_eq!(cell_before, cell_after);
+        // …all prior elements were boxed and preserved, and the new one is there.
+        assert_eq!(a.len(), 4);
+        assert_eq!(a.get_vm(0).unwrap().as_int(), 7);
+        assert_eq!(a.get_vm(1).unwrap().as_int(), 8);
+        assert_eq!(a.get_vm(2).unwrap().as_int(), 9);
+        assert_eq!(a.get_vm(3).unwrap(), str_like);
+        // Boxed projection now works.
+        assert!(a.as_boxed().is_some());
+    }
+
+    #[test]
+    fn set_vm_migrates_f64_to_boxed_preserving_identity_and_elements() {
+        let a = VmArray::new_f64(vec![1.0, 2.0, 3.0]);
+        let cell_before = Rc::as_ptr(&a.0);
+
+        // Overwrite index 1 with a non-float value → migration.
+        let str_like = VmValue::from_heap_idx(7);
+        assert!(!str_like.is_f64());
+        assert!(a.set_vm(1, str_like));
+
+        assert_eq!(a.discriminant(), 0);
+        assert_eq!(Rc::as_ptr(&a.0), cell_before);
+        assert_eq!(a.len(), 3);
+        assert_eq!(a.get_vm(0).unwrap().as_f64(), 1.0);
+        assert_eq!(a.get_vm(1).unwrap(), str_like);
+        assert_eq!(a.get_vm(2).unwrap().as_f64(), 3.0);
+    }
+
+    #[test]
+    fn aliases_observe_migration_through_shared_cell() {
+        let a = VmArray::new_i64(vec![5, 6]);
+        let b = a.clone(); // shares the Rc cell
+        assert!(VmArray::eq(&a, &b));
+        a.push_vm(VmValue::from_heap_idx(1)); // migrate via alias a
+        // Alias b sees the migration because they share one cell.
+        assert_eq!(b.discriminant(), 0);
+        assert_eq!(b.len(), 3);
+        assert_eq!(b.get_vm(0).unwrap().as_int(), 5);
     }
 }

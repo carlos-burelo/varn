@@ -58,7 +58,17 @@ pub struct JitArrayLayout {
     pub array_tag: usize,
     /// Slot base → the array payload's Rc pointer.
     pub payload_off: usize,
-    /// Word offsets of (data ptr, len) inside `Vec<VmValue>`.
+    /// Byte offset, from the `ArrayRepr` base (i.e. from payload RcBox + 16),
+    /// of the `#[repr(C, u8)]` discriminant. `0` in practice; the inline fast
+    /// paths load this byte and take the generic helper unless it is
+    /// `ArrayRepr::Boxed` (0). Before Task A.4 only Boxed arrays exist, so the
+    /// guard never fires — but it keeps the raw-`Vec` loads below sound the
+    /// moment typed reprs appear.
+    pub disc_off: usize,
+    /// Byte offsets of (data ptr, len) of the element `Vec`, measured **from
+    /// the `ArrayRepr` base** (payload RcBox + 16). They already include the
+    /// discriminant tag + alignment padding, so `payload + 16 + off` lands
+    /// directly on the `Vec`'s words for the `Boxed` variant.
     pub elems_ptr_off: usize,
     pub elems_len_off: usize,
 }
@@ -226,7 +236,8 @@ pub struct JitHelpers {
     pub jit_native_result_offset: usize,
     pub globals_offset: usize,
     /// Byte offset within `ExecCtx` of the `stack` `Vec<VmValue>`'s data
-    /// pointer word (`offset_of!(ExecCtx, stack) + elems_ptr_off`). The
+    /// pointer word (`offset_of!(ExecCtx, stack) + slots_ptr_off`, the bare-Vec
+    /// ptr offset — NOT `elems_ptr_off`, which is `ArrayRepr`-relative). The
     /// allocating clif path loads this fresh each time it addresses a
     /// register's `ctx.stack` home slot, so a stack reallocation can never
     /// leave a stale base.
