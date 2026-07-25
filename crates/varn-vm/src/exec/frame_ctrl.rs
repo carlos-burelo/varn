@@ -305,61 +305,27 @@ impl NativeCtx for ExecCtx {
     }
 
     fn array_len(&self, arr: VmValue) -> usize {
-        if arr.is_heap() {
-            if let Some(HeapObj::Array(a)) = self.heap.get(arr.as_heap_idx()) {
-                return a.len();
-            }
-        }
-        0
+        crate::heap_array::array_len(&self.heap, arr)
     }
 
     fn array_get(&self, arr: VmValue, idx: usize) -> Option<VmValue> {
-        if arr.is_heap() {
-            if let Some(HeapObj::Array(a)) = self.heap.get(arr.as_heap_idx()) {
-                return a.get_vm(idx);
-            }
-        }
-        None
+        crate::heap_array::array_get(&self.heap, arr, idx)
     }
 
     fn array_set(&mut self, arr: VmValue, idx: usize, val: VmValue) {
-        if arr.is_heap() {
-            let raw_idx = arr.as_heap_idx();
-            if let Some(HeapObj::Array(a)) = self.heap.get(raw_idx) {
-                if a.set_vm(idx, val) {
-                    self.heap.write_barrier(raw_idx, val);
-                }
-            }
-        }
+        crate::heap_array::array_set(&mut self.heap, arr, idx, val)
     }
 
     fn array_push(&mut self, arr: VmValue, val: VmValue) {
-        if arr.is_heap() {
-            let raw_idx = arr.as_heap_idx();
-            if let Some(HeapObj::Array(a)) = self.heap.get(raw_idx) {
-                a.push_vm(val);
-                self.heap.write_barrier(raw_idx, val);
-            }
-        }
+        crate::heap_array::array_push(&mut self.heap, arr, val)
     }
 
     fn array_pop(&mut self, arr: VmValue) -> Option<VmValue> {
-        if arr.is_heap() {
-            if let Some(HeapObj::Array(a)) = self.heap.get(arr.as_heap_idx()) {
-                return a.pop_vm();
-            }
-        }
-        None
+        crate::heap_array::array_pop(&self.heap, arr)
     }
 
     fn array_for_each(&self, arr: VmValue, f: &mut dyn FnMut(VmValue, usize)) {
-        if arr.is_heap() {
-            if let Some(HeapObj::Array(a)) = self.heap.get(arr.as_heap_idx()) {
-                for i in 0..a.len() {
-                    f(a.get_vm(i).unwrap(), i);
-                }
-            }
-        }
+        crate::heap_array::array_for_each(&self.heap, arr, f)
     }
 
     fn is_object(&self, v: VmValue) -> bool {

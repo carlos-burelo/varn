@@ -6,6 +6,7 @@ pub mod gc;
 pub mod generator;
 pub mod globals;
 pub mod heap;
+pub mod heap_array;
 pub mod linker;
 pub mod loader;
 pub mod nursery;
