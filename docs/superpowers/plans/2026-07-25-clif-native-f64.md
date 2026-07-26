@@ -156,6 +156,37 @@ sitios verificados:
 Activar = des-borrar esos tipos (toca el contrato compartido `register_meta` y
 arriesga el template JIT), validando 3 tiers. Es trabajo de Fase 2.
 
+## ESTADO (2026-07-25): ACTIVADO — f64 nativo en params y loops
+
+Ambos borrados resueltos, 3 commits en main:
+- **98587ca** — backend clif (correcto, dormido).
+- **8c41a85** (Paso A, params) — `derive_register_meta` deja de forzar params a
+  `Dynamic`; los siembra desde `param_kinds` (r0 staging queda Dynamic; el meet
+  degrada a Dynamic si el allocator reusa el registro para otro tipo). Ese kind
+  solo maneja skip-de-flush-GC (`slot_is_immediate`), así que es seguro. Bug de
+  coerción expuesto y arreglado: un arg int a param float (`takesFloat(5)`) llega
+  boxed; `unbox_f64_coerce` chequea el tag int → `fcvt`, sino bitcast (= `to_f64_val`).
+- **858478d** (Paso B, loops) — asignación de registros type-aware: pool libre
+  segregado float/no-float en `assign_registers` (linear scan); `regalloc_post`
+  salta el coalescing por completo si la función tiene algún registro float
+  (re-colorea por liveness y re-empacaría float+int). Funciones puras-int no
+  cambian.
+
+**Resultado:** `poly` (params) y `dot` (loop) rutean nativo — `vmovq/xmm`,
+`vaddsd`, kinds todos `Float`, sin call de helper por iteración.
+
+**Perf** (dot: acumulador float 50M iter, máquina en corriente, min de 3):
+`clif 57ms | template 305ms | interp 1448ms` — **5.3x sobre el helper boxed**,
+25x sobre el intérprete.
+
+**Validado 3 tiers:** `tests/main.vn` 709/709/771, 0 fallos; `float_ok.vn`
+byte-idéntico (incl. NaN→null, div, mod, div-por-cero mismo error).
+
+**Follow-ups (no en este pase):** `ModFloat`/`PowFloat` nativos (no hay `frem`/
+`powf` ISA — helper es correcto); loads de arrays float desboxeados (arrays son
+repr Boxed hoy); `regalloc_post` coalescing type-aware fino (hoy se salta entero
+en funciones float — sacrifica coalescing de Moves por simplicidad).
+
 ## Riesgos
 - **NaN no canonicalizado en box** → divergencia con interp en ops que producen
   NaN. Mitig: `box_f64` replica `from_f64`; test #6 es el gate.
