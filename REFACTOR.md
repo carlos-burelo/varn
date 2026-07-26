@@ -212,7 +212,38 @@ Decisión de tipo en compile-time: el compilador conoce `CgTy::Array(el)` en el 
 - [ ] **Step 5:** Medir vs baseline: `bench_matrix`, `bench_array_ops`, `bench_math` vs `bun`/`node`. Registrar ratios.
 - [ ] **Step 6:** Commit: `git commit -m "clif: raw unboxed load/store for I64/F64 arrays"`.
 
-**Salida A:** matrix/array_ops deberían caer a paridad o mejor vs V8 (Varn hace menos trabajo: sin box/unbox, GC omite). Registrar números reales en este archivo.
+**Salida A — números reales (2026-07-25, commits `1e8679b` + `42b109e`).**
+
+Medición: min de 6 corridas pareadas e intercaladas por benchmark, release, misma
+máquina (base 1700 MHz — termaliza fuerte, una corrida A/B suelta no es fiable).
+`bench_fib` como control (no toca arrays).
+
+| benchmark | fix `Array<T>`≡`T[]` | arrays desboxeados | acumulado |
+|---|---|---|---|
+| `bench_array_ops` | **2.49x** (32.9 → 13.2 ms) | 1.00x | **2.49x** |
+| `bench_matrix` | — (no anotado) | **1.06x** (48.0 → 45.1 ms) | 1.06x |
+| `bench_gc_alloc` | — | 0.99x | 1.01x |
+| `bench_fib` (control) | — | 1.02x | 1.02x |
+
+Dos conclusiones que corrigen la premisa de esta fase:
+
+1. **La ganancia grande NO era la desboxación.** Era que `Array<int>` y `int[]`
+   resolvían a tipos distintos en el checker, así que el spelling genérico perdía
+   `record_array_index` → opcodes `GetIndex`/`SetIndex` genéricos → sin fast path
+   inline en ningún tier y bail de la función entera en clif.
+
+2. **La desboxación rinde poco EN ESTE VM y eso es estructural.** Con NaN-boxing
+   un int desbox son 2 shifts y un float desbox es un bitcast gratis; no hay
+   allocation por número que evitar, a diferencia de un VM que bóxea en heap. El
+   win de `Vec<i64>`/`Vec<f64>` queda reducido a ahorrar esos shifts y al skip de
+   GC. No esperar más de esta línea.
+
+**Bloqueador vivo para la ruta clif de A.5:** `bench_array_ops` y `bench_matrix`
+son código top-level completo y **bailean clif** (`unsupported opcode
+DefineGlobalIdx` / `LoadStaticFn`), así que el load/store crudo no los toca — el
+1.06x de matrix viene del tier template. Un workload con los arrays dentro de
+funciones sí rutea (verificado con `VARN_CLIF_TRACE=1`). Mientras el top-level no
+rutee, medir Fase A con benchmarks función-scoped o los números no dicen nada.
 
 ---
 
