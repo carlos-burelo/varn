@@ -158,6 +158,52 @@ function rule4MemberExists(): int {
     return a[0].toUpperCase() == "" ? 0 : 1
 }
 
+// --- `Array<T>` and `T[]` are one type --------------------------------
+// The two spellings must produce identical behavior AND identical
+// bytecode. They used to resolve to different checker types, so only the
+// `T[]` form was recognized as an array index — the `Array<T>` form fell
+// back to the generic index opcodes and lost the fast path everywhere.
+function genericSpelling(): int {
+    let a: Array<int> = []
+    a.push(10)
+    a.push(20)
+    a[0] = a[0] + 5
+    return a[0] + a[1] + a.length
+}
+
+function suffixSpelling(): int {
+    let a: int[] = []
+    a.push(10)
+    a.push(20)
+    a[0] = a[0] + 5
+    return a[0] + a[1] + a.length
+}
+
+function genericSpellingParam(arr: Array<float>): float {
+    let total = 0.0
+    for (let i = 0; i < arr.length; i = i + 1) {
+        total = total + arr[i]
+    }
+    return total
+}
+
+// --- Unboxed element buffers are not observable -----------------------
+// An array whose elements are all numbers is backed by a raw buffer; a
+// mismatched write migrates it back in place. Identity, contents and
+// element order must survive both transitions.
+function reprRoundTrip(): str {
+    let ints = []
+    ints.push(7)
+    ints.push(-3)
+    let alias = ints
+    ints.push("s")          // migrate: raw buffer -> boxed, in place
+    alias.push(9)
+    let floats: float[] = []
+    floats.push(1.5)
+    floats.push(-0.25)
+    return `${ints[0]}${ints[1]}${ints[2]}${ints[3]}${alias.length}${floats[0] + floats[1]}`
+}
+
 assert("evolve push-int sum",        evolvePushInt() === 6)
 assert("evolve index-write sum",     evolveIndexWrite() === 20)
 assert("evolve mixed stays runnable", evolveMixedStaysPermissive() === "1-two")
@@ -166,6 +212,10 @@ assert("evolve escape stays runnable", evolveEscapeStaysPermissive() === 6)
 assert("evolve matmul shape",        evolveMatmulShape() === 690)
 assert("pattern-shadowed [a] un-governed", staleB() === 6.0)
 assert("pattern-shadowed {a} un-governed", staleC() === 6.0)
+assert("Array<int> and int[] agree",  genericSpelling() === suffixSpelling())
+assert("Array<int> spelling value",   genericSpelling() === 37)
+assert("Array<float> param spelling", genericSpellingParam([1.5, 2.5]) === 4.0)
+assert("array repr round-trip",       reprRoundTrip() === "7-3s941.25")
 
 // Compile the Rule-4 regression shapes without executing them (see above).
 if (false) {

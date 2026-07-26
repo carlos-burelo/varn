@@ -58,6 +58,25 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
                 return ty;
             }
 
+            // `Array<T>` is the same type as `T[]`; the parser just produces a
+            // different node for each spelling. Normalize to the one form the
+            // rest of the checker tests for, so both spellings behave — and
+            // COMPILE — identically. Without this, every `TypeKind::Array`
+            // check silently misses `Array<T>`, and the one that matters most
+            // is `record_array_index`: an `Array<int>`-annotated value fell
+            // back to the generic `GetIndex`/`SetIndex` opcodes, losing the
+            // inline array fast path in both JIT tiers (and bailing the whole
+            // function out of CLIF), while the very same code written `int[]`
+            // — or with no annotation at all — got it.
+            //
+            // Placed after the user/stdlib alias lookups so an explicitly
+            // declared `Array<T>` alias still wins.
+            if name.as_str() == "Array" {
+                if let [el] = resolved_args.as_slice() {
+                    return Type::array(el.clone());
+                }
+            }
+
             // Origin must point at the DECLARING module, not the file that
             // wrote the annotation: member lookup resolves the class through
             // it (`check_origin_module`). An imported symbol carries its
