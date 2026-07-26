@@ -21,8 +21,8 @@ pub fn emit_function(
 
     let nparams = f.params.len();
     let (reg, scratch, null_reg, call_base, register_count) = assign_registers(&ssa, nparams)?;
-    let register_meta = derive_register_meta(&ssa, &reg, register_count, nparams, f.has_this);
     let param_kinds: Vec<_> = f.params.iter().map(|p| slot_kind_of(p.ty)).collect();
+    let register_meta = derive_register_meta(&ssa, &reg, register_count, &param_kinds);
     let return_kind = slot_kind_of(f.return_ty);
 
     let n = ssa.blocks.len();
@@ -125,15 +125,26 @@ fn derive_register_meta(
     ssa: &SsaFunc,
     reg: &[u8],
     register_count: u16,
-    nparams: usize,
-    has_this: bool,
+    param_kinds: &[varn_types::register_meta::SlotKind],
 ) -> Vec<varn_types::register_meta::RegisterMeta> {
     use varn_types::register_meta::{RegisterMeta, SlotKind};
     let n = register_count as usize;
     let mut kinds: Vec<Option<SlotKind>> = vec![None; n];
-    let fixed = 1 + nparams + usize::from(has_this);
-    for k in kinds.iter_mut().take(fixed.min(n)) {
-        *k = Some(SlotKind::Dynamic);
+    // r0 is the callee/`this` staging slot the caller writes; keep it Dynamic
+    // (it may host a heap ref during call staging, and the GC must flush it).
+    // Params (at r1+i, matching the JIT's entry contract) carry their declared
+    // kind: an immediate param (int/float/bool) is a proven fact the backend
+    // uses — it skips the GC flush and, for float, routes to native f64 — while
+    // a heap-ref param stays non-immediate and still flushes. The value meet
+    // below downgrades any param register the allocator reuses for a
+    // differently-typed value back to Dynamic.
+    if n > 0 {
+        kinds[0] = Some(SlotKind::Dynamic);
+    }
+    for (i, pk) in param_kinds.iter().enumerate() {
+        if 1 + i < n {
+            kinds[1 + i] = Some(*pk);
+        }
     }
     for (vi, def) in ssa.values.iter().enumerate() {
         let Some(&r) = reg.get(vi) else { continue };

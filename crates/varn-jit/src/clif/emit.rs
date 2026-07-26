@@ -215,6 +215,28 @@ pub(super) fn unbox_f64(
     b.ins().bitcast(types::F64, MemFlags::new(), v)
 }
 
+/// Mask isolating a VmValue's QNAN+tag bits, for an int-tag test.
+pub(super) const INT_CHECK_MASK: i64 =
+    (varn_types::vm_value::QNAN | varn_types::vm_value::MASK_TAG) as i64;
+
+/// Unbox a VmValue a float slot may hold as EITHER float bits OR an int
+/// VmValue — the latter arises when a widening int argument is passed to a
+/// float parameter (`takesFloat(5)`), where the caller boxes the int and the
+/// callee must coerce, exactly as the interpreter's `to_f64_val` does. An
+/// int-tagged value sign-extends its i48 payload and `fcvt`s; anything else is
+/// reinterpreted as its f64 bits.
+pub(super) fn unbox_f64_coerce(
+    b: &mut FunctionBuilder,
+    v: cranelift_codegen::ir::Value,
+) -> cranelift_codegen::ir::Value {
+    let masked = b.ins().band_imm(v, INT_CHECK_MASK);
+    let is_int = b.ins().icmp_imm(IntCC::Equal, masked, INT_TAG);
+    let ext = wrap_i48(b, v);
+    let from_int = b.ins().fcvt_from_sint(types::F64, ext);
+    let from_bits = b.ins().bitcast(types::F64, MemFlags::new(), v);
+    b.ins().select(is_int, from_int, from_bits)
+}
+
 /// Read a register as a raw `f64`: a `Float` var is already `F64`; an `Int`
 /// var coerces via `fcvt_from_sint` (the interpreter's `to_f64_val` does the
 /// same int→float widening in a mixed float op).

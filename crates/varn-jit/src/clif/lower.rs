@@ -46,8 +46,8 @@ use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::emit::{
     box_int, call_helper, code_has_array_ops, def_const, emit_array_payload, emit_return_value,
-    meta_is_float, patch_rel32, unbox_bool, unbox_f64, use_boxed, use_int, wrap_i48, INT_TAG,
-    MASK_48,
+    meta_is_float, patch_rel32, unbox_bool, unbox_f64_coerce, use_boxed, use_int, wrap_i48,
+    INT_TAG, MASK_48,
 };
 use super::fields;
 use super::floats;
@@ -398,7 +398,7 @@ fn lower_raw(
         // A float param arrives as its boxed VmValue bits (i64); unbox to the
         // F64 Variable. Everything else is already the right i64 representation.
         if meta_is_float(&proto.register_meta, 1 + i) {
-            let f = unbox_f64(&mut b, p);
+            let f = unbox_f64_coerce(&mut b, p);
             b.def_var(vars[1 + i], f);
         } else {
             b.def_var(vars[1 + i], p);
