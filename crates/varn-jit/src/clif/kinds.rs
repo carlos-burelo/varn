@@ -143,9 +143,22 @@ pub(crate) fn apply_kinds(
             let src = (code[ip + 1] >> 8) as usize;
             state[dest] = state[src];
         }
-        // Array element / fixed-field / property loads produce boxed values,
-        // unboxed to int when the register meta proves it.
-        OpCode::ArrayGetIndex | OpCode::GetFixedField | OpCode::GetProperty => {
+        // An array element load lands in whatever representation the register
+        // meta declares: the lowering serves an `I64` array raw into an `Int`
+        // register and an `F64` array raw into an `F64` one (see
+        // `clif::arrays`), converting on the `Boxed` and helper arms.
+        OpCode::ArrayGetIndex => {
+            state[dest] = if meta_float(dest) {
+                K::Float
+            } else if meta_int(dest) {
+                K::Int
+            } else {
+                K::Boxed
+            };
+        }
+        // Fixed-field / property loads produce boxed values, unboxed to int
+        // when the register meta proves it.
+        OpCode::GetFixedField | OpCode::GetProperty => {
             state[dest] = if meta_int(dest) { K::Int } else { K::Boxed };
         }
         // `BuildArray`/`BuildObjectWithShape` encode their destination in the

@@ -4,7 +4,9 @@ use crate::assembler::{Cond, Reg};
 use crate::regalloc::{emit_load, emit_store};
 use crate::registers::REG_INT_TAG;
 
-use super::array_fast::{emit_cached_or_fallthrough, emit_resolve_array_payload, patch_all};
+use super::array_fast::{
+    emit_boxed_repr_guard, emit_cached_or_fallthrough, emit_resolve_array_payload, patch_all,
+};
 use super::ffi::{emit_ffi_call, FfiArg, FfiCallSpec};
 use super::CodegenCtx;
 
@@ -73,6 +75,9 @@ fn emit_get_index(ctx: &mut CodegenCtx, op: OpCode, first_reg: usize) {
             let after = asm.current_offset();
             asm.patch_u32(p, (after as i32 - (p as i32 + 4)) as u32);
         }
+        // After the cache merge: a hoisted payload can outlive the repr it
+        // was resolved from, so the tag is checked on every read.
+        emit_boxed_repr_guard(asm, &lay, &mut slow);
 
         // Untag the key (48-bit sign extend); unsigned bounds check also
         // rejects negative indices.
@@ -138,6 +143,7 @@ fn emit_set_index(ctx: &mut CodegenCtx, first_reg: usize) {
         emit_int_key_guard(asm, &mut slow);
         // nursery_only: old-gen parents divert so the write barrier runs.
         emit_resolve_array_payload(asm, &lay, heap_off, true, &mut slow);
+        emit_boxed_repr_guard(asm, &lay, &mut slow);
 
         // Untag the key; unsigned bounds check (strictly below len — the
         // idx == len append case belongs to the helper).

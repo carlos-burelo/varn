@@ -448,29 +448,36 @@ pub(super) fn emit_array_payload(
     let ok = b.create_block();
     b.ins().brif(is_arr, ok, &[], slow, &[]);
     b.switch_to_block(ok);
-    let payload = b.ins().load(types::I64, ro, slot, lay.payload_off as i32);
+    b.ins().load(types::I64, ro, slot, lay.payload_off as i32)
+}
 
-    // Discriminant guard: the `ArrayRepr` tag byte lives at `RcBox + 16 +
-    // disc_off`. Only `Boxed` (0) may take the raw-`Vec` element loads below;
-    // a typed (`I64`/`F64`) repr — or an in-place migration — diverts to the
-    // generic helper. Never taken before Task A.4 (all arrays Boxed), but it
-    // keeps every `payload + 16 + elems_*` load sound the moment typed reprs
-    // exist. Boxed is terminal (a Boxed array never becomes typed), so a loop
-    // cache populated from a passing resolve stays valid on its hit path.
-    //
-    // This load DEREFERENCES `payload`, so it must be plain `trusted()` — NOT
-    // the `readonly`/`can_move` `ro` flags. `can_move` would let the mid-end
-    // speculate the deref above the `is_arr` guard, reading `[payload + 16]`
-    // for a non-array receiver (bogus payload) → segfault. The element loads
-    // below use `trusted()` for the same reason.
-    let disc = b
-        .ins()
-        .uload8(types::I64, MemFlags::trusted(), payload, (16 + lay.disc_off) as i32);
-    let is_boxed = b.ins().icmp_imm(IntCC::Equal, disc, 0);
-    let boxed_ok = b.create_block();
-    b.ins().brif(is_boxed, boxed_ok, &[], slow, &[]);
-    b.switch_to_block(boxed_ok);
-    payload
+/// The `ArrayRepr` discriminant (0 = `Boxed`, 1 = `I64`, 2 = `F64`) of an
+/// already-resolved payload, zero-extended to `I64`.
+///
+/// Read at every element access rather than folded into
+/// [`emit_array_payload`]: the resolve can be hoisted into a loop cache
+/// (see [`cached_payload`]), but an array's repr changes *under* that cached
+/// pointer — an empty array specializes on its first push, a typed array
+/// migrates back to `Boxed` on a mismatched write. Both swap the contents of
+/// the same `ArrayRepr` cell, so the cached pointer stays valid while the tag
+/// under it does not.
+///
+/// This load DEREFERENCES `payload`, so it must be plain `trusted()` — NOT
+/// `readonly`/`can_move`. `can_move` would let the mid-end speculate the deref
+/// above the resolve's `is_arr` guard, reading `[payload + 16]` for a
+/// non-array receiver (bogus payload) → segfault. The element loads keyed off
+/// this discriminant use `trusted()` for the same reason.
+pub(super) fn array_disc(
+    b: &mut FunctionBuilder,
+    payload: cranelift_codegen::ir::Value,
+    lay: &crate::JitArrayLayout,
+) -> cranelift_codegen::ir::Value {
+    b.ins().uload8(
+        types::I64,
+        MemFlags::trusted(),
+        payload,
+        (16 + lay.disc_off) as i32,
+    )
 }
 
 /// `(v << 16) >> 16` — the canonical i48 wrap (varn_core::numeric), which

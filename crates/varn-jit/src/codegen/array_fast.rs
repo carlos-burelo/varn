@@ -87,14 +87,30 @@ pub(crate) fn emit_resolve_array_payload(
 
     // Element `Vec`'s words live at payload RcBox + 16.
     asm.mov_reg_mem(Reg::Rax, Reg::Rax, lay.payload_off as i32);
+}
 
-    // Discriminant guard: the `ArrayRepr` tag byte sits at `RcBox + 16 +
-    // disc_off`. Only `Boxed` (0) may take the raw-`Vec` inline path — a typed
-    // (`I64`/`F64`) repr has no NaN-boxed elements at these offsets, so it
-    // diverts to the generic helper. Before Task A.4 every array is Boxed, so
-    // this branch is never taken; it keeps the fast path sound the instant
-    // typed reprs (or an in-place migration) appear. `Rax` (the payload
-    // pointer the callers consume) is left untouched.
+/// `Boxed`-repr guard on an already-resolved payload pointer in `Rax`: the
+/// `ArrayRepr` tag byte at `RcBox + 16 + disc_off` must be `0`. A typed
+/// (`I64`/`F64`) repr holds raw numbers where the inline path expects
+/// NaN-boxed `VmValue`s, so it diverts to the generic helper. `Rax` is left
+/// untouched; `Rcx`, `R10` are clobbered.
+///
+/// This is deliberately NOT part of [`emit_resolve_array_payload`]: a loop
+/// hoists that resolve into a register once (see [`emit_resolve_into_cache`]),
+/// but an array's repr can change *inside* the loop — an empty array
+/// specializes on its first push, a typed array migrates back to `Boxed` on a
+/// mismatched write. Both keep the same `ArrayRepr` cell, so the cached
+/// pointer stays valid while the tag under it does not. Re-reading the tag at
+/// every use is what keeps a hoisted payload honest.
+///
+/// Length reads do not need this guard at all — `elems_len_off` lands on the
+/// `Vec` length word of every variant, verified at startup by
+/// `Heap::jit_array_layout`'s typed-repr probe.
+pub(crate) fn emit_boxed_repr_guard(
+    asm: &mut Assembler,
+    lay: &JitArrayLayout,
+    slow: &mut Vec<usize>,
+) {
     asm.mov_reg_mem(Reg::R10, Reg::Rax, (16 + lay.disc_off) as i32);
     asm.mov_reg_imm64(Reg::Rcx, 0xFF);
     asm.and_reg_reg(Reg::R10, Reg::Rcx);

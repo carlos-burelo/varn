@@ -314,10 +314,12 @@ use crate::register_meta::SlotKind;
 /// index / `===` semantics / `Map` key) is preserved because only the cell's
 /// *contents* are swapped, never the cell itself.
 ///
-/// A.1 note: only `Boxed` is ever constructed by the compiler/runtime today;
-/// the typed variants exist in the type system but are not produced until
-/// Task A.4. The migration and typed accessors are implemented and unit
-/// tested now so the machinery is proven before it goes live.
+/// The variant is chosen from the *values*, not from a static type: a literal
+/// picks its repr in [`VmArray::from_items`], and an array that starts empty
+/// specializes on its first [`VmArray::push_vm`]. Nothing else can produce a
+/// typed repr, and every typed repr is reversible — a mismatched write
+/// migrates back to `Boxed` in place — so the representation is never
+/// observable from the language.
 #[repr(C, u8)]
 #[derive(Debug)]
 pub enum ArrayRepr {
@@ -380,8 +382,7 @@ impl VmArray {
         Self::new(Vec::new())
     }
 
-    /// `Array<int>` backed by a raw `i64` buffer. Not produced by the
-    /// compiler until Task A.4; available now for tests and future phases.
+    /// `Array<int>` backed by a raw `i64` buffer.
     #[inline(always)]
     pub fn new_i64(items: Vec<i64>) -> Self {
         Self(Rc::new(UnsafeCell::new(ArrayRepr::I64(items))))
@@ -391,6 +392,33 @@ impl VmArray {
     #[inline(always)]
     pub fn new_f64(items: Vec<f64>) -> Self {
         Self(Rc::new(UnsafeCell::new(ArrayRepr::F64(items))))
+    }
+
+    /// Array from boxed values, choosing the narrowest repr the values admit:
+    /// all-int → `I64`, all-float → `F64`, anything else (mixed, empty, or a
+    /// non-numeric element) → `Boxed`.
+    ///
+    /// The choice is made from the runtime values rather than a static type
+    /// because it must hold for *every* producer — literals, natives, JSON,
+    /// spreads — and because a static `Array<int>` still has to be verified
+    /// element-wise before its elements can be stored raw. Unboxing here is
+    /// exact: `from_int(as_int())` and `from_f64(as_f64())` are the identity
+    /// on values that pass `is_int` / `is_f64`, so reading a typed element
+    /// back reproduces the original `VmValue` bit for bit.
+    ///
+    /// The scan is one pass over data already being moved into the array, so
+    /// it costs no allocation and no extra traversal order of growth.
+    pub fn from_items(items: Vec<VmValue>) -> Self {
+        if items.is_empty() {
+            return Self::new(items);
+        }
+        if items.iter().all(|v| v.is_int()) {
+            return Self::new_i64(items.iter().map(|v| v.as_int()).collect());
+        }
+        if items.iter().all(|v| v.is_f64()) {
+            return Self::new_f64(items.iter().map(|v| v.as_f64()).collect());
+        }
+        Self::new(items)
     }
 
     // ---- repr access (internal) ------------------------------------------
@@ -549,13 +577,24 @@ impl VmArray {
     /// Append `val`. A type-mismatched push into a typed repr migrates the
     /// array to `Boxed` in place, then pushes boxed. Single repr projection on
     /// the hot (`Boxed`/matching-typed) path.
+    ///
+    /// An *empty* `Boxed` array specializes to the pushed value's repr instead
+    /// of staying boxed. This is what makes `let a = []` followed by
+    /// `a.push(int)` — the way essentially every array in real code is built —
+    /// end up with a raw buffer; without it only literals could ever be typed.
+    /// It cannot lose information: the array holds no elements to reinterpret,
+    /// and a later mismatched push migrates straight back to `Boxed`.
     #[inline]
     pub fn push_vm(&self, val: VmValue) {
         {
             match self.repr_mut() {
+                // Only a NON-empty Boxed array pushes boxed here; the empty
+                // case falls out to `push_repr_change` to specialize.
                 ArrayRepr::Boxed(v) => {
-                    v.push(val);
-                    return;
+                    if !v.is_empty() {
+                        v.push(val);
+                        return;
+                    }
                 }
                 ArrayRepr::I64(v) => {
                     if val.is_int() {
@@ -571,7 +610,30 @@ impl VmArray {
                 }
             }
         }
-        // Cold: type-mismatched push into a typed repr → migrate, push boxed.
+        self.push_repr_change(val);
+    }
+
+    /// The two pushes that can change the representation, kept out of line so
+    /// [`Self::push_vm`]'s hot path stays a single projection plus a branch:
+    /// an empty `Boxed` array adopting the pushed value's repr (once per
+    /// array), and a type-mismatched push into a typed repr migrating back to
+    /// `Boxed`. Reached only when the match above fell through, so a `Boxed`
+    /// repr here is necessarily empty.
+    #[cold]
+    fn push_repr_change(&self, val: VmValue) {
+        if matches!(self.repr(), ArrayRepr::Boxed(_)) {
+            if val.is_int() {
+                *self.repr_mut() = ArrayRepr::I64(vec![val.as_int()]);
+            } else if val.is_f64() {
+                *self.repr_mut() = ArrayRepr::F64(vec![val.as_f64()]);
+            } else {
+                match self.repr_mut() {
+                    ArrayRepr::Boxed(v) => v.push(val),
+                    _ => unreachable!("checked Boxed above"),
+                }
+            }
+            return;
+        }
         self.migrate_to_boxed().push(val);
     }
 

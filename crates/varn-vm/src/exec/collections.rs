@@ -37,7 +37,7 @@ pub fn build_array(stack: &mut Vec<VmValue>, count: usize, heap: &mut Heap) -> V
     let len = stack.len();
     let start = len.saturating_sub(count);
     let items: Vec<VmValue> = stack.drain(start..).collect();
-    let va = VmArray::new(items);
+    let va = VmArray::from_items(items);
     VmValue::from_heap_idx(heap.alloc(HeapObj::Array(va)))
 }
 

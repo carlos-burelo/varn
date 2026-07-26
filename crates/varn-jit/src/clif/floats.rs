@@ -204,6 +204,10 @@ fn is_supported_float_writer(op: OpCode) -> bool {
             | OpCode::PowFloat
             | OpCode::Move
             | OpCode::LoadConst
+            // `clif::arrays` produces an `f64` on every arm of an element
+            // load — raw from an `F64` array, coerced from a `Boxed` one or
+            // from the helper's boxed result.
+            | OpCode::ArrayGetIndex
     )
 }
 

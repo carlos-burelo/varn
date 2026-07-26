@@ -62,7 +62,10 @@ fn emit_array_length(ctx: &mut CodegenCtx, first_reg: usize) {
     });
 
     // Fast path: a heap array's length is a single Vec-len load, NaN-boxed
-    // as an int. Non-array receivers (strings, etc.) fall back.
+    // as an int. Non-array receivers (strings, etc.) fall back. No repr
+    // guard: `elems_len_off` lands on the `Vec` length word of every
+    // `ArrayRepr` variant (checked at startup by `Heap::jit_array_layout`),
+    // so a typed array reads its length inline just like a boxed one.
     let mut slow: Vec<usize> = Vec::new();
     {
         let asm = &mut ctx.asm;

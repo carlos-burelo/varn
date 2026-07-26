@@ -654,7 +654,7 @@ impl HeapInner {
             Value::Array(a) => {
                 let guard = a.borrow();
                 let vm_items: Vec<VmValue> = guard.iter().map(|v| self.intern(v.clone())).collect();
-                let va = VmArray::new(vm_items);
+                let va = VmArray::from_items(vm_items);
                 let idx = self.alloc(HeapObj::Array(va));
                 VmValue::from_heap_idx(idx)
             }
@@ -963,8 +963,12 @@ impl HeapInner {
         VmValue::from_heap_idx(packed)
     }
 
+    /// The single allocation point for arrays built from boxed values —
+    /// literals (interpreter and both JIT tiers), natives, spreads. The repr
+    /// is chosen from the values here (see [`VmArray::from_items`]) so every
+    /// producer gets a raw buffer for free when the elements admit one.
     pub fn alloc_array_vm(&mut self, items: Vec<VmValue>) -> VmValue {
-        let va = VmArray::new(items);
+        let va = VmArray::from_items(items);
         VmValue::from_heap_idx(self.alloc(HeapObj::Array(va)))
     }
 
@@ -2117,10 +2121,15 @@ mod array_variant_runtime_tests {
         assert_eq!(popped.as_f64(), 3.5);
     }
 
+    /// `alloc_array_vm` — the single construction point for arrays built from
+    /// boxed values — picks the repr from those values. An all-int literal
+    /// gets a raw `Vec<i64>`, and every accessor still round-trips the exact
+    /// `VmValue` that was stored.
     #[test]
-    fn array_helpers_boxed_variant_unchanged() {
+    fn alloc_array_vm_picks_i64_repr_for_all_int_items() {
         let mut heap = Heap::new();
         let arr_nv = heap.alloc_array_vm(vec![VmValue::from_int(10), VmValue::from_int(20)]);
+        assert_eq!(array_discriminant(&heap, arr_nv), 1);
 
         assert_eq!(heap.array_len(arr_nv), 2);
         assert_eq!(heap.array_get(arr_nv, 1).unwrap().as_int(), 20);
@@ -2129,7 +2138,73 @@ mod array_variant_runtime_tests {
         heap.array_push(arr_nv, VmValue::from_int(7));
         assert_eq!(heap.array_len(arr_nv), 3);
         assert_eq!(heap.array_pop(arr_nv).unwrap().as_int(), 7);
+        assert_eq!(array_discriminant(&heap, arr_nv), 1);
+    }
+
+    /// A heterogeneous literal has no raw repr to fall into, so it stays
+    /// `Boxed` and behaves exactly as it always did.
+    #[test]
+    fn array_helpers_boxed_variant_unchanged() {
+        let mut heap = Heap::new();
+        let s = heap.alloc_str_dynamic("a string longer than five bytes");
+        let arr_nv = heap.alloc_array_vm(vec![VmValue::from_int(10), s]);
         assert_eq!(array_discriminant(&heap, arr_nv), 0);
+
+        assert_eq!(heap.array_len(arr_nv), 2);
+        assert_eq!(heap.array_get(arr_nv, 1).unwrap(), s);
+        heap.array_set(arr_nv, 0, VmValue::from_int(99));
+        assert_eq!(heap.array_get(arr_nv, 0).unwrap().as_int(), 99);
+        heap.array_push(arr_nv, VmValue::from_int(7));
+        assert_eq!(heap.array_len(arr_nv), 3);
+        assert_eq!(heap.array_pop(arr_nv).unwrap().as_int(), 7);
+        assert_eq!(array_discriminant(&heap, arr_nv), 0);
+    }
+
+    /// The `let a = []` + `a.push(...)` shape: an empty array has no repr to
+    /// preserve, so its first push decides one. This is what makes arrays
+    /// built by pushing — the overwhelmingly common case — unboxed.
+    #[test]
+    fn empty_array_specializes_on_first_push() {
+        let mut heap = Heap::new();
+
+        let ints = heap.alloc_array_vm(vec![]);
+        assert_eq!(array_discriminant(&heap, ints), 0);
+        heap.array_push(ints, VmValue::from_int(1));
+        assert_eq!(array_discriminant(&heap, ints), 1);
+        heap.array_push(ints, VmValue::from_int(2));
+        assert_eq!(heap.array_len(ints), 2);
+        assert_eq!(heap.array_get(ints, 1).unwrap().as_int(), 2);
+
+        let floats = heap.alloc_array_vm(vec![]);
+        heap.array_push(floats, VmValue::from_f64(1.5));
+        assert_eq!(array_discriminant(&heap, floats), 2);
+        assert_eq!(heap.array_get(floats, 0).unwrap().as_f64(), 1.5);
+
+        // A non-numeric first push has no raw repr: stays Boxed.
+        let s = heap.alloc_str_dynamic("a string longer than five bytes");
+        let strs = heap.alloc_array_vm(vec![]);
+        heap.array_push(strs, s);
+        assert_eq!(array_discriminant(&heap, strs), 0);
+        assert_eq!(heap.array_get(strs, 0).unwrap(), s);
+    }
+
+    /// A specialized array that later takes a mismatched push migrates back to
+    /// `Boxed`, keeping every element it had already accepted.
+    #[test]
+    fn specialized_array_migrates_back_on_mismatched_push() {
+        let mut heap = Heap::new();
+        let arr = heap.alloc_array_vm(vec![]);
+        heap.array_push(arr, VmValue::from_int(1));
+        heap.array_push(arr, VmValue::from_int(2));
+        assert_eq!(array_discriminant(&heap, arr), 1);
+
+        let s = heap.alloc_str_dynamic("a string longer than five bytes");
+        heap.array_push(arr, s);
+        assert_eq!(array_discriminant(&heap, arr), 0);
+        assert_eq!(heap.array_len(arr), 3);
+        assert_eq!(heap.array_get(arr, 0).unwrap().as_int(), 1);
+        assert_eq!(heap.array_get(arr, 1).unwrap().as_int(), 2);
+        assert_eq!(heap.array_get(arr, 2).unwrap(), s);
     }
 
     /// A.2/A.3 binding contract: a type-mismatched `array_set` into a typed
