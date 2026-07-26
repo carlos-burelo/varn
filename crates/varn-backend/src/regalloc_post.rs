@@ -709,6 +709,21 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         return;
     }
 
+    // The SSA allocator (ssa/emit) keeps float and non-float values in
+    // separate registers so the backend can route native f64. This coalescing
+    // pass re-colours by liveness alone, so it could re-pack a float register
+    // with a non-float one — meeting `register_meta` to Dynamic and erasing the
+    // float type. Skip the whole pass for any function that owns a float
+    // register: it keeps the segregated allocation at the cost of not
+    // coalescing that function's Moves. Pure-int functions are unaffected.
+    if proto
+        .register_meta
+        .iter()
+        .any(|m| m.kind == varn_types::register_meta::SlotKind::Float)
+    {
+        return;
+    }
+
 
 
     let back_edges =

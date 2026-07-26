@@ -431,23 +431,45 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
         .filter(|&v| !assigned[v] && def[v] != u32::MAX)
         .collect();
     order.sort_by_key(|&v| def[v]);
+    // Type-aware linear scan: float values and non-float values draw from
+    // separate free-register pools so no physical register is ever shared
+    // between a float and a non-float value. Packing the two into one register
+    // (their live ranges are disjoint, so a type-agnostic allocator would)
+    // makes `derive_register_meta` meet their kinds to Dynamic, which erases
+    // the float type the backend needs to route native f64. A pure-int
+    // function never fills the float pool, so its allocation is unchanged.
+    let is_float_v = |v: usize| {
+        matches!(
+            slot_kind_of(ssa.values[v].ty),
+            varn_types::register_meta::SlotKind::Float
+        )
+    };
     let mut next: u32 = base;
-    let mut free: Vec<u32> = Vec::new();
-    let mut active: Vec<(u32, u32)> = Vec::new();
+    let mut free_float: Vec<u32> = Vec::new();
+    let mut free_other: Vec<u32> = Vec::new();
+    // (interval end, register, is_float)
+    let mut active: Vec<(u32, u32, bool)> = Vec::new();
     for &v in &order {
         let d = def[v];
+        let vf = is_float_v(v);
         let mut i = 0;
         while i < active.len() {
             if active[i].0 < d {
-                free.push(active[i].1);
+                let (_, r, rf) = active[i];
+                if rf {
+                    free_float.push(r);
+                } else {
+                    free_other.push(r);
+                }
                 active.swap_remove(i);
             } else {
                 i += 1;
             }
         }
-        let r = match free.iter().copied().min() {
+        let pool = if vf { &mut free_float } else { &mut free_other };
+        let r = match pool.iter().copied().min() {
             Some(m) => {
-                free.retain(|&x| x != m);
+                pool.retain(|&x| x != m);
                 m
             }
             None => {
@@ -463,7 +485,7 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
         }
         reg[v] = r as u8;
         assigned[v] = true;
-        active.push((end[v], r));
+        active.push((end[v], r, vf));
     }
 
     let mut max_call = 0u32;
