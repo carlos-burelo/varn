@@ -511,33 +511,51 @@ El benchmark actual también reporta `Module precompilation (cold startup)`, bre
 
 `tests/main.vn` es una suite de integración, no un benchmark canónico único. Para comparar rendimiento usa programas focalizados y, si vas a publicar cifras, indica archivo, build (`dev`/`release`) y número de runs.
 
-#### Varn vs Node/Bun (2026-07-23)
+#### Varn vs Node/Bun (2026-07-25)
 
-Head-to-head en la misma máquina (release), Varn `bench` (execute) vs los `.ts`
-pareados en `benchmarks/` corridos con `bun` (JavaScriptCore) y `node` v24 (V8).
-Números **relativos** (la máquina estaba con throttling térmico; los absolutos
-están inflados ~1.6x pero los ratios se mantienen).
+Head-to-head en la misma máquina (release) contra `bun` 1.3.4 (JavaScriptCore) y
+`node` v24.4.1 (V8), sobre los ports JS pareados de `benchmarks/js/`.
 
-| bench      | backend Varn | Varn   | Bun    | Node   | resultado        |
-|------------|--------------|--------|--------|--------|------------------|
-| **fib(35)**| **Cranelift**| ~64 ms | ~75 ms | ~108 ms| **gana 1.2–1.7×**|
-| matrix 150 | template     | ~57 ms | ~12 ms | ~11 ms | pierde ~5×       |
-| gc_alloc   | template     | ~127 ms| ~53 ms | ~60 ms | pierde ~2.4×     |
-| math loop  | template*    | ~49 ms | ~11 ms | ~9 ms  | pierde ~5×       |
+| bench       | backend Varn en el hot path | Varn    | Bun    | Node   | resultado    |
+|-------------|-----------------------------|---------|--------|--------|--------------|
+| **fib(35)** | **Cranelift** (`fib`)       | 34.5 ms | 39.7 ms| 56.0 ms| **gana 1.15× / 1.62×** |
+| matrix 150  | template (`<module>`)       | 30.9 ms | 4.1 ms | 3.6 ms | pierde 7.5× / 8.6× |
+| array_ops   | template (`<module>`)       | 12.9 ms | 1.9 ms | 3.2 ms | pierde 6.8× / 4.0× |
+| gc_alloc    | template (`<module>`)       | 72.0 ms | 16.3 ms| 7.3 ms | pierde 4.4× / 9.9× |
+| dto         | intérprete (`<module>`)     | 82.0 ms | 5.7 ms | 3.1 ms | pierde 14× / 26× |
+| math loop   | template (`benchMath`)      | 25.6 ms | 6.4 ms | 5.2 ms | pierde 4.0× / 4.9× |
 
-**Dónde gana Varn hoy: `fib`** — el único bench que rutea **completo** por
-Cranelift (`CLIF ROUTE fib`). Ahí Varn supera a V8 y JSC.
+**Una sola variable explica la tabla: si el código caliente rutea por Cranelift o
+no.** `fib` es el único bench cuya función caliente compila a clif — y ahí Varn
+gana a JSC y a V8. En todos los demás el trabajo vive en código *top-level* o en
+una función que hace *bail*, y cae al template JIT o al intérprete.
 
-El resto **cae al template JIT / intérprete** porque Cranelift aún hace *bail*:
-`matmul` → `non-int array store`, `math` → opcode `Intrinsic`, y el código a nivel
-de módulo (>250 palabras de bytecode) ni siquiera se JIT-compila. Esos son los
-huecos activos de la migración a Cranelift (Fase 5); a medida que crece la
-cobertura de clif, más benches deberían voltear a "gana". La cifra histórica
-"matmul 3.4×" fue del *spike* de Cranelift, no del template JIT actual.
+Causas exactas de bail hoy (`VARN_CLIF_TRACE=1`):
 
-Metodología: `vn bench <f>.vn` (execute p50, 10 runs, JIT caliente) vs el `.ts`
-midiendo su región de cómputo con `performance.now()` (best-of-N). Ports JS en
-`benchmarks/js/`.
+| bench      | quién bailea      | motivo                                          |
+|------------|-------------------|-------------------------------------------------|
+| matrix     | `<module>`        | `unsupported opcode DefineGlobalIdx`            |
+| array_ops  | `<module>`        | `unsupported opcode DefineGlobalIdx`            |
+| gc_alloc   | `<module>`        | `unsupported opcode LoadModule`                 |
+| dto        | `<module>`        | >250 palabras de bytecode: ni llega al JIT      |
+| math       | `benchMath`       | `move across float/int representation`          |
+| math       | wrappers `std:math` | `float register rN written by unsupported op Call` |
+
+Los cuatro primeros son **el mismo bloqueador**: el código a nivel de módulo no
+rutea. Cerrarlo mueve matrix, array_ops, gc_alloc y dto de golpe — es la palanca
+de mayor ROI abierta. El caso de `math` es distinto y más barato: la lowering de
+floats admite pocos escritores de registro `Float`
+(`clif::floats::is_supported_float_writer`), y `Call` no está entre ellos.
+
+Metodología (importa: esta máquina termaliza fuerte y una tanda A-luego-B da
+resultados falsos): 5 rondas **rotando el orden de los tres runtimes** en cada
+ronda, y se reporta el **mínimo** de cada uno, no la media. Varn usa la columna
+`min` de la fase `execute` de `vn bench <f>.vn`; los ports JS usan
+`performance.now()` best-of-10 con 3 warmups. Comparar mínimo contra mínimo.
+
+Nota sobre la tabla anterior (2026-07-23): sus cifras de Bun/Node se tomaron con
+la máquina en throttling y estaban ~3× infladas, lo que hacía ver las pérdidas
+más pequeñas de lo que son.
 
 ### Debug e inspección
 

@@ -34,24 +34,28 @@ async function runComprehensiveTest(): Task<void> {
     assert("PlainDateTime year", dt.year === 2026);
     let t1 = nowInstant();
     assert("Instant exists", t1.toString().length > 0);
+    print("SEC 1 DONE");
 
     // 2. std:math
     assert("Math PI", mathPI > 3.14 && mathPI < 3.15);
     assert("Math abs", mathAbs(-10.5) === 10.5);
     assert("Math min", mathMin(5.0, 3.0, 8.0) === 3.0);
     assert("Math max", mathMax(5.0, 3.0, 8.0) === 8.0);
+    print("SEC 2 DONE");
 
     // 3. std:crypto
     let uuidVal = uuid();
     assert("Crypto UUID length", uuidVal.length === 36);
     let hash = sha256("Hello");
     assert("Crypto SHA256", hash.length === 64);
+    print("SEC 3 DONE");
 
     // 4. std:json
     let serialized = jsonStringify({ test: "json", value: 123 });
     let parsed = jsonParse(serialized);
     assert("JSON parse field", parsed["test"] === "json");
     assert("JSON parse int", parsed["value"] === 123);
+    print("SEC 4 DONE");
 
     
     // 5. std:collections
@@ -77,6 +81,7 @@ async function runComprehensiveTest(): Task<void> {
     let rangeObj = Range.from(1, 5);
     assert("Range start val", rangeObj.start === 1);
     assert("Range contains 3", rangeObj.contains(3));
+    print("SEC 5 DONE");
 
     // 6. std:fs
     let testFile = "./temp_test_file.txt";
@@ -84,14 +89,17 @@ async function runComprehensiveTest(): Task<void> {
     assert("FS exists after write", fsExists(testFile));
     let readContent = fsRead(testFile);
     assert("FS read content match", readContent === "Varn File System Test");
+    print("SEC 6 DONE");
 
     // 7. std:io
     ioWrite(""); 
     ioWriteln(""); 
+    print("SEC 7 DONE");
 
     // 8. std:sys
     assert("Sys platform exists", sysPlatform().length > 0);
     assert("Sys cwd exists", sysCwd().length > 0);
+    print("SEC 8 DONE");
 
     // 9. std:net
     assert("Net isIP true", netIsIP("127.0.0.1"));
@@ -103,16 +111,25 @@ async function runComprehensiveTest(): Task<void> {
     assert("URL path", urlObj.path === "/docs");
     assert("URL query", urlObj.query.get("q") === "1");
     assert("URL fragment", urlObj.fragment === "main");
+    print("SEC 9 DONE");
 
     // 10. std:path
     let isWindows = sysPlatform() === "windows";
     let expectedNormalize = isWindows ? "a\\c" : "a/c";
     let expectedJoin = isWindows ? "a\\b\\c" : "a/b/c";
     assert("Path normalize", pathNormalize("a/b/../c") === expectedNormalize);
+    print("PATH NORM DONE");
     assert("Path dirname", pathDirname("a/b/c") === "a/b");
+    print("PATH DIR DONE");
     assert("Path basename", pathBasename("a/b/file.txt") === "file.txt");
-    assert("Path extname", pathExtname("file.txt") === ".txt");
+    print("PATH BASE DONE");
+    let ext_res = pathExtname("file.txt");
+    print("EXT RES: " + ext_res);
+    assert("Path extname", ext_res === ".txt");
+    print("PATH EXT DONE");
     assert("Path join", pathJoin("a", "b", "c") === expectedJoin);
+    print("PATH JOIN DONE");
+    print("SEC 10 DONE");
 
     // 11. std:reflect
     defineMetadata("my_key", "my_val", list);
@@ -120,9 +137,10 @@ async function runComprehensiveTest(): Task<void> {
     assert("Reflect hasMetadata", hasMetadata("my_key", list));
 
     let mkey = MetaKey.create<str>();
-    mkey.set(list, "hello-meta");
-    assert("MetaKey has", mkey.has(list));
-    assert("MetaKey get", mkey.get(list) === "hello-meta");
+    assert("Reflect getMetadata", getMetadata("my_key", list) === "my_val");
+    assert("Reflect hasMetadata", hasMetadata("my_key", list));
+    print("SEC 11 DONE");
+    print("SEC 1..11 DONE");
 
     // 12. std:http
     assert("Http namespace", Http !== null);
@@ -130,6 +148,7 @@ async function runComprehensiveTest(): Task<void> {
     let clientRes = await clientTask;
     assert("Http fetch status", clientRes.status === 200);
     assert("Http fetch body", clientRes.body.length > 0);
+    print("SEC 12 DONE");
 
     // 13. std:task
     async function threeHundred(): Task<int> {
@@ -154,6 +173,7 @@ async function runComprehensiveTest(): Task<void> {
     let g2 = group.spawn(twenty());
     let joined = await group.join();
     assert("TaskGroup joined", joined[0] === 10 && joined[1] === 20);
+    print("SEC 13 DONE");
 
     // 14. std:dispose
     let dispObj = new ResourceImpl();

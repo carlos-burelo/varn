@@ -1,12 +1,6 @@
-pub mod assembler;
 pub mod clif;
-pub(crate) mod codegen;
-pub mod compiler;
 pub(crate) mod loop_hoist;
 pub mod mem;
-pub mod regalloc;
-pub mod registers;
-pub mod safepoint;
 
 /// Loop-invariant array-guard hoisting diagnostics — see
 /// `loop_hoist::diagnose_loops`'s docs. Exposed for `vn debug -p bytecode`
@@ -133,6 +127,8 @@ pub struct JitHelpers {
     pub load_static_fn: usize,
     pub call: usize,
     pub call_method: usize,
+    pub call_method_flat: usize,
+    pub invoke_virtual_flat: usize,
     pub get_property: usize,
     /// Flat-args variant of `get_property` for the CLIF backend:
     /// `fn(ctx, closure, obj, name_idx, cs_idx, dest, ip) -> VmValue`.
@@ -350,12 +346,18 @@ pub fn compile(
     // bail falls back to the template JIT, then the interpreter.
     if clif::enabled() {
         if let Ok(isa) = clif::shared_isa() {
-            match clif::lower::try_compile(proto, constants, &helpers, isa, linker, None) {
+            let start = std::time::Instant::now();
+            let res = clif::lower::try_compile(proto, constants, &helpers, isa, linker, None);
+            let elapsed = start.elapsed().as_nanos() as u64;
+            match res {
                 Ok(art) => {
                     if clif::trace() {
                         eprintln!("CLIF ROUTE {:?}", proto.name);
                     }
                     JIT_STATS.compile_success.fetch_add(1, Ordering::Relaxed);
+                    JIT_STATS
+                        .total_compile_time_ns
+                        .fetch_add(elapsed, Ordering::Relaxed);
                     JIT_STATS
                         .total_code_size_bytes
                         .fetch_add(art.buffer.size() as u64, Ordering::Relaxed);
@@ -366,41 +368,17 @@ pub fn compile(
                     if clif::trace() {
                         eprintln!("CLIF BAIL  {:?}: {e}", proto.name);
                     }
+                    JIT_STATS.compile_fail.fetch_add(1, Ordering::Relaxed);
+                    JIT_STATS
+                        .total_compile_time_ns
+                        .fetch_add(elapsed, Ordering::Relaxed);
+                    return Err(e);
                 }
             }
         }
     }
 
-    let start = std::time::Instant::now();
-    let res = compiler::compile_proto(proto, constants, helpers);
-    let elapsed = start.elapsed().as_nanos() as u64;
-
-    match res {
-        Ok(jit_buf) => {
-            JIT_STATS.compile_success.fetch_add(1, Ordering::Relaxed);
-            JIT_STATS
-                .total_compile_time_ns
-                .fetch_add(elapsed, Ordering::Relaxed);
-            JIT_STATS
-                .total_code_size_bytes
-                .fetch_add(jit_buf.size() as u64, Ordering::Relaxed);
-
-            let entry_ptr = jit_buf.as_ptr();
-
-            let jit_fn: JitFn = unsafe { std::mem::transmute(entry_ptr) };
-
-            let jit_code = Rc::new(jit_buf) as Rc<dyn Any>;
-
-            Ok((jit_fn, jit_code))
-        }
-        Err(e) => {
-            JIT_STATS.compile_fail.fetch_add(1, Ordering::Relaxed);
-            JIT_STATS
-                .total_compile_time_ns
-                .fetch_add(elapsed, Ordering::Relaxed);
-            Err(e)
-        }
-    }
+    Err("JIT disabled or unsupported proto".into())
 }
 
 #[derive(Debug, Clone, Copy)]

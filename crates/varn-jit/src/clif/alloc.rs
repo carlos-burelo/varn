@@ -26,7 +26,9 @@ use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::chunk::{Literal, PoolEntry};
 
-use super::emit::{box_or_pass, call_helper, call_helper_void};
+use varn_types::register_meta::{RegisterMeta, SlotKind};
+
+use super::emit::{box_or_pass, call_helper, call_helper_void, meta_is_float, unbox_f64_coerce};
 use super::kinds::{is_boxed_kind, K};
 use crate::JitHelpers;
 
@@ -63,6 +65,8 @@ pub(super) fn has_alloc(
                     // (arbitrary VM code that can allocate); needs closure.
                     | OpCode::GetProperty
                     | OpCode::SetProperty
+                    | OpCode::CallMethod
+                    | OpCode::InvokeVirtual
                     // These allocate a heap string / bind a method / make a
                     // BigInt — force the safepoint discipline in loops.
                     | OpCode::ToString
@@ -72,6 +76,7 @@ pub(super) fn has_alloc(
                     // A string slice allocates a Slice HeapStr (and it's not
                     // an int-contract callee, so no fast-IC regression).
                     | OpCode::StrSlice
+                    | OpCode::Intrinsic
             )
         ) {
             return Ok(true);
@@ -96,7 +101,7 @@ pub(super) struct AllocCtx<'a> {
 
 /// Address of this frame's register-0 home slot, recomputed from `ExecCtx`
 /// so a `ctx.stack` reallocation can never leave it stale.
-fn frame_base_addr(b: &mut FunctionBuilder, actx: &AllocCtx) -> cranelift_codegen::ir::Value {
+pub(super) fn frame_base_addr(b: &mut FunctionBuilder, actx: &AllocCtx) -> cranelift_codegen::ir::Value {
     let sp = b.ins().load(
         types::I64,
         MemFlags::trusted(),
@@ -117,8 +122,17 @@ pub(super) fn load_receiver(
     b.ins().load(types::I64, MemFlags::trusted(), fb, 0)
 }
 
+pub(super) fn load_home(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    r: usize,
+) -> cranelift_codegen::ir::Value {
+    let fb = frame_base_addr(b, actx);
+    b.ins().load(types::I64, MemFlags::trusted(), fb, (r * 8) as i32)
+}
+
 /// Store `reg`'s current value into its `ctx.stack` home slot.
-fn store_home(
+pub(super) fn store_home(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     state: &[K],
@@ -160,13 +174,13 @@ pub(super) fn emit_backedge_safepoint(b: &mut FunctionBuilder, actx: &AllocCtx, 
 
 /// Registers that could hold a heap reference at this program point — the
 /// set to root across a collection.
-fn live_boxed(actx: &AllocCtx, state: &[K]) -> Vec<usize> {
+pub(super) fn live_boxed(actx: &AllocCtx, state: &[K]) -> Vec<usize> {
     (0..actx.nregs).filter(|&r| is_boxed_kind(state[r])).collect()
 }
 
 /// Spill `regs` to their `ctx.stack` home slots so the collector roots (and
 /// rewrites) them. Ints are GC-irrelevant and stay in registers.
-fn flush_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K], regs: &[usize]) {
+pub(super) fn flush_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K], regs: &[usize]) {
     let fb = frame_base_addr(b, actx);
     for &r in regs {
         store_home(b, actx, state, fb, r);
@@ -175,7 +189,7 @@ fn flush_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K], regs: &[us
 
 /// Reload `regs` from their home slots after a collection may have moved
 /// their indices (and grown/moved `ctx.stack`, so recompute the base).
-fn reload_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, regs: &[usize]) {
+pub(super) fn reload_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, regs: &[usize]) {
     let fb = frame_base_addr(b, actx);
     for &r in regs {
         let v = b
@@ -203,16 +217,15 @@ pub(super) fn emit_generic_call(
     let w2 = code[ip + 2];
     let dest = (w1 >> 8) as usize;
     let callee_reg = (w1 & 0xFF) as usize;
-    let total = (w2 >> 8) as usize;
-    let call_base = (w2 & 0xFF) as usize;
-    let argc = total.saturating_sub(1);
+    let argc = (w2 >> 8) as usize;
+    let arg_start = (w2 & 0xFF) as usize;
     if argc > 4 {
         return Err("clif: generic call arity > 4".into());
     }
 
     let callee = box_or_pass(b, actx.vars, state, callee_reg);
     let arg_vals: Vec<cranelift_codegen::ir::Value> = (0..argc)
-        .map(|i| box_or_pass(b, actx.vars, state, call_base + 1 + i))
+        .map(|i| box_or_pass(b, actx.vars, state, arg_start + i))
         .collect();
 
     let regs = live_boxed(actx, state);
@@ -249,7 +262,7 @@ pub(super) fn emit_get_property(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     state: &[K],
-    meta: &[varn_types::register_meta::RegisterMeta],
+    _meta: &[varn_types::register_meta::RegisterMeta],
     code: &[u16],
     ip: usize,
 ) {
@@ -276,13 +289,7 @@ pub(super) fn emit_get_property(
 
     reload_boxed(b, actx, &regs);
 
-    if meta.get(dest).map_or(false, |m| m.kind == varn_types::register_meta::SlotKind::Int) {
-        let s = b.ins().ishl_imm(res, 16);
-        let un = b.ins().sshr_imm(s, 16);
-        b.def_var(actx.vars[dest], un);
-    } else {
-        b.def_var(actx.vars[dest], res);
-    }
+    b.def_var(actx.vars[dest], res);
 }
 
 /// `SetProperty obj(=first_reg), val, cs_idx, name_idx` — dynamic/generic
@@ -380,7 +387,14 @@ pub(super) fn emit_str_concat(
     let b_r = (code[ip + 1] & 0xFF) as usize;
     let a = box_or_pass(b, actx.vars, state, a_r);
     let bb = box_or_pass(b, actx.vars, state, b_r);
+
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+
     let res = call_helper(b, actx.cc, actx.helpers.str_concat, &[actx.exec_ctx, a, bb]);
+
+    reload_boxed(b, actx, &regs);
+
     b.def_var(actx.vars[dest], res);
 }
 
@@ -393,6 +407,7 @@ pub(super) fn emit_call_native_op(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     state: &[K],
+    meta: &[RegisterMeta],
     code: &[u16],
     pool: &[PoolEntry],
     ip: usize,
@@ -418,7 +433,13 @@ pub(super) fn emit_call_native_op(
         actx.helpers.jit_call_native_op,
         &[actx.exec_ctx, op_id_v, args_start, total_v],
     );
-    b.def_var(actx.vars[dest], res);
+    if meta.get(dest).map_or(false, |m| m.kind == varn_types::register_meta::SlotKind::Int) {
+        let s = b.ins().ishl_imm(res, 16);
+        let un = b.ins().sshr_imm(s, 16);
+        b.def_var(actx.vars[dest], un);
+    } else {
+        b.def_var(actx.vars[dest], res);
+    }
     Ok(())
 }
 
@@ -452,4 +473,184 @@ pub(super) fn emit_build_object_with_shape(
         &[actx.exec_ctx, actx.closure, start_v, shape_v],
     );
     b.def_var(actx.vars[dest], res);
+}
+
+pub(super) fn emit_make_enum_variant(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+) {
+    let dest = (code[ip + 1] >> 8) as usize;
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+
+    let ip_v = b.ins().iconst(types::I64, ip as i64);
+    let res = call_helper(
+        b,
+        actx.cc,
+        actx.helpers.make_enum_variant,
+        &[actx.exec_ctx, ip_v],
+    );
+
+    reload_boxed(b, actx, &regs);
+    b.def_var(actx.vars[dest], res);
+}
+
+pub(super) fn emit_get_enum_tag(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    meta: &[RegisterMeta],
+    code: &[u16],
+    ip: usize,
+) {
+    let dest = (code[ip] >> 8) as usize;
+    let src = (code[ip + 1] >> 8) as usize;
+
+    let val = box_or_pass(b, actx.vars, state, src);
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+
+    let res = call_helper(
+        b,
+        actx.cc,
+        actx.helpers.get_enum_tag,
+        &[actx.exec_ctx, val],
+    );
+
+    reload_boxed(b, actx, &regs);
+
+    if meta_is_float(meta, dest) {
+        let f = unbox_f64_coerce(b, res);
+        b.def_var(actx.vars[dest], f);
+    } else if meta.get(dest).map_or(false, |m| m.kind == SlotKind::Int) {
+        let s = b.ins().ishl_imm(res, 16);
+        let un = b.ins().sshr_imm(s, 16);
+        b.def_var(actx.vars[dest], un);
+    } else {
+        b.def_var(actx.vars[dest], res);
+    }
+}
+
+pub(super) fn emit_build_str(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+) {
+    let dest = (code[ip] >> 8) as usize;
+    let count = (code[ip + 1] >> 8) as usize;
+
+    let slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
+        cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+        (count * 8) as u32,
+        3,
+    ));
+    let parts_ptr = b.ins().stack_addr(types::I64, slot, 0);
+
+    let vals: Vec<_> = (0..count)
+        .map(|i| {
+            let r = (code[ip + 2 + i] >> 8) as usize;
+            box_or_pass(b, actx.vars, state, r)
+        })
+        .collect();
+
+    for (i, val) in vals.into_iter().enumerate() {
+        b.ins().store(MemFlags::trusted(), val, parts_ptr, (i * 8) as i32);
+    }
+
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+
+    let count_v = b.ins().iconst(types::I64, count as i64);
+
+    let res = call_helper(
+        b,
+        actx.cc,
+        actx.helpers.build_str,
+        &[actx.exec_ctx, parts_ptr, count_v],
+    );
+
+    reload_boxed(b, actx, &regs);
+    b.def_var(actx.vars[dest], res);
+}
+
+pub(super) fn emit_intrinsic(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    meta: &[RegisterMeta],
+    code: &[u16],
+    ip: usize,
+) {
+    let dest = (code[ip] >> 8) as usize;
+    let w1 = code[ip + 1];
+    let wire_byte = (w1 >> 8) as usize;
+    let arg_count = (w1 & 0xFF) as usize;
+
+    let fb = frame_base_addr(b, actx);
+    for r in dest..dest + arg_count {
+        store_home(b, actx, state, fb, r);
+    }
+
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+
+    let wire_v = b.ins().iconst(types::I64, wire_byte as i64);
+    let start_v = b.ins().iadd_imm(actx.base, dest as i64);
+    let count_v = b.ins().iconst(types::I64, arg_count as i64);
+
+    let res = call_helper(
+        b,
+        actx.cc,
+        actx.helpers.dispatch_intrinsic,
+        &[actx.exec_ctx, wire_v, start_v, count_v],
+    );
+
+    reload_boxed(b, actx, &regs);
+
+    if meta_is_float(meta, dest) {
+        let f = unbox_f64_coerce(b, res);
+        b.def_var(actx.vars[dest], f);
+    } else if meta.get(dest).map_or(false, |m| m.kind == SlotKind::Int) {
+        let s = b.ins().ishl_imm(res, 16);
+        let un = b.ins().sshr_imm(s, 16);
+        b.def_var(actx.vars[dest], un);
+    } else {
+        b.def_var(actx.vars[dest], res);
+    }
+}
+
+pub(super) fn emit_to_string(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    meta: &[RegisterMeta],
+    code: &[u16],
+    ip: usize,
+) {
+    let dest = (code[ip] >> 8) as usize;
+    let src = (code[ip + 1] >> 8) as usize;
+
+    let v = box_or_pass(b, actx.vars, state, src);
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+
+    let res = call_helper(b, actx.cc, actx.helpers.to_string, &[actx.exec_ctx, v]);
+
+    reload_boxed(b, actx, &regs);
+
+    if meta_is_float(meta, dest) {
+        let f = unbox_f64_coerce(b, res);
+        b.def_var(actx.vars[dest], f);
+    } else if meta.get(dest).map_or(false, |m| m.kind == SlotKind::Int) {
+        let s = b.ins().ishl_imm(res, 16);
+        let un = b.ins().sshr_imm(s, 16);
+        b.def_var(actx.vars[dest], un);
+    } else {
+        b.def_var(actx.vars[dest], res);
+    }
 }

@@ -135,8 +135,7 @@ fn write_value_json(val: &Value, ctx: &ExecCtx, out: &mut String) {
         Value::Array(a) => {
             out.push('[');
             let mut first = true;
-            let guard = a.borrow();
-            for item in guard.iter() {
+            for item in a.borrow().iter() {
                 if !first {
                     out.push(',');
                 }

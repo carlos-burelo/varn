@@ -282,7 +282,6 @@ impl ExecCtx {
             }
         }
 
-        self.push(callee);
         for i in 0..arg_count {
             let v = self.stack[base + arg_start + i];
             self.push(v);
@@ -362,6 +361,7 @@ impl ExecCtx {
                 let mut frame = crate::frame::CallFrame::new(closure_ref, new_base);
                 frame._owned_closure = self.frames[frame_idx]._owned_closure.clone();
                 frame.return_reg = Some(dest as u16);
+                frame.caller_base = Some(base);
                 self.record_call_vm_fast();
                 self.record_frame_push();
                 self.frames.push(frame);

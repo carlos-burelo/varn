@@ -32,8 +32,38 @@ pub(super) fn patch_rel32(buf: &mut [u8], site: usize, target: usize) {
     buf[site..site + 4].copy_from_slice(&disp.to_le_bytes());
 }
 
+pub(super) fn meta_is_int(meta: &[varn_types::register_meta::RegisterMeta], r: usize) -> bool {
+    meta.get(r).map_or(false, |m| m.kind == SlotKind::Int)
+}
+
 pub(super) fn def_const(b: &mut FunctionBuilder, vars: &[Variable], reg: usize, v: i64) {
     let c = b.ins().iconst(types::I64, v);
+    b.def_var(vars[reg], c);
+}
+
+pub(super) fn def_const_int(
+    b: &mut FunctionBuilder,
+    meta: &[varn_types::register_meta::RegisterMeta],
+    vars: &[Variable],
+    reg: usize,
+    v: i64,
+) {
+    if meta_is_float(meta, reg) {
+        let f = b.ins().f64const(v as f64);
+        b.def_var(vars[reg], f);
+    } else {
+        let c = b.ins().iconst(types::I64, v);
+        b.def_var(vars[reg], c);
+    }
+}
+
+pub(super) fn def_const_bool(
+    b: &mut FunctionBuilder,
+    vars: &[Variable],
+    reg: usize,
+    v: bool,
+) {
+    let c = b.ins().iconst(types::I64, if v { 1 } else { 0 });
     b.def_var(vars[reg], c);
 }
 
@@ -108,34 +138,14 @@ pub(super) fn emit_return_value(
             k if is_boxed_kind(k) => b.use_var(vars[src]),
             k => return Err(format!("clif: unproven float return ({k:?})")),
         },
-        // string/ref: already boxed bits, passed through by the wrapper.
-        SlotKind::Str | SlotKind::Ref => {
-            if is_boxed_kind(state[src]) {
-                b.use_var(vars[src])
-            } else {
-                return Err(format!("clif: non-boxed heap return ({:?})", state[src]));
-            }
-        }
+        SlotKind::Str | SlotKind::Ref | SlotKind::Dynamic => box_or_pass(b, vars, state, src),
         SlotKind::Bool => match state[src] {
             K::Bool => {
                 let raw = b.use_var(vars[src]);
                 box_bool(b, raw)
             }
             k if is_boxed_kind(k) => b.use_var(vars[src]),
-            k => return Err(format!("clif: unproven bool return ({k:?})")),
-        },
-        // Dynamic (`any`): box whatever representation the value holds.
-        SlotKind::Dynamic => match state[src] {
-            K::Int => {
-                let raw = b.use_var(vars[src]);
-                box_int(b, raw)
-            }
-            K::Bool => {
-                let raw = b.use_var(vars[src]);
-                box_bool(b, raw)
-            }
-            k if is_boxed_kind(k) => b.use_var(vars[src]),
-            k => return Err(format!("clif: unproven dynamic return ({k:?})")),
+            _ => box_or_pass(b, vars, state, src),
         },
     })
 }
@@ -280,6 +290,20 @@ pub(super) fn box_or_pass(
     }
 }
 
+pub(super) fn box_for_target(
+    b: &mut FunctionBuilder,
+    vars: &[Variable],
+    state: &[K],
+    target_state: &[K],
+) {
+    for r in 0..vars.len() {
+        if is_boxed_kind(target_state[r]) && !is_boxed_kind(state[r]) {
+            let boxed = box_or_pass(b, vars, state, r);
+            b.def_var(vars[r], boxed);
+        }
+    }
+}
+
 pub(super) fn state_meta_int(meta: &[varn_types::register_meta::RegisterMeta], r: usize) -> bool {
     meta.get(r).map_or(false, |m| m.kind == SlotKind::Int)
 }
@@ -384,7 +408,7 @@ pub(super) fn emit_array_payload(
     heap_off: usize,
     slow: cranelift_codegen::ir::Block,
     nursery_only: bool,
-    readonly: bool,
+    _readonly: bool,
 ) -> cranelift_codegen::ir::Value {
     // The chain down to the payload pointer is `readonly` FOR THE DURATION
     // OF ONE ROUTED ACTIVATION: heap indices only get rebound by a GC
@@ -396,11 +420,7 @@ pub(super) fn emit_array_payload(
     // every access re-resolves from the (reloaded) receiver. The element
     // Vec's data/len words are never readonly — an out-of-bounds store's
     // append path reallocates them.
-    let ro = if readonly {
-        MemFlags::trusted().with_readonly().with_can_move()
-    } else {
-        MemFlags::trusted()
-    };
+    let ro = MemFlags::trusted();
     let tag = b.ins().band_imm(obj, HEAP_MASK);
     let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_EXPECT);
     let chk = b.create_block();

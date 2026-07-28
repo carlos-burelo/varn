@@ -54,10 +54,15 @@ pub(super) fn emit_is_null(
 ) {
     let dest = (code[ip] >> 8) as usize;
     let src = (code[ip + 1] >> 8) as usize;
-    let v = box_or_pass(b, g.vars, state, src);
-    let is_null = b.ins().icmp_imm(IntCC::Equal, v, VmValue::null().0 as i64);
-    let ext = b.ins().uextend(types::I64, is_null);
-    b.def_var(g.vars[dest], ext);
+    let is_null = match state[src] {
+        K::Int | K::Float | K::Bool => b.ins().iconst(types::I64, 0),
+        _ => {
+            let v = box_or_pass(b, g.vars, state, src);
+            let cmp = b.ins().icmp_imm(IntCC::Equal, v, VmValue::null().0 as i64);
+            b.ins().uextend(types::I64, cmp)
+        }
+    };
+    b.def_var(g.vars[dest], is_null);
 }
 
 /// Dispatch a generic (helper-based) op. Returns `true` if `op` was one of

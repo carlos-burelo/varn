@@ -119,6 +119,8 @@ pub fn build_jit_helpers() -> varn_jit::JitHelpers {
         load_static_fn: ctx::jit_load_static_fn as usize,
         call: ctx::jit_call as usize,
         call_method: ctx::jit_call_method as usize,
+        call_method_flat: ctx::jit_call_method_flat as usize,
+        invoke_virtual_flat: ctx::jit_invoke_virtual_flat as usize,
         get_property: ctx::jit_get_property as usize,
         get_property_flat: ctx::jit_get_property_flat as usize,
         set_property: ctx::jit_set_property as usize,
@@ -340,6 +342,7 @@ pub struct CallFrame {
     pub base: usize,
     pub current_class: Option<Rc<varn_types::ClassObj>>,
     pub return_reg: Option<u16>,
+    pub caller_base: Option<usize>,
 }
 
 unsafe impl Send for CallFrame {}
@@ -354,6 +357,7 @@ impl CallFrame {
             base,
             current_class: None,
             return_reg: None,
+            caller_base: None,
         }
     }
 
@@ -365,6 +369,7 @@ impl CallFrame {
             base,
             current_class: None,
             return_reg: None,
+            caller_base: None,
         }
     }
 

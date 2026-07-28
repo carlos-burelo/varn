@@ -33,16 +33,15 @@ pub use super::ctx_jit_runtime::{
     jit_str_slice, jit_throw, jit_typeof_val, jit_ushr, jit_wrap_spread_stub, jit_yield,
 };
 pub use super::ctx_jit_values::{
-    jit_add, jit_build_array, jit_build_str, jit_call, jit_call_method, jit_call_native_fast,
-    jit_call_native_fnptr, jit_call_native_op, jit_define_global_idx, jit_dispatch_intrinsic,
-    jit_ensure_stack_capacity,
-    jit_eq, jit_get_property, jit_get_property_flat, jit_get_property_ic_fast,
-    jit_get_property_maybe_ic_fast, jit_gt,
-    jit_gte, jit_invoke_virtual, jit_is_native_fn, jit_load_const, jit_load_global,
-    jit_load_global_idx, jit_load_static_fn, jit_load_upvalue, jit_lt, jit_lte, jit_make_closure,
-    jit_mul, jit_neq, jit_post_call, jit_prepare_call, jit_push_self_frame, jit_set_property,
-    jit_set_property_flat,
-    jit_store_global_idx, jit_store_upvalue, jit_sub, jit_to_string,
+    jit_add, jit_build_array, jit_build_str, jit_call, jit_call_method, jit_call_method_flat,
+    jit_call_native_fast, jit_call_native_fnptr, jit_call_native_op, jit_define_global_idx,
+    jit_dispatch_intrinsic, jit_ensure_stack_capacity, jit_eq, jit_get_property,
+    jit_get_property_flat, jit_get_property_ic_fast, jit_get_property_maybe_ic_fast, jit_gt,
+    jit_gte, jit_invoke_virtual, jit_invoke_virtual_flat, jit_is_native_fn, jit_load_const,
+    jit_load_global, jit_load_global_idx, jit_load_static_fn, jit_load_upvalue, jit_lt, jit_lte,
+    jit_make_closure, jit_mul, jit_neq, jit_post_call, jit_prepare_call, jit_push_self_frame,
+    jit_set_property, jit_set_property_flat, jit_store_global_idx, jit_store_upvalue, jit_sub,
+    jit_to_string,
 };
 
 #[repr(C)]

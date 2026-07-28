@@ -669,7 +669,11 @@ impl ExecCtx {
                             first_reg + 1,
                             total - 1,
                         )?;
-                        (*ctx).stack[base + first_reg] = result;
+                        let target_slot = base + first_reg;
+                        if (*ctx).stack.len() <= target_slot {
+                            (*ctx).stack.resize(target_slot + 1, VmValue::null());
+                        }
+                        (*ctx).stack[target_slot] = result;
                     }
 
                     OpCode::LoadStaticFn => {

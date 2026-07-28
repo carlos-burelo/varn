@@ -14,7 +14,8 @@ use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_types::register_meta::RegisterMeta;
 
 use super::emit::{
-    box_or_pass, call_helper, call_helper_void, state_meta_int, use_boxed, HEAP_EXPECT, HEAP_MASK,
+    box_or_pass, call_helper, call_helper_void, meta_is_float, state_meta_int, unbox_f64_coerce,
+    use_boxed, wrap_i48, HEAP_EXPECT, HEAP_MASK,
 };
 use super::kinds::K;
 use crate::JitHelpers;
@@ -141,10 +142,12 @@ pub(super) fn emit_get_fixed_field(
 
     b.switch_to_block(cont);
     let v = b.block_params(cont)[0];
-    if state_meta_int(c.register_meta, first_reg) {
-        let s = b.ins().ishl_imm(v, 16);
-        let un = b.ins().sshr_imm(s, 16);
+    if matches!(state[first_reg], K::Int) || state_meta_int(c.register_meta, first_reg) {
+        let un = wrap_i48(b, v);
         b.def_var(c.vars[first_reg], un);
+    } else if matches!(state[first_reg], K::Float) || meta_is_float(c.register_meta, first_reg) {
+        let f = unbox_f64_coerce(b, v);
+        b.def_var(c.vars[first_reg], f);
     } else {
         b.def_var(c.vars[first_reg], v);
     }

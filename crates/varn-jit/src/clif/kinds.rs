@@ -159,13 +159,29 @@ pub(crate) fn apply_kinds(
         // Fixed-field / property loads produce boxed values, unboxed to int
         // when the register meta proves it.
         OpCode::GetFixedField | OpCode::GetProperty => {
-            state[dest] = if meta_int(dest) { K::Int } else { K::Boxed };
+            state[dest] = if meta_float(dest) {
+                K::Float
+            } else if meta_int(dest) {
+                K::Int
+            } else {
+                K::Boxed
+            };
         }
         // `BuildArray`/`BuildObjectWithShape` encode their destination in the
         // FIRST operand word (`w1 >> 8`), not the opcode word — unlike the
         // ops below whose dest is the standard `first_reg`.
-        OpCode::BuildArray | OpCode::BuildObjectWithShape => {
-            state[(code[ip + 1] >> 8) as usize] = K::Boxed
+        OpCode::BuildArray
+        | OpCode::BuildObjectWithShape
+        | OpCode::CallMethod
+        | OpCode::InvokeVirtual => {
+            let dest = (code[ip + 1] >> 8) as usize;
+            state[dest] = if meta_float(dest) {
+                K::Float
+            } else if meta_int(dest) {
+                K::Int
+            } else {
+                K::Boxed
+            };
         }
         // Other heap-producing ops yield a boxed reference in `first_reg`.
         // A native op / generic Add result kind is unknown here; treat it as
@@ -180,8 +196,16 @@ pub(crate) fn apply_kinds(
         | OpCode::Mul
         | OpCode::Div
         | OpCode::Mod
-        | OpCode::Negate
-        | OpCode::Typeof
+        | OpCode::Negate => {
+            state[dest] = if meta_float(dest) {
+                K::Float
+            } else if meta_int(dest) {
+                K::Int
+            } else {
+                K::Boxed
+            };
+        }
+        OpCode::Typeof
         | OpCode::ToString
         | OpCode::GetSymbol
         | OpCode::Pow
@@ -202,6 +226,15 @@ pub(crate) fn apply_kinds(
                 K::Int
             } else {
                 K::Global(code[ip + 1] as u32)
+            };
+        }
+        OpCode::Intrinsic => {
+            state[dest] = if meta_float(dest) {
+                K::Float
+            } else if meta_int(dest) {
+                K::Int
+            } else {
+                K::Boxed
             };
         }
         _ => {}

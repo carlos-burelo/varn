@@ -270,8 +270,34 @@ pub(super) fn emit_array_get_index(
     let is_boxed = b.ins().icmp_imm(IntCC::Equal, disc, 0);
     b.ins().brif(is_boxed, boxed_blk, &[], slow, &[]);
     b.switch_to_block(boxed_blk);
-    let v = load_elem_as(b, addr, ElemRepr::Boxed, want);
-    b.ins().jump(merge, &[v.into()]);
+    let raw = b.ins().load(types::I64, MemFlags::trusted(), addr, 0);
+    if want == ElemRepr::Int {
+        let tag_mask = b.ins().iconst(types::I64, 0x7FFF_0000_0000_0000i64);
+        let int_expect = b.ins().iconst(types::I64, 0x7FFC_0000_0000_0000i64);
+        let masked = b.ins().band(raw, tag_mask);
+        let is_int_elem = b.ins().icmp(IntCC::Equal, masked, int_expect);
+        let int_blk = b.create_block();
+        b.ins().brif(is_int_elem, int_blk, &[], slow, &[]);
+        b.switch_to_block(int_blk);
+        let v = wrap_i48(b, raw);
+        b.ins().jump(merge, &[v.into()]);
+    } else if want == ElemRepr::Float {
+        let num_blk = b.create_block();
+        let qnan = b.ins().iconst(types::I64, 0x7FF8_0000_0000_0000i64);
+        let masked = b.ins().band(raw, qnan);
+        let is_f64_elem = b.ins().icmp(IntCC::NotEqual, masked, qnan);
+        let tag_mask = b.ins().iconst(types::I64, 0x7FFF_0000_0000_0000i64);
+        let int_expect = b.ins().iconst(types::I64, 0x7FFC_0000_0000_0000i64);
+        let masked_int = b.ins().band(raw, tag_mask);
+        let is_int_elem = b.ins().icmp(IntCC::Equal, masked_int, int_expect);
+        let is_num = b.ins().bor(is_f64_elem, is_int_elem);
+        b.ins().brif(is_num, num_blk, &[], slow, &[]);
+        b.switch_to_block(num_blk);
+        let v = unbox_f64_coerce(b, raw);
+        b.ins().jump(merge, &[v.into()]);
+    } else {
+        b.ins().jump(merge, &[raw.into()]);
+    }
 
     // slow: same generic helper as the template (returns null out of bounds;
     // allocates nothing). It answers for every repr, so a cross-typed access

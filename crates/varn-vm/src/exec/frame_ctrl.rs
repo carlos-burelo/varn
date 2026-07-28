@@ -209,8 +209,10 @@ impl ExecCtx {
                 result
             };
             if let Some(reg) = frame.return_reg {
-                if let Some(caller_frame) = self.frames.last() {
-                    let caller_base = caller_frame.base;
+                let caller_base = frame.caller_base.unwrap_or_else(|| {
+                    self.frames.last().map(|f| f.base).unwrap_or(0)
+                });
+                if caller_base + (reg as usize) < self.stack.len() {
                     self.stack[caller_base + reg as usize] = final_val;
                 }
                 Ok(final_val)
@@ -411,29 +413,28 @@ impl NativeCtx for ExecCtx {
         self.heap.alloc_range(start, end, inclusive)
     }
 
+
     fn call_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String> {
+        let orig_len = self.stack.len();
         self.stack.push(callee);
-        self.stack.push(VmValue::null());
         self.stack.extend_from_slice(args);
-        let prepared = self
-            .prepare_call(callee, args.len() + 1)
-            .map_err(|e| e.message)?;
-        match prepared {
-            PreparedCall::Native(f, args) => {
-                let res = (f)(self as &mut dyn NativeCtx, &args);
-                self.stack.pop();
-                res
+        let prepared = match self.prepare_call(callee, args.len() + 1) {
+            Ok(p) => p,
+            Err(e) => {
+                self.stack.truncate(orig_len);
+                return Err(e.message);
             }
+        };
+        let res = match prepared {
+            PreparedCall::Native(f, args) => (f)(self as &mut dyn NativeCtx, &args),
             PreparedCall::NativeImmediate(f, arg_count) => {
                 let args_start = self.stack.len() - arg_count;
                 let vm_args: Vec<VmValue> = self.stack[args_start..args_start + arg_count].to_vec();
-                self.stack.drain((args_start - 1)..);
                 (f)(self as &mut dyn NativeCtx, &vm_args)
             }
             PreparedCall::RawNativeImmediate(f, arg_count) => {
                 let args_start = self.stack.len() - arg_count;
                 let vm_args: Vec<VmValue> = self.stack[args_start..args_start + arg_count].to_vec();
-                self.stack.drain((args_start - 1)..);
                 let slice = if arg_count > 0 {
                     &vm_args[1..]
                 } else {
@@ -448,14 +449,9 @@ impl NativeCtx for ExecCtx {
                     self.stack.resize(required, VmValue::null());
                 }
                 self.frames.push(frame);
-                let res = self.run_until(depth).map_err(|e| e.message)?;
-                self.stack.pop();
-                Ok(res)
+                self.run_until(depth).map_err(|e| e.message)
             }
-            PreparedCall::PushValue(nv) => {
-                self.stack.pop();
-                Ok(nv)
-            }
+            PreparedCall::PushValue(nv) => Ok(nv),
             PreparedCall::Constructor(frame, instance_nv) => {
                 let depth = self.frames.len();
                 let required = frame.base + frame.closure().proto.register_count as usize;
@@ -465,12 +461,10 @@ impl NativeCtx for ExecCtx {
                 self.frames.push(frame);
                 self.pending_constructors.push((depth, instance_nv));
                 let _ = self.run_until(depth).map_err(|e| e.message)?;
-                self.stack.pop();
                 Ok(instance_nv)
             }
             PreparedCall::NativeConstructor(f, args, instance_nv) => {
                 let result = (f)(self as &mut dyn NativeCtx, &args).map_err(|e| e)?;
-                self.stack.pop();
                 let nv = if result.is_null() {
                     instance_nv
                 } else {
@@ -478,8 +472,11 @@ impl NativeCtx for ExecCtx {
                 };
                 Ok(nv)
             }
-        }
+        };
+        self.stack.truncate(orig_len);
+        res
     }
+
 
     fn spawn_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String> {
         let value = self.heap.extract(callee);
@@ -831,6 +828,71 @@ impl NativeCtx for ExecCtx {
 }
 
 impl ExecCtx {
+    /// Like `call_vm`, but for the JIT generic-call fallback.
+    /// Args are already staged on a slice (including the callee-placeholder null for
+    /// regular calls, or the receiver for extension calls). We push them directly
+    /// without an extra callee push, and hand `arg_count` straight to `prepare_call` —
+    /// exactly mirroring the interpreter's `exec_call_reg` fallback path.
+    pub(crate) fn call_vm_staged(
+        &mut self,
+        callee: VmValue,
+        staged_args: &[VmValue],
+        arg_count: usize,
+    ) -> Result<VmValue, String> {
+        let orig_len = self.stack.len();
+        self.stack.extend_from_slice(staged_args);
+        let prepared = match self.prepare_call(callee, arg_count) {
+            Ok(p) => p,
+            Err(e) => {
+                self.stack.truncate(orig_len);
+                return Err(e.message);
+            }
+        };
+        let res = match prepared {
+            PreparedCall::Native(f, args) => (f)(self as &mut dyn NativeCtx, &args),
+            PreparedCall::NativeImmediate(f, n) => {
+                let args_start = self.stack.len() - n;
+                let vm_args: Vec<VmValue> = self.stack[args_start..args_start + n].to_vec();
+                (f)(self as &mut dyn NativeCtx, &vm_args)
+            }
+            PreparedCall::RawNativeImmediate(f, n) => {
+                let args_start = self.stack.len() - n;
+                let vm_args: Vec<VmValue> = self.stack[args_start..args_start + n].to_vec();
+                let slice = if n > 0 { &vm_args[1..] } else { &vm_args[..] };
+                (f)(self as &mut dyn NativeCtx, slice)
+            }
+            PreparedCall::Frame(frame) => {
+                let depth = self.frames.len();
+                let required = frame.base + frame.closure().proto.register_count as usize;
+                if self.stack.len() < required {
+                    self.stack.resize(required, VmValue::null());
+                }
+                self.frames.push(frame);
+                self.run_until(depth).map_err(|e| e.message)
+            }
+            PreparedCall::PushValue(nv) => Ok(nv),
+            PreparedCall::Constructor(frame, instance_nv) => {
+                let depth = self.frames.len();
+                let required = frame.base + frame.closure().proto.register_count as usize;
+                if self.stack.len() < required {
+                    self.stack.resize(required, VmValue::null());
+                }
+                self.frames.push(frame);
+                self.pending_constructors.push((depth, instance_nv));
+                let _ = self.run_until(depth).map_err(|e| e.message)?;
+                Ok(instance_nv)
+            }
+            PreparedCall::NativeConstructor(f, args, instance_nv) => {
+                let result = (f)(self as &mut dyn NativeCtx, &args).map_err(|e| e)?;
+                let nv = if result.is_null() { instance_nv } else { result };
+                Ok(nv)
+            }
+        };
+        self.stack.truncate(orig_len);
+        res
+    }
+
+
     /// Convert a materialized `Value` (e.g. a Map/Set entry) into a
     /// `SendValue`. Self-contained values route through the single shared
     /// `Value::to_sendable` (which also performs channel-endpoint detection);

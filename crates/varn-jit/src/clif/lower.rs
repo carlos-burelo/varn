@@ -43,11 +43,12 @@ use crate::mem::JitBuffer;
 use crate::JitHelpers;
 
 use super::alloc::{self, AllocCtx};
+use super::methods;
 use super::arrays;
 use super::emit::{
-    box_int, call_helper, code_has_array_ops, def_const, emit_array_payload, emit_return_value,
-    meta_is_float, patch_rel32, unbox_bool, unbox_f64_coerce, use_boxed, use_int, wrap_i48,
-    INT_TAG, MASK_48,
+    box_for_target, box_int, box_or_pass, call_helper, code_has_array_ops, def_const, def_const_bool, def_const_int,
+    emit_array_payload, emit_return_value, meta_is_float, meta_is_int, patch_rel32, unbox_bool,
+    unbox_f64_coerce, use_boxed, use_f64, use_int, wrap_i48, INT_TAG, MASK_48,
 };
 use super::fields;
 use super::floats;
@@ -392,19 +393,6 @@ fn lower_raw(
     } else {
         None
     };
-    let arg_off = if frame_aware { 3 } else { 1 };
-    for i in 0..nparams {
-        let p = b.block_params(entry)[arg_off + i];
-        // A float param arrives as its boxed VmValue bits (i64); unbox to the
-        // F64 Variable. Everything else is already the right i64 representation.
-        if meta_is_float(&proto.register_meta, 1 + i) {
-            let f = unbox_f64_coerce(&mut b, p);
-            b.def_var(vars[1 + i], f);
-        } else {
-            b.def_var(vars[1 + i], p);
-        }
-    }
-
     let actx = alloc_env.map(|(base, closure)| AllocCtx {
         vars: vars.as_slice(),
         helpers,
@@ -414,6 +402,23 @@ fn lower_raw(
         closure,
         nregs,
     });
+    for i in 0..nparams {
+        let r = 1 + i;
+        let p = if let Some(ref actx) = actx {
+            alloc::load_home(&mut b, actx, r)
+        } else {
+            b.block_params(entry)[1 + i]
+        };
+        if meta_is_float(&proto.register_meta, r) {
+            let f = unbox_f64_coerce(&mut b, p);
+            b.def_var(vars[r], f);
+        } else if meta_is_int(&proto.register_meta, r) && actx.is_some() {
+            let un = wrap_i48(&mut b, p);
+            b.def_var(vars[r], un);
+        } else {
+            b.def_var(vars[r], p);
+        }
+    }
     // A method/constructor receives `this` at register 0 — read it from its
     // ctx.stack home slot (stack[base+0]); the caller placed it there.
     if proto.has_this {
@@ -515,6 +520,10 @@ fn lower_raw(
             }
             match entries.get(&ip) {
                 Some(e) => {
+                    if !terminated {
+                        box_for_target(&mut b, &vars, &state, e);
+                        b.ins().jump(*blk, &[]);
+                    }
                     b.switch_to_block(*blk);
                     filled.push(ip);
                     state = e.clone();
@@ -544,15 +553,14 @@ fn lower_raw(
         let next_ip = ip + info.len;
 
         match op {
-            OpCode::LoadIntZero => def_const(&mut b, &vars, first_reg, 0),
-            OpCode::LoadIntOne => def_const(&mut b, &vars, first_reg, 1),
-            OpCode::LoadIntMinusOne => def_const(&mut b, &vars, first_reg, -1),
-            // Bools: unboxed 0/1; boxed at storage/return boundaries.
-            OpCode::LoadTrue => def_const(&mut b, &vars, first_reg, 1),
-            OpCode::LoadFalse => def_const(&mut b, &vars, first_reg, 0),
+            OpCode::LoadIntZero => def_const_int(&mut b, &proto.register_meta, &vars, first_reg, 0),
+            OpCode::LoadIntOne => def_const_int(&mut b, &proto.register_meta, &vars, first_reg, 1),
+            OpCode::LoadIntMinusOne => def_const_int(&mut b, &proto.register_meta, &vars, first_reg, -1),
+            OpCode::LoadTrue => def_const_bool(&mut b, &vars, first_reg, true),
+            OpCode::LoadFalse => def_const_bool(&mut b, &vars, first_reg, false),
             OpCode::LoadInt => {
                 let v = code[ip + 1] as i16 as i64;
-                def_const(&mut b, &vars, first_reg, v);
+                def_const_int(&mut b, &proto.register_meta, &vars, first_reg, v);
             }
             OpCode::LoadConst => {
                 let idx = code[ip + 1] as usize;
@@ -616,6 +624,18 @@ fn lower_raw(
                 };
                 let w = wrap_i48(&mut b, r);
                 b.def_var(vars[first_reg], w);
+            }
+            OpCode::Negate => {
+                let src = (code[ip + 1] >> 8) as usize;
+                if meta_is_float(&proto.register_meta, first_reg) {
+                    let f = use_f64(&mut b, &vars, &state, src)?;
+                    let neg = b.ins().fneg(f);
+                    b.def_var(vars[first_reg], neg);
+                } else {
+                    let i = use_int(&mut b, &vars, &state, src)?;
+                    let neg = b.ins().ineg(i);
+                    b.def_var(vars[first_reg], neg);
+                }
             }
             OpCode::AddImm | OpCode::SubImm => {
                 let w1 = code[ip + 1];
@@ -684,13 +704,18 @@ fn lower_raw(
             }
             OpCode::Jump => {
                 let off = ((code[ip + 1] as u32) << 16 | code[ip + 2] as u32) as usize;
-                let target = blocks[&(ip + 3 + off)];
+                let target_ip = ip + 3 + off;
+                let target = blocks[&target_ip];
+                if let Some(target_state) = entries.get(&target_ip) {
+                    box_for_target(&mut b, &vars, &state, target_state);
+                }
                 b.ins().jump(target, &[]);
                 terminated = true;
             }
             OpCode::Loop => {
                 let off = ((code[ip + 1] as u32) << 16 | code[ip + 2] as u32) as usize;
-                let target = blocks[&((ip + 3) - off)];
+                let target_ip = (ip + 3) - off;
+                let target = blocks[&target_ip];
                 // Allocating functions run a GC safepoint at the back-edge,
                 // flushing live heap refs to their ctx.stack home slots so
                 // the collector can root and rewrite them. (A frame-aware but
@@ -700,6 +725,9 @@ fn lower_raw(
                     if let Some(actx) = actx.as_ref() {
                         alloc::emit_backedge_safepoint(&mut b, actx, &state);
                     }
+                }
+                if let Some(target_state) = entries.get(&target_ip) {
+                    box_for_target(&mut b, &vars, &state, target_state);
                 }
                 b.ins().jump(target, &[]);
                 terminated = true;
@@ -716,16 +744,40 @@ fn lower_raw(
                         let falsy = unbox_bool(&mut b, falsy_boxed);
                         b.ins().bxor_imm(falsy, 1)
                     }
-                    _ => return Err("clif: branch on untracked cond".into()),
+                    _ => {
+                        if meta_is_int(&proto.register_meta, first_reg) {
+                            b.use_var(vars[first_reg])
+                        } else {
+                            let v = box_or_pass(&mut b, &vars, &state, first_reg);
+                            let falsy_boxed = call_helper(&mut b, cc, helpers.logical_not, &[exec_ctx, v]);
+                            let falsy = unbox_bool(&mut b, falsy_boxed);
+                            b.ins().bxor_imm(falsy, 1)
+                        }
+                    }
                 };
                 let off = ((code[ip + 1] as u32) << 16 | code[ip + 2] as u32) as usize;
-                let target = blocks[&(ip + 3 + off)];
+                let target_ip = ip + 3 + off;
+                let target = blocks[&target_ip];
                 let fall = blocks[&next_ip];
+                let target_trampoline = b.create_block();
+                let fall_trampoline = b.create_block();
                 if op == OpCode::JumpIfFalse {
-                    b.ins().brif(cond, fall, &[], target, &[]);
+                    b.ins().brif(cond, fall_trampoline, &[], target_trampoline, &[]);
                 } else {
-                    b.ins().brif(cond, target, &[], fall, &[]);
+                    b.ins().brif(cond, target_trampoline, &[], fall_trampoline, &[]);
                 }
+
+                b.switch_to_block(target_trampoline);
+                if let Some(target_state) = entries.get(&target_ip) {
+                    box_for_target(&mut b, &vars, &state, target_state);
+                }
+                b.ins().jump(target, &[]);
+
+                b.switch_to_block(fall_trampoline);
+                if let Some(fall_state) = entries.get(&next_ip) {
+                    box_for_target(&mut b, &vars, &state, fall_state);
+                }
+                b.ins().jump(fall, &[]);
                 terminated = true;
             }
             OpCode::Return => {
@@ -905,7 +957,35 @@ fn lower_raw(
             }
             OpCode::CallNativeOp => {
                 let actx = actx.as_ref().ok_or("clif: CallNativeOp outside alloc fn")?;
-                alloc::emit_call_native_op(&mut b, actx, &state, code, pool, ip)?;
+                alloc::emit_call_native_op(&mut b, actx, &state, &proto.register_meta, code, pool, ip)?;
+            }
+            OpCode::CallMethod => {
+                let actx = actx.as_ref().ok_or("clif: CallMethod outside alloc fn")?;
+                methods::emit_call_method(&mut b, actx, &state, &proto.register_meta, code, ip);
+            }
+            OpCode::InvokeVirtual => {
+                let actx = actx.as_ref().ok_or("clif: InvokeVirtual outside alloc fn")?;
+                methods::emit_invoke_virtual(&mut b, actx, &state, &proto.register_meta, code, ip);
+            }
+            OpCode::MakeEnumVariant => {
+                let actx = actx.as_ref().ok_or("clif: MakeEnumVariant outside alloc fn")?;
+                alloc::emit_make_enum_variant(&mut b, actx, &state, code, ip);
+            }
+            OpCode::GetEnumTag => {
+                let actx = actx.as_ref().ok_or("clif: GetEnumTag outside alloc fn")?;
+                alloc::emit_get_enum_tag(&mut b, actx, &state, &proto.register_meta, code, ip);
+            }
+            OpCode::BuildStr => {
+                let actx = actx.as_ref().ok_or("clif: BuildStr outside alloc fn")?;
+                alloc::emit_build_str(&mut b, actx, &state, code, ip);
+            }
+            OpCode::Intrinsic => {
+                let actx = actx.as_ref().ok_or("clif: Intrinsic outside alloc fn")?;
+                alloc::emit_intrinsic(&mut b, actx, &state, &proto.register_meta, code, ip);
+            }
+            OpCode::ToString => {
+                let actx = actx.as_ref().ok_or("clif: ToString outside alloc fn")?;
+                alloc::emit_to_string(&mut b, actx, &state, &proto.register_meta, code, ip);
             }
             OpCode::BuildObjectWithShape => {
                 let actx = actx

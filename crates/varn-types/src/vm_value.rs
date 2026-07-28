@@ -647,6 +647,27 @@ impl VmArray {
             ArrayRepr::F64(v) => v.pop().map(VmValue::from_f64),
         }
     }
+    /// Execute a closure `f` for each element as a `VmValue` without intermediate allocation.
+    #[inline]
+    pub fn for_each_vm<F: FnMut(VmValue)>(&self, mut f: F) {
+        match self.repr() {
+            ArrayRepr::Boxed(v) => {
+                for &val in v {
+                    f(val);
+                }
+            }
+            ArrayRepr::I64(v) => {
+                for &n in v {
+                    f(VmValue::from_int(n));
+                }
+            }
+            ArrayRepr::F64(v) => {
+                for &fl in v {
+                    f(VmValue::from_f64(fl));
+                }
+            }
+        }
+    }
 
     /// Box every element of a typed repr and swap the repr to `Boxed` through
     /// the *same* cell (identity preserved; all aliases observe the change).

@@ -18,6 +18,7 @@ pub(crate) mod floats;
 pub(crate) mod generic;
 pub(crate) mod globals;
 pub(crate) mod kinds;
+pub(crate) mod methods;
 pub mod lower;
 
 use cranelift_codegen::control::ControlPlane;

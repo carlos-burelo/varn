@@ -172,11 +172,14 @@ pub extern "C" fn clif_call_fallback(
     a3: VmValue,
 ) -> VmValue {
     unsafe {
-        use varn_types::NativeCtx;
         let ctx_ref = &mut *ctx;
         let all = [a0, a1, a2, a3];
-        let args = &all[..argc.min(4)];
-        match ctx_ref.call_vm(callee, args) {
+        // `argc` slots starting at all[0] are already staged (including the null
+        // placeholder for regular calls, or the receiver for extension calls).
+        // call_vm_staged mirrors the interpreter's exec_call_reg fallback:
+        // push the staged args directly and call prepare_call(callee, argc).
+        let staged = &all[..argc.min(4)];
+        match ctx_ref.call_vm_staged(callee, staged, argc) {
             Ok(v) => v,
             Err(msg) => jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg)),
         }
@@ -234,10 +237,7 @@ pub extern "C" fn jit_array_extend(ctx: *mut ExecCtx, arr: VmValue, src: VmValue
 pub extern "C" fn jit_str_concat(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let sa = ctx_ref.heap.str_repr(a);
-        let sb = ctx_ref.heap.str_repr(b);
-        let combined = format!("{sa}{sb}");
-        ctx_ref.heap.alloc_str(&combined)
+        crate::exec::strings::str_concat(a, b, &mut ctx_ref.heap)
     }
 }
 

@@ -189,7 +189,7 @@ pub fn prepare_call(
 
                     return Ok(PreparedCall::PushValue(heap.intern(task)));
                 }
-                let base = stack.len() - arg_count;
+                let base = stack.len() - nc.proto.arity as usize;
                 return Ok(PreparedCall::Frame(CallFrame::new(&nc, base)));
             }
             HeapObj::NativeFn(_name, f) => {

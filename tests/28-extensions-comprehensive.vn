@@ -47,7 +47,10 @@ extension PointOps on Point {
         return (dx * dx + dy * dy) ** 0.5
     }
     isOrigin(): bool { return this.x === 0 && this.y === 0 }
-    negate(): Point { return new Point(-this.x, -this.y) }
+    negate(): Point {
+        print("INSIDE NEGATE: this.x=" + this.x + " this.y=" + this.y)
+        return new Point(-this.x, -this.y)
+    }
 }
 
 extension IntOps on int {
@@ -63,6 +66,7 @@ extension IntOps on int {
 
 
 // ── String extensions ───────────────────────────────────────────
+print("SHOUT RESULT: '" + "hello".shout() + "'")
 assert("str shout",          "hello".shout() === "hello!")
 assert("str times",          "ab".times(3) === "ababab")
 assert("str wordCount",      "hello world foo".wordCount() === 3)
@@ -78,10 +82,12 @@ assert("point isOrigin true",  p2.isOrigin() === true)
 assert("point isOrigin false", p1.isOrigin() === false)
 
 const neg = p1.negate()
+print("NEG: neg.x=" + neg.x + " neg.y=" + neg.y)
 assert("point negate x",     neg.x === -3)
 assert("point negate y",     neg.y === -4)
 
 // ── Int extensions ──────────────────────────────────────────────
+print("SHOUT RESULT: '" + "hello".shout() + "'")
 assert("int isEven true",    (4).isEven() === true)
 assert("int isEven false",   (7).isEven() === false)
 assert("int isOdd true",     (3).isOdd() === true)

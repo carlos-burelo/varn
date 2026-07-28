@@ -411,6 +411,7 @@ impl ExecCtx {
         }
         let mut frame = crate::frame::CallFrame::new_owned(nc, final_base);
         frame.return_reg = Some(dest as u16);
+        frame.caller_base = Some(base);
         frame.current_class = owner_class;
         self.record_frame_push();
         self.frames.push(frame);

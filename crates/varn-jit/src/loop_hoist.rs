@@ -50,34 +50,7 @@ use varn_types::bytecode::decode;
 use varn_types::chunk::PoolEntry;
 use varn_types::loop_analysis::{instr_offsets, natural_loops, NaturalLoop};
 
-use crate::assembler::Reg;
-
-/// Reserved physical register for the first cached array-box pointer. Not
-/// part of `regalloc::ALLOC_REGS` — see `registers.rs`: on non-Windows
-/// every other callee-saved register is already claimed (4 for general
-/// allocation + frame base + int tag + globals), so `RegMap` must give up
-/// one general-purpose slot to make this available, and only does so for
-/// functions that actually have a hoist plan (see `RegMap::from_bytecode`'s
-/// `cache_regs_needed` parameter).
-pub(crate) const LOOP_ARRAY_CACHE_REG: Reg = Reg::R13;
-
-/// Second cache register, for loops with two simultaneously-invariant
-/// arrays (e.g. `a[..] * b[..]` in a matrix-multiply inner loop). Only
-/// available on Windows: its x64 ABI has two callee-saved registers (Rdi,
-/// Rsi) the JIT never assigns any fixed role — `ARG_CTX`/`ARG_CLOSURE` use
-/// Rcx/Rdx there. On SysV (non-Windows), Rdi/Rsi are volatile argument
-/// registers already spoken for by `ARG_CTX`/`ARG_CLOSURE`, and every other
-/// callee-saved register is claimed, so there is no free slot — loops
-/// needing a second candidate simply don't get one there (see
-/// `plan_hoists`, gated by `cfg(target_os = "windows")`).
-#[cfg(target_os = "windows")]
-pub(crate) const LOOP_ARRAY_CACHE_REG2: Reg = Reg::Rdi;
-
-/// Maximum simultaneously-cached arrays per loop, bounded by how many
-/// physical registers are actually available on the target ABI: 2 on
-/// Windows (see [`LOOP_ARRAY_CACHE_REG2`]), 1 everywhere else. Bumping the
-/// Windows side further requires a third reserved register, which no
-/// supported ABI has spare.
+/// Maximum simultaneously-cached arrays per loop.
 #[cfg(target_os = "windows")]
 const MAX_CANDIDATES: usize = 2;
 #[cfg(not(target_os = "windows"))]
@@ -98,58 +71,18 @@ pub struct HoistCandidate {
 
 /// One hoisted loop: up to [`MAX_CANDIDATES`] invariant arrays touched in
 /// `[header_offset, latch_offset]` (inclusive, `chunk.code` word offsets).
+#[allow(dead_code)]
 pub(crate) struct HoistPlan {
     pub candidates: Vec<HoistCandidate>,
     pub header_offset: usize,
     pub latch_offset: usize,
-    /// One past the latch instruction's last word — the exclusive upper
-    /// bound used to scan the whole loop body for `Store/DefineGlobalIdx`
-    /// writes when validating a `GlobalInvariant` candidate.
     latch_end_offset: usize,
 }
 
 impl HoistPlan {
+    #[allow(dead_code)]
     pub fn contains(&self, ip: usize) -> bool {
         ip >= self.header_offset && ip <= self.latch_offset
-    }
-
-    /// Physical register holding the resolved payload pointer for
-    /// candidate `i` (plan order == discovery order == register order:
-    /// first candidate gets `LOOP_ARRAY_CACHE_REG`, second — Windows only,
-    /// see [`LOOP_ARRAY_CACHE_REG2`] — gets the second slot).
-    pub(crate) fn reg_for_slot(i: usize) -> Reg {
-        match i {
-            0 => LOOP_ARRAY_CACHE_REG,
-            #[cfg(target_os = "windows")]
-            1 => LOOP_ARRAY_CACHE_REG2,
-            _ => unreachable!("HoistPlan candidates bounded by MAX_CANDIDATES"),
-        }
-    }
-
-    /// Which cache register (if any) holds the resolved payload for the
-    /// array read/length site at `site_offset` whose object register is
-    /// `obj_reg`. Re-derives the site's source via [`classify_site`] the
-    /// same way `plan_hoists` did, rather than matching on `obj_reg` alone
-    /// — see module docs on why register-only matching is ambiguous.
-    pub fn cache_reg_for(
-        &self,
-        code: &[u16],
-        constants: &[PoolEntry],
-        obj_reg: u8,
-        site_offset: usize,
-    ) -> Option<Reg> {
-        let source = classify_site(
-            code,
-            constants,
-            self.header_offset,
-            self.latch_end_offset,
-            site_offset,
-            obj_reg,
-        )?;
-        self.candidates
-            .iter()
-            .position(|c| c.obj_vreg == obj_reg && c.source == source)
-            .map(Self::reg_for_slot)
     }
 }
 
@@ -490,6 +423,7 @@ pub fn diagnose_loops(code: &[u16], constants: &[PoolEntry]) -> Vec<LoopDiagnost
 /// that themselves contain a nested loop (only the innermost loop of a
 /// nest gets the cache registers — see the design doc's "Registro de
 /// cache" section).
+#[allow(dead_code)]
 pub(crate) fn plan_hoists(code: &[u16], constants: &[PoolEntry]) -> Vec<HoistPlan> {
     diagnose_loops(code, constants)
         .into_iter()

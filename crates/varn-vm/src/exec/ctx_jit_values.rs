@@ -550,6 +550,31 @@ pub extern "C" fn jit_call_method(
     }
 }
 
+/// Flat-argument shim over [`jit_call_method`] for the CLIF backend.
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn jit_call_method_flat(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    this_val: VmValue,
+    name_idx: usize,
+    cs: usize,
+    arg_start: usize,
+    arg_count: usize,
+    dest: usize,
+    ip: usize,
+) -> VmValue {
+    let args = varn_jit::JitCallMethodArgs {
+        this_val,
+        name_idx,
+        cs,
+        arg_start,
+        arg_count,
+        dest,
+        ip,
+    };
+    jit_call_method(ctx, closure, &args)
+}
+
 pub extern "C" fn jit_get_property(
     ctx: *mut ExecCtx,
     closure: *const crate::frame::VmClosure,
@@ -780,6 +805,29 @@ pub extern "C" fn jit_invoke_virtual(
 
         ctx_ref.stack[base + args.dest]
     }
+}
+
+/// Flat-argument shim over [`jit_invoke_virtual`] for the CLIF backend.
+#[allow(clippy::too_many_arguments)]
+pub extern "C" fn jit_invoke_virtual_flat(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    this_val: VmValue,
+    name_idx: usize,
+    arg_start: usize,
+    arg_count: usize,
+    dest: usize,
+    ip: usize,
+) -> VmValue {
+    let args = varn_jit::JitInvokeVirtualArgs {
+        this_val,
+        name_idx,
+        arg_start,
+        arg_count,
+        dest,
+        ip,
+    };
+    jit_invoke_virtual(ctx, closure, &args)
 }
 
 pub extern "C" fn jit_get_property_ic_fast(
@@ -1093,7 +1141,11 @@ pub extern "C" fn jit_dispatch_intrinsic(
 ) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let args = &ctx_ref.stack[args_start..args_start + arg_count];
+        let required = args_start + arg_count;
+        if ctx_ref.stack.len() < required {
+            ctx_ref.stack.resize(required, VmValue::null());
+        }
+        let args = &ctx_ref.stack[args_start..required];
         match crate::exec::intrinsics::dispatch(wire_byte as u8, args, &mut ctx_ref.heap) {
             Ok(v) => v,
             Err(e) => jit_propagate_error(ctx_ref, e),
