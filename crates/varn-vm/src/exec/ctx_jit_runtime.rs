@@ -441,6 +441,7 @@ pub extern "C" fn jit_yield(ctx: *mut ExecCtx, val: VmValue, dest_reg: u32, resu
 pub extern "C" fn jit_build_object_with_shape(
     ctx: *mut ExecCtx,
     closure: *const crate::frame::VmClosure,
+    base: usize,
     start_reg: usize,
     shape_idx: usize,
 ) -> VmValue {
@@ -451,8 +452,6 @@ pub extern "C" fn jit_build_object_with_shape(
             return VmValue::null();
         };
         let count = shape.property_names.len();
-        let frame_idx = ctx_ref.frames.len() - 1;
-        let base = ctx_ref.frames[frame_idx].base;
 
         let required = base + start_reg + count;
         if ctx_ref.stack.len() < required {
@@ -689,11 +688,15 @@ pub extern "C" fn jit_store_global(ctx: *mut ExecCtx, src: VmValue, name_idx: us
     }
 }
 
-pub extern "C" fn jit_declare_field(ctx: *mut ExecCtx, class_val: VmValue, name_idx: usize) {
+pub extern "C" fn jit_declare_field(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    class_val: VmValue,
+    name_idx: usize,
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = ctx_ref.frames[frame_idx].closure();
+        let closure_ref = &*closure;
         let key_nv = closure_ref.constants[name_idx];
         let key = ctx_ref.heap.str_val(key_nv).expect("non-string const");
         if let Err(e) = crate::exec::class::op_declare_field(class_val, &key, &mut ctx_ref.heap) {
@@ -704,13 +707,13 @@ pub extern "C" fn jit_declare_field(ctx: *mut ExecCtx, class_val: VmValue, name_
 
 pub extern "C" fn jit_make_class(
     ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
     super_val: VmValue,
     name_idx: usize,
 ) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = ctx_ref.frames[frame_idx].closure();
+        let closure_ref = &*closure;
         let name_nv = closure_ref.constants[name_idx];
         let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
         let cls = crate::exec::class::op_class(&name, &mut ctx_ref.heap);
@@ -732,12 +735,15 @@ pub extern "C" fn jit_inherit(ctx: *mut ExecCtx, class_val: VmValue, super_val: 
     }
 }
 
-pub extern "C" fn jit_class_member_op(ctx: *mut ExecCtx, args: *const std::ffi::c_void) {
+pub extern "C" fn jit_class_member_op(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    args: *const std::ffi::c_void,
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let args = &*(args as *const JitClassMemberArgs);
-        let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = ctx_ref.frames[frame_idx].closure();
+        let closure_ref = &*closure;
         let key_nv = closure_ref.constants[args.name_idx];
         let key = ctx_ref.heap.str_val(key_nv).expect("non-string const");
 
@@ -783,12 +789,15 @@ pub extern "C" fn jit_class_member_op(ctx: *mut ExecCtx, args: *const std::ffi::
     }
 }
 
-pub extern "C" fn jit_build_object(ctx: *mut ExecCtx, ip_before: usize) -> VmValue {
+pub extern "C" fn jit_build_object(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    base: usize,
+    ip_before: usize,
+) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = ctx_ref.frames[frame_idx].closure();
-        let base = ctx_ref.frames[frame_idx].base;
+        let closure_ref = &*closure;
         let code = &closure_ref.proto.chunk.code;
 
         let mut temp_ip = ip_before;

@@ -155,8 +155,10 @@ pub fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmResult<V
         }
     }
     Err(RuntimeError::new(format!(
-        "OpGetFixedField: slot {} out of range",
-        slot
+        "OpGetFixedField: slot {} out of range on obj {:?} (heap_obj={:?})",
+        slot,
+        obj,
+        if obj.is_heap() { heap.get(obj.as_heap_idx()) } else { None }
     )))
 }
 

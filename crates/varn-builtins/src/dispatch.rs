@@ -10,40 +10,40 @@ use varn_types::{NativeCtx, NativeOpEntry, VmValue};
 extern "C" {
     #[cfg(target_os = "windows")]
     #[link_name = "\x01.varn_ops$A"]
-    static __varn_OPS_START: NativeOpEntry;
+    static __VARN_OPS_START: NativeOpEntry;
     #[cfg(target_os = "windows")]
     #[link_name = "\x01.varn_ops$C"]
-    static __varn_OPS_END: NativeOpEntry;
+    static __VARN_OPS_END: NativeOpEntry;
 
     #[cfg(target_os = "macos")]
     #[link_name = "\x01section$start$__DATA$varn_ops"]
-    static __varn_OPS_START: NativeOpEntry;
+    static __VARN_OPS_START: NativeOpEntry;
     #[cfg(target_os = "macos")]
     #[link_name = "\x01section$end$__DATA$varn_ops"]
-    static __varn_OPS_END: NativeOpEntry;
+    static __VARN_OPS_END: NativeOpEntry;
 
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     #[link_name = "__start_varn_ops"]
-    static __varn_OPS_START: NativeOpEntry;
+    static __VARN_OPS_START: NativeOpEntry;
     #[cfg(not(any(target_os = "windows", target_os = "macos")))]
     #[link_name = "__stop_varn_ops"]
-    static __varn_OPS_END: NativeOpEntry;
+    static __VARN_OPS_END: NativeOpEntry;
 }
 
 #[cfg(target_os = "windows")]
 #[used]
 #[link_section = ".varn_ops$A"]
-static __VARN_OPS_START_MARKER: NativeOpEntry = unsafe { std::mem::zeroed() };
+pub static __VARN_OPS_START_MARKER: NativeOpEntry = unsafe { std::mem::zeroed() };
 
 #[cfg(target_os = "windows")]
 #[used]
 #[link_section = ".varn_ops$C"]
-static __VARN_OPS_END_MARKER: NativeOpEntry = unsafe { std::mem::zeroed() };
+pub static __VARN_OPS_END_MARKER: NativeOpEntry = unsafe { std::mem::zeroed() };
 
 pub fn iter_native_ops() -> impl Iterator<Item = &'static NativeOpEntry> {
     unsafe {
-        let start = &__varn_OPS_START as *const NativeOpEntry;
-        let end = &__varn_OPS_END as *const NativeOpEntry;
+        let start = &__VARN_OPS_START as *const NativeOpEntry;
+        let end = &__VARN_OPS_END as *const NativeOpEntry;
         let len = (end as usize - start as usize) / std::mem::size_of::<NativeOpEntry>();
         let slice = std::slice::from_raw_parts(start, len);
         slice.iter().filter(|e| !e.func_ptr.is_null())

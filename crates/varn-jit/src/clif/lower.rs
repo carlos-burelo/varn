@@ -107,26 +107,14 @@ pub fn try_compile(
     linker: &dyn ClifLinker,
     mut debug: Option<&mut ClifDebugSink>,
 ) -> Result<ClifArtifact, String> {
-    if proto.is_generator || proto.is_async || proto.has_rest {
-        return Err("clif: unsupported function kind".into());
-    }
-    if proto.upvalue_count > 0 {
-        return Err("clif: upvalues not supported".into());
-    }
     let nparams = proto.arity.saturating_sub(1);
-    // Int params enter unboxed; anything else passes through boxed
-    // (`K::Boxed`). No declared kinds at all (pre-param_kinds caches)
-    // means we cannot prove the entry contract.
     if proto.param_kinds.len() != nparams {
         return Err("clif: missing param kinds".into());
     }
-    // Reject any Float register written by an op the float lowering can't
-    // place as an unboxed f64 (loads, calls, generic arithmetic into a float
-    // sink), so every def on an F64 Variable stays type-consistent.
     floats::check_float_writes(&proto.chunk.code, &proto.chunk.constants, &proto.register_meta)?;
 
     let has_alloc = alloc::has_alloc(&proto.chunk.code, &proto.chunk.constants)?;
-    let frame_aware = proto.has_this || has_alloc;
+    let frame_aware = proto.has_this || has_alloc || proto.upvalue_count > 0 || proto.is_generator || proto.is_async;
     let raw = lower_raw(proto, constants, helpers, isa, linker, has_alloc, debug.as_deref_mut())?;
     let wrapper = build_wrapper(proto, helpers, isa, frame_aware)?;
 
@@ -201,7 +189,7 @@ fn compile_piece(func: Function, isa: &OwnedTargetIsa) -> Result<CompiledPiece, 
 /// shape-driven object construction).
 fn raw_signature(nparams: usize, isa: &OwnedTargetIsa, frame_aware: bool) -> Signature {
     let mut sig = Signature::new(isa.default_call_conv());
-    let extra = if frame_aware { 2 } else { 0 };
+    let extra = if frame_aware { 3 } else { 0 };
     for _ in 0..(1 + extra + nparams) {
         sig.params.push(AbiParam::new(types::I64));
     }
@@ -227,7 +215,7 @@ fn lower_raw(
     // to ctx.stack home slots at a safepoint and read the `this` receiver
     // from stack[base+0]. A method/constructor needs it for the receiver even
     // when it never allocates.
-    let frame_aware = proto.has_this || has_alloc;
+    let frame_aware = proto.has_this || has_alloc || proto.upvalue_count > 0 || proto.is_generator || proto.is_async;
 
     // Cross-function static calls (the `Call` arm) are only sound when no
     // heap pointer is live across the call — a GC under the fallback could
@@ -385,13 +373,14 @@ fn lower_raw(
     for v in cache_vars.values() {
         b.def_var(*v, zero);
     }
-    let exec_ctx = b.block_params(entry)[0];
-    // Frame-aware functions carry `base` and `closure` as the second and
-    // third raw parameters; args follow them.
-    let alloc_env = if frame_aware {
-        Some((b.block_params(entry)[1], b.block_params(entry)[2]))
+    let (exec_ctx, alloc_env) = if frame_aware {
+        let closure = b.block_params(entry)[1];
+        let base = b.block_params(entry)[2];
+        let exec_ctx = b.block_params(entry)[3];
+        (exec_ctx, Some((base, closure)))
     } else {
-        None
+        let exec_ctx = b.block_params(entry)[0];
+        (exec_ctx, None)
     };
     let actx = alloc_env.map(|(base, closure)| AllocCtx {
         vars: vars.as_slice(),
@@ -401,6 +390,7 @@ fn lower_raw(
         base,
         closure,
         nregs,
+        register_meta: &proto.register_meta,
     });
     for i in 0..nparams {
         let r = 1 + i;
@@ -412,7 +402,7 @@ fn lower_raw(
         if meta_is_float(&proto.register_meta, r) {
             let f = unbox_f64_coerce(&mut b, p);
             b.def_var(vars[r], f);
-        } else if meta_is_int(&proto.register_meta, r) && actx.is_some() {
+        } else if proto.param_kinds.get(i) == Some(&SlotKind::Int) && actx.is_some() {
             let un = wrap_i48(&mut b, p);
             b.def_var(vars[r], un);
         } else {
@@ -517,11 +507,12 @@ fn lower_raw(
                     }
                 }
                 b.ins().jump(*blk, &[]);
+                terminated = true;
             }
             match entries.get(&ip) {
                 Some(e) => {
                     if !terminated {
-                        box_for_target(&mut b, &vars, &state, e);
+                        box_for_target(&mut b, &proto.register_meta, &vars, &state, e);
                         b.ins().jump(*blk, &[]);
                     }
                     b.switch_to_block(*blk);
@@ -599,7 +590,7 @@ fn lower_raw(
                 let src = (code[ip + 1] >> 8) as usize;
                 // Any concrete kind copies by bits (ints, bools, and boxed
                 // heap refs alike); only bottom/top/poison are unmovable.
-                if matches!(state[src], K::Unset | K::Poison | K::Mixed) {
+                if matches!(state[src], K::Unset | K::Poison) {
                     return Err("clif: move of untracked kind".into());
                 }
                 // Source and dest must share representation (both F64 or both
@@ -688,26 +679,40 @@ fn lower_raw(
             | OpCode::NeqInt => {
                 let w1 = code[ip + 1];
                 let (r1, r2) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
-                let s1 = use_int(&mut b, &vars, &state, r1)?;
-                let s2 = use_int(&mut b, &vars, &state, r2)?;
-                let cc = match op {
-                    OpCode::LtInt => IntCC::SignedLessThan,
-                    OpCode::LteInt => IntCC::SignedLessThanOrEqual,
-                    OpCode::GtInt => IntCC::SignedGreaterThan,
-                    OpCode::GteInt => IntCC::SignedGreaterThanOrEqual,
-                    OpCode::EqInt => IntCC::Equal,
-                    _ => IntCC::NotEqual,
-                };
-                let c = b.ins().icmp(cc, s1, s2);
-                let ext = b.ins().uextend(types::I64, c);
-                b.def_var(vars[first_reg], ext);
+                if state[r1] == K::Int && state[r2] == K::Int {
+                    let s1 = use_int(&mut b, &vars, &state, r1)?;
+                    let s2 = use_int(&mut b, &vars, &state, r2)?;
+                    let cc = match op {
+                        OpCode::LtInt => IntCC::SignedLessThan,
+                        OpCode::LteInt => IntCC::SignedLessThanOrEqual,
+                        OpCode::GtInt => IntCC::SignedGreaterThan,
+                        OpCode::GteInt => IntCC::SignedGreaterThanOrEqual,
+                        OpCode::EqInt => IntCC::Equal,
+                        OpCode::NeqInt => IntCC::NotEqual,
+                        _ => unreachable!(),
+                    };
+                    let c = b.ins().icmp(cc, s1, s2);
+                    let ext = b.ins().uextend(types::I64, c);
+                    b.def_var(vars[first_reg], ext);
+                } else {
+                    let h_fn = match op {
+                        OpCode::LtInt => helpers.lt,
+                        OpCode::LteInt => helpers.lte,
+                        OpCode::GtInt => helpers.gt,
+                        OpCode::GteInt => helpers.gte,
+                        OpCode::EqInt => helpers.eq,
+                        OpCode::NeqInt => helpers.neq,
+                        _ => unreachable!(),
+                    };
+                    generic::emit_compare(&mut b, &gen, &state, code, ip, h_fn);
+                }
             }
             OpCode::Jump => {
                 let off = ((code[ip + 1] as u32) << 16 | code[ip + 2] as u32) as usize;
                 let target_ip = ip + 3 + off;
                 let target = blocks[&target_ip];
                 if let Some(target_state) = entries.get(&target_ip) {
-                    box_for_target(&mut b, &vars, &state, target_state);
+                    box_for_target(&mut b, &proto.register_meta, &vars, &state, target_state);
                 }
                 b.ins().jump(target, &[]);
                 terminated = true;
@@ -727,7 +732,7 @@ fn lower_raw(
                     }
                 }
                 if let Some(target_state) = entries.get(&target_ip) {
-                    box_for_target(&mut b, &vars, &state, target_state);
+                    box_for_target(&mut b, &proto.register_meta, &vars, &state, target_state);
                 }
                 b.ins().jump(target, &[]);
                 terminated = true;
@@ -769,13 +774,13 @@ fn lower_raw(
 
                 b.switch_to_block(target_trampoline);
                 if let Some(target_state) = entries.get(&target_ip) {
-                    box_for_target(&mut b, &vars, &state, target_state);
+                    box_for_target(&mut b, &proto.register_meta, &vars, &state, target_state);
                 }
                 b.ins().jump(target, &[]);
 
                 b.switch_to_block(fall_trampoline);
                 if let Some(fall_state) = entries.get(&next_ip) {
-                    box_for_target(&mut b, &vars, &state, fall_state);
+                    box_for_target(&mut b, &proto.register_meta, &vars, &state, fall_state);
                 }
                 b.ins().jump(fall, &[]);
                 terminated = true;
@@ -787,27 +792,27 @@ fn lower_raw(
                 terminated = true;
             }
             OpCode::CallSelf => {
-                // A frame-aware self-call's extra ABI params (base/closure)
-                // aren't threaded through the raw self-call path — bail.
-                if frame_aware {
-                    return Err("clif: CallSelf in frame-aware fn unsupported".into());
-                }
                 let w1 = code[ip + 1];
                 let w2 = code[ip + 2];
                 let dest = (w1 >> 8) as usize;
-                // arg_count counts the staged callee slot too.
                 let arg_count = (w2 >> 8) as usize;
                 let arg_start = (w2 & 0xFF) as usize;
                 if arg_count != nparams + 1 {
                     return Err("clif: CallSelf arity mismatch".into());
                 }
-                // Raw self-args must match the entry contract: unboxed for
-                // Int-declared params, boxed bits otherwise.
-                let mut args = Vec::with_capacity(1 + nparams);
+                let mut args = Vec::with_capacity(4 + nparams);
+                if frame_aware {
+                    let stack_ptr = b.block_params(entry)[0];
+                    let closure_val = b.block_params(entry)[1];
+                    let base_val = b.block_params(entry)[2];
+                    args.push(stack_ptr);
+                    args.push(closure_val);
+                    args.push(base_val);
+                }
                 args.push(exec_ctx);
                 for i in 0..nparams {
                     let r = arg_start + 1 + i;
-                    let v = if proto.param_kinds[i] == SlotKind::Int {
+                    let v = if proto.param_kinds.get(i) == Some(&SlotKind::Int) {
                         use_int(&mut b, &vars, &state, r)?
                     } else {
                         use_boxed(&mut b, &vars, &state, r)?
@@ -816,12 +821,17 @@ fn lower_raw(
                 }
                 let call = b.ins().call(self_ref, &args);
                 let res = b.inst_results(call)[0];
-                b.def_var(vars[dest], res);
+                if meta_is_float(&proto.register_meta, dest) {
+                    let f = unbox_f64_coerce(&mut b, res);
+                    b.def_var(vars[dest], f);
+                } else {
+                    b.def_var(vars[dest], res);
+                }
             }
             OpCode::LoadGlobalIdx => {
                 globals::emit_load_global_idx(&mut b, &gbl, code, ip, first_reg);
             }
-            OpCode::StoreGlobalIdx => {
+            OpCode::StoreGlobalIdx | OpCode::DefineGlobalIdx => {
                 globals::emit_store_global_idx(&mut b, &gbl, &state, code, ip)?;
             }
             OpCode::ArrayLength => {
@@ -847,101 +857,88 @@ fn lower_raw(
             OpCode::SetFixedField => {
                 fields::emit_set_fixed_field(&mut b, &fld, &state, code, ip, first_reg)?;
             }
-            OpCode::Call if !calls_allowed => {
-                // `new` / non-int-contract call: fallback runs the callee (maybe a ctor) and can GC.
-                let actx = actx.as_ref().ok_or("clif: call in non-frame-aware fn")?;
-                alloc::emit_generic_call(&mut b, actx, &state, &proto.register_meta, code, ip)?;
-            }
             OpCode::Call => {
-                // Static cross-function call via a guarded monomorphic IC
-                // (calls_allowed). w1 = pack(dest, callee_reg);
-                // w2 = pack(total, call_base); total-1 real args at
-                // call_base+1.. (total counts the staged null callee slot).
                 let w1 = code[ip + 1];
                 let w2 = code[ip + 2];
-                let dest = (w1 >> 8) as usize;
                 let callee_reg = (w1 & 0xFF) as usize;
                 let total = (w2 >> 8) as usize;
-                let call_base = (w2 & 0xFF) as usize;
                 let argc = total.saturating_sub(1);
 
-                // The callee must be a global-loaded function (guarded);
-                // the linker must have a clif target with a matching int
-                // contract; ≤4 args for the by-value fallback.
-                let gidx = match state[callee_reg] {
-                    K::Global(i) => i as usize,
-                    _ => return Err("clif: non-global-fn callee".into()),
+                let static_target = if calls_allowed {
+                    match state[callee_reg] {
+                        K::Global(i) => linker.static_target(i as usize),
+                        _ => None,
+                    }
+                } else {
+                    None
                 };
-                let target = linker
-                    .static_target(gidx)
-                    .ok_or("clif: no static target for callee")?;
-                if target.param_kinds.len() != argc
-                    || target.param_kinds.iter().any(|k| *k != SlotKind::Int)
-                    || target.return_kind != SlotKind::Int
-                    || argc > 4
-                {
-                    return Err("clif: callee contract unsupported".into());
-                }
-                for i in 0..argc {
-                    let r = call_base + 1 + i;
-                    if !matches!(state[r], K::Int | K::Boxed) {
-                        return Err("clif: non-int call arg".into());
-                    }
-                }
 
-                let callee = b.use_var(vars[callee_reg]);
-                let expected = b.ins().iconst(types::I64, target.expected_bits as i64);
-                let same = b.ins().icmp(IntCC::Equal, callee, expected);
-                let fast = b.create_block();
-                let slow = b.create_block();
-                let merge = b.create_block();
-                b.append_block_param(merge, types::I64); // unboxed int result
-                b.ins().brif(same, fast, &[], slow, &[]);
-
-                // fast: direct clif->clif raw call (unboxed int in and out).
-                b.switch_to_block(fast);
-                let mut raw_args = Vec::with_capacity(1 + argc);
-                raw_args.push(exec_ctx);
-                for i in 0..argc {
-                    raw_args.push(use_int(&mut b, &vars, &state, call_base + 1 + i)?);
-                }
-                let raw_sig = {
-                    let mut s = Signature::new(cc);
-                    for _ in 0..=argc {
-                        s.params.push(AbiParam::new(types::I64));
-                    }
-                    s.returns.push(AbiParam::new(types::I64));
-                    b.import_signature(s)
+                let can_fast_ic = if let Some(ref target) = static_target {
+                    target.param_kinds.len() == argc
+                        && target.param_kinds.iter().all(|k| *k == SlotKind::Int)
+                        && target.return_kind == SlotKind::Int
+                        && argc <= 4
+                } else {
+                    false
                 };
-                let raw_ptr = b.ins().iconst(types::I64, target.raw as i64);
-                let rc = b.ins().call_indirect(raw_sig, raw_ptr, &raw_args);
-                let rfast = b.inst_results(rc)[0];
-                b.ins().jump(merge, &[rfast.into()]);
 
-                // slow: box args, dispatch through the interpreter/JIT via
-                // the fallback helper, whose extern "C" signature is fixed at
-                // (ctx, callee, argc, a0, a1, a2, a3) — pass exactly seven,
-                // padding the unused arg slots with zero.
-                b.switch_to_block(slow);
-                let argc_v = b.ins().iconst(types::I64, argc as i64);
-                let zero_arg = b.ins().iconst(types::I64, 0);
-                let mut fb = vec![exec_ctx, callee, argc_v];
-                for i in 0..4 {
-                    if i < argc {
-                        let a = use_int(&mut b, &vars, &state, call_base + 1 + i)?;
-                        fb.push(box_int(&mut b, a));
-                    } else {
-                        fb.push(zero_arg);
+                if can_fast_ic {
+                    let target = static_target.unwrap();
+                    let dest = (w1 >> 8) as usize;
+                    let call_base = (w2 & 0xFF) as usize;
+
+                    let callee = b.use_var(vars[callee_reg]);
+                    let expected = b.ins().iconst(types::I64, target.expected_bits as i64);
+                    let same = b.ins().icmp(IntCC::Equal, callee, expected);
+                    let fast = b.create_block();
+                    let slow = b.create_block();
+                    let merge = b.create_block();
+                    b.append_block_param(merge, types::I64);
+                    b.ins().brif(same, fast, &[], slow, &[]);
+
+                    b.switch_to_block(fast);
+                    let mut raw_args = Vec::with_capacity(1 + argc);
+                    raw_args.push(exec_ctx);
+                    for i in 0..argc {
+                        raw_args.push(use_int(&mut b, &vars, &state, call_base + 1 + i)?);
                     }
-                }
-                let boxed = call_helper(&mut b, cc, helpers.clif_call_fallback, &fb);
-                let s = b.ins().ishl_imm(boxed, 16);
-                let rslow = b.ins().sshr_imm(s, 16);
-                b.ins().jump(merge, &[rslow.into()]);
+                    let raw_sig = {
+                        let mut s = Signature::new(cc);
+                        for _ in 0..=argc {
+                            s.params.push(AbiParam::new(types::I64));
+                        }
+                        s.returns.push(AbiParam::new(types::I64));
+                        b.import_signature(s)
+                    };
+                    let raw_ptr = b.ins().iconst(types::I64, target.raw as i64);
+                    let rc = b.ins().call_indirect(raw_sig, raw_ptr, &raw_args);
+                    let rfast = b.inst_results(rc)[0];
+                    b.ins().jump(merge, &[rfast.into()]);
 
-                b.switch_to_block(merge);
-                let res = b.block_params(merge)[0];
-                b.def_var(vars[dest], res);
+                    b.switch_to_block(slow);
+                    let argc_v = b.ins().iconst(types::I64, argc as i64);
+                    let zero_arg = b.ins().iconst(types::I64, 0);
+                    let mut fb = vec![exec_ctx, callee, argc_v];
+                    for i in 0..4 {
+                        if i < argc {
+                            let a = use_int(&mut b, &vars, &state, call_base + 1 + i)?;
+                            fb.push(box_int(&mut b, a));
+                        } else {
+                            fb.push(zero_arg);
+                        }
+                    }
+                    let boxed = call_helper(&mut b, cc, helpers.clif_call_fallback, &fb);
+                    let s = b.ins().ishl_imm(boxed, 16);
+                    let rslow = b.ins().sshr_imm(s, 16);
+                    b.ins().jump(merge, &[rslow.into()]);
+
+                    b.switch_to_block(merge);
+                    let res = b.block_params(merge)[0];
+                    b.def_var(vars[dest], res);
+                } else {
+                    let actx = actx.as_ref().ok_or("clif: call in non-frame-aware fn")?;
+                    alloc::emit_generic_call(&mut b, actx, &state, &proto.register_meta, code, ip)?;
+                }
             }
             OpCode::BuildArray => {
                 let actx = actx.as_ref().ok_or("clif: BuildArray outside alloc fn")?;
@@ -997,6 +994,123 @@ fn lower_raw(
                     .map(|s| s.property_names.len())
                     .ok_or("clif: unresolved object shape")?;
                 alloc::emit_build_object_with_shape(&mut b, actx, &state, code, ip, count);
+            }
+            OpCode::LoadUpvalue => {
+                let actx = actx.as_ref().ok_or("clif: LoadUpvalue outside frame-aware fn")?;
+                alloc::emit_load_upvalue(&mut b, actx, code, ip);
+                let dest = (code[ip + 1] >> 8) as usize;
+                state[dest] = K::Boxed;
+            }
+            OpCode::StoreUpvalue => {
+                let actx = actx.as_ref().ok_or("clif: StoreUpvalue outside frame-aware fn")?;
+                alloc::emit_store_upvalue(&mut b, actx, &state, code, ip);
+            }
+            OpCode::CloseUpvalue => {
+                let actx = actx.as_ref().ok_or("clif: CloseUpvalue outside frame-aware fn")?;
+                alloc::emit_close_upvalue(&mut b, actx, code, ip);
+            }
+            OpCode::MakeClosure => {
+                let actx = actx.as_ref().ok_or("clif: MakeClosure outside alloc fn")?;
+                alloc::emit_make_closure(&mut b, actx, &state, code, ip);
+                let dest = (code[ip + 1] >> 8) as usize;
+                state[dest] = K::Boxed;
+            }
+            OpCode::LoadStaticFn => {
+                let actx = actx.as_ref().ok_or("clif: LoadStaticFn outside alloc fn")?;
+                alloc::emit_load_static_fn(&mut b, actx, &state, code, ip);
+                let dest = (code[ip + 1] >> 8) as usize;
+                state[dest] = K::Boxed;
+            }
+            OpCode::LoadModule => {
+                let actx = actx.as_ref().ok_or("clif: LoadModule outside alloc fn")?;
+                alloc::emit_load_module(&mut b, actx, &state, code, ip);
+                let dest = (code[ip + 1] >> 8) as usize;
+                state[dest] = K::Boxed;
+            }
+            OpCode::LoadModuleSlot => {
+                let actx = actx.as_ref().ok_or("clif: LoadModuleSlot outside alloc fn")?;
+                alloc::emit_load_module_slot(&mut b, actx, &state, code, ip);
+                let dest = (code[ip + 1] >> 8) as usize;
+                state[dest] = K::Boxed;
+            }
+            OpCode::StoreModuleSlot => {
+                let actx = actx.as_ref().ok_or("clif: StoreModuleSlot outside alloc fn")?;
+                alloc::emit_store_module_slot(&mut b, actx, &state, code, ip);
+            }
+            OpCode::MakeClass => {
+                let actx = actx.as_ref().ok_or("clif: MakeClass outside alloc fn")?;
+                alloc::emit_make_class(&mut b, actx, &state, code, ip);
+                let dest = (code[ip + 1] >> 8) as usize;
+                state[dest] = K::Boxed;
+            }
+            OpCode::DeclareField
+            | OpCode::Method
+            | OpCode::DefineStatic
+            | OpCode::DefineGetter
+            | OpCode::DefineSetter
+            | OpCode::DefineStaticGetter
+            | OpCode::DefineStaticSetter
+            | OpCode::Inherit => {
+                let actx = actx.as_ref().ok_or("clif: ClassMemberOp outside alloc fn")?;
+                alloc::emit_class_member_op(&mut b, actx, &state, code, ip);
+            }
+            OpCode::GetSuper => {
+                let actx = actx.as_ref().ok_or("clif: GetSuper outside alloc fn")?;
+                alloc::emit_get_super(&mut b, actx, &state, code, ip);
+                let dest = (code[ip + 1] >> 8) as usize;
+                state[dest] = K::Boxed;
+            }
+            OpCode::LoadGlobal => {
+                let actx = actx.as_ref().ok_or("clif: LoadGlobal outside alloc fn")?;
+                alloc::emit_load_global(&mut b, actx, &state, code, ip);
+                let dest = (code[ip] >> 8) as usize;
+                state[dest] = K::Boxed;
+            }
+            OpCode::StoreGlobal => {
+                let actx = actx.as_ref().ok_or("clif: StoreGlobal outside alloc fn")?;
+                alloc::emit_store_global(&mut b, actx, &state, code, ip);
+            }
+            OpCode::DefineGlobal => {
+                let actx = actx.as_ref().ok_or("clif: DefineGlobal outside alloc fn")?;
+                alloc::emit_define_global(&mut b, actx, &state, code, ip);
+            }
+            OpCode::GetIndex => {
+                let actx = actx.as_ref().ok_or("clif: GetIndex outside alloc fn")?;
+                alloc::emit_get_index(&mut b, actx, &state, code, ip);
+                let dest = (code[ip] >> 8) as usize;
+                state[dest] = K::Boxed;
+            }
+            OpCode::SetIndex => {
+                let actx = actx.as_ref().ok_or("clif: SetIndex outside alloc fn")?;
+                alloc::emit_set_index(&mut b, actx, &state, code, ip);
+            }
+            OpCode::Try => {
+                let actx = actx.as_ref().ok_or("clif: Try outside alloc fn")?;
+                alloc::emit_try_push(&mut b, actx, code, ip);
+            }
+            OpCode::PopTry => {
+                let actx = actx.as_ref().ok_or("clif: PopTry outside alloc fn")?;
+                alloc::emit_try_pop(&mut b, actx);
+            }
+            OpCode::Throw => {
+                let actx = actx.as_ref().ok_or("clif: Throw outside alloc fn")?;
+                alloc::emit_throw(&mut b, actx, &state, code, ip);
+            }
+            OpCode::Yield => {
+                let actx = actx.as_ref().ok_or("clif: Yield outside alloc fn")?;
+                alloc::emit_yield(&mut b, actx, &state, code, ip);
+            }
+            OpCode::Await => {
+                let actx = actx.as_ref().ok_or("clif: Await outside alloc fn")?;
+                alloc::emit_await(&mut b, actx, &state, code, ip);
+                let dest = (code[ip] >> 8) as usize;
+                state[dest] = K::Boxed;
+            }
+            OpCode::Spawn => {
+                let actx = actx.as_ref().ok_or("clif: Spawn outside alloc fn")?;
+                alloc::emit_spawn(&mut b, actx, &state, code, ip);
+                let dest = (code[ip] >> 8) as usize;
+                state[dest] = K::Boxed;
             }
             OpCode::Nop => {}
             // Typed float ops: native fadd/fsub/fmul/fdiv/fcmp when operands
@@ -1110,21 +1224,18 @@ fn build_wrapper(
     // else passes through as boxed bits per the raw entry contract.
     let base_bytes = b.ins().imul_imm(base, 8);
     let arg_base = b.ins().iadd(stack_ptr, base_bytes);
-    let mut args = Vec::with_capacity(3 + nparams);
-    args.push(exec_ctx);
-    // Frame-aware raw functions take `base` (frame register-0 index) and
-    // `closure` (this VmClosure*) next, so they can address ctx.stack home
-    // slots at safepoints, read the receiver, and drive shape-based object
-    // construction.
+    let mut args = Vec::with_capacity(4 + nparams);
     if frame_aware {
-        args.push(base);
+        args.push(stack_ptr);
         args.push(closure);
+        args.push(base);
     }
+    args.push(exec_ctx);
     for i in 0..nparams {
         let boxed = b
             .ins()
             .load(types::I64, MemFlags::trusted(), arg_base, ((1 + i) * 8) as i32);
-        if proto.param_kinds[i] == SlotKind::Int {
+        if proto.param_kinds.get(i) == Some(&SlotKind::Int) {
             let sh = b.ins().ishl_imm(boxed, 16);
             let un = b.ins().sshr_imm(sh, 16);
             args.push(un);

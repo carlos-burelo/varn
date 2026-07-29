@@ -303,7 +303,7 @@ pub extern "C" fn jit_make_closure(
         let ctx_ref = &mut *ctx;
         let closure_ref = &*closure;
         let code = &closure_ref.proto.chunk.code;
-        let mut ip = ip_offset;
+        let mut ip = ip_offset + 1;
 
         let w1 = code[ip];
 
@@ -317,8 +317,7 @@ pub extern "C" fn jit_make_closure(
 
         let proto = match closure_ref.proto.chunk.constants.get(proto_idx) {
             Some(varn_types::PoolEntry::Function(p)) => p.clone(),
-
-            _ => panic!("MakeClosure: invalid function proto"),
+            other => panic!("MakeClosure: invalid function proto at ip_offset={} proto_idx={} consts_len={} got={:?} in fn={:?}", ip_offset, proto_idx, closure_ref.proto.chunk.constants.len(), other, closure_ref.proto.name),
         };
 
         let proto_ptr = std::rc::Rc::as_ptr(&proto) as usize;
@@ -552,9 +551,11 @@ pub extern "C" fn jit_call_method(
 
 /// Flat-argument shim over [`jit_call_method`] for the CLIF backend.
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 pub extern "C" fn jit_call_method_flat(
     ctx: *mut ExecCtx,
     closure: *const crate::frame::VmClosure,
+    base: usize,
     this_val: VmValue,
     name_idx: usize,
     cs: usize,
@@ -563,16 +564,38 @@ pub extern "C" fn jit_call_method_flat(
     dest: usize,
     ip: usize,
 ) -> VmValue {
-    let args = varn_jit::JitCallMethodArgs {
-        this_val,
-        name_idx,
-        cs,
-        arg_start,
-        arg_count,
-        dest,
-        ip,
-    };
-    jit_call_method(ctx, closure, &args)
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let closure_ref = &*closure;
+        let caller_depth = ctx_ref.frames.len();
+        let frame_idx = caller_depth - 1;
+
+        ctx_ref.frames[frame_idx].ip = ip;
+
+        let res = ctx_ref.exec_call_method_reg(
+            this_val,
+            base,
+            name_idx,
+            cs,
+            arg_start,
+            arg_count,
+            dest,
+            frame_idx,
+            closure_ref,
+        );
+
+        match res {
+            Ok(true) => {
+                if let Err(e) = ctx_ref.run_until_inner(caller_depth) {
+                    jit_propagate_error(ctx_ref, e);
+                }
+            }
+            Ok(false) => {}
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+
+        ctx_ref.stack[base + dest]
+    }
 }
 
 pub extern "C" fn jit_get_property(
@@ -621,20 +644,43 @@ pub extern "C" fn jit_get_property(
 pub extern "C" fn jit_get_property_flat(
     ctx: *mut ExecCtx,
     closure: *const crate::frame::VmClosure,
+    base: usize,
     obj: VmValue,
     name_idx: usize,
     cs_idx: usize,
     dest: usize,
     ip: usize,
 ) -> VmValue {
-    let args = varn_jit::JitGetPropertyArgs {
-        obj,
-        name_idx,
-        cs_idx,
-        dest,
-        ip,
-    };
-    jit_get_property(ctx, closure, &args)
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let closure_ref = &*closure;
+        let caller_depth = ctx_ref.frames.len();
+        let frame_idx = caller_depth - 1;
+
+        ctx_ref.frames[frame_idx].ip = ip;
+
+        let res = ctx_ref.exec_get_property_reg(
+            obj,
+            name_idx,
+            cs_idx,
+            dest,
+            base,
+            frame_idx,
+            closure_ref,
+        );
+
+        match res {
+            Ok(true) => {
+                if let Err(e) = ctx_ref.run_until_inner(caller_depth) {
+                    jit_propagate_error(ctx_ref, e);
+                }
+            }
+            Ok(false) => {}
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+
+        ctx_ref.stack[base + dest]
+    }
 }
 
 /// Flat-argument shim over [`jit_set_property`] for the CLIF backend (may run
@@ -696,11 +742,14 @@ pub extern "C" fn jit_set_property(
     }
 }
 
-pub extern "C" fn jit_build_array(ctx: *mut ExecCtx, start_reg: usize, count: usize) -> VmValue {
+pub extern "C" fn jit_build_array(
+    ctx: *mut ExecCtx,
+    base: usize,
+    start_reg: usize,
+    count: usize,
+) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let frame_idx = ctx_ref.frames.len() - 1;
-        let base = ctx_ref.frames[frame_idx].base;
         let mut elems = Vec::with_capacity(count);
         for i in 0..count {
             let nv = ctx_ref.stack[base + start_reg + i];

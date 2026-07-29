@@ -1,5 +1,9 @@
+[build]
+jobs = 12
+
 [target.x86_64-pc-windows-msvc]
 linker = "rust-lld.exe"
+rustflags = ["-C", "target-cpu=native"]
 
 [env]
 VARN_STD = { value = "std", relative = true }

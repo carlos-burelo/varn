@@ -52,9 +52,8 @@ pub(super) fn emit_load_global_idx(
     }
 }
 
-/// `StoreGlobalIdx src, idx` — plain boxed store, no barrier (globals are
-/// roots). DefineGlobalIdx is NOT admitted: it can grow the globals vec and
-/// move its base.
+/// `StoreGlobalIdx src, idx` / `DefineGlobalIdx src, idx` — plain boxed store,
+/// no barrier (globals are roots).
 pub(super) fn emit_store_global_idx(
     b: &mut FunctionBuilder,
     c: &GblCtx,

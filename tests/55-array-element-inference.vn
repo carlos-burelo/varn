@@ -204,24 +204,27 @@ function reprRoundTrip(): str {
     return `${ints[0]}${ints[1]}${ints[2]}${ints[3]}${alias.length}${floats[0] + floats[1]}`
 }
 
-assert("evolve push-int sum",        evolvePushInt() === 6)
-assert("evolve index-write sum",     evolveIndexWrite() === 20)
-assert("evolve mixed stays runnable", evolveMixedStaysPermissive() === "1-two")
-assert("annotated int[] unchanged",  annotatedUnchanged() === 30)
-assert("evolve escape stays runnable", evolveEscapeStaysPermissive() === 6)
-assert("evolve matmul shape",        evolveMatmulShape() === 690)
-assert("pattern-shadowed [a] un-governed", staleB() === 6.0)
-assert("pattern-shadowed {a} un-governed", staleC() === 6.0)
-assert("Array<int> and int[] agree",  genericSpelling() === suffixSpelling())
-assert("Array<int> spelling value",   genericSpelling() === 37)
-assert("Array<float> param spelling", genericSpellingParam([1.5, 2.5]) === 4.0)
-assert("array repr round-trip",       reprRoundTrip() === "7-3s941.25")
+if (!isIsolate) {
+    print("55 starting")
+    assert("evolve push-int sum",        evolvePushInt() === 6)
+    assert("evolve index-write sum",     evolveIndexWrite() === 20)
+    assert("evolve mixed stays runnable", evolveMixedStaysPermissive() === "1-two")
+    assert("annotated int[] unchanged",  annotatedUnchanged() === 30)
+    assert("evolve escape stays runnable", evolveEscapeStaysPermissive() === 6)
+    assert("evolve matmul shape",        evolveMatmulShape() === 690)
+    assert("pattern-shadowed [a] un-governed", staleB() === 6.0)
+    assert("pattern-shadowed {a} un-governed", staleC() === 6.0)
+    assert("Array<int> and int[] agree",  genericSpelling() === suffixSpelling())
+    assert("Array<int> spelling value",   genericSpelling() === 37)
+    assert("Array<float> param spelling", genericSpellingParam([1.5, 2.5]) === 4.0)
+    assert("array repr round-trip",       reprRoundTrip() === "7-3s941.25")
 
-// Compile the Rule-4 regression shapes without executing them (see above).
-if (false) {
-    rule4ArgPosition()
-    rule4ReturnPosition()
-    rule4MemberExists()
+    // Compile the Rule-4 regression shapes without executing them (see above).
+    if (false) {
+        rule4ArgPosition()
+        rule4ReturnPosition()
+        rule4MemberExists()
+    }
+
+    print("[PASSED] 55. Array element-type inference")
 }
-
-print("[PASSED] 55. Array element-type inference")

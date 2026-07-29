@@ -22,18 +22,24 @@ class GcVtB {
 
 // Enough string allocations to force several minor GC cycles.
 let gcJunk = []
+print("53: loop 1 start")
 for (let i = 0; i < 20000; i = i + 1) {
+    if (i % 5000 === 0) print(`53: loop 1 i=${i}`)
     gcJunk.push("gc_" + i)
 }
+print("53: loop 1 end")
 
 let gcAccA = 0
 let gcAccB = 0
+print("53: loop 2 start")
 for (let i = 0; i < 5000; i = i + 1) {
+    if (i % 1000 === 0) print(`53: loop 2 i=${i}`)
     let a = new GcVtA(i)
     gcAccA = gcAccA + a.x
     let b = new GcVtB(i)
     gcAccB = gcAccB + b.y
 }
+print("53: loop 2 end")
 
 assert("gc: first class ctor survives minor GC",  gcAccA === 12497500)
 assert("gc: second class ctor survives minor GC", gcAccB === 12497500)

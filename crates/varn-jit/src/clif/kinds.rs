@@ -37,7 +37,7 @@ pub(crate) enum K {
 
 /// Whether `k` can be read as a boxed VmValue (heap receiver / call arg).
 pub(crate) fn is_boxed_kind(k: K) -> bool {
-    matches!(k, K::Boxed | K::Global(_))
+    matches!(k, K::Boxed | K::Global(_) | K::Mixed)
 }
 
 fn merge(cur: K, k: K) -> K {

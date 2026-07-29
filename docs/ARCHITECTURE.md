@@ -197,3 +197,16 @@ siguen embebidos — son el host. Detalle completo del empaquetado, formato
 ## 8. Formato `.vnc`
 
 `vn build program.vn` produce un `.vnc`: magic `WRC\0` + versión u32 LE + artefacto serializado con postcard. `vn run program.vnc` omite todas las fases de compilación y ejecuta directamente.
+
+---
+
+## 9. Hoja de Ruta de Rendimiento Extremo
+
+Estrategia arquitectónica y propuesta de rediseño de regiones/memoria plana para superar a Bun y Node.js: ver [PERFORMANCE_ROADMAP.md](PERFORMANCE_ROADMAP.md).
+
+---
+
+## 10. Visión de Sintaxis y Experiencia de Desarrollo (DX)
+
+Propuestas de evolución sintáctica, guardas en `match`, pipelines asíncronos y ergonometría de tipos: ver [LANGUAGE_DX_VISION.md](LANGUAGE_DX_VISION.md).
+

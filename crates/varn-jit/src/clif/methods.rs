@@ -50,7 +50,7 @@ pub(super) fn emit_call_method(
         b,
         actx.cc,
         actx.helpers.call_method_flat,
-        &[actx.exec_ctx, actx.closure, this_val, ni, ci, ast, ac, de, ipv],
+        &[actx.exec_ctx, actx.closure, actx.base, this_val, ni, ci, ast, ac, de, ipv],
     );
 
     reload_boxed(b, actx, &regs);

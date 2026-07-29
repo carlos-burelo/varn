@@ -363,3 +363,18 @@ No construir nuevas capas sobre una base incorrecta.
 Corregir la causa raíz antes de añadir funcionalidad adicional.
 
 </replacement_over_extension>
+
+<hardware_and_compilation_profile>
+
+Perfil del entorno host:
+- SO: Windows (x86_64-pc-windows-msvc)
+- CPU: Intel Core i7-1355U (10 núcleos: 2 P-cores + 8 E-cores, 12 hilos lógicos)
+- Linker: rust-lld.exe
+
+Reglas de compilación y ejecución para el agente:
+1. Aprovechar la compilación paralela de dependencias y Thin LTO (`jobs = 12`, `lto = "thin"`). Nota: Para la compilación en release del binario final, mantén `codegen-units = 1` en `[profile.release]` debido a que los marcadores de sección personalizados de MSVC (`.varn_ops$A`, `.varn_ops$C`) en `varn-builtins` requieren que el linker agrupe los símbolos en un único CGU final.
+2. NUNCA ejecutar `cargo clean` a menos que sea strictly necesario por corrupción de artefactos de build.
+3. Para ciclos rápidos de iteración y validación, utilizar `--profile quick` o compilaciones incrementales para no invalidar cachés.
+4. Para benchmarks y pruebas de estabilidad final, usar `cargo run --release --bin vn -- bench ./tests/main.vn -v`.
+
+</hardware_and_compilation_profile>

@@ -77,7 +77,11 @@ pub(super) fn use_int(
     r: usize,
 ) -> Result<cranelift_codegen::ir::Value, String> {
     match state[r] {
-        K::Int => Ok(b.use_var(vars[r])),
+        K::Int => {
+            let v = b.use_var(vars[r]);
+            let s = b.ins().ishl_imm(v, 16);
+            Ok(b.ins().sshr_imm(s, 16))
+        }
         k if is_boxed_kind(k) => {
             let v = b.use_var(vars[r]);
             let s = b.ins().ishl_imm(v, 16);
@@ -292,14 +296,29 @@ pub(super) fn box_or_pass(
 
 pub(super) fn box_for_target(
     b: &mut FunctionBuilder,
+    meta: &[varn_types::register_meta::RegisterMeta],
     vars: &[Variable],
     state: &[K],
     target_state: &[K],
 ) {
     for r in 0..vars.len() {
+        if meta_is_float(meta, r) {
+            continue;
+        }
         if is_boxed_kind(target_state[r]) && !is_boxed_kind(state[r]) {
             let boxed = box_or_pass(b, vars, state, r);
             b.def_var(vars[r], boxed);
+        } else if !is_boxed_kind(target_state[r]) && is_boxed_kind(state[r]) {
+            if target_state[r] == K::Int {
+                let v = b.use_var(vars[r]);
+                let s = b.ins().ishl_imm(v, 16);
+                let un = b.ins().sshr_imm(s, 16);
+                b.def_var(vars[r], un);
+            } else if target_state[r] == K::Bool {
+                let v = b.use_var(vars[r]);
+                let un = unbox_bool(b, v);
+                b.def_var(vars[r], un);
+            }
         }
     }
 }
