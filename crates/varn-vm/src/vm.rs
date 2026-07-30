@@ -295,12 +295,10 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
                     if let Some(PoolEntry::Literal(Literal::Str(name))) =
                         chunk.constants.get(name_idx)
                     {
-                        let global_idx = if let Some(idx) = globals.resolve_index(name) {
-                            idx
-                        } else {
-                            globals.define(name, VmValue::null())
+                        let global_idx = match globals.resolve_index(name) {
+                            Some(idx) => idx,
+                            None => globals.define(name, VmValue::null()),
                         };
-
                         let dest = chunk.code[ip] & 0xFF00;
                         chunk.code[ip] = dest | (OpCode::LoadGlobalIdx as u8 as u16);
                         chunk.code[ip + 1] = global_idx as u16;
@@ -315,10 +313,9 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
                     if let Some(PoolEntry::Literal(Literal::Str(name))) =
                         chunk.constants.get(name_idx)
                     {
-                        let global_idx = if let Some(idx) = globals.resolve_index(name) {
-                            idx
-                        } else {
-                            globals.define(name, VmValue::null())
+                        let global_idx = match globals.resolve_index(name) {
+                            Some(idx) => idx,
+                            None => globals.define(name, VmValue::null()),
                         };
                         let new_op = match op {
                             OpCode::StoreGlobal => OpCode::StoreGlobalIdx,

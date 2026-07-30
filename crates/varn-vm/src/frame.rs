@@ -75,8 +75,6 @@ pub struct VmClosure {
     pub constants: Rc<Vec<VmValue>>,
     pub ic_cache: Rc<RefCell<Vec<PolyICSlot>>>,
     pub feedback: Rc<RefCell<varn_types::chunk::FeedbackVector>>,
-    pub jit_entry: Option<varn_jit::JitFn>,
-    pub jit_code: Option<Rc<dyn std::any::Any>>,
 }
 
 /// Build the production `JitHelpers` table. All fields are static (function
@@ -244,15 +242,13 @@ impl VmClosure {
             constants: Rc::new(constants),
             ic_cache,
             feedback,
-            jit_entry: None,
-            jit_code: None,
         };
-        // `no_jit` means the JIT does not run at all, not merely that its
-        // output goes unused: a run meant to isolate a codegen bug should not
-        // be invoking codegen.
-        if !settings.no_jit {
-            closure.compile_jit();
-        }
+        // No compilation here: the compiled entry lives on the proto and is
+        // produced lazily by `hot_jit_fn` once the function proves hot (see
+        // `FunctionProto::jit_entry_count`). `settings.no_jit` is honoured at
+        // that point, so a run meant to isolate a codegen bug never invokes
+        // codegen.
+        let _ = settings;
         closure
     }
 
@@ -271,15 +267,13 @@ impl VmClosure {
             constants,
             ic_cache,
             feedback,
-            jit_entry: None,
-            jit_code: None,
         };
-        // `no_jit` means the JIT does not run at all, not merely that its
-        // output goes unused: a run meant to isolate a codegen bug should not
-        // be invoking codegen.
-        if !settings.no_jit {
-            closure.compile_jit();
-        }
+        // No compilation here: the compiled entry lives on the proto and is
+        // produced lazily by `hot_jit_fn` once the function proves hot (see
+        // `FunctionProto::jit_entry_count`). `settings.no_jit` is honoured at
+        // that point, so a run meant to isolate a codegen bug never invokes
+        // codegen.
+        let _ = settings;
         closure
     }
 
@@ -297,27 +291,59 @@ impl VmClosure {
         )
     }
 
-    pub fn compile_jit(&mut self) {
-        if self.proto.jit_failed.get() {
-            return;
-        }
-        if let Some(entry_usize) = self.proto.jit_entry.get() {
-            let entry: varn_jit::JitFn = unsafe { std::mem::transmute(entry_usize) };
-            self.jit_entry = Some(entry);
-            self.jit_code = self.proto.jit_code.borrow().clone();
+    /// Frame entries a proto must accumulate before it is worth lowering.
+    ///
+    /// 1 = compile just before the first entry. That is deliberately the
+    /// weakest possible tiering: it skips only the protos that are BUILT and
+    /// never RUN, which on `tests/47-isolates-multithread.vn` is 144 functions
+    /// compiled to execute 38 JIT frames. Anything that executes still runs
+    /// compiled from its first call, exactly as under eager compilation.
+    ///
+    /// A higher threshold (letting the first N calls interpret) is the real
+    /// tiering win and currently FAILS: at 2, tests/31-stdlib-migration-test.vn
+    /// breaks on "Duration hours" while `VARN_NO_JIT=1` passes — a tier-parity
+    /// bug that eager compilation had been masking. Fix that before raising it.
+    const JIT_TIER_THRESHOLD: u32 = 1;
+
+    /// The compiled entry, if this proto already has one. Never compiles.
+    /// The proto — not the closure — owns it: many closures share a proto, and
+    /// tiering happens after the closures exist.
+    #[inline(always)]
+    pub fn jit_fn(&self) -> Option<varn_jit::JitFn> {
+        self.proto
+            .jit_entry
+            .get()
+            .map(|e| unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(e) })
+    }
+
+    /// Count one frame entry and lower the proto once it proves hot.
+    pub fn hot_jit_fn(&self) -> Option<varn_jit::JitFn> {
+        if let Some(f) = self.jit_fn() {
             varn_jit::JIT_STATS
                 .jit_cached
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            return Some(f);
+        }
+        if self.proto.jit_failed.get() {
+            return None;
+        }
+        let n = self.proto.jit_entry_count.get() + 1;
+        self.proto.jit_entry_count.set(n);
+        if n < Self::JIT_TIER_THRESHOLD {
+            return None;
+        }
+        self.compile_jit();
+        self.jit_fn()
+    }
+
+    pub fn compile_jit(&self) {
+        if self.proto.jit_failed.get() || self.proto.jit_entry.get().is_some() {
             return;
         }
-
         let helpers = build_jit_helpers();
         let linker = crate::clif_link::CtxLinker::current();
         match varn_jit::compile(&self.proto, &self.constants, helpers, &linker) {
             Ok((entry, code)) => {
-                self.jit_entry = Some(entry);
-                self.jit_code = Some(code.clone());
-
                 let entry_usize: usize = unsafe { std::mem::transmute(entry) };
                 self.proto.jit_entry.set(Some(entry_usize));
                 *self.proto.jit_code.borrow_mut() = Some(code);

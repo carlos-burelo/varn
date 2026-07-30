@@ -52,42 +52,67 @@ fn merge(cur: K, k: K) -> K {
 
 /// Apply one instruction's effect on the kind state. Shared by the dataflow
 /// pass and the lowering walk so the two can never disagree.
+///
+/// The destination register comes from [`decode`] — the single authority on
+/// instruction shape — never from a per-opcode guess about which word carries
+/// it. Every opcode the lowering routes must be classified here: an opcode
+/// that defines a register but is missing from the match leaves the dataflow
+/// believing the old kind, and the lowering then reads the register with the
+/// wrong representation at the next join.
 pub(crate) fn apply_kinds(
     state: &mut [K],
     code: &[u16],
+    pool: &[varn_types::chunk::PoolEntry],
     ip: usize,
     op: OpCode,
     constants: &[VmValue],
     meta: &[varn_types::register_meta::RegisterMeta],
 ) {
-    let dest = (code[ip] >> 8) as usize;
+    let dest = match decode(code, ip, pool).and_then(|i| i.def) {
+        Some(d) if (d as usize) < state.len() => d as usize,
+        _ => return,
+    };
     let meta_int = |r: usize| meta.get(r).map_or(false, |m| m.kind == SlotKind::Int);
     let meta_float = |r: usize| meta.get(r).map_or(false, |m| m.kind == SlotKind::Float);
+    // A result the emitter serves in the register's declared representation
+    // (it unboxes to int / converts to f64 when the meta proves the type).
+    let typed = |r: usize| {
+        if meta_float(r) {
+            K::Float
+        } else if meta_int(r) {
+            K::Int
+        } else {
+            K::Boxed
+        }
+    };
+    // A result the emitter always produces as boxed VmValue bits. A float
+    // register still holds an unboxed `f64` (its Variable is `F64`), because
+    // the emitters convert on the way into the var.
+    let boxed = |r: usize| if meta_float(r) { K::Float } else { K::Boxed };
     match op {
-        OpCode::LoadIntZero
-        | OpCode::LoadIntOne
-        | OpCode::LoadIntMinusOne
-        | OpCode::LoadInt
-        | OpCode::AddInt
+        OpCode::AddInt
         | OpCode::SubInt
         | OpCode::MulInt
         | OpCode::AddImm
         | OpCode::SubImm
         | OpCode::ModInt
         | OpCode::ArrayLength => state[dest] = K::Int,
+        // An int literal into a float-typed sink loads as an unboxed f64
+        // (`def_const_int` branches on the same meta).
+        OpCode::LoadIntZero
+        | OpCode::LoadIntOne
+        | OpCode::LoadIntMinusOne
+        | OpCode::LoadInt => state[dest] = if meta_float(dest) { K::Float } else { K::Int },
         OpCode::LoadTrue | OpCode::LoadFalse => state[dest] = K::Bool,
         // A self-call routes only on an int contract.
-        OpCode::CallSelf => {
-            let dest = (code[ip + 1] >> 8) as usize;
-            state[dest] = K::Int;
-        }
-        // A static call's result is int on the fast int-contract path, but a
-        // generic call (`new`, heap-returning callee) yields a boxed value —
-        // let the register meta decide.
-        OpCode::Call => {
-            let dest = (code[ip + 1] >> 8) as usize;
-            state[dest] = if meta_int(dest) { K::Int } else { K::Boxed };
-        }
+        OpCode::CallSelf => state[dest] = K::Int,
+        // A call result is ALWAYS boxed bits, even into an `int`-typed slot:
+        // the register meta types the slot, not the value, and stdlib code
+        // relies on the VM coercing a whole float (`int_div`) at the int sink
+        // rather than at the definition. Unboxing here would read those float
+        // bits as an i48 payload. The fast int-contract IC re-boxes its raw
+        // result to keep this one representation (see `lower`'s `Call` arm).
+        OpCode::Call | OpCode::CallSpread => state[dest] = boxed(dest),
         OpCode::LoadConst => {
             let idx = code[ip + 1] as usize;
             state[dest] = if meta_float(dest) {
@@ -139,73 +164,44 @@ pub(crate) fn apply_kinds(
         | OpCode::EqFloat
         | OpCode::NeqFloat => state[dest] = K::Bool,
         OpCode::LoadNull => state[dest] = K::Boxed,
+        // The lowering converts across representations (int→f64 into a float
+        // sink, f64→boxed into a non-float one), so the kind follows the
+        // DESTINATION's declared representation, not the source's.
         OpCode::Move => {
             let src = (code[ip + 1] >> 8) as usize;
             state[dest] = state[src];
         }
-        // An array element load lands in whatever representation the register
-        // meta declares: the lowering serves an `I64` array raw into an `Int`
-        // register and an `F64` array raw into an `F64` one (see
-        // `clif::arrays`), converting on the `Boxed` and helper arms.
-        OpCode::ArrayGetIndex => {
-            state[dest] = if meta_float(dest) {
-                K::Float
-            } else if meta_int(dest) {
-                K::Int
-            } else {
-                K::Boxed
-            };
-        }
-        // Fixed-field / property loads produce boxed values, unboxed to int
-        // when the register meta proves it.
-        OpCode::GetFixedField | OpCode::GetProperty => {
-            state[dest] = if meta_float(dest) {
-                K::Float
-            } else if meta_int(dest) {
-                K::Int
-            } else {
-                K::Boxed
-            };
-        }
-        // `BuildArray`/`BuildObjectWithShape` encode their destination in the
-        // FIRST operand word (`w1 >> 8`), not the opcode word — unlike the
-        // ops below whose dest is the standard `first_reg`.
-        OpCode::BuildArray
+        // The one result the emitter serves in the register's DECLARED
+        // representation: `clif::arrays` converts an element to the wanted
+        // repr (an `I64` array element raw into an `Int` register, an `F64`
+        // one into an `F64` register).
+        OpCode::ArrayGetIndex => state[dest] = typed(dest),
+        // Everything else helper-backed lands as boxed VmValue bits (a float
+        // register still holds an unboxed `f64` — the emitters coerce on the
+        // way in). Claiming `Int` here because the register meta types the
+        // SLOT as int is a lie about the VALUE: `int_div` returns a whole
+        // float into an `int` slot, and reading those bits as an i48 payload
+        // yields garbage. Int consumers unbox at the use instead.
+        OpCode::GetFixedField
+        | OpCode::GetProperty
+        | OpCode::BuildArray
         | OpCode::BuildObjectWithShape
         | OpCode::CallMethod
-        | OpCode::InvokeVirtual => {
-            let dest = (code[ip + 1] >> 8) as usize;
-            state[dest] = if meta_float(dest) {
-                K::Float
-            } else if meta_int(dest) {
-                K::Int
-            } else {
-                K::Boxed
-            };
-        }
-        // Other heap-producing ops yield a boxed reference in `first_reg`.
-        // A native op / generic Add result kind is unknown here; treat it as
-        // boxed bits (an int result still unboxes correctly at an int use).
-        OpCode::BuildObject
+        | OpCode::InvokeVirtual
+        | OpCode::BuildObject
         | OpCode::StrConcat
         | OpCode::BuildStr
         | OpCode::MakeEnumVariant
         | OpCode::CallNativeOp
+        | OpCode::GetEnumTag
         | OpCode::Add
         | OpCode::Sub
         | OpCode::Mul
         | OpCode::Div
         | OpCode::Mod
-        | OpCode::Negate => {
-            state[dest] = if meta_float(dest) {
-                K::Float
-            } else if meta_int(dest) {
-                K::Int
-            } else {
-                K::Boxed
-            };
-        }
-        OpCode::Typeof
+        | OpCode::Negate
+        | OpCode::Intrinsic
+        | OpCode::Typeof
         | OpCode::ToString
         | OpCode::GetSymbol
         | OpCode::Pow
@@ -218,7 +214,30 @@ pub(crate) fn apply_kinds(
         | OpCode::Ushr
         | OpCode::StrSlice
         | OpCode::StrLength
-        | OpCode::ArrayPop => state[dest] = K::Boxed,
+        | OpCode::ArrayPop
+        | OpCode::GetIndex
+        | OpCode::GetPropertyMaybe
+        | OpCode::BindMethod
+        | OpCode::ObjectKeys
+        | OpCode::ObjectMerge
+        | OpCode::ObjectRest
+        | OpCode::WrapSpread
+        | OpCode::ArrayExtend
+        | OpCode::MakeClass
+        | OpCode::GetSuper
+        | OpCode::LoadGlobal
+        | OpCode::LoadUpvalue
+        | OpCode::MakeClosure
+        | OpCode::LoadStaticFn
+        | OpCode::LoadModule
+        | OpCode::LoadModuleSlot
+        | OpCode::InvokeRuntimeStatic
+        | OpCode::Await
+        | OpCode::Spawn
+        // `Try` defines the catch handler's error register. The value lands
+        // there on the exception path (which leaves clif code entirely), but
+        // the register is boxed for every reader downstream.
+        | OpCode::Try => state[dest] = boxed(dest),
         // A global load records its origin so a `Call` on it can link
         // statically; int-typed globals still unbox to Int.
         OpCode::LoadGlobalIdx => {
@@ -226,15 +245,6 @@ pub(crate) fn apply_kinds(
                 K::Int
             } else {
                 K::Global(code[ip + 1] as u32)
-            };
-        }
-        OpCode::Intrinsic => {
-            state[dest] = if meta_float(dest) {
-                K::Float
-            } else if meta_int(dest) {
-                K::Int
-            } else {
-                K::Boxed
             };
         }
         _ => {}
@@ -260,8 +270,9 @@ pub(crate) fn kind_flow(
         entry0[0] = K::Boxed;
     }
     for (i, pk) in param_kinds.iter().enumerate() {
-        if 1 + i < nregs {
-            entry0[1 + i] = if *pk == SlotKind::Int { K::Int } else { K::Boxed };
+        let r = 1 + i;
+        if r < nregs {
+            entry0[r] = if *pk == SlotKind::Int { K::Int } else { K::Boxed };
         }
     }
     // A float-typed register is an F64 Variable for the whole function (static
@@ -309,7 +320,7 @@ pub(crate) fn kind_flow(
                 }
                 OpCode::Return => break,
                 _ => {
-                    apply_kinds(&mut state, code, ip, op, constants, meta);
+                    apply_kinds(&mut state, code, pool, ip, op, constants, meta);
                 }
             }
             ip += info.len;

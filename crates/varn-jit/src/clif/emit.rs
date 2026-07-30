@@ -124,11 +124,17 @@ pub(super) fn emit_return_value(
         SlotKind::Int => match state[src] {
             K::Int => b.use_var(vars[src]),
             K::Boxed => use_int(b, vars, state, src)?,
-            k => return Err(format!("clif: unproven int return ({k:?})")),
+            _ => {
+                let raw = b.use_var(vars[src]);
+                if b.func.dfg.value_type(raw) == types::F64 {
+                    let iv = b.ins().fcvt_to_sint(types::I64, raw);
+                    wrap_i48(b, iv)
+                } else {
+                    let v = box_or_pass(b, vars, state, src);
+                    wrap_i48(b, v)
+                }
+            }
         },
-        // A float return: an F64 register boxes (with NaN canonicalization);
-        // an int coerces int→float then boxes; already-boxed float bits pass
-        // through.
         SlotKind::Float => match state[src] {
             K::Float => {
                 let f = b.use_var(vars[src]);
@@ -139,8 +145,7 @@ pub(super) fn emit_return_value(
                 let f = b.ins().fcvt_from_sint(types::F64, iv);
                 box_f64(b, f)
             }
-            k if is_boxed_kind(k) => b.use_var(vars[src]),
-            k => return Err(format!("clif: unproven float return ({k:?})")),
+            _ => box_or_pass(b, vars, state, src),
         },
         SlotKind::Str | SlotKind::Ref | SlotKind::Dynamic => box_or_pass(b, vars, state, src),
         SlotKind::Bool => match state[src] {
@@ -148,7 +153,6 @@ pub(super) fn emit_return_value(
                 let raw = b.use_var(vars[src]);
                 box_bool(b, raw)
             }
-            k if is_boxed_kind(k) => b.use_var(vars[src]),
             _ => box_or_pass(b, vars, state, src),
         },
     })
@@ -286,11 +290,14 @@ pub(super) fn box_or_pass(
     r: usize,
 ) -> cranelift_codegen::ir::Value {
     let raw = b.use_var(vars[r]);
-    match state[r] {
-        K::Int => box_int(b, raw),
-        K::Bool => box_bool(b, raw),
-        K::Float => box_f64(b, raw),
-        _ => raw,
+    if b.func.dfg.value_type(raw) == types::F64 {
+        b.ins().bitcast(types::I64, MemFlags::new(), raw)
+    } else {
+        match state[r] {
+            K::Int => box_int(b, raw),
+            K::Bool => box_bool(b, raw),
+            _ => raw,
+        }
     }
 }
 

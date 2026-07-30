@@ -826,13 +826,13 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         )
         .max()
         .unwrap_or(0);
-
     let new_register_count = new_max as u16 + 1;
-    if new_register_count >= proto.register_count {
-        return;
-    }
 
     remap_bytecode(&mut proto.chunk.code, &proto.chunk.constants, &mapping);
+
+    if new_register_count < proto.register_count {
+        proto.register_count = new_register_count;
+    }
 
     // register_meta was derived per pre-coalescing register (ssa/emit);
     // permute it through the same mapping, meeting kinds when two old

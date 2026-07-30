@@ -8,7 +8,7 @@ use cranelift_codegen::ir::{types, InstBuilder, MemFlags};
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_types::register_meta::RegisterMeta;
 
-use super::emit::{box_bool, box_int, state_meta_int};
+use super::emit::{box_bool, box_f64, box_int, state_meta_int};
 use super::kinds::K;
 use crate::JitHelpers;
 
@@ -72,8 +72,11 @@ pub(super) fn emit_store_global_idx(
             let raw = b.use_var(c.vars[src]);
             box_bool(b, raw)
         }
-        K::Boxed => b.use_var(c.vars[src]),
-        k => return Err(format!("clif: global store of {k:?}")),
+        K::Float => {
+            let f = b.use_var(c.vars[src]);
+            box_f64(b, f)
+        }
+        _ => b.use_var(c.vars[src]),
     };
     let gbase = globals_base(b, c);
     b.ins()

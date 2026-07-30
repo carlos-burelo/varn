@@ -51,6 +51,27 @@ fn jit_construct_fast(
     base: usize,
     args: &varn_jit::JitCallArgs,
 ) -> Option<VmValue> {
+    let v = construct_staged_fast(ctx_ref, cls, base + args.arg_start)?;
+    ctx_ref.stack[base + args.dest] = v;
+    ctx_ref.record_call_vm_fast();
+    Some(v)
+}
+
+/// `new cls(...)` with the arguments already staged as a contiguous window at
+/// `callee_base`, whose first slot is the callee placeholder the instance
+/// replaces. Returns `None` for any shape the fast path does not cover (async /
+/// generator / rest constructor, a constructor that is not clif-compiled, a
+/// native constructor) — the caller must then take the generic
+/// `prepare_call` path.
+///
+/// Without this, every `new X()` reaching clif code goes through
+/// `prepare_call` + a frame push + a nested `run_until`: 10k of the 10.3k slow
+/// calls in tests/main.vn, worth ~3.5x on that suite.
+pub(crate) fn construct_staged_fast(
+    ctx_ref: &mut ExecCtx,
+    cls: &std::rc::Rc<varn_types::ClassObj>,
+    callee_base: usize,
+) -> Option<VmValue> {
     let ver = cls
         .vtable_version
         .load(std::sync::atomic::Ordering::Relaxed);
@@ -63,7 +84,7 @@ fn jit_construct_fast(
         Some(None) => None,
         Some(Some(any)) => {
             let nc = any.downcast::<crate::frame::VmClosure>().ok()?;
-            let jit_fn = nc.jit_entry?;
+            let jit_fn = nc.jit_fn()?;
             Some((nc, jit_fn))
         }
         None => {
@@ -77,7 +98,7 @@ fn jit_construct_fast(
                     if nc.proto.is_async || nc.proto.is_generator || nc.proto.has_rest {
                         return None;
                     }
-                    let jit_fn = nc.jit_entry?;
+                    let jit_fn = nc.jit_fn()?;
                     *cls.ctor_rt_cache.borrow_mut() = Some((
                         ver,
                         Some(nc.clone() as std::rc::Rc<dyn std::any::Any>),
@@ -98,12 +119,9 @@ fn jit_construct_fast(
         VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Object(oref)));
 
     let Some((closure, jit_fn)) = jit_ctor else {
-        ctx_ref.stack[base + args.dest] = instance_nv;
-        ctx_ref.record_call_vm_fast();
         return Some(instance_nv);
     };
 
-    let callee_base = base + args.arg_start;
     let required = callee_base + closure.proto.register_count as usize + 32;
     if ctx_ref.stack.len() < required {
         ctx_ref.stack.resize(required, VmValue::null());
@@ -127,10 +145,7 @@ fn jit_construct_fast(
     ctx_ref.frames.pop();
     ctx_ref.close_upvalues_above(callee_base);
 
-    let final_val = if res.is_null() { instance_nv } else { res };
-    ctx_ref.stack[base + args.dest] = final_val;
-    ctx_ref.record_call_vm_fast();
-    Some(final_val)
+    Some(if res.is_null() { instance_nv } else { res })
 }
 
 pub extern "C" fn jit_load_const(closure: *const crate::frame::VmClosure, idx: usize) -> VmValue {
@@ -411,7 +426,7 @@ pub extern "C" fn jit_call(ctx: *mut ExecCtx, args: *const varn_jit::JitCallArgs
             if let Some(crate::heap::HeapObj::VmClosure(closure)) = heap_obj {
                 let is_eligible = !closure.proto.is_async && !closure.proto.is_generator && !closure.proto.has_rest;
 
-                if let Some(jit_fn) = closure.jit_entry.filter(|_| is_eligible) {
+                if let Some(jit_fn) = closure.jit_fn().filter(|_| is_eligible) {
                     let callee_base = base + args.arg_start;
 
                     let required = callee_base + closure.proto.register_count as usize + 32;
@@ -806,7 +821,7 @@ pub extern "C" fn jit_invoke_virtual(
             let heap_obj = ctx_ref.heap.get(method_nv.as_heap_idx());
             if let Some(crate::heap::HeapObj::VmClosure(closure)) = heap_obj {
                 let is_eligible = !closure.proto.is_async && !closure.proto.is_generator;
-                if let Some(jit_fn) = closure.jit_entry.filter(|_| is_eligible) {
+                if let Some(jit_fn) = closure.jit_fn().filter(|_| is_eligible) {
                     let callee_base = base + args.arg_start;
                     let required = callee_base + closure.proto.register_count as usize + 32;
                     if ctx_ref.stack.len() < required {
@@ -960,7 +975,7 @@ pub extern "C" fn jit_prepare_call(
         let heap_idx = callee.as_heap_idx();
         if let Some(closure) = ctx_ref.heap.get_closure(heap_idx) {
             if !closure.proto.is_async && !closure.proto.is_generator && !closure.proto.has_rest {
-                if closure.jit_entry.is_some() {
+                if closure.jit_fn().is_some() {
                     let required_cap = callee_base + closure.proto.register_count as usize + 32;
                     let required_len = callee_base + closure.proto.register_count as usize;
                     let stack_len = ctx_ref.stack.len();
@@ -996,7 +1011,7 @@ pub extern "C" fn jit_prepare_call(
                         {
                             let closure = wrapper.0.clone();
                             if !closure.proto.is_async && !closure.proto.is_generator {
-                                if closure.jit_entry.is_some() {
+                                if closure.jit_fn().is_some() {
                                     let required_cap =
                                         callee_base + closure.proto.register_count as usize + 32;
                                     let required_len =

@@ -537,6 +537,18 @@ pub struct FunctionProto {
     #[serde(skip)]
     #[serde(default)]
     pub static_closure_val: std::cell::Cell<u64>,
+
+    /// Frame entries seen so far, counted only while this proto is still
+    /// uncompiled. Cranelift lowering costs ~640 µs per function against the
+    /// ~17 µs the template JIT used to charge, so compiling at closure
+    /// construction — as the template tier could afford — now dominates any
+    /// workload that builds more functions than it runs (isolates: 144
+    /// functions compiled to execute 38 JIT frames, 4.6 ms of interpretation
+    /// turned into 60 ms). Compilation therefore waits for evidence the
+    /// function is worth it.
+    #[serde(skip)]
+    #[serde(default)]
+    pub jit_entry_count: std::cell::Cell<u32>,
 }
 
 fn slot_kind_dynamic() -> crate::register_meta::SlotKind {

@@ -71,6 +71,10 @@ impl ExecCtx {
                 (*ctx).jit_jmp_buf = &mut jmp_buf as *mut super::ctx::JmpBuf;
             }
             (*ctx).jit_frame_prepushed = 1;
+            let required = base + (*closure_ptr).proto.register_count as usize;
+            if (*ctx).stack.len() < required {
+                (*ctx).stack.resize(required, crate::value::VmValue::null());
+            }
             let val = (jit_fn)(
                 (*ctx).stack.as_mut_ptr() as *mut std::ffi::c_void,
                 closure_ptr as *const std::ffi::c_void,
@@ -101,8 +105,15 @@ impl ExecCtx {
 
             let is_first_entry = (*ctx).frames[frame_idx].ip == 0;
 
-            if !(*ctx).settings.no_jit && closure.jit_entry.is_some() && is_first_entry {
-                let jit_fn = closure.jit_entry.unwrap();
+            // Tiering point: counting entries here (rather than compiling at
+            // closure construction) is what keeps a proto that is built and
+            // run once out of Cranelift.
+            let hot_fn = if !(*ctx).settings.no_jit && is_first_entry {
+                closure.hot_jit_fn()
+            } else {
+                None
+            };
+            if let Some(jit_fn) = hot_fn {
                 if is_first_entry {
                     varn_jit::JIT_STATS
                         .jit_runs
@@ -154,9 +165,14 @@ impl ExecCtx {
                                 return Err(err_obj.unwrap());
                             }
                         } else if code == 2 {
-                            let resume_ip = (*ctx).jit_panic_suspend_resume_ip.take().unwrap();
-                            let frame_idx2 = (*ctx).frames.len() - 1;
-                            (*ctx).frames[frame_idx2].ip = resume_ip;
+                            // Absent when the suspending helper parked a frame
+                            // other than the top one itself (see
+                            // `jit_suspend_at`): a module that suspends on a
+                            // top-level await leaves its frame above ours.
+                            if let Some(resume_ip) = (*ctx).jit_panic_suspend_resume_ip.take() {
+                                let frame_idx2 = (*ctx).frames.len() - 1;
+                                (*ctx).frames[frame_idx2].ip = resume_ip;
+                            }
                             return Ok(VmValue::null());
                         } else {
                             panic!("Unknown longjmp code: {}", code);
@@ -733,7 +749,14 @@ impl ExecCtx {
         let is_module_frame = frame.closure().proto.name.as_deref() == Some("<module>")
             && !frame.closure().proto.chunk.source_file.is_empty();
 
-        self.stack.truncate(frame.base);
+        if let Some(caller) = self.frames.last() {
+            let caller_req = caller.base + caller.closure().proto.register_count as usize;
+            if self.stack.len() < caller_req {
+                self.stack.resize(caller_req, VmValue::null());
+            } else {
+                self.stack.truncate(caller_req);
+            }
+        }
 
         let ctor_pos = if !self.pending_constructors.is_empty() {
             self.pending_constructors

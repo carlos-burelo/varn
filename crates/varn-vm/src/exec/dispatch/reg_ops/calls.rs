@@ -203,7 +203,7 @@ impl ExecCtx {
                                 let nc = nc.clone();
                                 let fn_name =
                                     nc.proto.name.as_deref().unwrap_or("<anon>").to_owned();
-                                let is_jit = nc.jit_entry.is_some();
+                                let is_jit = nc.jit_fn().is_some();
                                 self.record_hotspot_fn(&fn_name, is_jit);
                                 self.stack.push(callee);
                                 for i in 0..arg_count {
@@ -234,7 +234,7 @@ impl ExecCtx {
                                 let nc = nc.clone();
                                 let fn_name2 =
                                     nc.proto.name.as_deref().unwrap_or("<anon>").to_owned();
-                                let is_jit2 = nc.jit_entry.is_some();
+                                let is_jit2 = nc.jit_fn().is_some();
                                 self.record_hotspot_fn(&fn_name2, is_jit2);
                                 let rest_idx = arity.saturating_sub(1);
                                 self.stack.push(callee);
@@ -338,7 +338,7 @@ impl ExecCtx {
                     .as_deref()
                     .unwrap_or("<anon>")
                     .to_owned();
-                let is_jit = closure_ref.jit_entry.is_some();
+                let is_jit = closure_ref.jit_fn().is_some();
                 self.record_hotspot_fn(&fn_name, is_jit);
                 self.stack.push(callee);
                 for i in 0..arg_count {
@@ -373,7 +373,7 @@ impl ExecCtx {
                     .as_deref()
                     .unwrap_or("<anon>")
                     .to_owned();
-                let is_jit2 = closure_ref.jit_entry.is_some();
+                let is_jit2 = closure_ref.jit_fn().is_some();
                 self.record_hotspot_fn(&fn_name2, is_jit2);
                 let rest_idx = arity.saturating_sub(1);
                 self.stack.push(callee);

@@ -46,7 +46,7 @@ use super::alloc::{self, AllocCtx};
 use super::methods;
 use super::arrays;
 use super::emit::{
-    box_for_target, box_int, box_or_pass, call_helper, code_has_array_ops, def_const, def_const_bool, def_const_int,
+    box_for_target, box_f64, box_int, box_or_pass, call_helper, code_has_array_ops, def_const, def_const_bool, def_const_int,
     emit_array_payload, emit_return_value, meta_is_float, meta_is_int, patch_rel32, unbox_bool,
     unbox_f64_coerce, use_boxed, use_f64, use_int, wrap_i48, INT_TAG, MASK_48,
 };
@@ -392,13 +392,11 @@ fn lower_raw(
         nregs,
         register_meta: &proto.register_meta,
     });
+    let reg_offset = 1;
     for i in 0..nparams {
-        let r = 1 + i;
-        let p = if let Some(ref actx) = actx {
-            alloc::load_home(&mut b, actx, r)
-        } else {
-            b.block_params(entry)[1 + i]
-        };
+        let r = reg_offset + i;
+        let param_idx = if frame_aware { 4 + i } else { 1 + i };
+        let p = b.block_params(entry)[param_idx];
         if meta_is_float(&proto.register_meta, r) {
             let f = unbox_f64_coerce(&mut b, p);
             b.def_var(vars[r], f);
@@ -408,9 +406,13 @@ fn lower_raw(
         } else {
             b.def_var(vars[r], p);
         }
+        if let Some(ref actx) = actx {
+            let fb = alloc::frame_base_addr(&mut b, actx);
+            b.ins().store(MemFlags::trusted(), p, fb, (r * 8) as i32);
+        }
     }
     // A method/constructor receives `this` at register 0 — read it from its
-    // ctx.stack home slot (stack[base+0]); the caller placed it there.
+    // ctx.stack home slot (stack[base+1]); the caller placed it there.
     if proto.has_this {
         if let Some(actx) = actx.as_ref() {
             let this = alloc::load_receiver(&mut b, actx);
@@ -444,6 +446,7 @@ fn lower_raw(
         vars: vars.as_slice(),
         cc,
         exec_ctx,
+        register_meta: &proto.register_meta,
     };
 
     let blocks: HashMap<usize, cranelift_codegen::ir::Block> = block_starts
@@ -474,6 +477,16 @@ fn lower_raw(
     while ip < code.len() {
         if let Some(blk) = blocks.get(&ip) {
             if !terminated {
+                // A fall-through edge is an edge like any other: the block's
+                // entry kinds are the merge over ALL its predecessors, so the
+                // registers must be converted into that representation before
+                // jumping. Skipping this leaves, say, an unboxed loop counter
+                // in a register the body then reads as boxed VmValue bits —
+                // a raw small int reinterpreted as a denormal float.
+                if let Some(e) = entries.get(&ip) {
+                    box_for_target(&mut b, &proto.register_meta, &vars, &state, e);
+                    state = e.clone();
+                }
                 // Falling through into a loop header: this block is the
                 // preheader — resolve each planned receiver's payload into
                 // its cache (sentinel 0 when the guard chain rejects).
@@ -507,14 +520,10 @@ fn lower_raw(
                     }
                 }
                 b.ins().jump(*blk, &[]);
-                terminated = true;
             }
+            // Both arms below set `terminated` for the block being entered.
             match entries.get(&ip) {
                 Some(e) => {
-                    if !terminated {
-                        box_for_target(&mut b, &proto.register_meta, &vars, &state, e);
-                        b.ins().jump(*blk, &[]);
-                    }
                     b.switch_to_block(*blk);
                     filled.push(ip);
                     state = e.clone();
@@ -588,20 +597,33 @@ fn lower_raw(
             }
             OpCode::Move => {
                 let src = (code[ip + 1] >> 8) as usize;
-                // Any concrete kind copies by bits (ints, bools, and boxed
-                // heap refs alike); only bottom/top/poison are unmovable.
-                if matches!(state[src], K::Unset | K::Poison) {
-                    return Err("clif: move of untracked kind".into());
+                let src_is_float = meta_is_float(&proto.register_meta, src);
+                let dest_is_float = meta_is_float(&proto.register_meta, first_reg);
+                // The two registers can disagree on representation, and the
+                // Variable's declared Cranelift type is fixed for the whole
+                // function — so the copy CONVERTS rather than reinterprets.
+                // Every non-float source reaches an f64 sink through its boxed
+                // bits (`unbox_f64_coerce` widens a tagged int), never by
+                // passing an I64 straight into an F64 Variable.
+                let val_to_store = if dest_is_float && !src_is_float {
+                    let v = box_or_pass(&mut b, &vars, &state, src);
+                    let f = unbox_f64_coerce(&mut b, v);
+                    b.def_var(vars[first_reg], f);
+                    v
+                } else if !dest_is_float && src_is_float {
+                    let f = b.use_var(vars[src]);
+                    let boxed = box_f64(&mut b, f);
+                    b.def_var(vars[first_reg], boxed);
+                    boxed
+                } else {
+                    let v = b.use_var(vars[src]);
+                    b.def_var(vars[first_reg], v);
+                    box_or_pass(&mut b, &vars, &state, src)
+                };
+                if let Some(ref actx) = actx {
+                    let fb = alloc::frame_base_addr(&mut b, actx);
+                    b.ins().store(MemFlags::trusted(), val_to_store, fb, (first_reg * 8) as i32);
                 }
-                // Source and dest must share representation (both F64 or both
-                // I64), else the copy would be a Cranelift type mismatch.
-                if meta_is_float(&proto.register_meta, src)
-                    != meta_is_float(&proto.register_meta, first_reg)
-                {
-                    return Err("clif: move across float/int representation".into());
-                }
-                let v = b.use_var(vars[src]);
-                b.def_var(vars[first_reg], v);
             }
             OpCode::AddInt | OpCode::SubInt | OpCode::MulInt => {
                 let w1 = code[ip + 1];
@@ -934,7 +956,12 @@ fn lower_raw(
 
                     b.switch_to_block(merge);
                     let res = b.block_params(merge)[0];
-                    b.def_var(vars[dest], res);
+                    // Both arms yield a raw i48; re-tag it so every `Call`
+                    // destination carries boxed bits (see `apply_kinds`).
+                    // An int consumer unboxes again — the redundant pair is a
+                    // known perf lever, not a correctness one.
+                    let boxed_res = box_int(&mut b, res);
+                    b.def_var(vars[dest], boxed_res);
                 } else {
                     let actx = actx.as_ref().ok_or("clif: call in non-frame-aware fn")?;
                     alloc::emit_generic_call(&mut b, actx, &state, &proto.register_meta, code, ip)?;
@@ -998,8 +1025,6 @@ fn lower_raw(
             OpCode::LoadUpvalue => {
                 let actx = actx.as_ref().ok_or("clif: LoadUpvalue outside frame-aware fn")?;
                 alloc::emit_load_upvalue(&mut b, actx, code, ip);
-                let dest = (code[ip + 1] >> 8) as usize;
-                state[dest] = K::Boxed;
             }
             OpCode::StoreUpvalue => {
                 let actx = actx.as_ref().ok_or("clif: StoreUpvalue outside frame-aware fn")?;
@@ -1007,31 +1032,23 @@ fn lower_raw(
             }
             OpCode::CloseUpvalue => {
                 let actx = actx.as_ref().ok_or("clif: CloseUpvalue outside frame-aware fn")?;
-                alloc::emit_close_upvalue(&mut b, actx, code, ip);
+                alloc::emit_close_upvalue(&mut b, actx, &state, code, ip);
             }
             OpCode::MakeClosure => {
                 let actx = actx.as_ref().ok_or("clif: MakeClosure outside alloc fn")?;
                 alloc::emit_make_closure(&mut b, actx, &state, code, ip);
-                let dest = (code[ip + 1] >> 8) as usize;
-                state[dest] = K::Boxed;
             }
             OpCode::LoadStaticFn => {
                 let actx = actx.as_ref().ok_or("clif: LoadStaticFn outside alloc fn")?;
                 alloc::emit_load_static_fn(&mut b, actx, &state, code, ip);
-                let dest = (code[ip + 1] >> 8) as usize;
-                state[dest] = K::Boxed;
             }
             OpCode::LoadModule => {
                 let actx = actx.as_ref().ok_or("clif: LoadModule outside alloc fn")?;
                 alloc::emit_load_module(&mut b, actx, &state, code, ip);
-                let dest = (code[ip + 1] >> 8) as usize;
-                state[dest] = K::Boxed;
             }
             OpCode::LoadModuleSlot => {
                 let actx = actx.as_ref().ok_or("clif: LoadModuleSlot outside alloc fn")?;
                 alloc::emit_load_module_slot(&mut b, actx, &state, code, ip);
-                let dest = (code[ip + 1] >> 8) as usize;
-                state[dest] = K::Boxed;
             }
             OpCode::StoreModuleSlot => {
                 let actx = actx.as_ref().ok_or("clif: StoreModuleSlot outside alloc fn")?;
@@ -1040,8 +1057,6 @@ fn lower_raw(
             OpCode::MakeClass => {
                 let actx = actx.as_ref().ok_or("clif: MakeClass outside alloc fn")?;
                 alloc::emit_make_class(&mut b, actx, &state, code, ip);
-                let dest = (code[ip + 1] >> 8) as usize;
-                state[dest] = K::Boxed;
             }
             OpCode::DeclareField
             | OpCode::Method
@@ -1052,33 +1067,27 @@ fn lower_raw(
             | OpCode::DefineStaticSetter
             | OpCode::Inherit => {
                 let actx = actx.as_ref().ok_or("clif: ClassMemberOp outside alloc fn")?;
-                alloc::emit_class_member_op(&mut b, actx, &state, code, ip);
+                alloc::emit_class_member_op(&mut b, actx, &state, op, code, ip)?;
             }
             OpCode::GetSuper => {
                 let actx = actx.as_ref().ok_or("clif: GetSuper outside alloc fn")?;
                 alloc::emit_get_super(&mut b, actx, &state, code, ip);
-                let dest = (code[ip + 1] >> 8) as usize;
-                state[dest] = K::Boxed;
             }
             OpCode::LoadGlobal => {
                 let actx = actx.as_ref().ok_or("clif: LoadGlobal outside alloc fn")?;
                 alloc::emit_load_global(&mut b, actx, &state, code, ip);
-                let dest = (code[ip] >> 8) as usize;
-                state[dest] = K::Boxed;
             }
             OpCode::StoreGlobal => {
                 let actx = actx.as_ref().ok_or("clif: StoreGlobal outside alloc fn")?;
-                alloc::emit_store_global(&mut b, actx, &state, code, ip);
+                alloc::emit_global_write(&mut b, actx, &state, helpers.store_global, code, ip);
             }
             OpCode::DefineGlobal => {
                 let actx = actx.as_ref().ok_or("clif: DefineGlobal outside alloc fn")?;
-                alloc::emit_define_global(&mut b, actx, &state, code, ip);
+                alloc::emit_global_write(&mut b, actx, &state, helpers.define_global, code, ip);
             }
             OpCode::GetIndex => {
                 let actx = actx.as_ref().ok_or("clif: GetIndex outside alloc fn")?;
                 alloc::emit_get_index(&mut b, actx, &state, code, ip);
-                let dest = (code[ip] >> 8) as usize;
-                state[dest] = K::Boxed;
             }
             OpCode::SetIndex => {
                 let actx = actx.as_ref().ok_or("clif: SetIndex outside alloc fn")?;
@@ -1103,14 +1112,54 @@ fn lower_raw(
             OpCode::Await => {
                 let actx = actx.as_ref().ok_or("clif: Await outside alloc fn")?;
                 alloc::emit_await(&mut b, actx, &state, code, ip);
-                let dest = (code[ip] >> 8) as usize;
-                state[dest] = K::Boxed;
             }
             OpCode::Spawn => {
                 let actx = actx.as_ref().ok_or("clif: Spawn outside alloc fn")?;
                 alloc::emit_spawn(&mut b, actx, &state, code, ip);
-                let dest = (code[ip] >> 8) as usize;
-                state[dest] = K::Boxed;
+            }
+            OpCode::BuildObject => {
+                let actx = actx.as_ref().ok_or("clif: BuildObject outside alloc fn")?;
+                alloc::emit_build_object(&mut b, actx, &state, code, ip);
+            }
+            OpCode::ObjectRest => {
+                let actx = actx.as_ref().ok_or("clif: ObjectRest outside alloc fn")?;
+                alloc::emit_object_rest(&mut b, actx, &state, code, ip);
+            }
+            OpCode::ObjectKeys => {
+                let actx = actx.as_ref().ok_or("clif: ObjectKeys outside alloc fn")?;
+                alloc::emit_object_keys(&mut b, actx, &state, code, ip);
+            }
+            OpCode::ObjectMerge => {
+                let actx = actx.as_ref().ok_or("clif: ObjectMerge outside alloc fn")?;
+                alloc::emit_object_merge(&mut b, actx, &state, code, ip);
+            }
+            OpCode::GetPropertyMaybe => {
+                let actx = actx.as_ref().ok_or("clif: GetPropertyMaybe outside alloc fn")?;
+                alloc::emit_get_property_maybe(&mut b, actx, &state, code, ip);
+            }
+            OpCode::BindMethod => {
+                let actx = actx.as_ref().ok_or("clif: BindMethod outside alloc fn")?;
+                alloc::emit_bind_method(&mut b, actx, &state, code, ip);
+            }
+            OpCode::AssertNotNull => {
+                let actx = actx.as_ref().ok_or("clif: AssertNotNull outside alloc fn")?;
+                alloc::emit_assert_not_null(&mut b, actx, &state, code, ip);
+            }
+            OpCode::ArrayExtend => {
+                let actx = actx.as_ref().ok_or("clif: ArrayExtend outside alloc fn")?;
+                alloc::emit_array_extend(&mut b, actx, &state, code, ip);
+            }
+            OpCode::WrapSpread => {
+                let actx = actx.as_ref().ok_or("clif: WrapSpread outside alloc fn")?;
+                alloc::emit_wrap_spread(&mut b, actx, &state, code, ip);
+            }
+            OpCode::CallSpread => {
+                let actx = actx.as_ref().ok_or("clif: CallSpread outside alloc fn")?;
+                alloc::emit_call_spread(&mut b, actx, &state, &proto.register_meta, code, ip);
+            }
+            OpCode::InvokeRuntimeStatic => {
+                let actx = actx.as_ref().ok_or("clif: InvokeRuntimeStatic outside alloc fn")?;
+                alloc::emit_invoke_runtime_static(&mut b, actx, &state, code, ip)?;
             }
             OpCode::Nop => {}
             // Typed float ops: native fadd/fsub/fmul/fdiv/fcmp when operands
@@ -1148,7 +1197,7 @@ fn lower_raw(
             _ if generic::try_emit(&mut b, &gen, helpers, &state, op, code, ip) => {}
             _ => return Err(format!("clif: unsupported opcode {op:?}")),
         }
-        apply_kinds(&mut state, code, ip, op, constants, &proto.register_meta);
+        apply_kinds(&mut state, code, pool, ip, op, constants, &proto.register_meta);
         ip = next_ip;
     }
     if !terminated {
@@ -1252,8 +1301,12 @@ fn build_wrapper(
     // null) is already boxed VmValue bits — pass through. Re-tagging a null
     // would forge a non-null value and defeat jit_construct_fast's null check.
     let result = if proto.return_kind == SlotKind::Int {
+        let qnan = b.ins().iconst(types::I64, varn_types::vm_value::QNAN as i64);
+        let high = b.ins().band(raw_res, qnan);
+        let is_unboxed = b.ins().icmp_imm(IntCC::Equal, high, 0);
         let masked = b.ins().band_imm(raw_res, MASK_48);
-        b.ins().bor_imm(masked, INT_TAG)
+        let tagged = b.ins().bor_imm(masked, INT_TAG);
+        b.ins().select(is_unboxed, tagged, raw_res)
     } else {
         raw_res
     };

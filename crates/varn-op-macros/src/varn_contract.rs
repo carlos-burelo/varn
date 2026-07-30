@@ -187,6 +187,7 @@ enum Kind {
     StaticMethod,
     StaticGetter,
     Constructor,
+    Property,
 
     Function,
 }
@@ -258,11 +259,13 @@ fn collect_members(class_name: &str, decl: &ClassDecl) -> Vec<Member> {
                 init: None,
                 modifiers,
                 ..
-            } if modifiers.is_static || modifiers.is_readonly => {
+            } => {
                 let kind = if modifiers.is_static {
                     Kind::StaticGetter
-                } else {
+                } else if modifiers.is_readonly {
                     Kind::Getter
+                } else {
+                    Kind::Property
                 };
                 out.push(Member {
                     symbol: key.to_string(),
@@ -404,6 +407,12 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
 
     for m in &members {
         let sym = &m.symbol;
+        if m.kind == Kind::Property {
+            setup_calls.push(quote! {
+                cls.declare_field(::std::rc::Rc::from(#sym));
+            });
+            continue;
+        }
         let method_ident = format_ident!("{}", sym);
         let wrap_ident = format_ident!("__varn_wrap_{}_{}", sanitize(&prefix), sanitize(sym));
         let fast_wrap_ident = format_ident!("__varn_fast_wrap_{}_{}", sanitize(&prefix), sanitize(sym));
@@ -440,7 +449,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                 call_args.push(quote!(#b));
                 arg_base = 1;
             }
-            Kind::StaticMethod | Kind::StaticGetter | Kind::Function => {
+            Kind::StaticMethod | Kind::StaticGetter | Kind::Function | Kind::Property => {
                 arg_base_is_dynamic = true;
             }
         }
@@ -647,7 +656,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                 Kind::Constructor => {
                     quote!(cls.add_method("constructor", ::varn_types::Value::native(#wrap_ident::<#self_ty>, "constructor"));)
                 }
-                Kind::Function => unreachable!(),
+                Kind::Function | Kind::Property => unreachable!(),
             };
             setup_calls.push(setup);
 

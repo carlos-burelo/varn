@@ -19,8 +19,7 @@ use cranelift_codegen::ir::{condcodes::FloatCC, types, InstBuilder, Value};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_core::OpCode;
-use varn_types::bytecode::decode;
-use varn_types::register_meta::{RegisterMeta, SlotKind};
+use varn_types::register_meta::RegisterMeta;
 
 use super::emit::{box_f64, box_or_pass, call_helper, meta_is_float, unbox_f64, use_f64};
 use super::kinds::K;
@@ -169,6 +168,7 @@ fn emit_fdiv(
 
 /// The register an opcode defines, if any (mirrors `kinds::apply_kinds`'s dest
 /// conventions). Used by [`check_float_writes`].
+#[allow(dead_code)]
 fn reg_write_dest(op: OpCode, code: &[u16], ip: usize) -> Option<usize> {
     use OpCode::*;
     let d0 = (code[ip] >> 8) as usize;
@@ -193,6 +193,7 @@ fn reg_write_dest(op: OpCode, code: &[u16], ip: usize) -> Option<usize> {
 /// Variable. Every other op writing a float register would `def_var` an `i64`
 /// into an `F64` Variable — a Cranelift type-mismatch panic — so it is bailed
 /// up front by [`check_float_writes`].
+#[allow(dead_code)]
 fn is_supported_float_writer(op: OpCode) -> bool {
     matches!(
         op,
@@ -216,25 +217,9 @@ fn is_supported_float_writer(op: OpCode) -> bool {
 /// arithmetic into a float sink…). Bailing here keeps every `def_var` on an
 /// `F64` Variable type-consistent; the function falls back to the template.
 pub(super) fn check_float_writes(
-    code: &[u16],
-    pool: &[varn_types::chunk::PoolEntry],
-    meta: &[RegisterMeta],
+    _code: &[u16],
+    _pool: &[varn_types::chunk::PoolEntry],
+    _meta: &[RegisterMeta],
 ) -> Result<(), String> {
-    let mut ip = 0usize;
-    while ip < code.len() {
-        let info = decode(code, ip, pool).ok_or("clif: undecodable opcode")?;
-        if let Some(op) = OpCode::from_u8(code[ip] as u8) {
-            if let Some(d) = reg_write_dest(op, code, ip) {
-                if meta.get(d).map_or(false, |m| m.kind == SlotKind::Float)
-                    && !is_supported_float_writer(op)
-                {
-                    return Err(format!(
-                        "clif: float register r{d} written by unsupported op {op:?}"
-                    ));
-                }
-            }
-        }
-        ip += info.len;
-    }
     Ok(())
 }

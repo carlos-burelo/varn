@@ -45,8 +45,22 @@ pub fn op_inherit(subclass_nv: VmValue, superclass_nv: VmValue, heap: &mut Heap)
             *sub.vtable_owners.borrow_mut() = superclass.vtable_owners.borrow().clone();
             *sub.method_map.borrow_mut() = superclass.method_map.borrow().clone();
 
-            *sub.root_shape.borrow_mut() =
-                superclass.root_shape.borrow().with_class(Some(sub.clone()));
+            let mut existing_sub_fields: Vec<(varn_types::RuntimeString, usize)> = sub
+                .root_shape
+                .borrow()
+                .property_names
+                .iter()
+                .map(|(k, &v)| (k.clone(), v))
+                .collect();
+            existing_sub_fields.sort_by_key(|(_, slot)| *slot);
+
+            let mut new_root = superclass.root_shape.borrow().with_class(Some(sub.clone()));
+            for (name, _) in existing_sub_fields {
+                if !new_root.property_names.contains_key(&name) {
+                    new_root = new_root.transition(name);
+                }
+            }
+            *sub.root_shape.borrow_mut() = new_root;
 
             *sub.getter_map.borrow_mut() = superclass.getter_map.borrow().clone();
             *sub.getter_vtable.borrow_mut() = superclass.getter_vtable.borrow().clone();

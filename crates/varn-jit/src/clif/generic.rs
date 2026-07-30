@@ -13,7 +13,7 @@ use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_core::OpCode;
 use varn_types::VmValue;
 
-use super::emit::{box_or_pass, call_helper, unbox_bool};
+use super::emit::{box_or_pass, call_helper, meta_is_float, unbox_bool, unbox_f64_coerce};
 use super::kinds::K;
 use crate::JitHelpers;
 
@@ -23,6 +23,24 @@ pub(super) struct GenCtx<'a> {
     pub vars: &'a [Variable],
     pub cc: CallConv,
     pub exec_ctx: cranelift_codegen::ir::Value,
+    pub register_meta: &'a [varn_types::register_meta::RegisterMeta],
+}
+
+/// Define `dest` from a helper's boxed `VmValue` result, coercing when the
+/// register is float-typed — its Variable is `F64`, so the raw bits would be
+/// a Cranelift type error. Matches the kind `apply_kinds` assigns.
+fn def_boxed(
+    b: &mut FunctionBuilder,
+    g: &GenCtx,
+    dest: usize,
+    res: cranelift_codegen::ir::Value,
+) {
+    if meta_is_float(g.register_meta, dest) {
+        let f = unbox_f64_coerce(b, res);
+        b.def_var(g.vars[dest], f);
+    } else {
+        b.def_var(g.vars[dest], res);
+    }
 }
 
 /// `dest, a, b` generic arithmetic via `helper(ctx, a, b) -> VmValue`.
@@ -41,7 +59,7 @@ pub(super) fn emit_binop(
     let a = box_or_pass(b, g.vars, state, a_r);
     let bb = box_or_pass(b, g.vars, state, b_r);
     let res = call_helper(b, g.cc, helper, &[g.exec_ctx, a, bb]);
-    b.def_var(g.vars[dest], res);
+    def_boxed(b, g, dest, res);
 }
 
 /// `IsNull dest, src` — compare against the null VmValue bits (0/1 result).
@@ -77,6 +95,33 @@ pub(super) fn try_emit(
     code: &[u16],
     ip: usize,
 ) -> bool {
+    // A raw 0/1 result cannot live in a float-typed register (its Variable is
+    // `F64`), and a bool has no meaningful float representation — so a
+    // comparison landing in one bails the whole function to the interpreter
+    // rather than being coerced into nonsense.
+    let bool_result = matches!(
+        op,
+        OpCode::Eq
+            | OpCode::Neq
+            | OpCode::Lt
+            | OpCode::Gt
+            | OpCode::Lte
+            | OpCode::Gte
+            | OpCode::EqFloat
+            | OpCode::NeqFloat
+            | OpCode::LtFloat
+            | OpCode::GtFloat
+            | OpCode::LteFloat
+            | OpCode::GteFloat
+            | OpCode::Instanceof
+            | OpCode::In
+            | OpCode::Not
+            | OpCode::IsArray
+            | OpCode::IsNull
+    );
+    if bool_result && meta_is_float(g.register_meta, (code[ip] >> 8) as usize) {
+        return false;
+    }
     match op {
         // Numeric/string/float arithmetic — the runtime helpers dispatch by
         // operand type, so the typed *Float variants share them (operands are
@@ -84,7 +129,7 @@ pub(super) fn try_emit(
         OpCode::Add | OpCode::AddFloat => emit_binop(b, g, state, code, ip, h.add),
         OpCode::Sub | OpCode::SubFloat => emit_binop(b, g, state, code, ip, h.sub),
         OpCode::Mul | OpCode::MulFloat => emit_binop(b, g, state, code, ip, h.mul),
-        OpCode::Div | OpCode::DivFloat => emit_binop(b, g, state, code, ip, h.div),
+        OpCode::Div | OpCode::DivFloat | OpCode::DivInt => emit_binop(b, g, state, code, ip, h.div),
         OpCode::Mod | OpCode::ModFloat => emit_binop(b, g, state, code, ip, h.modulo),
         OpCode::Pow | OpCode::PowInt | OpCode::PowFloat => {
             emit_binop(b, g, state, code, ip, h.pow)
@@ -136,7 +181,7 @@ pub(super) fn emit_unary(
     let src = (code[ip + 1] >> 8) as usize;
     let v = box_or_pass(b, g.vars, state, src);
     let res = call_helper(b, g.cc, helper, &[g.exec_ctx, v]);
-    b.def_var(g.vars[dest], res);
+    def_boxed(b, g, dest, res);
 }
 
 /// `dest, src` unary producing a boxed bool (`Not` = logical_not); unboxed to
@@ -173,7 +218,7 @@ pub(super) fn emit_get_symbol(
     let obj = box_or_pass(b, g.vars, state, obj_r);
     let sym = b.ins().iconst(types::I64, sym_idx as i64);
     let res = call_helper(b, g.cc, get_symbol, &[g.exec_ctx, obj, sym]);
-    b.def_var(g.vars[dest], res);
+    def_boxed(b, g, dest, res);
 }
 
 /// `dest, a, b` generic comparison via `helper(ctx, a, b) -> boxed bool`;

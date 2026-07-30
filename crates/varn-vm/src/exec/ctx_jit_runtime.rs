@@ -285,10 +285,15 @@ pub extern "C" fn jit_ushr(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue
     unsafe { crate::exec::arith::ushr(a, b, &mut (*ctx).heap) }
 }
 
+/// `own_ip` is this `LoadModule` instruction's own offset, not the next one:
+/// an imported module that suspends on a top-level `await` leaves the import
+/// unfinished, so the frame rewinds to re-execute the load once the awaited
+/// task resolves — the same rewind `op_load_module` performs interpreted.
 pub extern "C" fn jit_load_module(
     ctx: *mut ExecCtx,
     closure: *const crate::frame::VmClosure,
     const_idx: usize,
+    own_ip: usize,
 ) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -298,11 +303,34 @@ pub extern "C" fn jit_load_module(
             Some(s) => s,
             None => return VmValue::null(),
         };
-        match ctx_ref.load_module_from_source(&spec, &closure_ref.proto.chunk.source_file) {
+        // Our own frame, taken BEFORE the load: a module that suspends leaves
+        // its frame on top of ours, so `frames.last()` is no longer us.
+        let self_idx = ctx_ref.frames.len() - 1;
+        let loaded = match ctx_ref.load_module_from_source(&spec, &closure_ref.proto.chunk.source_file) {
             Ok(v) => v,
             Err(e) => panic!("JIT load_module failed: {:?}", e),
+        };
+        if ctx_ref.vm_suspend.is_some() {
+            jit_suspend_at(ctx_ref, self_idx, own_ip);
         }
+        loaded
     }
+}
+
+/// Leave clif code with frame `frame_idx` parked at `resume_ip`, so the
+/// interpreter picks that function up from there once the suspension the
+/// caller already recorded in `vm_suspend` is resolved.
+unsafe fn jit_suspend_at(ctx: &mut ExecCtx, frame_idx: usize, resume_ip: usize) -> ! {
+    ctx.frames[frame_idx].ip = resume_ip;
+    // The unwind handler patches the TOP frame's ip from this field. We have
+    // already parked the right frame, and it is not the top one — the module
+    // that suspended left its own frame above ours — so leave it clear.
+    ctx.jit_panic_suspend_resume_ip = None;
+    let buf = ctx.jit_jmp_buf;
+    if buf.is_null() {
+        panic!("JIT suspend triggered but no jump buffer registered");
+    }
+    super::ctx::my_longjmp(buf, 2)
 }
 
 pub extern "C" fn jit_load_module_slot(

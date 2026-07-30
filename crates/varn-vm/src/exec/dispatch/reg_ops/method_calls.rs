@@ -363,19 +363,29 @@ impl ExecCtx {
                 owner_class.as_ref().map(|c| c.name.as_str()).unwrap_or("?"),
                 name
             );
-            let is_jit = nc.jit_entry.is_some();
+            let is_jit = nc.jit_fn().is_some();
             self.record_hotspot_method(&method_key, is_jit);
         }
-        self.stack.push(VmValue::null());
+        // `arity` counts register 0 (the receiver here) plus the declared
+        // params, so the staged window is exactly `arity` slots wide: the
+        // receiver, the supplied args, and nulls for any param the call
+        // omitted.
+        let nparams = nc.proto.arity.saturating_sub(1);
+        let staged;
         if !nc.proto.has_rest {
             self.stack.push(this_val);
             for i in 0..arg_count {
                 let v = self.stack[base + arg_start + i];
                 self.stack.push(v);
             }
+            for _ in arg_count..nparams {
+                self.stack.push(VmValue::null());
+            }
+            staged = 1 + arg_count.max(nparams);
         } else {
-            let arity = nc.proto.arity;
-            let rest_idx = arity.saturating_sub(1);
+            // The last declared param collects the overflow, so only the ones
+            // before it are staged individually.
+            let rest_idx = nparams.saturating_sub(1);
             self.stack.push(this_val);
             let regular_count = arg_count.min(rest_idx);
             for i in 0..regular_count {
@@ -397,9 +407,9 @@ impl ExecCtx {
                     .alloc(crate::heap::HeapObj::Array(VmArray::new(rest_items))),
             );
             self.stack.push(rest_nv);
+            staged = 1 + rest_idx + 1;
         }
-        let full_arg_count = nc.proto.arity;
-        let final_base = self.stack.len() - full_arg_count;
+        let final_base = self.stack.len() - staged;
         if self.frames.len() >= 10000 {
             return Err(crate::error::RuntimeError::new(
                 "stack overflow: call depth exceeded 10000",

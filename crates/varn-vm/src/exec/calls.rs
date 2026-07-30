@@ -75,30 +75,29 @@ pub fn try_prepare_call_fast(
             }
             None
         }
-        HeapObj::BoundMethod(bm) => {
-            if let BoundMethodTarget::Vm {
-                closure,
-                owner_class,
-            } = &bm.target
-            {
-                if let Some(wrapper) = closure.as_any().downcast_ref::<VmClosurePayload>() {
-                    let nc = &wrapper.0;
-                    if !nc.proto.is_generator && !nc.proto.is_async {
-                        if !nc.proto.has_rest || arg_count <= nc.proto.arity {
-                            let base = stack.len() - arg_count;
-                            let mut frame = CallFrame::new(nc, base);
-                            frame.current_class = owner_class.clone();
-                            return Some((PreparedCall::Frame(frame), true));
-                        }
-                    }
-                }
+        // A bound method is the hot shape for every stdlib method call
+        // (`arr.push`, `Map.get`, …). Dropping it to the slow `prepare_call`
+        // turns 21k immediate native returns into 10k frame pushes — measured
+        // 3.8x on tests/main.vn — so both targets keep their fast path. The
+        // receiver fills the staged callee slot (`stack[frame.base]`) in
+        // `ExecCtx::prepare_call`, which is why the flag comes back `true`.
+        // Only the NATIVE target. It is the hot shape for every stdlib method
+        // call (`arr.push`, `Map.get`, …) and returns immediately with no frame
+        // — dropping it to the slow `prepare_call` turned 21k immediate native
+        // returns into 10k frame pushes, measured 3.8x on tests/main.vn.
+        //
+        // The VM target deliberately stays slow: staging a `CallFrame` here
+        // skips the receiver bookkeeping that `super.method()` needs and fails
+        // tests/48-opt-unsupported-phase1.vn with "super write via method".
+        //
+        // The receiver fills the staged callee slot in `ExecCtx::prepare_call`,
+        // which is why the flag comes back `true`.
+        HeapObj::BoundMethod(bm) => match &bm.target {
+            BoundMethodTarget::Native { func, .. } => {
+                Some((PreparedCall::NativeImmediate(*func, arg_count), true))
             }
-
-            if let BoundMethodTarget::Native { func, .. } = &bm.target {
-                return Some((PreparedCall::NativeImmediate(*func, arg_count), true));
-            }
-            None
-        }
+            BoundMethodTarget::Vm { .. } => None,
+        },
         HeapObj::NativeFn(_name, f) => {
             Some((PreparedCall::RawNativeImmediate(*f, arg_count), false))
         }
@@ -225,19 +224,20 @@ pub fn prepare_call(
                                 "BoundMethod(Vm): invalid closure payload",
                             ));
                         };
-                        let arity = nc.proto.arity as usize;
+                        // `arity` already counts register 0 — the callee slot the
+                        // caller stages as a null placeholder — plus the declared
+                        // params, so the receiver FILLS that slot rather than
+                        // shifting it. A caller that staged only the args (no
+                        // placeholder) is one short, and gets the receiver
+                        // inserted in front instead.
+                        let arity = nc.proto.arity;
                         let mut full_arg_count = arg_count;
                         let base = stack.len() - arg_count;
-                        if arg_count == arity - 1 {
+                        if arg_count < arity {
                             stack.insert(base, recv_nv);
-                            full_arg_count = arg_count + 1;
+                            full_arg_count += 1;
                         } else {
-                            if base >= stack.len() {
-                                stack.push(recv_nv);
-                                full_arg_count = 1;
-                            } else {
-                                stack[base] = recv_nv;
-                            }
+                            stack[base] = recv_nv;
                         }
                         if nc.proto.is_generator {
                             let args_start = stack.len() - full_arg_count;
@@ -313,6 +313,9 @@ pub fn prepare_call(
                             let final_base = stack.len() - full_arg_count;
                             let mut frame = CallFrame::new(&nc, final_base);
                             frame.current_class = owner_class;
+                            if nc.proto.name.as_deref() == Some("constructor") {
+                                return Ok(PreparedCall::Constructor(frame, recv_nv));
+                            }
                             return Ok(PreparedCall::Frame(frame));
                         }
                         return Err(RuntimeError::new("BoundMethod(Vm): invalid VmClosure"));
@@ -406,10 +409,6 @@ pub fn prepare_call(
         Value::Class(ref c) => c.name.as_str(),
         ref other => other.type_name(),
     };
-    eprintln!(
-        "PREPARE_CALL FAILED: callee_nv={:?}, repr={}, type={}",
-        callee_nv, callee_repr, type_name
-    );
     Err(RuntimeError::new(format!(
         "value is not callable: {} (type: {})",
         callee_repr, type_name

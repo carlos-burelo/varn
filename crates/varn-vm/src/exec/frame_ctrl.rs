@@ -70,6 +70,9 @@ impl ExecCtx {
                 self.frames.push(frame);
                 self.pending_constructors
                     .push((ctor_frame_idx, instance_nv));
+                if self.jit_frame_prepushed != 0 {
+                    let _ = self.run_until(ctor_frame_idx)?;
+                }
             }
             PreparedCall::Native(f, args) => {
                 self.record_call_native();
@@ -841,6 +844,23 @@ impl ExecCtx {
     ) -> Result<VmValue, String> {
         let orig_len = self.stack.len();
         self.stack.extend_from_slice(staged_args);
+        // `new X()` is the single hottest shape reaching here from clif code.
+        // The template JIT's own call helper had this fast path; without it
+        // every construction pays prepare_call + a frame push + a nested
+        // run_until.
+        if callee.is_heap() {
+            if let Some(HeapObj::Class(cls)) = self.heap.get(callee.as_heap_idx()) {
+                let cls = cls.clone();
+                let callee_base = self.stack.len() - arg_count;
+                if let Some(v) =
+                    super::ctx_jit_values::construct_staged_fast(self, &cls, callee_base)
+                {
+                    self.stack.truncate(orig_len);
+                    self.record_call_vm_fast();
+                    return Ok(v);
+                }
+            }
+        }
         let prepared = match self.prepare_call(callee, arg_count) {
             Ok(p) => p,
             Err(e) => {

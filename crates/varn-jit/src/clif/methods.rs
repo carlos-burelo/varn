@@ -4,7 +4,7 @@
 
 use cranelift_codegen::ir::{types, InstBuilder};
 use cranelift_frontend::FunctionBuilder;
-use varn_types::register_meta::{RegisterMeta, SlotKind};
+use varn_types::register_meta::RegisterMeta;
 
 use super::alloc::{flush_boxed, frame_base_addr, live_boxed, reload_boxed, store_home, AllocCtx};
 use super::emit::{box_or_pass, call_helper, meta_is_float, unbox_f64_coerce};
@@ -23,7 +23,7 @@ pub(super) fn emit_call_method(
     code: &[u16],
     ip: usize,
 ) {
-    let cs = (code[ip] & 0xFF) as usize;
+    let cs = (code[ip] >> 8) as usize;
     let dest = (code[ip + 1] >> 8) as usize;
     let this_reg = (code[ip + 1] & 0xFF) as usize;
     let name_idx = code[ip + 2] as usize;
@@ -53,15 +53,11 @@ pub(super) fn emit_call_method(
         &[actx.exec_ctx, actx.closure, actx.base, this_val, ni, ci, ast, ac, de, ipv],
     );
 
-    reload_boxed(b, actx, &regs);
+    reload_boxed(b, actx, state, &regs);
 
     if meta_is_float(meta, dest) {
         let f = unbox_f64_coerce(b, res);
         b.def_var(actx.vars[dest], f);
-    } else if meta.get(dest).map_or(false, |m| m.kind == SlotKind::Int) {
-        let s = b.ins().ishl_imm(res, 16);
-        let un = b.ins().sshr_imm(s, 16);
-        b.def_var(actx.vars[dest], un);
     } else {
         b.def_var(actx.vars[dest], res);
     }
@@ -107,15 +103,11 @@ pub(super) fn emit_invoke_virtual(
         &[actx.exec_ctx, actx.closure, this_val, ni, ast, ac, de, ipv],
     );
 
-    reload_boxed(b, actx, &regs);
+    reload_boxed(b, actx, state, &regs);
 
     if meta_is_float(meta, dest) {
         let f = unbox_f64_coerce(b, res);
         b.def_var(actx.vars[dest], f);
-    } else if meta.get(dest).map_or(false, |m| m.kind == SlotKind::Int) {
-        let s = b.ins().ishl_imm(res, 16);
-        let un = b.ins().sshr_imm(s, 16);
-        b.def_var(actx.vars[dest], un);
     } else {
         b.def_var(actx.vars[dest], res);
     }

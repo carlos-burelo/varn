@@ -26,10 +26,10 @@ use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::chunk::{Literal, PoolEntry};
 
-use varn_types::register_meta::{RegisterMeta, SlotKind};
+use varn_types::register_meta::RegisterMeta;
 
 use super::emit::{
-    box_or_pass, call_helper, call_helper_void, meta_is_float, meta_is_int, unbox_f64_coerce,
+    box_or_pass, call_helper, call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce,
     wrap_i48,
 };
 use super::kinds::K;
@@ -148,8 +148,7 @@ pub(super) fn load_receiver(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
 ) -> cranelift_codegen::ir::Value {
-    let fb = frame_base_addr(b, actx);
-    b.ins().load(types::I64, MemFlags::trusted(), fb, 0)
+    load_home(b, actx, 0)
 }
 
 pub(super) fn load_home(
@@ -171,6 +170,45 @@ pub(super) fn store_home(
 ) {
     let v = box_or_pass(b, actx.vars, state, reg);
     b.ins().store(MemFlags::trusted(), v, fb, (reg * 8) as i32);
+}
+
+/// Land a helper's boxed `VmValue` result in `dest`'s Variable. A float-typed
+/// register's Variable is `F64`, so raw `I64` result bits must be coerced on
+/// the way in — defining it with the bits directly is a Cranelift type error,
+/// not a silent miscompile. Mirrors the kind the dataflow assigns to these
+/// destinations (`kinds::apply_kinds`, `boxed`/`typed`).
+pub(super) fn def_result(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    dest: usize,
+    res: cranelift_codegen::ir::Value,
+) {
+    let fb = frame_base_addr(b, actx);
+    if meta_is_float(actx.register_meta, dest) {
+        let f = unbox_f64_coerce(b, res);
+        b.def_var(actx.vars[dest], f);
+    } else {
+        b.def_var(actx.vars[dest], res);
+    }
+    b.ins().store(MemFlags::trusted(), res, fb, (dest * 8) as i32);
+}
+
+/// Materialize a `#[repr(C)]` argument struct for a helper that takes a
+/// pointer instead of flat arguments, and return its address. `words` are
+/// stored at consecutive 8-byte offsets, matching the struct's field order.
+pub(super) fn args_struct(
+    b: &mut FunctionBuilder,
+    words: &[cranelift_codegen::ir::Value],
+) -> cranelift_codegen::ir::Value {
+    let slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
+        cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+        (words.len() * 8) as u32,
+        3,
+    ));
+    for (i, w) in words.iter().enumerate() {
+        b.ins().stack_store(*w, slot, (i * 8) as i32);
+    }
+    b.ins().stack_addr(types::I64, slot, 0)
 }
 
 /// Loop back-edge GC safepoint, positioned in the block that ends the loop
@@ -197,7 +235,7 @@ pub(super) fn emit_backedge_safepoint(b: &mut FunctionBuilder, actx: &AllocCtx, 
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
     call_helper_void(b, actx.cc, h.gc_safepoint, &[actx.exec_ctx]);
-    reload_boxed(b, actx, &regs);
+    reload_boxed(b, actx, state, &regs);
     b.ins().jump(cont, &[]);
     b.switch_to_block(cont);
 }
@@ -221,7 +259,16 @@ pub(super) fn flush_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K],
 
 /// Reload `regs` from their home slots after a collection may have moved
 /// their indices (and grown/moved `ctx.stack`, so recompute the base).
-pub(super) fn reload_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, regs: &[usize]) {
+///
+/// The restored representation is the EXACT inverse of the one
+/// [`store_home`] used — both driven by the flow's kind state, never by
+/// `register_meta`. The two authorities disagree in real code (the meta types
+/// a slot `Int` while the flow has merged it to a boxed kind at a loop
+/// header, and vice versa); restoring by the meta then leaves a raw integer
+/// in a register the lowering goes on to read as boxed VmValue bits, which
+/// reinterprets a small int as a denormal float — silently wrong comparisons,
+/// and an infinite loop when it is a loop counter.
+pub(super) fn reload_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K], regs: &[usize]) {
     let fb = frame_base_addr(b, actx);
     for &r in regs {
         let v = b
@@ -230,11 +277,17 @@ pub(super) fn reload_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, regs: &[usi
         if meta_is_float(actx.register_meta, r) {
             let f = unbox_f64_coerce(b, v);
             b.def_var(actx.vars[r], f);
-        } else if meta_is_int(actx.register_meta, r) {
-            let un = wrap_i48(b, v);
-            b.def_var(actx.vars[r], un);
         } else {
-            b.def_var(actx.vars[r], v);
+            let restored = match state[r] {
+                K::Int => wrap_i48(b, v),
+                K::Bool => unbox_bool(b, v),
+                K::Float => {
+                    let f = unbox_f64_coerce(b, v);
+                    super::emit::box_f64(b, f)
+                }
+                _ => v,
+            };
+            b.def_var(actx.vars[r], restored);
         }
     }
 }
@@ -249,19 +302,16 @@ pub(super) fn emit_generic_call(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     state: &[K],
-    meta: &[varn_types::register_meta::RegisterMeta],
+    _meta: &[varn_types::register_meta::RegisterMeta],
     code: &[u16],
     ip: usize,
 ) -> Result<(), String> {
     let w1 = code[ip + 1];
     let w2 = code[ip + 2];
-    let dest = (code[ip] >> 8) as usize;
+    let dest = (w1 >> 8) as usize;
     let callee_reg = (w1 & 0xFF) as usize;
     let argc = (w2 >> 8) as usize;
     let arg_start = (w2 & 0xFF) as usize;
-    if argc > 4 {
-        return Err("clif: generic call arity > 4".into());
-    }
 
     let callee = box_or_pass(b, actx.vars, state, callee_reg);
     let arg_vals: Vec<cranelift_codegen::ir::Value> = (0..argc)
@@ -279,15 +329,9 @@ pub(super) fn emit_generic_call(
     }
     let res = call_helper(b, actx.cc, actx.helpers.clif_call_fallback, &args);
 
-    reload_boxed(b, actx, &regs);
+    reload_boxed(b, actx, state, &regs);
 
-    if meta.get(dest).map_or(false, |m| m.kind == varn_types::register_meta::SlotKind::Int) {
-        let s = b.ins().ishl_imm(res, 16);
-        let un = b.ins().sshr_imm(s, 16);
-        b.def_var(actx.vars[dest], un);
-    } else {
-        b.def_var(actx.vars[dest], res);
-    }
+    def_result(b, actx, dest, res);
     Ok(())
 }
 
@@ -327,9 +371,9 @@ pub(super) fn emit_get_property(
         &[actx.exec_ctx, actx.closure, actx.base, obj, ni, ci, de, ipv],
     );
 
-    reload_boxed(b, actx, &regs);
+    reload_boxed(b, actx, state, &regs);
 
-    b.def_var(actx.vars[dest], res);
+    def_result(b, actx, dest, res);
 }
 
 /// `SetProperty obj(=first_reg), val, cs_idx, name_idx` — dynamic/generic
@@ -363,7 +407,7 @@ pub(super) fn emit_set_property(
         &[actx.exec_ctx, actx.closure, obj, val, ni, ci, ipv],
     );
 
-    reload_boxed(b, actx, &regs);
+    reload_boxed(b, actx, state, &regs);
 }
 
 /// `BuildArray dest, start, count` — materialize the `count` element
@@ -394,7 +438,7 @@ pub(super) fn emit_build_array(
         actx.helpers.build_array,
         &[actx.exec_ctx, actx.base, start_v, count_v],
     );
-    b.def_var(actx.vars[dest], res);
+    def_result(b, actx, dest, res);
 }
 
 /// `ArrayPush arr, val` — append a value; the helper carries the old→young
@@ -415,7 +459,7 @@ pub(super) fn emit_array_push(
 
     call_helper_void(b, actx.cc, actx.helpers.array_push, &[actx.exec_ctx, arr, val]);
 
-    reload_boxed(b, actx, &regs);
+    reload_boxed(b, actx, state, &regs);
 }
 
 /// `StrConcat dest, a, b` — allocate the concatenation. Result is a boxed
@@ -438,9 +482,9 @@ pub(super) fn emit_str_concat(
 
     let res = call_helper(b, actx.cc, actx.helpers.str_concat, &[actx.exec_ctx, a, bb]);
 
-    reload_boxed(b, actx, &regs);
+    reload_boxed(b, actx, state, &regs);
 
-    b.def_var(actx.vars[dest], res);
+    def_result(b, actx, dest, res);
 }
 
 /// `CallNativeOp` — a statically-typed core-type method by op-id (e.g.
@@ -452,7 +496,7 @@ pub(super) fn emit_call_native_op(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     state: &[K],
-    meta: &[RegisterMeta],
+    _meta: &[RegisterMeta],
     code: &[u16],
     pool: &[PoolEntry],
     ip: usize,
@@ -465,10 +509,19 @@ pub(super) fn emit_call_native_op(
         _ => return Err("clif: native op-id not an int constant".into()),
     };
 
+    // Flush EVERY live register, not just the argument window: the reload
+    // after the call restores all of them from their home slots, so a
+    // register left unflushed comes back as whatever `ctx.stack` happened to
+    // hold (usually zero) — silently destroying a live value. The extra loop
+    // over the argument window covers float-typed args, which `flush_boxed`
+    // skips but the native call still needs materialized as boxed values.
     let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
     let fb = frame_base_addr(b, actx);
     for r in dest..dest + total {
-        store_home(b, actx, state, fb, r);
+        if meta_is_float(actx.register_meta, r) {
+            store_home(b, actx, state, fb, r);
+        }
     }
     let args_start = b.ins().iadd_imm(actx.base, dest as i64);
     let op_id_v = b.ins().iconst(types::I64, op_id as i64);
@@ -479,14 +532,8 @@ pub(super) fn emit_call_native_op(
         actx.helpers.jit_call_native_op,
         &[actx.exec_ctx, op_id_v, args_start, total_v],
     );
-    reload_boxed(b, actx, &regs);
-    if meta.get(dest).map_or(false, |m| m.kind == varn_types::register_meta::SlotKind::Int) {
-        let s = b.ins().ishl_imm(res, 16);
-        let un = b.ins().sshr_imm(s, 16);
-        b.def_var(actx.vars[dest], un);
-    } else {
-        b.def_var(actx.vars[dest], res);
-    }
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest, res);
     Ok(())
 }
 
@@ -519,7 +566,7 @@ pub(super) fn emit_build_object_with_shape(
         actx.helpers.build_object_with_shape,
         &[actx.exec_ctx, actx.closure, actx.base, start_v, shape_v],
     );
-    b.def_var(actx.vars[dest], res);
+    def_result(b, actx, dest, res);
 }
 
 pub(super) fn emit_make_enum_variant(
@@ -533,7 +580,9 @@ pub(super) fn emit_make_enum_variant(
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
 
-    let ip_v = b.ins().iconst(types::I64, ip as i64);
+    // The helper decodes from the FIRST OPERAND word (the interpreter's
+    // post-opcode `ip`), like `BuildObject`/`ObjectRest`.
+    let ip_v = b.ins().iconst(types::I64, (ip + 1) as i64);
     let res = call_helper(
         b,
         actx.cc,
@@ -541,8 +590,8 @@ pub(super) fn emit_make_enum_variant(
         &[actx.exec_ctx, ip_v],
     );
 
-    reload_boxed(b, actx, &regs);
-    b.def_var(actx.vars[dest], res);
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest, res);
 }
 
 pub(super) fn emit_get_enum_tag(
@@ -567,15 +616,11 @@ pub(super) fn emit_get_enum_tag(
         &[actx.exec_ctx, val],
     );
 
-    reload_boxed(b, actx, &regs);
+    reload_boxed(b, actx, state, &regs);
 
     if meta_is_float(meta, dest) {
         let f = unbox_f64_coerce(b, res);
         b.def_var(actx.vars[dest], f);
-    } else if meta.get(dest).map_or(false, |m| m.kind == SlotKind::Int) {
-        let s = b.ins().ishl_imm(res, 16);
-        let un = b.ins().sshr_imm(s, 16);
-        b.def_var(actx.vars[dest], un);
     } else {
         b.def_var(actx.vars[dest], res);
     }
@@ -621,8 +666,8 @@ pub(super) fn emit_build_str(
         &[actx.exec_ctx, parts_ptr, count_v],
     );
 
-    reload_boxed(b, actx, &regs);
-    b.def_var(actx.vars[dest], res);
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest, res);
 }
 
 pub(super) fn emit_intrinsic(
@@ -657,15 +702,11 @@ pub(super) fn emit_intrinsic(
         &[actx.exec_ctx, wire_v, start_v, count_v],
     );
 
-    reload_boxed(b, actx, &regs);
+    reload_boxed(b, actx, state, &regs);
 
     if meta_is_float(meta, dest) {
         let f = unbox_f64_coerce(b, res);
         b.def_var(actx.vars[dest], f);
-    } else if meta.get(dest).map_or(false, |m| m.kind == SlotKind::Int) {
-        let s = b.ins().ishl_imm(res, 16);
-        let un = b.ins().sshr_imm(s, 16);
-        b.def_var(actx.vars[dest], un);
     } else {
         b.def_var(actx.vars[dest], res);
     }
@@ -688,15 +729,11 @@ pub(super) fn emit_to_string(
 
     let res = call_helper(b, actx.cc, actx.helpers.to_string, &[actx.exec_ctx, v]);
 
-    reload_boxed(b, actx, &regs);
+    reload_boxed(b, actx, state, &regs);
 
     if meta_is_float(meta, dest) {
         let f = unbox_f64_coerce(b, res);
         b.def_var(actx.vars[dest], f);
-    } else if meta.get(dest).map_or(false, |m| m.kind == SlotKind::Int) {
-        let s = b.ins().ishl_imm(res, 16);
-        let un = b.ins().sshr_imm(s, 16);
-        b.def_var(actx.vars[dest], un);
     } else {
         b.def_var(actx.vars[dest], res);
     }
@@ -708,8 +745,8 @@ pub(super) fn emit_load_upvalue(
     code: &[u16],
     ip: usize,
 ) {
-    let dest = (code[ip] >> 8) as usize;
-    let uv_idx = code[ip + 1] as usize;
+    let dest = (code[ip + 1] >> 8) as usize;
+    let uv_idx = (code[ip + 1] & 0xFF) as usize;
     let uv_v = b.ins().iconst(types::I64, uv_idx as i64);
     let res = call_helper(
         b,
@@ -717,7 +754,7 @@ pub(super) fn emit_load_upvalue(
         actx.helpers.load_upvalue,
         &[actx.exec_ctx, actx.closure, uv_v],
     );
-    b.def_var(actx.vars[dest], res);
+    def_result(b, actx, dest, res);
 }
 
 pub(super) fn emit_store_upvalue(
@@ -727,8 +764,8 @@ pub(super) fn emit_store_upvalue(
     code: &[u16],
     ip: usize,
 ) {
-    let uv_idx = (code[ip] >> 8) as usize;
-    let src_r = (code[ip + 1] >> 8) as usize;
+    let uv_idx = (code[ip + 1] >> 8) as usize;
+    let src_r = (code[ip + 1] & 0xFF) as usize;
     let uv_v = b.ins().iconst(types::I64, uv_idx as i64);
     let val = box_or_pass(b, actx.vars, state, src_r);
     call_helper_void(
@@ -742,17 +779,15 @@ pub(super) fn emit_store_upvalue(
 pub(super) fn emit_close_upvalue(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
+    state: &[K],
     code: &[u16],
     ip: usize,
 ) {
-    let reg = (code[ip] >> 8) as usize;
+    let reg = (code[ip + 1] >> 8) as usize;
+    let fb = frame_base_addr(b, actx);
+    store_home(b, actx, state, fb, reg);
     let reg_v = b.ins().iconst(types::I64, reg as i64);
-    call_helper_void(
-        b,
-        actx.cc,
-        actx.helpers.close_upvalue,
-        &[actx.exec_ctx, actx.base, reg_v],
-    );
+    call_helper_void(b, actx.cc, actx.helpers.close_upvalue, &[actx.exec_ctx, reg_v]);
 }
 
 pub(super) fn emit_make_closure(
@@ -763,6 +798,16 @@ pub(super) fn emit_make_closure(
     ip: usize,
 ) {
     let dest = (code[ip + 1] >> 8) as usize;
+    let uv_count = (code[ip + 1] & 0xFF) as usize;
+    let fb = frame_base_addr(b, actx);
+    for i in 0..uv_count {
+        let uv_desc = code[ip + 3 + i];
+        let is_local = (uv_desc >> 8) != 0;
+        let index = (uv_desc & 0xFF) as usize;
+        if is_local {
+            store_home(b, actx, state, fb, index);
+        }
+    }
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
     let ip_v = b.ins().iconst(types::I64, ip as i64);
@@ -772,8 +817,8 @@ pub(super) fn emit_make_closure(
         actx.helpers.make_closure,
         &[actx.exec_ctx, actx.closure, ip_v, actx.base],
     );
-    reload_boxed(b, actx, &regs);
-    b.def_var(actx.vars[dest], res);
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest, res);
 }
 
 pub(super) fn emit_load_static_fn(
@@ -794,8 +839,8 @@ pub(super) fn emit_load_static_fn(
         actx.helpers.load_static_fn,
         &[actx.exec_ctx, actx.closure, idx_v],
     );
-    reload_boxed(b, actx, &regs);
-    b.def_var(actx.vars[dest], res);
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest, res);
 }
 
 pub(super) fn emit_load_module(
@@ -807,17 +852,26 @@ pub(super) fn emit_load_module(
 ) {
     let dest = (code[ip] >> 8) as usize;
     let spec_idx = code[ip + 1] as usize;
+    // The imported module may suspend on a top-level `await`, in which case
+    // the helper does not return — it parks this frame at `ip` and longjmps
+    // out, and the interpreter re-executes the load. Every register must be
+    // in its home slot for that hand-off, exactly as at an `Await`.
+    let fb = frame_base_addr(b, actx);
+    for r in 0..actx.vars.len() {
+        store_home(b, actx, state, fb, r);
+    }
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
     let spec_v = b.ins().iconst(types::I64, spec_idx as i64);
+    let own_ip_v = b.ins().iconst(types::I64, ip as i64);
     let res = call_helper(
         b,
         actx.cc,
         actx.helpers.load_module,
-        &[actx.exec_ctx, actx.closure, spec_v],
+        &[actx.exec_ctx, actx.closure, spec_v, own_ip_v],
     );
-    reload_boxed(b, actx, &regs);
-    b.def_var(actx.vars[dest], res);
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest, res);
 }
 
 pub(super) fn emit_load_module_slot(
@@ -838,7 +892,7 @@ pub(super) fn emit_load_module_slot(
         actx.helpers.load_module_slot,
         &[actx.exec_ctx, mod_val, slot_v],
     );
-    b.def_var(actx.vars[dest], res);
+    def_result(b, actx, dest, res);
 }
 
 pub(super) fn emit_store_module_slot(
@@ -848,20 +902,25 @@ pub(super) fn emit_store_module_slot(
     code: &[u16],
     ip: usize,
 ) {
-    let mod_r = (code[ip] >> 8) as usize;
-    let val_r = (code[ip + 1] >> 8) as usize;
-    let slot_idx = code[ip + 2] as usize;
-    let mod_val = box_or_pass(b, actx.vars, state, mod_r);
+    // `StoreModuleSlot val_reg, slot_idx` — two words. The destination module
+    // is the frame's own export object (the helper looks it up), not an
+    // operand.
+    let val_r = (code[ip] >> 8) as usize;
+    let slot_idx = code[ip + 1] as usize;
     let val = box_or_pass(b, actx.vars, state, val_r);
     let slot_v = b.ins().iconst(types::I64, slot_idx as i64);
     call_helper_void(
         b,
         actx.cc,
         actx.helpers.store_module_slot,
-        &[actx.exec_ctx, mod_val, slot_v, val],
+        &[actx.exec_ctx, slot_v, val],
     );
 }
 
+/// `MakeClass dest, super_reg, name_idx` — allocate the class object and, when
+/// a superclass register is named, inherit from it. `super_reg == 0` means "no
+/// superclass" (register 0 is the callee/`this` slot, never a class operand),
+/// exactly as the interpreter reads it.
 pub(super) fn emit_make_class(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
@@ -869,37 +928,96 @@ pub(super) fn emit_make_class(
     code: &[u16],
     ip: usize,
 ) {
-    let dest = (code[ip + 1] >> 8) as usize;
+    let dest = (code[ip] >> 8) as usize;
+    let super_reg = (code[ip + 1] >> 8) as usize;
+    let name_idx = code[ip + 2] as usize;
+    let super_val = if super_reg == 0 {
+        b.ins()
+            .iconst(types::I64, varn_types::VmValue::null().0 as i64)
+    } else {
+        box_or_pass(b, actx.vars, state, super_reg)
+    };
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
-    let ip_v = b.ins().iconst(types::I64, ip as i64);
+    let idx_v = b.ins().iconst(types::I64, name_idx as i64);
     let res = call_helper(
         b,
         actx.cc,
         actx.helpers.make_class,
-        &[actx.exec_ctx, actx.closure, ip_v, actx.base],
+        &[actx.exec_ctx, actx.closure, super_val, idx_v],
     );
-    reload_boxed(b, actx, &regs);
-    b.def_var(actx.vars[dest], res);
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest, res);
 }
 
+/// `Method|DefineStatic|DefineGetter|DefineSetter|DefineStaticGetter|
+/// DefineStaticSetter class_reg, fn_reg, name_idx` — attach one member to a
+/// class. `DeclareField` and `Inherit` share the shape family but have their
+/// own helpers (the member helper only knows the six method kinds).
 pub(super) fn emit_class_member_op(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     state: &[K],
+    op: OpCode,
     code: &[u16],
     ip: usize,
-) {
+) -> Result<(), String> {
+    let class_reg = (code[ip + 1] >> 8) as usize;
+    let class_val = box_or_pass(b, actx.vars, state, class_reg);
     let regs = live_boxed(actx, state);
+
+    if op == OpCode::Inherit {
+        // `Inherit class_reg, super_reg` — no name constant.
+        let super_val = box_or_pass(b, actx.vars, state, (code[ip + 1] & 0xFF) as usize);
+        flush_boxed(b, actx, state, &regs);
+        call_helper_void(
+            b,
+            actx.cc,
+            actx.helpers.inherit,
+            &[actx.exec_ctx, class_val, super_val],
+        );
+        reload_boxed(b, actx, state, &regs);
+        return Ok(());
+    }
+
+    let name_idx = code[ip + 2] as usize;
+    let idx_v = b.ins().iconst(types::I64, name_idx as i64);
+
+    if op == OpCode::DeclareField {
+        flush_boxed(b, actx, state, &regs);
+        call_helper_void(
+            b,
+            actx.cc,
+            actx.helpers.declare_field,
+            &[actx.exec_ctx, actx.closure, class_val, idx_v],
+        );
+        reload_boxed(b, actx, state, &regs);
+        return Ok(());
+    }
+
+    // `JitClassMemberArgs { class_val, fn_val, name_idx, kind }` — the kind
+    // discriminant the helper switches on.
+    let kind = match op {
+        OpCode::Method => 0,
+        OpCode::DefineStatic => 1,
+        OpCode::DefineGetter => 2,
+        OpCode::DefineSetter => 3,
+        OpCode::DefineStaticGetter => 4,
+        OpCode::DefineStaticSetter => 5,
+        _ => return Err(format!("clif: not a class member op ({op:?})")),
+    };
+    let fn_val = box_or_pass(b, actx.vars, state, (code[ip + 1] & 0xFF) as usize);
+    let kind_v = b.ins().iconst(types::I64, kind);
+    let args = args_struct(b, &[class_val, fn_val, idx_v, kind_v]);
     flush_boxed(b, actx, state, &regs);
-    let ip_v = b.ins().iconst(types::I64, ip as i64);
     call_helper_void(
         b,
         actx.cc,
         actx.helpers.class_member_op,
-        &[actx.exec_ctx, actx.closure, ip_v, actx.base],
+        &[actx.exec_ctx, actx.closure, args],
     );
-    reload_boxed(b, actx, &regs);
+    reload_boxed(b, actx, state, &regs);
+    Ok(())
 }
 
 pub(super) fn emit_get_super(
@@ -915,8 +1033,8 @@ pub(super) fn emit_get_super(
     flush_boxed(b, actx, state, &regs);
     let idx_v = b.ins().iconst(types::I64, name_idx as i64);
     let res = call_helper(b, actx.cc, actx.helpers.get_super, &[actx.exec_ctx, idx_v]);
-    reload_boxed(b, actx, &regs);
-    b.def_var(actx.vars[dest], res);
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest, res);
 }
 
 pub(super) fn emit_load_global(
@@ -937,52 +1055,29 @@ pub(super) fn emit_load_global(
         actx.helpers.load_global,
         &[actx.exec_ctx, actx.closure, idx_v],
     );
-    reload_boxed(b, actx, &regs);
-    b.def_var(actx.vars[dest], res);
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest, res);
 }
 
-pub(super) fn emit_store_global(
+/// `StoreGlobal|DefineGlobal src_reg, name_idx` — the source register lives in
+/// the FIRST operand word and the name constant in the second (a three-word
+/// instruction), like the interpreter's `exec_variable_op`.
+pub(super) fn emit_global_write(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     state: &[K],
+    helper: usize,
     code: &[u16],
     ip: usize,
 ) {
-    let src = (code[ip] >> 8) as usize;
-    let name_idx = code[ip + 1] as usize;
+    let src = (code[ip + 1] >> 8) as usize;
+    let name_idx = code[ip + 2] as usize;
     let val = box_or_pass(b, actx.vars, state, src);
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
     let idx_v = b.ins().iconst(types::I64, name_idx as i64);
-    call_helper_void(
-        b,
-        actx.cc,
-        actx.helpers.store_global,
-        &[actx.exec_ctx, actx.closure, idx_v, val],
-    );
-    reload_boxed(b, actx, &regs);
-}
-
-pub(super) fn emit_define_global(
-    b: &mut FunctionBuilder,
-    actx: &AllocCtx,
-    state: &[K],
-    code: &[u16],
-    ip: usize,
-) {
-    let src = (code[ip] >> 8) as usize;
-    let name_idx = code[ip + 1] as usize;
-    let val = box_or_pass(b, actx.vars, state, src);
-    let regs = live_boxed(actx, state);
-    flush_boxed(b, actx, state, &regs);
-    let idx_v = b.ins().iconst(types::I64, name_idx as i64);
-    call_helper_void(
-        b,
-        actx.cc,
-        actx.helpers.define_global,
-        &[actx.exec_ctx, actx.closure, idx_v, val],
-    );
-    reload_boxed(b, actx, &regs);
+    call_helper_void(b, actx.cc, helper, &[actx.exec_ctx, val, idx_v]);
+    reload_boxed(b, actx, state, &regs);
 }
 
 pub(super) fn emit_get_index(
@@ -997,16 +1092,14 @@ pub(super) fn emit_get_index(
     let idx_r = (code[ip + 1] & 0xFF) as usize;
     let obj = box_or_pass(b, actx.vars, state, obj_r);
     let idx = box_or_pass(b, actx.vars, state, idx_r);
+    // `JitGetIndexArgs { obj, key, dest }`.
+    let dest_v = b.ins().iconst(types::I64, dest as i64);
+    let args = args_struct(b, &[obj, idx, dest_v]);
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
-    let res = call_helper(
-        b,
-        actx.cc,
-        actx.helpers.get_index,
-        &[actx.exec_ctx, obj, idx],
-    );
-    reload_boxed(b, actx, &regs);
-    b.def_var(actx.vars[dest], res);
+    let res = call_helper(b, actx.cc, actx.helpers.get_index, &[actx.exec_ctx, args]);
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest, res);
 }
 
 pub(super) fn emit_set_index(
@@ -1022,15 +1115,12 @@ pub(super) fn emit_set_index(
     let obj = box_or_pass(b, actx.vars, state, obj_r);
     let idx = box_or_pass(b, actx.vars, state, idx_r);
     let val = box_or_pass(b, actx.vars, state, val_r);
+    // `JitSetIndexArgs { obj, key, val }`.
+    let args = args_struct(b, &[obj, idx, val]);
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
-    call_helper_void(
-        b,
-        actx.cc,
-        actx.helpers.set_index,
-        &[actx.exec_ctx, obj, idx, val],
-    );
-    reload_boxed(b, actx, &regs);
+    call_helper_void(b, actx.cc, actx.helpers.set_index, &[actx.exec_ctx, args]);
+    reload_boxed(b, actx, state, &regs);
 }
 
 pub(super) fn emit_try_push(
@@ -1039,14 +1129,18 @@ pub(super) fn emit_try_push(
     code: &[u16],
     ip: usize,
 ) {
-    let handler_off = code[ip + 1] as usize;
-    let handler_ip = ip + 2 + handler_off;
-    let ip_v = b.ins().iconst(types::I64, handler_ip as i64);
+    let err_reg = (code[ip + 1] >> 8) as u32;
+    let offset_hi = code[ip + 2] as usize;
+    let offset_lo = code[ip + 3] as usize;
+    let catch_offset = (offset_hi << 16) | offset_lo;
+    let catch_ip = ip + 4 + catch_offset;
+    let ip_v = b.ins().iconst(types::I64, catch_ip as i64);
+    let err_v = b.ins().iconst(types::I64, err_reg as i64);
     call_helper_void(
         b,
         actx.cc,
         actx.helpers.try_push,
-        &[actx.exec_ctx, ip_v],
+        &[actx.exec_ctx, ip_v, err_v],
     );
 }
 
@@ -1069,7 +1163,7 @@ pub(super) fn emit_throw(
     code: &[u16],
     ip: usize,
 ) {
-    let src = (code[ip] >> 8) as usize;
+    let src = (code[ip + 1] >> 8) as usize;
     let val = box_or_pass(b, actx.vars, state, src);
     call_helper_void(
         b,
@@ -1086,13 +1180,20 @@ pub(super) fn emit_yield(
     code: &[u16],
     ip: usize,
 ) {
-    let src = (code[ip] >> 8) as usize;
+    let dest_reg = (code[ip + 1] >> 8) as u32;
+    let src = (code[ip + 1] & 0xFF) as usize;
     let val = box_or_pass(b, actx.vars, state, src);
+    let fb = frame_base_addr(b, actx);
+    for r in 0..actx.vars.len() {
+        store_home(b, actx, state, fb, r);
+    }
+    let dest_v = b.ins().iconst(types::I64, dest_reg as i64);
+    let resume_v = b.ins().iconst(types::I64, (ip + 2) as i64);
     call_helper_void(
         b,
         actx.cc,
         actx.helpers.yield_helper,
-        &[actx.exec_ctx, val],
+        &[actx.exec_ctx, val, dest_v, resume_v],
     );
 }
 
@@ -1106,16 +1207,22 @@ pub(super) fn emit_await(
     let dest = (code[ip] >> 8) as usize;
     let src = (code[ip + 1] >> 8) as usize;
     let val = box_or_pass(b, actx.vars, state, src);
+    let fb = frame_base_addr(b, actx);
+    for r in 0..actx.vars.len() {
+        store_home(b, actx, state, fb, r);
+    }
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
+    let dest_v = b.ins().iconst(types::I64, dest as i64);
+    let resume_v = b.ins().iconst(types::I64, (ip + 2) as i64);
     let res = call_helper(
         b,
         actx.cc,
         actx.helpers.await_helper,
-        &[actx.exec_ctx, val],
+        &[actx.exec_ctx, val, dest_v, resume_v],
     );
-    reload_boxed(b, actx, &regs);
-    b.def_var(actx.vars[dest], res);
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest, res);
 }
 
 pub(super) fn emit_spawn(
@@ -1136,7 +1243,301 @@ pub(super) fn emit_spawn(
         actx.helpers.spawn,
         &[actx.exec_ctx, val],
     );
-    reload_boxed(b, actx, &regs);
-    b.def_var(actx.vars[dest], res);
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest, res);
 }
+
+pub(super) fn emit_build_object(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+) {
+    let dest = (code[ip + 1] >> 8) as usize;
+    let count = (code[ip + 1] & 0xFF) as usize;
+    let fb = frame_base_addr(b, actx);
+    let mut cur_ip = ip + 2;
+    for _ in 0..count {
+        cur_ip += 1; // skip k_idx
+        let val_reg = (code[cur_ip] >> 8) as usize;
+        cur_ip += 1;
+        store_home(b, actx, state, fb, val_reg);
+    }
+    // The helper re-walks the instruction from its FIRST OPERAND word (the
+    // interpreter's post-opcode `ip`), not from the opcode word.
+    let ipv = b.ins().iconst(types::I64, (ip + 1) as i64);
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+    let res = call_helper(
+        b,
+        actx.cc,
+        actx.helpers.build_object,
+        &[actx.exec_ctx, actx.closure, actx.base, ipv],
+    );
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest, res);
+}
+
+pub(super) fn emit_object_rest(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+) {
+    let dest = (code[ip + 1] >> 8) as usize;
+    let src = (code[ip + 1] & 0xFF) as usize;
+    let fb = frame_base_addr(b, actx);
+    store_home(b, actx, state, fb, src);
+    // Same convention as `BuildObject`: the helper decodes from the first
+    // operand word.
+    let ipv = b.ins().iconst(types::I64, (ip + 1) as i64);
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+    let res = call_helper(
+        b,
+        actx.cc,
+        actx.helpers.object_rest,
+        &[actx.exec_ctx, ipv],
+    );
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest, res);
+}
+
+pub(super) fn emit_object_keys(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+) {
+    let dest = (code[ip] >> 8) as usize;
+    let src = (code[ip + 1] >> 8) as usize;
+    let obj = box_or_pass(b, actx.vars, state, src);
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+    let res = call_helper(
+        b,
+        actx.cc,
+        actx.helpers.object_keys,
+        &[actx.exec_ctx, obj],
+    );
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest, res);
+}
+
+pub(super) fn emit_object_merge(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+) {
+    let dest_reg = (code[ip] >> 8) as usize;
+    let src_reg = (code[ip + 1] >> 8) as usize;
+    let dest_val = box_or_pass(b, actx.vars, state, dest_reg);
+    let src_val = box_or_pass(b, actx.vars, state, src_reg);
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+    let res = call_helper(
+        b,
+        actx.cc,
+        actx.helpers.object_merge,
+        &[actx.exec_ctx, dest_val, src_val],
+    );
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest_reg, res);
+}
+
+pub(super) fn emit_get_property_maybe(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+) {
+    let dest = (code[ip] >> 8) as usize;
+    let obj_r = (code[ip + 1] >> 8) as usize;
+    let name_idx = code[ip + 2] as usize;
+    let obj = box_or_pass(b, actx.vars, state, obj_r);
+    let ni = b.ins().iconst(types::I64, name_idx as i64);
+    let res = call_helper(
+        b,
+        actx.cc,
+        actx.helpers.get_property_maybe,
+        &[actx.exec_ctx, obj, ni],
+    );
+    def_result(b, actx, dest, res);
+}
+
+pub(super) fn emit_bind_method(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+) {
+    // `BindMethod dest, obj, name_idx` — dest and receiver BOTH live in the
+    // first operand word (hi/lo), unlike the property ops above.
+    let dest = (code[ip + 1] >> 8) as usize;
+    let obj_r = (code[ip + 1] & 0xFF) as usize;
+    let name_idx = code[ip + 2] as usize;
+    let obj = box_or_pass(b, actx.vars, state, obj_r);
+    let ni = b.ins().iconst(types::I64, name_idx as i64);
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+    let res = call_helper(
+        b,
+        actx.cc,
+        actx.helpers.bind_method,
+        &[actx.exec_ctx, obj, ni],
+    );
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest, res);
+}
+
+pub(super) fn emit_assert_not_null(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+) {
+    let src = (code[ip + 1] >> 8) as usize;
+    let val = box_or_pass(b, actx.vars, state, src);
+    call_helper_void(
+        b,
+        actx.cc,
+        actx.helpers.assert_not_null,
+        &[actx.exec_ctx, val],
+    );
+}
+
+pub(super) fn emit_array_extend(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+) {
+    let arr_r = (code[ip] >> 8) as usize;
+    let src_r = (code[ip + 1] >> 8) as usize;
+    let arr = box_or_pass(b, actx.vars, state, arr_r);
+    let src = box_or_pass(b, actx.vars, state, src_r);
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+    call_helper_void(
+        b,
+        actx.cc,
+        actx.helpers.array_extend,
+        &[actx.exec_ctx, arr, src],
+    );
+    reload_boxed(b, actx, state, &regs);
+}
+
+pub(super) fn emit_wrap_spread(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+) {
+    let dest = (code[ip] >> 8) as usize;
+    let src = (code[ip + 1] >> 8) as usize;
+    let val = box_or_pass(b, actx.vars, state, src);
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+    let res = call_helper(
+        b,
+        actx.cc,
+        actx.helpers.wrap_spread,
+        &[actx.exec_ctx, val],
+    );
+    reload_boxed(b, actx, state, &regs);
+    def_result(b, actx, dest, res);
+}
+
+pub(super) fn emit_call_spread(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    meta: &[varn_types::register_meta::RegisterMeta],
+    code: &[u16],
+    ip: usize,
+) {
+    let w1 = code[ip + 1];
+    let w2 = code[ip + 2];
+    let dest = (w1 >> 8) as usize;
+    let callee_reg = (w1 & 0xFF) as usize;
+    let argc = (w2 >> 8) as usize;
+    let arg_start = (w2 & 0xFF) as usize;
+
+    let callee = box_or_pass(b, actx.vars, state, callee_reg);
+    let slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
+        cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+        40,
+        0,
+    ));
+
+    let arg_start_v = b.ins().iconst(types::I64, arg_start as i64);
+    let argc_v = b.ins().iconst(types::I64, argc as i64);
+    let dest_v = b.ins().iconst(types::I64, dest as i64);
+    let next_ip_v = b.ins().iconst(types::I64, (ip + 3) as i64);
+
+    b.ins().stack_store(callee, slot, 0);
+    b.ins().stack_store(arg_start_v, slot, 8);
+    b.ins().stack_store(argc_v, slot, 16);
+    b.ins().stack_store(dest_v, slot, 24);
+    b.ins().stack_store(next_ip_v, slot, 32);
+
+    let slot_addr = b.ins().stack_addr(types::I64, slot, 0);
+
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+
+    let res = call_helper(
+        b,
+        actx.cc,
+        actx.helpers.call_spread,
+        &[actx.exec_ctx, slot_addr],
+    );
+
+    reload_boxed(b, actx, state, &regs);
+
+    if meta.get(dest).map_or(false, |m| m.kind == varn_types::register_meta::SlotKind::Int) {
+        let s = b.ins().ishl_imm(res, 16);
+        let un = b.ins().sshr_imm(s, 16);
+        b.def_var(actx.vars[dest], un);
+    } else {
+        b.def_var(actx.vars[dest], res);
+    }
+}
+
+pub(super) fn emit_invoke_runtime_static(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    _state: &[K],
+    code: &[u16],
+    ip: usize,
+) -> Result<(), String> {
+    let dest = (code[ip + 1] >> 8) as usize;
+    let start_reg = (code[ip + 3] & 0xFF) as usize;
+    let end_reg = (code[ip + 4] >> 8) as usize;
+    let flag = (code[ip + 4] & 0xFF) as usize;
+
+    let start_v = b.ins().iconst(types::I64, start_reg as i64);
+    let end_v = b.ins().iconst(types::I64, end_reg as i64);
+    let flag_v = b.ins().iconst(types::I64, flag as i64);
+
+    let res = call_helper(
+        b,
+        actx.cc,
+        actx.helpers.range,
+        &[actx.exec_ctx, start_v, end_v, flag_v],
+    );
+    def_result(b, actx, dest, res);
+    Ok(())
+}
+
 

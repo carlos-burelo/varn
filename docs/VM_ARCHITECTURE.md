@@ -209,10 +209,29 @@ memoria liberada.
 
 ### Backend Cranelift (`varn-jit/src/clif/`)
 
-El backend optimizante. En `varn_jit::compile` el router intenta primero
-Cranelift; cualquier bail cae al template JIT y de ahí al intérprete — tres
-tiers semánticamente idénticos, y el `match` de `clif/lower.rs` es la
-autoridad de soporte igual que `compile_proto` lo es del template.
+El único backend compilado. El template JIT ya no existe: `varn_jit::compile`
+lowerea con Cranelift o devuelve `Err`, y un bail deja la función al
+intérprete — dos tiers semánticamente idénticos, y el `match` de
+`clif/lower.rs` es la autoridad de soporte.
+
+Los 134 opcodes de `OpCode` están ruteados: la suite completa
+(`tests/main.vn`) da 745 rutas y 0 bails bajo `VARN_CLIF_TRACE=1`. Lo que
+queda fuera no son opcodes sino funciones enteras, por las puertas de entrada
+de `varn_jit::compile` y `clif::lower::try_compile`:
+
+- **`code.len() > 250`** — no es un presupuesto de compilación. Es lo que
+  mantiene los top-level de módulo (y otras funciones largas) fuera de clif, y
+  con ellos las únicas formas que ponen un frame clif debajo de otro. Un frame
+  clif no es reanudable (no tiene `ip` de bytecode propio) y
+  `execute_jit_frame` instala un `setjmp` solo para el frame clif MÁS EXTERNO,
+  así que un `throw` en una llamada clif anidada desarma la pila nativa de
+  todos los frames clif intermedios mientras sus `CallFrame` siguen vivos con
+  `ip == 0`, y el frame loop los reentra desde arriba: reejecución infinita.
+  Levantar el tope exige frames clif reanudables (buffer de salto por frame
+  para excepciones + ip de side-exit para suspensión), no subir el número.
+- **`param_kinds.len() != arity - 1`** (`clif: missing param kinds`).
+  `arity` cuenta el slot del callee (r0) MÁS los params declarados; tratarlo
+  como el número de params deja el backend entero sin rutear.
 
 - **Lowering desde bytecode**, no desde SSA (los runs cacheados `.vnc` solo
   tienen bytecode). Los opcodes tipados (`AddInt`, `LtInt`, …) son las
@@ -232,16 +251,19 @@ autoridad de soporte igual que `compile_proto` lo es del template.
   bool aquí e int allá, así que la validación es por punto, no por registro.
   Sin deopt, sin patching, sin invalidación: nada compilado es una apuesta.
 - **Arrays/globals**: walk de heap inline (espejo de `array_fast.rs` con los
-  layouts probados); los rechazos van por `call_indirect` a los MISMOS
-  helpers del template — ninguno de los admitidos aloca en heap VM, de modo
-  que **ningún GC puede correr bajo un frame ruteado** (por eso el subset
-  tampoco necesita safepoints ni stack maps todavía). Los loops (contiguos
+  layouts probados); los rechazos van por `call_indirect` a los mismos
+  helpers que usa el intérprete. Los que alocan en heap VM (literales de
+  array/objeto, `push`, aritmética genérica) sí pueden disparar GC bajo un
+  frame ruteado, y se cubren con safepoints que vuelcan cada registro a su
+  home slot en `ctx.stack` antes del helper y lo recargan después — sin stack
+  maps: las raíces se ven por los home slots. Los loops (contiguos
   post-linearización) cachean el puntero de payload por receiver invariante
   en el preheader (centinela 0), y cada acceso lo testea y salta el walk.
 - Límite v1 documentado: sin guard de stack nativo (recursión más profunda
   que el stack del SO aborta en vez del error limpio de la VM).
 
-`VARN_NO_CLIF=1` apaga solo Cranelift (todo va por el template);
+`VARN_NO_CLIF=1` apaga Cranelift (todo va por el intérprete, igual que
+`VARN_NO_JIT=1` ahora que no hay template);
 `VARN_CLIF_TRACE=1` loguea cada decisión route/bail con su razón — **ante un
 timing plano, trazar el ruteo antes de tocar codegen**: un bail silencioso se
 disfraza exactamente de "optimización que no funcionó".

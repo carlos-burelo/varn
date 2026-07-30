@@ -112,6 +112,7 @@ pub fn emit_function(
         )),
         feedback: Rc::new(RefCell::new(FeedbackVector::new(cache_count as usize))),
         static_closure_val: Cell::new(0),
+        jit_entry_count: Cell::new(0),
     })
 }
 
@@ -1093,8 +1094,9 @@ fn emit_inst(
             }
             let total = (args.len() + 1) as u8;
             chunk.emit(OpCode::Call, LINE);
-            chunk.write(Chunk::pack(d, call_base), LINE);
+            chunk.write(Chunk::pack(call_base, call_base), LINE);
             chunk.write(Chunk::pack(total, call_base + 1), LINE);
+            chunk.emit_rr(OpCode::Move, d, call_base + 1, LINE);
         }
 
         InstKind::SuperMethodCall { name, args } => {

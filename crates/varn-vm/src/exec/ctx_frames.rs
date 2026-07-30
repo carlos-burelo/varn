@@ -51,59 +51,13 @@ impl ExecCtx {
         }
 
         self.record_call_slow();
-        let res = super::calls::prepare_call(
+        super::calls::prepare_call(
             callee_nv,
             arg_count,
             &mut self.stack,
             &mut self.heap,
             self.settings,
-        );
-        if let Err(ref e) = res {
-            if let Some(f) = self.frames.last() {
-                let code = &f.closure().proto.chunk.code;
-                let ip = f.ip;
-                let start = ip.saturating_sub(10);
-                let end = (ip + 10).min(code.len());
-                let code_snippet: Vec<(usize, u16)> = (start..end).map(|i| (i, code[i])).collect();
-                let globals_dump: Vec<String> = self
-                    .globals
-                    .idx_to_name
-                    .iter()
-                    .enumerate()
-                    .map(|(i, name)| {
-                        let val = self
-                            .globals
-                            .values
-                            .get(i)
-                            .map(|v| self.heap.str_repr(*v))
-                            .unwrap_or_else(|| "???".into());
-                        format!("[{}]{}={}", i, name, val)
-                    })
-                    .collect();
-                let frames_dump: Vec<String> = self
-                    .frames
-                    .iter()
-                    .map(|fr| {
-                        format!(
-                            "{}@ip={}",
-                            fr.closure().proto.name.as_deref().unwrap_or("<anon>"),
-                            fr.ip
-                        )
-                    })
-                    .collect();
-                eprintln!("PREPARE_CALL ERROR: {:?}", e);
-                eprintln!(
-                    "  fn={:?}, file={}, ip={}",
-                    f.closure().proto.name,
-                    f.closure().proto.chunk.source_file,
-                    f.ip
-                );
-                eprintln!("  code_near_ip={:?}", code_snippet);
-                eprintln!("  frames={:?}", frames_dump);
-                eprintln!("  globals={:?}", globals_dump);
-            }
-        }
-        res
+        )
     }
 
     pub fn push_frame(&mut self, closure: Rc<VmClosure>) -> crate::error::VmResult<()> {

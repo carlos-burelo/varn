@@ -338,12 +338,38 @@ pub fn compile(
     helpers: JitHelpers,
     linker: &dyn clif::lower::ClifLinker,
 ) -> Result<(JitFn, Rc<dyn Any>), String> {
+    // NOT a compile-time budget: this cap is what keeps module top-levels
+    // (and other long functions) out of clif, and with them the only shapes
+    // that put one clif frame underneath another.
+    //
+    // A clif frame is not resumable — it has no bytecode `ip` of its own — and
+    // `execute_jit_frame` installs a single `setjmp` for the OUTERMOST clif
+    // frame only. So a `throw` inside a nested clif call unwinds the native
+    // stack of every clif frame in between while their `CallFrame`s stay live
+    // with `ip == 0`, and the frame loop re-enters them from the top: an
+    // endless re-execution (`assert(safeDivide(10, 0) === -1)` in
+    // tests/11-errors.vn hangs allocating). Suspension (`Await`, `Yield`) has
+    // the same hole, minus the loop.
+    //
+    // Lifting this cap therefore means making clif frames resumable (a
+    // per-frame jump buffer for exceptions plus a side-exit ip for
+    // suspension), not just raising the number.
     if proto.chunk.code.len() > 250 {
+        // Traced like a lowering bail: this gate fires BEFORE clif is asked, so
+        // a function rejected here shows up in neither `CLIF BAIL` nor
+        // `compile_fail`. Counting "0 bails" without it overstates coverage.
+        if clif::trace() {
+            eprintln!(
+                "CLIF GATE  {:?}: too large ({} words)",
+                proto.name,
+                proto.chunk.code.len()
+            );
+        }
         return Err("JIT Bailout: function too large".to_owned());
     }
 
-    // Typed alloc-free functions route through the Cranelift backend; any
-    // bail falls back to the template JIT, then the interpreter.
+    // Everything routes through the Cranelift backend; a bail leaves the
+    // function to the interpreter.
     if clif::enabled() {
         if let Ok(isa) = clif::shared_isa() {
             let start = std::time::Instant::now();
