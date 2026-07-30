@@ -1,0 +1,53 @@
+// Tier parity. With lazy tiering a proto's first N frame entries run
+// interpreted and every later one runs compiled, so the SAME constructor
+// produces some instances through the interpreter and some through Cranelift.
+// Both tiers must store bit-identical field values.
+//
+// The regression this pins: `int_div` in std:time was declared `int` but
+// returned a whole FLOAT (`int / int` is float by design). The interpreter's
+// *Int opcodes fall back to the generic helper when an operand is not an int,
+// so it read the float fine; clif trusts the declared type and unboxed those
+// float bits as an i48 payload. `Duration.hours` came out as 7330077518
+// instead of 1 — but only once one call interpreted and another compiled,
+// which eager compilation had been hiding.
+
+import { Duration } from "std:time";
+
+function halve(n: int): int {
+    return ((n - (n % 2)) / 2).toInt()
+}
+
+class TierBox {
+    a: int
+    b: float
+
+    constructor(n: int) {
+        this.a = halve(n)
+        this.b = n / 2
+    }
+}
+
+let tierFirst = new TierBox(10)
+let tierLast = new TierBox(10)
+for (let i = 0; i < 64; i = i + 1) {
+    tierLast = new TierBox(10)
+}
+
+assert("tier parity: int field agrees across tiers",   tierFirst.a === tierLast.a)
+assert("tier parity: int field value",                 tierLast.a === 5)
+assert("tier parity: int field representation",        typeof tierFirst.a === typeof tierLast.a)
+assert("tier parity: int field is int",                typeof tierLast.a === "int")
+assert("tier parity: float field agrees across tiers", tierFirst.b === tierLast.b)
+assert("tier parity: float field value",               tierLast.b === 5.0)
+
+// The stdlib constructor that actually broke: every field but the first comes
+// from `int_div`, and the calls straddle the tiering threshold.
+let tierD1 = Duration.from("PT1H30M")
+let tierD2 = Duration.from("PT1H30M")
+
+assert("tier parity: Duration hours agree",   tierD1.hours === tierD2.hours)
+assert("tier parity: Duration hours value",   tierD2.hours === 1)
+assert("tier parity: Duration minutes value", tierD2.minutes === 30)
+assert("tier parity: Duration seconds value", tierD2.seconds === 5400)
+assert("tier parity: Duration days value",    tierD2.days === 0)
+assert("tier parity: Duration hours repr",    typeof tierD1.hours === typeof tierD2.hours)

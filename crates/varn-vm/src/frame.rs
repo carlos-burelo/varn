@@ -236,7 +236,7 @@ impl VmClosure {
         proto.ensure_ic();
         let ic_cache = Rc::clone(&proto.ic_cache);
         let feedback = Rc::clone(&proto.feedback);
-        let mut closure = Self {
+        let closure = Self {
             proto,
             upvalues: Vec::new(),
             constants: Rc::new(constants),
@@ -261,7 +261,7 @@ impl VmClosure {
         proto.ensure_ic();
         let ic_cache = Rc::clone(&proto.ic_cache);
         let feedback = Rc::clone(&proto.feedback);
-        let mut closure = Self {
+        let closure = Self {
             proto,
             upvalues,
             constants,
@@ -293,17 +293,14 @@ impl VmClosure {
 
     /// Frame entries a proto must accumulate before it is worth lowering.
     ///
-    /// 1 = compile just before the first entry. That is deliberately the
-    /// weakest possible tiering: it skips only the protos that are BUILT and
-    /// never RUN, which on `tests/47-isolates-multithread.vn` is 144 functions
-    /// compiled to execute 38 JIT frames. Anything that executes still runs
-    /// compiled from its first call, exactly as under eager compilation.
+    /// Cranelift compiles ~1.24 ms per function, so on a short run the whole
+    /// JIT budget is compilation, not execution; the first N calls of a proto
+    /// are cheaper interpreted. `tests/main.vn` is entirely compile-bound.
     ///
-    /// A higher threshold (letting the first N calls interpret) is the real
-    /// tiering win and currently FAILS: at 2, tests/31-stdlib-migration-test.vn
-    /// breaks on "Duration hours" while `VARN_NO_JIT=1` passes — a tier-parity
-    /// bug that eager compilation had been masking. Fix that before raising it.
-    const JIT_TIER_THRESHOLD: u32 = 1;
+    /// Raising this past 1 means the same proto runs interpreted and compiled
+    /// within one program, so the two tiers must agree bit-for-bit. That is
+    /// pinned by `tests/56-tier-parity.vn` — see it before touching this.
+    const JIT_TIER_THRESHOLD: u32 = 2;
 
     /// The compiled entry, if this proto already has one. Never compiles.
     /// The proto — not the closure — owns it: many closures share a proto, and

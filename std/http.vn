@@ -504,8 +504,9 @@ export async function fetch(
     const host = parsedUrl.host;
     
     let port = 80;
-    if (parsedUrl.port !== null) {
-        port = parsedUrl.port;
+    const parsedPort = parsedUrl.port;
+    if (parsedPort !== null) {
+        port = parsedPort;
     } else if (parsedUrl.protocol === "https") {
         port = 443;
     }

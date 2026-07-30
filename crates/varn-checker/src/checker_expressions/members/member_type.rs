@@ -1,8 +1,68 @@
 use crate::binder::BindResult;
 use crate::checker::Checker;
 use crate::types::{ObjectTypeMember, Type};
+use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_core::TypeKind;
+
+/// Declared type-parameter names of a class/interface, by name. Mirrors
+/// `Checker::symbol_type_params_any` without its cache, which needs `&mut`,
+/// and additionally follows `origin` into the declaring module: a generic type
+/// can flow in as a call's return type (`channel<int>()` -> `Channel<int>`)
+/// without `Channel` itself ever being imported here.
+fn class_type_params(name: &str, origin: Option<&Rc<str>>, bind: &BindResult) -> Vec<Rc<str>> {
+    let local = params_in(name, bind);
+    if !local.is_empty() {
+        return local;
+    }
+    if let Some(params) = bind
+        .core
+        .as_ref()
+        .and_then(|b| b.class_type_params.get(name))
+    {
+        return params.clone();
+    }
+    let origins: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
+    if let Some(b) = crate::module_resolver::find_module_bind_for_type_ref(name, &origins) {
+        return params_in(name, &b);
+    }
+    if origin.is_none() {
+        for spec in varn_modules::std_module_ids() {
+            if let Some(b) = crate::module_resolver::resolve_stdlib_module_bind_ref(spec) {
+                let params = params_in(name, &b);
+                if !params.is_empty() {
+                    return params;
+                }
+            }
+        }
+    }
+    Vec::new()
+}
+
+fn params_in(name: &str, bind: &BindResult) -> Vec<Rc<str>> {
+    bind.scopes
+        .get(bind.global_scope)
+        .resolve(name, &bind.scopes)
+        .map(|sid| bind.arena.get(sid).type_params.clone())
+        .unwrap_or_default()
+}
+
+/// `{ T -> int }` for a `Generic("Channel", [int])` receiver. Empty when the
+/// class declares no parameters or the receiver carries no arguments.
+fn generic_mapping(
+    name: &str,
+    args: &[Type],
+    origin: Option<&Rc<str>>,
+    bind: &BindResult,
+) -> FxHashMap<Rc<str>, Type> {
+    if args.is_empty() {
+        return FxHashMap::default();
+    }
+    class_type_params(name, origin, bind)
+        .into_iter()
+        .zip(args.iter().cloned())
+        .collect()
+}
 
 fn resolve_extension_symbol_type(bind: &BindResult, mangled: &Rc<str>) -> Option<Type> {
     let scope = bind.scopes.get(bind.global_scope);
@@ -262,9 +322,22 @@ impl Checker {
                 }
                 None
             }
-            TypeKind::Generic(name, _, origin) => {
-                let ty = crate::types::Type(TypeKind::Named(name.clone(), origin.clone()), false);
-                self.find_member_info_uncached(&ty, key, bind)
+            TypeKind::Generic(name, args, origin) => {
+                let base = crate::types::Type(TypeKind::Named(name.clone(), origin.clone()), false);
+                // The member is declared against the class's type PARAMETERS
+                // (`Channel<T>.rx: Receiver<T>`); the receiver carries the
+                // ARGUMENTS. Without this substitution `channel<int>(…).rx`
+                // reads as `Receiver<T>` and every use of the element type sees
+                // an unbound `T`.
+                self.find_member_info_uncached(&base, key, bind)
+                    .map(|(member_ty, sym)| {
+                        let mapping = generic_mapping(name.as_ref(), args, origin.as_ref(), bind);
+                        if mapping.is_empty() {
+                            (member_ty, sym)
+                        } else {
+                            (member_ty.map_generics(&mapping), sym)
+                        }
+                    })
             }
             TypeKind::Object(members) => members.iter().find(|m| m.name() == key).map(|m| {
                 let ty = match m {
@@ -433,12 +506,19 @@ impl Checker {
                 }
                 None
             }
-            TypeKind::Generic(name, _, _) => {
+            TypeKind::Generic(name, args, origin) => {
                 if let Some(entry) = bind.get_class_entry(name.as_ref()) {
                     if let Some(m) = entry.members.iter().find(|m| m.name.as_ref() == key) {
+                        // Same substitution as `find_member_info_uncached`: the
+                        // member's type is written in the class's parameters.
+                        let mapping = generic_mapping(name.as_ref(), args, origin.as_ref(), bind);
                         return Some(ObjectTypeMember::Property {
                             name: m.name.clone(),
-                            ty: m.ty.clone(),
+                            ty: if mapping.is_empty() {
+                                m.ty.clone()
+                            } else {
+                                m.ty.map_generics(&mapping)
+                            },
                             optional: m.is_optional,
                             readonly: m.is_readonly,
                         });

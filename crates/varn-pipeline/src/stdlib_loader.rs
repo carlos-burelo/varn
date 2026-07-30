@@ -171,13 +171,47 @@ fn load_uncached(spec: &str) -> Result<FunctionProto, ModuleError> {
         .map_err(|e| ModuleError::new(format!("stdlib compile error in {spec}: {e}")))
 }
 
-/// Compile one stdlib-namespace module source to a FunctionProto. Used by StdlibLoader and xtask build-std.
+/// Compile one module source to a FunctionProto. Used by StdlibLoader (which
+/// also loads user modules) and by xtask build-std.
 pub fn compile_source(source: &str, path: &str) -> Result<FunctionProto, String> {
+    compile_source_inner(source, path, false)
+}
+
+/// Same, but rejects a module whose types do not check.
+///
+/// Only the bundle build validates: it compiles every stdlib module once, in
+/// manifest order, so its diagnostics are complete. The on-demand loader
+/// resolves modules in import order and would re-litigate types that were
+/// already validated — and a load-time `Err` on a module the program needs
+/// deadlocks rather than reporting.
+pub fn compile_source_checked(source: &str, path: &str) -> Result<FunctionProto, String> {
+    compile_source_inner(source, path, true)
+}
+
+fn compile_source_inner(
+    source: &str,
+    path: &str,
+    reject_type_errors: bool,
+) -> Result<FunctionProto, String> {
     let (tokens, lexeme_buf, _) = varn_lexer::scan(source, path);
     let mut program =
         varn_parser::parse(tokens, lexeme_buf, path).map_err(|errs| errs[0].message.clone())?;
     varn_core::assign_ast_ids(&mut program);
     let check = varn_checker::Checker::check(&program);
+    if reject_type_errors && check.diagnostics.has_errors() {
+        // The stdlib goes through the same checker as user code. Silently
+        // dropping these diagnostics let `std/*.vn` carry types the backend
+        // then trusted — e.g. an `int`-declared function returning a whole
+        // float, which clif unboxes as an i48 payload.
+        let mut msg = String::new();
+        for d in check.diagnostics.errors() {
+            msg.push_str(&format!(
+                "\n  {path}:{}:{}: {}",
+                d.range.start.line, d.range.start.column, d.message
+            ));
+        }
+        return Err(format!("type errors in stdlib module:{msg}"));
+    }
     let exports =
         if path.starts_with("std:") || path.starts_with("core:") || path.starts_with("runtime:") {
             varn_checker::module_resolver::resolve_stdlib_module_exports_ref(path)
@@ -226,6 +260,9 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
         .map_err(|e| format!("invalid std.json: {e}"))?;
 
     let mut modules = Vec::new();
+    // Report every failing module in one pass: fixing the stdlib one build
+    // round-trip at a time is not worth the four-minute rebuild.
+    let mut failures = String::new();
     for m in &manifest.modules {
         let file = std_dir.join(format!("{}.vn", m.id.strip_prefix("std:").ok_or("invalid std: prefix")?));
         let source = std::fs::read_to_string(&file)
@@ -237,8 +274,13 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
         let interface = varn_checker::module_resolver::serialize_module_interface(&exports, &bind)
             .map_err(|e| format!("interface serialization failed for {}: {e}", m.id))?;
 
-        let proto = compile_source(&source, &m.id)
-            .map_err(|e| format!("compile error in {}: {e}", m.id))?;
+        let proto = match compile_source_checked(&source, &m.id) {
+            Ok(p) => p,
+            Err(e) => {
+                failures.push_str(&format!("\n{e}"));
+                continue;
+            }
+        };
         let bytecode = postcard::to_allocvec(&proto)
             .map_err(|e| format!("bytecode serialization failed for {}: {e}", m.id))?;
 
@@ -248,6 +290,9 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
             interface,
             bytecode,
         });
+    }
+    if !failures.is_empty() {
+        return Err(failures);
     }
 
     let bundle = varn_modules::bundle::StdBundle {

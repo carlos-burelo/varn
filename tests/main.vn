@@ -53,6 +53,7 @@ import "./52-math-trig.vn"
 import "./53-gc-class-vtable.vn"
 import "./54-channels.vn"
 import "./55-array-element-inference.vn"
+import "./56-tier-parity.vn"
 
-print("\n57 side-effect modules executed in suite")
+print("\n58 side-effect modules executed in suite")
 assertSummary()

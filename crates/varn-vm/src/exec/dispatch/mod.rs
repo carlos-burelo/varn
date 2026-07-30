@@ -71,7 +71,9 @@ impl ExecCtx {
                 (*ctx).jit_jmp_buf = &mut jmp_buf as *mut super::ctx::JmpBuf;
             }
             (*ctx).jit_frame_prepushed = 1;
-            let required = base + (*closure_ptr).proto.register_count as usize;
+            // Explicit borrow of the `Rc` field: an implicit autoref through a
+            // raw pointer is what `dangerous_implicit_autorefs` warns about.
+            let required = base + (&(*closure_ptr).proto).register_count as usize;
             if (*ctx).stack.len() < required {
                 (*ctx).stack.resize(required, crate::value::VmValue::null());
             }

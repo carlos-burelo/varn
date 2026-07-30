@@ -201,6 +201,20 @@ pub(super) fn types_compatible_impl(
             .iter()
             .all(|m| types_compatible_impl(declared, m, bind, cache, in_progress)),
         (_, TypeKind::Intrinsic(varn_core::TypeTag::Never)) => true,
+
+        // Some intrinsics (`str`, `Error`, …) are also nameable declarations, so
+        // the same type reaches here spelled two ways: an annotation resolves to
+        // `Intrinsic(tag)` while `new Error(…)` infers `Named("Error")` from the
+        // class symbol. One spelling, one type. Restricted to the bare `Named`
+        // form on purpose — a `Generic` spelling carries type arguments the
+        // intrinsic side has nothing to check against.
+        (TypeKind::Intrinsic(tag), TypeKind::Named(name, _))
+        | (TypeKind::Named(name, _), TypeKind::Intrinsic(tag))
+            if IntrinsicType::from_str(name).is_some_and(|it| it.0 == *tag) =>
+        {
+            true
+        }
+
         (TypeKind::Named(dn, origin_d), TypeKind::Named(in_, origin_i))
         | (TypeKind::Named(dn, origin_d), TypeKind::Generic(in_, _, origin_i))
         | (TypeKind::Generic(dn, _, origin_d), TypeKind::Named(in_, origin_i))

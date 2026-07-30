@@ -22,4 +22,5 @@ export declare class float {
     ceil(): float;
     round(): float;
     trunc(): float;
+    toInt(): int;
 }

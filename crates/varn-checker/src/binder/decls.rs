@@ -7,6 +7,13 @@ use varn_core::ast::{
 };
 use varn_core::{Diagnostic, ErrorCode};
 
+/// Whether a declaration occupies only the type namespace. Classes, enums and
+/// structs live in both, so they are not type-only.
+fn type_only(kind: crate::symbol::SymbolKind) -> bool {
+    use crate::symbol::SymbolKind as K;
+    matches!(kind, K::Interface | K::TypeAlias)
+}
+
 impl super::Binder {
     pub(super) fn bind_decl(&mut self, decl: &Decl) {
         match decl {
@@ -40,7 +47,21 @@ impl super::Binder {
                 self.scopes.get_mut(self.current).define(rc_name, id);
                 return id;
             }
-            if existing_from_extern && new_is_import {
+            // A prelude symbol (`core:global`, or anything reaching us from
+            // another module) sits in this scope only as an implementation
+            // shortcut; conceptually it is an outer scope. Any local
+            // declaration is allowed to shadow it — that is how `std:io`
+            // declares the `print` the prelude also exposes.
+            if existing_from_extern && (new_is_import || sym.origin_module.is_none()) {
+                let id = self.arena.push(sym);
+                let rc_name: Rc<str> = name.clone().into();
+                self.scopes.get_mut(self.current).define(rc_name, id);
+                return id;
+            }
+            // Type space and value space are separate: `type TaskGroup<T> = …`
+            // and `function TaskGroup<T>()` are two declarations of one name in
+            // two namespaces, not a redeclaration.
+            if type_only(existing_sym.kind) != type_only(sym.kind) {
                 let id = self.arena.push(sym);
                 let rc_name: Rc<str> = name.clone().into();
                 self.scopes.get_mut(self.current).define(rc_name, id);

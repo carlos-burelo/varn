@@ -201,8 +201,9 @@ export class Url {
 
     toString(): str {
         let out = this.protocol + "://" + this.host;
-        if (this.port != null) {
-            out = out + ":" + this.port.toString();
+        const port = this.port;
+        if (port != null) {
+            out = out + ":" + port.toString();
         }
 
         if (this.path.length == 0) {

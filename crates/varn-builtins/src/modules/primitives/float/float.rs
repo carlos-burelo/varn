@@ -51,6 +51,11 @@ varn_contract! {
         fn ceil(_ctx: &mut dyn NativeCtx, this: f64) -> f64 { this.ceil() }
         fn round(_ctx: &mut dyn NativeCtx, this: f64) -> f64 { this.round() }
         fn trunc(_ctx: &mut dyn NativeCtx, this: f64) -> f64 { this.trunc() }
+        /// Truncating float -> int. The inverse of `int.toFloat`, and the only
+        /// way to land a computed value in an `int` slot: `as int` is a type
+        /// assertion with no runtime conversion, so it would leave float bits
+        /// in a register the backend then reads as an i48 payload.
+        fn toInt(_ctx: &mut dyn NativeCtx, this: f64) -> i64 { this.trunc() as i64 }
     }
 }
 
