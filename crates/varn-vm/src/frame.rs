@@ -293,14 +293,33 @@ impl VmClosure {
 
     /// Frame entries a proto must accumulate before it is worth lowering.
     ///
-    /// Cranelift compiles ~1.24 ms per function, so on a short run the whole
-    /// JIT budget is compilation, not execution; the first N calls of a proto
-    /// are cheaper interpreted. `tests/main.vn` is entirely compile-bound.
+    /// 1 = compile just before the first entry. That is the weakest possible
+    /// tiering: it skips only the protos that are BUILT and never RUN, which on
+    /// `tests/47-isolates-multithread.vn` is 144 functions compiled to execute
+    /// 38 JIT frames. Anything that executes still runs compiled from its first
+    /// call.
     ///
-    /// Raising this past 1 means the same proto runs interpreted and compiled
-    /// within one program, so the two tiers must agree bit-for-bit. That is
-    /// pinned by `tests/56-tier-parity.vn` — see it before touching this.
-    const JIT_TIER_THRESHOLD: u32 = 2;
+    /// Raising it is the real win — Cranelift costs ~1.24 ms per function and
+    /// `tests/main.vn` is compile-bound, not execution-bound — but ANY value
+    /// above 1 is currently blocked by a closure/upvalue tier-parity bug:
+    ///
+    /// ```text
+    /// tests/scratch.vn:
+    ///     import "./33-globals-async-coherence.vn"
+    ///     import "./37-complex-closures.vn"
+    /// vn bench tests/scratch.vn --runs 1
+    ///     -> ASSERT FAIL: sm after start
+    /// ```
+    ///
+    /// `vn run` passes; `vn bench` fails because it executes the program twice
+    /// (a warmup run plus the timed ones), and only then does `makeStateMachine`
+    /// reach its second frame entry and get compiled. The captured `current`
+    /// then reads back its pre-`transition` value. It reproduces at 2 and at 4,
+    /// needs the async module 33 ahead of 37, and does not reproduce with 37
+    /// alone — so it is stack/upvalue lifetime, not arithmetic. The int-sink
+    /// half of tier parity is already fixed and pinned by
+    /// `tests/56-tier-parity.vn`.
+    const JIT_TIER_THRESHOLD: u32 = 1;
 
     /// The compiled entry, if this proto already has one. Never compiles.
     /// The proto — not the closure — owns it: many closures share a proto, and

@@ -3,6 +3,12 @@
 // produces some instances through the interpreter and some through Cranelift.
 // Both tiers must store bit-identical field values.
 //
+// The threshold is back at 1 while a separate closure/upvalue tier bug is
+// open (see `VmClosure::JIT_TIER_THRESHOLD`), so today this file mostly pins
+// the underlying defect rather than the straddle: an `int`-declared sink must
+// really hold an int, in either tier. Raise the threshold and it becomes a
+// straddle test as written, with no edit needed.
+//
 // The regression this pins: `int_div` in std:time was declared `int` but
 // returned a whole FLOAT (`int / int` is float by design). The interpreter's
 // *Int opcodes fall back to the generic helper when an operand is not an int,

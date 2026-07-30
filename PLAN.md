@@ -63,8 +63,38 @@ verde sin proteger, y `HEAD` está roto.
 
 ## Tarea 1 — Bug de paridad de tiers (BLOQUEANTE)
 
-Es el gate de todo el rendimiento restante y además es un bug de correctitud
-real, hoy tapado.
+> **Estado 2026-07-30: mitad resuelta.** La causa del fallo de `Duration hours`
+> era que **la stdlib nunca se type-checkeaba**: `stdlib_loader::compile_source`
+> corría el checker y tiraba sus diagnósticos, así que `std/time.vn` podía
+> declarar `int_div(...): int` devolviendo un float entero. Ahora el bundle se
+> valida al construirse (`compile_source_checked`), existe `float.toInt(): int`
+> (única conversión real: `as int` no baja a nada), y los 7 errores de tipos que
+> el gate destapó están arreglados — junto con tres bugs del checker que
+> afectaban también a código de usuario. Commit `a09e24a`.
+>
+> **Queda un SEGUNDO bug de paridad, distinto, en closures/upvalues**, que sigue
+> bloqueando cualquier umbral > 1:
+>
+> ```text
+> tests/scratch.vn:
+>     import "./33-globals-async-coherence.vn"
+>     import "./37-complex-closures.vn"
+> vn bench tests/scratch.vn --runs 1   →  ASSERT FAIL: sm after start
+> ```
+>
+> `vn run` pasa. `vn bench` falla porque ejecuta el programa dos veces (warmup +
+> medidas): sólo entonces `makeStateMachine` llega a su segunda entrada de frame
+> y se compila, y el `current` capturado vuelve a leerse con su valor previo al
+> `transition`. Reproduce con umbral 2 y con 4; necesita el módulo async 33
+> delante del 37; con 37 solo no reproduce. Es vida útil de stack/upvalue, no
+> aritmética. Empezar por comparar `emit_make_closure`/`emit_close_upvalue`
+> (`clif/alloc.rs`) contra `capture_upvalue`/`close_upvalues_above`
+> (`exec/ctx_frames.rs`) y por qué la suspensión del módulo 33 cambia el layout.
+>
+> **`vn bench` es gate obligatorio** (CLAUDE.md), no sólo `vn run`: este fallo no
+> aparece en `run`.
+
+Lo que sigue es el análisis original, ya resuelto, que se conserva por contexto.
 
 ### Repro exacto
 
@@ -134,7 +164,9 @@ y deben ser tier-idénticas.
 
 ## Tarea 2 — Subir el umbral de tiering y medir
 
-Sólo después de la Tarea 1.
+Sólo después de la Tarea 1. **Sigue bloqueada**: el umbral está en `1` porque
+2 y 4 rompen `vn bench` (ver el recuadro de la Tarea 1). Medir cualquier umbral
+antes de arreglar ese bug es medir un árbol incorrecto.
 
 `crates/varn-vm/src/frame.rs:306`. Hoy vale `1`, que es el tiering más débil
 posible: salta únicamente los protos que se **construyen y nunca se entran**
