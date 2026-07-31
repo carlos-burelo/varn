@@ -72,13 +72,23 @@ Cualquier trabajo en el emisor rinde como mucho un 9%.
 
 ### Resultado neto, medido pareado
 
-`vn run tests/main.vn`, dos binarios, órdenes alternados, 6 rondas, mediana de
-razones: **0.75 → 1.33x más rápido**.
+`vn run tests/main.vn`, dos binarios, órdenes alternados, mediana de razones:
+**0.41 → 2.4x más rápido**. Benchmarks planos.
 
-El `execute` de `vn bench` sube (45 → ~500 ms) y **eso es correcto**: el bench
-arranca cada corrida desde un `deep_clone` del snapshot, así que las corridas
-2..10 reusaban código horneado contra otro heap. El número viejo medía trabajo
-que no se estaba haciendo.
+**El `execute` de `vn bench` sube igualmente respecto al número viejo, y eso es
+correcto.** Un `bench --runs 1` ejecuta el programa **cinco veces** (init,
+snapshot, la corrida medida, la de e2e que rehace todo el pipeline…), cada una
+con su heap. Antes las cinco reusaban el código de la primera — que es
+exactamente el bug. El 65 ms de antes medía un programa cuyas funciones ya
+estaban compiladas contra OTRO heap; no era una medida de un arranque en frío.
+
+Dos cosas amortiguan el coste honesto: el tiering consciente de bucles (abajo) y
+la adopción por ascendencia — un heap copiado con `deep_clone` hereda las
+entradas que su ancestro ya había construido en el momento de la copia
+(`HeapInner::jit_ancestry` + `FunctionProto::jit_serial`), porque esa copia es
+fiel y esos handles nombran lo mismo. Lo que nunca se comparte es entre
+**hermanos**: el código que la corrida 1 compiló horneó handles que alocó
+después de su copia, y la corrida 2 no los tiene. Ahí estaba el bug.
 
 ### Tarea 2 (barrido de umbral): desbloqueada, barrida, y la respuesta es NO
 
@@ -93,9 +103,23 @@ Barrido sobre tiempo real:
 El 5.6x de `main.vn` es un artefacto de una suite de correctitud que llama cada
 función ~3 veces. `bench_matrix` empeora **2.4x**: contar *entradas de frame* es
 ciego a los bucles — una función que se entra una vez e itera un millón de veces
-no alcanza ningún umbral. Arreglarlo pide contar back-edges y OSR, no otro
-número. **El umbral se queda en 1.** `VARN_JIT_TIER` existe para rebarrer esto
-sin un binario por valor.
+no alcanza ningún umbral.
+
+**Arreglado partiendo el umbral en dos según una propiedad estática del
+bytecode**, sin necesitar OSR: si el cuerpo contiene `OpCode::Loop`
+(`FunctionProto::has_backedge`, decodificado una vez y memoizado) se compila en
+la primera entrada — puede no haber una segunda; si no lo contiene, el conteo de
+entradas es exactamente la evidencia correcta y se exige 8.
+
+Barrido del brazo recto sobre `main.vn` (execute, mediana de 3 rondas
+alternadas): 1 → 548 ms, 2 → 488, 4 → 204, **8 → 176**, 16 → 168, 32 → 163. A
+partir de 8 la curva es plana y el riesgo no. `VARN_JIT_TIER` (fuerza ambos
+brazos) y `VARN_JIT_TIER_STRAIGHT` (sólo el recto) quedan para rebarrer.
+
+Resultado: `tests/main.vn` bajo `vn bench --runs 1` **897 → 149 ms** de execute,
+cobertura clif 97% (las frames que quedan interpretadas son cuerpos de test
+rectos que no valían 2 ms de Cranelift), y los benchmarks planos — `matrix`
+1.01, `dto` 1.0, `fib` 1.0, `str_ops` 0.92 pareados contra el árbol pre-sesión.
 
 ### La palanca que queda: código independiente del heap
 
