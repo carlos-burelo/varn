@@ -174,9 +174,22 @@ escapa), y la llamada ya está en 2.8 ns. No queda nada que ganar ahí.
    `bench_dto` pareado **1.53x** (67.2 → 42.5 ms). El criterio de aceptación
    de la Tarea 4, cumplido.
 
-### Tarea 4: lo que ya está hecho y lo único que falta
+### Tarea 4: CERRADA (`0e1be7d`)
 
-Aterrizado (`8583e3b`), con el tope todavía en 250:
+`SIZE_GATE_WORDS` = **8192**. Los `<module>` top-level y las funciones largas
+rutean por clif por primera vez.
+
+| | |
+|---|---|
+| `tests/main.vn` | **836/836** con `run` **y** con `bench`, en clif, `VARN_NO_JIT=1` y `VARN_NO_CLIF=1` |
+| cobertura clif | **1287 de 1287 frames (100%)** |
+| `CLIF GATE` | **0** |
+| `CLIF BAIL` | **0** |
+| `cargo test --workspace --release` | 48 suites verdes |
+| `bench_dto` pareado | **1.53x** (52.0 → 33.5 ms) |
+| `bench_matrix` / `bench_json` | 1.06x / 1.00x |
+
+Aterrizado en `8583e3b`:
 
 1. **Buffer de salto por frame.** Era el diseño de la Tarea 4 §1.
    `execute_jit_frame` instalaba `setjmp` sólo para el frame clif más externo,
@@ -195,24 +208,42 @@ Aterrizado (`8583e3b`), con el tope todavía en 250:
    `tests/58-clif-range.vn`. Barrido hecho sobre todos los demás helpers que
    leen home slots — era el único hueco.
 
-**Lo único que bloquea subir el tope**, un tercer bug pre-existente:
+Aterrizado en `0e1be7d`, los tres bugs que faltaban:
 
-```varn
-function na(a: int): int { return -a }
-na(3)   // clif: null      intérprete: -3
-```
+3. **Todo retorno `int` NEGATIVO daba null.** No sólo con el tope alto: vivo
+   en una función normal del binario publicado.
 
-`Negate` elige su camino inline por el meta del registro DESTINO solamente,
-así que un operando boxed cae en `use_int` —que acepta boxed— y `ineg` corre
-sobre los bits de payload de un VmValue heap-tagged. Es también por lo que
-`-(7.5d)` da null y `decimal abs` falla con el tope alto. El arreglo requiere
-consultar el flujo de kinds para el OPERANDO; un primer intento regresó
-`(-a) + (-f)` (operando int hacia un destino float-typed, caso que antes
-bailaba al intérprete), así que quedó fuera en vez de a medias.
+   ```varn
+   function sub(a: int, b: int): int { return a - b }
+   sub(1, 4)   // clif: null      intérprete: -3
+   ```
 
-Orden para la próxima sesión: arreglar `Negate`, subir `SIZE_GATE_WORDS`,
-correr los tres modos, y esperar que aparezcan más bugs latentes de la misma
-familia — el gate llevaba años tapando todo lo que no cabía en 250 words.
+   Un raw que devuelve `int` produce SIEMPRE un payload i48 desboxeado — las
+   tres ramas del caso `SlotKind::Int` de `emit_return_value` lo hacen. El
+   wrapper re-etiquetaba sólo si los bits altos estaban limpios, asumiendo que
+   un tag NaN-box puesto significaba "ya boxeado". Ese test no distingue un
+   valor boxeado de un payload **negativo**: `-3` es `0xFFFF_FFFF_FFFF_FFFD`.
+   Re-etiquetado ahora incondicional. La suite no lo veía porque sus funciones
+   que devuelven `int` daban siempre no-negativos.
+4. **`Negate` sobre operando boxed.** Elegía su camino inline por el meta del
+   registro DESTINO solamente, así que un operando boxed caía en `use_int` —que
+   acepta boxed— e `ineg` corría sobre los bits de payload de un VmValue
+   heap-tagged: `-(7.5d)` daba null. Ese caso va ahora al helper (negar un
+   decimal ALOCA, que es justo por lo que `Negate` está en `has_alloc`).
+5. **`Negate` inline escribía un payload crudo** en un registro que el flujo de
+   kinds tipa `Boxed`. Ahora envuelve como el `make_int` del intérprete y boxea.
+
+   > **El camino float no se toca, a propósito.** `use_f64` baila ante lo que
+   > no puede probar, y ese bail es load-bearing: es lo que manda
+   > `(-a) + (-f)` (operando int hacia destino float-typed) al intérprete. Un
+   > primer intento se tragó ese caso en un arm de helper y convirtió -4.5 en
+   > -1.5.
+
+**Esperar más bugs de la misma familia.** Nada por encima de 250 words se había
+compilado nunca; cada función que ahora rutea es superficie que la suite jamás
+pudo ejercitar. Los cuatro que salieron en esta tanda
+(`InvokeRuntimeStatic`, retorno negativo, y los dos de `Negate`) estaban todos
+vivos en funciones normales, no sólo en top-level.
 
 ### Método de medición (corrección)
 
@@ -441,6 +472,13 @@ Medir siempre con el método de la sección "Cómo medir".
 ---
 
 ## Tarea 4 — Tope de 250 words: frames clif reanudables
+
+> **CERRADA en `0e1be7d`.** El tope es 8192, cobertura clif 100%, `CLIF GATE`
+> 0, suite 836/836 en los tres modos, `bench_dto` 1.53x. Lo que sigue es el
+> análisis original, conservado porque el diseño que describe es exactamente el
+> que se implementó (§1 = buffer por frame, §2 = `jit_suspend_buf`), y porque
+> la advertencia sobre la suspensión sigue vigente: sigue desenrollando al
+> frame MÁS EXTERNO, no anida.
 
 `crates/varn-jit/src/lib.rs:357`. **No es un presupuesto de compilación** — es
 lo único que mantiene los `<module>` top-level fuera de clif, y con ellos las
