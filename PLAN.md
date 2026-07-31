@@ -5,6 +5,103 @@ derivar nada.
 
 ---
 
+## 0.0 Corrección de rumbo (2026-07-30, tarde)
+
+**Este plan medía la métrica equivocada.** Las Tareas 1-4 son todas cobertura
+clif y coste de compilación sobre `tests/main.vn`, que es una **suite de
+correctitud**: compila 31 funciones para correr cada una ~3 veces, y el 77% de
+su tiempo es compilar. Un programa real compila una vez y corre largo, así que
+bajar ese coste no se nota fuera de la suite. Los huecos reales frente a Bun
+(JSC) estaban en la **llamada**, en la **inferencia de tipos que no llegaba a
+los globals**, y en **alloc/GC** — ninguno tocado por las Tareas 1-4.
+
+### Lo que se midió
+
+Coste por operación, dentro de funciones clif, antes de los arreglos:
+
+| operación | ns | veredicto |
+|---|---|---|
+| iter de loop int (`sum + k*3`) | 1.76 | óptimo |
+| iter de loop float | 1.27 | óptimo |
+| `{a: i}` que no escapa | 1.48 | scalar replacement funciona |
+| lectura `int[]` | +2.0 c/u | bounds + guard de repr |
+| `arr.push(i)` | 15.7 | |
+| **llamada a otra función** | **43-53** | vs 1.5 inlineado |
+| `new P1(i)` | 83.3 | = llamada + alloc |
+| `new P5(...)` que escapa | 161-167 | +70.6 de promoción GC |
+
+Aritmética escalar y escape analysis ya estaban a nivel V8. El agujero era la
+llamada.
+
+### Lo que aterrizó
+
+1. **Llamada directa clif→clif, ligada tarde** — `43.4 → 2.76 ns` (15.7x).
+   El fast path ya existía pero era **código muerto**: `calls_allowed` exigía
+   `!has_alloc`, y `OpCode::Call` está EN la lista de `has_alloc`, así que
+   nunca era cierto en una función que contuviera una llamada. Además
+   `static_target` exigía el callee ya compilado, y los callers compilan antes
+   que sus callees por definición. Ahora el sitio de llamada carga la entrada
+   desde `FunctionProto::clif_raw` en tiempo de ejecución (0 = todavía no), y
+   el ABI acepta parámetros/retornos de cualquier `SlotKind`, no sólo `Int`.
+   `tests/main.vn` **correr** 10.44 → 4.89 ms.
+
+2. **BUG DE CORRECTITUD: llamadas con ≥4 parámetros corrompían argumentos.**
+   `emit_generic_call` pasaba 4 `VmValue` planos a `clif_call_fallback` pero
+   declaraba el `argc` real por separado, y ese conteo incluye el slot r0. Con
+   4 params reales se stageaban 4 valores para un `arg_count` de 5 y
+   `prepare_call` leía el frame un slot abajo. `f4(1,2,3,4)` daba **123** en
+   vez de 1234; `f6(...)` daba **230123** en vez de 123456. `VARN_NO_JIT=1`
+   era correcto, así que sólo un caller compilado lo exponía; la suite no lo
+   cubría. Los argumentos ahora viajan por la ventana de registros flusheada,
+   sin techo de aridad. Fijado por `tests/57-call-arity.vn`.
+
+3. **Inferencia de tipo de elemento para arrays a nivel de módulo.** Existía
+   (`binder::array_evolve`) pero excluía el scope Global por diseño. Lo que un
+   scan de un solo archivo no puede justificar es un binding que **sale** del
+   archivo, y eso es exactamente lo que `bind_export` escapa ahora (forma
+   declaración, forma especificador y `export default <expr>`). `bench_matrix`
+   sin anotar: **58.9 → 38.4 ms**.
+
+4. **Cache de payload de array en funciones que alocan.** Estaba desactivada
+   porque cualquier alocación puede mover el Vec del heap bajo el puntero
+   cacheado. Ahora se habilita por región de loop cuyo cuerpo no aloca, y el
+   safepoint de back-edge invalida las caches en su rama tomada. 1.17x en el
+   micro que tiene esa forma exacta.
+
+Resultado pareado (método robusto a térmica: los dos binarios adyacentes en
+cada ronda, mediana de las razones): **matrix 1.65x**, resto plano, ninguna
+regresión. `tests/main.vn` 805/805 en clif, `VARN_NO_JIT=1` y `VARN_NO_CLIF=1`;
+`cargo test --workspace --release` 48 suites verdes.
+
+### Lo que sigue abierto, por ROI medido
+
+1. **Constructores.** `new X(...)` sigue costando ~83 ns porque el callee es un
+   `Class`, no un `VmClosure`, así que nunca toca el linker: va por
+   `clif_call_fallback` → `call_vm_window` → `construct_staged_fast`, que
+   empuja un `CallFrame` de verdad (143 333 frame pushes en `bench_dto`). El
+   arreglo real es inlinear el constructor en el sitio de llamada cuando su
+   cuerpo son sólo `SetFixedField` desde parámetros.
+2. **Promoción del GC: 70.6 ns por objeto promovido.** Medido aislando
+   `freshEscape` (166.6) contra `freshShortLived` (96.0) a igual tasa de
+   alocación. **Subir la nursery NO sirve**: de 16384 a 131072 bajó los minor
+   GC de 20 a 3 y empeoró `bench_dto` un 18.6% y `bench_gc_alloc` un 11.8%
+   (locality). El coste es por objeto evacuado, no por colección. Esto pide el
+   trabajo de representación desboxeada, no un ajuste de política.
+3. Las Tareas 1-4 de abajo — reales, pero por debajo de estas dos. Ojo: la
+   Tarea 4 **no arregla `bench_dto`**. Comprobado: envolver el benchmark entero
+   en una función (100% clif, 0 frames intérprete) da 81.5 ms contra 76.8 ms
+   del original top-level. `bench_dto` es alloc-bound, no dispatch-bound.
+
+### Método de medición (corrección)
+
+Tomar el min de N por binario está **sesgado**: la máquina calienta de forma
+monótona, así que el binario que ocupe el primer slot del barrido se lleva el
+min. Un mismo binario midió `bench_fib` a 36.4 ms en la ronda 1 y a 74.0 ms en
+la ronda 3. Medir los dos binarios **adyacentes** en cada ronda, tomar la razón
+por ronda y reportar la mediana; alternar el orden entre rondas.
+
+---
+
 ## 0. Dónde estamos
 
 ### Migración de opcodes: terminada
@@ -42,6 +139,12 @@ Cranelift compila ~**65x** más lento que el template borrado — sobre las mism
 | baseline `505c004` (07-25) | 23.9 ms |
 | antes del tiering | 87.3 ms |
 | **hoy** | **38.3 ms** (suite completa: 42.1 ms min / 45.6 ms p50) |
+
+> Actualizado tras la sección 0.0: el reparto es `compilar 34.3 ms (77%) +
+> correr 10.4 ms (23%)`, y la parte de **correr** bajó a **4.89 ms** con la
+> llamada directa. El coste que persiguen las Tareas 2-3 es el 77% de una
+> suite de tests, y lo empequeñece la `precompilación de módulos`: **141.7 ms**
+> de arranque en frío, fuera del p50.
 
 ### Estado del árbol
 
