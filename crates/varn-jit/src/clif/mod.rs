@@ -62,11 +62,33 @@ pub fn host_isa() -> Result<OwnedTargetIsa, String> {
         .map_err(|e| e.to_string())
 }
 
+thread_local! {
+    /// Cranelift's own guidance: reuse one `Context` across compilations so the
+    /// per-pass arenas it owns are allocated once instead of per function. We
+    /// compile one function at a time per thread, so a thread-local is enough.
+    static CTX: std::cell::RefCell<Context> = std::cell::RefCell::new(Context::new());
+}
+
 /// Compile one self-contained CLIF function to machine code bytes.
 /// Relocation-bearing code (calls, global values) is out of scope for the
 /// spike and returns an error instead of silently mis-linking.
 pub fn compile_function(func: Function, isa: &dyn TargetIsa) -> Result<Vec<u8>, String> {
-    let mut ctx = Context::for_function(func);
+    CTX.with(|cell| {
+        // `try_borrow_mut` rather than `borrow_mut`: a re-entrant compile would
+        // otherwise panic. Falling back to a fresh Context keeps correctness
+        // independent of the optimisation.
+        match cell.try_borrow_mut() {
+            Ok(mut ctx) => {
+                ctx.clear();
+                ctx.func = func;
+                compile_in(&mut ctx, isa)
+            }
+            Err(_) => compile_in(&mut Context::for_function(func), isa),
+        }
+    })
+}
+
+fn compile_in(ctx: &mut Context, isa: &dyn TargetIsa) -> Result<Vec<u8>, String> {
     let compiled = ctx
         .compile(isa, &mut ControlPlane::default())
         .map_err(|e| format!("clif compile: {e:?}"))?;
