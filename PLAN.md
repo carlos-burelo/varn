@@ -1,7 +1,119 @@
 # PLAN — Cranelift: cerrar cobertura y recuperar rendimiento
 
-Estado a 2026-07-30. Escrito para arrancarse en una sesión limpia sin volver a
+Estado a 2026-07-31. Escrito para arrancarse en una sesión limpia sin volver a
 derivar nada.
+
+---
+
+## 0.0-bis Sesión 2026-07-31: el código compilado estaba ligado al heap
+
+### El bug que la Tarea 1 describía mal
+
+La Tarea 1 llamaba a esto «bug de paridad de tiers en closures/upvalues, vida de
+stack/upvalue». **No era ninguna de las dos cosas.** La traza de vida de
+upvalues sobre el repro mostró capturas compartidas correctamente, cierres en su
+sitio, y lecturas/escrituras con los bits correctos. Lo que fallaba estaba una
+capa más abajo:
+
+```
+UV eq  a=0xfffd…001b [idle[object]start]   b=0xfffd…00b4 [idle→start] → false
+```
+
+`current + "→" + event` concatenó **un objeto** donde iba la constante `"→"`.
+
+**Causa raíz: el código de Cranelift no es independiente del contexto, pero el
+proto que lo guarda sí sobrevive al contexto.** `LoadConst` hornea el `VmValue`
+de la constante —un handle a *un* heap— como inmediato
+(`clif/lower.rs`, arm `OpCode::LoadConst`), y `CtxLinker` hornea direcciones de
+los globals vivos. Un `FunctionProto`, en cambio, pertenece al chunk del módulo
+y sigue vivo entre ejecuciones; `jit_entry` viajaba con él. Segunda ejecución =
+heap nuevo = el índice horneado apunta a otro objeto.
+
+Por qué parecía un bug de tiering, y por qué era tan frágil:
+
+- Con umbral 1 casi siempre coincidían los handles entre ejecuciones (el
+  interning es determinista si el orden de alocación no cambia), así que el
+  fallo se escondía. Importar el módulo async 33 delante cambia ese orden.
+- `head -25` de `tests/37` falla y `head -24` no: la línea 25 es **posterior**
+  al assert que falla. Cambia la asignación de registros, luego el orden de
+  alocación, luego qué handle significa qué. Sensibilidad de layout pura.
+- `vn run` pasa siempre: una sola ejecución, un solo heap.
+
+### El arreglo: época por heap
+
+`HeapInner` lleva un id (`jit_epoch`) asignado al crearse; `Heap::clone`
+—contexto anidado sobre los mismos objetos— lo comparte, y `deep_clone` recibe
+uno nuevo (mismos índices, objetos distintos). `FunctionProto::jit_epoch` sella
+para qué heap se compiló, `VmClosure::jit_fn` rechaza cualquier otra, y
+`Drop for HeapInner` limpia las entradas de su época. El código reemplazado se
+**retira** bajo su propia época en vez de liberarse: un contexto anidado puede
+recompilar un proto que un frame clif externo está ejecutando.
+
+Fijado por `frame::jit_epoch_tests` (3 tests) y por el gate de `vn bench`, que
+ejecuta el programa dos veces y es el único que lo veía.
+
+### Coste de compilación: el 90% se fue en un flag
+
+`enable_verifier` es `true` **por defecto en Cranelift** y `host_isa()` nunca lo
+apagaba: pagábamos el verificador de IR en cada compilación del binario
+publicado. Es una herramienta de desarrollo del compilador; nuestro lowering es
+fijo en tiempo de build. Apagado en release (`VARN_CLIF_VERIFY=1` lo devuelve;
+siempre encendido en debug): `compilar` 50.9 → 32.3 ms, **1.58x**.
+
+Además el reuso del `Context` de Cranelift, que la Tarea 3 §2 daba por hecho,
+**no estaba en el camino real**: `clif/mod.rs` tenía el thread-local pero
+`compile_piece` (`clif/lower.rs`) creaba un `Context::for_function` por pieza, y
+son dos piezas por función. Ahora todo pasa por `clif::with_ctx`, único sitio
+que compila y único que contabiliza tiempo de backend.
+
+Con la instrumentación nueva (`backend_time_ns`, línea `de eso: cranelift … ·
+lowering …`): **91% del coste de compilación es Cranelift, 9% nuestro lowering.**
+Cualquier trabajo en el emisor rinde como mucho un 9%.
+
+### Resultado neto, medido pareado
+
+`vn run tests/main.vn`, dos binarios, órdenes alternados, 6 rondas, mediana de
+razones: **0.75 → 1.33x más rápido**.
+
+El `execute` de `vn bench` sube (45 → ~500 ms) y **eso es correcto**: el bench
+arranca cada corrida desde un `deep_clone` del snapshot, así que las corridas
+2..10 reusaban código horneado contra otro heap. El número viejo medía trabajo
+que no se estaba haciendo.
+
+### Tarea 2 (barrido de umbral): desbloqueada, barrida, y la respuesta es NO
+
+Con la época arreglada, `vn bench` pasa con umbral 1, 2, 4, 8 y 16 (836/836).
+Barrido sobre tiempo real:
+
+| | main.vn | bench_matrix | bench_str_ops |
+|---|---|---|---|
+| umbral 1 | 552 ms | **90 ms** | **240 ms** |
+| umbral 8 | **99 ms** | 218 ms | 386 ms |
+
+El 5.6x de `main.vn` es un artefacto de una suite de correctitud que llama cada
+función ~3 veces. `bench_matrix` empeora **2.4x**: contar *entradas de frame* es
+ciego a los bucles — una función que se entra una vez e itera un millón de veces
+no alcanza ningún umbral. Arreglarlo pide contar back-edges y OSR, no otro
+número. **El umbral se queda en 1.** `VARN_JIT_TIER` existe para rebarrer esto
+sin un binario por valor.
+
+### La palanca que queda: código independiente del heap
+
+Es la misma que la Tarea 3 §3 (compartir código entre isolates) y ahora tiene
+una segunda razón: si el código no hornea handles, se reusa entre corridas y
+entre isolates, y el coste de compilación por heap desaparece. Lo que hay que
+quitar del inmediato:
+
+1. `LoadConst` → cargar de la tabla de constantes de la closure en tiempo de
+   ejecución. Requiere el puntero a la closure también en funciones no
+   frame-aware (hoy sólo lo reciben las frame-aware).
+2. `ClifTarget::expected_bits` (guarda del call directo) es un handle: no rompe
+   corrección —la guarda falla y cae al camino lento— pero se pierde la llamada
+   directa tras cambiar de heap.
+
+Nota aparte, del mismo linaje y sin cerrar: `ExecCtx::proto_constants` NO es
+raíz de GC, aunque sus `VmValue` son handles vivos. Hoy se salva porque las
+constantes también están en `frame.closure().constants` mientras hay frames.
 
 ---
 
@@ -317,7 +429,14 @@ verde sin proteger, y `HEAD` está roto.
 
 ---
 
-## Tarea 1 — Bug de paridad de tiers (BLOQUEANTE)
+## Tarea 1 — Bug de paridad de tiers (CERRADA 2026-07-31)
+
+> **CERRADA.** La segunda mitad no era un bug de closures/upvalues ni de
+> tiering: era código compilado contra un heap muerto. Ver §0.0-bis. El repro
+> (`33` + `37`, `vn bench`, umbral > 1) pasa, y la suite pasa con umbral 1, 2,
+> 4, 8 y 16 en los tres modos. Lo que sigue se conserva porque documenta la
+> primera mitad (el sink `int` de la stdlib, `a09e24a`) y porque la
+> descripción equivocada de la segunda es justo lo que costó la sesión.
 
 > **Estado 2026-07-30: mitad resuelta.** La causa del fallo de `Duration hours`
 > era que **la stdlib nunca se type-checkeaba**: `stdlib_loader::compile_source`
@@ -453,19 +572,19 @@ Contexto de la implementación actual:
 
 ## Tarea 3 — Coste de compilación de Cranelift
 
-~1.24 ms por función es el número a bajar; el tiering sólo evita pagarlo, no lo
-reduce. Palancas, de menor a mayor riesgo:
+> **§1 y §2 hechos (2026-07-31), §3 es ahora la palanca principal.** Ver
+> §0.0-bis: verifier apagado (1.58x), `Context` reusado de verdad, y el reparto
+> medido es 91% Cranelift / 9% lowering.
 
-1. **`opt_level`**: `crates/varn-jit/src/clif/mod.rs:52` fija `"speed"`. Probar
-   `"none"` para el primer tier y reservar `"speed"` para un segundo escalón.
-   Medir compile time **y** execute; es el clásico trade de tiering.
-2. **Reutilizar `Context`**: `compile_piece` (`clif/lower.rs`) crea un
-   `cranelift_codegen::Context` por función. Cranelift documenta reusar el
-   Context entre compilaciones para amortizar allocs. Es el cambio más barato.
-3. **Compartir código entre isolates**: hoy cada isolate recompila sus protos.
-   Un `FunctionProto` compilado podría publicar su `JitBuffer` a los demás si la
-   linkage estática lo permite (ojo: `ClifLinker` liga contra los globals vivos
-   del ctx, ver `clif_link::CtxLinker`).
+1. **`opt_level`**: `"speed"` sigue siendo el default; `VARN_CLIF_OPT` lo
+   hace barrible. Medido: `none` da un 15% más de compilación sobre el verifier
+   ya apagado (32.3 → 27.9 ms) a costa de calidad de código. Eso pertenece a un
+   primer tier con un segundo escalón `speed`, no al único tier que hay.
+2. **Reutilizar `Context`**: hecho, en `clif::with_ctx`. El thread-local ya
+   existía pero el camino real no lo usaba.
+3. **Compartir código entre isolates y entre corridas**: bloqueado por lo mismo
+   que causaba el miscompile — el código hornea handles del heap. Quitar ese
+   horneado (ver §0.0-bis, «la palanca que queda») es lo que lo habilita.
 
 Medir siempre con el método de la sección "Cómo medir".
 
@@ -573,8 +692,13 @@ La máquina termaliza duro: en esta sesión el **mismo binario** pasó de 23.9 a
 
 ## Orden sugerido
 
-1. Commitear el árbol verde actual.
-2. Tarea 1 (paridad de tiers) — desbloquea la 2.
-3. Tarea 2 (barrido de umbral) — el retorno de perf más barato.
-4. Tarea 3 (coste de compilación) — empezar por reusar el `Context`.
-5. Tarea 4 (frames reanudables) — la más grande; cierra la cobertura de verdad.
+Tareas 1, 2 y 4 cerradas; Tarea 3 §1-§2 hechas. Lo que queda, por ROI:
+
+1. **Código independiente del heap** (§0.0-bis): `LoadConst` desde la tabla de
+   la closure en vez de inmediato, y el puntero de closure disponible también en
+   funciones no frame-aware. Habilita reuso entre corridas e isolates, que es
+   todo el coste de compilación por heap.
+2. **Contar back-edges + OSR**: sin eso, ningún umbral de tiering sirve (Tarea 2
+   lo midió: `bench_matrix` 2.4x peor con umbral 2).
+3. **Representación desboxeada** (objetos inline en región bump, campos crudos):
+   lo único que queda para `bench_dto`/`bench_matrix` según §0.0.
