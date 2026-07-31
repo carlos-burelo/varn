@@ -69,6 +69,11 @@ pub struct ExecCtx {
     pub static_closures: FxHashMap<usize, VmValue>,
     pub linker: Linker,
     pub jit_jmp_buf: *mut JmpBuf,
+    /// The OUTERMOST clif frame's jump buffer. `jit_jmp_buf` is per-frame so
+    /// a throw unwinds one clif frame at a time, but a suspension cannot do
+    /// that — an intermediate clif frame has no way to park in the middle of
+    /// a native function — so `jit_await`/`jit_yield` jump here instead.
+    pub jit_suspend_buf: *mut JmpBuf,
     pub jit_panic_exception_handler: Option<crate::frame::TryHandler>,
     pub jit_panic_exception_error: Option<VmValue>,
     pub jit_panic_exception_err_obj: Option<crate::error::RuntimeError>,
@@ -143,6 +148,7 @@ impl ExecCtx {
             static_closures: FxHashMap::default(),
             linker: Linker::new(),
             jit_jmp_buf: std::ptr::null_mut(),
+            jit_suspend_buf: std::ptr::null_mut(),
             jit_panic_exception_handler: None,
             jit_panic_exception_error: None,
             jit_panic_exception_err_obj: None,
@@ -282,6 +288,7 @@ impl ExecCtx {
             static_closures: FxHashMap::default(),
             linker: self.linker.clone_state(),
             jit_jmp_buf: std::ptr::null_mut(),
+            jit_suspend_buf: std::ptr::null_mut(),
             jit_panic_exception_handler: None,
             jit_panic_exception_error: None,
             jit_panic_exception_err_obj: None,

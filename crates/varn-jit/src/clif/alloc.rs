@@ -1663,7 +1663,7 @@ pub(super) fn emit_call_spread(
 pub(super) fn emit_invoke_runtime_static(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
-    _state: &[K],
+    state: &[K],
     code: &[u16],
     ip: usize,
 ) -> Result<(), String> {
@@ -1671,6 +1671,21 @@ pub(super) fn emit_invoke_runtime_static(
     let start_reg = (code[ip + 3] & 0xFF) as usize;
     let end_reg = (code[ip + 4] >> 8) as usize;
     let flag = (code[ip + 4] & 0xFF) as usize;
+
+    // `jit_range` takes REGISTER NUMBERS and reads the operands out of
+    // `ctx.stack[base + reg]`, so both have to be in their home slots first.
+    // Without this the helper read whatever the slots happened to hold —
+    // usually null — and `0..5` built `RangeData { start: 0, end: 0 }`, so
+    // `r.end` and `r.length` came back 0 while `r.start` was right by
+    // coincidence. Pinned by tests/58-range-clif.vn.
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+    let fb = frame_base_addr(b, actx);
+    for r in [start_reg, end_reg] {
+        if meta_is_float(actx.register_meta, r) {
+            store_home(b, actx, state, fb, r);
+        }
+    }
 
     let start_v = b.ins().iconst(types::I64, start_reg as i64);
     let end_v = b.ins().iconst(types::I64, end_reg as i64);
@@ -1682,6 +1697,7 @@ pub(super) fn emit_invoke_runtime_static(
         actx.helpers.range,
         &[actx.exec_ctx, start_v, end_v, flag_v],
     );
+    reload_boxed(b, actx, state, &regs);
     def_result(b, actx, dest, res);
     Ok(())
 }

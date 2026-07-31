@@ -50,6 +50,28 @@ impl ExecCtx {
         unsafe { Self::run_until_inner_raw(self as *mut ExecCtx, depth) }
     }
 
+    /// Run one clif frame under its OWN jump buffer.
+    ///
+    /// Every clif frame installs one, not just the outermost. A clif frame is
+    /// a native stack frame, so a `throw` raised several clif frames deep used
+    /// to `longjmp` straight past the ones in between — destroying their
+    /// native state while their `CallFrame`s stayed live with `ip == 0`, which
+    /// the frame loop then re-entered from the top, forever. (`assert(
+    /// safeDivide(10, 0) === -1)` in tests/11-errors.vn hung allocating.)
+    ///
+    /// With a buffer per frame the unwind is one hop: the innermost frame
+    /// catches, its own frame loop handles the throw if the handler belongs at
+    /// or above it, and otherwise returns the error to `clif_call_fallback`,
+    /// which re-raises against the buffer this function has by then RESTORED
+    /// to its parent's. Each clif frame therefore unwinds its own native stack
+    /// in turn. A null saved buffer means we are outermost: the error leaves
+    /// as `Err`, exactly as before.
+    ///
+    /// Suspension is the one thing that still needs the OUTERMOST buffer — an
+    /// intermediate clif frame cannot park in the middle of a native function
+    /// — so `jit_suspend_buf` is pinned by the outermost frame and is what
+    /// `jit_await`/`jit_yield` jump to. That preserves today's behaviour
+    /// exactly; it does not make suspension nest.
     #[inline(never)]
     unsafe fn execute_jit_frame(
         ctx: *mut ExecCtx,
@@ -57,18 +79,15 @@ impl ExecCtx {
         closure_ptr: *const crate::frame::VmClosure,
         base: usize,
     ) -> Result<VmValue, i32> {
-        let is_outer = (*ctx).jit_jmp_buf.is_null();
+        let saved = (*ctx).jit_jmp_buf;
+        let is_outer = saved.is_null();
         let mut jmp_buf = super::ctx::JmpBuf::default();
-        let jmp_res = if is_outer {
-            super::ctx::my_setjmp(&mut jmp_buf)
-        } else {
-            0
-        };
-        let jmp_res = std::hint::black_box(jmp_res);
+        let jmp_res = std::hint::black_box(super::ctx::my_setjmp(&mut jmp_buf));
 
         if jmp_res == 0 {
+            (*ctx).jit_jmp_buf = &mut jmp_buf as *mut super::ctx::JmpBuf;
             if is_outer {
-                (*ctx).jit_jmp_buf = &mut jmp_buf as *mut super::ctx::JmpBuf;
+                (*ctx).jit_suspend_buf = (*ctx).jit_jmp_buf;
             }
             (*ctx).jit_frame_prepushed = 1;
             // Explicit borrow of the `Rc` field: an implicit autoref through a
@@ -84,13 +103,15 @@ impl ExecCtx {
                 ctx as *mut std::ffi::c_void,
             );
             std::hint::black_box(ctx);
+            (*ctx).jit_jmp_buf = saved;
             if is_outer {
-                (*ctx).jit_jmp_buf = std::ptr::null_mut();
+                (*ctx).jit_suspend_buf = std::ptr::null_mut();
             }
             Ok(val)
         } else {
+            (*ctx).jit_jmp_buf = saved;
             if is_outer {
-                (*ctx).jit_jmp_buf = std::ptr::null_mut();
+                (*ctx).jit_suspend_buf = std::ptr::null_mut();
             }
             Err(jmp_res)
         }

@@ -55,6 +55,7 @@ import "./54-channels.vn"
 import "./55-array-element-inference.vn"
 import "./56-tier-parity.vn"
 import "./57-call-arity.vn"
+import "./58-clif-range.vn"
 
-print("\n59 side-effect modules executed in suite")
+print("\n60 side-effect modules executed in suite")
 assertSummary()

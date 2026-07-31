@@ -1,0 +1,52 @@
+// `a..b` under Cranelift.
+//
+// The regression: `0..5` lowers to `InvokeRuntimeStatic`, whose helper takes
+// REGISTER NUMBERS and reads the operands out of `ctx.stack[base + reg]`. The
+// clif lowering never flushed those registers to their home slots, so the
+// helper read whatever was already there — usually null — and built
+// `RangeData { start: 0, end: 0 }`. `r.start` came out right by coincidence
+// (it really is 0); `r.end` and `r.length` came back 0, and `contains` with
+// them.
+//
+// The asserts live inside functions on purpose: a module top-level is still
+// held out of clif by the size gate, so a module-level range would not have
+// exercised the bug at all.
+
+function rangeExcl(): int {
+    let r = 0..5
+    assert("clif range start", r.start === 0)
+    assert("clif range end", r.end === 5)
+    assert("clif range length", r.length === 5)
+    assert("clif range contains", r.contains(3))
+    assert("clif range excludes end", !r.contains(5))
+    return r.end
+}
+
+function rangeIncl(): int {
+    let r = 1..=5
+    assert("clif range incl end", r.end === 5)
+    assert("clif range incl length", r.length === 5)
+    assert("clif range incl bound", r.contains(5))
+    return r.end
+}
+
+// Operands that are not constants: the flush has to cover whatever register
+// the expression left them in.
+function rangeComputed(lo: int, hi: int): int {
+    let r = (lo + 1)..(hi * 2)
+    assert("clif range computed start", r.start === 3)
+    assert("clif range computed end", r.end === 8)
+    return r.length
+}
+
+function rangeToArray(): int {
+    let a = (0..4).toArray()
+    assert("clif range toArray len", a.length === 4)
+    assert("clif range toArray last", a[3] === 3)
+    return a.length
+}
+
+assert("clif range excl returns", rangeExcl() === 5)
+assert("clif range incl returns", rangeIncl() === 5)
+assert("clif range computed len", rangeComputed(2, 4) === 5)
+assert("clif range toArray", rangeToArray() === 4)

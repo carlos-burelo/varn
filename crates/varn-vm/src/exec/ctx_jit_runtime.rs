@@ -322,7 +322,10 @@ unsafe fn jit_suspend_at(ctx: &mut ExecCtx, frame_idx: usize, resume_ip: usize) 
     // already parked the right frame, and it is not the top one — the module
     // that suspended left its own frame above ours — so leave it clear.
     ctx.jit_panic_suspend_resume_ip = None;
-    let buf = ctx.jit_jmp_buf;
+    // The OUTERMOST clif frame's buffer: `jit_jmp_buf` is per-frame now, and
+    // a suspension cannot stop at an intermediate one (see
+    // `execute_jit_frame`).
+    let buf = ctx.jit_suspend_buf;
     if buf.is_null() {
         panic!("JIT suspend triggered but no jump buffer registered");
     }
@@ -432,7 +435,8 @@ pub extern "C" fn jit_await(ctx: *mut ExecCtx, fut: VmValue, dest_reg: u32, resu
         });
         ctx_ref.jit_panic_suspend_resume_ip = Some(resume_ip);
 
-        let buf = ctx_ref.jit_jmp_buf;
+        // Outermost buffer, not this frame's — see `execute_jit_frame`.
+        let buf = ctx_ref.jit_suspend_buf;
         if !buf.is_null() {
             super::ctx::my_longjmp(buf, 2);
         } else {
@@ -453,7 +457,8 @@ pub extern "C" fn jit_yield(ctx: *mut ExecCtx, val: VmValue, dest_reg: u32, resu
         });
         ctx_ref.jit_panic_suspend_resume_ip = Some(resume_ip);
 
-        let buf = ctx_ref.jit_jmp_buf;
+        // Outermost buffer, not this frame's — see `execute_jit_frame`.
+        let buf = ctx_ref.jit_suspend_buf;
         if !buf.is_null() {
             super::ctx::my_longjmp(buf, 2);
         } else {
