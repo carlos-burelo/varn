@@ -654,14 +654,30 @@ pub(super) fn emit_call_native_op(
         }
     }
     let args_start = b.ins().iadd_imm(actx.base, dest as i64);
-    let op_id_v = b.ins().iconst(types::I64, op_id as i64);
     let total_v = b.ins().iconst(types::I64, total as i64);
-    let res = call_helper(
-        b,
-        actx.cc,
-        actx.helpers.jit_call_native_op,
-        &[actx.exec_ctx, op_id_v, args_start, total_v],
-    );
+    // The op-id → native fn mapping is fixed for the process, so resolve it
+    // HERE and embed the address. The op-id form pays a hash lookup on every
+    // single call, which on a hot `arr.push(x)` is a large share of the cost
+    // of the call itself. `0` means the table does not know the id — keep the
+    // dynamic form so the helper raises the same error it always did.
+    let addr = (actx.helpers.resolve_native_op)(op_id);
+    let res = if addr != 0 {
+        let fn_v = b.ins().iconst(types::I64, addr as i64);
+        call_helper(
+            b,
+            actx.cc,
+            actx.helpers.jit_call_native_fnptr,
+            &[actx.exec_ctx, fn_v, args_start, total_v],
+        )
+    } else {
+        let op_id_v = b.ins().iconst(types::I64, op_id as i64);
+        call_helper(
+            b,
+            actx.cc,
+            actx.helpers.jit_call_native_op,
+            &[actx.exec_ctx, op_id_v, args_start, total_v],
+        )
+    };
     reload_boxed(b, actx, state, &regs);
     def_result(b, actx, dest, res);
     Ok(())
