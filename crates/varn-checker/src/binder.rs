@@ -174,6 +174,9 @@ impl Binder {
         }
 
         b.bind_stmts(&program.body);
+        // The global scope never "exits" through a block, so finalize its
+        // own candidates here — module-level `let x = []` is eligible.
+        b.finalize_array_watch(global);
 
         BindResult {
             arena: b.arena,

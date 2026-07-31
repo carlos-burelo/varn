@@ -20,13 +20,20 @@
 //!
 //! **Rules** (binding design resolution, see the task brief):
 //! 1. Only unannotated `let`/`const x = []` qualify (checked by the
-//!    caller in `bind_variable`), and only when declared outside module
-//!    top-level scope — top-level bindings are skipped (documented,
-//!    not implemented): they can be observed by other modules/hoisted
-//!    callers in ways a single-file, single-pass scan can't account
-//!    for, and the task's own acceptance proof targets function-local
-//!    arrays (matmul wrapped in a function), so this is not on the
-//!    critical path.
+//!    caller in `bind_variable`). Module top-level bindings qualify as
+//!    well, and their candidates are finalized by the explicit
+//!    `finalize_array_watch(global)` at the end of `Binder::bind` — the
+//!    global scope has no block exit to hang it on. What a single-file
+//!    scan genuinely cannot account for is a binding that LEAVES the
+//!    file, so `bind_export` escapes every exported local: the
+//!    declaration form (`export let a = []`), the specifier form
+//!    (`export { a }`, whose names never appear as bound identifier
+//!    expressions), and `export default <expr>` (whose expression the
+//!    binder does not visit at all, so it escapes every open candidate).
+//!    Everything else at top level is covered by the same rules as a
+//!    function body: a non-exported global is visible only to code in
+//!    this file, which this pass has fully scanned by the time the
+//!    finalize runs.
 //! 2. Whole-scope scan before fixing: every `x.push(e)` / `x[i] = e`
 //!    found while the declaring block is being bound (including nested
 //!    control-flow blocks — if/while/for/switch/try — but not

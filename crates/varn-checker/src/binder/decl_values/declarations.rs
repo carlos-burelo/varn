@@ -92,19 +92,14 @@ impl super::super::Binder {
                 {
                     // Task A0.3': `let`/`const x = []` (empty literal, no
                     // annotation) — register as a candidate for evolving
-                    // element-type inference (see
-                    // `binder::array_evolve`). Module top-level is
-                    // deliberately excluded (design rule 1): top-level
-                    // bindings can be observed by other modules / hoisted
-                    // callers in ways a single-file scan doesn't account
-                    // for, and the feature's critical-path use case
-                    // (matmul) is function-local anyway.
-                    if self.scopes.get(self.current).kind != ScopeKind::Global {
-                        if let Pattern::Identifier { name, .. } = &d.id {
-                            let scope = self.scopes.get(self.current);
-                            if let Some(sym_id) = scope.lookup(name.as_ref()) {
-                                self.register_array_candidate(sym_id, name.clone());
-                            }
+                    // element-type inference (see `binder::array_evolve`).
+                    // Module top-level qualifies too: what a single-file
+                    // scan cannot account for is a binding that LEAVES the
+                    // file, and that is exactly what `bind_export` escapes.
+                    if let Pattern::Identifier { name, .. } = &d.id {
+                        let scope = self.scopes.get(self.current);
+                        if let Some(sym_id) = scope.lookup(name.as_ref()) {
+                            self.register_array_candidate(sym_id, name.clone());
                         }
                     }
                 }

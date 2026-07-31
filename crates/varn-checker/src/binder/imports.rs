@@ -1,5 +1,7 @@
 use std::rc::Rc;
-use varn_core::ast::{ExportDecl, ExportDefaultDecl, ImportDecl, ImportSpecifier};
+use varn_core::ast::{
+    Decl, ExportDecl, ExportDefaultDecl, ImportDecl, ImportSpecifier, Pattern,
+};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
 use crate::module_resolver;
@@ -182,13 +184,33 @@ impl super::Binder {
         match e {
             ExportDecl::Decl { declaration, .. } => {
                 self.bind_decl(declaration);
+                // An exported binding leaves this file's scan, so its
+                // element type can no longer be proved from this file alone
+                // (`binder::array_evolve`, rule 1). Escaping after binding
+                // is enough: candidates finalize at scope exit, never here.
+                if let Decl::Variable(v) = declaration.as_ref() {
+                    for d in &v.declarators {
+                        if let Pattern::Identifier { name, .. } = &d.id {
+                            self.escape_array_candidate(name.as_ref());
+                        }
+                    }
+                }
             }
             ExportDecl::Default { declaration, .. } => match declaration.as_ref() {
                 ExportDefaultDecl::Function(f) => self.bind_function(f),
                 ExportDefaultDecl::Class(c) => self.bind_class(c),
-                ExportDefaultDecl::Expr(_) => {}
+                // The expression is not bound here, so an array candidate
+                // named in it would never be seen as a use. Escape the lot.
+                ExportDefaultDecl::Expr(_) => self.escape_all_open_array_candidates(),
             },
-            ExportDecl::Named { .. } | ExportDecl::All { .. } => {}
+            // `export { a, b }` names locals without producing identifier
+            // expressions the binder would otherwise visit.
+            ExportDecl::Named { specifiers, .. } => {
+                for s in specifiers {
+                    self.escape_array_candidate(s.local.as_ref());
+                }
+            }
+            ExportDecl::All { .. } => {}
         }
     }
 }
