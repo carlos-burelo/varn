@@ -11,6 +11,14 @@ use cli::{Cli, Commands};
 use std::process;
 use varn_utilities::terminal;
 
+/// Varn is allocation-bound in the shapes that matter (object construction,
+/// string concatenation, array growth), and the Windows MSVC system heap
+/// charges far more per small allocation than a modern thread-caching
+/// allocator does. Swapping it out is the one change that reaches every
+/// allocation site at once.
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 fn main() {
     const STDLIB_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/std.vnb"));
     varn_builtins::register_embedded_stdlib(STDLIB_BYTES);
