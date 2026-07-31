@@ -26,6 +26,7 @@ use cranelift_codegen::ir::Function;
 use cranelift_codegen::isa::{OwnedTargetIsa, TargetIsa};
 use cranelift_codegen::settings::{self, Configurable};
 use cranelift_codegen::Context;
+use std::sync::atomic::Ordering;
 use std::sync::OnceLock;
 
 /// Escape hatch while the backend matures: `VARN_NO_CLIF=1` routes
@@ -48,10 +49,24 @@ pub fn shared_isa() -> Result<&'static OwnedTargetIsa, String> {
 }
 
 /// Host ISA configured for Varn: speed-optimized, frame pointers kept.
+///
+/// Two knobs are env-overridable because their right value is a measurement,
+/// not a constant: `VARN_CLIF_OPT` (`none`|`speed`|`speed_and_size`) trades
+/// compile time against code quality, and `VARN_CLIF_VERIFY=1` puts back the
+/// IR verifier, which Cranelift enables by default and which we pay for on
+/// every compile in a shipped binary.
 pub fn host_isa() -> Result<OwnedTargetIsa, String> {
     let mut flags = settings::builder();
+    let opt = std::env::var("VARN_CLIF_OPT").unwrap_or_else(|_| "speed".to_owned());
     flags
-        .set("opt_level", "speed")
+        .set("opt_level", &opt)
+        .map_err(|e| e.to_string())?;
+    // Default-on in Cranelift and meant for compiler development: it re-walks
+    // the whole function at several points per compile. Our lowering is fixed
+    // at build time, so shipping it means paying a debug check per run.
+    let verify = std::env::var("VARN_CLIF_VERIFY").is_ok() || cfg!(debug_assertions);
+    flags
+        .set("enable_verifier", if verify { "true" } else { "false" })
         .map_err(|e| e.to_string())?;
     flags
         .set("preserve_frame_pointers", "true")
@@ -73,6 +88,23 @@ thread_local! {
 /// Relocation-bearing code (calls, global values) is out of scope for the
 /// spike and returns an error instead of silently mis-linking.
 pub fn compile_function(func: Function, isa: &dyn TargetIsa) -> Result<Vec<u8>, String> {
+    with_ctx(func, isa, |compiled| {
+        if !compiled.buffer.relocs().is_empty() {
+            return Err("clif compile: relocations not supported in the spike".to_string());
+        }
+        Ok(compiled.code_buffer().to_vec())
+    })
+}
+
+/// Compile `func` on the thread's reused `Context` and hand the result to
+/// `take` while the Context still owns it. Every Cranelift compilation in the
+/// crate goes through here: it is the one place that reuses the arenas and the
+/// one place that accounts for backend time.
+pub(crate) fn with_ctx<R>(
+    func: Function,
+    isa: &dyn TargetIsa,
+    take: impl FnOnce(&cranelift_codegen::CompiledCode) -> Result<R, String>,
+) -> Result<R, String> {
     CTX.with(|cell| {
         // `try_borrow_mut` rather than `borrow_mut`: a re-entrant compile would
         // otherwise panic. Falling back to a fresh Context keeps correctness
@@ -81,21 +113,24 @@ pub fn compile_function(func: Function, isa: &dyn TargetIsa) -> Result<Vec<u8>, 
             Ok(mut ctx) => {
                 ctx.clear();
                 ctx.func = func;
-                compile_in(&mut ctx, isa)
+                compile_in(&mut ctx, isa, take)
             }
-            Err(_) => compile_in(&mut Context::for_function(func), isa),
+            Err(_) => compile_in(&mut Context::for_function(func), isa, take),
         }
     })
 }
 
-fn compile_in(ctx: &mut Context, isa: &dyn TargetIsa) -> Result<Vec<u8>, String> {
-    let compiled = ctx
-        .compile(isa, &mut ControlPlane::default())
-        .map_err(|e| format!("clif compile: {e:?}"))?;
-    if !compiled.buffer.relocs().is_empty() {
-        return Err("clif compile: relocations not supported in the spike".to_string());
-    }
-    Ok(compiled.code_buffer().to_vec())
+fn compile_in<R>(
+    ctx: &mut Context,
+    isa: &dyn TargetIsa,
+    take: impl FnOnce(&cranelift_codegen::CompiledCode) -> Result<R, String>,
+) -> Result<R, String> {
+    let start = std::time::Instant::now();
+    let res = ctx.compile(isa, &mut ControlPlane::default());
+    crate::stats::JIT_STATS
+        .backend_time_ns
+        .fetch_add(start.elapsed().as_nanos() as u64, Ordering::Relaxed);
+    take(res.map_err(|e| format!("clif compile: {e:?}"))?)
 }
 
 #[cfg(test)]

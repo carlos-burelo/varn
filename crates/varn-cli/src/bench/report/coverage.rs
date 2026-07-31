@@ -159,6 +159,20 @@ pub fn print_coverage(jit: &JitStatsSnapshot, records: &[CompileRecord], scope: 
         chalk(format!("{per_fn}/fn")).dim(),
         chalk(fmt_bytes(jit.total_code_size_bytes)).dim()
     ));
+    if jit.backend_time_ns > 0 {
+        let backend = Duration::from_nanos(jit.backend_time_ns);
+        let lowering = compile.saturating_sub(backend);
+        let pct = jit.backend_time_ns as f64 / jit.total_compile_time_ns.max(1) as f64 * 100.0;
+        terminal::log(format!(
+            "  {}",
+            chalk(format!(
+                "de eso:  cranelift {} ({pct:.0}%)  ·  lowering {}",
+                fmt_dur(backend),
+                fmt_dur(lowering)
+            ))
+            .dim()
+        ));
+    }
 
     let mut by_cost: Vec<&CompileRecord> = records
         .iter()

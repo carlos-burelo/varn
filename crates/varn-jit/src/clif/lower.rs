@@ -23,13 +23,11 @@
 //! subset admits no allocating ops, so a routed function cannot create GC
 //! pressure.
 
-use cranelift_codegen::control::ControlPlane;
 use cranelift_codegen::ir::{
     condcodes::IntCC, types, AbiParam, ExternalName, Function, InstBuilder, MemFlags, Signature,
     UserFuncName,
 };
 use cranelift_codegen::isa::OwnedTargetIsa;
-use cranelift_codegen::Context;
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
 use std::collections::HashMap;
 use varn_core::OpCode;
@@ -158,27 +156,25 @@ struct CompiledPiece {
 }
 
 fn compile_piece(func: Function, isa: &OwnedTargetIsa) -> Result<CompiledPiece, String> {
-    let mut ctx = Context::for_function(func);
-    let compiled = ctx
-        .compile(isa.as_ref(), &mut ControlPlane::default())
-        .map_err(|e| format!("clif compile: {e:?}"))?;
-    let mut call_reloc_offsets = Vec::new();
-    for reloc in compiled.buffer.relocs() {
-        // The only symbol either piece may reference is user func 0 — the
-        // raw function itself.
-        match &reloc.target {
-            cranelift_codegen::FinalizedRelocTarget::ExternalName(ExternalName::User(_)) => {
-                if reloc.addend != -4 {
-                    return Err(format!("clif: unexpected reloc addend {}", reloc.addend));
+    super::with_ctx(func, isa.as_ref(), |compiled| {
+        let mut call_reloc_offsets = Vec::new();
+        for reloc in compiled.buffer.relocs() {
+            // The only symbol either piece may reference is user func 0 — the
+            // raw function itself.
+            match &reloc.target {
+                cranelift_codegen::FinalizedRelocTarget::ExternalName(ExternalName::User(_)) => {
+                    if reloc.addend != -4 {
+                        return Err(format!("clif: unexpected reloc addend {}", reloc.addend));
+                    }
+                    call_reloc_offsets.push(reloc.offset as usize);
                 }
-                call_reloc_offsets.push(reloc.offset as usize);
+                other => return Err(format!("clif: unsupported reloc target {other:?}")),
             }
-            other => return Err(format!("clif: unsupported reloc target {other:?}")),
         }
-    }
-    Ok(CompiledPiece {
-        code: compiled.code_buffer().to_vec(),
-        call_reloc_offsets,
+        Ok(CompiledPiece {
+            code: compiled.code_buffer().to_vec(),
+            call_reloc_offsets,
+        })
     })
 }
 

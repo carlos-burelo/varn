@@ -63,6 +63,11 @@ pub struct JitStatsSnapshot {
     /// Functions turned away by a gate before Cranelift saw them.
     pub gate_rejected: u64,
     pub total_compile_time_ns: u64,
+    /// Of `total_compile_time_ns`, the part spent inside Cranelift's own
+    /// `Context::compile`. The remainder is our lowering: walking bytecode and
+    /// building CLIF IR. Splitting them says which side a compile-time fix
+    /// belongs on.
+    pub backend_time_ns: u64,
     pub total_code_size_bytes: u64,
     pub jit_runs: u64,
     pub jit_cached: u64,
@@ -108,6 +113,7 @@ pub struct JitStats {
     pub compile_fail: AtomicU64,
     pub gate_rejected: AtomicU64,
     pub total_compile_time_ns: AtomicU64,
+    pub backend_time_ns: AtomicU64,
     pub total_code_size_bytes: AtomicU64,
     pub jit_runs: AtomicU64,
     pub jit_cached: AtomicU64,
@@ -121,6 +127,7 @@ impl JitStats {
             compile_fail: AtomicU64::new(0),
             gate_rejected: AtomicU64::new(0),
             total_compile_time_ns: AtomicU64::new(0),
+            backend_time_ns: AtomicU64::new(0),
             total_code_size_bytes: AtomicU64::new(0),
             jit_runs: AtomicU64::new(0),
             jit_cached: AtomicU64::new(0),
@@ -133,6 +140,7 @@ impl JitStats {
         self.compile_fail.store(0, Ordering::Relaxed);
         self.gate_rejected.store(0, Ordering::Relaxed);
         self.total_compile_time_ns.store(0, Ordering::Relaxed);
+        self.backend_time_ns.store(0, Ordering::Relaxed);
         self.total_code_size_bytes.store(0, Ordering::Relaxed);
         self.jit_runs.store(0, Ordering::Relaxed);
         self.jit_cached.store(0, Ordering::Relaxed);
@@ -145,6 +153,7 @@ impl JitStats {
             compile_fail: self.compile_fail.load(Ordering::Relaxed),
             gate_rejected: self.gate_rejected.load(Ordering::Relaxed),
             total_compile_time_ns: self.total_compile_time_ns.load(Ordering::Relaxed),
+            backend_time_ns: self.backend_time_ns.load(Ordering::Relaxed),
             total_code_size_bytes: self.total_code_size_bytes.load(Ordering::Relaxed),
             jit_runs: self.jit_runs.load(Ordering::Relaxed),
             jit_cached: self.jit_cached.load(Ordering::Relaxed),
