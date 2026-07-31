@@ -357,11 +357,18 @@ pub(super) fn find_cache(
 /// template's slow paths.
 /// Normalize a RAW function's return value to boxed `VmValue` bits.
 ///
-/// Only an `int` return needs work, and only conditionally: `emit_return_value`
-/// yields an unboxed i48 payload on the common path but passes boxed bits
-/// straight through when the returned value came from a nested call, so the
-/// re-tag has to test for an already-present NaN-box tag. Every other return
-/// kind is boxed by construction.
+/// An `int`-returning raw yields an unboxed i48 payload — UNCONDITIONALLY.
+/// Every arm of `emit_return_value`'s `SlotKind::Int` case produces one: an
+/// `Int` register is already a payload, a boxed one goes through `use_int`,
+/// and a float one converts and wraps. Every other return kind is boxed by
+/// construction and passes straight through.
+///
+/// This used to re-tag only when the high bits were clear, on the theory that
+/// a set NaN-box tag meant the value was already boxed. That test cannot tell
+/// a boxed value from a NEGATIVE payload — `-3` is `0xFFFF_FFFF_FFFF_FFFD`,
+/// whose high bits are all set — so every negative `int` return escaped
+/// untagged and decoded as null. `function sub(a: int, b: int): int` returned
+/// null for `sub(1, 4)`. Pinned by tests/59-clif-negative-int.vn.
 ///
 /// Shared by `build_wrapper` and by the direct clif→clif call site: the two
 /// consume the same raw entry and must decode its result identically.
@@ -373,12 +380,7 @@ pub(super) fn retag_raw_return(
     if return_kind != SlotKind::Int {
         return raw_res;
     }
-    let qnan = b.ins().iconst(types::I64, varn_types::vm_value::QNAN as i64);
-    let high = b.ins().band(raw_res, qnan);
-    let is_unboxed = b.ins().icmp_imm(IntCC::Equal, high, 0);
-    let masked = b.ins().band_imm(raw_res, MASK_48);
-    let tagged = b.ins().bor_imm(masked, INT_TAG);
-    b.ins().select(is_unboxed, tagged, raw_res)
+    box_int(b, raw_res)
 }
 
 pub(super) fn call_helper(

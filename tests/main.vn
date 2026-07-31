@@ -56,6 +56,7 @@ import "./55-array-element-inference.vn"
 import "./56-tier-parity.vn"
 import "./57-call-arity.vn"
 import "./58-clif-range.vn"
+import "./59-clif-negative-int.vn"
 
-print("\n60 side-effect modules executed in suite")
+print("\n61 side-effect modules executed in suite")
 assertSummary()

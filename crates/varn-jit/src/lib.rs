@@ -279,7 +279,7 @@ use stats::record;
 
 /// Bytecode length, in words, above which a function is refused before
 /// Cranelift is asked. See the gate in [`compile`] for why it exists.
-pub const SIZE_GATE_WORDS: usize = 250;
+pub const SIZE_GATE_WORDS: usize = 8192;
 
 fn fn_name(proto: &FunctionProto) -> String {
     proto.name.as_deref().unwrap_or("<module>").to_owned()

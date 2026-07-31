@@ -718,13 +718,36 @@ fn lower_raw(
             OpCode::Negate => {
                 let src = (code[ip + 1] >> 8) as usize;
                 if meta_is_float(&proto.register_meta, first_reg) {
+                    // `use_f64` converts an `Int` operand and bails on
+                    // anything else — unchanged, and the bail matters: it is
+                    // what sends `(-a) + (-f)` shapes to the interpreter.
                     let f = use_f64(&mut b, &vars, &state, src)?;
                     let neg = b.ins().fneg(f);
                     b.def_var(vars[first_reg], neg);
-                } else {
-                    let i = use_int(&mut b, &vars, &state, src)?;
+                } else if state[src] == K::Int {
+                    let i = b.use_var(vars[src]);
                     let neg = b.ins().ineg(i);
-                    b.def_var(vars[first_reg], neg);
+                    // Wrap like the interpreter's `make_int`, then BOX: the
+                    // kind flow types this destination `Boxed` (see
+                    // `apply_kinds`), and storing a raw payload into it left a
+                    // register whose readers disagree about its representation.
+                    let wrapped = wrap_i48(&mut b, neg);
+                    let boxed = box_int(&mut b, wrapped);
+                    b.def_var(vars[first_reg], boxed);
+                } else {
+                    // A boxed operand: an int, but equally a decimal or a
+                    // bigint, whose negation ALLOCATES — which is exactly why
+                    // `Negate` is in the `has_alloc` set. This used to take
+                    // `use_int`, which ACCEPTS boxed registers, so `-(7.5d)`
+                    // ran `ineg` over a heap-tagged VmValue's payload bits and
+                    // produced a value that resolved to null.
+                    let actx = actx.as_ref().ok_or("clif: Negate outside alloc fn")?;
+                    let regs = alloc::live_boxed(actx, &state);
+                    alloc::flush_boxed(&mut b, actx, &state, &regs);
+                    let v = box_or_pass(&mut b, &vars, &state, src);
+                    let res = call_helper(&mut b, cc, helpers.negate, &[exec_ctx, v]);
+                    alloc::reload_boxed(&mut b, actx, &state, &regs);
+                    alloc::def_result(&mut b, actx, first_reg, res);
                 }
             }
             OpCode::AddImm | OpCode::SubImm => {

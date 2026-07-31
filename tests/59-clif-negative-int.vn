@@ -1,0 +1,54 @@
+// Negative `int` results crossing the Cranelift return boundary.
+//
+// The regression: a raw clif function returning `int` always yields an
+// UNBOXED i48 payload — every arm of `emit_return_value`'s `SlotKind::Int`
+// case produces one. The wrapper re-tagged it only when the high bits were
+// clear, on the theory that a set NaN-box tag meant "already boxed". That
+// test cannot tell a boxed value from a negative payload: `-3` is
+// `0xFFFF_FFFF_FFFF_FFFD`, whose high bits are all set. So every negative
+// `int` return escaped untagged and decoded as null.
+//
+// `function sub(a: int, b: int): int` returned null for `sub(1, 4)`. The
+// existing suite never caught it because its int-returning functions happened
+// to stay non-negative.
+//
+// Second regression, same file: `Negate` chose its inline path from the
+// DESTINATION register's meta alone, so a boxed operand went through
+// `use_int` — which accepts boxed registers — and `ineg` ran over a
+// heap-tagged VmValue's payload bits. `-(7.5d)` resolved to null.
+
+function sub(a: int, b: int): int { return a - b }
+function negLit(): int { return -3 }
+function negParam(a: int): int { return -a }
+function viaZero(a: int): int { let z = 0; return z - a }
+function mulNeg(a: int, b: int): int { return a * b }
+
+assert("clif negative sub", sub(1, 4) === -3)
+assert("clif negative literal", negLit() === -3)
+assert("clif negate param", negParam(3) === -3)
+assert("clif negative via zero", viaZero(3) === -3)
+assert("clif negative product", mulNeg(-2, 3) === -6)
+assert("clif negative round trip", negParam(negParam(7)) === 7)
+assert("clif zero is not null", sub(4, 4) === 0)
+assert("clif positive still fine", sub(9, 4) === 5)
+
+// A negative int returned through a chain of calls: each hop re-tags.
+function outer(n: int): int { return sub(0, negParam(n)) }
+assert("clif negative through two calls", outer(5) === 5)
+
+// Large magnitudes, still inside i48.
+function bigNeg(): int { return -140737488355327 }
+assert("clif large negative", bigNeg() === -140737488355327)
+assert("clif large negative negated", -bigNeg() === 140737488355327)
+
+// Negation of the boxed representations. Negating a decimal allocates, which
+// is why `Negate` is in the `has_alloc` set in the first place.
+const d: decimal = 7.5d
+assert("clif negate decimal", (-d) === -7.5d)
+assert("clif negate decimal abs", (-d).abs() === 7.5d)
+
+function negFloat(f: float): float { return -f }
+assert("clif negate float", negFloat(1.5) === -1.5)
+
+function negMixed(a: int, f: float): float { return (-a) + (-f) }
+assert("clif negate mixed", negMixed(3, 1.5) === -4.5)
