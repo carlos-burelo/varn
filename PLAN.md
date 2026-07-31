@@ -68,29 +68,81 @@ llamada.
    safepoint de back-edge invalida las caches en su rama tomada. 1.17x en el
    micro que tiene esa forma exacta.
 
-Resultado pareado (método robusto a térmica: los dos binarios adyacentes en
-cada ronda, mediana de las razones): **matrix 1.65x**, resto plano, ninguna
-regresión. `tests/main.vn` 805/805 en clif, `VARN_NO_JIT=1` y `VARN_NO_CLIF=1`;
-`cargo test --workspace --release` 48 suites verdes.
+5. **mimalloc como allocator global** (`crates/varn-cli`). Varn es
+   alloc-bound justo en las formas que importan — construcción de objetos,
+   concatenación de strings, crecimiento de arrays — y todas terminan en el
+   allocator del sistema; en Windows MSVC ese es el heap del proceso, que
+   cobra mucho más por alocación pequeña que un allocator con caches por
+   hilo. Es el único cambio que llega a todos esos sitios a la vez.
+
+   | operación | antes | después | |
+   |---|---|---|---|
+   | `"a" + "b"` | 100.3 ns | 64.2 | 1.56x |
+   | `"prefix" + int` | 117.3 | 68.3 | 1.72x |
+   | `int.toString()` | 71.6 | 53.7 | 1.33x |
+   | `new P5(...)` que muere | 78.6 | 59.3 | 1.33x |
+   | `new P5(...)` que escapa | 166.6 | 119.1 | 1.40x |
+
+6. **Un solo lookup por objeto promovido en el minor GC** — limpieza
+   estructural, **sin** cambio de rendimiento medible (0.98x / 1.07x). Los
+   70 ns por objeto promovido están en el movimiento del `HeapObj` y en el
+   push al Vec de old gen, no en los lookups. Anotado para no volver a
+   intentarlo por ahí.
+
+### Resultado acumulado
+
+Pareado contra el árbol pre-sesión, método robusto a térmica (los dos
+binarios adyacentes en cada ronda, mediana de las razones):
+
+| bench | |
+|---|---|
+| bench_json | **2.04x** |
+| bench_gc_alloc | **1.69x** |
+| bench_matrix | **1.52x** |
+| bench_dto | **1.44x** |
+| bench_str_ops | **1.35x** |
+| bench_array_ops | 1.08x |
+| fib · class_fields · math · multiple | plano |
+| llamada cruzada (micro) | **15.7x** (43.4 → 2.76 ns) |
+| `new X(...)` (micro) | **2.05x** (83.3 → 40.7 ns) |
+
+`tests/main.vn` 805/805 con `run` y con `bench`, en clif, `VARN_NO_JIT=1` y
+`VARN_NO_CLIF=1`; `cargo test --workspace --release` 48 suites verdes.
 
 ### Lo que sigue abierto, por ROI medido
 
-1. **Constructores.** `new X(...)` sigue costando ~83 ns porque el callee es un
-   `Class`, no un `VmClosure`, así que nunca toca el linker: va por
-   `clif_call_fallback` → `call_vm_window` → `construct_staged_fast`, que
-   empuja un `CallFrame` de verdad (143 333 frame pushes en `bench_dto`). El
-   arreglo real es inlinear el constructor en el sitio de llamada cuando su
-   cuerpo son sólo `SetFixedField` desde parámetros.
-2. **Promoción del GC: 70.6 ns por objeto promovido.** Medido aislando
-   `freshEscape` (166.6) contra `freshShortLived` (96.0) a igual tasa de
-   alocación. **Subir la nursery NO sirve**: de 16384 a 131072 bajó los minor
-   GC de 20 a 3 y empeoró `bench_dto` un 18.6% y `bench_gc_alloc` un 11.8%
-   (locality). El coste es por objeto evacuado, no por colección. Esto pide el
-   trabajo de representación desboxeada, no un ajuste de política.
+`bench_dto` sigue 22x por detrás de Bun (53.1 ms contra 2.43) y `bench_matrix`
+4.0x (37.5 contra 9.38). Reparto medido de dto con los costes de hoy: ~5.8 ms
+en constructores, ~6.8 en concatenación, ~7.2 en promoción, ~2.1 en `push`,
+~3 en lecturas de propiedad. El resto es el bucle del módulo.
+
+1. **Constructores: 40.7 ns** (eran 83.3; mimalloc se llevó la mitad). El
+   callee de `new X(...)` es un `Class`, no un `VmClosure`, así que nunca toca
+   el linker: va por `clif_call_fallback` → `call_vm_window` →
+   `construct_staged_fast`, que empuja un `CallFrame` de verdad (143 333 frame
+   pushes en `bench_dto`) y paga cuatro clones de `Rc` por instancia. El
+   arreglo real es **inlinear** el constructor en el sitio de llamada cuando su
+   cuerpo son sólo `SetFixedField` desde parámetros: alocar con la shape
+   conocida y emitir los stores, sin llamada. Objetivo ~25 ns. Los apaños
+   parciales (quitar clones, cachear el ctor resuelto sin `dyn Any`) suman ~10
+   ns de los 40 y no valen el riesgo por separado.
+2. **Promoción del GC: ~50-70 ns por objeto promovido.** Medido aislando
+   `freshEscape` contra `freshShortLived` a igual tasa de alocación. Dos
+   caminos ya descartados con medición:
+   - **Subir la nursery NO sirve**: de 16384 a 131072 bajó los minor GC de 20
+     a 3 y empeoró `bench_dto` un 18.6% y `bench_gc_alloc` un 11.8`%`
+     (locality). El coste es por objeto evacuado, no por colección.
+   - **Reducir los lookups del scan tampoco**: colapsar cuatro `get_raw` por
+     objeto en uno dio 0.98x / 1.07x, ruido.
+
+   Lo que queda es el movimiento del `HeapObj` (48 bytes) y el push al Vec de
+   old gen. Eso pide el trabajo de representación desboxeada, no un ajuste.
 3. Las Tareas 1-4 de abajo — reales, pero por debajo de estas dos. Ojo: la
-   Tarea 4 **no arregla `bench_dto`**. Comprobado: envolver el benchmark entero
-   en una función (100% clif, 0 frames intérprete) da 81.5 ms contra 76.8 ms
-   del original top-level. `bench_dto` es alloc-bound, no dispatch-bound.
+   Tarea 4 **no arregla `bench_dto`**. Comprobado dos veces: envolver el
+   benchmark entero en una función rutea `main` por clif (verificado con
+   `VARN_CLIF_TRACE=1`, sin gate) y da 81.5 ms contra 76.8 ms del original
+   top-level. `bench_dto` es alloc-bound, no dispatch-bound. Dato aparte: su
+   `<module>` se gatea por **252 words**, dos por encima del tope.
 
 ### Método de medición (corrección)
 
