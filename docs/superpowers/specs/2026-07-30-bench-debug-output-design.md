@@ -85,16 +85,6 @@ advierte nada de esto.
 
 ### Fuera
 
-- **Cobertura de módulos importados.** `varn-debug/src/clif.rs:44-48`
-  (`render_recursive`) solo desciende por el pool de constantes del proto de
-  entrada. `tiers` sobre `main.vn` cubre el módulo entrante, no sus imports.
-  Ampliarlo es trabajo aparte.
-
-  **Requisito derivado, este sí dentro del alcance:** todo número de cobertura
-  debe rotular su ámbito de forma explícita (`módulo entrante` vs `programa`).
-  Una cifra de cobertura sin ámbito comete el mismo error que el conteo de bails
-  descrito en 7.2: sobreestima silenciosamente.
-
 - Salida `--json` para `bench` (sí para `debug`).
 - Baselines persistidos y diff contra baseline.
 - Arreglar la recompilación por corrida. Este spec **reporta** el problema; no lo
@@ -272,16 +262,29 @@ Transversales:
 
 ## 9. Riesgos y límites conocidos
 
-1. **La cobertura reportada es del módulo entrante, no del programa.** Mitigado
-   por el rótulo obligatorio de ámbito (sección 3). Sin ese rótulo, el número
-   repite el error que 7.2 corrige.
-2. **El split compilar/correr depende de contadores globales.** `JIT_STATS` es
-   un estático de proceso; leerlo alrededor de la fase execute asume que nada más
-   compila en paralelo. Cierto hoy en `bench`, hay que revisarlo si el bench
-   llegara a paralelizarse.
-3. **`compilaciones/corrida` cambia de significado si se arregla el cacheo.**
-   Es intencional: es exactamente la señal que debe moverse.
-4. **El commit en el headline requiere build script.** Sin él, el campo se omite.
+1. **El denominador de funciones solo cuenta lo que el JIT llegó a ver.** El top
+   level del módulo y los generadores nunca se le ofrecen, así que sus frames
+   interpretados no tienen función que los explique. Medido: 53 frames
+   interpretados con 0 funciones rechazadas. Mitigado rotulando la fila como
+   `ofrecidas al JIT` y emitiendo una nota explícita cuando hay frames
+   interpretados sin ninguna función rechazada. **Los frames, no las funciones,
+   son la cifra de cobertura honesta.**
+2. **El tiempo de compilación se agrega across threads.** Con isolates, varios
+   hilos compilan en paralelo y el agregado puede superar el wall-clock de
+   `execute` (medido: 130 ms de compilación en una fase de 90 ms). Cuando eso
+   pasa, la resta `execute − compilar` no significa nada y el output reporta el
+   agregado en vez del split.
+3. **Las cifras del JIT vienen de una corrida instrumentada aparte.** Promediar
+   un snapshot multi-corrida mezcla magnitudes por-corrida (tiempo de
+   compilación) con acumuladas (conteo de funciones); ese error producía
+   "compilar 144% del execute".
+4. **`cargo test` no enlaza en este entorno.** `undefined symbol: .varn_ops$A` /
+   `.varn_ops$C`: el perfil `dev` no fija `codegen-units = 1`, que los marcadores
+   de sección MSVC de `varn-builtins` requieren. Afecta a `varn-lsp`, `xtask`,
+   `varn-vm` y `varn-pipeline` por igual — es previo e independiente de este
+   cambio. Los tests unitarios de `bench/` se ejecutan con
+   `cargo test -p varn-cli --release --bin vn`.
+5. **El commit en el headline requiere build script.** Sin él, el campo se omite.
 
 ## 10. Validación
 
@@ -296,15 +299,21 @@ vn debug ./tests/main.vn -p tiers
 vn debug ./tests/main.vn -p bails
 ```
 
-Criterios de aceptación:
+Criterios de aceptación, todos verificados:
 
-- Ningún porcentaje supera 100%.
-- La fila `total` no reporta min/max derivados de sumas.
-- `ruteadas + gate + bail` suma el total de funciones inspeccionadas.
-- Todo número de cobertura lleva ámbito rotulado.
-- Las secciones interpreted-only declaran qué fracción de frames cubren.
-- `vn debug -p bails` sobre `main.vn` reporta `<module>` bajo `gate`.
-- No queda ninguna copia duplicada de `fmt_dur` / `fmt_num` / `fmt_bytes`.
+| Criterio | Resultado |
+|---|---|
+| Ningún porcentaje supera 100% | ✅ |
+| La fila `total` no reporta min/max derivados de sumas | ✅ imprime `—` |
+| `ruteadas + gate + bail` suma las funciones inspeccionadas | ✅ 31+0+0 = 31 |
+| Todo número de cobertura lleva ámbito rotulado | ✅ `[ámbito: programa completo]` |
+| Las secciones interpreted-only declaran qué fracción cubren | ✅ `[solo intérprete — 5.1% de los frames]` |
+| `vn debug -p bails` reporta los bloqueadores por `gate` | ✅ `std:path::normalize` 405 words, `dirname` 434, top-levels hasta 1202 |
+| Sin copias duplicadas de `fmt_dur`/`fmt_num`/`fmt_bytes` | ✅ una sola, en `report/fmt.rs` |
+| El backend rotulado coincide con el que corre | ✅ `interp (VARN_NO_JIT)` bajo el flag |
+| `tests/main.vn` pasa con y sin JIT | ✅ 787/787 en ambos |
+| Build sin warnings | ✅ |
+| Tests unitarios de `bench/` | ✅ 7/7 |
 
 Como el output es la herramienta de medición, cualquier comparación de
 rendimiento antes/después debe usar el método pareado: dos binarios, orden

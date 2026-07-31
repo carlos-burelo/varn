@@ -1,14 +1,10 @@
-mod bench_hotspots;
-mod bench_impl;
-mod bench_output;
-mod bench_phase;
+mod bench;
 mod cli;
 mod commands;
 mod cpu_freq;
 mod doctor_impl;
 mod error;
 mod pipeline;
-mod profiling;
 
 use clap::Parser;
 use cli::{Cli, Commands};

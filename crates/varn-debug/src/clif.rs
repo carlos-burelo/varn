@@ -38,9 +38,17 @@ fn render_recursive(
     helpers: &JitHelpers,
     isa: &varn_jit::OwnedTargetIsa,
 ) {
-    let constants = constants_for_inspect(proto);
-    let insp = inspect(proto, &constants, helpers, isa, &NoLinker);
-    render_one(&insp, flags);
+    // The filter selects which functions are *rendered*, never which are
+    // walked: a match can be nested inside a function that does not match.
+    if flags
+        .fn_filter
+        .as_ref()
+        .is_none_or(|needle| proto.name.as_deref().unwrap_or("<module>").contains(needle.as_str()))
+    {
+        let constants = constants_for_inspect(proto);
+        let insp = inspect(proto, &constants, helpers, isa, &NoLinker);
+        render_one(&insp, flags);
+    }
     for entry in &proto.chunk.constants {
         if let PoolEntry::Function(f) = entry {
             render_recursive(f, flags, helpers, isa);

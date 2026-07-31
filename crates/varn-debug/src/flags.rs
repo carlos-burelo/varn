@@ -40,6 +40,47 @@ pub struct DebugFlags {
     pub clif_kinds: bool,
     pub clif_ir: bool,
     pub clif_asm: bool,
+
+    pub tiers: bool,
+    pub bails: bool,
+    pub summary: bool,
+
+    /// Substring filter applied to function names by the per-function dumps.
+    /// Without it, `-p bytecode` on a real module prints every function.
+    pub fn_filter: Option<String>,
+}
+
+/// Every phase name `-p` accepts, with a one-line description. Single source
+/// for `--list-phases` and for the error message on an unknown phase.
+pub const PHASES: &[(&str, &str)] = &[
+    ("tokens", "flujo de tokens del lexer"),
+    ("ast", "árbol sintáctico"),
+    ("check", "símbolos, binds, tipos y expresiones"),
+    ("bytecode", "bytecode por función"),
+    ("hir", "HIR previo a SSA"),
+    ("ssa", "forma SSA"),
+    ("clif", "lowering Cranelift (route, kinds, ir, asm)"),
+    ("tiers", "tier por función: clif / gate / bail"),
+    ("bails", "solo lo que no rutea, agrupado por causa"),
+    ("summary", "tamaños, exports y top-10 de funciones"),
+    ("graph", "grafo de módulos"),
+    ("caps", "traza de capabilities"),
+    ("info", "metadatos del módulo"),
+    ("all", "todo lo anterior"),
+];
+
+pub fn print_phases() {
+    eprintln!("Fases disponibles para -p / --phase:\n");
+    for (name, desc) in PHASES {
+        eprintln!("  {name:<10} {desc}");
+    }
+    eprintln!("\nSub-fases:");
+    eprintln!("  clif:route  clif:kinds  clif:ir  clif:asm  clif:all");
+    eprintln!("  lsp:hovers  lsp:semantic  lsp:types  lsp:completions");
+    eprintln!("  lsp:symbols  lsp:colorize  lsp:hints  lsp:all");
+    eprintln!("\nFiltros:");
+    eprintln!("  --fn <nombre>   limita los volcados por función a las que coincidan");
+    eprintln!("  types:N  types:all  expr:N   rango de líneas");
 }
 
 pub fn parse_line_range(s: &str) -> Result<(u32, u32), CliError> {
@@ -159,6 +200,9 @@ impl DebugFlags {
                     "lsp" => flags.lsp = true,
                     "hir" => flags.hir = true,
                     "ssa" => flags.ssa = true,
+                    "tiers" => flags.tiers = true,
+                    "bails" => flags.bails = true,
+                    "summary" => flags.summary = true,
                     "clif" => flags.clif_all_on(),
                     "all" => {
                         flags.tokens = true;
@@ -178,15 +222,18 @@ impl DebugFlags {
                         flags.lsp_all();
                         flags.hir = true;
                         flags.ssa = true;
+                        flags.tiers = true;
+                        flags.bails = true;
+                        flags.summary = true;
                         flags.clif_all_on();
                     }
                     unknown => {
+                        let names: Vec<&str> = PHASES.iter().map(|(n, _)| *n).collect();
                         return Err(CliError::usage(format!(
                             "unknown debug phase: '{unknown}'\n\
-                             Valid phases: tokens, ast, check, bytecode, graph, caps, info, hir, ssa, clif, all\n\
-                             LSP sub-phases: lsp:hovers, lsp:semantic, lsp:types, lsp:completions, lsp:symbols, lsp:colorize, lsp:hints, lsp:all\n\
-                             clif sub-phases: clif:route, clif:kinds, clif:ir, clif:asm, clif:all\n\
-                             Line range filter: types:N  types:all  expr:N"
+                             Valid phases: {}\n\
+                             Run with --list-phases for descriptions.",
+                            names.join(", ")
                         )));
                     }
                 }
@@ -216,6 +263,9 @@ impl DebugFlags {
             || self.hir
             || self.ssa
             || self.clif
+            || self.tiers
+            || self.bails
+            || self.summary
     }
 
     pub fn lsp_all(&mut self) {

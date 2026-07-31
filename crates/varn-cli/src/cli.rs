@@ -73,6 +73,14 @@ pub struct DebugArgs {
 
     #[arg(short, long, value_name = "PHASE", default_value = "all")]
     pub phase: String,
+
+    /// Only dump functions whose name contains NAME.
+    #[arg(long = "fn", value_name = "NAME")]
+    pub fn_filter: Option<String>,
+
+    /// List every phase `-p` accepts and exit.
+    #[arg(long)]
+    pub list_phases: bool,
 }
 
 #[derive(Args)]
@@ -115,6 +123,10 @@ pub struct BenchArgs {
 
     #[arg(short, long)]
     pub verbose: bool,
+
+    /// Show phase and breakdown rows that measured zero or negligible time.
+    #[arg(long)]
+    pub all_rows: bool,
 }
 
 #[derive(Args)]

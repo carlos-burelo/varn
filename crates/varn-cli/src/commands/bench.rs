@@ -1,3 +1,4 @@
+use crate::bench::{run_bench, BenchOpts};
 use crate::{cli::BenchArgs, error::CliError};
 
 pub fn execute(args: BenchArgs) -> Result<(), CliError> {
@@ -9,11 +10,14 @@ pub fn execute(args: BenchArgs) -> Result<(), CliError> {
         (Some(file), None) => (file, None),
         (None, None) => return Err(CliError::usage("Provide a file or inline code with --eval")),
     };
-    crate::bench_impl::run_bench(
+    run_bench(
         &file_path,
         eval.as_deref(),
-        args.runs,
-        args.show_output,
-        args.verbose,
+        &BenchOpts {
+            runs: args.runs,
+            show_output: args.show_output,
+            verbose: args.verbose,
+            all_rows: args.all_rows,
+        },
     )
 }

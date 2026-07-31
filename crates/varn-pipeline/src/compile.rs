@@ -60,6 +60,20 @@ pub fn compile(
         varn_debug::clif::debug_clif(&proto, debug, &helpers);
     }
 
+    if debug.summary {
+        varn_debug::summary::debug_summary(&proto);
+    }
+
+    if debug.tiers || debug.bails {
+        let helpers = varn_vm::frame::build_jit_helpers();
+        if debug.tiers {
+            varn_debug::tiers::debug_tiers(&proto, debug, &helpers, None);
+        }
+        if debug.bails {
+            varn_debug::tiers::debug_bails(&proto, debug, &helpers, None);
+        }
+    }
+
     if debug.hir {
         varn_debug::hir::debug_hir(
             program,
@@ -110,7 +124,7 @@ pub fn compile(
     if debug.bytecode {
         for (path, module_proto) in graph_build.modules.iter() {
             if path != &graph_build.entry_path {
-                println!("\n=== MODULE BYTECODE: {} ===", path);
+                eprintln!("\n=== MODULE BYTECODE: {} ===", path);
                 varn_debug::bytecode::debug_bytecode(module_proto, debug);
             }
         }
@@ -120,8 +134,32 @@ pub fn compile(
         let helpers = varn_vm::frame::build_jit_helpers();
         for (path, module_proto) in graph_build.modules.iter() {
             if path != &graph_build.entry_path {
-                println!("\n=== MODULE CLIF: {} ===", path);
+                eprintln!("\n=== MODULE CLIF: {} ===", path);
                 varn_debug::clif::debug_clif(module_proto, debug, &helpers);
+            }
+        }
+    }
+
+    // Coverage is a whole-program property, so the imported modules matter as
+    // much as the entry one: a metric that stops at the entry module reports
+    // a number that looks like coverage and is not.
+    if debug.tiers || debug.bails || debug.summary {
+        let helpers = varn_vm::frame::build_jit_helpers();
+        for (path, module_proto) in graph_build.modules.iter() {
+            if path == &graph_build.entry_path {
+                continue;
+            }
+            if debug.summary {
+                eprintln!("\n=== MODULE: {} ===", path);
+                varn_debug::summary::debug_summary(module_proto);
+            }
+            // These two print their own header only when they have content, so
+            // a filtered run does not emit a banner per silent module.
+            if debug.tiers {
+                varn_debug::tiers::debug_tiers(module_proto, debug, &helpers, Some(path));
+            }
+            if debug.bails {
+                varn_debug::tiers::debug_bails(module_proto, debug, &helpers, Some(path));
             }
         }
     }

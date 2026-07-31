@@ -1,6 +1,9 @@
 pub mod clif;
 pub(crate) mod loop_hoist;
 pub mod mem;
+pub mod stats;
+
+pub use stats::{CompileOutcome, CompileRecord, JitStats, JitStatsSnapshot, JIT_STATS};
 
 /// Loop-invariant array-guard hoisting diagnostics — see
 /// `loop_hoist::diagnose_loops`'s docs. Exposed for `vn debug -p bytecode`
@@ -270,67 +273,17 @@ pub struct JitSetIndexArgs {
     pub val: VmValue,
 }
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::Ordering;
 
-#[derive(Debug, Clone)]
-pub struct JitStatsSnapshot {
-    pub compile_success: u64,
-    pub compile_fail: u64,
-    pub total_compile_time_ns: u64,
-    pub total_code_size_bytes: u64,
-    pub jit_runs: u64,
-    pub jit_cached: u64,
-    pub interp_runs: u64,
+use stats::record;
+
+/// Bytecode length, in words, above which a function is refused before
+/// Cranelift is asked. See the gate in [`compile`] for why it exists.
+pub const SIZE_GATE_WORDS: usize = 250;
+
+fn fn_name(proto: &FunctionProto) -> String {
+    proto.name.as_deref().unwrap_or("<module>").to_owned()
 }
-
-pub struct JitStats {
-    pub compile_success: AtomicU64,
-    pub compile_fail: AtomicU64,
-    pub total_compile_time_ns: AtomicU64,
-    pub total_code_size_bytes: AtomicU64,
-    pub jit_runs: AtomicU64,
-
-    pub jit_cached: AtomicU64,
-    pub interp_runs: AtomicU64,
-}
-
-impl JitStats {
-    pub const fn new() -> Self {
-        Self {
-            compile_success: AtomicU64::new(0),
-            compile_fail: AtomicU64::new(0),
-            total_compile_time_ns: AtomicU64::new(0),
-            total_code_size_bytes: AtomicU64::new(0),
-            jit_runs: AtomicU64::new(0),
-            jit_cached: AtomicU64::new(0),
-            interp_runs: AtomicU64::new(0),
-        }
-    }
-
-    pub fn reset(&self) {
-        self.compile_success.store(0, Ordering::Relaxed);
-        self.compile_fail.store(0, Ordering::Relaxed);
-        self.total_compile_time_ns.store(0, Ordering::Relaxed);
-        self.total_code_size_bytes.store(0, Ordering::Relaxed);
-        self.jit_runs.store(0, Ordering::Relaxed);
-        self.jit_cached.store(0, Ordering::Relaxed);
-        self.interp_runs.store(0, Ordering::Relaxed);
-    }
-
-    pub fn snapshot(&self) -> JitStatsSnapshot {
-        JitStatsSnapshot {
-            compile_success: self.compile_success.load(Ordering::Relaxed),
-            compile_fail: self.compile_fail.load(Ordering::Relaxed),
-            total_compile_time_ns: self.total_compile_time_ns.load(Ordering::Relaxed),
-            total_code_size_bytes: self.total_code_size_bytes.load(Ordering::Relaxed),
-            jit_runs: self.jit_runs.load(Ordering::Relaxed),
-            jit_cached: self.jit_cached.load(Ordering::Relaxed),
-            interp_runs: self.interp_runs.load(Ordering::Relaxed),
-        }
-    }
-}
-
-pub static JIT_STATS: JitStats = JitStats::new();
 
 pub fn compile(
     proto: &FunctionProto,
@@ -354,17 +307,22 @@ pub fn compile(
     // Lifting this cap therefore means making clif frames resumable (a
     // per-frame jump buffer for exceptions plus a side-exit ip for
     // suspension), not just raising the number.
-    if proto.chunk.code.len() > 250 {
+    let words = proto.chunk.code.len();
+    if words > SIZE_GATE_WORDS {
         // Traced like a lowering bail: this gate fires BEFORE clif is asked, so
         // a function rejected here shows up in neither `CLIF BAIL` nor
         // `compile_fail`. Counting "0 bails" without it overstates coverage.
         if clif::trace() {
-            eprintln!(
-                "CLIF GATE  {:?}: too large ({} words)",
-                proto.name,
-                proto.chunk.code.len()
-            );
+            eprintln!("CLIF GATE  {:?}: too large ({words} words)", proto.name);
         }
+        JIT_STATS.gate_rejected.fetch_add(1, Ordering::Relaxed);
+        record(|| CompileRecord {
+            name: fn_name(proto),
+            words,
+            outcome: CompileOutcome::Gated("too large (>250 words)"),
+            compile_ns: 0,
+            code_bytes: 0,
+        });
         return Err("JIT Bailout: function too large".to_owned());
     }
 
@@ -380,13 +338,21 @@ pub fn compile(
                     if clif::trace() {
                         eprintln!("CLIF ROUTE {:?}", proto.name);
                     }
+                    let code_bytes = art.buffer.size() as u64;
                     JIT_STATS.compile_success.fetch_add(1, Ordering::Relaxed);
                     JIT_STATS
                         .total_compile_time_ns
                         .fetch_add(elapsed, Ordering::Relaxed);
                     JIT_STATS
                         .total_code_size_bytes
-                        .fetch_add(art.buffer.size() as u64, Ordering::Relaxed);
+                        .fetch_add(code_bytes, Ordering::Relaxed);
+                    record(|| CompileRecord {
+                        name: fn_name(proto),
+                        words,
+                        outcome: CompileOutcome::Routed,
+                        compile_ns: elapsed,
+                        code_bytes,
+                    });
                     let jit_fn: JitFn = unsafe { std::mem::transmute(art.entry) };
                     return Ok((jit_fn, Rc::new(art) as Rc<dyn Any>));
                 }
@@ -398,6 +364,13 @@ pub fn compile(
                     JIT_STATS
                         .total_compile_time_ns
                         .fetch_add(elapsed, Ordering::Relaxed);
+                    record(|| CompileRecord {
+                        name: fn_name(proto),
+                        words,
+                        outcome: CompileOutcome::Bailed(e.clone()),
+                        compile_ns: elapsed,
+                        code_bytes: 0,
+                    });
                     return Err(e);
                 }
             }
