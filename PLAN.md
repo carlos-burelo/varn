@@ -111,10 +111,25 @@ binarios adyacentes en cada ronda, mediana de las razones):
 
 ### Lo que sigue abierto, por ROI medido
 
-`bench_dto` sigue 22x por detrás de Bun (53.1 ms contra 2.43) y `bench_matrix`
-4.0x (37.5 contra 9.38). Reparto medido de dto con los costes de hoy: ~5.8 ms
-en constructores, ~6.8 en concatenación, ~7.2 en promoción, ~2.1 en `push`,
-~3 en lecturas de propiedad. El resto es el bucle del módulo.
+`bench_dto` sigue ~20x por detrás de Bun (49.5 ms contra 2.43) y `bench_matrix`
+4x (36 contra 9.4). Reparto medido de dto con los costes de hoy: ~5.8 ms en
+constructores, ~6.8 en concatenación, ~7.2 en promoción, ~2.1 en `push`, ~3 en
+lecturas de propiedad. El resto es el bucle del módulo.
+
+> **Las optimizaciones puntuales en el camino de alocación se agotaron.**
+> Después de mimalloc, los cinco intentos siguientes dieron ruido (ver más
+> abajo y en la Tarea de GC). Todo número grande que queda — `push` 15.5 ns,
+> `new` 40.7, concat 64, promoción ~60 — es *tocar un objeto del heap*, y todos
+> comparten la misma causa: un objeto es un `Rc<ObjData>` con campos
+> NaN-boxeados, alojado en un slot de `Vec<Option<HeapObj>>` de 48 bytes que
+> luego hay que copiar al promover. El siguiente paso real es cambiar eso
+> (objetos inline en una región bump, campos crudos), que colapsa alocación y
+> promoción a la vez. Es un rewrite del heap, el GC y todos los consumidores de
+> `HeapObj` — no un ajuste más.
+
+Medido para acotar el objetivo: la aritmética escalar y el escape analysis ya
+están a nivel V8 (1.5-1.8 ns/iter int, 1.3 float, 1.5 para un objeto que no
+escapa), y la llamada ya está en 2.8 ns. No queda nada que ganar ahí.
 
 1. **Constructores: 40.7 ns** (eran 83.3; mimalloc se llevó la mitad). El
    callee de `new X(...)` es un `Class`, no un `VmClosure`, así que nunca toca
@@ -127,13 +142,17 @@ en constructores, ~6.8 en concatenación, ~7.2 en promoción, ~2.1 en `push`,
    parciales (quitar clones, cachear el ctor resuelto sin `dyn Any`) suman ~10
    ns de los 40 y no valen el riesgo por separado.
 2. **Promoción del GC: ~50-70 ns por objeto promovido.** Medido aislando
-   `freshEscape` contra `freshShortLived` a igual tasa de alocación. Dos
+   `freshEscape` contra `freshShortLived` a igual tasa de alocación. Tres
    caminos ya descartados con medición:
    - **Subir la nursery NO sirve**: de 16384 a 131072 bajó los minor GC de 20
      a 3 y empeoró `bench_dto` un 18.6% y `bench_gc_alloc` un 11.8`%`
      (locality). El coste es por objeto evacuado, no por colección.
    - **Reducir los lookups del scan tampoco**: colapsar cuatro `get_raw` por
      objeto en uno dio 0.98x / 1.07x, ruido.
+   - **Quitar el segundo push de Vec por alocación tampoco**: `try_alloc`
+     empujaba a `objects` y a `forwarding`, y `forwarding` no se lee hasta
+     que corre un GC. Moverlo a un `resize` en `collect` dio 1.04x / 0.98x /
+     0.96x / 1.00x. Revertido: churn en el camino caliente del GC por ruido.
 
    Lo que queda es el movimiento del `HeapObj` (48 bytes) y el push al Vec de
    old gen. Eso pide el trabajo de representación desboxeada, no un ajuste.
