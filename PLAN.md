@@ -156,12 +156,63 @@ escapa), y la llamada ya está en 2.8 ns. No queda nada que ganar ahí.
 
    Lo que queda es el movimiento del `HeapObj` (48 bytes) y el push al Vec de
    old gen. Eso pide el trabajo de representación desboxeada, no un ajuste.
-3. Las Tareas 1-4 de abajo — reales, pero por debajo de estas dos. Ojo: la
-   Tarea 4 **no arregla `bench_dto`**. Comprobado dos veces: envolver el
-   benchmark entero en una función rutea `main` por clif (verificado con
-   `VARN_CLIF_TRACE=1`, sin gate) y da 81.5 ms contra 76.8 ms del original
-   top-level. `bench_dto` es alloc-bound, no dispatch-bound. Dato aparte: su
-   `<module>` se gatea por **252 words**, dos por encima del tope.
+3. **La Tarea 4 (subir el tope de 250 words) es AHORA el lever más grande.**
+   Corrijo lo que decía esta sección antes: medí dos veces que envolver
+   `bench_dto` en una función no ganaba nada y concluí que era alloc-bound.
+   Esa medición era correcta **en su momento y ya no lo es**: entonces la
+   llamada de 53 ns por constructor dominaba igual desde un caller
+   interpretado que desde uno compilado, y tapaba el despacho del intérprete.
+   Con el entorno 3x más barato (llamada directa + mimalloc) queda expuesto:
+
+   | `bench_dto` | |
+   |---|---|
+   | top-level, `<module>` interpretado (gate a 252 words) | 50.95 ms |
+   | envuelto en función, 100% clif | **33.42 ms** |
+
+   Con el tope en 8192 y las dos correcciones de abajo: suite **805/805** en
+   los tres modos, cobertura clif **1282/1282 frames**, `CLIF GATE` **0**, y
+   `bench_dto` pareado **1.53x** (67.2 → 42.5 ms). El criterio de aceptación
+   de la Tarea 4, cumplido.
+
+### Tarea 4: lo que ya está hecho y lo único que falta
+
+Aterrizado (`8583e3b`), con el tope todavía en 250:
+
+1. **Buffer de salto por frame.** Era el diseño de la Tarea 4 §1.
+   `execute_jit_frame` instalaba `setjmp` sólo para el frame clif más externo,
+   así que un `throw` varias capas adentro saltaba por encima de los
+   intermedios y el bucle de frames los reentraba desde `ip == 0` para
+   siempre. Ahora cada frame instala el suyo y restaura el del padre al salir;
+   el desenrollado es de a un salto, y `clif_call_fallback` re-lanza contra el
+   buffer del padre ya restaurado. **`11-errors.vn` pasa con el tope en 8192.**
+   La suspensión sigue necesitando el buffer MÁS EXTERNO (Tarea 4 §2): vive en
+   `jit_suspend_buf`, fijado por el frame externo — comportamiento idéntico al
+   de antes, sin anidar.
+2. **`InvokeRuntimeStatic` volcaba mal sus operandos.** `jit_range` recibe
+   NÚMEROS DE REGISTRO y lee de `ctx.stack[base + reg]`, pero el lowering
+   nunca los ponía ahí: `0..5` construía `RangeData { start: 0, end: 0 }`.
+   Vivo en funciones normales, no sólo en top-level. Fijado por
+   `tests/58-clif-range.vn`. Barrido hecho sobre todos los demás helpers que
+   leen home slots — era el único hueco.
+
+**Lo único que bloquea subir el tope**, un tercer bug pre-existente:
+
+```varn
+function na(a: int): int { return -a }
+na(3)   // clif: null      intérprete: -3
+```
+
+`Negate` elige su camino inline por el meta del registro DESTINO solamente,
+así que un operando boxed cae en `use_int` —que acepta boxed— y `ineg` corre
+sobre los bits de payload de un VmValue heap-tagged. Es también por lo que
+`-(7.5d)` da null y `decimal abs` falla con el tope alto. El arreglo requiere
+consultar el flujo de kinds para el OPERANDO; un primer intento regresó
+`(-a) + (-f)` (operando int hacia un destino float-typed, caso que antes
+bailaba al intérprete), así que quedó fuera en vez de a medias.
+
+Orden para la próxima sesión: arreglar `Negate`, subir `SIZE_GATE_WORDS`,
+correr los tres modos, y esperar que aparezcan más bugs latentes de la misma
+familia — el gate llevaba años tapando todo lo que no cabía en 250 words.
 
 ### Método de medición (corrección)
 
