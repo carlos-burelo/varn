@@ -217,141 +217,73 @@ impl Nursery {
     ) {
         fixups.clear();
 
-        // A generator carries a whole suspended ExecCtx (stack, frames,
-        // upvalues, pending suspends) whose slots hold raw heap indices;
-        // rewrite them in place through the driver's mutable trace. Clone
-        // the Rc first so the borrow of `old_gen` ends before evacuating.
-        let gen_driver = match old_gen.get_raw(raw_old) {
-            Some(HeapObj::Generator(g)) => Some(g.0.clone()),
-            _ => None,
+        // ONE lookup, whatever the variant. This runs once per promoted
+        // object, and probing `get_raw` separately for Generator, then Map,
+        // then Set, then everything else charged four bounds-checked slot
+        // reads to reach the common case (a plain Object or Array). The
+        // three container variants still have to hand their handle out of
+        // the borrow — they evacuate THROUGH `old_gen`, so its borrow must
+        // end first — but every other variant is scanned right here.
+        let deferred = match old_gen.get_raw(raw_old) {
+            Some(HeapObj::Generator(g)) => Container::Generator(g.0.clone()),
+            Some(HeapObj::Map(m)) => Container::Map(m.clone()),
+            Some(HeapObj::Set(s)) => Container::Set(s.clone()),
+            Some(obj) => {
+                Self::scan_children(obj, old_gen, fixups);
+                Container::None
+            }
+            None => Container::None,
         };
-        if let Some(driver) = gen_driver {
-            driver.trace_vm_values_mut(&mut |val| {
-                self.update_value(val, old_gen, worklist);
-            });
-            return;
-        }
 
-        // Map/Set entries are raw VmValues mutated through interior
-        // mutability (the write barrier remembers the collection). Values
-        // rewrite in place; canonical keys (interned strings, scalars) are
-        // old-gen-stable, but identity keys can move — their hash is their
-        // bit pattern, so the table is rebuilt when any key evacuates.
-        let map_ref = match old_gen.get_raw(raw_old) {
-            Some(HeapObj::Map(m)) => Some(m.clone()),
-            _ => None,
-        };
-        if let Some(m) = map_ref {
-            let mut g = m.borrow_mut();
-            for v in g.values_mut() {
-                self.update_value(v, old_gen, worklist);
+        match deferred {
+            // A generator carries a whole suspended ExecCtx (stack, frames,
+            // upvalues, pending suspends) whose slots hold raw heap indices;
+            // rewrite them in place through the driver's mutable trace.
+            Container::Generator(driver) => {
+                driver.trace_vm_values_mut(&mut |val| {
+                    self.update_value(val, old_gen, worklist);
+                });
+                return;
             }
-            let any_key_moved = g
-                .keys()
-                .any(|k| k.0.is_heap() && is_nursery_idx(k.0.as_heap_idx()));
-            if any_key_moved {
-                let entries: Vec<(VmValue, VmValue)> =
-                    g.drain().map(|(k, v)| (k.0, v)).collect();
-                for (mut k, v) in entries {
-                    self.update_value(&mut k, old_gen, worklist);
-                    g.insert(varn_types::value::MapKey(k), v);
+            // Map/Set entries are raw VmValues mutated through interior
+            // mutability (the write barrier remembers the collection).
+            // Values rewrite in place; canonical keys (interned strings,
+            // scalars) are old-gen-stable, but identity keys can move —
+            // their hash is their bit pattern, so the table is rebuilt when
+            // any key evacuates.
+            Container::Map(m) => {
+                let mut g = m.borrow_mut();
+                for v in g.values_mut() {
+                    self.update_value(v, old_gen, worklist);
                 }
+                let any_key_moved = g
+                    .keys()
+                    .any(|k| k.0.is_heap() && is_nursery_idx(k.0.as_heap_idx()));
+                if any_key_moved {
+                    let entries: Vec<(VmValue, VmValue)> =
+                        g.drain().map(|(k, v)| (k.0, v)).collect();
+                    for (mut k, v) in entries {
+                        self.update_value(&mut k, old_gen, worklist);
+                        g.insert(varn_types::value::MapKey(k), v);
+                    }
+                }
+                return;
             }
-            return;
-        }
-        let set_ref = match old_gen.get_raw(raw_old) {
-            Some(HeapObj::Set(s)) => Some(s.clone()),
-            _ => None,
-        };
-        if let Some(s) = set_ref {
-            let mut g = s.borrow_mut();
-            let any_key_moved = g
-                .iter()
-                .any(|k| k.0.is_heap() && is_nursery_idx(k.0.as_heap_idx()));
-            if any_key_moved {
-                let items: Vec<VmValue> = g.drain().map(|k| k.0).collect();
-                for mut k in items {
-                    self.update_value(&mut k, old_gen, worklist);
-                    g.insert(varn_types::value::MapKey(k));
+            Container::Set(s) => {
+                let mut g = s.borrow_mut();
+                let any_key_moved = g
+                    .iter()
+                    .any(|k| k.0.is_heap() && is_nursery_idx(k.0.as_heap_idx()));
+                if any_key_moved {
+                    let items: Vec<VmValue> = g.drain().map(|k| k.0).collect();
+                    for mut k in items {
+                        self.update_value(&mut k, old_gen, worklist);
+                        g.insert(varn_types::value::MapKey(k));
+                    }
                 }
+                return;
             }
-            return;
-        }
-
-        if let Some(obj) = old_gen.get_raw(raw_old) {
-            match obj {
-                HeapObj::Array(arr) => {
-                    // Variant-aware: I64/F64 elements are raw numeric words,
-                    // never a nursery heap ref, so there is nothing to scan
-                    // or fix up. Only `Boxed` can hold a moved child.
-                    if let Some(items) = arr.as_boxed() {
-                        for (i, &v) in items.iter().enumerate() {
-                            if v.is_heap() && is_nursery_idx(v.as_heap_idx()) {
-                                fixups.push((ChildSlot::ArrayItem(i), v.as_heap_idx()));
-                            }
-                        }
-                    }
-                }
-                HeapObj::Object(obj_ref) => {
-                    obj_ref.borrow().for_each_field(|i, v| {
-                        if v.is_heap() && is_nursery_idx(v.as_heap_idx()) {
-                            fixups.push((ChildSlot::ObjField(i), v.as_heap_idx()));
-                        }
-                    });
-                }
-                HeapObj::VmClosure(clos) => {
-                    for (i, uv) in clos.upvalues.iter().enumerate() {
-                        if let Ok(inner) = uv.inner.try_borrow() {
-                            if inner.value.is_heap() && is_nursery_idx(inner.value.as_heap_idx()) {
-                                fixups.push((ChildSlot::Upvalue(i), inner.value.as_heap_idx()));
-                            }
-                        }
-                    }
-                }
-                HeapObj::Spread(v) => {
-                    if v.is_heap() && is_nursery_idx(v.as_heap_idx()) {
-                        fixups.push((ChildSlot::Spread, v.as_heap_idx()));
-                    }
-                }
-                HeapObj::BoundMethod(bm) => {
-                    if let Some(idx) = old_gen.value_heap_idx(&bm.receiver) {
-                        if is_nursery_idx(idx) {
-                            fixups.push((ChildSlot::BoundMethodReceiver, idx));
-                        }
-                    }
-                }
-                HeapObj::Class(cls) => {
-                    for (i, v) in cls.vtable.borrow().iter().enumerate() {
-                        if let Some(idx) = old_gen.value_heap_idx(v) {
-                            if is_nursery_idx(idx) {
-                                fixups.push((ChildSlot::ClassVtableItem(i), idx));
-                            }
-                        }
-                    }
-                    for (k, v) in cls.statics.borrow().iter() {
-                        if let Some(idx) = old_gen.value_heap_idx(v) {
-                            if is_nursery_idx(idx) {
-                                fixups.push((ChildSlot::ClassStatic(k.clone()), idx));
-                            }
-                        }
-                    }
-                }
-                HeapObj::Module(m) => {
-                    for (i, &v) in m.exports.iter().enumerate() {
-                        if v.is_heap() && is_nursery_idx(v.as_heap_idx()) {
-                            fixups.push((ChildSlot::ModuleExport(i), v.as_heap_idx()));
-                        }
-                    }
-                }
-                HeapObj::EnumVariant(ev) => {
-                    if let Some(idx) = old_gen.value_heap_idx(&ev.payload) {
-                        if is_nursery_idx(idx) {
-                            fixups.push((ChildSlot::EnumVariantPayload, idx));
-                        }
-                    }
-                }
-                _ => {}
-            }
+            Container::None => {}
         }
 
         for (slot, nursery_idx) in fixups.drain(..) {
@@ -413,6 +345,89 @@ impl Nursery {
                 }
                 _ => {}
             }
+        }
+    }
+
+    /// Record every child of `obj` that still points into the nursery. Pure
+    /// scan: it only reads through the borrow of `old_gen` the caller holds,
+    /// so the evacuation that consumes `fixups` happens after it returns.
+    fn scan_children(
+        obj: &HeapObj,
+        old_gen: &HeapInner,
+        fixups: &mut Vec<(ChildSlot, u32)>,
+    ) {
+        match obj {
+            HeapObj::Array(arr) => {
+                // Variant-aware: I64/F64 elements are raw numeric words,
+                // never a nursery heap ref, so there is nothing to scan
+                // or fix up. Only `Boxed` can hold a moved child.
+                if let Some(items) = arr.as_boxed() {
+                    for (i, &v) in items.iter().enumerate() {
+                        if v.is_heap() && is_nursery_idx(v.as_heap_idx()) {
+                            fixups.push((ChildSlot::ArrayItem(i), v.as_heap_idx()));
+                        }
+                    }
+                }
+            }
+            HeapObj::Object(obj_ref) => {
+                obj_ref.borrow().for_each_field(|i, v| {
+                    if v.is_heap() && is_nursery_idx(v.as_heap_idx()) {
+                        fixups.push((ChildSlot::ObjField(i), v.as_heap_idx()));
+                    }
+                });
+            }
+            HeapObj::VmClosure(clos) => {
+                for (i, uv) in clos.upvalues.iter().enumerate() {
+                    if let Ok(inner) = uv.inner.try_borrow() {
+                        if inner.value.is_heap() && is_nursery_idx(inner.value.as_heap_idx()) {
+                            fixups.push((ChildSlot::Upvalue(i), inner.value.as_heap_idx()));
+                        }
+                    }
+                }
+            }
+            HeapObj::Spread(v) => {
+                if v.is_heap() && is_nursery_idx(v.as_heap_idx()) {
+                    fixups.push((ChildSlot::Spread, v.as_heap_idx()));
+                }
+            }
+            HeapObj::BoundMethod(bm) => {
+                if let Some(idx) = old_gen.value_heap_idx(&bm.receiver) {
+                    if is_nursery_idx(idx) {
+                        fixups.push((ChildSlot::BoundMethodReceiver, idx));
+                    }
+                }
+            }
+            HeapObj::Class(cls) => {
+                for (i, v) in cls.vtable.borrow().iter().enumerate() {
+                    if let Some(idx) = old_gen.value_heap_idx(v) {
+                        if is_nursery_idx(idx) {
+                            fixups.push((ChildSlot::ClassVtableItem(i), idx));
+                        }
+                    }
+                }
+                for (k, v) in cls.statics.borrow().iter() {
+                    if let Some(idx) = old_gen.value_heap_idx(v) {
+                        if is_nursery_idx(idx) {
+                            fixups.push((ChildSlot::ClassStatic(k.clone()), idx));
+                        }
+                    }
+                }
+            }
+            HeapObj::Module(m) => {
+                for (i, &v) in m.exports.iter().enumerate() {
+                    if v.is_heap() && is_nursery_idx(v.as_heap_idx()) {
+                        fixups.push((ChildSlot::ModuleExport(i), v.as_heap_idx()));
+                    }
+                }
+            }
+            HeapObj::EnumVariant(ev) => {
+                if let Some(idx) = old_gen.value_heap_idx(&ev.payload) {
+                    if is_nursery_idx(idx) {
+                        fixups.push((ChildSlot::EnumVariantPayload, idx));
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -480,6 +495,17 @@ mod array_scan_tests {
             other => panic!("expected Array, got {other:?}"),
         }
     }
+}
+
+/// The variants `scan_and_fix_old_obj` cannot scan under the borrow that
+/// found them: each rewrites its contents by evacuating THROUGH `old_gen`,
+/// so the handle has to leave the borrow first. Everything else is scanned
+/// in place by `scan_children` and reports `None` here.
+enum Container {
+    Generator(Rc<dyn varn_types::generator::GeneratorDriver>),
+    Map(varn_types::value::MapRef),
+    Set(varn_types::value::SetRef),
+    None,
 }
 
 #[derive(Clone)]
