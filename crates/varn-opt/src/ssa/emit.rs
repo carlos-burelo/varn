@@ -109,6 +109,8 @@ pub fn emit_function(
         jit_code: RefCell::new(None),
         jit_failed: Cell::new(false),
         jit_epoch: Cell::new(0),
+        jit_serial: Cell::new(0),
+        backedge_memo: Cell::new(0),
         ic_cache: Rc::new(RefCell::new(
             (0..cache_count).map(|_| PolyICSlot::new()).collect(),
         )),

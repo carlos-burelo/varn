@@ -53,11 +53,57 @@ struct EpochCode {
 }
 
 static NEXT_EPOCH: AtomicU64 = AtomicU64::new(1);
+static NEXT_SERIAL: AtomicU64 = AtomicU64::new(1);
 
-/// A fresh identity for one `ExecCtx`'s compiled code. `0` means "no context",
+/// A fresh identity for one heap's compiled code. `0` means "no context",
 /// which no compiled entry ever matches.
 pub fn next_epoch() -> u64 {
     NEXT_EPOCH.fetch_add(1, Ordering::Relaxed)
+}
+
+/// Monotonic tick, stamped on each compilation and read when a heap is copied.
+/// It orders "compiled before this copy" against "compiled after it", which is
+/// exactly the line between code a copy inherits and code it must not.
+pub fn compile_serial() -> u64 {
+    NEXT_SERIAL.load(Ordering::Relaxed)
+}
+
+/// Take the next tick, for an entry that has just been built.
+pub fn stamp_compile_serial() -> u64 {
+    NEXT_SERIAL.fetch_add(1, Ordering::Relaxed)
+}
+
+/// Can the running heap enter `proto`'s compiled entry?
+///
+/// Yes when it compiled it. Yes, too, when an ancestor compiled it before this
+/// heap was copied off that ancestor: a `deep_clone` duplicates the object
+/// table wholesale, so those baked handles name the same things here. The
+/// entry is re-stamped to the running epoch on the way through, so this walk
+/// happens once per proto per heap rather than once per frame entry.
+#[cold]
+pub fn adopt_if_inherited(proto: &Rc<FunctionProto>) -> bool {
+    let owner = proto.jit_epoch.get();
+    if owner == 0 || proto.jit_entry.get().is_none() {
+        return false;
+    }
+    let epoch = current_epoch();
+    if epoch == 0 {
+        return false;
+    }
+    let ctx = CURRENT_CTX.with(|c| c.get());
+    if ctx.is_null() {
+        return false;
+    }
+    // Safety: same contract as `CtxLinker` — the guard keeps `ctx` alive.
+    let inherits = unsafe { (*ctx).heap.jit_ancestry() }
+        .iter()
+        .any(|&(ancestor, cutoff)| ancestor == owner && proto.jit_serial.get() <= cutoff);
+    if !inherits {
+        return false;
+    }
+    proto.jit_epoch.set(epoch);
+    register_compiled(proto, None);
+    true
 }
 
 /// The epoch of the context executing on this thread, `0` outside a run.

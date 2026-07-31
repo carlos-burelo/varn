@@ -290,6 +290,14 @@ pub struct HeapInner {
     /// `Heap::clone` (a nested context reaches the same objects) and fresh for
     /// `deep_clone` (equal contents, separate table).
     pub jit_epoch: u64,
+    /// Epochs this heap was copied from, each with the compile serial at the
+    /// moment of the copy. A `deep_clone` duplicates the whole table —
+    /// same indices, same contents, same interner — so code an ancestor
+    /// compiled BEFORE the copy baked handles this heap also has, and stays
+    /// valid here. Code compiled after the copy did not: that is what sibling
+    /// clones (the bench's runs) must never share, and the whole point of the
+    /// epoch. Ordered oldest first; typically empty or one entry.
+    pub jit_ancestry: Vec<(u64, u64)>,
     pub alloc_count: u64,
     pub intrinsic_classes: FxHashMap<String, Rc<ClassObj>>,
     pub gc_collections: u64,
@@ -358,6 +366,7 @@ impl HeapInner {
     pub fn new() -> Self {
         Self {
             jit_epoch: crate::clif_link::next_epoch(),
+            jit_ancestry: Vec::new(),
             objects: Vec::with_capacity(4096),
             free: Vec::new(),
             alloc_count: 0,
@@ -1452,8 +1461,11 @@ impl Heap {
 
     pub fn deep_clone(&self) -> Self {
         let mut inner_clone = unsafe { (*self.inner.get()).clone() };
-        // Same indices, different objects: code baked for the original must
-        // not be entered against the copy.
+        // A distinct table, so a distinct epoch — but it starts as a faithful
+        // copy, so whatever was compiled against the original up to now is
+        // still about objects this copy has.
+        let parent = inner_clone.jit_epoch;
+        inner_clone.jit_ancestry.push((parent, crate::clif_link::compile_serial()));
         inner_clone.jit_epoch = crate::clif_link::next_epoch();
         Self {
             inner: Rc::new(std::cell::UnsafeCell::new(inner_clone)),
@@ -1464,6 +1476,11 @@ impl Heap {
     #[inline(always)]
     pub fn jit_epoch(&self) -> u64 {
         unsafe { (*self.inner.get()).jit_epoch }
+    }
+
+    /// See [`HeapInner::jit_ancestry`].
+    pub fn jit_ancestry(&self) -> Vec<(u64, u64)> {
+        unsafe { (*self.inner.get()).jit_ancestry.clone() }
     }
 
     #[inline(always)]

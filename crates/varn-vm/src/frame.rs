@@ -315,15 +315,40 @@ impl VmClosure {
     /// `tests/56-tier-parity.vn`.
     const JIT_TIER_THRESHOLD: u32 = 1;
 
-    /// The threshold in force. `VARN_JIT_TIER` overrides it so a sweep does not
-    /// need one binary per value; unset, it is the constant above.
-    fn tier_threshold() -> u32 {
-        static T: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
-        *T.get_or_init(|| {
+    /// Threshold for a function with NO back edge. Straight-line code that has
+    /// only ever been entered a couple of times is not worth ~2 ms of
+    /// Cranelift: a correctness suite is mostly this shape, and compiling it
+    /// all is the single biggest cost of a cold run. Code that loops is
+    /// exempt (see `FunctionProto::has_backedge`) — it may never be entered
+    /// twice and there is no OSR to rescue it.
+    ///
+    /// Swept on `tests/main.vn` (execute, median of 3 alternated rounds):
+    /// 1 → 548 ms, 2 → 488, 4 → 204, 8 → 176, 16 → 168, 32 → 163. Past 8 the
+    /// curve is flat and the risk is not: a straight-line function called from
+    /// a hot loop would stay interpreted longer for nothing.
+    const JIT_TIER_THRESHOLD_STRAIGHT: u32 = 8;
+
+    /// The threshold in force for `proto`. `VARN_JIT_TIER` overrides both arms
+    /// so a sweep does not need one binary per value.
+    fn tier_threshold(proto: &FunctionProto) -> u32 {
+        static T: std::sync::OnceLock<Option<u32>> = std::sync::OnceLock::new();
+        let forced = *T.get_or_init(|| {
             std::env::var("VARN_JIT_TIER")
                 .ok()
                 .and_then(|v| v.parse().ok())
-                .unwrap_or(Self::JIT_TIER_THRESHOLD)
+        });
+        if let Some(n) = forced {
+            return n;
+        }
+        if proto.has_backedge() {
+            return Self::JIT_TIER_THRESHOLD;
+        }
+        static ST: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+        *ST.get_or_init(|| {
+            std::env::var("VARN_JIT_TIER_STRAIGHT")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(Self::JIT_TIER_THRESHOLD_STRAIGHT)
         })
     }
 
@@ -335,7 +360,9 @@ impl VmClosure {
     /// `FunctionProto::jit_epoch`).
     #[inline(always)]
     pub fn jit_fn(&self) -> Option<varn_jit::JitFn> {
-        if self.proto.jit_epoch.get() != crate::clif_link::current_epoch() {
+        if self.proto.jit_epoch.get() != crate::clif_link::current_epoch()
+            && !crate::clif_link::adopt_if_inherited(&self.proto)
+        {
             return None;
         }
         self.proto
@@ -357,7 +384,7 @@ impl VmClosure {
         }
         let n = self.proto.jit_entry_count.get() + 1;
         self.proto.jit_entry_count.set(n);
-        if n < Self::tier_threshold() {
+        if n < Self::tier_threshold(&self.proto) {
             return None;
         }
         self.compile_jit();
@@ -370,11 +397,14 @@ impl VmClosure {
             return;
         }
         // An entry from a PREVIOUS epoch is not a reason to skip: it is code
-        // for a dead heap. Rebuild, and retire the old buffer under its own
-        // epoch rather than dropping it — an outer context may still be
-        // executing it (a nested run can reach a proto its caller is in).
+        // for a heap this one did not come from. Rebuild, and retire the old
+        // buffer under its own epoch rather than dropping it — an outer
+        // context may still be executing it (a nested run can reach a proto
+        // its caller is in).
         let previous = if self.proto.jit_entry.get().is_some() {
-            if self.proto.jit_epoch.get() == epoch {
+            if self.proto.jit_epoch.get() == epoch
+                || crate::clif_link::adopt_if_inherited(&self.proto)
+            {
                 return;
             }
             let old_epoch = self.proto.jit_epoch.get();
@@ -392,6 +422,9 @@ impl VmClosure {
             Ok(compiled) => {
                 let entry_usize: usize = unsafe { std::mem::transmute(compiled.entry) };
                 self.proto.jit_epoch.set(epoch);
+                self.proto
+                    .jit_serial
+                    .set(crate::clif_link::stamp_compile_serial());
                 self.proto.jit_entry.set(Some(entry_usize));
                 *self.proto.jit_code.borrow_mut() = Some(compiled.code);
                 // Publish the direct entry LAST: a call site that observes a
@@ -529,6 +562,8 @@ mod jit_epoch_tests {
             jit_code: std::cell::RefCell::new(None),
             jit_failed: std::cell::Cell::new(false),
             jit_epoch: std::cell::Cell::new(0),
+            jit_serial: std::cell::Cell::new(0),
+            backedge_memo: std::cell::Cell::new(0),
             ic_cache: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
             feedback: std::rc::Rc::new(std::cell::RefCell::new(
                 varn_types::chunk::FeedbackVector::new(0),

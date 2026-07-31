@@ -560,6 +560,20 @@ pub struct FunctionProto {
     #[serde(default)]
     pub jit_epoch: std::cell::Cell<u64>,
 
+    /// When that code was built, on the VM's monotonic compile clock. A heap
+    /// copied off another inherits the entries its ancestor had already built
+    /// at the moment of the copy, and only those — this is what orders the two.
+    #[serde(skip)]
+    #[serde(default)]
+    pub jit_serial: std::cell::Cell<u64>,
+
+    /// Memoised "does this function contain a back edge": `0` not looked at,
+    /// `1` yes, `2` no. Decides how the tier threshold applies — see
+    /// [`Self::has_backedge`].
+    #[serde(skip)]
+    #[serde(default)]
+    pub backedge_memo: std::cell::Cell<u8>,
+
     #[serde(skip, default = "proto_ic_default")]
     pub ic_cache: Rc<RefCell<Vec<PolyICSlot>>>,
 
@@ -596,6 +610,46 @@ fn proto_feedback_default() -> Rc<RefCell<FeedbackVector>> {
 }
 
 impl FunctionProto {
+    /// Whether the body contains a back edge (`OpCode::Loop`).
+    ///
+    /// Tiering counts FRAME ENTRIES, which says nothing about a function that
+    /// is entered once and then spins a million iterations: it never reaches
+    /// any threshold, and without on-stack replacement there is no second
+    /// chance to compile it. So a looping function is compiled on its first
+    /// entry and only straight-line code is made to prove itself by being
+    /// called again — for that shape the entry count is exactly the right
+    /// evidence. Measured: a flat threshold of 8 is 5.6x on the test suite and
+    /// 2.4x WORSE on `bench_matrix`; splitting the two recovers both.
+    ///
+    /// Walked through the shared decoder so operand words can never be
+    /// mistaken for an opcode, and memoised — the answer is a property of the
+    /// bytecode, which never changes.
+    pub fn has_backedge(&self) -> bool {
+        match self.backedge_memo.get() {
+            1 => return true,
+            2 => return false,
+            _ => {}
+        }
+        let code = &self.chunk.code;
+        let mut ip = 0;
+        let mut found = false;
+        while ip < code.len() {
+            let Some(info) = crate::bytecode::decode(code, ip, &self.chunk.constants) else {
+                // Undecodable: assume the worst and compile eagerly, which is
+                // the pre-existing behaviour.
+                found = true;
+                break;
+            };
+            if OpCode::from_u16(code[ip]) == Some(OpCode::Loop) {
+                found = true;
+                break;
+            }
+            ip += info.len.max(1);
+        }
+        self.backedge_memo.set(if found { 1 } else { 2 });
+        found
+    }
+
     pub fn ensure_ic(&self) {
         let n = self.cache_count;
         if n == 0 {
