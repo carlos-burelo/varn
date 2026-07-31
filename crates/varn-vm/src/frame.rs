@@ -40,14 +40,8 @@ impl VmUpvalue {
     pub fn read(&self, stack: &[VmValue]) -> VmValue {
         let g = self.inner.borrow_mut();
         match g.stack_slot {
-            Some(slot) => {
-                let v = stack[slot];
-                v
-            }
-            None => {
-                let v = g.value;
-                v
-            }
+            Some(slot) => stack[slot],
+            None => g.value,
         }
     }
 
@@ -321,11 +315,29 @@ impl VmClosure {
     /// `tests/56-tier-parity.vn`.
     const JIT_TIER_THRESHOLD: u32 = 1;
 
-    /// The compiled entry, if this proto already has one. Never compiles.
-    /// The proto — not the closure — owns it: many closures share a proto, and
-    /// tiering happens after the closures exist.
+    /// The threshold in force. `VARN_JIT_TIER` overrides it so a sweep does not
+    /// need one binary per value; unset, it is the constant above.
+    fn tier_threshold() -> u32 {
+        static T: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+        *T.get_or_init(|| {
+            std::env::var("VARN_JIT_TIER")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(Self::JIT_TIER_THRESHOLD)
+        })
+    }
+
+    /// The compiled entry, if this proto already has one BUILT FOR THE RUNNING
+    /// CONTEXT. Never compiles. The proto — not the closure — owns the entry:
+    /// many closures share a proto, and tiering happens after the closures
+    /// exist. The epoch test is what keeps that ownership honest across runs:
+    /// the proto outlives the context, the code does not (see
+    /// `FunctionProto::jit_epoch`).
     #[inline(always)]
     pub fn jit_fn(&self) -> Option<varn_jit::JitFn> {
+        if self.proto.jit_epoch.get() != crate::clif_link::current_epoch() {
+            return None;
+        }
         self.proto
             .jit_entry
             .get()
@@ -345,7 +357,7 @@ impl VmClosure {
         }
         let n = self.proto.jit_entry_count.get() + 1;
         self.proto.jit_entry_count.set(n);
-        if n < Self::JIT_TIER_THRESHOLD {
+        if n < Self::tier_threshold() {
             return None;
         }
         self.compile_jit();
@@ -353,22 +365,48 @@ impl VmClosure {
     }
 
     pub fn compile_jit(&self) {
-        if self.proto.jit_failed.get() || self.proto.jit_entry.get().is_some() {
+        let epoch = crate::clif_link::current_epoch();
+        if self.proto.jit_failed.get() || epoch == 0 {
             return;
         }
+        // An entry from a PREVIOUS epoch is not a reason to skip: it is code
+        // for a dead heap. Rebuild, and retire the old buffer under its own
+        // epoch rather than dropping it — an outer context may still be
+        // executing it (a nested run can reach a proto its caller is in).
+        let previous = if self.proto.jit_entry.get().is_some() {
+            if self.proto.jit_epoch.get() == epoch {
+                return;
+            }
+            let old_epoch = self.proto.jit_epoch.get();
+            self.proto
+                .jit_code
+                .borrow_mut()
+                .take()
+                .map(|code| (old_epoch, code))
+        } else {
+            None
+        };
         let helpers = build_jit_helpers();
         let linker = crate::clif_link::CtxLinker::current();
         match varn_jit::compile(&self.proto, &self.constants, helpers, &linker) {
             Ok(compiled) => {
                 let entry_usize: usize = unsafe { std::mem::transmute(compiled.entry) };
+                self.proto.jit_epoch.set(epoch);
                 self.proto.jit_entry.set(Some(entry_usize));
                 *self.proto.jit_code.borrow_mut() = Some(compiled.code);
                 // Publish the direct entry LAST: a call site that observes a
                 // non-zero `clif_raw` must find fully installed code behind it.
                 self.proto.clif_raw.set(compiled.raw);
+                crate::clif_link::register_compiled(&self.proto, previous);
             }
             Err(_) => {
                 self.proto.jit_failed.set(true);
+                self.proto.jit_entry.set(None);
+                self.proto.clif_raw.set(0);
+                self.proto.jit_epoch.set(0);
+                if let Some((old_epoch, code)) = previous {
+                    crate::clif_link::retire_code(old_epoch, code);
+                }
             }
         }
     }
@@ -455,6 +493,109 @@ impl VmValuePayload for VmClosurePayload {
     }
     fn as_any(&self) -> &dyn std::any::Any {
         self
+    }
+}
+
+#[cfg(test)]
+mod jit_epoch_tests {
+    use crate::clif_link::{current_epoch, invalidate_epoch, CtxGuard};
+    use crate::exec::ExecCtx;
+    use crate::globals::GlobalStore;
+    use crate::settings::ExecSettings;
+
+    /// The smallest proto that can carry a compiled entry. Only the JIT cells
+    /// matter here; nothing executes it.
+    fn bare_proto() -> varn_types::FunctionProto {
+        use varn_types::register_meta::SlotKind;
+        varn_types::FunctionProto {
+            name: Some("victim".into()),
+            arity: 1,
+            export_names: Vec::new(),
+            register_count: 1,
+            has_rest: false,
+            is_async: false,
+            is_generator: false,
+            has_this: false,
+            upvalue_count: 0,
+            cache_count: 0,
+            chunk: varn_types::chunk::Chunk::new(),
+            required_caps: Vec::new(),
+            register_meta: Vec::new(),
+            param_kinds: Vec::new(),
+            return_kind: SlotKind::Dynamic,
+            resolved_shapes: std::cell::RefCell::new(Vec::new()),
+            jit_entry: std::cell::Cell::new(None),
+            clif_raw: std::cell::Cell::new(0),
+            jit_code: std::cell::RefCell::new(None),
+            jit_failed: std::cell::Cell::new(false),
+            jit_epoch: std::cell::Cell::new(0),
+            ic_cache: std::rc::Rc::new(std::cell::RefCell::new(Vec::new())),
+            feedback: std::rc::Rc::new(std::cell::RefCell::new(
+                varn_types::chunk::FeedbackVector::new(0),
+            )),
+            static_closure_val: std::cell::Cell::new(0),
+            jit_entry_count: std::cell::Cell::new(0),
+        }
+    }
+
+    fn ctx() -> ExecCtx {
+        ExecCtx::new(
+            GlobalStore::new(),
+            ExecSettings {
+                no_jit: true,
+                trace: false,
+            },
+        )
+    }
+
+    /// Compiled code bakes handles into one heap's object table, so two heaps
+    /// must never be told they can share it. This is the invariant behind the
+    /// `"a" + <object> + "b"` miscompile: a proto outlives the context that
+    /// compiled it, and the next run got the old entry.
+    #[test]
+    fn each_heap_is_its_own_epoch() {
+        let a = ctx();
+        let b = ctx();
+        assert_ne!(a.heap.jit_epoch(), b.heap.jit_epoch());
+
+        // A nested context over the SAME objects keeps the epoch: it reaches
+        // the very handles the code baked, so that code stays valid.
+        let shared = a.heap.clone();
+        assert_eq!(shared.jit_epoch(), a.heap.jit_epoch());
+
+        // A deep copy does not: same indices, different objects.
+        assert_ne!(a.heap.deep_clone().jit_epoch(), a.heap.jit_epoch());
+    }
+
+    #[test]
+    fn the_guard_publishes_the_running_heap() {
+        let c = ctx();
+        assert_eq!(current_epoch(), 0, "no epoch outside a run");
+        {
+            let _g = CtxGuard::enter(&c as *const ExecCtx);
+            assert_eq!(current_epoch(), c.heap.jit_epoch());
+        }
+        assert_eq!(current_epoch(), 0, "the guard restores what it found");
+    }
+
+    /// Ending an epoch must strip the entries compiled under it — the protos
+    /// holding them are still alive and reachable by the next run, and a stale
+    /// `clif_raw` is jumped to directly by other compiled code.
+    #[test]
+    fn invalidating_an_epoch_strips_its_entries() {
+        let c = ctx();
+        let epoch = c.heap.jit_epoch();
+        let proto = std::rc::Rc::new(bare_proto());
+        proto.jit_entry.set(Some(0xdead_beef));
+        proto.clif_raw.set(0xdead_beef);
+        proto.jit_epoch.set(epoch);
+        {
+            let _g = CtxGuard::enter(&c as *const ExecCtx);
+            crate::clif_link::register_compiled(&proto, None);
+        }
+        invalidate_epoch(epoch);
+        assert_eq!(proto.jit_entry.get(), None);
+        assert_eq!(proto.clif_raw.get(), 0);
     }
 }
 

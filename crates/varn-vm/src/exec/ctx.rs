@@ -65,8 +65,15 @@ pub struct ExecCtx {
     pub opcode_counts: Option<Rc<Vec<std::sync::atomic::AtomicU64>>>,
     pub profile_counters: Option<Arc<ProfileCounters>>,
     pub hotspot_counters: Option<Rc<RefCell<HotspotCounters>>>,
-    pub proto_constants: FxHashMap<usize, Rc<Vec<VmValue>>>,
-    pub static_closures: FxHashMap<usize, VmValue>,
+    /// Both of these are keyed by `Rc::as_ptr(&proto)`, and each entry holds a
+    /// strong ref to the proto that address belongs to. That ref is not
+    /// decoration: without it the `Rc` can be dropped while the entry lives on,
+    /// the allocator can hand the same address to a DIFFERENT proto, and the
+    /// cache then answers with another function's constant pool — a silent
+    /// miscompile ("a" + `<object>` + "b" where a literal should be). Holding
+    /// the proto makes the address ours for as long as it is a key.
+    pub proto_constants: FxHashMap<usize, (Rc<FunctionProto>, Rc<Vec<VmValue>>)>,
+    pub static_closures: FxHashMap<usize, (Rc<FunctionProto>, VmValue)>,
     pub linker: Linker,
     pub jit_jmp_buf: *mut JmpBuf,
     /// The OUTERMOST clif frame's jump buffer. `jit_jmp_buf` is per-frame so
@@ -326,7 +333,7 @@ impl ExecCtx {
             all_vals.push(*v);
         }
         let static_closures_start = all_vals.len();
-        for v in self.static_closures.values() {
+        for (_, v) in self.static_closures.values() {
             all_vals.push(*v);
         }
         let pending_ctors_start = all_vals.len();
@@ -367,7 +374,7 @@ impl ExecCtx {
 
         {
             let mut si = static_closures_start;
-            for v in self.static_closures.values_mut() {
+            for (_, v) in self.static_closures.values_mut() {
                 *v = all_vals[si];
                 si += 1;
             }
@@ -441,7 +448,7 @@ impl ExecCtx {
                 }
             }
         }
-        for v in self.static_closures.values() {
+        for (_, v) in self.static_closures.values() {
             if v.is_heap() {
                 roots.push(v.as_heap_idx());
             }

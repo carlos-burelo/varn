@@ -545,6 +545,21 @@ pub struct FunctionProto {
     #[serde(default)]
     pub jit_failed: std::cell::Cell<bool>,
 
+    /// Which `ExecCtx` the code in `jit_entry`/`clif_raw` was compiled for.
+    ///
+    /// Compiled code is NOT context-independent: `LoadConst` bakes the
+    /// constant's `VmValue` — a handle into one heap — as an immediate, and the
+    /// linker bakes addresses of that context's globals and sibling protos.
+    /// A proto, by contrast, outlives any single context: it is owned by the
+    /// module chunk and survives every re-execution of the program. Running
+    /// yesterday's code against today's heap reads whatever object now sits at
+    /// the baked index — `"a" + <object> + "b"` where a literal belonged.
+    /// A frame entry may only use the entry when this matches the running
+    /// context's epoch; anything else recompiles.
+    #[serde(skip)]
+    #[serde(default)]
+    pub jit_epoch: std::cell::Cell<u64>,
+
     #[serde(skip, default = "proto_ic_default")]
     pub ic_cache: Rc<RefCell<Vec<PolyICSlot>>>,
 

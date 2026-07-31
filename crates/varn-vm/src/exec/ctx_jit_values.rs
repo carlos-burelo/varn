@@ -337,7 +337,7 @@ pub extern "C" fn jit_make_closure(
 
         let proto_ptr = std::rc::Rc::as_ptr(&proto) as usize;
         if uv_count == 0 {
-            if let Some(&cached_val) = ctx_ref.static_closures.get(&proto_ptr) {
+            if let Some(&(_, cached_val)) = ctx_ref.static_closures.get(&proto_ptr) {
                 return cached_val;
             }
         }
@@ -370,18 +370,24 @@ pub extern "C" fn jit_make_closure(
             .proto_constants
             .entry(proto_ptr)
             .or_insert_with(|| {
-                std::rc::Rc::new(crate::exec::calls::resolve_constants(
+                let resolved = std::rc::Rc::new(crate::exec::calls::resolve_constants(
                     &proto,
                     &mut ctx_ref.heap,
-                ))
+                ));
+                (proto.clone(), resolved)
             })
+            .1
             .clone();
 
-        let new_closure =
-            crate::frame::VmClosure::with_upvalues(proto, upvalues, constants, ctx_ref.settings);
+        let new_closure = crate::frame::VmClosure::with_upvalues(
+            proto.clone(),
+            upvalues,
+            constants,
+            ctx_ref.settings,
+        );
         let val = ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(new_closure));
         if uv_count == 0 {
-            ctx_ref.static_closures.insert(proto_ptr, val);
+            ctx_ref.static_closures.insert(proto_ptr, (proto, val));
         }
         val
     }
@@ -1172,18 +1178,20 @@ pub extern "C" fn jit_load_static_fn(
         };
 
         let proto_ptr = std::rc::Rc::as_ptr(proto) as usize;
-        if let Some(&cached_val) = ctx_ref.static_closures.get(&proto_ptr) {
+        if let Some(&(_, cached_val)) = ctx_ref.static_closures.get(&proto_ptr) {
             return cached_val;
         }
         let constants = ctx_ref
             .proto_constants
             .entry(proto_ptr)
             .or_insert_with(|| {
-                std::rc::Rc::new(crate::exec::calls::resolve_constants(
+                let resolved = std::rc::Rc::new(crate::exec::calls::resolve_constants(
                     proto,
                     &mut ctx_ref.heap,
-                ))
+                ));
+                (proto.clone(), resolved)
             })
+            .1
             .clone();
         let new_closure = crate::frame::VmClosure::with_upvalues(
             proto.clone(),
@@ -1192,7 +1200,9 @@ pub extern "C" fn jit_load_static_fn(
             ctx_ref.settings,
         );
         let val = ctx_ref.heap.alloc_vm_closure(std::rc::Rc::new(new_closure));
-        ctx_ref.static_closures.insert(proto_ptr, val);
+        ctx_ref
+            .static_closures
+            .insert(proto_ptr, (proto.clone(), val));
         val
     }
 }

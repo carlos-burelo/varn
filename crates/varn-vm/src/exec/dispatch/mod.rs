@@ -729,7 +729,8 @@ impl ExecCtx {
                         };
 
                         let proto_ptr = std::rc::Rc::as_ptr(proto) as usize;
-                        let val = if let Some(&cached_val) = (*ctx).static_closures.get(&proto_ptr)
+                        let val = if let Some(&(_, cached_val)) =
+                            (*ctx).static_closures.get(&proto_ptr)
                         {
                             cached_val
                         } else {
@@ -744,7 +745,7 @@ impl ExecCtx {
                                     (*ctx).settings,
                                 ));
                             let val = (*ctx).heap.alloc_vm_closure(vm_closure);
-                            (*ctx).static_closures.insert(proto_ptr, val);
+                            (*ctx).static_closures.insert(proto_ptr, (proto.clone(), val));
                             val
                         };
                         (*ctx).stack[base + dest] = val;

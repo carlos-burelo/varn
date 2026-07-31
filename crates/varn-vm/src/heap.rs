@@ -284,6 +284,12 @@ impl HeapObj {
 
 #[derive(Clone)]
 pub struct HeapInner {
+    /// Identity of this object table, and therefore of every `VmValue` handle
+    /// into it. Compiled code bakes those handles as immediates, so it is only
+    /// valid while this heap is: see `FunctionProto::jit_epoch`. Shared by
+    /// `Heap::clone` (a nested context reaches the same objects) and fresh for
+    /// `deep_clone` (equal contents, separate table).
+    pub jit_epoch: u64,
     pub alloc_count: u64,
     pub intrinsic_classes: FxHashMap<String, Rc<ClassObj>>,
     pub gc_collections: u64,
@@ -338,9 +344,20 @@ fn alloc_into(
     }
 }
 
+impl Drop for HeapInner {
+    fn drop(&mut self) {
+        // Last owner of this object table. Every compiled entry that baked a
+        // handle into it is now code for a heap that no longer exists — and the
+        // protos holding those entries outlive this drop, so they must be
+        // stripped here rather than left for the next run to enter.
+        crate::clif_link::invalidate_epoch(self.jit_epoch);
+    }
+}
+
 impl HeapInner {
     pub fn new() -> Self {
         Self {
+            jit_epoch: crate::clif_link::next_epoch(),
             objects: Vec::with_capacity(4096),
             free: Vec::new(),
             alloc_count: 0,
@@ -1434,10 +1451,19 @@ impl Heap {
     }
 
     pub fn deep_clone(&self) -> Self {
-        let inner_clone = unsafe { (*self.inner.get()).clone() };
+        let mut inner_clone = unsafe { (*self.inner.get()).clone() };
+        // Same indices, different objects: code baked for the original must
+        // not be entered against the copy.
+        inner_clone.jit_epoch = crate::clif_link::next_epoch();
         Self {
             inner: Rc::new(std::cell::UnsafeCell::new(inner_clone)),
         }
+    }
+
+    /// See [`HeapInner::jit_epoch`].
+    #[inline(always)]
+    pub fn jit_epoch(&self) -> u64 {
+        unsafe { (*self.inner.get()).jit_epoch }
     }
 
     #[inline(always)]

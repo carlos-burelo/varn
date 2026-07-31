@@ -19,30 +19,113 @@
 //! interpreter fallback on any mismatch (rebind, GC move, uncompiled) — so a
 //! stale or wrong context here can only cost speed, never correctness.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
+use rustc_hash::FxHashMap;
 use varn_jit::clif::lower::{ClifLinker, ClifTarget};
+use varn_types::FunctionProto;
 
 use crate::exec::ExecCtx;
 
 thread_local! {
     static CURRENT_CTX: Cell<*const ExecCtx> = const { Cell::new(std::ptr::null()) };
+    /// Epoch of the context in `CURRENT_CTX`. Kept beside it rather than read
+    /// through the pointer so the hot `jit_fn` check is one TLS load.
+    static CURRENT_EPOCH: Cell<u64> = const { Cell::new(0) };
+    /// Per epoch: the protos that compiled under it, and the code buffers it
+    /// retired. Both are released when the epoch ends.
+    static COMPILED: RefCell<FxHashMap<u64, EpochCode>> =
+        RefCell::new(FxHashMap::default());
+}
+
+#[derive(Default)]
+struct EpochCode {
+    /// Protos whose `jit_entry` points at code built for this epoch. Held by
+    /// `Rc` so the proto — and therefore the `clif_raw` cell whose ADDRESS
+    /// sibling call sites baked — cannot be freed while that code can run.
+    protos: Vec<Rc<FunctionProto>>,
+    /// Code this epoch built and then replaced. A nested context can recompile
+    /// a proto that an outer, still-live clif frame is executing, so the buffer
+    /// is retired rather than dropped, and only freed with the epoch.
+    retired: Vec<Rc<dyn std::any::Any>>,
+}
+
+static NEXT_EPOCH: AtomicU64 = AtomicU64::new(1);
+
+/// A fresh identity for one `ExecCtx`'s compiled code. `0` means "no context",
+/// which no compiled entry ever matches.
+pub fn next_epoch() -> u64 {
+    NEXT_EPOCH.fetch_add(1, Ordering::Relaxed)
+}
+
+/// The epoch of the context executing on this thread, `0` outside a run.
+#[inline(always)]
+pub fn current_epoch() -> u64 {
+    CURRENT_EPOCH.with(|e| e.get())
+}
+
+/// Record that `proto` now holds code built for the running context, retiring
+/// whatever code it held before.
+pub fn register_compiled(proto: &Rc<FunctionProto>, previous: Option<(u64, Rc<dyn std::any::Any>)>) {
+    let epoch = current_epoch();
+    COMPILED.with(|m| {
+        let mut m = m.borrow_mut();
+        if let Some((old_epoch, old_code)) = previous {
+            m.entry(old_epoch).or_default().retired.push(old_code);
+        }
+        m.entry(epoch).or_default().protos.push(proto.clone());
+    });
+}
+
+/// Park `code` under `epoch` so it stays mapped until that epoch ends.
+pub fn retire_code(epoch: u64, code: Rc<dyn std::any::Any>) {
+    COMPILED.with(|m| m.borrow_mut().entry(epoch).or_default().retired.push(code));
+}
+
+/// End `epoch`: strip every entry it compiled and free its buffers. Called when
+/// the context that produced them is dropped, so nothing can reach code that
+/// was baked against a dead heap.
+pub fn invalidate_epoch(epoch: u64) {
+    let entry = COMPILED.with(|m| m.borrow_mut().remove(&epoch));
+    let Some(entry) = entry else { return };
+    for proto in &entry.protos {
+        if proto.jit_epoch.get() != epoch {
+            // Already recompiled for a live context; that owner clears it.
+            continue;
+        }
+        proto.jit_entry.set(None);
+        proto.clif_raw.set(0);
+        proto.jit_code.replace(None);
+        proto.jit_epoch.set(0);
+        proto.jit_entry_count.set(0);
+    }
 }
 
 /// Records `ctx` as the linking context for the duration of the guard,
 /// restoring the previous one on drop (so nested runs compose).
-pub struct CtxGuard(*const ExecCtx);
+pub struct CtxGuard(*const ExecCtx, u64);
 
 impl CtxGuard {
     pub fn enter(ctx: *const ExecCtx) -> Self {
+        let epoch = if ctx.is_null() {
+            0
+        } else {
+            // Safety: same contract as `CtxLinker` — the caller keeps `ctx`
+            // alive for the guard's lifetime.
+            unsafe { (*ctx).heap.jit_epoch() }
+        };
         let prev = CURRENT_CTX.with(|c| c.replace(ctx));
-        CtxGuard(prev)
+        let prev_epoch = CURRENT_EPOCH.with(|e| e.replace(epoch));
+        CtxGuard(prev, prev_epoch)
     }
 }
 
 impl Drop for CtxGuard {
     fn drop(&mut self) {
         CURRENT_CTX.with(|c| c.set(self.0));
+        CURRENT_EPOCH.with(|e| e.set(self.1));
     }
 }
 

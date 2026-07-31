@@ -40,7 +40,7 @@ impl ExecCtx {
                 };
                 let proto_ptr = std::rc::Rc::as_ptr(&proto) as usize;
                 if uv_count == 0 {
-                    if let Some(&cached_val) = self.static_closures.get(&proto_ptr) {
+                    if let Some(&(_, cached_val)) = self.static_closures.get(&proto_ptr) {
                         self.stack[base + dest] = cached_val;
                         return Ok(Some(ObjectFlow::ContinueInstruction));
                     }
@@ -61,21 +61,23 @@ impl ExecCtx {
                     .proto_constants
                     .entry(proto_ptr)
                     .or_insert_with(|| {
-                        std::rc::Rc::new(crate::exec::calls::resolve_constants(
+                        let resolved = std::rc::Rc::new(crate::exec::calls::resolve_constants(
                             &proto,
                             &mut self.heap,
-                        ))
+                        ));
+                        (proto.clone(), resolved)
                     })
+                    .1
                     .clone();
                 let vm_closure = std::rc::Rc::new(crate::frame::VmClosure::with_upvalues(
-                    proto,
+                    proto.clone(),
                     upvalues,
                     constants,
                     self.settings,
                 ));
                 let val = self.heap.alloc_vm_closure(vm_closure);
                 if uv_count == 0 {
-                    self.static_closures.insert(proto_ptr, val);
+                    self.static_closures.insert(proto_ptr, (proto, val));
                 }
                 self.stack[base + dest] = val;
                 Ok(Some(ObjectFlow::ContinueInstruction))
