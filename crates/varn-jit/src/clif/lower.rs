@@ -43,6 +43,7 @@ use crate::mem::JitBuffer;
 use crate::JitHelpers;
 
 use super::alloc::{self, AllocCtx};
+use super::emit;
 use super::methods;
 use super::arrays;
 use super::emit::{
@@ -268,7 +269,7 @@ fn lower_raw(
     // (`alloc::emit_backedge_safepoint`). That pair is the whole soundness
     // argument; `readonly` stays false here regardless, since the mid-end
     // must not hoist a resolve across the safepoint on its own.
-    let mut regions: Vec<(usize, usize, Vec<usize>)> = Vec::new();
+    let mut regions: Vec<emit::Region> = Vec::new();
     let mut scan_ip = 0usize;
     while scan_ip < code.len() {
         let ip = scan_ip;
@@ -278,6 +279,7 @@ fn lower_raw(
             let header = (ip + 3) - off;
             if header > 0 && (!has_alloc || !alloc::has_alloc(&code[header..ip], pool)?) {
                 let mut receivers: Vec<usize> = Vec::new();
+                let mut written: Vec<usize> = Vec::new();
                 let mut redefined: Vec<usize> = Vec::new();
                 let mut j = header;
                 while j < ip {
@@ -289,7 +291,10 @@ fn lower_raw(
                             receivers.push((code[j + 1] >> 8) as usize);
                             redefined.push(dest);
                         }
-                        OpCode::ArraySetIndex => receivers.push(dest),
+                        OpCode::ArraySetIndex => {
+                            receivers.push(dest);
+                            written.push(dest);
+                        }
                         OpCode::CallSelf => redefined.push((code[j + 1] >> 8) as usize),
                         _ => {
                             if jinfo.def.is_some() {
@@ -302,8 +307,22 @@ fn lower_raw(
                 receivers.sort_unstable();
                 receivers.dedup();
                 receivers.retain(|r| !redefined.contains(r));
+                // A receiver the region only READS gets the stronger cache:
+                // with no allocation in the region either, its element
+                // pointer, length and repr are all loop-invariant.
+                let read_only: Vec<usize> = receivers
+                    .iter()
+                    .copied()
+                    .filter(|r| !written.contains(r))
+                    .collect();
                 if !receivers.is_empty() {
-                    regions.push((header, ip, receivers));
+                    if super::trace() {
+                        eprintln!(
+                            "CLIF REGION {:?}: [{header}..{ip}] recv={receivers:?} ro={read_only:?}",
+                            proto.name
+                        );
+                    }
+                    regions.push((header, ip, receivers, read_only));
                 }
             }
         }
@@ -342,14 +361,29 @@ fn lower_raw(
     // One payload-cache variable per (loop region, receiver register).
     // Zero-defined at entry like every var, and 0 means "not resolved":
     // the frontend's all-paths-defined rule and the sentinel share a def.
-    let cache_vars: HashMap<(usize, usize), Variable> = regions
+    let cache_vars: HashMap<(usize, usize), emit::RegionCache> = regions
         .iter()
-        .flat_map(|(h, _, regs)| regs.iter().map(move |r| (*h, *r)))
-        .map(|k| (k, b.declare_var(types::I64)))
+        .flat_map(|(h, _, regs, ro)| regs.iter().map(move |r| ((*h, *r), ro.contains(r))))
+        .map(|(k, read_only)| {
+            let payload = b.declare_var(types::I64);
+            let view = read_only.then(|| {
+                [
+                    b.declare_var(types::I64),
+                    b.declare_var(types::I64),
+                    b.declare_var(types::I64),
+                ]
+            });
+            (k, emit::RegionCache { payload, view })
+        })
         .collect();
     // Flat list for the safepoint, which invalidates all of them at once
     // and has no way to tell which region it sits in.
-    let all_caches: Vec<Variable> = cache_vars.values().copied().collect();
+    let all_caches: Vec<Variable> = cache_vars
+        .values()
+        .flat_map(|c| {
+            std::iter::once(c.payload).chain(c.view.into_iter().flatten())
+        })
+        .collect();
 
     let entry = b.create_block();
     b.append_block_params_for_function_params(entry);
@@ -367,8 +401,11 @@ fn lower_raw(
             b.def_var(*v, zero);
         }
     }
-    for v in cache_vars.values() {
-        b.def_var(*v, zero);
+    for c in cache_vars.values() {
+        b.def_var(c.payload, zero);
+        for v in c.view.into_iter().flatten() {
+            b.def_var(v, zero);
+        }
     }
     let (exec_ctx, alloc_env) = if frame_aware {
         let closure = b.block_params(entry)[1];
@@ -487,7 +524,7 @@ fn lower_raw(
                 // Falling through into a loop header: this block is the
                 // preheader — resolve each planned receiver's payload into
                 // its cache (sentinel 0 when the guard chain rejects).
-                for (h, _, regs) in regions.iter().filter(|(h, _, _)| *h == ip) {
+                for (h, _, regs, _) in regions.iter().filter(|(h, _, _, _)| *h == ip) {
                     for &r in regs {
                         if state[r] != K::Boxed {
                             continue;
@@ -513,7 +550,50 @@ fn lower_raw(
                         b.ins().jump(done, &[z.into()]);
                         b.switch_to_block(done);
                         let resolved = b.block_params(done)[0];
-                        b.def_var(cache, resolved);
+                        b.def_var(cache.payload, resolved);
+                        // Read-only receiver: hoist the three words behind the
+                        // payload too. Loading them off an unresolved (0)
+                        // payload would fault, so they are read on the
+                        // resolved path and zeroed on the reject path — and
+                        // `data == 0` is what the accesses test.
+                        if let Some(view) = cache.view {
+                            let lay = &helpers.array_layout;
+                            let ok = b.ins().icmp_imm(IntCC::NotEqual, resolved, 0);
+                            let load_blk = b.create_block();
+                            let skip = b.create_block();
+                            let merge = b.create_block();
+                            for _ in 0..3 {
+                                b.append_block_param(merge, types::I64);
+                            }
+                            b.ins().brif(ok, load_blk, &[], skip, &[]);
+
+                            b.switch_to_block(load_blk);
+                            let data = b.ins().load(
+                                types::I64,
+                                MemFlags::trusted(),
+                                resolved,
+                                (16 + lay.elems_ptr_off) as i32,
+                            );
+                            let len = b.ins().load(
+                                types::I64,
+                                MemFlags::trusted(),
+                                resolved,
+                                (16 + lay.elems_len_off) as i32,
+                            );
+                            let disc = super::emit::array_disc(&mut b, resolved, lay);
+                            b.ins()
+                                .jump(merge, &[data.into(), len.into(), disc.into()]);
+
+                            b.switch_to_block(skip);
+                            let z0 = b.ins().iconst(types::I64, 0);
+                            b.ins().jump(merge, &[z0.into(), z0.into(), z0.into()]);
+
+                            b.switch_to_block(merge);
+                            for (i, v) in view.iter().enumerate() {
+                                let p = b.block_params(merge)[i];
+                                b.def_var(*v, p);
+                            }
+                        }
                     }
                 }
                 b.ins().jump(*blk, &[]);

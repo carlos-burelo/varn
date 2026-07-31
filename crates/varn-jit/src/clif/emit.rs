@@ -312,17 +312,42 @@ pub(super) fn state_meta_int(meta: &[varn_types::register_meta::RegisterMeta], r
 }
 
 /// Innermost loop region containing `ip` with a hoisted cache for `r`.
+/// What a loop region knows about one array receiver, resolved once in the
+/// region's preheader.
+///
+/// `payload` alone (the pointer to the array's `ArrayRepr`) is what every
+/// receiver gets: it skips the tag/generation/slot walk on each access.
+///
+/// `view` is the stronger form, and only a receiver the region never WRITES
+/// can have it, inside a region that never allocates. Under those two facts
+/// the element pointer, the length and the repr discriminant are all
+/// loop-invariant, so an access is a bounds compare, a repr compare and one
+/// load — no resolve, and no reload of the three words behind it. A written
+/// receiver keeps `view: None`: a store can grow the element Vec (moving the
+/// data pointer and the length) or migrate the repr.
+#[derive(Clone, Copy)]
+pub(super) struct RegionCache {
+    /// Payload pointer; `0` means the preheader's guard chain rejected it.
+    pub payload: Variable,
+    /// `[data, len, disc]`, sharing the same `0`-means-unresolved sentinel on
+    /// `data` (a live `Vec`'s pointer is never null, empty or not).
+    pub view: Option<[Variable; 3]>,
+}
+
+/// A loop region: `(header ip, back-edge ip, receivers, read-only receivers)`.
+pub(super) type Region = (usize, usize, Vec<usize>, Vec<usize>);
+
 pub(super) fn find_cache(
-    regions: &[(usize, usize, Vec<usize>)],
-    cache_vars: &HashMap<(usize, usize), Variable>,
+    regions: &[Region],
+    cache_vars: &HashMap<(usize, usize), RegionCache>,
     ip: usize,
     r: usize,
-) -> Option<Variable> {
+) -> Option<RegionCache> {
     regions
         .iter()
-        .filter(|(h, e, regs)| *h <= ip && ip < *e && regs.contains(&r))
-        .min_by_key(|(h, e, _)| e - h)
-        .map(|(h, _, _)| cache_vars[&(*h, r)])
+        .filter(|(h, e, regs, _)| *h <= ip && ip < *e && regs.contains(&r))
+        .min_by_key(|(h, e, _, _)| e - h)
+        .map(|(h, _, _, _)| cache_vars[&(*h, r)])
 }
 
 /// Indirect call to a template-JIT runtime helper

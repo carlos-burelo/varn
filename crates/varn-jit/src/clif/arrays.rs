@@ -47,8 +47,8 @@ pub(super) struct ArrCtx<'a> {
     pub helpers: &'a JitHelpers,
     pub cc: CallConv,
     pub exec_ctx: cranelift_codegen::ir::Value,
-    pub regions: &'a [(usize, usize, Vec<usize>)],
-    pub cache_vars: &'a HashMap<(usize, usize), Variable>,
+    pub regions: &'a [super::emit::Region],
+    pub cache_vars: &'a HashMap<(usize, usize), super::emit::RegionCache>,
     pub register_meta: &'a [RegisterMeta],
     pub has_alloc: bool,
 }
@@ -172,22 +172,36 @@ pub(super) fn emit_array_length(
     let merge = b.create_block();
     b.append_block_param(merge, types::I64); // unboxed len
     let cache = find_cache(c.regions, c.cache_vars, ip, src);
-    let payload = cached_payload(
-        b,
-        c.exec_ctx,
-        obj,
-        &c.helpers.array_layout,
-        c.helpers.heap_field_offset,
-        slow,
-        cache,
-        !c.has_alloc,
-    );
-    let len = b.ins().load(
-        types::I64,
-        MemFlags::trusted(),
-        payload,
-        (16 + c.helpers.array_layout.elems_len_off) as i32,
-    );
+    let len = match cache.and_then(|c| c.view) {
+        // Hoisted length: `.length` inside a read-only region is one variable
+        // read (see `RegionCache`).
+        Some(view) => {
+            let data = b.use_var(view[0]);
+            let resolved = b.ins().icmp_imm(IntCC::NotEqual, data, 0);
+            let live = b.create_block();
+            b.ins().brif(resolved, live, &[], slow, &[]);
+            b.switch_to_block(live);
+            b.use_var(view[1])
+        }
+        None => {
+            let payload = cached_payload(
+                b,
+                c.exec_ctx,
+                obj,
+                &c.helpers.array_layout,
+                c.helpers.heap_field_offset,
+                slow,
+                cache.map(|c| c.payload),
+                !c.has_alloc,
+            );
+            b.ins().load(
+                types::I64,
+                MemFlags::trusted(),
+                payload,
+                (16 + c.helpers.array_layout.elems_len_off) as i32,
+            )
+        }
+    };
     b.ins().jump(merge, &[len.into()]);
     // slow: generic helper returns a boxed int; unbox.
     b.switch_to_block(slow);
@@ -228,31 +242,58 @@ pub(super) fn emit_array_get_index(
     let merge = b.create_block();
     b.append_block_param(merge, want.ty());
     let cache = find_cache(c.regions, c.cache_vars, ip, obj_r);
-    let payload = cached_payload(
-        b,
-        c.exec_ctx,
-        obj,
-        &c.helpers.array_layout,
-        c.helpers.heap_field_offset,
-        slow,
-        cache,
-        !c.has_alloc,
-    );
     let lay = &c.helpers.array_layout;
-    let len = b.ins().load(
-        types::I64,
-        MemFlags::trusted(),
-        payload,
-        (16 + lay.elems_len_off) as i32,
-    );
+
+    // A read-only receiver in an allocation-free region had its data pointer,
+    // length and repr hoisted into the region's preheader, so the whole
+    // resolve chain and all three loads collapse to variable reads here. The
+    // `data == 0` sentinel means the preheader's guard chain rejected the
+    // receiver; the generic helper answers for it, as it does for every other
+    // rejection.
+    let (data, len, disc) = match cache.and_then(|c| c.view) {
+        Some(view) => {
+            let data = b.use_var(view[0]);
+            let resolved = b.ins().icmp_imm(IntCC::NotEqual, data, 0);
+            let live = b.create_block();
+            b.ins().brif(resolved, live, &[], slow, &[]);
+            b.switch_to_block(live);
+            (data, b.use_var(view[1]), b.use_var(view[2]))
+        }
+        None => {
+            let payload = cached_payload(
+                b,
+                c.exec_ctx,
+                obj,
+                lay,
+                c.helpers.heap_field_offset,
+                slow,
+                cache.map(|c| c.payload),
+                !c.has_alloc,
+            );
+            let data = b.ins().load(
+                types::I64,
+                MemFlags::trusted(),
+                payload,
+                (16 + lay.elems_ptr_off) as i32,
+            );
+            let len = b.ins().load(
+                types::I64,
+                MemFlags::trusted(),
+                payload,
+                (16 + lay.elems_len_off) as i32,
+            );
+            (data, len, array_disc(b, payload, lay))
+        }
+    };
+
     // Unsigned compare also rejects negative keys.
     let oob = b.ins().icmp(IntCC::UnsignedGreaterThanOrEqual, key, len);
     let inb = b.create_block();
     b.ins().brif(oob, slow, &[], inb, &[]);
     b.switch_to_block(inb);
 
-    let disc = array_disc(b, payload, lay);
-    let addr = elem_addr(b, payload, key, lay);
+    let off = b.ins().ishl_imm(key, 3);
+    let addr = b.ins().iadd(data, off);
     // Raw arm first (the expected repr for this destination), then the Boxed
     // arm, then the helper. When the destination is already boxed the two
     // coincide and only one arm is emitted.
@@ -388,7 +429,7 @@ pub(super) fn emit_array_set_index(
         &c.helpers.array_layout,
         c.helpers.heap_field_offset,
         slow,
-        cache,
+        cache.map(|c| c.payload),
         !c.has_alloc,
     );
     let lay = &c.helpers.array_layout;
