@@ -28,9 +28,11 @@ use varn_types::chunk::{Literal, PoolEntry};
 
 use varn_types::register_meta::RegisterMeta;
 
+use varn_types::register_meta::SlotKind;
+
 use super::emit::{
     box_or_pass, call_helper, call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce,
-    wrap_i48,
+    use_int, wrap_i48,
 };
 use super::kinds::K;
 use crate::JitHelpers;
@@ -216,7 +218,12 @@ pub(super) fn args_struct(
 /// for the caller to emit the actual back-edge jump. Mirrors the template's
 /// `emit_gc_safepoint_check`: inline nursery-fill test, and only the taken
 /// branch flushes/collects/reloads.
-pub(super) fn emit_backedge_safepoint(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K]) {
+pub(super) fn emit_backedge_safepoint(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    payload_caches: &[Variable],
+) {
     let h = actx.helpers;
     let rcbox = b
         .ins()
@@ -236,6 +243,18 @@ pub(super) fn emit_backedge_safepoint(b: &mut FunctionBuilder, actx: &AllocCtx, 
     flush_boxed(b, actx, state, &regs);
     call_helper_void(b, actx.cc, h.gc_safepoint, &[actx.exec_ctx]);
     reload_boxed(b, actx, state, &regs);
+    // A collection just ran, so every resolved payload pointer may dangle:
+    // the object can have been evacuated to a different generation and the
+    // old-gen `objects` Vec can have moved. Reset the caches to the 0
+    // sentinel here, in the TAKEN arm only — the check above is the common
+    // path and must stay a test-and-fall-through. This is what lets an
+    // allocating function keep a loop payload cache at all; the other half
+    // of the argument is that a cached region is allocation-free, so
+    // nothing inside it can grow a heap Vec under the pointer.
+    let invalid = b.ins().iconst(types::I64, 0);
+    for &cv in payload_caches {
+        b.def_var(cv, invalid);
+    }
     b.ins().jump(cont, &[]);
     b.switch_to_block(cont);
 }
@@ -292,47 +311,158 @@ pub(super) fn reload_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K]
     }
 }
 
-/// Generic cross-function `Call` — the callee is a class (`new`) or any
-/// non-int-contract value, so it can't use the clif→clif fast IC. Dispatch
-/// through `clif_call_fallback` (which runs the callee, possibly a
-/// constructor, in the interpreter and can therefore trigger a GC): flush
-/// live heap refs to their home slots first, box the callee+args, call, then
-/// reload. Result is unboxed to int only when the register meta proves it.
-pub(super) fn emit_generic_call(
+/// Cross-function `Call`.
+///
+/// Two lowerings share one merge point:
+///
+/// * **direct** — the callee register was proven to hold a specific global,
+///   the linker bound that global's closure, and the closure's proto has
+///   published a bare (non frame-aware) RAW entry. The call becomes a
+///   hardware call into that entry, guarded on the callee's exact `VmValue`
+///   bits AND on the entry still being published. A bare raw cannot allocate
+///   (`has_alloc` is exactly what makes a lowering frame-aware), so no GC can
+///   run under it and nothing needs flushing.
+/// * **fallback** — everything else: `clif_call_fallback` runs the callee
+///   (interpreter, JIT, constructor, native) and can therefore GC, so live
+///   heap refs go to their home slots first and come back after.
+///
+/// The guard's entry load is what makes the direct path reachable at all:
+/// callers compile before their callees, so binding the entry at compile time
+/// would resolve to "uncompiled" for essentially every site and never be
+/// revisited. See `FunctionProto::clif_raw`.
+pub(super) fn emit_call(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
     state: &[K],
-    _meta: &[varn_types::register_meta::RegisterMeta],
     code: &[u16],
     ip: usize,
+    target: Option<&crate::clif::lower::ClifTarget>,
 ) -> Result<(), String> {
     let w1 = code[ip + 1];
     let w2 = code[ip + 2];
     let dest = (w1 >> 8) as usize;
     let callee_reg = (w1 & 0xFF) as usize;
-    let argc = (w2 >> 8) as usize;
+    // `total` counts the callee/receiver slot at `arg_start`, so the callee's
+    // declared parameters are `total - 1` registers starting at `arg_start+1`.
+    let total = (w2 >> 8) as usize;
     let arg_start = (w2 & 0xFF) as usize;
 
     let callee = box_or_pass(b, actx.vars, state, callee_reg);
-    let arg_vals: Vec<cranelift_codegen::ir::Value> = (0..argc)
-        .map(|i| box_or_pass(b, actx.vars, state, arg_start + i))
-        .collect();
 
-    let regs = live_boxed(actx, state);
-    flush_boxed(b, actx, state, &regs);
+    let direct = target.filter(|t| {
+        t.raw_slot != 0
+            && t.param_kinds.len() + 1 == total
+            && arg_start + total <= actx.nregs
+            // An `int` parameter is handed over unboxed, which `use_int` can
+            // only produce from an Int or boxed register — never from a
+            // float-typed Variable.
+            && t.param_kinds.iter().enumerate().all(|(i, k)| {
+                let r = arg_start + 1 + i;
+                if *k != SlotKind::Int {
+                    return true;
+                }
+                let unboxable = state[r] == K::Int || super::kinds::is_boxed_kind(state[r]);
+                unboxable && !meta_is_float(actx.register_meta, r)
+            })
+    });
 
-    let argc_v = b.ins().iconst(types::I64, argc as i64);
-    let zero = b.ins().iconst(types::I64, 0);
-    let mut args = vec![actx.exec_ctx, callee, argc_v];
-    for i in 0..4 {
-        args.push(if i < argc { arg_vals[i] } else { zero });
+    let Some(t) = direct else {
+        let res = emit_vm_call(b, actx, state, callee, arg_start, total);
+        def_result(b, actx, dest, res);
+        return Ok(());
+    };
+
+    // The raw entry unboxes nothing: an `int` parameter arrives as a bare i48
+    // payload, every other kind as boxed VmValue bits. Mirrors `build_wrapper`,
+    // which stages the same arguments off the VM stack. Materialized before
+    // the branch so both arms see values from a dominating block.
+    let mut raw_args = Vec::with_capacity(1 + t.param_kinds.len());
+    raw_args.push(actx.exec_ctx);
+    for (i, k) in t.param_kinds.iter().enumerate() {
+        let r = arg_start + 1 + i;
+        let v = if *k == SlotKind::Int {
+            use_int(b, actx.vars, state, r)?
+        } else {
+            box_or_pass(b, actx.vars, state, r)
+        };
+        raw_args.push(v);
     }
-    let res = call_helper(b, actx.cc, actx.helpers.clif_call_fallback, &args);
 
-    reload_boxed(b, actx, state, &regs);
+    let expected = b.ins().iconst(types::I64, t.expected_bits as i64);
+    let same = b.ins().icmp(IntCC::Equal, callee, expected);
+    let slot = b.ins().iconst(types::I64, t.raw_slot as i64);
+    let raw = b.ins().load(types::I64, MemFlags::trusted(), slot, 0);
+    let published = b.ins().icmp_imm(IntCC::NotEqual, raw, 0);
+    let take_direct = b.ins().band(same, published);
 
+    let fast = b.create_block();
+    let slow = b.create_block();
+    let merge = b.create_block();
+    b.append_block_param(merge, types::I64);
+    b.ins().brif(take_direct, fast, &[], slow, &[]);
+
+    b.switch_to_block(fast);
+    let raw_sig = {
+        let mut s = cranelift_codegen::ir::Signature::new(actx.cc);
+        for _ in 0..raw_args.len() {
+            s.params
+                .push(cranelift_codegen::ir::AbiParam::new(types::I64));
+        }
+        s.returns
+            .push(cranelift_codegen::ir::AbiParam::new(types::I64));
+        b.import_signature(s)
+    };
+    let call = b.ins().call_indirect(raw_sig, raw, &raw_args);
+    let raw_res = b.inst_results(call)[0];
+    let boxed_fast = super::emit::retag_raw_return(b, raw_res, t.return_kind);
+    b.ins().jump(merge, &[boxed_fast.into()]);
+
+    b.switch_to_block(slow);
+    let boxed_slow = emit_vm_call(b, actx, state, callee, arg_start, total);
+    b.ins().jump(merge, &[boxed_slow.into()]);
+
+    b.switch_to_block(merge);
+    let res = b.block_params(merge)[0];
     def_result(b, actx, dest, res);
     Ok(())
+}
+
+/// Dispatch a call through the VM. The helper reads the arguments out of
+/// `ctx.stack[base + arg_start ..]`, so the whole call window must be in its
+/// home slots first — passing them as C arguments capped the site at three
+/// real parameters and silently dropped the rest.
+///
+/// `flush_boxed` already lands every non-float register; float registers are
+/// deliberately outside its set (a float is never a heap reference, so the
+/// collector does not need it rooted) but the callee still needs the value,
+/// so they are stored here.
+fn emit_vm_call(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    callee: cranelift_codegen::ir::Value,
+    arg_start: usize,
+    total: usize,
+) -> cranelift_codegen::ir::Value {
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+    let fb = frame_base_addr(b, actx);
+    for r in arg_start..(arg_start + total).min(actx.nregs) {
+        if meta_is_float(actx.register_meta, r) {
+            store_home(b, actx, state, fb, r);
+        }
+    }
+
+    let src = b.ins().iadd_imm(actx.base, arg_start as i64);
+    let n = b.ins().iconst(types::I64, total as i64);
+    let res = call_helper(
+        b,
+        actx.cc,
+        actx.helpers.clif_call_fallback,
+        &[actx.exec_ctx, callee, src, n],
+    );
+    reload_boxed(b, actx, state, &regs);
+    res
 }
 
 /// `BuildArray dest, start, count` — materialize the `count` element

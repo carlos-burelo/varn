@@ -153,33 +153,29 @@ pub extern "C" fn jit_typeof_val(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
     }
 }
 
-/// CLIF static-call IC miss path: the guarded callee bits didn't match the
-/// linked target (rebound global, or GC-moved closure), so dispatch the
-/// actual runtime callee through the interpreter/JIT with the (already
-/// boxed) argument values. Up to 4 args — the lowering bails a `Call` with
-/// more, so `a0..a3` beyond `argc` are ignored.
+/// CLIF call path for everything the direct clif→clif call can't take: an
+/// unlinkable callee, a callee with no published entry yet, or a guard miss
+/// (rebound global, GC-moved closure).
+///
+/// `src` is the ABSOLUTE index in `ctx.stack` of the call window the caller
+/// flushed — `argc` consecutive slots starting with the callee/receiver
+/// placeholder. Passing the window by address rather than by value is what
+/// lifts the site's old three-argument ceiling: the previous signature took
+/// four `VmValue`s and declared `argc` separately, so any call with four or
+/// more real parameters staged too few and `prepare_call` read the frame one
+/// slot low.
 ///
 /// Errors propagate through the same longjmp path as every other JIT
 /// helper, unwinding to the outer `setjmp` in `execute_jit_frame`.
-#[allow(clippy::too_many_arguments)]
 pub extern "C" fn clif_call_fallback(
     ctx: *mut ExecCtx,
     callee: VmValue,
+    src: usize,
     argc: usize,
-    a0: VmValue,
-    a1: VmValue,
-    a2: VmValue,
-    a3: VmValue,
 ) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let all = [a0, a1, a2, a3];
-        // `argc` slots starting at all[0] are already staged (including the null
-        // placeholder for regular calls, or the receiver for extension calls).
-        // call_vm_staged mirrors the interpreter's exec_call_reg fallback:
-        // push the staged args directly and call prepare_call(callee, argc).
-        let staged = &all[..argc.min(4)];
-        match ctx_ref.call_vm_staged(callee, staged, argc) {
+        match ctx_ref.call_vm_window(callee, src, argc) {
             Ok(v) => v,
             Err(msg) => jit_propagate_error(ctx_ref, crate::error::RuntimeError::new(msg)),
         }

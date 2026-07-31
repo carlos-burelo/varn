@@ -8,8 +8,6 @@ use std::collections::HashMap;
 
 use cranelift_codegen::ir::{condcodes::IntCC, types, AbiParam, InstBuilder, MemFlags, Signature};
 use cranelift_frontend::{FunctionBuilder, Variable};
-use varn_core::OpCode;
-use varn_types::bytecode::decode;
 use varn_types::register_meta::SlotKind;
 use varn_types::VmValue;
 
@@ -156,27 +154,6 @@ pub(super) fn emit_return_value(
             _ => box_or_pass(b, vars, state, src),
         },
     })
-}
-
-/// Whether the function contains any array opcode. Functions that both
-/// call and touch arrays are rejected: a payload pointer cached across a
-/// loop body would dangle if the call's fallback triggers a GC.
-pub(super) fn code_has_array_ops(
-    code: &[u16],
-    pool: &[varn_types::chunk::PoolEntry],
-) -> Result<bool, String> {
-    let mut ip = 0usize;
-    while ip < code.len() {
-        let info = decode(code, ip, pool).ok_or("clif: undecodable opcode")?;
-        if matches!(
-            OpCode::from_u8(code[ip] as u8),
-            Some(OpCode::ArrayGetIndex | OpCode::ArraySetIndex | OpCode::ArrayLength)
-        ) {
-            return Ok(true);
-        }
-        ip += info.len;
-    }
-    Ok(false)
 }
 
 /// Re-tag an unboxed int as a VmValue.
@@ -353,6 +330,32 @@ pub(super) fn find_cache(
 /// never allocate on the VM heap (no GC can run under a clif frame) and
 /// raise VM errors by longjmp'ing to the outer setjmp, exactly like the
 /// template's slow paths.
+/// Normalize a RAW function's return value to boxed `VmValue` bits.
+///
+/// Only an `int` return needs work, and only conditionally: `emit_return_value`
+/// yields an unboxed i48 payload on the common path but passes boxed bits
+/// straight through when the returned value came from a nested call, so the
+/// re-tag has to test for an already-present NaN-box tag. Every other return
+/// kind is boxed by construction.
+///
+/// Shared by `build_wrapper` and by the direct clif→clif call site: the two
+/// consume the same raw entry and must decode its result identically.
+pub(super) fn retag_raw_return(
+    b: &mut FunctionBuilder,
+    raw_res: cranelift_codegen::ir::Value,
+    return_kind: SlotKind,
+) -> cranelift_codegen::ir::Value {
+    if return_kind != SlotKind::Int {
+        return raw_res;
+    }
+    let qnan = b.ins().iconst(types::I64, varn_types::vm_value::QNAN as i64);
+    let high = b.ins().band(raw_res, qnan);
+    let is_unboxed = b.ins().icmp_imm(IntCC::Equal, high, 0);
+    let masked = b.ins().band_imm(raw_res, MASK_48);
+    let tagged = b.ins().bor_imm(masked, INT_TAG);
+    b.ins().select(is_unboxed, tagged, raw_res)
+}
+
 pub(super) fn call_helper(
     b: &mut FunctionBuilder,
     cc: cranelift_codegen::isa::CallConv,

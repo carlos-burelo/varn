@@ -105,6 +105,7 @@ pub fn emit_function(
         return_kind,
         resolved_shapes: RefCell::new(Vec::new()),
         jit_entry: Cell::new(None),
+        clif_raw: Cell::new(0),
         jit_code: RefCell::new(None),
         jit_failed: Cell::new(false),
         ic_cache: Rc::new(RefCell::new(

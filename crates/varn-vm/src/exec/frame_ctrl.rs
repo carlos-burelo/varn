@@ -831,19 +831,29 @@ impl NativeCtx for ExecCtx {
 }
 
 impl ExecCtx {
-    /// Like `call_vm`, but for the JIT generic-call fallback.
-    /// Args are already staged on a slice (including the callee-placeholder null for
-    /// regular calls, or the receiver for extension calls). We push them directly
-    /// without an extra callee push, and hand `arg_count` straight to `prepare_call` —
-    /// exactly mirroring the interpreter's `exec_call_reg` fallback path.
-    pub(crate) fn call_vm_staged(
+    /// Like `call_vm`, but for the JIT call fallback.
+    ///
+    /// The caller's clif frame flushed its call window to home slots, so the
+    /// `arg_count` arguments — including the callee-placeholder null for a
+    /// regular call, or the receiver for an extension call — sit at
+    /// `stack[src..src + arg_count]`. Copy them to the stack top, where
+    /// `prepare_call` expects a callee's frame to begin, and hand `arg_count`
+    /// straight over, exactly mirroring the interpreter's `exec_call_reg`
+    /// fallback path.
+    pub(crate) fn call_vm_window(
         &mut self,
         callee: VmValue,
-        staged_args: &[VmValue],
+        src: usize,
         arg_count: usize,
     ) -> Result<VmValue, String> {
+        // The window is inside the caller's register file, which is allocated
+        // on frame entry — but a proto whose trailing registers were never
+        // written can leave the stack short of it.
+        if self.stack.len() < src + arg_count {
+            self.stack.resize(src + arg_count, VmValue::null());
+        }
         let orig_len = self.stack.len();
-        self.stack.extend_from_slice(staged_args);
+        self.stack.extend_from_within(src..src + arg_count);
         // `new X()` is the single hottest shape reaching here from clif code.
         // The template JIT's own call helper had this fast path; without it
         // every construction pays prepare_call + a frame push + a nested

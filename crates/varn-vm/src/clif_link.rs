@@ -1,20 +1,27 @@
 //! VM side of the Cranelift static-call linker.
 //!
 //! When a function clif-compiles a cross-function `Call`, it asks this
-//! linker whether the global slot holds a clif-compiled, int-contract
-//! callee it can call directly (guarded). The answer is derived from the
-//! live `ExecCtx`: clif compilation happens during closure construction,
-//! which happens during execution, so a thread-local records the executing
-//! context for the duration of a run.
+//! linker which closure the global slot holds, so the call site can bind
+//! directly to that closure's proto. The answer is derived from the live
+//! `ExecCtx`: clif compilation happens during execution, so a thread-local
+//! records the executing context for the duration of a run.
+//!
+//! The link does NOT require the callee to be compiled yet. Callers reach
+//! their tier threshold before their callees do — a caller must be entered
+//! for its callee to be entered at all — so demanding compiled code here
+//! would decline essentially every call and never revisit it. Instead the
+//! link carries the ADDRESS of the callee proto's `clif_raw` cell, which the
+//! call site loads at run time: `0` until the callee compiles, the direct
+//! entry afterwards.
 //!
 //! Every link is only a runtime HINT — the generated call site guards on
-//! the callee's exact `VmValue` bits and takes the interpreter fallback on
-//! any mismatch (rebind, GC move) — so a stale or wrong context here can
-//! only cost speed, never correctness.
+//! the callee's exact `VmValue` bits and on a non-zero entry, taking the
+//! interpreter fallback on any mismatch (rebind, GC move, uncompiled) — so a
+//! stale or wrong context here can only cost speed, never correctness.
 
 use std::cell::Cell;
 
-use varn_jit::clif::lower::{ClifArtifact, ClifLinker, ClifTarget};
+use varn_jit::clif::lower::{ClifLinker, ClifTarget};
 
 use crate::exec::ExecCtx;
 
@@ -65,16 +72,13 @@ impl ClifLinker for CtxLinker {
             _ => return None,
         };
         let proto = &closure.proto;
-        let borrow = proto.jit_code.borrow();
-        let art = borrow.as_ref()?.downcast_ref::<ClifArtifact>()?;
-        // Frame-aware raws take extra (base, closure) params; the clif→clif
-        // fast path can't supply them, so decline and let the guarded call
-        // take the wrapper-based fallback (always correct, just slower).
-        if art.frame_aware {
-            return None;
-        }
+        // The proto lives in an `Rc` for as long as any closure over it does,
+        // and compiled code outlives neither — so the cell's address stays
+        // valid for the lifetime of every call site that embeds it. The cell
+        // stays `0` for a proto that fails to compile or takes the
+        // frame-aware lowering; the call site checks it on every call.
         Some(ClifTarget {
-            raw: art.raw as usize,
+            raw_slot: &proto.clif_raw as *const std::cell::Cell<usize> as usize,
             expected_bits: gv.0,
             param_kinds: proto.param_kinds.clone(),
             return_kind: proto.return_kind,

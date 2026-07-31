@@ -359,10 +359,13 @@ impl VmClosure {
         let helpers = build_jit_helpers();
         let linker = crate::clif_link::CtxLinker::current();
         match varn_jit::compile(&self.proto, &self.constants, helpers, &linker) {
-            Ok((entry, code)) => {
-                let entry_usize: usize = unsafe { std::mem::transmute(entry) };
+            Ok(compiled) => {
+                let entry_usize: usize = unsafe { std::mem::transmute(compiled.entry) };
                 self.proto.jit_entry.set(Some(entry_usize));
-                *self.proto.jit_code.borrow_mut() = Some(code);
+                *self.proto.jit_code.borrow_mut() = Some(compiled.code);
+                // Publish the direct entry LAST: a call site that observes a
+                // non-zero `clif_raw` must find fully installed code behind it.
+                self.proto.clif_raw.set(compiled.raw);
             }
             Err(_) => {
                 self.proto.jit_failed.set(true);

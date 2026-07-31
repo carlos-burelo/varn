@@ -285,12 +285,25 @@ fn fn_name(proto: &FunctionProto) -> String {
     proto.name.as_deref().unwrap_or("<module>").to_owned()
 }
 
+/// What a successful compilation hands back to the VM.
+///
+/// `raw` is the direct clif→clif entry, or `0` when the function took the
+/// frame-aware lowering — such a raw expects `(stack_ptr, closure, base, …)`,
+/// a callee frame no caller can supply, so only the wrapper may invoke it.
+/// The VM publishes `raw` in `FunctionProto::clif_raw` for other functions'
+/// call sites to load.
+pub struct Compiled {
+    pub entry: JitFn,
+    pub raw: usize,
+    pub code: Rc<dyn Any>,
+}
+
 pub fn compile(
     proto: &FunctionProto,
     constants: &[VmValue],
     helpers: JitHelpers,
     linker: &dyn clif::lower::ClifLinker,
-) -> Result<(JitFn, Rc<dyn Any>), String> {
+) -> Result<Compiled, String> {
     // NOT a compile-time budget: this cap is what keeps module top-levels
     // (and other long functions) out of clif, and with them the only shapes
     // that put one clif frame underneath another.
@@ -354,7 +367,12 @@ pub fn compile(
                         code_bytes,
                     });
                     let jit_fn: JitFn = unsafe { std::mem::transmute(art.entry) };
-                    return Ok((jit_fn, Rc::new(art) as Rc<dyn Any>));
+                    let raw = if art.frame_aware { 0 } else { art.raw as usize };
+                    return Ok(Compiled {
+                        entry: jit_fn,
+                        raw,
+                        code: Rc::new(art) as Rc<dyn Any>,
+                    });
                 }
                 Err(e) => {
                     if clif::trace() {

@@ -46,9 +46,9 @@ use super::alloc::{self, AllocCtx};
 use super::methods;
 use super::arrays;
 use super::emit::{
-    box_for_target, box_f64, box_int, box_or_pass, call_helper, code_has_array_ops, def_const, def_const_bool, def_const_int,
-    emit_array_payload, emit_return_value, meta_is_float, meta_is_int, patch_rel32, unbox_bool,
-    unbox_f64_coerce, use_boxed, use_f64, use_int, wrap_i48, INT_TAG, MASK_48,
+    box_for_target, box_f64, box_int, box_or_pass, call_helper, def_const, def_const_bool, def_const_int,
+    emit_array_payload, emit_return_value, meta_is_float, meta_is_int, patch_rel32, retag_raw_return,
+    unbox_bool, unbox_f64_coerce, use_boxed, use_f64, use_int, wrap_i48,
 };
 use super::fields;
 use super::floats;
@@ -71,10 +71,13 @@ pub struct ClifArtifact {
 }
 
 /// A statically linkable call target: the CURRENT closure a global slot
-/// holds, when that closure is clif-compiled with an Int-proven contract.
+/// holds, bound to that closure's proto.
 pub struct ClifTarget {
-    /// Raw-function entry address.
-    pub raw: usize,
+    /// Address of the callee proto's `clif_raw` cell — NOT the entry itself.
+    /// The call site loads it on every call, so a callee compiled after its
+    /// caller still gets called directly. `0` means "no direct entry yet"
+    /// (uncompiled, failed, or frame-aware) and selects the fallback.
+    pub raw_slot: usize,
     /// The exact boxed `VmValue` bits of the closure the link was made
     /// against. The call site guards on equality: a rebound (or GC-moved)
     /// global mismatches and takes the generic fallback — never a wrong
@@ -217,20 +220,6 @@ fn lower_raw(
     // when it never allocates.
     let frame_aware = proto.has_this || has_alloc || proto.upvalue_count > 0 || proto.is_generator || proto.is_async;
 
-    // Cross-function static calls (the `Call` arm) are only sound when no
-    // heap pointer is live across the call — a GC under the fallback could
-    // move it. In the routed subset, the only boxed values are callee-fn
-    // loads consumed immediately by their own call; the presence of ANY
-    // array op (whose payload pointers are cached across loop bodies) or a
-    // boxed parameter breaks that, so we forbid `Call` in those functions.
-    let array_free = !code_has_array_ops(code, pool)?;
-    let all_int_params = proto.param_kinds.iter().all(|k| *k == SlotKind::Int);
-    // Cross-function static calls are not yet threaded through the
-    // frame-aware safepoint discipline, so an allocating function forbids
-    // them (they bail to the template) alongside the existing array/boxed
-    // constraints.
-    let calls_allowed = array_free && all_int_params && !has_alloc;
-
     // ---- scan: instruction starts, block starts (jump targets +
     // fall-through after conditional jumps) ----
     let mut block_starts: Vec<usize> = vec![0];
@@ -269,51 +258,56 @@ fn lower_raw(
     // the routed subset: nothing under a routed frame can run a GC, and an
     // append only mutates the payload's inner words, never the payload
     // pointer itself.
-    // Loop payload caching is unsound in an allocating function: a
-    // back-edge safepoint can grow the old-gen Vec or move the array, so
-    // a cached data pointer would dangle. Such functions re-resolve every
-    // access instead (see `readonly = !has_alloc` below).
+    // An ALLOCATING function may cache too, but only over a loop whose own
+    // body allocates nothing. The pointer a cache holds is the address of
+    // the receiver's heap slot, and any allocation can push that slot's Vec
+    // (nursery or old gen) past its capacity and move it — a collection is
+    // not the only way to invalidate one. An allocation-free region cannot
+    // do that, and the collection that CAN happen at its back edge resets
+    // every cache from the safepoint's taken arm
+    // (`alloc::emit_backedge_safepoint`). That pair is the whole soundness
+    // argument; `readonly` stays false here regardless, since the mid-end
+    // must not hoist a resolve across the safepoint on its own.
     let mut regions: Vec<(usize, usize, Vec<usize>)> = Vec::new();
-    if !has_alloc {
-        let mut ip = 0usize;
-        while ip < code.len() {
-            let info = decode(code, ip, pool).ok_or("clif: undecodable opcode")?;
-            if OpCode::from_u8(code[ip] as u8) == Some(OpCode::Loop) {
-                let off = ((code[ip + 1] as u32) << 16 | code[ip + 2] as u32) as usize;
-                let header = (ip + 3) - off;
-                if header > 0 {
-                    let mut receivers: Vec<usize> = Vec::new();
-                    let mut redefined: Vec<usize> = Vec::new();
-                    let mut j = header;
-                    while j < ip {
-                        let jinfo = decode(code, j, pool).ok_or("clif: undecodable opcode")?;
-                        let jop = OpCode::from_u8(code[j] as u8).ok_or("clif: unknown opcode")?;
-                        let dest = (code[j] >> 8) as usize;
-                        match jop {
-                            OpCode::ArrayGetIndex | OpCode::ArrayLength => {
-                                receivers.push((code[j + 1] >> 8) as usize);
+    let mut scan_ip = 0usize;
+    while scan_ip < code.len() {
+        let ip = scan_ip;
+        let info = decode(code, ip, pool).ok_or("clif: undecodable opcode")?;
+        if OpCode::from_u8(code[ip] as u8) == Some(OpCode::Loop) {
+            let off = ((code[ip + 1] as u32) << 16 | code[ip + 2] as u32) as usize;
+            let header = (ip + 3) - off;
+            if header > 0 && (!has_alloc || !alloc::has_alloc(&code[header..ip], pool)?) {
+                let mut receivers: Vec<usize> = Vec::new();
+                let mut redefined: Vec<usize> = Vec::new();
+                let mut j = header;
+                while j < ip {
+                    let jinfo = decode(code, j, pool).ok_or("clif: undecodable opcode")?;
+                    let jop = OpCode::from_u8(code[j] as u8).ok_or("clif: unknown opcode")?;
+                    let dest = (code[j] >> 8) as usize;
+                    match jop {
+                        OpCode::ArrayGetIndex | OpCode::ArrayLength => {
+                            receivers.push((code[j + 1] >> 8) as usize);
+                            redefined.push(dest);
+                        }
+                        OpCode::ArraySetIndex => receivers.push(dest),
+                        OpCode::CallSelf => redefined.push((code[j + 1] >> 8) as usize),
+                        _ => {
+                            if jinfo.def.is_some() {
                                 redefined.push(dest);
                             }
-                            OpCode::ArraySetIndex => receivers.push(dest),
-                            OpCode::CallSelf => redefined.push((code[j + 1] >> 8) as usize),
-                            _ => {
-                                if jinfo.def.is_some() {
-                                    redefined.push(dest);
-                                }
-                            }
                         }
-                        j += jinfo.len;
                     }
-                    receivers.sort_unstable();
-                    receivers.dedup();
-                    receivers.retain(|r| !redefined.contains(r));
-                    if !receivers.is_empty() {
-                        regions.push((header, ip, receivers));
-                    }
+                    j += jinfo.len;
+                }
+                receivers.sort_unstable();
+                receivers.dedup();
+                receivers.retain(|r| !redefined.contains(r));
+                if !receivers.is_empty() {
+                    regions.push((header, ip, receivers));
                 }
             }
-            ip += info.len;
         }
+        scan_ip += info.len;
     }
 
     // ---- build ----
@@ -353,6 +347,9 @@ fn lower_raw(
         .flat_map(|(h, _, regs)| regs.iter().map(move |r| (*h, *r)))
         .map(|k| (k, b.declare_var(types::I64)))
         .collect();
+    // Flat list for the safepoint, which invalidates all of them at once
+    // and has no way to tell which region it sits in.
+    let all_caches: Vec<Variable> = cache_vars.values().copied().collect();
 
     let entry = b.create_block();
     b.append_block_params_for_function_params(entry);
@@ -750,7 +747,7 @@ fn lower_raw(
                 // nursery, so it skips this.)
                 if has_alloc {
                     if let Some(actx) = actx.as_ref() {
-                        alloc::emit_backedge_safepoint(&mut b, actx, &state);
+                        alloc::emit_backedge_safepoint(&mut b, actx, &state, &all_caches);
                     }
                 }
                 if let Some(target_state) = entries.get(&target_ip) {
@@ -880,92 +877,15 @@ fn lower_raw(
                 fields::emit_set_fixed_field(&mut b, &fld, &state, code, ip, first_reg)?;
             }
             OpCode::Call => {
-                let w1 = code[ip + 1];
-                let w2 = code[ip + 2];
-                let callee_reg = (w1 & 0xFF) as usize;
-                let total = (w2 >> 8) as usize;
-                let argc = total.saturating_sub(1);
-
-                let static_target = if calls_allowed {
-                    match state[callee_reg] {
-                        K::Global(i) => linker.static_target(i as usize),
-                        _ => None,
-                    }
-                } else {
-                    None
+                // `Call` is itself in the `has_alloc` set, so a function that
+                // contains one is always frame-aware and always has `actx`.
+                let actx = actx.as_ref().ok_or("clif: call in non-frame-aware fn")?;
+                let callee_reg = (code[ip + 1] & 0xFF) as usize;
+                let target = match state[callee_reg] {
+                    K::Global(i) => linker.static_target(i as usize),
+                    _ => None,
                 };
-
-                let can_fast_ic = if let Some(ref target) = static_target {
-                    target.param_kinds.len() == argc
-                        && target.param_kinds.iter().all(|k| *k == SlotKind::Int)
-                        && target.return_kind == SlotKind::Int
-                        && argc <= 4
-                } else {
-                    false
-                };
-
-                if can_fast_ic {
-                    let target = static_target.unwrap();
-                    let dest = (w1 >> 8) as usize;
-                    let call_base = (w2 & 0xFF) as usize;
-
-                    let callee = b.use_var(vars[callee_reg]);
-                    let expected = b.ins().iconst(types::I64, target.expected_bits as i64);
-                    let same = b.ins().icmp(IntCC::Equal, callee, expected);
-                    let fast = b.create_block();
-                    let slow = b.create_block();
-                    let merge = b.create_block();
-                    b.append_block_param(merge, types::I64);
-                    b.ins().brif(same, fast, &[], slow, &[]);
-
-                    b.switch_to_block(fast);
-                    let mut raw_args = Vec::with_capacity(1 + argc);
-                    raw_args.push(exec_ctx);
-                    for i in 0..argc {
-                        raw_args.push(use_int(&mut b, &vars, &state, call_base + 1 + i)?);
-                    }
-                    let raw_sig = {
-                        let mut s = Signature::new(cc);
-                        for _ in 0..=argc {
-                            s.params.push(AbiParam::new(types::I64));
-                        }
-                        s.returns.push(AbiParam::new(types::I64));
-                        b.import_signature(s)
-                    };
-                    let raw_ptr = b.ins().iconst(types::I64, target.raw as i64);
-                    let rc = b.ins().call_indirect(raw_sig, raw_ptr, &raw_args);
-                    let rfast = b.inst_results(rc)[0];
-                    b.ins().jump(merge, &[rfast.into()]);
-
-                    b.switch_to_block(slow);
-                    let argc_v = b.ins().iconst(types::I64, argc as i64);
-                    let zero_arg = b.ins().iconst(types::I64, 0);
-                    let mut fb = vec![exec_ctx, callee, argc_v];
-                    for i in 0..4 {
-                        if i < argc {
-                            let a = use_int(&mut b, &vars, &state, call_base + 1 + i)?;
-                            fb.push(box_int(&mut b, a));
-                        } else {
-                            fb.push(zero_arg);
-                        }
-                    }
-                    let boxed = call_helper(&mut b, cc, helpers.clif_call_fallback, &fb);
-                    let s = b.ins().ishl_imm(boxed, 16);
-                    let rslow = b.ins().sshr_imm(s, 16);
-                    b.ins().jump(merge, &[rslow.into()]);
-
-                    b.switch_to_block(merge);
-                    let res = b.block_params(merge)[0];
-                    // Both arms yield a raw i48; re-tag it so every `Call`
-                    // destination carries boxed bits (see `apply_kinds`).
-                    // An int consumer unboxes again — the redundant pair is a
-                    // known perf lever, not a correctness one.
-                    let boxed_res = box_int(&mut b, res);
-                    b.def_var(vars[dest], boxed_res);
-                } else {
-                    let actx = actx.as_ref().ok_or("clif: call in non-frame-aware fn")?;
-                    alloc::emit_generic_call(&mut b, actx, &state, &proto.register_meta, code, ip)?;
-                }
+                alloc::emit_call(&mut b, actx, &state, code, ip, target.as_ref())?;
             }
             OpCode::BuildArray => {
                 let actx = actx.as_ref().ok_or("clif: BuildArray outside alloc fn")?;
@@ -1300,16 +1220,7 @@ fn build_wrapper(
     // Every other admitted return (string/ref/dynamic, or a constructor's
     // null) is already boxed VmValue bits — pass through. Re-tagging a null
     // would forge a non-null value and defeat jit_construct_fast's null check.
-    let result = if proto.return_kind == SlotKind::Int {
-        let qnan = b.ins().iconst(types::I64, varn_types::vm_value::QNAN as i64);
-        let high = b.ins().band(raw_res, qnan);
-        let is_unboxed = b.ins().icmp_imm(IntCC::Equal, high, 0);
-        let masked = b.ins().band_imm(raw_res, MASK_48);
-        let tagged = b.ins().bor_imm(masked, INT_TAG);
-        b.ins().select(is_unboxed, tagged, raw_res)
-    } else {
-        raw_res
-    };
+    let result = retag_raw_return(&mut b, raw_res, proto.return_kind);
     b.ins().return_(&[result]);
     b.finalize();
     compile_piece(func, isa)

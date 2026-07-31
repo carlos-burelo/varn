@@ -520,6 +520,23 @@ pub struct FunctionProto {
     #[serde(default)]
     pub jit_entry: std::cell::Cell<Option<usize>>,
 
+    /// Address of this proto's Cranelift RAW entry — the unboxed
+    /// `fn(exec_ctx, args…) -> i64` body, callable clif→clif without going
+    /// back through the VM frame loop. `0` means "no direct entry": either
+    /// the proto is not compiled yet, its compilation failed, or it took the
+    /// frame-aware lowering (whose raw needs a callee frame the caller cannot
+    /// supply).
+    ///
+    /// Call sites embed the ADDRESS OF THIS CELL and load it at run time
+    /// rather than baking the entry in. Callers compile before their callees
+    /// — a caller reaches its tier threshold first, by definition — so a
+    /// compile-time snapshot would be `None` for essentially every call and
+    /// would never be revisited. The extra load is what makes the direct call
+    /// reachable at all.
+    #[serde(skip)]
+    #[serde(default)]
+    pub clif_raw: std::cell::Cell<usize>,
+
     #[serde(skip)]
     #[serde(default)]
     pub jit_code: std::cell::RefCell<Option<Rc<dyn std::any::Any>>>,
