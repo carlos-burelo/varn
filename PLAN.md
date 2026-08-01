@@ -121,6 +121,34 @@ cobertura clif 97% (las frames que quedan interpretadas son cuerpos de test
 rectos que no valían 2 ms de Cranelift), y los benchmarks planos — `matrix`
 1.01, `dto` 1.0, `fib` 1.0, `str_ops` 0.92 pareados contra el árbol pre-sesión.
 
+### El dato que ordena todo lo demás: en esta suite compilar NO paga
+
+Medido sobre `tests/main.vn`, una ejecución:
+
+| | fns compiladas | compilar | execute |
+|---|---|---|---|
+| `VARN_JIT_TIER=1` (todo) | 517 | 1.133 s | 886 ms |
+| default (bucles eager, recto ≥8) | 241 | 349 ms | 281 ms |
+| **`VARN_NO_JIT=1`** | 0 | 0 | **42 ms** |
+
+Cualquier dosis de compilación es peor que interpretar, porque cada ejecución
+compila ~500 funciones a 1.5-2.2 ms y luego llama a cada una unas tres veces.
+Ningún umbral arregla eso: es la razón por la que el `505c004` medía 23 ms
+—compilaba con el template JIT, ~19 µs por función, 65-100x más barato— y por la
+que el 45 ms del 07-30 sólo existía reusando entre heaps.
+
+El barrido del brazo de bucles deja el conflicto a la vista:
+
+| umbral de bucles | main.vn execute | bench_matrix |
+|---|---|---|
+| 1 | 244-265 ms | **156-185 ms** |
+| 4 | 80-85 ms | 282-316 ms |
+| 8 | **63-66 ms** | 264-304 ms |
+
+La suite quiere no compilar; el código real quiere compilar sus bucles en la
+primera entrada. Se queda en 1: optimizar el número para la suite es optimizar
+para el perfil equivocado.
+
 ### La palanca que queda: código independiente del heap
 
 Es la misma que la Tarea 3 §3 (compartir código entre isolates) y ahora tiene
