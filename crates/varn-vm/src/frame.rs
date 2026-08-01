@@ -322,11 +322,18 @@ impl VmClosure {
     /// exempt (see `FunctionProto::has_backedge`) — it may never be entered
     /// twice and there is no OSR to rescue it.
     ///
-    /// Swept on `tests/main.vn` (execute, median of 3 alternated rounds):
-    /// 1 → 548 ms, 2 → 488, 4 → 204, 8 → 176, 16 → 168, 32 → 163. Past 8 the
-    /// curve is flat and the risk is not: a straight-line function called from
-    /// a hot loop would stay interpreted longer for nothing.
-    const JIT_TIER_THRESHOLD_STRAIGHT: u32 = 8;
+    /// The earlier sweep that picked 8 was run under `SIZE_GATE_WORDS = 250`,
+    /// which turned every large function away before Cranelift saw it. Raising
+    /// the gate to 8192 admitted exactly those functions, so the old curve no
+    /// longer describes this build — a perf conclusion expires when what
+    /// surrounds it changes.
+    ///
+    /// Re-swept on `tests/main.vn` (e2e p50, loop arm pinned at 1):
+    /// 8 → 395 ms, 32 → 164, 64 → 141, 128 → 121, 512 → 129. The hot
+    /// benchmarks are indifferent because their kernels all carry a back edge
+    /// and take the other arm: at 128, matrix/dto/gc_alloc/json move by less
+    /// than run-to-run noise.
+    const JIT_TIER_THRESHOLD_STRAIGHT: u32 = 128;
 
     /// The threshold in force for `proto`. `VARN_JIT_TIER` overrides every arm
     /// so a sweep does not need one binary per value.
