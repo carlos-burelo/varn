@@ -101,6 +101,51 @@ impl ClifLinker for NoLinker {
     }
 }
 
+/// Why a lowering came out frame-aware, in the order the flag tests them,
+/// plus `resume` when the body can hand control back to the INTERPRETER at a
+/// bytecode ip (`Try`'s catch, `Yield`/`Await`'s suspension), which is what
+/// reads registers back out of the home slots.
+///
+/// `frame_aware` is what zeroes `clif_raw` and so denies a function the direct
+/// clif→clif entry. Sizing that gap needs the split: a function marked only
+/// `alloc` is one a stack-map rooting model could set free, whereas one that
+/// also says `resume` needs its home slots regardless.
+pub fn frame_aware_reasons(proto: &FunctionProto) -> Vec<&'static str> {
+    let code = &proto.chunk.code;
+    let pool = &proto.chunk.constants;
+    let mut r = Vec::new();
+    if proto.has_this {
+        r.push("this");
+    }
+    if alloc::has_alloc(code, pool).unwrap_or(true) {
+        r.push("alloc");
+    }
+    if proto.upvalue_count > 0 {
+        r.push("upvalue");
+    }
+    if proto.is_generator {
+        r.push("generator");
+    }
+    if proto.is_async {
+        r.push("async");
+    }
+    let mut ip = 0usize;
+    while ip < code.len() {
+        let Some(info) = decode(code, ip, pool) else {
+            break;
+        };
+        if matches!(
+            OpCode::from_u8(code[ip] as u8),
+            Some(OpCode::Try) | Some(OpCode::Yield) | Some(OpCode::Await) | Some(OpCode::LoadModule)
+        ) {
+            r.push("resume");
+            break;
+        }
+        ip += info.len;
+    }
+    r
+}
+
 pub fn try_compile(
     proto: &FunctionProto,
     constants: &[VmValue],

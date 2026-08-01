@@ -101,6 +101,8 @@ pub struct ClifInspection {
     pub clif_ir: Option<String>,
     pub code: Option<CodeBytes>,
     pub frame_aware: bool,
+    /// Which tests made it frame-aware — see `lower::frame_aware_reasons`.
+    pub fa_reasons: Vec<&'static str>,
 }
 
 /// Run the clif lowering for `proto` with capture active, without executing.
@@ -124,5 +126,6 @@ pub fn inspect(
         clif_ir: sink.clif_ir,
         code: sink.code,
         frame_aware,
+        fa_reasons: super::lower::frame_aware_reasons(proto),
     }
 }

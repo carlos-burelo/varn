@@ -38,6 +38,8 @@ pub struct TierRow {
     pub words: usize,
     pub tier: Tier,
     pub frame_aware: bool,
+    /// Which tests made it frame-aware — see `clif::lower::frame_aware_reasons`.
+    pub fa_reasons: Vec<&'static str>,
 }
 
 impl TierRow {
@@ -91,6 +93,7 @@ fn walk(
             words,
             tier: Tier::Gate(format!("too large (>{SIZE_GATE_WORDS} words)")),
             frame_aware: false,
+            fa_reasons: Vec::new(),
         });
     } else {
         let constants = constants_for_inspect(proto);
@@ -104,6 +107,7 @@ fn walk(
             words,
             tier,
             frame_aware: insp.frame_aware,
+            fa_reasons: insp.fa_reasons,
         });
     }
 
@@ -176,7 +180,11 @@ pub fn debug_tiers(
         "función", "words", "tier", "razón"
     );
     for r in &rows {
-        let fa = if r.frame_aware { " (frame-aware)" } else { "" };
+        let fa = if r.frame_aware {
+            format!(" (frame-aware: {})", r.fa_reasons.join("+"))
+        } else {
+            String::new()
+        };
         eprintln!(
             "  {:<name_w$}  {:>6}  {}{:<5}{R}  {DIM}{}{fa}{R}",
             truncate(&r.name, name_w),
