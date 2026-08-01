@@ -22,6 +22,7 @@
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::{FunctionBuilder, Variable};
+use std::cell::Cell;
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::chunk::{Literal, PoolEntry};
@@ -35,6 +36,7 @@ use super::emit::{
     use_int, wrap_i48,
 };
 use super::kinds::K;
+use super::liveness::Liveness;
 use crate::JitHelpers;
 
 /// Whether the function constructs or mutates heap objects — i.e. can run a
@@ -129,6 +131,15 @@ pub(super) struct AllocCtx<'a> {
     pub closure: cranelift_codegen::ir::Value,
     pub nregs: usize,
     pub register_meta: &'a [RegisterMeta],
+    /// Registers still readable after each instruction — what [`live_boxed`]
+    /// narrows the flush set with.
+    pub live: &'a Liveness,
+    /// Bytecode ip the lowering is currently emitting for, republished by the
+    /// dispatch loop once per opcode. The thirty-odd emit arms below all need
+    /// it to size their flush set and every one of them already sits under
+    /// that loop, so carrying it here keeps their signatures unchanged
+    /// instead of threading one more argument through all of them.
+    pub cur_ip: Cell<usize>,
 }
 
 /// Address of this frame's register-0 home slot, recomputed from `ExecCtx`
@@ -261,9 +272,18 @@ pub(super) fn emit_backedge_safepoint(
 
 /// Registers that could hold a live value at this program point — the
 /// set to flush across a helper/GC call.
+///
+/// Floats are excluded because they live in F64 Variables the collector never
+/// looks at. The rest is whatever `liveness` proves is still readable after
+/// the current instruction: a register no reader will touch again does not
+/// need to be rooted, and leaving its home slot alone keeps the older (still
+/// valid) VmValue the frame's null-fill guarantees, which the collector
+/// already scans and tolerates.
 pub(super) fn live_boxed(actx: &AllocCtx, _state: &[K]) -> Vec<usize> {
+    let ip = actx.cur_ip.get();
     (0..actx.nregs)
         .filter(|&r| !meta_is_float(actx.register_meta, r))
+        .filter(|&r| actx.live.is_live_after(ip, r))
         .collect()
 }
 

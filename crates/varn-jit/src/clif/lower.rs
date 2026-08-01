@@ -412,6 +412,12 @@ fn lower_raw(
         let exec_ctx = b.block_params(entry)[0];
         (exec_ctx, None)
     };
+    // Only a frame-aware function ever flushes, so only it needs the answer.
+    let live = if alloc_env.is_some() {
+        super::liveness::analyze(code, pool, nregs)
+    } else {
+        super::liveness::Liveness::everything()
+    };
     let actx = alloc_env.map(|(base, closure)| AllocCtx {
         vars: vars.as_slice(),
         helpers,
@@ -421,6 +427,8 @@ fn lower_raw(
         closure,
         nregs,
         register_meta: &proto.register_meta,
+        live: &live,
+        cur_ip: std::cell::Cell::new(0),
     });
     let reg_offset = 1;
     for i in 0..nparams {
@@ -624,6 +632,10 @@ fn lower_raw(
         let op = OpCode::from_u8(raw_op as u8).ok_or("clif: unknown opcode")?;
         let info = decode(code, ip, pool).ok_or("clif: undecodable opcode")?;
         let next_ip = ip + info.len;
+        // Republish the point every emit arm below sizes its GC flush set at.
+        if let Some(a) = actx.as_ref() {
+            a.cur_ip.set(ip);
+        }
 
         match op {
             OpCode::LoadIntZero => def_const_int(&mut b, &proto.register_meta, &vars, first_reg, 0),
