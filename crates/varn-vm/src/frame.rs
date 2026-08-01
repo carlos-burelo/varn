@@ -328,20 +328,17 @@ impl VmClosure {
     /// a hot loop would stay interpreted longer for nothing.
     const JIT_TIER_THRESHOLD_STRAIGHT: u32 = 8;
 
-    /// The threshold in force for `proto`. `VARN_JIT_TIER` overrides both arms
+    /// The threshold in force for `proto`. `VARN_JIT_TIER` overrides every arm
     /// so a sweep does not need one binary per value.
     fn tier_threshold(proto: &FunctionProto) -> u32 {
-        static T: std::sync::OnceLock<Option<u32>> = std::sync::OnceLock::new();
-        let forced = *T.get_or_init(|| {
-            std::env::var("VARN_JIT_TIER")
-                .ok()
-                .and_then(|v| v.parse().ok())
-        });
-        if let Some(n) = forced {
-            return n;
-        }
         if proto.has_backedge() {
-            return Self::JIT_TIER_THRESHOLD;
+            static LT: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+            return *LT.get_or_init(|| {
+                std::env::var("VARN_JIT_TIER")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(Self::JIT_TIER_THRESHOLD)
+            });
         }
         static ST: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
         *ST.get_or_init(|| {
