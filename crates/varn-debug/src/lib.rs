@@ -11,6 +11,7 @@ pub mod flags;
 pub mod hir;
 pub mod loop_diagnostics;
 pub mod modules;
+pub mod roots;
 pub mod scope;
 pub mod ssa;
 pub mod summary;

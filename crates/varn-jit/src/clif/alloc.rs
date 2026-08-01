@@ -22,7 +22,7 @@
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::{FunctionBuilder, Variable};
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::chunk::{Literal, PoolEntry};
@@ -140,6 +140,12 @@ pub(super) struct AllocCtx<'a> {
     /// that loop, so carrying it here keeps their signatures unchanged
     /// instead of threading one more argument through all of them.
     pub cur_ip: Cell<usize>,
+    /// `(ip, flushed registers)` per safepoint, for `vn debug -p roots`.
+    /// Recorded from inside [`live_boxed`] rather than reconstructed later:
+    /// the whole point of the report is to show what the lowering ACTUALLY
+    /// flushed, and any second implementation of that could agree with the
+    /// report while disagreeing with the emitted code. `None` in production.
+    pub safepoints: Option<RefCell<Vec<(usize, Vec<usize>)>>>,
 }
 
 /// Address of this frame's register-0 home slot, recomputed from `ExecCtx`
@@ -281,10 +287,14 @@ pub(super) fn emit_backedge_safepoint(
 /// already scans and tolerates.
 pub(super) fn live_boxed(actx: &AllocCtx, _state: &[K]) -> Vec<usize> {
     let ip = actx.cur_ip.get();
-    (0..actx.nregs)
+    let regs: Vec<usize> = (0..actx.nregs)
         .filter(|&r| !meta_is_float(actx.register_meta, r))
         .filter(|&r| actx.live.is_live_after(ip, r))
-        .collect()
+        .collect();
+    if let Some(rec) = &actx.safepoints {
+        rec.borrow_mut().push((ip, regs.clone()));
+    }
+    regs
 }
 
 /// Spill `regs` to their `ctx.stack` home slots so the collector roots (and

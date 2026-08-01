@@ -64,13 +64,16 @@ pub fn compile(
         varn_debug::summary::debug_summary(&proto);
     }
 
-    if debug.tiers || debug.bails {
+    if debug.tiers || debug.bails || debug.roots {
         let helpers = varn_vm::frame::build_jit_helpers();
         if debug.tiers {
             varn_debug::tiers::debug_tiers(&proto, debug, &helpers, None);
         }
         if debug.bails {
             varn_debug::tiers::debug_bails(&proto, debug, &helpers, None);
+        }
+        if debug.roots {
+            varn_debug::roots::debug_roots(&proto, debug, &helpers, None);
         }
     }
 

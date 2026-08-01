@@ -198,10 +198,35 @@ struct CompiledPiece {
     code: Vec<u8>,
     /// Offsets of rel32 call displacements that must resolve to raw@0.
     call_reloc_offsets: Vec<usize>,
+    /// `(bytecode ip, roots declared)` per emitted stack map, joined through
+    /// the srclocs stamped in the dispatch loop. Empty unless roots were asked
+    /// for — with no marking Cranelift emits no maps at all.
+    stack_maps: Vec<(usize, usize)>,
+    /// Maps whose PC fell in no stamped srcloc range.
+    maps_unmatched: usize,
 }
 
 fn compile_piece(func: Function, isa: &OwnedTargetIsa) -> Result<CompiledPiece, String> {
     super::with_ctx(func, isa.as_ref(), |compiled| {
+        let srclocs = compiled.buffer.get_srclocs_sorted();
+        let mut stack_maps = Vec::new();
+        let mut maps_unmatched = 0usize;
+        for (offset, _, map) in compiled.buffer.user_stack_maps() {
+            // The map's PC is the safepoint instruction. Attribute it to the
+            // NEAREST PRECEDING stamped srcloc rather than to a range that
+            // strictly contains it: regalloc interleaves spills and reloads
+            // around a call, and those carry no srcloc of their own, so a
+            // containment test drops the map even though the emitting opcode
+            // is unambiguous.
+            match srclocs
+                .iter()
+                .filter(|l| l.start <= *offset && !l.loc.is_default())
+                .max_by_key(|l| l.start)
+            {
+                Some(l) => stack_maps.push((l.loc.bits() as usize, map.entries().count())),
+                None => maps_unmatched += 1,
+            }
+        }
         let mut call_reloc_offsets = Vec::new();
         for reloc in compiled.buffer.relocs() {
             // The only symbol either piece may reference is user func 0 — the
@@ -219,6 +244,8 @@ fn compile_piece(func: Function, isa: &OwnedTargetIsa) -> Result<CompiledPiece, 
         Ok(CompiledPiece {
             code: compiled.code_buffer().to_vec(),
             call_reloc_offsets,
+            stack_maps,
+            maps_unmatched,
         })
     })
 }
@@ -256,6 +283,7 @@ fn lower_raw(
     let nparams = proto.arity.saturating_sub(1);
     let nregs = proto.register_count as usize;
     let cc = isa.default_call_conv();
+    let want_roots = debug.as_deref().is_some_and(|d| d.want_roots);
     // Frame-aware functions carry (base, closure) so they can flush heap refs
     // to ctx.stack home slots at a safepoint and read the `this` receiver
     // from stack[base+0]. A method/constructor needs it for the receiver even
@@ -396,7 +424,13 @@ fn lower_raw(
             } else {
                 types::I64
             };
-            b.declare_var(ty)
+            let v = b.declare_var(ty);
+            // Marking has to happen before any use — Cranelift explicitly does
+            // not retrofit pre-existing ones. Floats are never GC references.
+            if want_roots && ty == types::I64 {
+                b.declare_var_needs_stack_map(v);
+            }
+            v
         })
         .collect();
     // One payload-cache variable per (loop region, receiver register).
@@ -474,6 +508,7 @@ fn lower_raw(
         register_meta: &proto.register_meta,
         live: &live,
         cur_ip: std::cell::Cell::new(0),
+        safepoints: want_roots.then(|| std::cell::RefCell::new(Vec::new())),
     });
     let reg_offset = 1;
     for i in 0..nparams {
@@ -680,6 +715,13 @@ fn lower_raw(
         // Republish the point every emit arm below sizes its GC flush set at.
         if let Some(a) = actx.as_ref() {
             a.cur_ip.set(ip);
+        }
+        // Stamp the bytecode ip onto every instruction this opcode emits. It
+        // is what later maps a stack map's PC back to an ip: the two sides are
+        // keyed differently (ours by bytecode ip, Cranelift's by code offset)
+        // and this is the only thing that joins them.
+        if want_roots {
+            b.set_srcloc(cranelift_codegen::ir::SourceLoc::new(ip as u32));
         }
 
         match op {
@@ -1294,7 +1336,20 @@ fn lower_raw(
     b.seal_all_blocks();
     b.finalize();
     super::debug::capture_ir(&mut debug, &func);
-    compile_piece(func, isa)
+    let piece = compile_piece(func, isa)?;
+    if let Some(rec) = actx.as_ref().and_then(|a| a.safepoints.as_ref()) {
+        super::debug::capture_roots(
+            &mut debug,
+            &rec.borrow(),
+            &piece.stack_maps,
+            piece.maps_unmatched,
+            |ip| match OpCode::from_u8(code[ip] as u8) {
+                Some(op) => format!("{op:?}"),
+                None => "?".to_owned(),
+            },
+        );
+    }
+    Ok(piece)
 }
 
 

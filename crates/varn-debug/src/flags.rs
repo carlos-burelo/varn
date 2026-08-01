@@ -45,6 +45,12 @@ pub struct DebugFlags {
     pub bails: bool,
     pub summary: bool,
 
+    pub roots: bool,
+    /// Only safepoints where the two root answers disagree.
+    pub roots_diff: bool,
+    /// Counts only, no per-safepoint rows.
+    pub roots_summary: bool,
+
     /// Substring filter applied to function names by the per-function dumps.
     /// Without it, `-p bytecode` on a real module prints every function.
     pub fn_filter: Option<String>,
@@ -61,6 +67,10 @@ pub const PHASES: &[(&str, &str)] = &[
     ("ssa", "forma SSA"),
     ("clif", "lowering Cranelift (route, kinds, ir, asm)"),
     ("tiers", "tier por función: clif / gate / bail"),
+    (
+        "roots",
+        "conjunto de raíces GC por safepoint, contra la liveness de Cranelift",
+    ),
     ("bails", "solo lo que no rutea, agrupado por causa"),
     ("summary", "tamaños, exports y top-10 de funciones"),
     ("graph", "grafo de módulos"),
@@ -76,6 +86,7 @@ pub fn print_phases() {
     }
     eprintln!("\nSub-fases:");
     eprintln!("  clif:route  clif:kinds  clif:ir  clif:asm  clif:all");
+    eprintln!("  roots:diff  roots:summary  roots:all");
     eprintln!("  lsp:hovers  lsp:semantic  lsp:types  lsp:completions");
     eprintln!("  lsp:symbols  lsp:colorize  lsp:hints  lsp:all");
     eprintln!("\nFiltros:");
@@ -154,6 +165,21 @@ impl DebugFlags {
                         }
                     }
                 }
+            } else if let Some(sub) = phase.strip_prefix("roots:") {
+                flags.roots = true;
+                for sub_part in sub.split('+') {
+                    match sub_part {
+                        "diff" => flags.roots_diff = true,
+                        "summary" => flags.roots_summary = true,
+                        "all" => {}
+                        unknown => {
+                            return Err(CliError::usage(format!(
+                                "unknown roots debug sub-phase: '{unknown}'\n\
+                                 Valid sub-phases: diff, summary, all"
+                            )));
+                        }
+                    }
+                }
             } else if let Some(sub) = phase.strip_prefix("clif:") {
                 flags.clif = true;
                 for sub_part in sub.split('+') {
@@ -202,6 +228,7 @@ impl DebugFlags {
                     "ssa" => flags.ssa = true,
                     "tiers" => flags.tiers = true,
                     "bails" => flags.bails = true,
+                    "roots" => flags.roots = true,
                     "summary" => flags.summary = true,
                     "clif" => flags.clif_all_on(),
                     "all" => {
@@ -266,6 +293,7 @@ impl DebugFlags {
             || self.tiers
             || self.bails
             || self.summary
+            || self.roots
     }
 
     pub fn lsp_all(&mut self) {

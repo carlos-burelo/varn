@@ -121,7 +121,7 @@ fn walk(
 /// Heap-free constant resolution: only `is_int()` fidelity affects the
 /// lowering's kind classification, so scalars map exactly and heap literals
 /// become non-int placeholders.
-fn constants_for_inspect(proto: &FunctionProto) -> Vec<VmValue> {
+pub(crate) fn constants_for_inspect(proto: &FunctionProto) -> Vec<VmValue> {
     const I48_MIN: i64 = -(1_i64 << 47);
     const I48_MAX: i64 = (1_i64 << 47) - 1;
     proto

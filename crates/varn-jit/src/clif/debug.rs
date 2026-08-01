@@ -26,12 +26,48 @@ pub struct CodeBytes {
     pub entry_off: usize,
 }
 
+/// One safepoint's two answers to "what is live here".
+///
+/// `ours` is the set `alloc::live_boxed` actually flushed to home slots, so it
+/// is what the collector can see today. `cranelift` is how many of the same
+/// registers Cranelift's own SSA liveness kept in the stack map at the
+/// correlated PC. Two independent analyses of one program point:
+///
+/// * `ours` bigger — we flush registers Cranelift proved dead. Safe, and the
+///   difference is wasted stores.
+/// * `cranelift` bigger — Cranelift believes something is live that we do not
+///   root. That is the shape of a missing GC root.
+#[derive(Debug, Clone)]
+pub struct SafepointRoots {
+    pub ip: usize,
+    pub op: String,
+    pub ours: Vec<usize>,
+    /// `None` when no stack map correlated to this ip — itself a finding, it
+    /// means the safepoint emitted no map at all.
+    pub cranelift: Option<usize>,
+}
+
+/// Per-function result of `vn debug -p roots`.
+#[derive(Debug, Default, Clone)]
+pub struct RootsReport {
+    pub points: Vec<SafepointRoots>,
+    pub maps_total: usize,
+    /// Stack maps whose PC fell outside every recorded safepoint's srcloc.
+    pub maps_unmatched: usize,
+}
+
 /// Capture slots populated by `try_compile` when inspection is active.
 #[derive(Debug, Default)]
 pub struct ClifDebugSink {
     pub kinds: Option<KindReport>,
     pub clif_ir: Option<String>,
     pub code: Option<CodeBytes>,
+    /// Requested by `-p roots` BEFORE inspecting. It turns on stack-map
+    /// marking and per-opcode srclocs, both of which change what Cranelift
+    /// emits, so it stays off for `-p clif` — that pass has to show what
+    /// production actually compiles.
+    pub want_roots: bool,
+    pub roots: Option<RootsReport>,
 }
 
 use std::collections::HashMap;
@@ -87,6 +123,64 @@ pub(super) fn capture_code(
     }
 }
 
+/// Join the two root answers for one function.
+///
+/// Both sides are grouped by bytecode ip, because one opcode can emit more
+/// than one safepoint (a call that flushes, plus a loop back-edge check).
+/// `ours` is the union of everything flushed at that ip and `cranelift` the
+/// largest map emitted there — the pairing that cannot understate either side.
+pub(super) fn capture_roots(
+    debug: &mut Option<&mut ClifDebugSink>,
+    safepoints: &[(usize, Vec<usize>)],
+    stack_maps: &[(usize, usize)],
+    maps_unmatched: usize,
+    op_name: impl Fn(usize) -> String,
+) {
+    let Some(sink) = debug.as_deref_mut() else {
+        return;
+    };
+    if !sink.want_roots {
+        return;
+    }
+    let mut by_ip: Vec<(usize, Vec<usize>)> = Vec::new();
+    for (ip, regs) in safepoints {
+        match by_ip.iter_mut().find(|(i, _)| i == ip) {
+            Some((_, acc)) => {
+                for r in regs {
+                    if !acc.contains(r) {
+                        acc.push(*r);
+                    }
+                }
+            }
+            None => by_ip.push((*ip, regs.clone())),
+        }
+    }
+    by_ip.sort_by_key(|(ip, _)| *ip);
+
+    let points = by_ip
+        .into_iter()
+        .map(|(ip, mut ours)| {
+            ours.sort_unstable();
+            SafepointRoots {
+                ip,
+                op: op_name(ip),
+                ours,
+                cranelift: stack_maps
+                    .iter()
+                    .filter(|(i, _)| *i == ip)
+                    .map(|(_, n)| *n)
+                    .max(),
+            }
+        })
+        .collect();
+
+    sink.roots = Some(RootsReport {
+        points,
+        maps_total: stack_maps.len() + maps_unmatched,
+        maps_unmatched,
+    });
+}
+
 use varn_types::{FunctionProto, VmValue};
 use cranelift_codegen::isa::OwnedTargetIsa;
 use crate::JitHelpers;
@@ -103,6 +197,8 @@ pub struct ClifInspection {
     pub frame_aware: bool,
     /// Which tests made it frame-aware — see `lower::frame_aware_reasons`.
     pub fa_reasons: Vec<&'static str>,
+    /// Populated only when the caller asked for roots — see `inspect_roots`.
+    pub roots: Option<RootsReport>,
 }
 
 /// Run the clif lowering for `proto` with capture active, without executing.
@@ -113,7 +209,35 @@ pub fn inspect(
     isa: &OwnedTargetIsa,
     linker: &dyn ClifLinker,
 ) -> ClifInspection {
-    let mut sink = ClifDebugSink::default();
+    inspect_with(proto, constants, helpers, isa, linker, false)
+}
+
+/// [`inspect`] with stack-map marking on, for `vn debug -p roots`. Separate
+/// entry point because the marking is not free: Cranelift spills every marked
+/// value around every safepoint, so this compiles something production does
+/// not, and only this pass may ask for it.
+pub fn inspect_roots(
+    proto: &FunctionProto,
+    constants: &[VmValue],
+    helpers: &JitHelpers,
+    isa: &OwnedTargetIsa,
+    linker: &dyn ClifLinker,
+) -> ClifInspection {
+    inspect_with(proto, constants, helpers, isa, linker, true)
+}
+
+fn inspect_with(
+    proto: &FunctionProto,
+    constants: &[VmValue],
+    helpers: &JitHelpers,
+    isa: &OwnedTargetIsa,
+    linker: &dyn ClifLinker,
+    want_roots: bool,
+) -> ClifInspection {
+    let mut sink = ClifDebugSink {
+        want_roots,
+        ..Default::default()
+    };
     let result = try_compile(proto, constants, helpers, isa, linker, Some(&mut sink));
     let (route, frame_aware) = match &result {
         Ok(art) => (Ok(()), art.frame_aware),
@@ -127,5 +251,6 @@ pub fn inspect(
         code: sink.code,
         frame_aware,
         fa_reasons: super::lower::frame_aware_reasons(proto),
+        roots: sink.roots,
     }
 }
