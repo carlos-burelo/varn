@@ -46,12 +46,38 @@ impl Nursery {
         // Full capacity from birth, not grown into. `try_alloc` pushes to
         // `objects` and `forwarding` together and the minor collector indexes
         // both by nursery index, so a realloc in either is a moving backing
-        // store — which the JIT's inline bump (clif/nursery.rs) and
-        // `Heap::alloc_str_concat_inline` both assume cannot happen. Fixed
-        // size, so this is ~900 KB paid once rather than a growth curve.
+        // store — which a planned JIT inline bump and a planned
+        // `Heap::alloc_str_concat_inline` (JIT string-codegen plan, Tasks 2
+        // and 5; neither exists yet) will need to assume cannot happen. Fixed
+        // size, so this is ~900 KB paid once rather than a growth curve —
+        // for the nursery a live `HeapInner` owns. See `vacant` for the
+        // placeholder used when a `Nursery` is briefly swapped out, which
+        // must NOT pay this cost.
         Self {
             objects: Vec::with_capacity(NURSERY_CAPACITY),
             forwarding: Vec::with_capacity(NURSERY_CAPACITY),
+            remembered: Vec::new(),
+            alloc_count: 0,
+            minor_gc_count: 0,
+            minor_gc_promoted: 0,
+        }
+    }
+
+    /// An empty, non-allocating placeholder — capacity 0 in both `objects`
+    /// and `forwarding`, so construction touches no allocator.
+    ///
+    /// For use only as a swap target while the real nursery is moved out
+    /// (see `HeapInner::minor_gc`). `Default`/`new` reserve
+    /// `NURSERY_CAPACITY` up front (~900 KB) so that a *live* nursery never
+    /// reallocates; `mem::take`, which builds a `Default`, would pay that
+    /// same ~900 KB on every single minor GC to build a value that is
+    /// dropped a few lines later. `Vec::new()` is documented not to
+    /// allocate until pushed to, so this constructor is zero-cost; see
+    /// `capacity_invariant::vacant_nursery_allocates_nothing`.
+    pub fn vacant() -> Self {
+        Self {
+            objects: Vec::new(),
+            forwarding: Vec::new(),
             remembered: Vec::new(),
             alloc_count: 0,
             minor_gc_count: 0,
@@ -580,10 +606,10 @@ mod capacity_invariant {
     ///
     /// The brief's scaffolding named this entry point `collect_minor`; the
     /// actual API (see `heap.rs`) calls it `HeapInner::minor_gc`. It
-    /// `mem::take`s the nursery, calls `Nursery::collect` on the owned
-    /// value, then writes it back — a struct move, which does not touch the
-    /// Vecs' heap-allocated backing stores, so the pointer assertion below
-    /// still holds.
+    /// `mem::replace`s the nursery with `Nursery::vacant()`, calls
+    /// `Nursery::collect` on the owned (real) value, then writes it back — a
+    /// struct move, which does not touch the Vecs' heap-allocated backing
+    /// stores, so the pointer assertion below still holds.
     #[test]
     fn nursery_capacity_survives_a_collection() {
         let heap = crate::heap::Heap::new();
@@ -601,6 +627,33 @@ mod capacity_invariant {
             inner.nursery.objects_data_ptr(),
             before,
             "collection relocated the nursery backing store"
+        );
+    }
+
+    /// `HeapInner::minor_gc` swaps a `Nursery::vacant()` into `self.nursery`
+    /// for the duration of `collect`, once per minor GC. If `vacant` ever
+    /// regressed to reserving real capacity (e.g. someone "simplifying" it
+    /// back to `Self::new()`), every minor GC would pay a ~900 KB
+    /// malloc+free for a value nothing reads. Capacity 0 is the direct,
+    /// documented proof of no backing allocation — `Vec`'s capacity field
+    /// IS the size of its current allocation (0 means the dangling
+    /// zero-capacity sentinel, never a live buffer), not a number reported
+    /// independently of it. Two independently constructed placeholders
+    /// sharing the exact same data pointer is the same fact restated
+    /// empirically: a real allocator call would not hand back the same
+    /// address twice for two simultaneously-live allocations.
+    #[test]
+    fn vacant_nursery_allocates_nothing() {
+        let a = Nursery::vacant();
+        let b = Nursery::vacant();
+        assert_eq!(a.objects_capacity(), 0);
+        assert_eq!(a.forwarding_capacity(), 0);
+        assert_eq!(b.objects_capacity(), 0);
+        assert_eq!(b.forwarding_capacity(), 0);
+        assert_eq!(
+            a.objects_data_ptr(),
+            b.objects_data_ptr(),
+            "two vacant nurseries have different data pointers — vacant() is allocating"
         );
     }
 }

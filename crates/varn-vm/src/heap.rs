@@ -628,7 +628,11 @@ impl HeapInner {
     }
 
     pub fn minor_gc(&mut self, stack: &mut [VmValue], extra_packed: &[u32]) {
-        let mut nursery = std::mem::take(&mut self.nursery);
+        // `mem::take` would build a `Default`, i.e. a full `Nursery::new` —
+        // ~900 KB of reservation for a placeholder that lives only until
+        // `self.nursery = nursery` a few lines down. `Nursery::vacant` is
+        // the same swap without the allocation.
+        let mut nursery = std::mem::replace(&mut self.nursery, Nursery::vacant());
         nursery.collect(self, stack, extra_packed);
         self.nursery = nursery;
     }
