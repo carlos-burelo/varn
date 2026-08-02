@@ -55,6 +55,27 @@ impl Heap {
         let none_tag = unsafe { *(&none_slot as *const _ as *const u8) } as usize;
         assert_ne!(str_tag, none_tag, "Option<HeapObj> niche probe failed");
 
+        // `forwarding`'s `None` bit pattern, for `emit_nursery_alloc` to write
+        // into a freshly bumped slot — `Nursery::collect` clears length
+        // without zeroing bytes, so that slot can otherwise read back as a
+        // stale `Some` from a prior epoch. `emit_nursery_alloc` always writes
+        // this as one 8-byte store, so the element width is asserted here
+        // rather than trusted: a widening of `Option<u32>` must fail loudly
+        // at startup, not silently truncate/overrun in emitted code.
+        let none_fwd: Option<u32> = None;
+        let fwd_elem_size = std::mem::size_of::<Option<u32>>();
+        assert_eq!(
+            fwd_elem_size, 8,
+            "Option<u32> ({fwd_elem_size} B) no longer matches the 8-byte store \
+             emit_nursery_alloc performs"
+        );
+        let mut pat = [0u8; 8];
+        let raw_fwd = unsafe {
+            std::slice::from_raw_parts(&none_fwd as *const _ as *const u8, fwd_elem_size)
+        };
+        pat[..fwd_elem_size].copy_from_slice(raw_fwd);
+        let fwd_none_pattern = u64::from_ne_bytes(pat);
+
         varn_jit::JitStrLayout {
             str_tag,
             template,
@@ -62,14 +83,32 @@ impl Heap {
             len_off,
             bytes_off,
             inline_cap: INLINE_STR_CAP,
-            nursery_fwd_vec_off: 2 * std::mem::size_of::<usize>()
-                + std::mem::offset_of!(HeapInner, nursery)
-                + crate::nursery::Nursery::forwarding_vec_byte_offset(),
-            alloc_count_off: 2 * std::mem::size_of::<usize>()
-                + std::mem::offset_of!(HeapInner, nursery)
-                + std::mem::offset_of!(crate::nursery::Nursery, alloc_count),
+            nursery_fwd_vec_off: Heap::nursery_fwd_vec_byte_offset_from_rcbox(),
+            alloc_count_off: Heap::nursery_alloc_count_byte_offset_from_rcbox(),
             nursery_capacity: crate::nursery::NURSERY_CAPACITY,
+            fwd_none_pattern,
+            fwd_elem_size,
         }
+    }
+
+    /// Byte offset from the `RcBox` pointer stored in `Heap.inner` to the
+    /// nursery `forwarding` Vec's three words (cap, ptr, len), for the JIT's
+    /// inline allocation write path (`emit_nursery_alloc`). Validated against
+    /// a live heap in `ExecCtx::new`, same as
+    /// [`Heap::nursery_len_byte_offset_from_rcbox`](crate::heap::Heap::nursery_len_byte_offset_from_rcbox).
+    pub fn nursery_fwd_vec_byte_offset_from_rcbox() -> usize {
+        2 * std::mem::size_of::<usize>()
+            + std::mem::offset_of!(HeapInner, nursery)
+            + crate::nursery::Nursery::forwarding_vec_byte_offset()
+    }
+
+    /// Byte offset from the `RcBox` pointer stored in `Heap.inner` to
+    /// `Nursery::alloc_count`, for the JIT's inline allocation write path.
+    /// Validated against a live heap in `ExecCtx::new`.
+    pub fn nursery_alloc_count_byte_offset_from_rcbox() -> usize {
+        2 * std::mem::size_of::<usize>()
+            + std::mem::offset_of!(HeapInner, nursery)
+            + std::mem::offset_of!(crate::nursery::Nursery, alloc_count)
     }
 }
 

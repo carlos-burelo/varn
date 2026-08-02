@@ -28,6 +28,7 @@ pub(crate) mod globals;
 pub(crate) mod kinds;
 pub(crate) mod liveness;
 pub(crate) mod methods;
+pub(crate) mod nursery;
 pub(crate) mod osr;
 pub mod lower;
 

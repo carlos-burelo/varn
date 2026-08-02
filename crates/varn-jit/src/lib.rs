@@ -144,6 +144,15 @@ pub struct JitStrLayout {
     pub alloc_count_off: usize,
     /// `NURSERY_CAPACITY` — the bound the emitted bump checks against.
     pub nursery_capacity: usize,
+    /// Raw bytes of `Option::<u32>::None`, captured by the probe. Written
+    /// into a freshly bumped `forwarding` slot so it never reads back as a
+    /// stale `Some` left over by `Nursery::collect` (which clears length
+    /// without zeroing the backing bytes).
+    pub fwd_none_pattern: u64,
+    /// `size_of::<Option<u32>>()`. Asserted `== 8` at the probe: emitted code
+    /// always stores `fwd_none_pattern` as a single 8-byte write, which is
+    /// only correct at that width.
+    pub fwd_elem_size: usize,
 }
 
 // `derive(Default)` cannot cover `[u8; STR_TEMPLATE_MAX]`: std only
@@ -162,6 +171,8 @@ impl Default for JitStrLayout {
             nursery_fwd_vec_off: 0,
             alloc_count_off: 0,
             nursery_capacity: 0,
+            fwd_none_pattern: 0,
+            fwd_elem_size: 0,
         }
     }
 }

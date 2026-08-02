@@ -184,10 +184,12 @@ impl ExecCtx {
     }
 
     /// The JIT back-edge safepoint reads the nursery fill level through raw
-    /// offsets (ExecCtx.heap -> RcBox -> HeapInner.nursery.objects.len). Those
-    /// offsets bake in Rc/Vec internal layout; verify the whole chain against
-    /// the live heap so a std layout change fails loudly at startup instead of
-    /// corrupting memory at runtime.
+    /// offsets (ExecCtx.heap -> RcBox -> HeapInner.nursery.objects.len), and
+    /// `emit_nursery_alloc` (`crates/varn-jit/src/clif/nursery.rs`) writes
+    /// through two more: the `forwarding` Vec and `Nursery::alloc_count`.
+    /// These offsets all bake in Rc/Vec internal layout; verify the whole
+    /// chain against the live heap so a std layout change fails loudly at
+    /// startup instead of corrupting memory at runtime.
     fn validate_jit_safepoint_offsets(&self) {
         unsafe {
             let base = self as *const ExecCtx as *const u8;
@@ -202,6 +204,30 @@ impl ExecCtx {
                 len,
                 self.heap.nursery.len(),
                 "JIT safepoint: nursery length offset chain is stale"
+            );
+
+            // `emit_nursery_alloc` bumps `forwarding`'s length word alongside
+            // `objects`'; the two must always agree (`try_alloc` pushes to
+            // both together, and `collect` clears both together), so reading
+            // it back through the offset chain and comparing against
+            // `objects.len()` catches a stale/wrong offset the same way the
+            // check above does.
+            let fwd_len_off =
+                Heap::nursery_fwd_vec_byte_offset_from_rcbox() + 2 * std::mem::size_of::<usize>();
+            let fwd_len = *(rcbox.add(fwd_len_off) as *const usize);
+            assert_eq!(
+                fwd_len,
+                self.heap.nursery.len(),
+                "JIT allocation: nursery forwarding-vec offset chain is stale"
+            );
+
+            // `Nursery::alloc_count` is a plain field, so its raw-read value
+            // must match exactly, not just be consistent with another read.
+            let alloc_count =
+                *(rcbox.add(Heap::nursery_alloc_count_byte_offset_from_rcbox()) as *const u64);
+            assert_eq!(
+                alloc_count, self.heap.nursery.alloc_count,
+                "JIT allocation: nursery alloc_count offset chain is stale"
             );
         }
     }
