@@ -1,4 +1,4 @@
-import { MetaKey, MethodContext } from "std:reflect"
+import { MetaKey, MethodContext, ClassRef } from "std:reflect"
 
 
 let deco_log: str[] = []

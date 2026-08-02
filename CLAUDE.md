@@ -103,6 +103,9 @@ Antes de escribir código:
 5. Implementar.
 6. Validar.
 7. Actualizar documentación relevante.
+8. Auditar tamaño de archivos y modularización.
+9. Revisar impacto en rendimiento y benchmarks (debe ser medido, no asumido).
+10. Breaking changes estan permitidos si son controlados y justificados (maximo performance, simplicidad, cohesión, modularidad, mantenibilidad).
 
 Nunca comenzar implementando sin análisis previo.
 
