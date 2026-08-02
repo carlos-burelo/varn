@@ -152,6 +152,13 @@ pub(super) fn lower_raw(
     } else {
         super::liveness::Liveness::everything()
     };
+    // Same reason: the answer only feeds `live_boxed`, which only a frame-aware
+    // function calls.
+    let narrow_roots = if alloc_env.is_some() {
+        !alloc::has_try(code, pool)?
+    } else {
+        false
+    };
     let actx = alloc_env.map(|(base, closure)| AllocCtx {
         vars: vars.as_slice(),
         helpers,
@@ -162,6 +169,7 @@ pub(super) fn lower_raw(
         nregs,
         register_meta: &proto.register_meta,
         live: &live,
+        narrow_roots,
         cur_ip: std::cell::Cell::new(0),
         safepoints: want_roots.then(|| std::cell::RefCell::new(Vec::new())),
     });

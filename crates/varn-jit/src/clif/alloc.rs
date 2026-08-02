@@ -119,6 +119,29 @@ pub(super) fn has_alloc(
     Ok(false)
 }
 
+/// Whether the function installs an exception handler. Such a function can
+/// resume in the INTERPRETER at a catch ip, which reads every register out of
+/// `ctx.stack`, so its safepoints must keep flushing registers the collector
+/// itself would not need — see [`live_boxed`].
+///
+/// `PopTry` is not enough on its own to matter, and `Throw` unwinds past this
+/// frame rather than into it; `Try` is the opcode that publishes a resume
+/// point inside this function.
+pub(super) fn has_try(
+    code: &[u16],
+    pool: &[varn_types::chunk::PoolEntry],
+) -> Result<bool, String> {
+    let mut ip = 0usize;
+    while ip < code.len() {
+        let info = decode(code, ip, pool).ok_or("clif: undecodable opcode")?;
+        if OpCode::from_u8(code[ip] as u8) == Some(OpCode::Try) {
+            return Ok(true);
+        }
+        ip += info.len;
+    }
+    Ok(false)
+}
+
 /// Immutable context threaded through the allocation arms and the safepoint.
 pub(super) struct AllocCtx<'a> {
     pub vars: &'a [Variable],
@@ -134,18 +157,29 @@ pub(super) struct AllocCtx<'a> {
     /// Registers still readable after each instruction — what [`live_boxed`]
     /// narrows the flush set with.
     pub live: &'a Liveness,
+    /// Whether [`live_boxed`] may drop registers the kind flow proved unboxed.
+    /// False for a function containing a `Try`: an exception resumes in the
+    /// interpreter at the handler's ip, which reads every register out of its
+    /// home slot, so there `int` and `bool` have to keep being flushed too.
+    /// Computed once by [`has_try`].
+    pub narrow_roots: bool,
     /// Bytecode ip the lowering is currently emitting for, republished by the
     /// dispatch loop once per opcode. The thirty-odd emit arms below all need
     /// it to size their flush set and every one of them already sits under
     /// that loop, so carrying it here keeps their signatures unchanged
     /// instead of threading one more argument through all of them.
     pub cur_ip: Cell<usize>,
-    /// `(ip, flushed registers)` per safepoint, for `vn debug -p roots`.
-    /// Recorded from inside [`live_boxed`] rather than reconstructed later:
-    /// the whole point of the report is to show what the lowering ACTUALLY
-    /// flushed, and any second implementation of that could agree with the
-    /// report while disagreeing with the emitted code. `None` in production.
-    pub safepoints: Option<RefCell<Vec<(usize, Vec<usize>)>>>,
+    /// `(ip, flushed registers, live-but-unboxed registers)` per safepoint, for
+    /// `vn debug -p roots`. Recorded from inside [`live_boxed`] rather than
+    /// reconstructed later: the whole point of the report is to show what the
+    /// lowering ACTUALLY flushed, and any second implementation of that could
+    /// agree with the report while disagreeing with the emitted code.
+    ///
+    /// The third field is what the kind filter dropped. The report compares our
+    /// set against Cranelift's stack maps, and Cranelift marks every I64
+    /// Variable without knowing our kinds — so without this it would read a
+    /// live unboxed int as a root we failed to flush. `None` in production.
+    pub safepoints: Option<RefCell<Vec<(usize, Vec<usize>, Vec<usize>)>>>,
 }
 
 /// Address of this frame's register-0 home slot, recomputed from `ExecCtx`
@@ -276,25 +310,58 @@ pub(super) fn emit_backedge_safepoint(
     b.switch_to_block(cont);
 }
 
-/// Registers that could hold a live value at this program point — the
-/// set to flush across a helper/GC call.
+/// The GC root set at this program point — the registers to flush across a
+/// helper/GC call so the collector can root and rewrite them.
 ///
-/// Floats are excluded because they live in F64 Variables the collector never
-/// looks at. The rest is whatever `liveness` proves is still readable after
-/// the current instruction: a register no reader will touch again does not
-/// need to be rooted, and leaving its home slot alone keeps the older (still
-/// valid) VmValue the frame's null-fill guarantees, which the collector
-/// already scans and tolerates.
-pub(super) fn live_boxed(actx: &AllocCtx, _state: &[K]) -> Vec<usize> {
+/// This answers only that question. A helper that reads registers back out of
+/// `ctx.stack` by number stores its own window at its own site; do not grow
+/// this set to serve one.
+///
+/// Three filters, each dropping registers the collector provably has no
+/// business in:
+///
+/// * **Floats** live in F64 Variables the collector never looks at.
+/// * **Dead registers** — whatever `liveness` proves is no longer readable
+///   after the current instruction. A register no reader will touch again does
+///   not need to be rooted, and leaving its home slot alone keeps the older
+///   (still valid) VmValue the frame's null-fill guarantees, which the
+///   collector already scans and tolerates.
+/// * **Provably unboxed registers** ([`is_root_kind`]) — same argument, one
+///   step further: a register the kind flow typed `Int` or `Bool` holds a raw
+///   machine integer, not a heap index. There is nothing to root and nothing
+///   to rewrite, and its home slot keeps that same older valid VmValue.
+///
+/// The third filter is off in a function containing a `Try`, because an
+/// exception leaves compiled code entirely and resumes in the INTERPRETER at
+/// the handler's bytecode ip, which reads every register — ints included —
+/// back from its home slot. See `clif::liveness`, which over-approximates the
+/// try region for the same reason.
+pub(super) fn live_boxed(actx: &AllocCtx, state: &[K]) -> Vec<usize> {
     let ip = actx.cur_ip.get();
-    let regs: Vec<usize> = (0..actx.nregs)
+    let live_nonfloat = (0..actx.nregs)
         .filter(|&r| !meta_is_float(actx.register_meta, r))
-        .filter(|&r| actx.live.is_live_after(ip, r))
-        .collect();
+        .filter(|&r| actx.live.is_live_after(ip, r));
+    let rooted = |r: usize| {
+        !actx.narrow_roots || state.get(r).copied().map_or(true, is_root_kind)
+    };
+    let regs: Vec<usize> = live_nonfloat.clone().filter(|&r| rooted(r)).collect();
     if let Some(rec) = &actx.safepoints {
-        rec.borrow_mut().push((ip, regs.clone()));
+        let unboxed: Vec<usize> = live_nonfloat.filter(|&r| !rooted(r)).collect();
+        rec.borrow_mut().push((ip, regs.clone(), unboxed));
     }
     regs
+}
+
+/// Whether a register of kind `k` could carry a heap index, and therefore has
+/// to be rooted. The conservative complement of "provably unboxed": true for
+/// every kind the flow has not decided, so a kind added to [`K`] without
+/// touching this function is rooted rather than silently dropped.
+///
+/// Deliberately NOT `kinds::is_boxed_kind`, which asks a different question —
+/// "can this be READ as a boxed VmValue" — and answers `false` for `K::Unset`
+/// and `K::Poison`, neither of which is safe to leave unrooted here.
+fn is_root_kind(k: K) -> bool {
+    !matches!(k, K::Int | K::Bool)
 }
 
 /// Spill `regs` to their `ctx.stack` home slots so the collector roots (and

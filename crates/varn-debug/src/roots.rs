@@ -30,9 +30,15 @@
 //!   collector, which is sound only because nothing under a bare raw can
 //!   allocate; it is exactly the set stack maps would have to root after the
 //!   cutover, so it sizes that work.
+//! * `unboxed` — live and deliberately not flushed because the kind flow proved
+//!   the register holds a raw machine integer. Cranelift marks every I64
+//!   Variable and cannot see our kinds, so these show up inside its map count;
+//!   they are netted out of `registro` before it is reported. Rooting them
+//!   would be meaningless — there is no heap index to rewrite.
 //!
 //! Counts, never identities: Cranelift owns spill-slot assignment and does not
-//! publish which slot holds which variable.
+//! publish which slot holds which variable. `unboxed` is the one exception —
+//! it comes from our own kind flow, so the identities are known.
 
 use varn_jit::clif::debug::{inspect_roots, ClifInspection};
 use varn_jit::clif::lower::NoLinker;
@@ -103,6 +109,7 @@ pub fn debug_roots(
     let mut with_reg_roots = 0usize;
     let mut reg_roots_total = 0usize;
     let mut reg_roots_max = 0usize;
+    let mut unboxed_total = 0usize;
     let mut unmatched = 0usize;
     let mut rendered = Vec::new();
 
@@ -112,7 +119,11 @@ pub fn debug_roots(
         let mut rows = Vec::new();
         for p in &rep.points {
             safepoints += 1;
-            let in_reg = p.cranelift.unwrap_or(0);
+            // Net out the registers the kind flow proved unboxed: Cranelift
+            // counted them because it marks every I64 Variable, but they carry
+            // no heap index and are not roots the cutover would have to cover.
+            let in_reg = p.cranelift.unwrap_or(0).saturating_sub(p.unboxed.len());
+            unboxed_total += p.unboxed.len();
             if in_reg == 0 {
                 fully_flushed += 1;
             } else {
@@ -147,18 +158,20 @@ pub fn debug_roots(
         };
         eprintln!("\n{BOLD}ROOTS{R}{DIM} ── {}{fa}{R}", f.name);
         eprintln!(
-            "  {DIM}{:>6}  {:<18} {:>5}  {:>8}   home slots{R}",
-            "ip", "opcode", "home", "registro"
+            "  {DIM}{:>6}  {:<18} {:>5}  {:>8}  {:>8}   home slots{R}",
+            "ip", "opcode", "home", "registro", "unboxed"
         );
         for (p, in_reg) in rows {
             let colour = if in_reg == 0 { DIM } else { YELLOW };
             let regs: Vec<String> = p.ours.iter().map(|r| format!("r{r}")).collect();
+            let un: Vec<String> = p.unboxed.iter().map(|r| format!("r{r}")).collect();
             eprintln!(
-                "  {:>6}  {:<18} {:>5}  {colour}{:>8}{R}   {DIM}{}{R}",
+                "  {:>6}  {:<18} {:>5}  {colour}{:>8}{R}  {DIM}{:>8}{R}   {DIM}{}{R}",
                 p.ip,
                 p.op,
                 p.ours.len(),
                 in_reg,
+                un.join(" "),
                 regs.join(" ")
             );
         }
@@ -168,6 +181,12 @@ pub fn debug_roots(
         "\n  {GREEN}{safepoints} safepoints{R}{DIM} · {fully_flushed} cubiertos solo por \
          home slots · {with_reg_roots} con valores vivos en registro{R}"
     );
+    if unboxed_total > 0 {
+        eprintln!(
+            "  {DIM}{unboxed_total} registros vivos sin flushear por ser Int/Bool — no son \
+             raíces, no entran en la cuenta de arriba.{R}"
+        );
+    }
     if with_reg_roots > 0 {
         eprintln!(
             "  {YELLOW}{reg_roots_total} raíces en registro{R}{DIM} (máx {reg_roots_max} en un \

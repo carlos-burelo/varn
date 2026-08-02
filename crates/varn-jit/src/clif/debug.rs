@@ -36,12 +36,19 @@ pub struct CodeBytes {
 /// * `ours` bigger — we flush registers Cranelift proved dead. Safe, and the
 ///   difference is wasted stores.
 /// * `cranelift` bigger — Cranelift believes something is live that we do not
-///   root. That is the shape of a missing GC root.
+///   root. That is the shape of a missing GC root, EXCEPT for the registers in
+///   `unboxed`: those the kind flow proved hold a raw machine integer, so
+///   Cranelift keeping them alive is correct and rooting them would be
+///   meaningless. Cranelift marks every I64 Variable and cannot see our kinds,
+///   so the comparison has to net them out.
 #[derive(Debug, Clone)]
 pub struct SafepointRoots {
     pub ip: usize,
     pub op: String,
     pub ours: Vec<usize>,
+    /// Live here, deliberately NOT flushed: the kind flow typed them `Int` or
+    /// `Bool`, which cannot carry a heap index.
+    pub unboxed: Vec<usize>,
     /// `None` when no stack map correlated to this ip — itself a finding, it
     /// means the safepoint emitted no map at all.
     pub cranelift: Option<usize>,
@@ -131,7 +138,7 @@ pub(super) fn capture_code(
 /// largest map emitted there — the pairing that cannot understate either side.
 pub(super) fn capture_roots(
     debug: &mut Option<&mut ClifDebugSink>,
-    safepoints: &[(usize, Vec<usize>)],
+    safepoints: &[(usize, Vec<usize>, Vec<usize>)],
     stack_maps: &[(usize, usize)],
     maps_unmatched: usize,
     op_name: impl Fn(usize) -> String,
@@ -142,29 +149,36 @@ pub(super) fn capture_roots(
     if !sink.want_roots {
         return;
     }
-    let mut by_ip: Vec<(usize, Vec<usize>)> = Vec::new();
-    for (ip, regs) in safepoints {
-        match by_ip.iter_mut().find(|(i, _)| i == ip) {
-            Some((_, acc)) => {
+    let mut by_ip: Vec<(usize, Vec<usize>, Vec<usize>)> = Vec::new();
+    for (ip, regs, unboxed) in safepoints {
+        match by_ip.iter_mut().find(|(i, _, _)| i == ip) {
+            Some((_, acc, acc_un)) => {
                 for r in regs {
                     if !acc.contains(r) {
                         acc.push(*r);
                     }
                 }
+                for r in unboxed {
+                    if !acc_un.contains(r) {
+                        acc_un.push(*r);
+                    }
+                }
             }
-            None => by_ip.push((*ip, regs.clone())),
+            None => by_ip.push((*ip, regs.clone(), unboxed.clone())),
         }
     }
-    by_ip.sort_by_key(|(ip, _)| *ip);
+    by_ip.sort_by_key(|(ip, _, _)| *ip);
 
     let points = by_ip
         .into_iter()
-        .map(|(ip, mut ours)| {
+        .map(|(ip, mut ours, mut unboxed)| {
             ours.sort_unstable();
+            unboxed.sort_unstable();
             SafepointRoots {
                 ip,
                 op: op_name(ip),
                 ours,
+                unboxed,
                 cranelift: stack_maps
                     .iter()
                     .filter(|(i, _)| *i == ip)
