@@ -43,14 +43,37 @@ impl Default for Nursery {
 
 impl Nursery {
     pub fn new() -> Self {
+        // Full capacity from birth, not grown into. `try_alloc` pushes to
+        // `objects` and `forwarding` together and the minor collector indexes
+        // both by nursery index, so a realloc in either is a moving backing
+        // store — which the JIT's inline bump (clif/nursery.rs) and
+        // `Heap::alloc_str_concat_inline` both assume cannot happen. Fixed
+        // size, so this is ~900 KB paid once rather than a growth curve.
         Self {
-            objects: Vec::with_capacity(4096.min(NURSERY_CAPACITY)),
-            forwarding: Vec::with_capacity(4096.min(NURSERY_CAPACITY)),
+            objects: Vec::with_capacity(NURSERY_CAPACITY),
+            forwarding: Vec::with_capacity(NURSERY_CAPACITY),
             remembered: Vec::new(),
             alloc_count: 0,
             minor_gc_count: 0,
             minor_gc_promoted: 0,
         }
+    }
+
+    /// Capacity of the object slots. Constant for the nursery's lifetime —
+    /// see `new`. Exposed so the invariant test and the JIT's emitted bounds
+    /// check assert against one number.
+    pub fn objects_capacity(&self) -> usize {
+        self.objects.capacity()
+    }
+
+    /// Capacity of the forwarding slots, which must track `objects`.
+    pub fn forwarding_capacity(&self) -> usize {
+        self.forwarding.capacity()
+    }
+
+    /// Backing-store address of the object slots, for the invariant test.
+    pub fn objects_data_ptr(&self) -> *const Option<HeapObj> {
+        self.objects.as_ptr()
     }
 
     #[inline(always)]
@@ -519,4 +542,65 @@ enum ChildSlot {
     ClassStatic(std::rc::Rc<str>),
     ModuleExport(usize),
     EnumVariantPayload,
+}
+
+#[cfg(test)]
+mod capacity_invariant {
+    use super::*;
+    use crate::heap::{HeapObj, HeapStr};
+
+    /// Stage B emits a nursery bump inline, which is only sound if a `push`
+    /// can never move the backing store. That makes "capacity is
+    /// NURSERY_CAPACITY from birth and never changes" a load-bearing
+    /// invariant rather than a tuning detail.
+    #[test]
+    fn nursery_capacity_is_fixed_from_birth() {
+        let mut n = Nursery::new();
+        assert_eq!(n.objects_capacity(), NURSERY_CAPACITY);
+        assert_eq!(n.forwarding_capacity(), NURSERY_CAPACITY);
+
+        let objects_ptr = n.objects_data_ptr();
+        for i in 0..NURSERY_CAPACITY {
+            let obj = HeapObj::Str(HeapStr::inline("x"));
+            assert!(n.try_alloc(obj).is_ok(), "alloc {i} should fit");
+        }
+        assert_eq!(n.objects_capacity(), NURSERY_CAPACITY, "capacity grew");
+        assert_eq!(
+            n.objects_data_ptr(),
+            objects_ptr,
+            "backing store moved — an inline bump would write into freed memory"
+        );
+
+        // One past capacity must decline, not grow.
+        assert!(n.try_alloc(HeapObj::Str(HeapStr::inline("y"))).is_err());
+        assert_eq!(n.objects_capacity(), NURSERY_CAPACITY);
+    }
+
+    /// A collection must not hand back a smaller (or relocated) nursery.
+    ///
+    /// The brief's scaffolding named this entry point `collect_minor`; the
+    /// actual API (see `heap.rs`) calls it `HeapInner::minor_gc`. It
+    /// `mem::take`s the nursery, calls `Nursery::collect` on the owned
+    /// value, then writes it back — a struct move, which does not touch the
+    /// Vecs' heap-allocated backing stores, so the pointer assertion below
+    /// still holds.
+    #[test]
+    fn nursery_capacity_survives_a_collection() {
+        let heap = crate::heap::Heap::new();
+        let mut stack: Vec<VmValue> = Vec::new();
+        for i in 0..1000 {
+            let v = unsafe { heap.inner_mut() }
+                .alloc_str_dynamic(format!("keep-{i}-padding-to-exceed-sso"));
+            stack.push(v);
+        }
+        let inner = unsafe { heap.inner_mut() };
+        let before = inner.nursery.objects_data_ptr();
+        inner.minor_gc(&mut stack, &[]);
+        assert_eq!(inner.nursery.objects_capacity(), NURSERY_CAPACITY);
+        assert_eq!(
+            inner.nursery.objects_data_ptr(),
+            before,
+            "collection relocated the nursery backing store"
+        );
+    }
 }
