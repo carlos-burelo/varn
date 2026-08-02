@@ -1,0 +1,172 @@
+// A GC safepoint spills live registers to their ctx.stack home slots so the
+// collector can root and rewrite them. `live_boxed` decides that set. This
+// file pins the set being narrow enough to be fast and wide enough to be
+// correct: every assert here holds a heap reference ACROSS an allocating
+// call, under enough pressure to force real collections.
+//
+// A missed root shows up here as a wrong value or a crash, not as a warning.
+
+// Heap refs (strings) live across a concat that allocates on every iteration.
+function spRefsSurviveConcat(n: int): int {
+  const keep = "anchor-string-long-enough-to-be-heap"
+  let last = ""
+  let hits = 0
+  for (let i = 0; i < n; i = i + 1) {
+    last = "item-" + i
+    if (keep === "anchor-string-long-enough-to-be-heap") { hits = hits + 1 }
+  }
+  if (last === "item-" + (n - 1)) { hits = hits + 1 }
+  return hits
+}
+assert("safepoint: heap refs survive allocating concats", spRefsSurviveConcat(50000) === 50001)
+
+// Ints interleaved with heap refs: the ints are what the kind-narrowed flush
+// set stops flushing, so their values must still be exact after collections
+// move things around.
+function spIntsExactAcrossGc(n: int): int {
+  let acc = 0
+  let s = ""
+  for (let i = 0; i < n; i = i + 1) {
+    s = "x" + i
+    acc = acc + (i % 7)
+  }
+  if (s === "") { return -1 }
+  return acc
+}
+assert("safepoint: ints exact across collections", spIntsExactAcrossGc(70000) === 210000)
+
+// An array of heap objects built under pressure: the array reference itself
+// is live across every push, and every element must survive.
+class SpBox { v: int
+  constructor(v: int) { this.v = v } }
+function spArraySurvives(n: int): int {
+  const arr = []
+  for (let i = 0; i < n; i = i + 1) { arr.push(new SpBox(i)); arr.push("s" + i) }
+  return arr.length + arr[0].v + arr[(n - 1) * 2].v
+}
+assert("safepoint: array and elements survive", spArraySurvives(20000) === 40000 + 0 + 19999)
+
+// Nested: an outer heap ref live across an inner allocating loop.
+function spNested(outer: int, inner: int): int {
+  let total = 0
+  const tag = "outer-anchor-string"
+  for (let i = 0; i < outer; i = i + 1) {
+    let local = ""
+    for (let j = 0; j < inner; j = j + 1) { local = tag + j }
+    if (local === tag + (inner - 1)) { total = total + 1 }
+  }
+  return total
+}
+assert("safepoint: outer ref survives inner allocating loop", spNested(500, 100) === 500)
+
+// ---------------------------------------------------------------------------
+// Helpers that read registers BY INDEX out of ctx.stack.
+//
+// Most JIT helpers receive their operands as C arguments, but a handful take
+// register NUMBERS and read `ctx.stack[base + reg]` themselves: a range's
+// bounds, a spread call's argument window, a native op's receiver window, an
+// enum variant's tag. Every one of those registers is an `int` here — exactly
+// the kind the GC flush set stops rooting — so each emit site has to
+// materialize its own window rather than ride on the flush set. Each case runs
+// under allocation pressure, so a stale home slot is a wrong answer rather
+// than a lucky read of a slot that happened to still be correct.
+// ---------------------------------------------------------------------------
+
+// The range is built from two int registers and read back, rather than
+// iterated: `for (const k of lo..hi)` over COMPUTED bounds drops iterations
+// today (8989 instead of 9000 over 1000 rounds, identically under the JIT and
+// the interpreter, so it is a compiler bug and not a flush-set one). Building
+// the range is what exercises `jit_range`'s home-slot reads; iterating it adds
+// nothing here and would tie this file to that bug.
+function spRangeUnderPressure(n: int): int {
+  let total = 0
+  let junk = ""
+  for (let i = 0; i < n; i = i + 1) {
+    junk = "r" + i
+    const lo = i % 5
+    const hi = lo + 3
+    const r = lo..hi
+    total = total + r.start + r.end
+  }
+  if (junk === "") { return -1 }
+  return total
+}
+assert("safepoint: range bounds survive", spRangeUnderPressure(20000) === 140000)
+
+function spSum3(a: int, b: int, c: int): int { return a + b + c }
+function spSpreadUnderPressure(n: int): int {
+  let total = 0
+  let junk = ""
+  for (let i = 0; i < n; i = i + 1) {
+    junk = "s" + i
+    const args = [i % 3, i % 5, i % 7]
+    total = total + spSum3(...args)
+  }
+  if (junk === "") { return -1 }
+  return total
+}
+assert("safepoint: spread argument window survives", spSpreadUnderPressure(20000) === 119996)
+
+// `arr.push(x)` is a CallNativeOp: the receiver and argument are read out of
+// the home slots by register number, and the pushed value here is an int.
+function spNativeOpUnderPressure(n: int): int {
+  const acc = []
+  let junk = ""
+  for (let i = 0; i < n; i = i + 1) {
+    junk = "n" + i
+    acc.push(i % 11)
+  }
+  if (junk === "") { return -1 }
+  return acc.length + acc[0] + acc[n - 1]
+}
+assert("safepoint: native op window survives", spNativeOpUnderPressure(20000) === 20001)
+
+enum SpTag { A(int), B(int) }
+function spEnumUnderPressure(n: int): int {
+  let total = 0
+  let junk = ""
+  for (let i = 0; i < n; i = i + 1) {
+    junk = "e" + i
+    const v = i % 2 === 0 ? SpTag.A(i) : SpTag.B(i)
+    total = total + match v {
+      A(x) => 1,
+      B(x) => 2,
+    }
+  }
+  if (junk === "") { return -1 }
+  return total
+}
+assert("safepoint: enum variant tag survives", spEnumUnderPressure(20000) === 30000)
+
+// An exception LEAVES compiled code entirely and resumes in the INTERPRETER at
+// the catch handler's bytecode ip, reading every register back from its home
+// slot. So a function containing a `try` cannot use the kind-narrowed flush
+// set at all: `counter`, `caught` and `depth` are ints defined before the
+// throw and read after the catch, and the interpreter can only see them
+// through `ctx.stack`.
+//
+// The throw is raised in THIS function rather than in a callee on purpose:
+// an exception crossing out of a compiled callee into a compiled caller's
+// handler currently loses most of its throws (JIT 91 vs interpreter 500 on a
+// 5000-iteration loop). That is a separate, pre-existing unwind bug with
+// nothing to do with the flush set; pinning it here would tie this file to it.
+function spTryUnderPressure(n: int): int {
+  let counter = 0
+  let caught = 0
+  let junk = ""
+  for (let i = 0; i < n; i = i + 1) {
+    const depth = i % 13
+    try {
+      junk = "t" + i
+      if (i % 1000 === 999) { throw new Error("boom") }
+      counter = counter + depth
+    } catch (e) {
+      caught = caught + depth
+    }
+  }
+  if (junk === "") { return -1 }
+  return counter * 10000 + caught
+}
+assert("safepoint: registers survive an interpreter catch resume", spTryUnderPressure(20000) === 119845 * 10000 + 134)
+
+print("[PASSED] 65. Safepoint roots ")

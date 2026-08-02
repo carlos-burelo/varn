@@ -62,6 +62,7 @@ import "./61-algebraic-identities.vn"
 import "./62-jit-osr.vn"
 import "./63-escape-analysis.vn"
 import "./64-str-concat-typed.vn"
+import "./65-safepoint-roots.vn"
 
-print("\n64 side-effect modules executed in suite")
+print("\n65 side-effect modules executed in suite")
 assertSummary()
