@@ -146,6 +146,14 @@ pub fn invalidate_epoch(epoch: u64) {
         proto.jit_code.replace(None);
         proto.jit_epoch.set(0);
         proto.jit_entry_count.set(0);
+        // The OSR entry is baked against the same dead heap and gated by the
+        // same `jit_epoch`, so it dies with it. Its buffer is separate from
+        // `jit_code` and must be released here too.
+        proto.jit_osr_entry.set(None);
+        proto.jit_osr_ip.set(0);
+        proto.jit_osr_code.replace(None);
+        proto.jit_osr_failed.set(false);
+        proto.backedge_count.set(0);
     }
 }
 

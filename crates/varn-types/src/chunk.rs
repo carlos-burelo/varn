@@ -595,6 +595,47 @@ pub struct FunctionProto {
     #[serde(skip)]
     #[serde(default)]
     pub jit_entry_count: std::cell::Cell<u32>,
+
+    /// Back edges taken in this proto, across all frames. Drives the OSR
+    /// trigger; unlike [`Self::jit_entry_count`] it keeps rising inside one
+    /// long frame, which is the whole point — a function entered once and then
+    /// looping reaches no entry threshold at all.
+    #[serde(skip)]
+    #[serde(default)]
+    pub backedge_count: std::cell::Cell<u32>,
+
+    /// Compiled ON-STACK REPLACEMENT entry: the same body lowered with a
+    /// parameterless prologue that reloads every register from this frame's
+    /// `ctx.stack` home slots and jumps straight to the block for
+    /// [`Self::jit_osr_ip`].
+    ///
+    /// Valid ONLY for that ip, and only in the epoch recorded by
+    /// [`Self::jit_epoch`] — which it shares with the normal entry, since both
+    /// bake the same context's constants and globals.
+    #[serde(skip)]
+    #[serde(default)]
+    pub jit_osr_entry: std::cell::Cell<Option<usize>>,
+
+    /// The loop-header ip [`Self::jit_osr_entry`] resumes at. One OSR variant
+    /// per proto: the first loop to prove hot wins, and a request for any other
+    /// ip is refused rather than recompiling.
+    #[serde(skip)]
+    #[serde(default)]
+    pub jit_osr_ip: std::cell::Cell<usize>,
+
+    /// The OSR buffer, kept alive exactly like [`Self::jit_code`]: it is a
+    /// separate `JitBuffer` from the normal entry's, and dropping it would
+    /// unmap code the frame loop is about to jump into.
+    #[serde(skip)]
+    #[serde(default)]
+    pub jit_osr_code: std::cell::RefCell<Option<Rc<dyn std::any::Any>>>,
+
+    /// OSR was attempted and refused (ineligible shape, or Cranelift bailed).
+    /// Latches so a frame that keeps looping does not re-attempt the same
+    /// compilation every `JIT_OSR_BACKEDGES` back edges.
+    #[serde(skip)]
+    #[serde(default)]
+    pub jit_osr_failed: std::cell::Cell<bool>,
 }
 
 fn slot_kind_dynamic() -> crate::register_meta::SlotKind {

@@ -574,6 +574,11 @@ mod jit_epoch_tests {
             )),
             static_closure_val: std::cell::Cell::new(0),
             jit_entry_count: std::cell::Cell::new(0),
+            backedge_count: std::cell::Cell::new(0),
+            jit_osr_entry: std::cell::Cell::new(None),
+            jit_osr_ip: std::cell::Cell::new(0),
+            jit_osr_code: std::cell::RefCell::new(None),
+            jit_osr_failed: std::cell::Cell::new(false),
         }
     }
 
