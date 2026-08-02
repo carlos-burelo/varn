@@ -78,13 +78,29 @@ construyó el objeto (modelo de in-object slots de V8).
 
 ### Strings
 
-`HeapStr` tiene tres formas:
+`HeapStr` tiene cuatro formas:
 
 - `Shared(Rc<str>)` — string inmutable.
 - `Ext { buf, len }` — buffer extensible; una acumulación `s = s + x` sobre la punta
   del buffer hace append en O(1) amortizado. Se siembra cuando el operando izquierdo
   tiene ≥ 16 bytes (`EXT_SEED_LEN`).
 - `Slice { src, off, len }` — vista zero-copy sobre un buffer inmutable.
+- `Inline { len, bytes }` — hasta `INLINE_STR_CAP` bytes guardados **dentro** del
+  objeto de heap, sin `Rc` detrás. `alloc_str_dynamic` la elige para todo string
+  dinámico que pase el límite SSO pero quepa aquí, que es justo donde cae el
+  `"prefijo" + <entero chico>` habitual; el `Rc::from` que pagaba antes era un
+  malloc más una copia por cada uno.
+
+  `INLINE_STR_CAP = 37` es **medido, no elegido**: es el valor más grande que deja
+  `size_of::<HeapObj>()` en 48. Con 38 pasa a 64, y ese número es el *stride* de
+  slot que comparte todo tipo de heap — un tercio más de memoria por objeto de
+  cualquier clase para favorecer strings sería un mal negocio que ningún benchmark
+  de strings mostraría. Lo fija el test `heap_obj_slot_stride_is_unchanged`.
+
+  Un `Inline` **no** se puede rebanar en el sitio: un `Slice` toma prestado un
+  buffer `Rc` que sobrevive a cualquier colección, mientras que estos bytes viven
+  en el slot y se mueven con él. `alloc_substring` copia, el mismo camino que ya
+  tomaba `Ext`.
 
 Los strings de ≤ 5 bytes no llegan al heap: viven inline en el `VmValue` (SSO). Esa
 es la razón de que `"User_" + i` **no** active el fast path de acumulación —
@@ -263,6 +279,100 @@ compilada después). Compartir la celda dejaría a un heap copiado entrar a cód
 horneado contra los objetos de su ancestro. OSR nunca adopta; si la epoch no
 coincide, recompila.
 
+### Strings en código compilado
+
+**Tres representaciones, una decisión.** `alloc_str_dynamic` elige en este orden:
+≤ 5 bytes ASCII → SSO, inline en el `VmValue`, sin heap; ≤ `INLINE_STR_CAP` (37)
+bytes → `HeapStr::Inline`, dentro del objeto de heap, sin `Rc`; el resto →
+`HeapStr::Shared` detrás de un `Rc`. Ver §2 para por qué 37.
+
+**El fast path de `StrConcat`** (`clif/strconcat.rs`). Si los dos operandos son SSO
+y la suma de sus longitudes cabe en 5 bytes, el concat entero son shifts y ors sobre
+valores que ya están en registros: no aloca, así que no hay nada que rootear y el
+brazo inline no tiene flush, ni call, ni reload. El brazo del helper conserva su
+flush/reload y los dos se juntan en un bloque merge — la misma forma que usa
+`alloc::emit_backedge_safepoint` para su chequeo de nursery.
+
+El flush vive **solo** en el brazo del helper. Subirlo antes del branch pagaría el
+safepoint en el camino que existe justamente para evitarlo.
+
+El ensamblado espeja `VmValue::try_from_sso`: los bytes de `a` ya están en su lugar,
+y el byte `j` de `b` va al índice `a_len + j` del resultado, que está `8 * a_len`
+bits más abajo de donde vive en `b` — un solo shift para todo el payload, porque los
+bytes más allá de una longitud son cero y los dos payloads simplemente se orean. SSO
+rechaza no-ASCII en la construcción, así que un valor que *es* sso es ASCII por
+inducción y no hace falta testear bytes.
+
+**Alcance real.** La guarda exige que *ambos* operandos sean SSO, y un entero nunca
+lo es. O sea que esto **no** dispara en `"prefijo" + <entero>`, que es la forma del
+benchmark de referencia. Medido contando llamadas a `jit_str_concat`: ~400k llamadas
+para 400k concats `"a" + (i % 100)` (nunca toma el fast path) contra 0 llamadas para
+400k concats `"x" + parts[i % 4]` (siempre lo toma). Llegar al caso del entero
+significa emitir `itoa` en CLIF; es otro trabajo.
+
+En la forma que sí toma: 400k concats pasan de 22 ms a 15 ms (~30%), consistente en
+7 rondas pareadas con el control limpio.
+
+### La regla del safepoint: qué se flushea y por qué
+
+`live_boxed` responde **una** pregunta: qué registros tiene que rootear el colector.
+Filtra tres cosas, cada una tirando registros en los que el colector provablemente
+no tiene nada que hacer:
+
+- **Floats** — viven en Variables `F64` que el colector nunca mira.
+- **Registros muertos** — lo que `liveness` prueba que ya no se lee después de la
+  instrucción actual. Dejar su home slot en paz conserva el `VmValue` (viejo pero
+  válido) que garantiza el null-fill del frame, que el colector ya escanea y tolera.
+- **Registros provablemente unboxed** (`is_root_kind`) — mismo argumento, un paso
+  más: un registro que el kind flow tipó `Int` o `Bool` tiene un entero de máquina,
+  no un índice de heap. No hay nada que rootear ni que reescribir.
+
+El tercer filtro se **apaga entero** en una función que contiene un `Try`: una
+excepción abandona el código compilado y resume en el **intérprete** en el ip del
+handler, que lee todos los registros — enteros incluidos — de vuelta desde sus home
+slots (`AllocCtx::narrow_roots`, calculado por `has_try`).
+
+**Lo que `live_boxed` NO responde** es qué registros va a leer un helper. Un puñado
+de helpers toma *números de registro* y lee `ctx.stack[base + reg]` por su cuenta:
+la ventana de argumentos de una llamada, la de un spread, la de un native op, los
+dos límites de un rango, el tag de una variante de enum. Cada uno de esos sitios
+materializa su propia ventana, para todos los kinds. Antes varios se colgaban de
+que el flush set alcanzara a cubrirlos, lo cual dejó de ser cierto en cuanto el set
+se angostó por kind — y ninguno de esos registros es un root, son todos enteros.
+
+`vn debug -p roots` verifica las dos mitades a la vez: contrasta nuestro set contra
+los stack maps que emite Cranelift, y descuenta la columna `unboxed` porque
+Cranelift marca toda Variable `I64` y no ve nuestros kinds. Sin ese descuento leería
+un entero vivo sin flushear como un root perdido.
+
+### Lo que se midió en cero
+
+Convención del repo: una conclusión de rendimiento viene con su evidencia, y una
+hipótesis **refutada** vale tanto como una confirmada porque cuesta un día
+re-derivarla. Sobre el benchmark de strings (400k `"gc_" + i`), en este host y con el
+protocolo de rondas alternadas más control, midieron **cero**:
+
+| Intento | Resultado |
+|---|---|
+| Saltear el probe del interner de contenido en strings dinámicos | 38 ms vs 39 ms |
+| `StrBuf` en pila en vez de `String` de scratch en `BuildStr` | 57 ms vs 55 ms |
+| Emitir `StrConcat` tipado en vez de `Add` genérico | 39 ms vs 38 ms |
+| Angostar el flush set del safepoint por kind (4 accesos a memoria menos por concat) | 30/30/43/38/39/38/37/38 vs 29/30/40/37/39/37/37/39 |
+| `HeapStr::Inline` (un malloc menos por string dinámico corto) | ver abajo |
+
+El caso de `Inline` es el más instructivo porque las dos direcciones se cancelan: en
+el benchmark `"gc_" + i` (resultados de 4-9 bytes) gana en 7 de 8 rondas por 0-3 ms,
+y en una banda enfocada de 12-17 bytes **pierde** por 0-2 ms. Es ruido. El
+asignador de clases chicas de Rust es evidentemente lo bastante rápido como para que
+sacarle el malloc no aparezca en el reloj.
+
+Los cinco se conservaron por razones estructurales — DRY, el `<backend_principle>`,
+menos código emitido, menos presión sobre el asignador — pero ninguno es un
+speedup, y ninguno debería re-intentarse esperando que lo sea.
+
+El único que **sí** midió es el fast path SSO de `StrConcat`, y solo en la forma
+string+string descrita arriba.
+
 ### Frames lógicos: handshake caller→prologue
 
 Cada activación tiene exactamente **un** CallFrame lógico en `ExecCtx.frames`, y
@@ -408,3 +518,34 @@ No hay una cifra única honesta para "la VM de Varn": depende del workload.
 
 **No copiar números de este documento a un reporte.** Medir. Ver
 `<performance_rules>` en `CLAUDE.md`.
+
+### Protocolo, cuando el número importa
+
+Este host invirtió un efecto del 40% durante el trabajo de OSR, y un lote entero
+llegó a leerse como una regresión del 50% que era puro drift térmico. Así que:
+
+- comparar **dos binarios alternados en un mismo loop**, nunca en secuencia;
+- tomar la **mediana de ≥ 7 rondas alternadas**;
+- llevar en la mezcla un **control** que el cambio no pueda afectar (`fib(30)` sirve:
+  no aloca). Si el control se mueve entre las dos mitades de un par, el lote se
+  descarta;
+- purgar la caché de compilación antes de validar, porque está indexada solo por
+  hash de fuente y esconde cambios de codegen:
+  `Remove-Item -Recurse -Force $env:LOCALAPPDATA\varn\cache`.
+
+### Comparación externa (fase de strings)
+
+400k `j.push("gc_" + i)` más 100k allocations de objetos, en funciones (un loop de
+top-level nunca se compila, así que medirlo compara nuestro intérprete contra el JIT
+de node). Mismo host, misma sesión, mejor de 12 corridas descartando 2 de warmup:
+
+| | strings | objetos |
+|---|---|---|
+| node | 8.9 ms | 0.0 ms |
+| bun | 19.9 ms | 0.1 ms |
+| varn | 33 ms | 0 ms |
+
+La fase de objetos está a la par gracias al escape analysis. La de strings no: lo
+que queda es un helper fuera de línea haciendo un trabajo que node emite inline, y
+cerrarlo pide allocation inline en CLIF. Nótese que estos números son de una sesión
+concreta; lo que vale es la relación, no el valor absoluto.
