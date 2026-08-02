@@ -103,6 +103,69 @@ pub struct JitObjectLayout {
     pub shape_id_off: usize,
 }
 
+/// Largest number of bytes of `Option<HeapObj>` the JIT's string template can
+/// hold. `template` below is captured at this fixed size regardless of the
+/// probed `slot_size`, so the buffer only needs widening if `HeapObj` grows
+/// past it — the probe asserts that at startup instead of silently
+/// truncating.
+pub const STR_TEMPLATE_MAX: usize = 64;
+
+/// Probed layout facts for the JIT's inline string allocation.
+///
+/// Stage B writes a `HeapObj::Str(HeapStr::Inline { .. })` straight into a
+/// nursery slot from generated code. `Option<HeapObj>`'s encoding and
+/// `HeapStr::Inline`'s field offsets inside it are not guaranteed by Rust, so
+/// nothing here is hardcoded: `template` is a real value captured as bytes,
+/// and every other field is measured against that same value (see
+/// `Heap::jit_str_layout`, which follows `JitArrayLayout`'s and
+/// `JitObjectLayout`'s precedent of probing rather than assuming).
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct JitStrLayout {
+    /// Discriminant byte value of `HeapObj::Str` (niche-shared with `Option`).
+    pub str_tag: usize,
+    /// A ready-made `Some(HeapObj::Str(HeapStr::Inline { len: 0, ascii:
+    /// UNKNOWN, bytes: [0; INLINE_STR_CAP] }))`, captured as raw bytes.
+    /// Emitted code stores `slot_size` bytes of this and then overwrites
+    /// `len_off` and the payload — so it never has to understand the
+    /// discriminant or the `ascii` cell.
+    pub template: [u8; STR_TEMPLATE_MAX],
+    /// `size_of::<Option<HeapObj>>()` — how much of `template` is live.
+    pub slot_size: usize,
+    /// Slot base → the `Inline` variant's `len: u8`.
+    pub len_off: usize,
+    /// Slot base → the `Inline` variant's `bytes[0]`.
+    pub bytes_off: usize,
+    /// `INLINE_STR_CAP` — the largest result the inline arm may build.
+    pub inline_cap: usize,
+    /// RcBox base → the nursery `forwarding` Vec's three words.
+    pub nursery_fwd_vec_off: usize,
+    /// RcBox base → `Nursery::alloc_count`.
+    pub alloc_count_off: usize,
+    /// `NURSERY_CAPACITY` — the bound the emitted bump checks against.
+    pub nursery_capacity: usize,
+}
+
+// `derive(Default)` cannot cover `[u8; STR_TEMPLATE_MAX]`: std only
+// implements `Default` for arrays up to length 32, and `STR_TEMPLATE_MAX` is
+// 64. Hand-written for the same all-zero result the derive would have given
+// every other (all-`usize`) field.
+impl Default for JitStrLayout {
+    fn default() -> Self {
+        JitStrLayout {
+            str_tag: 0,
+            template: [0u8; STR_TEMPLATE_MAX],
+            slot_size: 0,
+            len_off: 0,
+            bytes_off: 0,
+            inline_cap: 0,
+            nursery_fwd_vec_off: 0,
+            alloc_count_off: 0,
+            nursery_capacity: 0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct JitHelpers {
@@ -222,6 +285,8 @@ pub struct JitHelpers {
     pub array_layout: JitArrayLayout,
     /// Probed object layout for the inline property get/set fast paths.
     pub object_layout: JitObjectLayout,
+    /// Probed string-slot layout for the inline concat allocation path.
+    pub str_layout: JitStrLayout,
     pub open_upvalues_offset: usize,
     pub pending_constructors_offset: usize,
     /// `extern "C" fn(*mut ExecCtx)` — loop back-edge GC safepoint.

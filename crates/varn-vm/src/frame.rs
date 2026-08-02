@@ -192,6 +192,7 @@ pub fn build_jit_helpers() -> varn_jit::JitHelpers {
         resolve_native_op_v2: VmClosure::resolve_native_op_addr_v2,
         array_layout,
         object_layout: crate::heap::Heap::jit_object_layout(),
+        str_layout: crate::heap::Heap::jit_str_layout(),
         open_upvalues_offset: {
             let dummy = std::mem::MaybeUninit::<ctx::ExecCtx>::uninit();
             let dummy_ptr = dummy.as_ptr();

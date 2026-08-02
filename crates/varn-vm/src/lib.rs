@@ -8,6 +8,7 @@ pub mod globals;
 pub mod heap;
 pub mod heap_array;
 mod heap_str_alloc;
+mod jit_layout;
 pub mod linker;
 pub mod loader;
 pub mod nursery;

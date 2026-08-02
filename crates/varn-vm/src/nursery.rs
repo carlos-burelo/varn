@@ -147,6 +147,13 @@ impl Nursery {
         std::mem::offset_of!(Nursery, objects)
     }
 
+    /// Byte offset of the `forwarding` Vec's three words within `Nursery`,
+    /// for the JIT's inline allocation — which must bump both Vecs, since the
+    /// minor collector indexes them together.
+    pub fn forwarding_vec_byte_offset() -> usize {
+        std::mem::offset_of!(Nursery, forwarding)
+    }
+
     #[inline(always)]
     pub fn len(&self) -> usize {
         self.objects.len()
