@@ -248,11 +248,9 @@ pub extern "C" fn jit_mul(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue 
 pub extern "C" fn jit_to_string(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let s = ctx_ref.heap.str_repr(v);
-        // Dynamic by construction — see `Heap::alloc_str_dynamic`. `alloc_str`
-        // would hash the whole result on every call for a probe that cannot
-        // hit, and the interpreter's `ToString` does not pay it either.
-        ctx_ref.heap.alloc_str_dynamic(&s)
+        // Same implementation the interpreter's `ToString` runs; the two
+        // tiers must not disagree about how a coercion allocates.
+        crate::exec::strings::to_string(v, &mut ctx_ref.heap)
     }
 }
 
@@ -791,17 +789,15 @@ pub extern "C" fn jit_build_str(
     unsafe {
         let ctx_ref = &mut *ctx;
         let parts = std::slice::from_raw_parts(parts_ptr, count);
-        // Append each part directly: strings borrow, scalars format in
-        // place — no per-part String allocation.
-        let mut combined = String::new();
+        // Stack-first buffer, exactly as the interpreter's `BuildStr` — a
+        // template whose result fits inline never reaches the allocator, and
+        // one that does not pays a single `Rc<str>` instead of a scratch
+        // `String` plus a copy into it.
+        let mut out = crate::strbuf::StrBuf::new();
         for &v in parts {
-            ctx_ref.heap.str_repr_into(v, &mut combined);
+            ctx_ref.heap.str_repr_into(v, &mut out);
         }
-        // A concatenation result is dynamic by definition, so the interner
-        // probe `alloc_str` performs is a full content hash that can never
-        // hit — on a string-building loop that is per-iteration waste the
-        // interpreter's `BuildStr` does not pay.
-        ctx_ref.heap.alloc_str_dynamic(&combined)
+        ctx_ref.heap.alloc_str_dynamic(out.as_str())
     }
 }
 

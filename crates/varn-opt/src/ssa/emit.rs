@@ -36,6 +36,8 @@ pub fn emit_function(
 
     let imms = plan_immediates(&ssa);
 
+    let value_tys: Vec<crate::hir::HirType> = ssa.values.iter().map(|v| v.ty).collect();
+
     let order = emission_order(&ssa);
     let mut pos_of = vec![usize::MAX; n];
     for (i, &b) in order.iter().enumerate() {
@@ -49,6 +51,7 @@ pub fn emit_function(
             emit_inst(
                 &mut chunk,
                 inst,
+                &value_tys,
                 &reg,
                 scratch,
                 call_base,
@@ -634,6 +637,9 @@ fn plan_immediates(ssa: &SsaFunc) -> Immediates {
 fn emit_inst(
     chunk: &mut Chunk,
     inst: &Inst,
+    // Static type of every SSA value, so a binary can be specialized on what
+    // its OPERANDS are proven to be and not only on its own result type.
+    value_tys: &[crate::hir::HirType],
     reg: &[u8],
     scratch: u8,
     call_base: u8,
@@ -899,7 +905,20 @@ fn emit_inst(
         }
         InstKind::ConstNull => chunk.emit_rr(OpCode::LoadNull, d, 0, LINE),
         InstKind::Binary { op, lhs, rhs, ty } => {
-            let opcode = bin_opcode(*op, *ty);
+            // `+` with a statically-proven string operand IS concatenation.
+            // That is exactly what `arith::add` works out at RUN TIME, one
+            // type test at a time, on every single execution — and the
+            // checker already proved it here. The binary's own `ty` is
+            // `Dynamic` for the common `"literal" + int`, so specializing on
+            // the result type alone never reaches this.
+            let str_operand = matches!(op, crate::hir::HirBinOp::Add)
+                && (matches!(value_tys.get(lhs.0 as usize), Some(crate::hir::HirType::Str))
+                    || matches!(value_tys.get(rhs.0 as usize), Some(crate::hir::HirType::Str)));
+            let opcode = if str_operand {
+                OpCode::StrConcat
+            } else {
+                bin_opcode(*op, *ty)
+            };
             chunk.emit_rrr(opcode, d, reg[lhs.0 as usize], reg[rhs.0 as usize], LINE);
         }
         InstKind::Unary { op, operand, .. } => {

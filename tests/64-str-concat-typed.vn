@@ -1,0 +1,68 @@
+// `+` with a statically-proven string operand now emits `StrConcat` instead
+// of the generic `Add`. That opcode was previously NEVER emitted — its
+// interpreter arm, its Cranelift lowering, its runtime helper and its
+// register-allocator handling were all unreachable code. This file is the
+// coverage that path never had.
+//
+// The specialization must be semantics-preserving: `arith::add` routes to
+// `str_concat` whenever EITHER operand is a string, so every case below has
+// to read the same as it did through the generic path — including the ones
+// where the string is on the right, and where the other operand is not a
+// number.
+
+function scLeft(n: int): string { return "n=" + n }
+assert("strconcat: string on the left", scLeft(42) === "n=42")
+
+function scRight(n: int): string { return n + " items" }
+assert("strconcat: string on the right", scRight(7) === "7 items")
+
+// NOTE: `a + b` with both operands DECLARED `string` is rejected by the
+// checker (`WR3010: invalid binary operation '+' between 'string' and
+// 'string'`), so the two-literal form is the only way to reach a
+// string/string concat from source.
+assert("strconcat: two string literals", ("ab" + "cd") === "abcd")
+
+// Non-numeric right operands must stringify, not coerce.
+function scNull(): string { return "v=" + null }
+assert("strconcat: null stringifies", scNull() === "v=null")
+
+function scBool(): string { return "b=" + true }
+assert("strconcat: bool stringifies", scBool() === "b=true")
+
+function scFloat(): string { return "f=" + 1.5 }
+assert("strconcat: float stringifies", scFloat() === "f=1.5")
+
+// A float that happens to be integral prints without a fractional part —
+// pinned because `str_repr_into` has a dedicated branch for it.
+function scWholeFloat(): string { return "w=" + 3.0 }
+assert("strconcat: integral float stringifies", scWholeFloat() === "w=3")
+
+// Negative and zero through the itoa path.
+assert("strconcat: negative int", ("x" + -5) === "x-5")
+assert("strconcat: zero", ("x" + 0) === "x0")
+
+// Empty string operands.
+assert("strconcat: empty left", ("" + 9) === "9")
+assert("strconcat: empty right", ("9" + "") === "9")
+
+// Results crossing the small-string-optimization boundary: <=5 bytes stays
+// inline in the value, longer ones become heap strings. Both must compare and
+// concatenate the same.
+assert("strconcat: sso-sized result", ("a" + 1) === "a1")
+assert("strconcat: heap-sized result", ("abcdefgh" + 123456) === "abcdefgh123456")
+
+// Accumulation in a loop — the shape `str_concat`'s extensible-buffer fast
+// path exists for. Length is checked through a dynamic binding because the
+// static `string` type exposes no `.length`.
+function scAccum(n: int): int {
+  let s = ""
+  for (let i = 0; i < n; i = i + 1) { s = s + "xy" }
+  return s.length
+}
+assert("strconcat: accumulation stays exact", scAccum(1000) === 2000)
+
+// Chained concatenation mixing types, evaluated left to right.
+function scChain(n: int): string { return "a" + n + "b" + (n + 1) }
+assert("strconcat: chain mixes types left to right", scChain(1) === "a1b2")
+
+print("[PASSED] 64. Typed string concat ")

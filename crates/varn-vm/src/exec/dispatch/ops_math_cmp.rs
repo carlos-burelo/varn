@@ -279,11 +279,7 @@ impl ExecCtx {
                 let src = hi(code[*ip]);
                 *ip += 1;
                 let v = self.stack[base + src];
-                let s = self.heap.str_repr(v);
-                // `alloc_str_dynamic`, not `alloc_str`: a coerced value is a
-                // runtime-produced string, so the interner probe can only ever
-                // hash its full contents and miss. See that method's contract.
-                self.stack[base + first_reg] = self.heap.alloc_str_dynamic(&s);
+                self.stack[base + first_reg] = crate::exec::strings::to_string(v, &mut self.heap);
             }
             OpCode::StrConcat => {
                 let w1 = code[*ip];
@@ -291,29 +287,31 @@ impl ExecCtx {
                 let (src1, src2) = (hi(w1), lo(w1));
                 let a = self.stack[base + src1];
                 let b = self.stack[base + src2];
-                // Append both operands into ONE buffer. The `format!` this
-                // replaces allocated a third String on top of the two
-                // `str_repr` results, to produce a value that is then copied
-                // again into the heap string.
-                let mut combined = String::new();
-                self.heap.str_repr_into(a, &mut combined);
-                self.heap.str_repr_into(b, &mut combined);
-                self.stack[base + first_reg] = self.heap.alloc_str_dynamic(&combined);
+                // Delegated rather than reimplemented: `str_concat` is where
+                // the stack-first `StrBuf` and the `s = s + x` accumulation
+                // fast path live. This arm used to build its result in a
+                // `String` and copy it into the heap string — two allocations
+                // for what that one does in one, and no accumulation path at
+                // all, so a concat loop was quadratic here and linear through
+                // the generic `Add`.
+                self.stack[base + first_reg] = crate::exec::strings::str_concat(a, b, &mut self.heap);
             }
             OpCode::BuildStr => {
                 let count = hi(code[*ip]);
                 *ip += 1;
 
-                // Append each part directly into one buffer: strings borrow,
-                // ints/bools/null format in place — no per-part String alloc.
-                let mut combined = String::new();
+                // One stack-first buffer for every part: strings borrow,
+                // ints/bools/null format in place. Only a result that
+                // outgrows the inline capacity touches the allocator, and
+                // then once — the `String` this replaced always allocated,
+                // and its contents were copied again into the heap string.
+                let mut out = crate::strbuf::StrBuf::new();
                 for i in 0..count {
                     let reg_idx = hi(code[*ip + i]);
-                    self.heap
-                        .str_repr_into(self.stack[base + reg_idx], &mut combined);
+                    self.heap.str_repr_into(self.stack[base + reg_idx], &mut out);
                 }
                 *ip += count;
-                self.stack[base + first_reg] = self.heap.alloc_str_dynamic(&combined);
+                self.stack[base + first_reg] = self.heap.alloc_str_dynamic(out.as_str());
             }
             OpCode::StrLength => {
                 let src = hi(code[*ip]);
