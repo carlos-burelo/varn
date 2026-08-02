@@ -418,7 +418,120 @@ Stage A was chosen as both a win and a probe. This task spends fifteen minutes r
   - **`"gc_" + i` at or below ~15 ns** → Stage A got there on its own. **Stop after Task 8** (`.length`), skip Tasks 4–7, and record in `docs/VM_ARCHITECTURE.md` that the inline nursery emitter was measured unnecessary. That is a result worth as much as the code.
   - **Between the two** → build Task 4–6 (layout probe, nursery emitter, itoa) but land only the **SSO arm** of Task 7, whose payoff is largest per line. Note the nursery arm as a follow-up with its measured expected value.
 
-- [ ] **Step 4: Commit the decision** as a docs-only change to this plan file, checking the boxes above and adding a `**Gate result:**` line under this task.
+- [x] **Step 4: Commit the decision** as a docs-only change to this plan file, checking the boxes above and adding a `**Gate result:**` line under this task.
+
+**Gate result (2026-08-02, commits `26601a9..777956c`):** PROCEED to Task 4.
+
+Measured against the pre-plan baseline `26601a9`, 17 alternating rounds across two
+batches with the order flipped between them; one earlier batch discarded when a
+thermal event moved the `B_sso_fast` control. All controls (`A_loop`,
+`B_sso_fast`, `I_index`, `L_length`, object allocation) flat at 0.0%.
+
+| row | base ns/it | new ns/it | delta |
+|---|---:|---:|---:|
+| `D_inline` (`"gc_" + i`) | 37.50 | 22.50 | **-40.0%** |
+| `F_itoa` (`"" + i`) | 35.00 | 27.50 | -21.4% |
+| `C_sso_res` (`"g" + (i%1000)`) | 30.00 | 35.00 | **+16.7%** |
+| `E_rc` (>37 B result) | 70.00 | 73.75 | +5.4-6.2% |
+
+`D_inline` at 22.50 ns is above the ~20 ns threshold, so the boundary and the
+remaining copies still dominate and Stage B is worth building. The floor argument
+holds: 5 ns loop + 2.5 ns for a concat that never leaves compiled code + itoa,
+so roughly 10-12 ns is reachable and about half the current cost is still on the
+table.
+
+**Two regressions Stage A introduced, which the plan did not anticipate.** The
+guard resolves the left operand and formats the digits before deciding to
+decline, and the general path then redoes that work. Task 3's Part 1 fixed the
+`E_rc` case for free (a prefix already over `INLINE_STR_CAP` cannot fit inline
+whatever the digit count), taking it from ~19-21% down to ~5-6%. `C_sso_res` is
+untouched at +16.7%.
+
+Stage B does **not** fix `C_sso_res`: its SSO arm removes the helper call only
+for JIT-compiled code, while the helper remains the interpreter's path and
+`VARN_NO_JIT=1` is a supported configuration this repo validates on every task.
+So the regression is repaired at the source, in Task 3b below, before Stage B
+starts.
+
+---
+
+## Task 3b: Stop declining the SSO-sized result after building it
+
+`alloc_str_concat_inline` assembles the result bytes and then returns `None` when
+the total is ≤5, on the reasoning that `alloc_str_dynamic` will make it an SSO
+value more cheaply. It will — but only after `str_concat` re-renders both
+operands into a `StrBuf` from scratch. The bytes were already in hand.
+
+**Files:**
+- Modify: `crates/varn-vm/src/heap_str_alloc.rs`
+- Test: same file
+
+**Interfaces:** no signature change. `alloc_str_concat_inline` keeps
+`(&mut self, a: VmValue, b: VmValue) -> Option<VmValue>`.
+
+- [ ] **Step 1: Write the failing test.** It must pin that a ≤5-byte result comes
+  back from the inline path rather than being declined, and that a non-ASCII
+  result of the same length still round-trips correctly:
+
+```rust
+    /// A result that fits SSO used to be declined AFTER its bytes were built,
+    /// making the general path re-render both operands. The bytes are already
+    /// in hand; hand them back.
+    #[test]
+    fn sso_sized_results_come_back_from_the_inline_path() {
+        let heap = Heap::new();
+        let h = unsafe { heap.inner_mut() };
+
+        for (l, r, want) in [("g", 1i64, "g1"), ("ab", 123, "ab123"), ("", 0, "0")] {
+            let a = h.alloc_str_dynamic(l);
+            let got = h
+                .alloc_str_concat_inline(a, VmValue::from_int(r))
+                .expect("sso-sized result must not be declined");
+            assert!(got.is_sso(), "{want:?} should be an SSO value, not a heap string");
+            assert_eq!(h.str_repr(got), want);
+        }
+
+        // Non-ASCII cannot be SSO at any length: `try_from_sso` refuses bytes
+        // over 127. It must still produce the right string.
+        let uni = h.alloc_str_dynamic("é");
+        let got = h
+            .alloc_str_concat_inline(uni, VmValue::from_int(1))
+            .expect("non-ascii short result must still be served");
+        assert!(!got.is_sso());
+        assert_eq!(h.str_repr(got), "é1");
+    }
+```
+
+- [ ] **Step 2: Run it and watch it fail.** `cargo test -p varn-vm sso_sized_results_come_back_from_the_inline_path`. Expected: FAIL on the `expect` — today the function declines.
+
+- [ ] **Step 3: Replace the decline with a return.** The `total <= 5` arm becomes:
+
+```rust
+        // The bytes are built; declining here would make `str_concat` render
+        // both operands again from scratch. `try_from_sso` refuses non-ASCII
+        // at any length, so a short multibyte result falls through to the
+        // inline heap representation below rather than being lost.
+        if total <= 5 {
+            if let Some(sso) = VmValue::try_from_sso(
+                std::str::from_utf8(&bytes[..total]).expect("operands were valid UTF-8"),
+            ) {
+                return Some(sso);
+            }
+        }
+```
+
+  Note the `INLINE_STR_CAP` path below must then accept `total <= 5` too, since a
+  short non-ASCII result now reaches it. Check that `HeapStr::Inline` has no
+  implicit lower-length assumption before relying on this.
+
+- [ ] **Step 4: Run the test**, then `cargo test -p varn-vm`, then the validation
+  gold across all three configurations, byte-identical, cache purged.
+
+- [ ] **Step 5: Measure.** Per the protocol, against the pre-plan baseline.
+  `C_sso_res` must return to at least its 30.00 ns/it baseline; `D_inline`,
+  `F_itoa` and every control must not move.
+
+- [ ] **Step 6: Commit.**
 
 ---
 
