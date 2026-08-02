@@ -50,6 +50,15 @@ impl HeapInner {
             return None;
         };
 
+        // A prefix that already exceeds the inline capacity cannot produce an
+        // inline result no matter how few digits `b` has — decline before
+        // paying for the digits. Formatting first and discarding it is what
+        // made the >37-byte shape measurably slower than not having this path
+        // at all.
+        if a_bytes.len() > INLINE_STR_CAP {
+            return None;
+        }
+
         let mut digits = [0u8; INT_MAX_DIGITS];
         let digits = itoa(b.as_int(), &mut digits).as_bytes();
         let total = a_bytes.len() + digits.len();
@@ -144,5 +153,32 @@ mod tests {
             .alloc_str_concat_inline(uni, VmValue::from_int(5))
             .expect("multibyte prefix fits in 37 bytes");
         assert_eq!(h.str_repr(got), "日本語のプレフィックス5");
+    }
+
+    /// A left operand whose bytes alone already exceed `INLINE_STR_CAP` must
+    /// decline before `itoa` ever runs on `b` — that is the ordering fix
+    /// this test pins down, distinct from the "one past the cap after
+    /// adding digits" case above. And regardless of *why* it declined, the
+    /// general path it falls through to must still produce the right string.
+    #[test]
+    fn oversized_prefix_declines_before_itoa_and_general_path_is_correct() {
+        let mut heap = Heap::new();
+        let h = unsafe { heap.inner_mut() };
+
+        // 43 bytes on its own — already past INLINE_STR_CAP (37) with zero
+        // digits appended, so the decline must not depend on `b` at all.
+        let prefix = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG";
+        assert!(prefix.len() > INLINE_STR_CAP, "fixture must exceed INLINE_STR_CAP on its own");
+
+        let a = h.alloc_str_dynamic(prefix);
+        assert!(
+            h.alloc_str_concat_inline(a, VmValue::from_int(123)).is_none(),
+            "oversized prefix must decline regardless of digit count"
+        );
+
+        // Falling through to the general path must still round-trip correctly.
+        let want = format!("{prefix}123");
+        let got = crate::exec::strings::str_concat(a, VmValue::from_int(123), &mut heap);
+        assert_eq!(heap.str_repr(got), want);
     }
 }
