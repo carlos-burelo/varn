@@ -1,0 +1,79 @@
+// Dynamic strings up to the SSO limit live inside the VmValue; longer ones
+// become heap strings. This file pins a third representation between them —
+// short heap strings stored inline in the heap object rather than behind an
+// Rc. It must be invisible: same contents, same comparisons, same slicing,
+// same length, whichever representation a given string happens to take.
+
+function isStr(n: int): string { return "ab" + n }
+
+// Straddle the boundaries: 3 bytes (SSO), 8 bytes (inline), 40 bytes (past the
+// inline capacity, so out of line behind an Rc).
+assert("inline: sso-sized",    isStr(1) === "ab1")
+assert("inline: inline-sized", isStr(123456) === "ab123456")
+assert("inline: long", ("ab" + "cdefghijklmnopqrstuvwxyz0123456789ABCD") === "abcdefghijklmnopqrstuvwxyz0123456789ABCD")
+
+// Exactly at the inline capacity and one past it, which is where an off-by-one
+// in the length check would show up.
+const at37 = "0123456789012345678901234567890123456"
+const at38 = "01234567890123456789012345678901234567"
+assert("inline: exactly at capacity",  ("" + at37) === at37)
+assert("inline: one past capacity",    ("" + at38) === at38)
+function lenOfStr(s: string): int { let d = "" + s; return d.length }
+assert("inline: capacity length",      lenOfStr(at37) === 37)
+assert("inline: past-capacity length", lenOfStr(at38) === 38)
+
+// Length must agree across representations. Read through an inferred binding:
+// the static `string` type exposes no `.length`, only the dynamic one does.
+function lenOf(n: int): int { let d = "ab" + n; return d.length }
+assert("inline: length sso",    lenOf(1) === 3)
+assert("inline: length inline", lenOf(123456) === 8)
+
+// Equality between two independently built strings of the same contents.
+assert("inline: equality of equal contents", isStr(4242) === ("ab" + 4242))
+
+// Concatenating an inline string as the LEFT operand must still work — this
+// is the path that reads the bytes back out.
+assert("inline: inline string concatenated again", (isStr(123456) + "!") === "ab123456!")
+
+// Slicing reads the bytes through a different route than concat. An inline
+// string cannot hand out a zero-copy view (its bytes move with the heap slot),
+// so this exercises the copying fallback.
+function sliceOf(n: int, from: int): string { let d = "ab" + n; return d.slice(from) }
+assert("inline: slice of an inline string", sliceOf(123456, 2) === "123456")
+assert("inline: slice to empty", sliceOf(123456, 8) === "")
+assert("inline: slice whole", sliceOf(123456, 0) === "ab123456")
+
+// Non-ASCII: multi-byte content must round-trip and report byte-correct
+// boundaries, since the inline bytes are stored raw.
+function utf8Str(n: int): string { return "héllo-ñ" + n }
+assert("inline: non-ascii round trip", utf8Str(7) === "héllo-ñ7")
+assert("inline: non-ascii concatenated again", (utf8Str(7) + "!") === "héllo-ñ7!")
+
+// Used as a map key, which canonicalizes through the interner.
+function mapRoundTrip(n: int): bool {
+  const m = new Map()
+  m.set(isStr(n), n)
+  return m.get("ab" + n) === n
+}
+assert("inline: works as a map key", mapRoundTrip(123456))
+
+// Survives a collection: built, held, then heavy allocation, then read.
+function inlineSurvivesGc(n: int): bool {
+  const held = isStr(999999)
+  let junk = ""
+  for (let i = 0; i < n; i = i + 1) { junk = "g" + i }
+  if (junk === "") { return false }
+  return held === "ab999999"
+}
+assert("inline: survives a collection", inlineSurvivesGc(60000) === true)
+
+// Accumulation still takes the extensible-buffer path rather than turning into
+// a chain of inline copies.
+function inlineAccum(n: int): int {
+  let s = ""
+  for (let i = 0; i < n; i = i + 1) { s = s + "xy" }
+  return s.length
+}
+assert("inline: accumulation stays exact", inlineAccum(1000) === 2000)
+
+print("[PASSED] 66. Inline strings ")

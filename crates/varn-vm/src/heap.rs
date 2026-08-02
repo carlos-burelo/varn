@@ -60,7 +60,33 @@ pub enum HeapStr {
         /// bits 0..30 = byte length, bits 30..32 = `ascii_flag` state.
         len_ascii: std::cell::Cell<u32>,
     },
+    /// A short dynamic string stored IN the heap object, with no `Rc` behind
+    /// it. `alloc_str_dynamic`'s `Rc::from` is a malloc plus a copy for every
+    /// string over the 5-byte SSO limit, and the common `"prefix" + <small
+    /// int>` result lands just past it. Capacity is chosen so
+    /// `size_of::<HeapObj>()` does not change — the slot stride is shared with
+    /// every other heap type, so widening it to help strings would tax every
+    /// other allocation.
+    ///
+    /// Not sliceable in place: a `Slice` view borrows an `Rc` buffer that
+    /// outlives any collection, whereas these bytes live in the heap slot and
+    /// move with it. `alloc_substring` copies out of one instead.
+    Inline {
+        len: u8,
+        ascii: std::cell::Cell<u8>,
+        bytes: [u8; INLINE_STR_CAP],
+    },
 }
+
+/// Bytes a short dynamic string keeps inside its heap object instead of behind
+/// an `Rc`.
+///
+/// Measured, not chosen: 37 is the largest value that leaves
+/// `size_of::<HeapObj>()` at 48. 38 takes it to 64, and that number is the slot
+/// stride every heap type shares — a third more memory per object of every kind
+/// to help strings would be a bad trade nothing in a string benchmark would
+/// show. Pinned by `heap_obj_slot_stride_is_unchanged`.
+pub const INLINE_STR_CAP: usize = 37;
 
 impl HeapStr {
     #[inline]
@@ -74,6 +100,20 @@ impl HeapStr {
             buf,
             len,
             ascii: std::cell::Cell::new(ascii),
+        }
+    }
+
+    /// Store `s` inside the heap object. Caller guarantees
+    /// `s.len() <= INLINE_STR_CAP`.
+    #[inline]
+    pub fn inline(s: &str) -> Self {
+        debug_assert!(s.len() <= INLINE_STR_CAP);
+        let mut bytes = [0u8; INLINE_STR_CAP];
+        bytes[..s.len()].copy_from_slice(s.as_bytes());
+        HeapStr::Inline {
+            len: s.len() as u8,
+            ascii: std::cell::Cell::new(ascii_flag::UNKNOWN),
+            bytes,
         }
     }
 
@@ -102,6 +142,12 @@ impl HeapStr {
                 let len = (len_ascii.get() & SLICE_LEN_MASK) as usize;
                 &src[off..off + len]
             }
+            // Safety: `Inline` is only ever built from a `&str` in
+            // `alloc_str_dynamic`, which copies whole bytes, so the prefix is
+            // valid UTF-8 by construction.
+            HeapStr::Inline { len, bytes, .. } => unsafe {
+                std::str::from_utf8_unchecked(&bytes[..*len as usize])
+            },
         }
     }
 
@@ -119,6 +165,7 @@ impl HeapStr {
             HeapStr::Shared(s, _) => s.len(),
             HeapStr::Ext { len, .. } => *len,
             HeapStr::Slice { len_ascii, .. } => (len_ascii.get() & SLICE_LEN_MASK) as usize,
+            HeapStr::Inline { len, .. } => *len as usize,
         }
     }
 
@@ -133,6 +180,7 @@ impl HeapStr {
             HeapStr::Shared(_, ascii) => ascii.get(),
             HeapStr::Ext { ascii, .. } => ascii.get(),
             HeapStr::Slice { len_ascii, .. } => (len_ascii.get() >> 30) as u8,
+            HeapStr::Inline { ascii, .. } => ascii.get(),
         }
     }
 
@@ -162,6 +210,7 @@ impl HeapStr {
                 let len = len_ascii.get() & SLICE_LEN_MASK;
                 len_ascii.set(len | ((state as u32) << 30));
             }
+            HeapStr::Inline { ascii, .. } => ascii.set(state),
         }
     }
 
@@ -908,6 +957,13 @@ impl HeapInner {
             return sso;
         }
 
+        // Just past the SSO limit is where `"prefix" + <small int>` lands, and
+        // `Rc::from` below is a malloc plus a copy for every one of them. The
+        // heap slot is a fixed stride whether or not these bytes are in it.
+        if s_ref.len() <= INLINE_STR_CAP {
+            return self.alloc_str_view(HeapStr::inline(s_ref));
+        }
+
         let rs: RuntimeString = Rc::from(s_ref);
         let idx = match self.nursery.try_alloc(HeapObj::Str(HeapStr::shared(rs))) {
             Ok(ni) => ni,
@@ -950,7 +1006,11 @@ impl HeapInner {
                     let hs = HeapStr::slice_of(Rc::clone(src), *off as usize + bs, len, flag);
                     return self.alloc_str_view(hs);
                 }
-                HeapStr::Ext { .. } => {}
+                // Neither can hand out a zero-copy view: `Ext`'s buffer can
+                // reallocate on growth, and `Inline`'s bytes live in the heap
+                // slot itself, which the collector moves. Both fall through to
+                // the copying path below.
+                HeapStr::Ext { .. } | HeapStr::Inline { .. } => {}
             }
         }
         self.alloc_str_dynamic(sub)
@@ -2101,6 +2161,22 @@ mod jit_object_layout_tests {
 /// which panics on a typed repr; these tests prove the total-accessor
 /// (`get_vm`/`set_vm`/`push_vm`/`pop_vm`/`len`) rewrite is variant-safe and
 /// that the Boxed path is unchanged.
+#[cfg(test)]
+mod heap_obj_size_tests {
+    use super::*;
+
+    /// `INLINE_STR_CAP` was chosen against this number. `size_of::<HeapObj>()`
+    /// is the slot stride every heap type shares, so if the enum grows, every
+    /// allocation of every kind pays for it — a global regression no string
+    /// benchmark would show. 48 is the value from before `HeapStr::Inline`
+    /// existed; capacity 37 keeps it, 38 takes it to 64.
+    #[test]
+    fn heap_obj_slot_stride_is_unchanged() {
+        assert_eq!(std::mem::size_of::<HeapObj>(), 48);
+        assert!(INLINE_STR_CAP <= u8::MAX as usize, "len field is a u8");
+    }
+}
+
 #[cfg(test)]
 mod array_variant_runtime_tests {
     use super::*;
