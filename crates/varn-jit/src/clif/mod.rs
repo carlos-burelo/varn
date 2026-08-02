@@ -9,10 +9,16 @@
 //! stack walks (errors, debugger, GC) through an RBP chain plus a
 //! return-address side table.
 
+pub(crate) mod abi;
 pub(crate) mod alloc;
 pub(crate) mod arrays;
+pub(crate) mod body;
 pub mod debug;
 pub(crate) mod emit;
+pub(crate) mod piece;
+pub(crate) mod preheader;
+pub(crate) mod scan;
+pub(crate) mod vars;
 pub(crate) mod fields;
 pub(crate) mod floats;
 pub(crate) mod generic;
