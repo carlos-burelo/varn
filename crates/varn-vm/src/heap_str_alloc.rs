@@ -25,9 +25,14 @@ impl HeapInner {
     /// * `b` is not an int — the digit fast path is the whole point;
     /// * `a` is `Ext` — it **must** fall through, or `str_concat`'s
     ///   accumulation path is bypassed and `s = s + x` goes quadratic;
-    /// * the result exceeds `INLINE_STR_CAP` — it needs an `Rc`;
-    /// * the result fits SSO — cheaper still, and `alloc_str_dynamic` already
-    ///   does it with no heap slot at all.
+    /// * the result exceeds `INLINE_STR_CAP` — it needs an `Rc`.
+    ///
+    /// A result that fits SSO is handed back as an SSO value directly rather
+    /// than declined: the bytes are already assembled by the time the length
+    /// is known, so returning them beats making `str_concat`'s general path
+    /// re-render both operands into a `StrBuf` from scratch. Non-ASCII bytes
+    /// can never be SSO (`try_from_sso` refuses anything over 127) and fall
+    /// through to the heap-inline representation below instead.
     pub fn alloc_str_concat_inline(&mut self, a: VmValue, b: VmValue) -> Option<VmValue> {
         use crate::strbuf::{itoa, INT_MAX_DIGITS};
 
@@ -63,15 +68,26 @@ impl HeapInner {
         let digits = itoa(b.as_int(), &mut digits).as_bytes();
         let total = a_bytes.len() + digits.len();
 
-        // Below the SSO limit there is no reason to touch the heap at all;
-        // above INLINE_STR_CAP the bytes cannot live in the slot.
-        if total <= 5 || total > INLINE_STR_CAP {
+        // Above INLINE_STR_CAP the bytes cannot live in the slot.
+        if total > INLINE_STR_CAP {
             return None;
         }
 
         let mut bytes = [0u8; INLINE_STR_CAP];
         bytes[..a_bytes.len()].copy_from_slice(a_bytes);
         bytes[a_bytes.len()..total].copy_from_slice(digits);
+
+        // The bytes are built; declining here would make `str_concat` render
+        // both operands again from scratch. `try_from_sso` refuses non-ASCII
+        // at any length, so a short multibyte result falls through to the
+        // inline heap representation below rather than being lost.
+        if total <= 5 {
+            if let Some(sso) = VmValue::try_from_sso(
+                std::str::from_utf8(&bytes[..total]).expect("operands were valid UTF-8"),
+            ) {
+                return Some(sso);
+            }
+        }
 
         // ASCII is decided here for free: the digits always are, so the
         // answer is `a`'s. Recording it saves the first `.length` a scan.
@@ -124,16 +140,17 @@ mod tests {
             assert_eq!(h.str_repr(got), *want, "inline concat of {l:?} + {r}");
         }
 
-        // At or below the 5-byte SSO cap, the inline path must decline: the
-        // general path's `alloc_str_dynamic` already produces these with no
-        // heap slot at all, so claiming one here would be a pure loss.
-        for (l, r) in [("", 0i64), ("gc_", 1), ("ab", -7), ("", -1)] {
+        // At or below the 5-byte SSO cap, the inline path now hands back the
+        // bytes it already built as an SSO value instead of declining and
+        // making the general path re-render both operands from scratch.
+        for (l, r, want) in [("", 0i64, "0"), ("gc_", 1, "gc_1"), ("ab", -7, "ab-7"), ("", -1, "-1")] {
             let a = h.alloc_str_dynamic(l);
             let b = VmValue::from_int(r);
-            assert!(
-                h.alloc_str_concat_inline(a, b).is_none(),
-                "SSO-sized result ({l:?} + {r}) must decline"
-            );
+            let got = h
+                .alloc_str_concat_inline(a, b)
+                .unwrap_or_else(|| panic!("SSO-sized result ({l:?} + {r}) must not decline"));
+            assert!(got.is_sso(), "{want:?} should be an SSO value, not a heap string");
+            assert_eq!(h.str_repr(got), want);
         }
 
         // One past INLINE_STR_CAP must decline.
@@ -180,5 +197,32 @@ mod tests {
         let want = format!("{prefix}123");
         let got = crate::exec::strings::str_concat(a, VmValue::from_int(123), &mut heap);
         assert_eq!(heap.str_repr(got), want);
+    }
+
+    /// A result that fits SSO used to be declined AFTER its bytes were built,
+    /// making the general path re-render both operands. The bytes are already
+    /// in hand; hand them back.
+    #[test]
+    fn sso_sized_results_come_back_from_the_inline_path() {
+        let heap = Heap::new();
+        let h = unsafe { heap.inner_mut() };
+
+        for (l, r, want) in [("g", 1i64, "g1"), ("ab", 123, "ab123"), ("", 0, "0")] {
+            let a = h.alloc_str_dynamic(l);
+            let got = h
+                .alloc_str_concat_inline(a, VmValue::from_int(r))
+                .expect("sso-sized result must not be declined");
+            assert!(got.is_sso(), "{want:?} should be an SSO value, not a heap string");
+            assert_eq!(h.str_repr(got), want);
+        }
+
+        // Non-ASCII cannot be SSO at any length: `try_from_sso` refuses bytes
+        // over 127. It must still produce the right string.
+        let uni = h.alloc_str_dynamic("é");
+        let got = h
+            .alloc_str_concat_inline(uni, VmValue::from_int(1))
+            .expect("non-ascii short result must still be served");
+        assert!(!got.is_sso());
+        assert_eq!(h.str_repr(got), "é1");
     }
 }
