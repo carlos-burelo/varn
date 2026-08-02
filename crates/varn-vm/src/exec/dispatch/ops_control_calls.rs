@@ -27,13 +27,24 @@ impl ExecCtx {
         }
         let proto = &closure.proto;
         let n = proto.backedge_count.get().wrapping_add(1);
-        proto.backedge_count.set(n);
-        // `==`, not `>=`: the request fires once per proto per threshold
-        // crossing. A frame that keeps looping after a refusal must not pay
-        // the eligibility walk on every subsequent back edge.
-        if n != VmClosure::osr_backedge_threshold() {
+        if n < VmClosure::osr_backedge_threshold() {
+            proto.backedge_count.set(n);
             return false;
         }
+        // Crossed: raise a request and START OVER, rather than latching.
+        //
+        // The counter lives on the PROTO and outlives the frame, so a latch
+        // would make OSR a once-per-process event: the second frame to enter
+        // this function would be past the threshold before it began, raise
+        // nothing, and interpret its whole loop while a perfectly good
+        // compiled entry sat in `jit_osr_entry` unreachable. Resetting makes
+        // every later frame re-request after another 1000 back edges, which
+        // costs one cached lookup — `osr_jit_fn` compiles only once.
+        //
+        // It also bounds the cost of a refusal: a frame the guards keep
+        // turning away pays one frame-loop round trip per 1000 back edges,
+        // not one per back edge.
+        proto.backedge_count.set(0);
         self.request_osr(header_ip, frame_idx, closure)
     }
 

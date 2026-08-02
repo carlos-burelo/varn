@@ -287,40 +287,76 @@ impl VmClosure {
 
     /// Frame entries a proto must accumulate before it is worth lowering.
     ///
-    /// 1 = compile just before the first entry. That is the weakest possible
-    /// tiering: it skips only the protos that are BUILT and never RUN, which on
-    /// `tests/47-isolates-multithread.vn` is 144 functions compiled to execute
-    /// 38 JIT frames. Anything that executes still runs compiled from its first
-    /// call.
+    /// Threshold for a function WITH a back edge.
     ///
-    /// Raising it is the real win — Cranelift costs ~1.24 ms per function and
-    /// `tests/main.vn` is compile-bound, not execution-bound — but ANY value
-    /// above 1 is currently blocked by a closure/upvalue tier-parity bug:
+    /// This arm was pinned at 1 — compile every looping function just before
+    /// its first entry — for one reason: tiering counts FRAME ENTRIES, which
+    /// says nothing about a function entered once that then spins a million
+    /// iterations. It reached no threshold, and there was no way back into it.
+    ///
+    /// [`Self::JIT_OSR_BACKEDGES`] is that way back in. A looping frame is now
+    /// rescued in flight by on-stack replacement after it has PROVEN it loops,
+    /// so this arm no longer has to compile on faith, and a function that
+    /// loops three times and returns stops paying ~2 ms of Cranelift for it.
+    ///
+    /// Two earlier obstacles, both re-checked rather than inherited:
+    ///
+    /// * A closure/upvalue tier-parity bug used to make ANY value above 1 fail
+    ///   (`import 33-globals-async-coherence` then `37-complex-closures`,
+    ///   `vn bench --runs 1` → `ASSERT FAIL: sm after start`). Re-run at
+    ///   `VARN_JIT_TIER` 2, 4 and 128 on 2026-08-01: both modules pass across
+    ///   the warmup and timed runs. It has been fixed since; the note is kept
+    ///   only so the next reader does not re-derive it from the git log.
+    /// * The straight-line arm's own sweep expired once `SIZE_GATE_WORDS` grew
+    ///   to 8192 — see [`Self::JIT_TIER_THRESHOLD_STRAIGHT`]. Both arms now
+    ///   agree at 128, which is why they are still two constants: the value is
+    ///   a measurement, and a measurement that happens to coincide is not the
+    ///   same claim as one that must.
+    ///
+    /// Measured going from 1 to 128, paired and alternating per the protocol
+    /// in `docs/superpowers/plans/2026-08-01-jit-osr.md` §6 (medians of 9
+    /// alternating rounds, both binaries in one loop):
     ///
     /// ```text
-    /// tests/scratch.vn:
-    ///     import "./33-globals-async-coherence.vn"
-    ///     import "./37-complex-closures.vn"
-    /// vn bench tests/scratch.vn --runs 1
-    ///     -> ASSERT FAIL: sm after start
+    ///                      │ threshold 1 │ 128 + OSR │ ratio
+    /// ─────────────────────┼─────────────┼───────────┼───────
+    /// main.vn, quiet host  │   104.44 ms │  46.19 ms │ 2.26x
+    /// main.vn, noisy host  │   150.98 ms │  49.39 ms │ 3.06x
+    /// hot loop, 1 entry    │    51.37 ms │  49.42 ms │ noise
     /// ```
     ///
-    /// `vn run` passes; `vn bench` fails because it executes the program twice
-    /// (a warmup run plus the timed ones), and only then does `makeStateMachine`
-    /// reach its second frame entry and get compiled. The captured `current`
-    /// then reads back its pre-`transition` value. It reproduces at 2 and at 4,
-    /// needs the async module 33 ahead of 37, and does not reproduce with 37
-    /// alone — so it is stack/upvalue lifetime, not arithmetic. The int-sink
-    /// half of tier parity is already fixed and pinned by
-    /// `tests/56-tier-parity.vn`.
-    const JIT_TIER_THRESHOLD: u32 = 1;
+    /// Two batches, not one, because the ratio is not stable to three digits
+    /// on this host: the second ran while the machine was busy and the
+    /// threshold-1 column spread 112–301 ms against the OSR column's 41–67.
+    /// Both batches are reported rather than the flattering one — the honest
+    /// claim is "2–3x on the suite, hot loop unchanged", and the hot-loop
+    /// spreads (46–76 vs 44–68) overlap almost completely.
+    ///
+    /// The alternation is not ceremony: within a single quiet batch the
+    /// threshold-1 column still drifted from 85 ms to 104 ms while the OSR
+    /// column held near 46 ms. A sequential A/B here would have reported
+    /// anything from 1.8x to 3x depending only on when it ran.
+    ///
+    /// **This value is only sound BECAUSE OSR exists.** Same binary, same hot
+    /// loop, OSR pushed out of reach with `VARN_JIT_OSR=4000000000`:
+    ///
+    /// ```text
+    /// 128 + OSR    │ 48.8 ms · 68.8 ms · 56.8 ms
+    /// 128, no OSR  │ 1.041 s · 1.430 s · 1.712 s     ← ~20x, i.e. interpreted
+    /// ```
+    ///
+    /// A function entered once that loops never reaches 128 entries, so
+    /// without the OSR arm it runs interpreted start to finish. If OSR is ever
+    /// disabled or proves unsound, this constant goes back to 1 in the same
+    /// change — leaving it raised is the 20x regression above.
+    const JIT_TIER_THRESHOLD: u32 = 128;
 
     /// Threshold for a function with NO back edge. Straight-line code that has
     /// only ever been entered a couple of times is not worth ~2 ms of
     /// Cranelift: a correctness suite is mostly this shape, and compiling it
-    /// all is the single biggest cost of a cold run. Code that loops is
-    /// exempt (see `FunctionProto::has_backedge`) — it may never be entered
-    /// twice and there is no OSR to rescue it.
+    /// all is the single biggest cost of a cold run. Code that loops takes the
+    /// other arm (see `FunctionProto::has_backedge`) — it may never be entered
+    /// twice, and it is [`Self::JIT_OSR_BACKEDGES`] that rescues it instead.
     ///
     /// The earlier sweep that picked 8 was run under `SIZE_GATE_WORDS = 250`,
     /// which turned every large function away before Cranelift saw it. Raising
@@ -346,6 +382,31 @@ impl VmClosure {
     ///
     /// Low, because by the time it fires the frame has already PROVEN it
     /// loops; the only cost being amortized is the lowering itself.
+    ///
+    /// Swept on this host (release, p50 e2e, median of 3 passes,
+    /// `JIT_TIER_THRESHOLD = 128`), suite = `tests/main.vn --runs 20`,
+    /// hot loop = one entry / 20M iterations / `--runs 5`:
+    ///
+    /// ```text
+    /// VARN_JIT_OSR │ suite    │ hot loop
+    /// ─────────────┼──────────┼──────────
+    ///          100 │ 44.50 ms │ 43.93 ms
+    ///         1000 │ 44.74 ms │ 43.73 ms
+    ///        10000 │ 45.61 ms │ 43.54 ms
+    ///       100000 │ 46.00 ms │ 47.55 ms
+    /// ```
+    ///
+    /// The honest reading is that the curve is FLAT from 100 to 10000 — every
+    /// difference there is inside this host's run-to-run spread — and only
+    /// starts costing at 100000, where the interpreted prologue of the hot
+    /// loop finally shows up. 1000 is the middle of that plateau, not a
+    /// measured optimum, and picking 100 or 10000 instead would not be
+    /// contradicted by this data.
+    ///
+    /// Like every perf constant here, the conclusion expires when what
+    /// surrounds it changes: it was measured with the OSR lowering NOT
+    /// mirroring registers to home slots (see `mirror_home` in
+    /// `clif::lower`), which is what makes the compiled arm worth reaching.
     const JIT_OSR_BACKEDGES: u32 = 1000;
 
     /// The OSR back-edge threshold in force. `VARN_JIT_OSR` overrides it, so a

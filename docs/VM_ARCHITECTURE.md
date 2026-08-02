@@ -159,16 +159,109 @@ JIT y viceversa.
 
 ## 7. JIT (`varn-jit`)
 
-- **Compilación eager, no tiered**: `VmClosure::new` / `with_upvalues` compilan la
-  función al construir el closure. No hay contador de calor. El resultado se cachea
-  en el `FunctionProto`, así que otro closure del mismo proto reusa el código.
+- **Compilación tiered, no eager**: construir un closure no compila nada. La
+  compilación espera evidencia de que la función lo vale — Cranelift cuesta ~1-2 ms
+  por función, y un programa corto construye muchas más funciones de las que
+  ejecuta. El resultado se cachea en el `FunctionProto`, así que otro closure del
+  mismo proto reusa el código.
 - Si la compilación falla, `jit_entry` queda en `None` y esa función **se
   interpreta** — por eso el intérprete es obligatorio, no opcional.
 - Se entra al código compilado en la primera instrucción del frame (`ip == 0`,
-  `crates/varn-vm/src/exec/dispatch/mod.rs`). Las llamadas JIT→JIT saltan directo a
-  la entrada del callee sin volver al dispatch.
+  `crates/varn-vm/src/exec/dispatch/mod.rs`), **o en la cabecera de un bucle** vía
+  OSR (ver abajo). Las llamadas JIT→JIT saltan directo a la entrada del callee sin
+  volver al dispatch.
 - Fast paths inline: get/set de propiedades y de campos fijos, acceso a arrays,
   aritmética entera tipada.
+
+### Tiering y OSR (on-stack replacement)
+
+Hay dos formas de evidencia, porque una sola no cubre las dos formas del código:
+
+| Evidencia | Umbral | Para qué shape |
+|---|---|---|
+| Entradas al frame (`jit_entry_count`) | `JIT_TIER_THRESHOLD{,_STRAIGHT}` = 128 | Funciones que se llaman muchas veces |
+| Back edges (`backedge_count`) | `JIT_OSR_BACKEDGES` = 1000 | Funciones que se entran **una vez** y giran |
+
+Contar entradas no dice nada de una función que se entra una vez y después itera un
+millón de veces: nunca alcanza ningún umbral. Por eso el brazo con back edge estuvo
+clavado en 1 (compilar todo bucle en su primera entrada, a ciegas). OSR es lo que
+permite subirlo: **la función se compila mientras sigue corriendo**.
+
+Cómo funciona:
+
+1. `OpCode::Loop` cuenta el back edge. Al cruzar el umbral, guarda el ip de la
+   cabecera en `ExecCtx.osr_request`, **resetea el contador a 0**, y devuelve
+   `ContinueFrame` — el opcode no puede entrar a código compilado por sí mismo, hay
+   que salir del bucle de dispatch.
+
+   El reset no es cosmético. El contador vive en el **proto**, que sobrevive al
+   frame: con un latch, OSR sería un evento una-vez-por-proceso y el segundo frame
+   que entrara a esa función ya estaría pasado del umbral, no pediría nada, e
+   interpretaría su bucle entero mientras una entrada compilada perfectamente buena
+   seguía en `jit_osr_entry` sin que nadie la alcanzara. Reseteando, cada frame
+   posterior vuelve a pedir tras otros 1000 back edges y recibe la entrada
+   **cacheada** — `osr_jit_fn` compila una sola vez. También acota el costo de un
+   rechazo: un frame que las guardas rechazan paga un round trip del frame loop cada
+   1000 back edges, no uno por back edge.
+2. El frame loop toma el request, verifica que pertenece a **este** frame comparando
+   contra `frames[frame_idx].ip`, y pide `closure.osr_jit_fn(osr_ip)`.
+3. `varn_jit::compile(..., Some(osr_ip))` lowerea **el mismo cuerpo** con un prólogo
+   distinto: sin parámetros, materializa cada registro desde su home slot en
+   `ctx.stack`, y salta al bloque CLIF de `osr_ip` en vez del bloque 0
+   (`clif/osr.rs`).
+4. La entrada resultante es un `JitFn` normal y corre por el `execute_jit_frame` de
+   siempre — el setjmp, la suspensión, el unwind de excepciones y el pop del frame
+   son compartidos, no duplicados.
+
+**El requisito de representación (lo que hay que leer antes de tocar esto).** Los
+slots del frame del intérprete siempre contienen `VmValue` *boxed*. El bloque en
+`osr_ip` espera lo que diga `entries[&osr_ip]` — el estado del `kind_flow` —, donde
+algunos registros son `i64` sin boxear y otros `f64` crudos. La conversión del
+prólogo debe usar **ese estado, nunca `register_meta`**: las dos autoridades
+discrepan en código real (el meta tipa un slot como `Int` mientras el flow lo mergeó
+a boxed en la cabecera del bucle, y al revés). Convertir por el meta deja un entero
+crudo en un registro que el lowering lee como bits de `VmValue`, lo que reinterpreta
+un int pequeño como un float denormal: comparaciones mal y **bucle infinito** cuando
+el registro es el contador. Por eso el prólogo reusa `alloc::reload_boxed` tal cual
+—hay una sola implementación de la conversión— y `tests/62-jit-osr.vn` existe
+exactamente para atrapar el error.
+
+**Guardas.** Un OSR abandona el frame del intérprete a mitad de ejecución, así que
+solo es válido cuando el frame no lleva estado que el cuerpo compilado no modele.
+Cada guarda vive donde está su evidencia:
+
+- *Handler `try` activo en este frame* → lo rechaza el intérprete; solo `ExecCtx`
+  conoce la pila de handlers, y el código compilado no la modela.
+- *Generador o async* → lo rechaza `osr_jit_fn`: suspenden contra el buffer del
+  frame clif **más externo**, y un frame OSR por construcción no es ese.
+- *`CallSelf` en el cuerpo* → lo rechaza el lowering. Es una llamada directa a
+  raw@0, que bajo OSR **es** el prólogo de reanudación: ni la firma ni la función
+  son las que quiere. Una función recursiva alcanza el umbral de entradas igual.
+- *`osr_ip` que no es inicio de bloque*, o cuerpo por encima de `SIZE_GATE_WORDS`
+  → los rechaza el lowering / la gate de tamaño.
+
+Una variante OSR por proto: el primer bucle que se calienta se la queda.
+
+**`mirror_home` vs `frame_aware`.** OSR fuerza `frame_aware` porque necesita `base`
+para leer los home slots. Eso es la **forma del ABI**, y es una pregunta distinta de
+si `ctx.stack[base + r]` tiene que seguir *espejando* el registro `r` mientras el
+cuerpo corre. Lo segundo (`mirror_home`) solo hace falta por las razones que
+preceden a OSR — y `has_alloc`, cuya lista de opcodes incluye `Call`, `Try`,
+`Throw`, `Yield`, `Await` y los de upvalue, cubre casi todas. Cuando es falso, el
+frame no puede allocar, llamar, suspender ni capturar, y **nadie puede observar esos
+slots** hasta que la función retorna. Mantenerlas fusionadas hacía que cada `Move`
+de un bucle OSR escribiera a memoria por una garantía que nadie reclama: medido en
+~9% sobre un bucle entero de 20M iteraciones, o sea casi todo lo que OSR debía
+recuperar.
+
+**El estado vive en el proto, con su propia epoch.** `jit_osr_entry` / `jit_osr_ip`
+/ `jit_osr_code` / `jit_osr_failed`, más `jit_osr_epoch` — deliberadamente *no*
+`jit_epoch`: esa celda la re-estampa `clif_link::adopt_if_inherited` cuando un heap
+copiado adopta la entrada normal, y ese argumento es por-entrada (compara
+`jit_serial` contra el corte de la copia, que no dice nada de una variante OSR
+compilada después). Compartir la celda dejaría a un heap copiado entrar a código
+horneado contra los objetos de su ancestro. OSR nunca adopta; si la epoch no
+coincide, recompila.
 
 ### Frames lógicos: handshake caller→prologue
 
