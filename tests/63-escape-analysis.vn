@@ -1,0 +1,131 @@
+// `passes::escape` deletes a class instance that never escapes, answering
+// every `getfixed` on it from the constructor's argument instead. The whole
+// optimization rests on a compile-time claim — "this global still holds the
+// class it was declared with" — which is FALSE in general, because class
+// bindings are reassignable. Most of this file pins the cases where the pass
+// must refuse.
+//
+// Any assert here that starts failing means an allocation was removed whose
+// effects were still observable.
+
+class EaPoint {
+  x: int
+  y: int
+  constructor(x: int, y: int) { this.x = x; this.y = y }
+}
+
+// The shape the pass exists for: built, read, never escapes.
+function eaSum(n: int): int {
+  let s = 0
+  for (let i = 0; i < n; i = i + 1) { const p = new EaPoint(i, i + 1); s = s + p.x + p.y }
+  return s
+}
+assert("ea: non-escaping instance is exact", eaSum(1000) === 1000000)
+
+// Argument order must survive: reading slot 1 has to yield the SECOND
+// argument, not whichever the summary happened to visit first.
+function eaOrder(): int { const p = new EaPoint(7, 11); return p.y * 100 + p.x }
+assert("ea: slots map to the right arguments", eaOrder() === 1107)
+
+// --- the instance escapes: the allocation must stay ---------------------
+
+function eaEscapeReturn(v: int): EaPoint { return new EaPoint(v, v) }
+const eaKept = eaEscapeReturn(3)
+assert("ea: returned instance survives", eaKept.x === 3 && eaKept.y === 3)
+
+function eaEscapeArray(n: int): int {
+  const acc = []
+  for (let i = 0; i < n; i = i + 1) { acc.push(new EaPoint(i, i)) }
+  return acc.length + acc[0].x + acc[4].y
+}
+assert("ea: instance stored in an array survives", eaEscapeArray(5) === 9)
+
+function eaTakes(p: EaPoint): int { return p.x + p.y }
+function eaEscapeArg(v: int): int { return eaTakes(new EaPoint(v, v)) }
+assert("ea: instance passed as an argument survives", eaEscapeArg(6) === 12)
+
+// Identity is observable: `===` on objects is the address, so two separately
+// constructed instances must stay distinct even with identical fields.
+function eaIdentity(): bool {
+  const a = new EaPoint(1, 2)
+  const b = new EaPoint(1, 2)
+  return a === b
+}
+assert("ea: identity of two equal instances is still false", eaIdentity() === false)
+
+// --- shapes the summary must refuse -------------------------------------
+
+// A constructor that computes rather than copies is not a parameter map.
+class EaComputed {
+  v: int
+  constructor(v: int) { this.v = v * 2 + 1 }
+}
+function eaComputedSum(): int { const c = new EaComputed(10); return c.v }
+assert("ea: computing constructor is not scalar-replaced", eaComputedSum() === 21)
+
+// A field the constructor never assigns reads null, not the argument.
+class EaPartial {
+  a: int
+  b: int
+  constructor(a: int) { this.a = a }
+}
+function eaPartialB(): bool { const p = new EaPartial(4); return p.b === null }
+assert("ea: unassigned field still reads null", eaPartialB() === true)
+assert("ea: assigned field of a partial class", (new EaPartial(4)).a === 4)
+
+// Inheritance brings a super constructor whose effects are not in this body.
+class EaBase {
+  a: int
+  constructor(a: int) { this.a = a }
+}
+class EaDerived extends EaBase {
+  b: int
+  constructor(a: int, b: int) { super(a); this.b = b }
+}
+function eaDerivedSum(): int { const d = new EaDerived(3, 4); return d.a + d.b }
+assert("ea: derived class keeps its super call", eaDerivedSum() === 7)
+
+// A getter gives the name behaviour a raw slot read does not have.
+class EaGetter {
+  v: int
+  constructor(v: int) { this.v = v }
+  get doubled(): int { return this.v * 2 }
+}
+function eaGetterRead(): int { const g = new EaGetter(21); return g.doubled }
+assert("ea: class with an accessor is left alone", eaGetterRead() === 42)
+
+// --- the reassignment guard ---------------------------------------------
+//
+// This is the one that matters. `EaSwapped` is declared as one class and then
+// rebound to another; every `new EaSwapped(..)` after the rebinding must build
+// the SECOND class. A pass that resolved the global at compile time would
+// answer with the first one's field map and silently return 5.
+
+class EaSwapA {
+  v: int
+  constructor(v: int) { this.v = v }
+}
+class EaSwapB {
+  v: int
+  constructor(v: int) { this.v = v * 1000 }
+}
+class EaSwapped {
+  v: int
+  constructor(v: int) { this.v = v }
+}
+EaSwapped = EaSwapB
+function eaSwappedRead(n: int): int { const s = new EaSwapped(n); return s.v }
+assert("ea: reassigned class binding is not resolved at compile time", eaSwappedRead(5) === 5000)
+
+// The same, but the rebinding sits inside a nested block — the scan has to
+// descend into statement bodies, not just the top level.
+class EaNested {
+  v: int
+  constructor(v: int) { this.v = v }
+}
+let eaFlag = true
+if (eaFlag) { EaNested = EaSwapB }
+function eaNestedRead(n: int): int { const s = new EaNested(n); return s.v }
+assert("ea: rebinding inside a nested block is still seen", eaNestedRead(7) === 7000)
+
+print("[PASSED] 63. Escape analysis ")

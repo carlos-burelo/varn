@@ -14,7 +14,7 @@ pub fn try_compile_function(
     source_file: Rc<str>,
 ) -> Result<FunctionProto, OptError> {
     let mut ssa = build::build_function(f, &[], Some(source_file.clone()))?;
-    crate::passes::optimize(&mut ssa);
+    crate::passes::optimize_with(&mut ssa, &crate::hir::ctor_summary::current());
     if let Err(why) = verify::verify(&ssa) {
         panic!("ssa: verify failed for {}: {}", f.name, why);
     }
@@ -27,7 +27,7 @@ pub fn lower_module(
     export_names: Vec<Rc<str>>,
 ) -> Result<FunctionProto, OptError> {
     let mut ssa = build::build_function(&module.top_level, &module.functions, Some(source_file.clone()))?;
-    crate::passes::optimize(&mut ssa);
+    crate::passes::optimize_with(&mut ssa, &crate::hir::ctor_summary::current());
     if let Err(why) = verify::verify(&ssa) {
         panic!("ssa: verify failed for top-level: {}", why);
     }

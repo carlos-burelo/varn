@@ -1,6 +1,7 @@
 use rust_decimal::Decimal;
 use std::rc::Rc;
 
+pub mod ctor_summary;
 pub mod dump;
 pub mod inline;
 pub mod lower;

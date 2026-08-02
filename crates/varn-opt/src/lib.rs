@@ -73,13 +73,15 @@ pub fn lower_to_ssa(
 ) -> Result<(Vec<ssa::ir::SsaFunc>, Vec<(Rc<str>, &'static str)>), OptError> {
     let mut module = hir::lower::lower_program(&input)?;
     hir::inline::run(&mut module);
+    let _summaries =
+        hir::ctor_summary::Scope::enter(hir::ctor_summary::collect(&module));
     let mut funcs = Vec::new();
     let mut errors: Vec<(Rc<str>, &'static str)> = Vec::new();
 
     let source_file = Some(input.program.filename.clone());
     match ssa::build::build_function(&module.top_level, &module.functions, source_file.clone()) {
         Ok(mut f) => {
-            crate::passes::optimize(&mut f);
+            crate::passes::optimize_with(&mut f, &hir::ctor_summary::current());
             funcs.push(f);
         }
         Err(OptError::Unsupported(msg)) => {
@@ -90,7 +92,7 @@ pub fn lower_to_ssa(
     for f in &module.functions {
         match ssa::build::build_function(f, &[], source_file.clone()) {
             Ok(mut sf) => {
-                crate::passes::optimize(&mut sf);
+                crate::passes::optimize_with(&mut sf, &hir::ctor_summary::current());
                 funcs.push(sf);
             }
             Err(OptError::Unsupported(msg)) => {

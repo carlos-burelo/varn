@@ -3,13 +3,21 @@ pub mod cfg;
 pub mod const_fold;
 pub mod cse;
 pub mod dce;
+pub mod escape;
 pub mod fixed_fields;
 pub mod licm;
 pub mod tco;
 
+use crate::hir::ctor_summary::CtorSummaries;
 use crate::ssa::ir::SsaFunc;
 
+/// Optimize without cross-function knowledge. `escape` needs constructor
+/// summaries and is simply skipped; every other pass is intra-function.
 pub fn optimize(func: &mut SsaFunc) {
+    optimize_with(func, &CtorSummaries::default())
+}
+
+pub fn optimize_with(func: &mut SsaFunc, summaries: &CtorSummaries) {
     let mut iterations = 0;
     loop {
         let mut changed = false;
@@ -29,6 +37,12 @@ pub fn optimize(func: &mut SsaFunc) {
         changed |= cse::run(func);
 
         changed |= fixed_fields::run(func);
+
+        // After `fixed_fields` (same disqualification shape, and a literal
+        // stored into a field is one fewer escaping use to reason about) and
+        // before DCE, which deletes the `global` load the deleted call leaves
+        // behind.
+        changed |= escape::run(func, summaries);
 
         changed |= licm::run(func);
 

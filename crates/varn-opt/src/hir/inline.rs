@@ -290,7 +290,7 @@ fn body_mentions(e: &HirExpr, name: &Rc<str>) -> bool {
 
 /// Immutable walk over an expression tree (does not cross into nested
 /// `HirFunction` bodies — validated candidate bodies contain none).
-fn walk_exprs(e: &HirExpr, f: &mut impl FnMut(&HirExpr)) {
+pub(crate) fn walk_exprs<'a>(e: &'a HirExpr, f: &mut impl FnMut(&'a HirExpr)) {
     f(e);
     // Clone-free traversal via the mutable-children helper is not possible on
     // a shared reference; mirror the child list instead.
@@ -828,8 +828,8 @@ fn for_each_stmt_expr_mut(s: &mut HirStmt, f: &mut impl FnMut(&mut HirExpr)) {
 }
 
 /// Immutable variant used by the global-mutation scan.
-fn for_each_stmt_expr(s: &HirStmt, f: &mut impl FnMut(&HirExpr)) {
-    let mut apply = |e: &HirExpr| walk_exprs(e, f);
+pub(crate) fn for_each_stmt_expr<'a>(s: &'a HirStmt, f: &mut impl FnMut(&'a HirExpr)) {
+    let mut apply = |e: &'a HirExpr| walk_exprs(e, f);
     match s {
         HirStmt::Expr(e)
         | HirStmt::Let { value: e, .. }
@@ -912,7 +912,7 @@ fn child_stmts_mut(s: &mut HirStmt) -> Vec<&mut HirStmt> {
     }
 }
 
-fn push_child_stmts<'a>(s: &'a HirStmt, out: &mut Vec<&'a HirStmt>) {
+pub(crate) fn push_child_stmts<'a>(s: &'a HirStmt, out: &mut Vec<&'a HirStmt>) {
     match s {
         HirStmt::If {
             then_body,
