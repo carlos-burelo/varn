@@ -249,7 +249,10 @@ pub extern "C" fn jit_to_string(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         let s = ctx_ref.heap.str_repr(v);
-        ctx_ref.heap.alloc_str(&s)
+        // Dynamic by construction — see `Heap::alloc_str_dynamic`. `alloc_str`
+        // would hash the whole result on every call for a probe that cannot
+        // hit, and the interpreter's `ToString` does not pay it either.
+        ctx_ref.heap.alloc_str_dynamic(&s)
     }
 }
 
@@ -794,7 +797,11 @@ pub extern "C" fn jit_build_str(
         for &v in parts {
             ctx_ref.heap.str_repr_into(v, &mut combined);
         }
-        ctx_ref.heap.alloc_str(&combined)
+        // A concatenation result is dynamic by definition, so the interner
+        // probe `alloc_str` performs is a full content hash that can never
+        // hit — on a string-building loop that is per-iteration waste the
+        // interpreter's `BuildStr` does not pay.
+        ctx_ref.heap.alloc_str_dynamic(&combined)
     }
 }
 

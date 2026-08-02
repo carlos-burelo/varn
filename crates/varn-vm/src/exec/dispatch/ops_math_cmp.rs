@@ -280,7 +280,10 @@ impl ExecCtx {
                 *ip += 1;
                 let v = self.stack[base + src];
                 let s = self.heap.str_repr(v);
-                self.stack[base + first_reg] = self.heap.alloc_str(&s);
+                // `alloc_str_dynamic`, not `alloc_str`: a coerced value is a
+                // runtime-produced string, so the interner probe can only ever
+                // hash its full contents and miss. See that method's contract.
+                self.stack[base + first_reg] = self.heap.alloc_str_dynamic(&s);
             }
             OpCode::StrConcat => {
                 let w1 = code[*ip];
@@ -288,10 +291,14 @@ impl ExecCtx {
                 let (src1, src2) = (hi(w1), lo(w1));
                 let a = self.stack[base + src1];
                 let b = self.stack[base + src2];
-                let sa = self.heap.str_repr(a);
-                let sb = self.heap.str_repr(b);
-                let combined = format!("{sa}{sb}");
-                self.stack[base + first_reg] = self.heap.alloc_str(&combined);
+                // Append both operands into ONE buffer. The `format!` this
+                // replaces allocated a third String on top of the two
+                // `str_repr` results, to produce a value that is then copied
+                // again into the heap string.
+                let mut combined = String::new();
+                self.heap.str_repr_into(a, &mut combined);
+                self.heap.str_repr_into(b, &mut combined);
+                self.stack[base + first_reg] = self.heap.alloc_str_dynamic(&combined);
             }
             OpCode::BuildStr => {
                 let count = hi(code[*ip]);
@@ -306,7 +313,7 @@ impl ExecCtx {
                         .str_repr_into(self.stack[base + reg_idx], &mut combined);
                 }
                 *ip += count;
-                self.stack[base + first_reg] = self.heap.alloc_str(&combined);
+                self.stack[base + first_reg] = self.heap.alloc_str_dynamic(&combined);
             }
             OpCode::StrLength => {
                 let src = hi(code[*ip]);
