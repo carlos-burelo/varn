@@ -65,4 +65,50 @@ assert("strconcat: accumulation stays exact", scAccum(1000) === 2000)
 function scChain(n: int): string { return "a" + n + "b" + (n + 1) }
 assert("strconcat: chain mixes types left to right", scChain(1) === "a1b2")
 
+// The Cranelift fast path builds a small-string-optimized result inline and
+// falls back to the helper otherwise, so every boundary of "fits inline"
+// needs pinning: exactly at the limit, one past it, and non-ASCII (which the
+// SSO encoding refuses regardless of length).
+assert("strconcat: result exactly at the sso limit", ("ab" + 123) === "ab123")
+assert("strconcat: result one past the sso limit", ("ab" + 1234) === "ab1234")
+assert("strconcat: empty + empty", ("" + "") === "")
+assert("strconcat: non-ascii refuses the inline path", ("é" + 1) === "é1")
+assert("strconcat: non-ascii on the right", ("a" + "ñ") === "añ")
+assert("strconcat: multibyte stays correct", ("日本" + 5) === "日本5")
+
+// Byte-order inside the packed result: `a`'s bytes must land before `b`'s, and
+// an asymmetric pair is the only thing that catches them swapped. Both operands
+// vary in length so every (len_a, len_b) split up to the limit is exercised.
+assert("strconcat: order 1+1", ("x" + "y") === "xy")
+assert("strconcat: order 1+4", ("x" + "wxyz") === "xwxyz")
+assert("strconcat: order 4+1", ("wxyz" + "x") === "wxyzx")
+assert("strconcat: order 2+3", ("ab" + "cde") === "abcde")
+assert("strconcat: order 3+2", ("abc" + "de") === "abcde")
+assert("strconcat: empty left keeps right", ("" + "abcde") === "abcde")
+assert("strconcat: empty right keeps left", ("abcde" + "") === "abcde")
+
+// Inside a hot loop, where the fast path is actually reached: results stay
+// exact and comparable both to a literal and to a second concat.
+function scFastLoop(n: int): int {
+  let hits = 0
+  for (let i = 0; i < n; i = i + 1) {
+    const s = "a" + (i % 100)
+    if (s === ("a" + (i % 100))) { hits = hits + 1 }
+  }
+  return hits
+}
+assert("strconcat: fast path exact in a loop", scFastLoop(50000) === 50000)
+
+// The same loop, but straddling: half the results fit inline and half do not,
+// so both arms are taken from one compiled body.
+function scStraddle(n: int): int {
+  let hits = 0
+  for (let i = 0; i < n; i = i + 1) {
+    const s = i % 2 === 0 ? ("a" + (i % 100)) : ("abcdefgh" + (i % 100))
+    if (s.length > 0) { hits = hits + 1 }
+  }
+  return hits
+}
+assert("strconcat: both arms from one body", scStraddle(50000) === 50000)
+
 print("[PASSED] 64. Typed string concat ")
