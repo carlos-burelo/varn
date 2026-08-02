@@ -92,6 +92,24 @@ Orden (`varn_modules::std_root::resolve`), primer hit gana:
 archivo → `Bundle`. `StdProvenance` (`ProjectOverride` / `Env` / `DevCheckout`
 / `Toolchain`) viaja hasta `vn doctor` para diagnóstico.
 
+### Std resuelto pero inutilizable
+
+Un std presente pero inválido (bundle corrupto, fingerprint o host API que no
+calzan, `std.json` ilegible) **no** cae de vuelta al registry embebido — pero
+tampoco hace panic. `provider_impl::ACTIVE_STD` guarda el fallo como dato y
+`varn_builtins::std_load_error()` lo expone; cada host elige su ruido:
+
+| Host | Comportamiento |
+|---|---|
+| `vn` | Fuerza la resolución al arrancar (`main`): imprime el error y sale con código 1, antes de compilar nada. |
+| `vn-lsp` | Reporta el motivo una vez en `initialized` (`window/showMessage` + log) y sigue sirviendo; los `std:` no resuelven hasta que se arregle. |
+| `build.rs` de `varn-cli` | Panic — un checkout inconsistente debe romper el build. |
+
+La regla que preserva el §3 es **nunca silencioso**, no **siempre fatal**: un
+editor abierto sobre un checkout a medio recompilar es un estado rutinario, y
+matar el language server ahí solo produce un `EPIPE` en el cliente en vez de un
+diagnóstico legible.
+
 - **Modo bundle**: `StdlibLoader::load` consulta `provider.bytecode_blob(id)`
   primero — deserializa `FunctionProto` directo del blob, sin parse/check/compile.
   El checker resuelve exports vía `provider.interface_blob(id)` (bundle-first,

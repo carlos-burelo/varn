@@ -1,7 +1,12 @@
 //! End-to-end evidence for design spec §8: a corrupt `.vnb` bundle must
 //! produce a hard error through the *real* resolution chain — `VARN_STD` ->
-//! `provider_impl::active_std` -> `load_bundle_std` -> `read_bundle` -> panic
-//! — never a silent fallback to the embedded registry.
+//! `provider_impl::active_std` -> `load_bundle_std` -> `read_bundle` ->
+//! `std_load_error` — never a silent fallback to the embedded registry.
+//!
+//! The failure is reported as data rather than a panic so that each host
+//! chooses its own loudness (`vn` exits, `vn-lsp` reports and keeps serving);
+//! what the test pins down is that the reason is available *and* that the
+//! rejected bundle's modules do not resolve anyway.
 //!
 //! `crates/varn-modules/src/bundle.rs` already unit-tests `read_bundle`/
 //! `validate_compat_with` directly (`rejects_bad_magic`,
@@ -63,23 +68,24 @@ fn corrupt_magic_bundle_hard_errors_through_real_provider_chain() {
     varn_builtins::register_provider();
     let provider = varn_modules::provider::get().expect("provider registered");
 
-    // `interface_blob` is the real trigger the checker uses in production
-    // (see `varn-checker/src/module_resolver.rs::resolve_from_interface_blob`)
-    // — it calls into `active_std()` -> `load_bundle_std` -> `read_bundle`.
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        provider.interface_blob("std:math")
-    }));
-
-    let err = result.expect_err("corrupt bundle must panic, not silently fall back");
-    let message = err
-        .downcast_ref::<String>()
-        .cloned()
-        .or_else(|| err.downcast_ref::<&str>().map(|s| s.to_string()))
-        .expect("panic payload should be a string message");
-
+    let message = varn_builtins::std_load_error()
+        .expect("corrupt bundle must be reported, not silently ignored");
     assert!(
         message.contains("invalid std bundle"),
-        "panic message did not mention the expected bundle-rejection reason: {message}"
+        "error did not mention the expected bundle-rejection reason: {message}"
+    );
+
+    // `interface_blob` is the real trigger the checker uses in production
+    // (see `varn-checker/src/module_resolver.rs::resolve_from_interface_blob`)
+    // — a rejected bundle must leave it empty rather than let the embedded
+    // registry quietly stand in for the module.
+    assert!(
+        provider.interface_blob("std:math").is_none(),
+        "rejected bundle must not resolve std:math"
+    );
+    assert!(
+        provider.spec_for("std:math").is_none(),
+        "rejected bundle must not fall back to the embedded registry"
     );
 
     let _ = std::fs::remove_dir_all(&dir);

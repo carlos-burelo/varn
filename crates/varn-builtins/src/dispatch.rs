@@ -41,6 +41,19 @@ pub static __VARN_OPS_START_MARKER: NativeOpEntry = unsafe { std::mem::zeroed() 
 pub static __VARN_OPS_END_MARKER: NativeOpEntry = unsafe { std::mem::zeroed() };
 
 pub fn iter_native_ops() -> impl Iterator<Item = &'static NativeOpEntry> {
+    // `#[used]` keeps the boundary markers inside the object file that defines
+    // them, but it does not make any *other* object depend on that one — so the
+    // linker is free to drop it while keeping this function, leaving the extern
+    // `.varn_ops$A`/`$C` refs below undefined. That is not hypothetical: it is
+    // why `[profile.release]` pins `codegen-units = 1`, and the debug profile's
+    // default partitioning hits it too. Taking the markers' addresses here emits
+    // a real symbol reference, which forces their object to be linked in — the
+    // section bounds then exist whatever the CGU count.
+    #[cfg(target_os = "windows")]
+    {
+        std::hint::black_box(&__VARN_OPS_START_MARKER as *const NativeOpEntry);
+        std::hint::black_box(&__VARN_OPS_END_MARKER as *const NativeOpEntry);
+    }
     unsafe {
         let start = &__VARN_OPS_START as *const NativeOpEntry;
         let end = &__VARN_OPS_END as *const NativeOpEntry;

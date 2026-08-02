@@ -24,6 +24,15 @@ fn main() {
     varn_builtins::register_embedded_stdlib(STDLIB_BYTES);
     varn_builtins::register_provider();
 
+    // Resolving the std is lazy; force it here so an unusable one fails at
+    // startup with a readable message instead of mid-compile (spec §3: never
+    // a silent fallback to the embedded registry).
+    if let Some(reason) = varn_builtins::std_load_error() {
+        let e = error::CliError::fatal(reason);
+        terminal::error(&e);
+        process::exit(e.exit_code);
+    }
+
     if std::env::var("VARN_DEBUG_OPS").is_ok() {
         println!("DEBUG std resolved: {:?}", varn_modules::std_root::resolve());
         println!("--- CLI NATIVE OPERATIONS ---");

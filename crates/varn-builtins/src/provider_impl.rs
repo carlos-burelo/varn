@@ -21,40 +21,53 @@ struct ActiveStd {
     provenance: StdProvenance,
 }
 
-static ACTIVE_STD: OnceLock<Option<ActiveStd>> = OnceLock::new();
+/// `Ok(None)` = no std resolved at all (embedded registry serves everything).
+/// `Err` = a std *was* resolved but is unusable. That failure is kept as data
+/// instead of a panic so every host decides how to be loud about it: `vn`
+/// aborts at startup, `vn-lsp` reports it to the editor and keeps serving.
+/// What it must never be is silent (spec §3) — see [`std_load_error`].
+static ACTIVE_STD: OnceLock<Result<Option<ActiveStd>, String>> = OnceLock::new();
 static EMBEDDED_STDLIB_BYTES: OnceLock<&'static [u8]> = OnceLock::new();
 
 pub fn register_embedded_stdlib(bytes: &'static [u8]) {
     let _ = EMBEDDED_STDLIB_BYTES.set(bytes);
 }
 
-fn active_std() -> Option<&'static ActiveStd> {
-    ACTIVE_STD
-        .get_or_init(|| {
-            if let Some((source, provenance)) = resolve() {
-                match source {
-                    StdSource::Bundle(path) => load_bundle_std(&path, provenance),
-                    StdSource::SourceTree(root) => load_tree_std(&root, provenance),
-                }
-            } else if let Some(bytes) = EMBEDDED_STDLIB_BYTES.get() {
-                load_embedded_std(bytes)
-            } else {
-                None
+fn active_std_result() -> &'static Result<Option<ActiveStd>, String> {
+    ACTIVE_STD.get_or_init(|| {
+        if let Some((source, provenance)) = resolve() {
+            match source {
+                StdSource::Bundle(path) => load_bundle_std(&path, provenance).map(Some),
+                StdSource::SourceTree(root) => load_tree_std(&root, provenance).map(Some),
             }
-        })
-        .as_ref()
+        } else if let Some(bytes) = EMBEDDED_STDLIB_BYTES.get() {
+            load_embedded_std(bytes).map(Some)
+        } else {
+            Ok(None)
+        }
+    })
 }
 
-fn load_embedded_std(bytes: &'static [u8]) -> Option<ActiveStd> {
-    let bundle: StdBundle = match read_bundle(bytes) {
-        Ok(b) => b,
-        Err(e) => {
-            panic!("embedded stdlib corrupt: {e}");
-        }
-    };
-    if let Err(e) = bundle.validate_compat_with(varn_core::HOST_API_VERSION) {
-        panic!("embedded stdlib incompatible: {e}");
-    }
+fn active_std() -> Option<&'static ActiveStd> {
+    active_std_result().as_ref().ok()?.as_ref()
+}
+
+/// Why the resolved std could not be loaded, if it could not be.
+///
+/// Resolving the std is lazy, so hosts must call this once at startup to
+/// force it and surface the message: a `std:` import silently resolving to
+/// nothing is exactly the failure mode spec §3 forbids. `vn` treats it as
+/// fatal; `vn-lsp` reports it to the client instead of dying mid-session.
+pub fn std_load_error() -> Option<&'static str> {
+    active_std_result().as_ref().err().map(String::as_str)
+}
+
+fn load_embedded_std(bytes: &'static [u8]) -> Result<ActiveStd, String> {
+    let bundle: StdBundle =
+        read_bundle(bytes).map_err(|e| format!("embedded stdlib corrupt: {e}"))?;
+    bundle
+        .validate_compat_with(varn_core::HOST_API_VERSION)
+        .map_err(|e| format!("embedded stdlib incompatible: {e}"))?;
     let mut specs = Vec::new();
     let mut blobs = Vec::new();
     for m in bundle.modules {
@@ -70,7 +83,7 @@ fn load_embedded_std(bytes: &'static [u8]) -> Option<ActiveStd> {
             &*Box::leak(m.bytecode.into_boxed_slice()),
         ));
     }
-    Some(ActiveStd {
+    Ok(ActiveStd {
         specs: Box::leak(specs.into_boxed_slice()),
         blobs: Box::leak(blobs.into_boxed_slice()),
         tree_root: None,
@@ -79,21 +92,19 @@ fn load_embedded_std(bytes: &'static [u8]) -> Option<ActiveStd> {
     })
 }
 
-fn load_bundle_std(path: &std::path::Path, provenance: StdProvenance) -> Option<ActiveStd> {
+fn load_bundle_std(
+    path: &std::path::Path,
+    provenance: StdProvenance,
+) -> Result<ActiveStd, String> {
     let bytes = std::fs::read(path)
-        .map_err(|e| eprintln!("warning: cannot read std bundle {}: {e}", path.display()))
-        .ok()?;
-    let bundle: StdBundle = match read_bundle(&bytes) {
-        Ok(b) => b,
-        Err(e) => {
-            // Hard error: a present-but-invalid bundle must not silently
-            // fall back to the embedded registry (spec §3).
-            panic!("{e} ({})", path.display());
-        }
-    };
-    if let Err(e) = bundle.validate_compat_with(varn_core::HOST_API_VERSION) {
-        panic!("{e} ({})", path.display());
-    }
+        .map_err(|e| format!("cannot read std bundle {}: {e}", path.display()))?;
+    // A present-but-invalid bundle must not fall back to the embedded
+    // registry (spec §3): both failures below propagate as `Err`.
+    let bundle: StdBundle =
+        read_bundle(&bytes).map_err(|e| format!("{e} ({})", path.display()))?;
+    bundle
+        .validate_compat_with(varn_core::HOST_API_VERSION)
+        .map_err(|e| format!("{e} ({})", path.display()))?;
     let mut specs = Vec::new();
     let mut blobs = Vec::new();
     for m in bundle.modules {
@@ -109,7 +120,7 @@ fn load_bundle_std(path: &std::path::Path, provenance: StdProvenance) -> Option<
             &*Box::leak(m.bytecode.into_boxed_slice()),
         ));
     }
-    Some(ActiveStd {
+    Ok(ActiveStd {
         specs: Box::leak(specs.into_boxed_slice()),
         blobs: Box::leak(blobs.into_boxed_slice()),
         tree_root: None,
@@ -118,18 +129,26 @@ fn load_bundle_std(path: &std::path::Path, provenance: StdProvenance) -> Option<
     })
 }
 
-fn load_tree_std(root: &std::path::Path, provenance: StdProvenance) -> Option<ActiveStd> {
-    let manifest = crate::std_manifest::read_manifest(root)?;
+fn load_tree_std(
+    root: &std::path::Path,
+    provenance: StdProvenance,
+) -> Result<ActiveStd, String> {
+    // `classify` only reports SourceTree when std.json is a readable file, so
+    // a failure here means the manifest itself is corrupt — same class as an
+    // invalid bundle, and equally not a reason to fall back (spec §3).
+    let manifest = crate::std_manifest::read_manifest(root).ok_or_else(|| {
+        format!(
+            "cannot read std manifest in source tree {}",
+            root.display()
+        )
+    })?;
     if manifest.host_api != varn_core::HOST_API_VERSION {
-        // Hard error: mirrors the bundle-mode gate (spec §3) — a
-        // present-but-incompatible source tree must not silently fall back
-        // to the embedded registry.
-        panic!(
+        return Err(format!(
             "std source tree {} requires host API v{} but this vn provides v{}",
             root.display(),
             manifest.host_api,
             varn_core::HOST_API_VERSION
-        );
+        ));
     }
     let mut specs = Vec::new();
     for m in manifest.modules {
@@ -142,7 +161,7 @@ fn load_tree_std(root: &std::path::Path, provenance: StdProvenance) -> Option<Ac
             m.pure,
         ));
     }
-    Some(ActiveStd {
+    Ok(ActiveStd {
         specs: Box::leak(specs.into_boxed_slice()),
         blobs: &[],
         tree_root: Some(root.to_path_buf()),

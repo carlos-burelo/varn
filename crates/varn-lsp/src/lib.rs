@@ -28,9 +28,18 @@ pub async fn run_server() {
     std::env::set_var("VARN_STDLIB", &stdlib_path);
 
     varn_builtins::register_provider();
+
+    // Resolve the std up front. A stale bundle or an incompatible source tree
+    // is a routine state in a checkout being rebuilt, and an editor session
+    // must survive it: the server reports the reason once and serves without
+    // `std:` resolution, rather than failing on whichever request happens to
+    // touch the stdlib first.
+    let std_error = varn_builtins::std_load_error();
+
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
-    let (service, socket) = tower_lsp::LspService::new(backend::Backend::new);
+    let (service, socket) =
+        tower_lsp::LspService::new(|client| backend::Backend::new(client, std_error));
     tower_lsp::Server::new(stdin, stdout, socket)
         .serve(service)
         .await;

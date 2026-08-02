@@ -26,13 +26,17 @@ const SLOW_REQUEST_MS: u128 = 30;
 pub struct Backend {
     pub client: Client,
     pub workspace: Arc<Workspace>,
+    /// Why the active std is unusable, if it is. Reported once on
+    /// `initialized`; until it is fixed, `std:` imports resolve to nothing.
+    std_error: Option<&'static str>,
 }
 
 impl Backend {
-    pub fn new(client: Client) -> Self {
+    pub fn new(client: Client, std_error: Option<&'static str>) -> Self {
         Self {
             client,
             workspace: Arc::new(Workspace::new()),
+            std_error,
         }
     }
 
@@ -162,6 +166,12 @@ impl LanguageServer for Backend {
         self.client
             .log_message(MessageType::INFO, "Varn Language Server initialized")
             .await;
+
+        if let Some(reason) = self.std_error {
+            let msg = format!("Varn stdlib unavailable — `std:` imports will not resolve: {reason}");
+            self.client.log_message(MessageType::ERROR, &msg).await;
+            self.client.show_message(MessageType::ERROR, msg).await;
+        }
 
         let workspace = Arc::clone(&self.workspace);
         let client = self.client.clone();

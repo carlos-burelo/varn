@@ -76,6 +76,17 @@ fn iter_native_ops() -> impl Iterator<Item = &'static NativeOpEntry> {
 
 Al arrancar, `iter_native_ops()` itera la sección de memoria y construye el dispatch table en un `HashMap<u64, DispatchEntry>` con clave FNV1a de `"module_id::symbol_name"`.
 
+**Marcadores de límite.** En Windows los extremos de la sección son dos
+estáticos propios (`.varn_ops$A` / `.varn_ops$C`) en `dispatch.rs`. `#[used]`
+los mantiene dentro de su object file, pero no hace que ningún *otro* object
+dependa de él: el linker puede conservar `iter_native_ops` y descartar el
+objeto que define los marcadores, y entonces los `extern` de arriba quedan sin
+resolver (`undefined symbol: .varn_ops$A`). Por eso `[profile.release]` fija
+`codegen-units = 1`; con el particionado por defecto de `dev` pasaba lo mismo
+al enlazar `vn-lsp`. `iter_native_ops()` toma la dirección de ambos marcadores
+antes de leer la sección — una referencia de símbolo real que obliga a enlazar
+su objeto sin depender del número de CGUs.
+
 ---
 
 ## Construcción de módulos

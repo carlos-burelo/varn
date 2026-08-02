@@ -2,8 +2,8 @@
 //! `.vnb` bundle that parses fine (valid envelope + magic) but was built
 //! for a different `HOST_API_VERSION` must still hard-error through the
 //! real resolution chain — `VARN_STD` -> `provider_impl::active_std` ->
-//! `load_bundle_std` -> `StdBundle::validate_compat_with` -> panic — never a
-//! silent fallback to the embedded registry.
+//! `load_bundle_std` -> `StdBundle::validate_compat_with` ->
+//! `std_load_error` — never a silent fallback to the embedded registry.
 //!
 //! Kept in its own file (own process) rather than a second `#[test]` next to
 //! `std_bundle_rejection_bad_magic.rs`: `provider_impl::ACTIVE_STD` is a
@@ -48,20 +48,20 @@ fn host_api_mismatch_bundle_hard_errors_through_real_provider_chain() {
     varn_builtins::register_provider();
     let provider = varn_modules::provider::get().expect("provider registered");
 
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        provider.interface_blob("std:math")
-    }));
-
-    let err = result.expect_err("host-API-mismatched bundle must panic, not silently fall back");
-    let message = err
-        .downcast_ref::<String>()
-        .cloned()
-        .or_else(|| err.downcast_ref::<&str>().map(|s| s.to_string()))
-        .expect("panic payload should be a string message");
-
+    let message = varn_builtins::std_load_error()
+        .expect("host-API-mismatched bundle must be reported, not silently ignored");
     assert!(
         message.contains("host API"),
-        "panic message did not mention the expected host-API-mismatch reason: {message}"
+        "error did not mention the expected host-API-mismatch reason: {message}"
+    );
+
+    assert!(
+        provider.interface_blob("std:math").is_none(),
+        "rejected bundle must not resolve std:math"
+    );
+    assert!(
+        provider.spec_for("std:math").is_none(),
+        "rejected bundle must not fall back to the embedded registry"
     );
 
     let _ = std::fs::remove_dir_all(&dir);
