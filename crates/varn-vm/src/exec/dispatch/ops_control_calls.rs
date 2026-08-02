@@ -13,6 +13,57 @@ pub(super) enum ControlCallFlow {
 }
 
 impl ExecCtx {
+    /// Count one back edge and, when this proto crosses the OSR threshold,
+    /// park a request for the frame loop. Returns `true` when a request was
+    /// raised, which the caller turns into a `ContinueFrame` so the dispatch
+    /// loop unwinds to the place that can actually enter compiled code.
+    ///
+    /// `header_ip` is the post-jump ip — the loop header, which the lowering's
+    /// scan guarantees is a CLIF block start.
+    #[inline(always)]
+    fn note_backedge(&mut self, header_ip: usize, frame_idx: usize, closure: &VmClosure) -> bool {
+        if self.settings.no_jit {
+            return false;
+        }
+        let proto = &closure.proto;
+        let n = proto.backedge_count.get().wrapping_add(1);
+        proto.backedge_count.set(n);
+        // `==`, not `>=`: the request fires once per proto per threshold
+        // crossing. A frame that keeps looping after a refusal must not pay
+        // the eligibility walk on every subsequent back edge.
+        if n != VmClosure::osr_backedge_threshold() {
+            return false;
+        }
+        self.request_osr(header_ip, frame_idx, closure)
+    }
+
+    /// The cold half of [`Self::note_backedge`]: everything that only runs on
+    /// the single back edge that crosses the threshold.
+    #[cold]
+    #[inline(never)]
+    fn request_osr(&mut self, header_ip: usize, frame_idx: usize, closure: &VmClosure) -> bool {
+        if closure.proto.jit_osr_failed.get() {
+            return false;
+        }
+        // Compiled code does not know about the interpreter's handler stack,
+        // and a handler pushed by THIS frame is live interpreter state the
+        // compiled body would neither pop nor unwind through correctly. A
+        // handler belonging to a frame below us is fine — we never reach it.
+        if self
+            .try_handlers
+            .last()
+            .is_some_and(|h| h.frame_depth >= self.frames.len())
+        {
+            return false;
+        }
+        // Only the top frame is executing; the dispatch loop guarantees it,
+        // and the resume reads `frames[frame_idx].ip` back on the way round.
+        debug_assert_eq!(frame_idx, self.frames.len() - 1);
+        self.frames[frame_idx].ip = header_ip;
+        self.osr_request = Some(header_ip);
+        true
+    }
+
     #[inline(always)]
     pub(super) fn exec_control_calls_op(
         &mut self,
@@ -39,7 +90,14 @@ impl ExecCtx {
                 // Collect on loop back-edges, not only at call boundaries. A long,
                 // call-free allocating loop (e.g. string concatenation) would
                 // otherwise never reach a GC check and exhaust memory.
+                //
+                // Unconditional, and deliberately NOT folded into the OSR test
+                // below: a call-free allocating loop depends on this running on
+                // EVERY back edge, whatever tiering decides.
                 self.gc_backedge_safepoint();
+                if self.note_backedge(*ip, frame_idx, closure) {
+                    return Ok(Some(ControlCallFlow::ContinueFrame));
+                }
                 Ok(Some(ControlCallFlow::ContinueInstruction))
             }
             OpCode::JumpIfFalse => {

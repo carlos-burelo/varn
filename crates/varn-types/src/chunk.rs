@@ -610,11 +610,22 @@ pub struct FunctionProto {
     /// [`Self::jit_osr_ip`].
     ///
     /// Valid ONLY for that ip, and only in the epoch recorded by
-    /// [`Self::jit_epoch`] — which it shares with the normal entry, since both
-    /// bake the same context's constants and globals.
+    /// [`Self::jit_osr_epoch`].
     #[serde(skip)]
     #[serde(default)]
     pub jit_osr_entry: std::cell::Cell<Option<usize>>,
+
+    /// Which context [`Self::jit_osr_entry`] was baked for. Deliberately NOT
+    /// [`Self::jit_epoch`]: that cell is re-stamped by
+    /// `clif_link::adopt_if_inherited` when a copied heap adopts the NORMAL
+    /// entry, and the adoption argument is per-entry — it tests
+    /// [`Self::jit_serial`] against the copy's cutoff, which says nothing
+    /// about an OSR variant compiled afterwards. Sharing the cell would let a
+    /// copied heap enter code baked against its ancestor's objects. OSR never
+    /// adopts; a mismatch just recompiles.
+    #[serde(skip)]
+    #[serde(default)]
+    pub jit_osr_epoch: std::cell::Cell<u64>,
 
     /// The loop-header ip [`Self::jit_osr_entry`] resumes at. One OSR variant
     /// per proto: the first loop to prove hot wins, and a request for any other

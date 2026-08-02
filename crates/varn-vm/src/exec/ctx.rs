@@ -109,6 +109,12 @@ pub struct ExecCtx {
     /// *interpreted* after an exception unwind, its `Return` writes the result
     /// to the caller's slot (the fast path's machine-return store never ran).
     pub jit_call_dest: usize,
+    /// An ON-STACK REPLACEMENT request raised by `OpCode::Loop` when a proto's
+    /// back edges crossed the threshold, holding the loop-header ip to resume
+    /// at. The opcode cannot service it itself — entering compiled code means
+    /// leaving the dispatch loop — so it parks the ip here and returns
+    /// `ContinueFrame`; the frame loop takes it on the way round.
+    pub osr_request: Option<usize>,
     /// Nested contexts (sync-generator bodies) share the heap but own a
     /// private stack the outer context's GC roots cannot see in the other
     /// direction: a collection triggered from *inside* the nested context
@@ -164,6 +170,7 @@ impl ExecCtx {
             jit_frame_prepushed: 0,
             jit_resume_ip: 0,
             jit_call_dest: 0,
+            osr_request: None,
             gc_inhibited: false,
         };
 
@@ -304,6 +311,7 @@ impl ExecCtx {
             jit_frame_prepushed: 0,
             jit_resume_ip: 0,
             jit_call_dest: 0,
+            osr_request: None,
             gc_inhibited: false,
         }
     }

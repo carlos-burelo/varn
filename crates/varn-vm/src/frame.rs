@@ -335,6 +335,33 @@ impl VmClosure {
     /// than run-to-run noise.
     const JIT_TIER_THRESHOLD_STRAIGHT: u32 = 128;
 
+    /// Back edges a proto must take before a frame still running it is
+    /// compiled MID-FLIGHT and resumed in the compiled code.
+    ///
+    /// This is the counter frame-entry tiering cannot supply: a function
+    /// entered once and then spinning never reaches any entry threshold, so
+    /// without OSR the only way to catch it was to compile every looping
+    /// function on its first entry — which is what
+    /// [`Self::JIT_TIER_THRESHOLD`] used to be forced to do.
+    ///
+    /// Low, because by the time it fires the frame has already PROVEN it
+    /// loops; the only cost being amortized is the lowering itself.
+    const JIT_OSR_BACKEDGES: u32 = 1000;
+
+    /// The OSR back-edge threshold in force. `VARN_JIT_OSR` overrides it, so a
+    /// sweep does not need one binary per value — the same arrangement
+    /// `VARN_JIT_TIER` has for the entry thresholds.
+    #[inline(always)]
+    pub(crate) fn osr_backedge_threshold() -> u32 {
+        static T: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+        *T.get_or_init(|| {
+            std::env::var("VARN_JIT_OSR")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(Self::JIT_OSR_BACKEDGES)
+        })
+    }
+
     /// The threshold in force for `proto`. `VARN_JIT_TIER` overrides every arm
     /// so a sweep does not need one binary per value.
     fn tier_threshold(proto: &FunctionProto) -> u32 {
@@ -422,7 +449,7 @@ impl VmClosure {
         };
         let helpers = build_jit_helpers();
         let linker = crate::clif_link::CtxLinker::current();
-        match varn_jit::compile(&self.proto, &self.constants, helpers, &linker) {
+        match varn_jit::compile(&self.proto, &self.constants, helpers, &linker, None) {
             Ok(compiled) => {
                 let entry_usize: usize = unsafe { std::mem::transmute(compiled.entry) };
                 self.proto.jit_epoch.set(epoch);
@@ -444,6 +471,81 @@ impl VmClosure {
                 if let Some((old_epoch, code)) = previous {
                     crate::clif_link::retire_code(old_epoch, code);
                 }
+            }
+        }
+    }
+
+    /// The ON-STACK REPLACEMENT entry for `osr_ip`, lowering it on first
+    /// request. `None` when this proto is not OSR-eligible or the lowering
+    /// bailed — the caller then keeps interpreting.
+    ///
+    /// One variant per proto: the first loop to prove hot owns it, and a
+    /// request for any other ip is refused rather than recompiling. A function
+    /// with two hot loops is a function that will reach the ordinary entry
+    /// threshold soon enough; paying a second ~2 ms lowering to catch the
+    /// other one mid-flight is not obviously worth it, and nothing measured
+    /// says it is.
+    pub fn osr_jit_fn(&self, osr_ip: usize) -> Option<varn_jit::JitFn> {
+        let proto = &self.proto;
+        if proto.jit_osr_failed.get() {
+            return None;
+        }
+        let epoch = crate::clif_link::current_epoch();
+        if epoch == 0 {
+            return None;
+        }
+        if proto.jit_osr_epoch.get() == epoch {
+            if let Some(entry) = proto.jit_osr_entry.get() {
+                if proto.jit_osr_ip.get() != osr_ip {
+                    return None;
+                }
+                return Some(unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(entry) });
+            }
+        }
+
+        // Eligibility. An OSR entry abandons the interpreter frame in the
+        // middle of its execution, so it is sound only when the frame carries
+        // no interpreter-side state the compiled body does not model.
+        //
+        // A generator or async body suspends through the OUTERMOST clif
+        // frame's jump buffer (`ExecCtx::jit_suspend_buf`); a frame resumed by
+        // OSR is by construction not that frame, so `Yield`/`Await` would park
+        // against a buffer belonging to someone else.
+        //
+        // The remaining guards are enforced where the evidence lives: the
+        // caller checks for an active `try` handler in this frame (only the
+        // `ExecCtx` knows), and the lowering itself refuses an `osr_ip` that
+        // is not a block start, a body containing `CallSelf`, and anything
+        // over the size gate.
+        if proto.is_generator || proto.is_async {
+            proto.jit_osr_failed.set(true);
+            return None;
+        }
+
+        let helpers = build_jit_helpers();
+        let linker = crate::clif_link::CtxLinker::current();
+        match varn_jit::compile(proto, &self.constants, helpers, &linker, Some(osr_ip)) {
+            Ok(compiled) => {
+                let entry_usize: usize = unsafe { std::mem::transmute(compiled.entry) };
+                proto.jit_osr_epoch.set(epoch);
+                proto.jit_osr_ip.set(osr_ip);
+                proto.jit_osr_entry.set(Some(entry_usize));
+                *proto.jit_osr_code.borrow_mut() = Some(compiled.code);
+                // `compiled.raw` is 0 for every OSR lowering (they are forced
+                // frame-aware), so there is deliberately nothing to publish in
+                // `clif_raw`: a resume prologue must never become a call
+                // target.
+                debug_assert_eq!(compiled.raw, 0, "osr lowering must not publish a raw entry");
+                // Registered so the epoch holds the proto — and therefore the
+                // buffer — alive for as long as code from it can run.
+                crate::clif_link::register_compiled(proto, None);
+                Some(unsafe { std::mem::transmute::<usize, varn_jit::JitFn>(entry_usize) })
+            }
+            Err(_) => {
+                proto.jit_osr_failed.set(true);
+                proto.jit_osr_entry.set(None);
+                proto.jit_osr_epoch.set(0);
+                None
             }
         }
     }
@@ -576,6 +678,7 @@ mod jit_epoch_tests {
             jit_entry_count: std::cell::Cell::new(0),
             backedge_count: std::cell::Cell::new(0),
             jit_osr_entry: std::cell::Cell::new(None),
+            jit_osr_epoch: std::cell::Cell::new(0),
             jit_osr_ip: std::cell::Cell::new(0),
             jit_osr_code: std::cell::RefCell::new(None),
             jit_osr_failed: std::cell::Cell::new(false),

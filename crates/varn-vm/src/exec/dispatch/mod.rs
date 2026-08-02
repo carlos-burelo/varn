@@ -128,13 +128,34 @@ impl ExecCtx {
 
             let is_first_entry = (*ctx).frames[frame_idx].ip == 0;
 
+            // On-stack replacement: `OpCode::Loop` proved this frame is
+            // looping and parked the header ip. Serviced here because entering
+            // compiled code means leaving the dispatch loop, and because the
+            // entry itself is an ordinary `JitFn` — the whole setjmp /
+            // suspend / exception / frame-pop path below is shared with a
+            // normal entry rather than duplicated.
+            //
+            // The ip test is what binds the request to the frame that raised
+            // it: an unrelated frame reached first (the request survives a
+            // `continue 'frame_loop` from anywhere) must not resume at another
+            // function's loop header.
+            let osr_fn = match (*ctx).osr_request.take() {
+                Some(osr_ip)
+                    if !(*ctx).settings.no_jit && osr_ip == (*ctx).frames[frame_idx].ip =>
+                {
+                    closure.osr_jit_fn(osr_ip)
+                }
+                _ => None,
+            };
+            let is_osr = osr_fn.is_some();
+
             // Tiering point: counting entries here (rather than compiling at
             // closure construction) is what keeps a proto that is built and
             // run once out of Cranelift.
-            let hot_fn = if !(*ctx).settings.no_jit && is_first_entry {
-                closure.hot_jit_fn()
-            } else {
-                None
+            let hot_fn = match osr_fn {
+                Some(f) => Some(f),
+                None if !(*ctx).settings.no_jit && is_first_entry => closure.hot_jit_fn(),
+                None => None,
             };
             if let Some(jit_fn) = hot_fn {
                 if is_first_entry {
@@ -142,8 +163,18 @@ impl ExecCtx {
                         .jit_runs
                         .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 }
+                if is_osr {
+                    // Not counted in `jit_runs`: this frame already counted as
+                    // an interpreted entry when it started, and it is the same
+                    // frame. `osr_entries` is what says the rescue happened.
+                    varn_jit::JIT_STATS
+                        .osr_entries
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
                 if (*ctx).settings.trace {
-                    (*ctx).trace_event("JIT ENTRY", frame_idx, closure, 0, None);
+                    let what = if is_osr { "JIT OSR" } else { "JIT ENTRY" };
+                    let at = (*ctx).frames[frame_idx].ip;
+                    (*ctx).trace_event(what, frame_idx, closure, at, None);
                 }
 
                 let base = (*ctx).frames[frame_idx].base;

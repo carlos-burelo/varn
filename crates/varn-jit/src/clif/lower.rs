@@ -146,12 +146,18 @@ pub fn frame_aware_reasons(proto: &FunctionProto) -> Vec<&'static str> {
     r
 }
 
+/// Lower `proto`. `osr_ip` selects the ENTRY, not the body: `None` builds the
+/// ordinary entry (arguments in registers, execution from ip 0), `Some(ip)`
+/// builds an on-stack-replacement entry that takes no arguments, reloads the
+/// register file from the frame's home slots and resumes at `ip`. The body
+/// lowered is identical either way — see `clif::osr`.
 pub fn try_compile(
     proto: &FunctionProto,
     constants: &[VmValue],
     helpers: &JitHelpers,
     isa: &OwnedTargetIsa,
     linker: &dyn ClifLinker,
+    osr_ip: Option<usize>,
     mut debug: Option<&mut ClifDebugSink>,
 ) -> Result<ClifArtifact, String> {
     let nparams = proto.arity.saturating_sub(1);
@@ -161,9 +167,29 @@ pub fn try_compile(
     floats::check_float_writes(&proto.chunk.code, &proto.chunk.constants, &proto.register_meta)?;
 
     let has_alloc = alloc::has_alloc(&proto.chunk.code, &proto.chunk.constants)?;
-    let frame_aware = proto.has_this || has_alloc || proto.upvalue_count > 0 || proto.is_generator || proto.is_async;
-    let raw = lower_raw(proto, constants, helpers, isa, linker, has_alloc, debug.as_deref_mut())?;
-    let wrapper = build_wrapper(proto, helpers, isa, frame_aware)?;
+    // OSR resumes a frame that already exists, and reads every register out of
+    // that frame's `ctx.stack` home slots — so it needs `base` and `closure`
+    // whatever the normal heuristic decided. Forcing the flag also keeps the
+    // OSR `raw` out of `clif_raw`: `compile` publishes a direct clif→clif
+    // entry only for non-frame-aware lowerings, and a raw that resumes
+    // mid-loop is the last thing a call site should reach.
+    let frame_aware = osr_ip.is_some()
+        || proto.has_this
+        || has_alloc
+        || proto.upvalue_count > 0
+        || proto.is_generator
+        || proto.is_async;
+    let raw = lower_raw(
+        proto,
+        constants,
+        helpers,
+        isa,
+        linker,
+        has_alloc,
+        osr_ip,
+        debug.as_deref_mut(),
+    )?;
+    let wrapper = build_wrapper(proto, helpers, isa, frame_aware, osr_ip.is_some())?;
 
     // Concatenate: raw at 0, wrapper 16-aligned after it, then resolve the
     // only two relocation targets we admit (self-recursion inside raw, and
@@ -269,6 +295,7 @@ fn raw_signature(nparams: usize, isa: &OwnedTargetIsa, frame_aware: bool) -> Sig
     sig
 }
 
+#[allow(clippy::too_many_arguments)]
 fn lower_raw(
     proto: &FunctionProto,
     constants: &[VmValue],
@@ -276,19 +303,27 @@ fn lower_raw(
     isa: &OwnedTargetIsa,
     linker: &dyn ClifLinker,
     has_alloc: bool,
+    osr_ip: Option<usize>,
     mut debug: Option<&mut ClifDebugSink>,
 ) -> Result<CompiledPiece, String> {
     let code = &proto.chunk.code;
     let pool = &proto.chunk.constants;
+    let osr = osr_ip.is_some();
     let nparams = proto.arity.saturating_sub(1);
+    // The OSR entry takes NO arguments: parameters are registers like any
+    // other, and the prologue reads them out of the frame with everything
+    // else. That makes its signature `(stack_ptr, closure, base, exec_ctx)` —
+    // exactly the four words `JitFn` already declares, so nothing downstream
+    // needs a second ABI.
+    let sig_nparams = if osr { 0 } else { nparams };
     let nregs = proto.register_count as usize;
     let cc = isa.default_call_conv();
     let want_roots = debug.as_deref().is_some_and(|d| d.want_roots);
     // Frame-aware functions carry (base, closure) so they can flush heap refs
     // to ctx.stack home slots at a safepoint and read the `this` receiver
     // from stack[base+0]. A method/constructor needs it for the receiver even
-    // when it never allocates.
-    let frame_aware = proto.has_this || has_alloc || proto.upvalue_count > 0 || proto.is_generator || proto.is_async;
+    // when it never allocates. OSR always needs it: the frame IS its input.
+    let frame_aware = osr || proto.has_this || has_alloc || proto.upvalue_count > 0 || proto.is_generator || proto.is_async;
 
     // ---- scan: instruction starts, block starts (jump targets +
     // fall-through after conditional jumps) ----
@@ -401,9 +436,9 @@ fn lower_raw(
     // ---- build ----
     let mut func = Function::with_name_signature(
         UserFuncName::user(0, 0),
-        raw_signature(nparams, isa, frame_aware),
+        raw_signature(sig_nparams, isa, frame_aware),
     );
-    let self_sig_ref = func.import_signature(raw_signature(nparams, isa, frame_aware));
+    let self_sig_ref = func.import_signature(raw_signature(sig_nparams, isa, frame_aware));
     let self_name =
         func.declare_imported_user_function(cranelift_codegen::ir::UserExternalName::new(0, 0));
     let self_ref = func.import_function(cranelift_codegen::ir::ExtFuncData {
@@ -511,7 +546,12 @@ fn lower_raw(
         safepoints: want_roots.then(|| std::cell::RefCell::new(Vec::new())),
     });
     let reg_offset = 1;
-    for i in 0..nparams {
+    // Nothing arrives in a register under OSR — the prologue below reads the
+    // whole file, parameters included, out of `ctx.stack`. Asserted rather
+    // than left to fall out of `sig_nparams`, so a future change that reuses
+    // `nparams` here cannot silently read block params that do not exist.
+    debug_assert!(!osr || sig_nparams == 0, "osr entry must take no parameters");
+    for i in 0..sig_nparams {
         let r = reg_offset + i;
         let param_idx = if frame_aware { 4 + i } else { 1 + i };
         let p = b.block_params(entry)[param_idx];
@@ -530,8 +570,11 @@ fn lower_raw(
         }
     }
     // A method/constructor receives `this` at register 0 — read it from its
-    // ctx.stack home slot (stack[base+1]); the caller placed it there.
-    if proto.has_this {
+    // ctx.stack home slot (stack[base+1]); the caller placed it there. Under
+    // OSR the reload prologue covers r0 like every other register, and does
+    // it in the target block's representation rather than raw boxed bits, so
+    // this load would only be overwritten.
+    if proto.has_this && !osr {
         if let Some(actx) = actx.as_ref() {
             let this = alloc::load_receiver(&mut b, actx);
             b.def_var(vars[0], this);
@@ -571,10 +614,9 @@ fn lower_raw(
         .iter()
         .map(|&s| (s, b.create_block()))
         .collect();
-    if let Some(first) = blocks.get(&0) {
-        b.ins().jump(*first, &[]);
-    }
-
+    // Computed BEFORE the entry terminator, not after: the OSR prologue needs
+    // the target block's kind state to convert the frame's boxed slots into,
+    // and that state is what this produces.
     let entries = kind_flow(
         code,
         pool,
@@ -587,6 +629,30 @@ fn lower_raw(
     )?;
 
     super::debug::capture_kinds(&mut debug, &entries, nregs);
+
+    match osr_ip {
+        Some(target_ip) => {
+            // A `Loop` target is always a block start (the scan above pushes
+            // it), so a miss means the caller invented an ip. Refuse rather
+            // than panic: the VM records `jit_osr_failed` and keeps
+            // interpreting.
+            let target = *blocks
+                .get(&target_ip)
+                .ok_or("osr: target ip is not a block start")?;
+            let target_state = entries
+                .get(&target_ip)
+                .ok_or("osr: target ip has no kind state")?;
+            let actx = actx
+                .as_ref()
+                .ok_or("osr: entry is not frame-aware")?;
+            super::osr::emit_osr_entry(&mut b, actx, target_state, target);
+        }
+        None => {
+            if let Some(first) = blocks.get(&0) {
+                b.ins().jump(*first, &[]);
+            }
+        }
+    }
 
     let mut state: Vec<K> = entries[&0].clone();
     let mut filled: Vec<usize> = Vec::new();
@@ -1017,6 +1083,16 @@ fn lower_raw(
                 if arg_count != nparams + 1 {
                     return Err("clif: CallSelf arity mismatch".into());
                 }
+                // Self-recursion is a direct hardware call to raw@0 — which
+                // under OSR IS the resume prologue: zero parameters, and a
+                // body that reloads the CALLER's register file and re-enters
+                // the loop. Recursing into it would be neither the right
+                // signature nor the right function. Refuse the OSR variant
+                // instead; a recursive function reaches the ordinary entry
+                // threshold by recursing anyway.
+                if osr {
+                    return Err("osr: CallSelf cannot target the resume entry".into());
+                }
                 let mut args = Vec::with_capacity(4 + nparams);
                 if frame_aware {
                     let stack_ptr = b.block_params(entry)[0];
@@ -1355,13 +1431,21 @@ fn lower_raw(
 
 /// Wrapper with the template `JitFn` ABI:
 /// `(stack_ptr, closure, base, exec_ctx) -> boxed VmValue`.
+///
+/// Kept for the OSR entry too, rather than exposing `raw` directly: the
+/// wrapper is what consumes the caller-prepush flag (every JIT prologue must)
+/// and what re-tags an unboxed i48 return. An OSR body returns through the
+/// same `Return` opcodes as any other, so it needs both.
 fn build_wrapper(
     proto: &FunctionProto,
     helpers: &JitHelpers,
     isa: &OwnedTargetIsa,
     frame_aware: bool,
+    osr: bool,
 ) -> Result<CompiledPiece, String> {
-    let nparams = proto.arity.saturating_sub(1);
+    // Mirrors `lower_raw`: the OSR raw takes no arguments, so the wrapper
+    // imports that signature and loads none from the stack.
+    let nparams = if osr { 0 } else { proto.arity.saturating_sub(1) };
     let mut sig = Signature::new(isa.default_call_conv());
     for _ in 0..4 {
         sig.params.push(AbiParam::new(types::I64));

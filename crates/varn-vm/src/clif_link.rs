@@ -137,6 +137,18 @@ pub fn invalidate_epoch(epoch: u64) {
     let entry = COMPILED.with(|m| m.borrow_mut().remove(&epoch));
     let Some(entry) = entry else { return };
     for proto in &entry.protos {
+        // The two entries carry their own epochs and are cleared
+        // independently: a proto can hold a normal entry recompiled for a live
+        // context while its OSR variant still belongs to the dying one, or the
+        // reverse.
+        if proto.jit_osr_epoch.get() == epoch {
+            proto.jit_osr_entry.set(None);
+            proto.jit_osr_epoch.set(0);
+            proto.jit_osr_ip.set(0);
+            proto.jit_osr_code.replace(None);
+            proto.jit_osr_failed.set(false);
+            proto.backedge_count.set(0);
+        }
         if proto.jit_epoch.get() != epoch {
             // Already recompiled for a live context; that owner clears it.
             continue;
@@ -146,14 +158,6 @@ pub fn invalidate_epoch(epoch: u64) {
         proto.jit_code.replace(None);
         proto.jit_epoch.set(0);
         proto.jit_entry_count.set(0);
-        // The OSR entry is baked against the same dead heap and gated by the
-        // same `jit_epoch`, so it dies with it. Its buffer is separate from
-        // `jit_code` and must be released here too.
-        proto.jit_osr_entry.set(None);
-        proto.jit_osr_ip.set(0);
-        proto.jit_osr_code.replace(None);
-        proto.jit_osr_failed.set(false);
-        proto.backedge_count.set(0);
     }
 }
 

@@ -145,6 +145,16 @@ pub fn print_coverage(jit: &JitStatsSnapshot, records: &[CompileRecord], scope: 
         row("de esos, cache hit", fmt_num(jit.jit_cached)),
         chalk(frame_pct(jit.jit_cached)).dim()
     ));
+    // Counted apart from `frames clif`: an OSR frame started interpreted and
+    // was rescued in flight, so it is already one of the interpreter frames
+    // above. This line says how many of them stopped being interpreted.
+    if jit.osr_entries > 0 {
+        terminal::log(format!(
+            "{}  {}",
+            row("rescatados por OSR", fmt_num(jit.osr_entries)),
+            chalk("← frames compilados en vuelo").dim()
+        ));
+    }
 
     terminal::blank();
     let compile = Duration::from_nanos(jit.total_compile_time_ns);

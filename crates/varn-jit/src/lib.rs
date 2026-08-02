@@ -298,11 +298,21 @@ pub struct Compiled {
     pub code: Rc<dyn Any>,
 }
 
+/// Lower `proto` for the running context.
+///
+/// `osr_ip` picks the entry shape. `None` is the ordinary one. `Some(ip)`
+/// builds an ON-STACK REPLACEMENT entry: same body, but a parameterless
+/// prologue that reloads the register file from the live frame and resumes at
+/// `ip`, so a function that was entered once and is still looping can be
+/// compiled without waiting for a second entry that may never come. Such a
+/// lowering is always frame-aware, so [`Compiled::raw`] comes back `0` and no
+/// call site can reach the resume prologue.
 pub fn compile(
     proto: &FunctionProto,
     constants: &[VmValue],
     helpers: JitHelpers,
     linker: &dyn clif::lower::ClifLinker,
+    osr_ip: Option<usize>,
 ) -> Result<Compiled, String> {
     // NOT a compile-time budget: this cap is what keeps module top-levels
     // (and other long functions) out of clif, and with them the only shapes
@@ -344,7 +354,8 @@ pub fn compile(
     if clif::enabled() {
         if let Ok(isa) = clif::shared_isa() {
             let start = std::time::Instant::now();
-            let res = clif::lower::try_compile(proto, constants, &helpers, isa, linker, None);
+            let res =
+                clif::lower::try_compile(proto, constants, &helpers, isa, linker, osr_ip, None);
             let elapsed = start.elapsed().as_nanos() as u64;
             match res {
                 Ok(art) => {

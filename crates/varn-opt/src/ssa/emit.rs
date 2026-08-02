@@ -122,6 +122,7 @@ pub fn emit_function(
         jit_entry_count: Cell::new(0),
         backedge_count: Cell::new(0),
         jit_osr_entry: Cell::new(None),
+        jit_osr_epoch: Cell::new(0),
         jit_osr_ip: Cell::new(0),
         jit_osr_code: RefCell::new(None),
         jit_osr_failed: Cell::new(false),

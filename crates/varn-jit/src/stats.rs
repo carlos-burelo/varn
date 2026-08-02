@@ -72,6 +72,12 @@ pub struct JitStatsSnapshot {
     pub jit_runs: u64,
     pub jit_cached: u64,
     pub interp_runs: u64,
+    /// Frames rescued mid-flight by on-stack replacement. Deliberately NOT
+    /// part of `jit_runs`: such a frame was already counted as an interpreted
+    /// ENTRY, and it is the same frame — adding it again would make
+    /// `total_frames` count one activation twice. It is the answer to "did OSR
+    /// fire", not to "how many frames ran compiled".
+    pub osr_entries: u64,
 }
 
 impl JitStatsSnapshot {
@@ -118,6 +124,7 @@ pub struct JitStats {
     pub jit_runs: AtomicU64,
     pub jit_cached: AtomicU64,
     pub interp_runs: AtomicU64,
+    pub osr_entries: AtomicU64,
 }
 
 impl JitStats {
@@ -132,6 +139,7 @@ impl JitStats {
             jit_runs: AtomicU64::new(0),
             jit_cached: AtomicU64::new(0),
             interp_runs: AtomicU64::new(0),
+            osr_entries: AtomicU64::new(0),
         }
     }
 
@@ -145,6 +153,7 @@ impl JitStats {
         self.jit_runs.store(0, Ordering::Relaxed);
         self.jit_cached.store(0, Ordering::Relaxed);
         self.interp_runs.store(0, Ordering::Relaxed);
+        self.osr_entries.store(0, Ordering::Relaxed);
     }
 
     pub fn snapshot(&self) -> JitStatsSnapshot {
@@ -158,6 +167,7 @@ impl JitStats {
             jit_runs: self.jit_runs.load(Ordering::Relaxed),
             jit_cached: self.jit_cached.load(Ordering::Relaxed),
             interp_runs: self.interp_runs.load(Ordering::Relaxed),
+            osr_entries: self.osr_entries.load(Ordering::Relaxed),
         }
     }
 }

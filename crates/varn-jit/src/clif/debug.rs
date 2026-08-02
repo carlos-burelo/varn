@@ -238,7 +238,7 @@ fn inspect_with(
         want_roots,
         ..Default::default()
     };
-    let result = try_compile(proto, constants, helpers, isa, linker, Some(&mut sink));
+    let result = try_compile(proto, constants, helpers, isa, linker, None, Some(&mut sink));
     let (route, frame_aware) = match &result {
         Ok(art) => (Ok(()), art.frame_aware),
         Err(e) => (Err(e.clone()), false),
