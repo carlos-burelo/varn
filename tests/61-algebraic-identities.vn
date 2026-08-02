@@ -1,0 +1,63 @@
+// `passes::algebraic` forwards an arithmetic result to one of its operands
+// when the other operand makes the operation an identity. Every rule has to
+// hold for ALL values of the surviving operand, so this file pins both
+// directions: the integer identities must fire, and the float near-misses
+// must NOT.
+//
+// On the float side only the NaN-producing cases are testable from Varn
+// today: `-0.0` is not observable (it compares equal to `0.0`, prints as
+// "0", and `1.0 / 0.0` raises at runtime instead of yielding an infinity).
+// The pass still refuses `x + 0.0`, which is the rule `-0.0` would break —
+// see the note in `algebraic.rs`.
+
+function addZero(n: int): int { return n + 0 }
+function zeroAdd(n: int): int { return 0 + n }
+function subZero(n: int): int { return n - 0 }
+function selfSub(n: int): int { return n - n }
+function mulOne(n: int): int { return n * 1 }
+function oneMul(n: int): int { return 1 * n }
+function mulZero(n: int): int { return n * 0 }
+
+assert("alg: n + 0", addZero(7) === 7)
+assert("alg: 0 + n", zeroAdd(7) === 7)
+assert("alg: n - 0", subZero(7) === 7)
+assert("alg: n - n", selfSub(7) === 0)
+assert("alg: n * 1", mulOne(7) === 7)
+assert("alg: 1 * n", oneMul(7) === 7)
+assert("alg: n * 0", mulZero(7) === 0)
+
+// Negatives and zero still behave once the operation is gone.
+assert("alg: negative through identity", addZero(-7) === -7)
+assert("alg: zero through identity", mulOne(0) === 0)
+assert("alg: self-sub of negative", selfSub(-7) === 0)
+assert("alg: identities compose", addZero(mulOne(subZero(9))) === 9)
+
+// Float multiply/divide by one are exact for every value, so they forward.
+function mulOneF(x: float): float { return x * 1.0 }
+function divOneF(x: float): float { return x / 1.0 }
+
+assert("alg: float * 1.0", mulOneF(2.5) === 2.5)
+assert("alg: float / 1.0", divOneF(2.5) === 2.5)
+assert("alg: float * 1.0 negative", mulOneF(-2.5) === -2.5)
+
+// `x * 0.0` is NOT `0.0` and `x - x` is NOT `0.0`: an infinity makes both
+// non-numeric (Varn surfaces the NaN as `null`). Folding either to a literal
+// zero would silently change these results, which is why the pass restricts
+// both rules to `int`.
+const inf: float = 1.0 / 0.0
+
+function mulZeroF(x: float): float { return x * 0.0 }
+function selfSubF(x: float): float { return x - x }
+
+assert("alg: inf * 0.0 is not 0", mulZeroF(inf) !== 0.0)
+assert("alg: inf - inf is not 0", selfSubF(inf) !== 0.0)
+assert("alg: finite * 0.0 still 0", mulZeroF(2.5) === 0.0)
+assert("alg: finite - itself still 0", selfSubF(2.5) === 0.0)
+
+// A mixed-type product keeps the float result type: forwarding the int
+// operand would hand downstream code an int where a float was promised.
+function mixed(n: int): float { return 1.0 * n }
+assert("alg: mixed 1.0 * int stays float", mixed(3) === 3.0)
+assert("alg: mixed halves cleanly", mixed(3) / 2.0 === 1.5)
+
+print("[PASSED] 61. Algebraic identities ")

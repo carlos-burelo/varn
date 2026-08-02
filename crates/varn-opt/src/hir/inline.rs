@@ -17,11 +17,22 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::{
     HirArrayEl, HirAssignTarget, HirBinding, HirExpr, HirFunction, HirModule, HirObjectProp,
-    HirOptionalProperty, HirPropKey, HirStmt, HirTemplatePart,
+    HirOptionalProperty, HirPropKey, HirStmt, HirTemplatePart, LocalId,
 };
 
 pub fn run(module: &mut HirModule) {
     let mutated = collect_mutated_globals(module);
+
+    // Call sites name a locally-declared function by its qualified global
+    // (`<source_file>::<name>`, built in `lower::global_binding`), never by
+    // the bare `HirFunction::name`. Keying candidates on the bare name meant
+    // the lookup in `rewrite_expr` could not match and nothing was ever
+    // inlined. Qualifying here — rather than comparing suffixes at the call
+    // site — also keeps `other.vn::helper` from colliding with a same-named
+    // local one.
+    let qualified = |name: &Rc<str>| -> Rc<str> {
+        Rc::from(format!("{}::{}", module.source_file, name))
+    };
 
     let mut candidates: Candidates = FxHashMap::default();
     for f in &module.functions {
@@ -30,16 +41,21 @@ pub fn run(module: &mut HirModule) {
             || f.has_rest
             || f.has_this
             || f.upvalue_count != 0
-            || mutated.contains(&f.name)
             || f.params.iter().any(|p| p.default.is_some())
         {
             continue;
         }
-        let [HirStmt::Return(Some(expr))] = f.body.as_slice() else {
+        let global = qualified(&f.name);
+        // Reassignment is recorded under the same qualified name the
+        // assignment statement carries.
+        if mutated.contains(&global) || mutated.contains(&f.name) {
+            continue;
+        }
+        let Some(expr) = single_expression_body(&f.body) else {
             continue;
         };
-        if body_is_inlinable(expr) {
-            candidates.insert(f.name.clone(), (f.params.len(), expr.clone()));
+        if body_is_inlinable(&expr) {
+            candidates.insert(global, (f.params.len(), expr));
         }
     }
     if candidates.is_empty() {
@@ -64,6 +80,97 @@ pub fn run(module: &mut HirModule) {
 }
 
 type Candidates = FxHashMap<Rc<str>, (usize, HirExpr)>;
+
+/// Collapses a body to the single expression it returns, folding away any
+/// straight-line `let` bindings on the way.
+///
+/// `return a * 2 + b` is directly one expression. `const t = a * 2; return t + b`
+/// is the same value written in two steps, and the two shapes should not
+/// optimize differently — but a `let` binds a `LocalId` that only means
+/// anything inside the callee's frame, so the body is only substitutable once
+/// every local is gone.
+///
+/// Folding is right-to-left: the last binding is substituted into the return
+/// expression, then the one before it into what remains, so a binding may
+/// refer to earlier ones. A local is only folded when it is read **at most
+/// once**, unless its initializer is a bare literal or parameter. Without that
+/// rule, `const t = expensive(); return t + t` would inline into two calls and
+/// the "optimization" would double the work.
+fn single_expression_body(body: &[HirStmt]) -> Option<HirExpr> {
+    let (last, leading) = body.split_last()?;
+    let HirStmt::Return(Some(result)) = last else {
+        return None;
+    };
+
+    let mut bindings = Vec::with_capacity(leading.len());
+    for stmt in leading {
+        match stmt {
+            HirStmt::Let { local, value, .. } => bindings.push((*local, value.clone())),
+            // Anything else is a statement with its own control flow or
+            // effect, which this substitution cannot represent.
+            _ => return None,
+        }
+    }
+
+    let mut folded = result.clone();
+    for (local, init) in bindings.into_iter().rev() {
+        let reads = count_local_reads(&mut folded, local);
+        if reads > 1 && !is_duplicable(&init) {
+            return None;
+        }
+        if reads > 0 {
+            substitute_local(&mut folded, local, &init);
+        } else if !init_is_droppable(&init) {
+            // An unread binding whose initializer still does something has to
+            // keep happening; there is nowhere to put it in an expression.
+            return None;
+        }
+    }
+    Some(folded)
+}
+
+/// Safe to substitute more than once: re-evaluating costs nothing and
+/// observes nothing.
+fn is_duplicable(e: &HirExpr) -> bool {
+    matches!(
+        e,
+        HirExpr::Int(_)
+            | HirExpr::Float(_)
+            | HirExpr::Str(_)
+            | HirExpr::Bool(_)
+            | HirExpr::Char(_)
+            | HirExpr::Decimal(_)
+            | HirExpr::BigInt(_)
+            | HirExpr::Null
+            | HirExpr::Var(HirBinding::Param(_))
+    )
+}
+
+/// Safe to discard entirely, because nothing observes that it ran.
+fn init_is_droppable(e: &HirExpr) -> bool {
+    is_duplicable(e) || matches!(e, HirExpr::Var(_))
+}
+
+/// Takes `&mut` only to reuse the single traversal helper — it does not
+/// modify anything. Adding an immutable twin would mean a second copy of the
+/// per-variant child list, which is exactly the duplication that made these
+/// traversals drift apart before.
+fn count_local_reads(e: &mut HirExpr, local: LocalId) -> usize {
+    if matches!(e, HirExpr::Var(HirBinding::Local(l)) if *l == local) {
+        return 1;
+    }
+    let mut n = 0;
+    for_each_child_expr_mut(e, &mut |c| n += count_local_reads(c, local));
+    n
+}
+
+fn substitute_local(e: &mut HirExpr, local: LocalId, init: &HirExpr) {
+    if matches!(e, HirExpr::Var(HirBinding::Local(l)) if *l == local) {
+        *e = init.clone();
+        return;
+    }
+    for_each_child_expr_mut(e, &mut |c| substitute_local(c, local, init));
+}
 
 // ---- candidate body validation -------------------------------------------
 

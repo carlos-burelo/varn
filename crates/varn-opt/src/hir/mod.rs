@@ -141,7 +141,7 @@ pub enum CaptureTarget {
     Local(LocalId),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HirBinOp {
     Add,
     Sub,
@@ -202,7 +202,7 @@ pub(crate) fn binary_result_ty(op: HirBinOp, operand_ty: HirType) -> HirType {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HirUnOp {
     Neg,
     Not,
@@ -795,6 +795,12 @@ pub struct HirFunction {
 pub struct HirModule {
     pub top_level: HirFunction,
     pub functions: Vec<HirFunction>,
+    /// The module's own path, exactly as `global_binding` spells it when it
+    /// qualifies a locally-declared global (`<source_file>::<name>`). Passes
+    /// that need to match a call site's global name against a function in
+    /// `functions` must rebuild the qualified form from this; the bare
+    /// `HirFunction::name` never appears at a call site.
+    pub source_file: Rc<str>,
     /// Resolves the `TyId`/`ClassId` handles inside this module's
     /// structured `HirType`s. Frozen after lowering.
     pub ty_table: Rc<TyTable>,

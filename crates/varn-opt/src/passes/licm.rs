@@ -8,9 +8,22 @@
 //!   and `Unary` neg/not on the same. A test-at-top loop can run zero
 //!   iterations, so anything that could throw (div/mod/pow, dynamic ops)
 //!   or allocate must stay put.
+//! * Literals are deliberately NOT hoisted. Rematerializing one is a single
+//!   cheap dispatch, while holding it in a register across the loop competes
+//!   with everything else live there. Measured on `tests/main.vn`, 20 runs,
+//!   interleaved A/B: hoisting literals cost ~12% (127.9 ms vs 114.6 ms p50
+//!   e2e) and bought nothing measurable on an object-field loop that load
+//!   hoisting alone already sped up 1.4x.
 //! * `LoadGlobalIdx` hoists only out of "transparent" loops — no calls, no
 //!   global stores, no opaque effects anywhere in the loop — since any call
 //!   can rebind a global.
+//! * `GetFixedField` and `ArrayGetIndex` hoist only out of loops where every
+//!   instruction is pure ([`super::dce::is_pure`]) — no store of any kind and
+//!   no user code, so a repeat read is guaranteed to see the same value.
+//!   Neither can throw from the preheader: the checker only emits
+//!   `GetFixedField` for a receiver it proved is a non-nullable class (a
+//!   nullable one lowers to `GetPropertyMaybe`), and an out-of-range
+//!   `ArrayGetIndex` yields null rather than raising.
 //! * The destination is the loop's unique entry predecessor, and only when
 //!   that predecessor ends in an unconditional jump to the header: it runs
 //!   exactly when the loop is entered, and it dominates every loop block.
@@ -21,6 +34,7 @@
 
 use crate::hir::{HirBinOp, HirType, HirUnOp};
 use crate::ssa::ir::{BlockId, InstKind, SsaFunc, Terminator};
+
 
 pub fn run(func: &mut SsaFunc) -> bool {
     let n = func.blocks.len();
@@ -91,7 +105,10 @@ fn hoist_loop(func: &mut SsaFunc, latches: &[BlockId], header: BlockId) -> bool 
 
     // Values defined inside the loop (params and inst dests).
     let mut def_in_loop = vec![false; func.values.len()];
-    let mut transparent = true;
+    let mut facts = LoopFacts {
+        globals_stable: true,
+        memory_stable: true,
+    };
     for (b, block) in func.blocks.iter().enumerate() {
         if !in_loop[b] {
             continue;
@@ -104,7 +121,10 @@ fn hoist_loop(func: &mut SsaFunc, latches: &[BlockId], header: BlockId) -> bool 
                 def_in_loop[d.0 as usize] = true;
             }
             if !is_transparent(&inst.kind) {
-                transparent = false;
+                facts.globals_stable = false;
+            }
+            if !super::dce::is_pure(&inst.kind) {
+                facts.memory_stable = false;
             }
         }
     }
@@ -120,7 +140,7 @@ fn hoist_loop(func: &mut SsaFunc, latches: &[BlockId], header: BlockId) -> bool 
             let mut i = 0;
             while i < func.blocks[b].insts.len() {
                 let inst = &func.blocks[b].insts[i];
-                let movable = hoistable(&inst.kind, transparent)
+                let movable = hoistable(&inst.kind, facts)
                     && operands(&inst.kind).iter().all(|v| !def_in_loop[v.0 as usize]);
                 if movable {
                     let inst = func.blocks[b].insts.remove(i);
@@ -142,10 +162,23 @@ fn hoist_loop(func: &mut SsaFunc, latches: &[BlockId], header: BlockId) -> bool 
     changed
 }
 
+/// What the loop body as a whole guarantees, which decides how much of it a
+/// single instruction is allowed to leave.
+#[derive(Debug, Clone, Copy)]
+struct LoopFacts {
+    /// Nothing in the loop can rebind a global.
+    globals_stable: bool,
+    /// Nothing in the loop writes memory or runs user code, so a repeated
+    /// load reads the same value on every iteration.
+    memory_stable: bool,
+}
+
 /// Non-throwing, allocation-free, effect-free — safe to run even when the
 /// loop body executes zero times.
-fn hoistable(kind: &InstKind, loop_is_transparent: bool) -> bool {
+fn hoistable(kind: &InstKind, facts: LoopFacts) -> bool {
     match kind {
+        InstKind::GetFixedField { .. } | InstKind::ArrayGetIndex { .. } => facts.memory_stable,
+
         InstKind::Binary { op, ty, .. } => {
             let typed = matches!(ty, HirType::Int | HirType::Float);
             let safe_op = matches!(
@@ -166,7 +199,7 @@ fn hoistable(kind: &InstKind, loop_is_transparent: bool) -> bool {
             matches!(ty, HirType::Int | HirType::Float | HirType::Bool)
                 && matches!(op, HirUnOp::Neg | HirUnOp::Not)
         }
-        InstKind::LoadGlobal(_) => loop_is_transparent,
+        InstKind::LoadGlobal(_) => facts.globals_stable,
         _ => false,
     }
 }
@@ -202,17 +235,7 @@ fn is_transparent(kind: &InstKind) -> bool {
 }
 
 fn operands(kind: &InstKind) -> Vec<crate::ssa::ir::Value> {
-    let mut out = Vec::new();
-    match kind {
-        InstKind::Binary { lhs, rhs, .. } => {
-            out.push(*lhs);
-            out.push(*rhs);
-        }
-        InstKind::Unary { operand, .. } => out.push(*operand),
-        InstKind::LoadGlobal(_) => {}
-        _ => {}
-    }
-    out
+    crate::ssa::verify::inst_uses(kind)
 }
 
 fn successors(t: &Terminator) -> Vec<BlockId> {

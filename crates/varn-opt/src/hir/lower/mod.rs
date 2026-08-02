@@ -371,6 +371,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
     Ok(HirModule {
         top_level,
         functions,
+        source_file: lo.source_file.clone(),
         ty_table: Rc::new(lo.ty_table),
     })
 }

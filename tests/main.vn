@@ -57,6 +57,8 @@ import "./56-tier-parity.vn"
 import "./57-call-arity.vn"
 import "./58-clif-range.vn"
 import "./59-clif-negative-int.vn"
+import "./60-dce-purity.vn"
+import "./61-algebraic-identities.vn"
 
 print("\n61 side-effect modules executed in suite")
 assertSummary()

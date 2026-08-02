@@ -34,6 +34,8 @@ pub fn emit_function(
 
     let mut cache_count: u16 = 0;
 
+    let imms = plan_immediates(&ssa);
+
     let order = emission_order(&ssa);
     let mut pos_of = vec![usize::MAX; n];
     for (i, &b) in order.iter().enumerate() {
@@ -54,6 +56,7 @@ pub fn emit_function(
                 &source_file,
                 nparams,
                 &mut fixups,
+                &imms,
             )?;
         }
         let term = ssa.blocks[b].term.clone();
@@ -542,6 +545,86 @@ fn var_reg(var: VarId, nparams: usize) -> u8 {
     }
 }
 
+/// Which `ConstInt`s can ride along inside an arithmetic opcode.
+///
+/// `AddImm`/`SubImm` carry a signed 8-bit operand, so `i + 1` needs no
+/// register for the `1` and no `LoadInt` to put it there. Both opcodes were
+/// fully supported by the VM, the Cranelift lowering, the disassembler and
+/// register allocation, and emitted by nothing.
+pub(super) struct Immediates {
+    /// The immediate a value can be folded to, if it is a small `ConstInt`.
+    imm: Vec<Option<i8>>,
+    /// Values whose every use folds, so their `LoadInt` is never emitted.
+    elided: Vec<bool>,
+}
+
+impl Immediates {
+    fn is_elided(&self, v: Value) -> bool {
+        self.elided.get(v.0 as usize).copied().unwrap_or(false)
+    }
+}
+
+/// An `Add`/`Sub` on proven ints is the only place an immediate can land.
+/// `Add` is commutative so either side may carry it; `Sub` only the right,
+/// since there is no reverse-subtract opcode.
+fn immediate_operand(kind: &InstKind, imm: &[Option<i8>]) -> Option<(Value, Value, i8)> {
+    let InstKind::Binary {
+        op,
+        lhs,
+        rhs,
+        ty: crate::hir::HirType::Int,
+    } = kind
+    else {
+        return None;
+    };
+    let get = |v: &Value| -> Option<i8> { *imm.get(v.0 as usize)? };
+    match op {
+        crate::hir::HirBinOp::Add => {
+            if let Some(i) = get(rhs) {
+                Some((*rhs, *lhs, i))
+            } else {
+                get(lhs).map(|i| (*lhs, *rhs, i))
+            }
+        }
+        crate::hir::HirBinOp::Sub => get(rhs).map(|i| (*rhs, *lhs, i)),
+        _ => None,
+    }
+}
+
+fn plan_immediates(ssa: &SsaFunc) -> Immediates {
+    let n = ssa.values.len();
+    let mut imm: Vec<Option<i8>> = vec![None; n];
+    for block in &ssa.blocks {
+        for inst in &block.insts {
+            if let (Some(d), InstKind::ConstInt(i)) = (inst.dest, &inst.kind) {
+                if let Ok(small) = i8::try_from(*i) {
+                    imm[d.0 as usize] = Some(small);
+                }
+            }
+        }
+    }
+
+    // A constant only disappears if *every* read of it folds. `c + c` reads
+    // the same value twice and can only fold one side, so it keeps its
+    // register — hence counting rather than a boolean.
+    let mut total = vec![0u32; n];
+    let mut folded = vec![0u32; n];
+    for block in &ssa.blocks {
+        for inst in &block.insts {
+            super::uses::visit_uses(&inst.kind, &mut |v| total[v.0 as usize] += 1);
+            if let Some((carrier, _, _)) = immediate_operand(&inst.kind, &imm) {
+                folded[carrier.0 as usize] += 1;
+            }
+        }
+        super::uses::visit_term_uses(&block.term, &mut |v| total[v.0 as usize] += 1);
+    }
+
+    let elided = (0..n)
+        .map(|i| imm[i].is_some() && total[i] > 0 && total[i] == folded[i])
+        .collect();
+    Immediates { imm, elided }
+}
+
 fn emit_inst(
     chunk: &mut Chunk,
     inst: &Inst,
@@ -552,7 +635,32 @@ fn emit_inst(
     source_file: &Rc<str>,
     nparams: usize,
     fixups: &mut Vec<(usize, BlockId)>,
+    imms: &Immediates,
 ) -> Result<()> {
+    // A constant that only ever rides inside an `AddImm`/`SubImm` needs no
+    // instruction of its own.
+    if let (Some(d), InstKind::ConstInt(_)) = (inst.dest, &inst.kind) {
+        if imms.is_elided(d) {
+            return Ok(());
+        }
+    }
+    if let Some((_, other, value)) = immediate_operand(&inst.kind, &imms.imm) {
+        let dest = reg[inst.dest.expect("binary defines a value").0 as usize];
+        // `a - c` subtracts the immediate; `c - a` never reaches here.
+        let opcode = match &inst.kind {
+            InstKind::Binary {
+                op: crate::hir::HirBinOp::Sub,
+                ..
+            } => OpCode::SubImm,
+            _ => OpCode::AddImm,
+        };
+        // Same shape as any three-register op: dest in the opcode word, then
+        // `(src, imm)` — the immediate rides in the byte a second register
+        // would occupy, which is why it is 8-bit and signed.
+        chunk.emit_rrr(opcode, dest, reg[other.0 as usize], value as u8, LINE);
+        return Ok(());
+    }
+
     match &inst.kind {
         InstKind::SetProperty {
             object,

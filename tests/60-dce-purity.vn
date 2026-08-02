@@ -1,0 +1,76 @@
+// DCE may only delete an instruction whose result is unused when that
+// instruction is *pure*. `passes::dce` classified purity with a deny-list, so
+// every `InstKind` the list forgot counted as pure and was deletable.
+//
+// The regression: `GetProperty` was not on the list. `const unused = t.tick`
+// where `tick` is a getter deleted the read — and with it the getter body, so
+// the effect simply never happened. Reading the same getter into a value the
+// function returns kept working, which is why nothing caught it.
+//
+// Each case below drops a value on the floor. The observable effect behind it
+// must still happen.
+
+let getterRuns: int = 0
+let methodRuns: int = 0
+
+class Ticker {
+  n: int
+  constructor() { this.n = 0 }
+
+  get tick(): int {
+    getterRuns = getterRuns + 1
+    return 1
+  }
+
+  bump(): int {
+    methodRuns = methodRuns + 1
+    return 2
+  }
+}
+
+function dropGetter(t: Ticker): int {
+  const unused = t.tick
+  return 42
+}
+
+function dropMethod(t: Ticker): int {
+  const unused = t.bump()
+  return 42
+}
+
+const ticker = Ticker()
+
+assert("dce: getter call returns", dropGetter(ticker) === 42)
+assert("dce: unused getter still ran", getterRuns === 1)
+
+// Twice, so the evidence is a count and not a single edge.
+dropGetter(ticker)
+assert("dce: unused getter ran again", getterRuns === 2)
+
+assert("dce: method call returns", dropMethod(ticker) === 42)
+assert("dce: unused method still ran", methodRuns === 1)
+
+// A getter read that IS used must of course still run — this pins the
+// baseline the bug hid behind.
+function useGetter(t: Ticker): int { return t.tick }
+assert("dce: used getter returns", useGetter(ticker) === 1)
+assert("dce: used getter ran", getterRuns === 3)
+
+// The other half of the contract: provably pure instructions must STILL be
+// deletable, or the allow-list is just a rubber stamp. Nothing here is
+// observable, so these only assert the program stays correct while the values
+// go unused.
+function dropPure(a: int[], t: Ticker): int {
+  const deadArith = a.length * 2 + 7
+  const deadField = t.n
+  const deadArray = [1, 2, 3]
+  const deadObject = { a: 1, b: 2 }
+  const deadIndex = a[0]
+  const deadCompare = a.length > 1
+  return 42
+}
+
+assert("dce: pure drops still correct", dropPure([1, 2, 3], ticker) === 42)
+assert("dce: pure drops ran no getter", getterRuns === 3)
+
+print("[PASSED] 60. DCE purity ")

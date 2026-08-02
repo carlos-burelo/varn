@@ -1,3 +1,4 @@
+use crate::hir::{HirBinOp, HirType, HirUnOp};
 use crate::ssa::ir::{BlockId, InstKind, SsaFunc, Terminator, Value};
 use rustc_hash::FxHashSet;
 
@@ -19,7 +20,7 @@ pub fn run(func: &mut SsaFunc) -> bool {
         let old_insts = std::mem::take(&mut func.blocks[b_id.0 as usize].insts);
         for inst in old_insts {
             if let Some(dest) = inst.dest {
-                if !used.contains(&dest) && !has_side_effects(&inst.kind) {
+                if !used.contains(&dest) && is_pure(&inst.kind) {
                     changed = true;
                     continue;
                 }
@@ -50,42 +51,142 @@ pub fn run(func: &mut SsaFunc) -> bool {
     changed
 }
 
-fn has_side_effects(kind: &InstKind) -> bool {
-    matches!(
-        kind,
-        InstKind::StoreGlobal { .. }
-            | InstKind::StoreUpvalue { .. }
-            | InstKind::Call { .. }
-            | InstKind::SelfCall { .. }
-            | InstKind::SetProperty { .. }
-            | InstKind::SetIndex { .. }
-            | InstKind::ArraySetIndex { .. }
-            | InstKind::ObjectMerge { .. }
-            | InstKind::MethodCall { .. }
-            | InstKind::IntrinsicCall { .. }
-            | InstKind::CallNativeOp { .. }
-            | InstKind::AssertNotNull { .. }
-            | InstKind::IterCall { .. }
-            | InstKind::SuperCall { .. }
-            | InstKind::SuperMethodCall { .. }
-            | InstKind::ExtensionCall { .. }
-            | InstKind::CallSpread { .. }
-            | InstKind::StoreCaptured { .. }
-            | InstKind::MakeClass { .. }
-            | InstKind::DeclareField { .. }
-            | InstKind::DefineStatic { .. }
-            | InstKind::DefineMethod { .. }
-            | InstKind::DefineAccessor { .. }
-            | InstKind::Try { .. }
-            | InstKind::PopTry
-            | InstKind::CloseUpvalues { .. }
-            | InstKind::Dispose { .. }
-            | InstKind::LoadModule { .. }
-            | InstKind::StoreModuleSlot { .. }
-            | InstKind::Await { .. }
-            | InstKind::Spawn { .. }
-            | InstKind::Yield { .. }
-    )
+/// Whether an instruction can be deleted when its result is unused.
+///
+/// Deliberately an **allow-list, written as an exhaustive match**: a new
+/// `InstKind` must be classified by hand or this stops compiling. The
+/// previous deny-list had the opposite default, so anything it forgot was
+/// silently deletable — that is how `GetProperty` on a side-effecting getter
+/// came to be dropped.
+///
+/// "Pure" here means: runs no user code, writes nothing observable, and
+/// cannot throw. Allocation alone is fine — an unobserved allocation is
+/// exactly what we want gone. Trap behaviour was measured, not assumed: an
+/// out-of-bounds array read yields `null`, while `/ 0`, `% 0` and a negative
+/// integer exponent all raise, so those three operators stay.
+pub(crate) fn is_pure(kind: &InstKind) -> bool {
+    use InstKind::*;
+    match kind {
+        // Values and plain memory reads.
+        ConstInt(_)
+        | ConstFloat(_)
+        | ConstBool(_)
+        | ConstStr(_)
+        | ConstChar(_)
+        | ConstDecimal(_)
+        | ConstBigInt(_)
+        | ConstNull
+        | LoadGlobal(_)
+        | LoadUpvalue(_)
+        | LoadCaptured { .. }
+        | ModuleSlot { .. }
+        | This
+        | CatchParam { .. } => true,
+
+        // Fixed slots and statically-typed array elements are plain memory:
+        // the checker proved the receiver's shape, so no accessor can run.
+        GetFixedField { .. } | ArrayGetIndex { .. } => true,
+
+        // Type tests and tag reads inspect the value, never dispatch.
+        IsNull { .. } | IsArray { .. } | GetEnumTag { .. } | ObjectKeys { .. } => true,
+
+        // Allocation with no observable effect.
+        BuildArray { .. }
+        | BuildObject { .. }
+        | MakeClosure { .. }
+        | MakeEnumVariant { .. }
+        | Range { .. } => true,
+
+        Binary { op, ty, .. } => {
+            let typed = matches!(ty, HirType::Int | HirType::Float | HirType::Bool);
+            // Div/Mod/Pow raise on zero divisor and negative exponent.
+            let total = matches!(
+                op,
+                HirBinOp::Add
+                    | HirBinOp::Sub
+                    | HirBinOp::Mul
+                    | HirBinOp::Eq
+                    | HirBinOp::Ne
+                    | HirBinOp::Lt
+                    | HirBinOp::Le
+                    | HirBinOp::Gt
+                    | HirBinOp::Ge
+                    | HirBinOp::BitAnd
+                    | HirBinOp::BitOr
+                    | HirBinOp::BitXor
+                    | HirBinOp::Shl
+                    | HirBinOp::Shr
+                    | HirBinOp::Ushr
+            );
+            typed && total
+        }
+        Unary { op, ty, .. } => match op {
+            HirUnOp::Typeof => true,
+            HirUnOp::Neg | HirUnOp::Not | HirUnOp::BitNot => {
+                matches!(ty, HirType::Int | HirType::Float | HirType::Bool)
+            }
+        },
+
+        // `GetProperty` runs a getter when the class declares one — the
+        // regression this list exists to prevent. The other property-shaped
+        // reads do not reach accessors today, but they resolve names through
+        // the same runtime path, so they are classified with it rather than
+        // on an incidental current behaviour.
+        GetProperty { .. }
+        | GetPropertyMaybe { .. }
+        | GetIndex { .. }
+        | GetSuper { .. }
+        | GetSymbol { .. } => false,
+
+        // Stringifying a class instance yields `[object Object]` today — no
+        // user `toString` dispatch — but that is the contract most likely to
+        // grow one, and dead interpolations are too rare for the distinction
+        // to buy anything.
+        ToString { .. } | BuildStr { .. } => false,
+
+        // Spread iterates the operand, which runs its iterator.
+        BuildArraySpread { .. } | BuildObjectSpread { .. } | CallSpread { .. } => false,
+
+        // Calls, in every shape.
+        Call { .. }
+        | SelfCall { .. }
+        | MethodCall { .. }
+        | SuperCall { .. }
+        | SuperMethodCall { .. }
+        | ExtensionCall { .. }
+        | IterCall { .. }
+        | IntrinsicCall { .. }
+        | CallNativeOp { .. } => false,
+
+        // Stores and other observable writes.
+        StoreGlobal { .. }
+        | StoreUpvalue { .. }
+        | StoreCaptured { .. }
+        | StoreModuleSlot { .. }
+        | SetProperty { .. }
+        | SetFixedField { .. }
+        | SetIndex { .. }
+        | ArraySetIndex { .. }
+        | ObjectMerge { .. } => false,
+
+        // Class construction mutates the class object being built.
+        MakeClass { .. }
+        | DeclareField { .. }
+        | DefineStatic { .. }
+        | DefineMethod { .. }
+        | DefineAccessor { .. } => false,
+
+        // Control-flow and runtime state.
+        Try { .. }
+        | PopTry
+        | CloseUpvalues { .. }
+        | Dispose { .. }
+        | LoadModule { .. }
+        | AssertNotNull { .. }
+        | Await { .. }
+        | Spawn { .. }
+        | Yield { .. } => false,
+    }
 }
 
 fn remove_param(func: &mut SsaFunc, block: BlockId, pos: usize) {

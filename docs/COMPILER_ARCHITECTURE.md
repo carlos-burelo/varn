@@ -45,7 +45,16 @@ fase `optimize` que reporta `vn bench` corresponde a los post-passes de
 `hir::lower` aplana el AST tipado a una representación intermedia de alto nivel,
 donde ya se resolvieron scopes, extensiones y azúcar sintáctico.
 
-`hir::inline` corre inlining sobre el HIR antes de bajar a SSA.
+`hir::inline` corre inlining sobre el HIR antes de bajar a SSA. Acepta
+funciones de módulo cuyo cuerpo se reduce a **una** expresión — directamente
+`return <expr>`, o una secuencia recta de `let` que se pliega dentro de él
+(`single_expression_body`), siempre que cada local se lea a lo sumo una vez o
+su inicializador sea un literal/parámetro.
+
+Los candidatos se indexan por el **global cualificado**
+(`<source_file>::<nombre>`), que es como los nombra `lower::global_binding` en
+el sitio de llamada. Indexarlos por el `HirFunction::name` pelado hacía que la
+búsqueda nunca acertara y el pass no inlineara nada en absoluto.
 
 Inspección: `vn debug -p hir <archivo>`.
 
@@ -63,9 +72,26 @@ fijo** — repite hasta que ningún pass reporta cambios, con tope de 100 iterac
 |------|----------|
 | `tco` | Tail-call optimization |
 | `const_fold` | Plegado de constantes (debe coincidir bit a bit con intérprete y JIT — ver `varn-core/src/numeric.rs`) |
-| `fixed_fields` | Convierte accesos por nombre en accesos por slot cuando el checker conoce la shape |
-| `dce` | Eliminación de código muerto |
+| `algebraic` | Identidades con **un** operando conocido (`x + 0`, `x * 1`, `n - n`). El set de float es mucho menor que el de int: `x + 0.0` no es identidad (`-0.0`), ni `x * 0.0` es `0.0` (infinitos → NaN) |
+| `cse` | Eliminación de subexpresiones comunes, **local a cada bloque**. Dos tablas: valores puros (nunca se invalidan) y lecturas de memoria (`GetFixedField`, `ArrayGetIndex`, globals, upvalues), que se descartan ante la primera instrucción no pura |
+| `fixed_fields` | **Scalar replacement de literales de objeto**: reenvía `GetProperty` sobre un `BuildObject` que no escapa al valor ya en SSA, y DCE elimina la asignación. *No* es el lowering a slot — eso ocurre en `hir/lower/expr.rs` con la info del checker |
+| `licm` | Hoisting de invariantes: aritmética typed, `LoadGlobal` en loops sin efectos, y `GetFixedField`/`ArrayGetIndex` en loops donde toda instrucción es pura. **Literales no** — ver nota en `licm.rs` |
+| `dce` | Eliminación de código muerto. La pureza es un **allow-list exhaustivo**: un `InstKind` nuevo rompe la compilación hasta clasificarlo, porque el deny-list anterior borraba getters con efectos |
 | `cfg` | Simplificación y compactación del grafo de control |
+
+`ssa/uses.rs` es el único lugar que sabe qué campos de un `InstKind` son
+operandos. `replace_all_uses`, `verify::inst_uses` y `licm::operands` se
+expresan sobre sus dos visitantes exhaustivos; antes eran tres copias
+independientes y la tercera fallaba abierta.
+
+### Costo medido
+
+Añadir `cse` + `algebraic` + el LICM ampliado cuesta ~7% en `tests/main.vn`
+(mediana 193.85 ms → 208.18 ms p50 e2e, 9 rondas alternadas de 30 corridas,
+más lento en 9/9). Esa suite ejecuta cada test una vez: mide throughput de
+compilación, no de ejecución. En un loop sobre campos de objeto el mismo
+conjunto de passes rinde 1.67x (99.11 ms → 59.35 ms). El trade es
+deliberado y hay que revisarlo con medición, no por intuición.
 
 Inspección: `vn debug -p ssa <archivo>`. Traza del compilador: `VN_OPT_TRACE=1`.
 
@@ -78,11 +104,12 @@ Inspección: `vn debug -p ssa <archivo>`. Traza del compilador: `VN_OPT_TRACE=1`
 
 - `regalloc_post::optimize_function` — asignación de registros sobre el bytecode ya
   emitido, apoyada en `liveness`.
-- `slot_kinds::infer` — infiere el tipo de cada slot de registro.
 
-`slot_kinds` es lo que alimenta el `register_meta` del que depende el JIT para
-saber qué registros puede mantener sin flush. Cambiar la anchura de un slot aquí y
-no reflejarlo allí produce corrupción silenciosa en el código generado.
+No existe ningún módulo `slot_kinds`. El `register_meta` del que depende el JIT
+para saber qué registros puede mantener sin flush se deriva en `ssa/emit.rs`
+(`derive_register_meta`, por registro pre-coalescing) y se re-mapea al
+coalescer en `regalloc_post`. Cambiar la anchura de un slot en un lado y no
+reflejarlo en el otro produce corrupción silenciosa en el código generado.
 
 ---
 
@@ -107,7 +134,12 @@ variantes tipadas que se saltan la comprobación de tipos en runtime:
 - Genéricos: `Add`, `Sub`, `Mul`, `Lt`, `Eq`, …
 - Enteros: `AddInt`, `SubInt`, `MulInt`, `LtInt`, `GtInt`, `EqInt`, …
 - Floats: `AddFloat`, `SubFloat`, `MulFloat`, `LtFloat`, `EqFloat`, …
-- Inmediatos: `AddImm`, `SubImm`
+- Inmediatos: `AddImm`, `SubImm` — los emite `ssa::emit` (`plan_immediates`)
+  cuando un operando de un `Add`/`Sub` typed es un `ConstInt` que entra en un
+  `i8`. Si **todos** los usos de esa constante se pliegan, su `LoadInt`
+  desaparece junto con el registro. Medido en el intérprete, loop de 30M
+  iteraciones: ~893 ms con el inmediato contra ~1001 ms sin él (~11% por
+  sitio). En el JIT es neutro — Cranelift ya funde `iconst` + `iadd`
 
 Lo mismo para el acceso a propiedades: si el checker conoce la clase, el pass
 `fixed_fields` emite `GetFixedField slot` / `SetFixedField slot` en lugar de
