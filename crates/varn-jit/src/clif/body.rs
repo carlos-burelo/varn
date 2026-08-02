@@ -736,7 +736,7 @@ pub(super) fn lower_raw(
             }
             OpCode::StrConcat => {
                 let actx = actx.as_ref().ok_or("clif: StrConcat outside alloc fn")?;
-                alloc::emit_str_concat(&mut b, actx, &state, code, ip);
+                super::strconcat::emit_str_concat(&mut b, actx, &state, code, ip);
             }
             OpCode::CallNativeOp => {
                 let actx = actx.as_ref().ok_or("clif: CallNativeOp outside alloc fn")?;
@@ -815,7 +815,7 @@ pub(super) fn lower_raw(
             }
             OpCode::MakeClass => {
                 let actx = actx.as_ref().ok_or("clif: MakeClass outside alloc fn")?;
-                alloc::emit_make_class(&mut b, actx, &state, code, ip);
+                super::classes::emit_make_class(&mut b, actx, &state, code, ip);
             }
             OpCode::DeclareField
             | OpCode::Method
@@ -826,11 +826,11 @@ pub(super) fn lower_raw(
             | OpCode::DefineStaticSetter
             | OpCode::Inherit => {
                 let actx = actx.as_ref().ok_or("clif: ClassMemberOp outside alloc fn")?;
-                alloc::emit_class_member_op(&mut b, actx, &state, op, code, ip)?;
+                super::classes::emit_class_member_op(&mut b, actx, &state, op, code, ip)?;
             }
             OpCode::GetSuper => {
                 let actx = actx.as_ref().ok_or("clif: GetSuper outside alloc fn")?;
-                alloc::emit_get_super(&mut b, actx, &state, code, ip);
+                super::classes::emit_get_super(&mut b, actx, &state, code, ip);
             }
             OpCode::LoadGlobal => {
                 let actx = actx.as_ref().ok_or("clif: LoadGlobal outside alloc fn")?;
