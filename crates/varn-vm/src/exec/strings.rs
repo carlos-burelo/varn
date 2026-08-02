@@ -86,6 +86,14 @@ pub fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
         }
     }
 
+    // The `"prefix" + <int>` shape, built once instead of staged through a
+    // `StrBuf` and a zeroed `[u8; INLINE_STR_CAP]`. Declines to anything it
+    // cannot serve, including an `Ext` left operand — but the accumulation
+    // path above has already claimed those.
+    if let Some(v) = heap.alloc_str_concat_inline(a, b) {
+        return v;
+    }
+
     // Render both operands into one buffer that starts on the stack: strings
     // borrow, scalars format in place. A short result (the common
     // `"prefix" + int`) therefore costs a single allocation — the `Rc<str>`
