@@ -462,10 +462,10 @@ pub(super) fn emit_call(
 /// home slots first — passing them as C arguments capped the site at three
 /// real parameters and silently dropped the rest.
 ///
-/// `flush_boxed` already lands every non-float register; float registers are
-/// deliberately outside its set (a float is never a heap reference, so the
-/// collector does not need it rooted) but the callee still needs the value,
-/// so they are stored here.
+/// The window is stored HERE, for every kind, rather than left to the GC flush
+/// set: [`live_boxed`] answers "what must the collector root", which is not the
+/// same question as "what will the callee read", and it deliberately omits
+/// kinds that can never be a heap reference.
 fn emit_vm_call(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
@@ -478,9 +478,7 @@ fn emit_vm_call(
     flush_boxed(b, actx, state, &regs);
     let fb = frame_base_addr(b, actx);
     for r in arg_start..(arg_start + total).min(actx.nregs) {
-        if meta_is_float(actx.register_meta, r) {
-            store_home(b, actx, state, fb, r);
-        }
+        store_home(b, actx, state, fb, r);
     }
 
     let src = b.ins().iadd_imm(actx.base, arg_start as i64);
@@ -672,16 +670,16 @@ pub(super) fn emit_call_native_op(
     // Flush EVERY live register, not just the argument window: the reload
     // after the call restores all of them from their home slots, so a
     // register left unflushed comes back as whatever `ctx.stack` happened to
-    // hold (usually zero) — silently destroying a live value. The extra loop
-    // over the argument window covers float-typed args, which `flush_boxed`
-    // skips but the native call still needs materialized as boxed values.
+    // hold (usually zero) — silently destroying a live value.
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
+    // The receiver/argument window, for every kind. The helper reads it out of
+    // `ctx.stack` by register number, which the GC flush set above does not
+    // promise to cover — it roots heap references, and an `int` argument is
+    // not one.
     let fb = frame_base_addr(b, actx);
-    for r in dest..dest + total {
-        if meta_is_float(actx.register_meta, r) {
-            store_home(b, actx, state, fb, r);
-        }
+    for r in dest..(dest + total).min(actx.nregs) {
+        store_home(b, actx, state, fb, r);
     }
     let args_start = b.ins().iadd_imm(actx.base, dest as i64);
     let total_v = b.ins().iconst(types::I64, total as i64);
@@ -755,6 +753,14 @@ pub(super) fn emit_make_enum_variant(
     let dest = (code[ip + 1] >> 8) as usize;
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
+    // The helper re-decodes the instruction and reads the variant tag out of
+    // `ctx.stack[base + tag_reg]`. That register is an `int`, which the GC
+    // flush set above does not promise to have landed, so store it here —
+    // same discipline as `BuildObject`/`ObjectRest`, which materialize the
+    // registers their helper re-walks to.
+    let tag_reg = (code[ip + 1] & 0xFF) as usize;
+    let fb = frame_base_addr(b, actx);
+    store_home(b, actx, state, fb, tag_reg);
 
     // The helper decodes from the FIRST OPERAND word (the interpreter's
     // post-opcode `ip`), like `BuildObject`/`ObjectRest`.
@@ -1671,6 +1677,13 @@ pub(super) fn emit_call_spread(
 
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
+    // `exec_call_spread_reg` reads the argument window out of `ctx.stack` by
+    // register number, so it goes to the home slots here for every kind — the
+    // GC flush set above roots heap references and an `int` argument is not one.
+    let fb = frame_base_addr(b, actx);
+    for r in arg_start..(arg_start + argc).min(actx.nregs) {
+        store_home(b, actx, state, fb, r);
+    }
 
     let res = call_helper(
         b,
@@ -1703,18 +1716,17 @@ pub(super) fn emit_invoke_runtime_static(
     let flag = (code[ip + 4] & 0xFF) as usize;
 
     // `jit_range` takes REGISTER NUMBERS and reads the operands out of
-    // `ctx.stack[base + reg]`, so both have to be in their home slots first.
-    // Without this the helper read whatever the slots happened to hold —
-    // usually null — and `0..5` built `RangeData { start: 0, end: 0 }`, so
-    // `r.end` and `r.length` came back 0 while `r.start` was right by
-    // coincidence. Pinned by tests/58-range-clif.vn.
+    // `ctx.stack[base + reg]`, so both have to be in their home slots first —
+    // for every kind, since range bounds are typically `int` and the GC flush
+    // set only promises to root heap references. Without this the helper read
+    // whatever the slots happened to hold — usually null — and `0..5` built
+    // `RangeData { start: 0, end: 0 }`, so `r.end` and `r.length` came back 0
+    // while `r.start` was right by coincidence. Pinned by tests/58-clif-range.vn.
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
     let fb = frame_base_addr(b, actx);
     for r in [start_reg, end_reg] {
-        if meta_is_float(actx.register_meta, r) {
-            store_home(b, actx, state, fb, r);
-        }
+        store_home(b, actx, state, fb, r);
     }
 
     let start_v = b.ins().iconst(types::I64, start_reg as i64);
