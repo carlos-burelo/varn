@@ -532,7 +532,10 @@ impl HeapInner {
     }
 
     pub fn alloc(&mut self, obj: HeapObj) -> u32 {
-        if let Some(ref h) = self.hotspot.clone() {
+        // Borrowed, not cloned: this is the hot path of every allocation, and
+        // the clone bumped an Rc refcount per object for a profiling hook that
+        // is `None` in every non-`-v` run.
+        if let Some(h) = &self.hotspot {
             h.borrow_mut().record_alloc(obj.tag().name());
         }
         let mut obj = obj;
