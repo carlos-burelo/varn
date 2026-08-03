@@ -46,3 +46,7 @@ Thumbs.db
 *.bak
 *.zip
 *.rar
+
+# Python bytecode from the benchmark twins
+__pycache__/
+*.pyc

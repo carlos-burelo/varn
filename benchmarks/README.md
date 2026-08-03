@@ -4,6 +4,31 @@ Micro-benchmarks `.vn` con su contraparte TypeScript (`.ts`) para comparación
 pareada. La referencia es **Bun** (JavaScriptCore), no Node: los `.ts` se corren
 directamente sin transpilar.
 
+## Tabla comparativa: `compare.ps1`
+
+Corre cada benchmark en Varn, Bun, Node y Python uno tras otro y saca una sola
+tabla. Es la forma recomendada de medir en cada iteración de mejora.
+
+```powershell
+.\benchmarks\compare.ps1                          # todo
+.\benchmarks\compare.ps1 -SkipPython              # Python es 10-40x mas lento
+.\benchmarks\compare.ps1 -Only matrix,array_ops
+.\benchmarks\compare.ps1 -Markdown                # para pegar en docs
+.\benchmarks\compare.ps1 -NoJit                   # cuanto aporta el JIT
+```
+
+Aplica por su cuenta las dos reglas de este README: verifica que **todos** los
+runtimes produzcan el mismo checksum antes de comparar tiempos (uno que
+discrepe sale como `FAIL` y queda fuera del ratio), y corre los runtimes de un
+benchmark de forma adyacente para que compartan condiciones. Avisa si `vn.exe`
+es más viejo que el fuente, y marca las filas cuyo CV supera el 10%.
+
+La columna `vs best` es Varn dividido por el rival **más rápido**, que no siempre
+es Bun — Node gana en varios.
+
+Las contrapartes viven en `js/` (las corren Bun y Node) y `py/`. Los tres arneses
+imprimen checksum a stderr y milisegundos a stdout, que es lo que el script lee.
+
 ```
 vn bench benchmarks/bench_fib.vn        # arnés de medición del CLI
 vn bench benchmarks/bench_fib.vn -v     # + IC, GC, JIT, hotspots de opcodes
