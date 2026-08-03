@@ -652,6 +652,13 @@ fn remap_bytecode(code: &mut Vec<u16>, constants: &[PoolEntry], mapping: &HashMa
                 OpCode::Intrinsic => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                 }
+                // Both operands are ordinary registers here (no call window),
+                // so `src` in the high byte gets remapped like any other use;
+                // the low byte is the wire byte, not a register.
+                OpCode::IntrinsicDirect => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                }
                 OpCode::CallNativeOp => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                 }

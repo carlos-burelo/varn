@@ -22,6 +22,26 @@ impl MathOp {
     pub const fn wire(self) -> u8 {
         encode(IntrinsicDomain::Math, self as u8)
     }
+
+}
+
+/// Whether `wire_byte` names a math op that [`crate::OpCode::IntrinsicDirect`]
+/// carries without a call window.
+///
+/// Deliberately narrower than "unary": only the four ops the JIT can lower to
+/// a single IEEE instruction. The direct form has no window for a helper to
+/// read arguments out of, so an op emitted here that the JIT cannot lower
+/// natively would have nowhere to fall back TO. `round`/`sin`/`log`/… stay on
+/// the windowed `Intrinsic`, which reaches the generic helper as before.
+pub fn is_unary_math(wire_byte: u8) -> bool {
+    let (domain, op) = super::wire::decode(wire_byte);
+    if domain != IntrinsicDomain::Math as u8 {
+        return false;
+    }
+    op == MathOp::Abs as u8
+        || op == MathOp::Sqrt as u8
+        || op == MathOp::Floor as u8
+        || op == MathOp::Ceil as u8
 }
 
 pub const MAP_ENTRIES: &[(&str, u8)] = &[

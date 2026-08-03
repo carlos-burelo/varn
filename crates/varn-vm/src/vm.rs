@@ -505,7 +505,11 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
                 }
             }
 
-            OpCode::AddImm | OpCode::SubImm | OpCode::Intrinsic | OpCode::LoadStaticFn => {
+            OpCode::AddImm
+            | OpCode::SubImm
+            | OpCode::Intrinsic
+            | OpCode::IntrinsicDirect
+            | OpCode::LoadStaticFn => {
                 ip += 2;
             }
 

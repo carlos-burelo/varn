@@ -64,6 +64,7 @@ import "./63-escape-analysis.vn"
 import "./64-str-concat-typed.vn"
 import "./65-safepoint-roots.vn"
 import "./66-inline-strings.vn"
+import "./67-math-intrinsic-fastpath.vn"
 
-print("\n66 side-effect modules executed in suite")
+print("\n67 side-effect modules executed in suite")
 assertSummary()

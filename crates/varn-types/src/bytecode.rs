@@ -87,6 +87,17 @@ pub fn decode(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<In
                 opaque: false,
             }
         }
+        // `[src][wire_byte]` in one word. Deliberately NO `call_args`: the
+        // whole point of this form is that it is not a call window, so
+        // regalloc is free to place `dest` and `src` wherever their types
+        // want instead of pinning them contiguous and untyped.
+        OpCode::IntrinsicDirect => InstrInfo {
+            len: 2,
+            def: Some(dest0),
+            uses: vec![hi1],
+            call_args: None,
+            opaque: false,
+        },
         OpCode::CallNativeOp => {
             // Operands: [op_id_const_idx][arg_count]. Receiver + args are
             // contiguous from `dest0` (call_base); `arg_count` includes the

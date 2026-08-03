@@ -338,7 +338,7 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
                 offset + 3
             }
 
-            OpCode::Intrinsic | OpCode::LoadStaticFn => {
+            OpCode::Intrinsic | OpCode::IntrinsicDirect | OpCode::LoadStaticFn => {
                 offset + 2
             }
 

@@ -1,0 +1,71 @@
+// Math intrinsics that the JIT lowers to a single ISA instruction
+// (`abs`/`sqrt`/`floor`/`ceil` on float arguments — see
+// `clif::floats::emit_math_intrinsic_native`). The fast path is only taken
+// for statically-float arguments, because the interpreter re-boxes an
+// INT-argument result back to `int` whenever it is integral
+// (`vm::exec::intrinsics::math::dispatch`) — a coercion the inline
+// instruction does not reproduce. Both argument kinds are pinned here so
+// that distinction cannot regress silently.
+//
+// Every case runs inside a hot loop: the fast path only exists in compiled
+// code, so a test that never tiers up would pass while measuring nothing.
+// Run under both tiers (`VARN_NO_JIT=1`) to compare interpreter and JIT.
+import { abs, sqrt, floor, ceil } from "std:math";
+
+function near(a: float, b: float): bool {
+    return a - b < 0.0000001 && b - a < 0.0000001;
+}
+
+// --- float arguments: the inlined path ---
+function floatOps(n: int): bool {
+    let ok = true;
+    for (let i = 0; i < n; i = i + 1) {
+        ok = ok && near(abs(-3.5), 3.5);
+        ok = ok && near(abs(3.5), 3.5);
+        ok = ok && near(sqrt(4.0), 2.0);
+        ok = ok && near(sqrt(2.0), 1.4142135623730951);
+        ok = ok && near(floor(-3.5), -4.0);
+        ok = ok && near(floor(3.5), 3.0);
+        ok = ok && near(ceil(-3.5), -3.0);
+        ok = ok && near(ceil(3.5), 4.0);
+        // Already-integral floats must round-trip unchanged.
+        ok = ok && near(floor(7.0), 7.0);
+        ok = ok && near(ceil(7.0), 7.0);
+    }
+    return ok;
+}
+
+// --- int arguments: stay on the helper path ---
+// The checker types every one of these as returning `float`, so the result
+// register is an F64 either way; what differs is that the interpreter boxes
+// an integral int-argument result back as `int`, which the helper path then
+// coerces straight back to f64. The fast path declines int arguments rather
+// than reproduce that round trip, so pin the values it must still produce.
+function intOps(n: int): float {
+    let acc = 0.0;
+    for (let i = 0; i < n; i = i + 1) {
+        acc = abs(-3) + sqrt(4) + floor(7) + ceil(7);
+    }
+    return acc;
+}
+
+// --- a float accumulator threaded through every op, as in bench_math ---
+function chained(iterations: int): float {
+    let r: float = 1.0;
+    let i = 0;
+    while (i < iterations) {
+        r = abs(r - i as float);
+        r = sqrt(r + 1.0);
+        r = floor(r * 10.0) / 10.0;
+        i = i + 1;
+    }
+    return r;
+}
+
+assert("math fastpath: float ops", floatOps(2000));
+assert("math fastpath: int args keep their values", near(intOps(2000), 19.0));
+// Same recurrence and iteration count as `benchmarks/bench_math.vn`, whose
+// result is verified equal to the Bun twin's.
+assert("math fastpath: chained float accumulator", near(chained(500000), 706.6));
+
+print("[PASSED] 67. Math intrinsic fast path");

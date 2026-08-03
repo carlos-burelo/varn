@@ -62,6 +62,7 @@ pub(super) fn lower_raw(
     let sig_nparams = if osr { 0 } else { nparams };
     let nregs = proto.register_count as usize;
     let cc = isa.default_call_conv();
+    let has_round = floats::has_round_support(isa);
     let want_roots = debug.as_deref().is_some_and(|d| d.want_roots);
     // Frame-aware functions carry (base, closure) so they can flush heap refs
     // to ctx.stack home slots at a safepoint and read the `this` receiver
@@ -762,9 +763,9 @@ pub(super) fn lower_raw(
                 let actx = actx.as_ref().ok_or("clif: BuildStr outside alloc fn")?;
                 alloc::emit_build_str(&mut b, actx, &state, code, ip);
             }
-            OpCode::Intrinsic => {
-                let actx = actx.as_ref().ok_or("clif: Intrinsic outside alloc fn")?;
-                alloc::emit_intrinsic(&mut b, actx, &state, &proto.register_meta, code, ip);
+            OpCode::Intrinsic | OpCode::IntrinsicDirect => {
+                let m = &proto.register_meta;
+                floats::emit_intrinsic_op(&mut b, op, actx.as_ref(), &vars, &state, m, code, ip, has_round)?;
             }
             OpCode::ToString => {
                 let actx = actx.as_ref().ok_or("clif: ToString outside alloc fn")?;

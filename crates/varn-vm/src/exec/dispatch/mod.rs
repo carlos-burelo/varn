@@ -708,6 +708,16 @@ impl ExecCtx {
                         (*ctx).stack[base + first_reg] = result;
                     }
 
+                    OpCode::IntrinsicDirect => {
+                        let w1 = code[ip];
+                        ip += 1;
+                        let src = (w1 >> 8) as usize;
+                        let wire_byte = (w1 & 0xFF) as u8;
+                        let x = (*ctx).stack[base + src];
+                        let result = crate::exec::intrinsics::dispatch_unary(wire_byte, x)?;
+                        (*ctx).stack[base + first_reg] = result;
+                    }
+
                     OpCode::CallNativeOp => {
                         let cidx = code[ip] as usize;
                         let total = code[ip + 1] as usize; // receiver + args

@@ -201,6 +201,9 @@ pub(crate) fn apply_kinds(
         | OpCode::Mod
         | OpCode::Negate
         | OpCode::Intrinsic
+        // Writes `Float` into a float-declared dest and boxed bits otherwise
+        // — the same two cases as `Intrinsic`, which is what `boxed` states.
+        | OpCode::IntrinsicDirect
         | OpCode::Typeof
         | OpCode::ToString
         | OpCode::GetSymbol

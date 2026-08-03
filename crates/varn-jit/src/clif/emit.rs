@@ -201,15 +201,6 @@ pub(super) fn box_f64(
     b.ins().select(is_qnan, null, bits)
 }
 
-/// Unbox a boxed float VmValue to a raw `f64` — a pure bitcast, since a float
-/// VmValue's bits ARE the `f64` (canonical NaN-boxing).
-pub(super) fn unbox_f64(
-    b: &mut FunctionBuilder,
-    v: cranelift_codegen::ir::Value,
-) -> cranelift_codegen::ir::Value {
-    b.ins().bitcast(types::F64, MemFlags::new(), v)
-}
-
 /// Mask isolating a VmValue's QNAN+tag bits, for an int-tag test.
 pub(super) const INT_CHECK_MASK: i64 =
     (varn_types::vm_value::QNAN | varn_types::vm_value::MASK_TAG) as i64;

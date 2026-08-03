@@ -189,12 +189,25 @@ pub enum OpCode {
     /// register, args contiguous above it; the result is written back to
     /// `call_base`. Bypasses the string method name + inline-cache lookup.
     CallNativeOp,
+
+    /// A unary `std:math` intrinsic with direct operands, bypassing the call
+    /// window `Intrinsic` needs. Operands: `[src: u8][wire_byte: u8]` packed
+    /// into one word, result into the packed `dest` register.
+    ///
+    /// `Intrinsic` writes its result to the SAME register that stages the
+    /// call receiver, so that register can never be float-typed — every
+    /// argument gets boxed on the way in and the result unboxed on the way
+    /// out, around ops that are a single IEEE instruction. This form has no
+    /// receiver and no window, so both ends stay in their natural
+    /// representation. Only unary math ops qualify: every other domain
+    /// actually reads its receiver.
+    IntrinsicDirect,
 }
 
 impl OpCode {
     #[inline(always)]
     pub fn from_u8(v: u8) -> Option<Self> {
-        if v <= OpCode::CallNativeOp as u8 {
+        if v <= OpCode::IntrinsicDirect as u8 {
             Some(unsafe { std::mem::transmute::<u8, OpCode>(v) })
         } else {
             None

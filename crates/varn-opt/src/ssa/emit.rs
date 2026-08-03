@@ -518,6 +518,11 @@ fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u
                 // area before BuildObjectWithShape.
                 InstKind::BuildObject { pairs } => pairs.len() as u32,
 
+                // Reserved unconditionally, including for calls that end up on
+                // the windowless `IntrinsicDirect` form. The reservation must
+                // be an UPPER bound on what emission uses: over-reserving
+                // wastes a frame slot, under-reserving would hand the emitted
+                // window registers that overlap live values.
                 InstKind::IntrinsicCall { args, .. } => args.len() as u32 + 1,
                 InstKind::CallNativeOp { args, .. } => args.len() as u32 + 1,
 
@@ -1098,6 +1103,32 @@ fn emit_inst(
                     chunk.write(Chunk::pack(is_local, index), LINE);
                 }
             }
+        }
+
+        InstKind::IntrinsicCall {
+            object,
+            args,
+            wire_byte,
+        } if args.len() == 1
+            && varn_core::intrinsic_ops::math::is_unary_math(*wire_byte)
+            && matches!(
+                value_tys.get(args[0].0 as usize),
+                Some(crate::hir::HirType::Float)
+            ) =>
+        {
+            // Direct form: no receiver staged, no window, no result Move.
+            // `object` was already lowered (its side effects, if any, ran);
+            // a unary math dispatch never reads it, so it simply stays in
+            // its own register instead of being copied into a call slot.
+            //
+            // The float-argument requirement is semantic, not an
+            // optimization: `intrinsics::math::dispatch` re-boxes an integral
+            // result back to `int` when the argument was int-tagged, and the
+            // direct form has no window for that path to round-trip through.
+            // An int argument keeps the windowed encoding.
+            let _ = object;
+            chunk.write(Chunk::pack_op(OpCode::IntrinsicDirect, d), LINE);
+            chunk.write(((reg[args[0].0 as usize] as u16) << 8) | *wire_byte as u16, LINE);
         }
 
         InstKind::IntrinsicCall {

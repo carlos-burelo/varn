@@ -655,6 +655,14 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 format!("r{dest} = intrinsic(0x{wire_byte:02x}, {arg_count} args)")
             }
 
+            OpCode::IntrinsicDirect => {
+                let dest = hi(op_val);
+                let w1 = w!();
+                let src = (w1 >> 8) as u8;
+                let wire_byte = (w1 & 0xFF) as u8;
+                format!("r{dest} = intrinsic_direct(0x{wire_byte:02x}, r{src})")
+            }
+
             OpCode::LoadStaticFn => {
                 let dest = hi(op_val);
                 let proto_idx = w!();
