@@ -204,6 +204,15 @@ pub struct Lowerer<'a> {
     local_globals: rustc_hash::FxHashSet<Rc<str>>,
     source_file: Rc<str>,
     ty_table: TyTable,
+    /// Qualified names of top-level `let`/`const` that are neither exported
+    /// nor namespace members — the only shapes `module_locals` may consider
+    /// promoting to `<module>` registers. Collected HERE because this is the
+    /// one place that knows a global write is a DECLARATION rather than an
+    /// assignment, and that it is not an import.
+    top_level_lets: Vec<Rc<str>>,
+    /// Namespace members are declared as globals in the module scope and then
+    /// read back to build the namespace object; they must stay globals.
+    in_namespace: bool,
 }
 
 impl<'a> Lowerer<'a> {
@@ -295,6 +304,8 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
         local_globals,
         source_file: Rc::from(input.program.filename.replace('\\', "/")),
         ty_table: TyTable::default(),
+        top_level_lets: Vec::new(),
+        in_namespace: false,
     };
 
     let mut functions = Vec::new();
@@ -315,6 +326,19 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
                             None => HirExpr::Null,
                         };
                         lo.desugar_pattern_global(&d.id, value, &mut module_scope, &mut top_body)?;
+                        // Promotion candidates. This is the path a top-level
+                        // `let`/`const` of the PROGRAM takes; the one in
+                        // `lower_decl_inline` only sees declarations nested in
+                        // a block or namespace.
+                        let mut names = Vec::new();
+                        collect_pattern_identifiers(&d.id, &mut names);
+                        for n in names {
+                            if !lo.export_names.contains(&n) {
+                                if let HirBinding::Global(q) = lo.global_binding(n) {
+                                    lo.top_level_lets.push(q);
+                                }
+                            }
+                        }
                     }
                 }
                 Decl::Class(cl) => {
@@ -373,6 +397,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
         functions,
         source_file: lo.source_file.clone(),
         ty_table: Rc::new(lo.ty_table),
+        top_level_lets: std::mem::take(&mut lo.top_level_lets),
     })
 }
 

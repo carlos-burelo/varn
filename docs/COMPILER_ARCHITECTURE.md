@@ -146,6 +146,63 @@ Lo mismo para el acceso a propiedades: si el checker conoce la clase, el pass
 `GetProperty "nombre"`, y el JIT los baja a un único load/store con offset
 constante.
 
+### Top-level `let` privado → registros de `<module>`
+
+`Scope::is_global()` es cierto en el frame del módulo, así que un `let` de nivel
+superior compila a **slot global**: cada lectura son dos loads dependientes
+(`ExecCtx` → puntero de `values` → slot) más los shifts de unbox, y cada escritura
+un store. Como registro es solo un registro. `hir::module_locals` promueve los que
+puede.
+
+La promoción es sana **solo** si toda lectura ocurre en el frame del propio módulo.
+Cuatro cosas la sacan de ahí, y cada una es requisito de corrección, no heurística:
+
+* **Funciones top-level** se bajan con un `Scope::new()` fresco, así que
+  `resolve_upvalue` devuelve `None` de inmediato y lo que referencien cae a global.
+  Una variable promovida simplemente no se encontraría.
+* **Closures, clases y enums** leen globals directamente en vez de capturarlos.
+* **Exports**: otros módulos los leen por slot.
+* **Miembros de namespace**: se declaran como globals y se releen para construir el
+  objeto del namespace.
+
+Las dos últimas se filtran en el sitio de declaración (`lower`, el único punto que
+sabe que una escritura a global es una DECLARACIÓN y no una asignación). Las dos
+primeras las responde el walker.
+
+**El walker es exhaustivo a propósito.** `module_locals::walk_stmts` cubre cada
+variante de `HirStmt` y `HirExpr` sin brazo `_`. Un contenedor añadido al HIR y
+omitido ahí escondería un uso, y el pase promovería un global que un closure aún
+lee — código mal, sin error de compilación. Con el match exhaustivo, añadir una
+variante rompe el build. La primera versión recorría solo `HirClass::methods` y se
+saltaba `getters`/`setters`/`ctor`/`static_methods`/`static_blocks`; lo atrapó
+`tests/60-dce-purity.vn`. Cubierto ahora por `tests/68-module-locals.vn`.
+
+Hay un tope de `MAX_PROMOTED` porque cada promoción añade un registro al frame del
+módulo y `ssa::emit` falla pasados 255: un programa que hoy compila no puede dejar
+de compilar por una optimización.
+
+**Medido**, pareado en la misma ventana (top-level contra el mismo código envuelto
+a mano en una función):
+
+| caso | brecha antes | después |
+|---|---|---|
+| loop de 5M con acumulador y contador | 2.35× | **1.00×** |
+| `bench_array_ops` | 2.14× | **~1.00×** |
+| `bench_matrix` | 37 ms | **26 ms** |
+
+En los tres el top level pasa a correr como el mismo código escrito dentro de una
+función (`bench_matrix` cae justo sobre los 26.7 ms de la versión envuelta a mano).
+
+Lo que **no** ayuda es hoistear la *carga* de un global invariante fuera de un loop:
+el compilador ya la hace una sola vez antes del bucle, así que un LICM sobre
+`LoadGlobalIdx` se implementó, midió cero y se descartó. El costo que P1 elimina es
+el de las variables **mutables**, que el loop reescribe y por tanto nadie puede
+hoistear: son load+store por iteración como global, y un registro como local.
+
+Usar `benchmarks/compare.ps1` para volver a medir esto; ojo con tomar cifras con la
+máquina cargada, que fue lo que en su momento hizo parecer que `bench_matrix` no se
+movía.
+
 ### El recorrido de anotaciones tiene que ser completo
 
 Nada de lo anterior sirve si el checker nunca visita la expresión. `annotate_expr`

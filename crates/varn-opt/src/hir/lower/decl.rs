@@ -426,7 +426,21 @@ impl<'a> Lowerer<'a> {
                     } else {
                         self.desugar_pattern_local(&d.id, value, scope, out)?;
                     }
+                    let before = names.len();
                     collect_pattern_identifiers(&d.id, &mut names);
+                    // Candidate for `<module>` register promotion. Exported
+                    // names are read by other modules through their slot, and
+                    // namespace members are read back to build the namespace
+                    // object, so both stay globals.
+                    if is_global && !self.in_namespace {
+                        for n in &names[before..] {
+                            if !self.export_names.contains(n) {
+                                if let HirBinding::Global(q) = self.global_binding(n.clone()) {
+                                    self.top_level_lets.push(q);
+                                }
+                            }
+                        }
+                    }
                 }
                 Ok(names)
             }
@@ -451,6 +465,7 @@ impl<'a> Lowerer<'a> {
     ) -> R<()> {
         let is_global = scope.is_global();
         scope.push_block();
+        let was_in_namespace = std::mem::replace(&mut self.in_namespace, true);
         let mut names = Vec::new();
         for member in &ns.body {
             let inner = match member {
@@ -484,6 +499,7 @@ impl<'a> Lowerer<'a> {
             })
             .collect();
         scope.pop_block();
+        self.in_namespace = was_in_namespace;
         let value = HirExpr::Object { properties };
         if is_global {
             let target = self.global_binding(ns.id.clone());

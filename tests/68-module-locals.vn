@@ -1,0 +1,99 @@
+// Promotion of module-private top-level `let`/`const` to `<module>` registers
+// (`varn-opt/src/hir/module_locals.rs`).
+//
+// This file is about the cases that must NOT be promoted. A binding is only
+// safe as a register when every read happens in the module's own frame:
+// top-level functions are lowered with a fresh `Scope`, and closures, classes
+// and enums read globals directly rather than capturing them, so any of those
+// naming a binding keeps it a global. Promoting one anyway does not crash —
+// the read simply finds nothing — which is exactly why it needs pinning.
+//
+// The getter case below is not hypothetical: the first cut of the pass walked
+// only `HirClass::methods` and missed `getters`, promoting a global a getter
+// wrote. `tests/60-dce-purity.vn` caught it.
+
+// --- promotable: read and written only by top-level code -------------------
+let counter = 0
+let total = 0
+for (let i = 0; i < 1000; i = i + 1) {
+    counter = counter + 1
+    total = total + i
+}
+assert("module-locals: top-level loop counter", counter === 1000)
+assert("module-locals: top-level accumulator", total === 499500)
+
+// --- NOT promotable: read by a top-level function --------------------------
+let readByFunction = 41
+function readsIt(): int {
+    return readByFunction + 1
+}
+assert("module-locals: function reads top-level binding", readsIt() === 42)
+
+// --- NOT promotable: written by a top-level function -----------------------
+let writtenByFunction = 0
+function writesIt(): int {
+    writtenByFunction = writtenByFunction + 5
+    return writtenByFunction
+}
+writesIt()
+writesIt()
+assert("module-locals: function writes top-level binding", writtenByFunction === 10)
+
+// --- NOT promotable: captured by a closure ---------------------------------
+let readByClosure = 7
+let closure = (): int => readByClosure * 2
+assert("module-locals: closure reads top-level binding", closure() === 14)
+
+// --- NOT promotable: touched from class bodies -----------------------------
+let ctorRuns = 0
+let getterRuns = 0
+let setterRuns = 0
+let methodRuns = 0
+let staticRuns = 0
+
+class Touches {
+    value: int
+    constructor(v: int) {
+        ctorRuns = ctorRuns + 1
+        this.value = v
+    }
+    get doubled(): int {
+        getterRuns = getterRuns + 1
+        return this.value * 2
+    }
+    set doubled(v: int) {
+        setterRuns = setterRuns + 1
+        this.value = v
+    }
+    bump(): int {
+        methodRuns = methodRuns + 1
+        return this.value + 1
+    }
+    static make(): int {
+        staticRuns = staticRuns + 1
+        return 1
+    }
+}
+
+let t = Touches(21)
+assert("module-locals: constructor writes top-level", ctorRuns === 1)
+assert("module-locals: getter value", t.doubled === 42)
+assert("module-locals: getter writes top-level", getterRuns === 1)
+t.doubled = 10
+assert("module-locals: setter writes top-level", setterRuns === 1)
+assert("module-locals: setter took effect", t.value === 10)
+assert("module-locals: method value", t.bump() === 11)
+assert("module-locals: method writes top-level", methodRuns === 1)
+Touches.make()
+assert("module-locals: static method writes top-level", staticRuns === 1)
+
+// --- a promotable binding living alongside all of the above ----------------
+let alsoPromotable = 0
+let j = 0
+while (j < 100) {
+    alsoPromotable = alsoPromotable + 2
+    j = j + 1
+}
+assert("module-locals: promotable next to blocked ones", alsoPromotable === 200)
+
+print("[PASSED] 68. Module-local promotion")

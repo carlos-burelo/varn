@@ -4,6 +4,7 @@ use std::rc::Rc;
 pub mod ctor_summary;
 pub mod dump;
 pub mod inline;
+pub mod module_locals;
 pub mod lower;
 
 /// Interned handle to a nested `HirType` in the module's [`TyTable`].
@@ -805,4 +806,8 @@ pub struct HirModule {
     /// Resolves the `TyId`/`ClassId` handles inside this module's
     /// structured `HirType`s. Frozen after lowering.
     pub ty_table: Rc<TyTable>,
+    /// Qualified names of module-private top-level `let`/`const` — the
+    /// promotion candidates `module_locals` filters down. See the field of
+    /// the same name on `Lowerer` for why they are collected there.
+    pub top_level_lets: Vec<Rc<str>>,
 }
