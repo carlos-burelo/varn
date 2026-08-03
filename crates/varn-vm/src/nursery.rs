@@ -25,7 +25,6 @@ pub fn pack_old_idx(raw_old: u32) -> u32 {
     raw_old | OLD_GEN_FLAG
 }
 
-#[derive(Clone)]
 pub struct Nursery {
     objects: Vec<Option<HeapObj>>,
     forwarding: Vec<Option<u32>>,
@@ -38,6 +37,43 @@ pub struct Nursery {
 impl Default for Nursery {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Clone for Nursery {
+    /// Hand-written, not derived. A derived `Clone` would clone `objects`
+    /// and `forwarding` via `Vec::clone` (`slice::to_vec`), which allocates
+    /// with `capacity == len` — silently dropping the "capacity is
+    /// `NURSERY_CAPACITY` from birth and never changes" invariant `new`
+    /// establishes and `emit_nursery_alloc` depends on for its raw slot
+    /// address to stay valid.
+    ///
+    /// This is reachable, not theoretical: `Heap::deep_clone` clones
+    /// `HeapInner`, which clones `Nursery`; `deep_clone`'s only caller is
+    /// `Vm::from_snapshot`, whose only caller is the bench harness
+    /// (`crates/varn-cli/src/bench/harness.rs`) — every single `vn bench`
+    /// iteration deep-clones a fresh heap this way. Without this override,
+    /// every VM `vn bench` builds would run on a nursery whose backing
+    /// store can move at the first `push` that exceeds its (small,
+    /// length-sized) cloned capacity — silent corruption the moment a
+    /// caller (Task 7) holds a raw slot address across such a `push`.
+    ///
+    /// Reserves exactly like `new`, then copies contents in — same
+    /// allocation cost `new` already pays, paid again here rather than
+    /// left cheaper-but-unsound.
+    fn clone(&self) -> Self {
+        let mut objects = Vec::with_capacity(NURSERY_CAPACITY);
+        objects.extend(self.objects.iter().cloned());
+        let mut forwarding = Vec::with_capacity(NURSERY_CAPACITY);
+        forwarding.extend(self.forwarding.iter().cloned());
+        Self {
+            objects,
+            forwarding,
+            remembered: self.remembered.clone(),
+            alloc_count: self.alloc_count,
+            minor_gc_count: self.minor_gc_count,
+            minor_gc_promoted: self.minor_gc_promoted,
+        }
     }
 }
 
@@ -100,6 +136,16 @@ impl Nursery {
     /// Backing-store address of the object slots, for the invariant test.
     pub fn objects_data_ptr(&self) -> *const Option<HeapObj> {
         self.objects.as_ptr()
+    }
+
+    /// Backing-store address of the forwarding slots, for the invariant test
+    /// and for `ExecCtx::validate_jit_safepoint_offsets` — the one raw
+    /// offset `emit_nursery_alloc`'s `None`-write uses
+    /// (`nursery_fwd_vec_off + slots_ptr_off`) that nothing else in the
+    /// write path independently re-derives, since `slots_ptr_off` is probed
+    /// against `Vec<Option<HeapObj>>` and reused here for `Vec<Option<u32>>`.
+    pub fn forwarding_data_ptr(&self) -> *const Option<u32> {
+        self.forwarding.as_ptr()
     }
 
     #[inline(always)]
