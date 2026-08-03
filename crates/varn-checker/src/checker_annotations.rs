@@ -1010,6 +1010,22 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                 }
             }
         }
+        // Constructor arguments were never visited — the same hole the
+        // `Template` arm below documents. Every expression inside
+        // `new User(i, "User_" + i, (i % 60) + 10, ...)` lost ALL of its
+        // annotations, so its arithmetic lowered to `mod.dyn`/`add.dyn`
+        // (runtime type dispatch) instead of the typed int opcodes, and any
+        // intrinsic or array index in there missed its fast path too.
+        ExprKind::New { callee, args, .. } => {
+            annotate_expr(callee, ann, ctx);
+            for arg in args {
+                let e = match arg {
+                    Arg::Positional(e) | Arg::Spread(e) => e,
+                    Arg::Named { value, .. } => value,
+                };
+                annotate_expr(e, ann, ctx);
+            }
+        }
         // Template interpolations were never visited, so arithmetic inside
         // `${...}` (e.g. `${i % 10000}`) missed its numeric annotation and
         // lowered to the generic FFI op instead of the typed int opcode.
@@ -1020,6 +1036,48 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                 }
             }
         }
+        // Object-literal property values: `{ total: qty * price }` has the
+        // same problem constructor arguments did.
+        ExprKind::Object { properties } => {
+            for p in properties {
+                if let varn_core::ast::ObjectProp::Property { value, .. } = p {
+                    annotate_expr(value, ann, ctx);
+                }
+            }
+        }
+        // Single-operand wrappers. None of these annotate anything of their
+        // own; they exist here purely so the walk does not stop at them.
+        ExprKind::Update { operand, .. } => annotate_expr(operand, ann, ctx),
+        ExprKind::Await { argument }
+        | ExprKind::Spawn { argument }
+        | ExprKind::Spread { argument } => annotate_expr(argument, ann, ctx),
+        ExprKind::Yield { argument, .. } => {
+            if let Some(e) = argument {
+                annotate_expr(e, ann, ctx);
+            }
+        }
+        ExprKind::NonNull { expression } | ExprKind::Try { expression } => {
+            annotate_expr(expression, ann, ctx)
+        }
+        ExprKind::Pipeline { left, right } => {
+            annotate_expr(left, ann, ctx);
+            annotate_expr(right, ann, ctx);
+        }
+        ExprKind::Range { start, end, .. } => {
+            annotate_expr(start, ann, ctx);
+            annotate_expr(end, ann, ctx);
+        }
+        ExprKind::Sequence { expressions } => {
+            for e in expressions {
+                annotate_expr(e, ann, ctx);
+            }
+        }
+        // Leaves (literals, identifiers, `this`, function/class bodies that
+        // `annotate_stmt` reaches on its own). Kept as a catch-all rather
+        // than an exhaustive match, but note that this arm is exactly what
+        // hid the missing `Template` and `New` walks: a container added to
+        // `ExprKind` and not added here goes silently unannotated, and the
+        // only symptom is slower code.
         _ => {}
     }
 }

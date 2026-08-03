@@ -146,7 +146,26 @@ Lo mismo para el acceso a propiedades: si el checker conoce la clase, el pass
 `GetProperty "nombre"`, y el JIT los baja a un único load/store con offset
 constante.
 
-Hay **134 opcodes** (`crates/varn-core/src/opcode.rs`). No llevan prefijo `Op`.
+### El recorrido de anotaciones tiene que ser completo
+
+Nada de lo anterior sirve si el checker nunca visita la expresión. `annotate_expr`
+(`varn-checker/src/checker_annotations.rs`) baja por el AST registrando lo que el
+backend luego consume — kind numérico, intrínseco, op-id nativo, índice de array,
+slot de campo fijo, tipo del resultado — y termina en un `_ => {}`.
+
+Ese catch-all ya escondió el mismo bug tres veces: las interpolaciones de template,
+los argumentos de constructor y los valores de object literal no se visitaban, así
+que **toda** expresión dentro de `${...}`, de `new User(...)` o de `{ k: ... }`
+perdía sus anotaciones. La aritmética ahí bajaba a `mod.dyn`/`add.dyn` — dispatch de
+tipos en runtime — teniendo el checker los tipos a mano. Medido en
+`benchmarks/bench_dto.vn`, cuyo loop construye 100k objetos con aritmética en los
+argumentos: 31 ms → 25 ms al visitar los argumentos de `new`.
+
+Un contenedor nuevo en `ExprKind` que no se añada a ese match no da error de
+compilación ni falla ningún test: el único síntoma es código más lento. Al añadir
+una variante que contenga expresiones, añadirla también aquí.
+
+Hay **135 opcodes** (`crates/varn-core/src/opcode.rs`). No llevan prefijo `Op`.
 
 ---
 

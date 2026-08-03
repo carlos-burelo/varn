@@ -505,7 +505,7 @@ lowerea con Cranelift o devuelve `Err`, y un bail deja la función al
 intérprete — dos tiers semánticamente idénticos, y el `match` de
 `clif/lower.rs` es la autoridad de soporte.
 
-Los 134 opcodes de `OpCode` están ruteados: la suite completa
+Los 135 opcodes de `OpCode` están ruteados: la suite completa
 (`tests/main.vn`) da 745 rutas y 0 bails bajo `VARN_CLIF_TRACE=1`. Lo que
 queda fuera no son opcodes sino funciones enteras, por las puertas de entrada
 de `varn_jit::compile` y `clif::lower::try_compile`:
