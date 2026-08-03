@@ -12,7 +12,7 @@ use varn_utilities::chalk::chalk;
 use varn_utilities::terminal;
 use varn_vm::Vm;
 
-use super::harness::{run_vm_to_completion, time_n, time_n_freq, VmFactory};
+use super::harness::{run_vm_to_completion, time_n, time_n_freq_setup, VmFactory};
 use super::report::coverage::{print_coverage, top_blocker};
 use super::report::headline::{ExecSplit, Headline};
 use super::report::hotspots::print_hotspots;
@@ -211,11 +211,14 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         proto: Rc::new(optimized_proto),
     };
 
-    let (exec_samples, cpu_freq) = time_n_freq(runs, || {
-        varn_builtins::reset_testing_counters();
-        let mut machine = factory.build();
-        run_vm_to_completion(&mut machine, factory.closure())
-    })?;
+    let (exec_samples, cpu_freq) = time_n_freq_setup(
+        runs,
+        || {
+            varn_builtins::reset_testing_counters();
+            factory.build()
+        },
+        |machine| run_vm_to_completion(machine, factory.closure()),
+    )?;
 
     let e2e_samples = time_n(runs, || {
         let source = match eval {

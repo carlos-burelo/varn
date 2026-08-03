@@ -10,7 +10,7 @@ use varn_utilities::chalk::chalk;
 use varn_utilities::terminal;
 use varn_vm::Vm;
 
-use super::harness::{run_vm_to_completion, time_n, time_n_freq, VmFactory};
+use super::harness::{run_vm_to_completion, time_n, time_n_freq_setup, VmFactory};
 use super::report::coverage::{print_coverage, top_blocker};
 use super::report::headline::{ExecSplit, Headline};
 use super::report::hotspots::print_hotspots;
@@ -81,11 +81,14 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
         proto: Rc::new(optimized_proto),
     };
 
-    let (exec_samples, cpu_freq) = time_n_freq(runs, || {
-        varn_builtins::reset_testing_counters();
-        let mut machine = factory.build();
-        run_vm_to_completion(&mut machine, factory.closure())
-    })?;
+    let (exec_samples, cpu_freq) = time_n_freq_setup(
+        runs,
+        || {
+            varn_builtins::reset_testing_counters();
+            factory.build()
+        },
+        |machine| run_vm_to_completion(machine, factory.closure()),
+    )?;
 
     let phases = vec![
         PhaseStats::from_samples("load", |c| c.white(), &load_samples),

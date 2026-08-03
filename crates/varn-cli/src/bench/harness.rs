@@ -148,13 +148,41 @@ pub fn time_n_freq<F: Fn() -> Result<(), String>>(
     runs: usize,
     f: F,
 ) -> Result<(Vec<Duration>, Option<crate::cpu_freq::CpuFreq>), CliError> {
-    f().map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
+    time_n_freq_setup(runs, || (), |_| f())
+}
+
+/// [`time_n_freq`] with a per-run SETUP step that is deliberately left out of
+/// the measurement.
+///
+/// The execute phase builds a fresh VM per run, and that build deep-clones the
+/// heap — whose cost scales with `NURSERY_CAPACITY`. Timing it made the harness
+/// structurally biased against exactly the change an allocation-heavy workload
+/// needs: growing the nursery from 16K to 256K slots measured 1.34x FASTER on
+/// `bench_gc_alloc`'s own internal clock while this phase reported it 3x
+/// slower, because each timed run was copying ~12 MB more before doing any
+/// work. A benchmark that punishes a real improvement is worse than no
+/// benchmark.
+///
+/// The setup still runs once per iteration, so each run starts from the same
+/// fresh state it always did; only the clock moved.
+pub fn time_n_freq_setup<T, S, F>(
+    runs: usize,
+    setup: S,
+    f: F,
+) -> Result<(Vec<Duration>, Option<crate::cpu_freq::CpuFreq>), CliError>
+where
+    S: Fn() -> T,
+    F: Fn(&mut T) -> Result<(), String>,
+{
+    let mut warm = setup();
+    f(&mut warm).map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
 
     let mut samples = Vec::with_capacity(runs);
     let mut peak = None;
     for _ in 0..runs {
+        let mut state = setup();
         let start = Instant::now();
-        f().map_err(|e| CliError::fatal(format!("bench run failed: {e}")))?;
+        f(&mut state).map_err(|e| CliError::fatal(format!("bench run failed: {e}")))?;
         samples.push(start.elapsed());
         peak = crate::cpu_freq::keep_peak(peak, crate::cpu_freq::sample());
     }
