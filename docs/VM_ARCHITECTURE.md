@@ -313,6 +313,94 @@ significa emitir `itoa` en CLIF; es otro trabajo.
 En la forma que sí toma: 400k concats pasan de 22 ms a 15 ms (~30%), consistente en
 7 rondas pareadas con el control limpio.
 
+### Intrínsecos de math en código compilado
+
+**El fast path** (`clif/floats.rs::emit_math_intrinsic_native`). `abs`/`sqrt`/
+`floor`/`ceil` sobre un argumento probado float bajan a una sola instrucción IEEE
+(`andpd`/`sqrtsd`/`roundsd`) en vez de pasar por `dispatch_intrinsic`. Lo caro del
+helper no es la llamada: es que vuelca cada registro boxed vivo a su home slot y los
+recarga después, en un cuerpo de loop que si no jamás toca memoria.
+
+**Por qué solo esos cuatro.** El recorte es la prueba de equivalencia, no prudencia.
+`round` queda fuera porque el ISA discrepa del intérprete: `nearest` de Cranelift es
+IEEE ties-to-even y `f64::round` de Rust es ties-away-from-zero (`round(0.5)` da
+`0.0` contra `1.0`). `min`/`max` difieren de `f64::min`/`max` con operandos NaN. Las
+transcendentales (`sin`/`log`/`pow`/…) no tienen instrucción.
+
+**Por qué se rechaza el argumento int.** `vm::exec::intrinsics::math::dispatch`
+re-empaca a `int` cuando el argumento venía int-tagged y el resultado es integral. En
+un destino float el helper lo vuelve a coercer a `f64`, así que los valores coinciden
+— pero por un round trip cuyo payload `from_int` mide 48 bits. Exigir argumento float
+hace `is_int()` falso por construcción, el intérprete toma siempre su brazo `from_f64`
+y el lowering es bit a bit idéntico, no solo igual en el rango común.
+
+**El kind no es la representación.** `state[r] == K::Float` prueba que el VALOR es
+float; **no** prueba que la Variable sea `F64`. `Move` copia el kind de la fuente tal
+cual (`kinds::apply_kinds`) mientras su lowering CONVIERTE, empacando el f64 en un
+destino declarado `I64` — así que un kind `Float` vive rutinariamente en un registro
+con bits boxed. El fast path decide por el tipo Cranelift del valor, la única
+autoridad que no puede discrepar de la Variable de la que salió. Meterle un `I64` a
+`floor` ni siquiera daría un error limpio: el verificador está apagado en release, así
+que sale como un panic "no rule matched for term x64_round" durante el lowering.
+
+**NaN no necesita caso especial.** `sqrt(-1.0)` deja un NaN crudo donde el helper
+habría dejado los bits de `null` — pero `null` ES un quiet NaN, ambos son NaN bajo
+toda op y comparación float, y `box_f64` canonicaliza cualquiera de los dos de vuelta
+a `null` en el siguiente borde. En el brazo boxed pasa lo mismo al revés:
+`unbox_f64_coerce` convierte `null` en NaN, que es exactamente el `f64::NAN` que
+`VmValue::to_f64` devuelve para null.
+
+**`floor`/`ceil` van tras `has_sse41`.** Cranelift no degrada acá: sin la feature, el
+lowering entra en `unreachable` en vez de caer a un libcall, porque la regla de
+fallback exige el operando en registro. `floats::has_round_support` lo consulta antes
+de construir la instrucción.
+
+**`IntrinsicDirect`: sin ventana de llamada.** `Intrinsic` escribe su resultado en el
+MISMO registro que monta el receptor de la llamada, así que esa ranura nunca puede ser
+float. La forma directa (`IntrinsicDirect dest, [src][wire_byte]`) no tiene receptor ni
+ventana, y su `decode` declara `call_args: None` — lo que libera al regalloc de fijar
+los operandos contiguos y sin tipo. `ssa::emit` la elige solo cuando el checker tipó el
+argumento `float`: el int-argument re-boxing del intérprete no tiene por dónde
+round-trippear en esta forma, así que un argumento int se queda en la forma con ventana.
+Solo la emiten los cuatro ops que SON una instrucción; no hay fallback per-instrucción
+porque no hay ventana de la que un helper pueda leer argumentos.
+
+**La causa que de verdad dominaba: el resultado perdía el tipo.** `hir::lower` construía
+todo `IntrinsicCall` con `ty: HirType::Dynamic`, descartando el tipo que el checker ya
+había registrado. Consecuencia en cadena: el valor SSA quedaba sin tipo →
+`is_float_v` falso → el linear scan lo sacaba del pool de floats y le daba una ranura
+compartida con un `int` → `derive_register_meta` hacía el meet a `Dynamic` →
+`kinds` lo marcaba `Boxed` → y entonces **cada `AddFloat`/`MulFloat` que consumía un
+intrínseco fallaba `operands_native` y se iba al helper genérico**. El costo no estaba
+en el intrínseco: estaba en toda la aritmética río abajo. Ahora el lowering usa
+`value_ty(offset)` con la convención de claves de `checker_annotations` (el offset del
+nombre del método en la forma método, el inicio de la expresión en la forma libre).
+Ejemplo del `<backend_principle>`: el checker ya lo sabía y el backend lo tiraba.
+
+**Medido.** `benchmarks/bench_math.vn` (500k iteraciones, tres intrínsecos por vuelta),
+Bun de control estable en 6.40-6.47 ms:
+
+| etapa | min |
+|---|---|
+| baseline | 20.46 ms |
+| fast path en la forma con ventana | 13.06 |
+| `IntrinsicDirect` | 12.73 |
+| propagación del tipo de resultado | **5.47** |
+
+Contra Bun: 3.2× → **0.85×**. El piso del mismo loop sin intrínsecos es 2.80 ms, así que
+los tres intrínsecos cuestan 1.78 ns cada uno — el costo de la instrucción, sin
+andamiaje. Nótese que las dos primeras etapas casi no movieron la aguja: la ventana era
+un síntoma, el tipo perdido era la causa.
+
+**Trampa de representación en el brazo del helper float.** Los helpers genéricos
+(`add`/`sub`/`mul`/`div`/`modulo`/`pow`) devuelven un VmValue **int** cuando ambos
+operandos venían int-tagged y el resultado es integral. Un opcode `*Float` llega ahí
+siempre que sus operandos son ints boxed — p. ej. dos intrínsecos de math sobre
+argumentos int (`abs(-3) + sqrt(4)`). Desempacar eso con un bitcast puro leía el tag
+QNAN del int como f64, que `box_f64` canonizaba a `null` en el siguiente borde: una
+respuesta mal, silenciosa, solo en código compilado. Por eso los dos brazos usan
+`unbox_f64_coerce` y no `unbox_f64`. Cubierto por `tests/67-math-intrinsic-fastpath.vn`.
+
 ### La regla del safepoint: qué se flushea y por qué
 
 `live_boxed` responde **una** pregunta: qué registros tiene que rootear el colector.

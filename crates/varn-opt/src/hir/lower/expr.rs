@@ -235,11 +235,19 @@ impl<'a> Lowerer<'a> {
                         let has_spread = args.iter().any(|a| matches!(a, Arg::Spread(_)));
                         if !has_spread {
                             let hargs = self.lower_call_args(args, offset, scope)?;
+                            // The checker recorded the result type at the
+                            // expression start for a plain call. Dropping it
+                            // (this was `Dynamic`) made the result register
+                            // share a slot with differently-typed values, so
+                            // `derive_register_meta` met the two to `Dynamic`
+                            // and every float op consuming an intrinsic fell
+                            // off the native f64 path onto the generic helper.
+                            let ty = self.value_ty(expr.range.start.offset);
                             return Ok(HirExpr::IntrinsicCall {
                                 object: Box::new(HirExpr::Null),
                                 args: hargs,
                                 wire_byte,
-                                ty: HirType::Dynamic,
+                                ty,
                             });
                         }
                     }
@@ -268,11 +276,15 @@ impl<'a> Lowerer<'a> {
                         if !has_spread {
                             let hobj = self.lower_expr(object, scope)?;
                             let hargs = self.lower_call_args(args, offset, scope)?;
+                            // Method form keys at the method-name offset (a
+                            // chain shares its expression start). Same reason
+                            // as the free-function arm above.
+                            let ty = self.value_ty(method_key.unwrap_or(offset));
                             return Ok(HirExpr::IntrinsicCall {
                                 object: Box::new(hobj),
                                 args: hargs,
                                 wire_byte,
-                                ty: HirType::Dynamic,
+                                ty,
                             });
                         }
                     }
