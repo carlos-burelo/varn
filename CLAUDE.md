@@ -26,6 +26,8 @@ La deuda técnica debe evitarse incluso si requiere cambios incompatibles.
 
 <workspace_map>
 
+* SIEMPRE RESPONDE EN ESPAÑOL Y DE FORMA CLARA, CONCISA Y DETALLADA. NO OMITAS NINGÚN DETALLE IMPORTANTE, PERO NO REPITAS INFORMACIÓN Y NO METAS INFORMACIÓN INSERVIBLE.
+
 Consultar primero:
 
 * docs/ARCHITECTURE.md
