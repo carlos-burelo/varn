@@ -495,6 +495,34 @@ pub extern "C" fn jit_build_object_with_shape(
     }
 }
 
+pub extern "C" fn jit_build_record_with_shape(
+    ctx: *mut ExecCtx,
+    closure: *const crate::frame::VmClosure,
+    base: usize,
+    start_reg: usize,
+    shape_idx: usize,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let closure_ref = &*closure;
+        let Some(shape) = closure_ref.proto.resolved_shape(shape_idx) else {
+            return VmValue::null();
+        };
+        let count = shape.property_names.len();
+
+        let required = base + start_reg + count;
+        if ctx_ref.stack.len() < required {
+            ctx_ref.stack.resize(required, VmValue::null());
+        }
+        crate::exec::collections::build_record_with_shape(
+            &ctx_ref.stack,
+            base + start_reg,
+            shape,
+            &mut ctx_ref.heap,
+        )
+    }
+}
+
 pub extern "C" fn jit_range(
     ctx: *mut ExecCtx,
     start_reg: usize,

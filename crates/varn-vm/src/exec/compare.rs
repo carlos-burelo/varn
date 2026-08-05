@@ -72,6 +72,38 @@ pub fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
                 (Some(HeapObj::EnumVariant(ea)), Some(HeapObj::EnumVariant(eb))) => {
                     return ea.variant_tag == eb.variant_tag;
                 }
+                (Some(HeapObj::Array(_)), Some(HeapObj::Array(_))) => return false,
+                (Some(HeapObj::Object(_)), Some(HeapObj::Object(_))) => return false,
+                (Some(HeapObj::Tuple(arr_a)), Some(HeapObj::Tuple(arr_b))) => {
+                    if arr_a.len() != arr_b.len() {
+                        return false;
+                    }
+                    for i in 0..arr_a.len() {
+                        let va = arr_a.get_vm(i).unwrap_or(VmValue::null());
+                        let vb = arr_b.get_vm(i).unwrap_or(VmValue::null());
+                        if !eq(va, vb, heap) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+                (Some(HeapObj::Record(obj_a)), Some(HeapObj::Record(obj_b))) => {
+                    let keys_a: Vec<_> = obj_a.keys().collect();
+                    let keys_b: Vec<_> = obj_b.keys().collect();
+                    if keys_a.len() != keys_b.len() {
+                        return false;
+                    }
+                    for k in &keys_a {
+                        let k_str = k.as_ref();
+                        let (Some(va), Some(vb)) = (obj_a.get(k_str), obj_b.get(k_str)) else {
+                            return false;
+                        };
+                        if !eq(va, vb, heap) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
                 _ => return false,
             }
         }

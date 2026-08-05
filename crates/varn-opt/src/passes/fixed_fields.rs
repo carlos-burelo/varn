@@ -25,22 +25,38 @@ use crate::ssa::ir::{InstKind, SsaFunc, Terminator, Value};
 use crate::ssa::verify::inst_uses;
 
 pub fn run(func: &mut SsaFunc) -> bool {
-    // Object-literal defs: SSA value -> (key, value) pairs in slot order.
-    let mut literals: FxHashMap<u32, Vec<(Rc<str>, Value)>> = FxHashMap::default();
+    // ConstInt definitions in function: SSA value -> i64
+    let mut const_ints: FxHashMap<u32, i64> = FxHashMap::default();
+    // Object/Record-literal defs: SSA value -> (key, value) pairs in slot order.
+    let mut obj_literals: FxHashMap<u32, Vec<(Rc<str>, Value)>> = FxHashMap::default();
+    // Tuple-literal defs: SSA value -> elements in index order.
+    let mut tuple_literals: FxHashMap<u32, Vec<Value>> = FxHashMap::default();
+
     for block in &func.blocks {
         for inst in &block.insts {
-            if let (Some(d), InstKind::BuildObject { pairs }) = (inst.dest, &inst.kind) {
-                // Duplicate keys collapse into one runtime slot; skip them.
-                let mut seen: Vec<_> = pairs.iter().map(|(k, _)| k.clone()).collect();
-                seen.sort();
-                seen.dedup();
-                if seen.len() == pairs.len() {
-                    literals.insert(d.0, pairs.clone());
+            if let Some(d) = inst.dest {
+                match &inst.kind {
+                    InstKind::ConstInt(n) => {
+                        const_ints.insert(d.0, *n);
+                    }
+                    InstKind::BuildObject { pairs } | InstKind::BuildRecord { pairs } => {
+                        let mut seen: Vec<_> = pairs.iter().map(|(k, _)| k.clone()).collect();
+                        seen.sort();
+                        seen.dedup();
+                        if seen.len() == pairs.len() {
+                            obj_literals.insert(d.0, pairs.clone());
+                        }
+                    }
+                    InstKind::BuildTuple { elements } => {
+                        tuple_literals.insert(d.0, elements.clone());
+                    }
+                    _ => {}
                 }
             }
         }
     }
-    if literals.is_empty() {
+
+    if obj_literals.is_empty() && tuple_literals.is_empty() {
         return false;
     }
 
@@ -48,17 +64,31 @@ pub fn run(func: &mut SsaFunc) -> bool {
     for block in &func.blocks {
         for inst in &block.insts {
             if let InstKind::GetProperty { object, .. } = &inst.kind {
-                if literals.contains_key(&object.0) {
+                if obj_literals.contains_key(&object.0) {
                     continue;
                 }
             }
+            if let InstKind::GetIndex { object, index } | InstKind::ArrayGetIndex { object, index } = &inst.kind {
+                if tuple_literals.contains_key(&object.0) {
+                    if let Some(&idx) = const_ints.get(&index.0) {
+                        if let Some(elems) = tuple_literals.get(&object.0) {
+                            if idx >= 0 && (idx as usize) < elems.len() {
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+
             for u in inst_uses(&inst.kind) {
-                literals.remove(&u.0);
+                obj_literals.remove(&u.0);
+                tuple_literals.remove(&u.0);
             }
         }
         match &block.term {
             Terminator::Return(Some(v)) | Terminator::Throw(v) => {
-                literals.remove(&v.0);
+                obj_literals.remove(&v.0);
+                tuple_literals.remove(&v.0);
             }
             Terminator::Branch {
                 cond,
@@ -66,33 +96,44 @@ pub fn run(func: &mut SsaFunc) -> bool {
                 else_args,
                 ..
             } => {
-                literals.remove(&cond.0);
+                obj_literals.remove(&cond.0);
+                tuple_literals.remove(&cond.0);
                 for a in then_args.iter().chain(else_args) {
-                    literals.remove(&a.0);
+                    obj_literals.remove(&a.0);
+                    tuple_literals.remove(&a.0);
                 }
             }
             Terminator::Jump { args, .. } => {
                 for a in args {
-                    literals.remove(&a.0);
+                    obj_literals.remove(&a.0);
+                    tuple_literals.remove(&a.0);
                 }
             }
             _ => {}
         }
     }
-    if literals.is_empty() {
+
+    if obj_literals.is_empty() && tuple_literals.is_empty() {
         return false;
     }
 
-    // Forward each resolvable read to the stored value. The read becomes
-    // dead and DCE removes it; a literal whose reads all forwarded loses
-    // its last use and DCE removes the allocation on the next iteration.
+    // Forward each resolvable read to the stored value.
     let mut forwards: Vec<(Value, Value)> = Vec::new();
     for block in &func.blocks {
         for inst in &block.insts {
             if let (Some(dest), InstKind::GetProperty { object, name }) = (inst.dest, &inst.kind) {
-                if let Some(pairs) = literals.get(&object.0) {
+                if let Some(pairs) = obj_literals.get(&object.0) {
                     if let Some((_, v)) = pairs.iter().find(|(k, _)| k == name) {
                         forwards.push((dest, *v));
+                    }
+                }
+            }
+            if let (Some(dest), InstKind::GetIndex { object, index } | InstKind::ArrayGetIndex { object, index }) = (inst.dest, &inst.kind) {
+                if let Some(elems) = tuple_literals.get(&object.0) {
+                    if let Some(&idx) = const_ints.get(&index.0) {
+                        if idx >= 0 && (idx as usize) < elems.len() {
+                            forwards.push((dest, elems[idx as usize]));
+                        }
                     }
                 }
             }

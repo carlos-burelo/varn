@@ -273,7 +273,10 @@ impl From<RuntimeString> for HeapStr {
 pub enum HeapObj {
     Str(HeapStr),
     Array(VmArray),
+    Tuple(VmArray),
     Object(ObjRef),
+    Record(ObjRef),
+    Buffer(varn_types::VmBuffer),
 
     Module(Rc<ModuleObj>),
 
@@ -307,8 +310,8 @@ impl HeapObj {
         use varn_base::TypeTag;
         match self {
             HeapObj::Str(_) => TypeTag::Str,
-            HeapObj::Array(_) => TypeTag::Array,
-            HeapObj::Object(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) => TypeTag::Object,
+            HeapObj::Array(_) | HeapObj::Tuple(_) => TypeTag::Array,
+            HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) => TypeTag::Object,
             HeapObj::VmClosure(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) => {
                 TypeTag::Function
             }
@@ -326,7 +329,7 @@ impl HeapObj {
             HeapObj::Generator(_) => TypeTag::Generator,
             HeapObj::AsyncQueue(_) => TypeTag::AsyncQueue,
             HeapObj::Spread(_) => TypeTag::Array,
-            HeapObj::VmValue(_) => TypeTag::VmRef,
+            HeapObj::Buffer(_) | HeapObj::VmValue(_) => TypeTag::VmRef,
         }
     }
 }
@@ -842,13 +845,13 @@ impl HeapInner {
                 .ok_or_else(|| RuntimeError::new("invalid heap ref"))?;
             return Ok(match obj {
                 HeapObj::Str(s) => Value::Str(s.to_shared()),
-                HeapObj::Array(a) => {
+                HeapObj::Array(a) | HeapObj::Tuple(a) => {
                     let val_items: Vec<Value> = (0..a.len())
                         .map(|i| self.extract(a.get_vm(i).unwrap()))
                         .collect();
                     Value::Array(varn_types::value::ArrayRef::new(val_items))
                 }
-                HeapObj::Object(o) => Value::Object(o.clone()),
+                HeapObj::Object(o) | HeapObj::Record(o) => Value::Object(o.clone()),
                 HeapObj::VmClosure(c) => Value::VmValue(Box::new(VmClosurePayload(c.clone()))),
                 HeapObj::Class(c) => Value::Class(c.clone()),
                 HeapObj::NativeFn(name, f) => Value::NativeFn(Box::new((*f, *name))),
@@ -868,11 +871,17 @@ impl HeapInner {
                 HeapObj::Spread(inner) => Value::Spread(Box::new(self.extract(*inner))),
                 HeapObj::VmValue(payload) => Value::VmValue(payload.clone_payload()),
                 HeapObj::Module(m) => Value::Module(m.clone()),
+                HeapObj::Buffer(_) => Value::VmValue(Box::new(VmValueRef(nv))),
 
                 HeapObj::FrozenModule(_) => Value::Null,
             });
         }
         Ok(Value::Null)
+    }
+
+    pub fn alloc_vm_buffer(&mut self, buf: varn_types::VmBuffer) -> VmValue {
+        let idx = self.alloc(HeapObj::Buffer(buf));
+        VmValue::from_heap_idx(idx)
     }
 
     pub fn alloc_str(&mut self, s: impl AsRef<str>) -> VmValue {
@@ -1065,6 +1074,11 @@ impl HeapInner {
         VmValue::from_heap_idx(self.alloc(HeapObj::Array(va)))
     }
 
+    pub fn alloc_tuple_vm(&mut self, items: Vec<VmValue>) -> VmValue {
+        let va = VmArray::from_items(items);
+        VmValue::from_heap_idx(self.alloc(HeapObj::Tuple(va)))
+    }
+
     pub fn alloc_array(&mut self, items: Vec<Value>) -> VmValue {
         let vm_items: Vec<VmValue> = items.into_iter().map(|v| self.intern(v)).collect();
         self.alloc_array_vm(vm_items)
@@ -1082,6 +1096,15 @@ impl HeapInner {
     ) -> VmValue {
         let oref = ObjRef::with_shape(Rc::clone(shape), values);
         VmValue::from_heap_idx(self.alloc(HeapObj::Object(oref)))
+    }
+
+    pub fn alloc_record_with_shape(
+        &mut self,
+        shape: &Rc<varn_types::Shape>,
+        values: Vec<VmValue>,
+    ) -> VmValue {
+        let oref = ObjRef::with_shape(Rc::clone(shape), values);
+        VmValue::from_heap_idx(self.alloc(HeapObj::Record(oref)))
     }
     
     pub fn make_int(&mut self, n: i64) -> VmValue {

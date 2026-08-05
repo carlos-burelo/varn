@@ -22,7 +22,7 @@ use crate::value::VmValue;
 #[inline(always)]
 pub(crate) fn array_len(heap: &Heap, arr: VmValue) -> usize {
     if arr.is_heap() {
-        if let Some(HeapObj::Array(a)) = heap.get_by_idx(arr.as_heap_idx()) {
+        if let Some(HeapObj::Array(a) | HeapObj::Tuple(a)) = heap.get_by_idx(arr.as_heap_idx()) {
             return a.len();
         }
     }
@@ -32,7 +32,7 @@ pub(crate) fn array_len(heap: &Heap, arr: VmValue) -> usize {
 #[inline(always)]
 pub(crate) fn array_get(heap: &Heap, arr: VmValue, idx: usize) -> Option<VmValue> {
     if arr.is_heap() {
-        if let Some(HeapObj::Array(a)) = heap.get_by_idx(arr.as_heap_idx()) {
+        if let Some(HeapObj::Array(a) | HeapObj::Tuple(a)) = heap.get_by_idx(arr.as_heap_idx()) {
             return a.get_vm(idx);
         }
     }
@@ -75,7 +75,7 @@ pub(crate) fn array_pop(heap: &Heap, arr: VmValue) -> Option<VmValue> {
 #[inline(always)]
 pub(crate) fn array_for_each(heap: &Heap, arr: VmValue, f: &mut dyn FnMut(VmValue, usize)) {
     if arr.is_heap() {
-        if let Some(HeapObj::Array(a)) = heap.get_by_idx(arr.as_heap_idx()) {
+        if let Some(HeapObj::Array(a) | HeapObj::Tuple(a)) = heap.get_by_idx(arr.as_heap_idx()) {
             for i in 0..a.len() {
                 f(a.get_vm(i).unwrap(), i);
             }

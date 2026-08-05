@@ -144,6 +144,7 @@ pub fn build_jit_helpers() -> varn_jit::JitHelpers {
         load_module_slot: ctx::jit_load_module_slot as usize,
         store_module_slot: ctx::jit_store_module_slot as usize,
         build_object_with_shape: ctx::jit_build_object_with_shape as usize,
+        build_record_with_shape: ctx::jit_build_record_with_shape as usize,
         range: ctx::jit_range as usize,
         assert_not_null: ctx::jit_assert_not_null as usize,
         close_upvalue: ctx::jit_close_upvalue as usize,

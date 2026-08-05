@@ -240,7 +240,8 @@ impl ExecCtx {
                 self.exec_array_set_index(obj, idx, val)?;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
-            OpCode::BuildArray => {
+            OpCode::BuildArray | OpCode::BuildTuple => {
+                let is_tuple = op == OpCode::BuildTuple;
                 let w1 = code[*ip];
                 *ip += 1;
                 let w2 = code[*ip];
@@ -250,9 +251,13 @@ impl ExecCtx {
                 let mut elems = Vec::with_capacity(count);
                 for i in 0..count {
                     let nv = self.stack[base + start_reg + i];
-                    elems.push(self.heap.extract(nv));
+                    elems.push(nv);
                 }
-                self.stack[base + dest] = self.heap.alloc_array(elems);
+                self.stack[base + dest] = if is_tuple {
+                    self.heap.alloc_tuple_vm(elems)
+                } else {
+                    self.heap.alloc_array_vm(elems)
+                };
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::BuildObject => {
@@ -283,14 +288,24 @@ impl ExecCtx {
                 self.stack[base + dest] = obj_nv;
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
-            OpCode::BuildObjectWithShape => {
+            OpCode::BuildObjectWithShape | OpCode::BuildRecord => {
+                let is_record = op == OpCode::BuildRecord;
                 let w1 = code[*ip];
                 *ip += 1;
                 let shape_idx = code[*ip] as usize;
                 *ip += 1;
                 let (dest, start_reg) = (hi(w1), lo(w1));
-                self.stack[base + dest] =
-                    self.exec_build_object_with_shape(base, start_reg, shape_idx, closure)?;
+                let shape = closure.proto.resolved_shape(shape_idx).expect("invalid shape");
+                let count = shape.property_names.len();
+                let mut values = Vec::with_capacity(count);
+                for i in 0..count {
+                    values.push(self.stack[base + start_reg + i]);
+                }
+                self.stack[base + dest] = if is_record {
+                    self.heap.alloc_record_with_shape(&shape, values)
+                } else {
+                    self.heap.alloc_object_with_shape(&shape, values)
+                };
                 Ok(Some(ObjectFlow::ContinueInstruction))
             }
             OpCode::ObjectRest => {

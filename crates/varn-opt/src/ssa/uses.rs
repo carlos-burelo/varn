@@ -129,11 +129,11 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
             f(*object);
             args.iter().for_each(|a| f(*a));
         }
-        BuildArray { elements } | BuildStr { parts: elements } => {
+        BuildArray { elements } | BuildTuple { elements } | BuildStr { parts: elements } => {
             elements.iter().for_each(|e| f(*e))
         }
         MakeClosure { upvalues, .. } => upvalues.iter().for_each(|u| f(*u)),
-        BuildObject { pairs } => pairs.iter().for_each(|(_, v)| f(*v)),
+        BuildObject { pairs } | BuildRecord { pairs } => pairs.iter().for_each(|(_, v)| f(*v)),
         CallSpread { callee, args } => {
             f(*callee);
             args.iter().for_each(|(a, _)| f(*a));
@@ -251,9 +251,11 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
             f(object);
             args.iter_mut().for_each(f);
         }
-        BuildArray { elements } | BuildStr { parts: elements } => elements.iter_mut().for_each(f),
+        BuildArray { elements } | BuildTuple { elements } | BuildStr { parts: elements } => {
+            elements.iter_mut().for_each(f)
+        }
         MakeClosure { upvalues, .. } => upvalues.iter_mut().for_each(f),
-        BuildObject { pairs } => pairs.iter_mut().for_each(|(_, v)| f(v)),
+        BuildObject { pairs } | BuildRecord { pairs } => pairs.iter_mut().for_each(|(_, v)| f(v)),
         CallSpread { callee, args } => {
             f(callee);
             args.iter_mut().for_each(|(a, _)| f(a));

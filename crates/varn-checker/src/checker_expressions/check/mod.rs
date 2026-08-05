@@ -404,7 +404,14 @@ impl Checker {
 
             ExprKind::Array { elements } => self.check_array_with_context(elements, bind),
 
+            ExprKind::Tuple { elements } => {
+                for e in elements {
+                    self.check_expr(e, bind);
+                }
+            }
+
             ExprKind::Object { properties } => self.check_object_with_context(properties, bind),
+            ExprKind::Record { properties } => self.check_object_with_context(properties, bind),
 
             ExprKind::Template { parts } => {
                 for p in parts {

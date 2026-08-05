@@ -301,14 +301,14 @@ fn walk_expr(e: &mut HirExpr, n: bool, act: &mut impl FnMut(&mut HirBinding, boo
             walk_expr(cons, n, act);
             walk_expr(alt, n, act);
         }
-        Array(els) => {
+        Array(els) | Tuple(els) => {
             for el in els {
                 if let HirArrayEl::Expr(x) | HirArrayEl::Spread(x) = el {
                     walk_expr(x, n, act);
                 }
             }
         }
-        Object { properties } => {
+        Object { properties } | Record { properties } => {
             for p in properties {
                 match p {
                     HirObjectProp::Property { key, value } => {

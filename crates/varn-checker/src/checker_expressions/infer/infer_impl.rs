@@ -130,6 +130,30 @@ impl Checker {
                 ..
             } => self.infer_arrow_type(expr, params, return_type, body, bind),
             ExprKind::Object { properties } => self.infer_object_type(properties, bind, expr),
+            ExprKind::Tuple { elements } => {
+                let elem_tys: Vec<Type> = elements.iter().map(|e| self.infer_type(e, bind)).collect();
+                Type(TypeKind::Tuple(elem_tys), false)
+            }
+            ExprKind::Record { properties } => {
+                let mut members = Vec::new();
+                for prop in properties {
+                    if let varn_core::ast::ObjectProp::Property { key, value, .. } = prop {
+                        let ty = self.infer_type(value, bind);
+                        let name: std::rc::Rc<str> = match key {
+                            varn_core::ast::PropKey::Identifier(s) | varn_core::ast::PropKey::Str(s) => std::rc::Rc::from(s.as_str()),
+                            varn_core::ast::PropKey::Int(n) => std::rc::Rc::from(n.to_string().as_str()),
+                            varn_core::ast::PropKey::Computed(_) => std::rc::Rc::from("<computed>"),
+                        };
+                        members.push(crate::types::ObjectTypeMember::Property {
+                            name,
+                            ty,
+                            optional: false,
+                            readonly: true,
+                        });
+                    }
+                }
+                Type(TypeKind::Object(members), false)
+            }
             ExprKind::As {
                 expression,
                 type_ann,

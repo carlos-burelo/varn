@@ -92,7 +92,9 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
 
         // Allocation with no observable effect.
         BuildArray { .. }
+        | BuildTuple { .. }
         | BuildObject { .. }
+        | BuildRecord { .. }
         | MakeClosure { .. }
         | MakeEnumVariant { .. }
         | Range { .. } => true,

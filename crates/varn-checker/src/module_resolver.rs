@@ -741,16 +741,21 @@ fn collect_exports(
                 alias: Some(ns),
                 ..
             } => {
-                let src_exports = if is_known_module(source) {
-                    resolve_stdlib_module_exports_ref(source)
+                let src_abs = if is_known_module(source) {
+                    source.to_string()
                 } else {
                     let src_abs = resolve_relative(base_dir, source);
                     record_dep(abs_path, &src_abs);
+                    src_abs
+                };
+                let src_exports = if is_known_module(source) {
+                    resolve_stdlib_module_exports_ref(source)
+                } else {
                     resolve_module_exports_ref(&src_abs, visiting)
                 };
                 let mut ns_sym = Symbol::new(SymbolKind::Namespace, ns.clone(), 0);
-                ns_sym.ty = Some(Type::named(ns.to_string()));
-                ns_sym.origin_module = Some(abs_path.to_owned().into());
+                ns_sym.ty = Some(Type::named_with_origin("*", Some(src_abs.clone())));
+                ns_sym.origin_module = Some(src_abs.into());
                 for (sub_name, sub_sym) in src_exports.iter() {
                     let mut s = sub_sym.clone();
                     s.re_export_path.push(abs_path.to_owned().into());
@@ -809,14 +814,15 @@ fn lookup_global<'a>(bind: &'a BindResult, name: &str) -> Option<&'a Symbol> {
 }
 
 fn resolve_relative(base_dir: &Path, specifier: &str) -> String {
-    match varn_core::ImportSpecifier::parse(specifier) {
+    let raw = match varn_core::ImportSpecifier::parse(specifier) {
         varn_core::ImportSpecifier::Package(_) => {
             resolve_package_specifier_path(base_dir, specifier)
                 .unwrap_or_else(|| base_dir.join(specifier).to_string_lossy().into_owned())
         }
         _ => resolve_specifier_path(base_dir, specifier)
             .unwrap_or_else(|| base_dir.join(specifier).to_string_lossy().into_owned()),
-    }
+    };
+    varn_modules::canonical_or_original(Path::new(&raw))
 }
 
 #[cfg(test)]

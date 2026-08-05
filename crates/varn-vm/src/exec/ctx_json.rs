@@ -165,6 +165,13 @@ fn write_value_json(val: &Value, ctx: &ExecCtx, out: &mut String) {
 fn write_json_str(s: &str, out: &mut String) {
     out.push('"');
     let bytes = s.as_bytes();
+    // Fast path: for strings without quotes, backslashes or control characters (< 0x20),
+    // append directly in one operation without per-byte branch scanning.
+    if !bytes.iter().any(|&b| b == b'"' || b == b'\\' || b < 0x20) {
+        out.push_str(s);
+        out.push('"');
+        return;
+    }
     let mut start = 0;
     for (i, &b) in bytes.iter().enumerate() {
         let escaped = match b {
@@ -278,13 +285,19 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
             values.push(val);
         }
 
-        let cached = JSON_SHAPE_CACHE.with(|c| c.borrow().clone());
-        if let Some((ref cached_keys, ref cached_shape)) = cached {
-            let matches = cached_keys.len() == keys.len()
-                && cached_keys.iter().zip(keys.iter()).all(|(ck, k)| ck.as_str() == k.as_ref());
-            if matches {
-                return Ok(self.0.alloc_object_with_shape(cached_shape, values));
+        let shape_opt = JSON_SHAPE_CACHE.with(|c| {
+            let borrow = c.borrow();
+            if let Some((ref cached_keys, ref cached_shape)) = *borrow {
+                if cached_keys.len() == keys.len()
+                    && cached_keys.iter().zip(keys.iter()).all(|(ck, k)| ck.as_str() == k.as_ref())
+                {
+                    return Some(std::rc::Rc::clone(cached_shape));
+                }
             }
+            None
+        });
+        if let Some(cached_shape) = shape_opt {
+            return Ok(self.0.alloc_object_with_shape(&cached_shape, values));
         }
 
         let owned_keys: Vec<String> = keys.iter().map(|k| k.as_ref().to_string()).collect();

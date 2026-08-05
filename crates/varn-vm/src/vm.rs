@@ -448,7 +448,9 @@ fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore
             | OpCode::StoreGlobalIdx
             | OpCode::DefineGlobalIdx
             | OpCode::BuildArray
+            | OpCode::BuildTuple
             | OpCode::BuildObjectWithShape
+            | OpCode::BuildRecord
             | OpCode::GetPropertyMaybe
             | OpCode::GetSymbol
             | OpCode::DeclareField

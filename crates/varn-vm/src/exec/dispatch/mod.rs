@@ -519,8 +519,10 @@ impl ExecCtx {
                     | OpCode::ArrayGetIndex
                     | OpCode::ArraySetIndex
                     | OpCode::BuildArray
+                    | OpCode::BuildTuple
                     | OpCode::BuildObject
                     | OpCode::BuildObjectWithShape
+                    | OpCode::BuildRecord
                     | OpCode::ObjectRest
                     | OpCode::ObjectKeys
                     | OpCode::ObjectMerge

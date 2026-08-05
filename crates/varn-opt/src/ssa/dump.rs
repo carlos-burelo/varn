@@ -119,6 +119,7 @@ fn inst_kind(kind: &InstKind) -> String {
         }
         InstKind::IsNull { operand } => format!("isnull {}", val(*operand)),
         InstKind::BuildArray { elements } => format!("array{}", args_list(elements)),
+        InstKind::BuildTuple { elements } => format!("tuple{}", args_list(elements)),
         InstKind::BuildObject { pairs } => {
             let inner = pairs
                 .iter()
@@ -126,6 +127,14 @@ fn inst_kind(kind: &InstKind) -> String {
                 .collect::<Vec<_>>()
                 .join(", ");
             format!("object {{{inner}}}")
+        }
+        InstKind::BuildRecord { pairs } => {
+            let inner = pairs
+                .iter()
+                .map(|(k, v)| format!("{k}: {}", val(*v)))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("record {{{inner}}}")
         }
         InstKind::ToString { operand } => format!("tostring {}", val(*operand)),
         InstKind::BuildStr { parts } => format!("buildstr{}", args_list(parts)),

@@ -1040,12 +1040,16 @@ fn emit_inst(
             chunk.write(Chunk::pack(elements.len() as u8, 0), LINE);
         }
 
+        InstKind::BuildTuple { elements } => {
+            for (i, e) in elements.iter().enumerate() {
+                chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[e.0 as usize], LINE);
+            }
+            chunk.emit(OpCode::BuildTuple, LINE);
+            chunk.write(Chunk::pack(d, call_base), LINE);
+            chunk.write(Chunk::pack(elements.len() as u8, 0), LINE);
+        }
+
         InstKind::BuildObject { pairs } => {
-            // Always take the shape path: the keys are compile-time constants,
-            // and the generic BuildObject pays a string materialisation plus a
-            // shape transition per key on every allocation. If the values are
-            // not already contiguous, stage them into the call area first —
-            // the same convention BuildArray and MethodCall use.
             let count = pairs.len();
             let mut is_contiguous = count > 0;
             let mut start_reg = call_base;
@@ -1068,6 +1072,33 @@ fn emit_inst(
             let keys = pairs.iter().map(|(k, _)| k.clone()).collect();
             let shape_idx = chunk.add_shape(keys);
             chunk.emit(OpCode::BuildObjectWithShape, LINE);
+            chunk.write(Chunk::pack(d, start_reg), LINE);
+            chunk.write(shape_idx, LINE);
+        }
+
+        InstKind::BuildRecord { pairs } => {
+            let count = pairs.len();
+            let mut is_contiguous = count > 0;
+            let mut start_reg = call_base;
+            if count > 0 {
+                let first = reg[pairs[0].1 .0 as usize];
+                for (i, (_, v)) in pairs.iter().enumerate() {
+                    if reg[v.0 as usize] != first + i as u8 {
+                        is_contiguous = false;
+                        break;
+                    }
+                }
+                if is_contiguous {
+                    start_reg = first;
+                } else {
+                    for (i, (_, v)) in pairs.iter().enumerate() {
+                        chunk.emit_rr(OpCode::Move, call_base + i as u8, reg[v.0 as usize], LINE);
+                    }
+                }
+            }
+            let keys = pairs.iter().map(|(k, _)| k.clone()).collect();
+            let shape_idx = chunk.add_shape(keys);
+            chunk.emit(OpCode::BuildRecord, LINE);
             chunk.write(Chunk::pack(d, start_reg), LINE);
             chunk.write(shape_idx, LINE);
         }

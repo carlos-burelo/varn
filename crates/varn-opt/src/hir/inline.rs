@@ -225,11 +225,11 @@ fn body_is_inlinable(e: &HirExpr) -> bool {
         Conditional { test, cons, alt } => {
             body_is_inlinable(test) && body_is_inlinable(cons) && body_is_inlinable(alt)
         }
-        Array(els) => els.iter().all(|el| match el {
+        Array(els) | Tuple(els) => els.iter().all(|el| match el {
             HirArrayEl::Expr(x) | HirArrayEl::Spread(x) => body_is_inlinable(x),
             HirArrayEl::Hole => true,
         }),
-        Object { properties } => properties.iter().all(|p| match p {
+        Object { properties } | Record { properties } => properties.iter().all(|p| match p {
             HirObjectProp::Property { key, value } => {
                 let key_ok = match key {
                     HirPropKey::Static(_) => true,
@@ -374,14 +374,14 @@ pub(crate) fn walk_exprs<'a>(e: &'a HirExpr, f: &mut impl FnMut(&'a HirExpr)) {
             walk_exprs(cons, f);
             walk_exprs(alt, f);
         }
-        Array(els) => {
+        Array(els) | Tuple(els) => {
             for el in els {
                 if let HirArrayEl::Expr(x) | HirArrayEl::Spread(x) = el {
                     walk_exprs(x, f);
                 }
             }
         }
-        Object { properties } => {
+        Object { properties } | Record { properties } => {
             for p in properties {
                 match p {
                     HirObjectProp::Property { key, value } => {
@@ -703,14 +703,14 @@ fn for_each_child_expr_mut(e: &mut HirExpr, f: &mut impl FnMut(&mut HirExpr)) {
             f(cons);
             f(alt);
         }
-        Array(els) => {
+        Array(els) | Tuple(els) => {
             for el in els {
                 if let HirArrayEl::Expr(x) | HirArrayEl::Spread(x) = el {
                     f(x);
                 }
             }
         }
-        Object { properties } => {
+        Object { properties } | Record { properties } => {
             for p in properties {
                 match p {
                     HirObjectProp::Property { key, value } => {

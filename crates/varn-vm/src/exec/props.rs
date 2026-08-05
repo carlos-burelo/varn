@@ -127,7 +127,7 @@ pub fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmResult<V
         }
 
         let found = match heap.get(idx) {
-            Some(HeapObj::Object(o)) => {
+            Some(HeapObj::Object(o)) | Some(HeapObj::Record(o)) => {
                 o.field_at(slot).map(FoundField::Vm)
             }
             Some(HeapObj::EnumVariant(ev)) => {
@@ -233,12 +233,10 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
     }
     let idx = obj.as_heap_idx();
     match heap.get(idx).cloned() {
-        Some(HeapObj::Object(o)) => o.get(key),
-        // O(1) array length. Without this, `arr.length` falls through to
-        // `heap.extract(obj)` in `resolve_property`, which clones the entire
-        // array's Vec just to read its length — making `arr.length` O(n) and any
-        // loop over it O(n²). (`heap.get(..).cloned()` only bumps the array's Rc.)
-        Some(HeapObj::Array(a)) if key == "length" => Some(VmValue::from_int(a.len() as i64)),
+        Some(HeapObj::Object(o)) | Some(HeapObj::Record(o)) => o.get(key),
+        Some(HeapObj::Array(a)) | Some(HeapObj::Tuple(a)) if key == "length" => {
+            Some(VmValue::from_int(a.len() as i64))
+        }
         _ => None,
     }
 }

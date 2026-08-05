@@ -479,6 +479,11 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w2 = w!();
                 format!("r{} = [r{}..+{}]", hi(w1), lo(w1), hi(w2))
             }
+            OpCode::BuildTuple => {
+                let w1 = w!();
+                let w2 = w!();
+                format!("r{} = #[r{}..+{}]", hi(w1), lo(w1), hi(w2))
+            }
             OpCode::BuildObject => {
                 let w1 = w!();
                 let count = lo(w1);
@@ -494,6 +499,11 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                 let w1 = w!();
                 let shape_idx = w!();
                 format!("r{} = shape[{}] vals@r{}", hi(w1), shape_idx, lo(w1))
+            }
+            OpCode::BuildRecord => {
+                let w1 = w!();
+                let shape_idx = w!();
+                format!("r{} = record_shape[{}] vals@r{}", hi(w1), shape_idx, lo(w1))
             }
             OpCode::ObjectRest => {
                 let w1 = w!();

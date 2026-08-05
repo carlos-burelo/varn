@@ -1,0 +1,40 @@
+// Test suite for Tuples #[...] and Records #{...} with deep structural equality ==
+
+// 1. Tuple creation and element access
+let t1 = #[1, "hello", true]
+assert("tuple elem 0", t1[0] == 1)
+assert("tuple elem 1", t1[1] == "hello")
+assert("tuple elem 2", t1[2] == true)
+assert("tuple length", t1.length == 3)
+
+// 2. Tuple structural equality (==)
+let t2 = #[1, "hello", true]
+let t3 = #[1, "hello", false]
+assert("tuple eq true", t1 == t2)
+assert("tuple eq false", t1 != t3)
+
+// 3. Mutable array referential equality (==) vs Tuple structural equality
+let a1 = [1, 2]
+let a2 = [1, 2]
+assert("array ref eq false", a1 != a2)
+
+// 4. Record creation and field access
+let r1 = #{ name: "Varn", version: 1 }
+assert("record field name", r1.name == "Varn")
+assert("record field version", r1.version == 1)
+assert("record index name", r1["name"] == "Varn")
+
+// 5. Record structural equality (==)
+let r2 = #{ name: "Varn", version: 1 }
+let r3 = #{ name: "Varn", version: 2 }
+assert("record eq true", r1 == r2)
+assert("record eq false", r1 != r3)
+
+// 6. Nested Tuples and Records deep equality
+let nested1 = #{ point: #[10, 20], meta: #{ active: true } }
+let nested2 = #{ point: #[10, 20], meta: #{ active: true } }
+let nested3 = #{ point: #[10, 99], meta: #{ active: true } }
+assert("nested eq true", nested1 == nested2)
+assert("nested eq false", nested1 != nested3)
+
+print("[PASSED] 69. Tuples & Records structural equality")

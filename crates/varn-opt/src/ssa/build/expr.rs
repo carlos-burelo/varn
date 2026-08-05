@@ -365,6 +365,20 @@ impl Builder {
                 Ok(self.emit(InstKind::BuildArray { elements: vals }, HirType::Ref))
             }
 
+            HirExpr::Tuple(els) => {
+                let mut vals = Vec::with_capacity(els.len());
+                for el in els {
+                    match el {
+                        HirArrayEl::Expr(e) => vals.push(self.lower_expr(e)?),
+                        HirArrayEl::Hole => {
+                            vals.push(self.emit(InstKind::ConstNull, HirType::Dynamic))
+                        }
+                        HirArrayEl::Spread(_) => {}
+                    }
+                }
+                Ok(self.emit(InstKind::BuildTuple { elements: vals }, HirType::Ref))
+            }
+
             HirExpr::Object { properties } => {
                 let has_computed_or_method = properties.iter().any(|p| match p {
                     HirObjectProp::Property {
@@ -470,6 +484,21 @@ impl Builder {
                     }
                 }
                 Ok(self.emit(InstKind::BuildObject { pairs }, HirType::Ref))
+            }
+
+            HirExpr::Record { properties } => {
+                let mut pairs = Vec::with_capacity(properties.len());
+                for prop in properties {
+                    if let HirObjectProp::Property {
+                        key: HirPropKey::Static(k),
+                        value,
+                    } = prop
+                    {
+                        let v = self.lower_expr(value)?;
+                        pairs.push((k.clone(), v));
+                    }
+                }
+                Ok(self.emit(InstKind::BuildRecord { pairs }, HirType::Ref))
             }
 
             HirExpr::Template(parts) => {

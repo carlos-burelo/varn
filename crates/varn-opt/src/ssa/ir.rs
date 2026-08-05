@@ -185,7 +185,15 @@ pub enum InstKind {
         elements: Vec<Value>,
     },
 
+    BuildTuple {
+        elements: Vec<Value>,
+    },
+
     BuildObject {
+        pairs: Vec<(Rc<str>, Value)>,
+    },
+
+    BuildRecord {
         pairs: Vec<(Rc<str>, Value)>,
     },
 

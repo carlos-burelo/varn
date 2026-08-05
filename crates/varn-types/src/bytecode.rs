@@ -197,7 +197,7 @@ pub fn decode(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<In
             }
         }
 
-        OpCode::BuildObjectWithShape => {
+        OpCode::BuildObjectWithShape | OpCode::BuildRecord => {
             let start = lo1 as usize;
             let shape_idx = w2 as usize;
             let count = match constants.get(shape_idx) {
@@ -218,7 +218,7 @@ pub fn decode(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<In
             }
         }
 
-        OpCode::BuildArray => {
+        OpCode::BuildArray | OpCode::BuildTuple => {
             let start = lo1 as usize;
             let count = hi2 as usize;
             let dest = hi1;

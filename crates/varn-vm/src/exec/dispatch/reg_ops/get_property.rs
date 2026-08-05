@@ -34,7 +34,7 @@ impl ExecCtx {
         let obj_is_heap_object = obj.is_heap()
             && matches!(
                 self.heap.get(obj.as_heap_idx()),
-                Some(crate::heap::HeapObj::Object(_))
+                Some(crate::heap::HeapObj::Object(_) | crate::heap::HeapObj::Record(_))
             );
         if obj_is_heap_object && cs_idx < cache_len && !is_megamorphic {
             let mut found_slot_val: Option<VmValue> = None;
@@ -54,7 +54,7 @@ impl ExecCtx {
 
                     if entry.is_class == 1 {
                         if obj.is_heap() {
-                            if let Some(crate::heap::HeapObj::Object(o)) =
+                            if let Some(crate::heap::HeapObj::Object(o) | crate::heap::HeapObj::Record(o)) =
                                 self.heap.get(obj.as_heap_idx())
                             {
                                 let guard = o.read();
@@ -178,7 +178,9 @@ impl ExecCtx {
 
         if cs_idx < cache_len && !is_megamorphic {
             if obj.is_heap() {
-                if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
+                if let Some(crate::heap::HeapObj::Object(o) | crate::heap::HeapObj::Record(o)) =
+                    self.heap.get(obj.as_heap_idx())
+                {
                     let guard = o.read();
                     if let Some(&slot) = guard.shape().property_names.get(name.as_ref()) {
                         if slot < guard.slot_count() {

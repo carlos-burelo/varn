@@ -192,6 +192,16 @@ impl<'a> IdAssigner<'a> {
                     self.assign_object_prop(prop);
                 }
             }
+            ExprKind::Tuple { elements } => {
+                for el in elements {
+                    self.assign_expr(el);
+                }
+            }
+            ExprKind::Record { properties } => {
+                for prop in properties {
+                    self.assign_object_prop(prop);
+                }
+            }
             ExprKind::Unary { operand, .. } => {
                 self.assign_expr(operand);
             }

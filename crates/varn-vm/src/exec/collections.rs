@@ -33,6 +33,31 @@ pub fn build_object_with_shape(
     VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref)))
 }
 
+pub fn build_record_with_shape(
+    stack: &[VmValue],
+    values_start: usize,
+    shape: Rc<varn_types::Shape>,
+    heap: &mut Heap,
+) -> VmValue {
+    let count = shape.property_names.len();
+
+    for i in 0..count {
+        let val_nv = stack[values_start + i];
+        if val_nv.is_heap() {
+            if let Some(crate::heap::HeapObj::VmClosure(nc)) = heap.get(val_nv.as_heap_idx()) {
+                let nc = nc.clone();
+                for uv in &nc.upvalues {
+                    uv.close(stack);
+                }
+            }
+        }
+    }
+
+    let values = stack[values_start..values_start + count].to_vec();
+    let oref = ObjRef::with_shape(shape, values);
+    VmValue::from_heap_idx(heap.alloc(HeapObj::Record(oref)))
+}
+
 pub fn build_array(stack: &mut Vec<VmValue>, count: usize, heap: &mut Heap) -> VmValue {
     let len = stack.len();
     let start = len.saturating_sub(count);
@@ -72,12 +97,13 @@ pub fn build_object(stack: &mut Vec<VmValue>, count: usize, heap: &mut Heap) -> 
 #[inline(always)]
 pub fn array_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
-        if let Some(HeapObj::Array(a)) = heap.get(obj.as_heap_idx()) {
-            let idx = if heap.is_int(key) {
-                heap.as_int(key) as usize
-            } else {
-                heap.to_f64_val(key) as usize
-            };
+        let heap_idx = obj.as_heap_idx();
+        let idx = if heap.is_int(key) {
+            heap.as_int(key) as usize
+        } else {
+            heap.to_f64_val(key) as usize
+        };
+        if let Some(HeapObj::Array(a) | HeapObj::Tuple(a)) = heap.get(heap_idx) {
             let val = a.get_vm(idx).unwrap_or(VmValue::null());
             return Ok(val);
         }
@@ -94,6 +120,9 @@ pub fn array_set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Heap
         } else {
             heap.to_f64_val(key) as usize
         };
+        if let Some(HeapObj::Tuple(_)) = heap.get(heap_idx) {
+            return Err(RuntimeError::new("TypeError: Cannot mutate tuple"));
+        }
         if let Some(HeapObj::Array(a)) = heap.get_mut(heap_idx) {
             let len = a.len();
             if idx < len {
@@ -115,7 +144,7 @@ pub fn array_set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Heap
 
 pub fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
-        if let Some(HeapObj::Array(a)) = heap.get(obj.as_heap_idx()) {
+        if let Some(HeapObj::Array(a) | HeapObj::Tuple(a)) = heap.get(obj.as_heap_idx()) {
             let idx = heap.as_int(key);
             let val = a.get_vm(idx as usize).unwrap_or(VmValue::null());
             return Ok(val);
@@ -134,7 +163,7 @@ pub fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult<VmValu
         return Err(RuntimeError::new("OpGetIndex: not indexable"));
     }
     match heap.get(obj.as_heap_idx()) {
-        Some(HeapObj::Object(o)) => {
+        Some(HeapObj::Object(o) | HeapObj::Record(o)) => {
             let key_s = heap.str_repr(key);
             Ok(o.borrow().get_field_nv(&key_s).unwrap_or(VmValue::null()))
         }

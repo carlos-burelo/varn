@@ -347,6 +347,7 @@ pub enum HirExpr {
     },
 
     Array(Vec<HirArrayEl>),
+    Tuple(Vec<HirArrayEl>),
 
     MemberMaybe {
         object: Box<HirExpr>,
@@ -365,6 +366,9 @@ pub enum HirExpr {
     },
 
     Object {
+        properties: Vec<HirObjectProp>,
+    },
+    Record {
         properties: Vec<HirObjectProp>,
     },
 

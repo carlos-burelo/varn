@@ -195,7 +195,12 @@ impl super::Binder {
                     }
                 }
             }
-            ExprKind::Object { properties } => {
+            ExprKind::Tuple { elements } => {
+                for e in elements {
+                    self.bind_expr(e);
+                }
+            }
+            ExprKind::Object { properties } | ExprKind::Record { properties } => {
                 for prop in properties {
                     match prop {
                         ObjectProp::Property { value, .. } => self.bind_expr(value),

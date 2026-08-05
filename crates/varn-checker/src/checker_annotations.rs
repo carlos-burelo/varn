@@ -1010,6 +1010,11 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
                 }
             }
         }
+        ExprKind::Tuple { elements } => {
+            for e in elements {
+                annotate_expr(e, ann, ctx);
+            }
+        }
         // Constructor arguments were never visited — the same hole the
         // `Template` arm below documents. Every expression inside
         // `new User(i, "User_" + i, (i % 60) + 10, ...)` lost ALL of its
@@ -1038,7 +1043,8 @@ fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) 
         }
         // Object-literal property values: `{ total: qty * price }` has the
         // same problem constructor arguments did.
-        ExprKind::Object { properties } => {
+        ExprKind::Object { properties }
+        | ExprKind::Record { properties } => {
             for p in properties {
                 if let varn_core::ast::ObjectProp::Property { value, .. } = p {
                     annotate_expr(value, ann, ctx);

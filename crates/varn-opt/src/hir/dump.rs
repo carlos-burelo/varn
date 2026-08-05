@@ -585,6 +585,17 @@ fn dump_expr(expr: &HirExpr) -> String {
                 .collect();
             format!("[{}]", items.join(", "))
         }
+        HirExpr::Tuple(els) => {
+            let items: Vec<String> = els
+                .iter()
+                .map(|el| match el {
+                    HirArrayEl::Expr(e) => dump_expr(e),
+                    HirArrayEl::Spread(e) => format!("...{}", dump_expr(e)),
+                    HirArrayEl::Hole => format!("{DIM}hole{R}"),
+                })
+                .collect();
+            format!("#[{}]", items.join(", "))
+        }
         HirExpr::Object { properties } => {
             let props: Vec<String> = properties
                 .iter()
@@ -599,6 +610,21 @@ fn dump_expr(expr: &HirExpr) -> String {
                 })
                 .collect();
             format!("{{{}}}", props.join(", "))
+        }
+        HirExpr::Record { properties } => {
+            let props: Vec<String> = properties
+                .iter()
+                .map(|p| match p {
+                    HirObjectProp::Property { key, value } => {
+                        format!("{}: {}", dump_prop_key(key), dump_expr(value))
+                    }
+                    HirObjectProp::Method { key, .. } => {
+                        format!("{DIM}method:{R} {}", dump_prop_key(key))
+                    }
+                    HirObjectProp::Spread(e) => format!("...{}", dump_expr(e)),
+                })
+                .collect();
+            format!("#{{{}}}", props.join(", "))
         }
         HirExpr::ObjectRest { object, skip_keys } => {
             format!(

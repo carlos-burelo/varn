@@ -94,7 +94,7 @@ fn collect_consecutive_blocks(code: &[u16], constants: &[PoolEntry]) -> Vec<(u8,
         }
         if let Some(op) = OpCode::from_u16(code[offset]) {
             match op {
-                OpCode::BuildArray => {
+                OpCode::BuildArray | OpCode::BuildTuple => {
                     let w1 = if offset + 1 < code.len() { code[offset + 1] } else { 0 };
                     let w2 = if offset + 2 < code.len() { code[offset + 2] } else { 0 };
                     let start = (w1 & 0xff) as u8;
@@ -103,7 +103,7 @@ fn collect_consecutive_blocks(code: &[u16], constants: &[PoolEntry]) -> Vec<(u8,
                         blocks.push((start, count));
                     }
                 }
-                OpCode::BuildObjectWithShape => {
+                OpCode::BuildObjectWithShape | OpCode::BuildRecord => {
                     let w1 = if offset + 1 < code.len() { code[offset + 1] } else { 0 };
                     let w2 = if offset + 2 < code.len() { code[offset + 2] } else { 0 };
                     let start = (w1 & 0xff) as u8;
@@ -626,11 +626,11 @@ fn remap_bytecode(code: &mut Vec<u16>, constants: &[PoolEntry], mapping: &HashMa
                     }
                 }
 
-                OpCode::BuildObjectWithShape => {
+                OpCode::BuildObjectWithShape | OpCode::BuildRecord => {
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
                 }
 
-                OpCode::BuildArray => {
+                OpCode::BuildArray | OpCode::BuildTuple => {
                     let start = lo1 as usize;
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, start as u8));
                 }
@@ -883,7 +883,7 @@ fn verify_build_array_constraints(
         };
 
         if let Some(op) = OpCode::from_u16(code[offset]) {
-            if matches!(op, OpCode::BuildArray) {
+            if matches!(op, OpCode::BuildArray | OpCode::BuildTuple) {
                 let w1 = if offset + 1 < code.len() {
                     code[offset + 1]
                 } else {
@@ -927,7 +927,7 @@ fn verify_build_object_with_shape_constraints(
         };
 
         if let Some(op) = OpCode::from_u16(code[offset]) {
-            if matches!(op, OpCode::BuildObjectWithShape) {
+            if matches!(op, OpCode::BuildObjectWithShape | OpCode::BuildRecord) {
                 let w1 = if offset + 1 < code.len() {
                     code[offset + 1]
                 } else {

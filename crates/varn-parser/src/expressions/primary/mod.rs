@@ -179,6 +179,27 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
         TokenKind::Class => parse_class_expr(s),
         TokenKind::Match => parse_match_expr(s),
 
+        TokenKind::Hash => {
+            if s.peek_kind(1) == TokenKind::LBracket {
+                s.advance();
+                s.advance();
+                let mut elements = vec![];
+                while !s.check(TokenKind::RBracket) && !s.is_eof() {
+                    elements.push(super::parse_assign_expr(s)?);
+                    s.eat(TokenKind::Comma);
+                }
+                s.expect(TokenKind::RBracket)?;
+                Ok(Expr::new_with_range(range, ExprKind::Tuple { elements }))
+            } else if s.peek_kind(1) == TokenKind::LBrace {
+                s.advance();
+                let obj = parse_object_expr(s)?;
+                let ExprKind::Object { properties } = obj.kind else { unreachable!() };
+                Ok(Expr::new_with_range(range, ExprKind::Record { properties }))
+            } else {
+                Err(format!("Unexpected `#` at {}:{}", s.line(), s.column()))
+            }
+        }
+
         _ => {
             let kind = s.kind();
             if kind.can_be_identifier() {

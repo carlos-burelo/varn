@@ -108,6 +108,27 @@ impl Checker {
                 self.member_exists(&Type::named(enum_name.clone()), key, bind)
             }
             TypeKind::Named(name, origin) => {
+                if name.as_ref() == "*" {
+                    if let Some(origin_path) = origin {
+                        let exports = if crate::module_resolver::is_known_module(origin_path) {
+                            Some(crate::module_resolver::resolve_stdlib_module_exports_ref(
+                                origin_path,
+                            ))
+                        } else {
+                            let mut visiting = Vec::new();
+                            Some(crate::module_resolver::resolve_module_exports_ref(
+                                origin_path,
+                                &mut visiting,
+                            ))
+                        };
+                        if let Some(exports) = exports {
+                            if exports.contains_key(key) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+
                 if name.as_ref() == varn_core::IntrinsicType::Str.as_str() && key == "length" {
                     return true;
                 }
