@@ -180,6 +180,7 @@ impl TricolorMarker {
                 | HeapObj::Range(_)
                 | HeapObj::NativeFn(_, _)
                 | HeapObj::FrozenModule(_)
+                | HeapObj::Buffer(_)
                 | HeapObj::VmValue(_) => {}
                 HeapObj::Module(m) => {
                     let exports = m.exports.clone();
@@ -189,19 +190,7 @@ impl TricolorMarker {
                         }
                     }
                 }
-                HeapObj::Array(arr) => {
-                    // Variant-aware: I64/F64 reprs hold raw numeric buffers
-                    // with zero heap references, so there is nothing to mark
-                    // — skip them entirely rather than boxing/copying just to
-                    // scan. Only `Boxed` can hold child heap refs.
-                    //
-                    // Iterate the borrowed elements directly for `Boxed`.
-                    // Cloning the whole Vec here made every mark O(n) *with
-                    // an allocation*, so a large live array re-scanned each
-                    // GC was O(n²) overall (and the throwaway clones
-                    // generated more garbage). `mark_gray` only mutates the
-                    // marker, never this cell, so holding the borrow across
-                    // the loop is sound.
+                HeapObj::Array(arr) | HeapObj::Tuple(arr) => {
                     if let Some(items) = arr.as_boxed() {
                         for nv in items.iter() {
                             if let Some(child_idx) = heap.get_heap_idx(*nv) {
@@ -210,7 +199,7 @@ impl TricolorMarker {
                         }
                     }
                 }
-                HeapObj::Object(obj_ref) => {
+                HeapObj::Object(obj_ref) | HeapObj::Record(obj_ref) => {
                     let guard = obj_ref.borrow();
                     let mut children = Vec::new();
                     guard.for_each_field(|_, nv| {

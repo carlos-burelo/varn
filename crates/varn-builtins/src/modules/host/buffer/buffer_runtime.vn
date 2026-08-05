@@ -1,0 +1,10 @@
+// runtime:buffer — native host zero-copy byte buffer operations.
+
+export declare function alloc(size: int): VmValue;
+export declare function fromBytes(bytes: int[]): VmValue;
+export declare function fromString(s: str): VmValue;
+export declare function len(buf: VmValue): int;
+export declare function getByte(buf: VmValue, index: int): int;
+export declare function setByte(buf: VmValue, index: int, value: int): void;
+export declare function slice(buf: VmValue, start: int, end: int): VmValue;
+export declare function toString(buf: VmValue): str;

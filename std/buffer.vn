@@ -1,0 +1,51 @@
+import {
+    alloc as _alloc,
+    fromBytes as _fromBytes,
+    fromString as _fromString,
+    len as _len,
+    getByte as _getByte,
+    setByte as _setByte,
+    slice as _slice,
+    toString as _toString
+} from "runtime:buffer";
+
+class Buffer {
+    let _inner: any;
+
+    constructor(inner: any) {
+        this._inner = inner;
+    }
+
+    static alloc(size: int): Buffer {
+        return new Buffer(_alloc(size));
+    }
+
+    static from(data: any): Buffer {
+        if (typeof data == "str") {
+            return new Buffer(_fromString(data));
+        }
+        return new Buffer(_fromBytes(data));
+    }
+
+    get length(): int {
+        return _len(this._inner);
+    }
+
+    getByte(index: int): int {
+        return _getByte(this._inner, index);
+    }
+
+    setByte(index: int, value: int): void {
+        _setByte(this._inner, index, value);
+    }
+
+    slice(start: int, end: int): Buffer {
+        return new Buffer(_slice(this._inner, start, end));
+    }
+
+    toString(): str {
+        return _toString(this._inner);
+    }
+}
+
+export { Buffer };

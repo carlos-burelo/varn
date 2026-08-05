@@ -1,4 +1,5 @@
 mod alloc;
+mod buffer;
 mod class;
 mod closure;
 mod constructors;
@@ -8,6 +9,7 @@ mod sendable;
 mod shape;
 mod task;
 mod traits;
+pub use buffer::VmBuffer;
 use crate::generator::{AsyncQueue, GeneratorObj};
 pub use crate::native::NativeFn;
 use crate::task::AsyncTask;
