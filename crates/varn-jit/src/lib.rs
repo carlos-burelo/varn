@@ -241,6 +241,7 @@ pub struct JitHelpers {
     pub load_module_slot: usize,
     pub store_module_slot: usize,
     pub build_object_with_shape: usize,
+    pub build_record_with_shape: usize,
     pub range: usize,
     pub assert_not_null: usize,
     pub close_upvalue: usize,

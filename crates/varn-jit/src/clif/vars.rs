@@ -8,9 +8,12 @@
 use cranelift_codegen::ir::types;
 use cranelift_frontend::{FunctionBuilder, Variable};
 use std::collections::HashMap;
+use varn_core::OpCode;
+use varn_types::bytecode::decode;
+use varn_types::chunk::PoolEntry;
 use varn_types::register_meta::RegisterMeta;
 
-use super::emit::{self, meta_is_float};
+use super::emit::{self, meta_is_float, state_meta_int};
 
 /// Every register's Variable, plus the loop-region payload caches.
 pub(super) struct VarFile {
@@ -24,6 +27,56 @@ pub(super) struct VarFile {
     pub all_caches: Vec<Variable>,
 }
 
+/// Determine the expected `ArrayRepr` disc for a read-only receiver in a
+/// loop region by scanning the region's body for `ArrayGetIndex` sites
+/// that use it. If EVERY such site reads into a register of the same
+/// non-Boxed repr (all Int or all Float), that repr's disc is returned.
+/// Otherwise returns `None` (mixed or boxed — no specialization possible).
+///
+/// Disc values: 0 = Boxed, 1 = I64, 2 = F64 (matching `arrays::ElemRepr`).
+fn expected_disc_for_receiver(
+    code: &[u16],
+    pool: &[PoolEntry],
+    register_meta: &[RegisterMeta],
+    header: usize,
+    back_edge: usize,
+    receiver: usize,
+) -> Option<i64> {
+    let mut agreed: Option<i64> = None;
+    let mut ip = header;
+    while ip < back_edge {
+        let Some(info) = decode(code, ip, pool) else {
+            return None;
+        };
+        let op = OpCode::from_u8((code[ip] & 0xFF) as u8);
+        if matches!(op, Some(OpCode::ArrayGetIndex)) {
+            let obj_r = (code[ip + 1] >> 8) as usize;
+            if obj_r == receiver {
+                let dest = (code[ip] >> 8) as usize;
+                let disc = if meta_is_float(register_meta, dest) {
+                    2 // F64
+                } else if state_meta_int(register_meta, dest) {
+                    1 // I64
+                } else {
+                    0 // Boxed — can't skip repr check
+                };
+                // Boxed destination → no specialization: the disc branch
+                // would be needed for element unboxing anyway.
+                if disc == 0 {
+                    return None;
+                }
+                match agreed {
+                    None => agreed = Some(disc),
+                    Some(prev) if prev != disc => return None, // mixed reprs
+                    _ => {}
+                }
+            }
+        }
+        ip += info.len;
+    }
+    agreed
+}
+
 /// Declare the whole file. `want_roots` marks the I64 Variables as needing
 /// stack maps, which Cranelift requires BEFORE any use — it explicitly does
 /// not retrofit pre-existing ones.
@@ -32,6 +85,8 @@ pub(super) fn declare(
     nregs: usize,
     register_meta: &[RegisterMeta],
     regions: &[emit::Region],
+    code: &[u16],
+    pool: &[PoolEntry],
     want_roots: bool,
 ) -> VarFile {
     // A float-typed register (`register_meta[r] == Float`) is an unboxed f64
@@ -56,8 +111,8 @@ pub(super) fn declare(
     // the frontend's all-paths-defined rule and the sentinel share a def.
     let cache_vars: HashMap<(usize, usize), emit::RegionCache> = regions
         .iter()
-        .flat_map(|(h, _, regs, ro)| regs.iter().map(move |r| ((*h, *r), ro.contains(r))))
-        .map(|(k, read_only)| {
+        .flat_map(|(h, e, regs, ro)| regs.iter().map(move |r| ((*h, *e, *r), ro.contains(r))))
+        .map(|((h, e, r), read_only)| {
             let payload = b.declare_var(types::I64);
             let view = read_only.then(|| {
                 [
@@ -66,7 +121,23 @@ pub(super) fn declare(
                     b.declare_var(types::I64),
                 ]
             });
-            (k, emit::RegionCache { payload, view })
+            // For read-only receivers, determine if all ArrayGetIndex
+            // accesses agree on a single non-Boxed repr. If so, the
+            // preheader can validate the disc once and the body skips
+            // both repr branches per access.
+            let repr_validated_disc = if read_only {
+                expected_disc_for_receiver(code, pool, register_meta, h, e, r)
+            } else {
+                None
+            };
+            (
+                (h, r),
+                emit::RegionCache {
+                    payload,
+                    view,
+                    repr_validated_disc,
+                },
+            )
         })
         .collect();
     let all_caches: Vec<Variable> = cache_vars

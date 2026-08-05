@@ -114,7 +114,7 @@ pub(super) fn lower_raw(
         vars,
         cache_vars,
         all_caches,
-    } = vars::declare(&mut b, nregs, &proto.register_meta, &regions, want_roots);
+    } = vars::declare(&mut b, nregs, &proto.register_meta, &regions, code, pool, want_roots);
 
     let entry = b.create_block();
     b.append_block_params_for_function_params(entry);
@@ -403,29 +403,27 @@ pub(super) fn lower_raw(
                 // Every non-float source reaches an f64 sink through its boxed
                 // bits (`unbox_f64_coerce` widens a tagged int), never by
                 // passing an I64 straight into an F64 Variable.
-                let val_to_store = if dest_is_float && !src_is_float {
-                    let v = box_or_pass(&mut b, &vars, &state, src);
-                    let f = unbox_f64_coerce(&mut b, v);
-                    b.def_var(vars[first_reg], f);
-                    v
-                } else if !dest_is_float && src_is_float {
-                    let f = b.use_var(vars[src]);
-                    let boxed = box_f64(&mut b, f);
-                    b.def_var(vars[first_reg], boxed);
-                    boxed
-                } else {
-                    let v = b.use_var(vars[src]);
-                    b.def_var(vars[first_reg], v);
-                    box_or_pass(&mut b, &vars, &state, src)
-                };
-                // Write-through, but only where the mirror is actually
-                // claimed: a lowering that is frame-aware ONLY because OSR
-                // needed `base` has no reader for these slots (see
-                // `mirror_home`), so the store would be dead.
-                if mirror_home {
-                    if let Some(ref actx) = actx {
-                        let fb = alloc::frame_base_addr(&mut b, actx);
-                        b.ins().store(MemFlags::trusted(), val_to_store, fb, (first_reg * 8) as i32);
+                if first_reg < vars.len() && src < vars.len() {
+                    let val_to_store = if dest_is_float && !src_is_float {
+                        let v = box_or_pass(&mut b, &vars, &state, src);
+                        let f = unbox_f64_coerce(&mut b, v);
+                        b.def_var(vars[first_reg], f);
+                        v
+                    } else if !dest_is_float && src_is_float {
+                        let f = b.use_var(vars[src]);
+                        let boxed = box_f64(&mut b, f);
+                        b.def_var(vars[first_reg], boxed);
+                        boxed
+                    } else {
+                        let v = b.use_var(vars[src]);
+                        b.def_var(vars[first_reg], v);
+                        box_or_pass(&mut b, &vars, &state, src)
+                    };
+                    if mirror_home {
+                        if let Some(ref actx) = actx {
+                            let fb = alloc::frame_base_addr(&mut b, actx);
+                            b.ins().store(MemFlags::trusted(), val_to_store, fb, (first_reg * 8) as i32);
+                        }
                     }
                 }
             }
@@ -673,6 +671,18 @@ pub(super) fn lower_raw(
                     let r = arg_start + 1 + i;
                     let v = if proto.param_kinds.get(i) == Some(&SlotKind::Int) {
                         use_int(&mut b, &vars, &state, r)?
+                    } else if proto.param_kinds.get(i) == Some(&SlotKind::Float) {
+                        if meta_is_float(&proto.register_meta, r) || state[r] == K::Float {
+                            let f = use_f64(&mut b, &vars, &state, r)?;
+                            b.ins().bitcast(types::I64, MemFlags::trusted(), f)
+                        } else {
+                            let boxed = use_boxed(&mut b, &vars, &state, r)?;
+                            let f = unbox_f64_coerce(&mut b, boxed);
+                            b.ins().bitcast(types::I64, MemFlags::trusted(), f)
+                        }
+                    } else if proto.param_kinds.get(i) == Some(&SlotKind::Bool) {
+                        let boxed = use_boxed(&mut b, &vars, &state, r)?;
+                        unbox_bool(&mut b, boxed)
                     } else {
                         use_boxed(&mut b, &vars, &state, r)?
                     };
@@ -727,7 +737,7 @@ pub(super) fn lower_raw(
                 };
                 alloc::emit_call(&mut b, actx, &state, code, ip, target.as_ref())?;
             }
-            OpCode::BuildArray => {
+            OpCode::BuildArray | OpCode::BuildTuple => {
                 let actx = actx.as_ref().ok_or("clif: BuildArray outside alloc fn")?;
                 alloc::emit_build_array(&mut b, actx, &state, code, ip);
             }
@@ -771,7 +781,7 @@ pub(super) fn lower_raw(
                 let actx = actx.as_ref().ok_or("clif: ToString outside alloc fn")?;
                 alloc::emit_to_string(&mut b, actx, &state, &proto.register_meta, code, ip);
             }
-            OpCode::BuildObjectWithShape => {
+            OpCode::BuildObjectWithShape | OpCode::BuildRecord => {
                 let actx = actx
                     .as_ref()
                     .ok_or("clif: BuildObjectWithShape outside alloc fn")?;
@@ -780,7 +790,8 @@ pub(super) fn lower_raw(
                     .resolved_shape(shape_idx)
                     .map(|s| s.property_names.len())
                     .ok_or("clif: unresolved object shape")?;
-                alloc::emit_build_object_with_shape(&mut b, actx, &state, code, ip, count);
+                let is_record = op == OpCode::BuildRecord;
+                alloc::emit_build_object_with_shape(&mut b, actx, &state, code, ip, count, is_record);
             }
             OpCode::LoadUpvalue => {
                 let actx = actx.as_ref().ok_or("clif: LoadUpvalue outside frame-aware fn")?;

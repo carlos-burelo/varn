@@ -244,6 +244,53 @@ pub(super) fn emit_array_get_index(
     let cache = find_cache(c.regions, c.cache_vars, ip, obj_r);
     let lay = &c.helpers.array_layout;
 
+    // Repr-validated fast path: the preheader already checked disc == expected
+    // and zeroed `data` on mismatch. `data != 0` guarantees both "resolved"
+    // AND "disc matches expected repr", so the access is just:
+    //   sentinel check → bounds check → raw load
+    // No repr branching at all — 2 branches instead of 4.
+    let repr_validated = cache.is_some_and(|c| c.repr_validated_disc.is_some());
+    if repr_validated {
+        if let Some(view) = cache.and_then(|c| c.view) {
+            let data = b.use_var(view[0]);
+            let resolved = b.ins().icmp_imm(IntCC::NotEqual, data, 0);
+            let live = b.create_block();
+            b.ins().brif(resolved, live, &[], slow, &[]);
+            b.switch_to_block(live);
+            let len = b.use_var(view[1]);
+
+            // Bounds check (unsigned also rejects negative keys).
+            let oob = b.ins().icmp(IntCC::UnsignedGreaterThanOrEqual, key, len);
+            let inb = b.create_block();
+            b.ins().brif(oob, slow, &[], inb, &[]);
+            b.switch_to_block(inb);
+
+            // Direct raw load — repr is guaranteed by the preheader.
+            let off = b.ins().ishl_imm(key, 3);
+            let addr = b.ins().iadd(data, off);
+            let v = load_elem_as(b, addr, want, want);
+            b.ins().jump(merge, &[v.into()]);
+
+            // slow: generic helper (always correct, handles every repr).
+            b.switch_to_block(slow);
+            let boxed_key = box_int(b, key);
+            let r = call_helper(
+                b,
+                c.cc,
+                c.helpers.jit_array_get_fast,
+                &[c.exec_ctx, obj, boxed_key],
+            );
+            let r = convert(b, r, ElemRepr::Boxed, want);
+            b.ins().jump(merge, &[r.into()]);
+
+            b.switch_to_block(merge);
+            let res = b.block_params(merge)[0];
+            b.def_var(c.vars[first_reg], res);
+            return Ok(());
+        }
+    }
+
+    // Standard path: resolve payload, bounds-check, repr-branch per access.
     // A read-only receiver in an allocation-free region had its data pointer,
     // length and repr hoisted into the region's preheader, so the whole
     // resolve chain and all three loads collapse to variable reads here. The

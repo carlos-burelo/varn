@@ -232,10 +232,14 @@ pub(super) fn use_f64(
     state: &[K],
     r: usize,
 ) -> Result<cranelift_codegen::ir::Value, String> {
-    match state[r] {
-        K::Float => Ok(b.use_var(vars[r])),
+    let st = state.get(r).copied().unwrap_or(K::Unset);
+    let Some(&var) = vars.get(r) else {
+        return Err(format!("clif: invalid register index {r}"));
+    };
+    match st {
+        K::Float => Ok(b.use_var(var)),
         K::Int => {
-            let iv = b.use_var(vars[r]);
+            let iv = b.use_var(var);
             Ok(b.ins().fcvt_from_sint(types::F64, iv))
         }
         k => Err(format!("clif: f64 use of {k:?} register")),
@@ -257,11 +261,14 @@ pub(super) fn box_or_pass(
     state: &[K],
     r: usize,
 ) -> cranelift_codegen::ir::Value {
-    let raw = b.use_var(vars[r]);
+    let Some(&var) = vars.get(r) else {
+        return b.ins().iconst(types::I64, VmValue::null().0 as i64);
+    };
+    let raw = b.use_var(var);
     if b.func.dfg.value_type(raw) == types::F64 {
         b.ins().bitcast(types::I64, MemFlags::new(), raw)
     } else {
-        match state[r] {
+        match state.get(r).copied().unwrap_or(K::Unset) {
             K::Int => box_int(b, raw),
             K::Bool => box_bool(b, raw),
             _ => raw,
@@ -323,6 +330,18 @@ pub(super) struct RegionCache {
     /// `[data, len, disc]`, sharing the same `0`-means-unresolved sentinel on
     /// `data` (a live `Vec`'s pointer is never null, empty or not).
     pub view: Option<[Variable; 3]>,
+    /// When `Some(disc)`, the preheader validated that the array's repr
+    /// discriminant equals `disc` before entering the loop. If the repr
+    /// does NOT match, the preheader sets `data = 0`, which routes every
+    /// access to the generic helper. Therefore, inside the loop body,
+    /// `data != 0` already guarantees `disc == expected`, and access sites
+    /// can skip both repr branches (the raw arm and the boxed fallback).
+    ///
+    /// Sound because `view` is only set in alloc-free regions, and no
+    /// operation in an alloc-free region can change an array's repr
+    /// (specialization happens on push, migration on mismatched write —
+    /// both allocate or call, which the allowlist excludes).
+    pub repr_validated_disc: Option<i64>,
 }
 
 /// A loop region: `(header ip, back-edge ip, receivers, read-only receivers)`.

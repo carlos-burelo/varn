@@ -32,6 +32,7 @@ use cranelift_frontend::FunctionBuilder;
 
 use crate::JitHelpers;
 
+#[allow(dead_code)]
 pub(super) struct NurserySlot {
     /// Machine address of the freshly reserved `Option<HeapObj>` slot.
     pub addr: Value,
@@ -40,6 +41,7 @@ pub(super) struct NurserySlot {
 }
 
 /// Reserve one nursery slot, or branch to `slow` if the nursery is full.
+#[allow(dead_code)]
 pub(super) fn emit_nursery_alloc(
     b: &mut FunctionBuilder,
     helpers: &JitHelpers,

@@ -144,6 +144,7 @@ pub fn time_n<F: Fn() -> Result<(), String>>(
 
 /// Like [`time_n`], but samples CPU frequency immediately after each run (CPU
 /// still warm from the just-finished work) and keeps the peak.
+#[allow(dead_code)]
 pub fn time_n_freq<F: Fn() -> Result<(), String>>(
     runs: usize,
     f: F,

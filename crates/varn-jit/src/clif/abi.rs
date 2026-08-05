@@ -117,6 +117,13 @@ pub(super) fn build_wrapper(
             let sh = b.ins().ishl_imm(boxed, 16);
             let un = b.ins().sshr_imm(sh, 16);
             args.push(un);
+        } else if proto.param_kinds.get(i) == Some(&SlotKind::Float) {
+            let un = super::emit::unbox_f64_coerce(&mut b, boxed);
+            let bits = b.ins().bitcast(types::I64, MemFlags::trusted(), un);
+            args.push(bits);
+        } else if proto.param_kinds.get(i) == Some(&SlotKind::Bool) {
+            let un = super::emit::unbox_bool(&mut b, boxed);
+            args.push(un);
         } else {
             args.push(boxed);
         }

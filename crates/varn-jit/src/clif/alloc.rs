@@ -33,7 +33,7 @@ use varn_types::register_meta::SlotKind;
 
 use super::emit::{
     box_or_pass, call_helper, call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce,
-    use_int, wrap_i48,
+    use_f64, use_int, wrap_i48,
 };
 use super::kinds::K;
 use super::liveness::Liveness;
@@ -55,8 +55,10 @@ pub(super) fn has_alloc(
             OpCode::from_u8(code[ip] as u8),
             Some(
                 OpCode::BuildArray
+                    | OpCode::BuildTuple
                     | OpCode::BuildObject
                     | OpCode::BuildObjectWithShape
+                    | OpCode::BuildRecord
                     | OpCode::ArrayPush
                     | OpCode::ArrayExtend
                     | OpCode::MakeEnumVariant
@@ -479,6 +481,18 @@ pub(super) fn emit_call(
         let r = arg_start + 1 + i;
         let v = if *k == SlotKind::Int {
             use_int(b, actx.vars, state, r)?
+        } else if *k == SlotKind::Float {
+            if meta_is_float(actx.register_meta, r) || state[r] == K::Float {
+                let f = use_f64(b, actx.vars, state, r)?;
+                b.ins().bitcast(types::I64, MemFlags::trusted(), f)
+            } else {
+                let boxed = box_or_pass(b, actx.vars, state, r);
+                let f = unbox_f64_coerce(b, boxed);
+                b.ins().bitcast(types::I64, MemFlags::trusted(), f)
+            }
+        } else if *k == SlotKind::Bool {
+            let boxed = box_or_pass(b, actx.vars, state, r);
+            unbox_bool(b, boxed)
         } else {
             box_or_pass(b, actx.vars, state, r)
         };
@@ -764,6 +778,7 @@ pub(super) fn emit_build_object_with_shape(
     code: &[u16],
     ip: usize,
     count: usize,
+    is_record: bool,
 ) {
     let w1 = code[ip + 1];
     let dest = (w1 >> 8) as usize;
@@ -776,10 +791,15 @@ pub(super) fn emit_build_object_with_shape(
     }
     let start_v = b.ins().iconst(types::I64, start as i64);
     let shape_v = b.ins().iconst(types::I64, shape_idx as i64);
+    let helper = if is_record {
+        actx.helpers.build_record_with_shape
+    } else {
+        actx.helpers.build_object_with_shape
+    };
     let res = call_helper(
         b,
         actx.cc,
-        actx.helpers.build_object_with_shape,
+        helper,
         &[actx.exec_ctx, actx.closure, actx.base, start_v, shape_v],
     );
     def_result(b, actx, dest, res);

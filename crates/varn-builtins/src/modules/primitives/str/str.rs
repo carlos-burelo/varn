@@ -211,9 +211,15 @@ varn_contract! {
 /// directly (char index == byte index while the prefix is ASCII); otherwise
 /// one forward char scan.
 fn char_code_at(s: &str, pos: i64) -> i64 {
-    let pos = pos.max(0) as usize;
+    if pos < 0 {
+        return -1;
+    }
+    let pos = pos as usize;
     let b = s.as_bytes();
-    if pos < b.len() && b[..=pos].is_ascii() {
+    if pos >= b.len() {
+        return -1;
+    }
+    if s.is_ascii() {
         return b[pos] as i64;
     }
     s.chars().nth(pos).map(|c| c as i64).unwrap_or(-1)

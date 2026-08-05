@@ -85,7 +85,29 @@ pub(super) fn emit_region_caches(
                     (16 + lay.elems_len_off) as i32,
                 );
                 let disc = emit::array_disc(b, resolved, lay);
-                b.ins().jump(merge, &[data.into(), len.into(), disc.into()]);
+
+                // Repr validation: when all ArrayGetIndex sites in the
+                // loop agree on a single non-Boxed repr, validate the
+                // disc here once. If it doesn't match, zero `data` so
+                // every access in the body takes the slow path — the
+                // body can then skip both repr branches entirely.
+                if let Some(expected) = cache.repr_validated_disc {
+                    let disc_ok = b.ins().icmp_imm(IntCC::Equal, disc, expected);
+                    let repr_ok = b.create_block();
+                    let repr_bad = b.create_block();
+                    b.ins().brif(disc_ok, repr_ok, &[], repr_bad, &[]);
+
+                    // disc matches expected: emit with real data.
+                    b.switch_to_block(repr_ok);
+                    b.ins().jump(merge, &[data.into(), len.into(), disc.into()]);
+
+                    // disc doesn't match: set data=0 to trigger slow path.
+                    b.switch_to_block(repr_bad);
+                    let z1 = b.ins().iconst(types::I64, 0);
+                    b.ins().jump(merge, &[z1.into(), len.into(), disc.into()]);
+                } else {
+                    b.ins().jump(merge, &[data.into(), len.into(), disc.into()]);
+                }
 
                 b.switch_to_block(skip);
                 let z0 = b.ins().iconst(types::I64, 0);

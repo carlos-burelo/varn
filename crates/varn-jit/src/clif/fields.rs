@@ -145,6 +145,10 @@ pub(super) fn emit_get_fixed_field(
     if meta_is_float(c.register_meta, first_reg) {
         let f = unbox_f64_coerce(b, v);
         b.def_var(c.vars[first_reg], f);
+    } else if super::emit::meta_is_int(c.register_meta, first_reg) {
+        let sh = b.ins().ishl_imm(v, 16);
+        let un = b.ins().sshr_imm(sh, 16);
+        b.def_var(c.vars[first_reg], un);
     } else {
         b.def_var(c.vars[first_reg], v);
     }

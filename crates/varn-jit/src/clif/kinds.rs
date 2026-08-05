@@ -185,7 +185,9 @@ pub(crate) fn apply_kinds(
         OpCode::GetFixedField
         | OpCode::GetProperty
         | OpCode::BuildArray
+        | OpCode::BuildTuple
         | OpCode::BuildObjectWithShape
+        | OpCode::BuildRecord
         | OpCode::CallMethod
         | OpCode::InvokeVirtual
         | OpCode::BuildObject
