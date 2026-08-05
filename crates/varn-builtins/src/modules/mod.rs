@@ -43,19 +43,28 @@ pub fn has_native_builder(id: &str) -> bool {
 pub fn force_link_builtins() -> usize {
     let dummy = std::env::var("VARN_DUMMY_LINK").is_ok() as usize;
     let mut sum = 0;
-    sum += std::hint::black_box(buffer::__VARN_LINK_MARKER_RUNTIME_BUFFER).as_ptr() as usize;
-    sum += std::hint::black_box(crypto::__VARN_LINK_MARKER_RUNTIME_CRYPTO).as_ptr() as usize;
-    sum += std::hint::black_box(ffi::__VARN_LINK_MARKER_RUNTIME_FFI).as_ptr() as usize;
-    sum += std::hint::black_box(fs::__VARN_LINK_MARKER_RUNTIME_FS).as_ptr() as usize;
-    sum += std::hint::black_box(globals::__VARN_LINK_MARKER_GLOBALS).as_ptr() as usize;
-    sum += std::hint::black_box(io::__VARN_LINK_MARKER_RUNTIME_IO).as_ptr() as usize;
-    sum += std::hint::black_box(json::__VARN_LINK_MARKER_RUNTIME_JSON).as_ptr() as usize;
-    sum += std::hint::black_box(math::__VARN_LINK_MARKER_RUNTIME_MATH).as_ptr() as usize;
-    sum += std::hint::black_box(net::__VARN_LINK_MARKER_RUNTIME_NET).as_ptr() as usize;
-    sum += std::hint::black_box(reflect::__VARN_LINK_MARKER_RUNTIME_REFLECT).as_ptr() as usize;
-    sum += std::hint::black_box(sys::__VARN_LINK_MARKER_RUNTIME_SYS).as_ptr() as usize;
-    sum += std::hint::black_box(task::__VARN_LINK_MARKER_RUNTIME_TASK).as_ptr() as usize;
-    sum += std::hint::black_box(time::__VARN_LINK_MARKER_RUNTIME_TIME).as_ptr() as usize;
+
+    macro_rules! register_marker {
+        ($m:ident, $marker:ident) => {
+            crate::dispatch::register_fallback_module_entries($m::$marker);
+            sum += std::hint::black_box($m::$marker).as_ptr() as usize;
+        };
+    }
+
+    register_marker!(buffer, __VARN_LINK_MARKER_RUNTIME_BUFFER);
+    register_marker!(crypto, __VARN_LINK_MARKER_RUNTIME_CRYPTO);
+    register_marker!(ffi, __VARN_LINK_MARKER_RUNTIME_FFI);
+    register_marker!(fs, __VARN_LINK_MARKER_RUNTIME_FS);
+    register_marker!(globals, __VARN_LINK_MARKER_GLOBALS);
+    register_marker!(io, __VARN_LINK_MARKER_RUNTIME_IO);
+    register_marker!(json, __VARN_LINK_MARKER_RUNTIME_JSON);
+    register_marker!(math, __VARN_LINK_MARKER_RUNTIME_MATH);
+    register_marker!(net, __VARN_LINK_MARKER_RUNTIME_NET);
+    register_marker!(reflect, __VARN_LINK_MARKER_RUNTIME_REFLECT);
+    register_marker!(sys, __VARN_LINK_MARKER_RUNTIME_SYS);
+    register_marker!(task, __VARN_LINK_MARKER_RUNTIME_TASK);
+    register_marker!(time, __VARN_LINK_MARKER_RUNTIME_TIME);
+
     sum + dummy
 }
 

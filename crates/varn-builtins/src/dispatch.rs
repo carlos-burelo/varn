@@ -63,17 +63,38 @@ pub fn iter_native_ops() -> impl Iterator<Item = &'static NativeOpEntry> {
     }
 }
 
+static FALLBACK_ENTRIES: OnceLock<std::sync::Mutex<Vec<&'static [&'static NativeOpEntry]>>> = OnceLock::new();
+
+pub fn register_fallback_module_entries(entries: &'static [&'static NativeOpEntry]) {
+    let mutex = FALLBACK_ENTRIES.get_or_init(|| std::sync::Mutex::new(Vec::new()));
+    if let Ok(mut guard) = mutex.lock() {
+        guard.push(entries);
+    }
+}
+
+pub fn all_native_ops() -> Vec<&'static NativeOpEntry> {
+    let mut list: Vec<&'static NativeOpEntry> = iter_native_ops().collect();
+    if let Some(mutex) = FALLBACK_ENTRIES.get() {
+        if let Ok(guard) = mutex.lock() {
+            for slice in guard.iter() {
+                for &entry in *slice {
+                    if !entry.func_ptr.is_null() && !list.iter().any(|e| std::ptr::eq(*e, entry)) {
+                        list.push(entry);
+                    }
+                }
+            }
+        }
+    }
+    list
+}
+
 static TABLE: OnceLock<FxHashMap<u64, DispatchEntry>> = OnceLock::new();
 
 fn build_table() -> FxHashMap<u64, DispatchEntry> {
     let mut table = FxHashMap::with_capacity_and_hasher(512, Default::default());
-    for entry in iter_native_ops() {
+    for entry in all_native_ops() {
         let module = entry.module_id();
         let symbol = entry.symbol_name();
-        // Class-qualified members (core-type methods/getters) carry the class in
-        // `namespace_path`; module-level ops have it empty. All historically
-        // emitted entries have an empty namespace, so this only ever affects the
-        // new per-method entries — existing dispatch ids are unchanged.
         let ns = entry.namespace_path();
         let id = if ns.is_empty() {
             entry::compound_op_id(module, symbol)
@@ -98,7 +119,7 @@ static MODULE_OPS: OnceLock<FxHashMap<String, Vec<&'static NativeOpEntry>>> = On
 
 fn build_module_ops_index() -> FxHashMap<String, Vec<&'static NativeOpEntry>> {
     let mut map = FxHashMap::default();
-    for entry in iter_native_ops() {
+    for entry in all_native_ops() {
         map.entry(entry.module_id().to_string())
             .or_insert_with(Vec::new)
             .push(entry);
@@ -110,7 +131,7 @@ pub fn find_native_op_entry(op_id: u64) -> Option<&'static NativeOpEntry> {
     static ENTRIES_MAP: OnceLock<FxHashMap<u64, &'static NativeOpEntry>> = OnceLock::new();
     let map = ENTRIES_MAP.get_or_init(|| {
         let mut m = FxHashMap::with_capacity_and_hasher(512, Default::default());
-        for entry in iter_native_ops() {
+        for entry in all_native_ops() {
             let module = entry.module_id();
             let symbol = entry.symbol_name();
             let ns = entry.namespace_path();
@@ -257,7 +278,7 @@ fn collect_module_fields(
     ctx: &dyn NativeCtx,
     out: &mut rustc_hash::FxHashMap<Rc<str>, VmValue>,
 ) {
-    for entry in iter_native_ops() {
+    for entry in all_native_ops() {
         if entry.module_id() != module_id {
             continue;
         }
