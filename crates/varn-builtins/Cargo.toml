@@ -19,6 +19,7 @@ runtime = [
     "dep:ureq",
     "dep:tiny_http",
     "dep:chrono",
+    "dep:libloading",
 ]
 
 [dependencies]
@@ -47,4 +48,5 @@ urlencoding  = { version = "2", optional = true }
 ureq         = { version = "2", optional = true }
 tiny_http    = { version = "0.12", optional = true }
 chrono       = { version = "0.4", optional = true }
+libloading   = { version = "0.8", optional = true }
 rustc-hash   = { workspace = true }

@@ -1,6 +1,10 @@
 
+#[path = "host/buffer/buffer.rs"]
+pub mod buffer;
 #[path = "host/crypto/crypto.rs"]
 pub mod crypto;
+#[path = "host/ffi/ffi.rs"]
+pub mod ffi;
 #[path = "host/fs/fs.rs"]
 pub mod fs;
 #[path = "globals/globals.rs"]
@@ -39,7 +43,9 @@ pub fn has_native_builder(id: &str) -> bool {
 pub fn force_link_builtins() -> usize {
     let dummy = std::env::var("VARN_DUMMY_LINK").is_ok() as usize;
     let mut sum = 0;
+    sum += std::hint::black_box(buffer::__VARN_LINK_MARKER_RUNTIME_BUFFER).as_ptr() as usize;
     sum += std::hint::black_box(crypto::__VARN_LINK_MARKER_RUNTIME_CRYPTO).as_ptr() as usize;
+    sum += std::hint::black_box(ffi::__VARN_LINK_MARKER_RUNTIME_FFI).as_ptr() as usize;
     sum += std::hint::black_box(fs::__VARN_LINK_MARKER_RUNTIME_FS).as_ptr() as usize;
     sum += std::hint::black_box(globals::__VARN_LINK_MARKER_GLOBALS).as_ptr() as usize;
     sum += std::hint::black_box(io::__VARN_LINK_MARKER_RUNTIME_IO).as_ptr() as usize;

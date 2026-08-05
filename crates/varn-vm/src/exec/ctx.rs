@@ -20,7 +20,7 @@ use varn_types::generator::GenChannel;
 pub use super::ctx_jit_runtime::{
     jit_array_extend, jit_array_get_fast, jit_array_length, jit_array_pop, jit_array_push,
     jit_array_set_fast, jit_assert_not_null, jit_await, jit_bind_method, jit_bitand, jit_bitor,
-    jit_bitxor, jit_build_object, jit_build_object_with_shape, jit_call_spread,
+    jit_bitxor, jit_build_object, jit_build_object_with_shape, jit_build_record_with_shape, jit_call_spread,
     jit_class_member_op, jit_close_upvalue, clif_call_fallback, jit_declare_field,
     jit_define_global, jit_div,
     jit_gc_safepoint, jit_get_enum_tag, jit_get_fixed_field, jit_get_index,
@@ -115,6 +115,7 @@ pub struct ExecCtx {
     /// leaving the dispatch loop — so it parks the ip here and returns
     /// `ContinueFrame`; the frame loop takes it on the way round.
     pub osr_request: Option<usize>,
+    pub resources: varn_types::ResourceStore,
     /// Nested contexts (sync-generator bodies) share the heap but own a
     /// private stack the outer context's GC roots cannot see in the other
     /// direction: a collection triggered from *inside* the nested context
@@ -171,6 +172,7 @@ impl ExecCtx {
             jit_resume_ip: 0,
             jit_call_dest: 0,
             osr_request: None,
+            resources: varn_types::ResourceStore::new(),
             gc_inhibited: false,
         };
 
@@ -338,6 +340,7 @@ impl ExecCtx {
             jit_resume_ip: 0,
             jit_call_dest: 0,
             osr_request: None,
+            resources: varn_types::ResourceStore::new(),
             gc_inhibited: false,
         }
     }

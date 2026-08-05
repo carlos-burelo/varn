@@ -2,9 +2,11 @@
     "version": "0.3.0",
     "hostApi": 3,
     "modules": [
+        { "id": "std:buffer" },
         { "id": "std:collections", "pure": true },
         { "id": "std:crypto" },
         { "id": "std:dispose" },
+        { "id": "std:ffi" },
         { "id": "std:fs" },
         { "id": "std:http" },
         { "id": "std:io" },

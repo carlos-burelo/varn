@@ -302,7 +302,11 @@ impl NativeCtx for ExecCtx {
     }
 
     fn is_array(&self, v: VmValue) -> bool {
-        v.is_heap() && matches!(self.heap.get(v.as_heap_idx()), Some(HeapObj::Array(_)))
+        v.is_heap()
+            && matches!(
+                self.heap.get(v.as_heap_idx()),
+                Some(HeapObj::Array(_) | HeapObj::Tuple(_))
+            )
     }
 
     fn alloc_array(&mut self, items: Vec<VmValue>) -> VmValue {
@@ -335,7 +339,10 @@ impl NativeCtx for ExecCtx {
 
     fn is_object(&self, v: VmValue) -> bool {
         if v.is_heap() {
-            matches!(self.heap.get(v.as_heap_idx()), Some(HeapObj::Object(_)))
+            matches!(
+                self.heap.get(v.as_heap_idx()),
+                Some(HeapObj::Object(_) | HeapObj::Record(_))
+            )
         } else {
             false
         }
@@ -343,7 +350,8 @@ impl NativeCtx for ExecCtx {
 
     fn object_for_each(&self, obj: VmValue, f: &mut dyn FnMut(&str, VmValue)) {
         if obj.is_heap() {
-            if let Some(HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
+            if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap_idx())
+            {
                 for (k, v) in o.borrow().iter() {
                     f(k.as_ref(), v);
                 }
@@ -353,7 +361,8 @@ impl NativeCtx for ExecCtx {
 
     fn get_object_shape(&self, obj: VmValue) -> Option<std::rc::Rc<varn_types::Shape>> {
         if obj.is_heap() {
-            if let Some(HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
+            if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap_idx())
+            {
                 return Some(std::rc::Rc::clone(o.borrow().shape()));
             }
         }
@@ -374,7 +383,8 @@ impl NativeCtx for ExecCtx {
 
     fn get_field(&self, obj: VmValue, key: &str) -> Option<VmValue> {
         if obj.is_heap() {
-            if let Some(HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx()) {
+            if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = self.heap.get(obj.as_heap_idx())
+            {
                 return o.borrow().get_field_nv(key);
             }
 
@@ -414,6 +424,73 @@ impl NativeCtx for ExecCtx {
 
     fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue {
         self.heap.alloc_range(start, end, inclusive)
+    }
+
+    fn alloc_buffer(&mut self, size: usize) -> VmValue {
+        self.heap.alloc_vm_buffer(varn_types::VmBuffer::new(size))
+    }
+
+    fn alloc_buffer_from_bytes(&mut self, bytes: &[u8]) -> VmValue {
+        self.heap.alloc_vm_buffer(varn_types::VmBuffer::from_bytes(bytes))
+    }
+
+    fn is_buffer(&self, v: VmValue) -> bool {
+        if v.is_heap() {
+            matches!(self.heap.get(v.as_heap_idx()), Some(HeapObj::Buffer(_)))
+        } else {
+            false
+        }
+    }
+
+    fn buffer_len(&self, v: VmValue) -> usize {
+        if v.is_heap() {
+            if let Some(HeapObj::Buffer(b)) = self.heap.get(v.as_heap_idx()) {
+                return b.len();
+            }
+        }
+        0
+    }
+
+    fn buffer_get_byte(&self, v: VmValue, idx: usize) -> Option<u8> {
+        if v.is_heap() {
+            if let Some(HeapObj::Buffer(b)) = self.heap.get(v.as_heap_idx()) {
+                return b.as_slice().get(idx).copied();
+            }
+        }
+        None
+    }
+
+    fn buffer_set_byte(&mut self, v: VmValue, idx: usize, byte: u8) -> bool {
+        if v.is_heap() {
+            if let Some(HeapObj::Buffer(b)) = self.heap.get_mut(v.as_heap_idx()) {
+                let mut slice = b.as_mut_slice();
+                if idx < slice.len() {
+                    slice[idx] = byte;
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn buffer_slice(&mut self, v: VmValue, start: usize, end: usize) -> Option<VmValue> {
+        if v.is_heap() {
+            if let Some(HeapObj::Buffer(b)) = self.heap.get(v.as_heap_idx()) {
+                let sub = b.slice(start, end);
+                return Some(self.heap.alloc_vm_buffer(sub));
+            }
+        }
+        None
+    }
+
+    fn buffer_to_string(&self, v: VmValue) -> Option<String> {
+        if v.is_heap() {
+            if let Some(HeapObj::Buffer(b)) = self.heap.get(v.as_heap_idx()) {
+                let slice = b.as_slice();
+                return String::from_utf8(slice.to_vec()).ok();
+            }
+        }
+        None
     }
 
 
@@ -526,7 +603,7 @@ impl NativeCtx for ExecCtx {
     }
 
     fn resources(&mut self) -> &mut ResourceStore {
-        panic!("ExecCtx::resources() is not implemented in the NaN-boxed VM")
+        &mut self.resources
     }
 
     fn extract(&self, v: VmValue) -> varn_types::Value {
