@@ -1,0 +1,64 @@
+import { nowInstant } from "std:time"
+
+const N = 5000000
+
+function bench_array() {
+    let sum = 0
+    let start = nowInstant().epochMilliseconds
+    for (let i = 0; i < N; i = i + 1) {
+        let a = [i, i + 1]
+        sum = sum + a[0] + a[1]
+    }
+    let end = nowInstant().epochMilliseconds
+    return end - start
+}
+
+function bench_tuple() {
+    let sum = 0
+    let start = nowInstant().epochMilliseconds
+    for (let i = 0; i < N; i = i + 1) {
+        let t = #[i, i + 1]
+        sum = sum + t[0] + t[1]
+    }
+    let end = nowInstant().epochMilliseconds
+    return end - start
+}
+
+function bench_object() {
+    let sum = 0
+    let start = nowInstant().epochMilliseconds
+    for (let i = 0; i < N; i = i + 1) {
+        let o = { x: i, y: i + 1 }
+        sum = sum + o.x + o.y
+    }
+    let end = nowInstant().epochMilliseconds
+    return end - start
+}
+
+function bench_record() {
+    let sum = 0
+    let start = nowInstant().epochMilliseconds
+    for (let i = 0; i < N; i = i + 1) {
+        let r = #{ x: i, y: i + 1 }
+        sum = sum + r.x + r.y
+    }
+    let end = nowInstant().epochMilliseconds
+    return end - start
+}
+
+bench_array()
+bench_tuple()
+bench_object()
+bench_record()
+
+print("--- BENCHMARK RESULTS (5,000,000 iterations) ---")
+let t_arr = bench_array()
+let t_tup = bench_tuple()
+print("Array  [x, y]: " + t_arr + " ms")
+print("Tuple #[x, y]: " + t_tup + " ms")
+
+print("-------------------------------------------------")
+let t_obj = bench_object()
+let t_rec = bench_record()
+print("Object  {x, y}: " + t_obj + " ms")
+print("Record #{x, y}: " + t_rec + " ms")

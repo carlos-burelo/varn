@@ -472,6 +472,14 @@ impl LineMapping {
     }
 }
 
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub struct ExceptionRange {
+    pub try_start_ip: u32,
+    pub try_end_ip: u32,
+    pub catch_ip: u32,
+    pub err_reg: u8,
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct FunctionProto {
     #[serde(with = "opt_rc_str_serde")]
@@ -492,11 +500,11 @@ pub struct FunctionProto {
     #[serde(default)]
     pub required_caps: Vec<std::rc::Rc<str>>,
 
-    /// Checker-derived per-register slot kinds (see ssa/emit). Serialized:
-    /// cached runs used to lose this (it was `serde(skip)`), silently
-    /// disabling every typed JIT gate on `.vnc`-loaded code.
     #[serde(default)]
     pub register_meta: Vec<crate::register_meta::RegisterMeta>,
+
+    #[serde(default)]
+    pub exception_table: Vec<ExceptionRange>,
 
     /// Declared parameter slot kinds, in parameter order (from the checker
     /// via HirParam). The Cranelift router requires all-Int parameters

@@ -101,12 +101,12 @@ impl Checker {
             if let Some(getter_map) = bind.extensions.getters.get(tn.as_ref()) {
                 if let Some(mangled) = getter_map.get(prop_name.as_ref()) {
                     self.extension_members
-                        .insert(range.start.offset, mangled.clone());
+                        .insert(property.range.start.offset, mangled.clone());
                 }
             } else if let Some(method_map) = bind.extensions.methods.get(tn.as_ref()) {
                 if let Some(mangled) = method_map.get(prop_name.as_ref()) {
                     self.extension_members
-                        .insert(range.start.offset, mangled.clone());
+                        .insert(property.range.start.offset, mangled.clone());
                 }
             }
         }

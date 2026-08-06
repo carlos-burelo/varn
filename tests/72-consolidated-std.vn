@@ -1,0 +1,40 @@
+// Test suite for consolidated StdLib enrichments (std:time, std:sys, std:crypto, std:testing)
+
+import { DateTime, formatDurationMs } from "std:time";
+import { parseDotEnv, parseArgs } from "std:sys";
+import { uuidV4, isValidUuid } from "std:crypto";
+import { describe, test, expect } from "std:testing";
+
+describe("Consolidated StdLib Enrichments", () => {
+    test("std:time DateTime and formatDurationMs", () => {
+        const dt = DateTime.now();
+        expect(dt.toMs > 0).toBeTruthy();
+        expect(dt.toISOString().length > 10).toBeTruthy();
+
+        const future = dt.addSeconds(10);
+        expect(future.diff(dt)).toBe(10000);
+
+        expect(formatDurationMs(5000)).toBe("5s");
+        expect(formatDurationMs(125000)).toBe("2m 5s");
+    });
+
+    test("std:sys parseDotEnv and parseArgs", () => {
+        const dotenv = parseDotEnv("PORT=8080\nDB_HOST='localhost'\n# comment");
+        expect(dotenv["PORT"]).toBe("8080");
+        expect(dotenv["DB_HOST"]).toBe("localhost");
+
+        const parsed = parseArgs(["--port=3000", "-v", "server.vn"]);
+        expect(parsed.flags["port"]).toBe("3000");
+        expect(parsed.flags["v"]).toBe("true");
+        expect(parsed.positionals.length).toBe(1);
+        expect(parsed.positionals[0]).toBe("server.vn");
+    });
+
+    test("std:crypto uuidV4 and isValidUuid", () => {
+        const id = uuidV4();
+        expect(isValidUuid(id)).toBeTruthy();
+        expect(id.length).toBe(36);
+    });
+});
+
+print("[PASSED] 72. Consolidated StdLib Enrichments (std:time, std:sys, std:crypto, std:testing)");

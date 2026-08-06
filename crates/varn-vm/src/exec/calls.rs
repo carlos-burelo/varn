@@ -403,16 +403,19 @@ pub fn prepare_call(
 
     let callee_repr = heap.str_repr(callee_nv);
     let extracted = heap.extract(callee_nv);
-    // Names derive from the canonical `Value::type_name`; a class value reports
-    // its own class name rather than the generic `"class"`.
     let type_name = match extracted {
         Value::Class(ref c) => c.name.as_str(),
         ref other => other.type_name(),
     };
-    Err(RuntimeError::new(format!(
-        "value is not callable: {} (type: {})",
-        callee_repr, type_name
-    )))
+    if callee_nv.is_null() {
+        Err(RuntimeError::new(
+            "Cannot invoke function because the value is null. Check if the function or host entry exists and is exported.",
+        ))
+    } else {
+        Err(RuntimeError::new(format!(
+            "value is not callable: {callee_repr} (type: {type_name})",
+        )))
+    }
 }
 
 pub(crate) fn bundle_rest_args(

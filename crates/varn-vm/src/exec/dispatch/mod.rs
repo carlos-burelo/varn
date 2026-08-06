@@ -606,7 +606,8 @@ impl ExecCtx {
                             &(*ctx).heap,
                             &(*ctx).frames,
                         );
-                        if let Some(handler) = (*ctx).try_handlers.pop() {
+                        let handler = (*ctx).try_handlers.pop();
+                        if let Some(handler) = handler {
                             while (*ctx).frames.len() > handler.frame_depth {
                                 (*ctx).record_frame_pop();
                                 let f = (*ctx).frames.pop().unwrap();
@@ -630,6 +631,39 @@ impl ExecCtx {
                             let new_frame_idx = (*ctx).frames.len() - 1;
                             (*ctx).frames[new_frame_idx].ip = handler.catch_ip;
                             continue 'frame_loop;
+                        } else {
+                            // Side-table zero-cost exception lookup
+                            let thrown_val = err.thrown.unwrap_or(VmValue::null());
+                            let mut handled = false;
+                            while !(*ctx).frames.is_empty() {
+                                let cur_ip = (*ctx).frames.last().unwrap().ip as u32;
+                                let proto = &(*ctx).frames.last().unwrap().closure().proto;
+                                if let Some(range) = proto.exception_table.iter().find(|r| cur_ip >= r.try_start_ip && cur_ip <= r.try_end_ip) {
+                                    let catch_ip = range.catch_ip as usize;
+                                    let err_reg = range.err_reg as usize;
+                                    let f2 = (*ctx).frames.len() - 1;
+                                    let b2 = (*ctx).frames[f2].base;
+                                    let required_depth = b2 + (*ctx).frames[f2].closure().proto.register_count as usize;
+                                    (*ctx).stack.truncate(required_depth);
+                                    let slot = b2 + err_reg;
+                                    if slot < (*ctx).stack.len() {
+                                        (*ctx).stack[slot] = thrown_val;
+                                    } else {
+                                        (*ctx).stack.resize(slot + 1, VmValue::null());
+                                        (*ctx).stack[slot] = thrown_val;
+                                    }
+                                    (*ctx).frames[f2].ip = catch_ip;
+                                    handled = true;
+                                    break;
+                                } else {
+                                    let popped = (*ctx).frames.pop().unwrap();
+                                    (*ctx).record_frame_pop();
+                                    (*ctx).close_upvalues_above(popped.base);
+                                }
+                            }
+                            if handled {
+                                continue 'frame_loop;
+                            }
                         }
                         return Err(err);
                     }

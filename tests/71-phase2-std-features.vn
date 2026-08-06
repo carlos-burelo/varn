@@ -1,0 +1,29 @@
+// Test suite for Phase 2 StdLib native language features (Enums, Records, Tuples, Generators)
+
+import { HttpStatus } from "std:http";
+import { readLines, write as fsWrite, remove as fsRemove } from "std:fs";
+import { getSystemInfo } from "std:sys";
+
+// 1. HttpStatus enum payload & shared field access
+assert("HttpStatus.Ok code", HttpStatus.Ok.code === 200);
+assert("HttpStatus.Ok message", HttpStatus.Ok.message === "OK");
+assert("HttpStatus.NotFound code", HttpStatus.NotFound.code === 404);
+assert("HttpStatus.InternalServerError code", HttpStatus.InternalServerError.code === 500);
+
+// 2. std:fs readLines generator
+const testPath = "./temp_phase2_lines.txt";
+fsWrite(testPath, "line1\nline2\nline3");
+
+let lineCount = 0;
+for (const line of readLines(testPath)) {
+    lineCount = lineCount + 1;
+}
+assert("readLines line count", lineCount === 3);
+fsRemove(testPath);
+
+// 3. std:sys getSystemInfo Record
+const info = getSystemInfo();
+assert("system info platform is non-empty", info.platform.length > 0);
+assert("system info cwd is non-empty", info.cwd.length > 0);
+
+print("[PASSED] 71. Phase 2 StdLib Native Language Features Integration");

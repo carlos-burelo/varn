@@ -1,0 +1,54 @@
+// Test suite for std:result ADTs (Result, Option) and std:extensions
+
+import { Result, Option, Ok, Err, Some, None, isOk, isErr, unwrap, unwrapOr, isSome, isNone } from "std:result";
+import { sha256$, base64Enc$ } from "runtime:crypto";
+
+extension StringExtensions on str {
+    sha256(): str {
+        return sha256$(this);
+    }
+
+    toBase64(): str {
+        return base64Enc$(this);
+    }
+}
+
+extension IntExtensions on int {
+    seconds(): int {
+        return this * 1000;
+    }
+
+    minutes(): int {
+        return this * 60000;
+    }
+}
+
+// 1. Result ADT with match and helper functions
+const okRes: Result<int, str> = Ok(42);
+const errRes: Result<int, str> = Err("something went wrong");
+
+assert("isOk true", isOk(okRes));
+assert("isOk false", !isOk(errRes));
+assert("isErr true", isErr(errRes));
+assert("unwrap ok", unwrap(okRes) === 42);
+assert("unwrapOr default", unwrapOr(errRes, 100) === 100);
+
+const matchedVal = match (okRes) {
+    Ok(val) => val,
+    Err(_) => 0
+};
+assert("match Ok payload", matchedVal === 42);
+
+// 2. Option ADT
+const someOpt: Option<str> = Some("varn");
+const noneOpt: Option<str> = None;
+
+assert("isSome true", isSome(someOpt));
+assert("isNone true", isNone(noneOpt));
+
+// 3. Extension methods
+assert("str.sha256 extension", "hello".sha256().length === 64);
+assert("int.seconds extension", 5.seconds() === 5000);
+assert("int.minutes extension", 2.minutes() === 120000);
+
+print("[PASSED] 70. std:result ADTs and std:extensions");

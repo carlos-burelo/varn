@@ -1,11 +1,9 @@
-// std:net — host-backed network primitives and URL/query value types.
-
 import {
-    isIP as nativeIsIP,
-    isIPv4 as nativeIsIPv4,
-    isIPv6 as nativeIsIPv6,
-    encodeURIComponent as nativeEncodeURIComponent,
-    decodeURIComponent as nativeDecodeURIComponent
+    isIP$,
+    isIPv4$,
+    isIPv6$,
+    encodeURIComponent$,
+    decodeURIComponent$
 } from "runtime:net";
 
 function trimPrefixQ(s: str): str {
@@ -35,7 +33,7 @@ export class Query {
             const rawKey = eq >= 0 ? entry.slice(0, eq) : entry;
             const rawValue = eq >= 0 ? entry.slice(eq + 1) : "";
 
-            query.append(nativeDecodeURIComponent(rawKey), nativeDecodeURIComponent(rawValue));
+            query.append(decodeURIComponent$(rawKey), decodeURIComponent$(rawValue));
         }
 
         return query;
@@ -92,10 +90,10 @@ export class Query {
     toString(): str {
         const parts: str[] = [];
         for (const key in this.values) {
-            const encodedKey = nativeEncodeURIComponent(key);
+            const encodedKey = encodeURIComponent$(key);
             const bucket = this.values[key];
             for (const value of bucket) {
-                parts.push(encodedKey + "=" + nativeEncodeURIComponent(value));
+                parts.push(encodedKey + "=" + encodeURIComponent$(value));
             }
         }
         return str.join(parts, "&");
@@ -226,15 +224,23 @@ export class Url {
 }
 
 export function isIP(s: str): bool {
-    return nativeIsIP(s);
+    return isIP$(s);
 }
 
 export function isIPv4(s: str): bool {
-    return nativeIsIPv4(s);
+    return isIPv4$(s);
 }
 
 export function isIPv6(s: str): bool {
-    return nativeIsIPv6(s);
+    return isIPv6$(s);
+}
+
+export function encodeURIComponent(s: str): str {
+    return encodeURIComponent$(s);
+}
+
+export function decodeURIComponent(s: str): str {
+    return decodeURIComponent$(s);
 }
 
 export function parseURL(url: str): Url {

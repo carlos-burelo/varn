@@ -1,13 +1,11 @@
-// std:json — JSON parsing and serialization.
-
-import { parse as nativeParse, stringify as nativeStringify } from "runtime:json";
+import { parse$, stringify$ } from "runtime:json";
 
 export type Json = int | float | str | bool | null | Json[] | { [key: str]: Json };
 
 export function parse(text: str): Json {
-    return nativeParse(text) as Json;
+    return parse$(text) as Json;
 }
 
 export function stringify(value: Json, space?: int): str {
-    return nativeStringify(value);
+    return stringify$(value);
 }

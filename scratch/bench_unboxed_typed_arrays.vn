@@ -1,0 +1,40 @@
+import { nowInstant } from "std:time"
+
+const N = 5000000
+
+function test_typed_int_array(): int {
+    let arr: int[] = [10, 20, 30, 40, 50]
+    let sum: int = 0
+    for (let i: int = 0; i < N; i = i + 1) {
+        let idx: int = i % 5
+        arr[idx] = arr[idx] + 1
+        sum = sum + arr[idx]
+    }
+    return sum
+}
+
+function test_typed_float_array(): float {
+    let arr: float[] = [1.5, 2.5, 3.5, 4.5, 5.5]
+    let sum: float = 0.0
+    for (let i: int = 0; i < N; i = i + 1) {
+        let idx: int = i % 5
+        arr[idx] = arr[idx] + 0.1
+        sum = sum + arr[idx]
+    }
+    return sum
+}
+
+// Warmup
+test_typed_int_array()
+test_typed_float_array()
+
+print("--- UNBOXED TYPED ARRAYS BENCHMARK (5,000,000 read/writes) ---")
+let t1 = nowInstant().epochMilliseconds
+let res_i = test_typed_int_array()
+let t2 = nowInstant().epochMilliseconds
+print("Unboxed Array<int> Read/Write: " + (t2 - t1) + " ms | Sum: " + res_i)
+
+let t3 = nowInstant().epochMilliseconds
+let res_f = test_typed_float_array()
+let t4 = nowInstant().epochMilliseconds
+print("Unboxed Array<float> Read/Write: " + (t4 - t3) + " ms | Sum: " + res_f)

@@ -1,15 +1,15 @@
 // runtime:net — low-level host network operations.
 
-export declare function isIP(s: str): bool;
-export declare function isIPv4(s: str): bool;
-export declare function isIPv6(s: str): bool;
-export declare function encodeURIComponent(value: str): str;
-export declare function decodeURIComponent(value: str): str;
+export declare function isIP$(s: str): bool;
+export declare function isIPv4$(s: str): bool;
+export declare function isIPv6$(s: str): bool;
+export declare function encodeURIComponent$(value: str): str;
+export declare function decodeURIComponent$(value: str): str;
 
-export declare function tcpListen(port: int): int;
-export declare function tcpAccept(listenerId: int): Task<int>;
-export declare function tcpConnect(host: str, port: int): Task<int>;
-export declare function tcpRead(connId: int, len: int): Task<str>;
-export declare function tcpWrite(connId: int, data: str): Task<int>;
-export declare function tcpClose(connId: int): void;
-export declare function tcpCloseListener(listenerId: int): void;
+export declare function tcpListen$(port: int): int;
+export declare function tcpAccept$(listenerId: int): Task<int>;
+export declare function tcpConnect$(host: str, port: int): Task<int>;
+export declare function tcpRead$(connId: int, len: int): Task<str>;
+export declare function tcpWrite$(connId: int, data: str): Task<int>;
+export declare function tcpClose$(connId: int): void;
+export declare function tcpCloseListener$(listenerId: int): void;

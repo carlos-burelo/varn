@@ -1,28 +1,32 @@
-import { spawn as nativeSpawn, sleep as nativeSleep, parallel as nativeParallel, channel,
+import { spawn$, sleep$, parallel$, channel$,
          Sender, Receiver, Channel, ChannelClosed,
-         IsolateHandle, spawnIsolate as nativeSpawnIsolate } from "runtime:task";
+         IsolateHandle, spawnIsolate$ } from "runtime:task";
 
 import { Generator, AsyncGenerator, Iterator, AsyncIterator, TaskHandle } from "core:intrinsics";
 
-export { channel, Sender, Receiver, Channel, ChannelClosed, IsolateHandle, Generator, AsyncGenerator, Iterator, AsyncIterator, TaskHandle };
+export function channel<T = dynamic>(capacity: int): Channel<T> {
+    return channel$<T>(capacity);
+}
+
+export { Sender, Receiver, Channel, ChannelClosed, IsolateHandle, Generator, AsyncGenerator, Iterator, AsyncIterator, TaskHandle };
 
 export function parallel<T>(tasks: Array<Task<T>>): Task<Array<T>> {
-    return nativeParallel(tasks);
+    return parallel$(tasks);
 }
 
 export function spawn<T>(target: Task<T> | ((...args: dynamic[]) => T), ...args: dynamic[]): TaskHandle<T> {
-    return nativeSpawn(target, ...args);
+    return spawn$(target, ...args);
 }
 
 export function sleep(ms: int): TaskHandle<void> {
-    return nativeSleep(ms);
+    return sleep$(ms);
 }
 
 export function spawnIsolate(
     fn: dynamic,
     args: Array<dynamic>
 ): Task<IsolateHandle> {
-    return nativeSpawnIsolate(fn, args);
+    return spawnIsolate$(fn, args);
 }
 
 async function wrapTask<T>(task: Task<T>, group: TaskGroupImpl<T>): T {
@@ -62,7 +66,7 @@ class TaskGroupImpl<T = dynamic> {
         if (this.isCancelled) {
             throw new Error("TaskGroup is cancelled");
         }
-        return await nativeParallel(this.tasks);
+        return await parallel$(this.tasks);
     }
 
     dispose(): void {

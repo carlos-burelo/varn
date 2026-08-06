@@ -1,18 +1,35 @@
 // std:http — Clean, modern, object-oriented HTTP client and server APIs for Varn.
 
 import {
-    tcpListen,
-    tcpAccept,
-    tcpConnect,
-    tcpRead,
-    tcpWrite,
-    tcpClose,
-    tcpCloseListener
+    tcpListen$,
+    tcpAccept$,
+    tcpConnect$,
+    tcpRead$,
+    tcpWrite$,
+    tcpClose$,
+    tcpCloseListener$
 } from "runtime:net";
 
 import { parse as jsonParse, stringify as jsonStringify, Json } from "std:json";
 import { Url } from "std:net";
 import { spawn } from "std:task";
+
+export class HttpStatus {
+    static Ok = #{ code: 200, message: "OK" };
+    static Created = #{ code: 201, message: "Created" };
+    static Accepted = #{ code: 202, message: "Accepted" };
+    static NoContent = #{ code: 204, message: "No Content" };
+    static MovedPermanently = #{ code: 301, message: "Moved Permanently" };
+    static Found = #{ code: 302, message: "Found" };
+    static BadRequest = #{ code: 400, message: "Bad Request" };
+    static Unauthorized = #{ code: 401, message: "Unauthorized" };
+    static Forbidden = #{ code: 403, message: "Forbidden" };
+    static NotFound = #{ code: 404, message: "Not Found" };
+    static MethodNotAllowed = #{ code: 405, message: "Method Not Allowed" };
+    static InternalServerError = #{ code: 500, message: "Internal Server Error" };
+    static BadGateway = #{ code: 502, message: "Bad Gateway" };
+    static ServiceUnavailable = #{ code: 503, message: "Service Unavailable" };
+}
 
 function parseInt(s: str): int {
     let val = 0;
@@ -85,7 +102,7 @@ async function readHttpRequest(connId: int): Task<RawRequest?> {
     let req: RawRequest? = null;
     let keepReading = true;
     while (keepReading) {
-        let chunk = await tcpRead(connId, 4096);
+        let chunk = await tcpRead$(connId, 4096);
         if (chunk.length > 0) {
             raw = raw + chunk;
             req = parseRawRequest(raw);
@@ -155,7 +172,7 @@ async function readHttpResponse(connId: int): Task<RawResponse?> {
     let resp: RawResponse? = null;
     let keepReading = true;
     while (keepReading) {
-        let chunk = await tcpRead(connId, 4096);
+        let chunk = await tcpRead$(connId, 4096);
         if (chunk.length > 0) {
             raw = raw + chunk;
             resp = parseRawResponse(raw);
@@ -269,8 +286,8 @@ export class HttpResponse {
     }
 
     private async _writeAndClose(data: str): Task<void> {
-        await tcpWrite(this.connId, data);
-        tcpClose(this.connId);
+        await tcpWrite$(this.connId, data);
+        tcpClose$(this.connId);
     }
 
     json(data: Json): void {
@@ -322,7 +339,7 @@ export class HttpServer {
     listen(port: int): void {
         if (this._isListening) return;
         this._port = port;
-        this._listenerId = tcpListen(port);
+        this._listenerId = tcpListen$(port);
         this._isListening = true;
 
         spawn(this._acceptLoop());
@@ -335,7 +352,7 @@ export class HttpServer {
     }
 
     private async _acceptNext(): Task<void> {
-        let connId = await tcpAccept(this._listenerId);
+        let connId = await tcpAccept$(this._listenerId);
         if (connId !== -1) {
             spawn(this._handleConnection(connId));
         } else {
@@ -398,18 +415,18 @@ export class HttpServer {
                 matchedHandler(reqObj, resObj);
             } else {
                 let notFoundResponse = "HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\nContent-Type: text/plain\r\n\r\nNot Found";
-                await tcpWrite(connId, notFoundResponse);
-                tcpClose(connId);
+                await tcpWrite$(connId, notFoundResponse);
+                tcpClose$(connId);
             }
         } else {
-            tcpClose(connId);
+            tcpClose$(connId);
         }
     }
 
     close(): void {
         if (!this._isListening) return;
         this._isListening = false;
-        tcpCloseListener(this._listenerId);
+        tcpCloseListener$(this._listenerId);
     }
 }
 
@@ -469,15 +486,15 @@ async function doFetch(connId: int, parsedUrl: Url, method: str, headers: { [key
         requestStr = requestStr + body;
     }
     
-    let writeRes = await tcpWrite(connId, requestStr);
+    let writeRes = await tcpWrite$(connId, requestStr);
     if (writeRes === -1) {
-        tcpClose(connId);
+        tcpClose$(connId);
         let mock_body = "<!DOCTYPE html><html><body>Offline mock response for " + parsedUrl.toString() + "</body></html>";
         return new Response(200, "OK", true, mock_body, {});
     }
     
     const rawResp = await readHttpResponse(connId);
-    tcpClose(connId);
+    tcpClose$(connId);
     
     if (rawResp === null) {
         let mock_body = "<!DOCTYPE html><html><body>Offline mock response for " + parsedUrl.toString() + "</body></html>";
@@ -511,7 +528,7 @@ export async function fetch(
         port = 443;
     }
     
-    let connId = await tcpConnect(host, port);
+    let connId = await tcpConnect$(host, port);
     if (connId === -1) {
         let mock_body = "<!DOCTYPE html><html><body>Offline mock response for " + url + "</body></html>";
         return new Response(200, "OK", true, mock_body, {});

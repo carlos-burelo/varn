@@ -1,6 +1,6 @@
 // runtime:ffi — native host Foreign Function Interface (FFI) operations.
 
-export declare function dlopen(path: str): VmValue;
-export declare function dlsym(libHandle: VmValue, symbol: str): VmValue;
-export declare function callI64(fnPtr: VmValue, a1: int, a2: int): int;
-export declare function callF64(fnPtr: VmValue, a1: float, a2: float): float;
+export declare function dlopen$(path: str): VmValue;
+export declare function dlsym$(libHandle: VmValue, symbol: str): VmValue;
+export declare function callI64$(fnPtr: VmValue, a1: int, a2: int): int;
+export declare function callF64$(fnPtr: VmValue, a1: float, a2: float): float;

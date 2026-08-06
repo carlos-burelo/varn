@@ -5,6 +5,7 @@ use std::path::Path;
 
 
 fn main() {
+    // Force rebuild of registry.generated.rs with $ suffix support
     println!("cargo:rerun-if-changed=src/modules");
 
     let out_dir = std::env::var("OUT_DIR").unwrap();
@@ -290,11 +291,11 @@ fn extract_exports_from_source(source: &str) -> Vec<String> {
                 }
             }
             _ => {
-                if brace_depth == 0 && (c.is_alphabetic() || c == '_') {
+                if brace_depth == 0 && (c.is_alphabetic() || c == '_' || c == '$') {
                     let mut word = String::new();
                     word.push(c);
                     while let Some(&next_c) = chars.peek() {
-                        if next_c.is_alphanumeric() || next_c == '_' {
+                        if next_c.is_alphanumeric() || next_c == '_' || next_c == '$' {
                             word.push(next_c);
                             chars.next();
                         } else {
@@ -308,10 +309,10 @@ fn extract_exports_from_source(source: &str) -> Vec<String> {
                             skip_whitespace_and_comments(&mut chars);
 
                             if let Some(&next_c) = chars.peek() {
-                                if next_c.is_alphanumeric() || next_c == '_' {
+                                if next_c.is_alphanumeric() || next_c == '_' || next_c == '$' {
                                     let mut w = String::new();
                                     while let Some(&nc) = chars.peek() {
-                                        if nc.is_alphanumeric() || nc == '_' {
+                                        if nc.is_alphanumeric() || nc == '_' || nc == '$' {
                                             w.push(nc);
                                             chars.next();
                                         } else {

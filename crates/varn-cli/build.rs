@@ -1,5 +1,7 @@
 fn main() {
+    // Rebuild std.vnb with readLines array return
     println!("cargo:rerun-if-changed=../../std");
+    println!("cargo:rerun-if-changed=../../crates/varn-builtins");
 
     let std_dir = std::path::Path::new("../../std");
 

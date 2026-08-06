@@ -1,3 +1,4 @@
+// Varn Core Architecture Crate (v2)
 pub mod ast;
 pub mod cg_ty;
 pub mod doc;

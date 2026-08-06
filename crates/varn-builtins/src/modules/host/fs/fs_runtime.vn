@@ -7,17 +7,17 @@ export interface RawStats {
     mtime: int;
 }
 
-export declare function open(path: str, mode: str): int;
-export declare function readFd(fd: int, len: int): str;
-export declare function writeFd(fd: int, data: str): int;
-export declare function seek(fd: int, offset: int, whence: int): int;
-export declare function close(fd: int): void;
-export declare function exists(path: str): bool;
-export declare function stat(path: str): RawStats;
-export declare function mkdir(path: str): void;
-export declare function mkdirAll(path: str): void;
-export declare function readDir(path: str): str[];
-export declare function remove(path: str): void;
-export declare function removeAll(path: str): void;
-export declare function rename(from: str, to: str): void;
-export declare function tempDir(): str;
+export declare function open$(path: str, mode: str): int;
+export declare function readFd$(fd: int, len: int): str;
+export declare function writeFd$(fd: int, data: str): int;
+export declare function seek$(fd: int, offset: int, whence: int): int;
+export declare function close$(fd: int): void;
+export declare function exists$(path: str): bool;
+export declare function stat$(path: str): RawStats;
+export declare function mkdir$(path: str): void;
+export declare function mkdirAll$(path: str): void;
+export declare function readDir$(path: str): str[];
+export declare function remove$(path: str): void;
+export declare function removeAll$(path: str): void;
+export declare function rename$(from: str, to: str): void;
+export declare function tempDir$(): str;

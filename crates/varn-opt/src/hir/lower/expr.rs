@@ -413,7 +413,7 @@ impl<'a> Lowerer<'a> {
                         if self.ann.get_slot_idx(offset).is_some() {
                             let slot_idx = self.ann.get_slot_idx(offset).unwrap() as u16;
                             HirOptionalProperty::ModuleSlot(slot_idx)
-                        } else if let Some(mangled) = self.extension_members.get(&offset).cloned() {
+                        } else if let Some(mangled) = self.extension_members.get(&property.range.start.offset).or_else(|| self.extension_members.get(&offset)).cloned() {
                             HirOptionalProperty::Extension(mangled)
                         } else {
                             HirOptionalProperty::Member(name)
@@ -456,7 +456,7 @@ impl<'a> Lowerer<'a> {
                     });
                 }
 
-                if let Some(mangled) = self.extension_members.get(&offset).cloned() {
+                if let Some(mangled) = self.extension_members.get(&property.range.start.offset).or_else(|| self.extension_members.get(&offset)).cloned() {
                     let recv = self.lower_expr(object, scope)?;
                     return Ok(self.ext_global_call(mangled, recv, vec![]));
                 }

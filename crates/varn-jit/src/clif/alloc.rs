@@ -32,8 +32,8 @@ use varn_types::register_meta::RegisterMeta;
 use varn_types::register_meta::SlotKind;
 
 use super::emit::{
-    box_or_pass, call_helper, call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce,
-    use_f64, use_int, wrap_i48,
+    box_bool, box_f64, box_int, box_or_pass, call_helper, call_helper_void, meta_is_float,
+    unbox_bool, unbox_f64_coerce, use_f64, use_int, wrap_i48,
 };
 use super::kinds::K;
 use super::liveness::Liveness;
@@ -744,9 +744,79 @@ pub(super) fn emit_call_native_op(
     // single call, which on a hot `arr.push(x)` is a large share of the cost
     // of the call itself. `0` means the table does not know the id — keep the
     // dynamic form so the helper raises the same error it always did.
-    let addr = (actx.helpers.resolve_native_op)(op_id);
-    let res = if addr != 0 {
-        let fn_v = b.ins().iconst(types::I64, addr as i64);
+    let (fn_addr, raw_addr, sig_desc) = (actx.helpers.resolve_native_op_v2)(op_id);
+    if raw_addr != 0 {
+        let mut sig = cranelift_codegen::ir::Signature::new(actx.cc);
+        let argc = sig_desc.param_count as usize;
+        let mut raw_args = Vec::with_capacity(argc);
+
+        for i in 0..argc {
+            let r = dest + 1 + i;
+            let arg_ty = sig_desc.param_types[i];
+            match arg_ty {
+                varn_types::ArgType::Int => {
+                    sig.params.push(cranelift_codegen::ir::AbiParam::new(types::I64));
+                    let v = use_int(b, actx.vars, state, r)?;
+                    raw_args.push(v);
+                }
+                varn_types::ArgType::Float => {
+                    sig.params.push(cranelift_codegen::ir::AbiParam::new(types::F64));
+                    let f = use_f64(b, actx.vars, state, r)?;
+                    raw_args.push(f);
+                }
+                varn_types::ArgType::Bool => {
+                    sig.params.push(cranelift_codegen::ir::AbiParam::new(types::I64));
+                    let boxed = box_or_pass(b, actx.vars, state, r);
+                    let b_val = unbox_bool(b, boxed);
+                    raw_args.push(b_val);
+                }
+                _ => {
+                    sig.params.push(cranelift_codegen::ir::AbiParam::new(types::I64));
+                    let boxed = box_or_pass(b, actx.vars, state, r);
+                    raw_args.push(boxed);
+                }
+            }
+        }
+
+        match sig_desc.return_type {
+            varn_types::ArgType::Float => {
+                sig.returns.push(cranelift_codegen::ir::AbiParam::new(types::F64));
+            }
+            varn_types::ArgType::Void => {}
+            _ => {
+                sig.returns.push(cranelift_codegen::ir::AbiParam::new(types::I64));
+            }
+        }
+
+        let sig_ref = b.import_signature(sig);
+        let raw_fn_v = b.ins().iconst(types::I64, raw_addr as i64);
+        let call = b.ins().call_indirect(sig_ref, raw_fn_v, &raw_args);
+
+        let res = match sig_desc.return_type {
+            varn_types::ArgType::Float => {
+                let f_res = b.inst_results(call)[0];
+                box_f64(b, f_res)
+            }
+            varn_types::ArgType::Int => {
+                let i_res = b.inst_results(call)[0];
+                let w = wrap_i48(b, i_res);
+                box_int(b, w)
+            }
+            varn_types::ArgType::Bool => {
+                let b_res = b.inst_results(call)[0];
+                box_bool(b, b_res)
+            }
+            varn_types::ArgType::Void => b.ins().iconst(types::I64, 0),
+            _ => b.inst_results(call)[0],
+        };
+
+        reload_boxed(b, actx, state, &regs);
+        def_result(b, actx, dest, res);
+        return Ok(());
+    }
+
+    let res = if fn_addr != 0 {
+        let fn_v = b.ins().iconst(types::I64, fn_addr as i64);
         call_helper(
             b,
             actx.cc,

@@ -1,11 +1,11 @@
 import {
-    defineMetadata,
-    getMetadata,
-    hasMetadata,
-    createMetaKey,
-    setMetaKey,
-    getMetaKey,
-    hasMetaKey
+    defineMetadata$,
+    getMetadata$,
+    hasMetadata$,
+    createMetaKey$,
+    setMetaKey$,
+    getMetaKey$,
+    hasMetaKey$
 } from "runtime:reflect";
 
 export interface ClassRef {
@@ -20,15 +20,33 @@ export interface FunctionRef {
     bind(thisArg: dynamic, ...args: dynamic[]): FunctionRef;
 }
 
-export {
-    defineMetadata,
-    getMetadata,
-    hasMetadata,
-    createMetaKey,
-    setMetaKey,
-    getMetaKey,
-    hasMetaKey
-};
+export function defineMetadata(metadataKey: dynamic, metadataValue: dynamic, target: dynamic): void {
+    defineMetadata$(metadataKey, metadataValue, target);
+}
+
+export function getMetadata(metadataKey: dynamic, target: dynamic): dynamic {
+    return getMetadata$(metadataKey, target);
+}
+
+export function hasMetadata(metadataKey: dynamic, target: dynamic): bool {
+    return hasMetadata$(metadataKey, target);
+}
+
+export function createMetaKey(): str {
+    return createMetaKey$();
+}
+
+export function setMetaKey(metaId: str, target: dynamic, value: dynamic): void {
+    setMetaKey$(metaId, target, value);
+}
+
+export function getMetaKey(metaId: str, target: dynamic): dynamic {
+    return getMetaKey$(metaId, target);
+}
+
+export function hasMetaKey(metaId: str, target: dynamic): bool {
+    return hasMetaKey$(metaId, target);
+}
 
 export function getMetadataKeys(target: dynamic): dynamic[] {
     return [];

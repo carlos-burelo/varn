@@ -124,29 +124,30 @@ impl ExecCtx {
         crate::exec::collections::array_set_index(obj, idx, val, &mut self.heap)
     }
 
-    pub(in crate::exec::dispatch) fn exec_build_object_with_shape(
-        &mut self,
-        base: usize,
-        start_reg: usize,
-        shape_idx: usize,
-        closure: &VmClosure,
-    ) -> VmResult<VmValue> {
-        let shape = closure
-            .proto
-            .resolved_shape(shape_idx)
-            .ok_or_else(|| RuntimeError::new("BuildObjectWithShape: invalid shape const"))?;
-        let count = shape.property_names.len();
-        let required = base + start_reg + count;
-        if self.stack.len() < required {
-            self.stack.resize(required, VmValue::null());
-        }
-        Ok(crate::exec::collections::build_object_with_shape(
-            &self.stack,
-            base + start_reg,
-            shape,
-            &mut self.heap,
-        ))
-    }
+    // #[allow(dead_code)]
+    // pub(in crate::exec::dispatch) fn exec_build_object_with_shape(
+    //     &mut self,
+    //     base: usize,
+    //     start_reg: usize,
+    //     shape_idx: usize,
+    //     closure: &VmClosure,
+    // ) -> VmResult<VmValue> {
+    //     let shape = closure
+    //         .proto
+    //         .resolved_shape(shape_idx)
+    //         .ok_or_else(|| RuntimeError::new("BuildObjectWithShape: invalid shape const"))?;
+    //     let count = shape.property_names.len();
+    //     let required = base + start_reg + count;
+    //     if self.stack.len() < required {
+    //         self.stack.resize(required, VmValue::null());
+    //     }
+    //     Ok(crate::exec::collections::build_object_with_shape(
+    //         &self.stack,
+    //         base + start_reg,
+    //         shape,
+    //         &mut self.heap,
+    //     ))
+    // }
 
     pub(crate) fn exec_object_rest(
         &mut self,

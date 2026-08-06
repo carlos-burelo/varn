@@ -1,17 +1,18 @@
+// Elevated std:math module - High-performance math intrinsics.
 import {
-    abs as nativeAbs,
-    sqrt as nativeSqrt,
-    sin as nativeSin,
-    cos as nativeCos,
-    tan as nativeTan,
-    floor as nativeFloor,
-    ceil as nativeCeil,
-    round as nativeRound,
-    random as nativeRandom,
-    acos as nativeAcos,
-    asin as nativeAsin,
-    atan as nativeAtan,
-    atan2 as nativeAtan2
+    abs$,
+    sqrt$,
+    sin$,
+    cos$,
+    tan$,
+    floor$,
+    ceil$,
+    round$,
+    random$,
+    acos$,
+    asin$,
+    atan$,
+    atan2$
 } from "runtime:math";
 
 export const E: float = 2.718281828459045;
@@ -23,53 +24,72 @@ export const PI: float = 3.141592653589793;
 export const SQRT1_2: float = 0.7071067811865476;
 export const SQRT2: float = 1.4142135623730951;
 
+export class Math {
+    static const E: float = 2.718281828459045;
+    static const PI: float = 3.141592653589793;
+
+    static abs(x: float): float { return abs$(x); }
+    static sqrt(x: float): float { return sqrt$(x); }
+    static sin(x: float): float { return sin$(x); }
+    static cos(x: float): float { return cos$(x); }
+    static tan(x: float): float { return tan$(x); }
+    static floor(x: float): float { return floor$(x); }
+    static ceil(x: float): float { return ceil$(x); }
+    static round(x: float): float { return round$(x); }
+    static random(): float { return random$(); }
+    static acos(x: float): float { return acos$(x); }
+    static asin(x: float): float { return asin$(x); }
+    static atan(x: float): float { return atan$(x); }
+    static atan2(y: float, x: float): float { return atan2$(y, x); }
+}
+
 export function abs(x: float): float {
-    return nativeAbs(x);
+    return abs$(x);
 }
 
 export function sqrt(x: float): float {
-    return nativeSqrt(x);
+    return sqrt$(x);
 }
 
 export function sin(x: float): float {
-    return nativeSin(x);
+    return sin$(x);
 }
 
 export function cos(x: float): float {
-    return nativeCos(x);
+    return cos$(x);
 }
 
 export function tan(x: float): float {
-    return nativeTan(x);
+    return tan$(x);
 }
 
 export function floor(x: float): float {
-    return nativeFloor(x);
+    return floor$(x);
 }
 
 export function ceil(x: float): float {
-    return nativeCeil(x);
+    return ceil$(x);
 }
 
 export function round(x: float): float {
-    return nativeRound(x);
+    return round$(x);
 }
 
 export function random(): float {
-    return nativeRandom();
+    return random$();
 }
 
 export function acos(x: float): float {
-    return nativeAcos(x);
+    return acos$(x);
 }
 export function asin(x: float): float {
-    return nativeAsin(x);
+    return asin$(x);
 }
 export function atan(x: float): float {
-    return nativeAtan(x);
+    return atan$(x);
 }
 export function atan2(y: float, x: float): float {
-    return nativeAtan2(y, x);
+    return atan2$(y, x);
 }
 export function exp(x: float): float {
     return 0.0;
@@ -113,7 +133,7 @@ export function sign(x: float): float {
 }
 export function trunc(x: float): float {
     if (x >= 0.0) {
-        return nativeFloor(x);
+        return floor$(x);
     }
-    return nativeCeil(x);
+    return ceil$(x);
 }

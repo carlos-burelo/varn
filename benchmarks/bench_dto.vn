@@ -29,7 +29,7 @@ class UserDTO {
 
 let count = 100000
 
-let users = []
+let users: User[] = []
 for (let i = 0; i < count; i = i + 1) {
     users.push(new User(
         i,
@@ -40,7 +40,7 @@ for (let i = 0; i < count; i = i + 1) {
     ))
 }
 
-let activeAdults = []
+let activeAdults: UserDTO[] = []
 let totalScore = 0.0
 
 for (let i = 0; i < count; i = i + 1) {

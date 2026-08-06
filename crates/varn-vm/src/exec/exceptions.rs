@@ -39,7 +39,8 @@ pub fn collect_frames(frames: &[CallFrame]) -> Vec<FrameInfo> {
                 .map(|s| s.to_owned())
                 .unwrap_or_else(|| "<anonymous>".to_owned());
             let file = proto.chunk.source_file.to_string();
-            let line = proto.chunk.lines.get_line(f.ip.saturating_sub(1));
+            let raw_line = proto.chunk.lines.get_line(f.ip.saturating_sub(1));
+            let line = if raw_line > 0 { raw_line } else { 1 };
             Some(FrameInfo {
                 fn_name,
                 file,

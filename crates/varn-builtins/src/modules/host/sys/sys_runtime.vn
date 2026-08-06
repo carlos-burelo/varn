@@ -1,9 +1,9 @@
 // runtime:sys — low-level host process/system operations.
 
-export declare function platform(): str;
-export declare function cwd(): str;
-export declare function args(): str[];
-export declare function exit(code?: int): void;
-export declare function env(key: str): str;
-export declare function setEnv(key: str, val: str): void;
-export declare function now(): float;
+export declare function platform$(): str;
+export declare function cwd$(): str;
+export declare function args$(): str[];
+export declare function exit$(code?: int): void;
+export declare function env$(key: str): str;
+export declare function setEnv$(key: str, val: str): void;
+export declare function now$(): float;

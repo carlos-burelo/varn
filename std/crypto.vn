@@ -1,21 +1,52 @@
 import {
-    sha256,
-    sha512,
-    uuid,
-    randomBytes,
-    randomHex,
-    base64Enc,
-    base64Dec,
-    hmac
+    sha256$,
+    sha512$,
+    uuid$,
+    randomBytes$,
+    randomHex$,
+    base64Enc$,
+    base64Dec$,
+    hmac$
 } from "runtime:crypto";
 
-export {
-    sha256,
-    sha512,
-    uuid,
-    randomBytes,
-    randomHex,
-    base64Enc,
-    base64Dec,
-    hmac
-};
+export function sha256(data: str): str {
+    return sha256$(data);
+}
+
+export function sha512(data: str): str {
+    return sha512$(data);
+}
+
+export function uuid(): str {
+    return uuid$();
+}
+
+export function randomBytes(size: int): int[] {
+    return randomBytes$(size);
+}
+
+export function randomHex(size: int): str {
+    return randomHex$(size);
+}
+
+export function base64Enc(data: str): str {
+    return base64Enc$(data);
+}
+
+export function base64Dec(data: str): str {
+    return base64Dec$(data);
+}
+
+export function hmac(algo: str, key: str, data: str): str {
+    return hmac$(algo, key, data);
+}
+
+export function uuidV4(): str {
+    return uuid$();
+}
+
+export function isValidUuid(s: str): bool {
+    if (s.length !== 36) return false;
+    if (s[8] !== "-" || s[13] !== "-" || s[18] !== "-" || s[23] !== "-") return false;
+    return true;
+}

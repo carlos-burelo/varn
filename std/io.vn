@@ -1,4 +1,4 @@
-import { write as nativeWrite, writeln as nativeWriteln, flush as nativeFlush, readLine as nativeReadLine } from "runtime:io";
+import { write$, writeln$, flush$, readLine$ } from "runtime:io";
 
 export interface Writer {
     write(content: str): void
@@ -10,19 +10,27 @@ export interface Reader {
     pipeTo(dst: Writer): void
 }
 
-export const write = nativeWrite;
-export const writeln = nativeWriteln;
-export const print = nativeWriteln;
+export function write(...args: dynamic[]): void {
+    write$(...args);
+}
+
+export function writeln(...args: dynamic[]): void {
+    writeln$(...args);
+}
+
+export function print(...args: dynamic[]): void {
+    writeln$(...args);
+}
 
 export function flush(): void {
-    nativeFlush();
+    flush$();
 }
 
 export function readLine(prompt?: str): str {
     if (prompt === null) {
-        return nativeReadLine("");
+        return readLine$("");
     }
-    return nativeReadLine(prompt);
+    return readLine$(prompt);
 }
 
 export function readAll(): str {

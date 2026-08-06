@@ -347,13 +347,20 @@ fn map_params(params: &[Param]) -> Vec<ParamInfo> {
 pub(crate) fn expand(input: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(input as ContractInput);
 
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
-    let abs_path = Path::new(&manifest_dir).join(&input.contract);
-    let abs_path_str = abs_path.to_string_lossy().replace('\\', "/");
-    let source = match std::fs::read_to_string(&abs_path) {
-        Ok(s) => s,
-        Err(e) => {
-            return err(format!("cannot read contract `{}`: {e}", abs_path_str));
+    let (source, abs_path_str) = if input.contract.trim().starts_with("declare")
+        || input.contract.trim().starts_with("export")
+        || input.contract.contains('\n')
+    {
+        (input.contract.clone(), "<inline>".to_string())
+    } else {
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_default();
+        let abs_path = Path::new(&manifest_dir).join(&input.contract);
+        let abs_path_str = abs_path.to_string_lossy().replace('\\', "/");
+        match std::fs::read_to_string(&abs_path) {
+            Ok(s) => (s, abs_path_str),
+            Err(e) => {
+                return err(format!("cannot read contract `{}`: {e}", abs_path_str));
+            }
         }
     };
 
@@ -413,9 +420,10 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
             });
             continue;
         }
-        let method_ident = format_ident!("{}", sym);
-        let wrap_ident = format_ident!("__varn_wrap_{}_{}", sanitize(&prefix), sanitize(sym));
-        let fast_wrap_ident = format_ident!("__varn_fast_wrap_{}_{}", sanitize(&prefix), sanitize(sym));
+        let rust_sym = sym.trim_end_matches('$');
+        let method_ident = format_ident!("{}", rust_sym);
+        let wrap_ident = format_ident!("__varn_wrap_{}_{}", sanitize(&prefix), sanitize(rust_sym));
+        let fast_wrap_ident = format_ident!("__varn_fast_wrap_{}_{}", sanitize(&prefix), sanitize(rust_sym));
 
         let mut sig_params: Vec<TS2> = Vec::new();
         let mut decode: Vec<TS2> = Vec::new();
@@ -844,7 +852,7 @@ fn map_to_arg_type_token(m: &Mapped) -> TS2 {
 }
 
 fn is_scalar(m: &Mapped) -> bool {
-    matches!(m, Mapped::Int | Mapped::Float | Mapped::Bool | Mapped::Void | Mapped::Dynamic)
+    matches!(m, Mapped::Int | Mapped::Float | Mapped::Bool | Mapped::Char | Mapped::Void)
 }
 
 fn is_fast_eligible(m: &Member) -> bool {

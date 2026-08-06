@@ -1,0 +1,25 @@
+import { nowInstant } from "std:time"
+
+const N = 10000000
+
+function add_unboxed(a: int, b: int): int {
+    return a + b
+}
+
+function process_loop(limit: int): int {
+    let sum: int = 0
+    for (let i: int = 0; i < limit; i = i + 1) {
+        sum = add_unboxed(sum, i)
+    }
+    return sum
+}
+
+// Warmup
+process_loop(100000)
+
+print("--- UNBOXED DIRECT FUNCTION CALLS BENCHMARK (10,000,000 calls) ---")
+let t1 = nowInstant().epochMilliseconds
+let result = process_loop(N)
+let t2 = nowInstant().epochMilliseconds
+
+print("10,000,000 Unboxed Direct Calls in: " + (t2 - t1) + " ms | Res: " + result)

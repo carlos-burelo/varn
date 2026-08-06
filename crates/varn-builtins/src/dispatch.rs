@@ -8,13 +8,6 @@ use varn_core::op_meta::OpMeta;
 use varn_types::{NativeCtx, NativeOpEntry, VmValue};
 
 extern "C" {
-    #[cfg(target_os = "windows")]
-    #[link_name = "\x01.varn_ops$A"]
-    static __VARN_OPS_START: NativeOpEntry;
-    #[cfg(target_os = "windows")]
-    #[link_name = "\x01.varn_ops$C"]
-    static __VARN_OPS_END: NativeOpEntry;
-
     #[cfg(target_os = "macos")]
     #[link_name = "\x01section$start$__DATA$varn_ops"]
     static __VARN_OPS_START: NativeOpEntry;
@@ -41,19 +34,16 @@ pub static __VARN_OPS_START_MARKER: NativeOpEntry = unsafe { std::mem::zeroed() 
 pub static __VARN_OPS_END_MARKER: NativeOpEntry = unsafe { std::mem::zeroed() };
 
 pub fn iter_native_ops() -> impl Iterator<Item = &'static NativeOpEntry> {
-    // `#[used]` keeps the boundary markers inside the object file that defines
-    // them, but it does not make any *other* object depend on that one — so the
-    // linker is free to drop it while keeping this function, leaving the extern
-    // `.varn_ops$A`/`$C` refs below undefined. That is not hypothetical: it is
-    // why `[profile.release]` pins `codegen-units = 1`, and the debug profile's
-    // default partitioning hits it too. Taking the markers' addresses here emits
-    // a real symbol reference, which forces their object to be linked in — the
-    // section bounds then exist whatever the CGU count.
     #[cfg(target_os = "windows")]
-    {
-        std::hint::black_box(&__VARN_OPS_START_MARKER as *const NativeOpEntry);
-        std::hint::black_box(&__VARN_OPS_END_MARKER as *const NativeOpEntry);
+    unsafe {
+        let start = &__VARN_OPS_START_MARKER as *const NativeOpEntry;
+        let end = &__VARN_OPS_END_MARKER as *const NativeOpEntry;
+        let len = (end as usize - start as usize) / std::mem::size_of::<NativeOpEntry>();
+        let slice = std::slice::from_raw_parts(start, len);
+        slice.iter().filter(|e| !e.func_ptr.is_null())
     }
+
+    #[cfg(not(target_os = "windows"))]
     unsafe {
         let start = &__VARN_OPS_START as *const NativeOpEntry;
         let end = &__VARN_OPS_END as *const NativeOpEntry;
@@ -128,34 +118,42 @@ fn build_module_ops_index() -> FxHashMap<String, Vec<&'static NativeOpEntry>> {
 }
 
 pub fn find_native_op_entry(op_id: u64) -> Option<&'static NativeOpEntry> {
-    static ENTRIES_MAP: OnceLock<FxHashMap<u64, &'static NativeOpEntry>> = OnceLock::new();
-    let map = ENTRIES_MAP.get_or_init(|| {
-        let mut m = FxHashMap::with_capacity_and_hasher(512, Default::default());
-        for entry in all_native_ops() {
-            let module = entry.module_id();
-            let symbol = entry.symbol_name();
-            let ns = entry.namespace_path();
-            let id = if ns.is_empty() {
-                entry::compound_op_id(module, symbol)
-            } else {
-                entry::compound_op_id3(module, ns, symbol)
-            };
-            m.insert(id, entry);
+    for entry in all_native_ops() {
+        let module = entry.module_id();
+        let symbol = entry.symbol_name();
+        let ns = entry.namespace_path();
+        let id = if ns.is_empty() {
+            entry::compound_op_id(module, symbol)
+        } else {
+            entry::compound_op_id3(module, ns, symbol)
+        };
+        if id == op_id {
+            return Some(entry);
         }
-        m
-    });
-    map.get(&op_id).copied()
+    }
+    None
 }
 
 pub fn describe_op(id: u64) -> Option<OpMeta> {
-    let table = TABLE.get_or_init(build_table);
-    let entry = table.get(&id)?;
-    Some(OpMeta {
-        name: entry.name,
-        op_id: entry.id,
-        is_async: false,
-        capability: entry.capability,
-    })
+    for entry in all_native_ops() {
+        let module = entry.module_id();
+        let symbol = entry.symbol_name();
+        let ns = entry.namespace_path();
+        let op_id = if ns.is_empty() {
+            entry::compound_op_id(module, symbol)
+        } else {
+            entry::compound_op_id3(module, ns, symbol)
+        };
+        if op_id == id {
+            return Some(OpMeta {
+                name: symbol,
+                op_id,
+                is_async: false,
+                capability: None,
+            });
+        }
+    }
+    None
 }
 
 /// Resolve a stable op-id to its native function pointer, for callers that want
@@ -164,6 +162,15 @@ pub fn describe_op(id: u64) -> Option<OpMeta> {
 pub fn native_op_fn(id: u64) -> Option<varn_types::NativeFn> {
     let table = TABLE.get_or_init(build_table);
     table.get(&id).map(|e| e.func)
+}
+
+pub fn native_fast_op_fn(id: u64) -> Option<(*const u8, varn_types::SignatureDescriptor)> {
+    let entry = find_native_op_entry(id)?;
+    if !entry.raw_func_ptr.is_null() {
+        Some((entry.raw_func_ptr, entry.signature))
+    } else {
+        None
+    }
 }
 
 pub fn dispatch_runtime_op(
@@ -224,8 +231,11 @@ fn resolve_ns<'a>(
 }
 
 pub(crate) fn build_module(id: &str, ctx: &mut dyn NativeCtx) -> Option<VmValue> {
-    let map = MODULE_OPS.get_or_init(build_module_ops_index);
-    let entries = map.get(id)?;
+    let all_ops = all_native_ops();
+    let entries: Vec<&'static NativeOpEntry> = all_ops
+        .into_iter()
+        .filter(|e| e.module_id() == id)
+        .collect();
     if entries.is_empty() {
         return None;
     }

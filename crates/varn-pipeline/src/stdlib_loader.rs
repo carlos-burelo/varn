@@ -269,8 +269,16 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
             .map_err(|e| format!("cannot read {}: {e}", file.display()))?;
 
         let exports = varn_checker::module_resolver::resolve_stdlib_module_exports_ref(&m.id);
-        let bind = varn_checker::module_resolver::resolve_stdlib_module_bind_ref(&m.id)
-            .ok_or_else(|| format!("cannot bind {}", m.id))?;
+        let bind = match varn_checker::module_resolver::resolve_stdlib_module_bind_ref(&m.id) {
+            Some(b) => b,
+            None => {
+                let err_msg = match compile_source_checked(&source, &m.id) {
+                    Ok(_) => "unknown bind failure".to_string(),
+                    Err(e) => e,
+                };
+                return Err(format!("cannot bind {}: {}", m.id, err_msg));
+            }
+        };
         let interface = varn_checker::module_resolver::serialize_module_interface(&exports, &bind)
             .map_err(|e| format!("interface serialization failed for {}: {e}", m.id))?;
 

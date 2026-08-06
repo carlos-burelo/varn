@@ -10,7 +10,7 @@ export interface RuntimeTimeParts {
     millisecond: int;
 }
 
-export declare function nowMs(): int;
-export declare function parseIsoDuration(s: str): int;
-export declare function msToParts(ms: int): RuntimeTimeParts;
-export declare function partsToMs(parts: RuntimeTimeParts): int;
+export declare function nowMs$(): int;
+export declare function parseIsoDuration$(s: str): int;
+export declare function msToParts$(ms: int): RuntimeTimeParts;
+export declare function partsToMs$(parts: RuntimeTimeParts): int;

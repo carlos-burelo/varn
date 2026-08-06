@@ -107,6 +107,7 @@ pub fn emit_function(
         chunk,
         required_caps: Vec::new(),
         register_meta,
+        exception_table: Vec::new(),
         param_kinds,
         return_kind,
         resolved_shapes: RefCell::new(Vec::new()),

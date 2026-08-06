@@ -1,8 +1,8 @@
 import {
-    nowMs as nativeNowMs,
-    parseIsoDuration as nativeParseIsoDuration,
-    msToParts as nativeMsToParts,
-    partsToMs as nativePartsToMs,
+    nowMs$,
+    parseIsoDuration$,
+    msToParts$,
+    partsToMs$,
     RuntimeTimeParts
 } from "runtime:time";
 
@@ -56,20 +56,20 @@ function pad4(n: int): str {
 }
 
 export function now(): int {
-    return nativeNowMs();
+    return nowMs$();
 }
 
 export function toISOString(ms: int): str {
-    let parts = nativeMsToParts(ms);
+    let parts = msToParts$(ms);
     return pad4(parts.year) + "-" + pad2(parts.month) + "-" + pad2(parts.day) + "T" + pad2(parts.hour) + ":" + pad2(parts.minute) + ":" + pad2(parts.second) + "." + pad3(parts.millisecond) + "Z";
 }
 
 export function fromISO(iso: str): int {
-    return nativeParseIsoDuration(iso);
+    return parseIsoDuration$(iso);
 }
 
 export function toParts(ms: int): TimeParts {
-    let parts = nativeMsToParts(ms);
+    let parts = msToParts$(ms);
     return {
         year: parts.year,
         month: parts.month,
@@ -82,11 +82,11 @@ export function toParts(ms: int): TimeParts {
 }
 
 export function fromParts(parts: TimeParts): int {
-    return nativePartsToMs(parts);
+    return partsToMs$(parts);
 }
 
 export function durationFromString(s: str): int {
-    return nativeParseIsoDuration(s);
+    return parseIsoDuration$(s);
 }
 
 export function durationToString(ms: int): str {
@@ -105,11 +105,11 @@ export function durationParts(ms: int): DurationParts {
 }
 
 export function nowInstant(): Instant {
-    return new Instant(nativeNowMs());
+    return new Instant(nowMs$());
 }
 
 export function nowPlainDateTimeISO(): PlainDateTime {
-    let parts = nativeMsToParts(nativeNowMs());
+    let parts = msToParts$(nowMs$());
     return new PlainDateTime(
         parts.year,
         parts.month,
@@ -199,7 +199,7 @@ export class Duration {
 
     static from(input: DurationLike): Duration {
         if (input instanceof str) {
-            let ms = nativeParseIsoDuration(input);
+            let ms = parseIsoDuration$(input);
             return new Duration(ms);
         } else if (input instanceof int) {
             return new Duration(input);
@@ -276,4 +276,72 @@ export class Duration {
     toJSON(): str {
         return this.toString();
     }
+}
+
+export class DateTime {
+    private timestamp: int;
+
+    constructor(timestampMs?: int) {
+        if (timestampMs !== null) {
+            this.timestamp = timestampMs;
+        } else {
+            this.timestamp = nowMs$();
+        }
+    }
+
+    static now(): DateTime {
+        return new DateTime(nowMs$());
+    }
+
+    static fromTimestamp(ms: int): DateTime {
+        return new DateTime(ms);
+    }
+
+    get toMs(): int {
+        return this.timestamp;
+    }
+
+    toISOString(): str {
+        let p = msToParts$(this.timestamp);
+        return pad4(p.year) + "-" + pad2(p.month) + "-" + pad2(p.day) + "T" + pad2(p.hour) + ":" + pad2(p.minute) + ":" + pad2(p.second) + "." + pad3(p.millisecond) + "Z";
+    }
+
+    addMs(ms: int): DateTime {
+        return new DateTime(this.timestamp + ms);
+    }
+
+    addSeconds(s: int): DateTime {
+        return new DateTime(this.timestamp + s * 1000);
+    }
+
+    addMinutes(m: int): DateTime {
+        return new DateTime(this.timestamp + m * 60000);
+    }
+
+    addHours(h: int): DateTime {
+        return new DateTime(this.timestamp + h * 3600000);
+    }
+
+    addDays(d: int): DateTime {
+        return new DateTime(this.timestamp + d * 86400000);
+    }
+
+    diff(other: DateTime): int {
+        return this.timestamp - other.toMs;
+    }
+}
+
+export function formatDurationMs(ms: int): str {
+    let seconds = int_div(ms, 1000);
+    let minutes = int_div(seconds, 60);
+    let hours = int_div(minutes, 60);
+    let remSec = seconds % 60;
+    let remMin = minutes % 60;
+    if (hours > 0) {
+        return hours + "h " + remMin + "m " + remSec + "s";
+    }
+    if (minutes > 0) {
+        return minutes + "m " + remSec + "s";
+    }
+    return seconds + "s";
 }

@@ -1,34 +1,34 @@
 import {
-    dlopen as _dlopen,
-    dlsym as _dlsym,
-    callI64 as _callI64,
-    callF64 as _callF64
+    dlopen$,
+    dlsym$,
+    callI64$,
+    callF64$
 } from "runtime:ffi";
 
 class DynamicLibrary {
-    let _handle: any;
+    let _handle: dynamic;
 
-    constructor(handle: any) {
+    constructor(handle: dynamic) {
         this._handle = handle;
     }
 
-    symbol(name: str): any {
-        return _dlsym(this._handle, name);
+    symbol(name: str): dynamic {
+        return dlsym$(this._handle, name);
     }
 }
 
 class FFI {
     static open(path: str): DynamicLibrary {
-        let handle = _dlopen(path);
+        let handle = dlopen$(path);
         return new DynamicLibrary(handle);
     }
 
-    static callInt(fnPtr: any, a1: int, a2: int): int {
-        return _callI64(fnPtr, a1, a2);
+    static callInt(fnPtr: dynamic, a1: int, a2: int): int {
+        return callI64$(fnPtr, a1, a2);
     }
 
-    static callFloat(fnPtr: any, a1: float, a2: float): float {
-        return _callF64(fnPtr, a1, a2);
+    static callFloat(fnPtr: dynamic, a1: float, a2: float): float {
+        return callF64$(fnPtr, a1, a2);
     }
 }
 

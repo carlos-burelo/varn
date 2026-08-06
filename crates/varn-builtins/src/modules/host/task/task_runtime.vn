@@ -1,14 +1,14 @@
 // runtime:task — low-level host task operations.
 
-export declare function spawn<T>(target: Task<T> | ((...args: dynamic[]) => T), ...args: dynamic[]): TaskHandle<T>;
-export declare function sleep(ms: int): TaskHandle<void>;
-export declare function parallel<T>(tasks: Array<Task<T> >): Task<Array<T> >;
+export declare function spawn$<T>(target: Task<T> | ((...args: dynamic[]) => T), ...args: dynamic[]): TaskHandle<T>;
+export declare function sleep$(ms: int): TaskHandle<void>;
+export declare function parallel$<T>(tasks: Array<Task<T> >): Task<Array<T> >;
 
 export declare class IsolateHandle {
     join(): Task<void>;
 }
 
-export declare function spawnIsolate(fn: dynamic, args: Array<dynamic>): Task<IsolateHandle>;
+export declare function spawnIsolate$(fn: dynamic, args: Array<dynamic>): Task<IsolateHandle>;
 
 export declare class ChannelClosed extends Error {}
 
@@ -29,4 +29,4 @@ export declare class Channel<T = dynamic> {
     rx: Receiver<T>;
 }
 
-export declare function channel<T = dynamic>(capacity: int): Channel<T>;
+export declare function channel$<T = dynamic>(capacity: int): Channel<T>;

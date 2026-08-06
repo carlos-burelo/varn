@@ -1,0 +1,18 @@
+import { nowInstant } from "std:time"
+
+function fib_unboxed(n: int): int {
+    if (n <= 1) {
+        return n
+    }
+    return fib_unboxed(n - 1) + fib_unboxed(n - 2)
+}
+
+// Warmup
+fib_unboxed(20)
+
+print("--- UNBOXED RECURSION BENCHMARK (fib_unboxed(35)) ---")
+let t1 = nowInstant().epochMilliseconds
+let res = fib_unboxed(35)
+let t2 = nowInstant().epochMilliseconds
+
+print("fib(35) in: " + (t2 - t1) + " ms | Res: " + res)

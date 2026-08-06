@@ -1,0 +1,58 @@
+// std:testing — Native testing framework for Varn programs
+
+import { write$ } from "runtime:io";
+
+function logLine(msg: str): void {
+    write$(msg + "\n");
+}
+
+export class Expectation<T> {
+    private actual: T;
+
+    constructor(actual: T) {
+        this.actual = actual;
+    }
+
+    toBe(expected: T): void {
+        if (this.actual !== expected) {
+            throw new Error("Expected " + expected + " but received " + this.actual);
+        }
+    }
+
+    toEqual(expected: T): void {
+        if (this.actual != expected) {
+            throw new Error("Expected equal " + expected + " but received " + this.actual);
+        }
+    }
+
+    toBeTruthy(): void {
+        if (!this.actual) {
+            throw new Error("Expected truthy value but received " + this.actual);
+        }
+    }
+
+    toBeFalsy(): void {
+        if (this.actual) {
+            throw new Error("Expected falsy value but received " + this.actual);
+        }
+    }
+}
+
+export function expect<T>(val: T): Expectation<T> {
+    return new Expectation<T>(val);
+}
+
+export function describe(suiteName: str, body: () => void): void {
+    logLine("=== Suite: " + suiteName + " ===");
+    body();
+}
+
+export function test(testName: str, body: () => void): void {
+    try {
+        body();
+        logLine("  ✔ " + testName);
+    } catch (err) {
+        logLine("  ✖ " + testName + ": " + err);
+        throw err;
+    }
+}

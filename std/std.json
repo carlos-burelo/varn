@@ -6,6 +6,7 @@
         { "id": "std:collections", "pure": true },
         { "id": "std:crypto" },
         { "id": "std:dispose" },
+        { "id": "std:extensions" },
         { "id": "std:ffi" },
         { "id": "std:fs" },
         { "id": "std:http" },
@@ -15,9 +16,11 @@
         { "id": "std:net" },
         { "id": "std:path", "pure": true },
         { "id": "std:reflect" },
+        { "id": "std:result", "pure": true },
         { "id": "std:sys" },
         { "id": "std:task" },
         { "id": "std:test" },
+        { "id": "std:testing" },
         { "id": "std:time" },
         { "id": "std:types", "pure": true }
     ]

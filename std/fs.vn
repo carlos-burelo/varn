@@ -1,18 +1,18 @@
 import {
-    open as nativeOpen,
-    readFd as nativeReadFd,
-    writeFd as nativeWriteFd,
-    seek as nativeSeek,
-    close as nativeClose,
-    exists as nativeExists,
-    stat as nativeStat,
-    mkdir as nativeMkdir,
-    mkdirAll as nativeMkdirAll,
-    readDir as nativeReadDir,
-    remove as nativeRemove,
-    removeAll as nativeRemoveAll,
-    rename as nativeRename,
-    tempDir as nativeTempDir,
+    open$,
+    readFd$,
+    writeFd$,
+    seek$,
+    close$,
+    exists$,
+    stat$,
+    mkdir$,
+    mkdirAll$,
+    readDir$,
+    remove$,
+    removeAll$,
+    rename$,
+    tempDir$,
     RawStats
 } from "runtime:fs";
 
@@ -52,11 +52,11 @@ export function appendText(path: str, content: str): void {
 }
 
 export function exists(path: str): bool {
-    return nativeExists(path);
+    return exists$(path);
 }
 
 export function stat(path: str): Stats {
-    let raw = nativeStat(path);
+    let raw = stat$(path);
     return new Stats(
         raw.size,
         raw.isDir,
@@ -66,27 +66,27 @@ export function stat(path: str): Stats {
 }
 
 export function mkdir(path: str): void {
-    nativeMkdir(path);
+    mkdir$(path);
 }
 
 export function mkdirAll(path: str): void {
-    nativeMkdirAll(path);
+    mkdirAll$(path);
 }
 
 export function readDir(path: str): str[] {
-    return nativeReadDir(path) as str[];
+    return readDir$(path) as str[];
 }
 
 export function remove(path: str): void {
-    nativeRemove(path);
+    remove$(path);
 }
 
 export function removeAll(path: str): void {
-    nativeRemoveAll(path);
+    removeAll$(path);
 }
 
 export function rename(from: str, to: str): void {
-    nativeRename(from, to);
+    rename$(from, to);
 }
 
 export function copy(from: str, to: str): void {
@@ -106,7 +106,7 @@ export function copy(from: str, to: str): void {
 }
 
 export function tempDir(): str {
-    return nativeTempDir();
+    return tempDir$();
 }
 
 export class File {
@@ -121,24 +121,24 @@ export class File {
     }
 
     static open(path: str, mode: str): File {
-        let fd = nativeOpen(path, mode);
+        let fd = open$(path, mode);
         return new File(fd, path, mode);
     }
 
     write(content: str): int {
-        return nativeWriteFd(this._fd, content);
+        return writeFd$(this._fd, content);
     }
 
     read(size?: int): str {
         let readSize = size ?? 4096;
-        return nativeReadFd(this._fd, readSize);
+        return readFd$(this._fd, readSize);
     }
 
     readAll(): str {
         let out = "";
         let keepReading = true;
         while (keepReading) {
-            let chunk = nativeReadFd(this._fd, 8192);
+            let chunk = readFd$(this._fd, 8192);
             if (chunk.length > 0) {
                 out = out + chunk;
             } else {
@@ -149,17 +149,17 @@ export class File {
     }
 
     seek(offset: int, whence: int): int {
-        return nativeSeek(this._fd, offset, whence);
+        return seek$(this._fd, offset, whence);
     }
 
     close(): void {
-        nativeClose(this._fd);
+        close$(this._fd);
     }
 
     pipeTo(dst: Writer): void {
         let keepReading = true;
         while (keepReading) {
-            let chunk = nativeReadFd(this._fd, 8192);
+            let chunk = readFd$(this._fd, 8192);
             if (chunk.length > 0) {
                 dst.write(chunk);
             } else {
@@ -171,4 +171,18 @@ export class File {
     dispose(): void {
         this.close();
     }
+}
+
+export function readLines(path: str): str[] {
+    let content = read(path);
+    let lines = content.split("\n");
+    let result: str[] = [];
+    for (let line of lines) {
+        if (line.endsWith("\r")) {
+            result.push(line.slice(0, line.length - 1));
+        } else {
+            result.push(line);
+        }
+    }
+    return result;
 }

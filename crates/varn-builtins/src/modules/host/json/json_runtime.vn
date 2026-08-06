@@ -1,4 +1,4 @@
 // runtime:json — low-level host JSON operations.
 
-export declare function parse(text: str): dynamic;
-export declare function stringify(value: dynamic): str;
+export declare function parse$(text: str): dynamic;
+export declare function stringify$(value: dynamic): str;
