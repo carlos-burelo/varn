@@ -13,10 +13,6 @@ pub enum TypeKind<T, N, C, F, O, E = ()> {
     Tuple(C),
     Named(N, Option<N>),
     Generic(N, C, Option<N>),
-    LiteralInt(i64),
-    LiteralFloat(u64),
-    LiteralStr(N),
-    LiteralBool(bool),
 
     TemplateLiteral(C),
     Fn(F),

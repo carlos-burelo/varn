@@ -316,15 +316,7 @@ pub(crate) fn collect_type_inferences(
 }
 
 fn is_generic_possible(ty: &Type) -> bool {
-    !matches!(
-        &ty.0,
-        TypeKind::Intrinsic(_)
-            | TypeKind::LiteralInt(_)
-            | TypeKind::LiteralFloat(_)
-            | TypeKind::LiteralStr(_)
-            | TypeKind::LiteralBool(_)
-            | TypeKind::This
-    )
+    !matches!(&ty.0, TypeKind::Intrinsic(_) | TypeKind::This)
 }
 
 pub(crate) fn map_generics_cached(

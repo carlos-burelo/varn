@@ -3,7 +3,7 @@ use crate::types::Type;
 use crate::{checker::Checker, SymbolId};
 use std::rc::Rc;
 use varn_core::ast::operators::BinaryOp;
-use varn_core::TypeKind;
+
 
 pub(super) fn levenshtein(a: &str, b: &str) -> usize {
     let a: Vec<char> = a.chars().collect();
@@ -50,13 +50,7 @@ pub(super) fn closest_in_list<'a>(name: &str, candidates: &'a [Rc<str>]) -> Opti
 }
 
 pub(super) fn base_type(ty: &Type) -> Type {
-    match &ty.0 {
-        TypeKind::LiteralInt(_) => Type::Int,
-        TypeKind::LiteralFloat(_) => Type::Float,
-        TypeKind::LiteralStr(_) => Type::Str,
-        TypeKind::LiteralBool(_) => Type::Bool,
-        _ => ty.clone(),
-    }
+    ty.clone()
 }
 
 pub(super) fn op_str(op: &BinaryOp) -> &'static str {

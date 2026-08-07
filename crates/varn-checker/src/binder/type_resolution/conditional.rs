@@ -143,15 +143,6 @@ fn type_satisfies_extends(check: &Type, extends: &Type) -> bool {
 
         (TypeKind::Named(cn, _), TypeKind::Named(en, _)) => cn == en,
 
-        (TypeKind::LiteralStr(a), TypeKind::LiteralStr(b)) => a == b,
-        (TypeKind::LiteralInt(a), TypeKind::LiteralInt(b)) => a == b,
-        (TypeKind::LiteralBool(a), TypeKind::LiteralBool(b)) => a == b,
-
-        (TypeKind::LiteralStr(_), TypeKind::Intrinsic(TypeTag::Str)) => true,
-        (TypeKind::LiteralInt(_), TypeKind::Intrinsic(TypeTag::Int)) => true,
-        (TypeKind::LiteralFloat(_), TypeKind::Intrinsic(TypeTag::Float)) => true,
-        (TypeKind::LiteralBool(_), TypeKind::Intrinsic(TypeTag::Bool)) => true,
-
         _ => std::mem::discriminant(&check.0) == std::mem::discriminant(&extends.0),
     }
 }

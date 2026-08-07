@@ -62,6 +62,35 @@ impl PmLockfile {
             })
         })
     }
+
+    pub fn verify_project_integrity(&self, project_root: &Path) -> Vec<String> {
+        let mut issues = Vec::new();
+        for pkg in &self.packages {
+            let installed_path = crate::cache::local_package_path(project_root, &pkg.name);
+            if !installed_path.exists() {
+                issues.push(format!("missing package '{}' at {}", pkg.name, installed_path.display()));
+                continue;
+            }
+
+            if pkg.integrity.starts_with("sha256:")
+                && pkg.integrity != "sha256:local"
+                && pkg.integrity != "sha256:unknown"
+            {
+                let integrity_file = installed_path.join(".integrity");
+                if let Ok(stored) = std::fs::read_to_string(&integrity_file) {
+                    if stored.trim() != pkg.integrity {
+                        issues.push(format!(
+                            "checksum mismatch for '{}': lockfile expects {}, installed is {}",
+                            pkg.name,
+                            pkg.integrity,
+                            stored.trim()
+                        ));
+                    }
+                }
+            }
+        }
+        issues
+    }
 }
 
 pub fn lock_path(project_root: &Path) -> PathBuf {

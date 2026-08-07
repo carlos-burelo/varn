@@ -1,4 +1,5 @@
 mod alloc;
+mod arena;
 mod buffer;
 mod class;
 mod closure;
@@ -9,6 +10,10 @@ mod sendable;
 mod shape;
 mod task;
 mod traits;
+pub use arena::{
+    enter_request_arena, exit_request_arena, request_arena_stats, reset_request_arena,
+    RequestArena,
+};
 pub use buffer::VmBuffer;
 use crate::generator::{AsyncQueue, GeneratorObj};
 pub use crate::native::NativeFn;

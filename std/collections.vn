@@ -1,3 +1,5 @@
+// std:collections — High-performance data structures for Varn
+
 export class List<T> {
     private items: T[];
 
@@ -5,33 +7,65 @@ export class List<T> {
         this.items = initial ?? [];
     }
 
-    get length(): int { return this.items.length; }
+    add(item: T): void {
+        this.items.push(item);
+    }
 
-    add(item: T): void { this.items.push(item); }
-    push(item: T): void { this.items.push(item); }
-    pop(): T? { return this.items.pop(); }
+    get(index: int): T? {
+        if (index < 0 || index >= this.items.length) {
+            return null;
+        }
+        return this.items[index];
+    }
 
-    get(index: int): T { return this.items[index]; }
-    set(index: int, val: T): void { this.items[index] = val; }
+    get length(): int {
+        return this.items.length;
+    }
 
-    clear(): void { this.items = []; }
-    contains(item: T): bool { return this.items.indexOf(item) !== -1; }
-
-    toArray(): T[] { return this.items.slice(); }
+    toArray(): T[] {
+        return this.items.slice();
+    }
 }
 
 export class Stack<S> {
-    private items: S[] = [];
-    push(item: S): void { this.items.push(item); }
-    pop(): S? { return this.items.pop(); }
-    peek(): S? { return this.items[this.items.length - 1]; }
-    get size(): int { return this.items.length; }
-    get isEmpty(): bool { return this.items.length === 0; }
+    private items: S[];
+
+    constructor(initial?: S[]) {
+        this.items = initial ?? [];
+    }
+
+    push(item: S): void {
+        this.items.push(item);
+    }
+
+    pop(): S? {
+        return this.items.pop();
+    }
+
+    peek(): S? {
+        if (this.items.length === 0) {
+            return null;
+        }
+        return this.items[this.items.length - 1];
+    }
+
+    get size(): int {
+        return this.items.length;
+    }
+
+    get isEmpty(): bool {
+        return this.items.length === 0;
+    }
 }
 
 export class Queue<Q> {
-    private inbox: Q[] = [];
-    private outbox: Q[] = [];
+    private inbox: Q[];
+    private outbox: Q[];
+
+    constructor() {
+        this.inbox = [];
+        this.outbox = [];
+    }
 
     enqueue(item: Q): void {
         this.inbox.push(item);
@@ -88,17 +122,5 @@ export class Record<K, V> {
 
     delete(key: K): bool {
         return this.entries.delete(key as str);
-    }
-
-    keys(): K[] {
-        return this.entries.keys() as K[];
-    }
-
-    values(): V[] {
-        return this.entries.values();
-    }
-
-    get size(): int {
-        return this.entries.size;
     }
 }

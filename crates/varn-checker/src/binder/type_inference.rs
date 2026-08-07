@@ -14,7 +14,7 @@ pub fn infer_expr_type(expr: &Expr, ctx: Option<&dyn crate::types::TypeContext>)
         ExprKind::FloatLiteral { .. } => Type::Float,
         ExprKind::DecimalLiteral { .. } => Type::Decimal,
         ExprKind::BigIntLiteral { .. } => Type::BigInt,
-        ExprKind::StrLiteral { value, .. } => Type::literal_str(value.to_string()),
+        ExprKind::StrLiteral { .. } => Type::Str,
         ExprKind::CharLiteral { .. } => Type::Char,
         ExprKind::BoolLiteral { .. } => Type::Bool,
         ExprKind::NullLiteral => Type::Null,
@@ -248,10 +248,8 @@ fn infer_member(
 pub(crate) fn numeric_binary_type(op: BinaryOp, l: &Type, r: &Type) -> Option<Type> {
     use varn_core::{binary_operand_kind, binary_result_kind, NumericOperand, TypeTag};
     let operand = |t: &Type| match &t.0 {
-        TypeKind::Intrinsic(TypeTag::Int) | TypeKind::LiteralInt(_) => Some(NumericOperand::Int),
-        TypeKind::Intrinsic(TypeTag::Float) | TypeKind::LiteralFloat(_) => {
-            Some(NumericOperand::Float)
-        }
+        TypeKind::Intrinsic(TypeTag::Int) => Some(NumericOperand::Int),
+        TypeKind::Intrinsic(TypeTag::Float) => Some(NumericOperand::Float),
         TypeKind::Intrinsic(TypeTag::Decimal) => Some(NumericOperand::Decimal),
         _ => None,
     };

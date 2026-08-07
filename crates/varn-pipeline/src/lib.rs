@@ -19,7 +19,7 @@ pub mod wrc;
 mod lex;
 
 pub use check::check as phase_check;
-pub use compile::CompileOutput;
+pub use compile::{CACHE_FORMAT_VERSION, CompileOutput};
 pub use core::core_protos_owned;
 pub use error::PipelineError;
 pub use execute::execute;

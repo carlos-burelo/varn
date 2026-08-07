@@ -212,25 +212,7 @@ pub(super) fn object_matches_class_members(
     true
 }
 
-fn interp_accepts(ty: &Type, segment: &str) -> bool {
-    use varn_core::TypeTag;
-    match &ty.0 {
-        TypeKind::Intrinsic(TypeTag::Str) => true,
-        TypeKind::Intrinsic(TypeTag::Char) => segment.chars().count() == 1,
-        TypeKind::Intrinsic(TypeTag::Int) => segment.parse::<i64>().is_ok(),
-        TypeKind::Intrinsic(TypeTag::Float) | TypeKind::Intrinsic(TypeTag::Decimal) => {
-            segment.parse::<f64>().is_ok()
-        }
-        TypeKind::Intrinsic(TypeTag::Bool) => segment == "true" || segment == "false",
-        TypeKind::LiteralStr(s) => segment == s.as_ref(),
-        TypeKind::LiteralInt(i) => segment == i.to_string(),
-        TypeKind::LiteralBool(b) => segment == b.to_string(),
-        TypeKind::TemplateLiteral(parts) => template_matches_literal(parts, segment),
-        TypeKind::Union(members) => members.iter().any(|m| interp_accepts(m, segment)),
-        TypeKind::Intrinsic(TypeTag::Dynamic) => true,
-        _ => false,
-    }
-}
+
 
 fn fn_signature_compatible_type(
     params: &[FunctionParam],
@@ -294,52 +276,3 @@ pub(super) fn types_compatible_with_fn_signature(
     }
 }
 
-pub(super) fn template_matches_literal(parts: &[Type], value: &str) -> bool {
-    fn rec(parts: &[Type], idx: usize, remaining: &str) -> bool {
-        if idx >= parts.len() {
-            return remaining.is_empty();
-        }
-
-        if idx % 2 == 0 {
-            let TypeKind::LiteralStr(prefix) = &parts[idx].0 else {
-                return false;
-            };
-            if let Some(rest) = remaining.strip_prefix(prefix.as_ref()) {
-                return rec(parts, idx + 1, rest);
-            }
-            return false;
-        }
-
-        let next_literal = if idx + 1 < parts.len() {
-            if let TypeKind::LiteralStr(s) = &parts[idx + 1].0 {
-                Some(s.as_ref())
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-
-        match next_literal {
-            Some(lit) if !lit.is_empty() => {
-                let mut starts = vec![];
-                if remaining.starts_with(lit) {
-                    starts.push(0);
-                }
-                starts.extend(
-                    remaining
-                        .match_indices(lit)
-                        .map(|(i, _)| i)
-                        .filter(|i| *i > 0),
-                );
-                starts.into_iter().any(|i| {
-                    interp_accepts(&parts[idx], &remaining[..i])
-                        && rec(parts, idx + 1, &remaining[i..])
-                })
-            }
-            _ => interp_accepts(&parts[idx], remaining) && rec(parts, idx + 1, ""),
-        }
-    }
-
-    rec(parts, 0, value)
-}

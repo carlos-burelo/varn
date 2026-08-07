@@ -234,8 +234,6 @@ impl Checker {
                                 | TypeKind::Intrinsic(TypeTag::Float)
                                 | TypeKind::Intrinsic(TypeTag::Decimal)
                                 | TypeKind::Intrinsic(TypeTag::BigInt)
-                                | TypeKind::LiteralInt(_)
-                                | TypeKind::LiteralFloat(_)
                         ) || matches!(&t.0, TypeKind::Named(n, _) if n.as_ref() == IntrinsicType::Decimal.as_str())
                     };
                     let same_numeric = is_numeric(l_base) && is_numeric(r_base);
@@ -446,12 +444,8 @@ impl Checker {
 
                     let arm_disc_ty = match &case.pattern {
                         MatchPattern::Literal(e) => match &e.kind {
-                            ExprKind::StrLiteral { value } => {
-                                Some(crate::types::Type::literal_str(value.to_string()))
-                            }
-                            ExprKind::IntLiteral { value, .. } => {
-                                Some(crate::types::Type::literal_int(*value))
-                            }
+                            ExprKind::StrLiteral { .. } => Some(crate::types::Type::Str),
+                            ExprKind::IntLiteral { .. } => Some(crate::types::Type::Int),
                             _ => None,
                         },
                         _ => None,

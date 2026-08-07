@@ -6,6 +6,7 @@ pub mod dce;
 pub mod escape;
 pub mod fixed_fields;
 pub mod licm;
+pub mod monomorphize;
 pub mod tco;
 
 use crate::hir::ctor_summary::CtorSummaries;
@@ -25,6 +26,8 @@ pub fn optimize_with(func: &mut SsaFunc, summaries: &CtorSummaries) {
         changed |= tco::run(func);
 
         changed |= const_fold::run(func);
+
+        changed |= monomorphize::run(func);
 
         // Needs const_fold's literals in place to recognize `x * 1`, and
         // feeds it back: collapsing one operand often makes the next

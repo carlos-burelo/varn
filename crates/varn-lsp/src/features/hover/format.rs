@@ -1,5 +1,5 @@
 use crate::document::{MemberKind, MemberRecord, SymbolRecord};
-use crate::util::kinds::{member_kind_label, symbol_kind_label};
+use crate::util::kinds::member_kind_label;
 use varn_checker::SymbolKind;
 use varn_core::TypeTag;
 
@@ -33,8 +33,8 @@ pub fn format_signature(sym: &SymbolRecord) -> String {
         SymbolKind::Const => format_binding("const", sym),
         SymbolKind::Let => format_binding("let", sym),
         SymbolKind::Var => format_binding("var", sym),
-        SymbolKind::Parameter => format_binding("(param)", sym),
-        SymbolKind::Property => format_binding("prop", sym),
+        SymbolKind::Parameter => format_param(sym),
+        SymbolKind::Property => format_binding("let", sym),
         SymbolKind::Extension => {
             if sym.type_str.is_empty() {
                 format!("extension {}", sym.name)
@@ -43,13 +43,13 @@ pub fn format_signature(sym: &SymbolRecord) -> String {
             }
         }
         SymbolKind::TypeParameter => format!("type {}", sym.name),
-        SymbolKind::EnumMember => format_binding("(enum member)", sym),
+        SymbolKind::EnumMember => format_enum_member_sym(sym),
     }
 }
 
 fn format_fn(sym: &SymbolRecord) -> String {
     let async_prefix = if sym.is_async { "async " } else { "" };
-    let kw = symbol_kind_label(sym.kind);
+    let kw = if sym.kind == SymbolKind::Method { "" } else { "function " };
     let tp = format_type_params(&sym.type_params);
     let gen_star = if sym.is_generator { "*" } else { "" };
     if sym.is_arrow {
@@ -59,9 +59,25 @@ fn format_fn(sym: &SymbolRecord) -> String {
         );
     }
     format!(
-        "{}{}{} {}{}({}): {}",
+        "{}{}{}{}{}({}): {}",
         async_prefix, kw, gen_star, sym.name, tp, sym.params_str, sym.type_str
     )
+}
+
+fn format_param(sym: &SymbolRecord) -> String {
+    if sym.type_str.is_empty() {
+        sym.name.clone()
+    } else {
+        format!("{}: {}", sym.name, sym.type_str)
+    }
+}
+
+fn format_enum_member_sym(sym: &SymbolRecord) -> String {
+    if sym.type_str.is_empty() {
+        sym.name.clone()
+    } else {
+        format!("{} = {}", sym.name, sym.type_str)
+    }
 }
 
 fn is_primitive_class_name(name: &str) -> bool {

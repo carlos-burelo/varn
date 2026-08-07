@@ -6,13 +6,15 @@ pub struct FfiRuntime;
 #[derive(Debug)]
 struct LoadedLib(libloading::Library);
 
+const ERR_PERMISSION_DENIED: &str = "E_HOST_PERMISSION_DENIED:id=runtime:ffi:capability=sys.ffi";
+
 varn_contract! {
     module: "runtime:ffi",
     contract: "src/modules/host/ffi/ffi_runtime.vn",
     impl FfiRuntime {
         fn dlopen(ctx: &mut dyn NativeCtx, path: &str) -> Result<VmValue, String> {
             if !ctx.has_capability("sys.ffi") {
-                return Err("E_HOST_PERMISSION_DENIED:id=runtime:ffi:capability=sys.ffi".to_string());
+                return Err(ERR_PERMISSION_DENIED.to_string());
             }
             unsafe {
                 let lib = libloading::Library::new(path)
@@ -24,7 +26,7 @@ varn_contract! {
 
         fn dlsym(ctx: &mut dyn NativeCtx, libHandle: VmValue, symbol: &str) -> Result<VmValue, String> {
             if !ctx.has_capability("sys.ffi") {
-                return Err("E_HOST_PERMISSION_DENIED:id=runtime:ffi:capability=sys.ffi".to_string());
+                return Err(ERR_PERMISSION_DENIED.to_string());
             }
             let handle_id = ctx.as_int(libHandle) as u32;
             let res = ctx.resources().get::<LoadedLib>(handle_id)
@@ -41,7 +43,7 @@ varn_contract! {
 
         fn callI64(ctx: &mut dyn NativeCtx, fnPtr: VmValue, a1: i64, a2: i64) -> Result<i64, String> {
             if !ctx.has_capability("sys.ffi") {
-                return Err("E_HOST_PERMISSION_DENIED:id=runtime:ffi:capability=sys.ffi".to_string());
+                return Err(ERR_PERMISSION_DENIED.to_string());
             }
             let ptr_val = ctx.as_int(fnPtr) as usize;
             if ptr_val == 0 {
@@ -55,7 +57,7 @@ varn_contract! {
 
         fn callF64(ctx: &mut dyn NativeCtx, fnPtr: VmValue, a1: f64, a2: f64) -> Result<f64, String> {
             if !ctx.has_capability("sys.ffi") {
-                return Err("E_HOST_PERMISSION_DENIED:id=runtime:ffi:capability=sys.ffi".to_string());
+                return Err(ERR_PERMISSION_DENIED.to_string());
             }
             let ptr_val = ctx.as_int(fnPtr) as usize;
             if ptr_val == 0 {

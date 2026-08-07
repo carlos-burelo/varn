@@ -22,8 +22,6 @@ pub(super) fn resolve_mapped(
         let key_ty = match &source.0 {
             TypeKind::Intrinsic(TypeTag::Str) => Some(Type::Str),
             TypeKind::Intrinsic(TypeTag::Int) => Some(Type::Int),
-            TypeKind::LiteralStr(_) => Some(Type::Str),
-            TypeKind::LiteralInt(_) => Some(Type::Int),
             _ => None,
         };
         if let Some(key_ty) = key_ty {
@@ -47,7 +45,7 @@ pub(super) fn resolve_mapped(
             let mapped_ctx = MappedContext {
                 inner: ctx,
                 key_var: key_var.to_owned(),
-                key_value: Type::literal_str(key.clone()),
+                key_value: Type::Str,
             };
             let value_ty = resolve_type_node(value_node, Some(&mapped_ctx));
             let member_optional = if optional {

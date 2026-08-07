@@ -385,10 +385,6 @@ impl Checker {
                 );
                 self.find_member_info_uncached(&array_ty, key, bind)
             }
-            TypeKind::LiteralStr(_) => self.find_member_info_uncached(&Type::Str, key, bind),
-            TypeKind::LiteralInt(_) => self.find_member_info_uncached(&Type::Int, key, bind),
-            TypeKind::LiteralFloat(_) => self.find_member_info_uncached(&Type::Float, key, bind),
-            TypeKind::LiteralBool(_) => self.find_member_info_uncached(&Type::Bool, key, bind),
             TypeKind::Intrinsic(varn_core::TypeTag::Str) => {
                 if key == "length" {
                     Some((Type::Int, None))

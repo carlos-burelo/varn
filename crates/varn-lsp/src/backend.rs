@@ -11,6 +11,7 @@ use crate::features::definition::build_goto_definition;
 use crate::features::diagnostics::convert_diagnostics;
 use crate::features::document_highlight::build_document_highlights;
 use crate::features::folding::build_folding_ranges;
+use crate::features::formatting::build_formatting;
 use crate::features::hover::build_hover;
 use crate::features::inlay_hints::build_inlay_hints;
 use crate::features::references::build_references;
@@ -53,46 +54,69 @@ impl Backend {
         }
     }
 
-    async fn analyze_and_publish(&self, uri: Url, source: String) {
+    async fn analyze_and_publish(&self, uri: Url, source: String, is_eager: bool) {
         let uri_str = uri.to_string();
-        let start = Instant::now();
-        self.workspace.update_file(uri_str.clone(), source);
-        self.log_slow("analyze", start.elapsed()).await;
+        let (_file_id, _rev, cancel_token) = self.workspace.update_source(&uri_str, &source);
 
-        let analysis = match self.workspace.get(&uri_str) {
-            Some(a) => a,
-            None => return,
-        };
+        if !is_eager {
+            tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+            if cancel_token.is_cancelled() {
+                return;
+            }
+        }
 
-        let diags = convert_diagnostics(&analysis);
+        let workspace = Arc::clone(&self.workspace);
+        let client = self.client.clone();
+        let uri_clone = uri.clone();
+        let uri_str_clone = uri_str.clone();
 
-        let file_name = uri_str
-            .rsplit(['/', '\\'])
-            .next()
-            .unwrap_or(&uri_str)
-            .to_owned();
+        tokio::task::spawn_blocking(move || {
+            if cancel_token.is_cancelled() {
+                return;
+            }
 
-        let user_syms_count = analysis
-            .symbols
-            .iter()
-            .filter(|s| s.line != u32::MAX)
-            .count();
-        let stdlib_syms_count = analysis.symbols.len() - user_syms_count;
+            let start = Instant::now();
+            workspace.update_file(uri_str_clone.clone(), source);
 
-        self.client
-            .log_message(
+            if cancel_token.is_cancelled() {
+                return;
+            }
+
+            let analysis = match workspace.get(&uri_str_clone) {
+                Some(a) => a,
+                None => return,
+            };
+
+            let diags = convert_diagnostics(&analysis);
+
+            let file_name = uri_str_clone
+                .rsplit(['/', '\\'])
+                .next()
+                .unwrap_or(&uri_str_clone)
+                .to_owned();
+
+            let user_syms_count = analysis
+                .symbols
+                .iter()
+                .filter(|s| s.line != u32::MAX)
+                .count();
+            let stdlib_syms_count = analysis.symbols.len() - user_syms_count;
+
+            let rt = tokio::runtime::Handle::current();
+            let _ = rt.block_on(client.log_message(
                 MessageType::LOG,
                 format!(
-                    "── {file_name}  ({} tokens | {} user symbols | {} stdlib)",
+                    "── {file_name}  ({} tokens | {} user symbols | {} stdlib) [{}ms]",
                     analysis.tokens.len(),
                     user_syms_count,
                     stdlib_syms_count,
+                    start.elapsed().as_millis(),
                 ),
-            )
-            .await;
+            ));
 
-        drop(analysis);
-        self.client.publish_diagnostics(uri, diags, None).await;
+            drop(analysis);
+            let _ = rt.block_on(client.publish_diagnostics(uri_clone, diags, None));
+        });
     }
 }
 
@@ -157,6 +181,10 @@ impl LanguageServer for Backend {
                     },
                 ))),
                 code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
+                document_formatting_provider: Some(OneOf::Left(true)),
+                code_lens_provider: Some(CodeLensOptions {
+                    resolve_provider: Some(false),
+                }),
                 ..Default::default()
             },
         })
@@ -232,20 +260,20 @@ impl LanguageServer for Backend {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        self.analyze_and_publish(params.text_document.uri, params.text_document.text)
+        self.analyze_and_publish(params.text_document.uri, params.text_document.text, true)
             .await;
     }
 
     async fn did_change(&self, mut params: DidChangeTextDocumentParams) {
         if let Some(change) = params.content_changes.pop() {
-            self.analyze_and_publish(params.text_document.uri, change.text)
+            self.analyze_and_publish(params.text_document.uri, change.text, false)
                 .await;
         }
     }
 
     async fn did_save(&self, params: DidSaveTextDocumentParams) {
         if let Some(text) = params.text {
-            self.analyze_and_publish(params.text_document.uri, text)
+            self.analyze_and_publish(params.text_document.uri, text, true)
                 .await;
         }
     }
@@ -487,6 +515,32 @@ impl LanguageServer for Backend {
         let uri = params.text_document.uri.to_string();
         let result = self.workspace.get(&uri).map(|a| build_inlay_hints(&a));
         self.log_slow("inlay_hint", start.elapsed()).await;
+        Ok(result)
+    }
+
+    async fn formatting(
+        &self,
+        params: DocumentFormattingParams,
+    ) -> LspResult<Option<Vec<TextEdit>>> {
+        let start = Instant::now();
+        let uri = params.text_document.uri.to_string();
+        let result = self
+            .workspace
+            .get(&uri)
+            .and_then(|a| build_formatting(&a.source, params.options));
+        self.log_slow("formatting", start.elapsed()).await;
+        Ok(result)
+    }
+
+    async fn code_lens(&self, params: CodeLensParams) -> LspResult<Option<Vec<CodeLens>>> {
+        let start = Instant::now();
+        let uri = params.text_document.uri;
+        let uri_str = uri.to_string();
+        let result = self
+            .workspace
+            .get(&uri_str)
+            .map(|a| crate::features::code_lens::build_code_lenses(&uri, &a));
+        self.log_slow("code_lens", start.elapsed()).await;
         Ok(result)
     }
 }

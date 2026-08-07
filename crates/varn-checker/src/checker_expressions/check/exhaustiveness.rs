@@ -2,7 +2,7 @@ use crate::binder::BindResult;
 use crate::checker::Checker;
 use crate::types::Type;
 use varn_core::ast::pattern::MatchPattern;
-use varn_core::ast::{ExprKind, MatchCase};
+use varn_core::ast::MatchCase;
 use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
@@ -149,21 +149,9 @@ impl Checker {
     }
 }
 
-fn pattern_covers_type(pattern: &MatchPattern, ty: &Type) -> bool {
+fn pattern_covers_type(pattern: &MatchPattern, _ty: &Type) -> bool {
     match pattern {
         MatchPattern::Wildcard => true,
-        MatchPattern::Literal(e) => match &e.kind {
-            ExprKind::StrLiteral { value } => {
-                matches!(&ty.0, TypeKind::LiteralStr(s) if s.as_ref() == value)
-            }
-            ExprKind::IntLiteral { value, .. } => {
-                matches!(&ty.0, TypeKind::LiteralInt(v) if v == value)
-            }
-            ExprKind::BoolLiteral { value } => {
-                matches!(&ty.0, TypeKind::LiteralBool(v) if v == value)
-            }
-            _ => false,
-        },
         _ => false,
     }
 }

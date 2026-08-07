@@ -29,6 +29,8 @@ pub enum Commands {
 
     Build(BuildArgs),
 
+    Test(TestArgs),
+
     #[command(subcommand)]
     Pkg(PkgCommands),
 
@@ -39,7 +41,7 @@ pub enum Commands {
     #[command(subcommand)]
     Cache(CacheCommands),
 
-    Lsp,
+    Lsp(LspArgs),
 
     Completions(CompletionsArgs),
 }
@@ -142,12 +144,24 @@ pub struct CompletionsArgs {
     pub shell: Shell,
 }
 
+#[derive(Args, Default)]
+pub struct LspArgs {
+    #[arg(short, long, help = "Puerto TCP para escuchar en socket (ej: 9257)")]
+    pub port: Option<u16>,
+
+    #[arg(long, help = "Dirección host:puerto TCP para escuchar (ej: 127.0.0.1:9257)")]
+    pub tcp: Option<String>,
+}
+
 #[derive(Args)]
 pub struct BuildArgs {
     pub file: String,
 
     #[arg(short, long, value_name = "PATH")]
     pub output: Option<String>,
+
+    #[arg(short, long, default_value = "bytecode", value_name = "TARGET")]
+    pub target: String,
 
     #[arg(short, long)]
     pub verbose: bool,
@@ -174,6 +188,12 @@ pub enum PkgCommands {
     Install,
 
     Update,
+
+    Tree,
+
+    Doctor,
+
+    Clean,
 }
 
 #[derive(Subcommand)]
@@ -189,4 +209,26 @@ pub enum Shell {
     Fish,
     PowerShell,
     Elvish,
+}
+
+#[derive(Args)]
+pub struct TestArgs {
+    /// Target file, directory, or pattern (default: "./tests" if exists, or current directory)
+    pub path: Option<String>,
+
+    /// Filter test names or file names matching this pattern
+    #[arg(short, long)]
+    pub filter: Option<String>,
+
+    /// Run tests in parallel across N isolates/worker threads
+    #[arg(short = 'j', long)]
+    pub jobs: Option<usize>,
+
+    /// Stop execution on first test failure
+    #[arg(long)]
+    pub fail_fast: bool,
+
+    /// Show detailed execution log and outputs for every test
+    #[arg(short, long)]
+    pub verbose: bool,
 }

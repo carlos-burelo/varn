@@ -253,10 +253,6 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
             Type::object(resolved_members)
         }
         TypeKind::TemplateLiteral(parts) => resolve_template_literal_type(parts, ctx),
-        TypeKind::LiteralInt(v) => Type::literal_int(*v),
-        TypeKind::LiteralFloat(v) => Type::literal_float(*v),
-        TypeKind::LiteralStr(v) => Type::literal_str(v.to_string()),
-        TypeKind::LiteralBool(v) => Type::literal_bool(*v),
 
         TypeKind::Typeof(expr) => crate::binder::infer_expr_type(expr, ctx),
 

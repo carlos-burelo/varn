@@ -147,12 +147,8 @@ impl Binder {
             return;
         }
         let normalized = match &value_ty.0 {
-            TypeKind::Intrinsic(varn_core::TypeTag::Int) | TypeKind::LiteralInt(_) => {
-                Some(Type::Int)
-            }
-            TypeKind::Intrinsic(varn_core::TypeTag::Float) | TypeKind::LiteralFloat(_) => {
-                Some(Type::Float)
-            }
+            TypeKind::Intrinsic(varn_core::TypeTag::Int) => Some(Type::Int),
+            TypeKind::Intrinsic(varn_core::TypeTag::Float) => Some(Type::Float),
             _ => None,
         };
         if let Some(c) = self.find_candidate_mut(name) {

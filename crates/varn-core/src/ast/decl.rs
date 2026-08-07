@@ -240,6 +240,7 @@ pub struct EnumMember {
 pub struct EnumField {
     pub name: Rc<str>,
     pub ty: TypeNode,
+    pub init: Option<Expr>,
     pub range: SourceRange,
 }
 

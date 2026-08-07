@@ -6,7 +6,7 @@ use std::rc::Rc;
 use varn_core::ast::decl::{Decl, StructField};
 use varn_core::ast::{
     EnumDecl, EnumField, EnumMember, InterfaceDecl, InterfaceMember, NamespaceDecl, StmtKind,
-    StructDecl, SumField, SumTypeDecl, SumVariant, TypeAliasDecl,
+    StructDecl, SumField, SumTypeDecl, SumVariant, TypeAliasDecl, TypeNode,
 };
 use varn_core::TokenKind;
 
@@ -244,10 +244,61 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
                         idx += 1;
                         n
                     };
-                let ty = crate::types::parse_type(s)?;
+                let (ty, init) = match s.kind() {
+                    TokenKind::IntegerLiteral => {
+                        let expr = crate::expressions::parse_expr(s)?;
+                        (
+                            TypeNode {
+                                id: 0,
+                                kind: varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Int),
+                                range: field_range,
+                            },
+                            Some(expr),
+                        )
+                    }
+                    TokenKind::FloatLiteral => {
+                        let expr = crate::expressions::parse_expr(s)?;
+                        (
+                            TypeNode {
+                                id: 0,
+                                kind: varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Float),
+                                range: field_range,
+                            },
+                            Some(expr),
+                        )
+                    }
+                    TokenKind::Str => {
+                        let expr = crate::expressions::parse_expr(s)?;
+                        (
+                            TypeNode {
+                                id: 0,
+                                kind: varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Str),
+                                range: field_range,
+                            },
+                            Some(expr),
+                        )
+                    }
+                    TokenKind::True | TokenKind::False => {
+                        let expr = crate::expressions::parse_expr(s)?;
+                        (
+                            TypeNode {
+                                id: 0,
+                                kind: varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Bool),
+                                range: field_range,
+                            },
+                            Some(expr),
+                        )
+                    }
+                    _ => {
+                        let parsed_ty = crate::types::parse_type(s)?;
+                        (parsed_ty, None)
+                    }
+                };
+
                 payload_fields.push(EnumField {
                     name: field_name,
                     ty,
+                    init,
                     range: field_range,
                 });
                 if s.check(TokenKind::Comma) {

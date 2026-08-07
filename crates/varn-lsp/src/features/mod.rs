@@ -12,3 +12,7 @@ pub mod semantic_tokens;
 pub mod signature_help;
 pub mod symbols;
 pub mod workspace_symbols;
+pub mod formatting;
+pub mod code_lens;
+
+

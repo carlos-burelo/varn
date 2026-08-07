@@ -21,6 +21,11 @@ struct LockPackage {
 
 const LOCK_VERSION: u32 = 1;
 
+#[derive(serde::Deserialize)]
+struct LockHeader {
+    version: u32,
+}
+
 pub fn sync_lockfile(entry_file: &str, graph: &ModuleGraphArtifact) -> Result<(), PipelineError> {
     let entry_path = Path::new(entry_file);
     let project_root = entry_path.parent().unwrap_or_else(|| Path::new("."));
@@ -55,6 +60,14 @@ pub fn sync_lockfile(entry_file: &str, graph: &ModuleGraphArtifact) -> Result<()
                 lock_path.display()
             ))
         })?;
+
+        if let Ok(header) = serde_json::from_str::<LockHeader>(&raw) {
+            if header.version == 2 {
+                // Version 2 lockfile produced by varn-pm
+                return Ok(());
+            }
+        }
+
         let prev: Lockfile = serde_json::from_str(&raw).map_err(|e| {
             PipelineError::fatal(format!("invalid lockfile '{}': {e}", lock_path.display()))
         })?;

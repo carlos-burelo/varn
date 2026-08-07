@@ -5,6 +5,7 @@ mod cpu_freq;
 mod doctor_impl;
 mod error;
 mod pipeline;
+mod tester;
 
 use clap::Parser;
 use cli::{Cli, Commands};
@@ -23,6 +24,8 @@ fn main() {
     const STDLIB_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/std.vnb"));
     varn_builtins::register_embedded_stdlib(STDLIB_BYTES);
     varn_builtins::register_provider();
+
+    try_run_standalone_executable();
 
     // Resolving the std is lazy; force it here so an unusable one fails at
     // startup with a readable message instead of mid-compile (spec §3: never
@@ -71,10 +74,11 @@ fn dispatch(cmd: Commands) -> Result<(), error::CliError> {
         Commands::Bench(args) => commands::bench::execute(args),
         Commands::Debug(args) => commands::debug::execute(args),
         Commands::Build(args) => commands::build::execute(args),
+        Commands::Test(args) => commands::test::execute(args),
         Commands::Pkg(sub) => commands::pkg::execute(sub),
         Commands::Doctor => commands::doctor::execute(),
         Commands::Cache(sub) => commands::cache::execute(sub),
-        Commands::Lsp => commands::lsp::execute(),
+        Commands::Lsp(args) => commands::lsp::execute(args),
         Commands::Init(args) => commands::init::execute(args),
         Commands::Completions(args) => commands::completions::execute(args),
     }
@@ -89,6 +93,7 @@ fn implicit_run(mut args: Vec<String>) -> Vec<String> {
         "bench",
         "debug",
         "build",
+        "test",
         "pkg",
         "init",
         "doctor",
@@ -107,4 +112,57 @@ fn implicit_run(mut args: Vec<String>) -> Vec<String> {
         }
     }
     args
+}
+
+fn try_run_standalone_executable() {
+    let Ok(exe_path) = std::env::current_exe() else { return; };
+    let Ok(file) = std::fs::File::open(&exe_path) else { return; };
+    let Ok(meta) = file.metadata() else { return; };
+    let len = meta.len();
+    if len < 12 {
+        return;
+    }
+    use std::io::{Read, Seek, SeekFrom};
+    let mut reader = std::io::BufReader::new(file);
+
+    let mut trailer = [0u8; 12];
+    if reader.seek(SeekFrom::End(-12)).is_err() { return; }
+    if reader.read_exact(&mut trailer).is_err() { return; }
+
+    if &trailer[8..12] != varn_modules::artifact::MAGIC_VEXE {
+        return;
+    }
+
+    let payload_len = u64::from_le_bytes(trailer[0..8].try_into().unwrap());
+    if len < 12 + payload_len {
+        return;
+    }
+
+    let payload_offset = len - 12 - payload_len;
+    if reader.seek(SeekFrom::Start(payload_offset)).is_err() { return; }
+    let mut envelope = vec![0u8; payload_len as usize];
+    if reader.read_exact(&mut envelope).is_err() { return; }
+
+    let Ok(inner_payload) = varn_modules::artifact::read_envelope(
+        varn_modules::artifact::MAGIC_WRC,
+        pipeline::CACHE_FORMAT_VERSION,
+        &envelope,
+    ) else { return; };
+
+    let Ok(artifact) = postcard::from_bytes::<varn_types::ModuleGraphArtifact>(inner_payload) else { return; };
+
+    let Ok(compiled) = pipeline::cache::compile_output_from_graph(artifact) else { return; };
+
+    let exe_str = exe_path.to_string_lossy();
+    if let Err(e) = pipeline::execute(
+        compiled.entry_proto,
+        compiled.precompiled,
+        "",
+        &exe_str,
+        &Default::default(),
+    ) {
+        eprintln!("Standalone runtime error: {e}");
+        process::exit(1);
+    }
+    process::exit(0);
 }

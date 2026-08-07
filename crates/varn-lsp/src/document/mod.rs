@@ -198,6 +198,7 @@ pub struct DocumentState {
     pub db: SemanticDB,
 
     pub import_paths: Vec<String>,
+    pub positional_index: crate::queries::indexes::PositionalIndex,
 }
 
 unsafe impl Send for DocumentState {}

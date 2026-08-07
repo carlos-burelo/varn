@@ -41,9 +41,9 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
                 })
                 .max_by_key(|s| s.line);
             if let Some(cls) = enclosing {
-                return Some(make_lang_hover(format!("(this) this: {}", cls.name)));
+                return Some(make_lang_hover(format!("this: {}", cls.name)));
             }
-            return Some(make_lang_hover("(this) this".to_owned()));
+            return Some(make_lang_hover("this".to_owned()));
         }
 
         let prev_is_dot = idx
@@ -99,11 +99,11 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
 
     if let Some(param) = query::param_at(state, line, col) {
         let sig = if param.is_type_param {
-            format!("(type parameter) {}", param.name)
+            format!("type {}", param.name)
         } else if param.type_str.is_empty() {
-            format!("(param) {}", param.name)
+            param.name.clone()
         } else {
-            format!("(param) {}: {}", param.name, param.type_str)
+            format!("{}: {}", param.name, param.type_str)
         };
         return Some(make_lang_hover(sig));
     }
@@ -115,7 +115,7 @@ pub(crate) fn make_lang_hover(value: String) -> Hover {
     Hover {
         contents: HoverContents::Markup(MarkupContent {
             kind: MarkupKind::Markdown,
-            value: format!("```Varn\n{value}\n```"),
+            value: format!("```varn\n{value}\n```"),
         }),
         range: None,
     }

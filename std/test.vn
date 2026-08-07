@@ -1,43 +1,189 @@
-// std:test — Pure Varn self-hosted testing operations.
+// std:test — Single unified native testing framework for Varn
 
-let passed = 0;
-let failed = 0;
+import { write$ } from "runtime:io";
 
-export function assert(label: str, condition: bool): void {
-    if (condition) {
-        passed = passed + 1;
-    } else {
-        failed = failed + 1;
-        print("FAIL: " + label);
-    }
+function logLine(msg: str): void {
+    write$(msg + "\n");
 }
 
-export function assertEqual<T>(actual: T, expected: T, message?: str): void {
-    if (actual === expected) {
-        passed = passed + 1;
-    } else {
-        failed = failed + 1;
-        let msg = message;
-        if (msg === null) {
-            msg = "expected " + expected + " but got " + actual;
+let passedCount = 0;
+let failedCount = 0;
+
+function isEq(a: dynamic, b: dynamic): bool {
+    if (a === b || a == b) {
+        return true;
+    }
+    if (typeof a === "str" && typeof b === "str") {
+        let s1 = a as str;
+        let s2 = b as str;
+        if (s1.length != s2.length) {
+            return false;
         }
-        print("FAIL: " + msg);
+        for (let i = 0; i < s1.length; i = i + 1) {
+            if (s1.slice(i, i + 1) !== s2.slice(i, i + 1)) {
+                return false;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+export class Expectation<T> {
+    private actual: T;
+
+    constructor(actual: T) {
+        this.actual = actual;
+    }
+
+    toBe(expected: T): void {
+        if (!isEq(this.actual, expected)) {
+            failedCount = failedCount + 1;
+            throw new Error("Expected " + expected + " but received " + this.actual);
+        }
+        passedCount = passedCount + 1;
+    }
+
+    toEqual(expected: T): void {
+        if (!isEq(this.actual, expected)) {
+            failedCount = failedCount + 1;
+            throw new Error("Expected equal " + expected + " but received " + this.actual);
+        }
+        passedCount = passedCount + 1;
+    }
+
+    toBeTruthy(): void {
+        if (!this.actual) {
+            failedCount = failedCount + 1;
+            throw new Error("Expected truthy value but received " + this.actual);
+        }
+        passedCount = passedCount + 1;
+    }
+
+    toBeFalsy(): void {
+        if (this.actual) {
+            failedCount = failedCount + 1;
+            throw new Error("Expected falsy value but received " + this.actual);
+        }
+        passedCount = passedCount + 1;
     }
 }
 
-export function assertTrue(cond: bool, message?: str): void {
-    assert(message ?? "assertTrue", cond);
+export function expect<T>(val: T): Expectation<T> {
+    return new Expectation<T>(val);
+}
+
+export function assert(a: dynamic, b?: dynamic): void {
+    let cond: bool = false;
+    let label: str = "assert";
+
+    if (typeof a === "str") {
+        label = a as str;
+        cond = b as bool;
+    } else if (typeof b === "str") {
+        label = b as str;
+        cond = a as bool;
+    } else {
+        cond = a as bool;
+    }
+
+    if (!cond) {
+        failedCount = failedCount + 1;
+        throw new Error("ASSERT FAIL: " + label);
+    }
+    passedCount = passedCount + 1;
+}
+
+export function assertEqual<T>(a: dynamic, b: dynamic, c?: dynamic): void {
+    let label: str = "assertEqual";
+    let actual: dynamic = a;
+    let expected: dynamic = b;
+
+    if (c != null) {
+        if (isEq(b, c)) {
+            label = a as str;
+            actual = b;
+            expected = c;
+        } else if (isEq(a, b)) {
+            label = c as str;
+            actual = a;
+            expected = b;
+        } else if (typeof a === "str" && typeof c !== "str") {
+            label = a as str;
+            actual = b;
+            expected = c;
+        } else if (typeof c === "str") {
+            label = c as str;
+            actual = a;
+            expected = b;
+        }
+    }
+
+    if (!isEq(actual, expected)) {
+        failedCount = failedCount + 1;
+        throw new Error("ASSERT FAIL: " + label + " (expected " + expected + " but got " + actual + ")");
+    }
+    passedCount = passedCount + 1;
+}
+
+export function assertTrue(a: dynamic, b?: dynamic): void {
+    let cond: bool = false;
+    let label: str = "assertTrue";
+
+    if (typeof a === "bool") {
+        cond = a as bool;
+        if (typeof b === "str") {
+            label = b as str;
+        }
+    } else if (typeof b === "bool") {
+        cond = b as bool;
+        if (typeof a === "str") {
+            label = a as str;
+        }
+    } else {
+        cond = a as bool;
+    }
+
+    if (!cond) {
+        failedCount = failedCount + 1;
+        throw new Error("ASSERT FAIL: " + label);
+    }
+    passedCount = passedCount + 1;
+}
+
+export function fail(msg?: str): void {
+    failedCount = failedCount + 1;
+    throw new Error("ASSERT FAIL: " + (msg ?? "fail"));
+}
+
+export function describe(suiteName: str, body: () => void): void {
+    logLine("=== Suite: " + suiteName + " ===");
+    body();
+}
+
+export function test(testName: str, body: () => void): void {
+    try {
+        body();
+        logLine("  ✔ " + testName);
+    } catch (err) {
+        logLine("  ✖ " + testName + ": " + err);
+        throw err;
+    }
 }
 
 export function summary(): void {
     print("\n════════════════════════════════════════");
-    print("PASSED: " + passed);
-    print("FAILED: " + failed);
-    if (failed === 0) {
+    print("PASSED: " + passedCount);
+    print("FAILED: " + failedCount);
+    if (failedCount === 0) {
         print("ALL TESTS PASSED");
     } else {
         print("SOME TESTS FAILED");
     }
+}
+
+export function assertSummary(): void {
+    summary();
 }
 
 const testImpl = {
@@ -47,7 +193,4 @@ const testImpl = {
     summary: summary
 };
 
-export const test = testImpl;
-
-// Top-level convenience exports
-export const fail = (msg?: str) => assert(msg ?? "fail", false);
+export const testObj = testImpl;

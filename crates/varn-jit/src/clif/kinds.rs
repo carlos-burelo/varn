@@ -200,23 +200,36 @@ pub(crate) fn apply_kinds(
         | OpCode::Sub
         | OpCode::Mul
         | OpCode::Div
-        | OpCode::Mod
-        | OpCode::Negate
-        | OpCode::Intrinsic
-        // Writes `Float` into a float-declared dest and boxed bits otherwise
-        // — the same two cases as `Intrinsic`, which is what `boxed` states.
+        | OpCode::Mod => state[dest] = boxed(dest),
+        OpCode::Negate => {
+            let src = (code[ip + 1] >> 8) as usize;
+            if meta_float(dest) || state[src] == K::Float {
+                state[dest] = K::Float;
+            } else if meta_int(dest) || state[src] == K::Int {
+                state[dest] = K::Int;
+            } else {
+                state[dest] = boxed(dest);
+            }
+        }
+        OpCode::BitAnd
+        | OpCode::BitOr
+        | OpCode::BitXor
+        | OpCode::Shl
+        | OpCode::Shr
+        | OpCode::Ushr => {
+            if meta_int(dest) {
+                state[dest] = K::Int;
+            } else {
+                state[dest] = boxed(dest);
+            }
+        }
+        OpCode::Intrinsic
         | OpCode::IntrinsicDirect
         | OpCode::Typeof
         | OpCode::ToString
         | OpCode::GetSymbol
         | OpCode::Pow
         | OpCode::PowInt
-        | OpCode::BitAnd
-        | OpCode::BitOr
-        | OpCode::BitXor
-        | OpCode::Shl
-        | OpCode::Shr
-        | OpCode::Ushr
         | OpCode::StrSlice
         | OpCode::StrLength
         | OpCode::ArrayPop

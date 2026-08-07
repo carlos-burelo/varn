@@ -141,4 +141,27 @@ impl<'a> Scanner<'a> {
         let col = (pos - self.line_starts[line_idx]) as u32;
         (line, col)
     }
+
+    #[inline]
+    pub(super) fn skip_whitespace(&mut self) {
+        while self.pos + 8 <= self.src.len() {
+            let chunk = u64::from_le_bytes(self.src[self.pos..self.pos + 8].try_into().unwrap());
+            if chunk == 0x2020_2020_2020_2020 {
+                self.pos += 8;
+                self.cur_col += 8;
+                continue;
+            }
+            break;
+        }
+
+        while self.pos < self.src.len() {
+            let b = self.src[self.pos];
+            if b == b' ' || b == b'\t' || b == b'\r' || b == b'\n' {
+                self.advance_byte();
+            } else {
+                break;
+            }
+        }
+    }
 }
+

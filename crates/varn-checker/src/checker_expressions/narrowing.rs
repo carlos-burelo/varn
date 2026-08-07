@@ -95,12 +95,8 @@ impl Checker {
                         ) = (&object.kind, &property.kind)
                         {
                             let disc_ty: Option<Type> = match &right.kind {
-                                ExprKind::StrLiteral { value } => {
-                                    Some(Type::literal_str(value.as_ref()))
-                                }
-                                ExprKind::IntLiteral { value, .. } => {
-                                    Some(Type::literal_int(*value))
-                                }
+                                ExprKind::StrLiteral { .. } => Some(Type::Str),
+                                ExprKind::IntLiteral { .. } => Some(Type::Int),
                                 _ => None,
                             };
                             if let Some(disc_ty) = disc_ty {

@@ -60,6 +60,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                             .join(" | "),
                         HoverContents::Markup(m) => m
                             .value
+                            .replace("```varn\n", "")
                             .replace("```Varn\n", "")
                             .replace("\n```", "")
                             .replace("```", ""),

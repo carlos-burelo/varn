@@ -171,8 +171,8 @@ fn load_uncached(spec: &str) -> Result<FunctionProto, ModuleError> {
         .map_err(|e| ModuleError::new(format!("stdlib compile error in {spec}: {e}")))
 }
 
-/// Compile one module source to a FunctionProto. Used by StdlibLoader (which
-/// also loads user modules) and by xtask build-std.
+/// Compile one module source to a FunctionProto. Used by StdlibLoader, which
+/// also loads user modules.
 pub fn compile_source(source: &str, path: &str) -> Result<FunctionProto, String> {
     compile_source_inner(source, path, false)
 }
@@ -234,8 +234,29 @@ fn compile_source_inner(
     .map_err(|e| e.to_string())
 }
 
+/// Spec §2: std modules may only import `runtime:*`, `std:*` or `core:intrinsics`.
+///
+/// Parser-based (not string-scanning): lex + parse the module, then reuse the
+/// same import collector the pipeline uses for cache invalidation. Avoids the
+/// false positives/negatives of matching import syntax inside string literals.
+fn validate_imports(id: &str, source: &str) -> Result<(), String> {
+    let (tokens, lexeme_buf, _) = varn_lexer::scan(source, id);
+    let program =
+        varn_parser::parse(tokens, lexeme_buf, id).map_err(|errs| errs[0].message.clone())?;
+    for spec in crate::import_collector::collect_imports(&program) {
+        if !(spec.starts_with("runtime:") || spec.starts_with("std:") || spec == "core:intrinsics")
+        {
+            return Err(format!(
+                "{id}: forbidden import \"{spec}\" — std may only import runtime:*/std:* or core:intrinsics"
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Compiles the entire stdlib directory into a single serialized VNB bytes buffer.
-/// Used by Cargo build.rs scripts to embed the stdlib.
+/// Sole producer of `.vnb`: `crates/varn-cli/build.rs` calls it to embed the
+/// stdlib into `vn`, which then serves every host (CLI, LSP, isolates).
 pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, String> {
     let manifest_raw = std::fs::read_to_string(std_dir.join("std.json"))
         .map_err(|e| format!("cannot read {}/std.json: {e}", std_dir.display()))?;
@@ -267,6 +288,11 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
         let file = std_dir.join(format!("{}.vn", m.id.strip_prefix("std:").ok_or("invalid std: prefix")?));
         let source = std::fs::read_to_string(&file)
             .map_err(|e| format!("cannot read {}: {e}", file.display()))?;
+
+        if let Err(e) = validate_imports(&m.id, &source) {
+            failures.push_str(&format!("\n{e}"));
+            continue;
+        }
 
         let exports = varn_checker::module_resolver::resolve_stdlib_module_exports_ref(&m.id);
         let bind = match varn_checker::module_resolver::resolve_stdlib_module_bind_ref(&m.id) {

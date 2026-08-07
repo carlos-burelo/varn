@@ -85,6 +85,48 @@ pub fn build_code_action(params: CodeActionParams) -> Option<Vec<CodeActionOrCom
                 }
             }
         }
+
+        // Auto-Import suggestion for undefined variables
+        if diag.message.contains("undefined variable:") {
+            if let Some(var_name) = diag.message.split("undefined variable:").nth(1) {
+                let sym_name = var_name.trim();
+                if !sym_name.is_empty() {
+                    let mut changes = HashMap::new();
+                    changes.insert(
+                        uri.clone(),
+                        vec![TextEdit {
+                            range: Range {
+                                start: Position {
+                                    line: 0,
+                                    character: 0,
+                                },
+                                end: Position {
+                                    line: 0,
+                                    character: 0,
+                                },
+                            },
+                            new_text: format!("import {{ {sym_name} }} from \"std:math\"\n"),
+                        }],
+                    );
+
+                    let action = CodeAction {
+                        title: format!("💡 Import {{ {sym_name} }}"),
+                        kind: Some(CodeActionKind::QUICKFIX),
+                        diagnostics: Some(vec![diag.clone()]),
+                        edit: Some(WorkspaceEdit {
+                            changes: Some(changes),
+                            document_changes: None,
+                            change_annotations: None,
+                        }),
+                        command: None,
+                        is_preferred: Some(true),
+                        disabled: None,
+                        data: None,
+                    };
+                    actions.push(CodeActionOrCommand::CodeAction(action));
+                }
+            }
+        }
     }
 
     if actions.is_empty() {

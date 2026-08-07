@@ -9,49 +9,64 @@ pub struct ResolvedVersion {
 }
 
 pub fn resolve_version(origin: &DepOrigin) -> Result<ResolvedVersion, String> {
-    let req = VersionReq::parse(&origin.req)
-        .map_err(|e| format!("invalid semver constraint '{}': {e}", origin.req))?;
+    match origin {
+        DepOrigin::LocalPath { path } => {
+            if !path.exists() {
+                return Err(format!("local dependency path does not exist: {}", path.display()));
+            }
+            let version = if let Ok(manifest) = crate::manifest::ProjectManifest::load(&path.join("varn.json")) {
+                manifest.version.unwrap_or_else(|| "0.0.0-local".to_owned())
+            } else {
+                "0.0.0-local".to_owned()
+            };
+            Ok(ResolvedVersion {
+                version,
+                commit: "local".to_owned(),
+            })
+        }
+        DepOrigin::Remote { host, user, repo, req: req_str } => {
+            let req = VersionReq::parse(req_str)
+                .map_err(|e| format!("invalid semver constraint '{req_str}': {e}"))?;
 
-    let tags = fetch_tags(origin)?;
+            let tags = fetch_tags(origin)?;
 
-    let mut candidates: Vec<(Version, String)> = tags
-        .into_iter()
-        .filter_map(|(tag, commit)| {
-            let ver_str = tag.strip_prefix('v').unwrap_or(&tag);
-            Version::parse(ver_str).ok().map(|v| (v, commit))
-        })
-        .filter(|(v, _)| req.matches(v))
-        .collect();
+            let mut candidates: Vec<(Version, String)> = tags
+                .into_iter()
+                .filter_map(|(tag, commit)| {
+                    let ver_str = tag.strip_prefix('v').unwrap_or(&tag);
+                    Version::parse(ver_str).ok().map(|v| (v, commit))
+                })
+                .filter(|(v, _)| req.matches(v))
+                .collect();
 
-    if candidates.is_empty() {
-        return Err(format!(
-            "no version of {}/{}/{} satisfies '{}'",
-            origin.host, origin.user, origin.repo, origin.req
-        ));
+            if candidates.is_empty() {
+                return Err(format!(
+                    "no version of {host}/{user}/{repo} satisfies '{req_str}'"
+                ));
+            }
+
+            candidates.sort_by(|a, b| b.0.cmp(&a.0));
+            let (best_ver, commit) = candidates.remove(0);
+
+            Ok(ResolvedVersion {
+                version: best_ver.to_string(),
+                commit,
+            })
+        }
     }
-
-    candidates.sort_by(|a, b| b.0.cmp(&a.0));
-    let (best_ver, commit) = candidates.remove(0);
-
-    Ok(ResolvedVersion {
-        version: best_ver.to_string(),
-        commit,
-    })
 }
 
 fn fetch_tags(origin: &DepOrigin) -> Result<Vec<(String, String)>, String> {
     let url = origin.tags_api_url();
 
-    let response = ureq::get(&url)
+    let response = ureq::AgentBuilder::new()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .get(&url)
         .set("User-Agent", "varn-pm/0.1")
         .set("Accept", "application/json")
         .call()
-        .map_err(|e| {
-            format!(
-                "cannot fetch tags for {}/{}/{}: {e}",
-                origin.host, origin.user, origin.repo
-            )
-        })?;
+        .map_err(|e| format!("cannot fetch tags for {url}: {e}"))?;
 
     let json: serde_json::Value = response
         .into_json()

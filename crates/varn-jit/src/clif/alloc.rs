@@ -33,7 +33,7 @@ use varn_types::register_meta::SlotKind;
 
 use super::emit::{
     box_bool, box_f64, box_int, box_or_pass, call_helper, call_helper_void, meta_is_float,
-    unbox_bool, unbox_f64_coerce, use_f64, use_int, wrap_i48,
+    state_meta_int, unbox_bool, unbox_f64_coerce, use_f64, use_int, wrap_i48,
 };
 use super::kinds::K;
 use super::liveness::Liveness;
@@ -242,6 +242,10 @@ pub(super) fn def_result(
     if meta_is_float(actx.register_meta, dest) {
         let f = unbox_f64_coerce(b, res);
         b.def_var(actx.vars[dest], f);
+    } else if state_meta_int(actx.register_meta, dest) {
+        let sh = b.ins().ishl_imm(res, 16);
+        let un = b.ins().sshr_imm(sh, 16);
+        b.def_var(actx.vars[dest], un);
     } else {
         b.def_var(actx.vars[dest], res);
     }

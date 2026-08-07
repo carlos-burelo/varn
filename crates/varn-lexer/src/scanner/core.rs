@@ -48,14 +48,7 @@ impl super::Scanner<'_> {
         let mut lexemes: Vec<u8> = Vec::with_capacity(8192);
 
         loop {
-            while !self.is_eof() {
-                let c = self.peek(0);
-                if c == b' ' || c == b'\t' || c == b'\r' || c == b'\n' {
-                    self.advance_byte();
-                } else {
-                    break;
-                }
-            }
+            self.skip_whitespace();
 
             if self.is_eof() {
                 break;

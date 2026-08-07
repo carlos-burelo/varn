@@ -26,7 +26,7 @@ use super::arrays;
 use super::debug::ClifDebugSink;
 use super::emit::{
     box_for_target, box_f64, box_int, box_or_pass, call_helper, def_const, def_const_bool,
-    def_const_int, emit_return_value, meta_is_float, meta_is_int, unbox_bool, unbox_f64_coerce,
+    def_const_int, emit_return_value, meta_is_float, meta_is_int, state_meta_int, unbox_bool, unbox_f64_coerce,
     use_boxed, use_f64, use_int, wrap_i48,
 };
 use super::fields;
@@ -443,29 +443,20 @@ pub(super) fn lower_raw(
             OpCode::Negate => {
                 let src = (code[ip + 1] >> 8) as usize;
                 if meta_is_float(&proto.register_meta, first_reg) {
-                    // `use_f64` converts an `Int` operand and bails on
-                    // anything else — unchanged, and the bail matters: it is
-                    // what sends `(-a) + (-f)` shapes to the interpreter.
                     let f = use_f64(&mut b, &vars, &state, src)?;
                     let neg = b.ins().fneg(f);
                     b.def_var(vars[first_reg], neg);
-                } else if state[src] == K::Int {
-                    let i = b.use_var(vars[src]);
+                } else if state[src] == K::Int || state_meta_int(&proto.register_meta, first_reg) {
+                    let i = use_int(&mut b, &vars, &state, src)?;
                     let neg = b.ins().ineg(i);
-                    // Wrap like the interpreter's `make_int`, then BOX: the
-                    // kind flow types this destination `Boxed` (see
-                    // `apply_kinds`), and storing a raw payload into it left a
-                    // register whose readers disagree about its representation.
                     let wrapped = wrap_i48(&mut b, neg);
-                    let boxed = box_int(&mut b, wrapped);
-                    b.def_var(vars[first_reg], boxed);
+                    if state_meta_int(&proto.register_meta, first_reg) {
+                        b.def_var(vars[first_reg], wrapped);
+                    } else {
+                        let boxed = box_int(&mut b, wrapped);
+                        b.def_var(vars[first_reg], boxed);
+                    }
                 } else {
-                    // A boxed operand: an int, but equally a decimal or a
-                    // bigint, whose negation ALLOCATES — which is exactly why
-                    // `Negate` is in the `has_alloc` set. This used to take
-                    // `use_int`, which ACCEPTS boxed registers, so `-(7.5d)`
-                    // ran `ineg` over a heap-tagged VmValue's payload bits and
-                    // produced a value that resolved to null.
                     let actx = actx.as_ref().ok_or("clif: Negate outside alloc fn")?;
                     let regs = alloc::live_boxed(actx, &state);
                     alloc::flush_boxed(&mut b, actx, &state, &regs);
@@ -473,6 +464,39 @@ pub(super) fn lower_raw(
                     let res = call_helper(&mut b, cc, helpers.negate, &[exec_ctx, v]);
                     alloc::reload_boxed(&mut b, actx, &state, &regs);
                     alloc::def_result(&mut b, actx, first_reg, res);
+                }
+            }
+            OpCode::BitAnd | OpCode::BitOr | OpCode::BitXor | OpCode::Shl | OpCode::Shr | OpCode::Ushr => {
+                let w1 = code[ip + 1];
+                let (r1, r2) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
+                let a = use_int(&mut b, &vars, &state, r1)?;
+                let c = use_int(&mut b, &vars, &state, r2)?;
+                let r = match op {
+                    OpCode::BitAnd => b.ins().band(a, c),
+                    OpCode::BitOr => b.ins().bor(a, c),
+                    OpCode::BitXor => b.ins().bxor(a, c),
+                    OpCode::Shl => {
+                        let shift = b.ins().band_imm(c, 0x3F);
+                        let res = b.ins().ishl(a, shift);
+                        wrap_i48(&mut b, res)
+                    }
+                    OpCode::Shr => {
+                        let shift = b.ins().band_imm(c, 0x3F);
+                        let res = b.ins().sshr(a, shift);
+                        wrap_i48(&mut b, res)
+                    }
+                    OpCode::Ushr => {
+                        let shift = b.ins().band_imm(c, 0x3F);
+                        let res = b.ins().ushr(a, shift);
+                        wrap_i48(&mut b, res)
+                    }
+                    _ => unreachable!(),
+                };
+                if state_meta_int(&proto.register_meta, first_reg) {
+                    b.def_var(vars[first_reg], r);
+                } else {
+                    let boxed = box_int(&mut b, r);
+                    b.def_var(vars[first_reg], boxed);
                 }
             }
             OpCode::AddImm | OpCode::SubImm => {

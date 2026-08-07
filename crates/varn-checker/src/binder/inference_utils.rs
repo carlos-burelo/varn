@@ -152,13 +152,7 @@ pub fn pattern_to_string(p: &Pattern) -> String {
 }
 
 pub fn widen_literal(ty: Type) -> Type {
-    match &ty.0 {
-        TypeKind::LiteralStr(_) => Type::Str,
-        TypeKind::LiteralInt(_) => Type::Int,
-        TypeKind::LiteralFloat(_) => Type::Float,
-        TypeKind::LiteralBool(_) => Type::Bool,
-        _ => ty,
-    }
+    ty
 }
 
 pub fn pattern_lead_name(p: &Pattern) -> &str {

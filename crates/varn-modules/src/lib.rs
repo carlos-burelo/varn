@@ -179,26 +179,15 @@ pub fn resolve_pkg_specifier_detailed(
     let manifest = load_package_manifest(&package_root)?;
     let version = manifest
         .version
+        .clone()
         .unwrap_or_else(|| DEFAULT_PACKAGE_VERSION.to_owned());
     enforce_dependency_constraint(base_dir, &package_name, &version)?;
     let sub = subpath.unwrap_or_default();
-    let export_key = if sub.is_empty() {
-        ".".to_owned()
-    } else {
-        format!("./{sub}")
-    };
-    let export_target = manifest.exports.get(&export_key).cloned().ok_or_else(|| {
-        format!(
-            "package '{}' does not export '{}'",
-            package_name, export_key
-        )
-    })?;
 
-    let entry = package_root.join(export_target.trim_start_matches(RELATIVE_EXPORT_PREFIX));
+    let entry = resolve_export_target(&package_root, &manifest, &package_name, &sub)?;
     let resolved = resolve_path_candidates(&entry).ok_or_else(|| {
         format!(
-            "export target not found for '{}': {}",
-            specifier,
+            "export target not found for '{specifier}': {}",
             entry.display()
         )
     })?;
@@ -214,6 +203,81 @@ pub fn resolve_pkg_specifier_detailed(
     })
 }
 
+fn resolve_export_target(
+    package_root: &Path,
+    manifest: &PackageManifest,
+    package_name: &str,
+    sub: &str,
+) -> Result<PathBuf, String> {
+    let export_key = if sub.is_empty() {
+        ".".to_owned()
+    } else {
+        format!("./{sub}")
+    };
+
+    // 1. Exact match in exports
+    if let Some(target) = manifest.exports.get(&export_key) {
+        let entry = package_root.join(target.trim_start_matches(RELATIVE_EXPORT_PREFIX));
+        if entry.exists() {
+            return Ok(entry);
+        }
+    }
+
+    // 2. Wildcard pattern matching in exports (e.g. "./*" -> "./src/*.vn")
+    for (key, val) in &manifest.exports {
+        if key.contains('*') {
+            let prefix = key.trim_end_matches('*');
+            if export_key.starts_with(prefix) {
+                let matched_suffix = &export_key[prefix.len()..];
+                let resolved_val = val.replace('*', matched_suffix);
+                let entry = package_root.join(resolved_val.trim_start_matches(RELATIVE_EXPORT_PREFIX));
+                if entry.exists() {
+                    return Ok(entry);
+                }
+            }
+        }
+    }
+
+    // 3. Fallback convention resolution
+    if sub.is_empty() {
+        if let Some(ref main_field) = manifest.main {
+            let main_path = package_root.join(main_field.trim_start_matches(RELATIVE_EXPORT_PREFIX));
+            if main_path.exists() {
+                return Ok(main_path);
+            }
+        }
+        for candidate_name in &["index.vn", "main.vn", "src/index.vn", "src/main.vn"] {
+            let cand = package_root.join(candidate_name);
+            if cand.exists() {
+                return Ok(cand);
+            }
+        }
+    } else {
+        let sub_with_ext = if sub.ends_with(".vn") {
+            sub.to_owned()
+        } else {
+            format!("{sub}.vn")
+        };
+        for candidate_rel in &[
+            sub,
+            &sub_with_ext,
+            &format!("src/{sub_with_ext}"),
+            &format!("{sub}/index.vn"),
+        ] {
+            let cand = package_root.join(candidate_rel);
+            if cand.exists() {
+                return Ok(cand);
+            }
+        }
+    }
+
+    Err(format!(
+        "cannot resolve subpath '{sub}' in package '{}' (root: {})",
+        manifest.name.as_deref().unwrap_or(&package_name),
+        package_root.display()
+    ))
+}
+
 fn find_package_root(base_dir: &Path, package_name: &str) -> Option<PathBuf> {
     for dir in base_dir.ancestors() {
         let env_modules = dir
@@ -223,23 +287,47 @@ fn find_package_root(base_dir: &Path, package_name: &str) -> Option<PathBuf> {
         if env_modules.exists() {
             return Some(env_modules);
         }
+
+        // Check if dir itself is the requested package
+        let manifest_file = dir.join(PACKAGE_MANIFEST_FILE);
+        if manifest_file.exists() {
+            if let Ok(manifest) = load_package_manifest(dir) {
+                if manifest.name.as_deref() == Some(package_name) {
+                    return Some(dir.to_path_buf());
+                }
+            }
+        }
     }
     None
 }
 
 #[derive(serde::Deserialize)]
 struct RawManifest {
+    name: Option<String>,
     version: Option<String>,
+    main: Option<String>,
     #[serde(default)]
     exports: std::collections::HashMap<String, String>,
     #[serde(default)]
     dependencies: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    dev_dependencies: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    peer_dependencies: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    workspaces: Vec<String>,
 }
 
-struct PackageManifest {
-    version: Option<String>,
-    exports: std::collections::HashMap<String, String>,
-    dependencies: std::collections::HashMap<String, String>,
+#[derive(Clone, Debug)]
+pub struct PackageManifest {
+    pub name: Option<String>,
+    pub version: Option<String>,
+    pub main: Option<String>,
+    pub exports: std::collections::HashMap<String, String>,
+    pub dependencies: std::collections::HashMap<String, String>,
+    pub dev_dependencies: std::collections::HashMap<String, String>,
+    pub peer_dependencies: std::collections::HashMap<String, String>,
+    pub workspaces: Vec<String>,
 }
 
 fn load_package_manifest(package_root: &Path) -> Result<PackageManifest, String> {
@@ -256,17 +344,16 @@ fn load_package_manifest(package_root: &Path) -> Result<PackageManifest, String>
         .map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?;
     let parsed: RawManifest = serde_json::from_str(&raw)
         .map_err(|e| format!("invalid {}: {e}", manifest_path.display()))?;
-    if parsed.exports.is_empty() {
-        return Err(format!(
-            "package manifest {} must declare non-empty 'exports'",
-            manifest_path.display()
-        ));
-    }
 
     Ok(PackageManifest {
+        name: parsed.name,
         version: parsed.version,
+        main: parsed.main,
         exports: parsed.exports,
         dependencies: parsed.dependencies,
+        dev_dependencies: parsed.dev_dependencies,
+        peer_dependencies: parsed.peer_dependencies,
+        workspaces: parsed.workspaces,
     })
 }
 
@@ -310,6 +397,10 @@ fn enforce_dependency_constraint(
         return Ok(());
     };
 
+    if required.starts_with("path:") || required == "*" {
+        return Ok(());
+    }
+
     let req = VersionReq::parse(required).map_err(|e| {
         format!(
             "invalid semver constraint '{}' for dependency '{}': {}",
@@ -343,9 +434,14 @@ fn nearest_owner_manifest(base_dir: &Path) -> Option<PackageManifest> {
         let raw = std::fs::read_to_string(&manifest).ok()?;
         let parsed: RawManifest = serde_json::from_str(&raw).ok()?;
         return Some(PackageManifest {
+            name: parsed.name,
             version: parsed.version,
+            main: parsed.main,
             exports: parsed.exports,
             dependencies: parsed.dependencies,
+            dev_dependencies: parsed.dev_dependencies,
+            peer_dependencies: parsed.peer_dependencies,
+            workspaces: parsed.workspaces,
         });
     }
     None

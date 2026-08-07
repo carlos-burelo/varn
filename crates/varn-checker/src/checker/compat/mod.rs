@@ -7,18 +7,11 @@ use varn_core::{IntrinsicType, MemberKey, TypeKind};
 
 use self::helpers::{
     class_members_match_object, compatible_named, is_known_named, named_members,
-    object_matches_class_members, template_matches_literal, types_compatible_with_fn_signature,
+    object_matches_class_members, types_compatible_with_fn_signature,
 };
 
 fn is_simple_type(ty: &Type) -> bool {
-    matches!(
-        &ty.0,
-        TypeKind::Intrinsic(_)
-            | TypeKind::LiteralInt(_)
-            | TypeKind::LiteralFloat(_)
-            | TypeKind::LiteralStr(_)
-            | TypeKind::LiteralBool(_)
-    )
+    matches!(&ty.0, TypeKind::Intrinsic(_))
 }
 
 fn simple_types_compatible(declared: &Type, inferred: &Type) -> bool {
@@ -28,8 +21,6 @@ fn simple_types_compatible(declared: &Type, inferred: &Type) -> bool {
 
         (a, b) if a == b => true,
 
-        (TypeKind::Intrinsic(varn_core::TypeTag::Int), TypeKind::LiteralInt(_)) => true,
-        (TypeKind::Intrinsic(varn_core::TypeTag::Float), TypeKind::LiteralFloat(_)) => true,
         (
             TypeKind::Intrinsic(varn_core::TypeTag::Float),
             TypeKind::Intrinsic(varn_core::TypeTag::Int),
@@ -46,13 +37,6 @@ fn simple_types_compatible(declared: &Type, inferred: &Type) -> bool {
             TypeKind::Intrinsic(varn_core::TypeTag::BigInt),
             TypeKind::Intrinsic(varn_core::TypeTag::Int),
         ) => true,
-        (TypeKind::Intrinsic(varn_core::TypeTag::Str), TypeKind::LiteralStr(_)) => true,
-        (TypeKind::Intrinsic(varn_core::TypeTag::Bool), TypeKind::LiteralBool(_)) => true,
-        (TypeKind::Intrinsic(varn_core::TypeTag::Char), TypeKind::LiteralStr(s))
-            if s.chars().count() == 1 =>
-        {
-            true
-        }
         _ => false,
     }
 }
@@ -119,8 +103,6 @@ pub(super) fn types_compatible_impl(
 
         (a, b) if a == b => true,
 
-        (TypeKind::Intrinsic(varn_core::TypeTag::Int), TypeKind::LiteralInt(_)) => true,
-        (TypeKind::Intrinsic(varn_core::TypeTag::Float), TypeKind::LiteralFloat(_)) => true,
         (
             TypeKind::Intrinsic(varn_core::TypeTag::Float),
             TypeKind::Intrinsic(varn_core::TypeTag::Int),
@@ -137,17 +119,7 @@ pub(super) fn types_compatible_impl(
             TypeKind::Intrinsic(varn_core::TypeTag::BigInt),
             TypeKind::Intrinsic(varn_core::TypeTag::Int),
         ) => true,
-        (TypeKind::Intrinsic(varn_core::TypeTag::Str), TypeKind::LiteralStr(_)) => true,
-        (TypeKind::Intrinsic(varn_core::TypeTag::Bool), TypeKind::LiteralBool(_)) => true,
-        (TypeKind::Intrinsic(varn_core::TypeTag::Char), TypeKind::LiteralStr(s))
-            if s.chars().count() == 1 =>
-        {
-            true
-        }
         (TypeKind::Intrinsic(varn_core::TypeTag::Str), TypeKind::TemplateLiteral(_)) => true,
-        (TypeKind::TemplateLiteral(parts), TypeKind::LiteralStr(s)) => {
-            template_matches_literal(parts, s)
-        }
         (TypeKind::TemplateLiteral(a), TypeKind::TemplateLiteral(b)) => a == b,
 
         (TypeKind::Array(_), TypeKind::Array(inf_elem)) if inf_elem.is_dynamic() => true,

@@ -21,7 +21,7 @@ class GcVtB {
 }
 
 // Enough string allocations to force several minor GC cycles.
-let gcJunk = []
+let gcJunk:str[] = []
 for (let i = 0; i < 20000; i = i + 1) {
     gcJunk.push("gc_" + i)
 }

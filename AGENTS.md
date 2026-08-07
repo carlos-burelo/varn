@@ -35,7 +35,7 @@ Según el dominio:
 
 CLI y orquestación del pipeline
 
-* crates/varn-cli (binario `vn`)
+* crates/varn-cli (binario `vn`) — Instalado globalmente en `C:\Users\x\.cargo\bin\vn.exe` (disponible globalmente en PATH como comando `vn`)
 * crates/varn-pipeline (fases: read, lex, parse, check, compile, optimize, execute)
 * docs/CLI_REFERENCE.md
 

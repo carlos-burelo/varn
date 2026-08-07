@@ -46,17 +46,11 @@ impl fmt::Display for Type {
                 }
                 write!(f, ">")
             }
-            TypeKind::LiteralInt(v) => write!(f, "{v}"),
-            TypeKind::LiteralFloat(v) => write!(f, "{v:?}"),
-            TypeKind::LiteralStr(v) => write!(f, "\"{v}\""),
-            TypeKind::LiteralBool(v) => write!(f, "{v}"),
             TypeKind::TemplateLiteral(parts) => {
                 write!(f, "`")?;
                 for (i, part) in parts.iter().enumerate() {
                     if i % 2 == 0 {
-                        if let TypeKind::LiteralStr(s) = &part.0 {
-                            write!(f, "{s}")?;
-                        }
+                        write!(f, "{part}")?;
                     } else {
                         write!(f, "${{{part}}}")?;
                     }
@@ -83,7 +77,7 @@ impl fmt::Display for Type {
                 write!(f, ") => {}", ft.return_type)
             }
             TypeKind::Object(members) => {
-                write!(f, "{{ ")?;
+                write!(f, "#{{ ")?;
                 for (i, m) in members.iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
@@ -160,7 +154,7 @@ impl fmt::Display for Type {
                 Ok(())
             }
             TypeKind::Tuple(members) => {
-                write!(f, "[")?;
+                write!(f, "#[")?;
                 for (i, m) in members.iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;

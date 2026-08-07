@@ -254,10 +254,6 @@ impl Checker {
             TypeKind::Intersection(members) => {
                 members.iter().any(|m| self.member_exists(m, key, bind))
             }
-            TypeKind::LiteralStr(_) => self.member_exists(&Type::Str, key, bind),
-            TypeKind::LiteralInt(_) => self.member_exists(&Type::Int, key, bind),
-            TypeKind::LiteralFloat(_) => self.member_exists(&Type::Float, key, bind),
-            TypeKind::LiteralBool(_) => self.member_exists(&Type::Bool, key, bind),
             _ => false,
         };
         if !res {

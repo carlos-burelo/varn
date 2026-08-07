@@ -9,34 +9,47 @@ pub fn fetch_and_extract(
     version: &str,
     dest_dir: &Path,
 ) -> Result<String, String> {
-    let url = origin.tarball_url(version);
+    match origin {
+        DepOrigin::LocalPath { path } => {
+            if !path.exists() {
+                return Err(format!("local path does not exist: {}", path.display()));
+            }
+            Ok("sha256:local".to_owned())
+        }
+        DepOrigin::Remote { .. } => {
+            let url = origin.tarball_url(version);
 
-    let response = ureq::get(&url)
-        .set("User-Agent", "varn-pm/0.1")
-        .call()
-        .map_err(|e| format!("cannot download {url}: {e}"))?;
+            let response = ureq::AgentBuilder::new()
+                .timeout(std::time::Duration::from_secs(10))
+                .build()
+                .get(&url)
+                .set("User-Agent", "varn-pm/0.1")
+                .call()
+                .map_err(|e| format!("cannot download {url}: {e}"))?;
 
-    let mut bytes = Vec::new();
-    response
-        .into_reader()
-        .read_to_end(&mut bytes)
-        .map_err(|e| format!("cannot read download body: {e}"))?;
+            let mut bytes = Vec::new();
+            response
+                .into_reader()
+                .read_to_end(&mut bytes)
+                .map_err(|e| format!("cannot read download body: {e}"))?;
 
-    let mut hasher = Sha256::new();
-    hasher.update(&bytes);
-    let digest = hasher.finalize();
-    let integrity = format!("sha256:{}", hex::encode(digest));
+            let mut hasher = Sha256::new();
+            hasher.update(&bytes);
+            let digest = hasher.finalize();
+            let integrity = format!("sha256:{}", hex::encode(digest));
 
-    if dest_dir.exists() {
-        std::fs::remove_dir_all(dest_dir)
-            .map_err(|e| format!("cannot clear {}: {e}", dest_dir.display()))?;
+            if dest_dir.exists() {
+                std::fs::remove_dir_all(dest_dir)
+                    .map_err(|e| format!("cannot clear {}: {e}", dest_dir.display()))?;
+            }
+            std::fs::create_dir_all(dest_dir)
+                .map_err(|e| format!("cannot create {}: {e}", dest_dir.display()))?;
+
+            extract_tarball(&bytes, dest_dir, version)?;
+
+            Ok(integrity)
+        }
     }
-    std::fs::create_dir_all(dest_dir)
-        .map_err(|e| format!("cannot create {}: {e}", dest_dir.display()))?;
-
-    extract_tarball(&bytes, dest_dir, version)?;
-
-    Ok(integrity)
 }
 
 pub fn verify_cached(dest_dir: &Path, expected_integrity: &str) -> bool {

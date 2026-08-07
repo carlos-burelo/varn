@@ -117,22 +117,6 @@ impl Type {
         }
     }
 
-    pub fn literal_int(v: i64) -> Self {
-        Type(TypeKind::LiteralInt(v), false)
-    }
-
-    pub fn literal_float(v: u64) -> Self {
-        Type(TypeKind::LiteralFloat(v), false)
-    }
-
-    pub fn literal_str(v: impl Into<Rc<str>>) -> Self {
-        Type(TypeKind::LiteralStr(v.into()), false)
-    }
-
-    pub fn literal_bool(v: bool) -> Self {
-        Type(TypeKind::LiteralBool(v), false)
-    }
-
     pub fn is_dynamic(&self) -> bool {
         matches!(&self.0, TypeKind::Intrinsic(TypeTag::Dynamic))
     }
@@ -151,10 +135,6 @@ impl Type {
                 TypeTag::Symbol => Some(I::Symbol.as_str()),
                 _ => None,
             },
-            TypeKind::LiteralInt(_) => Some(I::Int.as_str()),
-            TypeKind::LiteralFloat(_) => Some(I::Float.as_str()),
-            TypeKind::LiteralStr(_) => Some(I::Str.as_str()),
-            TypeKind::LiteralBool(_) => Some(I::Bool.as_str()),
             TypeKind::Array(_) => Some(I::Array.as_str()),
             _ => None,
         }

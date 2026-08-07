@@ -801,20 +801,9 @@ impl<'a> Lowerer<'a> {
             };
             let mut const_args = Vec::new();
             for f in &member.payload_fields {
-                match &f.ty.kind {
-                    varn_core::TypeKind::LiteralInt(val) => {
-                        const_args.push(HirExpr::Int(*val));
-                    }
-                    varn_core::TypeKind::LiteralStr(val) => {
-                        const_args.push(HirExpr::Str(Rc::from(val.as_str())));
-                    }
-                    varn_core::TypeKind::LiteralFloat(bits) => {
-                        const_args.push(HirExpr::Float(f64::from_bits(*bits)));
-                    }
-                    varn_core::TypeKind::LiteralBool(val) => {
-                        const_args.push(HirExpr::Bool(*val));
-                    }
-                    _ => {}
+                if let Some(init) = &f.init {
+                    let hir_expr = self.lower_expr(init, scope)?;
+                    const_args.push(hir_expr);
                 }
             }
             variants.push(HirEnumVariant {

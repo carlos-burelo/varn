@@ -5,7 +5,7 @@ use crate::document::SymbolRecord;
 use super::format::format_signature;
 
 pub fn symbol_hover(sym: &SymbolRecord) -> Hover {
-    let mut value = format!("```Varn\n{}\n```", format_signature(sym));
+    let mut value = format!("```varn\n{}\n```", format_signature(sym));
 
     if let Some(raw) = &sym.doc {
         let parsed = varn_core::DocComment::parse(raw);

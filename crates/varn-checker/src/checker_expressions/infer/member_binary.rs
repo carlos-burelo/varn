@@ -119,10 +119,6 @@ pub(crate) fn normalize_for_binary(ty: &Type) -> Type {
             n if n == varn_core::IntrinsicType::Decimal.as_str() => return Type::Decimal,
             _ => {}
         },
-        TypeKind::LiteralStr(_) => return Type::Str,
-        TypeKind::LiteralInt(_) => return Type::Int,
-        TypeKind::LiteralFloat(_) => return Type::Float,
-        TypeKind::LiteralBool(_) => return Type::Bool,
         _ => {}
     }
     ty.clone()

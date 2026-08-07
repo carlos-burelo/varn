@@ -397,59 +397,15 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
             })
         }
 
-        TokenKind::Str => {
-            let value = s.consume_lexeme();
-            Ok(TypeNode {
-                id: 0,
-                kind: TypeKind::LiteralStr(value.to_string()),
-                range,
-            })
-        }
-
-        TokenKind::IntegerLiteral => {
-            let pre_parsed = s.parsed_num();
-            let value = s.lexeme().to_owned();
-            s.advance();
-            let int_val = match pre_parsed {
-                Some(varn_core::ParsedNumber::Int(n)) => n,
-                _ => value.parse().unwrap_or(0),
-            };
-            Ok(TypeNode {
-                id: 0,
-                kind: TypeKind::LiteralInt(int_val),
-                range,
-            })
-        }
-        TokenKind::FloatLiteral => {
-            let pre_parsed = s.parsed_num();
-            let value = s.lexeme().to_owned();
-            s.advance();
-            let float_val = match pre_parsed {
-                Some(varn_core::ParsedNumber::Float(f)) => f,
-                _ => value.parse::<f64>().unwrap_or(0.0),
-            };
-            Ok(TypeNode {
-                id: 0,
-                kind: TypeKind::LiteralFloat(float_val.to_bits()),
-                range,
-            })
-        }
-        TokenKind::True => {
-            s.advance();
-            Ok(TypeNode {
-                id: 0,
-                kind: TypeKind::LiteralBool(true),
-                range,
-            })
-        }
-        TokenKind::False => {
-            s.advance();
-            Ok(TypeNode {
-                id: 0,
-                kind: TypeKind::LiteralBool(false),
-                range,
-            })
-        }
+        TokenKind::Str
+        | TokenKind::IntegerLiteral
+        | TokenKind::FloatLiteral
+        | TokenKind::True
+        | TokenKind::False => Err(format!(
+            "literal types are not supported; use primitive types (int, float, str, bool) at {}:{}",
+            s.line(),
+            s.column()
+        )),
         TokenKind::Null => {
             s.advance();
             Ok(TypeNode {
@@ -500,67 +456,32 @@ fn parse_primary_type(s: &mut TokenStream) -> Result<TypeNode, String> {
 
 fn parse_template_literal_type(s: &mut TokenStream) -> Result<TypeNode, String> {
     let start = s.range();
-    let mut parts: Vec<TypeNode> = vec![];
-
     let raw = s.consume_lexeme();
-    let literal_text = raw.trim_start_matches('`');
-    let (head_text, has_interp) = if let Some(text) = literal_text.strip_suffix("${") {
-        (text, true)
-    } else {
-        (literal_text.trim_end_matches('`'), false)
-    };
-    parts.push(TypeNode {
+    let has_interp = raw.ends_with("${");
+    if has_interp {
+        loop {
+            let _ = parse_type(s)?;
+            if !matches!(
+                s.kind(),
+                TokenKind::TemplateMiddle | TokenKind::TemplateTail
+            ) {
+                return Err(format!(
+                    "expected template continuation in type position at {}:{}",
+                    s.line(),
+                    s.column()
+                ));
+            }
+            let raw_cont = s.consume_lexeme();
+            if raw_cont.ends_with('`') {
+                break;
+            }
+        }
+    }
+    Ok(TypeNode {
         id: 0,
-        kind: TypeKind::LiteralStr(head_text.to_string()),
+        kind: TypeKind::Intrinsic(varn_core::TypeTag::Str),
         range: start,
-    });
-
-    if !has_interp {
-        return Ok(TypeNode {
-            id: 0,
-            kind: TypeKind::LiteralStr(head_text.to_string()),
-            range: start,
-        });
-    }
-
-    loop {
-        let interp_ty = parse_type(s)?;
-        parts.push(interp_ty);
-
-        if !matches!(
-            s.kind(),
-            TokenKind::TemplateMiddle | TokenKind::TemplateTail
-        ) {
-            return Err(format!(
-                "expected template continuation in type literal at {}:{}",
-                s.line(),
-                s.column()
-            ));
-        }
-
-        let cont_range = s.range();
-        let raw_cont = s.consume_lexeme();
-        let (content, is_tail) = if let Some(text) = raw_cont.strip_suffix('`') {
-            (text.strip_prefix('}').unwrap_or(text), true)
-        } else {
-            let after_close = raw_cont.strip_prefix('}').unwrap_or(raw_cont.as_ref());
-            (after_close.trim_end_matches("${"), false)
-        };
-        parts.push(TypeNode {
-            id: 0,
-            kind: TypeKind::LiteralStr(content.to_string()),
-            range: cont_range,
-        });
-
-        if is_tail {
-            let end = s.range();
-            return Ok(TypeNode {
-                id: 0,
-                kind: TypeKind::TemplateLiteral(parts),
-                range: start.to(end),
-            });
-        }
-    }
+    })
 }
 
 pub fn parse_type_args(s: &mut TokenStream) -> Result<Vec<TypeNode>, String> {

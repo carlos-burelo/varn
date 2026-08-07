@@ -302,7 +302,7 @@ impl Checker {
             ExprKind::FloatLiteral { .. } => Type::Float,
             ExprKind::DecimalLiteral { .. } => Type::Decimal,
             ExprKind::BigIntLiteral { .. } => Type::BigInt,
-            ExprKind::StrLiteral { value, .. } => Type::literal_str(value.to_string()),
+            ExprKind::StrLiteral { .. } => Type::Str,
             ExprKind::CharLiteral { .. } => Type::Char,
             ExprKind::BoolLiteral { .. } => Type::Bool,
             ExprKind::NullLiteral => Type::Null,

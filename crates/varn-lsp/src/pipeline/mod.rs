@@ -370,7 +370,10 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
                 symbol_id,
                 global_key,
                 full_range: sym.full_range,
-                is_from_stdlib: sym.origin_module.is_some(),
+                is_from_stdlib: sym
+                    .origin_module
+                    .as_deref()
+                    .map_or(false, |m| m.starts_with("std:") || m.starts_with("core:") || m.starts_with("runtime:")),
                 origin: sym.origin_module.as_deref().map(|s| s.to_owned()),
             }
         })
@@ -428,6 +431,8 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         extension_members,
     };
 
+    let positional_index = crate::queries::indexes::PositionalIndex::build(&tokens, &db.node_scopes);
+
     DocumentAnalysis {
         source,
         uri,
@@ -438,6 +443,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         type_param_names,
         db,
         import_paths,
+        positional_index,
     }
 }
 

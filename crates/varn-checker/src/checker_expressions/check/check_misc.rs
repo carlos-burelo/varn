@@ -43,8 +43,6 @@ impl Checker {
                     | TypeKind::Float
                     | TypeKind::Decimal
                     | TypeKind::BigInt
-                    | TypeKind::LiteralInt(_)
-                    | TypeKind::LiteralFloat(_)
             ) || matches!(&t.0, TypeKind::Named(n, _) if n == varn_core::IntrinsicType::Decimal.as_str())
         };
         let same_numeric_kind = is_numeric(l_base) && is_numeric(r_base);
@@ -221,12 +219,8 @@ impl Checker {
                 varn_core::ast::MatchPattern::Literal(e) => {
                     self.check_expr(e, bind);
                     match &e.kind {
-                        ExprKind::StrLiteral { value } => {
-                            Some(crate::types::Type::literal_str(value.clone()))
-                        }
-                        ExprKind::IntLiteral { value, .. } => {
-                            Some(crate::types::Type::literal_int(*value))
-                        }
+                        ExprKind::StrLiteral { .. } => Some(crate::types::Type::Str),
+                        ExprKind::IntLiteral { .. } => Some(crate::types::Type::Int),
                         _ => None,
                     }
                 }
