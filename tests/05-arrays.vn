@@ -13,14 +13,14 @@ assert("concat",       [1, 2].concat([3, 4]).length === 4)
 assert("join",         [1, 2, 3].join("-") === "1-2-3")
 assert("join default", [1, 2, 3].join() === "1,2,3")
 
-const doubled = nums.map((n) => n * 2)
+const doubled = nums.map((n) => n * 2) // TODO: REVISAR HOVER
 assert("map length",   doubled.length === 8)
 assert("map value",    doubled[0] === 6)
 
-const evens = nums.filter((n) => n % 2 === 0)
+const evens = nums.filter((n) => n % 2 === 0) // TODO: TAMBIEN, PROBLEMA DE CALLBACKS
 assert("filter",       evens.length === 3)
 
-const sum = nums.reduce((acc, n) => acc + n, 0)
+const sum = nums.reduce((acc, n) => acc + n, 0) //TODO: REVISAR SI LA INFERENCIA DE sum ES CORRECTA
 assert("reduce sum",   sum === 31)
 
 const found = nums.find((n) => n > 5)

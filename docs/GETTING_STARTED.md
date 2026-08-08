@@ -1,160 +1,249 @@
-# Primeros Pasos con Varn
+# Guía de Primeros Pasos con Varn
 
-## Qué es Varn
+Bienvenido a **Varn**. Esta guía proporciona una visión completa para comenzar a desarrollar aplicaciones con el lenguaje Varn, desde la instalación básica hasta el empaquetado y consumo de bibliotecas.
 
-Lenguaje compilado, estáticamente tipado, con VM register-based optimizada. Sintaxis propia inspirada en TypeScript pero sin ser TypeScript.
+---
 
-## Instalación
+## Tabla de Contenidos
 
-Consulta [INSTALL.md](INSTALL.md).
+- [¿Qué es Varn?](#qué-es-varn)
+- [Ciclo de Vida de Desarrollo](#ciclo-de-vida-de-desarrollo)
+- [Instalación Rápida](#instalación-rápida)
+- [Tu Primer Programa](#tu-primer-programa)
+- [Estructura de un Proyecto Varn](#estructura-de-un-proyecto-varn)
+- [Tour de Características Básicas](#tour-de-características-básicas)
+  - [Variables y Tipos](#variables-y-tipos)
+  - [Funciones y Closures](#funciones-y-closures)
+  - [Clases e Interfaces](#clases-e-interfaces)
+  - [Pattern Matching (`match`)](#pattern-matching-match)
+  - [Operador Pipeline (`|>`)](#operador-pipeline-)
+  - [Concurrencia Async/Await](#concurrencia-asyncawait)
+- [Importación de Módulos y Paquetes](#importación-de-módulos-y-paquetes)
+- [Compilación a Artefactos Portable `.vnc`](#compilación-a-artefactos-portable-vnc)
+- [Ejecución de la Suite de Verificación](#ejecución-de-la-suite-de-verificación)
+- [Siguientes Pasos](#siguientes-pasos)
 
-## Ejecutar el primer programa
+---
+
+## ¿Qué es Varn?
+
+Varn es un lenguaje compilado, estáticamente tipado, diseñado para combinar una sintaxis moderna y expresiva (inspirada en TypeScript) con el rendimiento de una máquina virtual basada en registros en 64 bits con NaN-boxing y un runtime asíncrono sobre Tokio.
+
+---
+
+## Ciclo de Vida de Desarrollo
+
+El binario unificado `vn` orquesta todas las fases del ciclo de vida del software:
+
+```mermaid
+flowchart LR
+    A["vn init\n(Nuevo Proyecto)"] --> B["vn check\n(Verificación Tipos)"]
+    B --> C["vn run\n(Ejecución Directa)"]
+    C --> D["vn bench\n(Perfilado Rendimiento)"]
+    D --> E["vn build\n(Artefacto .vnc)"]
+```
+
+---
+
+## Instalación Rápida
+
+Consulta la guía detallada en [INSTALL.md](INSTALL.md) para más opciones.
+
+```bash
+git clone https://github.com/carlos-burelo/varn.git
+cd varn-lang
+cargo build --bin vn --release
+```
+
+Verifica la instalación:
+
+```bash
+./target/release/vn doctor
+```
+
+---
+
+## Tu Primer Programa
+
+Crea un archivo llamado `hola.vn`:
 
 ```Varn
 // hola.vn
-print("Hola, mundo!")
+function saludar(nombre: str): str {
+    return `¡Hola, ${nombre} desde Varn!`
+}
+
+print(saludar("Mundo"))
 ```
 
-```sh
-vn hola.vn
+Ejecútalo con el comando `vn`:
+
+```bash
+vn run hola.vn
 ```
 
-## Ejecutar la suite de tests
-
-```sh
-vn tests/main.vn
-# Modules executed in suite: 48
-# PASSED: 686 / FAILED: 0
+Salida esperada:
+```
+¡Hola, Mundo desde Varn!
 ```
 
-Importante:
+---
 
-- `tests/main.vn` es la suite por defecto y hoy integra `48` módulos.
-- `41`, `42` y `47` ya no están fuera de la suite principal.
+## Estructura de un Proyecto Varn
 
-## Comandos principales
+Para inicializar un proyecto estructurado:
 
-Referencia completa: [CLI_REFERENCE.md](CLI_REFERENCE.md)
+```bash
+vn init mi-proyecto
+cd mi-proyecto
+```
 
-| Comando | Descripción |
-|---------|-------------|
-| `vn run <file>` | Ejecutar programa |
-| `vn check <file>` | Type-check sin ejecutar |
-| `vn build <file>` | Compilar a `.vnc` |
-| `vn bench <file>` | Benchmark con métricas VM |
-| `vn debug -p bytecode <file>` | Ver bytecode |
-| `vn debug <file>` | Inspeccionar AST/tipos/bytecode |
-| `vn repl` | REPL interactivo |
-| `vn pkg add <alias> <origin>` | Añadir dependencia |
-| `vn pkg install` | Instalar dependencias del proyecto |
+Esto generará la siguiente jerarquía de archivos:
 
-## Ejemplo de lenguaje
+```
+mi-proyecto/
+├── main.vn             ← Punto de entrada principal
+├── varn.json          ← Manifiesto del proyecto y dependencias
+└── .vn/
+    ├── varn.lock      ← Versiones bloqueadas de dependencias
+    └── cache/         ← Caché local de bytecode (.bin)
+```
+
+---
+
+## Tour de Características Básicas
+
+### Variables y Tipos
 
 ```Varn
-// Variables
-const x = 42
-const name: str = "Varn"
-let count = 0
+const pi: float = 3.14159
+let contador: int = 0
+const activo: bool = true
+const nombre: str = "Varn"
+```
 
-// Functions
-function add(a: int, b: int): int {
+### Funciones y Closures
+
+```Varn
+function sumar(a: int, b: int): int {
     return a + b
 }
 
-// Closures / lambdas
-const double = (n: int) => n * 2
-const greet = (name: str) => `Hello, ${name}!`
-
-// Named arguments (can pass out of order)
-function describe(name: str, age: int): str {
-    return `${name} is ${age} years old`
-}
-print(describe(age: 25, name: "Bob"))  // Bob is 25 years old
-
-// Classes
-class Animal {
-    name: str
-    constructor(n: str) { this.name = n }
-    speak(): str { return "..." }
-    toString(): str { return `Animal(${this.name})` }
-}
-
-class Dog extends Animal {
-    constructor(n: str) { super(n) }
-    override speak(): str { return "Woof" }
-}
-
-// Abstract classes
-abstract class Shape {
-    abstract area(): float
-    describe(): str { return `shape with area ${this.area()}` }
-}
-
-// Pattern matching
-const val = 2
-match (val) {
-    1 => print("one"),
-    2 | 3 => print("two or three"),
-    _ => print("other"),
-}
-
-// Pipeline
-const result = 5 |> double |> double
-print(result)  // 20
-
-// Generators
-function* range(n: int) {
-    let i = 0
-    while (i < n) {
-        yield i
-        i = i + 1
-    }
-}
-
-// Async
-async function fetchData(): str {
-    return await http.get("https://api.example.com/data")
-}
-
-// Extensions
-extension StringExt on str {
-    capitalize(): str {
-        if (this.length === 0) { return this }
-        return this[0].toUpperCase() + this.slice(1)
-    }
-}
-print("hola".capitalize())  // Hola
+const duplicar = (n: int): int => n * 2
+print(duplicar(21)) // 42
 ```
 
-## Importar stdlib
+### Clases e Interfaces
 
 ```Varn
-import { readFile } from "std:fs"
-import { now } from "std:time"
+interface Volador {
+    volar(): void
+}
+
+class Ave implements Volador {
+    especie: str
+    constructor(e: str) { this.especie = e }
+    volar(): void { print(`${this.especie} está volando`) }
+}
+```
+
+### Pattern Matching (`match`)
+
+```Varn
+const estado: int = 200
+
+const mensaje = match (estado) {
+    200 => "OK",
+    404 => "Not Found",
+    500 | 502 => "Server Error",
+    _ => "Unknown State"
+}
+```
+
+### Operador Pipeline (`|>`)
+
+```Varn
+function cuadrado(n: int): int = n * n
+function sumarUno(n: int): int = n + 1
+
+const resultado = 5 |> cuadrado |> sumarUno
+print(resultado) // 26
+```
+
+### Concurrencia Async/Await
+
+```Varn
+import { sleep } from "std:time"
+
+async function tareaLarga(): str {
+    await sleep(100)
+    return "Completado"
+}
+
+async function main(): void {
+    const res = await tareaLarga()
+    print(res)
+}
+
+await main()
+```
+
+---
+
+## Importación de Módulos y Paquetes
+
+### Módulos Nativos de la Stdlib (`std:*`)
+
+```Varn
+import { readFile, writeFile } from "std:fs"
 import { sha256 } from "std:crypto"
+import { now } from "std:time"
 ```
 
-## Importar paquetes externos
+### Paquetes Externos (`pkg:*`)
+
+Agrega dependencias a tu `varn.json`:
+
+```bash
+vn pkg add mathlib github.com/user/mathlib@^1.0.0
+```
+
+E impórtalas en tu código:
 
 ```Varn
-import { utils } from "pkg:mylib"
+import { calcular } from "pkg:mathlib"
 ```
 
-Requiere configuración en `varn.json`:
-```json
-{
-  "name": "mi-proyecto",
-  "dependencies": {
-    "mylib": "github.com/user/mylib@^1.0.0"
-  }
-}
+---
+
+## Compilación a Artefactos Portable `.vnc`
+
+Puedes compilar tu código a un paquete de bytecode optimizado `.vnc`:
+
+```bash
+vn build main.vn -o app.vnc
 ```
 
-Instalar: `vn pkg install`
+Ejecuta el archivo `.vnc` sin volver a pasar por las fases de parsing o type checking:
 
-## Siguiente
+```bash
+vn run app.vnc
+```
 
-1. [WARP-SPEC.md](WARP-SPEC.md) — referencia del lenguaje
-2. [ARCHITECTURE.md](ARCHITECTURE.md) — arquitectura interna
-3. [CLI_REFERENCE.md](CLI_REFERENCE.md) — comandos y variables de entorno
-4. [LBI_ARCHITECTURE.md](LBI_ARCHITECTURE.md) — sistema de bindings nativos
+---
+
+## Ejecución de la Suite de Verificación
+
+Varn incluye una suite de pruebas integrada con 72 módulos de integración:
+
+```bash
+vn run tests/main.vn
+```
+
+---
+
+## Siguientes Pasos
+
+- 📖 [**WARP-SPEC.md**](WARP-SPEC.md) — Especificación completa de la sintaxis y semántica.
+- 🏛️ [**ARCHITECTURE.md**](ARCHITECTURE.md) — Visión técnica interna de la VM y el compilador.
+- 💻 [**CLI_REFERENCE.md**](CLI_REFERENCE.md) — Referencia de comandos CLI e inspección de fases.

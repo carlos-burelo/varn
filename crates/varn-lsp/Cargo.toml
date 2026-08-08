@@ -3,10 +3,6 @@ name = "varn-lsp"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "vn-lsp"
-path = "src/main.rs"
-
 [dependencies]
 varn-core    = { path = "../varn-core" }
 varn-lexer   = { path = "../varn-lexer" }

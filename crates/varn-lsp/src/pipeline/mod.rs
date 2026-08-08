@@ -152,8 +152,8 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
             0,
             LspDiag {
                 message: "no standard library found for this workspace (checked varn.json \
-                    'std', VARN_STD, this checkout's std/ tree, and the toolchain's std.vnb) \
-                    — run `cargo xtask build-std` or reinstall the vn toolchain"
+                    'std', VARN_STD, this checkout's std/ tree, and the stdlib compiled \
+                    into this binary) — rebuild or reinstall the vn toolchain"
                     .to_string(),
                 line: 0,
                 col: 0,

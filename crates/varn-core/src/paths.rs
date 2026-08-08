@@ -1,4 +1,4 @@
-use std::env::{current_dir, current_exe, var};
+use std::env::{current_dir, var};
 use std::path::PathBuf;
 
 pub fn varn_home_dir() -> PathBuf {
@@ -26,35 +26,6 @@ pub fn varn_cache_dir() -> PathBuf {
         }
     }
     varn_home_dir().join("cache")
-}
-
-pub fn stdlib_candidates() -> Vec<PathBuf> {
-    let mut out = Vec::with_capacity(8);
-
-    if let Ok(raw) = var("VARN_STDLIB") {
-        let p = PathBuf::from(raw);
-        if !p.as_os_str().is_empty() {
-            out.push(p);
-        }
-    }
-
-    out.push(varn_home_dir().join("stdlib"));
-
-    if let Ok(cwd) = current_dir() {
-        out.push(cwd.join("varn-stdlib"));
-        if let Some(parent) = cwd.parent() {
-            out.push(parent.join("varn-stdlib"));
-        }
-    }
-
-    if let Ok(exe) = current_exe() {
-        if let Some(exe_dir) = exe.parent() {
-            out.push(exe_dir.join("varn-stdlib"));
-            out.push(exe_dir.join("../share/Varn/stdlib"));
-        }
-    }
-
-    out
 }
 
 fn user_home_dir() -> Option<PathBuf> {

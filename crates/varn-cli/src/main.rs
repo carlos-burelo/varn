@@ -27,15 +27,6 @@ fn main() {
 
     try_run_standalone_executable();
 
-    // Resolving the std is lazy; force it here so an unusable one fails at
-    // startup with a readable message instead of mid-compile (spec §3: never
-    // a silent fallback to the embedded registry).
-    if let Some(reason) = varn_builtins::std_load_error() {
-        let e = error::CliError::fatal(reason);
-        terminal::error(&e);
-        process::exit(e.exit_code);
-    }
-
     if std::env::var("VARN_DEBUG_OPS").is_ok() {
         println!("DEBUG std resolved: {:?}", varn_modules::std_root::resolve());
         println!("--- CLI NATIVE OPERATIONS ---");
@@ -56,6 +47,23 @@ fn main() {
     let effective = implicit_run(raw);
 
     let cli = Cli::parse_from(effective);
+
+    // Resolving the std is lazy; force it here so an unusable one fails at
+    // startup with a readable message instead of mid-compile (spec §3: never
+    // a silent fallback to the embedded registry).
+    //
+    // Two exceptions, both decided after parsing. `lsp`: an editor opened on
+    // a half-recompiled checkout is routine, and exiting there gives the
+    // client an EPIPE instead of a diagnostic — the server reports the same
+    // reason through `window/showMessage` and keeps serving. `doctor`: its
+    // whole job is explaining a broken install, so it must survive one.
+    if !matches!(cli.command, Commands::Lsp(_) | Commands::Doctor) {
+        if let Some(reason) = varn_builtins::std_load_error() {
+            let e = error::CliError::fatal(reason);
+            terminal::error(&e);
+            process::exit(e.exit_code);
+        }
+    }
 
     let result = dispatch(cli.command);
 

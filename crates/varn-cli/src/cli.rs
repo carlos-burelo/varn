@@ -151,6 +151,14 @@ pub struct LspArgs {
 
     #[arg(long, help = "Dirección host:puerto TCP para escuchar (ej: 127.0.0.1:9257)")]
     pub tcp: Option<String>,
+
+    /// Accepted and ignored: stdio is already the default when no TCP option
+    /// is given. LSP clients pass it unprompted — vscode-languageclient
+    /// appends `--stdio` for any `TransportKind.stdio` executable, and editor
+    /// configs write it by convention — so rejecting it kills the server at
+    /// startup with nothing but an EPIPE on the client side.
+    #[arg(long, help = "Servir sobre stdio (por defecto; aceptado por convención)")]
+    pub stdio: bool,
 }
 
 #[derive(Args)]

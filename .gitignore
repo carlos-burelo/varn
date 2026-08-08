@@ -7,8 +7,8 @@ coverage/
 *.gcda
 *.gcno
 
-# std bundle: `cargo xtask build-std` escribe target/std.vnb;
-# esta entrada evita commitear copias sueltas en raíz.
+# std bundle: lo produce crates/varn-cli/build.rs dentro de OUT_DIR y se
+# embebe en `vn`. Esta entrada evita commitear copias sueltas.
 std.vnb
 
 # Varn caches y lockfiles

@@ -323,6 +323,7 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
             pure: m.pure,
             interface,
             bytecode,
+            source,
         });
     }
     if !failures.is_empty() {

@@ -3,11 +3,13 @@ use std::path::{Path, PathBuf};
 use crate::registry::{is_known, spec_for, MODULE_REGISTRY};
 use varn_modules::spec::{ModuleKind, ModuleSpec};
 
-const ENV_VARN_STDLIB: &str = "VARN_STDLIB";
-const ENV_VARN_HOME: &str = "VARN_HOME";
-const BUILTINS_DIR_NAME: &str = "varn-builtins";
-const VARN_HOME_STDLIB_SUBDIR: &str = "stdlib";
-
+/// Registry lookups over `core:`/`runtime:` modules.
+///
+/// `core:`/`runtime:` sources are `include_str!`-embedded, so nothing here
+/// needs the filesystem — [`Self::vn_source_path`] exists only for the
+/// checkout, where `vn_source` is a repo-relative path. A released binary
+/// serves these through [`Self::embedded_source`], and the editor through
+/// the mirror `vn lsp` writes.
 pub struct CoreSourceLocator {
     stdlib_root: PathBuf,
 }
@@ -17,22 +19,10 @@ impl CoreSourceLocator {
         Self { stdlib_root }
     }
 
-    pub fn from_env() -> Self {
-        let candidates = stdlib_candidates();
-        for c in &candidates {
-            if c.is_dir() {
-                return Self::new(c.clone());
-            }
-        }
-        let selected = candidates
-            .into_iter()
-            .next()
-            .unwrap_or_else(|| PathBuf::from(BUILTINS_DIR_NAME));
-        Self::new(selected)
-    }
-
-    pub fn stdlib_root(&self) -> &Path {
-        &self.stdlib_root
+    /// Rooted at the working directory: `vn_source` fields are
+    /// `crates/varn-builtins/src/...`, which only resolve from a checkout.
+    pub fn from_checkout() -> Self {
+        Self::new(PathBuf::from("."))
     }
 
     pub fn is_known(&self, specifier: &str) -> bool {
@@ -97,30 +87,4 @@ impl CoreSourceLocator {
         });
         Some(normalized.to_string_lossy().to_string())
     }
-}
-
-fn stdlib_candidates() -> Vec<PathBuf> {
-    let mut out = Vec::new();
-
-    out.push(PathBuf::from("."));
-
-    if let Ok(v) = std::env::var(ENV_VARN_STDLIB) {
-        out.push(PathBuf::from(v));
-    }
-
-    if let Ok(home) = std::env::var(ENV_VARN_HOME) {
-        out.push(PathBuf::from(home).join(VARN_HOME_STDLIB_SUBDIR));
-    }
-
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(root) = exe.parent().and_then(|p| p.parent()) {
-            out.push(root.join(BUILTINS_DIR_NAME));
-        }
-    }
-
-    if let Ok(cwd) = std::env::current_dir() {
-        out.push(cwd.join(BUILTINS_DIR_NAME));
-    }
-
-    out
 }

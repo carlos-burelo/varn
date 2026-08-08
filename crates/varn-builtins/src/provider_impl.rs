@@ -13,19 +13,49 @@ use crate::registry::{spec_for, MODULE_REGISTRY};
 /// the provider's &'static contract; the std set is small and process-lived.
 struct ActiveStd {
     specs: &'static [ModuleSpec],
-    /// (id, interface, bytecode) — bundle mode only.
-    blobs: &'static [(String, &'static [u8], &'static [u8])],
+    /// Bundle mode only; empty in tree mode.
+    blobs: &'static [StdModuleBlobs],
     /// Source tree root — tree mode only.
     tree_root: Option<PathBuf>,
     description: String,
     provenance: StdProvenance,
 }
 
-/// `Ok(None)` = no std resolved at all (embedded registry serves everything).
-/// `Err` = a std *was* resolved but is unusable. That failure is kept as data
-/// instead of a panic so every host decides how to be loud about it: `vn`
-/// aborts at startup, `vn-lsp` reports it to the editor and keeps serving.
-/// What it must never be is silent (spec §3) — see [`std_load_error`].
+/// One std module as it arrives from a bundle: everything precomputed, so no
+/// consumer has to touch the filesystem to serve it.
+struct StdModuleBlobs {
+    id: String,
+    interface: &'static [u8],
+    bytecode: &'static [u8],
+    source: &'static str,
+}
+
+fn leak_bundle_modules(
+    modules: Vec<varn_modules::bundle::BundleModule>,
+) -> (Vec<ModuleSpec>, Vec<StdModuleBlobs>) {
+    let mut specs = Vec::with_capacity(modules.len());
+    let mut blobs = Vec::with_capacity(modules.len());
+    for m in modules {
+        // Same `<name>.vn` shape tree mode produces, so specs are
+        // indistinguishable between storage forms downstream.
+        let file = format!("{}.vn", m.id.strip_prefix("std:").unwrap_or(&m.id));
+        specs.push(ModuleSpec::leaked(m.id.clone(), ModuleKind::Stdlib, file, m.pure));
+        blobs.push(StdModuleBlobs {
+            id: m.id,
+            interface: Box::leak(m.interface.into_boxed_slice()),
+            bytecode: Box::leak(m.bytecode.into_boxed_slice()),
+            source: Box::leak(m.source.into_boxed_str()),
+        });
+    }
+    (specs, blobs)
+}
+
+/// `Ok(None)` = this host has no std at all (registry serves `core:`/
+/// `runtime:`, `std:` does not resolve). `Err` = a std *was* resolved but is
+/// unusable. That failure is kept as data instead of a panic so every host
+/// decides how to be loud about it: `vn` aborts at startup, `vn lsp` reports
+/// it to the editor and keeps serving. What it must never be is silent
+/// (spec §3) — see [`std_load_error`].
 static ACTIVE_STD: OnceLock<Result<Option<ActiveStd>, String>> = OnceLock::new();
 static EMBEDDED_STDLIB_BYTES: OnceLock<&'static [u8]> = OnceLock::new();
 
@@ -35,15 +65,23 @@ pub fn register_embedded_stdlib(bytes: &'static [u8]) {
 
 fn active_std_result() -> &'static Result<Option<ActiveStd>, String> {
     ACTIVE_STD.get_or_init(|| {
-        if let Some((source, provenance)) = resolve() {
-            match source {
-                StdSource::Bundle(path) => load_bundle_std(&path, provenance).map(Some),
-                StdSource::SourceTree(root) => load_tree_std(&root, provenance).map(Some),
-            }
-        } else if let Some(bytes) = EMBEDDED_STDLIB_BYTES.get() {
-            load_embedded_std(bytes).map(Some)
-        } else {
-            Ok(None)
+        let (source, provenance) = resolve();
+        match source {
+            StdSource::SourceTree(root) => load_tree_std(&root, provenance).map(Some),
+            StdSource::Embedded => match EMBEDDED_STDLIB_BYTES.get() {
+                Some(bytes) => load_embedded_std(bytes).map(Some),
+                // Hosts that link varn-builtins without embedding a bundle
+                // (test binaries, build scripts) still get `core:`/`runtime:`
+                // from the registry; only `std:` is unavailable. But if the
+                // embedded std was asked for by name, its absence is a
+                // configuration error, not a reason to serve less.
+                None if provenance == StdProvenance::Env => Err(format!(
+                    "{}={} was requested but this binary has no stdlib compiled into it",
+                    varn_modules::std_root::ENV_VARN_STD,
+                    varn_modules::std_root::STD_EMBEDDED_SENTINEL
+                )),
+                None => Ok(None),
+            },
         }
     })
 }
@@ -57,7 +95,7 @@ fn active_std() -> Option<&'static ActiveStd> {
 /// Resolving the std is lazy, so hosts must call this once at startup to
 /// force it and surface the message: a `std:` import silently resolving to
 /// nothing is exactly the failure mode spec §3 forbids. `vn` treats it as
-/// fatal; `vn-lsp` reports it to the client instead of dying mid-session.
+/// fatal; `vn lsp` reports it to the client instead of dying mid-session.
 pub fn std_load_error() -> Option<&'static str> {
     active_std_result().as_ref().err().map(String::as_str)
 }
@@ -68,64 +106,13 @@ fn load_embedded_std(bytes: &'static [u8]) -> Result<ActiveStd, String> {
     bundle
         .validate_compat_with(varn_core::HOST_API_VERSION)
         .map_err(|e| format!("embedded stdlib incompatible: {e}"))?;
-    let mut specs = Vec::new();
-    let mut blobs = Vec::new();
-    for m in bundle.modules {
-        specs.push(ModuleSpec::leaked(
-            m.id.clone(),
-            ModuleKind::Stdlib,
-            String::new(),
-            m.pure,
-        ));
-        blobs.push((
-            m.id,
-            &*Box::leak(m.interface.into_boxed_slice()),
-            &*Box::leak(m.bytecode.into_boxed_slice()),
-        ));
-    }
+    let (specs, blobs) = leak_bundle_modules(bundle.modules);
     Ok(ActiveStd {
         specs: Box::leak(specs.into_boxed_slice()),
         blobs: Box::leak(blobs.into_boxed_slice()),
         tree_root: None,
         description: format!("embedded stdlib v{}", bundle.std_version),
-        provenance: StdProvenance::Toolchain,
-    })
-}
-
-fn load_bundle_std(
-    path: &std::path::Path,
-    provenance: StdProvenance,
-) -> Result<ActiveStd, String> {
-    let bytes = std::fs::read(path)
-        .map_err(|e| format!("cannot read std bundle {}: {e}", path.display()))?;
-    // A present-but-invalid bundle must not fall back to the embedded
-    // registry (spec §3): both failures below propagate as `Err`.
-    let bundle: StdBundle =
-        read_bundle(&bytes).map_err(|e| format!("{e} ({})", path.display()))?;
-    bundle
-        .validate_compat_with(varn_core::HOST_API_VERSION)
-        .map_err(|e| format!("{e} ({})", path.display()))?;
-    let mut specs = Vec::new();
-    let mut blobs = Vec::new();
-    for m in bundle.modules {
-        specs.push(ModuleSpec::leaked(
-            m.id.clone(),
-            ModuleKind::Stdlib,
-            String::new(),
-            m.pure,
-        ));
-        blobs.push((
-            m.id,
-            &*Box::leak(m.interface.into_boxed_slice()),
-            &*Box::leak(m.bytecode.into_boxed_slice()),
-        ));
-    }
-    Ok(ActiveStd {
-        specs: Box::leak(specs.into_boxed_slice()),
-        blobs: Box::leak(blobs.into_boxed_slice()),
-        tree_root: None,
-        description: format!("bundle {} v{}", path.display(), bundle.std_version),
-        provenance,
+        provenance: StdProvenance::Embedded,
     })
 }
 
@@ -174,6 +161,10 @@ struct BuiltinsProvider;
 
 fn std_spec(specifier: &str) -> Option<&'static ModuleSpec> {
     active_std()?.specs.iter().find(|s| s.id == specifier)
+}
+
+fn std_blobs(specifier: &str) -> Option<&'static StdModuleBlobs> {
+    active_std()?.blobs.iter().find(|b| b.id == specifier)
 }
 
 /// Registry specs, minus any id the active std now serves (active std wins),
@@ -225,7 +216,7 @@ impl StdlibProvider for BuiltinsProvider {
             let root = std.tree_root.as_ref()?;
             return Some(root.join(spec.vn_source));
         }
-        CoreSourceLocator::from_env().vn_source_path(specifier)
+        CoreSourceLocator::from_checkout().vn_source_path(specifier)
     }
 
     fn all_specs(&self) -> &'static [ModuleSpec] {
@@ -233,19 +224,15 @@ impl StdlibProvider for BuiltinsProvider {
     }
 
     fn interface_blob(&self, specifier: &str) -> Option<&'static [u8]> {
-        let std = active_std()?;
-        std.blobs
-            .iter()
-            .find(|(id, _, _)| id == specifier)
-            .map(|(_, i, _)| *i)
+        Some(std_blobs(specifier)?.interface)
+    }
+
+    fn bundled_source(&self, specifier: &str) -> Option<&'static str> {
+        Some(std_blobs(specifier)?.source)
     }
 
     fn bytecode_blob(&self, specifier: &str) -> Option<&'static [u8]> {
-        let std = active_std()?;
-        std.blobs
-            .iter()
-            .find(|(id, _, _)| id == specifier)
-            .map(|(_, _, b)| *b)
+        Some(std_blobs(specifier)?.bytecode)
     }
 
     fn std_provenance(&self) -> Option<(String, StdProvenance)> {

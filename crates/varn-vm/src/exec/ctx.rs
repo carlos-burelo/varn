@@ -40,7 +40,9 @@ pub use super::ctx_jit_values::{
     jit_gte, jit_invoke_virtual, jit_invoke_virtual_flat, jit_is_native_fn, jit_load_const,
     jit_load_global, jit_load_global_idx, jit_load_static_fn, jit_load_upvalue, jit_lt, jit_lte,
     jit_make_closure, jit_mul, jit_neq, jit_post_call, jit_prepare_call, jit_push_self_frame,
-    jit_set_property, jit_set_property_flat, jit_store_global_idx, jit_store_upvalue, jit_sub,
+    jit_set_property, jit_set_property_flat, jit_store_global_idx, jit_store_upvalue,
+    jit_str_char_code_at, jit_str_char_code_at_fast, jit_str_slice_intrinsic,
+    jit_str_substring_intrinsic, jit_sub,
     jit_to_string,
 };
 

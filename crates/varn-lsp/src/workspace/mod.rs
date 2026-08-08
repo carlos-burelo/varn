@@ -1,4 +1,5 @@
 pub mod revision;
+pub mod std_sources;
 use crate::db::{CancellationToken, Database, FileId};
 use crate::document::DocumentState;
 use crate::index::ProjectIndex;
@@ -40,7 +41,18 @@ impl Workspace {
         varn_checker::module_resolver::invalidate_module_cache();
 
         let file_id = self.db.intern(&uri);
-        self.db.set_source(file_id, source.clone());
+        // Only store text that is actually new. `set_source` cancels the
+        // file's outstanding token, and the caller that ran `update_source`
+        // first is holding that very token to detect being superseded — so
+        // re-storing identical text here would make every analysis cancel
+        // itself before it could publish anything.
+        let already_current = self
+            .db
+            .get_source(file_id)
+            .is_some_and(|(_, stored)| *stored == *source);
+        if !already_current {
+            self.db.set_source(file_id, source.clone());
+        }
 
         let state = Arc::new(run_pipeline(source, uri.clone()));
 

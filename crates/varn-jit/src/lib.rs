@@ -282,6 +282,18 @@ pub struct JitHelpers {
     pub jit_post_call: usize,
     pub jit_ensure_stack_capacity: usize,
     pub dispatch_intrinsic: usize,
+    /// `extern "C" fn(*mut ExecCtx, receiver, pos) -> VmValue` — direct
+    /// `charCodeAt` without the stack-window flush/reload overhead.
+    pub str_char_code_at: usize,
+    /// `extern "C" fn(*mut ExecCtx, receiver: VmValue, pos: i64) -> i64` —
+    /// ultra-lean `charCodeAt` with raw int pos/result, no VmValue boxing.
+    pub str_char_code_at_fast: usize,
+    /// `extern "C" fn(*mut ExecCtx, receiver, start, end) -> VmValue` — direct
+    /// `substring` without the stack-window flush/reload overhead.
+    pub str_substring_intrinsic: usize,
+    /// `extern "C" fn(*mut ExecCtx, receiver, start, end) -> VmValue` — direct
+    /// `slice` without the stack-window flush/reload overhead.
+    pub str_slice_intrinsic: usize,
     pub jit_is_native_fn: usize,
     pub jit_call_native_fast: usize,
     pub jit_call_native_op: usize,

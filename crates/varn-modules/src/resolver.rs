@@ -126,32 +126,6 @@ pub fn is_known_module(specifier: &str) -> bool {
     super::is_known_stdlib_module(specifier)
 }
 
-pub const VARN_SCHEME: &str = "varn://";
-
-pub fn to_varn_uri(specifier: &str) -> String {
-    if let Some((cat, rest)) = specifier.split_once(':') {
-        format!("{VARN_SCHEME}{cat}/{rest}")
-    } else {
-        format!("{VARN_SCHEME}{specifier}")
-    }
-}
-
-pub fn is_varn_uri(uri: &str) -> bool {
-    uri.starts_with(VARN_SCHEME)
-}
-
-pub fn specifier_from_uri(uri: &str) -> Option<String> {
-    let path = uri.strip_prefix(VARN_SCHEME)?;
-    let slash = path.find('/')?;
-    let cat = &path[..slash];
-    let rest = &path[slash + 1..];
-    Some(format!("{cat}:{rest}"))
-}
-
-pub fn is_known_varn_uri(uri: &str) -> bool {
-    specifier_from_uri(uri).is_some_and(|s| is_known_module(&s))
-}
-
 pub const DOCS_BASE_URL: &str = "https://varn-lang.dev/errors";
 
 pub fn docs_error_url(error_name: &str) -> String {

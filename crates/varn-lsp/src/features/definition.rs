@@ -125,18 +125,10 @@ fn resolve_origin_to_url(origin: &str) -> Option<Url> {
     if std::path::Path::new(origin).is_absolute() {
         return Url::from_file_path(origin).ok();
     }
-    // Embedded standard library or core modules
-    let provider = varn_modules::provider::get()?;
-    if let Some(mod_path) = provider.source_path(origin) {
-        if mod_path.is_file() {
-            let canonical = std::fs::canonicalize(&mod_path).ok()?;
-            return Url::from_file_path(canonical).ok();
-        }
-    }
-    if provider.embedded_source(origin).is_some() {
-        return Url::parse(&varn_modules::resolver::to_varn_uri(origin)).ok();
-    }
-    None
+    // Standard library, core or runtime module: an active std tree if there
+    // is one, otherwise this binary's own sources mirrored to disk.
+    let path = crate::workspace::std_sources::resolve_module_file(origin)?;
+    Url::from_file_path(path).ok()
 }
 
 fn entry_location(uri: &str, line: u32, col: u32) -> Option<Location> {

@@ -1,99 +1,84 @@
-# Contribuir a Varn
+# Guía para Contribuidores de Varn
 
-## Configuración
+Gracias por tu interés en contribuir al desarrollo del lenguaje de programación **Varn**.
 
-Requisitos: Rust stable, Cargo.
+---
 
-```bash
-git clone https://github.com/tu-usuario/Varn
-cd Varn
-cargo build --bin vn
+## Tabla de Contenidos
+
+- [Principios de Gobernanza y Arquitectura](#principios-de-gobernanza-y-arquitectura)
+- [Gobernanza de Tamaño de Archivos](#gobernanza-de-tamaño-de-archivos)
+- [Principios Anti-God Object](#principios-anti-god-object)
+- [Flujo de Trabajo para Nuevas Funcionalidades](#flujo-de-trabajo-para-nuevas-funcionalidades)
+- [Matriz de Validación Obligatoria](#matriz-de-validación-obligatoria)
+- [Reglas Estrictas del Repositorio](#reglas-estrictas-del-repositorio)
+
+---
+
+## Principios de Gobernanza y Arquitectura
+
+1. **Simplicidad sobre Complejidad**: Preferir soluciones pequeñas, locales y cohesionadas. Aplicar DRY y KISS.
+2. **Sin Deuda Técnica Ni Compatibilidad Legada Innecesaria**: Si un subsistema tiene defectos fundamentales, no extenderlo; reemplazarlo.
+3. **Frontend / Backend Boundary**: Mantener límites estrictos entre frontend (`varn-lexer`, `varn-parser`, `varn-checker`), compilador (`varn-opt`), backend (`varn-backend`), VM (`varn-vm`) y runtime (`varn-runtime`).
+
+---
+
+## Gobernanza de Tamaño de Archivos
+
+Para evitar la creación de *God Files*, el proyecto aplica reglas estrictas sobre la extensión de código fuente en Rust:
+
+| Líneas de Código | Clasificación | Acción Requerida |
+|---|---|---|
+| `< 300` | **Ideal** | Tamaño óptimo y enfocado. |
+| `300 - 500` | **Advertencia** | Monitorear responsabilidad del módulo. |
+| `500 - 700` | **Refactor Recomendado** | Evaluar extracción de funciones o estructuras a submódulos. |
+| `> 1000` | **Refactor Obligatorio** | **Prohibido** añadir nuevas funciones sin dividir el archivo. |
+
+---
+
+## Principios Anti-God Object
+
+Evitar estrictamente:
+- Registros monolíticos globales.
+- Enums gigantescos que mezclen múltiples dominios funcionalmente dispares.
+- Funciones de `dispatch` centralizadas en constante expansión.
+- Módulos `utils.rs` o `helpers.rs` genéricos sin un dominio funcional bien definido.
+
+---
+
+## Flujo de Trabajo para Nuevas Funcionalidades
+
+```mermaid
+flowchart TD
+    A["1. Análisis Arquitectónico"] --> B["2. Diseño Modular por Dominio"]
+    B --> C["3. Implementación Localizada"]
+    C --> D["4. Ejecución de Matriz de Validación"]
+    D --> E["5. Actualización de Documentación (.md)"]
 ```
 
-Verificar que todo funciona:
+---
 
-```bash
-cargo run --bin vn -- tests/main.vn
-# Modules executed in suite: 48
-# PASSED: 686 / FAILED: 0
+## Matriz de Validación Obligatoria
+
+Ninguna tarea o Pull Request se considera completada sin pasar la matriz de 4 cuadrantes de validación:
+
+```mermaid
+matrix
 ```
 
-## Antes de un PR
+| Procedencia Std | Modo JIT / Intérprete | Comando de Validación |
+|---|---|---|
+| `dev-checkout` | **JIT Activado** | `./target/release/vn.exe run ./tests/main.vn` |
+| `dev-checkout` | **Intérprete Pure (`VARN_NO_JIT=1`)** | `VARN_NO_JIT=1 ./target/release/vn.exe run ./tests/main.vn` |
+| `@embedded` | **JIT Activado** | `VARN_STD=@embedded ./target/release/vn.exe run ./tests/main.vn` |
+| `@embedded` | **Intérprete Pure (`VARN_NO_JIT=1`)** | `VARN_STD=@embedded VARN_NO_JIT=1 ./target/release/vn.exe run ./tests/main.vn` |
 
-```bash
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo check --workspace
-cargo test --workspace
-cargo run --bin vn -- tests/main.vn   # suite completa
-```
+> [!IMPORTANT]
+> `cargo test` no ejercita la suite de integración completa del compilador. La prueba canónica del sistema es la ejecución de `tests/main.vn`.
 
-## Estructura del workspace
+---
 
-```
-crates/
-├── varn-core        # AST, OpCode (134), ModuleId, reglas numéricas — sin deps internas
-├── varn-lexer       # Tokenizer
-├── varn-parser      # Parser → AST
-├── varn-checker     # Type checker + resolución de módulos → TypedAST + SemanticDB
-├── varn-opt         # EL COMPILADOR: HIR → SSA → passes → bytecode (FunctionProto)
-├── varn-backend     # Post-passes de bytecode: liveness, regalloc, slot_kinds
-├── varn-vm          # VM register-based, NaN-boxing, GC generacional, inline caches
-├── varn-jit         # JIT x86-64 (compilación eager)
-├── varn-types       # Tipos compartidos: VmValue, Chunk, FunctionProto, ObjData, Shape
-├── varn-builtins    # Host nativo en Rust (core:/runtime:/globals)
-├── varn-modules     # Resolución de módulos, bundle .vnb de la stdlib
-├── varn-pm          # Package manager (add/install/update/remove)
-├── varn-op-macros   # Proc macros para bindings nativos
-├── varn-pipeline    # Orquesta las fases + caché de bytecode
-├── varn-cli         # Binario `vn`
-├── varn-debug       # Inspección de fases (tokens, ast, hir, ssa, bytecode…), profiling
-├── varn-lsp         # Language server
-├── varn-diagnostics # Reporte de errores
-├── varn-runtime     # Runtime async (Tokio) + isolates
-├── varn-utilities   # Terminal, colores
-└── varn-base        # Utilidades base
+## Reglas Estrictas del Repositorio
 
-No existe ningún crate `varn-compiler` ni `varn-ir`.
-```
-
-La jerarquía de dependencias es estricta: `varn-core` no depende de ningún crate interno. Los crates de más alto nivel (`varn-cli`, `varn-vm`) dependen de los de más bajo nivel, nunca al revés.
-
-## Convenciones
-
-**Código Rust:**
-- Sin `unwrap()` en paths que reciben input externo — usa `?` o manejo explícito.
-- Errores como `String` en la interfaz pública de crates de bajo nivel (para evitar dependencias de tipos de error).
-- Tipos `Rc<T>` en el compilador/VM local a cada scheduler/isolate. `Arc<T>` solo en fronteras con concurrencia real.
-
-**Stdlib nativa (`varn-builtins`):**
-- Cada módulo stdlib tiene un archivo `.vn` (interfaz) y una implementación Rust.
-- Registrar funciones con `#[varn_fn]`, clases con `#[varn_class]`.
-- `NativeFnResult` = `Result<VmValue, String>` — tipo canónico para funciones nativas.
-
-**Tests:**
-- Los tests de integración viven en `tests/` como archivos `.vn`.
-- `tests/main.vn` ejecuta la suite por defecto.
-- A fecha `2026-06-05`, `41`, `42` y `47` ya están integrados en `main.vn` y la suite completa pasa.
-- Todo PR debe al menos mantener verde `tests/main.vn`; si toca stdlib/runtime/concurrencia, conviene correr también los tests standalone relevantes.
-- Tests unitarios Rust en `#[cfg(test)]` dentro del crate correspondiente.
-
-**Formato `.vnc` y cache:**
-- `CACHE_FORMAT_VERSION` en `varn-cli/src/pipeline/compile.rs` — incrementar si cambias `FunctionProto`, `Chunk`, o `PoolEntry`.
-- El formato `.vnc` usa el mismo versioning. Cambiar la versión invalida compilados previos (comportamiento correcto).
-
-## Política de PRs
-
-1. Un PR = un foco. No mezcles refactors con features.
-2. Si cambias `FunctionProto` o `Chunk`: incrementa `CACHE_FORMAT_VERSION`.
-3. Si añades un módulo stdlib: implementa el `.vn` de interfaz + la implementación Rust + tests.
-4. Si cambias el resolver de paquetes o el formato de `varn.lock`: documenta la migración.
-5. Sin código muerto, sin rutas alternativas heredadas, sin `TODO` sin issue asociado.
-
-## Reportar bugs
-
-Abre un issue con:
-- Versión de Rust (`rustc --version`)
-- Código `.vn` mínimo que reproduce el problema
-- Output esperado vs. obtenido
-- Si es un crash: `RUST_BACKTRACE=full vn run programa.vn`
+> [!CAUTION]
+> **Prohibición de comandos de Git automáticos**: No ejecutar comandos `git` ni alterar el directorio `.git`. El control de versiones es gestionado exclusivamente por el usuario.

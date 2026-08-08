@@ -25,10 +25,7 @@ pub struct CoreMembers {
 }
 
 pub fn is_core_file(filename: &str) -> bool {
-    filename.contains("varn-stdlib/builtins")
-        || filename.contains(r"varn-stdlib\builtins")
-        || filename.contains("varn-builtins")
-        || filename.starts_with(CORE_PREFIX)
+    filename.contains("varn-builtins") || filename.starts_with(CORE_PREFIX)
 }
 
 pub fn load_global_exports() -> FxHashMap<Rc<str>, Symbol> {

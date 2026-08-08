@@ -266,6 +266,10 @@ Cambios de parser/checker/compiler/vm:
   1. `cargo run --release --bin vn -- bench ./tests/main.vn -v`
   2. `cargo run --release --bin vn -- run ./tests/main.vn`
 * Validar también con `VARN_NO_JIT=1` para cubrir intérprete y JIT por separado (el flag ya se propaga a isolates, generadores y bench).
+* Validar **las dos procedencias de la std**. El tier dev-checkout (árbol `std/`) gana por defecto en el checkout, así que el bundle embebido — el que toma todo binario distribuido — no se ejerce salvo que se fuerce:
+  * árbol: `./target/release/vn.exe run ./tests/main.vn`
+  * embebido: `VARN_STD=@embedded ./target/release/vn.exe run ./tests/main.vn`
+  Cruzar con `VARN_NO_JIT=1` da la matriz de 4 que debe estar verde. Purgar `vn cache clean` al cambiar de procedencia.
 
 Cambios de CLI:
 

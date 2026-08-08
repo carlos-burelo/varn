@@ -1,145 +1,126 @@
-# Arquitectura del Runtime Asíncrono (varn-runtime)
+# Arquitectura del Runtime Asíncrono e Isolates (`varn-runtime`)
 
-`varn-runtime` orquesta la VM síncrona (`varn-vm`) sobre Tokio para concurrencia cooperativa y paralelismo explícito con isolates.
-
-## 1. Modelo de Hilos
-
-El scheduler crea un runtime Tokio multi-thread compartido (`Builder::new_multi_thread()`), pero ejecuta cada raíz Varn en un `tokio::task::LocalSet` porque la VM sigue siendo `!Send` en su hot path.
-
-Eso da un modelo híbrido:
-
-- **Concurrencia local**: `spawn`, `parallel`, timers y generators viven dentro del `LocalSet` del isolate/raíz actual.
-- **Paralelismo real**: `spawnIsolate(...)` levanta otro worker con `std::thread::spawn` y su propia VM; la mensajería es por channels tipados `Sender<T>`/`Receiver<T>` transferidos como argumentos.
-- **Boundary de memoria**: no hay heap mutable compartido entre isolates; solo cruzan valores sendables.
+Este documento especifica la arquitectura del runtime asíncrono y el sistema de paralelismo de **Varn**, incluyendo la integración con Tokio, la mecánica de suspensión de frames (`async`/`await`), los generadores y la comunicación entre hilos mediante **Isolates**.
 
 ---
 
-## 2. Scheduler Cooperativo
+## Tabla de Contenidos
 
-El scheduler interactúa con la VM solo a través del trait `TaskRunner` — ignora `CallFrame` y NaN-boxing.
-
-### Poll Budget
-Para evitar que un loop infinito ahogue el event-loop:
-- Budget: 256 ciclos de polling por tarea.
-- Si se supera: `tokio::task::yield_now().await` — cede el hilo, permite que otras tareas progresen, luego retoma.
-
----
-
-## 3. Tipos de Suspend
-
-Cuando la VM no puede continuar sincrónicamente, emite un `VmSuspend`:
-
-| Variante | Causa | Acción del runtime |
-|----------|-------|--------------------|
-| `Suspend::Task(AsyncTask)` | `await expr` | `tokio::select!` sobre la tarea y canal de cancelación. Reanuda con `push_resume_value` al resolver. |
-| `Suspend::Timer(Duration)` | `sleep(ms)` / `setTimeout` | `tokio::time::sleep(dur)`. |
-| `Suspend::Yield(VmValue)` | `yield val` en generator | Envía valor al `GenChannel`. Suspende hasta `next()`. |
-
-El frame queda "congelado" en el heap hasta la reanudación.
+- [1. Visión General del Runtime](#1-visión-general-del-runtime)
+- [2. Event Loop de Tokio y `LocalSet`](#2-event-loop-de-tokio-y-localset)
+- [3. Mecánica de Suspensión y Reanudación (`async`/`await`)](#3-mecánica-de-suspensión-y-reanudación-asyncawait)
+- [4. Generadores y Canal de Rendimiento (`yield`)](#4-generadores-y-canal-de-rendimiento-yield)
+- [5. Primitivas de Concurrencia](#5-primitivas-de-concurrencia)
+  - [`spawn` y `parallel`](#spawn-y-parallel)
+  - [`TaskGroup` con Gestión Determinista (`using`)](#taskgroup-con-gestión-determinista-using)
+- [6. Concurrencia Multinúcleo mediante Isolates](#6-concurrencia-multinúcleo-mediante-isolates)
+  - [Aislamiento de Heap](#aislamiento-de-heap)
+  - [Canales Tipados (`SendValue` & `SendEnvelope`)](#canales-tipados-sendvalue--sendenvelope)
 
 ---
 
-## 4. Async/Await
+## 1. Visión General del Runtime
+
+`varn-runtime` proporciona la capa de ejecución asíncrona no bloqueante de Varn. Combina un event-loop asíncrono para operaciones I/O intensivas con un modelo de **Isolates** para paralelismo real en múltiples núcleos del procesador.
+
+```mermaid
+flowchart TD
+    subgraph Single Thread LocalSet ["Hilo Actual (Task Runner)"]
+        A["Event Loop de Tokio"] <--> B["LocalSet (Tareas !Send Varn)"]
+        B --> C["VM Frame actual"]
+        C -- "await promisoria" --> D["Emitir Suspend::Task"]
+        D --> A
+    end
+
+    subgraph Multi Thread Isolates ["Paralelismo Multinúcleo"]
+        E["Isolate Principal (Hilo 1)"] <-->|Canal Tipado Sender/Receiver| F["Isolate Worker (Hilo 2)"]
+        F <-->|Mensajes Serializados SendEnvelope| G["Isolate Worker (Hilo N)"]
+    end
+```
+
+---
+
+## 2. Event Loop de Tokio y `LocalSet`
+
+Puesto que las estructuras de la VM (`VmValue`, `CallFrame`, `HeapObj`) contienen punteros locales y referencias no compatibles con el rasgo `Send` de Rust, las tareas Varn de un mismo contexto se ejecutan en un `tokio::task::LocalSet`.
+- Cada hilo del runtime administra su propio `LocalSet`.
+- Permite la ejecución de miles de corrutinas en un solo hilo sin incurrir en costos de sincronización por cerrojos (*locks*).
+
+---
+
+## 3. Mecánica de Suspensión y Reanudación (`async`/`await`)
+
+Cuando la VM evalúa una instrucción `await` sobre una promesa no resuelta:
+
+```mermaid
+sequenceDiagram
+    participant VM as VM Frame
+    participant RT as Runtime Scheduler
+    participant IO as Tokio IO / Timer
+
+    VM->>RT: Emitir Suspend::Task(PromiseId)
+    Note over VM: Frame pausado (estado guardado)
+    RT->>IO: Registrar Waker para PromiseId
+    IO-->>RT: Notificar resolución de IO
+    RT->>VM: Reanudar Frame con resultado
+```
+
+1. La VM emite la señal `Suspend::Task(PromiseId)` guardando la posición del contador de programa (`IP`) y los registros locales.
+2. El runtime suspende el frame y retorna el control al bucle de eventos de Tokio.
+3. Al completarse la tarea I/O, el `Waker` notifica al scheduler, el cual reactiva el frame de la VM inyectando el valor resuelto en el registro destino.
+
+---
+
+## 4. Generadores y Canal de Rendimiento (`yield`)
+
+Las funciones generadoras (`function*`) utilizan un mecanismo similar a `async`/`await`:
+- Al ejecutar `yield valor`, la VM emite `Suspend::Yield(VmValue)`.
+- El valor devuelto se envía a un canal sincronizado `GenChannel`.
+- La ejecución de la función se congela hasta que el código consumidor invoca `.next()`.
+
+---
+
+## 5. Primitivas de Concurrencia
+
+### `spawn` y `parallel`
+- `spawn(asyncFn())`: Lanza una tarea en segundo plano dentro del `LocalSet` actual y retorna un handle awaitable.
+- `parallel([p1, p2, p3])`: Ejecuta un array de promesas concurrentemente y suspende el frame hasta que todas se hayan resuelto.
+
+### `TaskGroup` con Gestión Determinista (`using`)
+`TaskGroup` permite agrupar tareas asíncronas dinámicas garantizando la limpieza de recursos al salir del ámbito mediante la palabra clave `using`:
 
 ```Varn
-async function fetchData(): str {
-    const resp = await http.get("https://api.example.com")
-    return resp.body
+import { TaskGroup } from "std:task"
+
+async function procesarColeccion(): void {
+    using group = TaskGroup<int>()
+    group.spawn(async () => 10)
+    group.spawn(async () => 20)
+    
+    const resultados = await group.join()
+    assert("total", resultados[0] + resultados[1] === 30)
 }
 ```
 
-1. El compilador emite `OpAwait`.
-2. La VM evalúa la expresión → `AsyncTask`.
-3. Emite `Suspend::Task(task)`.
-4. El scheduler ejecuta la tarea Tokio.
-5. Al resolver: `push_resume_value(result)`, la VM continúa desde el mismo frame.
-
 ---
 
-## 5. spawn y parallel
+## 6. Concurrencia Multinúcleo mediante Isolates
 
-```Varn
-const task = spawn(fetchData())
-const [a, b] = await parallel([fetchA(), fetchB()])
+Para aprovechar arquitecturas multinúcleo sin sufrir los problemas de las condiciones de carrera (*race conditions*), Varn implementa **Isolates**:
+
+### Aislamiento de Heap
+Cada Isolate se ejecuta en su propio hilo del sistema operativo, con su propia instancia de la máquina virtual (`varn-vm`) y su propio Heap independiente. Ningún objeto del heap se comparte directamente entre Isolates.
+
+### Canales Tipados (`SendValue` & `SendEnvelope`)
+La comunicación inter-Isolate se realiza exclusivamente mediante paso de mensajes a través de canales tipados:
+
+```mermaid
+flowchart LR
+    A["Isolate A\n(Heap A)"] -->|1. Convertir VmValue a SendValue| B["SendEnvelope"]
+    B -->|2. Transferir por MPSC Channel| C["Isolate B\n(Heap B)"]
+    C -->|3. Reconstruir en Heap B| D["VmValue local"]
 ```
 
-- `spawn`: crea nueva tarea en el `LocalSet`, retorna handle `Task<T>`.
-- `parallel([...])`: dispara varios children sobre el scheduler actual y resuelve un array cuando terminan.
-- `spawnIsolate(fn, args)`: inicia otro hilo, carga el módulo del `fn` exportado y retorna un `IsolateHandle` (`join()` espera al worker; rechaza con `Error` tipado si el worker lanzó).
-
-### Channels tipados
-
-Mensajería entre isolates (y dentro de uno): `channel<T>(capacity)` retorna
-`{ tx: Sender<T>, rx: Receiver<T> }`.
-
-- **Tabla global de canales** (`varn-runtime::channel`): cada canal es una cola
-  mpmc bounded (`capacity >= 1`) identificada por `u64`; los endpoints Varn solo
-  llevan ese id (`_chan`), por eso transferirlos a otro isolate es copiar un
-  entero — ambos lados comparten el mismo canal.
-- **Backpressure**: `send` sobre cola llena parkea al productor (resuelve `true`
-  al entrar el mensaje, `false` si el canal cierra antes); `receive` sobre cola
-  vacía parkea al consumidor.
-- **Valores cross-thread**: siempre heap-independientes (`SendValue`, incluidos
-  enums vía `SendEnumVariant` y endpoints anidados). La materialización en el
-  heap del consumidor ocurre en un único hook del await-resume del VM
-  (`host_values::open_resolved` / `open_rejected`), que también mintea errores
-  tipados (`ChannelClosed extends Error`).
-- **Cierre real**: `close()` despierta a todos los waiters; lo encolado se
-  drena, después `receive()` rechaza con `ChannelClosed` y
-  `for await (const v of rx)` termina el loop.
-
----
-
-## 6. Generators
-
-```Varn
-function* range(n: int) {
-    let i = 0
-    while (i < n) {
-        yield i
-        i = i + 1
-    }
-}
-
-for (const item of range(5)) {
-    print(item)
-}
-```
-
-El runtime tiene un planificador dedicado para generators y `async function*`. Loop de polling hasta `Suspend::Yield`. El scheduler empaqueta `{ value: V, done: bool }` y lo envía al `GenChannel` del consumidor.
-
----
-
-## 7. using y AsyncDisposable
-
-```Varn
-async function main(): void {
-    using file = await fs.open("data.txt")
-    const content = await file.readAll()
-}  // file.asyncDispose() called automatically
-```
-
-`using` garantiza `dispose()` (o `asyncDispose()`) al salir del scope — incluso con `return`/`throw` intermedios. El compilador inlinea la llamada. El runtime no necesita lógica especial.
-
----
-
-## 8. Gestión de Memoria
-
-Sin GC mark-and-sweep. El heap usa `Rc<RefCell<T>>`:
-- Cuando la última referencia desaparece del scope Rust, la memoria se libera inmediatamente (RAII).
-- Ciclos de referencias son teóricamente posibles pero infrecuentes en código Varn típico.
-
-Cada isolate tiene su propio heap/VM. El boundary cross-thread ocurre a través de serialización a `SendValue`.
-
----
-
-## 9. Métricas
-
-El scheduler recopila métricas atómicas (`AtomicU64`) sin tocar el heap de la VM:
-- `root_tasks`: raíces ejecutadas
-- `spawned_tasks`: children creados por `spawn`
-- `spawned_async_gens`: generadores async lanzados
-- `vm_polls`: ciclos de ejecución
-- `cooperative_yields`: veces que el poll budget fue excedido
-- `timer_waits`: esperas en sleep/setTimeout
-- `task_waits`: esperas en `await`
+1. **Serialización Ligera**: Los datos se converten a una estructura neutra e independiente del heap (`SendValue`).
+2. **Transferencia Segura**: Se envían envueltos en un `SendEnvelope` a través de un canal mpsc no bloqueante.
+3. **Deserialización Local**: El Isolate receptor deserializa el mensaje y reconstruye las estructuras de objetos en su propio heap.

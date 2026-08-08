@@ -28,6 +28,13 @@ pub struct BundleModule {
     pub pure: bool,
     pub interface: Vec<u8>,
     pub bytecode: Vec<u8>,
+    /// Original `.vn` text. Not used to build anything — `interface` and
+    /// `bytecode` already carry the compiled forms — but the editor needs it:
+    /// goto-definition, hover and the symbol index all want real source, and
+    /// without it a released `vn` can only offer them inside a checkout.
+    /// 71 KiB for the whole std; the same trade Rust makes with `rust-src`,
+    /// except always shipped rather than an opt-in component.
+    pub source: String,
 }
 
 pub fn write_bundle(bundle: &StdBundle) -> Vec<u8> {
@@ -48,7 +55,7 @@ impl StdBundle {
     pub fn validate_compat_with(&self, host_api_expected: u32) -> Result<(), String> {
         if self.build_fingerprint != BUILD_FINGERPRINT {
             return Err(format!(
-                "std bundle was built by a different compiler build (fingerprint {:#010x}, this vn is {:#010x}); rebuild with `cargo xtask build-std`",
+                "std bundle was built by a different compiler build (fingerprint {:#010x}, this vn is {:#010x}); rebuild vn so the bundle it embeds matches",
                 self.build_fingerprint, BUILD_FINGERPRINT
             ));
         }
@@ -76,6 +83,7 @@ mod tests {
                 pure: true,
                 interface: vec![1, 2, 3],
                 bytecode: vec![4, 5, 6],
+                source: "export const PI = 3;".into(),
             }],
         }
     }
@@ -89,6 +97,7 @@ mod tests {
         assert_eq!(back.modules.len(), 1);
         assert_eq!(back.modules[0].id, "std:math");
         assert_eq!(back.modules[0].bytecode, vec![4, 5, 6]);
+        assert_eq!(back.modules[0].source, "export const PI = 3;");
         assert!(back.validate_compat_with(1).is_ok());
     }
 

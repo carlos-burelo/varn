@@ -43,14 +43,9 @@ pub fn debug_symbols(
 
         let is_core = origin.starts_with("core:")
             || origin.starts_with("builtin:")
-            || origin.contains("varn-stdlib/builtins")
-            || origin.contains(r"varn-stdlib\builtins")
             || (origin.is_empty() && sym.full_range.start.line == 0);
 
-        let is_std = !is_core
-            && (origin.starts_with("std:")
-                || origin.contains("varn-stdlib/")
-                || origin.contains(r"varn-stdlib\"));
+        let is_std = !is_core && origin.starts_with("std:");
 
         let tag_label = if is_core {
             "[core]"

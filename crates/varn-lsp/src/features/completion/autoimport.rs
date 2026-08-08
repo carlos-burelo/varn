@@ -2,9 +2,9 @@ use std::collections::HashSet;
 
 use tower_lsp::lsp_types::{CompletionItem, Position, Range, TextEdit};
 
-use varn_modules::resolver::{normalize_display_path, relative_import_path};
+use varn_modules::resolver::relative_import_path;
 
-use crate::constants::{SORT_AUTOIMPORT, STDLIB_STD_PATH, STD_PREFIX};
+use crate::constants::SORT_AUTOIMPORT;
 use crate::document::import::uri_to_path;
 use crate::index::ProjectIndex;
 use crate::util::kinds::to_completion_kind;
@@ -83,25 +83,13 @@ fn import_insert_position(source: &str) -> Position {
 }
 
 fn is_stdlib_uri(uri: &str) -> bool {
-    varn_modules::resolver::is_varn_uri(uri) || uri.contains(crate::constants::STD_LIB_PATH_SEGMENT)
+    crate::workspace::std_sources::is_mirrored_uri(uri)
 }
 
 fn uri_to_specifier(from_uri: &str, target_uri: &str) -> String {
-    if let Some(spec) = varn_modules::resolver::specifier_from_uri(target_uri) {
-        return spec;
-    }
-
     let target_path = uri_to_path(target_uri);
-    let normalized = normalize_display_path(&target_path);
-
-    if let Some(idx) = normalized.find(STDLIB_STD_PATH) {
-        let rest = &normalized[idx + STDLIB_STD_PATH.len()..];
-        let mod_suffix = concat!("/mod", ".vn");
-        let module = rest
-            .strip_suffix(mod_suffix)
-            .or_else(|| rest.strip_suffix(".vn"))
-            .unwrap_or(rest);
-        return format!("{STD_PREFIX}{module}");
+    if let Some(spec) = crate::workspace::std_sources::specifier_from_path(&target_path) {
+        return spec;
     }
 
     let from_path = uri_to_path(from_uri);

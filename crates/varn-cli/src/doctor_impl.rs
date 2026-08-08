@@ -3,51 +3,46 @@ use crate::error::CliError;
 type CliResult<T> = Result<T, CliError>;
 
 pub fn run_doctor() -> CliResult<()> {
-    let exe = std::env::current_exe().ok();
-    let home = varn_core::paths::varn_home_dir();
-    let cache = varn_core::paths::varn_cache_dir();
-    let loader = varn_builtins::CoreSourceLocator::from_env();
-    let stdlib = loader.stdlib_root();
-
     println!("Varn Doctor");
     println!("  version: {}", env!("CARGO_PKG_VERSION"));
-    if let Some(exe_path) = exe {
-        println!("  exe: {}", exe_path.display());
-    } else {
-        println!("  exe: <unavailable>");
+    match std::env::current_exe() {
+        Ok(exe_path) => println!("  exe: {}", exe_path.display()),
+        Err(_) => println!("  exe: <unavailable>"),
     }
 
-    println!("  VARN_HOME: {}", home.display());
-    println!("  cache dir: {}", cache.display());
-
-    if let Ok(raw) = std::env::var("VARN_STDLIB") {
-        println!("  varn_STDLIB env: {raw}");
-    } else {
-        println!("  varn_STDLIB env: <not set>");
+    println!("  VARN_HOME: {}", varn_core::paths::varn_home_dir().display());
+    println!("  cache dir: {}", varn_core::paths::varn_cache_dir().display());
+    match std::env::var(varn_modules::std_root::ENV_VARN_STD) {
+        Ok(raw) => println!("  VARN_STD: {raw}"),
+        Err(_) => println!("  VARN_STD: <not set>"),
     }
-
-    let stdlib_result = if stdlib.exists() {
-        println!("  stdlib: {} (ok)", stdlib.display());
-        Ok(())
-    } else {
-        println!("  stdlib: {} (NOT FOUND)", stdlib.display());
-        Err(CliError::fatal(
-            "stdlib not found. Run installer script or set varn_STDLIB to a valid directory.",
-        ))
-    };
 
     match varn_modules::provider::get().and_then(|p| p.std_provenance()) {
         Some((desc, prov)) => {
             let origin = match prov {
                 varn_modules::std_root::StdProvenance::ProjectOverride => "varn.json override",
                 varn_modules::std_root::StdProvenance::Env => "VARN_STD",
-                varn_modules::std_root::StdProvenance::DevCheckout => "dev checkout (std/ next to binary)",
-                varn_modules::std_root::StdProvenance::Toolchain => "toolchain",
+                varn_modules::std_root::StdProvenance::DevCheckout => {
+                    "dev checkout (std/ next to binary)"
+                }
+                varn_modules::std_root::StdProvenance::Embedded => "embedded in this binary",
             };
             println!("  std: {desc} (via {origin})");
         }
-        None => println!("  std: embedded registry only (no std tree/bundle found)"),
+        None => println!("  std: none resolved"),
     }
 
-    stdlib_result
+    // The only genuinely broken state: a std was found and is unusable. Every
+    // other tier falls through to the bundle compiled into this binary, which
+    // is fingerprint-matched by construction.
+    match varn_builtins::std_load_error() {
+        Some(reason) => {
+            println!("  status: BROKEN");
+            Err(CliError::fatal(reason))
+        }
+        None => {
+            println!("  status: ok");
+            Ok(())
+        }
+    }
 }

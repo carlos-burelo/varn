@@ -1,7 +1,7 @@
 mod collections;
 mod int;
 mod math;
-mod str;
+pub(crate) mod str;
 
 use crate::error::VmResult;
 use crate::heap::Heap;

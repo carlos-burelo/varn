@@ -23,6 +23,7 @@ pub(crate) mod strconcat;
 pub(crate) mod vars;
 pub(crate) mod fields;
 pub(crate) mod floats;
+pub(crate) mod strings;
 pub(crate) mod generic;
 pub(crate) mod globals;
 pub(crate) mod kinds;

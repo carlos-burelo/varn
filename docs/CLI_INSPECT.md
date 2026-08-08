@@ -1,109 +1,63 @@
-# vn debug — Dashboard del Compilador
+# Inspección de Fases del Compilador (`vn debug`)
 
-`vn debug` ejecuta el pipeline completo pero detiene antes de la VM, mostrando las estructuras internas de cada fase.
+Este documento describe el subcomando de inspección y depuración `vn debug`, detallando todas las fases disponibles para examinar la representación interna del compilador de **Varn**.
 
-Para el panorama completo de comandos, flags y ejemplos, ver [CLI_REFERENCE.md](CLI_REFERENCE.md).
+---
 
-## Uso
+## Tabla de Contenidos
 
-```bash
-# Todas las fases (default)
-vn debug archivo.vn
+- [1. Visión General](#1-visión-general)
+- [2. Fases de Depuración Disponibles](#2-fases-de-depuración-disponibles)
+- [3. Ejemplos de Inspección](#3-ejemplos-de-inspección)
 
-# Código inline
-vn debug -e "function add(a: int, b: int) = a + b"
+---
 
-# Fases específicas
-vn debug -p ast archivo.vn
-vn debug -p check archivo.vn
-vn debug -p bytecode archivo.vn
-```
+## 1. Visión General
 
-## Flag `-p` / `--phase`
-
-| Valor | Descripción |
-|-------|-------------|
-| `tokens` | Tokens del lexer |
-| `ast` | AST (Abstract Syntax Tree) |
-| `check` | TypedAST con tipos inferidos |
-| `bytecode` | Bytecode / FunctionProto |
-| `clif` | Backend Cranelift (ROUTE/BAIL, kinds, CLIF IR, disasm x86-64) |
-| `all` | Todas las fases (default) |
-
-Otros valores disponibles: `symbols`, `binds`, `types[:N]`, `expr`, `modules`, `graph`, `caps`, `scope`, `errors`, `trace`, `info` y `lsp[:sub]`.
-
-## Fases en detalle
-
-### `ast` — AST
-Árbol sintáctico del programa. Usa marcadores `├──`/`└──` para representar la jerarquía. Los nodos hoja muestran tipo de nodo + valor.
-
-**Cuándo usarlo:** Verificar que una construcción sintáctica parseó correctamente. Debuggear gramática nueva.
-
-### `check` — Tipos Inferidos
-AST anotado con los tipos resueltos por el type checker. Muestra firmas de funciones, tipos de expresiones, genéricos instanciados.
-
-**Cuándo usarlo:** Entender qué tipo infirió el checker para una expresión. Debuggear errores de tipo sutiles.
+El comando `vn debug` permite a los desarrolladores del compilador e integradores de tooling inspeccionar el estado exacto del código en cada etapa de la canalización de transformación:
 
 ```bash
-vn debug -p check -e "const x: int[] = [1, 2, 3]"
+vn debug -p <fase> <archivo.vn>
 ```
 
-### `bytecode` — Bytecode
-Disassembly de las instrucciones generadas. Equivalente a `vn debug -p bytecode`.
+---
 
-**Cuándo usarlo:** Optimizar código, verificar que peephole optimizations se apliquen, contar instrucciones.
+## 2. Fases de Depuración Disponibles
 
-### `clif` — Backend Cranelift
-Por función: decisión ROUTE/BAIL + razón, lattice de kinds, CLIF IR textual y
-disasm x86-64 del código generado. Estático (no ejecuta).
+| Fase | Descripción del Producto Inspeccionado |
+|---|---|
+| `tokens` | Lista de tokens producidos por `varn-lexer`. |
+| `ast` | Árbol de Sintaxis Abstracta generado por `varn-parser`. |
+| `check` | `TypedAST` con tipos inferidos por `varn-checker`. |
+| `bytecode` | Opcodes desensamblados de cada `FunctionProto`. |
+| `symbols` | Tabla de símbolos del ámbito global y local. |
+| `binds` | Resoluciones de ámbito y bindings de variables. |
+| `types` | Volcado de la SemanticDB de tipos inferidos. |
+| `expr` | Evaluación de expresiones en tiempo de compilación. |
+| `modules` | Grafo de dependencias e importaciones de módulos. |
+| `graph` | Grafo de Flujo de Control (CFG). |
+| `caps` | Capacidades de seguridad requeridas por el módulo. |
+| `trace` | Traza de ejecución paso a paso instrucción por instrucción en la VM. |
+| `all` | Volcado completo de todas las fases anteriores. |
 
-Sub-fases: `clif:route`, `clif:kinds`, `clif:ir`, `clif:asm`, `clif:all`.
-`clif` a secas = las cuatro.
+---
 
-    vn debug -p clif      -e "function f(a:int, b:int):int { return a*b+1; }"
-    vn debug -p clif:asm  src/hot.vn
+## 3. Ejemplos de Inspección
 
-**Cuándo usarlo:** verificar por qué una función rutea o bailea, revisar el
-lowering a CLIF, cazar bugs de codegen/regalloc.
-
-**Limitaciones (v1):** la inspección es estática y sin heap, así que las
-constantes de heap (strings, bigint, símbolos) aparecen como `null` en el IR/disasm
-y las llamadas a helpers no están simbolizadas (direcciones crudas). En
-consecuencia, una función cuyo único obstáculo sería una constante de heap
-residente en el nursery puede mostrarse como `ROUTE` aunque en ejecución real
-haría `BAIL` (`clif: nursery heap constant`) — caso raro y marcado como
-"inesperado" por el propio codegen. El disasm decodifica la función `raw` (el
-cuerpo) y el `wrapper` (glue de ABI) en pasadas independientes, cada una desde su
-propia base, así que el relleno entre ambos ya no desincroniza al decodificador —
-las instrucciones de ambos son fieles. Nota: el `wrapper` puede terminar con su
-pool de constantes embebido (p.ej. las máscaras NaN-box que Cranelift emite como
-rodata tras el código); esos bytes finales se muestran como pseudo-instrucciones
-tras el `ret` del wrapper — son datos, no código.
-
-## Ejemplos
+### Inspeccionar Bytecode Desensamblado
 
 ```bash
-# Ver AST de una función genérica
-vn debug -p ast -e "function id<T>(x: T): T = x"
-
-# Ver tipos inferidos
-vn debug -p check -e "const arr = [1, 2, 3]; print(arr.length)"
-
-# Ver bytecode generado para una clase
-vn debug -p bytecode src/models.vn
-
-# Todas las fases en un archivo
-vn debug tests/01-arithmetic.vn
+vn debug -p bytecode mi_programa.vn
 ```
 
-## Diferencia con otros comandos
+### Inspeccionar Tipos Inferidos
 
-| Comando | Descripción |
-|---------|-------------|
-| `vn debug -p ast` | AST jerárquico |
-| `vn debug -p check` | Tipos y SemanticDB |
-| `vn debug -p bytecode` | Solo bytecode (más compacto) |
-| `vn debug -p clif` | Backend Cranelift: ROUTE/BAIL, kinds, CLIF IR, disasm |
-| `vn debug -p tokens` | Tokens del lexer |
-| `vn run --trace` | Debug inline durante ejecución |
-| `vn check` | Solo errores de tipos, sin output de estructuras |
+```bash
+vn debug -p check mi_programa.vn
+```
+
+### Trazado Paso a Paso de Instrucción VM
+
+```bash
+vn run --trace mi_programa.vn
+```

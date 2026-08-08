@@ -100,17 +100,8 @@ fn collect_member_exports(
 
 fn resolve_specifier_to_uri(specifier: &str, doc_dir: Option<&std::path::Path>) -> Option<String> {
     if specifier.starts_with(STD_PREFIX) || specifier.starts_with(CORE_PREFIX) {
-        let provider = varn_modules::provider::get()?;
-        if let Some(mod_path) = provider.source_path(specifier) {
-            if mod_path.is_file() {
-                let canonical = std::fs::canonicalize(&mod_path).ok()?;
-                return Some(path_to_uri(&canonical.to_string_lossy()));
-            }
-        }
-        if provider.embedded_source(specifier).is_some() {
-            return Some(varn_modules::resolver::to_varn_uri(specifier));
-        }
-        return None;
+        let path = crate::workspace::std_sources::resolve_module_file(specifier)?;
+        return Some(path_to_uri(&path.to_string_lossy()));
     }
 
     if specifier.starts_with('.') {

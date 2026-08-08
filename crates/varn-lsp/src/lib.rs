@@ -10,68 +10,17 @@ pub mod queries;
 pub mod util;
 pub mod workspace;
 
-fn prepare_stdlib() -> std::path::PathBuf {
-    let temp_dir = std::env::temp_dir().join("varn-stdlib");
-    let _ = std::fs::create_dir_all(&temp_dir);
-
-    if let Some((src, _)) = varn_modules::std_root::resolve() {
-        match src {
-            varn_modules::std_root::StdSource::SourceTree(dir) => {
-                let _ = copy_dir_all(&dir, &temp_dir);
-                return temp_dir;
-            }
-            varn_modules::std_root::StdSource::Bundle(bundle_path) => {
-                if let Ok(bytes) = std::fs::read(&bundle_path) {
-                    if let Ok(bundle) = varn_modules::bundle::read_bundle(&bytes) {
-                        for module in bundle.modules {
-                            let rel = format!("{}.vn", module.id.replace(':', "/"));
-                            let file_path = temp_dir.join(&rel);
-                            if let Some(parent) = file_path.parent() {
-                                let _ = std::fs::create_dir_all(parent);
-                            }
-                            let _ = std::fs::write(&file_path, format!("// module {}\n", module.id));
-                        }
-                        return temp_dir;
-                    }
-                }
-            }
-        }
-    }
-
-    for spec in varn_builtins::MODULE_REGISTRY {
-        if let Some(source) = spec.source() {
-            let file_path = temp_dir.join(spec.vn_source);
-            if let Some(parent) = file_path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-            let _ = std::fs::write(&file_path, source);
-        }
-    }
-    temp_dir
-}
-
-fn copy_dir_all(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
-    std::fs::create_dir_all(dst)?;
-    for entry in std::fs::read_dir(src)? {
-        let entry = entry?;
-        let ty = entry.file_type()?;
-        if ty.is_dir() {
-            copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
-        } else {
-            std::fs::copy(entry.path(), dst.join(entry.file_name()))?;
-        }
-    }
-    Ok(())
+/// Provider first, then the source mirror it feeds: `materialize` reads the
+/// active std through the provider, so registering has to come first.
+fn init_std() -> Option<&'static str> {
+    varn_builtins::register_provider();
+    workspace::std_sources::materialize();
+    varn_builtins::std_load_error()
 }
 
 #[tokio::main]
 pub async fn run_server() {
-    let stdlib_path = prepare_stdlib();
-    std::env::set_var("VARN_STDLIB", &stdlib_path);
-
-    varn_builtins::register_provider();
-
-    let std_error = varn_builtins::std_load_error();
+    let std_error = init_std();
 
     eprintln!("Varn LSP server listening on stdio (JSON-RPC). Connect your editor or press Ctrl+C to exit.");
 
@@ -86,11 +35,7 @@ pub async fn run_server() {
 
 #[tokio::main]
 pub async fn run_server_tcp(addr: &str) {
-    let stdlib_path = prepare_stdlib();
-    std::env::set_var("VARN_STDLIB", &stdlib_path);
-
-    varn_builtins::register_provider();
-    let std_error = varn_builtins::std_load_error();
+    let std_error = init_std();
 
     let listener = match tokio::net::TcpListener::bind(addr).await {
         Ok(l) => l,

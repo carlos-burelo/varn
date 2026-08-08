@@ -86,15 +86,29 @@ varn_contract! {
 
 
         fn substring(_ctx: &mut dyn NativeCtx, this: &str, start: i64, end: Option<i64>) -> String {
+            let b = this.as_bytes();
+            let st = start.max(0) as usize;
+            let en = end.map(|e| e.max(0) as usize).unwrap_or(b.len());
+            let (s, e) = if st <= en { (st, en) } else { (en, st) };
+            if e <= b.len() && b[..e].is_ascii() {
+                return this[s..e].to_owned();
+            }
             let ascii = this.is_ascii();
             let len = char_len(this, ascii);
-            let s = (start.max(0) as usize).min(len);
-            let e = end.map(|e| e.max(0) as usize).unwrap_or(len).min(len);
-            let (si, ei) = if s <= e { (s, e) } else { (e, s) };
+            let si = s.min(len);
+            let ei = e.min(len);
             let (bs, be) = char_range_to_bytes(this, ascii, si, ei);
             this[bs..be].to_owned()
         }
         fn slice(_ctx: &mut dyn NativeCtx, this: &str, start: i64, end: Option<i64>) -> String {
+            let b = this.as_bytes();
+            if start >= 0 && end.map_or(true, |e| e >= 0) {
+                let st = start as usize;
+                let en = end.map_or(b.len(), |e| e as usize);
+                if st <= en && en <= b.len() && b[..en].is_ascii() {
+                    return this[st..en].to_owned();
+                }
+            }
             let ascii = this.is_ascii();
             let len = char_len(this, ascii);
             let si = normalize_idx(start, len as i64).min(len);
@@ -103,6 +117,13 @@ varn_contract! {
             this[bs..be].to_owned()
         }
         fn at(_ctx: &mut dyn NativeCtx, this: &str, index: i64) -> Option<String> {
+            let b = this.as_bytes();
+            if index >= 0 {
+                let idx = index as usize;
+                if idx < b.len() && b[..=idx].is_ascii() {
+                    return Some(this[idx..idx + 1].to_owned());
+                }
+            }
             let ascii = this.is_ascii();
             let len = char_len(this, ascii) as i64;
             let idx = if index < 0 { len + index } else { index };
@@ -113,6 +134,15 @@ varn_contract! {
             Some(this[bs..be].to_owned())
         }
         fn substr(_ctx: &mut dyn NativeCtx, this: &str, start: i64, length: Option<i64>) -> String {
+            let b = this.as_bytes();
+            if start >= 0 && length.map_or(true, |l| l >= 0) {
+                let st = start as usize;
+                let count = length.map_or(b.len().saturating_sub(st), |l| l as usize);
+                let en = (st + count).min(b.len());
+                if st <= b.len() && b[..en].is_ascii() {
+                    return this[st..en].to_owned();
+                }
+            }
             let ascii = this.is_ascii();
             let len = char_len(this, ascii);
             let st = if start < 0 { (len as i64 + start).max(0) as usize } else { (start as usize).min(len) };
@@ -219,7 +249,7 @@ fn char_code_at(s: &str, pos: i64) -> i64 {
     if pos >= b.len() {
         return -1;
     }
-    if s.is_ascii() {
+    if b[..=pos].is_ascii() {
         return b[pos] as i64;
     }
     s.chars().nth(pos).map(|c| c as i64).unwrap_or(-1)

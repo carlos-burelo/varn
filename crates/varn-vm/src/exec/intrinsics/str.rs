@@ -117,7 +117,11 @@ pub fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<VmValue> 
 
     if recv.is_heap() {
         if let Some(HeapObj::Str(h)) = heap.get(recv.as_heap_idx()) {
-            h.is_ascii_cached();
+            // Populate the ASCII cache on first use — `is_ascii()` computes
+            // and stores the result; `is_ascii_cached()` was a read-only check
+            // that returned false for UNKNOWN, leaving every call on the O(n)
+            // `chars().nth()` path.
+            h.is_ascii();
         }
     }
 
