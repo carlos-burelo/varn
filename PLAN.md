@@ -12,9 +12,9 @@ líneas se mueven, los nombres no.
 | | Estado | Commit |
 |---|---|---|
 | **P1** desenrollado de excepciones ×3 | ✅ hecho | `96279a3` |
-| **P2** superficie pública | pendiente | |
+| **P2** superficie pública | ✅ hecho | `6f66c7c` |
 | **P3** cola de `JitHelpers` sin test | ✅ hecho | `e15f56f` |
-| **P4** tupla posicional en `resolve_native_op` | pendiente | |
+| **P4** tupla posicional en `resolve_native_op` | ✅ hecho | `5089959` |
 | **P5** archivos sobre 500 | pendiente | |
 | **P6** función comentada | ✅ hecho | `e15f56f` |
 | **P7** puntos de aborto | pendiente | |
@@ -160,7 +160,34 @@ antes de borrarla.
 
 ---
 
-## P2 — La superficie pública sigue abierta
+## P2 — La superficie pública sigue abierta — ✅ hecho (`6f66c7c`)
+
+**63 → 5 `pub mod`.** Quedan `exec`, `loader`, `jit`, más `jit::helpers` y
+`exec::host_values`, que varn-pipeline alcanza directamente. Los `pub use` de
+`lib.rs` siguen funcionando: re-exportar un item `pub` desde un módulo privado
+es legal y es el patrón estándar.
+
+**Y pagó de inmediato** — cuatro piezas más de código muerto que los pases
+anteriores no podían ver, todas tipos o variantes, no funciones:
+
+- `PreparedCall::Native` — destruida en cuatro sitios, construida en ninguno.
+  Se fueron con ella cuatro brazos de `match` muertos.
+- `ControlSignal` — cuatro variantes, una sola construida y siempre
+  incondicionalmente, y todos los llamantes la descartaban con `?;`. Las tres
+  funciones devuelven ahora `VmResult<()>` y el enum desapareció.
+- `GcError` — tres variantes, ninguna construible, así que
+  `Result<usize, GcError>` era un `Result` que nunca podía ser `Err`. Cada
+  llamante tenía que atender un caso imposible y `Vm::collect_gc` lo hacía con
+  `.unwrap_or(0)`, que habría tragado en silencio un fallo real el día que se
+  introdujera uno. Marcar y barrer recorren estructuras que el heap ya posee:
+  son infalibles, y ahora lo dicen.
+- Tres re-exports sin uso en `value.rs`.
+
+Contadores de GC idénticos al baseline pre-refactor (36 minor, 2 colecciones,
+112 039 liberados, 1 553 vivos) — esa es la evidencia de que quitar `GcError` no
+movió comportamiento.
+
+<details><summary>Diagnóstico original</summary>
 
 F1 estrechó **funciones** (322 `pub(crate) fn` contra 24 `pub fn`) pero no
 módulos ni tipos.
@@ -188,7 +215,7 @@ compilador, que nombran exactamente lo que hay que volver a abrir.
 **Aceptación:** las cuatro validaciones. El número final de `pub` debe ser
 justificable item por item.
 
-**Riesgo:** bajo. Todo fallo es de compilación, ninguno silencioso.
+</details>
 
 ---
 
@@ -227,7 +254,14 @@ documentados con la razón por la que no se pueden verificar.
 
 ---
 
-## P4 — `resolve_native_op` devuelve una tupla posicional
+## P4 — `resolve_native_op` devuelve una tupla posicional — ✅ hecho (`5089959`)
+
+Ahora devuelve `varn_types::NativeOpTarget` con campos nombrados, más un
+constructor `unknown()` para que el caso "op-id no está en la tabla" sea un
+nombre y no un `(0, 0, empty)` que el lector tenga que descifrar. El tipo vive
+en `varn-types` porque es lo que ambos crates ya comparten.
+
+<details><summary>Diagnóstico original</summary>
 
 ```rust
 pub resolve_native_op: fn(u64) -> (usize, usize, varn_types::SignatureDescriptor),
@@ -252,7 +286,7 @@ Un único call site: `clif/alloc.rs`, en el lowering de `CallNativeOp`.
 **Aceptación:** las cuatro validaciones. Vigilar `str_ops` y `json_native`, que
 son los benchmarks que más pasan por `CallNativeOp`.
 
-**Riesgo:** bajo.
+</details>
 
 ---
 
@@ -337,14 +371,15 @@ diff y vuelve a romper la invariante.
 
 ## Orden recomendado
 
-~~1. **P1**~~ · ~~2. **P6**, **P8**, **P3**~~ · ~~**P9**~~ — hechos.
+~~P1~~ · ~~P2~~ · ~~P3~~ · ~~P4~~ · ~~P6~~ · ~~P8~~ · ~~P9~~ — hechos.
 
 Queda:
 
-1. **P4** — barato, elimina un fallo silencioso.
-2. **P2** — mecánico y guiado por el compilador; deja el crate cerrado.
-3. **P7** — por archivo, empezando por `ops_math_cmp.rs`.
-4. **P5** — sólo si el análisis por dominio lo justifica.
+1. **P7** — por archivo, empezando por `ops_math_cmp.rs`. Clasificar cada sitio
+   antes de tocarlo; sólo la categoría "alcanzable desde código de usuario" es
+   deuda real.
+2. **P5** — `nursery.rs` (647) y `exec/ctx.rs` (505), sólo si el análisis por
+   dominio lo justifica. `exec/dispatch/mod.rs` no entra: ver el final.
 
 Con el repo ya formateado (`bda5167`), pasar `cargo fmt` antes de cada commit.
 
