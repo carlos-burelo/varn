@@ -5,17 +5,17 @@ use super::obj::HeapObj;
 use super::structs::{Heap, HeapInner};
 
 impl Heap {
-    pub fn nursery_len_byte_offset_from_rcbox() -> usize {
+    pub(crate) fn nursery_len_byte_offset_from_rcbox() -> usize {
         2 * std::mem::size_of::<usize>()
             + std::mem::offset_of!(HeapInner, nursery)
             + crate::nursery::Nursery::objects_len_byte_offset()
     }
 
-    pub fn rcbox_ptr_for_validation(&self) -> *const u8 {
+    pub(crate) fn rcbox_ptr_for_validation(&self) -> *const u8 {
         (Rc::as_ptr(&self.inner) as *const u8).wrapping_sub(2 * std::mem::size_of::<usize>())
     }
 
-    pub fn jit_array_layout() -> varn_jit::JitArrayLayout {
+    pub(crate) fn jit_array_layout() -> varn_jit::JitArrayLayout {
         fn vec_word_offsets<T>(v: &Vec<T>) -> (usize, usize) {
             assert_eq!(v.len(), 3);
             assert_eq!(v.capacity(), 7);
@@ -164,7 +164,7 @@ impl Heap {
         }
     }
 
-    pub fn jit_object_layout() -> varn_jit::JitObjectLayout {
+    pub(crate) fn jit_object_layout() -> varn_jit::JitObjectLayout {
         const SENTINEL_FIELD: u64 = 0xFEED_BEEF_CAFE_1234;
         const TAIL: usize = 3;
 

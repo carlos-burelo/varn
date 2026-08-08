@@ -70,12 +70,12 @@ pub enum HeapStr {
 
 impl HeapStr {
     #[inline]
-    pub fn shared(s: RuntimeString) -> Self {
+    pub(crate) fn shared(s: RuntimeString) -> Self {
         HeapStr::Shared(s, std::cell::Cell::new(ascii_flag::UNKNOWN))
     }
 
     #[inline]
-    pub fn ext(buf: Rc<std::cell::UnsafeCell<String>>, len: usize, ascii: u8) -> Self {
+    pub(crate) fn ext(buf: Rc<std::cell::UnsafeCell<String>>, len: usize, ascii: u8) -> Self {
         HeapStr::Ext {
             buf,
             len,
@@ -86,7 +86,7 @@ impl HeapStr {
     /// Store `s` inside the heap object. Caller guarantees
     /// `s.len() <= INLINE_STR_CAP`.
     #[inline]
-    pub fn inline(s: &str) -> Self {
+    pub(crate) fn inline(s: &str) -> Self {
         debug_assert!(s.len() <= INLINE_STR_CAP);
         let mut bytes = [0u8; INLINE_STR_CAP];
         bytes[..s.len()].copy_from_slice(s.as_bytes());
@@ -101,7 +101,7 @@ impl HeapStr {
     /// guarantees `off..off+len` lies on char boundaries and `len` fits
     /// [`SLICE_LEN_MASK`].
     #[inline]
-    pub fn slice_of(src: RuntimeString, off: usize, len: usize, ascii: u8) -> Self {
+    pub(crate) fn slice_of(src: RuntimeString, off: usize, len: usize, ascii: u8) -> Self {
         debug_assert!(len as u32 <= SLICE_LEN_MASK);
         HeapStr::Slice {
             src,
@@ -111,7 +111,7 @@ impl HeapStr {
     }
 
     #[inline]
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         match self {
             HeapStr::Shared(s, _) => s,
             // Safety: single-threaded VM; the buffer is only appended to (via
@@ -132,7 +132,7 @@ impl HeapStr {
     }
 
     #[inline]
-    pub fn ascii_state(&self) -> u8 {
+    pub(crate) fn ascii_state(&self) -> u8 {
         match self {
             HeapStr::Shared(_, ascii) => ascii.get(),
             HeapStr::Ext { ascii, .. } => ascii.get(),
@@ -142,7 +142,7 @@ impl HeapStr {
     }
 
     #[inline]
-    pub fn is_ascii(&self) -> bool {
+    pub(crate) fn is_ascii(&self) -> bool {
         match self.ascii_state() {
             ascii_flag::YES => true,
             ascii_flag::NO => false,
@@ -159,12 +159,12 @@ impl HeapStr {
     }
 
     #[inline]
-    pub fn is_ascii_cached(&self) -> bool {
+    pub(crate) fn is_ascii_cached(&self) -> bool {
         self.ascii_state() == ascii_flag::YES
     }
 
     #[inline]
-    pub fn to_shared(&self) -> RuntimeString {
+    pub(crate) fn to_shared(&self) -> RuntimeString {
         match self {
             HeapStr::Shared(s, _) => Rc::clone(s),
             HeapStr::Ext { buf, len, .. } => {
@@ -199,7 +199,7 @@ impl HeapStr {
     /// True when this view ends exactly at the buffer tip, i.e. appending to
     /// the buffer extends this string without disturbing any other view.
     #[inline]
-    pub fn is_tip(&self) -> bool {
+    pub(crate) fn is_tip(&self) -> bool {
         match self {
             HeapStr::Ext { buf, len, .. } => unsafe { (&*buf.get()).len() == *len },
             _ => false,

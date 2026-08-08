@@ -1,6 +1,6 @@
 use crate::error::VmResult;
 use crate::exec::ctx::ExecCtx;
-use crate::frame::VmClosure;
+use crate::closure::VmClosure;
 use varn_core::OpCode;
 
 use super::{hi, lo};

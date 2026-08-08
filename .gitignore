@@ -50,3 +50,8 @@ Thumbs.db
 # Python bytecode from the benchmark twins
 __pycache__/
 *.pyc
+
+# Pre-refactor originals kept alongside the code during the VM refactor, so a
+# split can be diffed against what it came from. Deleted when the refactor
+# closes; the same content is always reachable from the parent commit.
+*.rs.back

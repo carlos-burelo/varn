@@ -16,7 +16,7 @@ pub struct RuntimeError {
 }
 
 impl RuntimeError {
-    pub fn new(message: impl Into<String>) -> Self {
+    pub(crate) fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
             frames: Vec::new(),
@@ -24,21 +24,6 @@ impl RuntimeError {
         }
     }
 
-    pub fn with_frames(message: impl Into<String>, frames: Vec<FrameInfo>) -> Self {
-        Self {
-            message: message.into(),
-            frames,
-            thrown: None,
-        }
-    }
-
-    pub fn with_thrown(message: impl Into<String>, thrown: crate::value::VmValue) -> Self {
-        Self {
-            message: message.into(),
-            frames: Vec::new(),
-            thrown: Some(thrown),
-        }
-    }
 }
 
 impl fmt::Display for RuntimeError {

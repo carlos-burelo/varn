@@ -1,7 +1,7 @@
 use crate::error::VmResult;
 use crate::exec::ctx::ExecCtx;
 use crate::exec::dispatch::ControlSignal;
-use crate::frame::VmClosure;
+use crate::closure::VmClosure;
 
 impl ExecCtx {
     #[inline(always)]

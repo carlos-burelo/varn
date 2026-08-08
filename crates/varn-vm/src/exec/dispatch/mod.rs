@@ -28,11 +28,11 @@ fn lo(w: u16) -> usize {
 }
 
 impl ExecCtx {
-    pub fn run(&mut self) -> VmResult<VmValue> {
+    pub(crate) fn run(&mut self) -> VmResult<VmValue> {
         self.run_until(0)
     }
 
-    pub fn run_until(&mut self, depth: usize) -> VmResult<VmValue> {
+    pub(crate) fn run_until(&mut self, depth: usize) -> VmResult<VmValue> {
         self.run_until_inner(depth).map_err(|mut e| {
             if e.frames.is_empty() {
                 e.frames = crate::exec::exceptions::collect_frames(&self.frames);
@@ -76,7 +76,7 @@ impl ExecCtx {
     unsafe fn execute_jit_frame(
         ctx: *mut ExecCtx,
         jit_fn: varn_jit::JitFn,
-        closure_ptr: *const crate::frame::VmClosure,
+        closure_ptr: *const crate::closure::VmClosure,
         base: usize,
     ) -> Result<VmValue, i32> {
         let saved = (*ctx).jit_jmp_buf;
@@ -123,7 +123,7 @@ impl ExecCtx {
         'frame_loop: while (*ctx).frames.len() > depth {
             let frame_idx = (*ctx).frames.len() - 1;
 
-            let closure_ptr: *const crate::frame::VmClosure = (*ctx).frames[frame_idx].closure_ptr;
+            let closure_ptr: *const crate::closure::VmClosure = (*ctx).frames[frame_idx].closure_ptr;
             let closure = unsafe { &*closure_ptr };
 
             let is_first_entry = (*ctx).frames[frame_idx].ip == 0;
@@ -815,7 +815,7 @@ impl ExecCtx {
                                 crate::exec::calls::resolve_constants(proto, &mut (*ctx).heap),
                             );
                             let vm_closure =
-                                std::rc::Rc::new(crate::frame::VmClosure::with_upvalues(
+                                std::rc::Rc::new(crate::closure::VmClosure::with_upvalues(
                                     proto.clone(),
                                     vec![],
                                     constants,

@@ -1,4 +1,5 @@
-use crate::frame::{CallFrame, TryHandler, VmUpvalue};
+use crate::frame::{CallFrame, TryHandler};
+use crate::closure::VmUpvalue;
 use crate::globals::GlobalStore;
 use crate::heap::Heap;
 use crate::loader::ModuleLoader;
@@ -17,34 +18,14 @@ use crate::linker::Linker;
 use super::VmSuspend;
 use varn_types::generator::GenChannel;
 
-pub use super::ctx_jit_runtime::{
-    jit_array_extend, jit_array_get_fast, jit_array_length, jit_array_pop, jit_array_push,
-    jit_array_set_fast, jit_assert_not_null, jit_await, jit_bind_method, jit_bitand, jit_bitor,
-    jit_bitxor, jit_build_object, jit_build_object_with_shape, jit_build_record_with_shape, jit_call_spread,
-    jit_class_member_op, jit_close_upvalue, clif_call_fallback, jit_declare_field,
-    jit_define_global, jit_div,
-    jit_gc_safepoint, jit_get_enum_tag, jit_get_fixed_field, jit_get_index,
-    jit_get_property_maybe_stub, jit_get_super, jit_get_symbol, jit_inherit, jit_instanceof,
-    jit_is_array_stub, jit_load_module, jit_load_module_by_idx, jit_load_module_slot,
-    jit_logical_not, jit_make_class, jit_make_enum_variant, jit_modulo, jit_negate,
-    jit_object_keys_stub, jit_object_merge_stub, jit_object_rest, jit_op_in_stub, jit_pop_try,
-    jit_pow, jit_push_try, jit_range, jit_set_fixed_field, jit_set_index, jit_shl, jit_shr,
-    jit_spawn, jit_store_global, jit_store_module_slot, jit_str_concat, jit_str_length,
-    jit_str_slice, jit_throw, jit_typeof_val, jit_ushr, jit_wrap_spread_stub, jit_yield,
-};
-pub use super::ctx_jit_values::{
-    jit_add, jit_build_array, jit_build_str, jit_call, jit_call_method, jit_call_method_flat,
-    jit_call_native_fast, jit_call_native_fnptr, jit_call_native_op, jit_define_global_idx,
-    jit_dispatch_intrinsic, jit_ensure_stack_capacity, jit_eq, jit_get_property,
-    jit_get_property_flat, jit_get_property_ic_fast, jit_get_property_maybe_ic_fast, jit_gt,
-    jit_gte, jit_invoke_virtual, jit_invoke_virtual_flat, jit_is_native_fn, jit_load_const,
-    jit_load_global, jit_load_global_idx, jit_load_static_fn, jit_load_upvalue, jit_lt, jit_lte,
-    jit_make_closure, jit_mul, jit_neq, jit_post_call, jit_prepare_call, jit_push_self_frame,
-    jit_set_property, jit_set_property_flat, jit_store_global_idx, jit_store_upvalue,
-    jit_str_char_code_at, jit_str_char_code_at_fast, jit_str_slice_intrinsic,
-    jit_str_substring_intrinsic, jit_sub,
-    jit_to_string,
-};
+// The JIT helper entry points live in two modules but are named through
+// `ctx::` by `jit::helpers` (and by the `jit_helper_abi!` list, which knows
+// only bare fn names). Globs rather than an explicit list: that list was a
+// fourth place every new helper had to be written down, and forgetting it
+// was a compile error at best. A collision between the two modules is still
+// a compile error, so nothing is silently shadowed.
+pub(crate) use super::ctx_jit_runtime::*;
+pub(crate) use super::ctx_jit_values::*;
 
 #[repr(C)]
 pub struct ExecCtx {
@@ -131,7 +112,7 @@ pub struct ExecCtx {
 }
 
 impl ExecCtx {
-    pub fn new(mut globals: GlobalStore, settings: crate::settings::ExecSettings) -> Self {
+    pub(crate) fn new(mut globals: GlobalStore, settings: crate::settings::ExecSettings) -> Self {
         varn_runtime::init_heap();
         let mut heap = Heap::new();
 
@@ -307,7 +288,7 @@ impl ExecCtx {
         }
     }
 
-    pub fn fork_for_task(&self) -> Self {
+    pub(crate) fn fork_for_task(&self) -> Self {
         Self {
             stack: Vec::with_capacity(1024),
             frames: Vec::with_capacity(64),
@@ -446,7 +427,7 @@ impl ExecCtx {
     /// (`scan_and_fix_old_obj`'s Generator arm / the marker's Generator arm),
     /// so async liveness no longer defers collection. Only nested contexts
     /// (`gc_inhibited`) never initiate one — see that field's invariant.
-    pub fn gc_backedge_safepoint(&mut self) {
+    pub(crate) fn gc_backedge_safepoint(&mut self) {
         if self.gc_inhibited {
             return;
         }
@@ -458,7 +439,7 @@ impl ExecCtx {
         }
     }
 
-    pub fn trigger_gc(&mut self) {
+    pub(crate) fn trigger_gc(&mut self) {
         if self.gc_inhibited {
             return;
         }
@@ -522,7 +503,7 @@ pub struct JmpBuf {
 }
 
 #[unsafe(naked)]
-pub unsafe extern "C" fn my_setjmp(_buf: *mut JmpBuf) -> i32 {
+pub(crate) unsafe extern "C" fn my_setjmp(_buf: *mut JmpBuf) -> i32 {
     std::arch::naked_asm!(
         "mov [rcx + 0],  rdi",
         "mov [rcx + 8],  rsi",
@@ -542,7 +523,7 @@ pub unsafe extern "C" fn my_setjmp(_buf: *mut JmpBuf) -> i32 {
 }
 
 #[unsafe(naked)]
-pub unsafe extern "C" fn my_longjmp(_buf: *const JmpBuf, _val: i32) -> ! {
+pub(crate) unsafe extern "C" fn my_longjmp(_buf: *const JmpBuf, _val: i32) -> ! {
     std::arch::naked_asm!(
         "mov rdi, [rcx + 0]",
         "mov rsi, [rcx + 8]",

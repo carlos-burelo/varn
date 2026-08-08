@@ -1,4 +1,5 @@
 pub mod clif;
+mod helper_abi;
 pub(crate) mod loop_hoist;
 pub mod mem;
 pub mod stats;
@@ -177,174 +178,65 @@ impl Default for JitStrLayout {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-pub struct JitHelpers {
-    pub load_const: usize,
-    pub load_global_idx: usize,
-    pub store_global_idx: usize,
-    pub define_global_idx: usize,
-    pub eq: usize,
-    pub neq: usize,
-    pub lt: usize,
-    pub lte: usize,
-    pub gt: usize,
-    pub gte: usize,
-    pub add: usize,
-    pub sub: usize,
-    pub mul: usize,
-    pub div: usize,
-    pub modulo: usize,
-    pub pow: usize,
-    pub to_string: usize,
-    pub load_global: usize,
-    pub load_upvalue: usize,
-    pub store_upvalue: usize,
-    pub make_closure: usize,
-    pub load_static_fn: usize,
-    pub call: usize,
-    pub call_method: usize,
-    pub call_method_flat: usize,
-    pub invoke_virtual_flat: usize,
-    pub get_property: usize,
-    /// Flat-args variant of `get_property` for the CLIF backend:
-    /// `fn(ctx, closure, obj, name_idx, cs_idx, dest, ip) -> VmValue`.
-    pub get_property_flat: usize,
-    pub set_property: usize,
-    /// Flat-args variant of `set_property` for the CLIF backend:
-    /// `fn(ctx, closure, obj, val, name_idx, cs_idx, ip)`.
-    pub set_property_flat: usize,
-    pub build_array: usize,
-    pub build_str: usize,
-    pub negate: usize,
-    pub logical_not: usize,
-    pub get_index: usize,
-    pub set_index: usize,
-    pub jit_array_get_fast: usize,
-    pub jit_array_set_fast: usize,
-    pub typeof_val: usize,
-    pub instanceof: usize,
-    pub array_length: usize,
-    pub array_push: usize,
-    pub array_pop: usize,
-    pub array_extend: usize,
-    pub str_concat: usize,
-    pub str_slice: usize,
-    pub str_length: usize,
-    pub bit_and: usize,
-    pub bit_or: usize,
-    pub bit_xor: usize,
-    pub shl: usize,
-    pub shr: usize,
-    pub ushr: usize,
-    pub load_module: usize,
-    pub load_module_slot: usize,
-    pub store_module_slot: usize,
-    pub build_object_with_shape: usize,
-    pub build_record_with_shape: usize,
-    pub range: usize,
-    pub assert_not_null: usize,
-    pub close_upvalue: usize,
-    pub get_enum_tag: usize,
-    pub is_array: usize,
-    pub wrap_spread: usize,
-    pub object_keys: usize,
-    pub op_in: usize,
-    pub object_merge: usize,
-    pub get_fixed_field: usize,
-    pub set_fixed_field: usize,
-    pub get_property_maybe: usize,
-    pub get_super: usize,
-    pub get_symbol: usize,
-    pub bind_method: usize,
-    pub define_global: usize,
-    pub store_global: usize,
-    pub declare_field: usize,
-    pub make_class: usize,
-    pub inherit: usize,
-    pub class_member_op: usize,
-    pub build_object: usize,
-    pub object_rest: usize,
-    pub make_enum_variant: usize,
-    pub spawn: usize,
-    pub call_spread: usize,
-    pub load_module_by_idx: usize,
-    pub invoke_virtual: usize,
-    pub try_push: usize,
-    pub try_pop: usize,
-    pub throw: usize,
-    pub await_helper: usize,
-    pub yield_helper: usize,
-    pub get_property_ic_fast: usize,
-    pub get_property_maybe_ic_fast: usize,
-    pub jit_prepare_call: usize,
-    pub jit_push_self_frame: usize,
-    pub jit_post_call: usize,
-    pub jit_ensure_stack_capacity: usize,
-    pub dispatch_intrinsic: usize,
-    /// `extern "C" fn(*mut ExecCtx, receiver, pos) -> VmValue` — direct
-    /// `charCodeAt` without the stack-window flush/reload overhead.
-    pub str_char_code_at: usize,
-    /// `extern "C" fn(*mut ExecCtx, receiver: VmValue, pos: i64) -> i64` —
-    /// ultra-lean `charCodeAt` with raw int pos/result, no VmValue boxing.
-    pub str_char_code_at_fast: usize,
-    /// `extern "C" fn(*mut ExecCtx, receiver, start, end) -> VmValue` — direct
-    /// `substring` without the stack-window flush/reload overhead.
-    pub str_substring_intrinsic: usize,
-    /// `extern "C" fn(*mut ExecCtx, receiver, start, end) -> VmValue` — direct
-    /// `slice` without the stack-window flush/reload overhead.
-    pub str_slice_intrinsic: usize,
-    pub jit_is_native_fn: usize,
-    pub jit_call_native_fast: usize,
-    pub jit_call_native_op: usize,
-    /// `extern "C" fn(*mut ExecCtx, fn_addr, args_start, total)` — direct
-    /// native call with the function pointer already resolved.
-    pub jit_call_native_fnptr: usize,
-    /// Compile-time op-id → native fn address resolution (0 = unknown).
-    /// Lets `CallNativeOp` embed the target directly instead of paying a
-    /// hash lookup on every runtime call.
-    pub resolve_native_op: fn(u64) -> usize,
-    pub resolve_native_op_v2: fn(u64) -> (usize, usize, varn_types::SignatureDescriptor),
-    /// Probed heap/array layout for the inline array-read fast path.
-    pub array_layout: JitArrayLayout,
-    /// Probed object layout for the inline property get/set fast paths.
-    pub object_layout: JitObjectLayout,
-    /// Probed string-slot layout for the inline concat allocation path.
-    pub str_layout: JitStrLayout,
-    pub open_upvalues_offset: usize,
-    pub pending_constructors_offset: usize,
-    /// `extern "C" fn(*mut ExecCtx)` — loop back-edge GC safepoint.
-    pub gc_safepoint: usize,
-    /// Byte offset of the heap field (an Rc, i.e. one pointer) inside ExecCtx.
-    pub heap_field_offset: usize,
-    /// Byte offset from the heap RcBox pointer to the nursery live-object count.
-    pub nursery_len_offset: usize,
-    /// Nursery fill level at which the safepoint must run.
-    pub nursery_threshold: usize,
-    pub jit_native_result_offset: usize,
-    pub globals_offset: usize,
-    /// Byte offset within `ExecCtx` of the `stack` `Vec<VmValue>`'s data
-    /// pointer word (`offset_of!(ExecCtx, stack) + slots_ptr_off`, the bare-Vec
-    /// ptr offset — NOT `elems_ptr_off`, which is `ArrayRepr`-relative). The
-    /// allocating clif path loads this fresh each time it addresses a
-    /// register's `ctx.stack` home slot, so a stack reallocation can never
-    /// leave a stale base.
-    pub stack_data_offset: usize,
-    /// Byte offset of ExecCtx.jit_frame_prepushed — the caller→prologue
-    /// frame handshake word (see its doc in varn-vm).
-    pub frame_prepushed_offset: usize,
-    /// Byte offset of ExecCtx.jit_resume_ip — the caller's post-call resume
-    /// ip, written before a fast JIT→JIT call so an exception unwinding
-    /// through this caller can resume it interpreted (see its doc in varn-vm).
-    pub jit_resume_ip_offset: usize,
-    /// Byte offset of ExecCtx.jit_call_dest — the caller dest register stamped
-    /// as the callee frame's return_reg for correct interpreted-resume returns.
-    pub jit_call_dest_offset: usize,
-    /// `extern "C" fn(*mut ExecCtx, callee: VmValue, argc, a0..a3) -> VmValue`
-    /// — the CLIF static-call IC miss path: dispatch the (rebound or
-    /// GC-moved) callee through the interpreter/JIT with boxed args.
-    pub clif_call_fallback: usize,
+/// Generates [`JitHelpers`] from the one shared list in
+/// [`crate::jit_helper_abi`]. Every entry there becomes a `usize` holding a
+/// host function address; the tail below is hand-written because those
+/// fields are not function addresses.
+macro_rules! define_jit_helpers {
+    ( $( $(#[$attr:meta])* $field:ident => $_vm_fn:ident ),* $(,)? ) => {
+        #[derive(Debug, Clone, Copy)]
+        #[repr(C)]
+        pub struct JitHelpers {
+            $( $(#[$attr])* pub $field: usize, )*
+        /// Compile-time op-id → native fn address resolution (0 = unknown).
+        /// Lets `CallNativeOp` embed the target directly instead of paying a
+        /// hash lookup on every runtime call.
+        pub resolve_native_op: fn(u64) -> usize,
+        pub resolve_native_op_v2: fn(u64) -> (usize, usize, varn_types::SignatureDescriptor),
+        /// Probed heap/array layout for the inline array-read fast path.
+        pub array_layout: JitArrayLayout,
+        /// Probed object layout for the inline property get/set fast paths.
+        pub object_layout: JitObjectLayout,
+        /// Probed string-slot layout for the inline concat allocation path.
+        pub str_layout: JitStrLayout,
+        pub open_upvalues_offset: usize,
+        pub pending_constructors_offset: usize,
+        /// `extern "C" fn(*mut ExecCtx)` — loop back-edge GC safepoint.
+        pub gc_safepoint: usize,
+        /// Byte offset of the heap field (an Rc, i.e. one pointer) inside ExecCtx.
+        pub heap_field_offset: usize,
+        /// Byte offset from the heap RcBox pointer to the nursery live-object count.
+        pub nursery_len_offset: usize,
+        /// Nursery fill level at which the safepoint must run.
+        pub nursery_threshold: usize,
+        pub jit_native_result_offset: usize,
+        pub globals_offset: usize,
+        /// Byte offset within `ExecCtx` of the `stack` `Vec<VmValue>`'s data
+        /// pointer word (`offset_of!(ExecCtx, stack) + slots_ptr_off`, the bare-Vec
+        /// ptr offset — NOT `elems_ptr_off`, which is `ArrayRepr`-relative). The
+        /// allocating clif path loads this fresh each time it addresses a
+        /// register's `ctx.stack` home slot, so a stack reallocation can never
+        /// leave a stale base.
+        pub stack_data_offset: usize,
+        /// Byte offset of ExecCtx.jit_frame_prepushed — the caller→prologue
+        /// frame handshake word (see its doc in varn-vm).
+        pub frame_prepushed_offset: usize,
+        /// Byte offset of ExecCtx.jit_resume_ip — the caller's post-call resume
+        /// ip, written before a fast JIT→JIT call so an exception unwinding
+        /// through this caller can resume it interpreted (see its doc in varn-vm).
+        pub jit_resume_ip_offset: usize,
+        /// Byte offset of ExecCtx.jit_call_dest — the caller dest register stamped
+        /// as the callee frame's return_reg for correct interpreted-resume returns.
+        pub jit_call_dest_offset: usize,
+        /// `extern "C" fn(*mut ExecCtx, callee: VmValue, argc, a0..a3) -> VmValue`
+        /// — the CLIF static-call IC miss path: dispatch the (rebound or
+        /// GC-moved) callee through the interpreter/JIT with boxed args.
+        pub clif_call_fallback: usize,
+        }
+    };
 }
+
+crate::jit_helper_abi!(define_jit_helpers);
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]

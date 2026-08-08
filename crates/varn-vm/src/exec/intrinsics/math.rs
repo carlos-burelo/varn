@@ -2,7 +2,7 @@ use crate::error::VmResult;
 use crate::value::VmValue;
 use varn_core::intrinsic_ops::math::MathOp;
 
-pub fn dispatch(op: u8, args: &[VmValue]) -> VmResult<VmValue> {
+pub(crate) fn dispatch(op: u8, args: &[VmValue]) -> VmResult<VmValue> {
     let Some(arg1) = args.get(1) else {
         return Ok(VmValue::null());
     };

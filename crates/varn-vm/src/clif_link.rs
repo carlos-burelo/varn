@@ -57,19 +57,19 @@ static NEXT_SERIAL: AtomicU64 = AtomicU64::new(1);
 
 /// A fresh identity for one heap's compiled code. `0` means "no context",
 /// which no compiled entry ever matches.
-pub fn next_epoch() -> u64 {
+pub(crate) fn next_epoch() -> u64 {
     NEXT_EPOCH.fetch_add(1, Ordering::Relaxed)
 }
 
 /// Monotonic tick, stamped on each compilation and read when a heap is copied.
 /// It orders "compiled before this copy" against "compiled after it", which is
 /// exactly the line between code a copy inherits and code it must not.
-pub fn compile_serial() -> u64 {
+pub(crate) fn compile_serial() -> u64 {
     NEXT_SERIAL.load(Ordering::Relaxed)
 }
 
 /// Take the next tick, for an entry that has just been built.
-pub fn stamp_compile_serial() -> u64 {
+pub(crate) fn stamp_compile_serial() -> u64 {
     NEXT_SERIAL.fetch_add(1, Ordering::Relaxed)
 }
 
@@ -81,7 +81,7 @@ pub fn stamp_compile_serial() -> u64 {
 /// entry is re-stamped to the running epoch on the way through, so this walk
 /// happens once per proto per heap rather than once per frame entry.
 #[cold]
-pub fn adopt_if_inherited(proto: &Rc<FunctionProto>) -> bool {
+pub(crate) fn adopt_if_inherited(proto: &Rc<FunctionProto>) -> bool {
     let owner = proto.jit_epoch.get();
     if owner == 0 || proto.jit_entry.get().is_none() {
         return false;
@@ -108,13 +108,13 @@ pub fn adopt_if_inherited(proto: &Rc<FunctionProto>) -> bool {
 
 /// The epoch of the context executing on this thread, `0` outside a run.
 #[inline(always)]
-pub fn current_epoch() -> u64 {
+pub(crate) fn current_epoch() -> u64 {
     CURRENT_EPOCH.with(|e| e.get())
 }
 
 /// Record that `proto` now holds code built for the running context, retiring
 /// whatever code it held before.
-pub fn register_compiled(proto: &Rc<FunctionProto>, previous: Option<(u64, Rc<dyn std::any::Any>)>) {
+pub(crate) fn register_compiled(proto: &Rc<FunctionProto>, previous: Option<(u64, Rc<dyn std::any::Any>)>) {
     let epoch = current_epoch();
     COMPILED.with(|m| {
         let mut m = m.borrow_mut();
@@ -126,14 +126,14 @@ pub fn register_compiled(proto: &Rc<FunctionProto>, previous: Option<(u64, Rc<dy
 }
 
 /// Park `code` under `epoch` so it stays mapped until that epoch ends.
-pub fn retire_code(epoch: u64, code: Rc<dyn std::any::Any>) {
+pub(crate) fn retire_code(epoch: u64, code: Rc<dyn std::any::Any>) {
     COMPILED.with(|m| m.borrow_mut().entry(epoch).or_default().retired.push(code));
 }
 
 /// End `epoch`: strip every entry it compiled and free its buffers. Called when
 /// the context that produced them is dropped, so nothing can reach code that
 /// was baked against a dead heap.
-pub fn invalidate_epoch(epoch: u64) {
+pub(crate) fn invalidate_epoch(epoch: u64) {
     let entry = COMPILED.with(|m| m.borrow_mut().remove(&epoch));
     let Some(entry) = entry else { return };
     for proto in &entry.protos {
@@ -166,7 +166,7 @@ pub fn invalidate_epoch(epoch: u64) {
 pub struct CtxGuard(*const ExecCtx, u64);
 
 impl CtxGuard {
-    pub fn enter(ctx: *const ExecCtx) -> Self {
+    pub(crate) fn enter(ctx: *const ExecCtx) -> Self {
         let epoch = if ctx.is_null() {
             0
         } else {
@@ -191,7 +191,7 @@ impl Drop for CtxGuard {
 pub struct CtxLinker(*const ExecCtx);
 
 impl CtxLinker {
-    pub fn current() -> Self {
+    pub(crate) fn current() -> Self {
         CtxLinker(CURRENT_CTX.with(|c| c.get()))
     }
 }

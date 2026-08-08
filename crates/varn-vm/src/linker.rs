@@ -21,38 +21,38 @@ impl Default for Linker {
 }
 
 impl Linker {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             state: FxHashMap::default(),
         }
     }
 
-    pub fn cached(&self, id: &ModuleId) -> Option<VmValue> {
+    pub(crate) fn cached(&self, id: &ModuleId) -> Option<VmValue> {
         match self.state.get(id) {
             Some(ModuleLinkState::Done(v)) => Some(*v),
             _ => None,
         }
     }
 
-    pub fn is_evaluating(&self, id: &ModuleId) -> bool {
+    pub(crate) fn is_evaluating(&self, id: &ModuleId) -> bool {
         matches!(self.state.get(id), Some(ModuleLinkState::Evaluating))
     }
 
-    pub fn set_evaluating(&mut self, id: ModuleId) {
+    pub(crate) fn set_evaluating(&mut self, id: ModuleId) {
         self.state.insert(id, ModuleLinkState::Evaluating);
     }
 
-    pub fn set_done(&mut self, id: ModuleId, val: VmValue) {
+    pub(crate) fn set_done(&mut self, id: ModuleId, val: VmValue) {
         self.state.insert(id, ModuleLinkState::Done(val));
     }
 
-    pub fn cancel_evaluating(&mut self, id: &ModuleId) {
+    pub(crate) fn cancel_evaluating(&mut self, id: &ModuleId) {
         if matches!(self.state.get(id), Some(ModuleLinkState::Evaluating)) {
             self.state.remove(id);
         }
     }
 
-    pub fn clone_state(&self) -> Self {
+    pub(crate) fn clone_state(&self) -> Self {
         Self {
             state: self.state.clone(),
         }

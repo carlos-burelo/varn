@@ -3,15 +3,15 @@ use crate::exec::props::bind_method_to_receiver;
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use std::rc::Rc;
-use varn_types::{value::ObjRef, ClassObj};
+use varn_types::ClassObj;
 
-pub fn op_class(name: &str, heap: &mut Heap) -> VmValue {
+pub(crate) fn op_class(name: &str, heap: &mut Heap) -> VmValue {
     let cls = ClassObj::new_rc(name);
     heap.set_intrinsic_class(name, cls.clone());
     VmValue::from_heap_idx(heap.alloc(HeapObj::Class(cls)))
 }
 
-pub fn op_method(
+pub(crate) fn op_method(
     class_nv: VmValue,
     name: &str,
     method_nv: VmValue,
@@ -23,7 +23,7 @@ pub fn op_method(
     Ok(())
 }
 
-pub fn op_define_static(
+pub(crate) fn op_define_static(
     class_nv: VmValue,
     name: &str,
     val_nv: VmValue,
@@ -35,7 +35,7 @@ pub fn op_define_static(
     Ok(())
 }
 
-pub fn op_inherit(subclass_nv: VmValue, superclass_nv: VmValue, heap: &mut Heap) -> VmResult<()> {
+pub(crate) fn op_inherit(subclass_nv: VmValue, superclass_nv: VmValue, heap: &mut Heap) -> VmResult<()> {
     let superclass = get_class_arc(superclass_nv, heap)?;
     if subclass_nv.is_heap() {
         if let Some(HeapObj::Class(sub)) = heap.get_mut(subclass_nv.as_heap_idx()) {
@@ -78,7 +78,7 @@ pub fn op_inherit(subclass_nv: VmValue, superclass_nv: VmValue, heap: &mut Heap)
     Err(RuntimeError::new("OpInherit: not a class"))
 }
 
-pub fn op_declare_field(class_nv: VmValue, name: &str, heap: &mut Heap) -> VmResult<()> {
+pub(crate) fn op_declare_field(class_nv: VmValue, name: &str, heap: &mut Heap) -> VmResult<()> {
     if class_nv.is_heap() {
         if let Some(HeapObj::Class(cls)) = heap.get_mut(class_nv.as_heap_idx()) {
             cls.declare_field(Rc::from(name));
@@ -92,7 +92,7 @@ pub fn op_declare_field(class_nv: VmValue, name: &str, heap: &mut Heap) -> VmRes
     )))
 }
 
-pub fn op_define_getter(
+pub(crate) fn op_define_getter(
     class_nv: VmValue,
     name: &str,
     closure_nv: VmValue,
@@ -104,7 +104,7 @@ pub fn op_define_getter(
     Ok(())
 }
 
-pub fn op_define_setter(
+pub(crate) fn op_define_setter(
     class_nv: VmValue,
     name: &str,
     closure_nv: VmValue,
@@ -116,7 +116,7 @@ pub fn op_define_setter(
     Ok(())
 }
 
-pub fn op_define_static_getter(
+pub(crate) fn op_define_static_getter(
     class_nv: VmValue,
     name: &str,
     closure_nv: VmValue,
@@ -128,7 +128,7 @@ pub fn op_define_static_getter(
     Ok(())
 }
 
-pub fn op_define_static_setter(
+pub(crate) fn op_define_static_setter(
     class_nv: VmValue,
     name: &str,
     closure_nv: VmValue,
@@ -140,7 +140,7 @@ pub fn op_define_static_setter(
     Ok(())
 }
 
-pub fn op_get_super(
+pub(crate) fn op_get_super(
     class_nv: VmValue,
     name: &str,
     receiver_nv: VmValue,
@@ -159,12 +159,6 @@ pub fn op_get_super(
     let receiver = heap.extract(receiver_nv);
     let bound = bind_method_to_receiver(receiver, method, Some(super_cls.clone()));
     Ok(heap.intern(bound))
-}
-
-pub fn new_instance(class_nv: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
-    let cls = get_class_arc(class_nv, heap)?;
-    let oref = ObjRef::instance(cls);
-    Ok(VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref))))
 }
 
 fn get_class_arc(nv: VmValue, heap: &Heap) -> VmResult<Rc<ClassObj>> {

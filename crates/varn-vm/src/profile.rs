@@ -22,7 +22,7 @@ pub struct ProfileCounters {
 }
 
 impl ProfileCounters {
-    pub fn new() -> Arc<Self> {
+    pub(crate) fn new() -> Arc<Self> {
         Arc::new(Self {
             ic_hits: AtomicU64::new(0),
             ic_misses: AtomicU64::new(0),
@@ -42,78 +42,63 @@ impl ProfileCounters {
     }
 
     #[inline(always)]
-    pub fn record_ic_hit(&self) {
-        self.ic_hits.fetch_add(1, Ordering::Relaxed);
-    }
-
-    #[inline(always)]
-    pub fn record_ic_miss(&self) {
-        self.ic_misses.fetch_add(1, Ordering::Relaxed);
-    }
-
-    #[inline(always)]
-    pub fn record_ic_hit_getprop(&self) {
+    pub(crate) fn record_ic_hit_getprop(&self) {
         self.ic_hits.fetch_add(1, Ordering::Relaxed);
         self.ic_hits_getprop.fetch_add(1, Ordering::Relaxed);
     }
 
     #[inline(always)]
-    pub fn record_ic_miss_getprop(&self) {
+    pub(crate) fn record_ic_miss_getprop(&self) {
         self.ic_misses.fetch_add(1, Ordering::Relaxed);
         self.ic_misses_getprop.fetch_add(1, Ordering::Relaxed);
     }
 
     #[inline(always)]
-    pub fn record_ic_hit_setprop(&self) {
+    pub(crate) fn record_ic_hit_setprop(&self) {
         self.ic_hits.fetch_add(1, Ordering::Relaxed);
         self.ic_hits_setprop.fetch_add(1, Ordering::Relaxed);
     }
 
     #[inline(always)]
-    pub fn record_ic_miss_setprop(&self) {
+    pub(crate) fn record_ic_miss_setprop(&self) {
         self.ic_misses.fetch_add(1, Ordering::Relaxed);
         self.ic_misses_setprop.fetch_add(1, Ordering::Relaxed);
     }
 
     #[inline(always)]
-    pub fn record_ic_hit_callmethod(&self) {
+    pub(crate) fn record_ic_hit_callmethod(&self) {
         self.ic_hits.fetch_add(1, Ordering::Relaxed);
         self.ic_hits_callmethod.fetch_add(1, Ordering::Relaxed);
     }
 
     #[inline(always)]
-    pub fn record_ic_miss_callmethod(&self) {
+    pub(crate) fn record_ic_miss_callmethod(&self) {
         self.ic_misses.fetch_add(1, Ordering::Relaxed);
         self.ic_misses_callmethod.fetch_add(1, Ordering::Relaxed);
     }
 
     #[inline(always)]
-    pub fn record_call_vm_fast(&self) {
+    pub(crate) fn record_call_vm_fast(&self) {
         self.calls_vm_fast.fetch_add(1, Ordering::Relaxed);
     }
 
     #[inline(always)]
-    pub fn record_call_slow(&self) {
+    pub(crate) fn record_call_slow(&self) {
         self.calls_prepare_slow.fetch_add(1, Ordering::Relaxed);
     }
 
     #[inline(always)]
-    pub fn record_call_native(&self) {
+    pub(crate) fn record_call_native(&self) {
         self.calls_native.fetch_add(1, Ordering::Relaxed);
     }
 
     #[inline(always)]
-    pub fn record_heap_alloc(&self) {
-        self.heap_allocs.fetch_add(1, Ordering::Relaxed);
-    }
-
-    #[inline(always)]
-    pub fn record_frame_push(&self) {
+    pub(crate) fn record_frame_push(&self) {
         self.frame_pushes.fetch_add(1, Ordering::Relaxed);
     }
 
     #[inline(always)]
-    pub fn record_frame_pop(&self) {
+    pub(crate) fn record_frame_pop(&self) {
         self.frame_pops.fetch_add(1, Ordering::Relaxed);
     }
 }
@@ -145,7 +130,7 @@ pub struct VmProfile {
 }
 
 impl VmProfile {
-    pub fn from_counters(c: &ProfileCounters) -> Self {
+    pub(crate) fn from_counters(c: &ProfileCounters) -> Self {
         Self {
             ic_hits: c.ic_hits.load(Ordering::Relaxed),
             ic_misses: c.ic_misses.load(Ordering::Relaxed),
@@ -191,11 +176,11 @@ pub struct HotspotCounters {
 }
 
 impl HotspotCounters {
-    pub fn new() -> Rc<RefCell<Self>> {
+    pub(crate) fn new() -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(Self::default()))
     }
 
-    pub fn record_fn_call(&mut self, name: &str, jit: bool) {
+    pub(crate) fn record_fn_call(&mut self, name: &str, jit: bool) {
         let e = self.fn_calls.entry(Rc::from(name)).or_default();
         e.calls += 1;
         if jit {
@@ -205,7 +190,7 @@ impl HotspotCounters {
         }
     }
 
-    pub fn record_method_call(&mut self, name: &str, jit: bool) {
+    pub(crate) fn record_method_call(&mut self, name: &str, jit: bool) {
         let e = self.method_calls.entry(Rc::from(name)).or_default();
         e.calls += 1;
         if jit {
@@ -215,15 +200,15 @@ impl HotspotCounters {
         }
     }
 
-    pub fn record_native_call(&mut self, name: &str) {
+    pub(crate) fn record_native_call(&mut self, name: &str) {
         *self.native_calls.entry(Rc::from(name)).or_default() += 1;
     }
 
-    pub fn record_global_access(&mut self, name: Rc<str>) {
+    pub(crate) fn record_global_access(&mut self, name: Rc<str>) {
         *self.global_accesses.entry(name).or_default() += 1;
     }
 
-    pub fn record_alloc(&mut self, type_name: &'static str) {
+    pub(crate) fn record_alloc(&mut self, type_name: &'static str) {
         *self.alloc_types.entry(type_name).or_default() += 1;
     }
 }

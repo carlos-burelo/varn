@@ -36,7 +36,7 @@ fn canonical_id_str(id: &ModuleId) -> String {
 }
 
 impl ExecCtx {
-    pub fn convert_to_module_obj(&mut self, id: ModuleId, val: VmValue) -> VmResult<VmValue> {
+    pub(crate) fn convert_to_module_obj(&mut self, id: ModuleId, val: VmValue) -> VmResult<VmValue> {
         if !val.is_heap() {
             return Ok(val);
         }
@@ -76,7 +76,7 @@ impl ExecCtx {
         }
     }
 
-    pub fn load_module(&mut self, specifier: &str) -> VmResult<VmValue> {
+    pub(crate) fn load_module(&mut self, specifier: &str) -> VmResult<VmValue> {
         let source_file = self
             .frames
             .last()
@@ -85,7 +85,7 @@ impl ExecCtx {
         self.load_module_from_source(specifier, &source_file.to_string())
     }
 
-    pub fn load_module_from_source(
+    pub(crate) fn load_module_from_source(
         &mut self,
         specifier: &str,
         source_file: &str,
@@ -222,7 +222,7 @@ fn get_cached_exports(module_id: &str) -> Option<Vec<std::rc::Rc<str>>> {
     }
 }
 
-pub fn freeze_module(
+pub(crate) fn freeze_module(
     module_val: VmValue,
     id: ModuleId,
     heap: &crate::heap::HeapInner,
@@ -274,7 +274,7 @@ fn freeze_value(val: VmValue, heap: &crate::heap::HeapInner) -> Option<FrozenExp
     }
 }
 
-pub fn thaw_module(frozen: &FrozenModuleObj, heap: &mut crate::heap::HeapInner) -> VmValue {
+pub(crate) fn thaw_module(frozen: &FrozenModuleObj, heap: &mut crate::heap::HeapInner) -> VmValue {
     let n = frozen.exports.len();
     let mut module_obj = ModuleObj::new(frozen.id.clone(), n);
     module_obj.exports.resize(n, VmValue::null());
@@ -299,7 +299,7 @@ fn thaw_export(export: &FrozenExport, heap: &mut crate::heap::HeapInner) -> VmVa
         FrozenExport::VmClosure(payload) => {
             if let Some(wrapper) = payload
                 .as_any()
-                .downcast_ref::<crate::frame::VmClosurePayload>()
+                .downcast_ref::<crate::closure::VmClosurePayload>()
             {
                 VmValue::from_heap_idx(heap.alloc(HeapObj::VmClosure(wrapper.0.clone())))
             } else {

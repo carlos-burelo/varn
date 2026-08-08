@@ -73,7 +73,7 @@ pub fn open_resolved(ctx: &mut ExecCtx, val: Value) -> Value {
 /// message}` marker objects, for producers that can pre-intern strings) into
 /// real instances of the named intrinsic class so
 /// `catch (e) { e instanceof X }` works.
-pub fn open_rejected(ctx: &mut ExecCtx, val: Value) -> Value {
+pub(crate) fn open_rejected(ctx: &mut ExecCtx, val: Value) -> Value {
     let (class_name, msg) = if let Some(he) = HostError::from_value(&val) {
         (he.class.clone(), he.message.clone())
     } else if let Some(class_name) = marker_str(&val, "__hostErrorClass") {

@@ -1,12 +1,11 @@
 use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
-use std::rc::Rc;
 use varn_core::{IntrinsicType, TypeTag};
-use varn_types::value::{EnumVariantData, RuntimeSymbol};
+use varn_types::value::RuntimeSymbol;
 use varn_types::{NativeCtx, Value};
 
-pub fn typeof_val(val: VmValue, heap: &Heap) -> &'static str {
+pub(crate) fn typeof_val(val: VmValue, heap: &Heap) -> &'static str {
     if val.is_null() {
         return TypeTag::Null.name();
     }
@@ -31,7 +30,7 @@ pub fn typeof_val(val: VmValue, heap: &Heap) -> &'static str {
     "unknown"
 }
 
-pub fn instanceof(obj: VmValue, class_nv: VmValue, heap: &Heap) -> bool {
+pub(crate) fn instanceof(obj: VmValue, class_nv: VmValue, heap: &Heap) -> bool {
     if !class_nv.is_heap() {
         return false;
     }
@@ -81,7 +80,7 @@ pub fn instanceof(obj: VmValue, class_nv: VmValue, heap: &Heap) -> bool {
     false
 }
 
-pub fn op_in(key: VmValue, obj: VmValue, heap: &Heap) -> bool {
+pub(crate) fn op_in(key: VmValue, obj: VmValue, heap: &Heap) -> bool {
     if !obj.is_heap() {
         return false;
     }
@@ -98,15 +97,11 @@ pub fn op_in(key: VmValue, obj: VmValue, heap: &Heap) -> bool {
     }
 }
 
-pub fn is_array(val: VmValue, heap: &Heap) -> bool {
+pub(crate) fn is_array(val: VmValue, heap: &Heap) -> bool {
     val.is_heap() && matches!(heap.get(val.as_heap_idx()), Some(HeapObj::Array(_)))
 }
 
-pub fn is_null(val: VmValue) -> bool {
-    val.is_null()
-}
-
-pub fn assert_not_null(val: VmValue) -> VmResult<()> {
+pub(crate) fn assert_not_null(val: VmValue) -> VmResult<()> {
     if val.is_null() {
         Err(RuntimeError::new("null assertion failed"))
     } else {
@@ -114,33 +109,7 @@ pub fn assert_not_null(val: VmValue) -> VmResult<()> {
     }
 }
 
-pub fn make_enum_variant(tag: u8, name: &str, payload: VmValue, heap: &mut Heap) -> VmValue {
-    let payload_val = heap.extract(payload);
-    let (name_part, fields_part) = match name.find(':') {
-        Some(idx) => (&name[..idx], &name[idx + 1..]),
-        None => (name, ""),
-    };
-    let (enum_name_str, variant_name_str) = match name_part.rfind('.') {
-        Some(idx) => (&name_part[..idx], &name_part[idx + 1..]),
-        None => ("", name_part),
-    };
-    let fields: Vec<Rc<str>> = if fields_part.is_empty() {
-        vec![]
-    } else {
-        fields_part.split(',').map(Rc::from).collect()
-    };
-
-    let data = Box::new(EnumVariantData {
-        enum_name: Rc::from(enum_name_str),
-        variant_name: Rc::from(variant_name_str),
-        variant_tag: tag,
-        fields,
-        payload: payload_val,
-    });
-    VmValue::from_heap_idx(heap.alloc(HeapObj::EnumVariant(data)))
-}
-
-pub fn get_enum_tag(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
+pub(crate) fn get_enum_tag(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
     if val.is_heap() {
         if let Some(HeapObj::EnumVariant(e)) = heap.get(val.as_heap_idx()) {
             return Ok(VmValue::from_i32(e.variant_tag as i32));
@@ -149,11 +118,7 @@ pub fn get_enum_tag(val: VmValue, heap: &Heap) -> VmResult<VmValue> {
     Err(RuntimeError::new("OpGetEnumTag: not an enum variant"))
 }
 
-pub fn wrap_spread(val: VmValue) -> VmValue {
-    val
-}
-
-pub fn get_symbol_property(
+pub(crate) fn get_symbol_property(
     obj: VmValue,
     symbol: RuntimeSymbol,
     heap: &mut Heap,
@@ -277,7 +242,7 @@ fn generator_symbol_iterator(
     Ok(args.first().copied().unwrap_or(VmValue::null()))
 }
 
-pub fn bind_method(receiver: VmValue, method: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn bind_method(receiver: VmValue, method: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     let recv_val = heap.extract(receiver);
     let method_val = heap.extract(method);
     match method_val {
@@ -289,11 +254,7 @@ pub fn bind_method(receiver: VmValue, method: VmValue, heap: &mut Heap) -> VmRes
     }
 }
 
-pub fn get_symbol(kind: varn_types::value::RuntimeSymbol, heap: &mut Heap) -> VmValue {
-    heap.intern(Value::Symbol(kind))
-}
-
-pub fn invoke_runtime_static(
+pub(crate) fn invoke_runtime_static(
     name: &str,
     stack: &mut Vec<VmValue>,
     heap: &mut Heap,

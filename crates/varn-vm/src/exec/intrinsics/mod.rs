@@ -12,13 +12,13 @@ use varn_core::intrinsic_ops::wire::{decode, IntrinsicDomain};
 /// receiver slot. Routed through the very same [`math::dispatch`] as the
 /// windowed form (fed a synthetic receiver) so the two encodings cannot
 /// drift apart in the int-result re-boxing or anywhere else.
-pub fn dispatch_unary(wire_byte: u8, x: VmValue) -> VmResult<VmValue> {
+pub(crate) fn dispatch_unary(wire_byte: u8, x: VmValue) -> VmResult<VmValue> {
     let (domain, op) = decode(wire_byte);
     debug_assert_eq!(domain, IntrinsicDomain::Math as u8, "IntrinsicDirect is math-only");
     math::dispatch(op, &[VmValue::null(), x])
 }
 
-pub fn dispatch(wire_byte: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn dispatch(wire_byte: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<VmValue> {
     let (domain, op) = decode(wire_byte);
     match domain {
         d if d == IntrinsicDomain::Math as u8 => math::dispatch(op, args),

@@ -32,7 +32,7 @@ pub struct NanSyncGenDriver {
 }
 
 impl NanSyncGenDriver {
-    pub fn new(ctx: Box<ExecCtx>) -> Rc<Self> {
+    pub(crate) fn new(ctx: Box<ExecCtx>) -> Rc<Self> {
         Rc::new(NanSyncGenDriver {
             inner: RefCell::new(NanSyncGenInner {
                 ctx,

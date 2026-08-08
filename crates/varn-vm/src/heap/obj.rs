@@ -9,7 +9,7 @@ use varn_types::{
     },
     AsyncTask, ClassObj, LazyTask, NativeFn, VmArray,
 };
-use crate::frame::VmClosure;
+use crate::closure::VmClosure;
 use crate::value::VmValue;
 use super::str::HeapStr;
 
@@ -53,7 +53,7 @@ impl HeapObj {
     /// (closure / native fn / bound method) coalesce to `Function`; modules
     /// present as `Object`; spreads as `Array`; opaque host payloads as `VmRef`.
     /// All value-kind name rendering flows through this — see [`TypeTag::name`].
-    pub fn tag(&self) -> varn_base::TypeTag {
+    pub(crate) fn tag(&self) -> varn_base::TypeTag {
         use varn_base::TypeTag;
         match self {
             HeapObj::Str(_) => TypeTag::Str,

@@ -32,7 +32,7 @@ fn arg(args: &[VmValue], i: usize) -> VmValue {
     args.get(i).copied().unwrap_or_else(VmValue::null)
 }
 
-pub fn dispatch_map(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn dispatch_map(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<VmValue> {
     let recv = arg(args, 0);
     let m = map_of(heap, recv)?;
     match op {
@@ -72,7 +72,7 @@ pub fn dispatch_map(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<VmVal
     }
 }
 
-pub fn dispatch_set(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn dispatch_set(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<VmValue> {
     let recv = arg(args, 0);
     let s = set_of(heap, recv)?;
     match op {

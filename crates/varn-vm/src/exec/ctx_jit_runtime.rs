@@ -8,25 +8,25 @@ use super::ctx_jit_values::jit_propagate_error;
 /// allocating loops don't overflow the nursery into the old generation.
 /// Takes no `VmValue` arguments by design — the caller has flushed every VM
 /// register to the stack, so all roots are visible and get reloaded after.
-pub extern "C" fn jit_gc_safepoint(ctx: *mut ExecCtx) {
+pub(crate) extern "C" fn jit_gc_safepoint(ctx: *mut ExecCtx) {
     unsafe {
         let ctx_ref = &mut *ctx;
         ctx_ref.gc_backedge_safepoint();
     }
 }
 
-pub extern "C" fn jit_negate(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_negate(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         crate::exec::arith::negate(v, &mut ctx_ref.heap)
     }
 }
 
-pub extern "C" fn jit_logical_not(_ctx: *mut ExecCtx, v: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_logical_not(_ctx: *mut ExecCtx, v: VmValue) -> VmValue {
     crate::exec::compare::logical_not(v)
 }
 
-pub extern "C" fn jit_div(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_div(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         match crate::exec::arith::div(a, b, &mut ctx_ref.heap) {
@@ -36,7 +36,7 @@ pub extern "C" fn jit_div(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue 
     }
 }
 
-pub extern "C" fn jit_modulo(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_modulo(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         match crate::exec::arith::modulo(a, b, &mut ctx_ref.heap) {
@@ -46,7 +46,7 @@ pub extern "C" fn jit_modulo(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmVal
     }
 }
 
-pub extern "C" fn jit_pow(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_pow(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         match crate::exec::arith::pow(a, b, &mut ctx_ref.heap) {
@@ -56,7 +56,7 @@ pub extern "C" fn jit_pow(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue 
     }
 }
 
-pub extern "C" fn jit_get_index(
+pub(crate) extern "C" fn jit_get_index(
     ctx: *mut ExecCtx,
     args: *const varn_jit::JitGetIndexArgs,
 ) -> VmValue {
@@ -70,7 +70,7 @@ pub extern "C" fn jit_get_index(
     }
 }
 
-pub extern "C" fn jit_set_index(ctx: *mut ExecCtx, args: *const varn_jit::JitSetIndexArgs) {
+pub(crate) extern "C" fn jit_set_index(ctx: *mut ExecCtx, args: *const varn_jit::JitSetIndexArgs) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let args = &*args;
@@ -81,7 +81,7 @@ pub extern "C" fn jit_set_index(ctx: *mut ExecCtx, args: *const varn_jit::JitSet
     }
 }
 
-pub unsafe extern "C" fn jit_array_get_fast(
+pub(crate) unsafe extern "C" fn jit_array_get_fast(
     ctx: *mut ExecCtx,
     obj: VmValue,
     key: VmValue,
@@ -107,7 +107,7 @@ pub unsafe extern "C" fn jit_array_get_fast(
     }
 }
 
-pub unsafe extern "C" fn jit_array_set_fast(
+pub(crate) unsafe extern "C" fn jit_array_set_fast(
     ctx: *mut ExecCtx,
     obj: VmValue,
     key: VmValue,
@@ -145,7 +145,7 @@ pub unsafe extern "C" fn jit_array_set_fast(
     }
 }
 
-pub extern "C" fn jit_typeof_val(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_typeof_val(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         let s = crate::exec::advanced::typeof_val(v, &ctx_ref.heap);
@@ -167,7 +167,7 @@ pub extern "C" fn jit_typeof_val(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
 ///
 /// Errors propagate through the same longjmp path as every other JIT
 /// helper, unwinding to the outer `setjmp` in `execute_jit_frame`.
-pub extern "C" fn clif_call_fallback(
+pub(crate) extern "C" fn clif_call_fallback(
     ctx: *mut ExecCtx,
     callee: VmValue,
     src: usize,
@@ -182,7 +182,7 @@ pub extern "C" fn clif_call_fallback(
     }
 }
 
-pub extern "C" fn jit_instanceof(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_instanceof(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &*ctx;
         let r = crate::exec::advanced::instanceof(a, b, &ctx_ref.heap);
@@ -190,7 +190,7 @@ pub extern "C" fn jit_instanceof(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> V
     }
 }
 
-pub extern "C" fn jit_array_length(ctx: *mut ExecCtx, arr: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_array_length(ctx: *mut ExecCtx, arr: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         match ctx_ref.exec_array_length(arr) {
@@ -200,7 +200,7 @@ pub extern "C" fn jit_array_length(ctx: *mut ExecCtx, arr: VmValue) -> VmValue {
     }
 }
 
-pub extern "C" fn jit_array_push(ctx: *mut ExecCtx, arr: VmValue, val: VmValue) {
+pub(crate) extern "C" fn jit_array_push(ctx: *mut ExecCtx, arr: VmValue, val: VmValue) {
     unsafe {
         let ctx_ref = &mut *ctx;
         match ctx_ref.exec_array_push(arr, val) {
@@ -210,7 +210,7 @@ pub extern "C" fn jit_array_push(ctx: *mut ExecCtx, arr: VmValue, val: VmValue) 
     }
 }
 
-pub extern "C" fn jit_array_pop(ctx: *mut ExecCtx, arr: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_array_pop(ctx: *mut ExecCtx, arr: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         match ctx_ref.exec_array_pop(arr) {
@@ -220,7 +220,7 @@ pub extern "C" fn jit_array_pop(ctx: *mut ExecCtx, arr: VmValue) -> VmValue {
     }
 }
 
-pub extern "C" fn jit_array_extend(ctx: *mut ExecCtx, arr: VmValue, src: VmValue) {
+pub(crate) extern "C" fn jit_array_extend(ctx: *mut ExecCtx, arr: VmValue, src: VmValue) {
     unsafe {
         let ctx_ref = &mut *ctx;
         match ctx_ref.exec_array_extend(arr, src) {
@@ -230,14 +230,14 @@ pub extern "C" fn jit_array_extend(ctx: *mut ExecCtx, arr: VmValue, src: VmValue
     }
 }
 
-pub extern "C" fn jit_str_concat(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_str_concat(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         crate::exec::strings::str_concat(a, b, &mut ctx_ref.heap)
     }
 }
 
-pub extern "C" fn jit_str_slice(ctx: *mut ExecCtx, s: VmValue, idx: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_str_slice(ctx: *mut ExecCtx, s: VmValue, idx: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         match ctx_ref.exec_str_slice(s, idx) {
@@ -247,7 +247,7 @@ pub extern "C" fn jit_str_slice(ctx: *mut ExecCtx, s: VmValue, idx: VmValue) -> 
     }
 }
 
-pub extern "C" fn jit_str_length(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_str_length(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         match ctx_ref.exec_str_length(v) {
@@ -257,27 +257,27 @@ pub extern "C" fn jit_str_length(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
     }
 }
 
-pub extern "C" fn jit_bitand(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_bitand(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe { crate::exec::arith::bit_and(a, b, &mut (*ctx).heap) }
 }
 
-pub extern "C" fn jit_bitor(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_bitor(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe { crate::exec::arith::bit_or(a, b, &mut (*ctx).heap) }
 }
 
-pub extern "C" fn jit_bitxor(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_bitxor(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe { crate::exec::arith::bit_xor(a, b, &mut (*ctx).heap) }
 }
 
-pub extern "C" fn jit_shl(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_shl(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe { crate::exec::arith::shl(a, b, &mut (*ctx).heap) }
 }
 
-pub extern "C" fn jit_shr(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_shr(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe { crate::exec::arith::shr(a, b, &mut (*ctx).heap) }
 }
 
-pub extern "C" fn jit_ushr(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_ushr(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe { crate::exec::arith::ushr(a, b, &mut (*ctx).heap) }
 }
 
@@ -285,9 +285,9 @@ pub extern "C" fn jit_ushr(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue
 /// an imported module that suspends on a top-level `await` leaves the import
 /// unfinished, so the frame rewinds to re-execute the load once the awaited
 /// task resolves — the same rewind `op_load_module` performs interpreted.
-pub extern "C" fn jit_load_module(
+pub(crate) extern "C" fn jit_load_module(
     ctx: *mut ExecCtx,
-    closure: *const crate::frame::VmClosure,
+    closure: *const crate::closure::VmClosure,
     const_idx: usize,
     own_ip: usize,
 ) -> VmValue {
@@ -332,7 +332,7 @@ unsafe fn jit_suspend_at(ctx: &mut ExecCtx, frame_idx: usize, resume_ip: usize) 
     super::ctx::my_longjmp(buf, 2)
 }
 
-pub extern "C" fn jit_load_module_slot(
+pub(crate) extern "C" fn jit_load_module_slot(
     ctx: *mut ExecCtx,
     module_val: VmValue,
     slot_idx: usize,
@@ -350,7 +350,7 @@ pub extern "C" fn jit_load_module_slot(
     }
 }
 
-pub extern "C" fn jit_store_module_slot(ctx: *mut ExecCtx, slot_idx: usize, val_nv: VmValue) {
+pub(crate) extern "C" fn jit_store_module_slot(ctx: *mut ExecCtx, slot_idx: usize, val_nv: VmValue) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let caller_depth = ctx_ref.frames.len();
@@ -377,14 +377,14 @@ pub extern "C" fn jit_store_module_slot(ctx: *mut ExecCtx, slot_idx: usize, val_
     }
 }
 
-pub extern "C" fn jit_spawn(ctx: *mut ExecCtx, task_val: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_spawn(ctx: *mut ExecCtx, task_val: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         ctx_ref.exec_spawn(task_val).unwrap()
     }
 }
 
-pub extern "C" fn jit_push_try(ctx: *mut ExecCtx, catch_ip: usize, err_reg: u32) {
+pub(crate) extern "C" fn jit_push_try(ctx: *mut ExecCtx, catch_ip: usize, err_reg: u32) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_depth = ctx_ref.frames.len();
@@ -397,14 +397,14 @@ pub extern "C" fn jit_push_try(ctx: *mut ExecCtx, catch_ip: usize, err_reg: u32)
     }
 }
 
-pub extern "C" fn jit_pop_try(ctx: *mut ExecCtx) {
+pub(crate) extern "C" fn jit_pop_try(ctx: *mut ExecCtx) {
     unsafe {
         let ctx_ref = &mut *ctx;
         crate::exec::exceptions::pop_try(&mut ctx_ref.try_handlers);
     }
 }
 
-pub extern "C" fn jit_throw(ctx: *mut ExecCtx, error: VmValue) {
+pub(crate) extern "C" fn jit_throw(ctx: *mut ExecCtx, error: VmValue) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let err =
@@ -423,7 +423,7 @@ pub extern "C" fn jit_throw(ctx: *mut ExecCtx, error: VmValue) {
     }
 }
 
-pub extern "C" fn jit_await(ctx: *mut ExecCtx, fut: VmValue, dest_reg: u32, resume_ip: usize) {
+pub(crate) extern "C" fn jit_await(ctx: *mut ExecCtx, fut: VmValue, dest_reg: u32, resume_ip: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let caller_depth = ctx_ref.frames.len();
@@ -445,7 +445,7 @@ pub extern "C" fn jit_await(ctx: *mut ExecCtx, fut: VmValue, dest_reg: u32, resu
     }
 }
 
-pub extern "C" fn jit_yield(ctx: *mut ExecCtx, val: VmValue, dest_reg: u32, resume_ip: usize) {
+pub(crate) extern "C" fn jit_yield(ctx: *mut ExecCtx, val: VmValue, dest_reg: u32, resume_ip: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let caller_depth = ctx_ref.frames.len();
@@ -467,9 +467,9 @@ pub extern "C" fn jit_yield(ctx: *mut ExecCtx, val: VmValue, dest_reg: u32, resu
     }
 }
 
-pub extern "C" fn jit_build_object_with_shape(
+pub(crate) extern "C" fn jit_build_object_with_shape(
     ctx: *mut ExecCtx,
-    closure: *const crate::frame::VmClosure,
+    closure: *const crate::closure::VmClosure,
     base: usize,
     start_reg: usize,
     shape_idx: usize,
@@ -495,9 +495,9 @@ pub extern "C" fn jit_build_object_with_shape(
     }
 }
 
-pub extern "C" fn jit_build_record_with_shape(
+pub(crate) extern "C" fn jit_build_record_with_shape(
     ctx: *mut ExecCtx,
-    closure: *const crate::frame::VmClosure,
+    closure: *const crate::closure::VmClosure,
     base: usize,
     start_reg: usize,
     shape_idx: usize,
@@ -523,7 +523,7 @@ pub extern "C" fn jit_build_record_with_shape(
     }
 }
 
-pub extern "C" fn jit_range(
+pub(crate) extern "C" fn jit_range(
     ctx: *mut ExecCtx,
     start_reg: usize,
     end_reg: usize,
@@ -557,7 +557,7 @@ pub struct JitClassMemberArgs {
     pub kind: u8,
 }
 
-pub extern "C" fn jit_assert_not_null(ctx: *mut ExecCtx, val: VmValue) {
+pub(crate) extern "C" fn jit_assert_not_null(ctx: *mut ExecCtx, val: VmValue) {
     if let Err(e) = crate::exec::advanced::assert_not_null(val) {
         unsafe {
             let ctx_ref = &mut *ctx;
@@ -566,7 +566,7 @@ pub extern "C" fn jit_assert_not_null(ctx: *mut ExecCtx, val: VmValue) {
     }
 }
 
-pub extern "C" fn jit_close_upvalue(ctx: *mut ExecCtx, lowest: usize) {
+pub(crate) extern "C" fn jit_close_upvalue(ctx: *mut ExecCtx, lowest: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
@@ -575,7 +575,7 @@ pub extern "C" fn jit_close_upvalue(ctx: *mut ExecCtx, lowest: usize) {
     }
 }
 
-pub extern "C" fn jit_get_enum_tag(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_get_enum_tag(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         match crate::exec::advanced::get_enum_tag(val, &ctx_ref.heap) {
@@ -585,14 +585,14 @@ pub extern "C" fn jit_get_enum_tag(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
     }
 }
 
-pub extern "C" fn jit_is_array_stub(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_is_array_stub(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &*ctx;
         VmValue::from_bool(crate::exec::advanced::is_array(val, &ctx_ref.heap))
     }
 }
 
-pub extern "C" fn jit_wrap_spread_stub(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_wrap_spread_stub(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         let extracted = ctx_ref.heap.extract(val);
@@ -602,7 +602,7 @@ pub extern "C" fn jit_wrap_spread_stub(ctx: *mut ExecCtx, val: VmValue) -> VmVal
     }
 }
 
-pub extern "C" fn jit_object_keys_stub(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_object_keys_stub(ctx: *mut ExecCtx, val: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         match crate::exec::collections::object_keys(val, &mut ctx_ref.heap) {
@@ -612,14 +612,14 @@ pub extern "C" fn jit_object_keys_stub(ctx: *mut ExecCtx, val: VmValue) -> VmVal
     }
 }
 
-pub extern "C" fn jit_op_in_stub(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_op_in_stub(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &*ctx;
         VmValue::from_bool(crate::exec::advanced::op_in(a, b, &ctx_ref.heap))
     }
 }
 
-pub extern "C" fn jit_object_merge_stub(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_object_merge_stub(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         match crate::exec::collections::object_merge(a, b, &mut ctx_ref.heap) {
@@ -629,7 +629,7 @@ pub extern "C" fn jit_object_merge_stub(ctx: *mut ExecCtx, a: VmValue, b: VmValu
     }
 }
 
-pub extern "C" fn jit_get_fixed_field(ctx: *mut ExecCtx, obj: VmValue, slot: usize) -> VmValue {
+pub(crate) extern "C" fn jit_get_fixed_field(ctx: *mut ExecCtx, obj: VmValue, slot: usize) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         match crate::exec::props::get_fixed_field(obj, slot, &mut ctx_ref.heap) {
@@ -639,7 +639,7 @@ pub extern "C" fn jit_get_fixed_field(ctx: *mut ExecCtx, obj: VmValue, slot: usi
     }
 }
 
-pub extern "C" fn jit_set_fixed_field(ctx: *mut ExecCtx, obj: VmValue, slot: usize, val: VmValue) {
+pub(crate) extern "C" fn jit_set_fixed_field(ctx: *mut ExecCtx, obj: VmValue, slot: usize, val: VmValue) {
     unsafe {
         let ctx_ref = &mut *ctx;
         if let Err(e) = crate::exec::props::set_fixed_field(obj, slot, val, &mut ctx_ref.heap) {
@@ -648,7 +648,7 @@ pub extern "C" fn jit_set_fixed_field(ctx: *mut ExecCtx, obj: VmValue, slot: usi
     }
 }
 
-pub extern "C" fn jit_get_property_maybe_stub(
+pub(crate) extern "C" fn jit_get_property_maybe_stub(
     ctx: *mut ExecCtx,
     obj: VmValue,
     name_idx: usize,
@@ -663,7 +663,7 @@ pub extern "C" fn jit_get_property_maybe_stub(
     }
 }
 
-pub extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) -> VmValue {
+pub(crate) extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
@@ -686,7 +686,7 @@ pub extern "C" fn jit_get_super(ctx: *mut ExecCtx, name_idx: usize) -> VmValue {
     }
 }
 
-pub extern "C" fn jit_get_symbol(ctx: *mut ExecCtx, obj: VmValue, sym_idx: usize) -> VmValue {
+pub(crate) extern "C" fn jit_get_symbol(ctx: *mut ExecCtx, obj: VmValue, sym_idx: usize) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
@@ -705,7 +705,7 @@ pub extern "C" fn jit_get_symbol(ctx: *mut ExecCtx, obj: VmValue, sym_idx: usize
     }
 }
 
-pub extern "C" fn jit_bind_method(ctx: *mut ExecCtx, obj: VmValue, name_idx: usize) -> VmValue {
+pub(crate) extern "C" fn jit_bind_method(ctx: *mut ExecCtx, obj: VmValue, name_idx: usize) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
@@ -723,7 +723,7 @@ pub extern "C" fn jit_bind_method(ctx: *mut ExecCtx, obj: VmValue, name_idx: usi
     }
 }
 
-pub extern "C" fn jit_define_global(ctx: *mut ExecCtx, src: VmValue, name_idx: usize) {
+pub(crate) extern "C" fn jit_define_global(ctx: *mut ExecCtx, src: VmValue, name_idx: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
@@ -734,7 +734,7 @@ pub extern "C" fn jit_define_global(ctx: *mut ExecCtx, src: VmValue, name_idx: u
     }
 }
 
-pub extern "C" fn jit_store_global(ctx: *mut ExecCtx, src: VmValue, name_idx: usize) {
+pub(crate) extern "C" fn jit_store_global(ctx: *mut ExecCtx, src: VmValue, name_idx: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
@@ -745,9 +745,9 @@ pub extern "C" fn jit_store_global(ctx: *mut ExecCtx, src: VmValue, name_idx: us
     }
 }
 
-pub extern "C" fn jit_declare_field(
+pub(crate) extern "C" fn jit_declare_field(
     ctx: *mut ExecCtx,
-    closure: *const crate::frame::VmClosure,
+    closure: *const crate::closure::VmClosure,
     class_val: VmValue,
     name_idx: usize,
 ) {
@@ -762,9 +762,9 @@ pub extern "C" fn jit_declare_field(
     }
 }
 
-pub extern "C" fn jit_make_class(
+pub(crate) extern "C" fn jit_make_class(
     ctx: *mut ExecCtx,
-    closure: *const crate::frame::VmClosure,
+    closure: *const crate::closure::VmClosure,
     super_val: VmValue,
     name_idx: usize,
 ) -> VmValue {
@@ -783,7 +783,7 @@ pub extern "C" fn jit_make_class(
     }
 }
 
-pub extern "C" fn jit_inherit(ctx: *mut ExecCtx, class_val: VmValue, super_val: VmValue) {
+pub(crate) extern "C" fn jit_inherit(ctx: *mut ExecCtx, class_val: VmValue, super_val: VmValue) {
     unsafe {
         let ctx_ref = &mut *ctx;
         if let Err(e) = crate::exec::class::op_inherit(class_val, super_val, &mut ctx_ref.heap) {
@@ -792,9 +792,9 @@ pub extern "C" fn jit_inherit(ctx: *mut ExecCtx, class_val: VmValue, super_val: 
     }
 }
 
-pub extern "C" fn jit_class_member_op(
+pub(crate) extern "C" fn jit_class_member_op(
     ctx: *mut ExecCtx,
-    closure: *const crate::frame::VmClosure,
+    closure: *const crate::closure::VmClosure,
     args: *const std::ffi::c_void,
 ) {
     unsafe {
@@ -846,9 +846,9 @@ pub extern "C" fn jit_class_member_op(
     }
 }
 
-pub extern "C" fn jit_build_object(
+pub(crate) extern "C" fn jit_build_object(
     ctx: *mut ExecCtx,
-    closure: *const crate::frame::VmClosure,
+    closure: *const crate::closure::VmClosure,
     base: usize,
     ip_before: usize,
 ) -> VmValue {
@@ -888,7 +888,7 @@ pub extern "C" fn jit_build_object(
     }
 }
 
-pub extern "C" fn jit_object_rest(ctx: *mut ExecCtx, ip_before: usize) -> VmValue {
+pub(crate) extern "C" fn jit_object_rest(ctx: *mut ExecCtx, ip_before: usize) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
@@ -923,7 +923,7 @@ pub extern "C" fn jit_object_rest(ctx: *mut ExecCtx, ip_before: usize) -> VmValu
     }
 }
 
-pub extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usize) -> VmValue {
+pub(crate) extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usize) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
@@ -967,7 +967,7 @@ pub extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usize) -> 
     }
 }
 
-pub extern "C" fn jit_call_spread(ctx: *mut ExecCtx, args: *const std::ffi::c_void) -> VmValue {
+pub(crate) extern "C" fn jit_call_spread(ctx: *mut ExecCtx, args: *const std::ffi::c_void) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         let args = &*(args as *const varn_jit::JitCallArgs);
@@ -999,9 +999,9 @@ pub extern "C" fn jit_call_spread(ctx: *mut ExecCtx, args: *const std::ffi::c_vo
         ctx_ref.stack[base + args.dest]
     }
 }
-pub extern "C" fn jit_load_module_by_idx(
+pub(crate) extern "C" fn jit_load_module_by_idx(
     ctx: *mut ExecCtx,
-    closure: *const crate::frame::VmClosure,
+    closure: *const crate::closure::VmClosure,
     spec_idx: usize,
 ) -> VmValue {
     unsafe {

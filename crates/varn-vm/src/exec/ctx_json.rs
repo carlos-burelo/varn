@@ -11,7 +11,7 @@ thread_local! {
 }
 
 impl ExecCtx {
-    pub fn json_parse(&mut self, text: &str) -> Result<VmValue, String> {
+    pub(crate) fn json_parse(&mut self, text: &str) -> Result<VmValue, String> {
         JSON_SHAPE_CACHE.with(|c| *c.borrow_mut() = None);
         let mut deserializer = serde_json::Deserializer::from_str(text);
         deserializer
@@ -19,7 +19,7 @@ impl ExecCtx {
             .map_err(|e| format!("JSON.parse: {e}"))
     }
 
-    pub fn json_stringify(&self, value: VmValue) -> Result<String, String> {
+    pub(crate) fn json_stringify(&self, value: VmValue) -> Result<String, String> {
         let mut out = String::with_capacity(value_estimate_capacity(self, value));
         write_json_vm(self, value, &mut out);
         Ok(out)

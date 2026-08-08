@@ -6,22 +6,22 @@ pub const OLD_GEN_FLAG: u32 = 0x8000_0000;
 pub const NURSERY_CAPACITY: usize = 16384;
 
 #[inline(always)]
-pub fn is_nursery_idx(idx: u32) -> bool {
+pub(crate) fn is_nursery_idx(idx: u32) -> bool {
     (idx & OLD_GEN_FLAG) == 0
 }
 
 #[inline(always)]
-pub fn is_old_idx(idx: u32) -> bool {
+pub(crate) fn is_old_idx(idx: u32) -> bool {
     (idx & OLD_GEN_FLAG) != 0
 }
 
 #[inline(always)]
-pub fn old_idx_raw(packed: u32) -> u32 {
+pub(crate) fn old_idx_raw(packed: u32) -> u32 {
     packed & !OLD_GEN_FLAG
 }
 
 #[inline(always)]
-pub fn pack_old_idx(raw_old: u32) -> u32 {
+pub(crate) fn pack_old_idx(raw_old: u32) -> u32 {
     raw_old | OLD_GEN_FLAG
 }
 
@@ -78,7 +78,7 @@ impl Clone for Nursery {
 }
 
 impl Nursery {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         // Full capacity from birth, not grown into. `try_alloc` pushes to
         // `objects` and `forwarding` together and the minor collector indexes
         // both by nursery index, so a realloc in either is a moving backing
@@ -110,7 +110,7 @@ impl Nursery {
     /// dropped a few lines later. `Vec::new()` is documented not to
     /// allocate until pushed to, so this constructor is zero-cost; see
     /// `capacity_invariant::vacant_nursery_allocates_nothing`.
-    pub fn vacant() -> Self {
+    pub(crate) fn vacant() -> Self {
         Self {
             objects: Vec::new(),
             forwarding: Vec::new(),
@@ -123,33 +123,27 @@ impl Nursery {
 
     /// Capacity of the object slots. Constant for the nursery's lifetime —
     /// see `new`. Exposed so the invariant test and the JIT's emitted bounds
-    /// check assert against one number.
-    pub fn objects_capacity(&self) -> usize {
+    /// check assert against one number. Test-only: the production write path
+    /// reaches the capacity through `NURSERY_CAPACITY`, never through here.
+    #[cfg(test)]
+    pub(crate) fn objects_capacity(&self) -> usize {
         self.objects.capacity()
     }
 
     /// Capacity of the forwarding slots, which must track `objects`.
-    pub fn forwarding_capacity(&self) -> usize {
+    #[cfg(test)]
+    pub(crate) fn forwarding_capacity(&self) -> usize {
         self.forwarding.capacity()
     }
 
     /// Backing-store address of the object slots, for the invariant test.
-    pub fn objects_data_ptr(&self) -> *const Option<HeapObj> {
+    #[cfg(test)]
+    pub(crate) fn objects_data_ptr(&self) -> *const Option<HeapObj> {
         self.objects.as_ptr()
     }
 
-    /// Backing-store address of the forwarding slots, for the invariant test
-    /// and for `ExecCtx::validate_jit_safepoint_offsets` — the one raw
-    /// offset `emit_nursery_alloc`'s `None`-write uses
-    /// (`nursery_fwd_vec_off + slots_ptr_off`) that nothing else in the
-    /// write path independently re-derives, since `slots_ptr_off` is probed
-    /// against `Vec<Option<HeapObj>>` and reused here for `Vec<Option<u32>>`.
-    pub fn forwarding_data_ptr(&self) -> *const Option<u32> {
-        self.forwarding.as_ptr()
-    }
-
     #[inline(always)]
-    pub fn try_alloc(&mut self, obj: HeapObj) -> Result<u32, HeapObj> {
+    pub(crate) fn try_alloc(&mut self, obj: HeapObj) -> Result<u32, HeapObj> {
         if self.objects.len() >= NURSERY_CAPACITY {
             return Err(obj);
         }
@@ -161,17 +155,17 @@ impl Nursery {
     }
 
     #[inline(always)]
-    pub fn get(&self, idx: u32) -> Option<&HeapObj> {
+    pub(crate) fn get(&self, idx: u32) -> Option<&HeapObj> {
         self.objects.get(idx as usize)?.as_ref()
     }
 
     #[inline(always)]
-    pub fn get_mut(&mut self, idx: u32) -> Option<&mut HeapObj> {
+    pub(crate) fn get_mut(&mut self, idx: u32) -> Option<&mut HeapObj> {
         self.objects.get_mut(idx as usize)?.as_mut()
     }
 
     #[inline(always)]
-    pub fn is_full(&self) -> bool {
+    pub(crate) fn is_full(&self) -> bool {
         self.objects.len() >= Self::FULL_THRESHOLD
     }
 
@@ -183,36 +177,36 @@ impl Nursery {
     /// `Nursery`, for the JIT back-edge safepoint. Relies on Vec's
     /// (cap, ptr, len) word layout — the same assumption the JIT already
     /// makes when it reads `ExecCtx.stack`/`ExecCtx.frames` lengths.
-    pub fn objects_len_byte_offset() -> usize {
+    pub(crate) fn objects_len_byte_offset() -> usize {
         std::mem::offset_of!(Nursery, objects) + 2 * std::mem::size_of::<usize>()
     }
 
     /// Byte offset of the `objects` Vec's three words within `Nursery`,
     /// for the JIT's inline array-read fast path.
-    pub fn objects_vec_byte_offset() -> usize {
+    pub(crate) fn objects_vec_byte_offset() -> usize {
         std::mem::offset_of!(Nursery, objects)
     }
 
     /// Byte offset of the `forwarding` Vec's three words within `Nursery`,
     /// for the JIT's inline allocation — which must bump both Vecs, since the
     /// minor collector indexes them together.
-    pub fn forwarding_vec_byte_offset() -> usize {
+    pub(crate) fn forwarding_vec_byte_offset() -> usize {
         std::mem::offset_of!(Nursery, forwarding)
     }
 
     #[inline(always)]
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.objects.len()
     }
 
     /// Duplicates are allowed here — the write barrier is the hot path, so
     /// dedup happens once per collection instead of O(n) per store.
     #[inline(always)]
-    pub fn remember(&mut self, packed_old_idx: u32) {
+    pub(crate) fn remember(&mut self, packed_old_idx: u32) {
         self.remembered.push(packed_old_idx);
     }
 
-    pub fn collect(
+    pub(crate) fn collect(
         &mut self,
         old_gen: &mut HeapInner,
         stack: &mut [VmValue],

@@ -1,5 +1,5 @@
 use crate::exec;
-use crate::frame::{VmClosure, VmUpvalue, VmUpvalueInner};
+use crate::closure::{VmClosure, VmUpvalue, VmUpvalueInner};
 use crate::globals::GlobalStore;
 use crate::heap::Heap;
 use crate::loader::ModuleLoader;

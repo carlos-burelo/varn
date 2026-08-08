@@ -17,7 +17,7 @@ pub const INT_MAX_DIGITS: usize = 20;
 ///
 /// `write!(out, "{}", v)` drags in `core::fmt`'s formatting machinery, which
 /// dominated integer concatenation. This is the same output, digit by digit.
-pub fn itoa(v: i64, buf: &mut [u8; INT_MAX_DIGITS]) -> &str {
+pub(crate) fn itoa(v: i64, buf: &mut [u8; INT_MAX_DIGITS]) -> &str {
     let negative = v < 0;
     // Via `u64`: `i64::MIN` has no positive counterpart, and `wrapping_neg`
     // on its bit pattern yields exactly its magnitude.
@@ -65,7 +65,7 @@ impl Default for StrBuf {
 }
 
 impl StrBuf {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             inline: [0; INLINE_CAP],
             len: 0,
@@ -74,7 +74,7 @@ impl StrBuf {
     }
 
     #[inline]
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         match &self.spilled {
             Some(s) => s.len(),
             None => self.len,
@@ -82,12 +82,7 @@ impl StrBuf {
     }
 
     #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    #[inline]
-    pub fn as_str(&self) -> &str {
+    pub(crate) fn as_str(&self) -> &str {
         match &self.spilled {
             Some(s) => s,
             // Only whole `&str`s are ever appended, so the inline bytes are
@@ -97,7 +92,7 @@ impl StrBuf {
         }
     }
 
-    pub fn push_str(&mut self, s: &str) {
+    pub(crate) fn push_str(&mut self, s: &str) {
         if let Some(spilled) = &mut self.spilled {
             spilled.push_str(s);
             return;
@@ -120,7 +115,7 @@ impl StrBuf {
 
     /// Takes the contents as an owned `String`, for callers that need to keep
     /// growing it (the extensible-buffer path in `str_concat`).
-    pub fn into_string(self) -> String {
+    pub(crate) fn into_string(self) -> String {
         match self.spilled {
             Some(s) => s,
             None => self.as_str().to_owned(),

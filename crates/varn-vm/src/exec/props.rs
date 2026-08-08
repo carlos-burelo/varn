@@ -8,7 +8,7 @@ use varn_types::{
     NativeCtx, Value,
 };
 
-pub fn find_getter(obj: VmValue, key: &str, heap: &Heap) -> Option<Value> {
+pub(crate) fn find_getter(obj: VmValue, key: &str, heap: &Heap) -> Option<Value> {
     if !obj.is_heap() {
         return get_class(obj, heap)?.find_getter(key);
     }
@@ -24,7 +24,7 @@ pub fn find_getter(obj: VmValue, key: &str, heap: &Heap) -> Option<Value> {
     }
 }
 
-pub fn find_setter(obj: VmValue, key: &str, heap: &Heap) -> Option<Value> {
+pub(crate) fn find_setter(obj: VmValue, key: &str, heap: &Heap) -> Option<Value> {
     if !obj.is_heap() {
         return get_class(obj, heap)?.find_setter(key);
     }
@@ -43,7 +43,7 @@ pub enum ResolvedProperty {
     Built(Value),
 }
 
-pub fn resolve_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult<ResolvedProperty> {
+pub(crate) fn resolve_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult<ResolvedProperty> {
     if obj.is_heap() {
         if let Some(HeapObj::Module(m)) = heap.get(obj.as_heap_idx()) {
             let val = m
@@ -64,7 +64,7 @@ pub fn resolve_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult<Re
         .map(ResolvedProperty::Built)
 }
 
-pub fn get_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn get_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult<VmValue> {
     let resolved = resolve_property(obj, key, heap)?;
     match resolved {
         ResolvedProperty::Nv(v) => Ok(v),
@@ -72,11 +72,11 @@ pub fn get_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult<VmValu
     }
 }
 
-pub fn get_property_maybe(obj: VmValue, key: &str, heap: &mut Heap) -> VmValue {
+pub(crate) fn get_property_maybe(obj: VmValue, key: &str, heap: &mut Heap) -> VmValue {
     get_property(obj, key, heap).unwrap_or(VmValue::null())
 }
 
-pub fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Heap) -> VmResult<()> {
+pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Heap) -> VmResult<()> {
     if !obj.is_heap() {
         return Err(RuntimeError::new(format!(
             "cannot set property '{}' on primitive",
@@ -117,7 +117,7 @@ pub fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Heap) -> V
 }
 
 #[inline(always)]
-pub fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
         let idx = obj.as_heap_idx();
 
@@ -163,7 +163,7 @@ pub fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmResult<V
 }
 
 #[inline(always)]
-pub fn set_fixed_field(obj: VmValue, slot: usize, val: VmValue, heap: &mut Heap) -> VmResult<()> {
+pub(crate) fn set_fixed_field(obj: VmValue, slot: usize, val: VmValue, heap: &mut Heap) -> VmResult<()> {
     if obj.is_heap() {
         let heap_idx = obj.as_heap_idx();
 
@@ -391,7 +391,7 @@ fn generator_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, 
     gen.0.next(input).map(|v| ctx.intern(v))
 }
 
-pub fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
+pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
     // Fast path for heap types whose class is fixed by their type: avoid
     // `heap.extract`, which deep-clones the contents. This is on the property-
     // access IC hot path, so cloning made every `arr.length` / array property
@@ -410,7 +410,7 @@ pub fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
     get_class_for_value(&v, heap)
 }
 
-pub fn bind_method_to_receiver(
+pub(crate) fn bind_method_to_receiver(
     receiver: Value,
     method: Value,
     _owner: Option<Rc<ClassObj>>,

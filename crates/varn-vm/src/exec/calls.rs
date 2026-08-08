@@ -1,6 +1,7 @@
 use crate::error::{RuntimeError, VmResult};
 use crate::exec::ExecCtx;
-use crate::frame::{CallFrame, VmClosure, VmClosurePayload, VmUpvalue};
+use crate::frame::CallFrame;
+use crate::closure::{VmClosure, VmClosurePayload, VmUpvalue};
 use crate::globals::GlobalStore;
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
@@ -11,7 +12,7 @@ use varn_types::value::BoundMethodTarget;
 use varn_types::value::LazyTask;
 use varn_types::{FunctionProto, Literal, PoolEntry, Value, VmArray};
 
-pub fn resolve_constants(proto: &FunctionProto, heap: &mut Heap) -> Vec<VmValue> {
+pub(crate) fn resolve_constants(proto: &FunctionProto, heap: &mut Heap) -> Vec<VmValue> {
     proto
         .chunk
         .constants
@@ -45,7 +46,7 @@ pub fn resolve_constants(proto: &FunctionProto, heap: &mut Heap) -> Vec<VmValue>
         .collect()
 }
 
-pub fn build_closure(
+pub(crate) fn build_closure(
     proto: Rc<FunctionProto>,
     heap: &mut Heap,
     settings: crate::settings::ExecSettings,
@@ -55,7 +56,7 @@ pub fn build_closure(
 }
 
 #[inline(always)]
-pub fn try_prepare_call_fast(
+pub(crate) fn try_prepare_call_fast(
     callee_nv: VmValue,
     arg_count: usize,
     stack: &[VmValue],
@@ -105,7 +106,7 @@ pub fn try_prepare_call_fast(
     }
 }
 
-pub fn prepare_call(
+pub(crate) fn prepare_call(
     callee_nv: VmValue,
     arg_count: usize,
     stack: &mut Vec<VmValue>,

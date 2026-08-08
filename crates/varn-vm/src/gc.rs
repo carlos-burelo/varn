@@ -35,7 +35,7 @@ pub struct MarkBitmap {
 }
 
 impl MarkBitmap {
-    pub fn new(capacity: u32) -> Self {
+    pub(crate) fn new(capacity: u32) -> Self {
         let bytes_needed = ((capacity as usize * 2) + 7) / 8;
         Self {
             bitmap: vec![0u8; bytes_needed],
@@ -43,7 +43,7 @@ impl MarkBitmap {
     }
 
     #[inline]
-    pub fn set_color(&mut self, idx: u32, color: MarkColor) {
+    pub(crate) fn set_color(&mut self, idx: u32, color: MarkColor) {
         let color_val = color as u8;
         let bit_idx = (idx as usize) * 2;
         let byte_idx = bit_idx / 8;
@@ -59,7 +59,7 @@ impl MarkBitmap {
     }
 
     #[inline]
-    pub fn get_color(&self, idx: u32) -> MarkColor {
+    pub(crate) fn get_color(&self, idx: u32) -> MarkColor {
         let bit_idx = (idx as usize) * 2;
         let byte_idx = bit_idx / 8;
         let bit_offset = bit_idx % 8;
@@ -79,7 +79,7 @@ impl MarkBitmap {
         }
     }
 
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.bitmap.iter_mut().for_each(|b| *b = 0);
     }
 }
@@ -92,7 +92,7 @@ pub struct TricolorMarker {
 }
 
 impl TricolorMarker {
-    pub fn new(heap_capacity: u32) -> Self {
+    pub(crate) fn new(heap_capacity: u32) -> Self {
         Self {
             marks: MarkBitmap::new(heap_capacity),
             gray_queue: VecDeque::new(),
@@ -100,7 +100,7 @@ impl TricolorMarker {
         }
     }
 
-    pub fn mark_gray(&mut self, idx: u32) {
+    pub(crate) fn mark_gray(&mut self, idx: u32) {
         let raw = if is_old_idx(idx) {
             old_idx_raw(idx)
         } else {
@@ -114,44 +114,33 @@ impl TricolorMarker {
         }
     }
 
-    pub fn mark_black(&mut self, idx: u32) {
+    pub(crate) fn mark_black(&mut self, idx: u32) {
         self.marks.set_color(idx, MarkColor::Black);
     }
 
-    pub fn get_color(&self, idx: u32) -> MarkColor {
+    pub(crate) fn get_color(&self, idx: u32) -> MarkColor {
         self.marks.get_color(idx)
     }
 
-    pub fn is_marked(&self, idx: u32) -> bool {
-        let color = self.marks.get_color(idx);
-        color == MarkColor::Gray || color == MarkColor::Black
-    }
-
-    pub fn marked_count(&self) -> usize {
+    /// Marker state, read only by the invariant tests below — the production
+    /// paths reach `marked_count`/`gray_queue` as fields.
+    #[cfg(test)]
+    pub(crate) fn marked_count(&self) -> usize {
         self.marked_count
     }
 
-    pub fn gray_queue_size(&self) -> usize {
+    #[cfg(test)]
+    pub(crate) fn gray_queue_size(&self) -> usize {
         self.gray_queue.len()
     }
 
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.marks.clear();
         self.gray_queue.clear();
         self.marked_count = 0;
     }
 
-    pub fn process_gray_step(&mut self, heap: &HeapInner) -> Result<bool, GcError> {
-        if let Some(idx) = self.gray_queue.pop_front() {
-            self.mark_children(heap, idx)?;
-            self.mark_black(idx);
-            Ok(!self.gray_queue.is_empty())
-        } else {
-            Ok(false)
-        }
-    }
-
-    pub fn mark_from_roots(&mut self, heap: &HeapInner, roots: &[u32]) -> Result<(), GcError> {
+    pub(crate) fn mark_from_roots(&mut self, heap: &HeapInner, roots: &[u32]) -> Result<(), GcError> {
         for &root in roots {
             if is_old_idx(root) {
                 let raw = old_idx_raw(root);
@@ -351,20 +340,20 @@ pub struct GcCollector {
 }
 
 impl GcCollector {
-    pub fn new(heap_capacity: u32) -> Self {
+    pub(crate) fn new(heap_capacity: u32) -> Self {
         Self {
             marker: TricolorMarker::new(heap_capacity),
             swept_count: 0,
         }
     }
 
-    pub fn mark_phase(&mut self, heap: &HeapInner, roots: &[u32]) -> Result<(), GcError> {
+    pub(crate) fn mark_phase(&mut self, heap: &HeapInner, roots: &[u32]) -> Result<(), GcError> {
         self.marker.clear();
         self.marker.mark_from_roots(heap, roots)?;
         Ok(())
     }
 
-    pub fn sweep_phase(&mut self, heap: &mut HeapInner) -> Result<usize, GcError> {
+    pub(crate) fn sweep_phase(&mut self, heap: &mut HeapInner) -> Result<usize, GcError> {
         self.swept_count = 0;
         let mut freed = 0;
 
@@ -383,23 +372,12 @@ impl GcCollector {
         Ok(freed)
     }
 
-    pub fn collect(&mut self, heap: &mut HeapInner, roots: &[u32]) -> Result<usize, GcError> {
+    pub(crate) fn collect(&mut self, heap: &mut HeapInner, roots: &[u32]) -> Result<usize, GcError> {
         self.mark_phase(heap, roots)?;
         let swept = self.sweep_phase(heap)?;
         Ok(swept)
     }
 
-    pub fn incremental_mark_step(&mut self, heap: &HeapInner) -> Result<bool, GcError> {
-        self.marker.process_gray_step(heap)
-    }
-
-    pub fn marked_count(&self) -> usize {
-        self.marker.marked_count()
-    }
-
-    pub fn swept_count(&self) -> usize {
-        self.swept_count
-    }
 }
 
 #[cfg(test)]

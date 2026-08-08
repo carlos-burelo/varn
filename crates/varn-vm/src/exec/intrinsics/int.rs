@@ -27,7 +27,7 @@ fn format_i64(mut n: i64, buf: &mut [u8; 20]) -> &str {
     unsafe { std::str::from_utf8_unchecked(&buf[i..]) }
 }
 
-pub fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<VmValue> {
     let recv = args
         .first()
         .copied()

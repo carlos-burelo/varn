@@ -2,7 +2,7 @@ use std::collections::hash_map::Entry;
 use std::rc::Rc;
 use std::sync::Arc;
 use crate::error::{RuntimeError, VmResult};
-use crate::frame::{VmClosure, VmClosurePayload, VmValueRef};
+use crate::closure::{VmClosure, VmClosurePayload, VmValueRef};
 use crate::nursery::{is_nursery_idx, old_idx_raw, pack_old_idx};
 use crate::value::VmValue;
 use varn_types::{
@@ -39,11 +39,11 @@ pub(super) fn alloc_into(
 
 impl HeapInner {
     #[inline]
-    pub fn alloc_native_fn(&mut self, f: NativeFn, name: &'static str) -> VmValue {
+    pub(crate) fn alloc_native_fn(&mut self, f: NativeFn, name: &'static str) -> VmValue {
         VmValue::from_heap_idx(self.alloc(HeapObj::NativeFn(name, f)))
     }
 
-    pub fn alloc(&mut self, obj: HeapObj) -> u32 {
+    pub(crate) fn alloc(&mut self, obj: HeapObj) -> u32 {
         if let Some(h) = &self.hotspot {
             h.borrow_mut().record_alloc(obj.tag().name());
         }
@@ -85,7 +85,7 @@ impl HeapInner {
         pack_old_idx(raw)
     }
 
-    pub fn alloc_raw(&mut self, obj: HeapObj) -> u32 {
+    pub(crate) fn alloc_raw(&mut self, obj: HeapObj) -> u32 {
         self.alloc_count += 1;
         let track = Self::needs_minor_scan(&obj);
         let identity = Self::identity_key(&obj);
@@ -107,7 +107,7 @@ impl HeapInner {
     }
 
     #[inline(always)]
-    pub fn get_by_idx(&self, idx: u32) -> Option<&HeapObj> {
+    pub(crate) fn get_by_idx(&self, idx: u32) -> Option<&HeapObj> {
         if is_nursery_idx(idx) {
             self.nursery.get(idx)
         } else {
@@ -116,7 +116,7 @@ impl HeapInner {
     }
 
     #[inline(always)]
-    pub fn get_by_idx_mut(&mut self, idx: u32) -> Option<&mut HeapObj> {
+    pub(crate) fn get_by_idx_mut(&mut self, idx: u32) -> Option<&mut HeapObj> {
         if is_nursery_idx(idx) {
             self.nursery.get_mut(idx)
         } else {
@@ -125,12 +125,12 @@ impl HeapInner {
     }
 
     #[inline(always)]
-    pub fn get(&self, idx: u32) -> Option<&HeapObj> {
+    pub(crate) fn get(&self, idx: u32) -> Option<&HeapObj> {
         self.get_by_idx(idx)
     }
 
     #[inline(always)]
-    pub fn get_closure(&self, idx: u32) -> Option<&VmClosure> {
+    pub(crate) fn get_closure(&self, idx: u32) -> Option<&VmClosure> {
         let obj = if is_nursery_idx(idx) {
             self.nursery.get(idx)?
         } else {
@@ -143,27 +143,17 @@ impl HeapInner {
     }
 
     #[inline(always)]
-    pub fn get_or_panic(&self, idx: u32) -> &HeapObj {
-        self.get_by_idx(idx).expect("invalid heap index")
-    }
-
-    #[inline(always)]
-    pub fn get_mut(&mut self, idx: u32) -> Option<&mut HeapObj> {
+    pub(crate) fn get_mut(&mut self, idx: u32) -> Option<&mut HeapObj> {
         self.get_by_idx_mut(idx)
     }
 
     #[inline(always)]
-    pub unsafe fn get_mut_unchecked(&mut self, idx: u32) -> &mut HeapObj {
-        self.get_by_idx_mut(idx).expect("invalid heap index")
-    }
-
-    #[inline(always)]
-    pub fn get_raw(&self, raw_old_idx: u32) -> Option<&HeapObj> {
+    pub(crate) fn get_raw(&self, raw_old_idx: u32) -> Option<&HeapObj> {
         self.objects.get(raw_old_idx as usize)?.as_ref()
     }
 
     #[inline(always)]
-    pub fn get_raw_mut(&mut self, raw_old_idx: u32) -> Option<&mut HeapObj> {
+    pub(crate) fn get_raw_mut(&mut self, raw_old_idx: u32) -> Option<&mut HeapObj> {
         self.objects.get_mut(raw_old_idx as usize)?.as_mut()
     }
 
@@ -277,7 +267,7 @@ impl HeapInner {
     }
 
     #[track_caller]
-    pub fn extract(&self, nv: VmValue) -> Value {
+    pub(crate) fn extract(&self, nv: VmValue) -> Value {
         match self.extract_val(nv) {
             Ok(v) => v,
             Err(e) => {
@@ -300,7 +290,7 @@ impl HeapInner {
         }
     }
 
-    pub fn extract_val(&self, nv: VmValue) -> VmResult<Value> {
+    pub(crate) fn extract_val(&self, nv: VmValue) -> VmResult<Value> {
         if nv.is_null() {
             return Ok(Value::Null);
         }
@@ -357,12 +347,12 @@ impl HeapInner {
         Ok(Value::Null)
     }
 
-    pub fn alloc_vm_buffer(&mut self, buf: varn_types::VmBuffer) -> VmValue {
+    pub(crate) fn alloc_vm_buffer(&mut self, buf: varn_types::VmBuffer) -> VmValue {
         let idx = self.alloc(HeapObj::Buffer(buf));
         VmValue::from_heap_idx(idx)
     }
 
-    pub fn alloc_str(&mut self, s: impl AsRef<str>) -> VmValue {
+    pub(crate) fn alloc_str(&mut self, s: impl AsRef<str>) -> VmValue {
         let s_ref = s.as_ref();
         if let Some(sso) = VmValue::try_from_sso(s_ref) {
             return sso;
@@ -403,7 +393,7 @@ impl HeapInner {
         VmValue::from_heap_idx(idx)
     }
 
-    pub fn alloc_str_interned(&mut self, s: impl AsRef<str>) -> VmValue {
+    pub(crate) fn alloc_str_interned(&mut self, s: impl AsRef<str>) -> VmValue {
         let s_ref = s.as_ref();
         if let Some(sso) = VmValue::try_from_sso(s_ref) {
             return sso;
@@ -433,7 +423,7 @@ impl HeapInner {
         VmValue::from_heap_idx(packed)
     }
 
-    pub fn alloc_str_dynamic(&mut self, s: impl AsRef<str>) -> VmValue {
+    pub(crate) fn alloc_str_dynamic(&mut self, s: impl AsRef<str>) -> VmValue {
         let s_ref = s.as_ref();
         if let Some(sso) = VmValue::try_from_sso(s_ref) {
             return sso;
@@ -456,7 +446,7 @@ impl HeapInner {
         VmValue::from_heap_idx(idx)
     }
 
-    pub fn alloc_substring(&mut self, handle: &HeapStr, bs: usize, be: usize) -> VmValue {
+    pub(crate) fn alloc_substring(&mut self, handle: &HeapStr, bs: usize, be: usize) -> VmValue {
         let sub = &handle.as_str()[bs..be];
         if let Some(sso) = VmValue::try_from_sso(sub) {
             return sso;
@@ -483,7 +473,7 @@ impl HeapInner {
         self.alloc_str_dynamic(sub)
     }
 
-    pub fn alloc_str_view(&mut self, hs: HeapStr) -> VmValue {
+    pub(crate) fn alloc_str_view(&mut self, hs: HeapStr) -> VmValue {
         let idx = match self.nursery.try_alloc(HeapObj::Str(hs)) {
             Ok(ni) => ni,
             Err(obj) => pack_old_idx(alloc_into(
@@ -497,7 +487,7 @@ impl HeapInner {
         VmValue::from_heap_idx(idx)
     }
 
-    pub fn alloc_symbol(&mut self, s: RuntimeSymbol) -> VmValue {
+    pub(crate) fn alloc_symbol(&mut self, s: RuntimeSymbol) -> VmValue {
         let packed = match self.symbol_interner.entry(s.clone()) {
             Entry::Occupied(e) => *e.get(),
             Entry::Vacant(e) => {
@@ -514,27 +504,27 @@ impl HeapInner {
         VmValue::from_heap_idx(packed)
     }
 
-    pub fn alloc_array_vm(&mut self, items: Vec<VmValue>) -> VmValue {
+    pub(crate) fn alloc_array_vm(&mut self, items: Vec<VmValue>) -> VmValue {
         let va = VmArray::from_items(items);
         VmValue::from_heap_idx(self.alloc(HeapObj::Array(va)))
     }
 
-    pub fn alloc_tuple_vm(&mut self, items: Vec<VmValue>) -> VmValue {
+    pub(crate) fn alloc_tuple_vm(&mut self, items: Vec<VmValue>) -> VmValue {
         let va = VmArray::from_items(items);
         VmValue::from_heap_idx(self.alloc(HeapObj::Tuple(va)))
     }
 
-    pub fn alloc_array(&mut self, items: Vec<Value>) -> VmValue {
+    pub(crate) fn alloc_array(&mut self, items: Vec<Value>) -> VmValue {
         let vm_items: Vec<VmValue> = items.into_iter().map(|v| self.intern(v)).collect();
         self.alloc_array_vm(vm_items)
     }
 
-    pub fn alloc_object(&mut self) -> VmValue {
+    pub(crate) fn alloc_object(&mut self) -> VmValue {
         let oref = ObjRef::empty();
         VmValue::from_heap_idx(self.alloc(HeapObj::Object(oref)))
     }
 
-    pub fn alloc_object_with_shape(
+    pub(crate) fn alloc_object_with_shape(
         &mut self,
         shape: &Rc<varn_types::Shape>,
         values: Vec<VmValue>,
@@ -543,7 +533,7 @@ impl HeapInner {
         VmValue::from_heap_idx(self.alloc(HeapObj::Object(oref)))
     }
 
-    pub fn alloc_record_with_shape(
+    pub(crate) fn alloc_record_with_shape(
         &mut self,
         shape: &Rc<varn_types::Shape>,
         values: Vec<VmValue>,
@@ -552,11 +542,11 @@ impl HeapInner {
         VmValue::from_heap_idx(self.alloc(HeapObj::Record(oref)))
     }
     
-    pub fn make_int(&mut self, n: i64) -> VmValue {
+    pub(crate) fn make_int(&mut self, n: i64) -> VmValue {
         VmValue::from_int(n)
     }
 
-    pub fn lookup_str_map_key(&self, s: &str) -> Option<MapKey> {
+    pub(crate) fn lookup_str_map_key(&self, s: &str) -> Option<MapKey> {
         if let Some(sso) = VmValue::try_from_sso(s) {
             return Some(MapKey(sso));
         }
@@ -565,7 +555,7 @@ impl HeapInner {
             .map(|&packed| MapKey(VmValue::from_heap_idx(packed)))
     }
 
-    pub fn lookup_map_key(&self, v: VmValue) -> Option<MapKey> {
+    pub(crate) fn lookup_map_key(&self, v: VmValue) -> Option<MapKey> {
         if v.is_f64() {
             if v.as_f64() == 0.0 {
                 return Some(MapKey(VmValue::from_f64(0.0)));
@@ -593,7 +583,7 @@ impl HeapInner {
         }
     }
 
-    pub fn canonical_map_key(&mut self, v: VmValue) -> MapKey {
+    pub(crate) fn canonical_map_key(&mut self, v: VmValue) -> MapKey {
         if v.is_f64() {
             if v.as_f64() == 0.0 {
                 return MapKey(VmValue::from_f64(0.0));
@@ -626,7 +616,7 @@ impl HeapInner {
         }
     }
 
-    pub fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue {
+    pub(crate) fn alloc_range(&mut self, start: i64, end: i64, inclusive: bool) -> VmValue {
         let r = RangeData {
             start,
             end,
@@ -636,11 +626,11 @@ impl HeapInner {
         VmValue::from_heap_idx(self.alloc(HeapObj::Range(r)))
     }
 
-    pub fn alloc_decimal(&mut self, d: rust_decimal::Decimal) -> VmValue {
+    pub(crate) fn alloc_decimal(&mut self, d: rust_decimal::Decimal) -> VmValue {
         VmValue::from_heap_idx(self.alloc(HeapObj::Decimal(Box::new(d))))
     }
 
-    pub fn alloc_vm_closure(&mut self, c: Rc<VmClosure>) -> VmValue {
+    pub(crate) fn alloc_vm_closure(&mut self, c: Rc<VmClosure>) -> VmValue {
         VmValue::from_heap_idx(self.alloc(HeapObj::VmClosure(c)))
     }
 
@@ -648,11 +638,11 @@ impl HeapInner {
         VmValue::from_heap_idx(self.alloc(HeapObj::Module(m)))
     }
 
-    pub fn alloc_frozen_module(&mut self, m: Arc<FrozenModuleObj>) -> VmValue {
+    pub(crate) fn alloc_frozen_module(&mut self, m: Arc<FrozenModuleObj>) -> VmValue {
         VmValue::from_heap_idx(self.alloc(HeapObj::FrozenModule(m)))
     }
 
-    pub fn str_val(&self, nv: VmValue) -> Option<RuntimeString> {
+    pub(crate) fn str_val(&self, nv: VmValue) -> Option<RuntimeString> {
         if nv.is_sso() {
             let mut buf = [0u8; 5];
             let s = nv.sso_as_str(&mut buf);
@@ -667,7 +657,7 @@ impl HeapInner {
         None
     }
 
-    pub fn is_string(&self, nv: VmValue) -> bool {
+    pub(crate) fn is_string(&self, nv: VmValue) -> bool {
         if nv.is_sso() {
             return true;
         }
@@ -677,7 +667,7 @@ impl HeapInner {
         false
     }
 
-    pub fn str_owned(&self, nv: VmValue) -> Option<String> {
+    pub(crate) fn str_owned(&self, nv: VmValue) -> Option<String> {
         if nv.is_sso() {
             let mut buf = [0u8; 5];
             let s = nv.sso_as_str(&mut buf);
@@ -691,7 +681,7 @@ impl HeapInner {
         None
     }
 
-    pub fn str_repr_borrowed<'a>(&'a self, nv: VmValue) -> std::borrow::Cow<'a, str> {
+    pub(crate) fn str_repr_borrowed<'a>(&'a self, nv: VmValue) -> std::borrow::Cow<'a, str> {
         if nv.is_heap() {
             if let Some(HeapObj::Str(s)) = self.get_by_idx(nv.as_heap_idx()) {
                 return std::borrow::Cow::Borrowed(s.as_ref());
@@ -700,7 +690,7 @@ impl HeapInner {
         std::borrow::Cow::Owned(self.str_repr(nv))
     }
 
-    pub fn str_repr_into<W: std::fmt::Write>(&self, nv: VmValue, out: &mut W) {
+    pub(crate) fn str_repr_into<W: std::fmt::Write>(&self, nv: VmValue, out: &mut W) {
         use crate::strbuf::{itoa, INT_MAX_DIGITS};
         if nv.is_null() {
             let _ = out.write_str("null");
@@ -731,7 +721,7 @@ impl HeapInner {
         }
     }
 
-    pub fn str_repr(&self, nv: VmValue) -> String {
+    pub(crate) fn str_repr(&self, nv: VmValue) -> String {
         if nv.is_null() {
             return "null".into();
         }
@@ -783,7 +773,7 @@ impl HeapInner {
         "null".into()
     }
 
-    pub fn get_heap_idx(&self, val: VmValue) -> Option<u32> {
+    pub(crate) fn get_heap_idx(&self, val: VmValue) -> Option<u32> {
         if val.is_heap() {
             Some(val.as_heap_idx())
         } else {
@@ -791,7 +781,7 @@ impl HeapInner {
         }
     }
 
-    pub fn value_heap_idx(&self, val: &varn_types::Value) -> Option<u32> {
+    pub(crate) fn value_heap_idx(&self, val: &varn_types::Value) -> Option<u32> {
         match val {
             varn_types::Value::Str(s) => self.string_interner.get(s).copied(),
             varn_types::Value::Array(a) => self.array_interner.get(a).copied(),

@@ -57,7 +57,7 @@ impl Drop for HeapInner {
 }
 
 impl HeapInner {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             jit_epoch: crate::clif_link::next_epoch(),
             jit_ancestry: Vec::new(),
@@ -110,17 +110,17 @@ impl HeapInner {
         )
     }
 
-    pub fn scan_roots(&self) -> &[u32] {
+    pub(crate) fn scan_roots(&self) -> &[u32] {
         &self.scan_roots
     }
 
     #[inline(always)]
-    pub fn is_int(&self, v: VmValue) -> bool {
+    pub(crate) fn is_int(&self, v: VmValue) -> bool {
         v.is_int()
     }
 
     #[inline(always)]
-    pub fn as_int(&self, v: VmValue) -> i64 {
+    pub(crate) fn as_int(&self, v: VmValue) -> i64 {
         if v.is_int() {
             v.as_int()
         } else {
@@ -129,7 +129,7 @@ impl HeapInner {
     }
 
     #[inline(always)]
-    pub fn to_f64_val(&self, v: VmValue) -> f64 {
+    pub(crate) fn to_f64_val(&self, v: VmValue) -> f64 {
         if v.is_f64() {
             v.as_f64()
         } else if v.is_int() {
@@ -139,31 +139,31 @@ impl HeapInner {
         }
     }
 
-    pub fn set_intrinsic_class(&mut self, name: &str, cls: Rc<ClassObj>) {
+    pub(crate) fn set_intrinsic_class(&mut self, name: &str, cls: Rc<ClassObj>) {
         self.intrinsic_classes.insert(name.to_string(), cls);
     }
 
-    pub fn get_intrinsic_class(&self, name: &str) -> Option<Rc<ClassObj>> {
+    pub(crate) fn get_intrinsic_class(&self, name: &str) -> Option<Rc<ClassObj>> {
         self.intrinsic_classes.get(name).cloned()
     }
 
-    pub fn objects_len(&self) -> u32 {
+    pub(crate) fn objects_len(&self) -> u32 {
         self.objects.len() as u32
     }
 
-    pub fn objects(&self) -> &Vec<Option<HeapObj>> {
+    pub(crate) fn objects(&self) -> &Vec<Option<HeapObj>> {
         &self.objects
     }
 
-    pub fn objects_mut(&mut self) -> &mut Vec<Option<HeapObj>> {
+    pub(crate) fn objects_mut(&mut self) -> &mut Vec<Option<HeapObj>> {
         &mut self.objects
     }
 
-    pub fn free_list_mut(&mut self) -> &mut Vec<u32> {
+    pub(crate) fn free_list_mut(&mut self) -> &mut Vec<u32> {
         &mut self.free
     }
 
-    pub fn identity_index(&self) -> &FxHashMap<usize, u32> {
+    pub(crate) fn identity_index(&self) -> &FxHashMap<usize, u32> {
         &self.identity_index
     }
 }
@@ -174,13 +174,13 @@ pub struct Heap {
 }
 
 impl Heap {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             inner: Rc::new(std::cell::UnsafeCell::new(HeapInner::new())),
         }
     }
 
-    pub fn deep_clone(&self) -> Self {
+    pub(crate) fn deep_clone(&self) -> Self {
         let mut inner_clone = unsafe { (*self.inner.get()).clone() };
         let parent = inner_clone.jit_epoch;
         inner_clone.jit_ancestry.push((parent, crate::clif_link::compile_serial()));
@@ -191,16 +191,16 @@ impl Heap {
     }
 
     #[inline(always)]
-    pub fn jit_epoch(&self) -> u64 {
+    pub(crate) fn jit_epoch(&self) -> u64 {
         unsafe { (*self.inner.get()).jit_epoch }
     }
 
-    pub fn jit_ancestry(&self) -> Vec<(u64, u64)> {
+    pub(crate) fn jit_ancestry(&self) -> Vec<(u64, u64)> {
         unsafe { (*self.inner.get()).jit_ancestry.clone() }
     }
 
     #[inline(always)]
-    pub unsafe fn inner_mut(&self) -> &mut HeapInner {
+    pub(crate) unsafe fn inner_mut(&self) -> &mut HeapInner {
         &mut *self.inner.get()
     }
 }

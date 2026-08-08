@@ -1,6 +1,6 @@
 use crate::error::VmResult;
 use crate::exec::ctx::ExecCtx;
-use crate::frame::VmClosure;
+use crate::closure::VmClosure;
 use crate::value::VmValue;
 use varn_core::OpCode;
 
@@ -69,7 +69,7 @@ impl ExecCtx {
                     })
                     .1
                     .clone();
-                let vm_closure = std::rc::Rc::new(crate::frame::VmClosure::with_upvalues(
+                let vm_closure = std::rc::Rc::new(crate::closure::VmClosure::with_upvalues(
                     proto.clone(),
                     upvalues,
                     constants,

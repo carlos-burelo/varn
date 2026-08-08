@@ -3,7 +3,7 @@ use crate::value::VmValue;
 use varn_types::Value;
 
 #[inline(always)]
-pub fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
+pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     if heap.is_int(a) && heap.is_int(b) {
         return heap.as_int(a) == heap.as_int(b);
     }
@@ -127,37 +127,11 @@ pub fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
 }
 
 #[inline(always)]
-pub fn neq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
+pub(crate) fn neq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     !eq(a, b, heap)
 }
 
-#[inline(always)]
-pub fn lt(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    if heap.is_int(a) && heap.is_int(b) {
-        return heap.as_int(a) < heap.as_int(b);
-    }
-    heap.to_f64_val(a) < heap.to_f64_val(b)
-}
-
-#[inline(always)]
-pub fn lte(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    if heap.is_int(a) && heap.is_int(b) {
-        return heap.as_int(a) <= heap.as_int(b);
-    }
-    heap.to_f64_val(a) <= heap.to_f64_val(b)
-}
-
-#[inline(always)]
-pub fn gt(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    lt(b, a, heap)
-}
-
-#[inline(always)]
-pub fn gte(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    lte(b, a, heap)
-}
-
-pub fn lt_heap(a: VmValue, b: VmValue, heap: &Heap) -> bool {
+pub(crate) fn lt_heap(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     if heap.is_int(a) && heap.is_int(b) {
         return heap.as_int(a) < heap.as_int(b);
     }
@@ -195,18 +169,18 @@ pub fn lt_heap(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     heap.to_f64_val(a) < heap.to_f64_val(b)
 }
 
-pub fn lte_heap(a: VmValue, b: VmValue, heap: &Heap) -> bool {
+pub(crate) fn lte_heap(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     if heap.is_int(a) && heap.is_int(b) {
         return heap.as_int(a) <= heap.as_int(b);
     }
     !gt_heap(a, b, heap)
 }
 
-pub fn gt_heap(a: VmValue, b: VmValue, heap: &Heap) -> bool {
+pub(crate) fn gt_heap(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     lt_heap(b, a, heap)
 }
 
-pub fn gte_heap(a: VmValue, b: VmValue, heap: &Heap) -> bool {
+pub(crate) fn gte_heap(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     if heap.is_int(a) && heap.is_int(b) {
         return heap.as_int(a) >= heap.as_int(b);
     }
@@ -214,56 +188,7 @@ pub fn gte_heap(a: VmValue, b: VmValue, heap: &Heap) -> bool {
 }
 
 #[inline(always)]
-pub fn logical_not(a: VmValue) -> VmValue {
+pub(crate) fn logical_not(a: VmValue) -> VmValue {
     VmValue::from_bool(!a.is_truthy())
 }
 
-#[inline(always)]
-pub fn eq_i32(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    heap.as_int(a) == heap.as_int(b)
-}
-#[inline(always)]
-pub fn neq_i32(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    heap.as_int(a) != heap.as_int(b)
-}
-#[inline(always)]
-pub fn lt_i32(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    heap.as_int(a) < heap.as_int(b)
-}
-#[inline(always)]
-pub fn lte_i32(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    heap.as_int(a) <= heap.as_int(b)
-}
-#[inline(always)]
-pub fn gt_i32(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    heap.as_int(a) > heap.as_int(b)
-}
-#[inline(always)]
-pub fn gte_i32(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    heap.as_int(a) >= heap.as_int(b)
-}
-
-#[inline(always)]
-pub fn eq_f64(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    heap.to_f64_val(a) == heap.to_f64_val(b)
-}
-#[inline(always)]
-pub fn neq_f64(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    heap.to_f64_val(a) != heap.to_f64_val(b)
-}
-#[inline(always)]
-pub fn lt_f64(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    heap.to_f64_val(a) < heap.to_f64_val(b)
-}
-#[inline(always)]
-pub fn lte_f64(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    heap.to_f64_val(a) <= heap.to_f64_val(b)
-}
-#[inline(always)]
-pub fn gt_f64(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    heap.to_f64_val(a) > heap.to_f64_val(b)
-}
-#[inline(always)]
-pub fn gte_f64(a: VmValue, b: VmValue, heap: &Heap) -> bool {
-    heap.to_f64_val(a) >= heap.to_f64_val(b)
-}

@@ -12,7 +12,7 @@ pub struct GlobalStore {
 }
 
 impl GlobalStore {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             values: Vec::new(),
             names: FxHashMap::default(),
@@ -20,7 +20,7 @@ impl GlobalStore {
         }
     }
 
-    pub fn with_native_layout(heap: &mut Heap) -> Self {
+    pub(crate) fn with_native_layout(heap: &mut Heap) -> Self {
         let native_map = varn_builtins::dispatch::register_globals_vm(heap);
 
         let mut values = Vec::new();
@@ -55,7 +55,7 @@ impl GlobalStore {
         }
     }
 
-    pub fn define(&mut self, name: &str, value: VmValue) -> usize {
+    pub(crate) fn define(&mut self, name: &str, value: VmValue) -> usize {
         if let Some(&idx) = self.names.get(name) {
             self.values[idx] = value;
             return idx;
@@ -68,7 +68,7 @@ impl GlobalStore {
         idx
     }
 
-    pub fn set_by_name(&mut self, name: &str, value: VmValue) -> bool {
+    pub(crate) fn set_by_name(&mut self, name: &str, value: VmValue) -> bool {
         if let Some(&idx) = self.names.get(name) {
             self.values[idx] = value;
             return true;
@@ -77,25 +77,25 @@ impl GlobalStore {
     }
 
     #[inline(always)]
-    pub fn set_by_index(&mut self, idx: usize, value: VmValue) {
+    pub(crate) fn set_by_index(&mut self, idx: usize, value: VmValue) {
         if idx >= self.values.len() {
             self.values.resize(idx + 1, VmValue::null());
         }
         self.values[idx] = value;
     }
 
-    pub fn get_by_name(&self, name: &str) -> Option<VmValue> {
+    pub(crate) fn get_by_name(&self, name: &str) -> Option<VmValue> {
         let idx = *self.names.get(name)?;
         Some(self.values[idx])
     }
 
     #[inline(always)]
-    pub fn get_by_index(&self, idx: usize) -> Option<VmValue> {
+    pub(crate) fn get_by_index(&self, idx: usize) -> Option<VmValue> {
         self.values.get(idx).copied()
     }
 
     #[inline(always)]
-    pub fn get_by_index_unchecked(&self, idx: usize) -> VmValue {
+    pub(crate) fn get_by_index_unchecked(&self, idx: usize) -> VmValue {
         debug_assert!(
             idx < self.values.len(),
             "global index OOB: {idx} >= {}",
@@ -105,7 +105,7 @@ impl GlobalStore {
     }
 
     #[inline(always)]
-    pub fn set_by_index_unchecked(&mut self, idx: usize, value: VmValue) {
+    pub(crate) fn set_by_index_unchecked(&mut self, idx: usize, value: VmValue) {
         debug_assert!(
             idx < self.values.len(),
             "global index OOB: {idx} >= {}",
@@ -116,13 +116,10 @@ impl GlobalStore {
         }
     }
 
-    pub fn resolve_index(&self, name: &str) -> Option<usize> {
+    pub(crate) fn resolve_index(&self, name: &str) -> Option<usize> {
         self.names.get(name).copied()
     }
 
-    pub fn len(&self) -> usize {
-        self.values.len()
-    }
 }
 
 impl Default for GlobalStore {

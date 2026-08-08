@@ -33,7 +33,7 @@ impl HeapInner {
     /// re-render both operands into a `StrBuf` from scratch. Non-ASCII bytes
     /// can never be SSO (`try_from_sso` refuses anything over 127) and fall
     /// through to the heap-inline representation below instead.
-    pub fn alloc_str_concat_inline(&mut self, a: VmValue, b: VmValue) -> Option<VmValue> {
+    pub(crate) fn alloc_str_concat_inline(&mut self, a: VmValue, b: VmValue) -> Option<VmValue> {
         use crate::strbuf::{itoa, INT_MAX_DIGITS};
 
         if !b.is_int() {

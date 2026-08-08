@@ -4,7 +4,7 @@ use crate::value::VmValue;
 use varn_types::Value;
 
 #[inline(always)]
-pub fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if heap.is_int(a) && heap.is_int(b) {
         let r = heap.as_int(a).wrapping_add(heap.as_int(b));
         return Ok(heap.make_int(r));
@@ -55,18 +55,7 @@ pub fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
 }
 
 #[inline(always)]
-pub fn add_i32(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
-    let r = heap.as_int(a).wrapping_add(heap.as_int(b));
-    heap.make_int(r)
-}
-
-#[inline(always)]
-pub fn add_f64(a: VmValue, b: VmValue, heap: &Heap) -> VmValue {
-    VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b))
-}
-
-#[inline(always)]
-pub fn sub(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn sub(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if heap.is_int(a) && heap.is_int(b) {
         let r = heap.as_int(a).wrapping_sub(heap.as_int(b));
         return Ok(heap.make_int(r));
@@ -91,18 +80,7 @@ pub fn sub(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
 }
 
 #[inline(always)]
-pub fn sub_i32(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
-    let r = heap.as_int(a).wrapping_sub(heap.as_int(b));
-    heap.make_int(r)
-}
-
-#[inline(always)]
-pub fn sub_f64(a: VmValue, b: VmValue, heap: &Heap) -> VmValue {
-    VmValue::from_f64(heap.to_f64_val(a) - heap.to_f64_val(b))
-}
-
-#[inline(always)]
-pub fn mul(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn mul(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if heap.is_int(a) && heap.is_int(b) {
         let r = heap.as_int(a).wrapping_mul(heap.as_int(b));
         return Ok(heap.make_int(r));
@@ -127,18 +105,7 @@ pub fn mul(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
 }
 
 #[inline(always)]
-pub fn mul_i32(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
-    let r = heap.as_int(a).wrapping_mul(heap.as_int(b));
-    heap.make_int(r)
-}
-
-#[inline(always)]
-pub fn mul_f64(a: VmValue, b: VmValue, heap: &Heap) -> VmValue {
-    VmValue::from_f64(heap.to_f64_val(a) * heap.to_f64_val(b))
-}
-
-#[inline(always)]
-pub fn div(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn div(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     {
         let av = heap.extract_val(a);
         let bv = heap.extract_val(b);
@@ -174,21 +141,7 @@ pub fn div(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
 }
 
 #[inline(always)]
-pub fn div_i32(a: VmValue, b: VmValue, heap: &Heap) -> VmResult<VmValue> {
-    let bv = heap.as_int(b);
-    if bv == 0 {
-        return Err(RuntimeError::new("division by zero"));
-    }
-    Ok(heap.extract(a).as_int().map(|av| VmValue::from_f64(av as f64 / bv as f64)).unwrap_or_else(VmValue::null))
-}
-
-#[inline(always)]
-pub fn div_f64(a: VmValue, b: VmValue, heap: &Heap) -> VmValue {
-    VmValue::from_f64(heap.to_f64_val(a) / heap.to_f64_val(b))
-}
-
-#[inline(always)]
-pub fn modulo(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn modulo(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     {
         let av = heap.extract_val(a);
         let bv = heap.extract_val(b);
@@ -223,7 +176,7 @@ pub fn modulo(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
 }
 
 #[inline(always)]
-pub fn pow(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn pow(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if heap.is_int(a) && heap.is_int(b) {
         let exp = heap.as_int(b);
         if exp < 0 {
@@ -237,7 +190,7 @@ pub fn pow(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
 }
 
 #[inline(always)]
-pub fn negate(a: VmValue, heap: &mut Heap) -> VmValue {
+pub(crate) fn negate(a: VmValue, heap: &mut Heap) -> VmValue {
     if heap.is_int(a) {
         let r = -heap.as_int(a);
         return heap.make_int(r);
@@ -252,37 +205,37 @@ pub fn negate(a: VmValue, heap: &mut Heap) -> VmValue {
 }
 
 #[inline(always)]
-pub fn bit_and(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+pub(crate) fn bit_and(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
     let r = heap.as_int(a) & heap.as_int(b);
     heap.make_int(r)
 }
 
 #[inline(always)]
-pub fn bit_or(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+pub(crate) fn bit_or(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
     let r = heap.as_int(a) | heap.as_int(b);
     heap.make_int(r)
 }
 
 #[inline(always)]
-pub fn bit_xor(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+pub(crate) fn bit_xor(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
     let r = heap.as_int(a) ^ heap.as_int(b);
     heap.make_int(r)
 }
 
 #[inline(always)]
-pub fn shl(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+pub(crate) fn shl(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
     let r = heap.as_int(a).wrapping_shl(heap.to_f64_val(b) as i32 as u32 & 63);
     heap.make_int(r)
 }
 
 #[inline(always)]
-pub fn shr(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+pub(crate) fn shr(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
     let r = heap.as_int(a).wrapping_shr(heap.to_f64_val(b) as i32 as u32 & 63);
     heap.make_int(r)
 }
 
 #[inline(always)]
-pub fn ushr(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+pub(crate) fn ushr(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
     let r = ((heap.as_int(a) as u64).wrapping_shr(heap.to_f64_val(b) as i32 as u32 & 63)) as i64;
     heap.make_int(r)
 }

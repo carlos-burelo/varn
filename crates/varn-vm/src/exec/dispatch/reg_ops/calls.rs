@@ -89,7 +89,7 @@ impl ExecCtx {
                     } => {
                         if let Some(nc_w) = method_closure
                             .as_any()
-                            .downcast_ref::<crate::frame::VmClosurePayload>()
+                            .downcast_ref::<crate::closure::VmClosurePayload>()
                         {
                             let nc = &nc_w.0;
                             let arity = nc.proto.arity;
@@ -141,7 +141,7 @@ impl ExecCtx {
                     varn_types::value::BoundMethodTarget::Vm { closure, .. } => {
                         if let Some(nc_w) = closure
                             .as_any()
-                            .downcast_ref::<crate::frame::VmClosurePayload>()
+                            .downcast_ref::<crate::closure::VmClosurePayload>()
                         {
                             arg_count == nc_w.0.proto.arity
                         } else {

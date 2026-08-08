@@ -109,7 +109,7 @@ fn alloc_sub(
     }
 }
 
-pub fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<VmValue> {
     let recv = args
         .first()
         .copied()

@@ -1,8 +1,10 @@
 pub mod clif_link;
+pub mod closure;
 pub mod error;
 pub mod exec;
 pub mod frame;
 pub mod gc;
+pub mod jit;
 pub mod generator;
 pub mod globals;
 pub mod heap;

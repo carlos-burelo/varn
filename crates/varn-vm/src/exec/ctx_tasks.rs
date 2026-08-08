@@ -1,6 +1,8 @@
 use std::rc::Rc;
 
-use crate::frame::{CallFrame, VmClosure, VmUpvalue};
+use crate::frame::CallFrame;
+
+use crate::closure::{VmClosure, VmUpvalue};
 use crate::value::VmValue;
 
 use super::ctx::ExecCtx;
@@ -14,7 +16,7 @@ impl ExecCtx {
     /// Like [`Self::wait_task_handle`] but preserves the rejection `Value`
     /// instead of stringifying it — required so typed payloads (e.g.
     /// `HostError`) survive to the await-resume hook (`host_values`).
-    pub fn wait_task_handle_value(
+    pub(crate) fn wait_task_handle_value(
         task: varn_types::AsyncTask,
     ) -> Result<varn_types::Value, varn_types::Value> {
         match task.peek_state() {
@@ -35,7 +37,7 @@ impl ExecCtx {
         }
     }
 
-    pub fn trace_event(
+    pub(crate) fn trace_event(
         &self,
         label: &str,
         frame_idx: usize,
@@ -206,15 +208,4 @@ impl ExecCtx {
         output
     }
 
-    pub fn exec_run_deferred(&mut self, handle: &varn_types::AsyncTask) {
-        let key = handle.ptr_key();
-        if let Some(lazy) = self.deferred_tasks.remove(&key) {
-            let resolved = self.run_lazy_task_sync(lazy.as_ref());
-            match resolved.peek_state() {
-                varn_types::task::TaskState::Resolved(v) => handle.resolve(v),
-                varn_types::task::TaskState::Rejected(v) => handle.reject(v),
-                varn_types::task::TaskState::Pending => {}
-            }
-        }
-    }
 }

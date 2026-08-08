@@ -22,7 +22,7 @@ impl Heap {
     /// directly in the heap slot), so the probe value below owns nothing that
     /// needs a matching drop or forget — it can be built, read through raw
     /// offsets, and dropped normally like any other plain data.
-    pub fn jit_str_layout() -> varn_jit::JitStrLayout {
+    pub(crate) fn jit_str_layout() -> varn_jit::JitStrLayout {
         let slot: Option<HeapObj> = Some(HeapObj::Str(HeapStr::Inline {
             len: 0,
             ascii: std::cell::Cell::new(ascii_flag::UNKNOWN),
@@ -96,7 +96,7 @@ impl Heap {
     /// inline allocation write path (`emit_nursery_alloc`). Validated against
     /// a live heap in `ExecCtx::new`, same as
     /// [`Heap::nursery_len_byte_offset_from_rcbox`](crate::heap::Heap::nursery_len_byte_offset_from_rcbox).
-    pub fn nursery_fwd_vec_byte_offset_from_rcbox() -> usize {
+    pub(crate) fn nursery_fwd_vec_byte_offset_from_rcbox() -> usize {
         2 * std::mem::size_of::<usize>()
             + std::mem::offset_of!(HeapInner, nursery)
             + crate::nursery::Nursery::forwarding_vec_byte_offset()
@@ -105,7 +105,7 @@ impl Heap {
     /// Byte offset from the `RcBox` pointer stored in `Heap.inner` to
     /// `Nursery::alloc_count`, for the JIT's inline allocation write path.
     /// Validated against a live heap in `ExecCtx::new`.
-    pub fn nursery_alloc_count_byte_offset_from_rcbox() -> usize {
+    pub(crate) fn nursery_alloc_count_byte_offset_from_rcbox() -> usize {
         2 * std::mem::size_of::<usize>()
             + std::mem::offset_of!(HeapInner, nursery)
             + std::mem::offset_of!(crate::nursery::Nursery, alloc_count)

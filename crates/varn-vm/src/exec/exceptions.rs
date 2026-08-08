@@ -4,7 +4,7 @@ use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use varn_core::{IntrinsicType, TypeTag};
 
-pub fn push_try(handlers: &mut Vec<TryHandler>, catch_ip: usize, frame_depth: usize, err_reg: u8) {
+pub(crate) fn push_try(handlers: &mut Vec<TryHandler>, catch_ip: usize, frame_depth: usize, err_reg: u8) {
     handlers.push(TryHandler {
         catch_ip,
         frame_depth,
@@ -12,22 +12,11 @@ pub fn push_try(handlers: &mut Vec<TryHandler>, catch_ip: usize, frame_depth: us
     });
 }
 
-pub fn pop_try(handlers: &mut Vec<TryHandler>) {
+pub(crate) fn pop_try(handlers: &mut Vec<TryHandler>) {
     handlers.pop();
 }
 
-pub fn dispatch_error(
-    handlers: &mut Vec<TryHandler>,
-    err: RuntimeError,
-) -> Result<(usize, usize, VmValue), RuntimeError> {
-    if let Some(handler) = handlers.pop() {
-        Ok((handler.catch_ip, handler.frame_depth, VmValue::null()))
-    } else {
-        Err(err)
-    }
-}
-
-pub fn collect_frames(frames: &[CallFrame]) -> Vec<FrameInfo> {
+pub(crate) fn collect_frames(frames: &[CallFrame]) -> Vec<FrameInfo> {
     frames
         .iter()
         .rev()
@@ -80,7 +69,7 @@ fn extract_error_message(val: VmValue, heap: &Heap) -> String {
     heap.str_repr(val)
 }
 
-pub fn build_thrown_error(val: VmValue, heap: &Heap, frames: &[CallFrame]) -> RuntimeError {
+pub(crate) fn build_thrown_error(val: VmValue, heap: &Heap, frames: &[CallFrame]) -> RuntimeError {
     let msg = extract_error_message(val, heap);
     let frame_infos = collect_frames(frames);
     RuntimeError {
