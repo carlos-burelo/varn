@@ -17,6 +17,7 @@
 
 use super::ExecCtx;
 use crate::closure::VmClosure;
+use crate::exec::frame_ctrl::resolve_constructor_return;
 use crate::error::{RuntimeError, VmResult};
 use crate::value::VmValue;
 
@@ -146,25 +147,7 @@ pub(super) unsafe fn run_compiled_frame(
     (*ctx).close_upvalues_above(frame.base);
     (*ctx).stack.truncate(frame.base);
 
-    let ctor_pos = if !(*ctx).pending_constructors.is_empty() {
-        (*ctx)
-            .pending_constructors
-            .iter()
-            .rposition(|(idx, _)| *idx == frame_idx)
-    } else {
-        None
-    };
-
-    let final_val = if let Some(pos) = ctor_pos {
-        let (_, instance_nv) = (*ctx).pending_constructors.remove(pos);
-        if res.is_null() {
-            instance_nv
-        } else {
-            res
-        }
-    } else {
-        res
-    };
+    let final_val = resolve_constructor_return(&mut *ctx, frame_idx, res);
 
     if let Some(return_reg) = frame.return_reg {
         let caller_base = (*ctx).frames.last().map(|f| f.base).unwrap_or(0);

@@ -2317,7 +2317,6 @@ version = "0.1.0"
 name = "varn-vm"
 version = "0.1.0"
 dependencies = [
- "parking_lot",
  "rust_decimal",
  "rustc-hash 1.1.0",
  "ryu",

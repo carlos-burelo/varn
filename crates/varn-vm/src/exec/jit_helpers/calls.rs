@@ -4,7 +4,8 @@
 //! the callee may be compiled, interpreted, native or bound, and the frame
 //! protocol has to come out identical either way.
 
-use super::construct::{jit_construct_fast, jit_propagate_error, resolve_constructor_return};
+use super::construct::{jit_construct_fast, jit_propagate_error};
+use crate::exec::frame_ctrl::resolve_constructor_return;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 

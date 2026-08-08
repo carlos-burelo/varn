@@ -755,24 +755,8 @@ impl ExecCtx {
             }
         }
 
-        let ctor_pos = if !self.pending_constructors.is_empty() {
-            self.pending_constructors
-                .iter()
-                .rposition(|(idx, _)| *idx == returning_frame_idx)
-        } else {
-            None
-        };
-
-        let final_val = if let Some(pos) = ctor_pos {
-            let (_, instance_nv) = self.pending_constructors.remove(pos);
-            if val.is_null() {
-                instance_nv
-            } else {
-                val
-            }
-        } else {
-            val
-        };
+        let final_val =
+            crate::exec::frame_ctrl::resolve_constructor_return(self, returning_frame_idx, val);
 
         if is_module_frame {
             let source_file = frame.closure().proto.chunk.source_file.to_string();

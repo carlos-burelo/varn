@@ -6,7 +6,8 @@
 //! `ExecCtx::jit_frame_prepushed` — read that before touching any of this.
 
 use super::calls::jit_guard_call_depth;
-use super::construct::{jit_propagate_error, resolve_constructor_return};
+use super::construct::jit_propagate_error;
+use crate::exec::frame_ctrl::resolve_constructor_return;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 

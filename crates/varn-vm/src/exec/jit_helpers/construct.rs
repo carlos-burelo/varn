@@ -21,32 +21,6 @@ pub(crate) unsafe fn jit_propagate_error(ctx: &mut ExecCtx, e: crate::error::Run
     panic!("JIT error: no jump buffer");
 }
 
-#[inline(always)]
-pub(super) fn resolve_constructor_return(
-    ctx: &mut ExecCtx,
-    returning_frame_idx: usize,
-    val: VmValue,
-) -> VmValue {
-    let ctor_pos = if !ctx.pending_constructors.is_empty() {
-        ctx.pending_constructors
-            .iter()
-            .rposition(|(idx, _)| *idx == returning_frame_idx)
-    } else {
-        None
-    };
-
-    if let Some(pos) = ctor_pos {
-        let (_, instance_nv) = ctx.pending_constructors.remove(pos);
-        if val.is_null() {
-            instance_nv
-        } else {
-            val
-        }
-    } else {
-        val
-    }
-}
-
 /// Fast `new Class(...)` from JIT code: allocates the instance and invokes a
 /// JIT-compiled constructor directly (JIT2JIT), skipping the interpreter
 /// prepare_call path. Returns None to fall back to the slow path (native

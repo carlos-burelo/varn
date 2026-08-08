@@ -10,6 +10,47 @@ use crate::error::{RuntimeError, VmResult};
 use crate::value::VmValue;
 use varn_types::NativeCtx;
 
+/// What a constructor frame's return actually yields.
+///
+/// A `constructor` returns the instance, not whatever its body returned —
+/// unless the body returned something non-null, which overrides it. The
+/// pending instance is found by frame index rather than by position, because
+/// a constructor can be re-entered (a ctor calling a ctor) and only the entry
+/// belonging to THIS frame may be consumed.
+///
+/// This is a language rule, not a tier detail, and it has THREE callers: the
+/// interpreter's `Return`, the exit of a compiled frame, and the JIT→JIT call
+/// fast path. It lived inline in all three, byte for byte. Changing it in one
+/// place and not the others is a tier-divergence bug — the interpreter and the
+/// compiled code would disagree about what `new X()` evaluates to — so it is
+/// written once here, where return sequencing lives, and called from all of
+/// them.
+pub(crate) fn resolve_constructor_return(
+    ctx: &mut ExecCtx,
+    returning_frame_idx: usize,
+    val: VmValue,
+) -> VmValue {
+    if ctx.pending_constructors.is_empty() {
+        return val;
+    }
+    let ctor_pos = ctx
+        .pending_constructors
+        .iter()
+        .rposition(|(idx, _)| *idx == returning_frame_idx);
+
+    match ctor_pos {
+        Some(pos) => {
+            let (_, instance_nv) = ctx.pending_constructors.remove(pos);
+            if val.is_null() {
+                instance_nv
+            } else {
+                val
+            }
+        }
+        None => val,
+    }
+}
+
 impl ExecCtx {
     pub(crate) fn dispatch_prepared_call(&mut self, call: PreparedCall) -> VmResult<()> {
         match call {

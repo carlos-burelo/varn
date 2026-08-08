@@ -15,7 +15,6 @@ varn-runtime  = { path = "../varn-runtime" }
 tokio         = { version = "1", features = ["time", "rt"] }
 varn-modules  = { path = "../varn-modules" }
 varn-base     = { path = "../varn-base" }
-parking_lot   = { workspace = true }
 rust_decimal  = { workspace = true }
 rustc-hash    = { workspace = true }
 varn-jit      = { path = "../varn-jit" }

@@ -4,7 +4,8 @@
 //! These are the helpers that read a cache slot first and only fall back to a
 //! full lookup on a miss.
 
-use super::construct::{jit_propagate_error, resolve_constructor_return};
+use super::construct::jit_propagate_error;
+use crate::exec::frame_ctrl::resolve_constructor_return;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
