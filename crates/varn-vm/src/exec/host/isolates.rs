@@ -44,7 +44,7 @@ impl ExecCtx {
                 let cls = cls.clone();
                 let callee_base = self.stack.len() - arg_count;
                 if let Some(v) =
-                    crate::exec::ctx_jit_values::construct_staged_fast(self, &cls, callee_base)
+                    crate::exec::jit_helpers::construct_staged_fast(self, &cls, callee_base)
                 {
                     self.stack.truncate(orig_len);
                     self.record_call_vm_fast();

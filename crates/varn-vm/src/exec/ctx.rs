@@ -18,14 +18,12 @@ use crate::linker::Linker;
 use super::VmSuspend;
 use varn_types::generator::GenChannel;
 
-// The JIT helper entry points live in two modules but are named through
-// `ctx::` by `jit::helpers` (and by the `jit_helper_abi!` list, which knows
-// only bare fn names). Globs rather than an explicit list: that list was a
-// fourth place every new helper had to be written down, and forgetting it
-// was a compile error at best. A collision between the two modules is still
-// a compile error, so nothing is silently shadowed.
-pub(crate) use super::ctx_jit_runtime::*;
-pub(crate) use super::ctx_jit_values::*;
+// The JIT helper entry points are named through `ctx::` by `jit::helpers` and
+// by the `jit_helper_abi!` list, which knows only bare fn names. A glob rather
+// than an explicit list: that list used to be a fourth place every new helper
+// had to be written down. A name collision between domain modules is still a
+// compile error, so nothing is silently shadowed.
+pub(crate) use super::jit_helpers::*;
 
 #[repr(C)]
 pub struct ExecCtx {

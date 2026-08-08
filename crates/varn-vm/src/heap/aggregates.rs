@@ -1,0 +1,51 @@
+//! Allocation for arrays, tuples, objects and records — the values whose
+//! representation is chosen at runtime from their contents.
+
+use std::rc::Rc;
+use crate::value::VmValue;
+use varn_types::{
+    value::ObjRef, Value, VmArray,
+};
+use super::obj::HeapObj;
+use super::structs::HeapInner;
+
+impl HeapInner {
+    pub(crate) fn alloc_array_vm(&mut self, items: Vec<VmValue>) -> VmValue {
+        let va = VmArray::from_items(items);
+        VmValue::from_heap_idx(self.alloc(HeapObj::Array(va)))
+    }
+
+    pub(crate) fn alloc_tuple_vm(&mut self, items: Vec<VmValue>) -> VmValue {
+        let va = VmArray::from_items(items);
+        VmValue::from_heap_idx(self.alloc(HeapObj::Tuple(va)))
+    }
+
+    pub(crate) fn alloc_array(&mut self, items: Vec<Value>) -> VmValue {
+        let vm_items: Vec<VmValue> = items.into_iter().map(|v| self.intern(v)).collect();
+        self.alloc_array_vm(vm_items)
+    }
+
+    pub(crate) fn alloc_object(&mut self) -> VmValue {
+        let oref = ObjRef::empty();
+        VmValue::from_heap_idx(self.alloc(HeapObj::Object(oref)))
+    }
+
+    pub(crate) fn alloc_object_with_shape(
+        &mut self,
+        shape: &Rc<varn_types::Shape>,
+        values: Vec<VmValue>,
+    ) -> VmValue {
+        let oref = ObjRef::with_shape(Rc::clone(shape), values);
+        VmValue::from_heap_idx(self.alloc(HeapObj::Object(oref)))
+    }
+
+    pub(crate) fn alloc_record_with_shape(
+        &mut self,
+        shape: &Rc<varn_types::Shape>,
+        values: Vec<VmValue>,
+    ) -> VmValue {
+        let oref = ObjRef::with_shape(Rc::clone(shape), values);
+        VmValue::from_heap_idx(self.alloc(HeapObj::Record(oref)))
+    }
+    
+}
