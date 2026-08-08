@@ -2,6 +2,7 @@ use crate::error::VmResult;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use varn_core::OpCode;
+mod jit_frame;
 pub mod modules;
 pub mod ops_control_calls;
 pub mod ops_literals_vars;
@@ -158,133 +159,28 @@ impl ExecCtx {
                 None => None,
             };
             if let Some(jit_fn) = hot_fn {
-                if is_first_entry {
-                    varn_jit::JIT_STATS
-                        .jit_runs
-                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                // Running the frame compiled, and reconciling the four ways
+                // that can end, lives in `jit_frame` — it is a different job
+                // from stepping opcodes and it ran once per frame entry, not
+                // once per opcode.
+                let outcome = jit_frame::run_compiled_frame(
+                    ctx,
+                    jit_fn,
+                    closure_ptr,
+                    closure,
+                    frame_idx,
+                    depth,
+                    is_first_entry,
+                    is_osr,
+                );
+                match outcome.into_result() {
+                    None => continue 'frame_loop,
+                    Some(result) => return result,
                 }
-                if is_osr {
-                    // Not counted in `jit_runs`: this frame already counted as
-                    // an interpreted entry when it started, and it is the same
-                    // frame. `osr_entries` is what says the rescue happened.
-                    varn_jit::JIT_STATS
-                        .osr_entries
-                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                }
-                if (*ctx).settings.trace {
-                    let what = if is_osr { "JIT OSR" } else { "JIT ENTRY" };
-                    let at = (*ctx).frames[frame_idx].ip;
-                    (*ctx).trace_event(what, frame_idx, closure, at, None);
-                }
-
-                let base = (*ctx).frames[frame_idx].base;
-                let res = Self::execute_jit_frame(ctx, jit_fn, closure_ptr, base);
-
-                let res = match res {
-                    Ok(val) => val,
-                    Err(code) => {
-                        if code == 1 {
-                            let handler = (*ctx).jit_panic_exception_handler.take();
-                            let error = (*ctx)
-                                .jit_panic_exception_error
-                                .take()
-                                .unwrap_or(VmValue::null());
-                            let err_obj = (*ctx).jit_panic_exception_err_obj.take();
-
-                            if let Some(handler) = handler {
-                                while (*ctx).frames.len() > handler.frame_depth {
-                                    (*ctx).record_frame_pop();
-                                    let f = (*ctx).frames.pop().unwrap();
-                                    (*ctx).close_upvalues_above(f.base);
-                                }
-
-                                let f2 = (*ctx).frames.len() - 1;
-                                let b2 = (*ctx).frames[f2].base;
-                                let required_depth =
-                                    b2 + (*ctx).frames[f2].closure().proto.register_count as usize;
-                                (*ctx).stack.truncate(required_depth);
-                                let thrown_val = error;
-
-                                let slot = b2 + handler.err_reg as usize;
-                                if slot < (*ctx).stack.len() {
-                                    (*ctx).stack[slot] = thrown_val;
-                                } else {
-                                    (*ctx).stack.resize(slot + 1, VmValue::null());
-                                    (*ctx).stack[slot] = thrown_val;
-                                }
-                                let new_frame_idx = (*ctx).frames.len() - 1;
-                                (*ctx).frames[new_frame_idx].ip = handler.catch_ip;
-                                continue 'frame_loop;
-                            } else {
-                                return Err(err_obj.unwrap());
-                            }
-                        } else if code == 2 {
-                            // Absent when the suspending helper parked a frame
-                            // other than the top one itself (see
-                            // `jit_suspend_at`): a module that suspends on a
-                            // top-level await leaves its frame above ours.
-                            if let Some(resume_ip) = (*ctx).jit_panic_suspend_resume_ip.take() {
-                                let frame_idx2 = (*ctx).frames.len() - 1;
-                                (*ctx).frames[frame_idx2].ip = resume_ip;
-                            }
-                            return Ok(VmValue::null());
-                        } else {
-                            panic!("Unknown longjmp code: {}", code);
-                        }
-                    }
-                };
-                if (*ctx).settings.trace {
-                    (*ctx).trace_event("JIT EXIT", frame_idx, closure, 0, None);
-                }
-
-                let frame = (*ctx).frames.pop().unwrap();
-                (*ctx).record_frame_pop();
-                while (*ctx)
-                    .try_handlers
-                    .last()
-                    .map(|h| h.frame_depth > (*ctx).frames.len())
-                    .unwrap_or(false)
-                {
-                    (*ctx).try_handlers.pop();
-                }
-                (*ctx).close_upvalues_above(frame.base);
-                (*ctx).stack.truncate(frame.base);
-
-                let ctor_pos = if !(*ctx).pending_constructors.is_empty() {
-                    (*ctx)
-                        .pending_constructors
-                        .iter()
-                        .rposition(|(idx, _)| *idx == frame_idx)
-                } else {
-                    None
-                };
-
-                let final_val = if let Some(pos) = ctor_pos {
-                    let (_, instance_nv) = (*ctx).pending_constructors.remove(pos);
-                    if res.is_null() {
-                        instance_nv
-                    } else {
-                        res
-                    }
-                } else {
-                    res
-                };
-
-                if let Some(return_reg) = frame.return_reg {
-                    let caller_base = (*ctx).frames.last().map(|f| f.base).unwrap_or(0);
-                    (*ctx).stack[caller_base + return_reg as usize] = final_val;
-                }
-
-                if (*ctx).frames.len() == depth {
-                    return Ok(final_val);
-                }
-                continue 'frame_loop;
-            } else {
-                if is_first_entry {
-                    varn_jit::JIT_STATS
-                        .interp_runs
-                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                }
+            } else if is_first_entry {
+                varn_jit::JIT_STATS
+                    .interp_runs
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             }
 
             let base = (*ctx).frames[frame_idx].base;
