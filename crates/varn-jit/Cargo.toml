@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 varn-core = { path = "../varn-core" }
 varn-types = { path = "../varn-types" }
-varn-base = { path = "../varn-base" }
 cranelift-codegen = "0.125.4"
 cranelift-frontend = "0.125.4"
 cranelift-native = "0.125.4"

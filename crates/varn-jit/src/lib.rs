@@ -210,8 +210,6 @@ macro_rules! define_jit_helpers {
         pub str_layout: JitStrLayout,
         pub open_upvalues_offset: usize,
         pub pending_constructors_offset: usize,
-        /// `extern "C" fn(*mut ExecCtx)` — loop back-edge GC safepoint.
-        pub gc_safepoint: usize,
         /// Byte offset of the heap field (an Rc, i.e. one pointer) inside ExecCtx.
         pub heap_field_offset: usize,
         /// Byte offset from the heap RcBox pointer to the nursery live-object count.
@@ -237,10 +235,6 @@ macro_rules! define_jit_helpers {
         /// Byte offset of ExecCtx.jit_call_dest — the caller dest register stamped
         /// as the callee frame's return_reg for correct interpreted-resume returns.
         pub jit_call_dest_offset: usize,
-        /// `extern "C" fn(*mut ExecCtx, callee: VmValue, argc, a0..a3) -> VmValue`
-        /// — the CLIF static-call IC miss path: dispatch the (rebound or
-        /// GC-moved) callee through the interpreter/JIT with boxed args.
-        pub clif_call_fallback: usize,
         }
     };
 }

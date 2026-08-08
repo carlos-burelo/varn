@@ -47,7 +47,6 @@ macro_rules! fill_jit_helpers {
                         - (dummy_ptr as usize)
                 }
             },
-            gc_safepoint: ctx::jit_gc_safepoint as usize,
             heap_field_offset: std::mem::offset_of!(ctx::ExecCtx, heap),
             nursery_len_offset: crate::heap::Heap::nursery_len_byte_offset_from_rcbox(),
             nursery_threshold: crate::nursery::Nursery::FULL_THRESHOLD,
@@ -57,7 +56,6 @@ macro_rules! fill_jit_helpers {
             frame_prepushed_offset: std::mem::offset_of!(ctx::ExecCtx, jit_frame_prepushed),
             jit_resume_ip_offset: std::mem::offset_of!(ctx::ExecCtx, jit_resume_ip),
             jit_call_dest_offset: std::mem::offset_of!(ctx::ExecCtx, jit_call_dest),
-            clif_call_fallback: ctx::clif_call_fallback as usize,
         }
     }};
 }
@@ -114,11 +112,20 @@ mod build_jit_helpers_tests {
     #[test]
     fn build_jit_helpers_has_real_addresses() {
         let h = super::build_jit_helpers();
-        // The two address fields outside the shared list (they sit in the
-        // hand-written tail), plus the probed nursery threshold — proving this
-        // is the production construction and not a zeroed stub.
-        assert_ne!(h.gc_safepoint, 0);
-        assert_ne!(h.clif_call_fallback, 0);
+        // Every function address is covered by the test above. What is left in
+        // the hand-written tail is offsets and probed layouts, which the shared
+        // list cannot express; these are the ones whose zero would be a bug.
+        // `globals_offset` is deliberately absent: it is legitimately 0 when
+        // `globals` happens to be the first field of `ExecCtx`.
         assert!(h.nursery_threshold > 0);
+        assert_ne!(h.heap_field_offset, 0);
+        assert_ne!(h.stack_data_offset, 0);
+        assert_ne!(h.nursery_len_offset, 0);
+        assert_ne!(h.open_upvalues_offset, 0);
+        assert_ne!(h.pending_constructors_offset, 0);
+        assert_ne!(h.frame_prepushed_offset, 0);
+        assert_ne!(h.jit_resume_ip_offset, 0);
+        assert_ne!(h.jit_call_dest_offset, 0);
+        assert_ne!(h.jit_native_result_offset, 0);
     }
 }

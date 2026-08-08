@@ -8,5 +8,3 @@ profiling = []
 
 [dependencies]
 varn-core = { path = "../varn-core" }
-varn-lexer = { path = "../varn-lexer" }
-varn-base = { path = "../varn-base" }

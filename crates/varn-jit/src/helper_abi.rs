@@ -140,6 +140,12 @@ macro_rules! jit_helper_abi {
             /// `extern "C" fn(*mut ExecCtx, fn_addr, args_start, total)` — direct
             /// native call with the function pointer already resolved.
             jit_call_native_fnptr => jit_call_native_fnptr,
+            /// `extern "C" fn(*mut ExecCtx)` — loop back-edge GC safepoint.
+            gc_safepoint => jit_gc_safepoint,
+            /// `extern "C" fn(*mut ExecCtx, callee: VmValue, argc, a0..a3) -> VmValue`
+            /// — the CLIF static-call IC miss path: dispatch the (rebound or
+            /// GC-moved) callee through the interpreter/JIT with boxed args.
+            clif_call_fallback => clif_call_fallback,
         }
     };
 }

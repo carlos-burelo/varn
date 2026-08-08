@@ -6,4 +6,3 @@ edition = "2021"
 [dependencies]
 varn-core  = { path = "../varn-core" }
 varn-types = { path = "../varn-types" }
-rustc-hash = { workspace = true }

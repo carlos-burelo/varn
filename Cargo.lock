@@ -2050,7 +2050,6 @@ dependencies = [
 name = "varn-backend"
 version = "0.1.0"
 dependencies = [
- "rustc-hash 1.1.0",
  "varn-core",
  "varn-types",
 ]
@@ -2175,7 +2174,6 @@ dependencies = [
  "cranelift-codegen",
  "cranelift-frontend",
  "cranelift-native",
- "varn-base",
  "varn-core",
  "varn-types",
 ]
@@ -2244,9 +2242,7 @@ dependencies = [
 name = "varn-parser"
 version = "0.1.0"
 dependencies = [
- "varn-base",
  "varn-core",
- "varn-lexer",
 ]
 
 [[package]]
