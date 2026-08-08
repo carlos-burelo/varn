@@ -190,9 +190,9 @@ macro_rules! define_jit_helpers {
         #[repr(C)]
         pub struct JitHelpers {
             $( $(#[$attr])* pub $field: usize, )*
-        /// Compile-time op-id → native call target: `(func_ptr, raw_func_ptr,
-        /// signature)`, with `func_ptr == 0` meaning the id is unknown (codegen
-        /// then keeps the dynamic form, whose helper raises the proper error).
+        /// Compile-time op-id → native call target. See
+        /// [`varn_types::NativeOpTarget`] for what each field means and what a
+        /// zero in it implies.
         ///
         /// Resolved at LOWERING time and embedded in the generated code: the
         /// op-id form pays a hash lookup on every runtime call, which on a hot
@@ -201,7 +201,7 @@ macro_rules! define_jit_helpers {
         /// A function pointer rather than a direct call because `varn-jit` does
         /// not depend on `varn-builtins` — this is the indirection that keeps
         /// the op table on the VM side of the boundary.
-        pub resolve_native_op: fn(u64) -> (usize, usize, varn_types::SignatureDescriptor),
+        pub resolve_native_op: fn(u64) -> varn_types::NativeOpTarget,
         /// Probed heap/array layout for the inline array-read fast path.
         pub array_layout: JitArrayLayout,
         /// Probed object layout for the inline property get/set fast paths.

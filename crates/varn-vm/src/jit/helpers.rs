@@ -70,17 +70,17 @@ pub fn build_jit_helpers() -> varn_jit::JitHelpers {
 
 /// Compile-time op-id resolution for `CallNativeOp` codegen.
 ///
-/// `(0, 0, empty)` when the op-id is unknown — codegen then keeps the dynamic
-/// form, whose helper raises the proper error at runtime.
-///
-/// `raw_func_ptr` is the unboxed entry point: present only for ops whose
-/// signature is fully described, and it is what lets codegen emit a direct
-/// typed call instead of boxing every argument.
-fn resolve_native_op_target(op_id: u64) -> (usize, usize, varn_types::SignatureDescriptor) {
-    varn_builtins::find_native_op_entry(op_id)
-        .map_or((0, 0, varn_types::SignatureDescriptor::empty()), |e| {
-            (e.func_ptr as usize, e.raw_func_ptr as usize, e.signature)
-        })
+/// See [`varn_types::NativeOpTarget`] for what each field means and what a zero
+/// in it implies. The whole op table lives in `varn-builtins`, which `varn-jit`
+/// deliberately does not depend on; this is the function pointer bridging that.
+fn resolve_native_op_target(op_id: u64) -> varn_types::NativeOpTarget {
+    varn_builtins::find_native_op_entry(op_id).map_or(varn_types::NativeOpTarget::unknown(), |e| {
+        varn_types::NativeOpTarget {
+            func_ptr: e.func_ptr as usize,
+            raw_func_ptr: e.raw_func_ptr as usize,
+            signature: e.signature,
+        }
+    })
 }
 
 #[cfg(test)]
