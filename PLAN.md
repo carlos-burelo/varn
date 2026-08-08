@@ -17,7 +17,7 @@ líneas se mueven, los nombres no.
 | **P4** tupla posicional en `resolve_native_op` | ✅ hecho | `5089959` |
 | **P5** archivos sobre 500 | pendiente | |
 | **P6** función comentada | ✅ hecho | `e15f56f` |
-| **P7** puntos de aborto | pendiente | |
+| **P7** puntos de aborto | 🟡 parcial | `e13f325`, `1e57454` |
 | **P8** deps sin uso | ✅ hecho | `e15f56f` |
 | **P9** indentación | ✅ hecho | `bda5167` (`cargo fmt` del proyecto) |
 
@@ -312,7 +312,50 @@ Eran 24 de 203 líneas: un `exec_build_object_with_shape` desactivado a base de
 
 ---
 
-## P7 — 101 puntos de aborto en el runtime
+## P7 — Puntos de aborto en el runtime — 🟡 parcial (`e13f325`, `1e57454`)
+
+**Hecho.** Los dos archivos que la auditoría señalaba, más un hallazgo que
+apareció al mirarlos:
+
+- `exec/jit_helpers/modules.rs` — `jit_load_module` y `jit_load_module_by_idx`
+  hacían `panic!` cuando `load_module_from_source` devolvía `Err`, mientras el
+  intérprete propaga con `?`. Divergencia entre tiers: el mismo `import` era
+  error capturable o aborto del proceso según si el frame estaba compilado.
+  Ahora ambos salen por `jit_propagate_error`.
+  **No es un bug demostrado**: no logré construir un reproductor. `import` es
+  sólo de top level ("hir: nested declaration kind" lo rechaza dentro de una
+  función) y el top level del módulo no se ofrece al JIT. Cuenta como poner de
+  acuerdo a los tiers, no como cerrar un crash conocido.
+- `exec/dispatch/ops_math_cmp.rs` — los 8 sitios son el mismo patrón: un
+  `match op` interno sobre opcodes que el brazo externo ya estrechó, con un `_`
+  muerto. **Inalcanzables por construcción**, así que siguen siendo
+  `unreachable!` — pero cada uno nombra ahora su invariante, para que una
+  edición equivocada dé un mensaje diagnosticable y no un panic pelado.
+- `exec::arith::{add,sub,mul}` devolvían `VmResult` sin contener un solo
+  `Err(`, y `jit_add`/`jit_sub`/`jit_mul` hacían `.unwrap()`. Mismo defecto que
+  `GcError`, pero con `.unwrap()` como manejo del caso imposible — se
+  convertiría en aborto del host el día que alguien añada un fallo a `add`.
+  Arreglado en el origen: las tres devuelven `VmValue`.
+
+**Queda: 99 sitios en 35 archivos**, y la muestra que revisé dice que el grueso
+es categoría 1 y 2, no deuda:
+
+- `heap/jit.rs` (9) — sondas de layout en el arranque (`"array payload probe
+  failed"`). Abortar ahí es **deliberado y correcto**: un cambio de layout en
+  std debe fallar ruidosamente al arrancar en vez de corromper memoria en
+  caliente.
+- `exec/dispatch/reg_ops/calls.rs` (6) — `frames.last_mut().unwrap()` dentro de
+  un `if self.frames.len() > frame_idx + 1`. Seguro por construcción.
+- `exec/jit_helpers/classes.rs` (6) — `expect("non-string const")` y
+  `panic!("Unknown class member op kind")`: bytecode roto, no entrada de
+  usuario. Categoría 2.
+
+**No he clasificado los 99 uno a uno.** Lo anterior es una muestra, no un censo.
+Antes de tocar más, clasificar el resto; sólo la categoría "alcanzable desde
+código de usuario" es deuda real, y en lo revisado hasta ahora esa categoría
+tenía exactamente un miembro (el `import`).
+
+<details><summary>Diagnóstico original</summary>
 
 | | Cuenta |
 |---|---|
@@ -340,6 +383,8 @@ Sólo la tercera categoría es deuda real. Empezar por `ops_math_cmp.rs`, que es
 aritmética y por tanto lo más expuesto a entrada del usuario.
 
 **Riesgo:** bajo por sitio, alto en volumen. Hacerlo por archivo, no de golpe.
+
+</details>
 
 ---
 
@@ -375,9 +420,9 @@ diff y vuelve a romper la invariante.
 
 Queda:
 
-1. **P7** — por archivo, empezando por `ops_math_cmp.rs`. Clasificar cada sitio
-   antes de tocarlo; sólo la categoría "alcanzable desde código de usuario" es
-   deuda real.
+1. **P7**, resto — clasificar los 99 sitios restantes por archivo antes de
+   tocar ninguno. La muestra revisada sugiere que casi todo es categoría 1 y 2;
+   si eso se confirma, P7 se cierra documentando en vez de cambiando.
 2. **P5** — `nursery.rs` (647) y `exec/ctx.rs` (505), sólo si el análisis por
    dominio lo justifica. `exec/dispatch/mod.rs` no entra: ver el final.
 
