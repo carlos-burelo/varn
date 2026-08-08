@@ -67,7 +67,7 @@ impl ExecCtx {
                 } else {
                     let imm_v = self.heap.make_int(imm);
                     self.stack[base + first_reg] =
-                        crate::exec::arith::add(v, imm_v, &mut self.heap)?;
+                        crate::exec::arith::add(v, imm_v, &mut self.heap);
                 }
             }
             OpCode::SubImm => {
@@ -86,7 +86,7 @@ impl ExecCtx {
                 } else {
                     let imm_v = self.heap.make_int(imm);
                     self.stack[base + first_reg] =
-                        crate::exec::arith::sub(v, imm_v, &mut self.heap)?;
+                        crate::exec::arith::sub(v, imm_v, &mut self.heap);
                 }
             }
             OpCode::AddInt

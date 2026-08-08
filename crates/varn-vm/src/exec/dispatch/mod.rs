@@ -757,10 +757,12 @@ impl ExecCtx {
 
     pub(super) fn exec_arith(&mut self, op: OpCode, a: VmValue, b: VmValue) -> VmResult<VmValue> {
         use crate::exec::arith;
+        // Only div/mod/pow can fail — by zero divisor or negative exponent.
+        // The rest are total, and their signatures now say so.
         match op {
-            OpCode::Add => arith::add(a, b, &mut self.heap),
-            OpCode::Sub => arith::sub(a, b, &mut self.heap),
-            OpCode::Mul => arith::mul(a, b, &mut self.heap),
+            OpCode::Add => Ok(arith::add(a, b, &mut self.heap)),
+            OpCode::Sub => Ok(arith::sub(a, b, &mut self.heap)),
+            OpCode::Mul => Ok(arith::mul(a, b, &mut self.heap)),
             OpCode::Div => arith::div(a, b, &mut self.heap),
             OpCode::Mod => arith::modulo(a, b, &mut self.heap),
             OpCode::Pow => arith::pow(a, b, &mut self.heap),
@@ -770,7 +772,9 @@ impl ExecCtx {
             OpCode::Shl => Ok(arith::shl(a, b, &mut self.heap)),
             OpCode::Shr => Ok(arith::shr(a, b, &mut self.heap)),
             OpCode::Ushr => Ok(arith::ushr(a, b, &mut self.heap)),
-            _ => unreachable!(),
+            _ => unreachable!(
+                "{op:?} is not an arithmetic opcode; callers narrow to the twelve above"
+            ),
         }
     }
 

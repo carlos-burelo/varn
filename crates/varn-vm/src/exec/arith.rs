@@ -4,20 +4,20 @@ use crate::value::VmValue;
 use varn_types::Value;
 
 #[inline(always)]
-pub(crate) fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
     if heap.is_int(a) && heap.is_int(b) {
         let r = heap.as_int(a).wrapping_add(heap.as_int(b));
-        return Ok(heap.make_int(r));
+        return heap.make_int(r);
     }
     // Both sides numeric → float add. A bare `is_f64() || is_f64()` here is
     // wrong: `str + float` must fall through to the concat checks below, not
     // coerce the string operand to 0.0.
     if (a.is_f64() || heap.is_int(a)) && (b.is_f64() || heap.is_int(b)) {
-        return Ok(VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b)));
+        return VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b));
     }
 
     if a.is_sso() || b.is_sso() {
-        return Ok(crate::exec::strings::str_concat(a, b, heap));
+        return crate::exec::strings::str_concat(a, b, heap);
     }
     if a.is_heap() || b.is_heap() {
         let a_is_str = a.is_heap()
@@ -31,77 +31,73 @@ pub(crate) fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
                 Some(crate::heap::HeapObj::Str(_))
             );
         if a_is_str || b_is_str {
-            return Ok(crate::exec::strings::str_concat(a, b, heap));
+            return crate::exec::strings::str_concat(a, b, heap);
         }
 
         let av = heap.extract_val(a);
         let bv = heap.extract_val(b);
         match (&av, &bv) {
             (Ok(Value::Decimal(da)), Ok(Value::Decimal(db))) => {
-                return Ok(heap.alloc_decimal(**da + **db))
+                return heap.alloc_decimal(**da + **db)
             }
             (Ok(Value::Decimal(da)), _) if heap.is_int(b) => {
                 let bi = rust_decimal::Decimal::from(heap.as_int(b));
-                return Ok(heap.alloc_decimal(**da + bi));
+                return heap.alloc_decimal(**da + bi);
             }
             (_, Ok(Value::Decimal(db))) if heap.is_int(a) => {
                 let ai = rust_decimal::Decimal::from(heap.as_int(a));
-                return Ok(heap.alloc_decimal(ai + **db));
+                return heap.alloc_decimal(ai + **db);
             }
             _ => {}
         }
     }
-    Ok(VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b)))
+    VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b))
 }
 
 #[inline(always)]
-pub(crate) fn sub(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn sub(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
     if heap.is_int(a) && heap.is_int(b) {
         let r = heap.as_int(a).wrapping_sub(heap.as_int(b));
-        return Ok(heap.make_int(r));
+        return heap.make_int(r);
     }
     let av = heap.extract_val(a);
     let bv = heap.extract_val(b);
     match (&av, &bv) {
-        (Ok(Value::Decimal(da)), Ok(Value::Decimal(db))) => {
-            return Ok(heap.alloc_decimal(**da - **db))
-        }
+        (Ok(Value::Decimal(da)), Ok(Value::Decimal(db))) => return heap.alloc_decimal(**da - **db),
         (Ok(Value::Decimal(da)), _) if heap.is_int(b) => {
             let bi = rust_decimal::Decimal::from(heap.as_int(b));
-            return Ok(heap.alloc_decimal(**da - bi));
+            return heap.alloc_decimal(**da - bi);
         }
         (_, Ok(Value::Decimal(db))) if heap.is_int(a) => {
             let ai = rust_decimal::Decimal::from(heap.as_int(a));
-            return Ok(heap.alloc_decimal(ai - **db));
+            return heap.alloc_decimal(ai - **db);
         }
         _ => {}
     }
-    Ok(VmValue::from_f64(heap.to_f64_val(a) - heap.to_f64_val(b)))
+    VmValue::from_f64(heap.to_f64_val(a) - heap.to_f64_val(b))
 }
 
 #[inline(always)]
-pub(crate) fn mul(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn mul(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
     if heap.is_int(a) && heap.is_int(b) {
         let r = heap.as_int(a).wrapping_mul(heap.as_int(b));
-        return Ok(heap.make_int(r));
+        return heap.make_int(r);
     }
     let av = heap.extract_val(a);
     let bv = heap.extract_val(b);
     match (&av, &bv) {
-        (Ok(Value::Decimal(da)), Ok(Value::Decimal(db))) => {
-            return Ok(heap.alloc_decimal(**da * **db))
-        }
+        (Ok(Value::Decimal(da)), Ok(Value::Decimal(db))) => return heap.alloc_decimal(**da * **db),
         (Ok(Value::Decimal(da)), _) if heap.is_int(b) => {
             let bi = rust_decimal::Decimal::from(heap.as_int(b));
-            return Ok(heap.alloc_decimal(**da * bi));
+            return heap.alloc_decimal(**da * bi);
         }
         (_, Ok(Value::Decimal(db))) if heap.is_int(a) => {
             let ai = rust_decimal::Decimal::from(heap.as_int(a));
-            return Ok(heap.alloc_decimal(ai * **db));
+            return heap.alloc_decimal(ai * **db);
         }
         _ => {}
     }
-    Ok(VmValue::from_f64(heap.to_f64_val(a) * heap.to_f64_val(b)))
+    VmValue::from_f64(heap.to_f64_val(a) * heap.to_f64_val(b))
 }
 
 #[inline(always)]
