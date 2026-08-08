@@ -60,7 +60,6 @@ impl ExecCtx {
             }
         };
         let res = match prepared {
-            PreparedCall::Native(f, args) => (f)(self as &mut dyn NativeCtx, &args),
             PreparedCall::NativeImmediate(f, n) => {
                 let args_start = self.stack.len() - n;
                 let vm_args: Vec<VmValue> = self.stack[args_start..args_start + n].to_vec();

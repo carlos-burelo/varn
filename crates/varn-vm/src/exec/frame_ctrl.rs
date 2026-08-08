@@ -168,13 +168,6 @@ impl ExecCtx {
                     let _ = self.run_until(ctor_frame_idx)?;
                 }
             }
-            PreparedCall::Native(f, args) => {
-                self.record_call_native();
-                let result =
-                    (f)(self as &mut dyn NativeCtx, &args).map_err(|e| RuntimeError::new(e))?;
-                self.stack.pop();
-                self.push(result);
-            }
             PreparedCall::NativeImmediate(f, arg_count) => {
                 self.record_call_native();
                 let args_start = self.stack.len() - arg_count;

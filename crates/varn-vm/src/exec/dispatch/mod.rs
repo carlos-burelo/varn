@@ -3,20 +3,12 @@ use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use varn_core::OpCode;
 mod jit_frame;
-pub mod modules;
-pub mod ops_control_calls;
-pub mod ops_literals_vars;
-pub mod ops_math_cmp;
-pub mod ops_objects_collections;
-pub mod reg_ops;
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum ControlSignal {
-    ContinueInstruction,
-    ContinueFrame,
-    Return(VmValue),
-    None,
-}
+pub(crate) mod modules;
+pub(crate) mod ops_control_calls;
+pub(crate) mod ops_literals_vars;
+pub(crate) mod ops_math_cmp;
+pub(crate) mod ops_objects_collections;
+pub(crate) mod reg_ops;
 
 #[inline(always)]
 fn hi(w: u16) -> usize {

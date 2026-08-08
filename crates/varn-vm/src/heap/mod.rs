@@ -6,19 +6,19 @@
 //! `HeapInner`, since Rust lets one inherent impl span modules of a crate, so
 //! nothing outside this directory had to change.
 
-pub mod access;
-pub mod aggregates;
-pub mod core;
-pub mod gc;
-pub mod intern;
-pub mod jit;
-pub mod map_keys;
-pub mod native;
-pub mod obj;
-pub mod str;
-pub mod strings;
-pub mod structs;
-pub mod values;
+pub(crate) mod access;
+pub(crate) mod aggregates;
+pub(crate) mod core;
+pub(crate) mod gc;
+pub(crate) mod intern;
+pub(crate) mod jit;
+pub(crate) mod map_keys;
+pub(crate) mod native;
+pub(crate) mod obj;
+pub(crate) mod str;
+pub(crate) mod strings;
+pub(crate) mod structs;
+pub(crate) mod values;
 
 pub use obj::*;
 pub use str::*;

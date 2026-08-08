@@ -2,4 +2,4 @@
 //! compiled code is allowed to call back into (helpers).
 
 pub mod helpers;
-pub mod tiering;
+pub(crate) mod tiering;

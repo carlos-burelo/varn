@@ -456,7 +456,9 @@ pub(crate) fn bundle_rest_args(
 pub enum PreparedCall {
     Frame(CallFrame),
     Constructor(CallFrame, VmValue),
-    Native(varn_types::NativeFn, Vec<VmValue>),
+    /// Native call whose arguments are read straight out of the register
+    /// window rather than collected into a `Vec` — `arg_count` slots starting
+    /// at the callee slot.
     NativeImmediate(varn_types::NativeFn, usize),
     RawNativeImmediate(varn_types::NativeFn, usize),
     NativeConstructor(varn_types::NativeFn, Vec<VmValue>, VmValue),

@@ -279,12 +279,6 @@ impl ExecCtx {
                         self.frames.push(frame);
                         return Ok(true);
                     }
-                    crate::exec::calls::PreparedCall::Native(f, args) => {
-                        let nv = f(self as &mut dyn varn_types::NativeCtx, &args)
-                            .map_err(|e| crate::error::RuntimeError::new(e))?;
-                        self.stack.pop();
-                        Some(self.heap.extract(nv))
-                    }
                     _ => None,
                 }
             }

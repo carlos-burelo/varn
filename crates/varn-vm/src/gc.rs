@@ -1,7 +1,6 @@
 use crate::heap::{HeapInner, HeapObj};
 use crate::nursery::{is_old_idx, old_idx_raw};
 use std::collections::VecDeque;
-use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MarkColor {
@@ -9,25 +8,6 @@ pub enum MarkColor {
     Gray = 1,
     Black = 2,
 }
-
-#[derive(Debug, Clone)]
-pub enum GcError {
-    StackOverflow,
-    AllocationFailed,
-    InternalError(String),
-}
-
-impl fmt::Display for GcError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            GcError::StackOverflow => write!(f, "GC: Stack overflow during mark phase"),
-            GcError::AllocationFailed => write!(f, "GC: Allocation failed"),
-            GcError::InternalError(msg) => write!(f, "GC: Internal error: {}", msg),
-        }
-    }
-}
-
-impl std::error::Error for GcError {}
 
 #[derive(Clone)]
 pub struct MarkBitmap {
@@ -140,11 +120,7 @@ impl TricolorMarker {
         self.marked_count = 0;
     }
 
-    pub(crate) fn mark_from_roots(
-        &mut self,
-        heap: &HeapInner,
-        roots: &[u32],
-    ) -> Result<(), GcError> {
+    pub(crate) fn mark_from_roots(&mut self, heap: &HeapInner, roots: &[u32]) {
         for &root in roots {
             if is_old_idx(root) {
                 let raw = old_idx_raw(root);
@@ -155,14 +131,12 @@ impl TricolorMarker {
         }
 
         while let Some(idx) = self.gray_queue.pop_front() {
-            self.mark_children(heap, idx)?;
+            self.mark_children(heap, idx);
             self.mark_black(idx);
         }
-
-        Ok(())
     }
 
-    fn mark_children(&mut self, heap: &HeapInner, idx: u32) -> Result<(), GcError> {
+    fn mark_children(&mut self, heap: &HeapInner, idx: u32) {
         if let Some(Some(obj)) = heap.objects().get(idx as usize) {
             match obj {
                 HeapObj::Str(_)
@@ -333,7 +307,6 @@ impl TricolorMarker {
                 }
             }
         }
-        Ok(())
     }
 }
 
@@ -351,13 +324,12 @@ impl GcCollector {
         }
     }
 
-    pub(crate) fn mark_phase(&mut self, heap: &HeapInner, roots: &[u32]) -> Result<(), GcError> {
+    pub(crate) fn mark_phase(&mut self, heap: &HeapInner, roots: &[u32]) {
         self.marker.clear();
-        self.marker.mark_from_roots(heap, roots)?;
-        Ok(())
+        self.marker.mark_from_roots(heap, roots);
     }
 
-    pub(crate) fn sweep_phase(&mut self, heap: &mut HeapInner) -> Result<usize, GcError> {
+    pub(crate) fn sweep_phase(&mut self, heap: &mut HeapInner) -> usize {
         self.swept_count = 0;
         let mut freed = 0;
 
@@ -373,17 +345,12 @@ impl GcCollector {
             }
         }
 
-        Ok(freed)
+        freed
     }
 
-    pub(crate) fn collect(
-        &mut self,
-        heap: &mut HeapInner,
-        roots: &[u32],
-    ) -> Result<usize, GcError> {
-        self.mark_phase(heap, roots)?;
-        let swept = self.sweep_phase(heap)?;
-        Ok(swept)
+    pub(crate) fn collect(&mut self, heap: &mut HeapInner, roots: &[u32]) -> usize {
+        self.mark_phase(heap, roots);
+        self.sweep_phase(heap)
     }
 }
 
@@ -405,12 +372,8 @@ mod array_scan_tests {
         let f64_idx = heap.alloc_raw(HeapObj::Array(VmArray::new_f64(vec![1.0, 2.0])));
 
         let mut marker = TricolorMarker::new(heap.objects_len());
-        marker
-            .mark_children(&heap, i64_idx)
-            .expect("marking an I64 array must not error");
-        marker
-            .mark_children(&heap, f64_idx)
-            .expect("marking an F64 array must not error");
+        marker.mark_children(&heap, i64_idx);
+        marker.mark_children(&heap, f64_idx);
 
         // Neither typed array holds a heap ref, so nothing should have been
         // queued gray by either scan.
@@ -434,9 +397,7 @@ mod array_scan_tests {
         ])));
 
         let mut marker = TricolorMarker::new(heap.objects_len());
-        marker
-            .mark_children(&heap, arr_idx)
-            .expect("marking a Boxed array must not error");
+        marker.mark_children(&heap, arr_idx);
 
         assert_eq!(marker.gray_queue_size(), 1);
         assert_eq!(marker.get_color(inner_str_idx), MarkColor::Gray);

@@ -79,19 +79,26 @@ impl HeapInner {
             .retain(|_, &mut packed| check(packed, &self.objects));
     }
 
-    pub(crate) fn collect(&mut self, roots: &[u32]) -> Result<usize, crate::gc::GcError> {
-        if let Some(mut collector) = self.gc_collector.take() {
-            let freed = collector.collect(self, roots)?;
-            self.gc_collector = Some(collector);
-            self.compact_interners();
-            self.rebuild_scan_roots();
-            self.gc_collections += 1;
-            self.gc_total_freed += freed as u64;
-            self.gc_alloc_since_collect = 0;
-            Ok(freed)
-        } else {
-            Ok(0)
-        }
+    /// Run a full collection, returning how many slots were freed.
+    ///
+    /// Infallible: marking and sweeping walk structures the heap already owns
+    /// and have no failure mode. This used to return `Result<usize, GcError>`
+    /// with an error type none of the code could construct, which forced every
+    /// caller to handle an impossible case — `Vm::collect_gc` did it with
+    /// `.unwrap_or(0)`, which would have silently swallowed a real failure the
+    /// day one was introduced.
+    pub(crate) fn collect(&mut self, roots: &[u32]) -> usize {
+        let Some(mut collector) = self.gc_collector.take() else {
+            return 0;
+        };
+        let freed = collector.collect(self, roots);
+        self.gc_collector = Some(collector);
+        self.compact_interners();
+        self.rebuild_scan_roots();
+        self.gc_collections += 1;
+        self.gc_total_freed += freed as u64;
+        self.gc_alloc_since_collect = 0;
+        freed
     }
 
     pub(crate) fn live_count(&self) -> usize {

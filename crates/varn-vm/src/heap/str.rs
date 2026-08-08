@@ -5,7 +5,7 @@ use varn_types::RuntimeString;
 /// `HeapStr` is immutable (a `Shared` string is frozen; an `Ext` prefix view
 /// never changes once created), so once computed the answer is stable for the
 /// lifetime of the instance.
-pub mod ascii_flag {
+pub(crate) mod ascii_flag {
     pub const UNKNOWN: u8 = 0;
     pub const YES: u8 = 1;
     pub const NO: u8 = 2;

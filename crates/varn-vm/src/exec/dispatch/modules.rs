@@ -1,7 +1,6 @@
 use crate::closure::VmClosure;
 use crate::error::VmResult;
 use crate::exec::ctx::ExecCtx;
-use crate::exec::dispatch::ControlSignal;
 
 impl ExecCtx {
     #[inline(always)]
@@ -12,7 +11,7 @@ impl ExecCtx {
         closure: &VmClosure,
         frame_idx: usize,
         dest_reg: usize,
-    ) -> VmResult<ControlSignal> {
+    ) -> VmResult<()> {
         let spec_idx = code[*ip] as usize;
         *ip += 1;
         let spec_nv = closure.constants[spec_idx];
@@ -26,11 +25,11 @@ impl ExecCtx {
         if self.vm_suspend.is_some() {
             *ip -= 2;
             self.frames[frame_idx].ip = *ip;
-            return Ok(ControlSignal::ContinueInstruction);
+            return Ok(());
         }
         let base = self.frames[frame_idx].base;
         self.stack[base + dest_reg] = module_nv;
-        Ok(ControlSignal::ContinueInstruction)
+        Ok(())
     }
 
     #[inline(always)]
@@ -40,7 +39,7 @@ impl ExecCtx {
         ip: &mut usize,
         frame_idx: usize,
         dest_reg: usize,
-    ) -> VmResult<ControlSignal> {
+    ) -> VmResult<()> {
         let w = code[*ip];
         *ip += 1;
         let src_reg = (w >> 8) as usize;
@@ -73,7 +72,7 @@ impl ExecCtx {
             )));
         }
 
-        Ok(ControlSignal::ContinueInstruction)
+        Ok(())
     }
 
     #[inline(always)]
@@ -83,7 +82,7 @@ impl ExecCtx {
         ip: &mut usize,
         frame_idx: usize,
         val_reg: usize,
-    ) -> VmResult<ControlSignal> {
+    ) -> VmResult<()> {
         let slot_idx = code[*ip] as usize;
         *ip += 1;
 
@@ -113,6 +112,6 @@ impl ExecCtx {
             ));
         }
 
-        Ok(ControlSignal::ContinueInstruction)
+        Ok(())
     }
 }

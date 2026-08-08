@@ -166,7 +166,7 @@ impl Vm {
                 roots.push(v.as_heap_idx());
             }
         }
-        self.ctx.heap.collect(&roots).unwrap_or(0)
+        self.ctx.heap.collect(&roots)
     }
 
     pub fn take_opcode_counts(&mut self) -> Vec<(OpCode, u64)> {

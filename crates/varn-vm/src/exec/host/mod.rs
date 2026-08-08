@@ -271,7 +271,6 @@ impl NativeCtx for ExecCtx {
             }
         };
         let res = match prepared {
-            PreparedCall::Native(f, args) => (f)(self as &mut dyn NativeCtx, &args),
             PreparedCall::NativeImmediate(f, arg_count) => {
                 let args_start = self.stack.len() - arg_count;
                 let vm_args: Vec<VmValue> = self.stack[args_start..args_start + arg_count].to_vec();
