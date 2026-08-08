@@ -128,7 +128,7 @@ impl ExecCtx {
                             let e = u32::try_from(b_val).unwrap_or(u32::MAX);
                             self.heap.make_int(a_val.wrapping_pow(e))
                         }
-                        _ => unreachable!(),
+                        _ => unreachable!("{op:?} reached the int-arith body; the enclosing arm matches only Add/Sub/Mul/Div/Mod/PowInt"),
                     }
                 } else {
                     let generic_op = match op {
@@ -138,7 +138,7 @@ impl ExecCtx {
                         OpCode::DivInt => OpCode::Div,
                         OpCode::ModInt => OpCode::Mod,
                         OpCode::PowInt => OpCode::Pow,
-                        _ => unreachable!(),
+                        _ => unreachable!("{op:?} has no generic int-arith counterpart; the enclosing arm matches only Add/Sub/Mul/Div/Mod/PowInt"),
                     };
                     self.exec_arith(generic_op, a, b)?
                 };
@@ -165,7 +165,7 @@ impl ExecCtx {
                         OpCode::GteInt => a_val >= b_val,
                         OpCode::EqInt => a_val == b_val,
                         OpCode::NeqInt => a_val != b_val,
-                        _ => unreachable!(),
+                        _ => unreachable!("{op:?} reached the int-compare body; the enclosing arm matches only Lt/Gt/Lte/Gte/Eq/NeqInt"),
                     };
                     VmValue::from_bool(cmp_res)
                 } else {
@@ -176,7 +176,7 @@ impl ExecCtx {
                         OpCode::GteInt => OpCode::Gte,
                         OpCode::EqInt => OpCode::Eq,
                         OpCode::NeqInt => OpCode::Neq,
-                        _ => unreachable!(),
+                        _ => unreachable!("{op:?} has no generic int-compare counterpart; the enclosing arm matches only Lt/Gt/Lte/Gte/Eq/NeqInt"),
                     };
                     self.exec_cmp(generic_op, a, b)
                 };
@@ -223,7 +223,7 @@ impl ExecCtx {
                         OpCode::PowFloat => {
                             VmValue::from_f64(self.heap.to_f64_val(a).powf(self.heap.to_f64_val(b)))
                         }
-                        _ => unreachable!(),
+                        _ => unreachable!("{op:?} reached the float-arith body; the enclosing arm matches only Add/Sub/Mul/Div/Mod/PowFloat"),
                     }
                 } else {
                     let generic_op = match op {
@@ -233,7 +233,7 @@ impl ExecCtx {
                         OpCode::DivFloat => OpCode::Div,
                         OpCode::ModFloat => OpCode::Mod,
                         OpCode::PowFloat => OpCode::Pow,
-                        _ => unreachable!(),
+                        _ => unreachable!("{op:?} has no generic float-arith counterpart; the enclosing arm matches only Add/Sub/Mul/Div/Mod/PowFloat"),
                     };
                     self.exec_arith(generic_op, a, b)?
                 };
@@ -250,30 +250,31 @@ impl ExecCtx {
                 let (src1, src2) = (hi(w1), lo(w1));
                 let a = self.stack[base + src1];
                 let b = self.stack[base + src2];
-                let res =
-                    if (a.is_f64() || self.heap.is_int(a)) && (b.is_f64() || self.heap.is_int(b)) {
-                        let cmp_res = match op {
+                let res = if (a.is_f64() || self.heap.is_int(a))
+                    && (b.is_f64() || self.heap.is_int(b))
+                {
+                    let cmp_res = match op {
                             OpCode::LtFloat => self.heap.to_f64_val(a) < self.heap.to_f64_val(b),
                             OpCode::GtFloat => self.heap.to_f64_val(a) > self.heap.to_f64_val(b),
                             OpCode::LteFloat => self.heap.to_f64_val(a) <= self.heap.to_f64_val(b),
                             OpCode::GteFloat => self.heap.to_f64_val(a) >= self.heap.to_f64_val(b),
                             OpCode::EqFloat => self.heap.to_f64_val(a) == self.heap.to_f64_val(b),
                             OpCode::NeqFloat => self.heap.to_f64_val(a) != self.heap.to_f64_val(b),
-                            _ => unreachable!(),
+                            _ => unreachable!("{op:?} reached the float-compare body; the enclosing arm matches only Lt/Gt/Lte/Gte/Eq/NeqFloat"),
                         };
-                        VmValue::from_bool(cmp_res)
-                    } else {
-                        let generic_op = match op {
+                    VmValue::from_bool(cmp_res)
+                } else {
+                    let generic_op = match op {
                             OpCode::LtFloat => OpCode::Lt,
                             OpCode::GtFloat => OpCode::Gt,
                             OpCode::LteFloat => OpCode::Lte,
                             OpCode::GteFloat => OpCode::Gte,
                             OpCode::EqFloat => OpCode::Eq,
                             OpCode::NeqFloat => OpCode::Neq,
-                            _ => unreachable!(),
+                            _ => unreachable!("{op:?} has no generic float-compare counterpart; the enclosing arm matches only Lt/Gt/Lte/Gte/Eq/NeqFloat"),
                         };
-                        self.exec_cmp(generic_op, a, b)
-                    };
+                    self.exec_cmp(generic_op, a, b)
+                };
                 self.stack[base + first_reg] = res;
             }
             OpCode::Eq | OpCode::Neq | OpCode::Lt | OpCode::Lte | OpCode::Gt | OpCode::Gte => {

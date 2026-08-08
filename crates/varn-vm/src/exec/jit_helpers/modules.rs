@@ -4,6 +4,7 @@
 //! top-level await, and the frame that asked for it must be parked and
 //! resumed later, with its ip rewound to re-run the load.
 
+use super::construct::jit_propagate_error;
 use super::suspend::jit_suspend_at;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
@@ -29,10 +30,16 @@ pub(crate) extern "C" fn jit_load_module(
         // Our own frame, taken BEFORE the load: a module that suspends leaves
         // its frame on top of ours, so `frames.last()` is no longer us.
         let self_idx = ctx_ref.frames.len() - 1;
+        // A failed import is the user's problem, not ours: a missing file or a
+        // module that throws while evaluating must surface as a catchable Varn
+        // error, exactly as it does interpreted (`op_load_module` propagates
+        // with `?`). Panicking here killed the host process instead, so the
+        // same `import` was catchable or fatal depending on whether the
+        // importing function happened to be compiled.
         let loaded =
             match ctx_ref.load_module_from_source(&spec, &closure_ref.proto.chunk.source_file) {
                 Ok(v) => v,
-                Err(e) => panic!("JIT load_module failed: {:?}", e),
+                Err(e) => jit_propagate_error(ctx_ref, e),
             };
         if ctx_ref.vm_suspend.is_some() {
             jit_suspend_at(ctx_ref, self_idx, own_ip);
@@ -103,15 +110,13 @@ pub(crate) extern "C" fn jit_load_module_by_idx(
             Some(s) => s,
             None => return VmValue::null(),
         };
+        // Same reasoning as `jit_load_module`: a failed import is a catchable
+        // Varn error, not a host abort. The `eprintln!` that used to accompany
+        // the panic went with it — the error now carries the specifier and
+        // reaches the user through the normal reporting path.
         match ctx_ref.load_module_from_source(&spec, &closure_ref.proto.chunk.source_file) {
             Ok(v) => v,
-            Err(e) => {
-                eprintln!(
-                    "JIT load_module_by_idx spec='{}', src='{}', err={:?}",
-                    spec, closure_ref.proto.chunk.source_file, e
-                );
-                panic!("JIT load_module failed: {:?}", e);
-            }
+            Err(e) => jit_propagate_error(ctx_ref, e),
         }
     }
 }
