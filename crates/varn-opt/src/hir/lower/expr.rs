@@ -229,9 +229,7 @@ impl<'a> Lowerer<'a> {
                 // method-form codegen (VM reads args[1]; JIT inlines
                 // fabs/sqrtsd/roundsd). Keyed at the callee identifier offset.
                 if let ExprKind::Identifier { .. } = &callee.kind {
-                    if let Some(wire_byte) =
-                        self.ann.get_intrinsic(callee.range.start.offset)
-                    {
+                    if let Some(wire_byte) = self.ann.get_intrinsic(callee.range.start.offset) {
                         let has_spread = args.iter().any(|a| matches!(a, Arg::Spread(_)));
                         if !has_spread {
                             let hargs = self.lower_call_args(args, offset, scope)?;
@@ -413,7 +411,12 @@ impl<'a> Lowerer<'a> {
                         if self.ann.get_slot_idx(offset).is_some() {
                             let slot_idx = self.ann.get_slot_idx(offset).unwrap() as u16;
                             HirOptionalProperty::ModuleSlot(slot_idx)
-                        } else if let Some(mangled) = self.extension_members.get(&property.range.start.offset).or_else(|| self.extension_members.get(&offset)).cloned() {
+                        } else if let Some(mangled) = self
+                            .extension_members
+                            .get(&property.range.start.offset)
+                            .or_else(|| self.extension_members.get(&offset))
+                            .cloned()
+                        {
                             HirOptionalProperty::Extension(mangled)
                         } else {
                             HirOptionalProperty::Member(name)
@@ -456,7 +459,12 @@ impl<'a> Lowerer<'a> {
                     });
                 }
 
-                if let Some(mangled) = self.extension_members.get(&property.range.start.offset).or_else(|| self.extension_members.get(&offset)).cloned() {
+                if let Some(mangled) = self
+                    .extension_members
+                    .get(&property.range.start.offset)
+                    .or_else(|| self.extension_members.get(&offset))
+                    .cloned()
+                {
                     let recv = self.lower_expr(object, scope)?;
                     return Ok(self.ext_global_call(mangled, recv, vec![]));
                 }
@@ -1200,7 +1208,9 @@ impl<'a> Lowerer<'a> {
                 HirTypeTest::TypeofEq(Rc::from(IntrinsicType::from(*tt).as_str()))
             }
             TypeKind::Named(name, _) => match IntrinsicType::from_str(name) {
-                Some(it) if it.is_scalar_primitive() => HirTypeTest::TypeofEq(Rc::from(it.as_str())),
+                Some(it) if it.is_scalar_primitive() => {
+                    HirTypeTest::TypeofEq(Rc::from(it.as_str()))
+                }
                 _ => {
                     let name_rc = Rc::from(name.as_str());
                     let binding = self.global_binding(name_rc);

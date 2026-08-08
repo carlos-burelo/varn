@@ -1,5 +1,5 @@
-use crate::frame::{CallFrame, TryHandler};
 use crate::closure::VmUpvalue;
+use crate::frame::{CallFrame, TryHandler};
 use crate::globals::GlobalStore;
 use crate::heap::Heap;
 use crate::loader::ModuleLoader;

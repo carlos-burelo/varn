@@ -81,4 +81,3 @@ pub(crate) extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usi
         ctx_ref.heap.intern(variant)
     }
 }
-

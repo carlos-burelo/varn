@@ -129,7 +129,11 @@ mod tests {
             ("ab", -700, "ab-700"),
             ("prefix", -1, "prefix-1"),
             // Exactly INLINE_STR_CAP (37): 34 chars + "123".
-            ("abcdefghijklmnopqrstuvwxyz01234567", 123, "abcdefghijklmnopqrstuvwxyz01234567123"),
+            (
+                "abcdefghijklmnopqrstuvwxyz01234567",
+                123,
+                "abcdefghijklmnopqrstuvwxyz01234567123",
+            ),
         ];
         for (l, r, want) in cases {
             let a = h.alloc_str_dynamic(l);
@@ -143,26 +147,38 @@ mod tests {
         // At or below the 5-byte SSO cap, the inline path now hands back the
         // bytes it already built as an SSO value instead of declining and
         // making the general path re-render both operands from scratch.
-        for (l, r, want) in [("", 0i64, "0"), ("gc_", 1, "gc_1"), ("ab", -7, "ab-7"), ("", -1, "-1")] {
+        for (l, r, want) in [
+            ("", 0i64, "0"),
+            ("gc_", 1, "gc_1"),
+            ("ab", -7, "ab-7"),
+            ("", -1, "-1"),
+        ] {
             let a = h.alloc_str_dynamic(l);
             let b = VmValue::from_int(r);
             let got = h
                 .alloc_str_concat_inline(a, b)
                 .unwrap_or_else(|| panic!("SSO-sized result ({l:?} + {r}) must not decline"));
-            assert!(got.is_sso(), "{want:?} should be an SSO value, not a heap string");
+            assert!(
+                got.is_sso(),
+                "{want:?} should be an SSO value, not a heap string"
+            );
             assert_eq!(h.str_repr(got), want);
         }
 
         // One past INLINE_STR_CAP must decline.
         let long = h.alloc_str_dynamic("abcdefghijklmnopqrstuvwxyz012345678");
         assert!(
-            h.alloc_str_concat_inline(long, VmValue::from_int(123)).is_none(),
+            h.alloc_str_concat_inline(long, VmValue::from_int(123))
+                .is_none(),
             "38-byte result must decline"
         );
 
         // A non-int right operand must decline.
         let s = h.alloc_str_dynamic("x");
-        assert!(h.alloc_str_concat_inline(s, s).is_none(), "non-int rhs must decline");
+        assert!(
+            h.alloc_str_concat_inline(s, s).is_none(),
+            "non-int rhs must decline"
+        );
 
         // Non-ASCII left operand still round-trips (bytes are copied whole).
         let uni = h.alloc_str_dynamic("日本語のプレフィックス");
@@ -185,11 +201,15 @@ mod tests {
         // 43 bytes on its own — already past INLINE_STR_CAP (37) with zero
         // digits appended, so the decline must not depend on `b` at all.
         let prefix = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG";
-        assert!(prefix.len() > INLINE_STR_CAP, "fixture must exceed INLINE_STR_CAP on its own");
+        assert!(
+            prefix.len() > INLINE_STR_CAP,
+            "fixture must exceed INLINE_STR_CAP on its own"
+        );
 
         let a = h.alloc_str_dynamic(prefix);
         assert!(
-            h.alloc_str_concat_inline(a, VmValue::from_int(123)).is_none(),
+            h.alloc_str_concat_inline(a, VmValue::from_int(123))
+                .is_none(),
             "oversized prefix must decline regardless of digit count"
         );
 
@@ -212,7 +232,10 @@ mod tests {
             let got = h
                 .alloc_str_concat_inline(a, VmValue::from_int(r))
                 .expect("sso-sized result must not be declined");
-            assert!(got.is_sso(), "{want:?} should be an SSO value, not a heap string");
+            assert!(
+                got.is_sso(),
+                "{want:?} should be an SSO value, not a heap string"
+            );
             assert_eq!(h.str_repr(got), want);
         }
 

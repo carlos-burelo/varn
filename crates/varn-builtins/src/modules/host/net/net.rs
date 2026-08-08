@@ -1,10 +1,10 @@
+use std::collections::HashMap;
+use std::io::{Read, Write};
+use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
 use urlencoding::{decode, encode};
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, Value, VmValue};
-use std::sync::atomic::{AtomicI64, Ordering};
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex, OnceLock};
-use std::io::{Read, Write};
 
 static NEXT_SOCKET_ID: AtomicI64 = AtomicI64::new(1);
 
@@ -14,7 +14,8 @@ fn listeners() -> &'static Mutex<HashMap<i64, Arc<std::net::TcpListener>>> {
 }
 
 fn streams() -> &'static Mutex<HashMap<i64, Arc<Mutex<std::net::TcpStream>>>> {
-    static INSTANCE: OnceLock<Mutex<HashMap<i64, Arc<Mutex<std::net::TcpStream>>>>> = OnceLock::new();
+    static INSTANCE: OnceLock<Mutex<HashMap<i64, Arc<Mutex<std::net::TcpStream>>>>> =
+        OnceLock::new();
     INSTANCE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 

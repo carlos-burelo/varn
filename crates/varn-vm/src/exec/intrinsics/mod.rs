@@ -14,7 +14,11 @@ use varn_core::intrinsic_ops::wire::{decode, IntrinsicDomain};
 /// drift apart in the int-result re-boxing or anywhere else.
 pub(crate) fn dispatch_unary(wire_byte: u8, x: VmValue) -> VmResult<VmValue> {
     let (domain, op) = decode(wire_byte);
-    debug_assert_eq!(domain, IntrinsicDomain::Math as u8, "IntrinsicDirect is math-only");
+    debug_assert_eq!(
+        domain,
+        IntrinsicDomain::Math as u8,
+        "IntrinsicDirect is math-only"
+    );
     math::dispatch(op, &[VmValue::null(), x])
 }
 

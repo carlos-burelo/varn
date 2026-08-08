@@ -401,7 +401,6 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
     })
 }
 
-
 fn numeric_ty(ann: &TypeAnnotations, offset: u32) -> HirType {
     match ann.get_numeric(offset) {
         Some(NumericKind::Int) => HirType::Int,
@@ -592,10 +591,7 @@ impl<'a> Lowerer<'a> {
         match pat {
             Pattern::Identifier { name, .. } => {
                 let target = self.global_binding(name.clone());
-                out.push(HirStmt::Assign {
-                    target,
-                    value: src,
-                });
+                out.push(HirStmt::Assign { target, value: src });
             }
             Pattern::Array { elements, rest, .. } => {
                 let tmp = scope.alloc_temp();

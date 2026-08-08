@@ -124,7 +124,8 @@ impl ExecCtx {
         'frame_loop: while (*ctx).frames.len() > depth {
             let frame_idx = (*ctx).frames.len() - 1;
 
-            let closure_ptr: *const crate::closure::VmClosure = (*ctx).frames[frame_idx].closure_ptr;
+            let closure_ptr: *const crate::closure::VmClosure =
+                (*ctx).frames[frame_idx].closure_ptr;
             let closure = unsafe { &*closure_ptr };
 
             let is_first_entry = (*ctx).frames[frame_idx].ip == 0;
@@ -534,12 +535,17 @@ impl ExecCtx {
                             while !(*ctx).frames.is_empty() {
                                 let cur_ip = (*ctx).frames.last().unwrap().ip as u32;
                                 let proto = &(*ctx).frames.last().unwrap().closure().proto;
-                                if let Some(range) = proto.exception_table.iter().find(|r| cur_ip >= r.try_start_ip && cur_ip <= r.try_end_ip) {
+                                if let Some(range) = proto
+                                    .exception_table
+                                    .iter()
+                                    .find(|r| cur_ip >= r.try_start_ip && cur_ip <= r.try_end_ip)
+                                {
                                     let catch_ip = range.catch_ip as usize;
                                     let err_reg = range.err_reg as usize;
                                     let f2 = (*ctx).frames.len() - 1;
                                     let b2 = (*ctx).frames[f2].base;
-                                    let required_depth = b2 + (*ctx).frames[f2].closure().proto.register_count as usize;
+                                    let required_depth = b2
+                                        + (*ctx).frames[f2].closure().proto.register_count as usize;
                                     (*ctx).stack.truncate(required_depth);
                                     let slot = b2 + err_reg;
                                     if slot < (*ctx).stack.len() {
@@ -718,7 +724,9 @@ impl ExecCtx {
                                     (*ctx).settings,
                                 ));
                             let val = (*ctx).heap.alloc_vm_closure(vm_closure);
-                            (*ctx).static_closures.insert(proto_ptr, (proto.clone(), val));
+                            (*ctx)
+                                .static_closures
+                                .insert(proto_ptr, (proto.clone(), val));
                             val
                         };
                         (*ctx).stack[base + dest] = val;

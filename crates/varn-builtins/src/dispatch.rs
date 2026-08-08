@@ -53,7 +53,8 @@ pub fn iter_native_ops() -> impl Iterator<Item = &'static NativeOpEntry> {
     }
 }
 
-static FALLBACK_ENTRIES: OnceLock<std::sync::Mutex<Vec<&'static [&'static NativeOpEntry]>>> = OnceLock::new();
+static FALLBACK_ENTRIES: OnceLock<std::sync::Mutex<Vec<&'static [&'static NativeOpEntry]>>> =
+    OnceLock::new();
 
 pub fn register_fallback_module_entries(entries: &'static [&'static NativeOpEntry]) {
     let mutex = FALLBACK_ENTRIES.get_or_init(|| std::sync::Mutex::new(Vec::new()));

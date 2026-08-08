@@ -163,11 +163,11 @@ fn array_iter_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue,
         .copied()
         .ok_or("array_iter_next: missing receiver")?;
     let arr_nv = ctx.get_field(obj_nv, "__arr").unwrap_or(VmValue::null());
-    let idx = ctx.as_int(ctx
-        .get_field(obj_nv, "__idx")
-        .unwrap_or(VmValue::null()));
+    let idx = ctx.as_int(ctx.get_field(obj_nv, "__idx").unwrap_or(VmValue::null()));
     let arr_len = ctx.array_len(arr_nv);
-    let result_nv = ctx.get_field(obj_nv, "__res").unwrap_or_else(|| ctx.alloc_object());
+    let result_nv = ctx
+        .get_field(obj_nv, "__res")
+        .unwrap_or_else(|| ctx.alloc_object());
     if idx as usize >= arr_len {
         ctx.set_field(result_nv, "value", VmValue::null());
         ctx.set_field(result_nv, "done", VmValue::from_bool(true));
@@ -213,15 +213,15 @@ fn range_iter_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue,
         .first()
         .copied()
         .ok_or("range_iter_next: missing receiver")?;
-    let cur = ctx
-        .as_int(ctx.get_field(obj_nv, "__cur").unwrap_or(VmValue::null()));
-    let end = ctx
-        .as_int(ctx.get_field(obj_nv, "__end").unwrap_or(VmValue::null()));
+    let cur = ctx.as_int(ctx.get_field(obj_nv, "__cur").unwrap_or(VmValue::null()));
+    let end = ctx.as_int(ctx.get_field(obj_nv, "__end").unwrap_or(VmValue::null()));
     let step = ctx
         .get_field(obj_nv, "__step")
         .map(|v| ctx.as_int(v))
         .unwrap_or(1);
-    let result_nv = ctx.get_field(obj_nv, "__res").unwrap_or_else(|| ctx.alloc_object());
+    let result_nv = ctx
+        .get_field(obj_nv, "__res")
+        .unwrap_or_else(|| ctx.alloc_object());
     if cur >= end {
         ctx.set_field(result_nv, "value", VmValue::null());
         ctx.set_field(result_nv, "done", VmValue::from_bool(true));
@@ -242,7 +242,11 @@ fn generator_symbol_iterator(
     Ok(args.first().copied().unwrap_or(VmValue::null()))
 }
 
-pub(crate) fn bind_method(receiver: VmValue, method: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
+pub(crate) fn bind_method(
+    receiver: VmValue,
+    method: VmValue,
+    heap: &mut Heap,
+) -> VmResult<VmValue> {
     let recv_val = heap.extract(receiver);
     let method_val = heap.extract(method);
     match method_val {

@@ -1,9 +1,8 @@
+use crate::closure::VmClosure;
 use crate::error::VmResult;
 use crate::exec::ctx::ExecCtx;
-use crate::closure::VmClosure;
 use crate::value::VmValue;
 use varn_core::OpCode;
-
 
 use super::{hi, lo};
 
@@ -194,11 +193,19 @@ impl ExecCtx {
                 let (src1, src2) = (hi(w1), lo(w1));
                 let a = self.stack[base + src1];
                 let b = self.stack[base + src2];
-                let res = if (a.is_f64() || self.heap.is_int(a)) && (b.is_f64() || self.heap.is_int(b)) {
+                let res = if (a.is_f64() || self.heap.is_int(a))
+                    && (b.is_f64() || self.heap.is_int(b))
+                {
                     match op {
-                        OpCode::AddFloat => VmValue::from_f64(self.heap.to_f64_val(a) + self.heap.to_f64_val(b)),
-                        OpCode::SubFloat => VmValue::from_f64(self.heap.to_f64_val(a) - self.heap.to_f64_val(b)),
-                        OpCode::MulFloat => VmValue::from_f64(self.heap.to_f64_val(a) * self.heap.to_f64_val(b)),
+                        OpCode::AddFloat => {
+                            VmValue::from_f64(self.heap.to_f64_val(a) + self.heap.to_f64_val(b))
+                        }
+                        OpCode::SubFloat => {
+                            VmValue::from_f64(self.heap.to_f64_val(a) - self.heap.to_f64_val(b))
+                        }
+                        OpCode::MulFloat => {
+                            VmValue::from_f64(self.heap.to_f64_val(a) * self.heap.to_f64_val(b))
+                        }
                         OpCode::DivFloat => {
                             let bv = self.heap.to_f64_val(b);
                             if bv == 0.0 {
@@ -213,7 +220,9 @@ impl ExecCtx {
                             }
                             VmValue::from_f64(self.heap.to_f64_val(a) % bv)
                         }
-                        OpCode::PowFloat => VmValue::from_f64(self.heap.to_f64_val(a).powf(self.heap.to_f64_val(b))),
+                        OpCode::PowFloat => {
+                            VmValue::from_f64(self.heap.to_f64_val(a).powf(self.heap.to_f64_val(b)))
+                        }
                         _ => unreachable!(),
                     }
                 } else {
@@ -241,29 +250,30 @@ impl ExecCtx {
                 let (src1, src2) = (hi(w1), lo(w1));
                 let a = self.stack[base + src1];
                 let b = self.stack[base + src2];
-                let res = if (a.is_f64() || self.heap.is_int(a)) && (b.is_f64() || self.heap.is_int(b)) {
-                    let cmp_res = match op {
-                        OpCode::LtFloat => self.heap.to_f64_val(a) < self.heap.to_f64_val(b),
-                        OpCode::GtFloat => self.heap.to_f64_val(a) > self.heap.to_f64_val(b),
-                        OpCode::LteFloat => self.heap.to_f64_val(a) <= self.heap.to_f64_val(b),
-                        OpCode::GteFloat => self.heap.to_f64_val(a) >= self.heap.to_f64_val(b),
-                        OpCode::EqFloat => self.heap.to_f64_val(a) == self.heap.to_f64_val(b),
-                        OpCode::NeqFloat => self.heap.to_f64_val(a) != self.heap.to_f64_val(b),
-                        _ => unreachable!(),
+                let res =
+                    if (a.is_f64() || self.heap.is_int(a)) && (b.is_f64() || self.heap.is_int(b)) {
+                        let cmp_res = match op {
+                            OpCode::LtFloat => self.heap.to_f64_val(a) < self.heap.to_f64_val(b),
+                            OpCode::GtFloat => self.heap.to_f64_val(a) > self.heap.to_f64_val(b),
+                            OpCode::LteFloat => self.heap.to_f64_val(a) <= self.heap.to_f64_val(b),
+                            OpCode::GteFloat => self.heap.to_f64_val(a) >= self.heap.to_f64_val(b),
+                            OpCode::EqFloat => self.heap.to_f64_val(a) == self.heap.to_f64_val(b),
+                            OpCode::NeqFloat => self.heap.to_f64_val(a) != self.heap.to_f64_val(b),
+                            _ => unreachable!(),
+                        };
+                        VmValue::from_bool(cmp_res)
+                    } else {
+                        let generic_op = match op {
+                            OpCode::LtFloat => OpCode::Lt,
+                            OpCode::GtFloat => OpCode::Gt,
+                            OpCode::LteFloat => OpCode::Lte,
+                            OpCode::GteFloat => OpCode::Gte,
+                            OpCode::EqFloat => OpCode::Eq,
+                            OpCode::NeqFloat => OpCode::Neq,
+                            _ => unreachable!(),
+                        };
+                        self.exec_cmp(generic_op, a, b)
                     };
-                    VmValue::from_bool(cmp_res)
-                } else {
-                    let generic_op = match op {
-                        OpCode::LtFloat => OpCode::Lt,
-                        OpCode::GtFloat => OpCode::Gt,
-                        OpCode::LteFloat => OpCode::Lte,
-                        OpCode::GteFloat => OpCode::Gte,
-                        OpCode::EqFloat => OpCode::Eq,
-                        OpCode::NeqFloat => OpCode::Neq,
-                        _ => unreachable!(),
-                    };
-                    self.exec_cmp(generic_op, a, b)
-                };
                 self.stack[base + first_reg] = res;
             }
             OpCode::Eq | OpCode::Neq | OpCode::Lt | OpCode::Lte | OpCode::Gt | OpCode::Gte => {
@@ -294,7 +304,8 @@ impl ExecCtx {
                 // for what that one does in one, and no accumulation path at
                 // all, so a concat loop was quadratic here and linear through
                 // the generic `Add`.
-                self.stack[base + first_reg] = crate::exec::strings::str_concat(a, b, &mut self.heap);
+                self.stack[base + first_reg] =
+                    crate::exec::strings::str_concat(a, b, &mut self.heap);
             }
             OpCode::BuildStr => {
                 let count = hi(code[*ip]);
@@ -308,7 +319,8 @@ impl ExecCtx {
                 let mut out = crate::strbuf::StrBuf::new();
                 for i in 0..count {
                     let reg_idx = hi(code[*ip + i]);
-                    self.heap.str_repr_into(self.stack[base + reg_idx], &mut out);
+                    self.heap
+                        .str_repr_into(self.stack[base + reg_idx], &mut out);
                 }
                 *ip += count;
                 self.stack[base + first_reg] = self.heap.alloc_str_dynamic(out.as_str());

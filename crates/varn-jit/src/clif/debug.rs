@@ -195,10 +195,10 @@ pub(super) fn capture_roots(
     });
 }
 
-use varn_types::{FunctionProto, VmValue};
-use cranelift_codegen::isa::OwnedTargetIsa;
-use crate::JitHelpers;
 use super::lower::{try_compile, ClifLinker};
+use crate::JitHelpers;
+use cranelift_codegen::isa::OwnedTargetIsa;
+use varn_types::{FunctionProto, VmValue};
 
 /// Everything `vn debug -p clif` shows for one function.
 pub struct ClifInspection {
@@ -252,7 +252,15 @@ fn inspect_with(
         want_roots,
         ..Default::default()
     };
-    let result = try_compile(proto, constants, helpers, isa, linker, None, Some(&mut sink));
+    let result = try_compile(
+        proto,
+        constants,
+        helpers,
+        isa,
+        linker,
+        None,
+        Some(&mut sink),
+    );
     let (route, frame_aware) = match &result {
         Ok(art) => (Ok(()), art.frame_aware),
         Err(e) => (Err(e.clone()), false),

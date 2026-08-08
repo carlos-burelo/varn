@@ -1,5 +1,5 @@
-mod heap;
 pub mod channel;
+mod heap;
 mod runner;
 pub mod scheduler;
 mod suspend;

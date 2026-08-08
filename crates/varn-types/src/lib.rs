@@ -16,7 +16,7 @@ pub use chunk::{Chunk, FunctionProto, Literal, PoolEntry};
 pub use generator::{AsyncQueue, GenChannel, GeneratorDriver, GeneratorObj};
 pub use marshal::{FromVm, IntoVm, VnArray, VnStr};
 pub use module_graph::{ModuleGraphArtifact, PackageNode};
-pub use native::{call_static_with, NativeFn, NativeOpEntry, ArgType, SignatureDescriptor};
+pub use native::{call_static_with, ArgType, NativeFn, NativeOpEntry, SignatureDescriptor};
 pub use native_ctx::NativeCtx;
 pub use native_ctx::NativeFnResult;
 pub use resource::ResourceStore;

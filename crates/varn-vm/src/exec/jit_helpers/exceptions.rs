@@ -42,4 +42,3 @@ pub(crate) extern "C" fn jit_throw(ctx: *mut ExecCtx, error: VmValue) {
         }
     }
 }
-

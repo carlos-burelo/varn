@@ -212,8 +212,6 @@ pub(super) fn object_matches_class_members(
     true
 }
 
-
-
 fn fn_signature_compatible_type(
     params: &[FunctionParam],
     return_type: &Type,
@@ -275,4 +273,3 @@ pub(super) fn types_compatible_with_fn_signature(
         }
     }
 }
-

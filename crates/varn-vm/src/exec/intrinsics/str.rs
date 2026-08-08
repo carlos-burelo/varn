@@ -67,7 +67,9 @@ impl StrHandle {
 /// Optional int argument: absent or null both mean "not provided".
 #[inline]
 fn opt_int(args: &[VmValue], i: usize, heap: &Heap) -> Option<i64> {
-    args.get(i).filter(|v| !v.is_null()).map(|&v| heap.as_int(v))
+    args.get(i)
+        .filter(|v| !v.is_null())
+        .map(|&v| heap.as_int(v))
 }
 
 #[inline]

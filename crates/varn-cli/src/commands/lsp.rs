@@ -11,5 +11,3 @@ pub fn execute(args: LspArgs) -> Result<(), CliError> {
     }
     Ok(())
 }
-
-

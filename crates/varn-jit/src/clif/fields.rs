@@ -73,9 +73,12 @@ fn emit_object_field_addr(
         );
         (base, raw)
     } else {
-        let base_old = b
-            .ins()
-            .load(types::I64, m, rc, (alay.slots_vec_off + alay.slots_ptr_off) as i32);
+        let base_old = b.ins().load(
+            types::I64,
+            m,
+            rc,
+            (alay.slots_vec_off + alay.slots_ptr_off) as i32,
+        );
         let base_nur = b.ins().load(
             types::I64,
             m,
@@ -98,12 +101,16 @@ fn emit_object_field_addr(
     b.switch_to_block(ok);
 
     // 4. Load the object's ObjData pointer.
-    let objdata = b.ins().load(types::I64, m, slot_addr, olay.payload_off as i32);
+    let objdata = b
+        .ins()
+        .load(types::I64, m, slot_addr, olay.payload_off as i32);
 
     // 5. slot < inline_len — fields past the inline tail spilled to the
     //    overflow store, which only the helper can read/write.
     let len = b.ins().load(types::I32, m, objdata, olay.len_off as i32);
-    let in_bounds = b.ins().icmp_imm(IntCC::UnsignedGreaterThan, len, slot as i64);
+    let in_bounds = b
+        .ins()
+        .icmp_imm(IntCC::UnsignedGreaterThan, len, slot as i64);
     let ok2 = b.create_block();
     b.ins().brif(in_bounds, ok2, &[], slow, &[]);
     b.switch_to_block(ok2);
@@ -137,7 +144,12 @@ pub(super) fn emit_get_fixed_field(
 
     b.switch_to_block(slow);
     let slot_v = b.ins().iconst(types::I64, slot as i64);
-    let res = call_helper(b, c.cc, c.helpers.get_fixed_field, &[c.exec_ctx, obj, slot_v]);
+    let res = call_helper(
+        b,
+        c.cc,
+        c.helpers.get_fixed_field,
+        &[c.exec_ctx, obj, slot_v],
+    );
     b.ins().jump(cont, &[res.into()]);
 
     b.switch_to_block(cont);

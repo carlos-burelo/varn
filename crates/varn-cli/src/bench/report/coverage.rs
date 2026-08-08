@@ -16,9 +16,9 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use varn_vm::varn_jit::{CompileOutcome, CompileRecord, JitStatsSnapshot};
 use varn_utilities::chalk::chalk;
 use varn_utilities::terminal;
+use varn_vm::varn_jit::{CompileOutcome, CompileRecord, JitStatsSnapshot};
 
 use super::fmt::{fmt_bytes, fmt_dur, fmt_num, fmt_pct, row, LABEL_WIDTH, VALUE_WIDTH};
 
@@ -184,10 +184,7 @@ pub fn print_coverage(jit: &JitStatsSnapshot, records: &[CompileRecord], scope: 
         ));
     }
 
-    let mut by_cost: Vec<&CompileRecord> = records
-        .iter()
-        .filter(|r| r.compile_ns > 0)
-        .collect();
+    let mut by_cost: Vec<&CompileRecord> = records.iter().filter(|r| r.compile_ns > 0).collect();
     by_cost.sort_by(|a, b| b.compile_ns.cmp(&a.compile_ns));
     if !by_cost.is_empty() {
         let top = by_cost

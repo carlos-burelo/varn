@@ -131,11 +131,17 @@ impl Binder {
     }
 
     fn find_candidate(&self, name: &str) -> Option<&ArrayCandidate> {
-        self.array_watch.iter().rev().find(|c| c.name.as_ref() == name)
+        self.array_watch
+            .iter()
+            .rev()
+            .find(|c| c.name.as_ref() == name)
     }
 
     fn find_candidate_mut(&mut self, name: &str) -> Option<&mut ArrayCandidate> {
-        self.array_watch.iter_mut().rev().find(|c| c.name.as_ref() == name)
+        self.array_watch
+            .iter_mut()
+            .rev()
+            .find(|c| c.name.as_ref() == name)
     }
 
     /// Records a `x.push(value)` / `x[i] = value` write against the
@@ -215,8 +221,7 @@ impl Binder {
                 if !c.escaped && !c.conflict {
                     if let Some(elem) = c.elem_ty {
                         let offset = self.arena.get(c.sym_id).offset;
-                        self.evolved_array_types
-                            .insert(offset, Type::array(elem));
+                        self.evolved_array_types.insert(offset, Type::array(elem));
                     }
                 }
             } else {

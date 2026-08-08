@@ -25,7 +25,9 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
     let test_files = discover_test_files(args.path.as_deref())?;
 
     if test_files.is_empty() {
-        return Err(CliError::usage("No test files (.vn) found matching the specified path"));
+        return Err(CliError::usage(
+            "No test files (.vn) found matching the specified path",
+        ));
     }
 
     // 2. Filter test files if --filter is provided
@@ -33,9 +35,7 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
         let filter_lc = filter.to_lowercase();
         test_files
             .into_iter()
-            .filter(|p| {
-                p.to_string_lossy().to_lowercase().contains(&filter_lc)
-            })
+            .filter(|p| p.to_string_lossy().to_lowercase().contains(&filter_lc))
             .collect()
     } else {
         test_files
@@ -49,9 +49,11 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
     }
 
     let total_suites = filtered_files.len();
-    let num_workers = args
-        .jobs
-        .unwrap_or_else(|| std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4));
+    let num_workers = args.jobs.unwrap_or_else(|| {
+        std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(4)
+    });
 
     println!(
         "\n  \x1b[1;36mvarn test\x1b[0m · {} test suite{} found · {} worker{}\n",
@@ -62,12 +64,8 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
     );
 
     // 3. Prepare parallel worker queue
-    let file_queue: std::sync::Mutex<Vec<(usize, PathBuf)>> = std::sync::Mutex::new(
-        filtered_files
-            .into_iter()
-            .enumerate()
-            .collect(),
-    );
+    let file_queue: std::sync::Mutex<Vec<(usize, PathBuf)>> =
+        std::sync::Mutex::new(filtered_files.into_iter().enumerate().collect());
 
     let has_failure = Arc::new(AtomicBool::new(false));
     let suites_passed = Arc::new(AtomicUsize::new(0));
@@ -104,7 +102,9 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
                     guard.pop()
                 };
 
-                let Some((_idx, path)) = item else { break; };
+                let Some((_idx, path)) = item else {
+                    break;
+                };
 
                 let display_name = path
                     .file_name()
@@ -192,7 +192,10 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
         passed_count, total_suites
     );
     if failed_count > 0 {
-        println!("  \x1b[1mStatus:\x1b[0m      \x1b[31m{} failed\x1b[0m", failed_count);
+        println!(
+            "  \x1b[1mStatus:\x1b[0m      \x1b[31m{} failed\x1b[0m",
+            failed_count
+        );
     } else {
         println!("  \x1b[1mStatus:\x1b[0m      \x1b[32mALL TEST SUITES PASSED\x1b[0m");
     }
@@ -245,7 +248,11 @@ fn collect_vn_files_recursively(dir: &Path, acc: &mut Vec<PathBuf>) -> Result<()
         if p.is_dir() {
             // Ignore hidden directories like .git, node_modules, target
             if let Some(name) = p.file_name().and_then(|n| n.to_str()) {
-                if name.starts_with('.') || name == "target" || name == "node_modules" || name == "errors" {
+                if name.starts_with('.')
+                    || name == "target"
+                    || name == "node_modules"
+                    || name == "errors"
+                {
                     continue;
                 }
             }

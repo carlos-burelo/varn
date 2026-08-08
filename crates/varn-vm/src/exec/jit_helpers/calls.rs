@@ -5,8 +5,8 @@
 //! protocol has to come out identical either way.
 
 use super::construct::{jit_construct_fast, jit_propagate_error};
-use crate::exec::frame_ctrl::resolve_constructor_return;
 use crate::exec::ctx::ExecCtx;
+use crate::exec::frame_ctrl::resolve_constructor_return;
 use crate::value::VmValue;
 
 /// Maximum VM call depth before a graceful error is raised. Kept in sync with
@@ -26,7 +26,10 @@ pub(super) unsafe fn jit_guard_call_depth(ctx: &mut ExecCtx) {
     }
 }
 
-pub(crate) extern "C" fn jit_call(ctx: *mut ExecCtx, args: *const varn_jit::JitCallArgs) -> VmValue {
+pub(crate) extern "C" fn jit_call(
+    ctx: *mut ExecCtx,
+    args: *const varn_jit::JitCallArgs,
+) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
 
@@ -46,7 +49,9 @@ pub(crate) extern "C" fn jit_call(ctx: *mut ExecCtx, args: *const varn_jit::JitC
             let heap_obj = ctx_ref.heap.get(args.callee.as_heap_idx());
 
             if let Some(crate::heap::HeapObj::VmClosure(closure)) = heap_obj {
-                let is_eligible = !closure.proto.is_async && !closure.proto.is_generator && !closure.proto.has_rest;
+                let is_eligible = !closure.proto.is_async
+                    && !closure.proto.is_generator
+                    && !closure.proto.has_rest;
 
                 if let Some(jit_fn) = closure.jit_fn().filter(|_| is_eligible) {
                     let callee_base = base + args.arg_start;
@@ -235,7 +240,6 @@ pub(crate) extern "C" fn jit_call_method_flat(
     }
 }
 
-
 /// CLIF call path for everything the direct clif→clif call can't take: an
 /// unlinkable callee, a callee with no published entry yet, or a guard miss
 /// (rebound global, GC-moved closure).
@@ -265,7 +269,10 @@ pub(crate) extern "C" fn clif_call_fallback(
     }
 }
 
-pub(crate) extern "C" fn jit_call_spread(ctx: *mut ExecCtx, args: *const std::ffi::c_void) -> VmValue {
+pub(crate) extern "C" fn jit_call_spread(
+    ctx: *mut ExecCtx,
+    args: *const std::ffi::c_void,
+) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         let args = &*(args as *const varn_jit::JitCallArgs);

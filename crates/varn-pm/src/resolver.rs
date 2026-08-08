@@ -12,9 +12,14 @@ pub fn resolve_version(origin: &DepOrigin) -> Result<ResolvedVersion, String> {
     match origin {
         DepOrigin::LocalPath { path } => {
             if !path.exists() {
-                return Err(format!("local dependency path does not exist: {}", path.display()));
+                return Err(format!(
+                    "local dependency path does not exist: {}",
+                    path.display()
+                ));
             }
-            let version = if let Ok(manifest) = crate::manifest::ProjectManifest::load(&path.join("varn.json")) {
+            let version = if let Ok(manifest) =
+                crate::manifest::ProjectManifest::load(&path.join("varn.json"))
+            {
                 manifest.version.unwrap_or_else(|| "0.0.0-local".to_owned())
             } else {
                 "0.0.0-local".to_owned()
@@ -24,7 +29,12 @@ pub fn resolve_version(origin: &DepOrigin) -> Result<ResolvedVersion, String> {
                 commit: "local".to_owned(),
             })
         }
-        DepOrigin::Remote { host, user, repo, req: req_str } => {
+        DepOrigin::Remote {
+            host,
+            user,
+            repo,
+            req: req_str,
+        } => {
             let req = VersionReq::parse(req_str)
                 .map_err(|e| format!("invalid semver constraint '{req_str}': {e}"))?;
 

@@ -196,7 +196,8 @@ impl LanguageServer for Backend {
             .await;
 
         if let Some(reason) = self.std_error {
-            let msg = format!("Varn stdlib unavailable — `std:` imports will not resolve: {reason}");
+            let msg =
+                format!("Varn stdlib unavailable — `std:` imports will not resolve: {reason}");
             self.client.log_message(MessageType::ERROR, &msg).await;
             self.client.show_message(MessageType::ERROR, msg).await;
         }

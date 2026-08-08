@@ -1,5 +1,5 @@
-use tower_lsp::lsp_types::{CodeLens, Command, Position, Range, Url};
 use crate::document::DocumentState;
+use tower_lsp::lsp_types::{CodeLens, Command, Position, Range, Url};
 
 pub fn build_code_lenses(uri: &Url, analysis: &DocumentState) -> Vec<CodeLens> {
     let mut lenses = Vec::new();

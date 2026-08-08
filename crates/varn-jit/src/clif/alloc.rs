@@ -129,10 +129,7 @@ pub(super) fn has_alloc(
 /// `PopTry` is not enough on its own to matter, and `Throw` unwinds past this
 /// frame rather than into it; `Try` is the opcode that publishes a resume
 /// point inside this function.
-pub(super) fn has_try(
-    code: &[u16],
-    pool: &[varn_types::chunk::PoolEntry],
-) -> Result<bool, String> {
+pub(super) fn has_try(code: &[u16], pool: &[varn_types::chunk::PoolEntry]) -> Result<bool, String> {
     let mut ip = 0usize;
     while ip < code.len() {
         let info = decode(code, ip, pool).ok_or("clif: undecodable opcode")?;
@@ -186,7 +183,10 @@ pub(super) struct AllocCtx<'a> {
 
 /// Address of this frame's register-0 home slot, recomputed from `ExecCtx`
 /// so a `ctx.stack` reallocation can never leave it stale.
-pub(super) fn frame_base_addr(b: &mut FunctionBuilder, actx: &AllocCtx) -> cranelift_codegen::ir::Value {
+pub(super) fn frame_base_addr(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+) -> cranelift_codegen::ir::Value {
     let sp = b.ins().load(
         types::I64,
         MemFlags::trusted(),
@@ -212,7 +212,8 @@ pub(super) fn load_home(
     r: usize,
 ) -> cranelift_codegen::ir::Value {
     let fb = frame_base_addr(b, actx);
-    b.ins().load(types::I64, MemFlags::trusted(), fb, (r * 8) as i32)
+    b.ins()
+        .load(types::I64, MemFlags::trusted(), fb, (r * 8) as i32)
 }
 
 /// Store `reg`'s current value into its `ctx.stack` home slot.
@@ -249,7 +250,8 @@ pub(super) fn def_result(
     } else {
         b.def_var(actx.vars[dest], res);
     }
-    b.ins().store(MemFlags::trusted(), res, fb, (dest * 8) as i32);
+    b.ins()
+        .store(MemFlags::trusted(), res, fb, (dest * 8) as i32);
 }
 
 /// Materialize a `#[repr(C)]` argument struct for a helper that takes a
@@ -282,15 +284,23 @@ pub(super) fn emit_backedge_safepoint(
     payload_caches: &[Variable],
 ) {
     let h = actx.helpers;
-    let rcbox = b
-        .ins()
-        .load(types::I64, MemFlags::trusted(), actx.exec_ctx, h.heap_field_offset as i32);
-    let len = b
-        .ins()
-        .load(types::I64, MemFlags::trusted(), rcbox, h.nursery_len_offset as i32);
-    let over = b
-        .ins()
-        .icmp_imm(IntCC::UnsignedGreaterThanOrEqual, len, h.nursery_threshold as i64);
+    let rcbox = b.ins().load(
+        types::I64,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        h.heap_field_offset as i32,
+    );
+    let len = b.ins().load(
+        types::I64,
+        MemFlags::trusted(),
+        rcbox,
+        h.nursery_len_offset as i32,
+    );
+    let over = b.ins().icmp_imm(
+        IntCC::UnsignedGreaterThanOrEqual,
+        len,
+        h.nursery_threshold as i64,
+    );
     let slow = b.create_block();
     let cont = b.create_block();
     b.ins().brif(over, slow, &[], cont, &[]);
@@ -347,9 +357,7 @@ pub(super) fn live_boxed(actx: &AllocCtx, state: &[K]) -> Vec<usize> {
     let live_nonfloat = (0..actx.nregs)
         .filter(|&r| !meta_is_float(actx.register_meta, r))
         .filter(|&r| actx.live.is_live_after(ip, r));
-    let rooted = |r: usize| {
-        !actx.narrow_roots || state.get(r).copied().map_or(true, is_root_kind)
-    };
+    let rooted = |r: usize| !actx.narrow_roots || state.get(r).copied().map_or(true, is_root_kind);
     let regs: Vec<usize> = live_nonfloat.clone().filter(|&r| rooted(r)).collect();
     if let Some(rec) = &actx.safepoints {
         let unboxed: Vec<usize> = live_nonfloat.filter(|&r| !rooted(r)).collect();
@@ -700,7 +708,12 @@ pub(super) fn emit_array_push(
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
 
-    call_helper_void(b, actx.cc, actx.helpers.array_push, &[actx.exec_ctx, arr, val]);
+    call_helper_void(
+        b,
+        actx.cc,
+        actx.helpers.array_push,
+        &[actx.exec_ctx, arr, val],
+    );
 
     reload_boxed(b, actx, state, &regs);
 }
@@ -759,23 +772,27 @@ pub(super) fn emit_call_native_op(
             let arg_ty = sig_desc.param_types[i];
             match arg_ty {
                 varn_types::ArgType::Int => {
-                    sig.params.push(cranelift_codegen::ir::AbiParam::new(types::I64));
+                    sig.params
+                        .push(cranelift_codegen::ir::AbiParam::new(types::I64));
                     let v = use_int(b, actx.vars, state, r)?;
                     raw_args.push(v);
                 }
                 varn_types::ArgType::Float => {
-                    sig.params.push(cranelift_codegen::ir::AbiParam::new(types::F64));
+                    sig.params
+                        .push(cranelift_codegen::ir::AbiParam::new(types::F64));
                     let f = use_f64(b, actx.vars, state, r)?;
                     raw_args.push(f);
                 }
                 varn_types::ArgType::Bool => {
-                    sig.params.push(cranelift_codegen::ir::AbiParam::new(types::I64));
+                    sig.params
+                        .push(cranelift_codegen::ir::AbiParam::new(types::I64));
                     let boxed = box_or_pass(b, actx.vars, state, r);
                     let b_val = unbox_bool(b, boxed);
                     raw_args.push(b_val);
                 }
                 _ => {
-                    sig.params.push(cranelift_codegen::ir::AbiParam::new(types::I64));
+                    sig.params
+                        .push(cranelift_codegen::ir::AbiParam::new(types::I64));
                     let boxed = box_or_pass(b, actx.vars, state, r);
                     raw_args.push(boxed);
                 }
@@ -784,11 +801,13 @@ pub(super) fn emit_call_native_op(
 
         match sig_desc.return_type {
             varn_types::ArgType::Float => {
-                sig.returns.push(cranelift_codegen::ir::AbiParam::new(types::F64));
+                sig.returns
+                    .push(cranelift_codegen::ir::AbiParam::new(types::F64));
             }
             varn_types::ArgType::Void => {}
             _ => {
-                sig.returns.push(cranelift_codegen::ir::AbiParam::new(types::I64));
+                sig.returns
+                    .push(cranelift_codegen::ir::AbiParam::new(types::I64));
             }
         }
 
@@ -927,12 +946,7 @@ pub(super) fn emit_get_enum_tag(
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
 
-    let res = call_helper(
-        b,
-        actx.cc,
-        actx.helpers.get_enum_tag,
-        &[actx.exec_ctx, val],
-    );
+    let res = call_helper(b, actx.cc, actx.helpers.get_enum_tag, &[actx.exec_ctx, val]);
 
     reload_boxed(b, actx, state, &regs);
 
@@ -969,7 +983,8 @@ pub(super) fn emit_build_str(
         .collect();
 
     for (i, val) in vals.into_iter().enumerate() {
-        b.ins().store(MemFlags::trusted(), val, parts_ptr, (i * 8) as i32);
+        b.ins()
+            .store(MemFlags::trusted(), val, parts_ptr, (i * 8) as i32);
     }
 
     let regs = live_boxed(actx, state);
@@ -1057,12 +1072,7 @@ pub(super) fn emit_to_string(
     }
 }
 
-pub(super) fn emit_load_upvalue(
-    b: &mut FunctionBuilder,
-    actx: &AllocCtx,
-    code: &[u16],
-    ip: usize,
-) {
+pub(super) fn emit_load_upvalue(b: &mut FunctionBuilder, actx: &AllocCtx, code: &[u16], ip: usize) {
     let dest = (code[ip + 1] >> 8) as usize;
     let uv_idx = (code[ip + 1] & 0xFF) as usize;
     let uv_v = b.ins().iconst(types::I64, uv_idx as i64);
@@ -1105,7 +1115,12 @@ pub(super) fn emit_close_upvalue(
     let fb = frame_base_addr(b, actx);
     store_home(b, actx, state, fb, reg);
     let reg_v = b.ins().iconst(types::I64, reg as i64);
-    call_helper_void(b, actx.cc, actx.helpers.close_upvalue, &[actx.exec_ctx, reg_v]);
+    call_helper_void(
+        b,
+        actx.cc,
+        actx.helpers.close_upvalue,
+        &[actx.exec_ctx, reg_v],
+    );
 }
 
 pub(super) fn emit_make_closure(
@@ -1321,12 +1336,7 @@ pub(super) fn emit_set_index(
     reload_boxed(b, actx, state, &regs);
 }
 
-pub(super) fn emit_try_push(
-    b: &mut FunctionBuilder,
-    actx: &AllocCtx,
-    code: &[u16],
-    ip: usize,
-) {
+pub(super) fn emit_try_push(b: &mut FunctionBuilder, actx: &AllocCtx, code: &[u16], ip: usize) {
     let err_reg = (code[ip + 1] >> 8) as u32;
     let offset_hi = code[ip + 2] as usize;
     let offset_lo = code[ip + 3] as usize;
@@ -1342,16 +1352,8 @@ pub(super) fn emit_try_push(
     );
 }
 
-pub(super) fn emit_try_pop(
-    b: &mut FunctionBuilder,
-    actx: &AllocCtx,
-) {
-    call_helper_void(
-        b,
-        actx.cc,
-        actx.helpers.try_pop,
-        &[actx.exec_ctx],
-    );
+pub(super) fn emit_try_pop(b: &mut FunctionBuilder, actx: &AllocCtx) {
+    call_helper_void(b, actx.cc, actx.helpers.try_pop, &[actx.exec_ctx]);
 }
 
 pub(super) fn emit_throw(
@@ -1363,12 +1365,7 @@ pub(super) fn emit_throw(
 ) {
     let src = (code[ip + 1] >> 8) as usize;
     let val = box_or_pass(b, actx.vars, state, src);
-    call_helper_void(
-        b,
-        actx.cc,
-        actx.helpers.throw,
-        &[actx.exec_ctx, val],
-    );
+    call_helper_void(b, actx.cc, actx.helpers.throw, &[actx.exec_ctx, val]);
 }
 
 pub(super) fn emit_yield(
@@ -1435,12 +1432,7 @@ pub(super) fn emit_spawn(
     let val = box_or_pass(b, actx.vars, state, src);
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
-    let res = call_helper(
-        b,
-        actx.cc,
-        actx.helpers.spawn,
-        &[actx.exec_ctx, val],
-    );
+    let res = call_helper(b, actx.cc, actx.helpers.spawn, &[actx.exec_ctx, val]);
     reload_boxed(b, actx, state, &regs);
     def_result(b, actx, dest, res);
 }
@@ -1493,12 +1485,7 @@ pub(super) fn emit_object_rest(
     let ipv = b.ins().iconst(types::I64, (ip + 1) as i64);
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
-    let res = call_helper(
-        b,
-        actx.cc,
-        actx.helpers.object_rest,
-        &[actx.exec_ctx, ipv],
-    );
+    let res = call_helper(b, actx.cc, actx.helpers.object_rest, &[actx.exec_ctx, ipv]);
     reload_boxed(b, actx, state, &regs);
     def_result(b, actx, dest, res);
 }
@@ -1515,12 +1502,7 @@ pub(super) fn emit_object_keys(
     let obj = box_or_pass(b, actx.vars, state, src);
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
-    let res = call_helper(
-        b,
-        actx.cc,
-        actx.helpers.object_keys,
-        &[actx.exec_ctx, obj],
-    );
+    let res = call_helper(b, actx.cc, actx.helpers.object_keys, &[actx.exec_ctx, obj]);
     reload_boxed(b, actx, state, &regs);
     def_result(b, actx, dest, res);
 }
@@ -1646,12 +1628,7 @@ pub(super) fn emit_wrap_spread(
     let val = box_or_pass(b, actx.vars, state, src);
     let regs = live_boxed(actx, state);
     flush_boxed(b, actx, state, &regs);
-    let res = call_helper(
-        b,
-        actx.cc,
-        actx.helpers.wrap_spread,
-        &[actx.exec_ctx, val],
-    );
+    let res = call_helper(b, actx.cc, actx.helpers.wrap_spread, &[actx.exec_ctx, val]);
     reload_boxed(b, actx, state, &regs);
     def_result(b, actx, dest, res);
 }
@@ -1710,7 +1687,9 @@ pub(super) fn emit_call_spread(
 
     reload_boxed(b, actx, state, &regs);
 
-    if meta.get(dest).map_or(false, |m| m.kind == varn_types::register_meta::SlotKind::Int) {
+    if meta.get(dest).map_or(false, |m| {
+        m.kind == varn_types::register_meta::SlotKind::Int
+    }) {
         let s = b.ins().ishl_imm(res, 16);
         let un = b.ins().sshr_imm(s, 16);
         b.def_var(actx.vars[dest], un);
@@ -1759,5 +1738,3 @@ pub(super) fn emit_invoke_runtime_static(
     def_result(b, actx, dest, res);
     Ok(())
 }
-
-

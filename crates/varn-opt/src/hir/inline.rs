@@ -30,9 +30,8 @@ pub fn run(module: &mut HirModule) {
     // inlined. Qualifying here — rather than comparing suffixes at the call
     // site — also keeps `other.vn::helper` from colliding with a same-named
     // local one.
-    let qualified = |name: &Rc<str>| -> Rc<str> {
-        Rc::from(format!("{}::{}", module.source_file, name))
-    };
+    let qualified =
+        |name: &Rc<str>| -> Rc<str> { Rc::from(format!("{}::{}", module.source_file, name)) };
 
     let mut candidates: Candidates = FxHashMap::default();
     for f in &module.functions {
@@ -792,8 +791,7 @@ fn for_each_stmt_expr_mut(s: &mut HirStmt, f: &mut impl FnMut(&mut HirExpr)) {
         | HirStmt::ForIn { object: e, .. }
         | HirStmt::If { test: e, .. }
         | HirStmt::Switch { disc: e, .. } => f(e),
-        HirStmt::SetMember { object, value, .. }
-        | HirStmt::SetFixedField { object, value, .. } => {
+        HirStmt::SetMember { object, value, .. } | HirStmt::SetFixedField { object, value, .. } => {
             f(object);
             f(value);
         }
@@ -844,8 +842,7 @@ pub(crate) fn for_each_stmt_expr<'a>(s: &'a HirStmt, f: &mut impl FnMut(&'a HirE
         | HirStmt::ForIn { object: e, .. }
         | HirStmt::If { test: e, .. }
         | HirStmt::Switch { disc: e, .. } => apply(e),
-        HirStmt::SetMember { object, value, .. }
-        | HirStmt::SetFixedField { object, value, .. } => {
+        HirStmt::SetMember { object, value, .. } | HirStmt::SetFixedField { object, value, .. } => {
             apply(object);
             apply(value);
         }

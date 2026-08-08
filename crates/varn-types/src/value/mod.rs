@@ -10,11 +10,6 @@ mod sendable;
 mod shape;
 mod task;
 mod traits;
-pub use arena::{
-    enter_request_arena, exit_request_arena, request_arena_stats, reset_request_arena,
-    RequestArena,
-};
-pub use buffer::VmBuffer;
 use crate::generator::{AsyncQueue, GeneratorObj};
 pub use crate::native::NativeFn;
 use crate::task::AsyncTask;
@@ -23,6 +18,10 @@ pub use alloc::{
     install_allocator, register_global_vtable, AllocVtable, ArrayRef, MapKey, MapRef, ObjRef,
     RuntimeString, SetRef, ValueMap, ValueSet,
 };
+pub use arena::{
+    enter_request_arena, exit_request_arena, request_arena_stats, reset_request_arena, RequestArena,
+};
+pub use buffer::VmBuffer;
 pub use class::{find_method_with_owner, ClassObj};
 pub use closure::{Closure, Upvalue, UpvalueInner};
 pub use constructors::{new_array, new_object};

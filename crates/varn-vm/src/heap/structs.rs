@@ -1,15 +1,15 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-use rustc_hash::FxHashMap;
-use varn_types::{
-    value::{ArrayRef, MapRef, ObjRef, RuntimeSymbol, SetRef},
-    ClassObj, RuntimeString,
-};
+use super::obj::HeapObj;
 use crate::gc::GcCollector;
 use crate::nursery::Nursery;
 use crate::profile::HotspotCounters;
 use crate::value::VmValue;
-use super::obj::HeapObj;
+use rustc_hash::FxHashMap;
+use std::cell::RefCell;
+use std::rc::Rc;
+use varn_types::{
+    value::{ArrayRef, MapRef, ObjRef, RuntimeSymbol, SetRef},
+    ClassObj, RuntimeString,
+};
 
 #[derive(Clone)]
 pub struct HeapInner {
@@ -183,7 +183,9 @@ impl Heap {
     pub(crate) fn deep_clone(&self) -> Self {
         let mut inner_clone = unsafe { (*self.inner.get()).clone() };
         let parent = inner_clone.jit_epoch;
-        inner_clone.jit_ancestry.push((parent, crate::clif_link::compile_serial()));
+        inner_clone
+            .jit_ancestry
+            .push((parent, crate::clif_link::compile_serial()));
         inner_clone.jit_epoch = crate::clif_link::next_epoch();
         Self {
             inner: Rc::new(std::cell::UnsafeCell::new(inner_clone)),

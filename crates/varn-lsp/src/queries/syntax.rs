@@ -12,7 +12,8 @@ pub struct SyntaxResult {
 
 pub fn parse_syntax(source: &str, path: &str) -> SyntaxResult {
     let (raw_tokens, lexeme_buf, lex_errs) = varn_lexer::scan(source, path);
-    let (mut program, parse_errs) = varn_parser::parse_partial(raw_tokens.clone(), lexeme_buf.clone(), path);
+    let (mut program, parse_errs) =
+        varn_parser::parse_partial(raw_tokens.clone(), lexeme_buf.clone(), path);
     varn_core::assign_ast_ids(&mut program);
 
     SyntaxResult {

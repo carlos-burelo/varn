@@ -25,9 +25,9 @@ use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::debug::ClifDebugSink;
 use super::emit::{
-    box_for_target, box_f64, box_int, box_or_pass, call_helper, def_const, def_const_bool,
-    def_const_int, emit_return_value, meta_is_float, meta_is_int, state_meta_int, unbox_bool, unbox_f64_coerce,
-    use_boxed, use_f64, use_int, wrap_i48,
+    box_f64, box_for_target, box_int, box_or_pass, call_helper, def_const, def_const_bool,
+    def_const_int, emit_return_value, meta_is_float, meta_is_int, state_meta_int, unbox_bool,
+    unbox_f64_coerce, use_boxed, use_f64, use_int, wrap_i48,
 };
 use super::fields;
 use super::generic;
@@ -86,8 +86,11 @@ pub(super) fn lower_raw(
     // through to memory for a guarantee no one is claiming — measured at ~9%
     // on a 20M-iteration integer loop, which is most of what OSR was supposed
     // to be winning back.
-    let mirror_home =
-        proto.has_this || has_alloc || proto.upvalue_count > 0 || proto.is_generator || proto.is_async;
+    let mirror_home = proto.has_this
+        || has_alloc
+        || proto.upvalue_count > 0
+        || proto.is_generator
+        || proto.is_async;
     let frame_aware = osr || mirror_home;
 
     let block_starts = scan::block_starts(code, pool)?;
@@ -114,7 +117,15 @@ pub(super) fn lower_raw(
         vars,
         cache_vars,
         all_caches,
-    } = vars::declare(&mut b, nregs, &proto.register_meta, &regions, code, pool, want_roots);
+    } = vars::declare(
+        &mut b,
+        nregs,
+        &proto.register_meta,
+        &regions,
+        code,
+        pool,
+        want_roots,
+    );
 
     let entry = b.create_block();
     b.append_block_params_for_function_params(entry);
@@ -179,7 +190,10 @@ pub(super) fn lower_raw(
     // whole file, parameters included, out of `ctx.stack`. Asserted rather
     // than left to fall out of `sig_nparams`, so a future change that reuses
     // `nparams` here cannot silently read block params that do not exist.
-    debug_assert!(!osr || sig_nparams == 0, "osr entry must take no parameters");
+    debug_assert!(
+        !osr || sig_nparams == 0,
+        "osr entry must take no parameters"
+    );
     for i in 0..sig_nparams {
         let r = reg_offset + i;
         let param_idx = if frame_aware { 4 + i } else { 1 + i };
@@ -271,9 +285,7 @@ pub(super) fn lower_raw(
             let target_state = entries
                 .get(&target_ip)
                 .ok_or("osr: target ip has no kind state")?;
-            let actx = actx
-                .as_ref()
-                .ok_or("osr: entry is not frame-aware")?;
+            let actx = actx.as_ref().ok_or("osr: entry is not frame-aware")?;
             super::osr::emit_osr_entry(&mut b, actx, target_state, target);
         }
         None => {
@@ -304,7 +316,14 @@ pub(super) fn lower_raw(
                 // preheader — resolve each planned receiver's payload into
                 // its cache (sentinel 0 when the guard chain rejects).
                 preheader::emit_region_caches(
-                    &mut b, helpers, exec_ctx, &vars, &cache_vars, &regions, &state, ip,
+                    &mut b,
+                    helpers,
+                    exec_ctx,
+                    &vars,
+                    &cache_vars,
+                    &regions,
+                    &state,
+                    ip,
                 );
                 b.ins().jump(*blk, &[]);
             }
@@ -353,7 +372,9 @@ pub(super) fn lower_raw(
         match op {
             OpCode::LoadIntZero => def_const_int(&mut b, &proto.register_meta, &vars, first_reg, 0),
             OpCode::LoadIntOne => def_const_int(&mut b, &proto.register_meta, &vars, first_reg, 1),
-            OpCode::LoadIntMinusOne => def_const_int(&mut b, &proto.register_meta, &vars, first_reg, -1),
+            OpCode::LoadIntMinusOne => {
+                def_const_int(&mut b, &proto.register_meta, &vars, first_reg, -1)
+            }
             OpCode::LoadTrue => def_const_bool(&mut b, &vars, first_reg, true),
             OpCode::LoadFalse => def_const_bool(&mut b, &vars, first_reg, false),
             OpCode::LoadInt => {
@@ -422,7 +443,12 @@ pub(super) fn lower_raw(
                     if mirror_home {
                         if let Some(ref actx) = actx {
                             let fb = alloc::frame_base_addr(&mut b, actx);
-                            b.ins().store(MemFlags::trusted(), val_to_store, fb, (first_reg * 8) as i32);
+                            b.ins().store(
+                                MemFlags::trusted(),
+                                val_to_store,
+                                fb,
+                                (first_reg * 8) as i32,
+                            );
                         }
                     }
                 }
@@ -466,7 +492,12 @@ pub(super) fn lower_raw(
                     alloc::def_result(&mut b, actx, first_reg, res);
                 }
             }
-            OpCode::BitAnd | OpCode::BitOr | OpCode::BitXor | OpCode::Shl | OpCode::Shr | OpCode::Ushr => {
+            OpCode::BitAnd
+            | OpCode::BitOr
+            | OpCode::BitXor
+            | OpCode::Shl
+            | OpCode::Shr
+            | OpCode::Ushr => {
                 let w1 = code[ip + 1];
                 let (r1, r2) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
                 let a = use_int(&mut b, &vars, &state, r1)?;
@@ -616,7 +647,8 @@ pub(super) fn lower_raw(
                     K::Bool | K::Int => b.use_var(vars[first_reg]),
                     k if is_boxed_kind(k) => {
                         let v = b.use_var(vars[first_reg]);
-                        let falsy_boxed = call_helper(&mut b, cc, helpers.logical_not, &[exec_ctx, v]);
+                        let falsy_boxed =
+                            call_helper(&mut b, cc, helpers.logical_not, &[exec_ctx, v]);
                         let falsy = unbox_bool(&mut b, falsy_boxed);
                         b.ins().bxor_imm(falsy, 1)
                     }
@@ -625,7 +657,8 @@ pub(super) fn lower_raw(
                             b.use_var(vars[first_reg])
                         } else {
                             let v = box_or_pass(&mut b, &vars, &state, first_reg);
-                            let falsy_boxed = call_helper(&mut b, cc, helpers.logical_not, &[exec_ctx, v]);
+                            let falsy_boxed =
+                                call_helper(&mut b, cc, helpers.logical_not, &[exec_ctx, v]);
                             let falsy = unbox_bool(&mut b, falsy_boxed);
                             b.ins().bxor_imm(falsy, 1)
                         }
@@ -638,9 +671,11 @@ pub(super) fn lower_raw(
                 let target_trampoline = b.create_block();
                 let fall_trampoline = b.create_block();
                 if op == OpCode::JumpIfFalse {
-                    b.ins().brif(cond, fall_trampoline, &[], target_trampoline, &[]);
+                    b.ins()
+                        .brif(cond, fall_trampoline, &[], target_trampoline, &[]);
                 } else {
-                    b.ins().brif(cond, target_trampoline, &[], fall_trampoline, &[]);
+                    b.ins()
+                        .brif(cond, target_trampoline, &[], fall_trampoline, &[]);
                 }
 
                 b.switch_to_block(target_trampoline);
@@ -740,11 +775,15 @@ pub(super) fn lower_raw(
                 fields::emit_get_fixed_field(&mut b, &fld, &state, code, ip, first_reg)?;
             }
             OpCode::GetProperty => {
-                let actx = actx.as_ref().ok_or("clif: GetProperty outside frame-aware fn")?;
+                let actx = actx
+                    .as_ref()
+                    .ok_or("clif: GetProperty outside frame-aware fn")?;
                 alloc::emit_get_property(&mut b, actx, &state, &proto.register_meta, code, ip);
             }
             OpCode::SetProperty => {
-                let actx = actx.as_ref().ok_or("clif: SetProperty outside frame-aware fn")?;
+                let actx = actx
+                    .as_ref()
+                    .ok_or("clif: SetProperty outside frame-aware fn")?;
                 alloc::emit_set_property(&mut b, actx, &state, code, ip);
             }
             OpCode::SetFixedField => {
@@ -775,18 +814,30 @@ pub(super) fn lower_raw(
             }
             OpCode::CallNativeOp => {
                 let actx = actx.as_ref().ok_or("clif: CallNativeOp outside alloc fn")?;
-                alloc::emit_call_native_op(&mut b, actx, &state, &proto.register_meta, code, pool, ip)?;
+                alloc::emit_call_native_op(
+                    &mut b,
+                    actx,
+                    &state,
+                    &proto.register_meta,
+                    code,
+                    pool,
+                    ip,
+                )?;
             }
             OpCode::CallMethod => {
                 let actx = actx.as_ref().ok_or("clif: CallMethod outside alloc fn")?;
                 methods::emit_call_method(&mut b, actx, &state, &proto.register_meta, code, ip);
             }
             OpCode::InvokeVirtual => {
-                let actx = actx.as_ref().ok_or("clif: InvokeVirtual outside alloc fn")?;
+                let actx = actx
+                    .as_ref()
+                    .ok_or("clif: InvokeVirtual outside alloc fn")?;
                 methods::emit_invoke_virtual(&mut b, actx, &state, &proto.register_meta, code, ip);
             }
             OpCode::MakeEnumVariant => {
-                let actx = actx.as_ref().ok_or("clif: MakeEnumVariant outside alloc fn")?;
+                let actx = actx
+                    .as_ref()
+                    .ok_or("clif: MakeEnumVariant outside alloc fn")?;
                 alloc::emit_make_enum_variant(&mut b, actx, &state, code, ip);
             }
             OpCode::GetEnumTag => {
@@ -799,7 +850,17 @@ pub(super) fn lower_raw(
             }
             OpCode::Intrinsic | OpCode::IntrinsicDirect => {
                 let m = &proto.register_meta;
-                floats::emit_intrinsic_op(&mut b, op, actx.as_ref(), &vars, &state, m, code, ip, has_round)?;
+                floats::emit_intrinsic_op(
+                    &mut b,
+                    op,
+                    actx.as_ref(),
+                    &vars,
+                    &state,
+                    m,
+                    code,
+                    ip,
+                    has_round,
+                )?;
             }
             OpCode::ToString => {
                 let actx = actx.as_ref().ok_or("clif: ToString outside alloc fn")?;
@@ -815,18 +876,26 @@ pub(super) fn lower_raw(
                     .map(|s| s.property_names.len())
                     .ok_or("clif: unresolved object shape")?;
                 let is_record = op == OpCode::BuildRecord;
-                alloc::emit_build_object_with_shape(&mut b, actx, &state, code, ip, count, is_record);
+                alloc::emit_build_object_with_shape(
+                    &mut b, actx, &state, code, ip, count, is_record,
+                );
             }
             OpCode::LoadUpvalue => {
-                let actx = actx.as_ref().ok_or("clif: LoadUpvalue outside frame-aware fn")?;
+                let actx = actx
+                    .as_ref()
+                    .ok_or("clif: LoadUpvalue outside frame-aware fn")?;
                 alloc::emit_load_upvalue(&mut b, actx, code, ip);
             }
             OpCode::StoreUpvalue => {
-                let actx = actx.as_ref().ok_or("clif: StoreUpvalue outside frame-aware fn")?;
+                let actx = actx
+                    .as_ref()
+                    .ok_or("clif: StoreUpvalue outside frame-aware fn")?;
                 alloc::emit_store_upvalue(&mut b, actx, &state, code, ip);
             }
             OpCode::CloseUpvalue => {
-                let actx = actx.as_ref().ok_or("clif: CloseUpvalue outside frame-aware fn")?;
+                let actx = actx
+                    .as_ref()
+                    .ok_or("clif: CloseUpvalue outside frame-aware fn")?;
                 alloc::emit_close_upvalue(&mut b, actx, &state, code, ip);
             }
             OpCode::MakeClosure => {
@@ -842,11 +911,15 @@ pub(super) fn lower_raw(
                 alloc::emit_load_module(&mut b, actx, &state, code, ip);
             }
             OpCode::LoadModuleSlot => {
-                let actx = actx.as_ref().ok_or("clif: LoadModuleSlot outside alloc fn")?;
+                let actx = actx
+                    .as_ref()
+                    .ok_or("clif: LoadModuleSlot outside alloc fn")?;
                 alloc::emit_load_module_slot(&mut b, actx, &state, code, ip);
             }
             OpCode::StoreModuleSlot => {
-                let actx = actx.as_ref().ok_or("clif: StoreModuleSlot outside alloc fn")?;
+                let actx = actx
+                    .as_ref()
+                    .ok_or("clif: StoreModuleSlot outside alloc fn")?;
                 alloc::emit_store_module_slot(&mut b, actx, &state, code, ip);
             }
             OpCode::MakeClass => {
@@ -861,7 +934,9 @@ pub(super) fn lower_raw(
             | OpCode::DefineStaticGetter
             | OpCode::DefineStaticSetter
             | OpCode::Inherit => {
-                let actx = actx.as_ref().ok_or("clif: ClassMemberOp outside alloc fn")?;
+                let actx = actx
+                    .as_ref()
+                    .ok_or("clif: ClassMemberOp outside alloc fn")?;
                 super::classes::emit_class_member_op(&mut b, actx, &state, op, code, ip)?;
             }
             OpCode::GetSuper => {
@@ -929,7 +1004,9 @@ pub(super) fn lower_raw(
                 alloc::emit_object_merge(&mut b, actx, &state, code, ip);
             }
             OpCode::GetPropertyMaybe => {
-                let actx = actx.as_ref().ok_or("clif: GetPropertyMaybe outside alloc fn")?;
+                let actx = actx
+                    .as_ref()
+                    .ok_or("clif: GetPropertyMaybe outside alloc fn")?;
                 alloc::emit_get_property_maybe(&mut b, actx, &state, code, ip);
             }
             OpCode::BindMethod => {
@@ -937,7 +1014,9 @@ pub(super) fn lower_raw(
                 alloc::emit_bind_method(&mut b, actx, &state, code, ip);
             }
             OpCode::AssertNotNull => {
-                let actx = actx.as_ref().ok_or("clif: AssertNotNull outside alloc fn")?;
+                let actx = actx
+                    .as_ref()
+                    .ok_or("clif: AssertNotNull outside alloc fn")?;
                 alloc::emit_assert_not_null(&mut b, actx, &state, code, ip);
             }
             OpCode::ArrayExtend => {
@@ -953,7 +1032,9 @@ pub(super) fn lower_raw(
                 alloc::emit_call_spread(&mut b, actx, &state, &proto.register_meta, code, ip);
             }
             OpCode::InvokeRuntimeStatic => {
-                let actx = actx.as_ref().ok_or("clif: InvokeRuntimeStatic outside alloc fn")?;
+                let actx = actx
+                    .as_ref()
+                    .ok_or("clif: InvokeRuntimeStatic outside alloc fn")?;
                 alloc::emit_invoke_runtime_static(&mut b, actx, &state, code, ip)?;
             }
             OpCode::Nop => {}
@@ -992,7 +1073,15 @@ pub(super) fn lower_raw(
             _ if generic::try_emit(&mut b, &gen, helpers, &state, op, code, ip) => {}
             _ => return Err(format!("clif: unsupported opcode {op:?}")),
         }
-        apply_kinds(&mut state, code, pool, ip, op, constants, &proto.register_meta);
+        apply_kinds(
+            &mut state,
+            code,
+            pool,
+            ip,
+            op,
+            constants,
+            &proto.register_meta,
+        );
         ip = next_ip;
     }
     if !terminated {
@@ -1006,7 +1095,8 @@ pub(super) fn lower_raw(
     for (&s, blk) in blocks.iter() {
         if !filled.contains(&s) {
             b.switch_to_block(*blk);
-            b.ins().trap(cranelift_codegen::ir::TrapCode::user(1).unwrap());
+            b.ins()
+                .trap(cranelift_codegen::ir::TrapCode::user(1).unwrap());
         }
     }
 

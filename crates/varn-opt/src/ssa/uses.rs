@@ -21,10 +21,25 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
     use InstKind::*;
     match kind {
         // No operands.
-        ConstInt(_) | ConstFloat(_) | ConstBool(_) | ConstStr(_) | ConstChar(_)
-        | ConstDecimal(_) | ConstBigInt(_) | ConstNull | LoadGlobal(_) | LoadUpvalue(_)
-        | LoadCaptured { .. } | MakeEnumVariant { .. } | Try { .. } | PopTry
-        | CloseUpvalues { .. } | Dispose { .. } | LoadModule { .. } | This | GetSuper { .. } => {}
+        ConstInt(_)
+        | ConstFloat(_)
+        | ConstBool(_)
+        | ConstStr(_)
+        | ConstChar(_)
+        | ConstDecimal(_)
+        | ConstBigInt(_)
+        | ConstNull
+        | LoadGlobal(_)
+        | LoadUpvalue(_)
+        | LoadCaptured { .. }
+        | MakeEnumVariant { .. }
+        | Try { .. }
+        | PopTry
+        | CloseUpvalues { .. }
+        | Dispose { .. }
+        | LoadModule { .. }
+        | This
+        | GetSuper { .. } => {}
 
         // One operand.
         Unary { operand, .. }
@@ -147,10 +162,25 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
 pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
     use InstKind::*;
     match kind {
-        ConstInt(_) | ConstFloat(_) | ConstBool(_) | ConstStr(_) | ConstChar(_)
-        | ConstDecimal(_) | ConstBigInt(_) | ConstNull | LoadGlobal(_) | LoadUpvalue(_)
-        | LoadCaptured { .. } | MakeEnumVariant { .. } | Try { .. } | PopTry
-        | CloseUpvalues { .. } | Dispose { .. } | LoadModule { .. } | This | GetSuper { .. } => {}
+        ConstInt(_)
+        | ConstFloat(_)
+        | ConstBool(_)
+        | ConstStr(_)
+        | ConstChar(_)
+        | ConstDecimal(_)
+        | ConstBigInt(_)
+        | ConstNull
+        | LoadGlobal(_)
+        | LoadUpvalue(_)
+        | LoadCaptured { .. }
+        | MakeEnumVariant { .. }
+        | Try { .. }
+        | PopTry
+        | CloseUpvalues { .. }
+        | Dispose { .. }
+        | LoadModule { .. }
+        | This
+        | GetSuper { .. } => {}
 
         Unary { operand, .. }
         | IsNull { operand }

@@ -29,11 +29,7 @@ use crate::JitHelpers;
 /// their home slots at a safepoint and for reading the receiver from
 /// `stack[base+0]`) and `closure` (this function's `VmClosure*`, needed by
 /// shape-driven object construction).
-pub(super) fn raw_signature(
-    nparams: usize,
-    isa: &OwnedTargetIsa,
-    frame_aware: bool,
-) -> Signature {
+pub(super) fn raw_signature(nparams: usize, isa: &OwnedTargetIsa, frame_aware: bool) -> Signature {
     let mut sig = Signature::new(isa.default_call_conv());
     let extra = if frame_aware { 3 } else { 0 };
     for _ in 0..(1 + extra + nparams) {
@@ -59,7 +55,11 @@ pub(super) fn build_wrapper(
 ) -> Result<CompiledPiece, String> {
     // Mirrors `lower_raw`: the OSR raw takes no arguments, so the wrapper
     // imports that signature and loads none from the stack.
-    let nparams = if osr { 0 } else { proto.arity.saturating_sub(1) };
+    let nparams = if osr {
+        0
+    } else {
+        proto.arity.saturating_sub(1)
+    };
     let mut sig = Signature::new(isa.default_call_conv());
     for _ in 0..4 {
         sig.params.push(AbiParam::new(types::I64));
@@ -110,9 +110,12 @@ pub(super) fn build_wrapper(
     }
     args.push(exec_ctx);
     for i in 0..nparams {
-        let boxed = b
-            .ins()
-            .load(types::I64, MemFlags::trusted(), arg_base, ((1 + i) * 8) as i32);
+        let boxed = b.ins().load(
+            types::I64,
+            MemFlags::trusted(),
+            arg_base,
+            ((1 + i) * 8) as i32,
+        );
         if proto.param_kinds.get(i) == Some(&SlotKind::Int) {
             let sh = b.ins().ishl_imm(boxed, 16);
             let un = b.ins().sshr_imm(sh, 16);

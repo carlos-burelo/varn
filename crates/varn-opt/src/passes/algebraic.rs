@@ -120,9 +120,7 @@ fn simplify(
                     (_, Some(1)) => Some(Simplified::Use(l)),
                     (Some(1), _) => Some(Simplified::Use(r)),
                     // Sound for integers precisely because there is no NaN.
-                    (_, Some(0)) | (Some(0), _) => {
-                        Some(Simplified::Const(InstKind::ConstInt(0)))
-                    }
+                    (_, Some(0)) | (Some(0), _) => Some(Simplified::Const(InstKind::ConstInt(0))),
                     _ => None,
                 },
                 // Deliberately nothing for the bitwise and shift operators.

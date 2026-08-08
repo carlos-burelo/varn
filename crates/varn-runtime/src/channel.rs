@@ -91,7 +91,9 @@ pub fn create(capacity: usize) -> u64 {
 }
 
 pub fn send(id: u64, val: SendValue) -> SendOutcome {
-    let Some(core) = core_of(id) else { return SendOutcome::Closed };
+    let Some(core) = core_of(id) else {
+        return SendOutcome::Closed;
+    };
     let mut st = core.state.lock().unwrap();
     if st.closed {
         return SendOutcome::Closed;
@@ -112,7 +114,9 @@ pub fn send(id: u64, val: SendValue) -> SendOutcome {
 }
 
 pub fn try_receive(id: u64) -> RecvOutcome {
-    let Some(core) = core_of(id) else { return RecvOutcome::Closed };
+    let Some(core) = core_of(id) else {
+        return RecvOutcome::Closed;
+    };
     let mut st = core.state.lock().unwrap();
     if let Some(v) = st.queue.pop_front() {
         // liberó hueco: promover un send parkeado
@@ -170,29 +174,44 @@ mod tests {
         let id = create(4);
         assert!(matches!(send(id, SendValue::Int(1)), SendOutcome::Sent));
         assert!(matches!(send(id, SendValue::Int(2)), SendOutcome::Sent));
-        let RecvOutcome::Item(SendValue::Int(1)) = try_receive(id) else { panic!("fifo 1") };
-        let RecvOutcome::Item(SendValue::Int(2)) = try_receive(id) else { panic!("fifo 2") };
+        let RecvOutcome::Item(SendValue::Int(1)) = try_receive(id) else {
+            panic!("fifo 1")
+        };
+        let RecvOutcome::Item(SendValue::Int(2)) = try_receive(id) else {
+            panic!("fifo 2")
+        };
     }
 
     #[test]
     fn bounded_send_parks_and_wakes_on_receive() {
         let id = create(1);
         assert!(matches!(send(id, SendValue::Int(1)), SendOutcome::Sent));
-        let SendOutcome::Parked(task) = send(id, SendValue::Int(2)) else { panic!("must park") };
-        assert!(matches!(task.peek_state(), varn_types::task::TaskState::Pending));
+        let SendOutcome::Parked(task) = send(id, SendValue::Int(2)) else {
+            panic!("must park")
+        };
+        assert!(matches!(
+            task.peek_state(),
+            varn_types::task::TaskState::Pending
+        ));
         // receive libera el hueco: el parked send entra a la cola y su task resuelve true
-        let RecvOutcome::Item(SendValue::Int(1)) = try_receive(id) else { panic!() };
+        let RecvOutcome::Item(SendValue::Int(1)) = try_receive(id) else {
+            panic!()
+        };
         match task.peek_state() {
             varn_types::task::TaskState::Resolved(Value::Bool(true)) => {}
             s => panic!("parked send should resolve true, got {s:?}"),
         }
-        let RecvOutcome::Item(SendValue::Int(2)) = try_receive(id) else { panic!("queued after wake") };
+        let RecvOutcome::Item(SendValue::Int(2)) = try_receive(id) else {
+            panic!("queued after wake")
+        };
     }
 
     #[test]
     fn receive_on_empty_parks_and_wakes_on_send() {
         let id = create(1);
-        let RecvOutcome::Parked(task) = try_receive(id) else { panic!("must park") };
+        let RecvOutcome::Parked(task) = try_receive(id) else {
+            panic!("must park")
+        };
         assert!(matches!(send(id, SendValue::Int(7)), SendOutcome::Sent));
         match task.peek_state() {
             varn_types::task::TaskState::Resolved(v) => {
@@ -208,7 +227,9 @@ mod tests {
         send(id, SendValue::Int(1));
         close(id);
         // lo encolado se drena
-        let RecvOutcome::Item(SendValue::Int(1)) = try_receive(id) else { panic!("drain") };
+        let RecvOutcome::Item(SendValue::Int(1)) = try_receive(id) else {
+            panic!("drain")
+        };
         // después: Closed
         assert!(matches!(try_receive(id), RecvOutcome::Closed));
         assert!(matches!(send(id, SendValue::Int(9)), SendOutcome::Closed));
@@ -231,11 +252,17 @@ mod tests {
     fn close_wakes_parked_receivers_done_true_and_parked_senders_false() {
         // Receiver parkeado: close() debe resolverlo a {value: null, done: true}.
         let rid = create(1);
-        let RecvOutcome::Parked(rtask) = try_receive(rid) else { panic!() };
+        let RecvOutcome::Parked(rtask) = try_receive(rid) else {
+            panic!()
+        };
         close(rid);
         match rtask.peek_state() {
             varn_types::task::TaskState::Resolved(v) => {
-                assert_eq!(as_done(&v), Some(true), "parked recv on close must resolve done=true");
+                assert_eq!(
+                    as_done(&v),
+                    Some(true),
+                    "parked recv on close must resolve done=true"
+                );
             }
             s => panic!("parked recv on close must resolve, got {s:?}"),
         }
@@ -244,7 +271,9 @@ mod tests {
         // encolar su valor.
         let sid = create(1);
         assert!(matches!(send(sid, SendValue::Int(1)), SendOutcome::Sent));
-        let SendOutcome::Parked(stask) = send(sid, SendValue::Int(2)) else { panic!("must park") };
+        let SendOutcome::Parked(stask) = send(sid, SendValue::Int(2)) else {
+            panic!("must park")
+        };
         close(sid);
         match stask.peek_state() {
             varn_types::task::TaskState::Resolved(Value::Bool(false)) => {}
@@ -252,7 +281,9 @@ mod tests {
         }
         // el valor parkeado (2) NO se encoló: tras drenar el único Int(1) que
         // había en cola, solo queda Closed.
-        let RecvOutcome::Item(SendValue::Int(1)) = try_receive(sid) else { panic!("drain") };
+        let RecvOutcome::Item(SendValue::Int(1)) = try_receive(sid) else {
+            panic!("drain")
+        };
         assert!(matches!(try_receive(sid), RecvOutcome::Closed));
     }
 
@@ -260,7 +291,9 @@ mod tests {
     fn parked_receiver_gets_scalar_as_value_done_object() {
         // Scalar payloads keep the plain `{value, done:false}` handoff.
         let id = create(1);
-        let RecvOutcome::Parked(task) = try_receive(id) else { panic!("must park") };
+        let RecvOutcome::Parked(task) = try_receive(id) else {
+            panic!("must park")
+        };
         assert!(matches!(send(id, SendValue::Int(42)), SendOutcome::Sent));
         match task.peek_state() {
             varn_types::task::TaskState::Resolved(v) => {
@@ -284,7 +317,9 @@ mod tests {
         // materialization — never allocated on the producer's GC heap.
         use varn_types::value::SendEnvelope;
         let id = create(1);
-        let RecvOutcome::Parked(task) = try_receive(id) else { panic!("must park") };
+        let RecvOutcome::Parked(task) = try_receive(id) else {
+            panic!("must park")
+        };
         let payload = SendValue::Array(vec![SendValue::Int(1), SendValue::Int(2)]);
         assert!(matches!(send(id, payload), SendOutcome::Sent));
         match task.peek_state() {
@@ -303,6 +338,9 @@ mod tests {
         close(id);
         close(id);
         assert!(matches!(try_receive(9999999), RecvOutcome::Closed));
-        assert!(matches!(send(9999999, SendValue::Null), SendOutcome::Closed));
+        assert!(matches!(
+            send(9999999, SendValue::Null),
+            SendOutcome::Closed
+        ));
     }
 }

@@ -35,7 +35,6 @@
 use crate::hir::{HirBinOp, HirType, HirUnOp};
 use crate::ssa::ir::{BlockId, InstKind, SsaFunc, Terminator};
 
-
 pub fn run(func: &mut SsaFunc) -> bool {
     let n = func.blocks.len();
     if n < 2 {
@@ -141,7 +140,9 @@ fn hoist_loop(func: &mut SsaFunc, latches: &[BlockId], header: BlockId) -> bool 
             while i < func.blocks[b].insts.len() {
                 let inst = &func.blocks[b].insts[i];
                 let movable = hoistable(&inst.kind, facts)
-                    && operands(&inst.kind).iter().all(|v| !def_in_loop[v.0 as usize]);
+                    && operands(&inst.kind)
+                        .iter()
+                        .all(|v| !def_in_loop[v.0 as usize]);
                 if movable {
                     let inst = func.blocks[b].insts.remove(i);
                     if let Some(d) = inst.dest {

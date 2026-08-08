@@ -70,4 +70,3 @@ pub(crate) extern "C" fn jit_shr(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> V
 pub(crate) extern "C" fn jit_ushr(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe { crate::exec::arith::ushr(a, b, &mut (*ctx).heap) }
 }
-

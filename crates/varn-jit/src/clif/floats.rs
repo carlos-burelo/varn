@@ -282,9 +282,7 @@ pub(super) fn emit_float_op(
         // generic helper would `def_var` an i64 into it and panic. With both
         // operands proven float/int, emit the native op; otherwise fall to the
         // runtime helper on boxed operands and unbox the result back to f64.
-        OpCode::AddFloat | OpCode::SubFloat | OpCode::MulFloat | OpCode::DivFloat
-            if dest_float =>
-        {
+        OpCode::AddFloat | OpCode::SubFloat | OpCode::MulFloat | OpCode::DivFloat if dest_float => {
             let res = if operands_native(state, a_r, b_r) {
                 let a = use_f64(b, vars, state, a_r)?;
                 let bb = use_f64(b, vars, state, b_r)?;
@@ -417,8 +415,8 @@ fn reg_write_dest(op: OpCode, code: &[u16], ip: usize) -> Option<usize> {
         | NeqFloat | Lt | Lte | Gt | Gte | Eq | Neq | Not | IsNull | IsArray | Instanceof | In
         | Move | ArrayGetIndex | GetFixedField | GetProperty | LoadGlobalIdx | Add | Sub | Mul
         | Div | Mod | Pow | Negate | Typeof | ToString | GetSymbol | BitAnd | BitOr | BitXor
-        | Shl | Shr | Ushr | StrSlice | StrLength | ArrayPop | BuildObject | StrConcat | BuildStr
-        | MakeEnumVariant | CallNativeOp => Some(d0),
+        | Shl | Shr | Ushr | StrSlice | StrLength | ArrayPop | BuildObject | StrConcat
+        | BuildStr | MakeEnumVariant | CallNativeOp => Some(d0),
         _ => None,
     }
 }

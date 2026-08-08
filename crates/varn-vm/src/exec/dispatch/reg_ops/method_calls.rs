@@ -1,6 +1,6 @@
+use crate::closure::{VmClosure, VmClosurePayload};
 use crate::error::{RuntimeError, VmResult};
 use crate::exec::ctx::ExecCtx;
-use crate::closure::{VmClosure, VmClosurePayload};
 use crate::value::VmValue;
 use std::rc::Rc;
 use std::sync::atomic::Ordering;

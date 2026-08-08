@@ -114,7 +114,6 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             export_names_of(&program_ref.filename),
         );
 
-
         varn_backend::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(false));
         let opt_dur = varn_backend::regalloc_post::OPTIMIZE_TIME.with(|t| t.get());
         optimize_samples.borrow_mut().push(opt_dur);
@@ -129,7 +128,6 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .zip(&optimize_samples)
         .map(|(c, o)| c.saturating_sub(*o))
         .collect();
-
 
     let proto = varn_opt::compile_module(
         &program,
@@ -317,7 +315,13 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     .print();
 
     terminal::blank();
-    print_table(&phases, Some(&e2e_stats), &TableOpts { all_rows: opts.all_rows });
+    print_table(
+        &phases,
+        Some(&e2e_stats),
+        &TableOpts {
+            all_rows: opts.all_rows,
+        },
+    );
 
     terminal::blank();
     terminal::log(format!(
@@ -333,7 +337,15 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     }
 
     if opts.verbose {
-        verbose_sections(&factory, &exec_jit, &records, &parse_profile, &check_result, &phases, opts)?;
+        verbose_sections(
+            &factory,
+            &exec_jit,
+            &records,
+            &parse_profile,
+            &check_result,
+            &phases,
+            opts,
+        )?;
     }
 
     varn_builtins::set_print_silent(false);
@@ -377,7 +389,9 @@ fn verbose_sections(
     varn_builtins::set_print_silent(!opts.show_output);
     varn_builtins::set_testing_silent(!opts.show_output);
 
-    let breakdown = BreakdownOpts { all_rows: opts.all_rows };
+    let breakdown = BreakdownOpts {
+        all_rows: opts.all_rows,
+    };
     let phase_p50 = |name: &str| phases.iter().find(|p| p.name == name).map(|p| p.p50);
 
     print_breakdown(

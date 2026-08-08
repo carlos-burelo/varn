@@ -80,10 +80,8 @@ pub(crate) fn construct_staged_fast(
                         return None;
                     }
                     let jit_fn = nc.jit_fn()?;
-                    *cls.ctor_rt_cache.borrow_mut() = Some((
-                        ver,
-                        Some(nc.clone() as std::rc::Rc<dyn std::any::Any>),
-                    ));
+                    *cls.ctor_rt_cache.borrow_mut() =
+                        Some((ver, Some(nc.clone() as std::rc::Rc<dyn std::any::Any>)));
                     Some((nc.clone(), jit_fn))
                 }
                 Some(_) => return None,
@@ -128,4 +126,3 @@ pub(crate) fn construct_staged_fast(
 
     Some(if res.is_null() { instance_nv } else { res })
 }
-

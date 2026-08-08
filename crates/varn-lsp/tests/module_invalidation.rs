@@ -59,7 +59,11 @@ fn dependent_file_sees_updated_export_type_after_edit() {
     // foo's return type flips from int to str; b.vn's `let x: int = foo()`
     // should now report a type mismatch. This can only happen if the
     // dependent's cached bind of a.vn was actually invalidated.
-    fs::write(&a_path, "export function foo(): str {\n  return \"hi\"\n}\n").unwrap();
+    fs::write(
+        &a_path,
+        "export function foo(): str {\n  return \"hi\"\n}\n",
+    )
+    .unwrap();
     ws.update_file(a_uri.clone(), fs::read_to_string(&a_path).unwrap());
 
     let after = ws.get(&b_uri).unwrap();

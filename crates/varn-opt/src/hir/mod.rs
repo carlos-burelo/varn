@@ -4,8 +4,8 @@ use std::rc::Rc;
 pub mod ctor_summary;
 pub mod dump;
 pub mod inline;
-pub mod module_locals;
 pub mod lower;
+pub mod module_locals;
 
 /// Interned handle to a nested `HirType` in the module's [`TyTable`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

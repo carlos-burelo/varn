@@ -939,7 +939,7 @@ mod array_repr_tests {
         let b = a.clone(); // shares the Rc cell
         assert!(VmArray::eq(&a, &b));
         a.push_vm(VmValue::from_heap_idx(1)); // migrate via alias a
-        // Alias b sees the migration because they share one cell.
+                                              // Alias b sees the migration because they share one cell.
         assert_eq!(b.discriminant(), 0);
         assert_eq!(b.len(), 3);
         assert_eq!(b.get_vm(0).unwrap().as_int(), 5);

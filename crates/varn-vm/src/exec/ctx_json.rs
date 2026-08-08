@@ -1,10 +1,10 @@
 use crate::exec::ctx::ExecCtx;
-use crate::value::VmValue;
 use crate::heap::HeapObj;
-use varn_types::{Value, NativeCtx};
+use crate::value::VmValue;
 use serde::de::{DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use serde::Deserializer;
 use std::borrow::Cow;
+use varn_types::{NativeCtx, Value};
 
 thread_local! {
     static JSON_SHAPE_CACHE: std::cell::RefCell<Option<(Vec<String>, std::rc::Rc<varn_types::Shape>)>> = const { std::cell::RefCell::new(None) };
@@ -289,7 +289,10 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
             let borrow = c.borrow();
             if let Some((ref cached_keys, ref cached_shape)) = *borrow {
                 if cached_keys.len() == keys.len()
-                    && cached_keys.iter().zip(keys.iter()).all(|(ck, k)| ck.as_str() == k.as_ref())
+                    && cached_keys
+                        .iter()
+                        .zip(keys.iter())
+                        .all(|(ck, k)| ck.as_str() == k.as_ref())
                 {
                     return Some(std::rc::Rc::clone(cached_shape));
                 }

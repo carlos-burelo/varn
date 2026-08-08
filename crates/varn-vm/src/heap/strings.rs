@@ -6,14 +6,14 @@
 //! and `alloc_str_view` build views over an existing buffer instead of
 //! copying.
 
-use std::rc::Rc;
-use crate::nursery::{old_idx_raw, pack_old_idx};
-use crate::value::VmValue;
-use varn_types::RuntimeString;
+use super::core::alloc_into;
 use super::obj::HeapObj;
 use super::str::{ascii_flag, HeapStr, INLINE_STR_CAP};
-use super::core::alloc_into;
 use super::structs::HeapInner;
+use crate::nursery::{old_idx_raw, pack_old_idx};
+use crate::value::VmValue;
+use std::rc::Rc;
+use varn_types::RuntimeString;
 
 const SLICE_LEN_MASK: u32 = 0x3FFF_FFFF;
 
@@ -283,5 +283,4 @@ impl HeapInner {
         }
         "null".into()
     }
-
 }

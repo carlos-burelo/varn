@@ -1,6 +1,6 @@
+use crate::closure::VmClosure;
 use crate::error::VmResult;
 use crate::exec::ctx::ExecCtx;
-use crate::closure::VmClosure;
 use crate::value::VmValue;
 use varn_core::OpCode;
 
@@ -295,7 +295,10 @@ impl ExecCtx {
                 let shape_idx = code[*ip] as usize;
                 *ip += 1;
                 let (dest, start_reg) = (hi(w1), lo(w1));
-                let shape = closure.proto.resolved_shape(shape_idx).expect("invalid shape");
+                let shape = closure
+                    .proto
+                    .resolved_shape(shape_idx)
+                    .expect("invalid shape");
                 let count = shape.property_names.len();
                 let mut values = Vec::with_capacity(count);
                 for i in 0..count {

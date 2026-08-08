@@ -31,4 +31,3 @@ pub(crate) extern "C" fn jit_str_length(ctx: *mut ExecCtx, v: VmValue) -> VmValu
         }
     }
 }
-

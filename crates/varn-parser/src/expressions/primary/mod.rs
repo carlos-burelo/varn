@@ -193,7 +193,9 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             } else if s.peek_kind(1) == TokenKind::LBrace {
                 s.advance();
                 let obj = parse_object_expr(s)?;
-                let ExprKind::Object { properties } = obj.kind else { unreachable!() };
+                let ExprKind::Object { properties } = obj.kind else {
+                    unreachable!()
+                };
                 Ok(Expr::new_with_range(range, ExprKind::Record { properties }))
             } else {
                 Err(format!("Unexpected `#` at {}:{}", s.line(), s.column()))

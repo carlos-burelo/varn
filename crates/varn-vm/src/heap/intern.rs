@@ -5,18 +5,16 @@
 //! that can clone. Both are per-type, and the interner tables here are what
 //! make equal literals share one heap slot.
 
-use std::collections::hash_map::Entry;
-use std::rc::Rc;
-use crate::error::{RuntimeError, VmResult};
+use super::core::alloc_into;
+use super::obj::HeapObj;
+use super::structs::HeapInner;
 use crate::closure::{VmClosurePayload, VmValueRef};
+use crate::error::{RuntimeError, VmResult};
 use crate::nursery::pack_old_idx;
 use crate::value::VmValue;
-use varn_types::{
-    Value, VmArray,
-};
-use super::obj::HeapObj;
-use super::core::alloc_into;
-use super::structs::HeapInner;
+use std::collections::hash_map::Entry;
+use std::rc::Rc;
+use varn_types::{Value, VmArray};
 
 impl HeapInner {
     pub fn intern(&mut self, val: Value) -> VmValue {
@@ -208,5 +206,4 @@ impl HeapInner {
         }
         Ok(Value::Null)
     }
-
 }

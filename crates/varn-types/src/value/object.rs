@@ -324,7 +324,13 @@ impl ObjData<[Cell<VmValue>]> {
             .shape()
             .property_names
             .iter()
-            .map(|(k, &idx)| (Rc::clone(k), self.field_at(idx).unwrap_or(VmValue::null()), idx))
+            .map(|(k, &idx)| {
+                (
+                    Rc::clone(k),
+                    self.field_at(idx).unwrap_or(VmValue::null()),
+                    idx,
+                )
+            })
             .collect();
         pairs.sort_unstable_by_key(|(_, _, idx)| *idx);
         pairs
@@ -578,7 +584,11 @@ mod tests {
         let before = Rc::strong_count(&shape);
 
         let o = ObjData::alloc(Rc::clone(&shape), 2);
-        assert_eq!(Rc::strong_count(&shape), before + 1, "object holds its shape");
+        assert_eq!(
+            Rc::strong_count(&shape),
+            before + 1,
+            "object holds its shape"
+        );
         drop(o);
         assert_eq!(Rc::strong_count(&shape), before, "drop released the shape");
 

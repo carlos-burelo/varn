@@ -29,10 +29,11 @@ pub(crate) extern "C" fn jit_load_module(
         // Our own frame, taken BEFORE the load: a module that suspends leaves
         // its frame on top of ours, so `frames.last()` is no longer us.
         let self_idx = ctx_ref.frames.len() - 1;
-        let loaded = match ctx_ref.load_module_from_source(&spec, &closure_ref.proto.chunk.source_file) {
-            Ok(v) => v,
-            Err(e) => panic!("JIT load_module failed: {:?}", e),
-        };
+        let loaded =
+            match ctx_ref.load_module_from_source(&spec, &closure_ref.proto.chunk.source_file) {
+                Ok(v) => v,
+                Err(e) => panic!("JIT load_module failed: {:?}", e),
+            };
         if ctx_ref.vm_suspend.is_some() {
             jit_suspend_at(ctx_ref, self_idx, own_ip);
         }
@@ -58,7 +59,11 @@ pub(crate) extern "C" fn jit_load_module_slot(
     }
 }
 
-pub(crate) extern "C" fn jit_store_module_slot(ctx: *mut ExecCtx, slot_idx: usize, val_nv: VmValue) {
+pub(crate) extern "C" fn jit_store_module_slot(
+    ctx: *mut ExecCtx,
+    slot_idx: usize,
+    val_nv: VmValue,
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let caller_depth = ctx_ref.frames.len();

@@ -1,8 +1,7 @@
 use crate::heap::{Heap, HeapObj, HeapStr};
+use crate::strbuf::StrBuf;
 use crate::value::VmValue;
 use std::rc::Rc;
-use crate::strbuf::StrBuf;
-
 
 /// Left operands at or above this length seed an extensible buffer, so a
 /// `s = s + x` accumulation appends in place from then on. Shorter results
@@ -107,4 +106,3 @@ pub(crate) fn to_string(val: VmValue, heap: &mut Heap) -> VmValue {
     let s = heap.str_repr(val);
     heap.alloc_str_dynamic(s)
 }
-

@@ -290,7 +290,11 @@ pub(crate) fn kind_flow(
     for (i, pk) in param_kinds.iter().enumerate() {
         let r = 1 + i;
         if r < nregs {
-            entry0[r] = if *pk == SlotKind::Int { K::Int } else { K::Boxed };
+            entry0[r] = if *pk == SlotKind::Int {
+                K::Int
+            } else {
+                K::Boxed
+            };
         }
     }
     // A float-typed register is an F64 Variable for the whole function (static

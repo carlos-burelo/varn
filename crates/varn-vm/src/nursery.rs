@@ -447,11 +447,7 @@ impl Nursery {
     /// Record every child of `obj` that still points into the nursery. Pure
     /// scan: it only reads through the borrow of `old_gen` the caller holds,
     /// so the evacuation that consumes `fixups` happens after it returns.
-    fn scan_children(
-        obj: &HeapObj,
-        old_gen: &HeapInner,
-        fixups: &mut Vec<(ChildSlot, u32)>,
-    ) {
+    fn scan_children(obj: &HeapObj, old_gen: &HeapInner, fixups: &mut Vec<(ChildSlot, u32)>) {
         match obj {
             HeapObj::Array(arr) => {
                 // Variant-aware: I64/F64 elements are raw numeric words,
@@ -564,9 +560,9 @@ mod array_scan_tests {
         let mut nursery = Nursery::new();
 
         let child_nursery_idx = nursery
-            .try_alloc(HeapObj::Str(crate::heap::HeapStr::shared(std::rc::Rc::from(
-                "child",
-            ))))
+            .try_alloc(HeapObj::Str(crate::heap::HeapStr::shared(
+                std::rc::Rc::from("child"),
+            )))
             .expect("fresh nursery has room");
         let child_val = VmValue::from_heap_idx(child_nursery_idx);
         assert!(is_nursery_idx(child_val.as_heap_idx()));

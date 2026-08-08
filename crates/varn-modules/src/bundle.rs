@@ -123,7 +123,10 @@ mod tests {
         let mut b = sample();
         b.host_api_version += 1;
         let bytes = write_bundle(&b);
-        let err = read_bundle(&bytes).unwrap().validate_compat_with(1).unwrap_err();
+        let err = read_bundle(&bytes)
+            .unwrap()
+            .validate_compat_with(1)
+            .unwrap_err();
         assert!(err.contains("host API"), "err was: {err}");
     }
 }

@@ -11,11 +11,7 @@ use crate::value::VmValue;
 /// Leave clif code with frame `frame_idx` parked at `resume_ip`, so the
 /// interpreter picks that function up from there once the suspension the
 /// caller already recorded in `vm_suspend` is resolved.
-pub(super) unsafe fn jit_suspend_at(
-    ctx: &mut ExecCtx,
-    frame_idx: usize,
-    resume_ip: usize,
-) -> ! {
+pub(super) unsafe fn jit_suspend_at(ctx: &mut ExecCtx, frame_idx: usize, resume_ip: usize) -> ! {
     ctx.frames[frame_idx].ip = resume_ip;
     // The unwind handler patches the TOP frame's ip from this field. We have
     // already parked the right frame, and it is not the top one — the module
@@ -38,7 +34,12 @@ pub(crate) extern "C" fn jit_spawn(ctx: *mut ExecCtx, task_val: VmValue) -> VmVa
     }
 }
 
-pub(crate) extern "C" fn jit_await(ctx: *mut ExecCtx, fut: VmValue, dest_reg: u32, resume_ip: usize) {
+pub(crate) extern "C" fn jit_await(
+    ctx: *mut ExecCtx,
+    fut: VmValue,
+    dest_reg: u32,
+    resume_ip: usize,
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let caller_depth = ctx_ref.frames.len();
@@ -60,7 +61,12 @@ pub(crate) extern "C" fn jit_await(ctx: *mut ExecCtx, fut: VmValue, dest_reg: u3
     }
 }
 
-pub(crate) extern "C" fn jit_yield(ctx: *mut ExecCtx, val: VmValue, dest_reg: u32, resume_ip: usize) {
+pub(crate) extern "C" fn jit_yield(
+    ctx: *mut ExecCtx,
+    val: VmValue,
+    dest_reg: u32,
+    resume_ip: usize,
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
         let caller_depth = ctx_ref.frames.len();
@@ -81,4 +87,3 @@ pub(crate) extern "C" fn jit_yield(ctx: *mut ExecCtx, val: VmValue, dest_reg: u3
         }
     }
 }
-

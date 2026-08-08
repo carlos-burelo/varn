@@ -119,7 +119,6 @@ impl GlobalStore {
     pub(crate) fn resolve_index(&self, name: &str) -> Option<usize> {
         self.names.get(name).copied()
     }
-
 }
 
 impl Default for GlobalStore {

@@ -35,7 +35,11 @@ pub(crate) fn op_define_static(
     Ok(())
 }
 
-pub(crate) fn op_inherit(subclass_nv: VmValue, superclass_nv: VmValue, heap: &mut Heap) -> VmResult<()> {
+pub(crate) fn op_inherit(
+    subclass_nv: VmValue,
+    superclass_nv: VmValue,
+    heap: &mut Heap,
+) -> VmResult<()> {
     let superclass = get_class_arc(superclass_nv, heap)?;
     if subclass_nv.is_heap() {
         if let Some(HeapObj::Class(sub)) = heap.get_mut(subclass_nv.as_heap_idx()) {

@@ -114,7 +114,7 @@ impl ExecCtx {
         if self.hotspot_counters.is_none() {
             return (f)(self as &mut dyn varn_types::NativeCtx, args);
         }
-        
+
         #[cfg(target_arch = "x86_64")]
         {
             static CYCLES_PER_NS: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
@@ -165,5 +165,4 @@ impl ExecCtx {
             }
         }
     }
-
 }

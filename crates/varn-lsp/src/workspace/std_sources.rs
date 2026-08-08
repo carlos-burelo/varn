@@ -124,7 +124,8 @@ fn strip_root(normalized_path: &str, root: &std::path::Path) -> Option<String> {
 /// Whether a URI points into the mirror — i.e. a stdlib module rather than
 /// user code.
 pub fn is_mirrored_uri(uri: &str) -> bool {
-    let path = varn_modules::resolver::normalize_display_path(&varn_modules::resolver::uri_to_path(uri));
+    let path =
+        varn_modules::resolver::normalize_display_path(&varn_modules::resolver::uri_to_path(uri));
     let root = varn_modules::resolver::normalize_display_path(&root().to_string_lossy());
     path.starts_with(&root)
 }

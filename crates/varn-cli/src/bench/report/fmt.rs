@@ -38,21 +38,40 @@ impl DurScale {
             .max(1) as f64;
 
         if max_ns < 1_000.0 {
-            Self { divisor: 1.0, suffix: "ns", decimals: 0 }
+            Self {
+                divisor: 1.0,
+                suffix: "ns",
+                decimals: 0,
+            }
         } else if max_ns < 1_000_000.0 {
-            Self { divisor: 1_000.0, suffix: "µs", decimals: 1 }
+            Self {
+                divisor: 1_000.0,
+                suffix: "µs",
+                decimals: 1,
+            }
         } else if max_ns < 1_000_000_000.0 {
-            Self { divisor: 1_000_000.0, suffix: "ms", decimals: 2 }
+            Self {
+                divisor: 1_000_000.0,
+                suffix: "ms",
+                decimals: 2,
+            }
         } else {
-            Self { divisor: 1_000_000_000.0, suffix: "s", decimals: 3 }
+            Self {
+                divisor: 1_000_000_000.0,
+                suffix: "s",
+                decimals: 3,
+            }
         }
     }
 
     pub fn fmt(&self, d: Duration) -> String {
         let v = d.as_nanos() as f64 / self.divisor;
-        format!("{v:.prec$} {suffix}", prec = self.decimals, suffix = self.suffix)
+        format!(
+            "{v:.prec$} {suffix}",
+            prec = self.decimals,
+            suffix = self.suffix
+        )
     }
-
 }
 
 /// Format one duration on its own, choosing the unit from its own magnitude.
@@ -164,11 +183,7 @@ pub fn row(label: &str, value: impl AsRef<str>) -> String {
 /// [`row`] plus a dim trailing note.
 pub fn row_note(label: &str, value: impl AsRef<str>, note: impl AsRef<str>) -> String {
     use varn_utilities::chalk::chalk;
-    format!(
-        "{}  {}",
-        row(label, value),
-        chalk(note.as_ref()).dim()
-    )
+    format!("{}  {}", row(label, value), chalk(note.as_ref()).dim())
 }
 
 #[cfg(test)]
@@ -177,10 +192,8 @@ mod tests {
 
     #[test]
     fn column_scale_is_uniform() {
-        let scale = DurScale::for_column([
-            Duration::from_nanos(8_820),
-            Duration::from_nanos(202_000),
-        ]);
+        let scale =
+            DurScale::for_column([Duration::from_nanos(8_820), Duration::from_nanos(202_000)]);
         // Both render in µs with the same precision, so the column lines up.
         assert_eq!(scale.fmt(Duration::from_nanos(8_820)), "8.8 µs");
         assert_eq!(scale.fmt(Duration::from_nanos(202_000)), "202.0 µs");

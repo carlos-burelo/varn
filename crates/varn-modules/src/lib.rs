@@ -16,7 +16,6 @@ pub const CORE_MAP: &str = "core:map";
 pub const CORE_SET: &str = "core:set";
 pub const CORE_SYMBOL: &str = "core:symbol";
 
-
 pub const PKG_PREFIX: &str = "pkg:";
 pub const ENV_DIR_NAME: &str = ".vn";
 pub const MODULES_DIR_NAME: &str = "packages";
@@ -230,7 +229,8 @@ fn resolve_export_target(
             if export_key.starts_with(prefix) {
                 let matched_suffix = &export_key[prefix.len()..];
                 let resolved_val = val.replace('*', matched_suffix);
-                let entry = package_root.join(resolved_val.trim_start_matches(RELATIVE_EXPORT_PREFIX));
+                let entry =
+                    package_root.join(resolved_val.trim_start_matches(RELATIVE_EXPORT_PREFIX));
                 if entry.exists() {
                     return Ok(entry);
                 }
@@ -241,7 +241,8 @@ fn resolve_export_target(
     // 3. Fallback convention resolution
     if sub.is_empty() {
         if let Some(ref main_field) = manifest.main {
-            let main_path = package_root.join(main_field.trim_start_matches(RELATIVE_EXPORT_PREFIX));
+            let main_path =
+                package_root.join(main_field.trim_start_matches(RELATIVE_EXPORT_PREFIX));
             if main_path.exists() {
                 return Ok(main_path);
             }

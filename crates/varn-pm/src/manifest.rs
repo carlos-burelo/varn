@@ -47,7 +47,12 @@ impl DepOrigin {
 
     pub fn to_origin_string(&self) -> String {
         match self {
-            DepOrigin::Remote { host, user, repo, req } => {
+            DepOrigin::Remote {
+                host,
+                user,
+                repo,
+                req,
+            } => {
                 if req == "*" {
                     format!("{host}/{user}/{repo}")
                 } else {
@@ -62,31 +67,28 @@ impl DepOrigin {
 
     pub fn tarball_url(&self, version: &str) -> String {
         match self {
-            DepOrigin::Remote { host, user, repo, .. } => {
-                varn_modules::resolver::forge_tarball_url(host, user, repo, version)
-            }
+            DepOrigin::Remote {
+                host, user, repo, ..
+            } => varn_modules::resolver::forge_tarball_url(host, user, repo, version),
             DepOrigin::LocalPath { path } => format!("file://{}", path.display()),
         }
     }
 
     pub fn tags_api_url(&self) -> String {
         match self {
-            DepOrigin::Remote { host, user, repo, .. } => {
-                varn_modules::resolver::forge_tags_api_url(host, user, repo)
-            }
+            DepOrigin::Remote {
+                host, user, repo, ..
+            } => varn_modules::resolver::forge_tags_api_url(host, user, repo),
             DepOrigin::LocalPath { path } => format!("file://{}", path.display()),
         }
     }
 
     pub fn local_name(&self) -> String {
         match self {
-            DepOrigin::Remote { host, user, repo, .. } => {
-                format!(
-                    "{}_{}_{}",
-                    host.replace('.', "_"),
-                    user,
-                    repo
-                )
+            DepOrigin::Remote {
+                host, user, repo, ..
+            } => {
+                format!("{}_{}_{}", host.replace('.', "_"), user, repo)
             }
             DepOrigin::LocalPath { path } => {
                 let name = path

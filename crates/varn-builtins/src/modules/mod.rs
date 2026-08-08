@@ -1,4 +1,3 @@
-
 #[path = "host/buffer/buffer.rs"]
 pub mod buffer;
 #[path = "host/crypto/crypto.rs"]
@@ -67,4 +66,3 @@ pub fn force_link_builtins() -> usize {
 
     sum + dummy
 }
-

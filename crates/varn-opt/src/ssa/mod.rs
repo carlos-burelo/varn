@@ -26,7 +26,11 @@ pub fn lower_module(
     source_file: Rc<str>,
     export_names: Vec<Rc<str>>,
 ) -> Result<FunctionProto, OptError> {
-    let mut ssa = build::build_function(&module.top_level, &module.functions, Some(source_file.clone()))?;
+    let mut ssa = build::build_function(
+        &module.top_level,
+        &module.functions,
+        Some(source_file.clone()),
+    )?;
     crate::passes::optimize_with(&mut ssa, &crate::hir::ctor_summary::current());
     if let Err(why) = verify::verify(&ssa) {
         panic!("ssa: verify failed for top-level: {}", why);

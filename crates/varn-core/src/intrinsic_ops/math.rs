@@ -22,7 +22,6 @@ impl MathOp {
     pub const fn wire(self) -> u8 {
         encode(IntrinsicDomain::Math, self as u8)
     }
-
 }
 
 /// Whether `wire_byte` names a math op that [`crate::OpCode::IntrinsicDirect`]

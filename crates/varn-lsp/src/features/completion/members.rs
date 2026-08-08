@@ -214,7 +214,10 @@ pub fn dot_receiver(
                     line: 0,
                     col: 0,
                     init_value: String::new(),
-                    ty: varn_checker::Type(varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Int), false),
+                    ty: varn_checker::Type(
+                        varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Int),
+                        false,
+                    ),
                     symbol_id: None,
                     members: Vec::new(),
                 });

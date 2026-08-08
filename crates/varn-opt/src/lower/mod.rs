@@ -100,8 +100,7 @@ pub fn lower(
 ) -> Result<FunctionProto, OptError> {
     // Established for the whole module lowering, top-level and every nested
     // function alike — `escape` runs inside both.
-    let _summaries = crate::hir::ctor_summary::Scope::enter(
-        crate::hir::ctor_summary::collect(module),
-    );
+    let _summaries =
+        crate::hir::ctor_summary::Scope::enter(crate::hir::ctor_summary::collect(module));
     crate::ssa::lower_module(module, source_file, export_names)
 }

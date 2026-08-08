@@ -57,10 +57,8 @@ pub fn classify(path: &Path) -> Option<StdSource> {
 
 /// `"std"` key in the project's varn.json, resolved relative to the manifest.
 pub fn project_std_override(project_root: &Path) -> Option<PathBuf> {
-    let raw = std::fs::read_to_string(
-        project_root.join(crate::artifact::PACKAGE_MANIFEST_FILE),
-    )
-    .ok()?;
+    let raw =
+        std::fs::read_to_string(project_root.join(crate::artifact::PACKAGE_MANIFEST_FILE)).ok()?;
     #[derive(serde::Deserialize)]
     struct StdKey {
         std: Option<String>,
@@ -68,7 +66,11 @@ pub fn project_std_override(project_root: &Path) -> Option<PathBuf> {
     let parsed: StdKey = serde_json::from_str(&raw).ok()?;
     let rel = parsed.std?;
     let p = PathBuf::from(&rel);
-    Some(if p.is_absolute() { p } else { project_root.join(p) })
+    Some(if p.is_absolute() {
+        p
+    } else {
+        project_root.join(p)
+    })
 }
 
 /// The active std is process-fixed (same contract as the provider's

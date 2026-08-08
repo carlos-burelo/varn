@@ -75,8 +75,7 @@ pub fn lower_to_ssa(
     let mut module = hir::lower::lower_program(&input)?;
     hir::inline::run(&mut module);
     hir::module_locals::run(&mut module);
-    let _summaries =
-        hir::ctor_summary::Scope::enter(hir::ctor_summary::collect(&module));
+    let _summaries = hir::ctor_summary::Scope::enter(hir::ctor_summary::collect(&module));
     let mut funcs = Vec::new();
     let mut errors: Vec<(Rc<str>, &'static str)> = Vec::new();
 

@@ -117,7 +117,11 @@ impl HeapStr {
             // Safety: single-threaded VM; the buffer is only appended to (via
             // `str_concat`), never while a borrow from this view is live.
             HeapStr::Ext { buf, len, .. } => unsafe { &(&*buf.get())[..*len] },
-            HeapStr::Slice { src, off, len_ascii } => {
+            HeapStr::Slice {
+                src,
+                off,
+                len_ascii,
+            } => {
                 let off = *off as usize;
                 let len = (len_ascii.get() & SLICE_LEN_MASK) as usize;
                 &src[off..off + len]
@@ -148,11 +152,7 @@ impl HeapStr {
             ascii_flag::NO => false,
             _ => {
                 let is = self.as_str().is_ascii();
-                self.set_ascii_state(if is {
-                    ascii_flag::YES
-                } else {
-                    ascii_flag::NO
-                });
+                self.set_ascii_state(if is { ascii_flag::YES } else { ascii_flag::NO });
                 is
             }
         }
@@ -171,7 +171,11 @@ impl HeapStr {
                 let slice = unsafe { &(&*buf.get())[..*len] };
                 Rc::from(slice)
             }
-            HeapStr::Slice { src, off, len_ascii } => {
+            HeapStr::Slice {
+                src,
+                off,
+                len_ascii,
+            } => {
                 let off = *off as usize;
                 let len = (len_ascii.get() & SLICE_LEN_MASK) as usize;
                 Rc::from(&src[off..off + len])

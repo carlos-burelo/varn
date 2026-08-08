@@ -17,8 +17,8 @@
 
 use super::ExecCtx;
 use crate::closure::VmClosure;
-use crate::exec::frame_ctrl::resolve_constructor_return;
 use crate::error::{RuntimeError, VmResult};
+use crate::exec::frame_ctrl::resolve_constructor_return;
 use crate::value::VmValue;
 
 /// How a compiled frame ended, as an instruction to the frame loop.

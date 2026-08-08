@@ -4,7 +4,12 @@ use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use varn_core::{IntrinsicType, TypeTag};
 
-pub(crate) fn push_try(handlers: &mut Vec<TryHandler>, catch_ip: usize, frame_depth: usize, err_reg: u8) {
+pub(crate) fn push_try(
+    handlers: &mut Vec<TryHandler>,
+    catch_ip: usize,
+    frame_depth: usize,
+    err_reg: u8,
+) {
     handlers.push(TryHandler {
         catch_ip,
         frame_depth,

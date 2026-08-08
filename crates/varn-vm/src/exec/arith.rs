@@ -42,11 +42,11 @@ pub(crate) fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
             }
             (Ok(Value::Decimal(da)), _) if heap.is_int(b) => {
                 let bi = rust_decimal::Decimal::from(heap.as_int(b));
-                return Ok(heap.alloc_decimal(**da + bi))
+                return Ok(heap.alloc_decimal(**da + bi));
             }
             (_, Ok(Value::Decimal(db))) if heap.is_int(a) => {
                 let ai = rust_decimal::Decimal::from(heap.as_int(a));
-                return Ok(heap.alloc_decimal(ai + **db))
+                return Ok(heap.alloc_decimal(ai + **db));
             }
             _ => {}
         }
@@ -68,11 +68,11 @@ pub(crate) fn sub(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
         }
         (Ok(Value::Decimal(da)), _) if heap.is_int(b) => {
             let bi = rust_decimal::Decimal::from(heap.as_int(b));
-            return Ok(heap.alloc_decimal(**da - bi))
+            return Ok(heap.alloc_decimal(**da - bi));
         }
         (_, Ok(Value::Decimal(db))) if heap.is_int(a) => {
             let ai = rust_decimal::Decimal::from(heap.as_int(a));
-            return Ok(heap.alloc_decimal(ai - **db))
+            return Ok(heap.alloc_decimal(ai - **db));
         }
         _ => {}
     }
@@ -93,11 +93,11 @@ pub(crate) fn mul(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
         }
         (Ok(Value::Decimal(da)), _) if heap.is_int(b) => {
             let bi = rust_decimal::Decimal::from(heap.as_int(b));
-            return Ok(heap.alloc_decimal(**da * bi))
+            return Ok(heap.alloc_decimal(**da * bi));
         }
         (_, Ok(Value::Decimal(db))) if heap.is_int(a) => {
             let ai = rust_decimal::Decimal::from(heap.as_int(a));
-            return Ok(heap.alloc_decimal(ai * **db))
+            return Ok(heap.alloc_decimal(ai * **db));
         }
         _ => {}
     }
@@ -151,11 +151,11 @@ pub(crate) fn modulo(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValu
             }
             (Ok(Value::Decimal(da)), _) if heap.is_int(b) => {
                 let bi = rust_decimal::Decimal::from(heap.as_int(b));
-                return Ok(heap.alloc_decimal(**da % bi))
+                return Ok(heap.alloc_decimal(**da % bi));
             }
             (_, Ok(Value::Decimal(db))) if heap.is_int(a) => {
                 let ai = rust_decimal::Decimal::from(heap.as_int(a));
-                return Ok(heap.alloc_decimal(ai % **db))
+                return Ok(heap.alloc_decimal(ai % **db));
             }
             _ => {}
         }
@@ -186,7 +186,9 @@ pub(crate) fn pow(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
         let r = heap.as_int(a).wrapping_pow(e);
         return Ok(heap.make_int(r));
     }
-    Ok(VmValue::from_f64(heap.to_f64_val(a).powf(heap.to_f64_val(b))))
+    Ok(VmValue::from_f64(
+        heap.to_f64_val(a).powf(heap.to_f64_val(b)),
+    ))
 }
 
 #[inline(always)]
@@ -224,13 +226,17 @@ pub(crate) fn bit_xor(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
 
 #[inline(always)]
 pub(crate) fn shl(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
-    let r = heap.as_int(a).wrapping_shl(heap.to_f64_val(b) as i32 as u32 & 63);
+    let r = heap
+        .as_int(a)
+        .wrapping_shl(heap.to_f64_val(b) as i32 as u32 & 63);
     heap.make_int(r)
 }
 
 #[inline(always)]
 pub(crate) fn shr(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
-    let r = heap.as_int(a).wrapping_shr(heap.to_f64_val(b) as i32 as u32 & 63);
+    let r = heap
+        .as_int(a)
+        .wrapping_shr(heap.to_f64_val(b) as i32 as u32 & 63);
     heap.make_int(r)
 }
 

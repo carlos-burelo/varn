@@ -1,7 +1,7 @@
+use crate::closure::{VmClosure, VmClosurePayload, VmUpvalue};
 use crate::error::{RuntimeError, VmResult};
 use crate::exec::ExecCtx;
 use crate::frame::CallFrame;
-use crate::closure::{VmClosure, VmClosurePayload, VmUpvalue};
 use crate::globals::GlobalStore;
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;

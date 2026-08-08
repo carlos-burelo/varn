@@ -4,7 +4,6 @@ use crate::{checker::Checker, SymbolId};
 use std::rc::Rc;
 use varn_core::ast::operators::BinaryOp;
 
-
 pub(super) fn levenshtein(a: &str, b: &str) -> usize {
     let a: Vec<char> = a.chars().collect();
     let b: Vec<char> = b.chars().collect();

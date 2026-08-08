@@ -13,13 +13,13 @@ pub fn global_cache_root() -> PathBuf {
 
 pub fn cached_package_path(origin: &DepOrigin, version: &str) -> PathBuf {
     match origin {
-        DepOrigin::Remote { host, user, repo, .. } => {
-            global_cache_root()
-                .join(host.replace('.', "_"))
-                .join(user)
-                .join(repo)
-                .join(version)
-        }
+        DepOrigin::Remote {
+            host, user, repo, ..
+        } => global_cache_root()
+            .join(host.replace('.', "_"))
+            .join(user)
+            .join(repo)
+            .join(version),
         DepOrigin::LocalPath { path } => path.clone(),
     }
 }

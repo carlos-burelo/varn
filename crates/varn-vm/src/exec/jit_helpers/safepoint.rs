@@ -35,4 +35,3 @@ pub(crate) extern "C" fn jit_close_upvalue(ctx: *mut ExecCtx, lowest: usize) {
         ctx_ref.close_upvalues_above(base + lowest);
     }
 }
-

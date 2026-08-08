@@ -37,7 +37,9 @@ impl DocumentState {
         let tok = self.identifier_token_at(line, col)?;
         if let Some(sid) = self.checker_symbol_id_at(line, col) {
             if let Some(s) = self.symbols.iter().find(|s| s.symbol_id == Some(sid)) {
-                if s.kind == varn_checker::SymbolKind::Function || s.kind == varn_checker::SymbolKind::Method {
+                if s.kind == varn_checker::SymbolKind::Function
+                    || s.kind == varn_checker::SymbolKind::Method
+                {
                     if let Some(cls) = self.symbols.iter().find(|c| {
                         c.name == tok.lexeme
                             && matches!(

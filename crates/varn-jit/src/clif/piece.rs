@@ -21,10 +21,7 @@ pub(super) struct CompiledPiece {
     pub maps_unmatched: usize,
 }
 
-pub(super) fn compile_piece(
-    func: Function,
-    isa: &OwnedTargetIsa,
-) -> Result<CompiledPiece, String> {
+pub(super) fn compile_piece(func: Function, isa: &OwnedTargetIsa) -> Result<CompiledPiece, String> {
     super::with_ctx(func, isa.as_ref(), |compiled| {
         let srclocs = compiled.buffer.get_srclocs_sorted();
         let mut stack_maps = Vec::new();

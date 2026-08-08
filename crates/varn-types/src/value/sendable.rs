@@ -106,7 +106,10 @@ impl Value {
             Value::Map(map_ref) => {
                 let mut items = Vec::new();
                 for (k, v) in map_ref.read().iter() {
-                    items.push((nv_to_value(k.0).to_sendable()?, nv_to_value(*v).to_sendable()?));
+                    items.push((
+                        nv_to_value(k.0).to_sendable()?,
+                        nv_to_value(*v).to_sendable()?,
+                    ));
                 }
                 Ok(SendValue::Map(items))
             }
@@ -403,10 +406,8 @@ mod channel_endpoint_tests {
 
     #[test]
     fn send_envelope_roundtrips_payload() {
-        let env = SendEnvelope::deliver(SendValue::Array(vec![
-            SendValue::Int(1),
-            SendValue::Int(2),
-        ]));
+        let env =
+            SendEnvelope::deliver(SendValue::Array(vec![SendValue::Int(1), SendValue::Int(2)]));
         let got = SendEnvelope::from_value(&env).expect("must be envelope");
         assert!(!got.wrap);
         assert!(matches!(&got.sv, SendValue::Array(items) if items.len() == 2));
@@ -440,7 +441,9 @@ mod channel_endpoint_tests {
     fn endpoint_variants_roundtrip_marker() {
         let tx = SendValue::ChannelSender(42);
         let v = tx.to_value();
-        let Value::Object(o) = &v else { panic!("marker must be object") };
+        let Value::Object(o) = &v else {
+            panic!("marker must be object")
+        };
         let guard = o.read();
         assert!(guard.contains_key("__chanEndpoint"));
         assert!(guard.contains_key("__chanId"));

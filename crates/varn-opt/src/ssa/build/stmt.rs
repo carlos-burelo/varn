@@ -968,10 +968,7 @@ impl Builder {
                                 HirType::Dynamic,
                             )
                         };
-                        self.emit_effect(InstKind::StoreGlobal {
-                            name,
-                            value: val,
-                        });
+                        self.emit_effect(InstKind::StoreGlobal { name, value: val });
                     }
                 }
             }

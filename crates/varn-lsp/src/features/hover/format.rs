@@ -49,7 +49,11 @@ pub fn format_signature(sym: &SymbolRecord) -> String {
 
 fn format_fn(sym: &SymbolRecord) -> String {
     let async_prefix = if sym.is_async { "async " } else { "" };
-    let kw = if sym.kind == SymbolKind::Method { "" } else { "function " };
+    let kw = if sym.kind == SymbolKind::Method {
+        ""
+    } else {
+        "function "
+    };
     let tp = format_type_params(&sym.type_params);
     let gen_star = if sym.is_generator { "*" } else { "" };
     if sym.is_arrow {

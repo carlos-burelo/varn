@@ -2,8 +2,6 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 
-
-
 fn main() {
     // Force rebuild of registry.generated.rs with $ suffix support
     println!("cargo:rerun-if-changed=src/modules");

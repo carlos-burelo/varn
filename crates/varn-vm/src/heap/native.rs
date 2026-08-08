@@ -1,11 +1,9 @@
-use std::ops::{Deref, DerefMut};
-use std::rc::Rc;
-use varn_types::{
-    value::MapKey, ClassObj, NativeCtx, NativeFn, ResourceStore, Value,
-};
-use crate::value::VmValue;
 use super::obj::HeapObj;
 use super::structs::Heap;
+use crate::value::VmValue;
+use std::ops::{Deref, DerefMut};
+use std::rc::Rc;
+use varn_types::{value::MapKey, ClassObj, NativeCtx, NativeFn, ResourceStore, Value};
 
 impl NativeCtx for Heap {
     fn int_val(&mut self, n: i64) -> VmValue {

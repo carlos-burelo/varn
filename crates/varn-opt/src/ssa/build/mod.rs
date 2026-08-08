@@ -279,8 +279,7 @@ fn scan_stmt(stmt: &HirStmt, pinned: &mut FxHashSet<VarId>, in_try: bool) {
                 }
             }
         }
-        HirStmt::SetMember { object, value, .. }
-        | HirStmt::SetFixedField { object, value, .. } => {
+        HirStmt::SetMember { object, value, .. } | HirStmt::SetFixedField { object, value, .. } => {
             scan_expr(object, pinned, in_try);
             scan_expr(value, pinned, in_try);
         }

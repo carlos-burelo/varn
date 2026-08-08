@@ -5,8 +5,8 @@
 //! full lookup on a miss.
 
 use super::construct::jit_propagate_error;
-use crate::exec::frame_ctrl::resolve_constructor_return;
 use crate::exec::ctx::ExecCtx;
+use crate::exec::frame_ctrl::resolve_constructor_return;
 use crate::value::VmValue;
 
 pub(crate) extern "C" fn jit_invoke_virtual(
@@ -122,8 +122,7 @@ pub(crate) extern "C" fn jit_get_property_ic_fast(
         let closure_ref = &*closure;
         if cs_idx < closure_ref.ic_cache_len() {
             if obj.is_heap() {
-                if let Some(crate::heap::HeapObj::Object(o)) = ctx_ref.heap.get(obj.as_heap_idx())
-                {
+                if let Some(crate::heap::HeapObj::Object(o)) = ctx_ref.heap.get(obj.as_heap_idx()) {
                     let guard = o.read();
                     let slot_cache = &*closure_ref.ic_cache.as_ptr();
                     let poly_slot = &slot_cache[cs_idx];
@@ -165,4 +164,3 @@ pub(crate) extern "C" fn jit_get_property_maybe_ic_fast(
 ) -> VmValue {
     jit_get_property_ic_fast(ctx, closure, obj, cs_idx)
 }
-

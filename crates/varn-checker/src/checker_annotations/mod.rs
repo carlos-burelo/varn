@@ -3,9 +3,9 @@ pub(crate) mod stmts;
 
 use crate::types::{Type, TypeContext};
 use crate::BindResult;
-use varn_core::ast::{Expr, ExprKind, Program, StmtKind, Decl, ExportDecl};
-use varn_core::TypeAnnotations;
 use stmts::annotate_stmt;
+use varn_core::ast::{Decl, ExportDecl, Expr, ExprKind, Program, StmtKind};
+use varn_core::TypeAnnotations;
 
 #[derive(Clone)]
 pub(crate) struct AnnotateCtx<'a> {

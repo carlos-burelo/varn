@@ -118,11 +118,7 @@ fn nested_globals(module: &HirModule) -> FxHashSet<Rc<str>> {
     out
 }
 
-fn walk_stmts(
-    stmts: &mut [HirStmt],
-    in_nested: bool,
-    act: &mut impl FnMut(&mut HirBinding, bool),
-) {
+fn walk_stmts(stmts: &mut [HirStmt], in_nested: bool, act: &mut impl FnMut(&mut HirBinding, bool)) {
     for s in stmts {
         walk_stmt(s, in_nested, act);
     }
@@ -237,12 +233,29 @@ fn walk_target(t: &mut HirAssignTarget, n: bool, act: &mut impl FnMut(&mut HirBi
 fn walk_expr(e: &mut HirExpr, n: bool, act: &mut impl FnMut(&mut HirBinding, bool)) {
     use HirExpr::*;
     match e {
-        Int(_) | Float(_) | Str(_) | Bool(_) | Char(_) | Decimal(_) | BigInt(_) | Null
-        | Regex { .. } | This | Super | SuperMember { .. } => {}
+        Int(_)
+        | Float(_)
+        | Str(_)
+        | Bool(_)
+        | Char(_)
+        | Decimal(_)
+        | BigInt(_)
+        | Null
+        | Regex { .. }
+        | This
+        | Super
+        | SuperMember { .. } => {}
         Var(b) => act(b, n),
-        NonNull(x) | TryOp(x) | Spread(x) | Await(x) | Spawn(x) | Yield(x)
+        NonNull(x)
+        | TryOp(x)
+        | Spread(x)
+        | Await(x)
+        | Spawn(x)
+        | Yield(x)
         | TypeTest { value: x, .. } => walk_expr(x, n, act),
-        Sequence(xs) | SelfCall { args: xs, .. } | SuperCall { args: xs }
+        Sequence(xs)
+        | SelfCall { args: xs, .. }
+        | SuperCall { args: xs }
         | SuperMethodCall { args: xs, .. } => {
             for x in xs {
                 walk_expr(x, n, act);

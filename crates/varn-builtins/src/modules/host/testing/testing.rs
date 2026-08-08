@@ -36,7 +36,10 @@ pub fn print_summary() {
     }
 }
 
-pub fn summary(_ctx: &mut dyn varn_types::NativeCtx, _args: &[varn_types::VmValue]) -> Result<varn_types::VmValue, String> {
+pub fn summary(
+    _ctx: &mut dyn varn_types::NativeCtx,
+    _args: &[varn_types::VmValue],
+) -> Result<varn_types::VmValue, String> {
     print_summary();
     Ok(varn_types::VmValue::null())
 }

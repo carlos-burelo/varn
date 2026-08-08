@@ -140,7 +140,11 @@ impl TricolorMarker {
         self.marked_count = 0;
     }
 
-    pub(crate) fn mark_from_roots(&mut self, heap: &HeapInner, roots: &[u32]) -> Result<(), GcError> {
+    pub(crate) fn mark_from_roots(
+        &mut self,
+        heap: &HeapInner,
+        roots: &[u32],
+    ) -> Result<(), GcError> {
         for &root in roots {
             if is_old_idx(root) {
                 let raw = old_idx_raw(root);
@@ -372,12 +376,15 @@ impl GcCollector {
         Ok(freed)
     }
 
-    pub(crate) fn collect(&mut self, heap: &mut HeapInner, roots: &[u32]) -> Result<usize, GcError> {
+    pub(crate) fn collect(
+        &mut self,
+        heap: &mut HeapInner,
+        roots: &[u32],
+    ) -> Result<usize, GcError> {
         self.mark_phase(heap, roots)?;
         let swept = self.sweep_phase(heap)?;
         Ok(swept)
     }
-
 }
 
 #[cfg(test)]

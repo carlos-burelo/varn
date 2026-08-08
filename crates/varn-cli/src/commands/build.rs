@@ -12,7 +12,11 @@ pub fn execute(args: BuildArgs) -> Result<(), CliError> {
 
     let is_native = args.target.eq_ignore_ascii_case("native");
     let ext = if is_native {
-        if cfg!(windows) { "exe" } else { "" }
+        if cfg!(windows) {
+            "exe"
+        } else {
+            ""
+        }
     } else {
         "vnc"
     };
@@ -22,8 +26,12 @@ pub fn execute(args: BuildArgs) -> Result<(), CliError> {
     if is_native {
         let current_exe = std::env::current_exe()
             .map_err(|e| CliError::fatal(format!("cannot locate runner executable: {e}")))?;
-        let host_bytes = std::fs::read(&current_exe)
-            .map_err(|e| CliError::fatal(format!("cannot read runner executable '{}': {e}", current_exe.display())))?;
+        let host_bytes = std::fs::read(&current_exe).map_err(|e| {
+            CliError::fatal(format!(
+                "cannot read runner executable '{}': {e}",
+                current_exe.display()
+            ))
+        })?;
 
         let payload = postcard::to_allocvec(&compiled.graph_artifact)
             .map_err(|e| CliError::fatal(format!("cannot serialize artifact: {e}")))?;
@@ -40,8 +48,11 @@ pub fn execute(args: BuildArgs) -> Result<(), CliError> {
         standalone.extend_from_slice(&(wrc_envelope.len() as u64).to_le_bytes());
         standalone.extend_from_slice(varn_modules::artifact::MAGIC_VEXE);
 
-        std::fs::write(&out_path, &standalone)
-            .map_err(|e| CliError::fatal(format!("cannot write standalone executable '{out_path}': {e}")))?;
+        std::fs::write(&out_path, &standalone).map_err(|e| {
+            CliError::fatal(format!(
+                "cannot write standalone executable '{out_path}': {e}"
+            ))
+        })?;
     } else {
         pipeline::wrc::write_wrc(&out_path, &compiled.graph_artifact)?;
     }
@@ -53,7 +64,11 @@ pub fn execute(args: BuildArgs) -> Result<(), CliError> {
         args.file,
         out_path,
         size / 1024,
-        if is_native { "native standalone" } else { "bytecode" }
+        if is_native {
+            "native standalone"
+        } else {
+            "bytecode"
+        }
     ));
     Ok(())
 }
@@ -82,7 +97,9 @@ fn resolve_output_path(source_file: &str, output: Option<&str>, default_ext: &st
             if default_ext.is_empty() {
                 stem.to_string()
             } else {
-                src.with_extension(default_ext).to_string_lossy().into_owned()
+                src.with_extension(default_ext)
+                    .to_string_lossy()
+                    .into_owned()
             }
         }
     }

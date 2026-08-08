@@ -132,7 +132,10 @@ pub fn frame_aware_reasons(proto: &FunctionProto) -> Vec<&'static str> {
         };
         if matches!(
             OpCode::from_u8(code[ip] as u8),
-            Some(OpCode::Try) | Some(OpCode::Yield) | Some(OpCode::Await) | Some(OpCode::LoadModule)
+            Some(OpCode::Try)
+                | Some(OpCode::Yield)
+                | Some(OpCode::Await)
+                | Some(OpCode::LoadModule)
         ) {
             r.push("resume");
             break;
@@ -160,7 +163,11 @@ pub fn try_compile(
     if proto.param_kinds.len() != nparams {
         return Err("clif: missing param kinds".into());
     }
-    floats::check_float_writes(&proto.chunk.code, &proto.chunk.constants, &proto.register_meta)?;
+    floats::check_float_writes(
+        &proto.chunk.code,
+        &proto.chunk.constants,
+        &proto.register_meta,
+    )?;
 
     let has_alloc = alloc::has_alloc(&proto.chunk.code, &proto.chunk.constants)?;
     // OSR resumes a frame that already exists, and reads every register out of
@@ -215,4 +222,3 @@ pub fn try_compile(
         frame_aware,
     })
 }
-

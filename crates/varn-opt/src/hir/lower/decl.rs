@@ -315,10 +315,7 @@ impl<'a> Lowerer<'a> {
                 };
                 if is_global {
                     let target = self.global_binding(f.id.clone());
-                    out.push(HirStmt::Assign {
-                        target,
-                        value,
-                    });
+                    out.push(HirStmt::Assign { target, value });
                 } else {
                     let local = scope.alloc_local(f.id.clone());
                     out.push(HirStmt::Let {
@@ -335,10 +332,7 @@ impl<'a> Lowerer<'a> {
                 let value = HirExpr::Class(Box::new(hir_class));
                 if is_global {
                     let target = self.global_binding(name.clone());
-                    out.push(HirStmt::Assign {
-                        target,
-                        value,
-                    });
+                    out.push(HirStmt::Assign { target, value });
                 } else {
                     let local = scope.alloc_local(name.clone());
                     out.push(HirStmt::Let {
@@ -354,10 +348,7 @@ impl<'a> Lowerer<'a> {
                 let value = HirExpr::Enum(Box::new(hir_enum));
                 if is_global {
                     let target = self.global_binding(en.id.clone());
-                    out.push(HirStmt::Assign {
-                        target,
-                        value,
-                    });
+                    out.push(HirStmt::Assign { target, value });
                 } else {
                     let local = scope.alloc_local(en.id.clone());
                     out.push(HirStmt::Let {
@@ -374,10 +365,7 @@ impl<'a> Lowerer<'a> {
                 let mut bound = vec![st.id.clone()];
                 if is_global {
                     let target = self.global_binding(st.id.clone());
-                    out.push(HirStmt::Assign {
-                        target,
-                        value,
-                    });
+                    out.push(HirStmt::Assign { target, value });
                     for v in &st.variants {
                         let target = self.global_binding(v.name.clone());
                         let st_global = self.global_binding(st.id.clone());
@@ -503,10 +491,7 @@ impl<'a> Lowerer<'a> {
         let value = HirExpr::Object { properties };
         if is_global {
             let target = self.global_binding(ns.id.clone());
-            out.push(HirStmt::Assign {
-                target,
-                value,
-            });
+            out.push(HirStmt::Assign { target, value });
         } else {
             let local = scope.alloc_local(ns.id.clone());
             out.push(HirStmt::Let {
@@ -678,10 +663,7 @@ impl<'a> Lowerer<'a> {
                         let value = HirExpr::Class(Box::new(hir_class));
                         if scope.is_global() {
                             let target = self.global_binding(name.clone());
-                            out.push(HirStmt::Assign {
-                                target,
-                                value,
-                            });
+                            out.push(HirStmt::Assign { target, value });
                         } else {
                             let local = scope.alloc_local(name.clone());
                             out.push(HirStmt::Let {

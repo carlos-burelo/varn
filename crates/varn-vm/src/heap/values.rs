@@ -1,18 +1,16 @@
 //! Allocation for scalar and opaque heap values: symbols, ranges, decimals,
 //! closures, modules and buffers.
 
-use std::collections::hash_map::Entry;
-use std::rc::Rc;
-use std::sync::Arc;
+use super::core::alloc_into;
+use super::obj::HeapObj;
+use super::structs::HeapInner;
 use crate::closure::VmClosure;
 use crate::nursery::pack_old_idx;
 use crate::value::VmValue;
-use varn_types::value::{
-        FrozenModuleObj, ModuleObj, RangeData, RuntimeSymbol,
-    };
-use super::obj::HeapObj;
-use super::core::alloc_into;
-use super::structs::HeapInner;
+use std::collections::hash_map::Entry;
+use std::rc::Rc;
+use std::sync::Arc;
+use varn_types::value::{FrozenModuleObj, ModuleObj, RangeData, RuntimeSymbol};
 
 impl HeapInner {
     pub(crate) fn alloc_vm_buffer(&mut self, buf: varn_types::VmBuffer) -> VmValue {
@@ -66,5 +64,4 @@ impl HeapInner {
     pub(crate) fn alloc_frozen_module(&mut self, m: Arc<FrozenModuleObj>) -> VmValue {
         VmValue::from_heap_idx(self.alloc(HeapObj::FrozenModule(m)))
     }
-
 }

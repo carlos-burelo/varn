@@ -1,17 +1,17 @@
+use super::str::HeapStr;
+use crate::closure::VmClosure;
+use crate::value::VmValue;
 use std::rc::Rc;
 use std::sync::Arc;
 use varn_base::VmValuePayload;
 use varn_types::{
     generator::{AsyncQueue, GeneratorObj},
     value::{
-        BoundMethod, EnumVariantData, FrozenModuleObj, MapRef, ModuleObj, ObjRef,
-        RangeData, RuntimeSymbol, SetRef,
+        BoundMethod, EnumVariantData, FrozenModuleObj, MapRef, ModuleObj, ObjRef, RangeData,
+        RuntimeSymbol, SetRef,
     },
     AsyncTask, ClassObj, LazyTask, NativeFn, VmArray,
 };
-use crate::closure::VmClosure;
-use crate::value::VmValue;
-use super::str::HeapStr;
 
 // `repr(u8)` pins the discriminant to the first byte with a defined layout
 // (RFC 2195), so JIT code can type-check a heap slot with one byte load.
@@ -58,7 +58,10 @@ impl HeapObj {
         match self {
             HeapObj::Str(_) => TypeTag::Str,
             HeapObj::Array(_) | HeapObj::Tuple(_) => TypeTag::Array,
-            HeapObj::Object(_) | HeapObj::Record(_) | HeapObj::Module(_) | HeapObj::FrozenModule(_) => TypeTag::Object,
+            HeapObj::Object(_)
+            | HeapObj::Record(_)
+            | HeapObj::Module(_)
+            | HeapObj::FrozenModule(_) => TypeTag::Object,
             HeapObj::VmClosure(_) | HeapObj::NativeFn(..) | HeapObj::BoundMethod(_) => {
                 TypeTag::Function
             }

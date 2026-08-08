@@ -4,12 +4,10 @@
 //! means resolving them to something representation-independent before they
 //! are used to index a Map or Set.
 
-use crate::value::VmValue;
-use varn_types::{
-    value::MapKey, Value,
-};
 use super::obj::HeapObj;
 use super::structs::HeapInner;
+use crate::value::VmValue;
+use varn_types::{value::MapKey, Value};
 
 impl HeapInner {
     pub(crate) fn lookup_str_map_key(&self, s: &str) -> Option<MapKey> {
@@ -81,5 +79,4 @@ impl HeapInner {
             Canon::Identity => MapKey(v),
         }
     }
-
 }

@@ -29,12 +29,7 @@ pub(super) struct GenCtx<'a> {
 /// Define `dest` from a helper's boxed `VmValue` result, coercing when the
 /// register is float-typed — its Variable is `F64`, so the raw bits would be
 /// a Cranelift type error. Matches the kind `apply_kinds` assigns.
-fn def_boxed(
-    b: &mut FunctionBuilder,
-    g: &GenCtx,
-    dest: usize,
-    res: cranelift_codegen::ir::Value,
-) {
+fn def_boxed(b: &mut FunctionBuilder, g: &GenCtx, dest: usize, res: cranelift_codegen::ir::Value) {
     if meta_is_float(g.register_meta, dest) {
         let f = unbox_f64_coerce(b, res);
         b.def_var(g.vars[dest], f);
@@ -131,9 +126,7 @@ pub(super) fn try_emit(
         OpCode::Mul | OpCode::MulFloat => emit_binop(b, g, state, code, ip, h.mul),
         OpCode::Div | OpCode::DivFloat | OpCode::DivInt => emit_binop(b, g, state, code, ip, h.div),
         OpCode::Mod | OpCode::ModFloat => emit_binop(b, g, state, code, ip, h.modulo),
-        OpCode::Pow | OpCode::PowInt | OpCode::PowFloat => {
-            emit_binop(b, g, state, code, ip, h.pow)
-        }
+        OpCode::Pow | OpCode::PowInt | OpCode::PowFloat => emit_binop(b, g, state, code, ip, h.pow),
         OpCode::Eq | OpCode::EqFloat => emit_compare(b, g, state, code, ip, h.eq),
         OpCode::Neq | OpCode::NeqFloat => emit_compare(b, g, state, code, ip, h.neq),
         OpCode::Lt | OpCode::LtFloat => emit_compare(b, g, state, code, ip, h.lt),

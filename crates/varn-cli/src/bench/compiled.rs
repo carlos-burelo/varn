@@ -132,7 +132,13 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
     .print();
 
     terminal::blank();
-    print_table(&phases, None, &TableOpts { all_rows: opts.all_rows });
+    print_table(
+        &phases,
+        None,
+        &TableOpts {
+            all_rows: opts.all_rows,
+        },
+    );
 
     if !opts.show_output {
         terminal::blank();

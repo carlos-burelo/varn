@@ -1,6 +1,6 @@
+use crate::closure::VmClosure;
 use crate::error::{RuntimeError, VmResult};
 use crate::exec::ctx::ExecCtx;
-use crate::closure::VmClosure;
 use crate::value::VmValue;
 use std::rc::Rc;
 use varn_core::OpCode;

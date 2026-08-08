@@ -1,7 +1,7 @@
-use crate::nursery::{is_nursery_idx, is_old_idx, old_idx_raw, Nursery};
-use crate::value::VmValue;
 use super::obj::HeapObj;
 use super::structs::HeapInner;
+use crate::nursery::{is_nursery_idx, is_old_idx, old_idx_raw, Nursery};
+use crate::value::VmValue;
 
 impl HeapInner {
     pub(crate) fn rebuild_scan_roots(&mut self) {

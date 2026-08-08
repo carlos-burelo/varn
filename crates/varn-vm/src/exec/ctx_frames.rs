@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
-use crate::error::VmResult;
 use crate::closure::{VmClosure, VmUpvalue};
+use crate::error::VmResult;
 use crate::value::VmValue;
 
 use super::calls::PreparedCall;
@@ -9,7 +9,11 @@ use super::ctx::ExecCtx;
 
 impl ExecCtx {
     #[inline(always)]
-    pub(crate) fn prepare_call(&mut self, callee_nv: VmValue, arg_count: usize) -> VmResult<PreparedCall> {
+    pub(crate) fn prepare_call(
+        &mut self,
+        callee_nv: VmValue,
+        arg_count: usize,
+    ) -> VmResult<PreparedCall> {
         if let Some((prepared, needs_receiver)) =
             super::calls::try_prepare_call_fast(callee_nv, arg_count, &self.stack, &self.heap)
         {
@@ -99,5 +103,4 @@ impl ExecCtx {
         }
         self.open_upvalues.retain(|(s, _)| *s < slot);
     }
-
 }

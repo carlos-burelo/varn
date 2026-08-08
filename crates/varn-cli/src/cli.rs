@@ -149,7 +149,10 @@ pub struct LspArgs {
     #[arg(short, long, help = "Puerto TCP para escuchar en socket (ej: 9257)")]
     pub port: Option<u16>,
 
-    #[arg(long, help = "Dirección host:puerto TCP para escuchar (ej: 127.0.0.1:9257)")]
+    #[arg(
+        long,
+        help = "Dirección host:puerto TCP para escuchar (ej: 127.0.0.1:9257)"
+    )]
     pub tcp: Option<String>,
 
     /// Accepted and ignored: stdio is already the default when no TCP option
@@ -157,7 +160,10 @@ pub struct LspArgs {
     /// appends `--stdio` for any `TransportKind.stdio` executable, and editor
     /// configs write it by convention — so rejecting it kills the server at
     /// startup with nothing but an EPIPE on the client side.
-    #[arg(long, help = "Servir sobre stdio (por defecto; aceptado por convención)")]
+    #[arg(
+        long,
+        help = "Servir sobre stdio (por defecto; aceptado por convención)"
+    )]
     pub stdio: bool,
 }
 

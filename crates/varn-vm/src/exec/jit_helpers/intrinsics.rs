@@ -162,4 +162,3 @@ pub(crate) extern "C" fn jit_str_slice_intrinsic(
         }
     }
 }
-

@@ -191,4 +191,3 @@ pub(crate) fn gte_heap(a: VmValue, b: VmValue, heap: &Heap) -> bool {
 pub(crate) fn logical_not(a: VmValue) -> VmValue {
     VmValue::from_bool(!a.is_truthy())
 }
-

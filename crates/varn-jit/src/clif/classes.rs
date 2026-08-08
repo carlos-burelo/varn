@@ -11,12 +11,9 @@ use cranelift_codegen::ir::{types, InstBuilder};
 use cranelift_frontend::FunctionBuilder;
 use varn_core::OpCode;
 
-use super::alloc::{
-    args_struct, def_result, flush_boxed, live_boxed, reload_boxed, AllocCtx,
-};
+use super::alloc::{args_struct, def_result, flush_boxed, live_boxed, reload_boxed, AllocCtx};
 use super::emit::{box_or_pass, call_helper, call_helper_void};
 use super::kinds::K;
-
 
 /// `MakeClass dest, super_reg, name_idx` — allocate the class object and, when
 /// a superclass register is named, inherit from it. `super_reg == 0` means "no

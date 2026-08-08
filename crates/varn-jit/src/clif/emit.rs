@@ -15,12 +15,12 @@ use super::kinds::{is_boxed_kind, K};
 
 pub(super) const INT_TAG: i64 = 0x7FFC_0000_0000_0000u64 as i64;
 pub(super) const MASK_48: i64 = 0x0000_FFFF_FFFF_FFFFu64 as i64;
-pub(super) const HEAP_MASK: i64 =
-    (varn_types::vm_value::SIGN | varn_types::vm_value::QNAN | varn_types::vm_value::MASK_TAG)
-        as i64;
-pub(super) const HEAP_EXPECT: i64 =
-    (varn_types::vm_value::SIGN | varn_types::vm_value::QNAN | varn_types::vm_value::TAG_PTR)
-        as i64;
+pub(super) const HEAP_MASK: i64 = (varn_types::vm_value::SIGN
+    | varn_types::vm_value::QNAN
+    | varn_types::vm_value::MASK_TAG) as i64;
+pub(super) const HEAP_EXPECT: i64 = (varn_types::vm_value::SIGN
+    | varn_types::vm_value::QNAN
+    | varn_types::vm_value::TAG_PTR) as i64;
 
 /// `site` is the buffer offset of the rel32 field; `target` the buffer
 /// offset the call must reach.
@@ -55,12 +55,7 @@ pub(super) fn def_const_int(
     }
 }
 
-pub(super) fn def_const_bool(
-    b: &mut FunctionBuilder,
-    vars: &[Variable],
-    reg: usize,
-    v: bool,
-) {
+pub(super) fn def_const_bool(b: &mut FunctionBuilder, vars: &[Variable], reg: usize, v: bool) {
     let c = b.ins().iconst(types::I64, if v { 1 } else { 0 });
     b.def_var(vars[reg], c);
 }
@@ -196,7 +191,9 @@ pub(super) fn box_f64(
 ) -> cranelift_codegen::ir::Value {
     let bits = b.ins().bitcast(types::I64, MemFlags::new(), v);
     let q = b.ins().band_imm(bits, varn_types::vm_value::QNAN as i64);
-    let is_qnan = b.ins().icmp_imm(IntCC::Equal, q, varn_types::vm_value::QNAN as i64);
+    let is_qnan = b
+        .ins()
+        .icmp_imm(IntCC::Equal, q, varn_types::vm_value::QNAN as i64);
     let null = b.ins().iconst(types::I64, VmValue::null().0 as i64);
     b.ins().select(is_qnan, null, bits)
 }

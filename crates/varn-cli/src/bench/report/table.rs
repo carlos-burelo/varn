@@ -27,11 +27,7 @@ pub struct TableOpts {
     pub all_rows: bool,
 }
 
-pub fn print_table(
-    phases: &[PhaseStats],
-    e2e: Option<&PhaseStats>,
-    opts: &TableOpts,
-) {
+pub fn print_table(phases: &[PhaseStats], e2e: Option<&PhaseStats>, opts: &TableOpts) {
     use terminal::Align::{Left, Right};
 
     let total_p50: Duration = phases.iter().map(|p| p.p50).sum();

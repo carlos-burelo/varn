@@ -165,7 +165,12 @@ pub fn debug_tiers(
     }
 
     let routed = rows.iter().filter(|r| r.tier == Tier::Clif).count();
-    let name_w = rows.iter().map(|r| r.name.len()).max().unwrap_or(8).clamp(8, 32);
+    let name_w = rows
+        .iter()
+        .map(|r| r.name.len())
+        .max()
+        .unwrap_or(8)
+        .clamp(8, 32);
 
     if let Some(h) = header {
         eprintln!("\n{DIM}=== {h} ==={R}");

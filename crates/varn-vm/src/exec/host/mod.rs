@@ -196,7 +196,8 @@ impl NativeCtx for ExecCtx {
     }
 
     fn alloc_buffer_from_bytes(&mut self, bytes: &[u8]) -> VmValue {
-        self.heap.alloc_vm_buffer(varn_types::VmBuffer::from_bytes(bytes))
+        self.heap
+            .alloc_vm_buffer(varn_types::VmBuffer::from_bytes(bytes))
     }
 
     fn is_buffer(&self, v: VmValue) -> bool {
@@ -257,7 +258,6 @@ impl NativeCtx for ExecCtx {
         }
         None
     }
-
 
     fn call_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String> {
         let orig_len = self.stack.len();
@@ -321,7 +321,6 @@ impl NativeCtx for ExecCtx {
         self.stack.truncate(orig_len);
         res
     }
-
 
     fn spawn_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String> {
         let value = self.heap.extract(callee);

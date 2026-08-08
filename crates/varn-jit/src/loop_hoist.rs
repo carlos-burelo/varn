@@ -202,9 +202,8 @@ pub fn is_alloc_free_op(op: OpCode) -> bool {
 }
 
 fn body_is_alloc_free(code: &[u16], offsets: &[usize], lp: &NaturalLoop) -> bool {
-    (lp.header..=lp.latch).all(|instr_idx| {
-        OpCode::from_u16(code[offsets[instr_idx]]).is_some_and(is_alloc_free_op)
-    })
+    (lp.header..=lp.latch)
+        .all(|instr_idx| OpCode::from_u16(code[offsets[instr_idx]]).is_some_and(is_alloc_free_op))
 }
 
 /// Forward-scans `[start_offset, end_offset)` for a `Store/DefineGlobalIdx`

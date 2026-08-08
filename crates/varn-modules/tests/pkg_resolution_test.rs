@@ -29,13 +29,21 @@ fn test_wildcard_and_fallback_pkg_resolution() {
 
     // 1. Resolve root package specifier "pkg:my-math"
     let resolved_root = resolve_pkg_specifier(&temp_dir, "pkg:my-math");
-    assert!(resolved_root.is_some(), "should resolve root package via exports '.'");
+    assert!(
+        resolved_root.is_some(),
+        "should resolve root package via exports '.'"
+    );
     assert!(resolved_root.unwrap().ends_with("src/index.vn"));
 
     // 2. Resolve wildcard specifier "pkg:my-math/helpers/algebra"
     let resolved_wildcard = resolve_pkg_specifier(&temp_dir, "pkg:my-math/helpers/algebra");
-    assert!(resolved_wildcard.is_some(), "should resolve wildcard export './helpers/*'");
-    assert!(resolved_wildcard.unwrap().ends_with("src/helpers/algebra.vn"));
+    assert!(
+        resolved_wildcard.is_some(),
+        "should resolve wildcard export './helpers/*'"
+    );
+    assert!(resolved_wildcard
+        .unwrap()
+        .ends_with("src/helpers/algebra.vn"));
 
     // Clean up
     let _ = fs::remove_dir_all(&temp_dir);

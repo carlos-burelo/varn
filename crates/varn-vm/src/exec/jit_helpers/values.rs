@@ -7,7 +7,10 @@
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 
-pub(crate) extern "C" fn jit_load_const(closure: *const crate::closure::VmClosure, idx: usize) -> VmValue {
+pub(crate) extern "C" fn jit_load_const(
+    closure: *const crate::closure::VmClosure,
+    idx: usize,
+) -> VmValue {
     unsafe {
         let closure_ref = &*closure;
         closure_ref.constants[idx]
@@ -253,7 +256,6 @@ pub(crate) extern "C" fn jit_make_closure(
     }
 }
 
-
 pub(crate) extern "C" fn jit_define_global(ctx: *mut ExecCtx, src: VmValue, name_idx: usize) {
     unsafe {
         let ctx_ref = &mut *ctx;
@@ -275,4 +277,3 @@ pub(crate) extern "C" fn jit_store_global(ctx: *mut ExecCtx, src: VmValue, name_
         ctx_ref.globals.set_by_name(&name, src);
     }
 }
-

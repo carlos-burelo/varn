@@ -433,7 +433,12 @@ impl super::Binder {
     /// any other property name (`.pop`, `.map`, ...) is not on the whitelist
     /// and escapes. Returns `false` when `object` isn't a watched candidate,
     /// so the caller falls back to normal traversal.
-    fn bind_array_whitelisted_member(&mut self, object: &Expr, property: &Expr, computed: bool) -> bool {
+    fn bind_array_whitelisted_member(
+        &mut self,
+        object: &Expr,
+        property: &Expr,
+        computed: bool,
+    ) -> bool {
         let ExprKind::Identifier { name } = &object.kind else {
             return false;
         };

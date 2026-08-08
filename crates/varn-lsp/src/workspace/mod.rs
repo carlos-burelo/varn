@@ -84,7 +84,8 @@ impl Workspace {
 
         for (dep_uri, dep_source) in dependents {
             let dep_path = crate::document::uri_to_path(&dep_uri);
-            let dep_canonical = varn_modules::canonical_or_original(std::path::Path::new(&dep_path));
+            let dep_canonical =
+                varn_modules::canonical_or_original(std::path::Path::new(&dep_path));
             varn_checker::module_resolver::invalidate_module(&varn_core::ModuleId::local_str(
                 &dep_canonical,
             ));

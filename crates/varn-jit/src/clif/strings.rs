@@ -13,9 +13,9 @@
 
 use cranelift_codegen::ir::{types, InstBuilder};
 use cranelift_frontend::{FunctionBuilder, Variable};
+use varn_core::intrinsic_ops::intrinsic_decode;
 use varn_core::intrinsic_ops::str::StrOp;
 use varn_core::intrinsic_ops::wire::IntrinsicDomain;
-use varn_core::intrinsic_ops::intrinsic_decode;
 use varn_types::register_meta::RegisterMeta;
 use varn_types::VmValue;
 

@@ -23,12 +23,15 @@ impl RuntimeError {
             thrown: None,
         }
     }
-
 }
 
 impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "\x1b[1m\x1b[31mUncaught Runtime Error\x1b[0m: \x1b[1m{}\x1b[0m", self.message)?;
+        write!(
+            f,
+            "\x1b[1m\x1b[31mUncaught Runtime Error\x1b[0m: \x1b[1m{}\x1b[0m",
+            self.message
+        )?;
         if let Some(top) = self.frames.first() {
             if top.line > 0 && !top.file.is_empty() {
                 if let Ok(content) = std::fs::read_to_string(&top.file) {

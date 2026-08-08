@@ -264,8 +264,7 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                 }
             }
         }
-        ExprKind::Object { properties }
-        | ExprKind::Record { properties } => {
+        ExprKind::Object { properties } | ExprKind::Record { properties } => {
             for p in properties {
                 match p {
                     varn_core::ast::ObjectProp::Property { key, value, .. } => {

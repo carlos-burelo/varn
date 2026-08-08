@@ -114,7 +114,10 @@ pub(crate) fn current_epoch() -> u64 {
 
 /// Record that `proto` now holds code built for the running context, retiring
 /// whatever code it held before.
-pub(crate) fn register_compiled(proto: &Rc<FunctionProto>, previous: Option<(u64, Rc<dyn std::any::Any>)>) {
+pub(crate) fn register_compiled(
+    proto: &Rc<FunctionProto>,
+    previous: Option<(u64, Rc<dyn std::any::Any>)>,
+) {
     let epoch = current_epoch();
     COMPILED.with(|m| {
         let mut m = m.borrow_mut();

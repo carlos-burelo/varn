@@ -56,7 +56,8 @@ fn cached_proto(key: &str, fingerprint: u64) -> Option<Rc<FunctionProto>> {
     };
     let proto = Rc::new(postcard::from_bytes::<FunctionProto>(&bytes).ok()?);
     PROTO_CACHE.with(|c| {
-        c.borrow_mut().insert(key.to_owned(), (fingerprint, proto.clone()));
+        c.borrow_mut()
+            .insert(key.to_owned(), (fingerprint, proto.clone()));
     });
     Some(proto)
 }
@@ -64,13 +65,15 @@ fn cached_proto(key: &str, fingerprint: u64) -> Option<Rc<FunctionProto>> {
 fn store_proto(key: &str, fingerprint: u64, proto: &Rc<FunctionProto>) {
     if let Ok(bytes) = postcard::to_allocvec(proto.as_ref()) {
         if let Ok(mut guard) = COMPILED_BYTES.lock() {
-            guard
-                .get_or_insert_with(FxHashMap::default)
-                .insert(key.to_owned(), (fingerprint, Arc::from(bytes.into_boxed_slice())));
+            guard.get_or_insert_with(FxHashMap::default).insert(
+                key.to_owned(),
+                (fingerprint, Arc::from(bytes.into_boxed_slice())),
+            );
         }
     }
     PROTO_CACHE.with(|c| {
-        c.borrow_mut().insert(key.to_owned(), (fingerprint, proto.clone()));
+        c.borrow_mut()
+            .insert(key.to_owned(), (fingerprint, proto.clone()));
     });
 }
 
@@ -152,9 +155,8 @@ fn load_uncached(spec: &str) -> Result<FunctionProto, ModuleError> {
         .ok_or_else(|| ModuleError::new("stdlib provider not registered"))?;
 
     if let Some(blob) = provider.bytecode_blob(spec) {
-        return postcard::from_bytes(blob).map_err(|e| {
-            ModuleError::new(format!("corrupt std bundle bytecode for {spec}: {e}"))
-        });
+        return postcard::from_bytes(blob)
+            .map_err(|e| ModuleError::new(format!("corrupt std bundle bytecode for {spec}: {e}")));
     }
 
     let source = provider
@@ -277,15 +279,18 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
         modules: Vec<ManifestModule>,
     }
 
-    let manifest: Manifest = serde_json::from_str(&manifest_raw)
-        .map_err(|e| format!("invalid std.json: {e}"))?;
+    let manifest: Manifest =
+        serde_json::from_str(&manifest_raw).map_err(|e| format!("invalid std.json: {e}"))?;
 
     let mut modules = Vec::new();
     // Report every failing module in one pass: fixing the stdlib one build
     // round-trip at a time is not worth the four-minute rebuild.
     let mut failures = String::new();
     for m in &manifest.modules {
-        let file = std_dir.join(format!("{}.vn", m.id.strip_prefix("std:").ok_or("invalid std: prefix")?));
+        let file = std_dir.join(format!(
+            "{}.vn",
+            m.id.strip_prefix("std:").ok_or("invalid std: prefix")?
+        ));
         let source = std::fs::read_to_string(&file)
             .map_err(|e| format!("cannot read {}: {e}", file.display()))?;
 

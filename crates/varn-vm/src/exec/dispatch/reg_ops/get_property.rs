@@ -1,6 +1,6 @@
+use crate::closure::VmClosure;
 use crate::error::{RuntimeError, VmResult};
 use crate::exec::ctx::ExecCtx;
-use crate::closure::VmClosure;
 use crate::value::VmValue;
 use std::rc::Rc;
 use std::sync::atomic::Ordering;
@@ -54,8 +54,9 @@ impl ExecCtx {
 
                     if entry.is_class == 1 {
                         if obj.is_heap() {
-                            if let Some(crate::heap::HeapObj::Object(o) | crate::heap::HeapObj::Record(o)) =
-                                self.heap.get(obj.as_heap_idx())
+                            if let Some(
+                                crate::heap::HeapObj::Object(o) | crate::heap::HeapObj::Record(o),
+                            ) = self.heap.get(obj.as_heap_idx())
                             {
                                 let guard = o.read();
                                 if guard.shape().id == entry.id {

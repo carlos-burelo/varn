@@ -10,8 +10,14 @@ pub fn run_doctor() -> CliResult<()> {
         Err(_) => println!("  exe: <unavailable>"),
     }
 
-    println!("  VARN_HOME: {}", varn_core::paths::varn_home_dir().display());
-    println!("  cache dir: {}", varn_core::paths::varn_cache_dir().display());
+    println!(
+        "  VARN_HOME: {}",
+        varn_core::paths::varn_home_dir().display()
+    );
+    println!(
+        "  cache dir: {}",
+        varn_core::paths::varn_cache_dir().display()
+    );
     match std::env::var(varn_modules::std_root::ENV_VARN_STD) {
         Ok(raw) => println!("  VARN_STD: {raw}"),
         Err(_) => println!("  VARN_STD: <not set>"),

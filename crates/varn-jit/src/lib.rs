@@ -10,7 +10,9 @@ pub use stats::{CompileOutcome, CompileRecord, JitStats, JitStatsSnapshot, JIT_S
 /// `loop_hoist::diagnose_loops`'s docs. Exposed for `vn debug -p bytecode`
 /// (via `varn-debug`); the rest of `loop_hoist` (the actual codegen-facing
 /// `plan_hoists`/`HoistPlan`) stays crate-private.
-pub use loop_hoist::{diagnose_loops, is_alloc_free_op, CacheSource, HoistCandidate, LoopDiagnostic};
+pub use loop_hoist::{
+    diagnose_loops, is_alloc_free_op, CacheSource, HoistCandidate, LoopDiagnostic,
+};
 
 /// Re-exported so `varn-debug` can name the host ISA type (from
 /// `clif::shared_isa()`) without taking a direct `cranelift-codegen` dep.

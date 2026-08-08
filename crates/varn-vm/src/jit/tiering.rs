@@ -336,7 +336,6 @@ impl VmClosure {
             }
         }
     }
-
 }
 
 #[cfg(test)]

@@ -53,7 +53,9 @@ pub fn debug_summary(proto: &FunctionProto) {
     eprintln!("  {:<24} {:>8}", "exports", proto.export_names.len());
     eprintln!(
         "  {:<24} {:>8}   {DIM}sobre el gate de {} words{R}",
-        "fuera de clif por tamaño", over_gate, varn_jit::SIZE_GATE_WORDS
+        "fuera de clif por tamaño",
+        over_gate,
+        varn_jit::SIZE_GATE_WORDS
     );
 
     fns.sort_by(|a, b| b.words.cmp(&a.words));
@@ -64,7 +66,12 @@ pub fn debug_summary(proto: &FunctionProto) {
         } else {
             ""
         };
-        eprintln!("    {:<32} {:>6} words{}", truncate(&f.name, 32), f.words, flag);
+        eprintln!(
+            "    {:<32} {:>6} words{}",
+            truncate(&f.name, 32),
+            f.words,
+            flag
+        );
     }
 }
 

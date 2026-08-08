@@ -40,11 +40,13 @@ fn render_recursive(
 ) {
     // The filter selects which functions are *rendered*, never which are
     // walked: a match can be nested inside a function that does not match.
-    if flags
-        .fn_filter
-        .as_ref()
-        .is_none_or(|needle| proto.name.as_deref().unwrap_or("<module>").contains(needle.as_str()))
-    {
+    if flags.fn_filter.as_ref().is_none_or(|needle| {
+        proto
+            .name
+            .as_deref()
+            .unwrap_or("<module>")
+            .contains(needle.as_str())
+    }) {
         let constants = constants_for_inspect(proto);
         let insp = inspect(proto, &constants, helpers, isa, &NoLinker);
         render_one(&insp, flags);
@@ -86,7 +88,11 @@ fn constants_for_inspect(proto: &FunctionProto) -> Vec<VmValue> {
 }
 
 fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
-    let fa = if insp.frame_aware { " (frame-aware)" } else { "" };
+    let fa = if insp.frame_aware {
+        " (frame-aware)"
+    } else {
+        ""
+    };
     eprintln!("\n  {BOLD}{}{R}{DIM}{fa}{R}", insp.name);
 
     if flags.clif_route {
@@ -124,7 +130,13 @@ fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
             let raw_end = (code.raw_off + code.raw_len).min(n);
             let entry = code.entry_off.min(n);
             eprintln!("    {DIM}x86-64 raw@{}:{R}", code.raw_off);
-            eprint!("{}", disasm(&code.bytes[code.raw_off.min(n)..raw_end], code.raw_off as u64));
+            eprint!(
+                "{}",
+                disasm(
+                    &code.bytes[code.raw_off.min(n)..raw_end],
+                    code.raw_off as u64
+                )
+            );
             eprintln!("    {DIM}x86-64 wrapper@{}:{R}", code.entry_off);
             eprint!("{}", disasm(&code.bytes[entry..], entry as u64));
         }

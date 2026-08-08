@@ -68,7 +68,11 @@ impl PmLockfile {
         for pkg in &self.packages {
             let installed_path = crate::cache::local_package_path(project_root, &pkg.name);
             if !installed_path.exists() {
-                issues.push(format!("missing package '{}' at {}", pkg.name, installed_path.display()));
+                issues.push(format!(
+                    "missing package '{}' at {}",
+                    pkg.name,
+                    installed_path.display()
+                ));
                 continue;
             }
 

@@ -16,22 +16,22 @@ pub(crate) mod body;
 pub(crate) mod classes;
 pub mod debug;
 pub(crate) mod emit;
-pub(crate) mod piece;
-pub(crate) mod preheader;
-pub(crate) mod scan;
-pub(crate) mod strconcat;
-pub(crate) mod vars;
 pub(crate) mod fields;
 pub(crate) mod floats;
-pub(crate) mod strings;
 pub(crate) mod generic;
 pub(crate) mod globals;
 pub(crate) mod kinds;
 pub(crate) mod liveness;
+pub mod lower;
 pub(crate) mod methods;
 pub(crate) mod nursery;
 pub(crate) mod osr;
-pub mod lower;
+pub(crate) mod piece;
+pub(crate) mod preheader;
+pub(crate) mod scan;
+pub(crate) mod strconcat;
+pub(crate) mod strings;
+pub(crate) mod vars;
 
 use cranelift_codegen::control::ControlPlane;
 use cranelift_codegen::ir::Function;
@@ -70,9 +70,7 @@ pub fn shared_isa() -> Result<&'static OwnedTargetIsa, String> {
 pub fn host_isa() -> Result<OwnedTargetIsa, String> {
     let mut flags = settings::builder();
     let opt = std::env::var("VARN_CLIF_OPT").unwrap_or_else(|_| "speed".to_owned());
-    flags
-        .set("opt_level", &opt)
-        .map_err(|e| e.to_string())?;
+    flags.set("opt_level", &opt).map_err(|e| e.to_string())?;
     // Default-on in Cranelift and meant for compiler development: it re-walks
     // the whole function at several points per compile. Our lowering is fixed
     // at build time, so shipping it means paying a debug check per run.
@@ -149,9 +147,7 @@ fn compile_in<R>(
 mod tests {
     use super::*;
     use crate::mem::JitBuffer;
-    use cranelift_codegen::ir::{
-        types, AbiParam, InstBuilder, Signature, UserFuncName,
-    };
+    use cranelift_codegen::ir::{types, AbiParam, InstBuilder, Signature, UserFuncName};
     use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 
     fn exec_buffer(code: &[u8]) -> JitBuffer {
@@ -190,8 +186,7 @@ mod tests {
 
         let code = compile_function(func, isa.as_ref()).expect("compile");
         let buf = exec_buffer(&code);
-        let f: extern "C" fn(i64, i64, i64) -> i64 =
-            unsafe { std::mem::transmute(buf.as_ptr()) };
+        let f: extern "C" fn(i64, i64, i64) -> i64 = unsafe { std::mem::transmute(buf.as_ptr()) };
         assert_eq!(f(3, 4, 5), 35);
         assert_eq!(f(-2, 2, 100), 0);
     }
@@ -226,7 +221,8 @@ mod tests {
         let n = b.block_params(entry)[0];
         let zero = b.ins().iconst(types::I64, 0);
         let one = b.ins().iconst(types::I64, 1);
-        b.ins().jump(header, &[zero.into(), zero.into(), one.into()]);
+        b.ins()
+            .jump(header, &[zero.into(), zero.into(), one.into()]);
 
         b.switch_to_block(header);
         let (i, a, bb) = {

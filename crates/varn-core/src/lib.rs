@@ -28,13 +28,13 @@ pub use kinds::TypeKind;
 pub use opcode::OpCode;
 pub use source::{SourceLocation, SourceRange};
 
+pub use cg_ty::CgTy;
 pub use intrinsics::{IntrinsicType, MemberKey};
 pub use module_id::{ImportSpecifier, ModuleId};
 pub use numeric::{binary_operand_kind, binary_result_kind, wrap_i48, NumericOperand};
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
-pub use cg_ty::CgTy;
 pub use token::{ParsedNumber, Token, TokenKind};
 pub use typed_ir::{NumericKind, TypeAnnotations};
 pub use varn_base::TypeTag;

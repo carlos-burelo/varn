@@ -2,9 +2,9 @@
 
 use std::time::Duration;
 
-use varn_vm::varn_jit::JitStatsSnapshot;
 use varn_utilities::chalk::chalk;
 use varn_utilities::terminal;
+use varn_vm::varn_jit::JitStatsSnapshot;
 
 use super::fmt::{fmt_bytes, fmt_dur, fmt_num, fmt_pct, short_path};
 use crate::bench::stats::{PhaseStats, CV_UNRELIABLE};
@@ -32,7 +32,11 @@ impl BuildId {
             "interp"
         };
         Self {
-            profile: if cfg!(debug_assertions) { "debug" } else { "release" },
+            profile: if cfg!(debug_assertions) {
+                "debug"
+            } else {
+                "release"
+            },
             backend,
             // Defined by the build script when git metadata is available; the
             // field is omitted rather than faked when it is not.
@@ -45,7 +49,11 @@ impl BuildId {
     }
 
     fn render(&self, runs: usize) -> String {
-        let mut parts = vec![format!("{runs} runs"), self.profile.to_owned(), self.backend.to_owned()];
+        let mut parts = vec![
+            format!("{runs} runs"),
+            self.profile.to_owned(),
+            self.backend.to_owned(),
+        ];
         if let Some(sha) = self.commit {
             parts.push(sha.to_owned());
         }
@@ -257,11 +265,7 @@ impl Headline<'_> {
                 terminal::log(format!(
                     "  {} {}",
                     chalk("✗").red(),
-                    chalk(format!(
-                        "{} frames al intérprete",
-                        fmt_num(jit.interp_runs)
-                    ))
-                    .red()
+                    chalk(format!("{} frames al intérprete", fmt_num(jit.interp_runs))).red()
                 ));
                 if off_clif == 0 {
                     // Every function the JIT saw was routed, yet frames still

@@ -1,13 +1,11 @@
 //! Allocation for arrays, tuples, objects and records — the values whose
 //! representation is chosen at runtime from their contents.
 
-use std::rc::Rc;
-use crate::value::VmValue;
-use varn_types::{
-    value::ObjRef, Value, VmArray,
-};
 use super::obj::HeapObj;
 use super::structs::HeapInner;
+use crate::value::VmValue;
+use std::rc::Rc;
+use varn_types::{value::ObjRef, Value, VmArray};
 
 impl HeapInner {
     pub(crate) fn alloc_array_vm(&mut self, items: Vec<VmValue>) -> VmValue {
@@ -47,5 +45,4 @@ impl HeapInner {
         let oref = ObjRef::with_shape(Rc::clone(shape), values);
         VmValue::from_heap_idx(self.alloc(HeapObj::Record(oref)))
     }
-    
 }

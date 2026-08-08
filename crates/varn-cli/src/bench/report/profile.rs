@@ -93,10 +93,7 @@ pub fn print_opcode_hotspots(rows: &[(OpCode, u64)], interp_frame_share: Option<
 
     terminal::blank();
     let scope = match interp_frame_share {
-        Some(share) => format!(
-            "[solo intérprete — {} de los frames]",
-            fmt_pct(share)
-        ),
+        Some(share) => format!("[solo intérprete — {} de los frames]", fmt_pct(share)),
         None => "[solo intérprete]".to_owned(),
     };
     terminal::log(format!(
@@ -109,10 +106,7 @@ pub fn print_opcode_hotspots(rows: &[(OpCode, u64)], interp_frame_share: Option<
         let share = *count as f64 / total as f64;
         terminal::log(format!(
             "{}  {}",
-            row(
-                format!("{op:?}").trim_start_matches("Op"),
-                fmt_num(*count)
-            ),
+            row(format!("{op:?}").trim_start_matches("Op"), fmt_num(*count)),
             chalk(fmt_pct(share)).dim()
         ));
     }
@@ -140,8 +134,16 @@ pub fn print_vm_profile(profile: &VmProfile, interp_frame_share: Option<f64>) {
     terminal::log(row("IC misses", fmt_num(profile.ic_misses)));
 
     let sites = [
-        ("GetProp", profile.ic_hits_getprop, profile.ic_misses_getprop),
-        ("SetProp", profile.ic_hits_setprop, profile.ic_misses_setprop),
+        (
+            "GetProp",
+            profile.ic_hits_getprop,
+            profile.ic_misses_getprop,
+        ),
+        (
+            "SetProp",
+            profile.ic_hits_setprop,
+            profile.ic_misses_setprop,
+        ),
         (
             "CallMethod",
             profile.ic_hits_callmethod,
@@ -169,13 +171,21 @@ pub fn print_vm_profile(profile: &VmProfile, interp_frame_share: Option<f64>) {
             fmt_pct(n as f64 / call_total as f64)
         }
     };
-    terminal::log(row_note("vm-fast", fmt_num(profile.calls_vm_fast), pct(profile.calls_vm_fast)));
+    terminal::log(row_note(
+        "vm-fast",
+        fmt_num(profile.calls_vm_fast),
+        pct(profile.calls_vm_fast),
+    ));
     terminal::log(row_note(
         "slow/prepare",
         fmt_num(profile.calls_prepare_slow),
         pct(profile.calls_prepare_slow),
     ));
-    terminal::log(row_note("native", fmt_num(profile.calls_native), pct(profile.calls_native)));
+    terminal::log(row_note(
+        "native",
+        fmt_num(profile.calls_native),
+        pct(profile.calls_native),
+    ));
     terminal::log(row("total", fmt_num(call_total)));
 
     terminal::blank();

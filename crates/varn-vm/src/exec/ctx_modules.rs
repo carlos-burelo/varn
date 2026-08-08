@@ -36,7 +36,11 @@ fn canonical_id_str(id: &ModuleId) -> String {
 }
 
 impl ExecCtx {
-    pub(crate) fn convert_to_module_obj(&mut self, id: ModuleId, val: VmValue) -> VmResult<VmValue> {
+    pub(crate) fn convert_to_module_obj(
+        &mut self,
+        id: ModuleId,
+        val: VmValue,
+    ) -> VmResult<VmValue> {
         if !val.is_heap() {
             return Ok(val);
         }

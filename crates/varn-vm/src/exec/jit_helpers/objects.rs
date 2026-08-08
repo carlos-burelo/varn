@@ -22,7 +22,11 @@ pub(crate) extern "C" fn jit_op_in_stub(ctx: *mut ExecCtx, a: VmValue, b: VmValu
     }
 }
 
-pub(crate) extern "C" fn jit_object_merge_stub(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_object_merge_stub(
+    ctx: *mut ExecCtx,
+    a: VmValue,
+    b: VmValue,
+) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         match crate::exec::collections::object_merge(a, b, &mut ctx_ref.heap) {
@@ -66,4 +70,3 @@ pub(crate) extern "C" fn jit_object_rest(ctx: *mut ExecCtx, ip_before: usize) ->
         }
     }
 }
-

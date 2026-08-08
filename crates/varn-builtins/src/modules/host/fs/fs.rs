@@ -1,6 +1,6 @@
-use std::fs;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fs;
 use std::sync::atomic::{AtomicI64, Ordering};
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
@@ -37,7 +37,7 @@ varn_contract! {
             FILES.with(|files| {
                 let mut files_map = files.borrow_mut();
                 let file = files_map.get_mut(&fd).ok_or_else(|| format!("invalid file descriptor {fd}"))?;
-                
+
                 use std::io::Read;
                 let mut buf = vec![0u8; len as usize];
                 let bytes_read = file.read(&mut buf).map_err(|e| e.to_string())?;
@@ -50,7 +50,7 @@ varn_contract! {
             FILES.with(|files| {
                 let mut files_map = files.borrow_mut();
                 let file = files_map.get_mut(&fd).ok_or_else(|| format!("invalid file descriptor {fd}"))?;
-                
+
                 use std::io::Write;
                 file.write_all(data.as_bytes()).map_err(|e| e.to_string())?;
                 Ok(data.as_bytes().len() as i64)
@@ -61,7 +61,7 @@ varn_contract! {
             FILES.with(|files| {
                 let mut files_map = files.borrow_mut();
                 let file = files_map.get_mut(&fd).ok_or_else(|| format!("invalid file descriptor {fd}"))?;
-                
+
                 use std::io::{Seek, SeekFrom};
                 let seek_from = match whence {
                     0 => SeekFrom::Start(offset as u64),

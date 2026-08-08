@@ -10,7 +10,10 @@ pub struct PositionalIndex {
 }
 
 impl PositionalIndex {
-    pub fn build(tokens: &[TokenRecord], node_scopes: &rustc_hash::FxHashMap<u32, CheckerScopeId>) -> Self {
+    pub fn build(
+        tokens: &[TokenRecord],
+        node_scopes: &rustc_hash::FxHashMap<u32, CheckerScopeId>,
+    ) -> Self {
         let mut tokens_by_offset = tokens.to_vec();
         tokens_by_offset.sort_by_key(|t| t.offset);
 
@@ -52,7 +55,10 @@ impl PositionalIndex {
             return global_scope;
         }
 
-        match self.scopes_by_offset.binary_search_by(|(off, _)| off.cmp(&offset)) {
+        match self
+            .scopes_by_offset
+            .binary_search_by(|(off, _)| off.cmp(&offset))
+        {
             Ok(idx) => self.scopes_by_offset[idx].1,
             Err(idx) => {
                 if idx == 0 {

@@ -1,6 +1,6 @@
+use rustc_hash::FxHasher;
 use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
-use rustc_hash::FxHasher;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExportedSymbol {

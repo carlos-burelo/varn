@@ -138,4 +138,3 @@ pub(crate) extern "C" fn jit_class_member_op(
         }
     }
 }
-

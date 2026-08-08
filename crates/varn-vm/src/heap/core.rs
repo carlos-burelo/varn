@@ -4,11 +4,11 @@
 //! also where the nursery is offered the object first. `alloc_raw` skips the
 //! nursery for objects that must be born old.
 
+use super::obj::HeapObj;
+use super::structs::HeapInner;
 use crate::nursery::pack_old_idx;
 use crate::value::VmValue;
 use varn_types::NativeFn;
-use super::obj::HeapObj;
-use super::structs::HeapInner;
 
 #[inline]
 pub(crate) fn alloc_into(
@@ -98,5 +98,4 @@ impl HeapInner {
         }
         idx
     }
-
 }

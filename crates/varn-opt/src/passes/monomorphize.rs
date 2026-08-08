@@ -4,9 +4,9 @@
 //! array operations (`ArrayGetIndex`/`ArraySetIndex`) when static type metadata or
 //! SSA allocation sources confirm array layout.
 
-use rustc_hash::FxHashSet;
 use crate::hir::HirType;
 use crate::ssa::ir::{InstKind, SsaFunc};
+use rustc_hash::FxHashSet;
 
 pub fn run(func: &mut SsaFunc) -> bool {
     let mut changed = false;

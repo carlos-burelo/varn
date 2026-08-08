@@ -7,8 +7,8 @@
 
 use super::calls::jit_guard_call_depth;
 use super::construct::jit_propagate_error;
-use crate::exec::frame_ctrl::resolve_constructor_return;
 use crate::exec::ctx::ExecCtx;
+use crate::exec::frame_ctrl::resolve_constructor_return;
 use crate::value::VmValue;
 
 pub(crate) extern "C" fn jit_prepare_call(
@@ -63,13 +63,15 @@ pub(crate) extern "C" fn jit_prepare_call(
         } else if let Some(crate::heap::HeapObj::Class(cls)) = ctx_ref.heap.get(heap_idx) {
             let cls = cls.clone();
             let oref = varn_types::value::ObjRef::instance(cls.clone());
-            let instance_nv = VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Object(oref)));
+            let instance_nv =
+                VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Object(oref)));
             ctx_ref.stack[callee_base] = instance_nv;
             if let Some(ctor) = cls.constructor() {
                 match ctor {
                     varn_types::Value::VmValue(ref payload) => {
-                        if let Some(wrapper) =
-                            payload.as_any().downcast_ref::<crate::closure::VmClosurePayload>()
+                        if let Some(wrapper) = payload
+                            .as_any()
+                            .downcast_ref::<crate::closure::VmClosurePayload>()
                         {
                             let closure = wrapper.0.clone();
                             if !closure.proto.is_async && !closure.proto.is_generator {
@@ -89,10 +91,14 @@ pub(crate) extern "C" fn jit_prepare_call(
                                             std::ptr::write(ptr.add(i), VmValue::null());
                                         }
                                     }
-                                    let ctor_closure_ptr = &*closure as *const crate::closure::VmClosure;
+                                    let ctor_closure_ptr =
+                                        &*closure as *const crate::closure::VmClosure;
                                     let returning_frame_idx = ctx_ref.frames.len();
-                                    ctx_ref.pending_constructors.push((returning_frame_idx, instance_nv));
-                                    let mut frame = crate::frame::CallFrame::new(&closure, callee_base);
+                                    ctx_ref
+                                        .pending_constructors
+                                        .push((returning_frame_idx, instance_nv));
+                                    let mut frame =
+                                        crate::frame::CallFrame::new(&closure, callee_base);
                                     frame.return_reg = Some(call_dest);
                                     ctx_ref.frames.push(frame);
                                     return ctor_closure_ptr;
@@ -121,11 +127,7 @@ pub(crate) extern "C" fn jit_prepare_call(
                         };
                         match result {
                             Ok(v) => {
-                                let nv = if v.is_null() {
-                                    instance_nv
-                                } else {
-                                    v
-                                };
+                                let nv = if v.is_null() { instance_nv } else { v };
                                 ctx_ref.jit_native_result = nv;
                                 return 1 as *const crate::closure::VmClosure;
                             }
@@ -203,7 +205,11 @@ pub(crate) extern "C" fn jit_push_self_frame(ctx: *mut ExecCtx, callee_base: usi
     }
 }
 
-pub(crate) extern "C" fn jit_post_call(ctx: *mut ExecCtx, callee_base: usize, val: VmValue) -> VmValue {
+pub(crate) extern "C" fn jit_post_call(
+    ctx: *mut ExecCtx,
+    callee_base: usize,
+    val: VmValue,
+) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         let returning_frame_idx = ctx_ref.frames.len() - 1;
@@ -262,4 +268,3 @@ pub(crate) extern "C" fn jit_load_static_fn(
         val
     }
 }
-

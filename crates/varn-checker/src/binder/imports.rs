@@ -1,7 +1,5 @@
 use std::rc::Rc;
-use varn_core::ast::{
-    Decl, ExportDecl, ExportDefaultDecl, ImportDecl, ImportSpecifier, Pattern,
-};
+use varn_core::ast::{Decl, ExportDecl, ExportDefaultDecl, ImportDecl, ImportSpecifier, Pattern};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
 use crate::module_resolver;

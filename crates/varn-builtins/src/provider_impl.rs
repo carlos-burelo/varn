@@ -39,7 +39,12 @@ fn leak_bundle_modules(
         // Same `<name>.vn` shape tree mode produces, so specs are
         // indistinguishable between storage forms downstream.
         let file = format!("{}.vn", m.id.strip_prefix("std:").unwrap_or(&m.id));
-        specs.push(ModuleSpec::leaked(m.id.clone(), ModuleKind::Stdlib, file, m.pure));
+        specs.push(ModuleSpec::leaked(
+            m.id.clone(),
+            ModuleKind::Stdlib,
+            file,
+            m.pure,
+        ));
         blobs.push(StdModuleBlobs {
             id: m.id,
             interface: Box::leak(m.interface.into_boxed_slice()),
@@ -116,19 +121,12 @@ fn load_embedded_std(bytes: &'static [u8]) -> Result<ActiveStd, String> {
     })
 }
 
-fn load_tree_std(
-    root: &std::path::Path,
-    provenance: StdProvenance,
-) -> Result<ActiveStd, String> {
+fn load_tree_std(root: &std::path::Path, provenance: StdProvenance) -> Result<ActiveStd, String> {
     // `classify` only reports SourceTree when std.json is a readable file, so
     // a failure here means the manifest itself is corrupt — same class as an
     // invalid bundle, and equally not a reason to fall back (spec §3).
-    let manifest = crate::std_manifest::read_manifest(root).ok_or_else(|| {
-        format!(
-            "cannot read std manifest in source tree {}",
-            root.display()
-        )
-    })?;
+    let manifest = crate::std_manifest::read_manifest(root)
+        .ok_or_else(|| format!("cannot read std manifest in source tree {}", root.display()))?;
     if manifest.host_api != varn_core::HOST_API_VERSION {
         return Err(format!(
             "std source tree {} requires host API v{} but this vn provides v{}",
@@ -181,7 +179,9 @@ fn combined_specs() -> &'static [ModuleSpec] {
             let mut combined: Vec<ModuleSpec> = MODULE_REGISTRY
                 .iter()
                 .filter(|m| !std.specs.iter().any(|s| s.id == m.id))
-                .map(|m| ModuleSpec::leaked(m.id.to_owned(), m.kind, m.vn_source.to_owned(), m.pure))
+                .map(|m| {
+                    ModuleSpec::leaked(m.id.to_owned(), m.kind, m.vn_source.to_owned(), m.pure)
+                })
                 .collect();
             combined.extend(std.specs.iter().map(|s| {
                 ModuleSpec::leaked(s.id.to_owned(), s.kind, s.vn_source.to_owned(), s.pure)
@@ -251,4 +251,3 @@ pub fn register_provider() {
     }
     varn_modules::provider::register(&PROVIDER);
 }
-

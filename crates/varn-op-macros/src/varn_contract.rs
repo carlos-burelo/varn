@@ -423,7 +423,11 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
         let rust_sym = sym.trim_end_matches('$');
         let method_ident = format_ident!("{}", rust_sym);
         let wrap_ident = format_ident!("__varn_wrap_{}_{}", sanitize(&prefix), sanitize(rust_sym));
-        let fast_wrap_ident = format_ident!("__varn_fast_wrap_{}_{}", sanitize(&prefix), sanitize(rust_sym));
+        let fast_wrap_ident = format_ident!(
+            "__varn_fast_wrap_{}_{}",
+            sanitize(&prefix),
+            sanitize(rust_sym)
+        );
 
         let mut sig_params: Vec<TS2> = Vec::new();
         let mut decode: Vec<TS2> = Vec::new();
@@ -562,7 +566,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
             let mut fast_call_args = Vec::new();
             let mut fast_decode = Vec::new();
             let fallback = default_value_token(&m.ret);
-            
+
             if m.kind == Kind::Method {
                 fast_sig_params.push(quote!(this: ::varn_types::VmValue));
                 let recv = receiver_mapped(&prefix);
@@ -575,17 +579,17 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                 });
                 fast_call_args.push(call_expr(&format_ident!("__this"), &recv));
             }
-            
+
             for (i, p) in m.params.iter().enumerate() {
                 let pname = format_ident!("__p{}", i);
                 let pty = param_ty(&p.mapped);
                 fast_sig_params.push(quote!(#pname: #pty));
                 fast_call_args.push(call_expr(&pname, &p.mapped));
             }
-            
+
             let fast_ret = ret_ty(&m.ret);
             let is_fn = m.kind == Kind::Function;
-            
+
             let call = quote!(<__T>::#method_ident(&mut dummy_ctx, #(#fast_call_args),*));
             let fast_body = if is_fn {
                 quote! {
@@ -603,7 +607,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                     #call
                 }
             };
-            
+
             let wrapper = quote! {
                 #[allow(non_snake_case)]
                 pub extern "C" fn #fast_wrap_ident<__T: #trait_ident>(
@@ -612,7 +616,7 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
                     #fast_body
                 }
             };
-            
+
             let raw_ptr = quote!(#fast_wrap_ident::<#self_ty> as *const u8);
             let sig = signature_token(m);
             (wrapper, raw_ptr, sig)
@@ -769,7 +773,10 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
     let marker_name = if let Some(class) = &input.class {
         format!("__VARN_LINK_MARKER_{}", sanitize(class).to_uppercase())
     } else {
-        format!("__VARN_LINK_MARKER_{}", sanitize(&input.module).to_uppercase())
+        format!(
+            "__VARN_LINK_MARKER_{}",
+            sanitize(&input.module).to_uppercase()
+        )
     };
     let link_marker_ident = format_ident!("{}", marker_name);
 
@@ -795,8 +802,6 @@ pub(crate) fn expand(input: TokenStream) -> TokenStream {
 
         #registration
     };
-
-
 
     out.into()
 }
@@ -852,7 +857,10 @@ fn map_to_arg_type_token(m: &Mapped) -> TS2 {
 }
 
 fn is_scalar(m: &Mapped) -> bool {
-    matches!(m, Mapped::Int | Mapped::Float | Mapped::Bool | Mapped::Char | Mapped::Void)
+    matches!(
+        m,
+        Mapped::Int | Mapped::Float | Mapped::Bool | Mapped::Char | Mapped::Void
+    )
 }
 
 fn is_fast_eligible(m: &Member) -> bool {
@@ -873,11 +881,11 @@ fn is_fast_eligible(m: &Member) -> bool {
 fn signature_token(m: &Member) -> TS2 {
     let ret_token = map_to_arg_type_token(&m.ret);
     let mut param_tokens = Vec::new();
-    
+
     if m.kind == Kind::Method {
         param_tokens.push(quote!(::varn_types::ArgType::Generic));
     }
-    
+
     for p in m.params.iter().take(7) {
         param_tokens.push(map_to_arg_type_token(&p.mapped));
     }

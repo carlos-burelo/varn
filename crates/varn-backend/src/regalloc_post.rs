@@ -95,8 +95,16 @@ fn collect_consecutive_blocks(code: &[u16], constants: &[PoolEntry]) -> Vec<(u8,
         if let Some(op) = OpCode::from_u16(code[offset]) {
             match op {
                 OpCode::BuildArray | OpCode::BuildTuple => {
-                    let w1 = if offset + 1 < code.len() { code[offset + 1] } else { 0 };
-                    let w2 = if offset + 2 < code.len() { code[offset + 2] } else { 0 };
+                    let w1 = if offset + 1 < code.len() {
+                        code[offset + 1]
+                    } else {
+                        0
+                    };
+                    let w2 = if offset + 2 < code.len() {
+                        code[offset + 2]
+                    } else {
+                        0
+                    };
                     let start = (w1 & 0xff) as u8;
                     let count = (w2 >> 8) as u8;
                     if count > 1 {
@@ -104,8 +112,16 @@ fn collect_consecutive_blocks(code: &[u16], constants: &[PoolEntry]) -> Vec<(u8,
                     }
                 }
                 OpCode::BuildObjectWithShape | OpCode::BuildRecord => {
-                    let w1 = if offset + 1 < code.len() { code[offset + 1] } else { 0 };
-                    let w2 = if offset + 2 < code.len() { code[offset + 2] } else { 0 };
+                    let w1 = if offset + 1 < code.len() {
+                        code[offset + 1]
+                    } else {
+                        0
+                    };
+                    let w2 = if offset + 2 < code.len() {
+                        code[offset + 2]
+                    } else {
+                        0
+                    };
                     let start = (w1 & 0xff) as u8;
                     let shape_idx = w2 as usize;
                     let count = match constants.get(shape_idx) {
@@ -133,10 +149,8 @@ fn color_with_base(
 ) -> HashMap<u8, u8> {
     let mut coloring: HashMap<u8, u8> = HashMap::new();
 
-    let ranges_by_vreg: HashMap<u8, &LiveRange> = ranges
-        .iter()
-        .map(|r| (r.vreg as u8, r))
-        .collect();
+    let ranges_by_vreg: HashMap<u8, &LiveRange> =
+        ranges.iter().map(|r| (r.vreg as u8, r)).collect();
 
     let mut parent_of: HashMap<u8, (u8, u8)> = HashMap::new();
     let mut block_count: HashMap<u8, u8> = HashMap::new();
@@ -201,10 +215,7 @@ fn color_with_base(
         for offset in 0..count {
             let child = reg + offset;
             for &(call_idx, arg_start, _) in &scan.call_sites {
-                let is_live_across = scan
-                    .defs
-                    .get(&child)
-                    .is_some_and(|&def| def < call_idx)
+                let is_live_across = scan.defs.get(&child).is_some_and(|&def| def < call_idx)
                     && scan
                         .uses
                         .get(&child)
@@ -248,8 +259,6 @@ fn color_with_base(
             coloring.insert(reg + offset, color + offset);
         }
     }
-
-
 
     coloring
 }
@@ -730,8 +739,6 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
     {
         return;
     }
-
-
 
     let back_edges =
         varn_types::loop_analysis::collect_back_edges(&proto.chunk.code, &proto.chunk.constants);

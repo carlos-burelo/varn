@@ -7,9 +7,9 @@
 
 use crate::exec::calls::PreparedCall;
 use crate::exec::ctx::ExecCtx;
-use varn_types::NativeCtx;
 use crate::heap::HeapObj;
 use crate::value::VmValue;
+use varn_types::NativeCtx;
 
 impl ExecCtx {
     /// Like `call_vm`, but for the JIT call fallback.
@@ -95,14 +95,17 @@ impl ExecCtx {
             }
             PreparedCall::NativeConstructor(f, args, instance_nv) => {
                 let result = (f)(self as &mut dyn NativeCtx, &args).map_err(|e| e)?;
-                let nv = if result.is_null() { instance_nv } else { result };
+                let nv = if result.is_null() {
+                    instance_nv
+                } else {
+                    result
+                };
                 Ok(nv)
             }
         };
         self.stack.truncate(orig_len);
         res
     }
-
 
     /// Convert a materialized `Value` (e.g. a Map/Set entry) into a
     /// `SendValue`. Self-contained values route through the single shared
@@ -123,10 +126,9 @@ impl ExecCtx {
                         Some(varn_types::Value::Int(id)) => Some(id),
                         _ => None,
                     };
-                    if let Some(sv) = varn_types::value::SendValue::endpoint_for(
-                        cls.name.as_str(),
-                        chan_id,
-                    )? {
+                    if let Some(sv) =
+                        varn_types::value::SendValue::endpoint_for(cls.name.as_str(), chan_id)?
+                    {
                         return Ok(sv);
                     }
                 }
@@ -227,101 +229,101 @@ pub(super) fn spawn_isolate(
     export_name: &str,
     args: Vec<varn_types::value::SendValue>,
 ) -> Result<varn_types::AsyncTask, String> {
-        // Heap-independent typed reject payload; the parent's await-resume hook
-        // (`host_values::open_rejected`) mints it into a real `Error` on the
-        // parent heap so `instanceof Error` works and the message survives (a
-        // bare ObjData cannot embed non-SSO strings — see `HostError`).
-        fn worker_error(msg: &str) -> varn_types::Value {
-            varn_types::value::HostError::to_value("Error", msg)
+    // Heap-independent typed reject payload; the parent's await-resume hook
+    // (`host_values::open_rejected`) mints it into a real `Error` on the
+    // parent heap so `instanceof Error` works and the message survives (a
+    // bare ObjData cannot embed non-SSO strings — see `HostError`).
+    fn worker_error(msg: &str) -> varn_types::Value {
+        varn_types::value::HostError::to_value("Error", msg)
+    }
+
+    let loader = ctx.loader.clone();
+
+    let module_path_str = module_path.to_string();
+    let export_name_str = export_name.to_string();
+    // The worker gets a fresh VM, so it must be handed this VM's settings;
+    // otherwise an interpreter-only run is not actually interpreter-only
+    // inside isolates.
+    let settings = ctx.settings;
+
+    // Join task: resolves `Null` when the worker finishes, rejects with a
+    // typed error if it threw. Returned to the caller (wrapped in an
+    // `IsolateHandle`); no port is injected into the worker.
+    let done = varn_types::AsyncTask::pending();
+    let done_t = done.clone();
+
+    std::thread::spawn(move || {
+        let mut machine =
+            crate::Vm::new(std::rc::Rc::new(rustc_hash::FxHashMap::default()), settings);
+        machine
+            .ctx
+            .globals
+            .define("isIsolate", VmValue::from_bool(true));
+        if let Some(ld) = loader {
+            machine = machine.with_loader(ld);
         }
 
-        let loader = ctx.loader.clone();
+        if let Err(e) = machine.ctx.load_module("std:task") {
+            done_t.reject(worker_error(&format!(
+                "isolate worker: failed to load std:task: {:?}",
+                e
+            )));
+            return;
+        }
 
-        let module_path_str = module_path.to_string();
-        let export_name_str = export_name.to_string();
-        // The worker gets a fresh VM, so it must be handed this VM's settings;
-        // otherwise an interpreter-only run is not actually interpreter-only
-        // inside isolates.
-        let settings = ctx.settings;
-
-        // Join task: resolves `Null` when the worker finishes, rejects with a
-        // typed error if it threw. Returned to the caller (wrapped in an
-        // `IsolateHandle`); no port is injected into the worker.
-        let done = varn_types::AsyncTask::pending();
-        let done_t = done.clone();
-
-        std::thread::spawn(move || {
-            let mut machine =
-                crate::Vm::new(std::rc::Rc::new(rustc_hash::FxHashMap::default()), settings);
-            machine
-                .ctx
-                .globals
-                .define("isIsolate", VmValue::from_bool(true));
-            if let Some(ld) = loader {
-                machine = machine.with_loader(ld);
-            }
-
-            if let Err(e) = machine.ctx.load_module("std:task") {
+        let module_val = match machine.ctx.load_module(&module_path_str) {
+            Ok(m) => m,
+            Err(e) => {
                 done_t.reject(worker_error(&format!(
-                    "isolate worker: failed to load std:task: {:?}",
-                    e
+                    "isolate worker: failed to load module {}: {:?}",
+                    module_path_str, e
                 )));
                 return;
             }
+        };
 
-            let module_val = match machine.ctx.load_module(&module_path_str) {
-                Ok(m) => m,
-                Err(e) => {
-                    done_t.reject(worker_error(&format!(
-                        "isolate worker: failed to load module {}: {:?}",
-                        module_path_str, e
-                    )));
-                    return;
-                }
-            };
-
-            let func_nv = match machine.ctx.get_field(module_val, &export_name_str) {
-                Some(f) => f,
-                None => {
-                    done_t.reject(worker_error(&format!(
-                        "isolate worker: export '{}' not found in module {}",
-                        export_name_str, module_path_str
-                    )));
-                    return;
-                }
-            };
-
-            // Endpoints arrive as `SendValue::Channel{Sender,Receiver}`;
-            // `to_value_ctx` emits `__chanEndpoint` markers, which
-            // `host_values::open_resolved` mints into real Sender/Receiver
-            // instances (one minting definition, shared with the same-thread
-            // await-resume path). std:task is already loaded above, so the
-            // endpoint classes exist on this worker's heap.
-            let mut vm_args = Vec::new();
-            for arg in args {
-                let v_nv = arg.to_value_ctx(&mut machine.ctx);
-                let val = machine.ctx.heap.extract(v_nv);
-                let opened = crate::exec::host_values::open_resolved(&mut machine.ctx, val);
-                vm_args.push(machine.ctx.heap.intern(opened));
+        let func_nv = match machine.ctx.get_field(module_val, &export_name_str) {
+            Some(f) => f,
+            None => {
+                done_t.reject(worker_error(&format!(
+                    "isolate worker: export '{}' not found in module {}",
+                    export_name_str, module_path_str
+                )));
+                return;
             }
+        };
 
-            match machine.ctx.call_vm(func_nv, &vm_args) {
-                Ok(res) => {
-                    let val = machine.ctx.heap.extract(res);
-                    if let varn_types::Value::Task(lazy) = val {
-                        let handle = machine.ctx.run_lazy_task_sync(lazy.as_ref());
-                        if let varn_types::task::TaskState::Rejected(e) = handle.peek_state() {
-                            done_t.reject(worker_error(&format!("{e}")));
-                            return;
-                        }
+        // Endpoints arrive as `SendValue::Channel{Sender,Receiver}`;
+        // `to_value_ctx` emits `__chanEndpoint` markers, which
+        // `host_values::open_resolved` mints into real Sender/Receiver
+        // instances (one minting definition, shared with the same-thread
+        // await-resume path). std:task is already loaded above, so the
+        // endpoint classes exist on this worker's heap.
+        let mut vm_args = Vec::new();
+        for arg in args {
+            let v_nv = arg.to_value_ctx(&mut machine.ctx);
+            let val = machine.ctx.heap.extract(v_nv);
+            let opened = crate::exec::host_values::open_resolved(&mut machine.ctx, val);
+            vm_args.push(machine.ctx.heap.intern(opened));
+        }
+
+        match machine.ctx.call_vm(func_nv, &vm_args) {
+            Ok(res) => {
+                let val = machine.ctx.heap.extract(res);
+                if let varn_types::Value::Task(lazy) = val {
+                    let handle = machine.ctx.run_lazy_task_sync(lazy.as_ref());
+                    if let varn_types::task::TaskState::Rejected(e) = handle.peek_state() {
+                        done_t.reject(worker_error(&format!("{e}")));
+                        return;
                     }
-                    done_t.resolve(varn_types::Value::Null);
                 }
-                Err(e) => done_t.reject(worker_error(&format!("{e}"))),
+                done_t.resolve(varn_types::Value::Null);
             }
-        });
+            Err(e) => done_t.reject(worker_error(&format!("{e}"))),
+        }
+    });
 
-        Ok(done)
+    Ok(done)
 }
 
 /// Body of [`NativeCtx::to_sendable`]: a heap handle means nothing on the
@@ -331,112 +333,111 @@ pub(super) fn to_sendable(
     ctx: &ExecCtx,
     val: VmValue,
 ) -> Result<varn_types::value::SendValue, String> {
-        if val.is_null() {
-            return Ok(varn_types::value::SendValue::Null);
-        }
-        if val.is_bool() {
-            return Ok(varn_types::value::SendValue::Bool(val.as_bool()));
-        }
-        if val.is_int() {
-            return Ok(varn_types::value::SendValue::Int(val.as_int()));
-        }
-        if val.is_f64() {
-            return Ok(varn_types::value::SendValue::Float(val.as_f64().to_bits()));
-        }
-        if val.is_sso() {
-            let mut buf = [0u8; 5];
-            return Ok(varn_types::value::SendValue::Str(
-                val.sso_as_str(&mut buf).to_owned(),
-            ));
-        }
-        if val.is_heap() {
-            match ctx.heap.get_by_idx(val.as_heap_idx()) {
-                Some(HeapObj::Str(s)) => Ok(varn_types::value::SendValue::Str(s.to_string())),
-                Some(HeapObj::Array(arr)) => {
-                    let mut items = Vec::with_capacity(arr.len());
-                    for i in 0..arr.len() {
-                        // `get_vm` boxes on read for typed reprs — a typed
-                        // array crossing an isolate boundary serializes the
-                        // same as a Boxed one; no migration, read-only.
-                        items.push(ctx.to_sendable(arr.get_vm(i).unwrap())?);
-                    }
-                    Ok(varn_types::value::SendValue::Array(items))
+    if val.is_null() {
+        return Ok(varn_types::value::SendValue::Null);
+    }
+    if val.is_bool() {
+        return Ok(varn_types::value::SendValue::Bool(val.as_bool()));
+    }
+    if val.is_int() {
+        return Ok(varn_types::value::SendValue::Int(val.as_int()));
+    }
+    if val.is_f64() {
+        return Ok(varn_types::value::SendValue::Float(val.as_f64().to_bits()));
+    }
+    if val.is_sso() {
+        let mut buf = [0u8; 5];
+        return Ok(varn_types::value::SendValue::Str(
+            val.sso_as_str(&mut buf).to_owned(),
+        ));
+    }
+    if val.is_heap() {
+        match ctx.heap.get_by_idx(val.as_heap_idx()) {
+            Some(HeapObj::Str(s)) => Ok(varn_types::value::SendValue::Str(s.to_string())),
+            Some(HeapObj::Array(arr)) => {
+                let mut items = Vec::with_capacity(arr.len());
+                for i in 0..arr.len() {
+                    // `get_vm` boxes on read for typed reprs — a typed
+                    // array crossing an isolate boundary serializes the
+                    // same as a Boxed one; no migration, read-only.
+                    items.push(ctx.to_sendable(arr.get_vm(i).unwrap())?);
                 }
-                Some(HeapObj::Object(obj)) => {
-                    let borrow = obj.borrow();
-                    // Channel endpoints (Sender/Receiver instances) transfer by
-                    // reference — detected once, in `SendValue::endpoint_for`.
-                    if let Some(cls) = borrow.class() {
-                        let chan_id = match borrow.get_field("_chan") {
-                            Some(varn_types::Value::Int(id)) => Some(id),
-                            _ => None,
-                        };
-                        if let Some(sv) = varn_types::value::SendValue::endpoint_for(
-                            cls.name.as_str(),
-                            chan_id,
-                        )? {
-                            return Ok(sv);
-                        }
-                    }
-                    let mut map = std::collections::HashMap::new();
-                    for (k, nv) in borrow.iter() {
-                        map.insert(k.to_string(), ctx.to_sendable(nv)?);
-                    }
-                    Ok(varn_types::value::SendValue::Object(map))
-                }
-                Some(HeapObj::Map(map_ref)) => {
-                    let map_ref = map_ref.clone();
-                    let mut items = Vec::new();
-                    for (k, v) in map_ref.read().iter() {
-                        items.push((ctx.to_sendable(k.0)?, ctx.to_sendable(*v)?));
-                    }
-                    Ok(varn_types::value::SendValue::Map(items))
-                }
-                Some(HeapObj::Set(set_ref)) => {
-                    let set_ref = set_ref.clone();
-                    let mut items = Vec::new();
-                    for v in set_ref.read().iter() {
-                        items.push(ctx.to_sendable(v.0)?);
-                    }
-                    Ok(varn_types::value::SendValue::Set(items))
-                }
-                Some(HeapObj::BigInt(b)) => Ok(varn_types::value::SendValue::BigInt(*b)),
-                Some(HeapObj::Decimal(d)) => Ok(varn_types::value::SendValue::Decimal(**d)),
-                Some(HeapObj::Char(c)) => Ok(varn_types::value::SendValue::Char(*c)),
-                Some(HeapObj::EnumVariant(d)) => {
-                    // Payload may hold heap refs — walk it with the
-                    // heap-aware converter, not `Value::to_sendable`.
-                    let payload = ctx.value_to_sendable(&d.payload)?;
-                    Ok(varn_types::value::SendValue::EnumVariant(Box::new(
-                        varn_types::value::SendEnumVariant {
-                            enum_name: d.enum_name.to_string(),
-                            variant_name: d.variant_name.to_string(),
-                            variant_tag: d.variant_tag,
-                            fields: d.fields.iter().map(|f| f.to_string()).collect(),
-                            payload,
-                        },
-                    )))
-                }
-                Some(HeapObj::Range(r)) => {
-                    let mut fields = std::collections::HashMap::new();
-                    fields.insert(
-                        "start".to_string(),
-                        varn_types::value::SendValue::Int(r.start),
-                    );
-                    fields.insert("end".to_string(), varn_types::value::SendValue::Int(r.end));
-                    fields.insert(
-                        "inclusive".to_string(),
-                        varn_types::value::SendValue::Bool(r.inclusive),
-                    );
-                    fields.insert(
-                        "step".to_string(),
-                        varn_types::value::SendValue::Int(r.step),
-                    );
-                    Ok(varn_types::value::SendValue::Object(fields))
-                }
-                _ => Err("Value cannot be sent to an isolate".to_string()),
+                Ok(varn_types::value::SendValue::Array(items))
             }
-        } else {
-            Err("Value cannot be sent to an isolate".to_string())
+            Some(HeapObj::Object(obj)) => {
+                let borrow = obj.borrow();
+                // Channel endpoints (Sender/Receiver instances) transfer by
+                // reference — detected once, in `SendValue::endpoint_for`.
+                if let Some(cls) = borrow.class() {
+                    let chan_id = match borrow.get_field("_chan") {
+                        Some(varn_types::Value::Int(id)) => Some(id),
+                        _ => None,
+                    };
+                    if let Some(sv) =
+                        varn_types::value::SendValue::endpoint_for(cls.name.as_str(), chan_id)?
+                    {
+                        return Ok(sv);
+                    }
+                }
+                let mut map = std::collections::HashMap::new();
+                for (k, nv) in borrow.iter() {
+                    map.insert(k.to_string(), ctx.to_sendable(nv)?);
+                }
+                Ok(varn_types::value::SendValue::Object(map))
+            }
+            Some(HeapObj::Map(map_ref)) => {
+                let map_ref = map_ref.clone();
+                let mut items = Vec::new();
+                for (k, v) in map_ref.read().iter() {
+                    items.push((ctx.to_sendable(k.0)?, ctx.to_sendable(*v)?));
+                }
+                Ok(varn_types::value::SendValue::Map(items))
+            }
+            Some(HeapObj::Set(set_ref)) => {
+                let set_ref = set_ref.clone();
+                let mut items = Vec::new();
+                for v in set_ref.read().iter() {
+                    items.push(ctx.to_sendable(v.0)?);
+                }
+                Ok(varn_types::value::SendValue::Set(items))
+            }
+            Some(HeapObj::BigInt(b)) => Ok(varn_types::value::SendValue::BigInt(*b)),
+            Some(HeapObj::Decimal(d)) => Ok(varn_types::value::SendValue::Decimal(**d)),
+            Some(HeapObj::Char(c)) => Ok(varn_types::value::SendValue::Char(*c)),
+            Some(HeapObj::EnumVariant(d)) => {
+                // Payload may hold heap refs — walk it with the
+                // heap-aware converter, not `Value::to_sendable`.
+                let payload = ctx.value_to_sendable(&d.payload)?;
+                Ok(varn_types::value::SendValue::EnumVariant(Box::new(
+                    varn_types::value::SendEnumVariant {
+                        enum_name: d.enum_name.to_string(),
+                        variant_name: d.variant_name.to_string(),
+                        variant_tag: d.variant_tag,
+                        fields: d.fields.iter().map(|f| f.to_string()).collect(),
+                        payload,
+                    },
+                )))
+            }
+            Some(HeapObj::Range(r)) => {
+                let mut fields = std::collections::HashMap::new();
+                fields.insert(
+                    "start".to_string(),
+                    varn_types::value::SendValue::Int(r.start),
+                );
+                fields.insert("end".to_string(), varn_types::value::SendValue::Int(r.end));
+                fields.insert(
+                    "inclusive".to_string(),
+                    varn_types::value::SendValue::Bool(r.inclusive),
+                );
+                fields.insert(
+                    "step".to_string(),
+                    varn_types::value::SendValue::Int(r.step),
+                );
+                Ok(varn_types::value::SendValue::Object(fields))
+            }
+            _ => Err("Value cannot be sent to an isolate".to_string()),
         }
+    } else {
+        Err("Value cannot be sent to an isolate".to_string())
+    }
 }

@@ -918,8 +918,13 @@ fn emit_inst(
             // `Dynamic` for the common `"literal" + int`, so specializing on
             // the result type alone never reaches this.
             let str_operand = matches!(op, crate::hir::HirBinOp::Add)
-                && (matches!(value_tys.get(lhs.0 as usize), Some(crate::hir::HirType::Str))
-                    || matches!(value_tys.get(rhs.0 as usize), Some(crate::hir::HirType::Str)));
+                && (matches!(
+                    value_tys.get(lhs.0 as usize),
+                    Some(crate::hir::HirType::Str)
+                ) || matches!(
+                    value_tys.get(rhs.0 as usize),
+                    Some(crate::hir::HirType::Str)
+                ));
             let opcode = if str_operand {
                 OpCode::StrConcat
             } else {
@@ -1160,7 +1165,10 @@ fn emit_inst(
             // An int argument keeps the windowed encoding.
             let _ = object;
             chunk.write(Chunk::pack_op(OpCode::IntrinsicDirect, d), LINE);
-            chunk.write(((reg[args[0].0 as usize] as u16) << 8) | *wire_byte as u16, LINE);
+            chunk.write(
+                ((reg[args[0].0 as usize] as u16) << 8) | *wire_byte as u16,
+                LINE,
+            );
         }
 
         InstKind::IntrinsicCall {

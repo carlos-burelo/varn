@@ -1,8 +1,8 @@
-use std::rc::Rc;
-use varn_types::value::ObjRef;
-use crate::value::VmValue;
 use super::obj::HeapObj;
 use super::structs::{Heap, HeapInner};
+use crate::value::VmValue;
+use std::rc::Rc;
+use varn_types::value::ObjRef;
 
 impl Heap {
     pub(crate) fn nursery_len_byte_offset_from_rcbox() -> usize {
@@ -76,7 +76,10 @@ impl Heap {
 
             let probed_ptr = unsafe { *(base.add(ptr_off) as *const usize) };
             let probed_len = unsafe { *(base.add(len_off) as *const usize) };
-            assert_eq!(probed_ptr, vec_ptr, "elems_ptr_off probe read-back mismatch");
+            assert_eq!(
+                probed_ptr, vec_ptr,
+                "elems_ptr_off probe read-back mismatch"
+            );
             assert_eq!(probed_len, 3, "elems_len_off probe read-back mismatch");
 
             (0usize, ptr_off, len_off)
@@ -135,13 +138,10 @@ impl Heap {
         let rcbox = Rc::as_ptr(&arr.0) as usize - 2 * std::mem::size_of::<usize>();
         let slot: Option<HeapObj> = Some(HeapObj::Array(arr));
         let size = std::mem::size_of::<Option<HeapObj>>();
-        let bytes =
-            unsafe { std::slice::from_raw_parts(&slot as *const _ as *const u8, size) };
+        let bytes = unsafe { std::slice::from_raw_parts(&slot as *const _ as *const u8, size) };
         let array_tag = bytes[0] as usize;
         let payload_off = (0..=size - 8)
-            .find(|&off| {
-                usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == rcbox
-            })
+            .find(|&off| usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == rcbox)
             .expect("array payload probe failed");
 
         let none_slot: Option<HeapObj> = None;
@@ -170,19 +170,14 @@ impl Heap {
 
         let shape = varn_types::Shape::create(None, std::collections::HashMap::new());
         let shape_id = shape.id;
-        let oref = ObjRef::with_shape(
-            Rc::clone(&shape),
-            vec![VmValue(SENTINEL_FIELD); TAIL],
-        );
+        let oref = ObjRef::with_shape(Rc::clone(&shape), vec![VmValue(SENTINEL_FIELD); TAIL]);
 
         let rcbox = Rc::as_ptr(&oref.0) as *const u8 as usize - 2 * std::mem::size_of::<usize>();
-        let shape_ptr =
-            Rc::as_ptr(&shape) as *const u8 as usize - 2 * std::mem::size_of::<usize>();
+        let shape_ptr = Rc::as_ptr(&shape) as *const u8 as usize - 2 * std::mem::size_of::<usize>();
 
         let block = unsafe { std::slice::from_raw_parts(rcbox as *const u8, 80) };
-        let word_at = |off: usize| -> u64 {
-            u64::from_ne_bytes(block[off..off + 8].try_into().unwrap())
-        };
+        let word_at =
+            |off: usize| -> u64 { u64::from_ne_bytes(block[off..off + 8].try_into().unwrap()) };
 
         let values_off = (0..=72)
             .step_by(8)
@@ -207,8 +202,7 @@ impl Heap {
 
         let slot: Option<HeapObj> = Some(HeapObj::Object(oref.clone()));
         let size = std::mem::size_of::<Option<HeapObj>>();
-        let bytes =
-            unsafe { std::slice::from_raw_parts(&slot as *const _ as *const u8, size) };
+        let bytes = unsafe { std::slice::from_raw_parts(&slot as *const _ as *const u8, size) };
         let object_tag = bytes[0] as usize;
         let payload_off = (0..=size - 8)
             .find(|&off| usize::from_ne_bytes(bytes[off..off + 8].try_into().unwrap()) == rcbox)
@@ -273,8 +267,8 @@ mod jit_object_layout_tests {
 
 #[cfg(test)]
 mod heap_obj_size_tests {
-    use super::*;
     use super::super::str::INLINE_STR_CAP;
+    use super::*;
 
     #[test]
     fn heap_obj_slot_stride_is_unchanged() {

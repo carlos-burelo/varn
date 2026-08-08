@@ -14,7 +14,8 @@ pub fn execute(cmd: PkgCommands) -> Result<(), CliError> {
 }
 
 fn execute_tree() -> Result<(), CliError> {
-    let cwd = std::env::current_dir().map_err(|e| CliError::fatal(format!("cannot get cwd: {e}")))?;
+    let cwd =
+        std::env::current_dir().map_err(|e| CliError::fatal(format!("cannot get cwd: {e}")))?;
     let manifest_path = varn_pm::manifest::find_project_manifest(&cwd)
         .ok_or_else(|| CliError::fatal("no varn.json found — run `vn init` first".to_owned()))?;
     let project_root = manifest_path.parent().unwrap_or(&cwd);
@@ -23,7 +24,10 @@ fn execute_tree() -> Result<(), CliError> {
     let project_name = manifest.name.as_deref().unwrap_or("project");
     let version = manifest.version.as_deref().unwrap_or("0.0.0");
 
-    terminal::log(format!("{project_name}@{version} ({})", project_root.display()));
+    terminal::log(format!(
+        "{project_name}@{version} ({})",
+        project_root.display()
+    ));
 
     let lock_path = varn_pm::lockfile::lock_path(project_root);
     if lock_path.exists() {
@@ -32,7 +36,10 @@ fn execute_tree() -> Result<(), CliError> {
             for (idx, pkg) in lock.packages.iter().enumerate() {
                 let is_last = idx + 1 == total;
                 let branch = if is_last { "└── " } else { "├── " };
-                terminal::log(format!("{branch}{}@{} ({})", pkg.name, pkg.version, pkg.origin));
+                terminal::log(format!(
+                    "{branch}{}@{} ({})",
+                    pkg.name, pkg.version, pkg.origin
+                ));
             }
             return Ok(());
         }
@@ -50,7 +57,8 @@ fn execute_tree() -> Result<(), CliError> {
 }
 
 fn execute_doctor() -> Result<(), CliError> {
-    let cwd = std::env::current_dir().map_err(|e| CliError::fatal(format!("cannot get cwd: {e}")))?;
+    let cwd =
+        std::env::current_dir().map_err(|e| CliError::fatal(format!("cannot get cwd: {e}")))?;
     let manifest_path = varn_pm::manifest::find_project_manifest(&cwd)
         .ok_or_else(|| CliError::fatal("no varn.json found — run `vn init` first".to_owned()))?;
     let project_root = manifest_path.parent().unwrap_or(&cwd);

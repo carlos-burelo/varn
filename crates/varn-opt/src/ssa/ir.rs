@@ -59,7 +59,6 @@ impl SsaFunc {
             crate::ssa::uses::visit_term_uses_mut(&mut block.term, &mut sub);
         }
     }
-
 }
 
 #[derive(Debug)]

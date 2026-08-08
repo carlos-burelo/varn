@@ -4,12 +4,12 @@
 //! old-generation one, so every accessor has to unpack before it indexes.
 //! `get_raw*` take an already-unpacked old index and skip that step.
 
-use std::rc::Rc;
+use super::obj::HeapObj;
+use super::structs::HeapInner;
 use crate::closure::{VmClosure, VmClosurePayload, VmValueRef};
 use crate::nursery::{is_nursery_idx, old_idx_raw};
 use crate::value::VmValue;
-use super::obj::HeapObj;
-use super::structs::HeapInner;
+use std::rc::Rc;
 
 impl HeapInner {
     #[inline(always)]
@@ -81,17 +81,13 @@ impl HeapInner {
             varn_types::Value::BigInt(b) => self.bigint_interner.get(b.as_ref()).copied(),
             varn_types::Value::Decimal(d) => self.decimal_interner.get(d.as_ref()).copied(),
             varn_types::Value::Char(c) => self.char_interner.get(c).copied(),
-            varn_types::Value::Class(c) => self
-                .identity_index
-                .get(&(Rc::as_ptr(c) as usize))
-                .copied(),
-            varn_types::Value::Task(t) => self
-                .identity_index
-                .get(&(Rc::as_ptr(t) as usize))
-                .copied(),
-            varn_types::Value::TaskHandle(th) => {
-                self.identity_index.get(&th.identity()).copied()
+            varn_types::Value::Class(c) => {
+                self.identity_index.get(&(Rc::as_ptr(c) as usize)).copied()
             }
+            varn_types::Value::Task(t) => {
+                self.identity_index.get(&(Rc::as_ptr(t) as usize)).copied()
+            }
+            varn_types::Value::TaskHandle(th) => self.identity_index.get(&th.identity()).copied(),
             varn_types::Value::Generator(g) => self
                 .identity_index
                 .get(&(Rc::as_ptr(&g.0) as *const () as usize))

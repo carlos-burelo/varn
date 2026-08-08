@@ -152,8 +152,11 @@ pub(crate) extern "C" fn jit_set_property(
     }
 }
 
-
-pub(crate) extern "C" fn jit_get_fixed_field(ctx: *mut ExecCtx, obj: VmValue, slot: usize) -> VmValue {
+pub(crate) extern "C" fn jit_get_fixed_field(
+    ctx: *mut ExecCtx,
+    obj: VmValue,
+    slot: usize,
+) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         match crate::exec::props::get_fixed_field(obj, slot, &mut ctx_ref.heap) {
@@ -163,7 +166,12 @@ pub(crate) extern "C" fn jit_get_fixed_field(ctx: *mut ExecCtx, obj: VmValue, sl
     }
 }
 
-pub(crate) extern "C" fn jit_set_fixed_field(ctx: *mut ExecCtx, obj: VmValue, slot: usize, val: VmValue) {
+pub(crate) extern "C" fn jit_set_fixed_field(
+    ctx: *mut ExecCtx,
+    obj: VmValue,
+    slot: usize,
+    val: VmValue,
+) {
     unsafe {
         let ctx_ref = &mut *ctx;
         if let Err(e) = crate::exec::props::set_fixed_field(obj, slot, val, &mut ctx_ref.heap) {
@@ -187,7 +195,11 @@ pub(crate) extern "C" fn jit_get_property_maybe_stub(
     }
 }
 
-pub(crate) extern "C" fn jit_get_symbol(ctx: *mut ExecCtx, obj: VmValue, sym_idx: usize) -> VmValue {
+pub(crate) extern "C" fn jit_get_symbol(
+    ctx: *mut ExecCtx,
+    obj: VmValue,
+    sym_idx: usize,
+) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
@@ -206,7 +218,11 @@ pub(crate) extern "C" fn jit_get_symbol(ctx: *mut ExecCtx, obj: VmValue, sym_idx
     }
 }
 
-pub(crate) extern "C" fn jit_bind_method(ctx: *mut ExecCtx, obj: VmValue, name_idx: usize) -> VmValue {
+pub(crate) extern "C" fn jit_bind_method(
+    ctx: *mut ExecCtx,
+    obj: VmValue,
+    name_idx: usize,
+) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
         let frame_idx = ctx_ref.frames.len() - 1;
@@ -223,4 +239,3 @@ pub(crate) extern "C" fn jit_bind_method(ctx: *mut ExecCtx, obj: VmValue, name_i
         }
     }
 }
-

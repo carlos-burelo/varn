@@ -135,4 +135,3 @@ pub(crate) extern "C" fn jit_array_extend(ctx: *mut ExecCtx, arr: VmValue, src: 
         }
     }
 }
-

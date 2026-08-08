@@ -68,7 +68,9 @@ pub fn run(func: &mut SsaFunc) -> bool {
                     continue;
                 }
             }
-            if let InstKind::GetIndex { object, index } | InstKind::ArrayGetIndex { object, index } = &inst.kind {
+            if let InstKind::GetIndex { object, index }
+            | InstKind::ArrayGetIndex { object, index } = &inst.kind
+            {
                 if tuple_literals.contains_key(&object.0) {
                     if let Some(&idx) = const_ints.get(&index.0) {
                         if let Some(elems) = tuple_literals.get(&object.0) {
@@ -128,7 +130,11 @@ pub fn run(func: &mut SsaFunc) -> bool {
                     }
                 }
             }
-            if let (Some(dest), InstKind::GetIndex { object, index } | InstKind::ArrayGetIndex { object, index }) = (inst.dest, &inst.kind) {
+            if let (
+                Some(dest),
+                InstKind::GetIndex { object, index } | InstKind::ArrayGetIndex { object, index },
+            ) = (inst.dest, &inst.kind)
+            {
                 if let Some(elems) = tuple_literals.get(&object.0) {
                     if let Some(&idx) = const_ints.get(&index.0) {
                         if idx >= 0 && (idx as usize) < elems.len() {

@@ -41,7 +41,6 @@ pub(crate) extern "C" fn jit_build_str(
     }
 }
 
-
 pub(crate) extern "C" fn jit_build_object_with_shape(
     ctx: *mut ExecCtx,
     closure: *const crate::closure::VmClosure,
@@ -175,4 +174,3 @@ pub(crate) extern "C" fn jit_build_object(
         obj_nv
     }
 }
-

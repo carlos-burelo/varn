@@ -76,7 +76,12 @@ pub(crate) fn array_get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> Vm
 }
 
 #[inline(always)]
-pub(crate) fn array_set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Heap) -> VmResult<()> {
+pub(crate) fn array_set_index(
+    obj: VmValue,
+    key: VmValue,
+    val: VmValue,
+    heap: &mut Heap,
+) -> VmResult<()> {
     if obj.is_heap() {
         let heap_idx = obj.as_heap_idx();
         let idx = if heap.is_int(key) {

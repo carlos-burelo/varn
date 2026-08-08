@@ -28,7 +28,10 @@ fn main() {
     try_run_standalone_executable();
 
     if std::env::var("VARN_DEBUG_OPS").is_ok() {
-        println!("DEBUG std resolved: {:?}", varn_modules::std_root::resolve());
+        println!(
+            "DEBUG std resolved: {:?}",
+            varn_modules::std_root::resolve()
+        );
         println!("--- CLI NATIVE OPERATIONS ---");
         for entry in varn_builtins::dispatch::iter_native_ops() {
             println!(
@@ -41,7 +44,6 @@ fn main() {
         }
         println!("-------------------------");
     }
-
 
     let raw: Vec<String> = std::env::args().collect();
     let effective = implicit_run(raw);
@@ -123,9 +125,15 @@ fn implicit_run(mut args: Vec<String>) -> Vec<String> {
 }
 
 fn try_run_standalone_executable() {
-    let Ok(exe_path) = std::env::current_exe() else { return; };
-    let Ok(file) = std::fs::File::open(&exe_path) else { return; };
-    let Ok(meta) = file.metadata() else { return; };
+    let Ok(exe_path) = std::env::current_exe() else {
+        return;
+    };
+    let Ok(file) = std::fs::File::open(&exe_path) else {
+        return;
+    };
+    let Ok(meta) = file.metadata() else {
+        return;
+    };
     let len = meta.len();
     if len < 12 {
         return;
@@ -134,8 +142,12 @@ fn try_run_standalone_executable() {
     let mut reader = std::io::BufReader::new(file);
 
     let mut trailer = [0u8; 12];
-    if reader.seek(SeekFrom::End(-12)).is_err() { return; }
-    if reader.read_exact(&mut trailer).is_err() { return; }
+    if reader.seek(SeekFrom::End(-12)).is_err() {
+        return;
+    }
+    if reader.read_exact(&mut trailer).is_err() {
+        return;
+    }
 
     if &trailer[8..12] != varn_modules::artifact::MAGIC_VEXE {
         return;
@@ -147,19 +159,30 @@ fn try_run_standalone_executable() {
     }
 
     let payload_offset = len - 12 - payload_len;
-    if reader.seek(SeekFrom::Start(payload_offset)).is_err() { return; }
+    if reader.seek(SeekFrom::Start(payload_offset)).is_err() {
+        return;
+    }
     let mut envelope = vec![0u8; payload_len as usize];
-    if reader.read_exact(&mut envelope).is_err() { return; }
+    if reader.read_exact(&mut envelope).is_err() {
+        return;
+    }
 
     let Ok(inner_payload) = varn_modules::artifact::read_envelope(
         varn_modules::artifact::MAGIC_WRC,
         pipeline::CACHE_FORMAT_VERSION,
         &envelope,
-    ) else { return; };
+    ) else {
+        return;
+    };
 
-    let Ok(artifact) = postcard::from_bytes::<varn_types::ModuleGraphArtifact>(inner_payload) else { return; };
+    let Ok(artifact) = postcard::from_bytes::<varn_types::ModuleGraphArtifact>(inner_payload)
+    else {
+        return;
+    };
 
-    let Ok(compiled) = pipeline::cache::compile_output_from_graph(artifact) else { return; };
+    let Ok(compiled) = pipeline::cache::compile_output_from_graph(artifact) else {
+        return;
+    };
 
     let exe_str = exe_path.to_string_lossy();
     if let Err(e) = pipeline::execute(

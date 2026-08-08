@@ -90,7 +90,9 @@ impl Database {
     }
 
     pub fn cancellation_token(&self, file_id: FileId) -> Option<CancellationToken> {
-        self.cancellation_tokens.get(&file_id).map(|r| r.value().clone())
+        self.cancellation_tokens
+            .get(&file_id)
+            .map(|r| r.value().clone())
     }
 
     pub fn current_revision(&self) -> u64 {

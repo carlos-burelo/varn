@@ -43,7 +43,11 @@ pub enum ResolvedProperty {
     Built(Value),
 }
 
-pub(crate) fn resolve_property(obj: VmValue, key: &str, heap: &mut Heap) -> VmResult<ResolvedProperty> {
+pub(crate) fn resolve_property(
+    obj: VmValue,
+    key: &str,
+    heap: &mut Heap,
+) -> VmResult<ResolvedProperty> {
     if obj.is_heap() {
         if let Some(HeapObj::Module(m)) = heap.get(obj.as_heap_idx()) {
             let val = m
@@ -158,12 +162,21 @@ pub(crate) fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmR
         "OpGetFixedField: slot {} out of range on obj {:?} (heap_obj={:?})",
         slot,
         obj,
-        if obj.is_heap() { heap.get(obj.as_heap_idx()) } else { None }
+        if obj.is_heap() {
+            heap.get(obj.as_heap_idx())
+        } else {
+            None
+        }
     )))
 }
 
 #[inline(always)]
-pub(crate) fn set_fixed_field(obj: VmValue, slot: usize, val: VmValue, heap: &mut Heap) -> VmResult<()> {
+pub(crate) fn set_fixed_field(
+    obj: VmValue,
+    slot: usize,
+    val: VmValue,
+    heap: &mut Heap,
+) -> VmResult<()> {
     if obj.is_heap() {
         let heap_idx = obj.as_heap_idx();
 

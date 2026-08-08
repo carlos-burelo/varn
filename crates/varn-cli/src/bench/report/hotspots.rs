@@ -37,7 +37,9 @@ pub fn print_hotspots(h: &HotspotCounters) {
                 .red()
                 .to_string()
             } else {
-                chalk(format!("clif {}", fmt_pct(jit_share))).dim().to_string()
+                chalk(format!("clif {}", fmt_pct(jit_share)))
+                    .dim()
+                    .to_string()
             };
             terminal::log(format!("{}  {note}", row(name, fmt_num(entry.calls))));
         }
@@ -108,10 +110,7 @@ pub fn print_hotspots(h: &HotspotCounters) {
                 fmt_num(counted - shown),
             ));
         }
-        terminal::log(format!(
-            "  {}",
-            chalk("─".repeat(LABEL_WIDTH + 11)).dim()
-        ));
+        terminal::log(format!("  {}", chalk("─".repeat(LABEL_WIDTH + 11)).dim()));
         terminal::log(row_note(
             "total por tipo",
             fmt_num(counted),

@@ -7,7 +7,10 @@ pub(crate) fn resolve_specifier_to_id(specifier: &str, from: &ModuleId) -> VmRes
         .map_err(RuntimeError::new)
 }
 
-pub(crate) fn resolve_specifier_from_path(specifier: &str, source_file: &str) -> VmResult<ModuleId> {
+pub(crate) fn resolve_specifier_from_path(
+    specifier: &str,
+    source_file: &str,
+) -> VmResult<ModuleId> {
     let from = if source_file.is_empty() {
         ModuleId::local_str(".")
     } else {
@@ -15,4 +18,3 @@ pub(crate) fn resolve_specifier_from_path(specifier: &str, source_file: &str) ->
     };
     resolve_specifier_to_id(specifier, &from)
 }
-

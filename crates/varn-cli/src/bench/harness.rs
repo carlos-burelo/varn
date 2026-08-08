@@ -49,7 +49,10 @@ impl VmFactory {
             varn_types::ModuleObj::new(self.module_id.clone(), self.proto.export_names.len());
         module_obj.export_map = export_map;
         let module_val = machine.ctx.heap.alloc_module(Rc::new(module_obj));
-        machine.ctx.modules.insert(self.module_id.clone(), module_val);
+        machine
+            .ctx
+            .modules
+            .insert(self.module_id.clone(), module_val);
         machine.ctx.module_exports.insert(0, module_val);
 
         machine
@@ -127,10 +130,7 @@ pub fn run_vm_to_completion(machine: &mut Vm, closure: Rc<Closure>) -> Result<()
 }
 
 /// Run `f` once untimed to warm caches, then `runs` timed iterations.
-pub fn time_n<F: Fn() -> Result<(), String>>(
-    runs: usize,
-    f: F,
-) -> Result<Vec<Duration>, CliError> {
+pub fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Duration>, CliError> {
     f().map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
 
     let mut samples = Vec::with_capacity(runs);
