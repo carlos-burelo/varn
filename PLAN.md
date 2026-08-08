@@ -7,6 +7,20 @@ se arregló, ordenado por lo que cuesta si se ignora.
 Las referencias son por **nombre de símbolo** primero y línea después: las
 líneas se mueven, los nombres no.
 
+## Progreso
+
+| | Estado | Commit |
+|---|---|---|
+| **P1** desenrollado de excepciones ×3 | ✅ hecho | `96279a3` |
+| **P2** superficie pública | pendiente | |
+| **P3** cola de `JitHelpers` sin test | ✅ hecho | `e15f56f` |
+| **P4** tupla posicional en `resolve_native_op` | pendiente | |
+| **P5** archivos sobre 500 | pendiente | |
+| **P6** función comentada | ✅ hecho | `e15f56f` |
+| **P7** puntos de aborto | pendiente | |
+| **P8** deps sin uso | ✅ hecho | `e15f56f` |
+| **P9** indentación | ✅ hecho | `bda5167` (`cargo fmt` del proyecto) |
+
 ---
 
 ## Estado de partida
@@ -14,7 +28,7 @@ líneas se mueven, los nombres no.
 | | |
 |---|---|
 | Archivos `.rs` en `varn-vm` | 95 |
-| Archivo mayor | `exec/dispatch/mod.rs`, 780 líneas |
+| Archivo mayor | `exec/dispatch/mod.rs`, 772 líneas |
 | Archivos > 1000 líneas | 0 |
 | Funciones muertas | 0 (el compilador las detecta desde F1) |
 | Listas del ABI JIT a sincronizar a mano | 1 (`varn-jit/src/helper_abi.rs`) |
@@ -75,9 +89,25 @@ magnitud, es la máquina, no Varn.**
 
 ---
 
-## P1 — El desenrollado de excepciones está escrito tres veces
+## P1 — El desenrollado de excepciones está escrito tres veces — ✅ hecho (`96279a3`)
 
-**Prioridad máxima.** Es exactamente el mismo defecto que la regla de retorno de
+Unificado en `exec::frame_ctrl::unwind_to_handler`, junto a
+`resolve_constructor_return`. Antes de colapsarlas se compararon las tres línea
+a línea: difieren **sólo** en cómo llegan al `ExecCtx` y de dónde sale el valor
+lanzado. Ninguna llevaba una regla extra, así que no se perdió nada — y esa
+comprobación importaba, porque una diferencia habría sido o un bug o un
+requisito no documentado, y borrarla a ciegas destruye la evidencia en ambos
+casos.
+
+`handler` se toma **por valor**: todos los llamantes ya lo habían sacado de
+donde vivía, y la firma es lo que hace eso innegociable.
+
+Validado con 11 / 21 / 47 comprobados explícitamente, cobertura clif intacta, y
+pareado n=30: **0.975 min / 1.010 mediana**.
+
+<details><summary>Diagnóstico original</summary>
+
+Es exactamente el mismo defecto que la regla de retorno de
 constructor que se unificó en `921a56b`, pero sobre semántica de excepciones.
 
 Tres copias del mismo bloque:
@@ -126,6 +156,8 @@ iguales pero hay que leerlas línea a línea antes de unificar — si una difier
 esa diferencia es o un bug o un requisito no documentado, y hay que decidir cuál
 antes de borrarla.
 
+</details>
+
 ---
 
 ## P2 — La superficie pública sigue abierta
@@ -160,7 +192,15 @@ justificable item por item.
 
 ---
 
-## P3 — La cola de `JitHelpers` no tiene red
+## P3 — La cola de `JitHelpers` no tiene red — ✅ hecho (`e15f56f`)
+
+`gc_safepoint` y `clif_call_fallback` movidos a la lista compartida, así que el
+test `every_helper_address_is_real` ya los cubre. Los offsets de la cola tienen
+ahora sus propias aserciones. **`globals_offset` queda deliberadamente fuera**:
+es legítimamente 0 si `globals` resulta ser el primer campo de `ExecCtx`, y
+afirmar sobre él convertiría un accidente de layout en un requisito.
+
+<details><summary>Diagnóstico original</summary>
 
 F3 dejó una sola lista compartida (`varn-jit/src/helper_abi.rs`) para los 106
 campos de dirección de función, y un test que verifica que ninguno es 0. Los
@@ -183,7 +223,7 @@ generado, descubierto cuando algún programa llegue por primera vez a ese opcode
 **Aceptación:** el test cubre los 123 campos, o los que queden fuera están
 documentados con la razón por la que no se pueden verificar.
 
-**Riesgo:** nulo.
+</details>
 
 ---
 
@@ -220,8 +260,8 @@ son los benchmarks que más pasan por `CallNativeOp`.
 
 | Archivo | Líneas | Nota |
 |---|---|---|
-| `exec/dispatch/mod.rs` | 780 | **deliberado**, ver abajo |
-| `nursery.rs` | 651 | sin auditar |
+| `exec/dispatch/mod.rs` | 772 | **deliberado**, ver abajo |
+| `nursery.rs` | 647 | sin auditar |
 | `exec/ctx.rs` | 505 | sin auditar |
 
 `nursery.rs` y `exec/ctx.rs` no se tocaron en F0–F6 y no se han mirado por
@@ -231,14 +271,10 @@ exactamente lo que este plan evita.
 
 ---
 
-## P6 — Función comentada en `reg_ops/misc_ops.rs`
+## P6 — Función comentada en `reg_ops/misc_ops.rs` — ✅ hecho (`e15f56f`)
 
-24 de 203 líneas del archivo son un `exec_build_object_with_shape` desactivado a
-base de `//`, con su `#[allow(dead_code)]` también comentado (~línea 127).
-
-Código muerto conservado por si acaso. Git ya lo conserva. Borrar.
-
-**Riesgo:** nulo.
+Eran 24 de 203 líneas: un `exec_build_object_with_shape` desactivado a base de
+`//`. Código muerto conservado por si acaso; git ya lo conservaba. Borrado.
 
 ---
 
@@ -273,52 +309,50 @@ aritmética y por tanto lo más expuesto a entrada del usuario.
 
 ---
 
-## P8 — Dependencias declaradas y nunca nombradas
+## P8 — Dependencias declaradas y nunca nombradas — ✅ hecho (`e15f56f`)
 
-| Crate | Dep sin uso |
-|---|---|
-| `varn-jit` | `varn-base` |
-| `varn-backend` | `rustc-hash` |
-| `varn-parser` | `varn-lexer`, `varn-base` |
+Quitadas cuatro: `varn-jit`→`varn-base`, `varn-backend`→`rustc-hash`,
+`varn-parser`→`varn-lexer` y `varn-base`. (`varn-vm`→`parking_lot` ya había
+caído en `921a56b`.)
 
-Verificado por búsqueda del identificador en `src/`, **no** por compilación.
-Confirmar es quitar la línea y compilar. (`varn-vm` → `parking_lot` era el mismo
-caso y ya se quitó en `921a56b`.)
-
-`varn-parser` → `varn-lexer` sorprende y merece una mirada antes de tocarlo: si
-el parser no nombra al lexer, conviene entender por dónde le llegan los tokens.
-
-**Riesgo:** nulo; el compilador decide.
+La de `varn-parser`→`varn-lexer` se comprobó en vez de asumirse: el parser toma
+`Token` y `TokenKind` de `varn_core`, no del crate del lexer, así que la
+dependencia sobraba de verdad. Confirmado quitando y compilando, no sólo por
+búsqueda.
 
 ---
 
-## P9 — Indentación en `exec/host/isolates.rs`
+## P9 — Indentación en `exec/host/isolates.rs` — ✅ resuelto
 
-`spawn_isolate` y `to_sendable` se movieron desde un `impl` y conservan 4
-espacios de indentación de más en sus cuerpos.
+`spawn_isolate` y `to_sendable` conservaban 4 espacios de más tras moverse desde
+un `impl`. Resuelto en `bda5167` (`fmt(all): format all project`), que además
+cambia una premisa de este plan: **el repo ahora sí está formateado con
+rustfmt**. Antes no lo estaba, y por eso no se aplicó en su momento.
 
-No se aplicó `rustfmt` porque **el repo no está formateado con rustfmt** — hasta
-un archivo intacto difiere del formato — y aplicarlo a un archivo suelto crea
-inconsistencia. Dos salidas: normalizar sólo esos dos cuerpos a mano, o adoptar
-`rustfmt` en todo el workspace en un commit propio que no mezcle formato con
-cambios de código.
+**Consecuencia para lo que queda:** pasar `cargo fmt` antes de cada commit. Con
+el repo ya limpio, un cambio sin formatear introduce ruido de formato en el
+diff y vuelve a romper la invariante.
 
 ---
 
 ## Orden recomendado
 
-1. **P1** — el único que evita una clase de bug real. Mismo patrón ya resuelto en `921a56b`.
-2. **P6**, **P8**, **P3** — sin riesgo, cierran huecos de golpe.
-3. **P4** — barato, elimina un fallo silencioso.
-4. **P2** — mecánico y guiado por el compilador; deja el crate cerrado.
-5. **P7** — por archivo, empezando por `ops_math_cmp.rs`.
-6. **P5**, **P9** — sólo si el análisis por dominio lo justifica.
+~~1. **P1**~~ · ~~2. **P6**, **P8**, **P3**~~ · ~~**P9**~~ — hechos.
+
+Queda:
+
+1. **P4** — barato, elimina un fallo silencioso.
+2. **P2** — mecánico y guiado por el compilador; deja el crate cerrado.
+3. **P7** — por archivo, empezando por `ops_math_cmp.rs`.
+4. **P5** — sólo si el análisis por dominio lo justifica.
+
+Con el repo ya formateado (`bda5167`), pasar `cargo fmt` antes de cada commit.
 
 ---
 
 ## Lo que deliberadamente NO se hace
 
-**`exec/dispatch/mod.rs` se queda en 780 líneas.** Lo que resta es el bucle de
+**`exec/dispatch/mod.rs` se queda en 772 líneas.** Lo que resta es el bucle de
 dispatch por opcode (~550 líneas) y el único argumento para partirlo es su
 tamaño. Eso no es razón para reestructurar el bucle caliente del intérprete.
 
