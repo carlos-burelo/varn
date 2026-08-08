@@ -28,8 +28,7 @@ macro_rules! fill_jit_helpers {
             std::mem::offset_of!(ctx::ExecCtx, stack) + array_layout.slots_ptr_off;
         varn_jit::JitHelpers {
             $( $field: ctx::$vm_fn as usize, )*
-            resolve_native_op: resolve_native_op_addr,
-            resolve_native_op_v2: resolve_native_op_addr_v2,
+            resolve_native_op: resolve_native_op_target,
             array_layout,
             object_layout: crate::heap::Heap::jit_object_layout(),
             str_layout: crate::heap::Heap::jit_str_layout(),
@@ -71,14 +70,15 @@ pub fn build_jit_helpers() -> varn_jit::JitHelpers {
     varn_jit::jit_helper_abi!(fill_jit_helpers)
 }
 
-/// Compile-time op-id resolution for `CallNativeOp` codegen: returns the
-/// native fn address, or 0 when the op-id is unknown (codegen then falls
-/// back to the runtime-resolving helper, which raises the proper error).
-fn resolve_native_op_addr(op_id: u64) -> usize {
-    varn_builtins::native_op_fn(op_id).map_or(0, |f| f as usize)
-}
-
-fn resolve_native_op_addr_v2(op_id: u64) -> (usize, usize, varn_types::SignatureDescriptor) {
+/// Compile-time op-id resolution for `CallNativeOp` codegen.
+///
+/// `(0, 0, empty)` when the op-id is unknown — codegen then keeps the dynamic
+/// form, whose helper raises the proper error at runtime.
+///
+/// `raw_func_ptr` is the unboxed entry point: present only for ops whose
+/// signature is fully described, and it is what lets codegen emit a direct
+/// typed call instead of boxing every argument.
+fn resolve_native_op_target(op_id: u64) -> (usize, usize, varn_types::SignatureDescriptor) {
     varn_builtins::find_native_op_entry(op_id).map_or(
         (0, 0, varn_types::SignatureDescriptor::empty()),
         |e| (e.func_ptr as usize, e.raw_func_ptr as usize, e.signature),

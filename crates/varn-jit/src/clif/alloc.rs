@@ -748,7 +748,7 @@ pub(super) fn emit_call_native_op(
     // single call, which on a hot `arr.push(x)` is a large share of the cost
     // of the call itself. `0` means the table does not know the id — keep the
     // dynamic form so the helper raises the same error it always did.
-    let (fn_addr, raw_addr, sig_desc) = (actx.helpers.resolve_native_op_v2)(op_id);
+    let (fn_addr, raw_addr, sig_desc) = (actx.helpers.resolve_native_op)(op_id);
     if raw_addr != 0 {
         let mut sig = cranelift_codegen::ir::Signature::new(actx.cc);
         let argc = sig_desc.param_count as usize;
