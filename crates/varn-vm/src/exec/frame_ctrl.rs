@@ -51,6 +51,54 @@ pub(crate) fn resolve_constructor_return(
     }
 }
 
+/// Unwind to `handler` and leave its frame ready to run the catch block.
+///
+/// Pops frames down to the handler's depth (closing each one's upvalues),
+/// truncates the stack to the receiving frame's register window, writes
+/// `thrown` into the handler's error register, and points that frame's ip at
+/// the catch block.
+///
+/// `handler` is taken BY VALUE because every caller has already removed it from
+/// wherever it lived — `try_handlers` for the interpreter and task paths,
+/// `jit_panic_exception_handler` for compiled code, which `jit_propagate_error`
+/// pops on the way out. Taking it by value is what makes that non-negotiable.
+///
+/// Like [`resolve_constructor_return`], this is a language rule rather than a
+/// tier detail, and it had three byte-identical copies: the interpreter's
+/// `Throw`, the exit of a compiled frame, and the task fork in `ctx_tasks`. A
+/// `catch` that behaves differently depending on which tier the frame came from
+/// is a bug no single-tier test can find, and exception handling is precisely
+/// what a user relies on to reason about their program.
+pub(crate) fn unwind_to_handler(
+    ctx: &mut ExecCtx,
+    handler: crate::frame::TryHandler,
+    thrown: VmValue,
+) {
+    while ctx.frames.len() > handler.frame_depth {
+        ctx.record_frame_pop();
+        let f = ctx.frames.pop().unwrap();
+        ctx.close_upvalues_above(f.base);
+    }
+
+    // The handler's own frame is now on top. Everything above its register
+    // window is dead: the frames that owned it are gone.
+    let target = ctx.frames.len() - 1;
+    let base = ctx.frames[target].base;
+    let required_depth = base + ctx.frames[target].closure().proto.register_count as usize;
+    ctx.stack.truncate(required_depth);
+
+    // `truncate` can leave the stack SHORTER than the error slot when the
+    // handler's frame declares fewer registers than its err_reg index — grow
+    // rather than index out of bounds.
+    let slot = base + handler.err_reg as usize;
+    if slot >= ctx.stack.len() {
+        ctx.stack.resize(slot + 1, VmValue::null());
+    }
+    ctx.stack[slot] = thrown;
+
+    ctx.frames[target].ip = handler.catch_ip;
+}
+
 impl ExecCtx {
     pub(crate) fn dispatch_prepared_call(&mut self, call: PreparedCall) -> VmResult<()> {
         match call {

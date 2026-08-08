@@ -505,28 +505,10 @@ impl ExecCtx {
                         );
                         let handler = (*ctx).try_handlers.pop();
                         if let Some(handler) = handler {
-                            while (*ctx).frames.len() > handler.frame_depth {
-                                (*ctx).record_frame_pop();
-                                let f = (*ctx).frames.pop().unwrap();
-                                (*ctx).close_upvalues_above(f.base);
-                            }
-
-                            let f2 = (*ctx).frames.len() - 1;
-                            let b2 = (*ctx).frames[f2].base;
-                            let required_depth =
-                                b2 + (*ctx).frames[f2].closure().proto.register_count as usize;
-                            (*ctx).stack.truncate(required_depth);
                             let thrown_val = err.thrown.unwrap_or(VmValue::null());
-
-                            let slot = b2 + handler.err_reg as usize;
-                            if slot < (*ctx).stack.len() {
-                                (*ctx).stack[slot] = thrown_val;
-                            } else {
-                                (*ctx).stack.resize(slot + 1, VmValue::null());
-                                (*ctx).stack[slot] = thrown_val;
-                            }
-                            let new_frame_idx = (*ctx).frames.len() - 1;
-                            (*ctx).frames[new_frame_idx].ip = handler.catch_ip;
+                            crate::exec::frame_ctrl::unwind_to_handler(
+                                &mut *ctx, handler, thrown_val,
+                            );
                             continue 'frame_loop;
                         } else {
                             // Side-table zero-cost exception lookup

@@ -18,7 +18,7 @@
 use super::ExecCtx;
 use crate::closure::VmClosure;
 use crate::error::{RuntimeError, VmResult};
-use crate::exec::frame_ctrl::resolve_constructor_return;
+use crate::exec::frame_ctrl::{resolve_constructor_return, unwind_to_handler};
 use crate::value::VmValue;
 
 /// How a compiled frame ended, as an instruction to the frame loop.
@@ -90,28 +90,7 @@ pub(super) unsafe fn run_compiled_frame(
                 let err_obj = (*ctx).jit_panic_exception_err_obj.take();
 
                 if let Some(handler) = handler {
-                    while (*ctx).frames.len() > handler.frame_depth {
-                        (*ctx).record_frame_pop();
-                        let f = (*ctx).frames.pop().unwrap();
-                        (*ctx).close_upvalues_above(f.base);
-                    }
-
-                    let f2 = (*ctx).frames.len() - 1;
-                    let b2 = (*ctx).frames[f2].base;
-                    let required_depth =
-                        b2 + (*ctx).frames[f2].closure().proto.register_count as usize;
-                    (*ctx).stack.truncate(required_depth);
-                    let thrown_val = error;
-
-                    let slot = b2 + handler.err_reg as usize;
-                    if slot < (*ctx).stack.len() {
-                        (*ctx).stack[slot] = thrown_val;
-                    } else {
-                        (*ctx).stack.resize(slot + 1, VmValue::null());
-                        (*ctx).stack[slot] = thrown_val;
-                    }
-                    let new_frame_idx = (*ctx).frames.len() - 1;
-                    (*ctx).frames[new_frame_idx].ip = handler.catch_ip;
+                    unwind_to_handler(&mut *ctx, handler, error);
                     return JitFrameOutcome::Continue;
                 } else {
                     return JitFrameOutcome::Failed(err_obj.unwrap());

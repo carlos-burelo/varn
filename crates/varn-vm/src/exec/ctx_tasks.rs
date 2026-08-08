@@ -156,28 +156,10 @@ impl ExecCtx {
                                     &fork.frames,
                                 );
                                 if let Some(handler) = fork.try_handlers.pop() {
-                                    while fork.frames.len() > handler.frame_depth {
-                                        fork.record_frame_pop();
-                                        let f = fork.frames.pop().unwrap();
-                                        fork.close_upvalues_above(f.base);
-                                    }
-
-                                    let f2 = fork.frames.len() - 1;
-                                    let b2 = fork.frames[f2].base;
-                                    let required_depth = b2
-                                        + fork.frames[f2].closure().proto.register_count as usize;
-                                    fork.stack.truncate(required_depth);
                                     let thrown_val = err.thrown.unwrap_or(VmValue::null());
-
-                                    let slot = b2 + handler.err_reg as usize;
-                                    if slot < fork.stack.len() {
-                                        fork.stack[slot] = thrown_val;
-                                    } else {
-                                        fork.stack.resize(slot + 1, VmValue::null());
-                                        fork.stack[slot] = thrown_val;
-                                    }
-                                    let new_frame_idx = fork.frames.len() - 1;
-                                    fork.frames[new_frame_idx].ip = handler.catch_ip;
+                                    crate::exec::frame_ctrl::unwind_to_handler(
+                                        &mut fork, handler, thrown_val,
+                                    );
                                 } else {
                                     output.reject(thrown);
                                     break;
