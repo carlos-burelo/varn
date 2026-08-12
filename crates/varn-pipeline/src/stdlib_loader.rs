@@ -273,9 +273,6 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
     #[derive(serde::Deserialize)]
     struct Manifest {
         version: String,
-        #[allow(dead_code)]
-        #[serde(rename = "hostApi")]
-        host_api: u32,
         modules: Vec<ManifestModule>,
     }
 

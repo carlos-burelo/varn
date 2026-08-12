@@ -398,52 +398,6 @@ fn emit_fdiv(
     b.block_params(cont)[0]
 }
 
-/// The register an opcode defines, if any (mirrors `kinds::apply_kinds`'s dest
-/// conventions). Used by [`check_float_writes`].
-#[allow(dead_code)]
-fn reg_write_dest(op: OpCode, code: &[u16], ip: usize) -> Option<usize> {
-    use OpCode::*;
-    let d0 = (code[ip] >> 8) as usize;
-    match op {
-        // Dest packed in the SECOND word.
-        Call | CallSelf | BuildArray | BuildObjectWithShape => Some((code[ip + 1] >> 8) as usize),
-        // Dest in the opcode word.
-        LoadIntZero | LoadIntOne | LoadIntMinusOne | LoadInt | LoadTrue | LoadFalse | LoadConst
-        | LoadNull | AddInt | SubInt | MulInt | AddImm | SubImm | ModInt | PowInt | ArrayLength
-        | LtInt | LteInt | GtInt | GteInt | EqInt | NeqInt | AddFloat | SubFloat | MulFloat
-        | DivFloat | ModFloat | PowFloat | LtFloat | GtFloat | LteFloat | GteFloat | EqFloat
-        | NeqFloat | Lt | Lte | Gt | Gte | Eq | Neq | Not | IsNull | IsArray | Instanceof | In
-        | Move | ArrayGetIndex | GetFixedField | GetProperty | LoadGlobalIdx | Add | Sub | Mul
-        | Div | Mod | Pow | Negate | Typeof | ToString | GetSymbol | BitAnd | BitOr | BitXor
-        | Shl | Shr | Ushr | StrSlice | StrLength | ArrayPop | BuildObject | StrConcat
-        | BuildStr | MakeEnumVariant | CallNativeOp => Some(d0),
-        _ => None,
-    }
-}
-
-/// Ops whose result the float lowering can place directly into an `F64`
-/// Variable. Every other op writing a float register would `def_var` an `i64`
-/// into an `F64` Variable — a Cranelift type-mismatch panic — so it is bailed
-/// up front by [`check_float_writes`].
-#[allow(dead_code)]
-fn is_supported_float_writer(op: OpCode) -> bool {
-    matches!(
-        op,
-        OpCode::AddFloat
-            | OpCode::SubFloat
-            | OpCode::MulFloat
-            | OpCode::DivFloat
-            | OpCode::ModFloat
-            | OpCode::PowFloat
-            | OpCode::Move
-            | OpCode::LoadConst
-            // `clif::arrays` produces an `f64` on every arm of an element
-            // load — raw from an `F64` array, coerced from a `Boxed` one or
-            // from the helper's boxed result.
-            | OpCode::ArrayGetIndex
-    )
-}
-
 /// Reject a function up front if any `Float`-typed register is written by an
 /// op the float lowering doesn't handle (loads, calls, negate, generic
 /// arithmetic into a float sink…). Bailing here keeps every `def_var` on an

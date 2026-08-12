@@ -7,15 +7,11 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use varn_pipeline::RunOpts;
 
-#[allow(dead_code)]
 pub struct TestResult {
-    pub path: PathBuf,
     pub display_name: String,
     pub passed: bool,
     pub duration: Duration,
     pub output: String,
-    pub assertions_passed: usize,
-    pub assertions_failed: usize,
 }
 
 pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
@@ -127,8 +123,6 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
 
                 let mut passed = run_res.is_ok();
                 let mut output = String::new();
-                let assertions_passed = 0;
-                let assertions_failed = 0;
 
                 if let Err(ref e) = run_res {
                     output = format!("{e}");
@@ -144,13 +138,10 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
                 }
 
                 let res = TestResult {
-                    path,
                     display_name,
                     passed,
                     duration: elapsed,
                     output,
-                    assertions_passed,
-                    assertions_failed,
                 };
 
                 if verbose || !res.passed {

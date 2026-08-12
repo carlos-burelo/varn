@@ -69,23 +69,6 @@ pub struct HoistCandidate {
     pub source: CacheSource,
 }
 
-/// One hoisted loop: up to [`MAX_CANDIDATES`] invariant arrays touched in
-/// `[header_offset, latch_offset]` (inclusive, `chunk.code` word offsets).
-#[allow(dead_code)]
-pub(crate) struct HoistPlan {
-    pub candidates: Vec<HoistCandidate>,
-    pub header_offset: usize,
-    pub latch_offset: usize,
-    latch_end_offset: usize,
-}
-
-impl HoistPlan {
-    #[allow(dead_code)]
-    pub fn contains(&self, ip: usize) -> bool {
-        ip >= self.header_offset && ip <= self.latch_offset
-    }
-}
-
 /// `OpCode::Loop` is not exclusively a real loop back-edge in Varn's
 /// bytecode: the SSA backend also uses it as a generic backward "goto" —
 /// e.g. `break` immediately before a `return` gets compiled as a jump
@@ -294,7 +277,6 @@ fn classify_site(
 pub struct LoopDiagnostic {
     pub header_offset: usize,
     pub latch_offset: usize,
-    latch_end_offset: usize,
     /// Header has a genuine fall-through predecessor (see
     /// `header_reachable_by_fallthrough`). `false` means this loop can
     /// never be hoisted regardless of the other checks — Varn currently
@@ -404,7 +386,6 @@ pub fn diagnose_loops(code: &[u16], constants: &[PoolEntry]) -> Vec<LoopDiagnost
             Some(LoopDiagnostic {
                 header_offset,
                 latch_offset,
-                latch_end_offset,
                 is_real: is_real[i],
                 is_alloc_free: alloc_free,
                 is_innermost,
@@ -414,24 +395,3 @@ pub fn diagnose_loops(code: &[u16], constants: &[PoolEntry]) -> Vec<LoopDiagnost
         .collect()
 }
 
-/// Plan hoists for every eligible innermost loop in `code`. Conservative by
-/// construction: skips loops with any instruction outside the
-/// allocation-free allowlist (see [`is_alloc_free_op`]), more than
-/// [`MAX_CANDIDATES`] distinct invariant arrays, a header with no
-/// fall-through predecessor (see `header_reachable_by_fallthrough`), or
-/// that themselves contain a nested loop (only the innermost loop of a
-/// nest gets the cache registers — see the design doc's "Registro de
-/// cache" section).
-#[allow(dead_code)]
-pub(crate) fn plan_hoists(code: &[u16], constants: &[PoolEntry]) -> Vec<HoistPlan> {
-    diagnose_loops(code, constants)
-        .into_iter()
-        .filter(|d| !d.candidates.is_empty())
-        .map(|d| HoistPlan {
-            candidates: d.candidates,
-            header_offset: d.header_offset,
-            latch_offset: d.latch_offset,
-            latch_end_offset: d.latch_end_offset,
-        })
-        .collect()
-}

@@ -168,18 +168,9 @@ pub fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Du
     Ok(samples)
 }
 
-/// Like [`time_n`], but samples CPU frequency immediately after each run (CPU
-/// still warm from the just-finished work) and keeps the peak.
-#[allow(dead_code)]
-pub fn time_n_freq<F: Fn() -> Result<(), String>>(
-    runs: usize,
-    f: F,
-) -> Result<(Vec<Duration>, Option<crate::cpu_freq::CpuFreq>), CliError> {
-    time_n_freq_setup(runs, || (), |_| f())
-}
-
-/// [`time_n_freq`] with a per-run SETUP step that is deliberately left out of
-/// the measurement.
+/// [`time_n`], sampling CPU frequency right after each run and keeping the
+/// peak, with a per-run SETUP step that is deliberately left out of the
+/// measurement.
 ///
 /// The execute phase builds a fresh VM per run, and that build deep-clones the
 /// heap — whose cost scales with `NURSERY_CAPACITY`. Timing it made the harness

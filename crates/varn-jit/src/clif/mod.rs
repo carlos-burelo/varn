@@ -24,7 +24,6 @@ pub(crate) mod kinds;
 pub(crate) mod liveness;
 pub mod lower;
 pub(crate) mod methods;
-pub(crate) mod nursery;
 pub(crate) mod osr;
 pub(crate) mod piece;
 pub(crate) mod preheader;
