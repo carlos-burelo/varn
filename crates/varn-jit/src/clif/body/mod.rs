@@ -4,7 +4,7 @@ pub(crate) mod op_dispatch;
 
 use cranelift_codegen::ir::{types, Function, InstBuilder, MemFlags, UserFuncName};
 use cranelift_codegen::isa::OwnedTargetIsa;
-use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
+use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext};
 use std::collections::HashMap;
 use varn_core::OpCode;
 use varn_types::bytecode::decode;
@@ -20,7 +20,7 @@ use super::fields;
 use super::floats;
 use super::generic;
 use super::globals;
-use super::kinds::{is_boxed_kind, kind_flow, K};
+use super::kinds::{apply_kinds, is_boxed_kind, kind_flow, K};
 use super::lower::ClifLinker;
 use super::piece::{compile_piece, CompiledPiece};
 use super::{preheader, scan, vars};
@@ -76,7 +76,7 @@ pub(super) fn lower_raw(
     let vars::VarFile {
         vars,
         cache_vars,
-        all_caches: _,
+        all_caches,
     } = vars::declare(
         &mut b,
         nregs,
@@ -311,9 +311,11 @@ pub(super) fn lower_raw(
                 let target = blocks[&target_ip];
                 if has_alloc {
                     if let Some(actx) = actx.as_ref() {
-                        let payload_vars: Vec<Variable> =
-                            cache_vars.values().map(|c| c.payload).collect();
-                        alloc::emit_backedge_safepoint(&mut b, actx, &state, &payload_vars);
+                        // Every cache Variable, payloads AND views: a collection
+                        // here can move what a view points into, and the
+                        // safepoint resetting all of them is what lets
+                        // `scan::loop_regions` treat the region as cacheable.
+                        alloc::emit_backedge_safepoint(&mut b, actx, &state, &all_caches);
                     }
                 }
                 if let Some(target_state) = entries.get(&target_ip) {
@@ -405,6 +407,20 @@ pub(super) fn lower_raw(
                 }
             }
         }
+
+        // Advance the kind lattice past the op just emitted. Without this the
+        // whole block is lowered against its ENTRY state, so every register
+        // defined mid-block is read with a stale kind — an `Int` param handed
+        // to a call as raw i48 where the callee reads a boxed value, and back.
+        apply_kinds(
+            &mut state,
+            code,
+            pool,
+            ip,
+            op,
+            constants,
+            &proto.register_meta,
+        );
 
         ip = next_ip;
     }

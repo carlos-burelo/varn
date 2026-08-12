@@ -69,8 +69,19 @@ pub fn register_fallback_module_entries(entries: &'static [&'static NativeOpEntr
     }
 }
 
+/// Every registered native op, linker-section entries FIRST.
+///
+/// The order is load-bearing: `find_native_op_entry` returns the first entry
+/// whose op id matches, and one op can appear in both lists as two distinct
+/// entries. The section entry is the authoritative one — it carries the typed
+/// signature the JIT lowers its call against.
 pub fn all_native_ops() -> Vec<&'static NativeOpEntry> {
     let mut list: Vec<&'static NativeOpEntry> = Vec::new();
+    for entry in iter_native_ops() {
+        if !entry.func_ptr.is_null() && !list.iter().any(|e| std::ptr::eq(*e, entry)) {
+            list.push(entry);
+        }
+    }
     if let Some(mutex) = FALLBACK_ENTRIES.get() {
         if let Ok(guard) = mutex.lock() {
             for slice in guard.iter() {
@@ -80,11 +91,6 @@ pub fn all_native_ops() -> Vec<&'static NativeOpEntry> {
                     }
                 }
             }
-        }
-    }
-    for entry in iter_native_ops() {
-        if !entry.func_ptr.is_null() && !list.iter().any(|e| std::ptr::eq(*e, entry)) {
-            list.push(entry);
         }
     }
     list

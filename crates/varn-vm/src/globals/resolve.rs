@@ -44,6 +44,17 @@ pub fn resolve_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore) {
         return;
     }
     proto.globals_id.set(globals.id());
+
+    // Compiled code bakes the slot indices this pass is about to rewrite, and
+    // `Rc::make_mut` hands us a CLONE whose `jit_entry`/`clif_raw` were copied
+    // from the original — so without this the clone can run machine code built
+    // from the pre-rewrite bytecode, reading another store's slots. Measured at
+    // zero on the suite and the benches: it only fires when a rewrite happens.
+    proto.jit_entry.set(None);
+    proto.clif_raw.set(0);
+    *proto.jit_code.borrow_mut() = None;
+    proto.jit_failed.set(false);
+
     let chunk = &mut proto.chunk;
     let mut ip = 0usize;
     while ip < chunk.code.len() {
