@@ -42,7 +42,7 @@ use crate::JitHelpers;
 
 /// Shared context for the array arms — the immutable references the payload
 /// resolve and helper calls need.
-pub(super) struct ArrCtx<'a> {
+pub(crate) struct ArrCtx<'a> {
     pub vars: &'a [Variable],
     pub helpers: &'a JitHelpers,
     pub cc: CallConv,

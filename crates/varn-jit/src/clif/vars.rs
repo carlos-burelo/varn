@@ -24,6 +24,7 @@ pub(super) struct VarFile {
     /// Flat list of every cache Variable, for the back-edge safepoint — it
     /// invalidates all of them at once and has no way to tell which region it
     /// sits in.
+    #[allow(dead_code)]
     pub all_caches: Vec<Variable>,
 }
 

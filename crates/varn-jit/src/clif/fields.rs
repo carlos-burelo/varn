@@ -21,7 +21,7 @@ use super::kinds::K;
 use crate::JitHelpers;
 
 /// Shared context for the fixed-field arms.
-pub(super) struct FldCtx<'a> {
+pub(crate) struct FldCtx<'a> {
     pub vars: &'a [Variable],
     pub helpers: &'a JitHelpers,
     pub cc: CallConv,

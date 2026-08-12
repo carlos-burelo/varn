@@ -321,7 +321,7 @@ pub(super) fn state_meta_int(meta: &[varn_types::register_meta::RegisterMeta], r
 /// receiver keeps `view: None`: a store can grow the element Vec (moving the
 /// data pointer and the length) or migrate the repr.
 #[derive(Clone, Copy)]
-pub(super) struct RegionCache {
+pub(crate) struct RegionCache {
     /// Payload pointer; `0` means the preheader's guard chain rejected it.
     pub payload: Variable,
     /// `[data, len, disc]`, sharing the same `0`-means-unresolved sentinel on

@@ -1,8 +1,16 @@
 //! Global-slot access lowering for CLIF: `LoadGlobalIdx` / `StoreGlobalIdx`.
 //! Globals live in `ExecCtx.globals` (a non-`repr(C)` `GlobalStore`), whose
-//! `values` Vec data pointer sits at `globals_offset + 8` — the same offset
-//! the template loads. Globals are always GC roots, so a store needs no write
-//! barrier. Split out of `lower.rs` for the file-size governance limit.
+//! `values` Vec data pointer sits at `globals_offset + 8`. Globals are always
+//! GC roots, so a store needs no write barrier. Split out of `lower.rs` for the
+//! file-size governance limit.
+//!
+//! The indexed forms are the ONLY ones lowered, and that is an invariant, not a
+//! subset: `varn_vm::globals::resolve_in_proto` rewrites every name-keyed
+//! `LoadGlobal`/`StoreGlobal`/`DefineGlobal` before the proto can run, in every
+//! VM. A name-keyed global reaching here is a bug in that pass, and it bails —
+//! the function silently drops to the interpreter. If that ever needs
+//! diagnosing, the cheap check is to make those three opcodes a distinct bail
+//! message and run the suite with `VARN_CLIF_TRACE=1 VARN_JIT_TIER=1`.
 
 use cranelift_codegen::ir::{types, InstBuilder, MemFlags};
 use cranelift_frontend::{FunctionBuilder, Variable};
@@ -13,7 +21,7 @@ use super::kinds::K;
 use crate::JitHelpers;
 
 /// Shared context for the global-access arms.
-pub(super) struct GblCtx<'a> {
+pub(crate) struct GblCtx<'a> {
     pub vars: &'a [Variable],
     pub helpers: &'a JitHelpers,
     pub exec_ctx: cranelift_codegen::ir::Value,

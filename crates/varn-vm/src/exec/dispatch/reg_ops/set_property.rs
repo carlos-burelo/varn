@@ -4,6 +4,7 @@ use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use std::rc::Rc;
 use std::sync::atomic::Ordering;
+use varn_types::chunk::ICKind;
 
 impl ExecCtx {
     pub(crate) fn exec_set_property_reg(
@@ -56,15 +57,15 @@ impl ExecCtx {
                             self.heap.get(obj.as_heap_idx())
                         {
                             let guard = o.read();
-                            if entry.is_class == 1
+                            if entry.is_class == ICKind::SHAPE_PROP
                                 && guard.shape().id == entry.id
                                 && slot < guard.slot_count()
                             {
-                                found_slot = Some((slot, 1));
+                                found_slot = Some((slot, ICKind::SHAPE_PROP));
                                 hit_found = true;
                                 break 'entries;
-                            } else if entry.is_class == 5 && guard.shape().id == entry.id {
-                                found_slot = Some((slot, 5));
+                            } else if entry.is_class == ICKind::SHAPE_TRANSITION && guard.shape().id == entry.id {
+                                found_slot = Some((slot, ICKind::SHAPE_TRANSITION));
                                 hit_found = true;
                                 break 'entries;
                             }
@@ -73,7 +74,7 @@ impl ExecCtx {
 
                     if found_slot.is_none() {
                         if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
-                            if entry.is_class == 4
+                            if entry.is_class == ICKind::CLASS_SETTER
                                 && cls.id == entry.id
                                 && entry.vtable_ver
                                     == (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8
@@ -100,7 +101,7 @@ impl ExecCtx {
                     if let Some(crate::heap::HeapObj::Object(o)) = self.heap.get(obj.as_heap_idx())
                     {
                         let o = o.clone();
-                        if kind == 5 {
+                        if kind == ICKind::SHAPE_TRANSITION {
                             o.insert(Rc::from(name.as_ref()), val);
                         } else {
                             o.set_field_at(slot, val);
@@ -124,7 +125,7 @@ impl ExecCtx {
                         let entry = varn_types::chunk::CacheEntry {
                             id: cls.id,
                             slot: slot as u16,
-                            is_class: 4,
+                            is_class: ICKind::CLASS_SETTER,
                             vtable_ver: (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8,
                         };
                         closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
@@ -146,7 +147,7 @@ impl ExecCtx {
                         let entry = varn_types::chunk::CacheEntry {
                             id: shape_id,
                             slot: slot as u16,
-                            is_class: 1,
+                            is_class: ICKind::SHAPE_PROP,
                             vtable_ver: 0,
                         };
                         o.set_field_at(slot, val);
@@ -172,14 +173,14 @@ impl ExecCtx {
                     ic[cs_idx].find_or_insert(varn_types::chunk::CacheEntry {
                         id: old_shape_id,
                         slot: new_slot as u16,
-                        is_class: 5,
+                        is_class: ICKind::SHAPE_TRANSITION,
                         vtable_ver: 0,
                     });
 
                     ic[cs_idx].find_or_insert(varn_types::chunk::CacheEntry {
                         id: new_shape_id,
                         slot: new_slot as u16,
-                        is_class: 1,
+                        is_class: ICKind::SHAPE_PROP,
                         vtable_ver: 0,
                     });
                     drop(ic);

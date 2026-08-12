@@ -19,7 +19,7 @@ use crate::JitHelpers;
 
 /// General lowering context (not frame-specific). Helper addresses are passed
 /// per-op, so this only carries the operand/dispatch essentials.
-pub(super) struct GenCtx<'a> {
+pub(crate) struct GenCtx<'a> {
     pub vars: &'a [Variable],
     pub cc: CallConv,
     pub exec_ctx: cranelift_codegen::ir::Value,

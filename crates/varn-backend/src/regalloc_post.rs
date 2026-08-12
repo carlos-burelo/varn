@@ -744,17 +744,6 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         varn_types::loop_analysis::collect_back_edges(&proto.chunk.code, &proto.chunk.constants);
     let scan = scan_bytecode(&proto.chunk.code, &proto.chunk.constants);
 
-    let all_regs: Vec<u16> = scan
-        .defs
-        .keys()
-        .filter(|&&r| r >= base)
-        .map(|&r| r as u16)
-        .collect();
-
-    if all_regs.is_empty() {
-        return;
-    }
-
     let mut analyzer = LivenessAnalyzer::new();
     for (&reg, &def_pos) in &scan.defs {
         if reg >= base {
@@ -773,6 +762,17 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         if reg >= base && !scan.defs.contains_key(&reg) {
             analyzer.record_def(reg as u16, 0);
         }
+    }
+
+    let all_regs: Vec<u16> = scan
+        .defs
+        .keys()
+        .filter(|&&r| r >= base)
+        .map(|&r| r as u16)
+        .collect();
+
+    if all_regs.is_empty() {
+        return;
     }
 
     let ranges = analyzer.analyze_with_back_edges(all_regs, &back_edges);

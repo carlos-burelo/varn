@@ -380,5 +380,6 @@ Reglas de compilación y ejecución para el agente:
 2. NUNCA ejecutar `cargo clean` a menos que sea estrictamente necesario por corrupción de artefactos de build.
 3. Para ciclos rápidos de iteración y validación, utilizar `--profile quick` o compilaciones incrementales para no invalidar cachés.
 4. Para benchmarks y pruebas de estabilidad final, usar `cargo run --release --bin vn -- bench ./tests/main.vn -v`.
+5. TODA ejecución de ejecutables (`vn.exe`, `cargo run`, etc.) realizada por el agente DEBE utilizar explícitamente un timeout acotado (por ejemplo, `powershell -Command "..."` con un timeout máximo de 10-15s o `Wait-Process` con timeout) para prevenir esperas e hilos colgados infinitamente.
 
 </hardware_and_compilation_profile>

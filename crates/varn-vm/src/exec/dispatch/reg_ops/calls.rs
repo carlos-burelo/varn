@@ -157,7 +157,7 @@ impl ExecCtx {
                 }
             } else {
                 match self.heap.get(callee.as_heap_idx()) {
-                    Some(crate::heap::HeapObj::NativeFn(name, f)) => {
+                    Some(crate::heap::HeapObj::NativeFn(f, name)) => {
                         let f = *f;
                         let name_str = *name;
                         self.record_call_native();
@@ -169,7 +169,7 @@ impl ExecCtx {
                                 copy_args_to_buf(&self.stack, base, arg_start, arg_count, &mut buf)
                             };
 
-                            let slice = if n > 0 {
+                            let slice = if n > 1 {
                                 unsafe {
                                     std::slice::from_raw_parts(
                                         buf.as_ptr().cast::<VmValue>().add(1),
@@ -184,10 +184,10 @@ impl ExecCtx {
                             let varn_args: Vec<VmValue> = (0..arg_count)
                                 .map(|i| self.stack[base + arg_start + i])
                                 .collect();
-                            let slice = if arg_count > 0 {
+                            let slice = if arg_count > 1 {
                                 &varn_args[1..]
                             } else {
-                                &varn_args[..]
+                                &[]
                             };
                             self.invoke_native(f, slice)
                         }
@@ -452,7 +452,6 @@ impl ExecCtx {
         dest: usize,
         frame_idx: usize,
     ) -> VmResult<bool> {
-        self.push(callee);
         let mut expanded = Vec::new();
         for i in 0..arg_count {
             let nv = self.stack[base + arg_start + i];
@@ -465,10 +464,16 @@ impl ExecCtx {
                     }
                     other => expanded.push(self.heap.intern(other)),
                 },
+                Value::Array(arr) => {
+                    for v in arr.borrow().iter().cloned() {
+                        expanded.push(self.heap.intern(v));
+                    }
+                }
                 other => expanded.push(self.heap.intern(other)),
             }
         }
         let flat_count = expanded.len();
+        self.push(callee);
         for nv in expanded {
             self.push(nv);
         }

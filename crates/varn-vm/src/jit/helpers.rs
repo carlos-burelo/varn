@@ -27,7 +27,7 @@ macro_rules! fill_jit_helpers {
         let stack_data_offset =
             std::mem::offset_of!(ctx::ExecCtx, stack) + array_layout.slots_ptr_off;
         varn_jit::JitHelpers {
-            $( $field: ctx::$vm_fn as usize, )*
+            $( $field: ctx::$vm_fn as *const () as usize, )*
             resolve_native_op: resolve_native_op_target,
             array_layout,
             object_layout: crate::heap::Heap::jit_object_layout(),

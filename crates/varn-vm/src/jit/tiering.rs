@@ -368,6 +368,7 @@ mod jit_epoch_tests {
             return_kind: SlotKind::Dynamic,
             resolved_shapes: std::cell::RefCell::new(Vec::new()),
             jit_entry: std::cell::Cell::new(None),
+            globals_id: std::cell::Cell::new(0),
             clif_raw: std::cell::Cell::new(0),
             jit_code: std::cell::RefCell::new(None),
             jit_failed: std::cell::Cell::new(false),

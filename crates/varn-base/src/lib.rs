@@ -157,6 +157,14 @@ impl TypeTag {
     pub fn is_primitive(self) -> bool {
         (self.flags() & TypeFlags::IS_SCALAR).bits() != 0
     }
+
+    pub fn is_array_like(self) -> bool {
+        matches!(self, Self::Array | Self::Tuple)
+    }
+
+    pub fn is_object_like(self) -> bool {
+        matches!(self, Self::Object | Self::Tuple | Self::Class)
+    }
 }
 
 pub trait VmValuePayload: std::fmt::Debug + std::any::Any {

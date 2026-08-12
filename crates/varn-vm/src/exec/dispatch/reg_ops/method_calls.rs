@@ -4,6 +4,7 @@ use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use std::rc::Rc;
 use std::sync::atomic::Ordering;
+use varn_types::chunk::ICKind;
 use varn_types::{Value, VmArray};
 
 impl ExecCtx {
@@ -51,7 +52,7 @@ impl ExecCtx {
                     if entry.id == 0 {
                         continue;
                     }
-                    if entry.is_class == 6 {
+                    if entry.is_class == ICKind::NATIVE_VTABLE_METHOD {
                         if let Some(ref cls) = receiver_class {
                             if cls.id == entry.id
                                 && entry.vtable_ver
@@ -66,7 +67,7 @@ impl ExecCtx {
                                 }
                             }
                         }
-                    } else if entry.is_class == 7 {
+                    } else if entry.is_class == ICKind::VM_VTABLE_METHOD {
                         if let Some(ref cls) = receiver_class {
                             let cls_ver = (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8;
                             if cls.id == entry.id && cls_ver == entry.vtable_ver {
@@ -74,10 +75,8 @@ impl ExecCtx {
                                 let method_val =
                                     unsafe { &*cls.vtable.as_ptr() }.get(slot).cloned();
                                 if let Some(Value::VmValue(payload)) = method_val {
-                                    if let Some(nc_w) =
-                                        payload.as_any().downcast_ref::<VmClosurePayload>()
-                                    {
-                                        let nc = nc_w.0.clone();
+                                    if let Some(nc) = VmClosurePayload::downcast_from(&*payload) {
+                                        let nc = nc.clone();
                                         if !nc.proto.is_generator
                                             && !nc.proto.is_async
                                             && arg_count <= nc.proto.arity as usize
@@ -127,6 +126,7 @@ impl ExecCtx {
         if let crate::exec::props::ResolvedProperty::Built(Value::BoundMethod(bm)) = &resolved {
             if let varn_types::value::BoundMethodTarget::Native { func, .. } = &bm.target {
                 let f = *func;
+                let val = Value::NativeFn(Box::new((f, "")));
                 self.populate_method_ic(
                     closure,
                     cs,
@@ -134,7 +134,8 @@ impl ExecCtx {
                     is_megamorphic,
                     &receiver_class,
                     name.as_ref(),
-                    6,
+                    val,
+                    ICKind::NATIVE_VTABLE_METHOD,
                 );
                 self.record_call_native();
                 self.record_hotspot_native(name.as_ref());
@@ -150,47 +151,42 @@ impl ExecCtx {
             crate::exec::props::ResolvedProperty::Built(v) => self.heap.intern(v),
         };
 
-        if let Some(ref cls) = receiver_class {
+        if receiver_class.is_some() {
             if cs < cache_len && method_nv.is_heap() && !is_megamorphic {
                 if let Some(crate::heap::HeapObj::BoundMethod(bm)) =
                     self.heap.get(method_nv.as_heap_idx())
                 {
                     match &bm.target {
-                        varn_types::value::BoundMethodTarget::Native { .. } => {
-                            if let Some(&slot) = cls.method_map.borrow().get(name.as_ref()) {
-                                let entry = varn_types::chunk::CacheEntry {
-                                    id: cls.id,
-                                    slot: slot as u16,
-                                    is_class: 6,
-                                    vtable_ver: (cls.vtable_version.load(Ordering::Relaxed) & 0xFF)
-                                        as u8,
-                                };
-                                closure.ic_cache.borrow_mut()[cs].find_or_insert(entry);
-                                closure.feedback.borrow_mut().observe(cs, cls.id);
-                            }
+                        varn_types::value::BoundMethodTarget::Native { func: f, .. } => {
+                            let val = Value::NativeFn(Box::new((*f, "")));
+                            self.populate_method_ic(
+                                closure,
+                                cs,
+                                cache_len,
+                                is_megamorphic,
+                                &receiver_class,
+                                name.as_ref(),
+                                val,
+                                ICKind::NATIVE_VTABLE_METHOD,
+                            );
                         }
                         varn_types::value::BoundMethodTarget::Vm {
                             closure: method_closure,
                             ..
                         } => {
-                            if let Some(nc_w) =
-                                method_closure.as_any().downcast_ref::<VmClosurePayload>()
-                            {
-                                let nc = &nc_w.0;
+                            if let Some(nc) = VmClosurePayload::downcast_from(&**method_closure) {
                                 if !nc.proto.is_generator && !nc.proto.is_async {
-                                    if let Some(&slot) = cls.method_map.borrow().get(name.as_ref())
-                                    {
-                                        let entry = varn_types::chunk::CacheEntry {
-                                            id: cls.id,
-                                            slot: slot as u16,
-                                            is_class: 7,
-                                            vtable_ver: (cls.vtable_version.load(Ordering::Relaxed)
-                                                & 0xFF)
-                                                as u8,
-                                        };
-                                        closure.ic_cache.borrow_mut()[cs].find_or_insert(entry);
-                                        closure.feedback.borrow_mut().observe(cs, cls.id);
-                                    }
+                                    let val = Value::VmValue(Box::new(VmClosurePayload(nc.clone())));
+                                    self.populate_method_ic(
+                                        closure,
+                                        cs,
+                                        cache_len,
+                                        is_megamorphic,
+                                        &receiver_class,
+                                        name.as_ref(),
+                                        val,
+                                        ICKind::VM_VTABLE_METHOD,
+                                    );
                                 }
                             }
                         }
@@ -437,11 +433,17 @@ impl ExecCtx {
         is_megamorphic: bool,
         receiver_class: &Option<Rc<varn_types::value::ClassObj>>,
         name: &str,
+        method_val: varn_types::Value,
         is_class: u8,
     ) {
         if cs >= cache_len || is_megamorphic {
             return;
         }
+        // Caching only ever RECORDS what the class already has. Installing a
+        // missing method here would bump `vtable_version` on the first call to
+        // it, invalidating every other entry cached against that class — which
+        // is what made the version guard above look wrong and get deleted.
+        let _ = method_val;
         if let Some(cls) = receiver_class {
             if let Some(&slot) = cls.method_map.borrow().get(name) {
                 let entry = varn_types::chunk::CacheEntry {

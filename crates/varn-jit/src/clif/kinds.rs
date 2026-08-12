@@ -243,7 +243,6 @@ pub(crate) fn apply_kinds(
         | OpCode::ArrayExtend
         | OpCode::MakeClass
         | OpCode::GetSuper
-        | OpCode::LoadGlobal
         | OpCode::LoadUpvalue
         | OpCode::MakeClosure
         | OpCode::LoadStaticFn

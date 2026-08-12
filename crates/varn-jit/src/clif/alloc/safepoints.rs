@@ -1,0 +1,286 @@
+//! Safepoint tracking and root flushes/reloads for CLIF allocation lowering.
+
+use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
+use cranelift_codegen::isa::CallConv;
+use cranelift_frontend::{FunctionBuilder, Variable};
+use std::cell::{Cell, RefCell};
+use varn_core::OpCode;
+use varn_types::bytecode::decode;
+use varn_types::register_meta::RegisterMeta;
+
+use super::super::emit::{
+    box_or_pass, call_helper_void, meta_is_float, state_meta_int, unbox_bool, unbox_f64_coerce,
+    wrap_i48,
+};
+use super::super::kinds::K;
+use super::super::liveness::Liveness;
+use crate::JitHelpers;
+
+pub(crate) fn has_alloc(
+    code: &[u16],
+    pool: &[varn_types::chunk::PoolEntry],
+) -> Result<bool, String> {
+    let mut ip = 0usize;
+    while ip < code.len() {
+        let info = decode(code, ip, pool).ok_or("clif: undecodable opcode")?;
+        if matches!(
+            OpCode::from_u8(code[ip] as u8),
+            Some(
+                OpCode::BuildArray
+                    | OpCode::BuildTuple
+                    | OpCode::BuildObject
+                    | OpCode::BuildObjectWithShape
+                    | OpCode::BuildRecord
+                    | OpCode::ArrayPush
+                    | OpCode::ArrayExtend
+                    | OpCode::MakeEnumVariant
+                    | OpCode::StrConcat
+                    | OpCode::BuildStr
+                    | OpCode::CallNativeOp
+                    | OpCode::Add
+                    | OpCode::GetProperty
+                    | OpCode::SetProperty
+                    | OpCode::Call
+                    | OpCode::CallMethod
+                    | OpCode::InvokeVirtual
+                    | OpCode::ToString
+                    | OpCode::Typeof
+                    | OpCode::Negate
+                    | OpCode::GetSymbol
+                    | OpCode::StrSlice
+                    | OpCode::Intrinsic
+                    | OpCode::MakeClosure
+                    | OpCode::MakeClass
+                    | OpCode::LoadUpvalue
+                    | OpCode::StoreUpvalue
+                    | OpCode::CloseUpvalue
+                    | OpCode::LoadStaticFn
+                    | OpCode::LoadModule
+                    | OpCode::LoadModuleSlot
+                    | OpCode::StoreModuleSlot
+                    | OpCode::GetSuper
+                    | OpCode::DeclareField
+                    | OpCode::Method
+                    | OpCode::DefineStatic
+                    | OpCode::DefineGetter
+                    | OpCode::DefineSetter
+                    | OpCode::DefineStaticGetter
+                    | OpCode::DefineStaticSetter
+                    | OpCode::Inherit
+                    | OpCode::BindMethod
+                    | OpCode::Try
+                    | OpCode::Throw
+                    | OpCode::PopTry
+                    | OpCode::Yield
+                    | OpCode::Await
+                    | OpCode::Spawn
+                    | OpCode::ObjectRest
+                    | OpCode::ObjectKeys
+                    | OpCode::ObjectMerge
+                    | OpCode::CallSpread
+                    | OpCode::WrapSpread
+                    | OpCode::GetIndex
+                    | OpCode::SetIndex
+            )
+        ) {
+            return Ok(true);
+        }
+        ip += info.len;
+    }
+    Ok(false)
+}
+
+pub(crate) fn has_try(code: &[u16], pool: &[varn_types::chunk::PoolEntry]) -> Result<bool, String> {
+    let mut ip = 0usize;
+    while ip < code.len() {
+        let info = decode(code, ip, pool).ok_or("clif: undecodable opcode")?;
+        if OpCode::from_u8(code[ip] as u8) == Some(OpCode::Try) {
+            return Ok(true);
+        }
+        ip += info.len;
+    }
+    Ok(false)
+}
+
+pub(crate) struct AllocCtx<'a> {
+    pub vars: &'a [Variable],
+    pub helpers: &'a JitHelpers,
+    pub cc: CallConv,
+    pub exec_ctx: cranelift_codegen::ir::Value,
+    pub base: cranelift_codegen::ir::Value,
+    pub closure: cranelift_codegen::ir::Value,
+    pub nregs: usize,
+    pub register_meta: &'a [RegisterMeta],
+    pub live: &'a Liveness,
+    pub narrow_roots: bool,
+    pub cur_ip: Cell<usize>,
+    pub safepoints: Option<RefCell<Vec<(usize, Vec<usize>, Vec<usize>)>>>,
+}
+
+pub(crate) fn frame_base_addr(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+) -> cranelift_codegen::ir::Value {
+    let sp = b.ins().load(
+        types::I64,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        actx.helpers.stack_data_offset as i32,
+    );
+    let base_bytes = b.ins().ishl_imm(actx.base, 3);
+    b.ins().iadd(sp, base_bytes)
+}
+
+pub(crate) fn load_receiver(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+) -> cranelift_codegen::ir::Value {
+    load_home(b, actx, 0)
+}
+
+pub(crate) fn load_home(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    r: usize,
+) -> cranelift_codegen::ir::Value {
+    let fb = frame_base_addr(b, actx);
+    b.ins()
+        .load(types::I64, MemFlags::trusted(), fb, (r * 8) as i32)
+}
+
+pub(crate) fn store_home(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    fb: cranelift_codegen::ir::Value,
+    reg: usize,
+) {
+    let v = box_or_pass(b, actx.vars, state, reg);
+    b.ins().store(MemFlags::trusted(), v, fb, (reg * 8) as i32);
+}
+
+pub(crate) fn def_result(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    dest: usize,
+    res: cranelift_codegen::ir::Value,
+) {
+    let fb = frame_base_addr(b, actx);
+    if meta_is_float(actx.register_meta, dest) {
+        let f = unbox_f64_coerce(b, res);
+        b.def_var(actx.vars[dest], f);
+    } else if state_meta_int(actx.register_meta, dest) {
+        let sh = b.ins().ishl_imm(res, 16);
+        let un = b.ins().sshr_imm(sh, 16);
+        b.def_var(actx.vars[dest], un);
+    } else {
+        b.def_var(actx.vars[dest], res);
+    }
+    b.ins()
+        .store(MemFlags::trusted(), res, fb, (dest * 8) as i32);
+}
+
+pub(crate) fn args_struct(
+    b: &mut FunctionBuilder,
+    words: &[cranelift_codegen::ir::Value],
+) -> cranelift_codegen::ir::Value {
+    let slot = b.create_sized_stack_slot(cranelift_codegen::ir::StackSlotData::new(
+        cranelift_codegen::ir::StackSlotKind::ExplicitSlot,
+        (words.len() * 8) as u32,
+        3,
+    ));
+    for (i, w) in words.iter().enumerate() {
+        b.ins().stack_store(*w, slot, (i * 8) as i32);
+    }
+    b.ins().stack_addr(types::I64, slot, 0)
+}
+
+pub(crate) fn emit_backedge_safepoint(
+    b: &mut FunctionBuilder,
+    actx: &AllocCtx,
+    state: &[K],
+    payload_caches: &[Variable],
+) {
+    let h = actx.helpers;
+    let rcbox = b.ins().load(
+        types::I64,
+        MemFlags::trusted(),
+        actx.exec_ctx,
+        h.heap_field_offset as i32,
+    );
+    let len = b.ins().load(
+        types::I64,
+        MemFlags::trusted(),
+        rcbox,
+        h.nursery_len_offset as i32,
+    );
+    let over = b.ins().icmp_imm(
+        IntCC::UnsignedGreaterThanOrEqual,
+        len,
+        h.nursery_threshold as i64,
+    );
+    let slow = b.create_block();
+    let cont = b.create_block();
+    b.ins().brif(over, slow, &[], cont, &[]);
+
+    b.switch_to_block(slow);
+    let regs = live_boxed(actx, state);
+    flush_boxed(b, actx, state, &regs);
+    call_helper_void(b, actx.cc, h.gc_safepoint, &[actx.exec_ctx]);
+    reload_boxed(b, actx, state, &regs);
+    let invalid = b.ins().iconst(types::I64, 0);
+    for &cv in payload_caches {
+        b.def_var(cv, invalid);
+    }
+    b.ins().jump(cont, &[]);
+    b.switch_to_block(cont);
+}
+
+pub(crate) fn live_boxed(actx: &AllocCtx, state: &[K]) -> Vec<usize> {
+    let ip = actx.cur_ip.get();
+    let live_nonfloat = (0..actx.nregs)
+        .filter(|&r| !meta_is_float(actx.register_meta, r))
+        .filter(|&r| actx.live.is_live_after(ip, r));
+    let rooted = |r: usize| !actx.narrow_roots || state.get(r).copied().map_or(true, is_root_kind);
+    let regs: Vec<usize> = live_nonfloat.clone().filter(|&r| rooted(r)).collect();
+    if let Some(rec) = &actx.safepoints {
+        let unboxed: Vec<usize> = live_nonfloat.filter(|&r| !rooted(r)).collect();
+        rec.borrow_mut().push((ip, regs.clone(), unboxed));
+    }
+    regs
+}
+
+fn is_root_kind(k: K) -> bool {
+    !matches!(k, K::Int | K::Bool)
+}
+
+pub(crate) fn flush_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K], regs: &[usize]) {
+    let fb = frame_base_addr(b, actx);
+    for &r in regs {
+        store_home(b, actx, state, fb, r);
+    }
+}
+
+pub(crate) fn reload_boxed(b: &mut FunctionBuilder, actx: &AllocCtx, state: &[K], regs: &[usize]) {
+    let fb = frame_base_addr(b, actx);
+    for &r in regs {
+        let v = b
+            .ins()
+            .load(types::I64, MemFlags::trusted(), fb, (r * 8) as i32);
+        if meta_is_float(actx.register_meta, r) {
+            let f = unbox_f64_coerce(b, v);
+            b.def_var(actx.vars[r], f);
+        } else {
+            let restored = match state[r] {
+                K::Int => wrap_i48(b, v),
+                K::Bool => unbox_bool(b, v),
+                K::Float => {
+                    let f = unbox_f64_coerce(b, v);
+                    super::super::emit::box_f64(b, f)
+                }
+                _ => v,
+            };
+            b.def_var(actx.vars[r], restored);
+        }
+    }
+}

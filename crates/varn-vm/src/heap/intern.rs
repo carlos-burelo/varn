@@ -82,7 +82,7 @@ impl HeapInner {
                 }
             }
             Value::Class(c) => VmValue::from_heap_idx(self.alloc(HeapObj::Class(c))),
-            Value::NativeFn(b) => VmValue::from_heap_idx(self.alloc(HeapObj::NativeFn(b.1, b.0))),
+            Value::NativeFn(b) => VmValue::from_heap_idx(self.alloc(HeapObj::NativeFn(b.0, b.1))),
             Value::BoundMethod(b) => VmValue::from_heap_idx(self.alloc(HeapObj::BoundMethod(b))),
             Value::Map(m) => {
                 if let Some(&idx) = self.map_interner.get(&m) {
@@ -183,7 +183,7 @@ impl HeapInner {
                 HeapObj::Object(o) | HeapObj::Record(o) => Value::Object(o.clone()),
                 HeapObj::VmClosure(c) => Value::VmValue(Box::new(VmClosurePayload(c.clone()))),
                 HeapObj::Class(c) => Value::Class(c.clone()),
-                HeapObj::NativeFn(name, f) => Value::NativeFn(Box::new((*f, *name))),
+                HeapObj::NativeFn(f, name) => Value::NativeFn(Box::new((*f, *name))),
                 HeapObj::BoundMethod(m) => Value::BoundMethod(m.clone()),
                 HeapObj::Map(m) => Value::Map(m.clone()),
                 HeapObj::Set(s) => Value::Set(s.clone()),

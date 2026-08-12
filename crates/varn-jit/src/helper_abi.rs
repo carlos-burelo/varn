@@ -21,9 +21,6 @@ macro_rules! jit_helper_abi {
     ($cb:ident) => {
         $cb! {
             load_const => jit_load_const,
-            load_global_idx => jit_load_global_idx,
-            store_global_idx => jit_store_global_idx,
-            define_global_idx => jit_define_global_idx,
             eq => jit_eq,
             neq => jit_neq,
             lt => jit_lt,
@@ -37,7 +34,6 @@ macro_rules! jit_helper_abi {
             modulo => jit_modulo,
             pow => jit_pow,
             to_string => jit_to_string,
-            load_global => jit_load_global,
             load_upvalue => jit_load_upvalue,
             store_upvalue => jit_store_upvalue,
             make_closure => jit_make_closure,
@@ -97,8 +93,6 @@ macro_rules! jit_helper_abi {
             get_super => jit_get_super,
             get_symbol => jit_get_symbol,
             bind_method => jit_bind_method,
-            define_global => jit_define_global,
-            store_global => jit_store_global,
             declare_field => jit_declare_field,
             make_class => jit_make_class,
             inherit => jit_inherit,

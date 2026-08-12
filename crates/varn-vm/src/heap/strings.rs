@@ -268,7 +268,7 @@ impl HeapInner {
                     "[Function {}]",
                     nc.proto.name.as_deref().unwrap_or("<anon>")
                 ),
-                Some(HeapObj::NativeFn(name, _)) => format!("[NativeFn: {}]", name),
+                Some(HeapObj::NativeFn(_, name)) => format!("[NativeFn: {}]", name),
                 Some(HeapObj::BoundMethod(method)) => match &method.target {
                     varn_types::value::BoundMethodTarget::Native { name, .. } => {
                         format!("[Function {}]", name)

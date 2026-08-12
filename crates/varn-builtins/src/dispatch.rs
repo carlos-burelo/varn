@@ -35,22 +35,28 @@ pub static __VARN_OPS_END_MARKER: NativeOpEntry = unsafe { std::mem::zeroed() };
 
 pub fn iter_native_ops() -> impl Iterator<Item = &'static NativeOpEntry> {
     #[cfg(target_os = "windows")]
-    unsafe {
+    let slice: &'static [NativeOpEntry] = unsafe {
         let start = &__VARN_OPS_START_MARKER as *const NativeOpEntry;
         let end = &__VARN_OPS_END_MARKER as *const NativeOpEntry;
-        let len = (end as usize - start as usize) / std::mem::size_of::<NativeOpEntry>();
-        let slice = std::slice::from_raw_parts(start, len);
-        slice.iter().filter(|e| !e.func_ptr.is_null())
-    }
+        let start_u = start as usize;
+        let end_u = end as usize;
+        if end_u <= start_u {
+            &[]
+        } else {
+            let len = (end_u - start_u) / std::mem::size_of::<NativeOpEntry>();
+            std::slice::from_raw_parts(start, len)
+        }
+    };
 
     #[cfg(not(target_os = "windows"))]
-    unsafe {
+    let slice: &'static [NativeOpEntry] = unsafe {
         let start = &__VARN_OPS_START as *const NativeOpEntry;
         let end = &__VARN_OPS_END as *const NativeOpEntry;
         let len = (end as usize - start as usize) / std::mem::size_of::<NativeOpEntry>();
-        let slice = std::slice::from_raw_parts(start, len);
-        slice.iter().filter(|e| !e.func_ptr.is_null())
-    }
+        std::slice::from_raw_parts(start, len)
+    };
+
+    slice.iter().filter(|e| !e.func_ptr.is_null())
 }
 
 static FALLBACK_ENTRIES: OnceLock<std::sync::Mutex<Vec<&'static [&'static NativeOpEntry]>>> =
@@ -64,7 +70,7 @@ pub fn register_fallback_module_entries(entries: &'static [&'static NativeOpEntr
 }
 
 pub fn all_native_ops() -> Vec<&'static NativeOpEntry> {
-    let mut list: Vec<&'static NativeOpEntry> = iter_native_ops().collect();
+    let mut list: Vec<&'static NativeOpEntry> = Vec::new();
     if let Some(mutex) = FALLBACK_ENTRIES.get() {
         if let Ok(guard) = mutex.lock() {
             for slice in guard.iter() {
@@ -74,6 +80,11 @@ pub fn all_native_ops() -> Vec<&'static NativeOpEntry> {
                     }
                 }
             }
+        }
+    }
+    for entry in iter_native_ops() {
+        if !entry.func_ptr.is_null() && !list.iter().any(|e| std::ptr::eq(*e, entry)) {
+            list.push(entry);
         }
     }
     list

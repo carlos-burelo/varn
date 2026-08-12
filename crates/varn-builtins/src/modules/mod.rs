@@ -44,9 +44,9 @@ pub fn force_link_builtins() -> usize {
     let mut sum = 0;
 
     macro_rules! register_marker {
-        ($m:ident, $marker:ident) => {
-            crate::dispatch::register_fallback_module_entries($m::$marker);
-            sum += std::hint::black_box($m::$marker).as_ptr() as usize;
+        ($($m:ident)::+, $marker:ident) => {
+            crate::dispatch::register_fallback_module_entries($($m)::*::$marker);
+            sum += std::hint::black_box($($m)::*::$marker).as_ptr() as usize;
         };
     }
 
@@ -55,6 +55,9 @@ pub fn force_link_builtins() -> usize {
     register_marker!(ffi, __VARN_LINK_MARKER_RUNTIME_FFI);
     register_marker!(fs, __VARN_LINK_MARKER_RUNTIME_FS);
     register_marker!(globals, __VARN_LINK_MARKER_GLOBALS);
+    register_marker!(globals, __VARN_LINK_MARKER_ERROR);
+    register_marker!(globals, __VARN_LINK_MARKER_TYPEERROR);
+    register_marker!(globals, __VARN_LINK_MARKER_RANGEERROR);
     register_marker!(io, __VARN_LINK_MARKER_RUNTIME_IO);
     register_marker!(json, __VARN_LINK_MARKER_RUNTIME_JSON);
     register_marker!(math, __VARN_LINK_MARKER_RUNTIME_MATH);
@@ -62,7 +65,25 @@ pub fn force_link_builtins() -> usize {
     register_marker!(reflect, __VARN_LINK_MARKER_RUNTIME_REFLECT);
     register_marker!(sys, __VARN_LINK_MARKER_RUNTIME_SYS);
     register_marker!(task, __VARN_LINK_MARKER_RUNTIME_TASK);
+    register_marker!(task, __VARN_LINK_MARKER_ISOLATEHANDLE);
+    register_marker!(task, __VARN_LINK_MARKER_SENDER);
+    register_marker!(task, __VARN_LINK_MARKER_RECEIVER);
+    register_marker!(task, __VARN_LINK_MARKER_CHANNEL);
+    register_marker!(task, __VARN_LINK_MARKER_CHANNELCLOSED);
     register_marker!(time, __VARN_LINK_MARKER_RUNTIME_TIME);
+
+    register_marker!(primitives::array, __VARN_LINK_MARKER_ARRAY);
+    register_marker!(primitives::bigint, __VARN_LINK_MARKER_BIGINT);
+    register_marker!(primitives::bool, __VARN_LINK_MARKER_BOOL);
+    register_marker!(primitives::char, __VARN_LINK_MARKER_CHAR);
+    register_marker!(primitives::decimal, __VARN_LINK_MARKER_DECIMAL);
+    register_marker!(primitives::float, __VARN_LINK_MARKER_FLOAT);
+    register_marker!(primitives::int, __VARN_LINK_MARKER_INT);
+    register_marker!(primitives::map, __VARN_LINK_MARKER_MAP);
+    register_marker!(primitives::range, __VARN_LINK_MARKER_RANGE);
+    register_marker!(primitives::set, __VARN_LINK_MARKER_SET);
+    register_marker!(primitives::string, __VARN_LINK_MARKER_STR);
+    register_marker!(primitives::symbol, __VARN_LINK_MARKER_SYMBOL);
 
     sum + dummy
 }

@@ -16,7 +16,7 @@ impl ExecCtx {
     /// Like [`Self::wait_task_handle`] but preserves the rejection `Value`
     /// instead of stringifying it — required so typed payloads (e.g.
     /// `HostError`) survive to the await-resume hook (`host_values`).
-    pub(crate) fn wait_task_handle_value(
+    pub fn wait_task_handle_value(
         task: varn_types::AsyncTask,
     ) -> Result<varn_types::Value, varn_types::Value> {
         match task.peek_state() {
@@ -86,8 +86,10 @@ impl ExecCtx {
                 VmUpvalue::closed(fork.heap.intern(val))
             })
             .collect();
+        let mut proto = Rc::clone(&task.closure.proto);
+        crate::globals::resolve_in_proto(Rc::make_mut(&mut proto), &mut fork.globals);
         let closure = Rc::new(VmClosure::with_upvalues(
-            Rc::clone(&task.closure.proto),
+            proto,
             upvalues,
             Rc::new(constants),
             fork.settings,
@@ -177,7 +179,14 @@ impl ExecCtx {
                     }
                 },
                 Err(err) => {
-                    output.reject_msg(err.message);
+                    let mut msg = err.message;
+                    for frame in &err.frames {
+                        msg.push_str(&format!(
+                            "\n  at {} ({}:{})",
+                            frame.fn_name, frame.file, frame.line
+                        ));
+                    }
+                    output.reject_msg(msg);
                     break;
                 }
             }

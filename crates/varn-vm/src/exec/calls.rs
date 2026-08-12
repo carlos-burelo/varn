@@ -99,7 +99,7 @@ pub(crate) fn try_prepare_call_fast(
             }
             BoundMethodTarget::Vm { .. } => None,
         },
-        HeapObj::NativeFn(_name, f) => {
+        HeapObj::NativeFn(f, _name) => {
             Some((PreparedCall::RawNativeImmediate(*f, arg_count), false))
         }
         _ => None,
@@ -192,7 +192,7 @@ pub(crate) fn prepare_call(
                 let base = stack.len() - nc.proto.arity as usize;
                 return Ok(PreparedCall::Frame(CallFrame::new(&nc, base)));
             }
-            HeapObj::NativeFn(_name, f) => {
+            HeapObj::NativeFn(f, _name) => {
                 let func = *f;
                 return Ok(PreparedCall::RawNativeImmediate(func, arg_count));
             }
@@ -458,8 +458,14 @@ pub enum PreparedCall {
     Constructor(CallFrame, VmValue),
     /// Native call whose arguments are read straight out of the register
     /// window rather than collected into a `Vec` — `arg_count` slots starting
-    /// at the callee slot.
+    /// at the callee slot. The callee slot holds the RECEIVER, so the whole
+    /// window is passed through: this is the bound-method form.
     NativeImmediate(varn_types::NativeFn, usize),
+    /// As [`Self::NativeImmediate`], but for a bare native function, where the
+    /// callee slot holds the callee itself rather than a receiver. The window
+    /// is passed minus that first slot. Collapsing the two hands every bare
+    /// native its own function as `args[0]` and shifts every real argument by
+    /// one — see `varn-builtins`, which indexes arguments from 0.
     RawNativeImmediate(varn_types::NativeFn, usize),
     NativeConstructor(varn_types::NativeFn, Vec<VmValue>, VmValue),
     PushValue(VmValue),

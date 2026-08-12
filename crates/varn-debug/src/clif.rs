@@ -28,7 +28,9 @@ pub fn debug_clif(proto: &FunctionProto, flags: &DebugFlags, helpers: &JitHelper
             return;
         }
     };
-    render_recursive(proto, flags, helpers, isa);
+    // Same shape production lowers — see `crate::resolved_copy`.
+    let resolved = crate::resolved_copy(proto);
+    render_recursive(&resolved, flags, helpers, isa);
     eprintln!("{DIM}── end: CLIF ──{R}");
 }
 

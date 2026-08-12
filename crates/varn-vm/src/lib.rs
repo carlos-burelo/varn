@@ -5,7 +5,7 @@ pub mod exec;
 pub(crate) mod frame;
 pub(crate) mod gc;
 pub(crate) mod generator;
-pub(crate) mod globals;
+pub mod globals;
 pub(crate) mod heap;
 pub(crate) mod heap_array;
 mod heap_str_alloc;

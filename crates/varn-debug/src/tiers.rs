@@ -72,8 +72,9 @@ pub fn classify(proto: &FunctionProto, helpers: &JitHelpers) -> Vec<TierRow> {
     let Ok(isa) = varn_jit::clif::shared_isa() else {
         return Vec::new();
     };
+    let resolved = crate::resolved_copy(proto);
     let mut rows = Vec::new();
-    walk(proto, helpers, isa, &mut rows);
+    walk(&resolved, helpers, isa, &mut rows);
     rows
 }
 

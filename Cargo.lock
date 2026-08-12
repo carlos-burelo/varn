@@ -2161,6 +2161,7 @@ dependencies = [
  "varn-parser",
  "varn-types",
  "varn-utilities",
+ "varn-vm",
 ]
 
 [[package]]

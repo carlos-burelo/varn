@@ -33,7 +33,7 @@ pub(crate) fn alloc_into(
 impl HeapInner {
     #[inline]
     pub(crate) fn alloc_native_fn(&mut self, f: NativeFn, name: &'static str) -> VmValue {
-        VmValue::from_heap_idx(self.alloc(HeapObj::NativeFn(name, f)))
+        VmValue::from_heap_idx(self.alloc(HeapObj::NativeFn(f, name)))
     }
 
     pub(crate) fn alloc(&mut self, obj: HeapObj) -> u32 {

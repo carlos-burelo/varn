@@ -1,5 +1,9 @@
-//! Value-level helpers: constants, globals, upvalues, closures, and the
-//! arithmetic and comparison operators compiled code cannot inline.
+//! Value-level helpers: constants, upvalues, closures, and the arithmetic and
+//! comparison operators compiled code cannot inline.
+//!
+//! Globals are absent on purpose: `clif::globals` emits the indexed load and
+//! store inline off `ExecCtx.globals`, and the name-keyed forms no longer
+//! survive `varn_vm::globals::resolve_in_proto`.
 //!
 //! Everything here is a pure value operation over the running `ExecCtx` —
 //! no frame is pushed and no call is made.
@@ -14,27 +18,6 @@ pub(crate) extern "C" fn jit_load_const(
     unsafe {
         let closure_ref = &*closure;
         closure_ref.constants[idx]
-    }
-}
-
-pub(crate) extern "C" fn jit_load_global_idx(ctx: *mut ExecCtx, idx: usize) -> VmValue {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        ctx_ref.globals.get_by_index(idx).unwrap_or(VmValue::null())
-    }
-}
-
-pub(crate) extern "C" fn jit_store_global_idx(ctx: *mut ExecCtx, idx: usize, val: VmValue) {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        ctx_ref.globals.set_by_index(idx, val);
-    }
-}
-
-pub(crate) extern "C" fn jit_define_global_idx(ctx: *mut ExecCtx, idx: usize, val: VmValue) {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        ctx_ref.globals.set_by_index(idx, val);
     }
 }
 
@@ -113,23 +96,6 @@ pub(crate) extern "C" fn jit_to_string(ctx: *mut ExecCtx, v: VmValue) -> VmValue
         // Same implementation the interpreter's `ToString` runs; the two
         // tiers must not disagree about how a coercion allocates.
         crate::exec::strings::to_string(v, &mut ctx_ref.heap)
-    }
-}
-
-pub(crate) extern "C" fn jit_load_global(
-    ctx: *mut ExecCtx,
-    closure: *const crate::closure::VmClosure,
-    name_idx: usize,
-) -> VmValue {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        let closure_ref = &*closure;
-        let name_nv = closure_ref.constants[name_idx];
-        let name = ctx_ref.heap.str_val(name_nv).unwrap();
-        ctx_ref
-            .globals
-            .get_by_name(&name)
-            .unwrap_or(VmValue::null())
     }
 }
 
@@ -253,27 +219,5 @@ pub(crate) extern "C" fn jit_make_closure(
             ctx_ref.static_closures.insert(proto_ptr, (proto, val));
         }
         val
-    }
-}
-
-pub(crate) extern "C" fn jit_define_global(ctx: *mut ExecCtx, src: VmValue, name_idx: usize) {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = ctx_ref.frames[frame_idx].closure();
-        let name_nv = closure_ref.constants[name_idx];
-        let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
-        ctx_ref.globals.define(&name, src);
-    }
-}
-
-pub(crate) extern "C" fn jit_store_global(ctx: *mut ExecCtx, src: VmValue, name_idx: usize) {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        let frame_idx = ctx_ref.frames.len() - 1;
-        let closure_ref = ctx_ref.frames[frame_idx].closure();
-        let name_nv = closure_ref.constants[name_idx];
-        let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
-        ctx_ref.globals.set_by_name(&name, src);
     }
 }

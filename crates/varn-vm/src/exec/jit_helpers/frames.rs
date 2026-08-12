@@ -143,7 +143,7 @@ pub(crate) extern "C" fn jit_prepare_call(
                 ctx_ref.jit_native_result = instance_nv;
                 return 1 as *const crate::closure::VmClosure;
             }
-        } else if let Some(crate::heap::HeapObj::NativeFn(_name, f)) = ctx_ref.heap.get(heap_idx) {
+        } else if let Some(crate::heap::HeapObj::NativeFn(f, _name)) = ctx_ref.heap.get(heap_idx) {
             let f = *f;
             ctx_ref.record_call_native();
             let base = callee_base;

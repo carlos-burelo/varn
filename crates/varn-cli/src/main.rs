@@ -17,8 +17,8 @@ use varn_utilities::terminal;
 /// charges far more per small allocation than a modern thread-caching
 /// allocator does. Swapping it out is the one change that reaches every
 /// allocation site at once.
-#[global_allocator]
-static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+// #[global_allocator]
+// static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn main() {
     const STDLIB_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/std.vnb"));

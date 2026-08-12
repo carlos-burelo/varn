@@ -43,7 +43,7 @@ use varn_types::chunk::PoolEntry;
 ///
 /// Indexed by bytecode ip; ips that are not instruction starts are never
 /// queried.
-pub(super) struct Liveness {
+pub(crate) struct Liveness {
     /// `words` bits per ip, or empty when the analysis bailed.
     after: Vec<u64>,
     words: usize,

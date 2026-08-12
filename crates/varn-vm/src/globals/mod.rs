@@ -1,3 +1,7 @@
+mod resolve;
+
+pub use resolve::{resolve_in_proto, resolve_shared};
+
 use crate::heap::Heap;
 use crate::value::VmValue;
 use rustc_hash::FxHashMap;
@@ -9,6 +13,23 @@ pub struct GlobalStore {
     pub values: Vec<VmValue>,
     names: FxHashMap<Rc<str>, usize>,
     pub idx_to_name: Vec<Rc<str>>,
+    /// Identity of this name→index mapping, so a proto can record which store
+    /// it was resolved against and [`resolve_in_proto`] can skip the work the
+    /// second time. NEVER read by compiled code — it must stay AFTER `values`,
+    /// whose data pointer the JIT loads at a fixed `globals_offset + 8`.
+    ///
+    /// A `Clone` keeps the id on purpose: `define` only ever appends, so every
+    /// index handed out before the clone still means the same name in both
+    /// copies. That is what lets the bench harness resolve once and hand the
+    /// store to a fresh VM per run.
+    id: u64,
+}
+
+/// Ids start at 1 — `0` on a proto means "never resolved against any store".
+fn next_store_id() -> u64 {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    NEXT.fetch_add(1, Ordering::Relaxed)
 }
 
 impl GlobalStore {
@@ -17,6 +38,7 @@ impl GlobalStore {
             values: Vec::new(),
             names: FxHashMap::default(),
             idx_to_name: Vec::new(),
+            id: next_store_id(),
         }
     }
 
@@ -52,6 +74,7 @@ impl GlobalStore {
             values,
             names,
             idx_to_name,
+            id: next_store_id(),
         }
     }
 
@@ -118,6 +141,11 @@ impl GlobalStore {
 
     pub(crate) fn resolve_index(&self, name: &str) -> Option<usize> {
         self.names.get(name).copied()
+    }
+
+    /// Identity of this name→index mapping. See the `id` field.
+    pub(crate) fn id(&self) -> u64 {
+        self.id
     }
 }
 

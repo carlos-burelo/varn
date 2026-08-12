@@ -4,6 +4,7 @@ use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use std::rc::Rc;
 use std::sync::atomic::Ordering;
+use varn_types::chunk::ICKind;
 
 impl ExecCtx {
     pub(crate) fn exec_get_property_reg(
@@ -52,7 +53,7 @@ impl ExecCtx {
                         continue;
                     }
 
-                    if entry.is_class == 1 {
+                    if entry.is_class == ICKind::SHAPE_PROP {
                         if obj.is_heap() {
                             if let Some(
                                 crate::heap::HeapObj::Object(o) | crate::heap::HeapObj::Record(o),
@@ -70,7 +71,7 @@ impl ExecCtx {
                         }
                     } else if let Some(cls) = crate::exec::props::get_class(obj, &self.heap) {
                         let slot = entry.slot as usize;
-                        if entry.is_class == 2
+                        if entry.is_class == ICKind::CLASS_METHOD
                             && cls.id == entry.id
                             && entry.vtable_ver
                                 == (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8
@@ -83,7 +84,7 @@ impl ExecCtx {
                                 hit_found = true;
                                 break 'entries;
                             }
-                        } else if entry.is_class == 3
+                        } else if entry.is_class == ICKind::CLASS_GETTER
                             && cls.id == entry.id
                             && entry.vtable_ver
                                 == (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8
@@ -120,10 +121,6 @@ impl ExecCtx {
             }
         }
 
-        // `.length` on str/Array: answer directly instead of dispatching the
-        // native getter (matches its semantics — see fast_length). The IC
-        // entry (9 = str, 8 = Array) lets jit_get_property_ic_fast take the
-        // same shortcut without re-resolving the receiver's class.
         if name.as_ref() == "length" {
             if let Some(v) = crate::exec::strings::fast_length(obj, &self.heap) {
                 self.stack[base + dest] = v;
@@ -137,7 +134,7 @@ impl ExecCtx {
                         let entry = varn_types::chunk::CacheEntry {
                             id: cls.id,
                             slot: 0,
-                            is_class: if is_str { 9 } else { 8 },
+                            is_class: if is_str { ICKind::STR_LENGTH } else { ICKind::ARRAY_LENGTH },
                             vtable_ver: 0,
                         };
                         closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
@@ -155,7 +152,7 @@ impl ExecCtx {
                         let entry = varn_types::chunk::CacheEntry {
                             id: cls.id,
                             slot: slot as u16,
-                            is_class: 3,
+                            is_class: ICKind::CLASS_GETTER,
                             vtable_ver: (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8,
                         };
                         closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
@@ -189,7 +186,7 @@ impl ExecCtx {
                             let entry = varn_types::chunk::CacheEntry {
                                 id: shape_id,
                                 slot: slot as u16,
-                                is_class: 1,
+                                is_class: ICKind::SHAPE_PROP,
                                 vtable_ver: 0,
                             };
                             closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);
@@ -204,7 +201,7 @@ impl ExecCtx {
                     let entry = varn_types::chunk::CacheEntry {
                         id: cls.id,
                         slot: slot as u16,
-                        is_class: 2,
+                        is_class: ICKind::CLASS_METHOD,
                         vtable_ver: (cls.vtable_version.load(Ordering::Relaxed) & 0xFF) as u8,
                     };
                     closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);

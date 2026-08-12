@@ -244,10 +244,7 @@ impl StdlibProvider for BuiltinsProvider {
 static PROVIDER: BuiltinsProvider = BuiltinsProvider;
 
 pub fn register_provider() {
-    #[cfg(feature = "runtime")]
-    {
-        let total = crate::modules::force_link_builtins();
-        std::hint::black_box(total);
-    }
+    let total = crate::modules::force_link_builtins();
+    std::hint::black_box(total);
     varn_modules::provider::register(&PROVIDER);
 }

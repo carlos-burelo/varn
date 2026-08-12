@@ -59,6 +59,9 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
     let mut optimized_proto = compile_output.entry_proto.clone();
     init_vm.resolve_globals(&mut optimized_proto);
 
+    // Pre-bind the module map to this store so the per-run `eval_module_proto`
+    // hits its already-resolved check instead of rewriting every module inside
+    // the timed region. Correctness still comes from that check, not from here.
     let mut optimized_precompiled_map = (*precompiled_base).clone();
     for module_proto_rc in optimized_precompiled_map.values_mut() {
         init_vm.resolve_globals(Rc::make_mut(module_proto_rc));

@@ -15,8 +15,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use varn_core::{ModuleId, OpCode};
 use varn_types::chunk::FunctionProto;
-use varn_types::chunk::PoolEntry;
-use varn_types::{Closure, Literal};
+use varn_types::Closure;
 
 pub struct Vm {
     pub ctx: ExecCtx,
@@ -187,8 +186,18 @@ impl Vm {
         result
     }
 
+    /// Bind `proto`'s global accesses to this VM's slot indices.
+    ///
+    /// Only the ENTRY proto needs this from outside: every other proto — every
+    /// module, in every VM, from `precompiled` or from a `ModuleLoader` — is
+    /// resolved by `ExecCtx::eval_module_proto` as it enters. The entry proto
+    /// is the one that never passes through there.
+    ///
+    /// Deliberately NOT folded into [`Vm::run`]: the bench harness builds a
+    /// fresh VM and calls `run` inside the timed region, so resolving there
+    /// would charge every measured iteration for work that belongs to setup.
     pub fn resolve_globals(&mut self, proto: &mut FunctionProto) {
-        resolve_globals_in_proto(proto, &mut self.ctx.globals);
+        crate::globals::resolve_in_proto(proto, &mut self.ctx.globals);
     }
 }
 
@@ -278,257 +287,3 @@ fn freeze_pure_modules(vm: &mut Vm) {
     }
 }
 
-fn resolve_globals_in_proto(proto: &mut FunctionProto, globals: &mut GlobalStore) {
-    let chunk = &mut proto.chunk;
-    let mut ip = 0;
-    while ip < chunk.code.len() {
-        let raw = chunk.code[ip];
-        let Some(op) = OpCode::from_u8(raw as u8) else {
-            ip += 1;
-            continue;
-        };
-
-        match op {
-            OpCode::LoadGlobal => {
-                if ip + 1 < chunk.code.len() {
-                    let name_idx = chunk.code[ip + 1] as usize;
-                    if let Some(PoolEntry::Literal(Literal::Str(name))) =
-                        chunk.constants.get(name_idx)
-                    {
-                        let global_idx = match globals.resolve_index(name) {
-                            Some(idx) => idx,
-                            None => globals.define(name, VmValue::null()),
-                        };
-                        let dest = chunk.code[ip] & 0xFF00;
-                        chunk.code[ip] = dest | (OpCode::LoadGlobalIdx as u8 as u16);
-                        chunk.code[ip + 1] = global_idx as u16;
-                    }
-                }
-                ip += 2;
-            }
-
-            OpCode::StoreGlobal | OpCode::DefineGlobal => {
-                if ip + 2 < chunk.code.len() {
-                    let name_idx = chunk.code[ip + 2] as usize;
-                    if let Some(PoolEntry::Literal(Literal::Str(name))) =
-                        chunk.constants.get(name_idx)
-                    {
-                        let global_idx = match globals.resolve_index(name) {
-                            Some(idx) => idx,
-                            None => globals.define(name, VmValue::null()),
-                        };
-                        let new_op = match op {
-                            OpCode::StoreGlobal => OpCode::StoreGlobalIdx,
-                            OpCode::DefineGlobal => OpCode::DefineGlobalIdx,
-                            _ => unreachable!(),
-                        };
-                        chunk.code[ip] = new_op as u8 as u16;
-                        chunk.code[ip + 2] = global_idx as u16;
-                    }
-                }
-                ip += 3;
-            }
-
-            OpCode::LoadNull
-            | OpCode::LoadTrue
-            | OpCode::LoadFalse
-            | OpCode::LoadIntZero
-            | OpCode::LoadIntOne
-            | OpCode::LoadIntMinusOne
-            | OpCode::Nop
-            | OpCode::PopTry => {
-                ip += 1;
-            }
-
-            // opcode word + [op_id_const_idx] + [arg_count]
-            OpCode::CallNativeOp => {
-                ip += 3;
-            }
-
-            OpCode::LoadInt
-            | OpCode::LoadConst
-            | OpCode::LoadGlobalIdx
-            | OpCode::Move
-            | OpCode::Negate
-            | OpCode::Not
-            | OpCode::ToString
-            | OpCode::IsNull
-            | OpCode::IsArray
-            | OpCode::Typeof
-            | OpCode::AssertNotNull
-            | OpCode::WrapSpread
-            | OpCode::Add
-            | OpCode::Sub
-            | OpCode::Mul
-            | OpCode::Div
-            | OpCode::Mod
-            | OpCode::Pow
-            | OpCode::BitAnd
-            | OpCode::BitOr
-            | OpCode::BitXor
-            | OpCode::Shl
-            | OpCode::Shr
-            | OpCode::Ushr
-            | OpCode::Eq
-            | OpCode::Neq
-            | OpCode::Lt
-            | OpCode::Lte
-            | OpCode::Gt
-            | OpCode::Gte
-            | OpCode::StrConcat
-            | OpCode::StrSlice
-            | OpCode::In
-            | OpCode::Instanceof
-            | OpCode::SetIndex
-            | OpCode::GetIndex
-            | OpCode::ArraySetIndex
-            | OpCode::ArrayGetIndex
-            | OpCode::LoadModule
-            | OpCode::StoreModuleSlot
-            | OpCode::LoadUpvalue
-            | OpCode::StoreUpvalue
-            | OpCode::CloseUpvalue
-            | OpCode::ArrayLength
-            | OpCode::ArrayPush
-            | OpCode::ArrayPop
-            | OpCode::ArrayExtend
-            | OpCode::ObjectKeys
-            | OpCode::ObjectMerge
-            | OpCode::GetEnumTag
-            | OpCode::StrLength
-            | OpCode::GetSuper
-            | OpCode::BindMethod
-            | OpCode::Yield
-            | OpCode::Await
-            | OpCode::Spawn
-            | OpCode::Throw
-            | OpCode::Return
-            | OpCode::AddInt
-            | OpCode::SubInt
-            | OpCode::MulInt
-            | OpCode::DivInt
-            | OpCode::ModInt
-            | OpCode::PowInt
-            | OpCode::LtInt
-            | OpCode::GtInt
-            | OpCode::LteInt
-            | OpCode::GteInt
-            | OpCode::EqInt
-            | OpCode::NeqInt
-            | OpCode::AddFloat
-            | OpCode::SubFloat
-            | OpCode::MulFloat
-            | OpCode::DivFloat
-            | OpCode::ModFloat
-            | OpCode::PowFloat
-            | OpCode::LtFloat
-            | OpCode::GtFloat
-            | OpCode::LteFloat
-            | OpCode::GteFloat
-            | OpCode::EqFloat
-            | OpCode::NeqFloat
-            | OpCode::Inherit => {
-                ip += 2;
-            }
-
-            OpCode::Jump
-            | OpCode::Loop
-            | OpCode::JumpIfFalse
-            | OpCode::JumpIfTrue
-            | OpCode::Call
-            | OpCode::CallSelf
-            | OpCode::CallSpread
-            | OpCode::MakeClass
-            | OpCode::Method
-            | OpCode::DefineStatic
-            | OpCode::DefineGetter
-            | OpCode::DefineSetter
-            | OpCode::DefineStaticGetter
-            | OpCode::DefineStaticSetter
-            | OpCode::StoreGlobalIdx
-            | OpCode::DefineGlobalIdx
-            | OpCode::BuildArray
-            | OpCode::BuildTuple
-            | OpCode::BuildObjectWithShape
-            | OpCode::BuildRecord
-            | OpCode::GetPropertyMaybe
-            | OpCode::GetSymbol
-            | OpCode::DeclareField
-            | OpCode::MakeEnumVariant
-            | OpCode::GetFixedField
-            | OpCode::SetFixedField
-            | OpCode::LoadModuleSlot => {
-                ip += 3;
-            }
-
-            OpCode::GetProperty | OpCode::SetProperty => {
-                ip += 3;
-            }
-
-            OpCode::Try => {
-                ip += 4;
-            }
-
-            OpCode::InvokeVirtual | OpCode::CallMethod => {
-                ip += 4;
-            }
-
-            OpCode::InvokeRuntimeStatic => {
-                ip += 5;
-            }
-
-            OpCode::MakeClosure => {
-                if ip + 1 < chunk.code.len() {
-                    let w1 = chunk.code[ip + 1];
-                    let uv_count = (w1 & 0xFF) as usize;
-                    ip += 3 + uv_count;
-                } else {
-                    ip += 1;
-                }
-            }
-
-            OpCode::BuildObject => {
-                if ip + 1 < chunk.code.len() {
-                    let w1 = chunk.code[ip + 1];
-                    let count = (w1 & 0xFF) as usize;
-                    ip += 2 + count * 2;
-                } else {
-                    ip += 1;
-                }
-            }
-
-            OpCode::ObjectRest => {
-                if ip + 2 < chunk.code.len() {
-                    let w2 = chunk.code[ip + 2];
-                    let skip_count = (w2 >> 8) as usize;
-                    ip += 3 + skip_count;
-                } else {
-                    ip += 1;
-                }
-            }
-
-            OpCode::AddImm
-            | OpCode::SubImm
-            | OpCode::Intrinsic
-            | OpCode::IntrinsicDirect
-            | OpCode::LoadStaticFn => {
-                ip += 2;
-            }
-
-            OpCode::BuildStr => {
-                if ip + 1 < chunk.code.len() {
-                    let count = (chunk.code[ip + 1] >> 8) as usize;
-                    ip += 2 + count;
-                } else {
-                    ip += 1;
-                }
-            }
-        }
-    }
-
-    for entry in &mut chunk.constants {
-        if let PoolEntry::Function(ref mut nested) = entry {
-            resolve_globals_in_proto(std::rc::Rc::make_mut(nested), globals);
-        }
-    }
-}

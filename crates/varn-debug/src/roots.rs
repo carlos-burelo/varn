@@ -98,8 +98,9 @@ pub fn debug_roots(
     let Ok(isa) = varn_jit::clif::shared_isa() else {
         return;
     };
+    let resolved = crate::resolved_copy(proto);
     let mut fns = Vec::new();
-    walk(proto, helpers, isa, &mut fns);
+    walk(&resolved, helpers, isa, &mut fns);
     if let Some(needle) = &flags.fn_filter {
         fns.retain(|f| f.name.contains(needle.as_str()));
     }

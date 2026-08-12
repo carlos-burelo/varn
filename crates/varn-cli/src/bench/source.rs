@@ -179,20 +179,23 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     varn_builtins::set_print_silent(!opts.show_output);
     varn_builtins::set_testing_silent(!opts.show_output);
 
-    let mut optimized_proto = proto.clone();
-    init_vm.resolve_globals(&mut optimized_proto);
-
-    let mut optimized_precompiled_map = (*precompiled).clone();
-    for module_proto_rc in optimized_precompiled_map.values_mut() {
-        init_vm.resolve_globals(Rc::make_mut(module_proto_rc));
-    }
-    let optimized_precompiled = Rc::new(optimized_precompiled_map);
-
     varn_builtins::set_print_silent(true);
     varn_builtins::set_testing_silent(true);
     varn_vm::prefill_native_modules(&mut init_vm);
     varn_builtins::set_print_silent(!opts.show_output);
     varn_builtins::set_testing_silent(!opts.show_output);
+
+    let mut optimized_proto = proto.clone();
+    init_vm.resolve_globals(&mut optimized_proto);
+
+    // Pre-bind the module map to this store so the per-run `eval_module_proto`
+    // hits its already-resolved check instead of rewriting every module inside
+    // the timed region. Correctness still comes from that check, not from here.
+    let mut optimized_precompiled_map = (*precompiled).clone();
+    for module_proto_rc in optimized_precompiled_map.values_mut() {
+        init_vm.resolve_globals(Rc::make_mut(module_proto_rc));
+    }
+    let optimized_precompiled = Rc::new(optimized_precompiled_map);
 
     init_vm.ctx.run_minor_gc();
     init_vm.collect_gc();

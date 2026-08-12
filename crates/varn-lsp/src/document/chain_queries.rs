@@ -22,7 +22,7 @@ impl DocumentState {
         bytes.len() as u32
     }
 
-    pub fn resolve_chain_at(&self, line: u32, col: u32) -> Option<ChainResult> {
+    pub fn resolve_chain_at(&self, line: u32, col: u32) -> Option<ChainResult<'_>> {
         let tok = self.identifier_token_at(line, col)?;
 
         if let Some(info) = self.db.expr_types.get(&tok.offset) {

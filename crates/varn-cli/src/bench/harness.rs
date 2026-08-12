@@ -77,37 +77,63 @@ pub fn run_vm_to_completion(machine: &mut Vm, closure: Rc<Closure>) -> Result<()
             Ok(_) => match machine.ctx.vm_suspend.take() {
                 None => break,
                 Some(varn_vm::exec::VmSuspend::Await { value, dest_reg }) => {
-                    let resolved = match value {
+                    let res_val = match value {
                         varn_types::Value::Task(lazy) => {
                             let handle = machine.ctx.run_lazy_task_sync(lazy.as_ref());
                             match handle.peek_state() {
-                                varn_types::TaskState::Resolved(v) => v,
-                                varn_types::TaskState::Rejected(e) => {
-                                    return Err(format!("awaited task failed: {}", e));
-                                }
-                                _ => varn_types::Value::Null,
+                                varn_types::TaskState::Resolved(v) => Ok(v),
+                                varn_types::TaskState::Rejected(e) => Err(e),
+                                _ => Ok(varn_types::Value::Null),
                             }
                         }
                         varn_types::Value::TaskHandle(handle) => match handle.peek_state() {
-                            varn_types::TaskState::Resolved(v) => v,
-                            _ => match varn_vm::exec::ExecCtx::wait_task_handle(handle.clone()) {
-                                Ok(v) => v,
-                                Err(e) => return Err(format!("awaited task failed: {}", e)),
-                            },
+                            varn_types::TaskState::Resolved(v) => Ok(v),
+                            varn_types::TaskState::Rejected(e) => Err(e),
+                            _ => varn_vm::exec::ExecCtx::wait_task_handle_value(handle.clone()),
                         },
-                        other => other,
+                        other => Ok(other),
                     };
-                    // Materialize host markers/envelopes (channel endpoints,
-                    // composite payloads) on this heap before delivery.
-                    let resolved =
-                        varn_vm::exec::host_values::open_resolved(&mut machine.ctx, resolved);
-                    let resolved_nv = machine.ctx.heap.intern(resolved);
 
-                    if let Some(frame) = machine.ctx.frames.last() {
-                        let base = frame.base;
-                        let slot = base + dest_reg as usize;
-                        if slot < machine.ctx.stack.len() {
-                            machine.ctx.stack[slot] = resolved_nv;
+                    match res_val {
+                        Ok(resolved) => {
+                            let resolved =
+                                varn_vm::exec::host_values::open_resolved(&mut machine.ctx, resolved);
+                            let resolved_nv = machine.ctx.heap.intern(resolved);
+
+                            if let Some(frame) = machine.ctx.frames.last() {
+                                let base = frame.base;
+                                let slot = base + dest_reg as usize;
+                                if slot < machine.ctx.stack.len() {
+                                    machine.ctx.stack[slot] = resolved_nv;
+                                }
+                            }
+                        }
+                        Err(thrown) => {
+                            let thrown =
+                                varn_vm::exec::host_values::open_rejected(&mut machine.ctx, thrown);
+                            let thrown_nv = machine.ctx.heap.intern(thrown.clone());
+                            let err = varn_vm::exec::exceptions::build_thrown_error(
+                                thrown_nv,
+                                &machine.ctx.heap,
+                                &machine.ctx.frames,
+                            );
+                            if let Some(handler) = machine.ctx.try_handlers.pop() {
+                                let thrown_val = err.thrown.unwrap_or(varn_types::VmValue::null());
+                                varn_vm::exec::frame_ctrl::unwind_to_handler(
+                                    &mut machine.ctx,
+                                    handler,
+                                    thrown_val,
+                                );
+                            } else {
+                                let mut msg = format!("awaited task failed: {}", err.message);
+                                for frame in &err.frames {
+                                    msg.push_str(&format!(
+                                        "\n  at {} ({}:{})",
+                                        frame.fn_name, frame.file, frame.line
+                                    ));
+                                }
+                                return Err(msg);
+                            }
                         }
                     }
                 }

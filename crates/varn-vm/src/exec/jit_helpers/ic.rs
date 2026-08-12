@@ -8,6 +8,7 @@ use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
 use crate::exec::frame_ctrl::resolve_constructor_return;
 use crate::value::VmValue;
+use varn_types::chunk::ICKind;
 
 pub(crate) extern "C" fn jit_invoke_virtual(
     ctx: *mut ExecCtx,
@@ -127,7 +128,7 @@ pub(crate) extern "C" fn jit_get_property_ic_fast(
                     let slot_cache = &*closure_ref.ic_cache.as_ptr();
                     let poly_slot = &slot_cache[cs_idx];
                     for entry in &poly_slot.entries {
-                        if entry.id != 0 && entry.is_class == 1 {
+                        if entry.id != 0 && entry.is_class == ICKind::SHAPE_PROP {
                             if guard.shape().id == entry.id {
                                 if let Some(v) = guard.field_at(entry.slot as usize) {
                                     return v;
@@ -138,13 +139,13 @@ pub(crate) extern "C" fn jit_get_property_ic_fast(
                 }
             }
 
-            // A `.length` IC entry (8 = Array, 9 = str) at this site means the
+            // A `.length` IC entry (ARRAY_LENGTH or STR_LENGTH) at this site means the
             // interpreter already validated the semantics; the receiver's own
             // tag is the guard, so no class resolution is needed.
             let slot_cache = &*closure_ref.ic_cache.as_ptr();
             let poly_slot = &slot_cache[cs_idx];
             for entry in &poly_slot.entries {
-                if entry.id != 0 && (entry.is_class == 8 || entry.is_class == 9) {
+                if entry.id != 0 && (entry.is_class == ICKind::ARRAY_LENGTH || entry.is_class == ICKind::STR_LENGTH) {
                     if let Some(v) = crate::exec::strings::fast_length(obj, &ctx_ref.heap) {
                         return v;
                     }

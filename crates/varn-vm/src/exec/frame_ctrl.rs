@@ -69,7 +69,7 @@ pub(crate) fn resolve_constructor_return(
 /// `catch` that behaves differently depending on which tier the frame came from
 /// is a bug no single-tier test can find, and exception handling is precisely
 /// what a user relies on to reason about their program.
-pub(crate) fn unwind_to_handler(
+pub fn unwind_to_handler(
     ctx: &mut ExecCtx,
     handler: crate::frame::TryHandler,
     thrown: VmValue,

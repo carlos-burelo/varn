@@ -282,6 +282,29 @@ impl PoolEntry {
 
 pub const INVALID_CACHE_SHAPE: u32 = 0;
 
+/// Classification flags for Inline Cache (IC) slot entries (`CacheEntry.is_class`).
+pub struct ICKind;
+impl ICKind {
+    /// Object / Record field access by shape ID
+    pub const SHAPE_PROP: u8 = 1;
+    /// Class instance method on vtable (GetProperty)
+    pub const CLASS_METHOD: u8 = 2;
+    /// Class getter accessor on vtable (GetProperty)
+    pub const CLASS_GETTER: u8 = 3;
+    /// Class setter accessor on vtable (SetProperty)
+    pub const CLASS_SETTER: u8 = 4;
+    /// Object shape transition (SetProperty)
+    pub const SHAPE_TRANSITION: u8 = 5;
+    /// Native function on class / intrinsic vtable (CallMethod)
+    pub const NATIVE_VTABLE_METHOD: u8 = 6;
+    /// VM closure on class / intrinsic vtable (CallMethod)
+    pub const VM_VTABLE_METHOD: u8 = 7;
+    /// Array `.length` property access
+    pub const ARRAY_LENGTH: u8 = 8;
+    /// String `.length` property access
+    pub const STR_LENGTH: u8 = 9;
+}
+
 #[derive(Clone, Copy, Default, Debug, serde::Serialize, serde::Deserialize)]
 #[repr(C)]
 pub struct CacheEntry {
@@ -527,6 +550,20 @@ pub struct FunctionProto {
     #[serde(skip)]
     #[serde(default)]
     pub jit_entry: std::cell::Cell<Option<usize>>,
+
+    /// Which `GlobalStore` this proto's global accesses are already bound to,
+    /// or `0` for none. Set by `varn_vm::globals::resolve_in_proto`, which
+    /// skips a proto whose id already matches the store it is handed.
+    ///
+    /// Not a "resolved yet?" bool: slot indices are only meaningful inside one
+    /// store, and a VM (an isolate worker, say) that inherits a proto resolved
+    /// against a different store must redo the work, not trust it. Recording
+    /// the identity is what makes the fast path safe.
+    ///
+    /// Skipped by serde: it names a store that exists in one process only.
+    #[serde(skip)]
+    #[serde(default)]
+    pub globals_id: std::cell::Cell<u64>,
 
     /// Address of this proto's Cranelift RAW entry — the unboxed
     /// `fn(exec_ctx, args…) -> i64` body, callable clif→clif without going

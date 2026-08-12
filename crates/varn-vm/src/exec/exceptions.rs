@@ -74,7 +74,7 @@ fn extract_error_message(val: VmValue, heap: &Heap) -> String {
     heap.str_repr(val)
 }
 
-pub(crate) fn build_thrown_error(val: VmValue, heap: &Heap, frames: &[CallFrame]) -> RuntimeError {
+pub fn build_thrown_error(val: VmValue, heap: &Heap, frames: &[CallFrame]) -> RuntimeError {
     let msg = extract_error_message(val, heap);
     let frame_infos = collect_frames(frames);
     RuntimeError {

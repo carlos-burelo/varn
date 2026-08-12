@@ -174,8 +174,16 @@ impl ExecCtx {
     fn eval_module_proto(
         &mut self,
         resolved: ModuleId,
-        proto: std::rc::Rc<varn_types::FunctionProto>,
+        mut proto: std::rc::Rc<varn_types::FunctionProto>,
     ) -> VmResult<VmValue> {
+        // Every module reaches the VM through here — `precompiled`, `FileLoader`,
+        // the stdlib bundle — and every VM (main, isolate worker, the
+        // module-freezing scratch VM) has its own `GlobalStore`. Resolving here
+        // is what makes the name-keyed global opcodes unreachable at runtime;
+        // `make_mut` keeps a proto shared with the thread-local stdlib cache or
+        // the `precompiled` map from inheriting another VM's indices.
+        crate::globals::resolve_shared(&mut proto, &mut self.globals);
+
         debug_assert!(
             proto.export_names.windows(2).all(|w| w[0] <= w[1]),
             "FunctionProto export_names must be sorted alphabetically (slot contract violated for {})",
@@ -262,7 +270,7 @@ fn freeze_value(val: VmValue, heap: &crate::heap::HeapInner) -> Option<FrozenExp
 
     match heap.get(val.as_heap_idx()) {
         Some(HeapObj::Str(s)) => Some(FrozenExport::Str(Arc::from(s.as_ref()))),
-        Some(HeapObj::NativeFn(name, f)) => Some(FrozenExport::NativeFn(*f, name)),
+        Some(HeapObj::NativeFn(f, name)) => Some(FrozenExport::NativeFn(*f, name)),
         Some(HeapObj::Class(_)) => None, // Cannot freeze Class safely across VM instances
         Some(HeapObj::VmClosure(_)) => None, // Cannot freeze VmClosure safely across VM instances
         Some(HeapObj::Object(obj_ref)) => {

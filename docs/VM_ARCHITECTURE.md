@@ -15,7 +15,8 @@ Este documento especifica la implementación de la máquina virtual (VM) basada 
 - [4. Estructura de Objetos DST en Una Asignación](#4-estructura-de-objetos-dst-en-una-asignación)
 - [5. Sistema de Inline Cache (IC) Polimórfico](#5-sistema-de-inline-cache-ic-polimórfico)
 - [6. CallFrames, Registros y Upvalues](#6-callframes-registros-y-upvalues)
-- [7. Compilador JIT x86-64 (`varn-jit`)](#7-compilador-jit-x86-64-varn-jit)
+- [7. Resolución de Globals](#7-resolución-de-globals)
+- [8. Compilador JIT x86-64 (`varn-jit`)](#8-compilador-jit-x86-64-varn-jit)
 
 ---
 
@@ -129,7 +130,26 @@ flowchart TD
 
 ---
 
-## 7. Compilador JIT x86-64 (`varn-jit`)
+## 7. Resolución de Globals
+
+El emisor produce accesos a globals **por nombre**: `LoadGlobal` / `StoreGlobal` / `DefineGlobal` llevan el índice del nombre en el pool de constantes. Ninguno de los tres llega a ejecutarse.
+
+`varn_vm::globals::resolve_in_proto` los reescribe a `LoadGlobalIdx` / `StoreGlobalIdx` / `DefineGlobalIdx`, que llevan el índice del slot: una lectura o escritura indexada, inline, en intérprete y en JIT. El pase es recursivo sobre los protos anidados del pool e idempotente.
+
+Dos puntos de entrada lo cubren todo:
+
+| Punto | Cubre |
+|---|---|
+| `ExecCtx::eval_module_proto` | Todo módulo, en todo VM — `precompiled`, `FileLoader`, bundle de la std, hilo principal o worker de isolate |
+| `Vm::resolve_globals` | El proto de entrada, el único que no pasa por el anterior. Lo llama el pipeline en setup, **no** `Vm::run` (el harness de bench cronometra `run`) |
+
+Los índices pertenecen a **un** `GlobalStore`, y cada `Vm` tiene el suyo — un isolate define `isIsolate` antes de cargar nada, así que el mismo nombre cae en índices distintos según el VM. Por eso un proto compartido (la caché thread-local de la std, el mapa `precompiled`) nunca se resuelve in-place: ambos sitios pasan por `Rc::make_mut`, que clona exactamente cuando el proto está compartido.
+
+**Esta invariante es carga estructural, no una optimización.** `clif` baja únicamente las formas `*Idx`; las formas por nombre no tienen lowering. Si el pase deja de cubrir un camino, esas funciones caen al intérprete en silencio. Las vistas de `vn debug` que compilan sin ejecutar (`-p tiers`, `-p bails`, `-p roots`, `-p clif`) resuelven una copia primero (`varn_debug::resolved_copy`) para no reportar bails que en producción no ocurren.
+
+---
+
+## 8. Compilador JIT x86-64 (`varn-jit`)
 
 `varn-jit` utiliza la infraestructura de Cranelift para traducir funciones a código ejecutable x86-64 nativo:
 - **Compilación Eager**: Se compila en el momento en que se instancia el closure.
