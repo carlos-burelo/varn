@@ -3,7 +3,6 @@ use tower_lsp::lsp_types::{Location, Position, Range, SymbolInformation, Url};
 use crate::index::ProjectIndex;
 use crate::util::converters::to_lsp_symbol_kind;
 
-#[allow(deprecated)]
 pub fn build_workspace_symbols(index: &ProjectIndex, query: &str) -> Vec<SymbolInformation> {
     let q = query.to_lowercase();
 
@@ -19,7 +18,10 @@ pub fn build_workspace_symbols(index: &ProjectIndex, query: &str) -> Vec<SymbolI
                 line: entry.line,
                 character: entry.col,
             };
-            results.push(SymbolInformation {
+            // `SymbolInformation` implements no `Default`, so the deprecated
+            // field has to be named to build one. Scoped to this literal.
+            #[allow(deprecated)]
+            let symbol = SymbolInformation {
                 name: name.clone(),
                 kind: to_lsp_symbol_kind(entry.kind),
                 tags: None,
@@ -32,7 +34,8 @@ pub fn build_workspace_symbols(index: &ProjectIndex, query: &str) -> Vec<SymbolI
                     },
                 ),
                 container_name: None,
-            });
+            };
+            results.push(symbol);
         }
     }
 

@@ -20,7 +20,6 @@ fn is_container(kind: SymbolKind) -> bool {
     is_container_symbol_kind(kind)
 }
 
-#[allow(deprecated)]
 fn nest_symbols(sorted: &[&SymbolRecord]) -> Vec<DocumentSymbol> {
     let mut container_stack: Vec<u32> = Vec::new();
     let mut roots: Vec<DocumentSymbol> = Vec::new();
@@ -54,7 +53,6 @@ fn nest_symbols(sorted: &[&SymbolRecord]) -> Vec<DocumentSymbol> {
     roots
 }
 
-#[allow(deprecated)]
 fn insert_at_depth(nodes: &mut Vec<DocumentSymbol>, depth: usize, sym: DocumentSymbol) {
     if depth == 0 {
         nodes.push(sym);
@@ -67,7 +65,6 @@ fn insert_at_depth(nodes: &mut Vec<DocumentSymbol>, depth: usize, sym: DocumentS
         nodes.push(sym);
     }
 }
-#[allow(deprecated)]
 fn member_to_doc(m: &crate::document::MemberRecord) -> DocumentSymbol {
     let name_end = m.col + m.name.len() as u32;
     let kind = member_to_symbol_kind(m.kind);
@@ -87,7 +84,13 @@ fn member_to_doc(m: &crate::document::MemberRecord) -> DocumentSymbol {
         Some(m.members.iter().map(member_to_doc).collect())
     };
 
-    DocumentSymbol {
+    // The spec replaced `deprecated` with `tags`, and we do use `tags` — but
+    // `lsp_types` implements no `Default` for `DocumentSymbol`, so the struct
+    // cannot be built without naming every field, deprecated ones included.
+    // The allow is scoped to this literal, not the function, so it cannot
+    // silently cover a second deprecation later.
+    #[allow(deprecated)]
+    let symbol = DocumentSymbol {
         name: m.name.clone(),
         detail,
         kind: to_lsp_symbol_kind(kind),
@@ -96,10 +99,10 @@ fn member_to_doc(m: &crate::document::MemberRecord) -> DocumentSymbol {
         range: full_range,
         selection_range: select_range,
         children,
-    }
+    };
+    symbol
 }
 
-#[allow(deprecated)]
 fn sym_to_doc(sym: &SymbolRecord) -> DocumentSymbol {
     let name_end = sym.col + sym.name.len() as u32;
 
@@ -132,7 +135,9 @@ fn sym_to_doc(sym: &SymbolRecord) -> DocumentSymbol {
         Some(sym.members.iter().map(member_to_doc).collect())
     };
 
-    DocumentSymbol {
+    // See `member_to_doc` for why the deprecated field is still named here.
+    #[allow(deprecated)]
+    let symbol = DocumentSymbol {
         name: sym.name.clone(),
         detail,
         kind: to_lsp_symbol_kind(sym.kind),
@@ -141,5 +146,6 @@ fn sym_to_doc(sym: &SymbolRecord) -> DocumentSymbol {
         range: full_range,
         selection_range: select_range,
         children,
-    }
+    };
+    symbol
 }
