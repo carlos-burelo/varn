@@ -342,26 +342,15 @@ impl NativeCtx for ExecCtx {
         Ok(())
     }
 
+    /// Timers block the calling thread.
+    ///
+    /// There is no event loop to hand them to: tasks run on a synchronous
+    /// trampoline inside the VM (docs/RUNTIME_ARCHITECTURE.md §1), so either
+    /// this sleeps or nothing ever resolves the handle.
     fn suspend_timer(&mut self, ms: u64) -> VmValue {
         let output = varn_types::AsyncTask::pending();
-        let output_clone = output.clone();
-
-        let spawned = if tokio::runtime::Handle::try_current().is_ok() {
-            std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
-                tokio::task::spawn_local(async move {
-                    tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
-                    output_clone.resolve(varn_types::Value::Null);
-                });
-            }))
-            .is_ok()
-        } else {
-            false
-        };
-
-        if !spawned {
-            std::thread::sleep(std::time::Duration::from_millis(ms));
-            output.resolve(varn_types::Value::Null);
-        }
+        std::thread::sleep(std::time::Duration::from_millis(ms));
+        output.resolve(varn_types::Value::Null);
         self.heap.intern(varn_types::Value::TaskHandle(output))
     }
 

@@ -12,7 +12,6 @@ varn-types    = { path = "../varn-types" }
 varn-core     = { path = "../varn-core" }
 varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
 varn-runtime  = { path = "../varn-runtime" }
-tokio         = { workspace = true }
 varn-modules  = { path = "../varn-modules" }
 rust_decimal  = { workspace = true }
 rustc-hash    = { workspace = true }

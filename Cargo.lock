@@ -2235,7 +2235,6 @@ dependencies = [
  "ryu",
  "serde",
  "serde_json",
- "tokio",
  "varn-builtins",
  "varn-core",
  "varn-jit",
