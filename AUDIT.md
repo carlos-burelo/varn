@@ -206,7 +206,7 @@ Arreglo: un segundo `OnceLock<FxHashMap<u64, &'static NativeOpEntry>>` y `all_na
 | §5.2 `panic = "abort"` + `catch_unwind` | hecho, rama eliminada | `acafc79` |
 | §5.1 `codegen-units` | refutado por medición, nota corregida | `c653bd5` |
 | §4a Parseo de contratos en `varn-op-macros` | **no se implementa** — ver abajo | — |
-| §4c Tres drivers del frontend | pendiente | — |
+| §4c Tres drivers del frontend | hecho hasta donde es correcto — ver abajo | `4225cdf` |
 | §8 Archivos >1000 líneas | pendiente | — |
 
 Cada fase se validó con `cargo check --workspace --all-targets` sin avisos y 991/991 en las cuatro combinaciones de procedencia de std × JIT.
@@ -227,7 +227,19 @@ Wall total 110,3 s, 300 s-CPU. La ruta crítica termina en `varn-lsp` (acaba exa
 
 Conclusión: reescribir `varn_contract!` para consumir un AST preparseado desde `OUT_DIR` no reduciría el tiempo de build de forma medible, y costaría un IR serializado nuevo más la reescritura de un macro de 910 líneas. La arista sigue siendo fea en el diagrama de dependencias, pero pagar esa complejidad exige una razón que la medición no da. Si el objetivo real es el tiempo de build, el objeto de estudio es el codegen de `varn-cli`, no el parser.
 
+### §4c: de 6 sitios duplicados a 4 drivers con propósito distinto
+
+La duplicación real eran los sitios que repetían `scan` + `parse` (+ `assign_ast_ids`, + volcado de diagnósticos del lexer) copiados a mano:
+
+- `varn-checker/module_resolver.rs`: 4 copias → `parse_and_cache` + `bind_and_cache`. Efecto secundario: el bind se memoiza *antes* de recolectar exports, así que un import circular que vuelve al mismo módulo encuentra el bind en lugar de reparsear.
+- `varn-pipeline`: 3 copias silenciosas (bundling de la std, precompilación de módulos, validación de imports) → `quiet_parse::{parse_module, parse_only}`.
+
+Lo que **no** se unifica, con razón:
+
+- `varn-pipeline/src/lex.rs` + `parse.rs` son las fases de usuario: renderizan diagnósticos, respetan `--verbose` y alimentan `-p tokens`. Meter por ahí el bundling de la std ensuciaría la salida.
+- `varn-lsp/src/pipeline/` es un driver distinto, no una copia: usa `parse_partial` para tolerar código a medio escribir y produce `DocumentAnalysis` (símbolos, índice posicional, tipos por offset) que ninguna fase del pipeline necesita. Unificarlo metería preocupaciones de editor en el orquestador, justo lo contrario de lo que arregló `5465313`.
+- `varn-op-macros` parsea contratos en expansión (§4a) y `varn-cli/src/debug_binder.rs` es una herramienta de dev.
+
 ## Trabajo pendiente
 
-1. **Unificar los tres drivers del frontend** (§4c) — `varn-checker/module_resolver.rs` re-corre lex+parse en 10 sitios y `varn-lsp` mantiene su propio `pipeline/`. Es el punto de mayor deuda estructural que queda.
-2. **Dividir los 6 archivos sobre 1000 líneas y el subárbol `varn-vm/src/exec/`** (§8).
+1. **Dividir los 6 archivos sobre 1000 líneas y el subárbol `varn-vm/src/exec/`** (§8).

@@ -7,7 +7,7 @@ use std::fs::read_to_string;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 use std::rc::Rc;
-use varn_core::ast::{Decl, ExportDecl, ExportDefaultDecl, Pattern, Stmt, StmtKind};
+use varn_core::ast::{Decl, ExportDecl, ExportDefaultDecl, Pattern, Program, Stmt, StmtKind};
 use varn_core::ModuleId;
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -322,6 +322,44 @@ pub fn resolve_stdlib_module_bind_ref(specifier: &str) -> Option<Rc<BindResult>>
     cache_get_or_insert_ref(&path.to_string_lossy())
 }
 
+/// Lex + parse one module source and memoize the `Program` under `key`.
+///
+/// `None` means the parse failed; what an unparseable dependency means is the
+/// caller's decision (an empty export map, or giving up on the bind). The lexer
+/// diagnostics come back rather than being folded in here: only the callers that
+/// build a `BindResult` have somewhere to put them.
+fn parse_and_cache(source: &str, key: &str) -> Option<(Rc<Program>, Vec<varn_core::Diagnostic>)> {
+    let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(source, key);
+    let program = Rc::new(varn_parser::parse(tokens, lexeme_buf, key).ok()?);
+    PROGRAM_CACHE.with(|c| {
+        let mut guard = c.borrow_mut();
+        let cache = guard.get_or_insert_with(FxHashMap::default);
+        cache
+            .entry(key.to_owned())
+            .or_insert_with(|| Rc::clone(&program));
+    });
+    Some((program, lex_errs))
+}
+
+/// Bind `program`, fold `lex_errs` into its diagnostics, and memoize the result
+/// under `key`.
+///
+/// The insert happens before the caller collects exports, so a circular import
+/// that comes back around finds this bind instead of parsing the module again.
+fn bind_and_cache(
+    program: &Program,
+    lex_errs: Vec<varn_core::Diagnostic>,
+    key: &str,
+) -> Rc<BindResult> {
+    let mut bind = Binder::bind(program);
+    for e in lex_errs {
+        bind.diagnostics.emit(e);
+    }
+    let bind = Rc::new(bind);
+    bind_cache_insert(key.to_owned(), Rc::clone(&bind));
+    bind
+}
+
 fn resolve_from_embedded_source(
     virtual_id: &str,
     source: &str,
@@ -341,28 +379,14 @@ fn resolve_from_embedded_source(
         return exports_rc;
     }
 
-    let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(source, virtual_id);
-    let program = match varn_parser::parse(tokens, lexeme_buf, virtual_id) {
-        Ok(p) => {
-            drop(lex_errs);
-            Rc::new(p)
-        }
-        Err(_) => {
-            visiting.pop();
-            return Rc::new(FxHashMap::default());
-        }
+    // Lex diagnostics are dropped here: this path produces an export map, not
+    // diagnostics -- the module gets checked on its own account elsewhere.
+    let Some((program, _lex_errs)) = parse_and_cache(source, virtual_id) else {
+        visiting.pop();
+        return Rc::new(FxHashMap::default());
     };
 
-    PROGRAM_CACHE.with(|c| {
-        let mut guard = c.borrow_mut();
-        let cache = guard.get_or_insert_with(FxHashMap::default);
-        cache
-            .entry(virtual_id.to_owned())
-            .or_insert_with(|| Rc::clone(&program));
-    });
-
-    let bind = Rc::new(Binder::bind(&program));
-    bind_cache_insert(virtual_id.to_owned(), Rc::clone(&bind));
+    let bind = bind_and_cache(&program, Vec::new(), virtual_id);
 
     let base_dir = Path::new(".");
     let mut exports = ExportMap::default();
@@ -394,22 +418,8 @@ fn bind_from_embedded_source(virtual_id: &str, source: &str) -> Option<Rc<BindRe
         export_cache_insert(id.as_str().to_owned(), exports_rc);
         return Some(bind_rc);
     }
-    let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(source, virtual_id);
-    let program = Rc::new(varn_parser::parse(tokens, lexeme_buf, virtual_id).ok()?);
-    PROGRAM_CACHE.with(|c| {
-        let mut guard = c.borrow_mut();
-        let cache = guard.get_or_insert_with(FxHashMap::default);
-        cache
-            .entry(virtual_id.to_owned())
-            .or_insert_with(|| Rc::clone(&program));
-    });
-    let mut bind = Binder::bind(&*program);
-    for e in lex_errs {
-        bind.diagnostics.emit(e);
-    }
-    let result = Rc::new(bind);
-    bind_cache_insert(virtual_id.to_owned(), Rc::clone(&result));
-    Some(result)
+    let (program, lex_errs) = parse_and_cache(source, virtual_id)?;
+    Some(bind_and_cache(&program, lex_errs, virtual_id))
 }
 
 pub fn resolve_module_bind_ref(abs_path: &str) -> Option<Rc<BindResult>> {
@@ -520,20 +530,8 @@ fn cache_get_or_insert_ref(abs_path: &str) -> Option<Rc<BindResult>> {
         export_cache_insert(canonical_abs, exports_rc);
         return Some(bind_rc);
     }
-    let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(&source, &canonical_abs);
-    let program = Rc::new(varn_parser::parse(tokens, lexeme_buf, &canonical_abs).ok()?);
-    PROGRAM_CACHE.with(|c| {
-        let mut guard = c.borrow_mut();
-        let cache = guard.get_or_insert_with(FxHashMap::default);
-        cache
-            .entry(canonical_abs.clone())
-            .or_insert_with(|| Rc::clone(&program));
-    });
-    let mut bind = Binder::bind(&*program);
-    for e in lex_errs {
-        bind.diagnostics.emit(e);
-    }
-    let result = Rc::new(bind);
+    let (program, lex_errs) = parse_and_cache(&source, &canonical_abs)?;
+    let result = bind_and_cache(&program, lex_errs, &canonical_abs);
 
     let base_dir = Path::new(&canonical_abs).parent().unwrap_or(Path::new("."));
     let mut exports = ExportMap::default();
@@ -549,7 +547,6 @@ fn cache_get_or_insert_ref(abs_path: &str) -> Option<Rc<BindResult>> {
     assign_slots(&mut exports);
     save_to_cache(&canonical_abs, &source, &exports, &result);
 
-    bind_cache_insert(canonical_abs, Rc::clone(&result));
     Some(result)
 }
 
@@ -584,28 +581,13 @@ fn resolve_inner(abs_path: &str, visiting: &mut Vec<String>) -> ExportMap {
         Err(_) => return FxHashMap::default(),
     };
 
-    let (tokens, lexeme_buf, lex_errs) = varn_lexer::scan(&source, abs_path);
-    let program = match varn_parser::parse(tokens, lexeme_buf, abs_path) {
-        Ok(p) => {
-            for _e in lex_errs {}
-            Rc::new(p)
-        }
-        Err(_) => return FxHashMap::default(),
+    // Same as above: an export map carries no diagnostics.
+    let Some((program, _lex_errs)) = parse_and_cache(&source, abs_path) else {
+        return FxHashMap::default();
     };
 
-    PROGRAM_CACHE.with(|c| {
-        let mut guard = c.borrow_mut();
-        let cache = guard.get_or_insert_with(FxHashMap::default);
-        cache.insert(abs_path.to_owned(), Rc::clone(&program));
-    });
-
-    let bind = if let Some(cached) = bind_cache_get(abs_path) {
-        cached
-    } else {
-        let computed = Rc::new(Binder::bind(&program));
-        bind_cache_insert(abs_path.to_owned(), Rc::clone(&computed));
-        computed
-    };
+    let bind = bind_cache_get(abs_path)
+        .unwrap_or_else(|| bind_and_cache(&program, Vec::new(), abs_path));
 
     let mut exports = ExportMap::default();
     let base_dir = Path::new(abs_path).parent().unwrap_or(Path::new("."));

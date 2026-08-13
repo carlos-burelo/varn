@@ -11,6 +11,7 @@ mod lockfile;
 pub mod module_precompile;
 mod opts;
 mod parse;
+mod quiet_parse;
 pub mod stdlib_loader;
 pub mod wrc;
 

@@ -195,10 +195,7 @@ fn compile_source_inner(
     path: &str,
     reject_type_errors: bool,
 ) -> Result<FunctionProto, String> {
-    let (tokens, lexeme_buf, _) = varn_lexer::scan(source, path);
-    let mut program =
-        varn_parser::parse(tokens, lexeme_buf, path).map_err(|errs| errs[0].message.clone())?;
-    varn_core::assign_ast_ids(&mut program);
+    let program = crate::quiet_parse::parse_module(source, path, "")?;
     let check = varn_checker::Checker::check(&program);
     if reject_type_errors && check.diagnostics.has_errors() {
         // The stdlib goes through the same checker as user code. Silently
@@ -242,9 +239,7 @@ fn compile_source_inner(
 /// same import collector the pipeline uses for cache invalidation. Avoids the
 /// false positives/negatives of matching import syntax inside string literals.
 fn validate_imports(id: &str, source: &str) -> Result<(), String> {
-    let (tokens, lexeme_buf, _) = varn_lexer::scan(source, id);
-    let program =
-        varn_parser::parse(tokens, lexeme_buf, id).map_err(|errs| errs[0].message.clone())?;
+    let program = crate::quiet_parse::parse_only(source, id, "")?;
     for spec in crate::import_collector::collect_imports(&program) {
         if !(spec.starts_with("runtime:") || spec.starts_with("std:") || spec == "core:intrinsics")
         {
