@@ -78,27 +78,6 @@ pub fn member_to_completion_kind(kind: MemberKind) -> CompletionItemKind {
     }
 }
 
-pub fn symbol_kind_label(kind: SymbolKind) -> &'static str {
-    match kind {
-        SymbolKind::Var => "var",
-        SymbolKind::Let => "let",
-        SymbolKind::Const => "const",
-        SymbolKind::Function => "function",
-        SymbolKind::Class => "class",
-        SymbolKind::Interface => "interface",
-        SymbolKind::TypeAlias => "type",
-        SymbolKind::Enum => "enum",
-        SymbolKind::Parameter => "param",
-        SymbolKind::Property => "prop",
-        SymbolKind::Method => "method",
-        SymbolKind::TypeParameter => "type parameter",
-        SymbolKind::Namespace => "namespace",
-        SymbolKind::Struct => "struct",
-        SymbolKind::Extension => "extension",
-        SymbolKind::EnumMember => "enum member",
-    }
-}
-
 pub fn member_kind_label(kind: MemberKind) -> &'static str {
     match kind {
         MemberKind::Class => "class",

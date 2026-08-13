@@ -63,10 +63,6 @@ impl TypeAnnotations {
         self.inner.entry(offset).or_default().type_only = true;
     }
 
-    pub fn contains_type_only(&self, offset: u32) -> bool {
-        self.inner.get(&offset).map_or(false, |a| a.type_only)
-    }
-
     pub fn record_call_mapping(&mut self, call_id: u32, mapping: Vec<Option<usize>>) {
         self.inner.entry(call_id).or_default().call_mapping = Some(mapping);
     }

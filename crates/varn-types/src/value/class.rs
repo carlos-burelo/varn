@@ -153,10 +153,6 @@ impl ClassObj {
         self.vtable_version.fetch_add(1, Ordering::Relaxed);
     }
 
-    pub fn add_setter(&self, name: impl Into<Rc<str>>, value: Value) {
-        self.add_setter_with_owner(name, value, None);
-    }
-
     pub fn add_setter_with_owner(
         &self,
         name: impl Into<Rc<str>>,

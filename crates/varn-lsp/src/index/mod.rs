@@ -1,5 +1,4 @@
 pub mod builder;
-pub mod query;
 use crate::document::DocumentState;
 use std::collections::{HashMap, HashSet};
 use varn_checker::SymbolKind;
@@ -60,16 +59,8 @@ impl ProjectIndex {
         self.module_cache.retain(|_, v| v != uri);
     }
 
-    pub fn exports_for(&self, uri: &str) -> &[ExportEntry] {
-        self.module_exports.get(uri).map_or(&[], Vec::as_slice)
-    }
-
     pub fn definitions_of(&self, name: &str) -> &[(String, ExportEntry)] {
         self.name_index.get(name).map_or(&[], Vec::as_slice)
-    }
-
-    pub fn definitions_of_key(&self, key: &str) -> &[(String, ExportEntry)] {
-        self.key_index.get(key).map_or(&[], Vec::as_slice)
     }
 
     pub fn dependents_of(&self, uri: &str) -> impl Iterator<Item = &str> {

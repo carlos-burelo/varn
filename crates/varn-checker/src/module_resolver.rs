@@ -322,10 +322,6 @@ pub fn resolve_stdlib_module_bind_ref(specifier: &str) -> Option<Rc<BindResult>>
     cache_get_or_insert_ref(&path.to_string_lossy())
 }
 
-pub fn resolve_stdlib_module_bind(specifier: &str) -> Option<BindResult> {
-    resolve_stdlib_module_bind_ref(specifier).map(|bind| (*bind).clone())
-}
-
 fn resolve_from_embedded_source(
     virtual_id: &str,
     source: &str,
@@ -422,10 +418,6 @@ pub fn resolve_module_bind_ref(abs_path: &str) -> Option<Rc<BindResult>> {
 
 pub fn resolve_module_bind(abs_path: &str) -> Option<BindResult> {
     resolve_module_bind_ref(abs_path).map(|bind| (*bind).clone())
-}
-
-pub fn find_module_bind_for_type(type_name: &str, origin_modules: &[String]) -> Option<BindResult> {
-    find_module_bind_for_type_ref(type_name, origin_modules).map(|bind| (*bind).clone())
 }
 
 pub fn find_module_bind_for_type_ref(

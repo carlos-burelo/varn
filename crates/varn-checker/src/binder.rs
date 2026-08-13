@@ -127,10 +127,6 @@ impl Binder {
         Self::bind_with_globals_iter(program, FxHashMap::default())
     }
 
-    pub fn bind_with_globals(program: &Program, globals: FxHashMap<Rc<str>, Symbol>) -> BindResult {
-        Self::bind_with_globals_iter(program, globals)
-    }
-
     pub fn bind_with_global_refs(
         program: &Program,
         globals: &FxHashMap<Rc<str>, Symbol>,

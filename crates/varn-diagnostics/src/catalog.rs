@@ -171,10 +171,6 @@ impl ErrorCode {
         }
     }
 
-    pub fn doc_url(self) -> String {
-        const DOCS_BASE_URL: &str = "https://varn-lang.dev/errors";
-        format!("{}/{}", DOCS_BASE_URL, self.name())
-    }
 }
 
 impl std::fmt::Display for ErrorCode {

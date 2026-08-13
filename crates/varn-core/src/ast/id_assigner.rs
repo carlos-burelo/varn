@@ -843,8 +843,3 @@ pub fn assign_ast_ids(program: &mut Program) {
     program.metadata = metadata;
 }
 
-pub fn count_ast_nodes(_program: &Program) -> usize {
-    struct Counter(usize);
-
-    Counter(0).0
-}

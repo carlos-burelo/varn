@@ -1,7 +1,3 @@
-pub fn uri_to_path_str(uri: &str) -> String {
-    varn_modules::resolver::uri_to_path(uri)
-}
-
 pub fn path_to_uri(path: &str) -> String {
     varn_modules::resolver::path_to_uri(path)
 }

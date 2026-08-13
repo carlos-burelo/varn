@@ -32,9 +32,6 @@ impl<T> Cached<T> {
         }
     }
 
-    pub fn is_valid_for(&self, source: &str) -> bool {
-        self.input_hash == hash_str(source)
-    }
 }
 
 fn hash_str(s: &str) -> u64 {

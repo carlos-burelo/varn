@@ -7,7 +7,6 @@ pub mod std_root;
 pub mod uri;
 
 use semver::{Version, VersionReq};
-use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 pub const CORE_GLOBAL: &str = "core:global";
@@ -84,10 +83,6 @@ pub fn std_module_ids() -> Vec<&'static str> {
     module_ids_of_kind(ModuleKind::Stdlib)
 }
 
-pub fn runtime_module_ids() -> Vec<&'static str> {
-    module_ids_of_kind(ModuleKind::Runtime)
-}
-
 pub fn is_known_stdlib_module(specifier: &str) -> bool {
     provider::get()
         .and_then(|p| p.spec_for(specifier))
@@ -95,19 +90,6 @@ pub fn is_known_stdlib_module(specifier: &str) -> bool {
 }
 
 pub use spec::{ModuleKind, ModuleSpec};
-
-pub fn is_package_module_path(path: &str) -> bool {
-    let as_path = Path::new(path);
-    let mut prev = None;
-    for component in as_path.components() {
-        let current = component.as_os_str();
-        if prev == Some(OsStr::new(ENV_DIR_NAME)) && current == OsStr::new(MODULES_DIR_NAME) {
-            return true;
-        }
-        prev = Some(current);
-    }
-    false
-}
 
 pub fn is_pkg_specifier(specifier: &str) -> bool {
     specifier.starts_with(PKG_PREFIX)

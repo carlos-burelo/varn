@@ -54,8 +54,3 @@ impl JitTimers {
 }
 
 
-pub fn fmt_duration_csv(d: Duration) -> String {
-    
-    let micros = d.as_nanos() as f64 / 1_000.0;
-    format!("{:.3}", micros)
-}

@@ -39,19 +39,11 @@ impl Type {
         &self.0
     }
 
-    pub fn is_tainted(&self) -> bool {
-        self.1
-    }
-
     pub fn tainted(mut self) -> Self {
         self.1 = true;
         self
     }
 
-    pub fn untainted(mut self) -> Self {
-        self.1 = false;
-        self
-    }
 }
 
 impl Default for Type {

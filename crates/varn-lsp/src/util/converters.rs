@@ -1,15 +1,4 @@
-use tower_lsp::lsp_types::{DiagnosticSeverity, Position, Range};
-use varn_core::DiagnosticKind;
-
-#[inline]
-pub fn ast_line_to_lsp(ast_line: u32) -> u32 {
-    ast_line.saturating_sub(1)
-}
-
-#[inline]
-pub fn lsp_line_to_ast(lsp_line: u32) -> u32 {
-    lsp_line + 1
-}
+use tower_lsp::lsp_types::{Position, Range};
 
 #[inline]
 pub fn pos(line: u32, col: u32) -> Position {
@@ -45,10 +34,3 @@ pub fn to_completion_kind(kind: SymbolKind) -> CompletionItemKind {
     crate::util::kinds::to_completion_kind(kind)
 }
 
-pub fn diagnostic_severity(kind: DiagnosticKind) -> DiagnosticSeverity {
-    match kind {
-        DiagnosticKind::Error => DiagnosticSeverity::ERROR,
-        DiagnosticKind::Warning => DiagnosticSeverity::WARNING,
-        DiagnosticKind::Hint => DiagnosticSeverity::HINT,
-    }
-}

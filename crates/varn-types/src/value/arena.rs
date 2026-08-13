@@ -19,19 +19,6 @@ impl RequestArena {
     }
 
     #[inline]
-    pub fn alloc_bytes(&mut self, size: usize, align: usize) -> Option<*mut u8> {
-        let align_mask = align - 1;
-        let aligned_offset = (self.offset + align_mask) & !align_mask;
-        if aligned_offset + size <= self.buf.len() {
-            let ptr = unsafe { self.buf.as_mut_ptr().add(aligned_offset) };
-            self.offset = aligned_offset + size;
-            Some(ptr)
-        } else {
-            None
-        }
-    }
-
-    #[inline]
     pub fn reset(&mut self) {
         self.offset = 0;
     }

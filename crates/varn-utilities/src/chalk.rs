@@ -46,14 +46,8 @@ impl Chalk {
     pub fn dim(self) -> Self {
         self.push("\x1b[2m")
     }
-    pub fn italic(self) -> Self {
-        self.push("\x1b[3m")
-    }
     pub fn underline(self) -> Self {
         self.push("\x1b[4m")
-    }
-    pub fn strike(self) -> Self {
-        self.push("\x1b[9m")
     }
 }
 

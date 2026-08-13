@@ -132,26 +132,3 @@ varn_contract! {
     }
 }
 
-pub fn range_op(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
-    let get_int = |i: usize| -> i64 {
-        args.get(i)
-            .and_then(|&v| {
-                if let Value::Int(n) = ctx.extract(v) {
-                    Some(n)
-                } else {
-                    None
-                }
-            })
-            .unwrap_or(if i == 2 { 1 } else { 0 })
-    };
-    let start = get_int(0);
-    let end = get_int(1);
-    let step = get_int(2).max(1);
-    let mut i = start;
-    let mut vals = Vec::new();
-    while i < end {
-        vals.push(ctx.intern(Value::Int(i)));
-        i += step;
-    }
-    Ok(ctx.alloc_array(vals))
-}

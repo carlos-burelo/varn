@@ -27,14 +27,6 @@ impl Type {
         }
     }
 
-    pub fn get_property_type(&self, _name: &str) -> Type {
-        Type::Dynamic
-    }
-
-    pub fn get_variant(&self, _name: &str) -> Option<Type> {
-        None
-    }
-
     pub fn fn_(f: FunctionType) -> Self {
         Type(TypeKind::Fn(f), false)
     }

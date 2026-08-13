@@ -43,10 +43,6 @@ impl GenChannel {
         self.done.load(Ordering::SeqCst)
     }
 
-    pub fn mark_done(&self) {
-        self.done.store(true, Ordering::SeqCst);
-        self.cancel_signal.resolve(Value::Null);
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -111,18 +107,6 @@ impl AsyncQueue {
         }
     }
 
-    pub fn next_value(&self) -> Value {
-        let mut inner = self.0.borrow_mut();
-        if let Some(chunk) = inner.queue.pop_front() {
-            return Value::TaskHandle(AsyncTask::resolved(make_iter_result(chunk, false)));
-        }
-        if inner.done {
-            return Value::TaskHandle(AsyncTask::resolved(make_iter_result(Value::Null, true)));
-        }
-        let fut = AsyncTask::pending();
-        inner.waiter = Some(fut.clone());
-        Value::TaskHandle(fut)
-    }
 }
 
 fn make_iter_result(value: Value, done: bool) -> Value {

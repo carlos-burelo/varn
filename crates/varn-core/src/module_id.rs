@@ -44,10 +44,6 @@ impl ModuleId {
         Self::Core(Arc::from(spec))
     }
 
-    pub fn std_module(spec: &str) -> Self {
-        Self::Std(Arc::from(spec))
-    }
-
     pub fn stdlib(spec: &str) -> Self {
         if spec.starts_with("core:") {
             Self::Core(Arc::from(spec))
@@ -126,10 +122,6 @@ impl ModuleId {
         matches!(self, Self::Core(_) | Self::Std(_))
     }
 
-    pub fn is_runtime(&self) -> bool {
-        matches!(self, Self::Runtime(_))
-    }
-
     pub fn is_local(&self) -> bool {
         matches!(self, Self::Local(_))
     }
@@ -181,7 +173,4 @@ impl ImportSpecifier {
         }
     }
 
-    pub fn is_managed(&self) -> bool {
-        matches!(self, Self::Stdlib(_) | Self::Core(_))
-    }
 }

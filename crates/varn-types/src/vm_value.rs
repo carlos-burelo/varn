@@ -85,11 +85,6 @@ impl VmValue {
     }
 
     #[inline(always)]
-    pub fn from_symbol_idx(idx: u32) -> Self {
-        Self(QNAN | TAG_SYMBOL | idx as u64)
-    }
-
-    #[inline(always)]
     pub fn is_f64(self) -> bool {
         (self.0 & QNAN) != QNAN
     }
@@ -113,11 +108,6 @@ impl VmValue {
     #[inline(always)]
     pub fn is_heap(self) -> bool {
         (self.0 & (SIGN | QNAN | MASK_TAG)) == (SIGN | QNAN | TAG_PTR)
-    }
-
-    #[inline(always)]
-    pub fn is_symbol(self) -> bool {
-        (self.0 & (QNAN | MASK_TAG)) == (QNAN | TAG_SYMBOL)
     }
 
     #[inline(always)]
@@ -189,11 +179,6 @@ impl VmValue {
 
     #[inline(always)]
     pub fn as_heap_idx(self) -> u32 {
-        (self.0 & MASK_LOW32) as u32
-    }
-
-    #[inline(always)]
-    pub fn as_symbol_idx(self) -> u32 {
         (self.0 & MASK_LOW32) as u32
     }
 
@@ -647,28 +632,6 @@ impl VmArray {
             ArrayRepr::F64(v) => v.pop().map(VmValue::from_f64),
         }
     }
-    /// Execute a closure `f` for each element as a `VmValue` without intermediate allocation.
-    #[inline]
-    pub fn for_each_vm<F: FnMut(VmValue)>(&self, mut f: F) {
-        match self.repr() {
-            ArrayRepr::Boxed(v) => {
-                for &val in v {
-                    f(val);
-                }
-            }
-            ArrayRepr::I64(v) => {
-                for &n in v {
-                    f(VmValue::from_int(n));
-                }
-            }
-            ArrayRepr::F64(v) => {
-                for &fl in v {
-                    f(VmValue::from_f64(fl));
-                }
-            }
-        }
-    }
-
     /// Box every element of a typed repr and swap the repr to `Boxed` through
     /// the *same* cell (identity preserved; all aliases observe the change).
     /// Returns a mutable view of the resulting `Boxed` vec. No-op if already
@@ -717,18 +680,6 @@ impl VmArray {
         }
     }
 
-    /// Append raw `i64`; `false` on a non-`I64` repr.
-    #[inline]
-    pub fn push_i64(&self, val: i64) -> bool {
-        match self.repr_mut() {
-            ArrayRepr::I64(v) => {
-                v.push(val);
-                true
-            }
-            _ => false,
-        }
-    }
-
     /// Element `idx` as a raw `f64`, or `None` for a non-`F64` repr / OOB.
     #[inline]
     pub fn get_f64(&self, idx: usize) -> Option<f64> {
@@ -750,17 +701,6 @@ impl VmArray {
         }
     }
 
-    /// Append raw `f64`; `false` on a non-`F64` repr.
-    #[inline]
-    pub fn push_f64(&self, val: f64) -> bool {
-        match self.repr_mut() {
-            ArrayRepr::F64(v) => {
-                v.push(val);
-                true
-            }
-            _ => false,
-        }
-    }
 }
 
 /// Cold panic for a Boxed-only projection reached with a typed repr. Kept out

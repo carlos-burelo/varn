@@ -182,15 +182,6 @@ pub fn native_op_fn(id: u64) -> Option<varn_types::NativeFn> {
     table.get(&id).map(|e| e.func)
 }
 
-pub fn native_fast_op_fn(id: u64) -> Option<(*const u8, varn_types::SignatureDescriptor)> {
-    let entry = find_native_op_entry(id)?;
-    if !entry.raw_func_ptr.is_null() {
-        Some((entry.raw_func_ptr, entry.signature))
-    } else {
-        None
-    }
-}
-
 pub fn dispatch_runtime_op(
     id: u64,
     ctx: &mut dyn NativeCtx,

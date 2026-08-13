@@ -128,10 +128,6 @@ pub fn is_known_module(specifier: &str) -> bool {
 
 pub const DOCS_BASE_URL: &str = "https://varn-lang.dev/errors";
 
-pub fn docs_error_url(error_name: &str) -> String {
-    format!("{DOCS_BASE_URL}/{error_name}")
-}
-
 pub fn forge_tarball_url(host: &str, user: &str, repo: &str, version: &str) -> String {
     format!("https://{host}/{user}/{repo}/archive/refs/tags/v{version}.tar.gz")
 }

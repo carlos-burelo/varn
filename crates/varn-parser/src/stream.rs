@@ -82,16 +82,6 @@ impl TokenStream {
     }
 
     #[inline]
-    pub fn range_from(&self, start: SourceRange) -> SourceRange {
-        let end = if self.pos > 0 {
-            self.tokens[self.pos - 1].range
-        } else {
-            start
-        };
-        start.to(end)
-    }
-
-    #[inline]
     pub fn lexeme(&self) -> &str {
         let tok = self.token();
         tok.get_lexeme(&self.lexeme_buf)
@@ -206,18 +196,6 @@ impl TokenStream {
         }
     }
 
-    pub fn peek_expect(&self, kind: TokenKind) -> Result<(), String> {
-        if self.check(kind) {
-            Ok(())
-        } else {
-            let tok = self.token();
-            Err(format!(
-                "Expected {:?}, got {:?} at {}:{}",
-                kind, tok.kind, tok.range.start.line, tok.range.start.column
-            ))
-        }
-    }
-
     pub fn line(&self) -> u32 {
         self.token().range.start.line
     }
@@ -236,10 +214,6 @@ impl TokenStream {
         } else {
             0
         }
-    }
-
-    pub fn is_arrow_ahead(&self) -> bool {
-        self.check(TokenKind::FatArrow)
     }
 
     pub fn save(&self) -> usize {

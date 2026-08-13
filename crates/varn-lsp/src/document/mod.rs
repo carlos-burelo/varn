@@ -180,9 +180,6 @@ impl SemanticDB {
         best_scope
     }
 
-    pub fn type_at(&self, offset: u32) -> Option<&varn_checker::ExprInfo> {
-        self.expr_types.get(&offset)
-    }
 }
 
 pub struct DocumentState {

@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::registry::{is_known, spec_for, MODULE_REGISTRY};
+use crate::registry::{is_known, spec_for};
 use varn_modules::spec::{ModuleKind, ModuleSpec};
 
 /// Registry lookups over `core:`/`runtime:` modules.
@@ -53,18 +53,6 @@ impl CoreSourceLocator {
         } else {
             None
         }
-    }
-
-    pub fn core_modules(&self) -> impl Iterator<Item = &'static ModuleSpec> {
-        MODULE_REGISTRY
-            .iter()
-            .filter(|m| m.kind == ModuleKind::Core)
-    }
-
-    pub fn stdlib_modules(&self) -> impl Iterator<Item = &'static ModuleSpec> {
-        MODULE_REGISTRY
-            .iter()
-            .filter(|m| m.kind == ModuleKind::Stdlib)
     }
 
     pub fn resolve_relative(&self, base_dir: &Path, specifier: &str) -> Option<String> {

@@ -135,18 +135,6 @@ impl AsyncTask {
         unsafe { (*self.0).state.lock().unwrap().clone() }
     }
 
-    pub fn is_pending(&self) -> bool {
-        unsafe { matches!(*(*self.0).state.lock().unwrap(), TaskState::Pending) }
-    }
-
-    pub fn is_resolved(&self) -> bool {
-        unsafe { matches!(*(*self.0).state.lock().unwrap(), TaskState::Resolved(_)) }
-    }
-
-    pub fn is_rejected(&self) -> bool {
-        unsafe { matches!(*(*self.0).state.lock().unwrap(), TaskState::Rejected(_)) }
-    }
-
     pub fn settle(&self, result: Result<Value, Value>) {
         let callbacks = unsafe {
             let inner = &*self.0;
@@ -205,15 +193,6 @@ impl AsyncTask {
         self.reject_msg("Task cancelled");
     }
 
-    #[inline]
-    pub fn ptr_key(&self) -> usize {
-        self.0 as usize
-    }
-
-    #[inline]
-    pub fn rejected_value(v: Value) -> Self {
-        Self::rejected(v)
-    }
 }
 
 pub enum Poll {

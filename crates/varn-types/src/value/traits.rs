@@ -1,7 +1,7 @@
-use super::{ArrayRef, BoundMethod, BoundMethodTarget, ObjRef, Value, VmValuePayload};
+use super::{BoundMethod, BoundMethodTarget, ObjRef, Value, VmValuePayload};
 use crate::native::NativeFn;
 use std::fmt;
-use std::hash::{Hash, Hasher};
+use std::hash::Hasher;
 use std::rc::Rc;
 use varn_core::TypeTag;
 
@@ -37,15 +37,6 @@ impl Value {
     pub fn instance(class: Rc<super::ClassObj>) -> Self {
         let obj_ref = ObjRef::instance(class);
         Value::Object(obj_ref)
-    }
-
-    pub fn plain_object() -> Self {
-        Value::Object(ObjRef::empty())
-    }
-
-    #[inline(always)]
-    pub fn empty_array() -> Self {
-        Value::Array(ArrayRef::new(Vec::new()))
     }
 
     pub fn is_truthy(&self) -> Result<bool, String> {
@@ -96,132 +87,13 @@ impl Value {
         .name()
     }
 
-    pub fn num_add(&self, rhs: &Value) -> Result<Value, String> {
-        match (self, rhs) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a + b)),
-            (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a + b)),
-            (Value::Int(a), Value::Float(b)) => Ok(Value::Float(*a as f64 + b)),
-            (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a + *b as f64)),
-            (Value::Decimal(a), Value::Decimal(b)) => Ok(Value::Decimal(Box::new(**a + **b))),
-            (Value::Decimal(a), Value::Int(b)) => Ok(Value::Decimal(Box::new(
-                **a + rust_decimal::Decimal::from(*b),
-            ))),
-            (Value::Int(a), Value::Decimal(b)) => Ok(Value::Decimal(Box::new(
-                rust_decimal::Decimal::from(*a) + **b,
-            ))),
-            (Value::Str(a), Value::Str(b)) => {
-                let mut s = String::with_capacity(a.len() + b.len());
-                s.push_str(a);
-                s.push_str(b);
-                Ok(Value::Str(Rc::from(s)))
-            }
-            (Value::Str(a), other) => {
-                let mut s = a.to_string();
-                s.push_str(&other.to_string());
-                Ok(Value::Str(Rc::from(s)))
-            }
-            (other, Value::Str(b)) => {
-                let mut s = other.to_string();
-                s.push_str(b);
-                Ok(Value::Str(Rc::from(s)))
-            }
-            _ => Err(format!(
-                "cannot add {} + {}",
-                self.type_name(),
-                rhs.type_name()
-            )),
-        }
-    }
-
-    pub fn num_sub(&self, rhs: &Value) -> Result<Value, String> {
-        match (self, rhs) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a - b)),
-            (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a - b)),
-            (Value::Int(a), Value::Float(b)) => Ok(Value::Float(*a as f64 - b)),
-            (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a - *b as f64)),
-            (Value::Decimal(a), Value::Decimal(b)) => Ok(Value::Decimal(Box::new(**a - **b))),
-            (Value::Decimal(a), Value::Int(b)) => Ok(Value::Decimal(Box::new(
-                **a - rust_decimal::Decimal::from(*b),
-            ))),
-            (Value::Int(a), Value::Decimal(b)) => Ok(Value::Decimal(Box::new(
-                rust_decimal::Decimal::from(*a) - **b,
-            ))),
-            _ => Err(format!(
-                "cannot subtract {} - {}",
-                self.type_name(),
-                rhs.type_name()
-            )),
-        }
-    }
-
-    pub fn num_mul(&self, rhs: &Value) -> Result<Value, String> {
-        match (self, rhs) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a * b)),
-            (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a * b)),
-            (Value::Int(a), Value::Float(b)) => Ok(Value::Float(*a as f64 * b)),
-            (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a * *b as f64)),
-            (Value::Decimal(a), Value::Decimal(b)) => Ok(Value::Decimal(Box::new(**a * **b))),
-            (Value::Decimal(a), Value::Int(b)) => Ok(Value::Decimal(Box::new(
-                **a * rust_decimal::Decimal::from(*b),
-            ))),
-            (Value::Int(a), Value::Decimal(b)) => Ok(Value::Decimal(Box::new(
-                rust_decimal::Decimal::from(*a) * **b,
-            ))),
-            _ => Err(format!(
-                "cannot multiply {} * {}",
-                self.type_name(),
-                rhs.type_name()
-            )),
-        }
-    }
-
-    pub fn num_div(&self, rhs: &Value) -> Result<Value, String> {
-        match (self, rhs) {
-            (Value::Int(a), Value::Int(b)) => {
-                if *b == 0 {
-                    Ok(Value::Float(f64::INFINITY))
-                } else {
-                    Ok(Value::Float(*a as f64 / *b as f64))
-                }
-            }
-            (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a / b)),
-            (Value::Int(a), Value::Float(b)) => Ok(Value::Float(*a as f64 / b)),
-            (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a / *b as f64)),
-            (Value::Decimal(a), Value::Decimal(b)) => {
-                if b.is_zero() {
-                    return Err("decimal division by zero".to_string());
-                }
-                Ok(Value::Decimal(Box::new(**a / **b)))
-            }
-            _ => Err(format!(
-                "cannot divide {} / {}",
-                self.type_name(),
-                rhs.type_name()
-            )),
-        }
-    }
-
     pub fn equals(&self, other: &Value) -> bool {
         self == other
-    }
-
-    pub fn hash_value(&self) -> u64 {
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        self.hash(&mut hasher);
-        hasher.finish()
     }
 
     pub fn as_int(&self) -> Option<i64> {
         match self {
             Value::Int(i) => Some(*i),
-            _ => None,
-        }
-    }
-
-    pub fn as_float(&self) -> Option<f64> {
-        match self {
-            Value::Float(f) => Some(*f),
-            Value::Int(i) => Some(*i as f64),
             _ => None,
         }
     }

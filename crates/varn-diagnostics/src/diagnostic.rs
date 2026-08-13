@@ -75,15 +75,6 @@ impl Diagnostic {
         self
     }
 
-    pub fn with_location(mut self, file: &str, line: u32, col: u32) -> Self {
-        self.file = Rc::from(file);
-        self.range.start.line = line;
-        self.range.start.column = col;
-        self.range.end.line = line;
-        self.range.end.column = col;
-        self
-    }
-
     pub fn with_suggestion(mut self, suggestion: Suggestion) -> Self {
         self.suggestions.push(suggestion);
         self

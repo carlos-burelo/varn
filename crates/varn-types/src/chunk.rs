@@ -316,16 +316,6 @@ pub struct CacheEntry {
 
 impl CacheEntry {
     #[inline(always)]
-    pub fn to_u64(self) -> u64 {
-        unsafe { std::mem::transmute(self) }
-    }
-
-    #[inline(always)]
-    pub fn from_u64(val: u64) -> Self {
-        unsafe { std::mem::transmute(val) }
-    }
-
-    #[inline(always)]
     pub fn matches(&self, other: &CacheEntry) -> bool {
         self.id == other.id && self.is_class == other.is_class
     }
@@ -391,13 +381,6 @@ impl SiteProfile {
         self.megamorphic = true;
     }
 
-    pub fn is_monomorphic(&self) -> bool {
-        !self.megamorphic && self.ids[1] == 0 && self.ids[0] != 0
-    }
-
-    pub fn is_polymorphic(&self) -> bool {
-        !self.megamorphic && self.ids[1] != 0
-    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -891,27 +874,6 @@ impl Chunk {
         self.write(operand, line);
     }
 
-    pub fn emit2(&mut self, op: OpCode, op1: u16, op2: u16, line: u32) {
-        self.write(op as u8 as u16, line);
-        self.write(op1, line);
-        self.write(op2, line);
-    }
-
-    pub fn emit3(&mut self, op: OpCode, op1: u16, op2: u16, op3: u16, line: u32) {
-        self.write(op as u8 as u16, line);
-        self.write(op1, line);
-        self.write(op2, line);
-        self.write(op3, line);
-    }
-
-    pub fn emit4(&mut self, op: OpCode, op1: u16, op2: u16, op3: u16, op4: u16, line: u32) {
-        self.write(op as u8 as u16, line);
-        self.write(op1, line);
-        self.write(op2, line);
-        self.write(op3, line);
-        self.write(op4, line);
-    }
-
     #[inline(always)]
     pub fn pack(r1: u8, r2: u8) -> u16 {
         ((r1 as u16) << 8) | (r2 as u16)
@@ -979,13 +941,6 @@ impl Chunk {
         self.write(0xFFFF, line);
         self.write(0xFFFF, line);
         patch_pos
-    }
-
-    pub fn patch_jump(&mut self, patch_pos: usize) {
-        let offset = self.code.len() - patch_pos - 2;
-        let offset = u32::try_from(offset).expect("jump offset overflows u32");
-        self.code[patch_pos] = (offset >> 16) as u16;
-        self.code[patch_pos + 1] = (offset & 0xFFFF) as u16;
     }
 
     pub fn emit_loop(&mut self, loop_start: usize, line: u32) {

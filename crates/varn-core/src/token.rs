@@ -442,16 +442,6 @@ impl Token {
         }
     }
 
-    pub fn eof(range: SourceRange) -> Self {
-        Token {
-            kind: TokenKind::EOF,
-            range,
-            parsed_num: None,
-            lex_start: 0,
-            lex_len: 0,
-        }
-    }
-
     pub fn is(&self, kind: TokenKind) -> bool {
         self.kind == kind
     }

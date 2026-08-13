@@ -373,26 +373,6 @@ pub fn def_sites(func: &SsaFunc) -> Vec<Option<Def>> {
     defs
 }
 
-/// How many times each value id is read, indexed by `Value.0`.
-///
-/// Counts, not a set: a pass that rewrites one use of a value needs to know
-/// whether any others remain, which a `contains` check cannot answer.
-pub fn use_counts(func: &SsaFunc) -> Vec<u32> {
-    let mut counts = vec![0u32; func.values.len()];
-    let mut bump = |v: Value| {
-        if let Some(c) = counts.get_mut(v.0 as usize) {
-            *c += 1;
-        }
-    };
-    for block in &func.blocks {
-        for inst in &block.insts {
-            visit_uses(&inst.kind, &mut bump);
-        }
-        visit_term_uses(&block.term, &mut bump);
-    }
-    counts
-}
-
 /// Applies many substitutions in a single traversal.
 ///
 /// The per-value [`SsaFunc::replace_all_uses`] walks every instruction in the
