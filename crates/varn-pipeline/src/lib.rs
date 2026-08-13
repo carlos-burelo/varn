@@ -8,8 +8,6 @@ pub mod fmt;
 pub mod hash;
 pub mod import_collector;
 mod lockfile;
-#[cfg(feature = "lsp-debug")]
-pub mod lsp_debug;
 pub mod module_precompile;
 mod opts;
 mod parse;

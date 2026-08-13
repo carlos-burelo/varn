@@ -1,5 +1,3 @@
-#![cfg(feature = "lsp-debug")]
-
 use tower_lsp::lsp_types::HoverContents;
 use varn_debug::colors::{BLUE, BOLD, C_TYPES, DIM, GREEN, R, YELLOW};
 use varn_debug::flags::DebugFlags;

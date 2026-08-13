@@ -57,13 +57,6 @@ pub fn check(
         varn_debug::symbols::debug_symbols(&check_result, &program.filename, debug);
     }
 
-    if debug.types {
-        varn_debug::types::debug_types(program, debug);
-    }
-    #[cfg(feature = "lsp-debug")]
-    if debug.lsp {
-        crate::lsp_debug::debug_lsp(program.filename.as_ref(), source, debug);
-    }
 
     Ok(CheckResult {
         checker_result: check_result,

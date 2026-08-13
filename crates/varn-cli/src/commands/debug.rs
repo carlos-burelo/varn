@@ -20,6 +20,8 @@ pub fn execute(args: DebugArgs) -> Result<(), CliError> {
         }
     };
 
+    crate::inspect_lsp::run_for(&file_path, eval.as_deref(), &debug);
+
     pipeline::run(&RunOpts {
         file_path,
         eval,

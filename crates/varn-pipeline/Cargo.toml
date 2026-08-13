@@ -3,9 +3,6 @@ name = "varn-pipeline"
 version.workspace = true
 edition.workspace = true
 
-[features]
-lsp-debug = ["dep:varn-lsp", "dep:tower-lsp"]
-
 [dependencies]
 varn-term      = { path = "../varn-term" }
 varn-core        = { path = "../varn-core" }
@@ -17,11 +14,9 @@ varn-vm          = { path = "../varn-vm" }
 varn-modules     = { path = "../varn-modules" }
 varn-types       = { path = "../varn-types" }
 varn-debug       = { path = "../varn-debug" }
-varn-lsp         = { path = "../varn-lsp", optional = true }
 rustc-hash       = { workspace = true }
 serde            = { workspace = true }
 serde_json       = { workspace = true }
-tower-lsp        = { workspace = true, optional = true }
 postcard     = { workspace = true }
 
 [lints]

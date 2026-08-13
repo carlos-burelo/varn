@@ -4,6 +4,7 @@ mod commands;
 mod cpu_freq;
 mod doctor_impl;
 mod error;
+mod inspect_lsp;
 mod pipeline;
 mod tester;
 

@@ -30,7 +30,6 @@ graph TD
     Pipeline --> VM["varn-vm"]
     Pipeline --> Modules["varn-modules"]
     Pipeline --> Term["varn-term"]
-    Pipeline -.->|"feature lsp-debug, que varn-cli activa siempre"| LSP["varn-lsp"]
 
     Opt --> Backend["varn-regalloc"]
     Opt --> Core["varn-core"]
@@ -49,6 +48,7 @@ graph TD
 
     Checker --> Lexer
     Checker --> Parser
+    CLI --> LSP["varn-lsp"]
     LSP --> Checker
     LSP --> Builtins
 
@@ -59,10 +59,11 @@ graph TD
     Modules --> Core
 ```
 
-Dos aristas del grafo son deuda conocida, no diseño (ver [../AUDIT.md](../AUDIT.md) §4):
+Queda una arista de deuda conocida, no diseño (ver [../AUDIT.md](../AUDIT.md) §4):
 
 - `varn-vm → varn-builtins → varn-op-macros → varn-parser`: `varn_contract!` parsea sus contratos `.vn` en tiempo de expansión, así que compilar el motor de ejecución exige compilar el frontend.
-- `varn-pipeline → varn-lsp` tras la feature `lsp-debug`, que `varn-cli` activa incondicionalmente: el orquestador consume el servidor de editor.
+
+Las vistas de inspección que necesitan el análisis del LSP (`-p types`, `-p lsp`) viven en `varn-cli/src/inspect_lsp/`, no en el pipeline: solo requieren ruta y fuente, así que no justifican que el orquestador dependa del servidor de editor.
 
 ---
 

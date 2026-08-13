@@ -20,7 +20,7 @@ dev-tools = []
 
 [dependencies]
 varn-term      = { path = "../varn-term" }
-varn-pipeline = { path = "../varn-pipeline", features = ["lsp-debug"] }
+varn-pipeline = { path = "../varn-pipeline" }
 varn-core     = { path = "../varn-core" }
 varn-lexer    = { path = "../varn-lexer" }
 varn-parser   = { path = "../varn-parser", features = ["profiling"] }
@@ -34,6 +34,7 @@ varn-debug    = { path = "../varn-debug" }
 varn-lsp      = { path = "../varn-lsp" }
 varn-pm       = { path = "../varn-pm" }
 varn-modules  = { path = "../varn-modules" }
+tower-lsp     = { workspace = true }
 postcard      = { workspace = true }
 clap          = { version = "4", features = ["derive"] }
 clap_complete = "4"

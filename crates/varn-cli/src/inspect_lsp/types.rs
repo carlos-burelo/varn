@@ -1,15 +1,16 @@
 use varn_checker::SymbolKind;
-use varn_core::ast::Program;
 use varn_debug::flags::DebugFlags;
 use varn_term::chalk::chalk;
 use varn_term::terminal::{Section, Table};
 
-pub fn debug_types(program: &Program, flags: &DebugFlags) {
-    let source_code = std::fs::read_to_string(&program.filename).unwrap_or_default();
-    let uri = varn_modules::resolver::path_to_uri(&program.filename);
+pub fn debug_types(path: &str, source: &str, flags: &DebugFlags) {
+    let uri = varn_modules::resolver::path_to_uri(path);
 
-    let analysis = varn_lsp::pipeline::run_pipeline(source_code, uri);
-    Section::new("type inference engine").subtitle(&program.filename).color(|c| c.blue()).print();
+    let analysis = varn_lsp::pipeline::run_pipeline(source.to_owned(), uri);
+    Section::new("type inference engine")
+        .subtitle(path)
+        .color(|c| c.blue())
+        .print();
 
     let in_range = |line: u32| match flags.types_range {
         Some((lo, hi)) => line >= lo && line <= hi,
