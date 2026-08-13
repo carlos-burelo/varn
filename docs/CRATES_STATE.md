@@ -2,7 +2,7 @@
 
 Matriz de estado, jerarquía de dependencias y tamaños de los **19 crates** del workspace de **Varn**.
 
-Los tamaños son líneas de Rust medidas sobre el árbol actual (105 060 líneas en 553 archivos). Este documento no publica porcentajes de cobertura: la suite de Rust son 85 tests, y la prueba real de integridad es `tests/main.vn` (991 aserciones) bajo las cuatro combinaciones de procedencia de std y JIT descritas en [CONTRIBUTING.md](../CONTRIBUTING.md).
+Los tamaños son líneas de Rust medidas sobre el árbol actual (104 870 líneas en 579 archivos). Este documento no publica porcentajes de cobertura: la suite de Rust son 85 tests, y la prueba real de integridad es `tests/main.vn` (991 aserciones) bajo las cuatro combinaciones de procedencia de std y JIT descritas en [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ---
 
@@ -71,18 +71,18 @@ Las vistas de inspección que necesitan el análisis del LSP (`-p types`, `-p ls
 
 | Crate | Dominio | Líneas | Estabilidad |
 |---|---|---|---|
-| `varn-vm` | Ejecución | 19 038 | Estable |
-| `varn-checker` | Frontend | 16 594 | Estable |
-| `varn-compiler` | Compilador (AST→HIR→SSA→bytecode) | 15 694 | Estable |
+| `varn-vm` | Ejecución | 19 027 | Estable |
+| `varn-checker` | Frontend | 16 576 | Estable |
+| `varn-compiler` | Compilador (AST→HIR→SSA→bytecode) | 16 119 | Estable |
 | `varn-jit` | JIT x86-64 (Cranelift) | 8 625 | En evolución |
 | `varn-lsp` | Servidor LSP | 7 437 | En evolución |
-| `varn-types` | Modelo de datos de runtime y bytecode | 6 263 | Estable |
+| `varn-types` | Modelo de datos de runtime y bytecode | 6 311 | Estable |
+| `varn-cli` | CLI (`vn`) | 5 085 | Estable |
 | `varn-parser` | Frontend | 4 943 | Estable |
 | `varn-core` | AST, opcodes, tokens, diagnósticos, `TypeTag` | 4 820 | Estable |
-| `varn-cli` | CLI (`vn`) | 4 590 | Estable |
-| `varn-builtins` | Stdlib nativa (LBI) | 4 307 | Estable |
-| `varn-debug` | Inspección de fases | 3 302 | Herramienta |
-| `varn-pipeline` | Orquestación de fases y caché | 3 034 | Estable |
+| `varn-builtins` | Stdlib nativa (LBI) | 4 312 | Estable |
+| `varn-debug` | Inspección de fases | 3 294 | Herramienta |
+| `varn-pipeline` | Orquestación de fases y caché | 1 908 | Estable |
 | `varn-lexer` | Frontend | 1 557 | Estable |
 | `varn-modules` | Resolución de módulos y bundle `.vnb` | 1 292 | Estable |
 | `varn-regalloc` | Liveness + regalloc post-pass | 1 103 | Estable |
@@ -111,15 +111,16 @@ Hoy expone exactamente dos cosas: los canales tipados entre isolates (`channel`)
 
 ## 4. Métricas de Gobierno de Código
 
-Umbral de refactor obligatorio: 1000 líneas por archivo. Archivos que hoy lo cruzan:
+Umbral de refactor obligatorio: 1000 líneas por archivo. **Ningún archivo lo cruza** (ver [../AUDIT.md](../AUDIT.md) §8: los seis que lo hacían se dividieron por dominio).
+
+Los mayores hoy, todos en la banda de "refactor recomendado" (700-1000):
 
 | Archivo | Líneas |
 |---|---|
-| `varn-compiler/src/ssa/emit.rs` | 1635 |
-| `varn-compiler/src/ssa/build/expr.rs` | 1513 |
-| `varn-compiler/src/hir/lower/expr.rs` | 1260 |
-| `varn-compiler/src/hir/lower/decl.rs` | 1196 |
-| `varn-compiler/src/ssa/build/stmt.rs` | 1089 |
-| `varn-types/src/chunk.rs` | 1007 |
+| `varn-jit/src/clif/alloc/objects.rs` | 993 |
+| `varn-regalloc/src/regalloc_post.rs` | 970 |
+| `varn-compiler/src/hir/inline.rs` | 950 |
+| `varn-compiler/src/ssa/build/mod.rs` | 933 |
+| `varn-debug/src/ast.rs` | 921 |
 
-El subárbol `varn-vm/src/exec/` son 12 806 líneas (67 % del crate) y es el siguiente candidato a división por dominio.
+El subárbol `varn-vm/src/exec/` son 12 795 líneas (67 % del crate) repartidas en archivos que sí respetan el umbral; su división es una tarea de dominio, no de gobierno de tamaño.
