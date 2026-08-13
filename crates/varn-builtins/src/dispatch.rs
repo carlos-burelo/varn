@@ -69,52 +69,80 @@ pub fn register_fallback_module_entries(entries: &'static [&'static NativeOpEntr
     }
 }
 
-/// Every registered native op, linker-section entries FIRST.
+static ALL_OPS: OnceLock<Vec<&'static NativeOpEntry>> = OnceLock::new();
+
+/// Every registered native op: the linker-section walk unioned with the
+/// fallback marker arrays, deduplicated by address.
 ///
-/// The order is load-bearing: `find_native_op_entry` returns the first entry
-/// whose op id matches, and one op can appear in both lists as two distinct
-/// entries. The section entry is the authoritative one — it carries the typed
-/// signature the JIT lowers its call against.
-pub fn all_native_ops() -> Vec<&'static NativeOpEntry> {
-    let mut list: Vec<&'static NativeOpEntry> = Vec::new();
-    for entry in iter_native_ops() {
-        if !entry.func_ptr.is_null() && !list.iter().any(|e| std::ptr::eq(*e, entry)) {
-            list.push(entry);
+/// Both sources point at the *same* statics — `varn_contract!` emits one
+/// `NativeOpEntry` per symbol and lists it in the module's
+/// `__VARN_LINK_MARKER_*` array — so `ptr::eq` collapses them and neither
+/// source is more authoritative than the other. The fallback exists so the
+/// table stays complete when the linker spreads `.varn_ops` across codegen
+/// units.
+///
+/// Frozen on first call, like [`TABLE`] and [`MODULE_OPS`]. Every registration
+/// happens in `register_provider()` (via `force_link_builtins`), which every
+/// entry point calls before touching dispatch.
+pub fn all_native_ops() -> &'static [&'static NativeOpEntry] {
+    ALL_OPS.get_or_init(|| {
+        let mut list: Vec<&'static NativeOpEntry> = Vec::new();
+        let mut seen: rustc_hash::FxHashSet<usize> = rustc_hash::FxHashSet::default();
+        let mut push = |entry: &'static NativeOpEntry, list: &mut Vec<_>| {
+            if !entry.func_ptr.is_null() && seen.insert(entry as *const NativeOpEntry as usize) {
+                list.push(entry);
+            }
+        };
+        for entry in iter_native_ops() {
+            push(entry, &mut list);
         }
-    }
-    if let Some(mutex) = FALLBACK_ENTRIES.get() {
-        if let Ok(guard) = mutex.lock() {
-            for slice in guard.iter() {
-                for &entry in *slice {
-                    if !entry.func_ptr.is_null() && !list.iter().any(|e| std::ptr::eq(*e, entry)) {
-                        list.push(entry);
+        if let Some(mutex) = FALLBACK_ENTRIES.get() {
+            if let Ok(guard) = mutex.lock() {
+                for slice in guard.iter() {
+                    for &entry in *slice {
+                        push(entry, &mut list);
                     }
                 }
             }
         }
+        list
+    })
+}
+
+/// `op_id` of an entry, as the compound hash the compiler emits for it.
+fn entry_op_id(entry: &NativeOpEntry) -> u64 {
+    let module = entry.module_id();
+    let symbol = entry.symbol_name();
+    let ns = entry.namespace_path();
+    if ns.is_empty() {
+        entry::compound_op_id(module, symbol)
+    } else {
+        entry::compound_op_id3(module, ns, symbol)
     }
-    list
+}
+
+static ENTRY_BY_OP_ID: OnceLock<FxHashMap<u64, &'static NativeOpEntry>> = OnceLock::new();
+
+fn build_entry_index() -> FxHashMap<u64, &'static NativeOpEntry> {
+    let mut map = FxHashMap::with_capacity_and_hasher(512, Default::default());
+    for &entry in all_native_ops() {
+        map.entry(entry_op_id(entry)).or_insert(entry);
+    }
+    map
 }
 
 static TABLE: OnceLock<FxHashMap<u64, DispatchEntry>> = OnceLock::new();
 
 fn build_table() -> FxHashMap<u64, DispatchEntry> {
     let mut table = FxHashMap::with_capacity_and_hasher(512, Default::default());
-    for entry in all_native_ops() {
-        let module = entry.module_id();
-        let symbol = entry.symbol_name();
-        let ns = entry.namespace_path();
-        let id = if ns.is_empty() {
-            entry::compound_op_id(module, symbol)
-        } else {
-            entry::compound_op_id3(module, ns, symbol)
-        };
+    for &entry in all_native_ops() {
+        let id = entry_op_id(entry);
         table.insert(
             id,
             DispatchEntry {
                 id,
-                module_id: module,
-                name: symbol,
+                module_id: entry.module_id(),
+                name: entry.symbol_name(),
                 func: entry.func(),
                 capability: None,
             },
@@ -127,7 +155,7 @@ static MODULE_OPS: OnceLock<FxHashMap<String, Vec<&'static NativeOpEntry>>> = On
 
 fn build_module_ops_index() -> FxHashMap<String, Vec<&'static NativeOpEntry>> {
     let mut map = FxHashMap::default();
-    for entry in all_native_ops() {
+    for &entry in all_native_ops() {
         map.entry(entry.module_id().to_string())
             .or_insert_with(Vec::new)
             .push(entry);
@@ -136,42 +164,19 @@ fn build_module_ops_index() -> FxHashMap<String, Vec<&'static NativeOpEntry>> {
 }
 
 pub fn find_native_op_entry(op_id: u64) -> Option<&'static NativeOpEntry> {
-    for entry in all_native_ops() {
-        let module = entry.module_id();
-        let symbol = entry.symbol_name();
-        let ns = entry.namespace_path();
-        let id = if ns.is_empty() {
-            entry::compound_op_id(module, symbol)
-        } else {
-            entry::compound_op_id3(module, ns, symbol)
-        };
-        if id == op_id {
-            return Some(entry);
-        }
-    }
-    None
+    ENTRY_BY_OP_ID
+        .get_or_init(build_entry_index)
+        .get(&op_id)
+        .copied()
 }
 
 pub fn describe_op(id: u64) -> Option<OpMeta> {
-    for entry in all_native_ops() {
-        let module = entry.module_id();
-        let symbol = entry.symbol_name();
-        let ns = entry.namespace_path();
-        let op_id = if ns.is_empty() {
-            entry::compound_op_id(module, symbol)
-        } else {
-            entry::compound_op_id3(module, ns, symbol)
-        };
-        if op_id == id {
-            return Some(OpMeta {
-                name: symbol,
-                op_id,
-                is_async: false,
-                capability: None,
-            });
-        }
-    }
-    None
+    find_native_op_entry(id).map(|entry| OpMeta {
+        name: entry.symbol_name(),
+        op_id: id,
+        is_async: false,
+        capability: None,
+    })
 }
 
 /// Resolve a stable op-id to its native function pointer, for callers that want
@@ -240,9 +245,9 @@ fn resolve_ns<'a>(
 }
 
 pub(crate) fn build_module(id: &str, ctx: &mut dyn NativeCtx) -> Option<VmValue> {
-    let all_ops = all_native_ops();
-    let entries: Vec<&'static NativeOpEntry> = all_ops
-        .into_iter()
+    let entries: Vec<&'static NativeOpEntry> = all_native_ops()
+        .iter()
+        .copied()
         .filter(|e| e.module_id() == id)
         .collect();
     if entries.is_empty() {
