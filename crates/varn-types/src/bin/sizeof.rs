@@ -1,3 +1,5 @@
+#![allow(unused_crate_dependencies)] // dev-tool bin: uses a slice of the crate deps
+
 use varn_core::ast::expr::Expr;
 use varn_core::ast::stmt::Stmt;
 use varn_types::Value;

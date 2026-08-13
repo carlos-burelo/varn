@@ -1,7 +1,7 @@
 [package]
 name = "varn-jit"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 varn-core = { path = "../varn-core" }
@@ -9,3 +9,6 @@ varn-types = { path = "../varn-types" }
 cranelift-codegen = "0.125.4"
 cranelift-frontend = "0.125.4"
 cranelift-native = "0.125.4"
+
+[lints]
+workspace = true

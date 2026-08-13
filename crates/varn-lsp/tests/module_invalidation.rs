@@ -1,3 +1,5 @@
+#![allow(unused_crate_dependencies)] // per-target lint: a test needs only a slice of the crate deps
+
 // Regression test for the scoped module-cache invalidation added to
 // `Workspace::update_file`. Before that change, correctness relied on
 // `module_resolver::invalidate_module_cache()` nuking every cache on

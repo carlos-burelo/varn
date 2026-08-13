@@ -1,3 +1,5 @@
+#![allow(unused_crate_dependencies)] // per-target lint: a test needs only a slice of the crate deps
+
 use std::fs;
 use varn_modules::resolve_pkg_specifier;
 

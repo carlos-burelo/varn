@@ -1,7 +1,7 @@
 [package]
 name = "varn-opt"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 # Optimizing backend: AST -> HIR -> SSA -> opt passes -> bytecode (FunctionProto).
 # Depends only on the AST (varn-core) and the bytecode/proto types (varn-types).
@@ -13,3 +13,6 @@ varn-types = { path = "../varn-types" }
 varn-backend = { path = "../varn-backend" }
 rustc-hash = { workspace = true }
 rust_decimal = { workspace = true }
+
+[lints]
+workspace = true

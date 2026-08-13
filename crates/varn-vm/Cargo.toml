@@ -1,7 +1,7 @@
 [package]
 name = "varn-vm"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [features]
 profiling = []
@@ -12,7 +12,7 @@ varn-types    = { path = "../varn-types" }
 varn-core     = { path = "../varn-core" }
 varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
 varn-runtime  = { path = "../varn-runtime" }
-tokio         = { version = "1", features = ["time", "rt"] }
+tokio         = { workspace = true }
 varn-modules  = { path = "../varn-modules" }
 varn-base     = { path = "../varn-base" }
 rust_decimal  = { workspace = true }
@@ -22,3 +22,6 @@ serde         = { workspace = true }
 serde_json    = { workspace = true }
 ryu           = { workspace = true }
 
+
+[lints]
+workspace = true

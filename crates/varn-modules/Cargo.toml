@@ -1,11 +1,14 @@
 [package]
 name = "varn-modules"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 varn-core  = { path = "../varn-core" }
 serde      = { workspace = true }
 serde_json = { workspace = true }
-semver     = "1"
-postcard   = { version = "1", features = ["alloc"] }
+semver     = { workspace = true }
+postcard     = { workspace = true }
+
+[lints]
+workspace = true

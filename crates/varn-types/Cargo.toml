@@ -1,12 +1,25 @@
 [package]
 name = "varn-types"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+
+# Dev-only layout probe: gated so a normal build does not pay for it.
+# Build with `cargo run -p varn-types --features dev-tools --bin sizeof`.
+[[bin]]
+name = "sizeof"
+path = "src/bin/sizeof.rs"
+required-features = ["dev-tools"]
+
+[features]
+dev-tools = []
 
 [dependencies]
 varn-core    = { path = "../varn-core" }
 varn-base    = { path = "../varn-base" }
-parking_lot  = { workspace = true }
+
 rust_decimal = { workspace = true }
 rustc-hash   = { workspace = true }
 serde        = { workspace = true, features = ["rc"] }
+
+[lints]
+workspace = true

@@ -1,8 +1,11 @@
 [package]
 name = "varn-backend"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 varn-core  = { path = "../varn-core" }
 varn-types = { path = "../varn-types" }
+
+[lints]
+workspace = true

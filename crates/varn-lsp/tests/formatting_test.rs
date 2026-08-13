@@ -1,3 +1,5 @@
+#![allow(unused_crate_dependencies)] // per-target lint: a test needs only a slice of the crate deps
+
 use tower_lsp::lsp_types::FormattingOptions;
 use varn_lsp::features::formatting::build_formatting;
 

@@ -1,16 +1,19 @@
 [package]
 name = "varn-pm"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 varn-utilities = { path = "../varn-utilities" }
 varn-modules = { path = "../varn-modules" }
 serde      = { workspace = true }
 serde_json = { workspace = true }
-semver     = "1"
+semver     = { workspace = true }
 ureq = { version = "2", features = ["json"] }
-sha2 = "0.10"
-hex = "0.4"
+sha2 = { workspace = true }
+hex  = { workspace = true }
 tar = "0.4"
 flate2 = "1"
+
+[lints]
+workspace = true

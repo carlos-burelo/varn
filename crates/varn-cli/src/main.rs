@@ -9,16 +9,11 @@ mod tester;
 
 use clap::Parser;
 use cli::{Cli, Commands};
+// `varn-lexer` belongs to the crate for the `debug_binder` bin, not to `vn`.
+// The anchor keeps `unused_crate_dependencies` honest for this target.
+use varn_lexer as _;
 use std::process;
 use varn_utilities::terminal;
-
-/// Varn is allocation-bound in the shapes that matter (object construction,
-/// string concatenation, array growth), and the Windows MSVC system heap
-/// charges far more per small allocation than a modern thread-caching
-/// allocator does. Swapping it out is the one change that reaches every
-/// allocation site at once.
-// #[global_allocator]
-// static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 fn main() {
     const STDLIB_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/std.vnb"));

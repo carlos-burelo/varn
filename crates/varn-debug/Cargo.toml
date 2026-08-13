@@ -1,18 +1,18 @@
 [package]
 name = "varn-debug"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 varn-utilities = { path = "../varn-utilities" }
 varn-core     = { path = "../varn-core" }
-varn-lexer    = { path = "../varn-lexer" }
-varn-parser   = { path = "../varn-parser" }
 varn-checker  = { path = "../varn-checker" }
-varn-modules  = { path = "../varn-modules" }
 varn-types    = { path = "../varn-types" }
 varn-opt      = { path = "../varn-opt" }
 varn-jit      = { path = "../varn-jit" }
 varn-vm       = { path = "../varn-vm" }
-rustc-hash    = "1"
+rustc-hash    = { workspace = true }
 iced-x86      = "1"
+
+[lints]
+workspace = true

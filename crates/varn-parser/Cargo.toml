@@ -1,10 +1,13 @@
 [package]
 name = "varn-parser"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [features]
 profiling = []
 
 [dependencies]
 varn-core = { path = "../varn-core" }
+
+[lints]
+workspace = true

@@ -1,7 +1,7 @@
 [package]
 name = "varn-checker"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 varn-core    = { path = "../varn-core" }
@@ -10,4 +10,7 @@ varn-parser  = { path = "../varn-parser" }
 varn-modules = { path = "../varn-modules" }
 rustc-hash   = { workspace = true }
 serde        = { workspace = true, features = ["rc"] }
-postcard     = { version = "1", features = ["alloc"] }
+postcard     = { workspace = true }
+
+[lints]
+workspace = true

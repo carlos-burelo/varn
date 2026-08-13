@@ -1,3 +1,5 @@
+#![allow(unused_crate_dependencies)] // dev-tool bin: uses a slice of the crate deps
+
 use std::fs::read_to_string;
 
 fn main() {

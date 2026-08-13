@@ -1,16 +1,22 @@
 [package]
 name = "varn-cli"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 
 [[bin]]
 name = "vn"
 path = "src/main.rs"
 
+# Dev-only inspection tool: gated so a normal build does not pay for it.
+# Build with `cargo build -p varn-cli --features dev-tools --bin debug_binder`.
 [[bin]]
 name = "debug_binder"
 path = "src/debug_binder.rs"
+required-features = ["dev-tools"]
+
+[features]
+dev-tools = []
 
 [dependencies]
 varn-utilities = { path = "../varn-utilities" }
@@ -28,21 +34,15 @@ varn-debug    = { path = "../varn-debug" }
 varn-lsp      = { path = "../varn-lsp" }
 varn-pm       = { path = "../varn-pm" }
 varn-modules  = { path = "../varn-modules" }
-tower-lsp        = { workspace = true }
-postcard         = { version = "1", features = ["alloc"] }
-clap             = { version = "4", features = ["derive"] }
-clap_complete    = "4"
-mimalloc         = { version = "0.1", default-features = false }
-rustc-hash       = { workspace = true }
-serde            = { workspace = true }
-serde_json       = { workspace = true }
+postcard      = { workspace = true }
+clap          = { version = "4", features = ["derive"] }
+clap_complete = "4"
+rustc-hash    = { workspace = true }
 
 [build-dependencies]
 varn-pipeline = { path = "../varn-pipeline" }
 varn-modules  = { path = "../varn-modules" }
 varn-builtins = { path = "../varn-builtins" }
-varn-checker  = { path = "../varn-checker" }
-varn-core     = { path = "../varn-core" }
-serde         = { workspace = true }
-serde_json    = { workspace = true }
-postcard      = { version = "1", features = ["alloc"] }
+
+[lints]
+workspace = true

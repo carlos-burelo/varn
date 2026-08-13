@@ -24,6 +24,10 @@ members = [
 ]
 resolver = "2"
 
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
 [workspace.dependencies]
 rustc-hash   = "1.1.0"
 rust_decimal = { version = "1", features = ["serde", "maths"] }
@@ -32,18 +36,23 @@ serde        = { version = "1", features = ["derive"] }
 serde_json   = "1"
 tower-lsp    = "0.20"
 ryu          = "1.0"
+postcard     = { version = "1", features = ["alloc"] }
+tokio        = { version = "1", features = ["full"] }
+semver       = "1"
+sha2         = "0.10"
+hex          = "0.4"
+
+# `unused_crate_dependencies` is the automated form of the manifest audit:
+# a declared dependency no crate target imports becomes a warning instead of
+# silent build-graph weight.
+[workspace.lints.rust]
+unused_crate_dependencies = "warn"
 
 [profile.release]
 opt-level = 3
 lto = "thin"
 codegen-units = 16
 panic = "abort"
-
-[profile.release.package.varn-jit]
-opt-level = 3
-
-[profile.release.package.varn-vm]
-opt-level = 3
 
 [profile.dev]
 opt-level = 1

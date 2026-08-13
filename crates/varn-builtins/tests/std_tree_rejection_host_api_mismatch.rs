@@ -1,3 +1,5 @@
+#![allow(unused_crate_dependencies)] // per-target lint: a test needs only a slice of the crate deps
+
 //! End-to-end evidence for design spec §3: a std that resolves but cannot be
 //! used must produce a hard error through the *real* chain — `VARN_STD` ->
 //! `provider_impl::active_std` -> `load_tree_std` -> `std_load_error` — and
