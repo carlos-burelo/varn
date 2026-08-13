@@ -381,7 +381,9 @@ Perfil del entorno host:
 - Linker: rust-lld.exe
 
 Reglas de compilación y ejecución para el agente:
-1. Aprovechar la compilación paralela de dependencias y Thin LTO (`jobs = 12`, `lto = "thin"`). Nota: Para la compilación en release del binario final, mantén `codegen-units = 1` en `[profile.release]` debido a que los marcadores de sección personalizados de MSVC (`.varn_ops$A`, `.varn_ops$C`) en `varn-builtins` requieren que el linker agrupe los símbolos en un único CGU final.
+1. Aprovechar la compilación paralela de dependencias y Thin LTO (`jobs = 12`, `lto = "thin"`, `codegen-units = 16`).
+
+   Nota sobre los marcadores de sección MSVC (`.varn_ops$A` / `$C` en `varn-builtins`): **no** imponen `codegen-units = 1`. Medido con `VARN_DEBUG_OPS=1`: 313 entradas en la sección tanto con `codegen-units = 16` como con `1`, y `tests/main.vn` verde en ambos. Además `register_provider()` llama a `force_link_builtins()`, que registra los arrays `__VARN_LINK_MARKER_*` apuntando a los mismos statics que la sección, y `all_native_ops()` une ambas fuentes deduplicando por `ptr::eq`: la tabla queda completa aunque el linker reparta los símbolos entre CGUs. Único efecto medido de `codegen-units = 1`: binario un 10,4 % menor (13,09 MB vs 14,61 MB); no hay medición fiable de tiempos, así que cambiarlo exige benchmark propio.
 2. NUNCA ejecutar `cargo clean` a menos que sea strictly necesario por corrupción de artefactos de build.
 3. Para ciclos rápidos de iteración y validación, utilizar `--profile quick` o compilaciones incrementales para no invalidar cachés.
 4. Para benchmarks y pruebas de estabilidad final, usar `cargo run --release --bin vn -- bench ./tests/main.vn -v`.

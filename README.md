@@ -37,7 +37,7 @@
 - **Compilador propio en SSA**: Pipeline multi-fase (`varn-opt`) que transforma AST en HIR y SSA, aplicando pases de inlining, eliminación de código muerto (DCE) y plegado de constantes.
 - **JIT x86-64 (Cranelift/Eager)**: Compilación nativa para funciones en el hot-path con fallback automático e indoloro al intérprete.
 - **GC Generacional**: Nursery de rápida asignación con promoción a Old-Gen mark-and-sweep tricolor y write barrier.
-- **Runtime Asíncrono e Isolates**: Integración nativa con Tokio, concurrencia determinista mediante `TaskGroup` y paralelismo multinúcleo real mediante Isolates aislados con canales tipados.
+- **Concurrencia e Isolates**: tareas cooperativas deterministas en un trampolín síncrono dentro de la VM, `TaskGroup` con limpieza por ámbito (`using`), y paralelismo multinúcleo real mediante Isolates aislados con canales tipados.
 - **Gestión de Paquetes y Tooling Integrado**: Comandos unificados (`vn run`, `vn check`, `vn build`, `vn bench`, `vn debug`, `vn repl`, `vn pkg`, `vn lsp`).
 
 ---
@@ -54,7 +54,7 @@ flowchart TD
     F --> G["varn-vm\n(Register VM + NaN-Boxing + GC Generacional + IC)"]
     F -.-> H["varn-jit\n(x86-64 Native JIT)"]
     H -.-> G
-    G --> I["varn-runtime\n(Tokio Async Event Loop + Isolates)"]
+    G --> I["varn-runtime\n(canales de Isolates)"]
     G <--> J["varn-builtins\n(Stdlib nativa Rust via LBI)"]
 ```
 
@@ -303,7 +303,7 @@ varn-lang/
 | [`varn-backend`](docs/COMPILER_ARCHITECTURE.md) | Post-passes de bytecode: Liveness analysis y Register Allocation. |
 | [`varn-vm`](docs/VM_ARCHITECTURE.md) | VM de registros con NaN-Boxing, GC generacional e Inline Cache. |
 | [`varn-jit`](docs/VM_ARCHITECTURE.md) | Backend JIT nativo para x86-64. |
-| [`varn-runtime`](docs/RUNTIME_ARCHITECTURE.md) | Scheduler async sobre Tokio e Isolates multi-hilo. |
+| [`varn-runtime`](docs/RUNTIME_ARCHITECTURE.md) | Canales tipados entre Isolates y vtable de asignación del heap. |
 | [`varn-builtins`](docs/LBI_ARCHITECTURE.md) | Bindings nativos Rust expuestos vía Linker-Bound Interface (LBI). |
 | [`varn-cli`](docs/CLI_REFERENCE.md) | Binario unificado CLI `vn`. |
 

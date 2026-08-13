@@ -1,13 +1,13 @@
-# Arquitectura del Runtime Asíncrono e Isolates (`varn-runtime`)
+# Arquitectura de Concurrencia: Tareas, Generadores e Isolates
 
-Este documento especifica la arquitectura del runtime asíncrono y el sistema de paralelismo de **Varn**, incluyendo la integración con Tokio, la mecánica de suspensión de frames (`async`/`await`), los generadores y la comunicación entre hilos mediante **Isolates**.
+Este documento especifica cómo Varn ejecuta `async`/`await`, generadores e Isolates. El nombre del crate `varn-runtime` es engañoso por historia: hoy ese crate aporta **solo** los canales tipados entre Isolates y la vtable de asignación del heap. La suspensión y reanudación de tareas viven en `varn-vm`.
 
 ---
 
 ## Tabla de Contenidos
 
-- [1. Visión General del Runtime](#1-visión-general-del-runtime)
-- [2. Event Loop de Tokio y `LocalSet`](#2-event-loop-de-tokio-y-localset)
+- [1. Modelo Real de Ejecución](#1-modelo-real-de-ejecución)
+- [2. Estado y Límites Conocidos](#2-estado-y-límites-conocidos)
 - [3. Mecánica de Suspensión y Reanudación (`async`/`await`)](#3-mecánica-de-suspensión-y-reanudación-asyncawait)
 - [4. Generadores y Canal de Rendimiento (`yield`)](#4-generadores-y-canal-de-rendimiento-yield)
 - [5. Primitivas de Concurrencia](#5-primitivas-de-concurrencia)
@@ -19,72 +19,100 @@ Este documento especifica la arquitectura del runtime asíncrono y el sistema de
 
 ---
 
-## 1. Visión General del Runtime
+## 1. Modelo Real de Ejecución
 
-`varn-runtime` proporciona la capa de ejecución asíncrona no bloqueante de Varn. Combina un event-loop asíncrono para operaciones I/O intensivas con un modelo de **Isolates** para paralelismo real en múltiples núcleos del procesador.
+No hay event loop. Las tareas se ejecutan en un **trampolín síncrono** dentro de la VM: el intérprete corre hasta que encuentra un `await`, señala la suspensión al driver, y el driver resuelve el valor esperado antes de reanudar el mismo frame.
 
 ```mermaid
 flowchart TD
-    subgraph Single Thread LocalSet ["Hilo Actual (Task Runner)"]
-        A["Event Loop de Tokio"] <--> B["LocalSet (Tareas !Send Varn)"]
-        B --> C["VM Frame actual"]
-        C -- "await promisoria" --> D["Emitir Suspend::Task"]
+    subgraph Hilo del Isolate ["Un hilo, un heap, un trampolín"]
+        A["ExecCtx::run_lazy_task_sync
+(driver de la tarea)"] --> B["fork_for_task():
+contexto hijo con su propia pila"]
+        B --> C["fork.run(): intérprete"]
+        C -- "OpCode::Await" --> D["vm_suspend = VmSuspend::Await"]
         D --> A
+        A -- "Value::Task: recursión" --> B
+        A -- "Value::TaskHandle pendiente:
+mpsc::recv bloqueante" --> E["ExecCtx::wait_task_handle_value"]
+        E --> A
+        A -- "valor resuelto en dest_reg" --> C
     end
 
-    subgraph Multi Thread Isolates ["Paralelismo Multinúcleo"]
-        E["Isolate Principal (Hilo 1)"] <-->|Canal Tipado Sender/Receiver| F["Isolate Worker (Hilo 2)"]
-        F <-->|Mensajes Serializados SendEnvelope| G["Isolate Worker (Hilo N)"]
+    subgraph Multi Thread Isolates ["Paralelismo Multinúcleo real"]
+        F["Isolate Principal (Hilo 1)"] <-->|"varn_runtime::channel
+(Sender/Receiver tipados)"| G["Isolate Worker (Hilo 2)"]
+        G <-->|"SendEnvelope serializado"| H["Isolate Worker (Hilo N)"]
     end
 ```
 
+El paralelismo real de Varn son los Isolates (§6): hilos del sistema operativo con VM y heap propios. La concurrencia intra-hilo es cooperativa y determinista, no preemptiva.
+
 ---
 
-## 2. Event Loop de Tokio y `LocalSet`
+## 2. Estado y Límites Conocidos
 
-Puesto que las estructuras de la VM (`VmValue`, `CallFrame`, `HeapObj`) contienen punteros locales y referencias no compatibles con el rasgo `Send` de Rust, las tareas Varn de un mismo contexto se ejecutan en un `tokio::task::LocalSet`.
-- Cada hilo del runtime administra su propio `LocalSet`.
-- Permite la ejecución de miles de corrutinas en un solo hilo sin incurrir en costos de sincronización por cerrojos (*locks*).
+Consecuencias directas del modelo, para que nadie las descubra depurando:
+
+- **`await` sobre un handle pendiente bloquea el hilo.** `wait_task_handle_value` registra un `on_settle` y espera en un canal `std::sync::mpsc`. Si quien debe resolverlo es el mismo hilo, no hay quien lo resuelva.
+- **I/O no cede el control.** Las operaciones de `runtime:fs` y `runtime:net` son síncronas; `net` lanza hilos del sistema (`std::thread::spawn`) cuando necesita concurrencia.
+- **Los timers duermen el hilo.** `suspend_timer` usa `thread::sleep`. Solo intenta `tokio::task::spawn_local` si detecta un runtime Tokio activo, situación que ninguna ruta del CLI produce hoy.
+- **No hay `LocalSet` en ejecución.** El scheduler basado en Tokio que este documento describía fue eliminado en el commit `0aef540` por no tener un solo consumidor: era una arquitectura documentada pero nunca instanciada.
+
+Un event loop real es un cambio de diseño pendiente, no una descripción del presente. Cuando llegue, este documento se escribe **después** de que exista.
 
 ---
 
 ## 3. Mecánica de Suspensión y Reanudación (`async`/`await`)
 
-Cuando la VM evalúa una instrucción `await` sobre una promesa no resuelta:
+`OpCode::Await` no llama a nadie: guarda el `IP` del frame, deja
+`VmSuspend::Await { value, dest_reg }` en el contexto y retorna al driver. El
+driver (`run_lazy_task_sync`) decide cómo obtener el valor:
 
 ```mermaid
 sequenceDiagram
-    participant VM as VM Frame
-    participant RT as Runtime Scheduler
-    participant IO as Tokio IO / Timer
+    participant I as Intérprete (fork)
+    participant D as Driver (run_lazy_task_sync)
+    participant T as AsyncTask
 
-    VM->>RT: Emitir Suspend::Task(PromiseId)
-    Note over VM: Frame pausado (estado guardado)
-    RT->>IO: Registrar Waker para PromiseId
-    IO-->>RT: Notificar resolución de IO
-    RT->>VM: Reanudar Frame con resultado
+    I->>D: VmSuspend::Await { value, dest_reg }
+    Note over I: Frame pausado (IP y registros guardados)
+    alt value es Value::Task (tarea perezosa)
+        D->>D: run_lazy_task_sync recursivo
+    else value es TaskHandle ya resuelto
+        D->>T: peek_state()
+    else value es TaskHandle pendiente
+        D->>T: on_settle(callback) + mpsc::recv (bloquea el hilo)
+    end
+    D->>I: escribe el resultado en dest_reg y reanuda
 ```
 
-1. La VM emite la señal `Suspend::Task(PromiseId)` guardando la posición del contador de programa (`IP`) y los registros locales.
-2. El runtime suspende el frame y retorna el control al bucle de eventos de Tokio.
-3. Al completarse la tarea I/O, el `Waker` notifica al scheduler, el cual reactiva el frame de la VM inyectando el valor resuelto en el registro destino.
+1. La VM emite `VmSuspend::Await` guardando `IP` y registros locales del frame.
+2. El driver resuelve el valor: recursión para tareas perezosas, `peek_state`
+   para handles ya resueltos, espera bloqueante para handles pendientes.
+3. Un rechazo se reinyecta como excepción de la VM en el frame reanudado; una
+   resolución se escribe en `dest_reg`.
+
+El JIT participa por el mismo canal: `jit_helpers/suspend.rs` deja el mismo
+`VmSuspend::Await` que el intérprete, así que el contrato de suspensión es
+único para ambas rutas de ejecución.
 
 ---
 
 ## 4. Generadores y Canal de Rendimiento (`yield`)
 
-Las funciones generadoras (`function*`) utilizan un mecanismo similar a `async`/`await`:
-- Al ejecutar `yield valor`, la VM emite `Suspend::Yield(VmValue)`.
-- El valor devuelto se envía a un canal sincronizado `GenChannel`.
-- La ejecución de la función se congela hasta que el código consumidor invoca `.next()`.
+Las funciones generadoras (`function*`) usan el mismo canal de suspensión que `await`:
+- Al ejecutar `yield valor`, la VM deja `VmSuspend::Yield { value, dest_reg }`.
+- El generador guarda su `ExecCtx` completo (`NanSyncGenDriver` en `varn-vm/src/generator.rs`), no un frame aislado: la reanudación reentra en ese contexto y escribe el valor enviado por `.next(v)` en `dest_reg`.
+- La ejecución se congela entre llamadas a `.next()`; un generador que emita `VmSuspend::Await` o `Task` se trata como generador asíncrono.
 
 ---
 
 ## 5. Primitivas de Concurrencia
 
 ### `spawn` y `parallel`
-- `spawn(asyncFn())`: Lanza una tarea en segundo plano dentro del `LocalSet` actual y retorna un handle awaitable.
-- `parallel([p1, p2, p3])`: Ejecuta un array de promesas concurrentemente y suspende el frame hasta que todas se hayan resuelto.
+- `spawn(asyncFn())`: ejecuta la tarea **hasta el final en el trampolín del hilo actual** (`spawn_internal` -> `run_lazy_task_sync`) y devuelve un handle ya resuelto. No es ejecución en segundo plano: el nombre viene del modelo previsto, no del actual.
+- `parallel([p1, p2, p3])`: registra un `on_settle` por handle sobre un contador compartido y resuelve el handle agregado cuando el último llega. Los handles provienen de `spawn`, así que las tareas ya vienen ejecutadas; lo que `parallel` aporta hoy es la agregación de resultados y la propagación del primer rechazo, no solapamiento temporal.
 
 ### `TaskGroup` con Gestión Determinista (`using`)
 `TaskGroup` permite agrupar tareas asíncronas dinámicas garantizando la limpieza de recursos al salir del ámbito mediante la palabra clave `using`:

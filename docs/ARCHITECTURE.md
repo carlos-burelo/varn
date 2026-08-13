@@ -35,14 +35,14 @@ flowchart TD
         D --> E["TypedAST"]
         E --> F["varn-opt\n(HIR -> SSA -> Optimizations)"]
         F --> G["FunctionProto (Bytecode)"]
-        G --> H["varn-backend\n(Liveness & RegAlloc)"]
+        G --> H["varn-backend\n(Liveness & RegAlloc,\ninvocado desde varn-opt)"]
     end
 
     subgraph Execution ["Runtime & Execution"]
         H --> I["varn-vm\n(Register Interpreter + GC + IC)"]
         H -.-> J["varn-jit\n(x86-64 Eager Native Code)"]
         J -.-> I
-        I --> K["varn-runtime\n(Tokio Async Event Loop + Isolates)"]
+        I --> K["varn-runtime\n(canales de Isolates)"]
         I <--> L["varn-builtins\n(Stdlib Rust via LBI)"]
     end
 ```
@@ -54,11 +54,11 @@ flowchart TD
 
 ## 2. Arquitectura de Crates y Modularidad
 
-El workspace de Varn está estrictamente desacoplado en 16 crates especializados:
+El workspace son 21 crates. El inventario completo con tamaños y el grafo de aristas reales está en [CRATES_STATE.md](CRATES_STATE.md); aquí van los que definen la arquitectura:
 
 | Crate | Categoría | Responsabilidad Principal |
 |---|---|---|
-| [`varn-core`](#) | Base | AST, `OpCode` (134 opcodes sin prefijos), `ModuleId`, `Span`, evaluador numérico canónico (`numeric.rs`). Cero dependencias internas. |
+| [`varn-core`](#) | Base | AST, `OpCode` (137 opcodes sin prefijos), `ModuleId`, `Span`, evaluador numérico canónico (`numeric.rs`). Depende solo de `varn-diagnostics` y `varn-base`. |
 | [`varn-types`](#) | Base | Tipos compartidos por VM y compilador: `VmValue`, `Chunk`, `FunctionProto`, `ClassObj`, `Closure`, `ObjData`/`ObjRef`, `Shape`. |
 | [`varn-diagnostics`](#) | Base | Formateo estandarizado de errores sintácticos y semánticos con underlines para CLI y LSP. |
 | [`varn-lexer`](#) | Frontend | Tokenizador streaming UTF-8 con inserción automática de puntos y comas (ASI). |
@@ -68,7 +68,12 @@ El workspace de Varn está estrictamente desacoplado en 16 crates especializados
 | [`varn-backend`](COMPILER_ARCHITECTURE.md) | Compilador | Post-passes de análisis de vida de registros (`liveness`), asignación de registros y metapropiedades de slots. |
 | [`varn-vm`](VM_ARCHITECTURE.md) | Ejecución | VM basada en registros en 64 bits con NaN-Boxing, GC generacional (nursery + old-gen mark-sweep) e Inline Cache polimórfico. |
 | [`varn-jit`](VM_ARCHITECTURE.md) | Ejecución | Backend JIT nativo para x86-64 que compila eager funciones en hot path. |
-| [`varn-runtime`](RUNTIME_ARCHITECTURE.md) | Ejecución | Scheduler asíncrono sobre Tokio (`LocalSet`) e Isolates en hilos independientes con canales tipados. |
+| [`varn-runtime`](RUNTIME_ARCHITECTURE.md) | Ejecución | Canales tipados entre Isolates (hilos independientes) y vtable de asignación del heap. La suspensión de `async`/`await` la implementa `varn-vm`, no este crate. |
+| [`varn-base`](#) | Base | `TypeTag` y `TypeFlags`, compartidos por `varn-core`, `varn-types` y `varn-vm`. |
+| [`varn-utilities`](#) | Herramienta | Estilo de terminal (chalk, colores ANSI, salida etiquetada). |
+| [`varn-op-macros`](LBI_ARCHITECTURE.md) | Stdlib Host | Proc-macro `varn_contract!`: cruza el contrato `.vn` con la implementación Rust y emite las entradas de la tabla de ops nativa. |
+| [`varn-lsp`](#) | Herramienta | Servidor LSP (hover, completion, semantic tokens, inlay hints). |
+| [`varn-pm`](#) | Herramienta | Gestor de paquetes (`vn add`, `install`, `update`). |
 | [`varn-builtins`](LBI_ARCHITECTURE.md) | Stdlib Host | Implementaciones nativas en Rust de `core:` y `runtime:`. Registradas mediante Linker-Bound Interface (LBI). |
 | [`varn-modules`](STDLIB_ARCHITECTURE.md) | Módulos | Registro de espacio de nombres, resolución topológica y despaquetado del bundle `.vnb`. |
 | [`varn-pipeline`](#) | Orquestación | Orquesta el flujo de ejecución completo y gestiona la caché de bytecode en disco. |
@@ -100,6 +105,9 @@ flowchart LR
     D --> E["FunctionProto Bytecode"]
     E --> F["varn-backend\n(Liveness & RegAlloc)"]
 ```
+
+> [!NOTE]
+> `varn-backend` no es una fase que corra después de `varn-opt`: es una **dependencia** suya. `varn_opt::compile_module` llama a `varn_backend::run_post_passes` sobre el `FunctionProto` ya emitido, recursivamente por cada función anidada del pool de constantes.
 
 ---
 
@@ -141,11 +149,13 @@ Value Encoding:         [1 11111111111 11] [TAG 4-bit] [Payload 48-bit          
 
 ---
 
-## 7. Runtime Asíncrono e Isolates (`varn-runtime`)
+## 7. Concurrencia: `await` e Isolates
 
-- **Event Loop**: Basado en Tokio con `LocalSet` por hilo para tareas `!Send`.
-- **Frames Suspendibles**: Un `await` emite `Suspend::Task`, guardando el CallFrame y cediendo el control al event loop.
-- **Isolates**: Hilos independientes con su propia VM y heap. La comunicación se realiza mediante paso de mensajes serializados (`SendValue` / `SendEnvelope`) a través de canales tipados.
+- **`await`**: lo implementa la VM, no `varn-runtime`. `ExecCtx::wait_task_handle` registra un callback con `AsyncTask::on_settle` y espera el resultado por un canal `std::sync::mpsc` — espera bloqueante, cooperativa dentro del hilo, sin event loop.
+- **Timers**: `suspend_timer` duerme el hilo (`thread::sleep`) salvo que exista un contexto Tokio con `LocalSet`, caso que hoy no se da en ninguna ruta del CLI.
+- **Isolates**: hilos independientes con su propia VM y heap. La comunicación es paso de mensajes serializados (`SendValue` / `SendEnvelope`) por los canales tipados de `varn-runtime::channel`.
+
+Detalle y estado en [RUNTIME_ARCHITECTURE.md](RUNTIME_ARCHITECTURE.md).
 
 ---
 
@@ -155,10 +165,16 @@ El sistema Linker-Bound Interface (LBI) elimina las tablas de registro manuales 
 
 ```mermaid
 flowchart TD
-    A["#[varn_module] #[varn_fn]\nen Rust"] --> B["Compilador coloca NativeOpEntry\nen sección .varn_ops"]
-    B --> C["Al arrancar: iter_native_ops()\nescaneador de sección"]
-    C --> D["Enrutador de OpCodes Nativos en VM"]
+    A["varn_contract! { contract: \"x.vn\", impl X { .. } }"] --> B["El macro emite un NativeOpEntry por símbolo\nen la sección .varn_ops"]
+    A --> M["...y un array __VARN_LINK_MARKER_*\napuntando a los mismos statics"]
+    B --> C["iter_native_ops(): recorrido de sección"]
+    M --> R["force_link_builtins(): registro de respaldo"]
+    C --> U["all_native_ops(): unión deduplicada por ptr::eq"]
+    R --> U
+    U --> D["Tabla de dispatch por op-id en la VM"]
 ```
+
+El registro de respaldo no es redundancia decorativa: apunta a los mismos statics que la sección, así que la tabla queda completa aunque el agrupamiento de secciones del linker no cubra todas las unidades de codegen. Medido: 313 entradas idénticas con `codegen-units = 1` y con `16`.
 
 ---
 
