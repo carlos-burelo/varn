@@ -207,7 +207,7 @@ Arreglo: un segundo `OnceLock<FxHashMap<u64, &'static NativeOpEntry>>` y `all_na
 | §5.1 `codegen-units` | refutado por medición, nota corregida | `c653bd5` |
 | §4a Parseo de contratos en `varn-op-macros` | **no se implementa** — ver abajo | — |
 | §4c Tres drivers del frontend | hecho hasta donde es correcto — ver abajo | `4225cdf` |
-| §8 Archivos >1000 líneas | pendiente | — |
+| §8 Archivos >1000 líneas | hecho: 6 → 0 | `fe7e409`, `5fb67bb`, `4453ee3`, `40a7d53`, `53a868f`, `e63ddc8` |
 
 Cada fase se validó con `cargo check --workspace --all-targets` sin avisos y 991/991 en las cuatro combinaciones de procedencia de std × JIT.
 
@@ -240,6 +240,20 @@ Lo que **no** se unifica, con razón:
 - `varn-lsp/src/pipeline/` es un driver distinto, no una copia: usa `parse_partial` para tolerar código a medio escribir y produce `DocumentAnalysis` (símbolos, índice posicional, tipos por offset) que ninguna fase del pipeline necesita. Unificarlo metería preocupaciones de editor en el orquestador, justo lo contrario de lo que arregló `5465313`.
 - `varn-op-macros` parsea contratos en expansión (§4a) y `varn-cli/src/debug_binder.rs` es una herramienta de dev.
 
+### §8: ningún archivo pasa de 1000 líneas
+
+| Archivo original | Líneas | Resultado |
+|---|---|---|
+| `varn-compiler/src/ssa/emit.rs` | 1635 | 7 módulos (mayor: 611) |
+| `varn-compiler/src/ssa/build/expr.rs` | 1513 | 7 módulos (mayor: 335) |
+| `varn-compiler/src/hir/lower/expr.rs` | 1260 | 6 módulos (mayor: 397) |
+| `varn-compiler/src/hir/lower/decl.rs` | 1196 | 5 módulos (mayor: 424) |
+| `varn-compiler/src/ssa/build/stmt.rs` | 1089 | 5 módulos (mayor: 380) |
+| `varn-types/src/chunk.rs` | 1007 | 6 módulos (mayor: 339) |
+
+En todos los casos los cuerpos se movieron verbatim: los únicos cambios son visibilidad (`pub(in ...)` donde la frontera nueva lo exige) y listas de imports. El archivo mayor del workspace pasa a ser `varn-jit/src/clif/alloc/objects.rs` con 993.
+
 ## Trabajo pendiente
 
-1. **Dividir los 6 archivos sobre 1000 líneas y el subárbol `varn-vm/src/exec/`** (§8).
+1. **`varn-vm/src/exec/`** sigue siendo 12 806 líneas en un subárbol (67 % del crate). Ningún archivo suyo cruza el umbral obligatorio — el mayor es `dispatch/mod.rs` con 816 — así que es una división por dominio, no una urgencia de gobierno de tamaño.
+2. **15 archivos entre 700 y 1000 líneas** (umbral de "refactor recomendado"), encabezados por `varn-jit/src/clif/alloc/objects.rs` (993) y `varn-regalloc/src/regalloc_post.rs` (970).
