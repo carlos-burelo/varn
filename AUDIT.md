@@ -191,14 +191,43 @@ Arreglo: un segundo `OnceLock<FxHashMap<u64, &'static NativeOpEntry>>` y `all_na
 
 **Sin medición.** Es un hallazgo estructural (asignación y O(n²) evitables en un camino que ya tiene índice); el impacto en tiempo de compilación JIT no se benchmarkeó y no debe declararse hasta medirlo.
 
-## Orden recomendado
+## Estado de implementación
 
-1. **Borrar el código muerto verificado** — riesgo nulo, gana claridad inmediata: `varn-runtime/src/scheduler.rs` (451 L) + `TaskRunner`/`TaskId`, `varn-core/src/time.rs` (155 L), `varn-backend/src/ir.rs` (144 L) + los 153 L de `liveness.rs`, la FFI de `varn-lexer` (68 L). Con `scheduler.rs` fuera, `tokio` sale de `varn-runtime`.
-2. **Corregir `CLAUDE.md` (§5.1) y las tres docs de §6.** La documentación que describe un scheduler inexistente es peor que la ausencia de documentación: dirige el trabajo futuro hacia una arquitectura que no está ahí.
-3. **Quitar las 12 dependencias sin uso** y añadir `[workspace.package]` + `[workspace.lints]` con `unreachable_pub` / `unused_crate_dependencies`. Esto convierte §2 y §3 en un check automático.
-4. **Bajar a `pub(crate)`** las ~100 funciones sin consumidor externo que se decida conservar, para que el lint vuelva a ver las fronteras.
-5. **Fusionar `varn-base` + `varn-diagnostics` en `varn-core`; renombrar `varn-utilities` → `varn-term`** (21 → 19 crates).
-6. **Renombrar `varn-opt` → `varn-compiler` y `varn-backend` → `varn-regalloc`**: mecánico, y elimina la necesidad de notas aclaratorias en las instrucciones del agente.
-7. **Cortar `varn-pipeline → varn-lsp`**: mover `lsp_debug.rs` y `debug/types.rs` a `varn-cli`, que ya depende de ambos.
-8. **Unificar los tres drivers del frontend** (§4c) y **mover el parseo de contratos de `varn-op-macros` a un build-script** (§4a). El trabajo grande, y el que más deuda paga.
-9. **Dividir `varn-vm/src/exec/` y los 6 archivos >1000 líneas** por dominio.
+| Punto | Estado | Commit |
+|---|---|---|
+| §2 Código muerto (bloques completos) | hecho, 1005 líneas | `0aef540` |
+| §2 Código muerto (101 `pub fn`) | hecho, 84 funciones + cascada, escáner en punto fijo | `a96a1c5` |
+| §3 Dependencias sin uso | hecho, 12 fuera + `unused_crate_dependencies` como lint de workspace | `8bfb14a` |
+| §6 Divergencia docs↔código | hecho (RUNTIME, CRATES_STATE, ARCHITECTURE, README, CLAUDE.md) | `c653bd5` |
+| §7 Fusión `varn-base` + `varn-diagnostics`, rename `varn-utilities` | hecho, 21 → 19 crates | `1c9a152` |
+| §7 Rename `varn-opt` → `varn-compiler`, `varn-backend` → `varn-regalloc` | hecho | `ce76b1c` |
+| §4b Arista `varn-pipeline → varn-lsp` | cortada; además `-p types` estaba roto y quedó arreglado | `5465313` |
+| §10 Índice por op-id en dispatch | hecho, sin claim de rendimiento | `e89a501` |
+| §5.2 `panic = "abort"` + `catch_unwind` | hecho, rama eliminada | `acafc79` |
+| §5.1 `codegen-units` | refutado por medición, nota corregida | `c653bd5` |
+| §4a Parseo de contratos en `varn-op-macros` | **no se implementa** — ver abajo | — |
+| §4c Tres drivers del frontend | pendiente | — |
+| §8 Archivos >1000 líneas | pendiente | — |
+
+Cada fase se validó con `cargo check --workspace --all-targets` sin avisos y 991/991 en las cuatro combinaciones de procedencia de std × JIT.
+
+### §4a: la arista al parser no cuesta build time (medido)
+
+El argumento para mover el parseo de contratos a un build-script era que `varn-vm → varn-builtins → varn-op-macros → varn-parser` "serializa el grafo de build". Medido con `cargo build --profile quick --bin vn --timings` sobre los 19 crates recompilados:
+
+| Unidad | Arranca | Dura |
+|---|---|---|
+| `varn-parser` (metadata) | 1,52 s | 2,98 s |
+| `varn-op-macros` | 4,52 s | 2,58 s |
+| `varn-builtins` (metadata) | 7,10 s | 10,61 s |
+| `varn-lsp` | 14,48 s | 20,96 s |
+| `varn-cli` | **35,44 s** | **74,83 s** |
+
+Wall total 110,3 s, 300 s-CPU. La ruta crítica termina en `varn-lsp` (acaba exactamente en 35,44 s, el instante en que arranca `varn-cli`) y luego en el codegen de `varn-cli`, que es el **68 % del wall**. `varn-op-macros` espera ~3,5 s por la metadata del parser, pero ni `op-macros` ni `builtins` están en la ruta crítica: ese retraso se solapa con `varn-checker` y `varn-lsp`.
+
+Conclusión: reescribir `varn_contract!` para consumir un AST preparseado desde `OUT_DIR` no reduciría el tiempo de build de forma medible, y costaría un IR serializado nuevo más la reescritura de un macro de 910 líneas. La arista sigue siendo fea en el diagrama de dependencias, pero pagar esa complejidad exige una razón que la medición no da. Si el objetivo real es el tiempo de build, el objeto de estudio es el codegen de `varn-cli`, no el parser.
+
+## Trabajo pendiente
+
+1. **Unificar los tres drivers del frontend** (§4c) — `varn-checker/module_resolver.rs` re-corre lex+parse en 10 sitios y `varn-lsp` mantiene su propio `pipeline/`. Es el punto de mayor deuda estructural que queda.
+2. **Dividir los 6 archivos sobre 1000 líneas y el subárbol `varn-vm/src/exec/`** (§8).
