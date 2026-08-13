@@ -1,6 +1,4 @@
-use std::collections::{HashMap, HashSet};
-
-use crate::ir::IrModule;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct LiveRange {
@@ -23,39 +21,6 @@ impl LivenessAnalyzer {
             use_sites: HashMap::new(),
             live_ranges: Vec::new(),
         }
-    }
-
-    pub fn analyze_module(&mut self, module: &IrModule) -> Vec<LiveRange> {
-        self.def_sites.clear();
-        self.use_sites.clear();
-
-        for (idx, instr) in module.instrs.iter().enumerate() {
-            if !instr.dest.is_none() {
-                self.def_sites
-                    .entry(instr.dest.0)
-                    .and_modify(|existing| *existing = (*existing).min(idx))
-                    .or_insert(idx);
-            }
-            if !instr.src1.is_none() {
-                self.use_sites
-                    .entry(instr.src1.0)
-                    .or_insert_with(Vec::new)
-                    .push(idx);
-            }
-            if !instr.src2.is_none() {
-                self.use_sites
-                    .entry(instr.src2.0)
-                    .or_insert_with(Vec::new)
-                    .push(idx);
-            }
-        }
-
-        let vregs = module.used_vregs();
-        self.analyze(vregs)
-    }
-
-    pub fn analyze(&mut self, vregs_used: Vec<u16>) -> Vec<LiveRange> {
-        self.analyze_with_back_edges(vregs_used, &[])
     }
 
     pub fn analyze_with_back_edges(
@@ -119,33 +84,6 @@ impl LivenessAnalyzer {
             .push(instr_idx);
     }
 
-    pub fn max_concurrent_live(&self) -> usize {
-        if self.live_ranges.is_empty() {
-            return 0;
-        }
-
-        let mut events: Vec<(usize, bool)> = Vec::with_capacity(self.live_ranges.len() * 2);
-        for r in &self.live_ranges {
-            events.push((r.start, false));
-            events.push((r.end + 1, true));
-        }
-
-        events.sort_unstable_by(|a, b| a.0.cmp(&b.0).then(b.1.cmp(&a.1)));
-        let mut live = 0i64;
-        let mut max_live = 0usize;
-        for (_, is_end) in events {
-            if is_end {
-                live -= 1;
-            } else {
-                live += 1;
-                if live as usize > max_live {
-                    max_live = live as usize;
-                }
-            }
-        }
-        max_live
-    }
-
     fn compute_interference(&mut self) {
         let ranges_len = self.live_ranges.len();
         let mut pairs: Vec<(usize, usize)> = Vec::new();
@@ -167,75 +105,5 @@ impl LivenessAnalyzer {
             self.live_ranges[i].interference.push(vj);
             self.live_ranges[j].interference.push(vi);
         }
-    }
-
-    pub fn live_ranges(&self) -> &[LiveRange] {
-        &self.live_ranges
-    }
-}
-
-pub struct InterferenceGraph {
-    pub nodes: Vec<u16>,
-    pub edges: HashMap<u16, HashSet<u16>>,
-}
-
-impl InterferenceGraph {
-    pub fn from_live_ranges(ranges: &[LiveRange]) -> Self {
-        let mut nodes = Vec::new();
-        let mut edges: HashMap<u16, HashSet<u16>> = HashMap::new();
-
-        for range in ranges {
-            nodes.push(range.vreg);
-            edges.insert(range.vreg, range.interference.iter().copied().collect());
-        }
-
-        Self { nodes, edges }
-    }
-
-    pub fn chromatic_number_upper_bound(&self) -> usize {
-        if self.nodes.is_empty() {
-            return 0;
-        }
-
-        let mut ordered = self.nodes.clone();
-        ordered.sort_unstable_by(|a, b| {
-            let da = self.edges.get(a).map(|s| s.len()).unwrap_or(0);
-            let db = self.edges.get(b).map(|s| s.len()).unwrap_or(0);
-            db.cmp(&da)
-        });
-
-        let mut coloring: HashMap<u16, usize> = HashMap::new();
-        let mut max_color = 0usize;
-
-        for &node in &ordered {
-            let neighbor_colors: HashSet<usize> = self
-                .edges
-                .get(&node)
-                .map(|neighbors| {
-                    neighbors
-                        .iter()
-                        .filter_map(|n| coloring.get(n).copied())
-                        .collect()
-                })
-                .unwrap_or_default();
-
-            let color = (0..).find(|c| !neighbor_colors.contains(c)).unwrap_or(0);
-            coloring.insert(node, color);
-            if color > max_color {
-                max_color = color;
-            }
-        }
-
-        max_color + 1
-    }
-
-    pub fn find_low_degree_node(&self, max_colors: u16) -> Option<u16> {
-        for &node in &self.nodes {
-            let degree = self.edges.get(&node).map(|s| s.len()).unwrap_or(0);
-            if degree < max_colors as usize {
-                return Some(node);
-            }
-        }
-        None
     }
 }

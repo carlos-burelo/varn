@@ -1,4 +1,3 @@
-pub mod ir;
 pub mod liveness;
 pub mod regalloc_post;
 

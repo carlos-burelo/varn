@@ -31,10 +31,6 @@ pub(crate) struct Scanner<'a> {
 }
 
 impl<'a> Scanner<'a> {
-    pub(crate) fn new(src: &'a [u8]) -> Self {
-        Self::with_config(src, LexerConfig::default())
-    }
-
     pub(crate) fn with_config(src: &'a [u8], config: LexerConfig) -> Self {
         let mut line_starts = Vec::with_capacity(64);
         line_starts.push(0usize);

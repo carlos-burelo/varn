@@ -4,6 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-varn-types  = { path = "../varn-types" }
-parking_lot = { workspace = true }
-tokio       = { version = "1", features = ["full"] }
+varn-types = { path = "../varn-types" }
