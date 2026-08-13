@@ -16,7 +16,7 @@ pub fn debug_ssa(
     extension_members: &FxHashMap<u32, Rc<str>>,
     extension_set_members: &FxHashMap<u32, Rc<str>>,
 ) {
-    let input = varn_opt::OptInput {
+    let input = varn_compiler::OptInput {
         program,
         annotations,
         extension_calls,
@@ -25,7 +25,7 @@ pub fn debug_ssa(
         export_names: Vec::new(),
     };
 
-    match varn_opt::lower_to_ssa(input) {
+    match varn_compiler::lower_to_ssa(input) {
         Ok((funcs, skipped)) => {
             eprintln!(
                 "\n{BOLD}{BLUE}SSA{R}{DIM} ─────────────────────────────── {}{R}",
@@ -40,7 +40,7 @@ pub fn debug_ssa(
             }
 
             for func in &funcs {
-                let dump = varn_opt::ssa::dump::dump(func);
+                let dump = varn_compiler::ssa::dump::dump(func);
                 eprint!("{dump}");
             }
 
@@ -56,7 +56,7 @@ pub fn debug_ssa(
 
             eprintln!("{DIM}── end: SSA ──{R}");
         }
-        Err(varn_opt::OptError::Unsupported(msg)) => {
+        Err(varn_compiler::OptError::Unsupported(msg)) => {
             eprintln!("\n  {YELLOW}warn{R} HIR lowering failed — cannot build SSA");
             eprintln!("  {DIM}unsupported construct: {msg}{R}");
         }

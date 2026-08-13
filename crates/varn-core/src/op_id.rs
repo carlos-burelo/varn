@@ -7,7 +7,7 @@
 //! fixed strings it is identical across builds and platforms, so it is safe to
 //! serialize into cached `.vnc` bytecode.
 //!
-//! This lives in `varn-core` so both the `varn-opt` compiler and the
+//! This lives in `varn-core` so both the `varn-compiler` crate and the
 //! `varn-builtins` runtime compute the exact same id (neither can depend on the
 //! other).
 

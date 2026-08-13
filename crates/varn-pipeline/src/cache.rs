@@ -136,7 +136,7 @@ pub fn compile_output_from_graph(graph: ModuleGraphArtifact) -> PipelineResult<C
         ))
     })?;
 
-    let mut precompiled: FxHashMap<varn_core::ModuleId, Rc<varn_opt::FunctionProto>> =
+    let mut precompiled: FxHashMap<varn_core::ModuleId, Rc<varn_compiler::FunctionProto>> =
         FxHashMap::default();
     for (path, proto) in &graph.modules {
         if *path == entry_path {

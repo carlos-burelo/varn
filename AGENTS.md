@@ -50,12 +50,12 @@ Checker
 
 Compilador (AST → HIR → SSA → bytecode)
 
-* crates/varn-opt
+* crates/varn-compiler
 * docs/COMPILER_ARCHITECTURE.md
 
 Backend de bytecode (liveness, register allocation, post-passes)
 
-* crates/varn-backend
+* crates/varn-regalloc
 
 JIT (x86-64)
 
@@ -86,9 +86,6 @@ Stdlib (`std/*.vn`, bundle `.vnb`)
 * std/
 * crates/varn-modules
 * docs/STDLIB_ARCHITECTURE.md
-
-NOTA: no existe ningún crate `varn-compiler` ni `varn-ir`. La generación de bytecode
-vive en `varn-opt`; los post-passes en `varn-backend`.
 
 </workspace_map>
 

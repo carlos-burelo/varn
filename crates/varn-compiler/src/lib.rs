@@ -45,7 +45,7 @@ pub fn compile_module(
         extension_set_members,
         export_names,
     })
-    .map_err(|e| -> Rc<str> { Rc::from(format!("varn-opt could not lower module: {e:?}")) })
+    .map_err(|e| -> Rc<str> { Rc::from(format!("varn-compiler could not lower module: {e:?}")) })
 }
 
 pub fn compile(input: OptInput<'_>) -> Result<FunctionProto, OptError> {
@@ -56,12 +56,12 @@ pub fn compile(input: OptInput<'_>) -> Result<FunctionProto, OptError> {
     hir::module_locals::run(&mut module);
     if std::env::var_os("VN_OPT_TRACE").is_some() {
         eprintln!(
-            "[varn-opt] compiled module: {} fn(s) + top-level",
+            "[varn-compiler] compiled module: {} fn(s) + top-level",
             module.functions.len()
         );
     }
     let mut proto = lower::lower(&module, source_file, export_names)?;
-    varn_backend::run_post_passes(&mut proto);
+    varn_regalloc::run_post_passes(&mut proto);
     Ok(proto)
 }
 

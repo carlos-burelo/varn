@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use rustc_hash::FxHashMap;
 use varn_core::ModuleId;
-use varn_opt::FunctionProto;
+use varn_compiler::FunctionProto;
 use varn_types::value::Closure;
 use varn_vm::loader::CompositeLoader;
 use varn_vm::Vm;

@@ -25,8 +25,8 @@ varn-core     = { path = "../varn-core" }
 varn-lexer    = { path = "../varn-lexer" }
 varn-parser   = { path = "../varn-parser", features = ["profiling"] }
 varn-checker  = { path = "../varn-checker" }
-varn-opt      = { path = "../varn-opt" }
-varn-backend  = { path = "../varn-backend" }
+varn-compiler = { path = "../varn-compiler" }
+varn-regalloc = { path = "../varn-regalloc" }
 varn-vm       = { path = "../varn-vm", features = ["profiling"] }
 varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
 varn-types    = { path = "../varn-types" }

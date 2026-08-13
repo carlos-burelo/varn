@@ -1,4 +1,4 @@
-# Arquitectura del Compilador y SSA (`varn-opt` & `varn-backend`)
+# Arquitectura del Compilador y SSA (`varn-compiler` & `varn-regalloc`)
 
 Este documento detalla el diseño interno del compilador de **Varn**, comprendiendo la transformación del Árbol de Sintaxis Abstracta Tipado (`TypedAST`), la representación intermedia de alto nivel (`HIR`), la construcción en Forma de Asignación Única Estática (`SSA`), el bucle de optimizaciones de punto fijo y la emisión de bytecode optimizado.
 
@@ -7,7 +7,7 @@ Este documento detalla el diseño interno del compilador de **Varn**, comprendie
 ## Tabla de Contenidos
 
 - [1. Visión General del Pipeline del Compilador](#1-visión-general-del-pipeline-del-compilador)
-- [2. Del AST Tipado al HIR (`varn-opt`)](#2-del-ast-tipado-al-hir-varn-opt)
+- [2. Del AST Tipado al HIR (`varn-compiler`)](#2-del-ast-tipado-al-hir-varn-compiler)
 - [3. Representación Formas SSA (Static Single Assignment)](#3-representación-formas-ssa-static-single-assignment)
 - [4. Bucle de Optimizaciones de Punto Fijo](#4-bucle-de-optimizaciones-de-punto-fijo)
   - [Propagación y Plegado de Constantes (`const_fold`)](#propagación-y-plegado-de-constantes-const_fold)
@@ -16,7 +16,7 @@ Este documento detalla el diseño interno del compilador de **Varn**, comprendie
   - [Acceso Directo a Campos por Shape (`fixed_fields`)](#acceso-directo-a-campos-por-shape-fixed_fields)
   - [Simplificación del Grafo de Flujo de Control (`cfg`)](#simplificación-del-grafo-de-flujo-de-control-cfg)
 - [5. Emisión de Bytecode y Estructura de `FunctionProto`](#5-emisión-de-bytecode-y-estructura-de-functionproto)
-- [6. Post-Passes del Backend (`varn-backend`)](#6-post-passes-del-backend-varn-backend)
+- [6. Post-Passes del Backend (`varn-regalloc`)](#6-post-passes-del-backend-varn-regalloc)
   - [Análisis de Vida de Registros (`liveness`)](#análisis-de-vida-de-registros-liveness)
   - [Asignación de Registros Nativos (`regalloc_post`)](#asignación-de-registros-nativos-regalloc_post)
   - [Inferidor de Tipos de Slot (`slot_kinds`)](#inferidor-de-tipos-de-slot-slot_kinds)
@@ -25,7 +25,7 @@ Este documento detalla el diseño interno del compilador de **Varn**, comprendie
 
 ## 1. Visión General del Pipeline del Compilador
 
-El pipeline de compilación se divide estrictamente entre la fase de optimización semántica SSA (`varn-opt`) y la fase de post-procesamiento de registros (`varn-backend`):
+El pipeline de compilación se divide estrictamente entre la fase de optimización semántica SSA (`varn-compiler`) y la fase de post-procesamiento de registros (`varn-regalloc`):
 
 ```mermaid
 flowchart TD
@@ -33,7 +33,7 @@ flowchart TD
         A["TypedAST + SemanticDB"]
     end
 
-    subgraph varn-opt ["varn-opt: Optimización & lowering SSA"]
+    subgraph varn-compiler ["varn-compiler: Optimización & lowering SSA"]
         A --> B["Lowering a HIR\n(High-Level IR)"]
         B --> C["Construcción de Grafo SSA\n(Basic Blocks + phi nodes)"]
         
@@ -49,7 +49,7 @@ flowchart TD
         Loop --> I["Emisión a Bytecode Inicial\n(FunctionProto / Chunk)"]
     end
 
-    subgraph varn-backend ["varn-backend: Post-passes de registros"]
+    subgraph varn-regalloc ["varn-regalloc: Post-passes de registros"]
         I --> J["liveness Analysis\n(Liveness ranges por registro)"]
         J --> K["regalloc_post\n(Reorganización compacta de registros)"]
         K --> L["slot_kinds Metadata\n(Clasificación float/int/ptr para JIT)"]
@@ -60,7 +60,7 @@ flowchart TD
 
 ---
 
-## 2. Del AST Tipado al HIR (`varn-opt`)
+## 2. Del AST Tipado al HIR (`varn-compiler`)
 
 El lowering convierte el árbol sintáctico del checker en un Grafo de Flujo de Control (CFG) estructurado en HIR:
 - Se desazucaran constructos complejos: el operador pipeline (`|>`) se expande a llamadas de función estándar; las clases e interfaces se traducen a vtables e índices de campos.
@@ -99,7 +99,7 @@ En la representación SSA:
 
 ## 4. Bucle de Optimizaciones de Punto Fijo
 
-`varn-opt` ejecuta un conjunto de pases iterativos hasta que el bytecode alcance un estado estable (*fixed-point*):
+`varn-compiler` ejecuta un conjunto de pases iterativos hasta que el bytecode alcance un estado estable (*fixed-point*):
 
 ### Propagación y Plegado de Constantes (`const_fold`)
 Evalúa expresiones aritméticas y lógicas conocidas en tiempo de compilación utilizando la fuente canónica `numeric.rs`:
@@ -135,9 +135,9 @@ El compilador emite un `FunctionProto` reutilizable que contiene:
 
 ---
 
-## 6. Post-Passes del Backend (`varn-backend`)
+## 6. Post-Passes del Backend (`varn-regalloc`)
 
-Una vez emitido el bytecode inicial, `varn-backend` procesa el resultado:
+Una vez emitido el bytecode inicial, `varn-regalloc` procesa el resultado:
 
 ### Análisis de Vida de Registros (`liveness`)
 Calcula los intervalos de vida (*live ranges*) de cada registro virtual para determinar la interferencia de variables.

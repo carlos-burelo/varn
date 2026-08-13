@@ -26,13 +26,13 @@ graph TD
     CLI --> Debug["varn-debug"]
 
     Pipeline --> Checker["varn-checker"]
-    Pipeline --> Opt["varn-opt"]
+    Pipeline --> Opt["varn-compiler"]
     Pipeline --> VM["varn-vm"]
     Pipeline --> Modules["varn-modules"]
     Pipeline --> Term["varn-term"]
     Pipeline -.->|"feature lsp-debug, que varn-cli activa siempre"| LSP["varn-lsp"]
 
-    Opt --> Backend["varn-backend"]
+    Opt --> Backend["varn-regalloc"]
     Opt --> Core["varn-core"]
     Opt --> Types["varn-types"]
     Backend --> Types
@@ -72,7 +72,7 @@ Dos aristas del grafo son deuda conocida, no diseño (ver [../AUDIT.md](../AUDIT
 |---|---|---|---|
 | `varn-vm` | Ejecución | 19 038 | Estable |
 | `varn-checker` | Frontend | 16 594 | Estable |
-| `varn-opt` | Compilador (AST→HIR→SSA→bytecode) | 15 694 | Estable |
+| `varn-compiler` | Compilador (AST→HIR→SSA→bytecode) | 15 694 | Estable |
 | `varn-jit` | JIT x86-64 (Cranelift) | 8 625 | En evolución |
 | `varn-lsp` | Servidor LSP | 7 437 | En evolución |
 | `varn-types` | Modelo de datos de runtime y bytecode | 6 263 | Estable |
@@ -84,7 +84,7 @@ Dos aristas del grafo son deuda conocida, no diseño (ver [../AUDIT.md](../AUDIT
 | `varn-pipeline` | Orquestación de fases y caché | 3 034 | Estable |
 | `varn-lexer` | Frontend | 1 557 | Estable |
 | `varn-modules` | Resolución de módulos y bundle `.vnb` | 1 292 | Estable |
-| `varn-backend` | Liveness + regalloc post-pass | 1 103 | Estable |
+| `varn-regalloc` | Liveness + regalloc post-pass | 1 103 | Estable |
 | `varn-op-macros` | Proc-macro `varn_contract!` | 918 | Estable |
 | `varn-pm` | Gestor de paquetes | 802 | En evolución |
 | `varn-runtime` | Canales de isolates + vtable de heap | 381 | Estable |
@@ -97,8 +97,8 @@ Dos aristas del grafo son deuda conocida, no diseño (ver [../AUDIT.md](../AUDIT
 ### Frontend (`varn-lexer`, `varn-parser`, `varn-checker`)
 Tokenización con ASI, parser descendente con precedencia Pratt, y type-checker multi-fase que produce `TypedAST` + `SemanticDB`.
 
-### Compilador (`varn-opt`, `varn-backend`)
-`varn-opt` baja AST → HIR → SSA → bytecode y corre los passes de optimización. `varn-backend` no es una fase posterior: `varn-opt` lo **invoca por dentro** (`run_post_passes`) para el liveness y la reasignación de registros sobre el bytecode ya emitido.
+### Compilador (`varn-compiler`, `varn-regalloc`)
+`varn-compiler` baja AST → HIR → SSA → bytecode y corre los passes de optimización. `varn-regalloc` no es una fase posterior: `varn-compiler` lo **invoca por dentro** (`run_post_passes`) para el liveness y la reasignación de registros sobre el bytecode ya emitido.
 
 ### Ejecución (`varn-vm`, `varn-jit`)
 VM de registros de 64 bits con NaN-boxing, GC generacional (nursery + mark-sweep) e inline caches. El JIT compila con Cranelift y comparte la tabla de helpers con la ruta de inspección `vn debug -p clif`.
@@ -114,11 +114,11 @@ Umbral de refactor obligatorio: 1000 líneas por archivo. Archivos que hoy lo cr
 
 | Archivo | Líneas |
 |---|---|
-| `varn-opt/src/ssa/emit.rs` | 1635 |
-| `varn-opt/src/ssa/build/expr.rs` | 1513 |
-| `varn-opt/src/hir/lower/expr.rs` | 1260 |
-| `varn-opt/src/hir/lower/decl.rs` | 1196 |
-| `varn-opt/src/ssa/build/stmt.rs` | 1089 |
+| `varn-compiler/src/ssa/emit.rs` | 1635 |
+| `varn-compiler/src/ssa/build/expr.rs` | 1513 |
+| `varn-compiler/src/hir/lower/expr.rs` | 1260 |
+| `varn-compiler/src/hir/lower/decl.rs` | 1196 |
+| `varn-compiler/src/ssa/build/stmt.rs` | 1089 |
 | `varn-types/src/chunk.rs` | 1007 |
 
 El subárbol `varn-vm/src/exec/` son 12 806 líneas (67 % del crate) y es el siguiente candidato a división por dominio.

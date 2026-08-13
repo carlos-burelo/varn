@@ -225,7 +225,7 @@ fn compile_source_inner(
         .map(|k| std::rc::Rc::from(k.as_str()))
         .collect();
     export_names.sort();
-    varn_opt::compile_module(
+    varn_compiler::compile_module(
         &program,
         &check.type_annotations,
         &check.extension_calls,

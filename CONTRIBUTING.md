@@ -19,7 +19,7 @@ Gracias por tu interés en contribuir al desarrollo del lenguaje de programació
 
 1. **Simplicidad sobre Complejidad**: Preferir soluciones pequeñas, locales y cohesionadas. Aplicar DRY y KISS.
 2. **Sin Deuda Técnica Ni Compatibilidad Legada Innecesaria**: Si un subsistema tiene defectos fundamentales, no extenderlo; reemplazarlo.
-3. **Frontend / Backend Boundary**: Mantener límites estrictos entre frontend (`varn-lexer`, `varn-parser`, `varn-checker`), compilador (`varn-opt`), backend (`varn-backend`), VM (`varn-vm`) y runtime (`varn-runtime`).
+3. **Frontend / Backend Boundary**: Mantener límites estrictos entre frontend (`varn-lexer`, `varn-parser`, `varn-checker`), compilador (`varn-compiler`), backend (`varn-regalloc`), VM (`varn-vm`) y runtime (`varn-runtime`).
 
 ---
 

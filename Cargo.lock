@@ -1998,14 +1998,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "varn-backend"
-version = "0.1.0"
-dependencies = [
- "varn-core",
- "varn-types",
-]
-
-[[package]]
 name = "varn-builtins"
 version = "0.1.0"
 dependencies = [
@@ -2051,21 +2043,32 @@ dependencies = [
  "clap_complete",
  "postcard",
  "rustc-hash 1.1.0",
- "varn-backend",
  "varn-builtins",
  "varn-checker",
+ "varn-compiler",
  "varn-core",
  "varn-debug",
  "varn-lexer",
  "varn-lsp",
  "varn-modules",
- "varn-opt",
  "varn-parser",
  "varn-pipeline",
  "varn-pm",
+ "varn-regalloc",
  "varn-term",
  "varn-types",
  "varn-vm",
+]
+
+[[package]]
+name = "varn-compiler"
+version = "0.1.0"
+dependencies = [
+ "rust_decimal",
+ "rustc-hash 1.1.0",
+ "varn-core",
+ "varn-regalloc",
+ "varn-types",
 ]
 
 [[package]]
@@ -2083,9 +2086,9 @@ dependencies = [
  "iced-x86",
  "rustc-hash 1.1.0",
  "varn-checker",
+ "varn-compiler",
  "varn-core",
  "varn-jit",
- "varn-opt",
  "varn-term",
  "varn-types",
  "varn-vm",
@@ -2151,17 +2154,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "varn-opt"
-version = "0.1.0"
-dependencies = [
- "rust_decimal",
- "rustc-hash 1.1.0",
- "varn-backend",
- "varn-core",
- "varn-types",
-]
-
-[[package]]
 name = "varn-parser"
 version = "0.1.0"
 dependencies = [
@@ -2178,12 +2170,12 @@ dependencies = [
  "serde_json",
  "tower-lsp",
  "varn-checker",
+ "varn-compiler",
  "varn-core",
  "varn-debug",
  "varn-lexer",
  "varn-lsp",
  "varn-modules",
- "varn-opt",
  "varn-parser",
  "varn-term",
  "varn-types",
@@ -2204,6 +2196,14 @@ dependencies = [
  "ureq",
  "varn-modules",
  "varn-term",
+]
+
+[[package]]
+name = "varn-regalloc"
+version = "0.1.0"
+dependencies = [
+ "varn-core",
+ "varn-types",
 ]
 
 [[package]]

@@ -1,5 +1,5 @@
 use crate::PipelineError;
-use varn_opt::FunctionProto;
+use varn_compiler::FunctionProto;
 
 type PipelineResult<T> = Result<T, PipelineError>;
 

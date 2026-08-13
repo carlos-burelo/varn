@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use rustc_hash::FxHashMap;
 use varn_checker::Checker;
 use varn_core::ModuleId;
-use varn_opt::FunctionProto;
+use varn_compiler::FunctionProto;
 use varn_types::value::Closure;
 use varn_term::chalk::chalk;
 use varn_term::terminal;
@@ -102,10 +102,10 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
 
     let optimize_samples = std::cell::RefCell::new(Vec::with_capacity(runs));
     let compile_samples = time_n(runs, || {
-        varn_backend::regalloc_post::OPTIMIZE_TIME.with(|t| t.set(Duration::ZERO));
-        varn_backend::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(true));
+        varn_regalloc::regalloc_post::OPTIMIZE_TIME.with(|t| t.set(Duration::ZERO));
+        varn_regalloc::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(true));
 
-        let res = varn_opt::compile_module(
+        let res = varn_compiler::compile_module(
             program_ref,
             &check_result.type_annotations,
             &check_result.extension_calls,
@@ -114,8 +114,8 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             export_names_of(&program_ref.filename),
         );
 
-        varn_backend::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(false));
-        let opt_dur = varn_backend::regalloc_post::OPTIMIZE_TIME.with(|t| t.get());
+        varn_regalloc::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(false));
+        let opt_dur = varn_regalloc::regalloc_post::OPTIMIZE_TIME.with(|t| t.get());
         optimize_samples.borrow_mut().push(opt_dur);
 
         res.map(|_| ())
@@ -129,7 +129,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map(|(c, o)| c.saturating_sub(*o))
         .collect();
 
-    let proto = varn_opt::compile_module(
+    let proto = varn_compiler::compile_module(
         &program,
         &check_result.type_annotations,
         &check_result.extension_calls,
@@ -247,7 +247,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
 
         let check_result = Checker::check_with_profile(&program);
 
-        let mut proto = varn_opt::compile_module(
+        let mut proto = varn_compiler::compile_module(
             &program,
             &check_result.type_annotations,
             &check_result.extension_calls,

@@ -10,7 +10,7 @@ pub fn debug_hir(
     extension_members: &FxHashMap<u32, Rc<str>>,
     extension_set_members: &FxHashMap<u32, Rc<str>>,
 ) {
-    let input = varn_opt::OptInput {
+    let input = varn_compiler::OptInput {
         program,
         annotations,
         extension_calls,
@@ -19,14 +19,14 @@ pub fn debug_hir(
         export_names: Vec::new(),
     };
 
-    match varn_opt::lower_to_hir(input) {
+    match varn_compiler::lower_to_hir(input) {
         Ok(module) => {
-            varn_opt::hir::dump::dump_module(&module, program.filename.as_ref());
+            varn_compiler::hir::dump::dump_module(&module, program.filename.as_ref());
         }
-        Err(varn_opt::OptError::Unsupported(msg)) => {
+        Err(varn_compiler::OptError::Unsupported(msg)) => {
             eprintln!("\n  \x1b[33mwarn\x1b[0m HIR lowering not fully supported for this file");
             eprintln!("  \x1b[2munsupported construct: {msg}\x1b[0m");
-            eprintln!("  \x1b[2m(set VN_OPT=1 to see which module routes through varn-opt)\x1b[0m");
+            eprintln!("  \x1b[2m(set VN_OPT=1 to see which module routes through varn-compiler)\x1b[0m");
         }
     }
 }

@@ -10,8 +10,8 @@ const FINGERPRINTED_CRATES: &[&str] = &[
     "varn-parser",
     "varn-checker",
     "varn-types",
-    "varn-opt",
-    "varn-backend",
+    "varn-compiler",
+    "varn-regalloc",
     "varn-modules",
 ];
 

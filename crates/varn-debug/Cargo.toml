@@ -8,7 +8,7 @@ varn-term      = { path = "../varn-term" }
 varn-core     = { path = "../varn-core" }
 varn-checker  = { path = "../varn-checker" }
 varn-types    = { path = "../varn-types" }
-varn-opt      = { path = "../varn-opt" }
+varn-compiler = { path = "../varn-compiler" }
 varn-jit      = { path = "../varn-jit" }
 varn-vm       = { path = "../varn-vm" }
 rustc-hash    = { workspace = true }

@@ -138,7 +138,7 @@ pub fn emit_function(
 /// every value a register hosts, plus `Dynamic` for caller-written slots
 /// (callee, params, `this`) and helper registers that host no SSA value
 /// (scratch, call staging, null). Replaces the old opcode-walking
-/// re-inference in `varn-backend`, which guessed back what the checker
+/// re-inference in `varn-regalloc`, which guessed back what the checker
 /// already proved. `regalloc_post` re-permutes this when it coalesces.
 fn derive_register_meta(
     ssa: &SsaFunc,

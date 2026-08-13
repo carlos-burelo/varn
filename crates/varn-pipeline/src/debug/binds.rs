@@ -1,4 +1,4 @@
-use varn_opt::{FunctionProto, PoolEntry};
+use varn_compiler::{FunctionProto, PoolEntry};
 use varn_term::chalk::chalk;
 use varn_term::terminal::Section;
 

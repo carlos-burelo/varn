@@ -1,16 +1,16 @@
 [package]
-name = "varn-opt"
+name = "varn-compiler"
 version.workspace = true
 edition.workspace = true
 
-# Optimizing backend: AST -> HIR -> SSA -> opt passes -> bytecode (FunctionProto).
+# The compiler: AST -> HIR -> SSA -> opt passes -> bytecode (FunctionProto).
 # Depends only on the AST (varn-core) and the bytecode/proto types (varn-types).
 # `compile_module` is the front door; the VM/JIT consume the FunctionProto it
-# emits. The register-allocation post-passes live in varn-backend.
+# emits. The register-allocation post-passes live in varn-regalloc.
 [dependencies]
 varn-core  = { path = "../varn-core" }
 varn-types = { path = "../varn-types" }
-varn-backend = { path = "../varn-backend" }
+varn-regalloc = { path = "../varn-regalloc" }
 rustc-hash = { workspace = true }
 rust_decimal = { workspace = true }
 

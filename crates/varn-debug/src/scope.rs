@@ -1,4 +1,4 @@
-use varn_opt::FunctionProto;
+use varn_compiler::FunctionProto;
 use varn_types::chunk::Literal;
 use varn_types::chunk::PoolEntry;
 use varn_term::chalk::chalk;

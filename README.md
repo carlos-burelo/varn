@@ -34,7 +34,7 @@
 ## Características Principales
 
 - **VM Register-Based con NaN-Boxing**: Todos los valores (enteros de 48 bits, flotantes IEEE 754, booleans, null y punteros de heap) caben en 64 bits sin boxing en el hot path.
-- **Compilador propio en SSA**: Pipeline multi-fase (`varn-opt`) que transforma AST en HIR y SSA, aplicando pases de inlining, eliminación de código muerto (DCE) y plegado de constantes.
+- **Compilador propio en SSA**: Pipeline multi-fase (`varn-compiler`) que transforma AST en HIR y SSA, aplicando pases de inlining, eliminación de código muerto (DCE) y plegado de constantes.
 - **JIT x86-64 (Cranelift/Eager)**: Compilación nativa para funciones en el hot-path con fallback automático e indoloro al intérprete.
 - **GC Generacional**: Nursery de rápida asignación con promoción a Old-Gen mark-and-sweep tricolor y write barrier.
 - **Concurrencia e Isolates**: tareas cooperativas deterministas en un trampolín síncrono dentro de la VM, `TaskGroup` con limpieza por ámbito (`using`), y paralelismo multinúcleo real mediante Isolates aislados con canales tipados.
@@ -49,8 +49,8 @@ flowchart TD
     A["Fuente (.vn)"] --> B["varn-lexer\n(Tokenizer UTF-8)"]
     B --> C["varn-parser\n(AST Parsing Pratt/RD)"]
     C --> D["varn-checker\n(Type Check, CFA, SemanticDB)"]
-    D --> E["varn-opt\n(HIR -> SSA -> Optimizations -> Bytecode)"]
-    E --> F["varn-backend\n(Liveness, RegAlloc, Slot Kinds)"]
+    D --> E["varn-compiler\n(HIR -> SSA -> Optimizations -> Bytecode)"]
+    E --> F["varn-regalloc\n(Liveness, RegAlloc, Slot Kinds)"]
     F --> G["varn-vm\n(Register VM + NaN-Boxing + GC Generacional + IC)"]
     F -.-> H["varn-jit\n(x86-64 Native JIT)"]
     H -.-> G
@@ -299,8 +299,8 @@ varn-lang/
 | [`varn-lexer`](docs/ARCHITECTURE.md#2-crates-y-responsabilidades) | Tokenizador UTF-8 con ASI (Automatic Semicolon Insertion). |
 | [`varn-parser`](docs/ARCHITECTURE.md#2-crates-y-responsabilidades) | Parser Pratt / Recursive Descent. |
 | [`varn-checker`](docs/ARCHITECTURE.md#2-crates-y-responsabilidades) | Inferidor de tipos, CFA, narrowing y SemanticDB. |
-| [`varn-opt`](docs/COMPILER_ARCHITECTURE.md) | **El Compilador**: HIR → SSA → Optimización → Bytecode. |
-| [`varn-backend`](docs/COMPILER_ARCHITECTURE.md) | Post-passes de bytecode: Liveness analysis y Register Allocation. |
+| [`varn-compiler`](docs/COMPILER_ARCHITECTURE.md) | **El Compilador**: HIR → SSA → Optimización → Bytecode. |
+| [`varn-regalloc`](docs/COMPILER_ARCHITECTURE.md) | Post-passes de bytecode: Liveness analysis y Register Allocation. |
 | [`varn-vm`](docs/VM_ARCHITECTURE.md) | VM de registros con NaN-Boxing, GC generacional e Inline Cache. |
 | [`varn-jit`](docs/VM_ARCHITECTURE.md) | Backend JIT nativo para x86-64. |
 | [`varn-runtime`](docs/RUNTIME_ARCHITECTURE.md) | Canales tipados entre Isolates y vtable de asignación del heap. |

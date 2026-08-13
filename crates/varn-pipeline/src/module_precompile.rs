@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
 
 use varn_core::ast::Program;
-use varn_opt::FunctionProto;
+use varn_compiler::FunctionProto;
 use varn_types::PackageNode;
 
 const UNKNOWN_INTEGRITY_HASH: &str = "0000000000000000";
@@ -200,7 +200,7 @@ pub fn build_module_graph(
             .map(|k| std::rc::Rc::from(k.as_str()))
             .collect();
         export_names.sort();
-        let module_proto = varn_opt::compile_module(
+        let module_proto = varn_compiler::compile_module(
             program,
             &check.type_annotations,
             &check.extension_calls,

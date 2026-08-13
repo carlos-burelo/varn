@@ -33,7 +33,7 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
             .map_err(|e| e.message.clone())
     })?;
 
-    let builtin_protos: Vec<varn_opt::FunctionProto> = crate::pipeline::core_protos_owned()?;
+    let builtin_protos: Vec<varn_compiler::FunctionProto> = crate::pipeline::core_protos_owned()?;
 
     varn_builtins::set_print_silent(true);
     varn_builtins::set_testing_silent(true);

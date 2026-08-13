@@ -9,7 +9,7 @@ Este documento ofrece una descripción técnica detallada e integral de la arqui
 - [1. Visión General del Pipeline de Compilación](#1-visión-general-del-pipeline-de-compilación)
 - [2. Arquitectura de Crates y Modularidad](#2-arquitectura-de-crates-y-modularidad)
 - [3. Frontend y Type Checker (`varn-checker`)](#3-frontend-y-type-checker-varn-checker)
-- [4. Compilador en SSA y Optimización (`varn-opt` & `varn-backend`)](#4-compilador-en-ssa-y-optimización-varn-opt--varn-backend)
+- [4. Compilador en SSA y Optimización (`varn-compiler` & `varn-regalloc`)](#4-compilador-en-ssa-y-optimización-varn-compiler--varn-regalloc)
 - [5. Machine Virtual Register-Based y NaN-Boxing (`varn-vm`)](#5-machine-virtual-register-based-y-nan-boxing-varn-vm)
 - [6. Backend JIT x86-64 (`varn-jit`)](#6-backend-jit-x86-64-varn-jit)
 - [7. Concurrencia: `await` e Isolates](#7-concurrencia-await-e-isolates)
@@ -33,9 +33,9 @@ flowchart TD
 
     subgraph Optimization ["Compilador & SSA"]
         D --> E["TypedAST"]
-        E --> F["varn-opt\n(HIR -> SSA -> Optimizations)"]
+        E --> F["varn-compiler\n(HIR -> SSA -> Optimizations)"]
         F --> G["FunctionProto (Bytecode)"]
-        G --> H["varn-backend\n(Liveness & RegAlloc,\ninvocado desde varn-opt)"]
+        G --> H["varn-regalloc\n(Liveness & RegAlloc,\ninvocado desde varn-compiler)"]
     end
 
     subgraph Execution ["Runtime & Execution"]
@@ -46,11 +46,6 @@ flowchart TD
         I <--> L["varn-builtins\n(Stdlib Rust via LBI)"]
     end
 ```
-
-> [!NOTE]
-> No existe ningún crate `varn-compiler` ni `varn-ir`. La generación de bytecode e IR intermedio vive en `varn-opt`; los post-passes sobre registros residen en `varn-backend`.
-
----
 
 ## 2. Arquitectura de Crates y Modularidad
 
@@ -63,8 +58,8 @@ El workspace son 19 crates. El inventario completo con tamaños y el grafo de ar
 | [`varn-lexer`](#) | Frontend | Tokenizador streaming UTF-8 con inserción automática de puntos y comas (ASI). |
 | [`varn-parser`](#) | Frontend | Parser en descenso recursivo + operador de precedencia Pratt (`|>`, ternarios, named args). |
 | [`varn-checker`](#) | Frontend | Type-checker multi-fase. Produce `TypedAST` y `SemanticDB`. |
-| [`varn-opt`](COMPILER_ARCHITECTURE.md) | Compilador | Transformación `TypedAST` → `HIR` → `SSA`. Passes de inlining, DCE, TCO y const-folding. |
-| [`varn-backend`](COMPILER_ARCHITECTURE.md) | Compilador | Post-passes de análisis de vida de registros (`liveness`), asignación de registros y metapropiedades de slots. |
+| [`varn-compiler`](COMPILER_ARCHITECTURE.md) | Compilador | Transformación `TypedAST` → `HIR` → `SSA`. Passes de inlining, DCE, TCO y const-folding. |
+| [`varn-regalloc`](COMPILER_ARCHITECTURE.md) | Compilador | Post-passes de análisis de vida de registros (`liveness`), asignación de registros y metapropiedades de slots. |
 | [`varn-vm`](VM_ARCHITECTURE.md) | Ejecución | VM basada en registros en 64 bits con NaN-Boxing, GC generacional (nursery + old-gen mark-sweep) e Inline Cache polimórfico. |
 | [`varn-jit`](VM_ARCHITECTURE.md) | Ejecución | Backend JIT nativo para x86-64 que compila eager funciones en hot path. |
 | [`varn-runtime`](RUNTIME_ARCHITECTURE.md) | Ejecución | Canales tipados entre Isolates (hilos independientes) y vtable de asignación del heap. La suspensión de `async`/`await` la implementa `varn-vm`, no este crate. |
@@ -91,7 +86,7 @@ El workspace son 19 crates. El inventario completo con tamaños y el grafo de ar
 
 ---
 
-## 4. Compilador en SSA y Optimización (`varn-opt` & `varn-backend`)
+## 4. Compilador en SSA y Optimización (`varn-compiler` & `varn-regalloc`)
 
 El compilador transforma la representación de alto nivel en bytecode para la VM:
 
@@ -101,11 +96,11 @@ flowchart LR
     B --> C["SSA Construction"]
     C --> D["Fixed-Point Optimization Loop\n(Inlining, DCE, TCO, Const Fold)"]
     D --> E["FunctionProto Bytecode"]
-    E --> F["varn-backend\n(Liveness & RegAlloc)"]
+    E --> F["varn-regalloc\n(Liveness & RegAlloc)"]
 ```
 
 > [!NOTE]
-> `varn-backend` no es una fase que corra después de `varn-opt`: es una **dependencia** suya. `varn_opt::compile_module` llama a `varn_backend::run_post_passes` sobre el `FunctionProto` ya emitido, recursivamente por cada función anidada del pool de constantes.
+> `varn-regalloc` no es una fase que corra después de `varn-compiler`: es una **dependencia** suya. `varn_compiler::compile_module` llama a `varn_regalloc::run_post_passes` sobre el `FunctionProto` ya emitido, recursivamente por cada función anidada del pool de constantes.
 
 ---
 

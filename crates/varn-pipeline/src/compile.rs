@@ -4,7 +4,7 @@ use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_core::ast::Program;
 use varn_debug::flags::DebugFlags;
-use varn_opt::FunctionProto;
+use varn_compiler::FunctionProto;
 use varn_types::ModuleGraphArtifact;
 
 pub const CACHE_FORMAT_VERSION: u32 = varn_modules::artifact::BUILD_FINGERPRINT;
@@ -36,7 +36,7 @@ pub fn compile(
         .collect();
     export_names.sort();
 
-    let proto = varn_opt::compile_module(
+    let proto = varn_compiler::compile_module(
         program,
         &check_result.checker_result.type_annotations,
         &check_result.checker_result.extension_calls,
