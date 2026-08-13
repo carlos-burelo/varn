@@ -1,4 +1,4 @@
-use varn_base::TypeTag;
+use crate::type_tag::TypeTag;
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,

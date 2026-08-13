@@ -1,6 +1,6 @@
 use varn_core::ast::{Decl, ExportDecl, Program, Stmt};
-use varn_utilities::chalk::chalk;
-use varn_utilities::terminal::Section;
+use varn_term::chalk::chalk;
+use varn_term::terminal::Section;
 use super::modules::format_import_specifiers;
 
 pub fn debug_import_graph(program: &Program) {
@@ -43,12 +43,12 @@ pub fn debug_import_graph(program: &Program) {
     Section::new("dependency graph").subtitle(&program.filename).color(|c| c.cyan()).print();
 
     if edges.is_empty() {
-        varn_utilities::terminal::log(format!("  {}", chalk("(no external dependencies)").dim()));
-        varn_utilities::terminal::log(chalk("── 0 edges ──").dim());
+        varn_term::terminal::log(format!("  {}", chalk("(no external dependencies)").dim()));
+        varn_term::terminal::log(chalk("── 0 edges ──").dim());
         return;
     }
 
-    varn_utilities::terminal::log(format!("  {}", chalk(format!("○ {}", program.filename)).blue().bold()));
+    varn_term::terminal::log(format!("  {}", chalk(format!("○ {}", program.filename)).blue().bold()));
 
     let total = edges.len();
     for (i, edge) in edges.iter().enumerate() {
@@ -60,7 +60,7 @@ pub fn debug_import_graph(program: &Program) {
             String::new()
         };
 
-        varn_utilities::terminal::log(format!(
+        varn_term::terminal::log(format!(
             "  {}{} {} │ {}{}",
             chalk(marker).dim(),
             chalk(format!("\"{}\"", edge.source)).bold(),
@@ -70,5 +70,5 @@ pub fn debug_import_graph(program: &Program) {
         ));
     }
 
-    varn_utilities::terminal::log(chalk(format!("── {total} dependencies resolved ──")).dim());
+    varn_term::terminal::log(chalk(format!("── {total} dependencies resolved ──")).dim());
 }

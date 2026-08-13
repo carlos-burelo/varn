@@ -3,7 +3,7 @@ use varn_core::ast::Program;
 
 use crate::PipelineError;
 use varn_debug::flags::DebugFlags;
-use varn_utilities::chalk::chalk;
+use varn_term::chalk::chalk;
 
 type PipelineResult<T> = Result<T, PipelineError>;
 
@@ -48,7 +48,7 @@ pub fn check(
             ));
         } else {
             for m in msgs {
-                varn_utilities::terminal::log(m);
+                varn_term::terminal::log(m);
             }
         }
     }

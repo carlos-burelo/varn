@@ -1,8 +1,8 @@
 // Varn Core Architecture Crate (v2)
 pub mod ast;
 pub mod cg_ty;
+pub mod diagnostics;
 pub mod doc;
-pub mod error;
 pub mod intrinsic_ops;
 pub mod intrinsics;
 pub mod kinds;
@@ -14,13 +14,14 @@ pub mod opcode;
 pub mod paths;
 pub mod source;
 pub mod token;
+pub mod type_tag;
 pub mod typed_ir;
 pub mod well_known;
 
 pub use ast::{assign_ast_ids, AstId};
 pub use doc::DocComment;
 
-pub use error::{
+pub use diagnostics::{
     Diagnostic, DiagnosticBag, DiagnosticKind, ErrorCode, RelatedInformation, Suggestion,
 };
 pub use kinds::TypeKind;
@@ -36,7 +37,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 pub use token::{ParsedNumber, Token, TokenKind};
 pub use typed_ir::{NumericKind, TypeAnnotations};
-pub use varn_base::TypeTag;
+pub use type_tag::{TypeTag, VmValuePayload};
 
 /// Version of the runtime:* host API surface. Bump on any breaking change
 /// (signature change, symbol removal). Additive changes do NOT bump — a std

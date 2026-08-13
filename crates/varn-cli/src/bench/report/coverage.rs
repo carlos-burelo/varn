@@ -16,8 +16,8 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use varn_utilities::chalk::chalk;
-use varn_utilities::terminal;
+use varn_term::chalk::chalk;
+use varn_term::terminal;
 use varn_vm::varn_jit::{CompileOutcome, CompileRecord, JitStatsSnapshot};
 
 use super::fmt::{fmt_bytes, fmt_dur, fmt_num, fmt_pct, row, LABEL_WIDTH, VALUE_WIDTH};

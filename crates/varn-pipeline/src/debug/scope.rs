@@ -1,12 +1,12 @@
 use varn_opt::{FunctionProto, PoolEntry};
-use varn_utilities::chalk::chalk;
-use varn_utilities::terminal::Section;
+use varn_term::chalk::chalk;
+use varn_term::terminal::Section;
 
 pub fn debug_scope(proto: &FunctionProto, filename: &str) {
     Section::new("static scope tree").subtitle(filename).color(|c| c.magenta()).print();
     let mut count = 0usize;
     print_fn_scope(proto, "", true, &mut count);
-    varn_utilities::terminal::log(
+    varn_term::terminal::log(
         chalk(format!("── {count} static function scope(s) indexed ──")).dim(),
     );
 }
@@ -15,7 +15,7 @@ fn print_fn_scope(proto: &FunctionProto, indent: &str, is_last: bool, count: &mu
     let marker = if is_last { "└── " } else { "├── " };
     let name = proto.name.as_deref().unwrap_or("<anonymous>");
 
-    varn_utilities::terminal::log(format!(
+    varn_term::terminal::log(format!(
         "{indent}{marker}{} {} {}",
         chalk("fn").blue().bold(),
         chalk(name).bold(),
@@ -45,7 +45,7 @@ fn print_fn_scope(proto: &FunctionProto, indent: &str, is_last: bool, count: &mu
         } else {
             ""
         };
-        varn_utilities::terminal::log(format!(
+        varn_term::terminal::log(format!(
             "{}{}",
             child_indent,
             chalk(format!("id: {}{}", locals.join(", "), suffix)).dim(),

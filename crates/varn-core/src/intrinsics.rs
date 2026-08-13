@@ -1,4 +1,4 @@
-use varn_base::TypeTag;
+use crate::type_tag::TypeTag;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct IntrinsicType(pub TypeTag);

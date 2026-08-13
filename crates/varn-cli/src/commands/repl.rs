@@ -1,7 +1,7 @@
 use crate::{cli::ReplArgs, error::CliError};
 use std::io::{self, Write};
 use varn_pipeline::{DebugFlags, RunOpts};
-use varn_utilities::terminal;
+use varn_term::terminal;
 
 pub fn execute(_args: ReplArgs) -> Result<(), CliError> {
     println!("Varn {} — REPL interactivo", env!("CARGO_PKG_VERSION"));

@@ -6,7 +6,7 @@ pub fn lex(source: &str, path: &str, verbose: bool, debug: &DebugFlags) -> (Vec<
     let (tokens, lexeme_buf, errors) = varn_lexer::scan(source, path);
 
     for e in &errors {
-        varn_utilities::terminal::error(crate::fmt::format_error_with_context(
+        varn_term::terminal::error(crate::fmt::format_error_with_context(
             source,
             path,
             e.range.start.line,
@@ -17,7 +17,7 @@ pub fn lex(source: &str, path: &str, verbose: bool, debug: &DebugFlags) -> (Vec<
     }
 
     if verbose {
-        varn_utilities::terminal::tagged("Varn", format_args!("scanned {} tokens", tokens.len()));
+        varn_term::terminal::tagged("Varn", format_args!("scanned {} tokens", tokens.len()));
     }
 
     if debug.tokens {

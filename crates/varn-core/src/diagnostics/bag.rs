@@ -1,5 +1,5 @@
-use crate::catalog::ErrorCode;
-use crate::diagnostic::{Diagnostic, DiagnosticKind};
+use super::catalog::ErrorCode;
+use super::diagnostic::{Diagnostic, DiagnosticKind};
 use crate::source::SourceRange;
 
 #[derive(Default, Debug, Clone)]

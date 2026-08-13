@@ -7,14 +7,13 @@ edition.workspace = true
 profiling = []
 
 [dependencies]
-varn-utilities = { path = "../varn-utilities" }
+varn-term      = { path = "../varn-term" }
 varn-types    = { path = "../varn-types" }
 varn-core     = { path = "../varn-core" }
 varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
 varn-runtime  = { path = "../varn-runtime" }
 tokio         = { workspace = true }
 varn-modules  = { path = "../varn-modules" }
-varn-base     = { path = "../varn-base" }
 rust_decimal  = { workspace = true }
 rustc-hash    = { workspace = true }
 varn-jit      = { path = "../varn-jit" }

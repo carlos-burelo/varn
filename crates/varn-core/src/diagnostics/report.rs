@@ -1,4 +1,4 @@
-use crate::diagnostic::{Diagnostic, DiagnosticKind};
+use super::diagnostic::{Diagnostic, DiagnosticKind};
 use crate::source::SourceRange;
 
 pub const BOLD: &str = "\x1b[1m";

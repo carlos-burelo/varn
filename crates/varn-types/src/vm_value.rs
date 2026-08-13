@@ -1,5 +1,5 @@
 use std::fmt;
-use varn_base::VmValuePayload;
+use varn_core::VmValuePayload;
 
 #[derive(Copy, Clone)]
 #[repr(transparent)]

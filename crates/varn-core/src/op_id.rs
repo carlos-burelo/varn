@@ -11,7 +11,7 @@
 //! `varn-builtins` runtime compute the exact same id (neither can depend on the
 //! other).
 
-use varn_base::TypeTag;
+use crate::type_tag::TypeTag;
 
 #[inline]
 fn fnv1a(segments: &[&[u8]]) -> u64 {

@@ -35,25 +35,6 @@ pub enum TypeTag {
     TaskHandle,
 }
 
-bitflags::bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    pub struct TypeFlags: u32 {
-        const NONE = 0;
-        const IS_SCALAR = 1 << 0;
-        const IS_REFERENCE = 1 << 1;
-        const IS_CALLABLE = 1 << 2;
-        const IS_ITERABLE = 1 << 3;
-        const IS_ASYNC = 1 << 4;
-        const HAS_VTABLE = 1 << 5;
-    }
-}
-
-pub struct BaseType {
-    pub tag: TypeTag,
-    pub name: &'static str,
-    pub flags: TypeFlags,
-}
-
 impl TypeTag {
     pub const fn name(self) -> &'static str {
         match self {
@@ -119,45 +100,24 @@ impl TypeTag {
         }
     }
 
-    pub fn flags(self) -> TypeFlags {
-        match self {
+    /// A tag whose values live inline in a `VmValue` word, with no heap
+    /// identity: everything the checker treats as a scalar type.
+    pub const fn is_primitive(self) -> bool {
+        matches!(
+            self,
             Self::Null
-            | Self::Bool
-            | Self::Int
-            | Self::Float
-            | Self::Char
-            | Self::Void
-            | Self::Never => TypeFlags::IS_SCALAR,
-            Self::Str | Self::BigInt | Self::Decimal | Self::Symbol => {
-                TypeFlags::IS_SCALAR | TypeFlags::HAS_VTABLE
-            }
-            Self::Array
-            | Self::Map
-            | Self::Set
-            | Self::Tuple
-            | Self::Object
-            | Self::Class
-            | Self::Generator
-            | Self::Range
-            | Self::Enum => TypeFlags::IS_REFERENCE | TypeFlags::HAS_VTABLE,
-            Self::Function | Self::NativeFn => {
-                TypeFlags::IS_REFERENCE | TypeFlags::IS_CALLABLE | TypeFlags::HAS_VTABLE
-            }
-            Self::Task | Self::TaskHandle => {
-                TypeFlags::IS_REFERENCE | TypeFlags::IS_ASYNC | TypeFlags::HAS_VTABLE
-            }
-            Self::VmRef | Self::AsyncQueue => TypeFlags::IS_REFERENCE,
-            Self::Error | Self::TypeError | Self::RangeError => {
-                TypeFlags::IS_REFERENCE | TypeFlags::HAS_VTABLE
-            }
-            Self::Dynamic => TypeFlags::NONE,
-        }
+                | Self::Bool
+                | Self::Int
+                | Self::Float
+                | Self::Char
+                | Self::Void
+                | Self::Never
+                | Self::Str
+                | Self::BigInt
+                | Self::Decimal
+                | Self::Symbol
+        )
     }
-
-    pub fn is_primitive(self) -> bool {
-        (self.flags() & TypeFlags::IS_SCALAR).bits() != 0
-    }
-
 }
 
 pub trait VmValuePayload: std::fmt::Debug + std::any::Any {

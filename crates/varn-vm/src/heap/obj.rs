@@ -3,7 +3,7 @@ use crate::closure::VmClosure;
 use crate::value::VmValue;
 use std::rc::Rc;
 use std::sync::Arc;
-use varn_base::VmValuePayload;
+use varn_core::VmValuePayload;
 use varn_types::{
     generator::{AsyncQueue, GeneratorObj},
     value::{
@@ -53,8 +53,8 @@ impl HeapObj {
     /// (closure / native fn / bound method) coalesce to `Function`; modules
     /// present as `Object`; spreads as `Array`; opaque host payloads as `VmRef`.
     /// All value-kind name rendering flows through this — see [`TypeTag::name`].
-    pub(crate) fn tag(&self) -> varn_base::TypeTag {
-        use varn_base::TypeTag;
+    pub(crate) fn tag(&self) -> varn_core::TypeTag {
+        use varn_core::TypeTag;
         match self {
             HeapObj::Str(_) => TypeTag::Str,
             HeapObj::Array(_) | HeapObj::Tuple(_) => TypeTag::Array,

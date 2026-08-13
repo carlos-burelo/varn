@@ -1,12 +1,12 @@
 use varn_opt::{FunctionProto, PoolEntry};
-use varn_utilities::chalk::chalk;
-use varn_utilities::terminal::Section;
+use varn_term::chalk::chalk;
+use varn_term::terminal::Section;
 
 pub fn debug_binds(proto: &FunctionProto, filename: &str) {
     Section::new("function hierarchy").subtitle(filename).color(|c| c.blue()).print();
     let mut count = 0usize;
     print_fn_binds(proto, "", true, &mut count);
-    varn_utilities::terminal::log(chalk(format!("── {count} function(s) in hierarchy ──")).dim());
+    varn_term::terminal::log(chalk(format!("── {count} function(s) in hierarchy ──")).dim());
 }
 
 fn print_fn_binds(proto: &FunctionProto, indent: &str, is_last: bool, count: &mut usize) {
@@ -21,7 +21,7 @@ fn print_fn_binds(proto: &FunctionProto, indent: &str, is_last: bool, count: &mu
         format!(" {}", chalk(format!("({})", flags.join(", "))).dim())
     };
 
-    varn_utilities::terminal::log(format!(
+    varn_term::terminal::log(format!(
         "{indent}{marker}{} {} {} {}{}",
         chalk("fn").blue().bold(),
         chalk(name).bold(),

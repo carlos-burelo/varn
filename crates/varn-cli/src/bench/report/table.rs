@@ -12,8 +12,8 @@
 
 use std::time::Duration;
 
-use varn_utilities::chalk::chalk;
-use varn_utilities::terminal;
+use varn_term::chalk::chalk;
+use varn_term::terminal;
 
 use super::fmt::{fmt_dur, fmt_pct, DurScale};
 use crate::bench::stats::{PhaseStats, CV_NOISY};

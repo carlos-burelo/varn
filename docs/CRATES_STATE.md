@@ -1,8 +1,8 @@
 # Estado e Inventario de Crates del Workspace
 
-Matriz de estado, jerarquía de dependencias y tamaños de los **21 crates** del workspace de **Varn**.
+Matriz de estado, jerarquía de dependencias y tamaños de los **19 crates** del workspace de **Varn**.
 
-Los tamaños son líneas de Rust medidas sobre el árbol actual (105 105 líneas en 560 archivos). Este documento no publica porcentajes de cobertura: la suite de Rust son 85 tests, y la prueba real de integridad es `tests/main.vn` (991 aserciones) bajo las cuatro combinaciones de procedencia de std y JIT descritas en [CONTRIBUTING.md](../CONTRIBUTING.md).
+Los tamaños son líneas de Rust medidas sobre el árbol actual (105 060 líneas en 553 archivos). Este documento no publica porcentajes de cobertura: la suite de Rust son 85 tests, y la prueba real de integridad es `tests/main.vn` (991 aserciones) bajo las cuatro combinaciones de procedencia de std y JIT descritas en [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ---
 
@@ -29,7 +29,7 @@ graph TD
     Pipeline --> Opt["varn-opt"]
     Pipeline --> VM["varn-vm"]
     Pipeline --> Modules["varn-modules"]
-    Pipeline --> Term["varn-utilities"]
+    Pipeline --> Term["varn-term"]
     Pipeline -.->|"feature lsp-debug, que varn-cli activa siempre"| LSP["varn-lsp"]
 
     Opt --> Backend["varn-backend"]
@@ -41,7 +41,6 @@ graph TD
     VM --> JIT["varn-jit"]
     VM --> Builtins["varn-builtins"]
     VM --> Runtime["varn-runtime"]
-    VM --> Base["varn-base"]
 
     Builtins --> OpMacros["varn-op-macros"]
     Builtins --> Runtime
@@ -53,8 +52,6 @@ graph TD
     LSP --> Checker
     LSP --> Builtins
 
-    Core --> Diagnostics["varn-diagnostics"]
-    Core --> Base
     Types --> Core
     Runtime --> Types
     Lexer --> Core
@@ -80,9 +77,9 @@ Dos aristas del grafo son deuda conocida, no diseño (ver [../AUDIT.md](../AUDIT
 | `varn-lsp` | Servidor LSP | 7 437 | En evolución |
 | `varn-types` | Modelo de datos de runtime y bytecode | 6 263 | Estable |
 | `varn-parser` | Frontend | 4 943 | Estable |
+| `varn-core` | AST, opcodes, tokens, diagnósticos, `TypeTag` | 4 820 | Estable |
 | `varn-cli` | CLI (`vn`) | 4 590 | Estable |
 | `varn-builtins` | Stdlib nativa (LBI) | 4 307 | Estable |
-| `varn-core` | AST, opcodes, tokens, IDs de módulo | 4 094 | Estable |
 | `varn-debug` | Inspección de fases | 3 302 | Herramienta |
 | `varn-pipeline` | Orquestación de fases y caché | 3 034 | Estable |
 | `varn-lexer` | Frontend | 1 557 | Estable |
@@ -90,10 +87,8 @@ Dos aristas del grafo son deuda conocida, no diseño (ver [../AUDIT.md](../AUDIT
 | `varn-backend` | Liveness + regalloc post-pass | 1 103 | Estable |
 | `varn-op-macros` | Proc-macro `varn_contract!` | 918 | Estable |
 | `varn-pm` | Gestor de paquetes | 802 | En evolución |
-| `varn-diagnostics` | Diagnósticos y formateo | 593 | Estable |
 | `varn-runtime` | Canales de isolates + vtable de heap | 381 | Estable |
-| `varn-utilities` | Estilo de terminal (chalk, colores) | 360 | Estable |
-| `varn-base` | `TypeTag`, `TypeFlags` | 178 | Estable |
+| `varn-term` | Estilo de terminal (chalk, colores) | 360 | Estable |
 
 ---
 

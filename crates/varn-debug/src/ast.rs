@@ -3,9 +3,9 @@ use varn_core::ast::{
     ForInit, InterfaceMember, MatchBody, ObjectProp, Pattern, Program, PropKey, Stmt, StmtKind,
     TemplatePart, VarKind,
 };
-use varn_utilities::chalk::chalk;
-use varn_utilities::terminal;
-use varn_utilities::terminal::Section;
+use varn_term::chalk::chalk;
+use varn_term::terminal;
+use varn_term::terminal::Section;
 
 pub fn debug_ast(program: &Program) {
     Section::new("abstract syntax tree")

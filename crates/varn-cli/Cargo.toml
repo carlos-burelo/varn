@@ -19,7 +19,7 @@ required-features = ["dev-tools"]
 dev-tools = []
 
 [dependencies]
-varn-utilities = { path = "../varn-utilities" }
+varn-term      = { path = "../varn-term" }
 varn-pipeline = { path = "../varn-pipeline", features = ["lsp-debug"] }
 varn-core     = { path = "../varn-core" }
 varn-lexer    = { path = "../varn-lexer" }

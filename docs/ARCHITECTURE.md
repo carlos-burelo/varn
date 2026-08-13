@@ -12,7 +12,7 @@ Este documento ofrece una descripción técnica detallada e integral de la arqui
 - [4. Compilador en SSA y Optimización (`varn-opt` & `varn-backend`)](#4-compilador-en-ssa-y-optimización-varn-opt--varn-backend)
 - [5. Machine Virtual Register-Based y NaN-Boxing (`varn-vm`)](#5-machine-virtual-register-based-y-nan-boxing-varn-vm)
 - [6. Backend JIT x86-64 (`varn-jit`)](#6-backend-jit-x86-64-varn-jit)
-- [7. Runtime Asíncrono e Isolates (`varn-runtime`)](#7-runtime-asíncrono-e-isolates-varn-runtime)
+- [7. Concurrencia: `await` e Isolates](#7-concurrencia-await-e-isolates)
 - [8. Interfaz Nativa LBI (`varn-builtins`)](#8-interfaz-nativa-lbi-varn-builtins)
 - [9. Sistema de Módulos y Bundles `.vnb`](#9-sistema-de-módulos-y-bundles-vnb)
 - [10. Formato de Artefacto `.vnc`](#10-formato-de-artefacto-vnc)
@@ -54,13 +54,12 @@ flowchart TD
 
 ## 2. Arquitectura de Crates y Modularidad
 
-El workspace son 21 crates. El inventario completo con tamaños y el grafo de aristas reales está en [CRATES_STATE.md](CRATES_STATE.md); aquí van los que definen la arquitectura:
+El workspace son 19 crates. El inventario completo con tamaños y el grafo de aristas reales está en [CRATES_STATE.md](CRATES_STATE.md); aquí van los que definen la arquitectura:
 
 | Crate | Categoría | Responsabilidad Principal |
 |---|---|---|
-| [`varn-core`](#) | Base | AST, `OpCode` (137 opcodes sin prefijos), `ModuleId`, `Span`, evaluador numérico canónico (`numeric.rs`). Depende solo de `varn-diagnostics` y `varn-base`. |
+| [`varn-core`](#) | Base | AST, `OpCode` (137 opcodes sin prefijos), `ModuleId`, `Span`, evaluador numérico canónico (`numeric.rs`). Incluye los diagnósticos (`diagnostics/`, formateo con underlines para CLI y LSP) y `TypeTag`. Sin dependencias internas. |
 | [`varn-types`](#) | Base | Tipos compartidos por VM y compilador: `VmValue`, `Chunk`, `FunctionProto`, `ClassObj`, `Closure`, `ObjData`/`ObjRef`, `Shape`. |
-| [`varn-diagnostics`](#) | Base | Formateo estandarizado de errores sintácticos y semánticos con underlines para CLI y LSP. |
 | [`varn-lexer`](#) | Frontend | Tokenizador streaming UTF-8 con inserción automática de puntos y comas (ASI). |
 | [`varn-parser`](#) | Frontend | Parser en descenso recursivo + operador de precedencia Pratt (`|>`, ternarios, named args). |
 | [`varn-checker`](#) | Frontend | Type-checker multi-fase. Produce `TypedAST` y `SemanticDB`. |
@@ -69,8 +68,7 @@ El workspace son 21 crates. El inventario completo con tamaños y el grafo de ar
 | [`varn-vm`](VM_ARCHITECTURE.md) | Ejecución | VM basada en registros en 64 bits con NaN-Boxing, GC generacional (nursery + old-gen mark-sweep) e Inline Cache polimórfico. |
 | [`varn-jit`](VM_ARCHITECTURE.md) | Ejecución | Backend JIT nativo para x86-64 que compila eager funciones en hot path. |
 | [`varn-runtime`](RUNTIME_ARCHITECTURE.md) | Ejecución | Canales tipados entre Isolates (hilos independientes) y vtable de asignación del heap. La suspensión de `async`/`await` la implementa `varn-vm`, no este crate. |
-| [`varn-base`](#) | Base | `TypeTag` y `TypeFlags`, compartidos por `varn-core`, `varn-types` y `varn-vm`. |
-| [`varn-utilities`](#) | Herramienta | Estilo de terminal (chalk, colores ANSI, salida etiquetada). |
+| [`varn-term`](#) | Herramienta | Estilo de terminal (chalk, colores ANSI, salida etiquetada). |
 | [`varn-op-macros`](LBI_ARCHITECTURE.md) | Stdlib Host | Proc-macro `varn_contract!`: cruza el contrato `.vn` con la implementación Rust y emite las entradas de la tabla de ops nativa. |
 | [`varn-lsp`](#) | Herramienta | Servidor LSP (hover, completion, semantic tokens, inlay hints). |
 | [`varn-pm`](#) | Herramienta | Gestor de paquetes (`vn add`, `install`, `update`). |

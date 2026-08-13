@@ -1,9 +1,9 @@
 use varn_core::OpCode;
 use varn_opt::FunctionProto;
 use varn_types::PoolEntry;
-use varn_utilities::chalk::chalk;
-use varn_utilities::terminal;
-use varn_utilities::terminal::Section;
+use varn_term::chalk::chalk;
+use varn_term::terminal;
+use varn_term::terminal::Section;
 
 const R: &str = "\x1b[0m";
 const DIM: &str = "\x1b[2m";

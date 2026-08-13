@@ -327,8 +327,8 @@ pub struct SendEnvelope {
     pub wrap: bool,
 }
 
-impl varn_base::VmValuePayload for SendEnvelope {
-    fn clone_payload(&self) -> Box<dyn varn_base::VmValuePayload> {
+impl varn_core::VmValuePayload for SendEnvelope {
+    fn clone_payload(&self) -> Box<dyn varn_core::VmValuePayload> {
         Box::new(self.clone())
     }
     fn as_any(&self) -> &dyn std::any::Any {
@@ -366,8 +366,8 @@ pub struct HostError {
     pub message: String,
 }
 
-impl varn_base::VmValuePayload for HostError {
-    fn clone_payload(&self) -> Box<dyn varn_base::VmValuePayload> {
+impl varn_core::VmValuePayload for HostError {
+    fn clone_payload(&self) -> Box<dyn varn_core::VmValuePayload> {
         Box::new(self.clone())
     }
     fn as_any(&self) -> &dyn std::any::Any {

@@ -7,7 +7,7 @@
 
 use varn_core::OpCode;
 use varn_jit::CacheSource;
-use varn_utilities::terminal;
+use varn_term::terminal;
 
 const DIM: &str = "\x1b[2m";
 const R: &str = "\x1b[0m";

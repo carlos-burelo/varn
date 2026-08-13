@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-varn-utilities = { path = "../varn-utilities" }
+varn-term      = { path = "../varn-term" }
 varn-core     = { path = "../varn-core" }
 varn-checker  = { path = "../varn-checker" }
 varn-types    = { path = "../varn-types" }

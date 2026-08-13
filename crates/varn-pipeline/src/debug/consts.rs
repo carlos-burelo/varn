@@ -1,18 +1,18 @@
 use varn_opt::{FunctionProto, Literal, PoolEntry};
 use varn_core::{IntrinsicType, TypeTag};
-use varn_utilities::chalk::chalk;
-use varn_utilities::terminal::{Section, Table};
+use varn_term::chalk::chalk;
+use varn_term::terminal::{Section, Table};
 
 pub fn debug_consts(proto: &FunctionProto, filename: &str) {
     Section::new("constant pool").subtitle(filename).color(|c| c.yellow()).print();
     let mut total = 0usize;
     print_fn_consts(proto, "", &mut total);
-    varn_utilities::terminal::log(chalk(format!("── {total} constant(s) total across all functions ──")).dim());
+    varn_term::terminal::log(chalk(format!("── {total} constant(s) total across all functions ──")).dim());
 }
 
 fn print_fn_consts(proto: &FunctionProto, indent: &str, total: &mut usize) {
     let name = proto.name.as_deref().unwrap_or("<anonymous>");
-    varn_utilities::terminal::log(format!(
+    varn_term::terminal::log(format!(
         "{}{}{} ({} constants)",
         indent,
         chalk("fn").blue(),
@@ -33,7 +33,7 @@ fn print_fn_consts(proto: &FunctionProto, indent: &str, total: &mut usize) {
         }
         table.print();
     }
-    varn_utilities::terminal::blank();
+    varn_term::terminal::blank();
 
     let nested_indent = format!("{indent}  ");
     for entry in &proto.chunk.constants {

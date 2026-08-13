@@ -13,7 +13,7 @@ use cli::{Cli, Commands};
 // The anchor keeps `unused_crate_dependencies` honest for this target.
 use varn_lexer as _;
 use std::process;
-use varn_utilities::terminal;
+use varn_term::terminal;
 
 fn main() {
     const STDLIB_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/std.vnb"));

@@ -1,5 +1,5 @@
 [package]
-name = "varn-diagnostics"
+name = "varn-term"
 version.workspace = true
 edition.workspace = true
 

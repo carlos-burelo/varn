@@ -6,8 +6,8 @@ use std::time::Duration;
 
 use varn_core::ModuleId;
 use varn_types::value::Closure;
-use varn_utilities::chalk::chalk;
-use varn_utilities::terminal;
+use varn_term::chalk::chalk;
+use varn_term::terminal;
 use varn_vm::Vm;
 
 use super::harness::{run_vm_to_completion, time_n, time_n_freq_setup, VmFactory};

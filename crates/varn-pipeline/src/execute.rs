@@ -27,13 +27,13 @@ pub fn execute(
     varn_vm::prefill_native_modules(&mut machine);
 
     if _debug.trace {
-        varn_utilities::terminal::tagged("pipeline:execute", "starting builtin initialization");
+        varn_term::terminal::tagged("pipeline:execute", "starting builtin initialization");
     }
 
     for builtin_proto in core::core_protos_owned()? {
         if _debug.trace {
             let name = builtin_proto.name.as_deref().unwrap_or("<builtin>");
-            varn_utilities::terminal::tagged(
+            varn_term::terminal::tagged(
                 "pipeline:execute",
                 format_args!("running builtin {name}"),
             );
@@ -81,7 +81,7 @@ pub fn execute(
 
     if _debug.trace {
         let name = main_closure.proto.name.as_deref().unwrap_or("<main>");
-        varn_utilities::terminal::tagged("pipeline:execute", format_args!("running main {name}"));
+        varn_term::terminal::tagged("pipeline:execute", format_args!("running main {name}"));
     }
 
     loop {

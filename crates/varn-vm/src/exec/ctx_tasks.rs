@@ -51,7 +51,7 @@ impl ExecCtx {
 
         let fn_name = closure.proto.name.as_deref().unwrap_or("<anon>");
         let line = closure.proto.chunk.lines.get_line(op_ip);
-        varn_utilities::terminal::tagged(
+        varn_term::terminal::tagged(
             format_args!("vm:{label}"),
             format_args!(
                 "fn={fn_name} file={} frame={} ip={} line={} stack={} tries={} op={:?}",

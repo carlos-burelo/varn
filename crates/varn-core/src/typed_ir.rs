@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-pub use varn_base::TypeTag as NumericKind;
+pub use crate::type_tag::TypeTag as NumericKind;
 
 #[derive(Clone, Debug, Default)]
 pub struct ExprAnnotation {

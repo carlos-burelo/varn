@@ -1,6 +1,6 @@
 use varn_core::ast::{Decl, ExportDecl, ExportDefaultDecl, ImportSpecifier, Program, Stmt};
-use varn_utilities::chalk::chalk;
-use varn_utilities::terminal::Section;
+use varn_term::chalk::chalk;
+use varn_term::terminal::Section;
 
 pub fn debug_modules(program: &Program) {
     Section::new("module linkage").subtitle(&program.filename).color(|c| c.cyan()).print();
@@ -18,30 +18,30 @@ pub fn debug_modules(program: &Program) {
     }
 
     if !imports.is_empty() {
-        varn_utilities::terminal::log(format!("  {}", chalk("Imports").blue().bold()));
-        varn_utilities::terminal::log(format!("  {}", chalk(format!("{:<30} │ Symbols", "Source")).dim()));
-        varn_utilities::terminal::log(format!("  {}", "─".repeat(70)));
+        varn_term::terminal::log(format!("  {}", chalk("Imports").blue().bold()));
+        varn_term::terminal::log(format!("  {}", chalk(format!("{:<30} │ Symbols", "Source")).dim()));
+        varn_term::terminal::log(format!("  {}", "─".repeat(70)));
         for imp in &imports {
             let spec_str = format_import_specifiers(&imp.specifiers);
-            varn_utilities::terminal::log(format!(
+            varn_term::terminal::log(format!(
                 "  {} │ {spec_str}",
                 chalk(format!("{:<30}", format!("\"{}\"", imp.source))).yellow(),
             ));
         }
-        varn_utilities::terminal::blank();
+        varn_term::terminal::blank();
     }
 
     if !exports.is_empty() {
-        varn_utilities::terminal::log(format!("  {}", chalk("Exports").blue().bold()));
-        varn_utilities::terminal::log(format!("  {}", chalk("Kind     │ Description").dim()));
-        varn_utilities::terminal::log(format!("  {}", "─".repeat(70)));
+        varn_term::terminal::log(format!("  {}", chalk("Exports").blue().bold()));
+        varn_term::terminal::log(format!("  {}", chalk("Kind     │ Description").dim()));
+        varn_term::terminal::log(format!("  {}", "─".repeat(70)));
         for exp in &exports {
             let (kind, desc) = format_export_parts(exp);
-            varn_utilities::terminal::log(format!("  {} │ {desc}", chalk(format!("{:<8}", kind)).yellow()));
+            varn_term::terminal::log(format!("  {} │ {desc}", chalk(format!("{:<8}", kind)).yellow()));
         }
     }
 
-    varn_utilities::terminal::log(
+    varn_term::terminal::log(
         chalk(format!("── {} import(s), {} export(s) ──", imports.len(), exports.len())).dim(),
     );
 }

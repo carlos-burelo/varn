@@ -1,6 +1,6 @@
 use varn_core::ast::Program;
-use varn_utilities::chalk::chalk;
-use varn_utilities::terminal::Section;
+use varn_term::chalk::chalk;
+use varn_term::terminal::Section;
 
 pub fn debug_expr(program: &Program, range: Option<(u32, u32)>) {
     let result = varn_checker::Checker::check(program);
@@ -34,11 +34,11 @@ pub fn debug_expr(program: &Program, range: Option<(u32, u32)>) {
     let mut sorted_exprs: Vec<_> = result.expr_types.iter().collect();
     sorted_exprs.sort_by_key(|(off, _)| *off);
 
-    varn_utilities::terminal::log(format!(
+    varn_term::terminal::log(format!(
         "  {}",
         chalk(format!("{:<8} │ {:<30} │ Inferred Type", "Loc", "Snippet")).dim()
     ));
-    varn_utilities::terminal::log(format!("  {}", "─".repeat(80)));
+    varn_term::terminal::log(format!("  {}", "─".repeat(80)));
 
     let mut shown = 0;
     for (offset, info) in sorted_exprs {
@@ -55,7 +55,7 @@ pub fn debug_expr(program: &Program, range: Option<(u32, u32)>) {
             .min(30);
         let snip = String::from_utf8_lossy(&src_bytes[start..start + raw_end]);
 
-        varn_utilities::terminal::log(format!(
+        varn_term::terminal::log(format!(
             "  {} │ {} │ {}",
             chalk(format!("{:<3}:{:>3}", line, col)).dim(),
             chalk(format!("{:<30}", snip.trim())).yellow(),
@@ -64,5 +64,5 @@ pub fn debug_expr(program: &Program, range: Option<(u32, u32)>) {
         shown += 1;
     }
 
-    varn_utilities::terminal::log(chalk(format!("── {shown} expressions analyzed ──")).dim());
+    varn_term::terminal::log(chalk(format!("── {shown} expressions analyzed ──")).dim());
 }

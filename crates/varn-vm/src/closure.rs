@@ -9,7 +9,7 @@
 use crate::value::VmValue;
 use std::cell::RefCell;
 use std::rc::Rc;
-use varn_base::VmValuePayload;
+use varn_core::VmValuePayload;
 use varn_types::chunk::PolyICSlot;
 use varn_types::FunctionProto;
 pub use varn_types::VmValueRef;

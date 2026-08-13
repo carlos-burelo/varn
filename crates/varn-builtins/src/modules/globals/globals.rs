@@ -53,7 +53,7 @@ varn_contract! {
                 .map(|&v| ctx.str_repr_borrowed(v))
                 .collect::<Vec<_>>()
                 .join(" ");
-            varn_utilities::terminal::tagged("debug", s);
+            varn_term::terminal::tagged("debug", s);
             Ok(())
         }
 
@@ -63,7 +63,7 @@ varn_contract! {
                 Ok(())
             } else {
                 crate::modules::testing::inc_failed();
-                varn_utilities::terminal::error(format!("ASSERT FAIL: {label}"));
+                varn_term::terminal::error(format!("ASSERT FAIL: {label}"));
                 Err(label.to_string())
             }
         }

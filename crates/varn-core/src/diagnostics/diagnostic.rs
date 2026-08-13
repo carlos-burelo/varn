@@ -1,6 +1,6 @@
-use crate::catalog::ErrorCode;
+use super::catalog::ErrorCode;
 use crate::source::SourceRange;
-use crate::suggestion::Suggestion;
+use super::suggestion::Suggestion;
 use std::rc::Rc;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

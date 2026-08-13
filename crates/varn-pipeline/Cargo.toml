@@ -7,7 +7,7 @@ edition.workspace = true
 lsp-debug = ["dep:varn-lsp", "dep:tower-lsp"]
 
 [dependencies]
-varn-utilities = { path = "../varn-utilities" }
+varn-term      = { path = "../varn-term" }
 varn-core        = { path = "../varn-core" }
 varn-lexer       = { path = "../varn-lexer" }
 varn-parser      = { path = "../varn-parser", features = ["profiling"] }
@@ -17,7 +17,6 @@ varn-vm          = { path = "../varn-vm" }
 varn-modules     = { path = "../varn-modules" }
 varn-types       = { path = "../varn-types" }
 varn-debug       = { path = "../varn-debug" }
-varn-diagnostics = { path = "../varn-diagnostics" }
 varn-lsp         = { path = "../varn-lsp", optional = true }
 rustc-hash       = { workspace = true }
 serde            = { workspace = true }

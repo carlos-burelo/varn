@@ -1,7 +1,7 @@
 use varn_core::ast::{Decl, Program, StmtKind};
-use varn_utilities::chalk::chalk;
-use varn_utilities::terminal;
-use varn_utilities::terminal::Section;
+use varn_term::chalk::chalk;
+use varn_term::terminal;
+use varn_term::terminal::Section;
 
 pub fn debug_modules(program: &Program) {
     Section::new("module linkage")

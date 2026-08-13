@@ -1,1 +1,1 @@
-pub use varn_utilities::colors::*;
+pub use varn_term::colors::*;

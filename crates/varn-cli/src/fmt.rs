@@ -1,4 +1,4 @@
-pub use varn_diagnostics::format_diagnostic;
+pub use varn_core::diagnostics::format_diagnostic;
 
 pub fn format_error_with_context(
     source: &str,

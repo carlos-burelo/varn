@@ -1,8 +1,8 @@
 use varn_checker::SymbolKind;
 use varn_core::ast::Program;
 use varn_debug::flags::DebugFlags;
-use varn_utilities::chalk::chalk;
-use varn_utilities::terminal::{Section, Table};
+use varn_term::chalk::chalk;
+use varn_term::terminal::{Section, Table};
 
 pub fn debug_types(program: &Program, flags: &DebugFlags) {
     let source_code = std::fs::read_to_string(&program.filename).unwrap_or_default();
@@ -50,7 +50,7 @@ pub fn debug_types(program: &Program, flags: &DebugFlags) {
             ]);
         }
         table.print();
-        varn_utilities::terminal::blank();
+        varn_term::terminal::blank();
     }
 
     let footer_msg = if std_hidden > 0 {
@@ -58,7 +58,7 @@ pub fn debug_types(program: &Program, flags: &DebugFlags) {
     } else {
         format!("{} symbols analyzed", analysis.symbols.len())
     };
-    varn_utilities::terminal::log(chalk(format!("── {footer_msg} ──")).dim());
+    varn_term::terminal::log(chalk(format!("── {footer_msg} ──")).dim());
 }
 
 fn format_sym_details(s: &varn_lsp::document::SymbolRecord) -> String {

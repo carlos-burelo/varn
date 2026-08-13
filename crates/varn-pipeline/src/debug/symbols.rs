@@ -1,7 +1,7 @@
 use varn_checker::CheckResult;
 use varn_debug::flags::DebugFlags;
-use varn_utilities::chalk::chalk;
-use varn_utilities::terminal::{Section, Table};
+use varn_term::chalk::chalk;
+use varn_term::terminal::{Section, Table};
 
 pub fn debug_symbols(result: &CheckResult, filename: &str, flags: &DebugFlags) {
     Section::new("resolved symbols").subtitle(filename).color(|c| c.blue()).print();
@@ -42,5 +42,5 @@ pub fn debug_symbols(result: &CheckResult, filename: &str, flags: &DebugFlags) {
     } else {
         format!("{local_count} symbols shown")
     };
-    varn_utilities::terminal::log(chalk(format!("── {msg} ──")).dim());
+    varn_term::terminal::log(chalk(format!("── {msg} ──")).dim());
 }
