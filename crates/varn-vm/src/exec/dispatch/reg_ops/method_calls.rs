@@ -26,6 +26,19 @@ impl ExecCtx {
             .str_val(name_nv)
             .ok_or_else(|| RuntimeError::new("CallMethod: non-string name"))?;
 
+        // `Enum.Variant(args)` reaches the VM as a method call on the enum's own
+        // class object. It has to be answered before anything else: the inline
+        // cache below can never help, because a variant is not in the class's
+        // `method_map`, and the generic path underneath allocates the variant
+        // template into the heap on every construction just to hand it to
+        // `prepare_call`. See `ExecCtx::construct_enum_variant`.
+        if let Some(template) = self.enum_variant_template(this_val, name.as_ref()) {
+            if let Some(built) = self.construct_enum_variant(&template, base, arg_start, arg_count) {
+                self.stack[base + dest] = built;
+                return Ok(false);
+            }
+        }
+
         let is_megamorphic = closure
             .feedback
             .borrow()
@@ -218,6 +231,28 @@ impl ExecCtx {
             return Ok(false);
         }
 
+        self.finish_generic_method_call(
+            method_nv, this_val, base, arg_start, arg_count, dest, frame_idx,
+        )
+    }
+
+    /// The generic tail of [`Self::exec_call_method_reg`]: lay the callee and
+    /// arguments out on the stack and dispatch, for every method shape that has
+    /// no shorter path.
+    ///
+    /// Split out so the enum-variant constructor can fall back into it for the
+    /// one case it does not handle — see [`Self::construct_enum_variant`].
+    #[allow(clippy::too_many_arguments)]
+    fn finish_generic_method_call(
+        &mut self,
+        method_nv: VmValue,
+        this_val: VmValue,
+        base: usize,
+        arg_start: usize,
+        arg_count: usize,
+        dest: usize,
+        frame_idx: usize,
+    ) -> VmResult<bool> {
         let is_bound = method_nv.is_heap()
             && matches!(
                 self.heap.get(method_nv.as_heap_idx()),
@@ -299,6 +334,7 @@ impl ExecCtx {
         self.stack[base + dest] = result;
         Ok(false)
     }
+
 
     #[inline(always)]
     pub(crate) fn call_native_with_receiver(
