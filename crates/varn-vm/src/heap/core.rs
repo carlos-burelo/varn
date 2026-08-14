@@ -60,6 +60,17 @@ impl HeapInner {
             },
             _ => {}
         }
+        // Reaching here means the nursery was full, so this object is BORN in
+        // the old generation. If it already holds nursery references — which a
+        // bulk build such as `JSON.parse` does constantly — nothing else will
+        // ever record that: the write barrier only fires on later writes, and
+        // `scan_roots` is for kinds whose children no barrier covers.
+        //
+        // Without this, a `JSON.parse` of 50 000 objects left its result array
+        // in the old generation pointing at nursery elements; the next minor
+        // collection evacuated them without updating the array, and the
+        // following read panicked with "dangling or corrupted heap reference".
+        let remember = crate::nursery::Nursery::holds_nursery_ref(&obj);
         let track = Self::needs_minor_scan(&obj);
         let identity = Self::identity_key(&obj);
         let raw = alloc_into(
@@ -71,6 +82,9 @@ impl HeapInner {
         );
         if track {
             self.scan_roots.push(raw);
+        }
+        if remember {
+            self.nursery.remember(pack_old_idx(raw));
         }
         if let Some(key) = identity {
             self.identity_index.insert(key, pack_old_idx(raw));

@@ -98,6 +98,15 @@ impl HeapInner {
         }
     }
 
+    /// Whether an object belongs in `scan_roots` — the set the minor collector
+    /// re-walks on EVERY collection, for as long as the object lives.
+    ///
+    /// Only for kinds holding Rust-side `Value`s that no write barrier covers.
+    /// Containers are covered by the barrier and must not go here: `scan_roots`
+    /// is never pruned, so enrolling them permanently makes each minor
+    /// collection O(containers ever born). A container born already pointing
+    /// into the nursery is registered in the nursery's `remembered` set
+    /// instead, which is drained every collection — see `HeapInner::alloc`.
     #[inline(always)]
     pub(super) fn needs_minor_scan(obj: &HeapObj) -> bool {
         matches!(

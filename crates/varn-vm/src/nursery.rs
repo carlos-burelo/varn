@@ -234,15 +234,8 @@ impl Nursery {
         // whole old gen (which made every minor GC O(old-gen size)).
         let candidates: Vec<u32> = old_gen.scan_roots().to_vec();
         for raw_idx in candidates {
-            match old_gen.get_raw(raw_idx) {
-                Some(HeapObj::VmClosure(_))
-                | Some(HeapObj::BoundMethod(_))
-                | Some(HeapObj::Class(_))
-                | Some(HeapObj::Module(_))
-                | Some(HeapObj::Generator(_)) => {
-                    self.scan_and_fix_old_obj(raw_idx, old_gen, &mut worklist, &mut fixups);
-                }
-                _ => {}
+            if matches!(old_gen.get_raw(raw_idx), Some(obj) if Self::can_reference_nursery(obj)) {
+                self.scan_and_fix_old_obj(raw_idx, old_gen, &mut worklist, &mut fixups);
             }
         }
 
@@ -447,9 +440,77 @@ impl Nursery {
     /// Record every child of `obj` that still points into the nursery. Pure
     /// scan: it only reads through the borrow of `old_gen` the caller holds,
     /// so the evacuation that consumes `fixups` happens after it returns.
+    /// Whether [`Self::scan_children`] can produce a fixup for `obj` — i.e.
+    /// whether this kind of object can hold a reference to a nursery object.
+    ///
+    /// An old-generation object is only visited by the minor collector if it is
+    /// in `scan_roots` or was caught by the write barrier. An object BORN in the
+    /// old generation — which happens whenever the nursery is full at the moment
+    /// it is allocated — goes through neither, so it must be enrolled at birth,
+    /// and this is the predicate that decides.
+    ///
+    /// It must agree with `scan_children` below. It did not: `Array`, `Object`,
+    /// `Spread` and `EnumVariant` were handled there and missing here. A
+    /// `JSON.parse` of 50 000 objects fills the nursery, the result array lands
+    /// in the old generation holding nursery elements, and the next minor
+    /// collection evacuates those elements without updating it — the array is
+    /// left pointing at freed slots and the following read panics with
+    /// "dangling or corrupted heap reference".
+    ///
+    /// Keep the two matches in the same file, and in the same order, so a new
+    /// `HeapObj` variant cannot be added to one alone.
+    pub(crate) fn can_reference_nursery(obj: &HeapObj) -> bool {
+        matches!(
+            obj,
+            HeapObj::Array(_)
+                | HeapObj::Tuple(_)
+                | HeapObj::Object(_)
+                | HeapObj::Record(_)
+                | HeapObj::VmClosure(_)
+                | HeapObj::Spread(_)
+                | HeapObj::BoundMethod(_)
+                | HeapObj::Class(_)
+                | HeapObj::Module(_)
+                | HeapObj::EnumVariant(_)
+                | HeapObj::Generator(_)
+                | HeapObj::Map(_)
+                | HeapObj::Set(_)
+        )
+    }
+
+    /// Whether `obj` points at a nursery object right now.
+    ///
+    /// The write barrier catches an old-generation object being WRITTEN with a
+    /// nursery reference, but nothing catches one being BORN holding them —
+    /// which happens to every object allocated while the nursery is full. Those
+    /// belong in `remembered` at birth; this is the test, applied once, at
+    /// allocation. See `HeapInner::alloc`.
+    pub(crate) fn holds_nursery_ref(obj: &HeapObj) -> bool {
+        let nursery_val = |v: &VmValue| v.is_heap() && is_nursery_idx(v.as_heap_idx());
+        match obj {
+            HeapObj::Array(arr) | HeapObj::Tuple(arr) => match arr.as_boxed() {
+                Some(items) => items.iter().any(nursery_val),
+                None => false,
+            },
+            HeapObj::Object(o) | HeapObj::Record(o) => {
+                let mut found = false;
+                o.borrow().for_each_field(|_, v| {
+                    found |= nursery_val(&v);
+                });
+                found
+            }
+            HeapObj::Spread(v) => nursery_val(v),
+            // An enum variant's payload and a map/set's entries are Rust-side
+            // `Value`s; deciding cheaply would mean duplicating their traversal.
+            // They are rare enough that always enrolling is the honest choice.
+            HeapObj::EnumVariant(_) | HeapObj::Map(_) | HeapObj::Set(_) => true,
+            _ => false,
+        }
+    }
+
     fn scan_children(obj: &HeapObj, old_gen: &HeapInner, fixups: &mut Vec<(ChildSlot, u32)>) {
         match obj {
-            HeapObj::Array(arr) => {
+            HeapObj::Array(arr) | HeapObj::Tuple(arr) => {
                 // Variant-aware: I64/F64 elements are raw numeric words,
                 // never a nursery heap ref, so there is nothing to scan
                 // or fix up. Only `Boxed` can hold a moved child.
@@ -461,7 +522,7 @@ impl Nursery {
                     }
                 }
             }
-            HeapObj::Object(obj_ref) => {
+            HeapObj::Object(obj_ref) | HeapObj::Record(obj_ref) => {
                 obj_ref.borrow().for_each_field(|i, v| {
                     if v.is_heap() && is_nursery_idx(v.as_heap_idx()) {
                         fixups.push((ChildSlot::ObjField(i), v.as_heap_idx()));
