@@ -126,35 +126,45 @@ pub fn print_coverage(jit: &JitStatsSnapshot, records: &[CompileRecord], scope: 
         row("frames clif", fmt_num(jit.jit_runs)),
         chalk(frame_pct(jit.jit_runs)).dim()
     ));
-    let interp_line = format!(
+    // An OSR frame is one of the interpreter frames: it STARTED interpreted and
+    // was rescued mid-loop. Reporting the two as one number said that a
+    // top-level loop runs interpreted when it does not — measured on a 3M
+    // iteration loop at module top level, 88.87 ms with `VARN_NO_JIT=1` against
+    // 7.78 ms with OSR, and the frame counted as "interpreter" either way.
+    // Split them, so the line that reads as a defect only counts frames that
+    // really did run to the end on the interpreter.
+    let never_compiled = jit.interp_runs.saturating_sub(jit.osr_entries);
+    terminal::log(format!(
         "{}  {}",
         row("frames intérprete", fmt_num(jit.interp_runs)),
-        frame_pct(jit.interp_runs)
-    );
-    if jit.interp_runs > 0 {
+        chalk(frame_pct(jit.interp_runs)).dim()
+    ));
+    if jit.osr_entries > 0 {
         terminal::log(format!(
             "{}  {}",
-            chalk(interp_line).red(),
-            chalk("← objetivo 0").dim()
+            row("  rescatados por OSR", fmt_num(jit.osr_entries)),
+            chalk("← empezaron interpretados, terminaron compilados").dim()
+        ));
+    }
+    let never_line = format!(
+        "{}  {}",
+        row("  nunca compilados", fmt_num(never_compiled)),
+        frame_pct(never_compiled)
+    );
+    if never_compiled > 0 {
+        terminal::log(format!(
+            "{}  {}",
+            chalk(never_line).yellow(),
+            chalk("← frías por tiering, o formas que el JIT no toma").dim()
         ));
     } else {
-        terminal::log(chalk(interp_line).green().to_string());
+        terminal::log(chalk(never_line).green().to_string());
     }
     terminal::log(format!(
         "{}  {}",
         row("de esos, cache hit", fmt_num(jit.jit_cached)),
         chalk(frame_pct(jit.jit_cached)).dim()
     ));
-    // Counted apart from `frames clif`: an OSR frame started interpreted and
-    // was rescued in flight, so it is already one of the interpreter frames
-    // above. This line says how many of them stopped being interpreted.
-    if jit.osr_entries > 0 {
-        terminal::log(format!(
-            "{}  {}",
-            row("rescatados por OSR", fmt_num(jit.osr_entries)),
-            chalk("← frames compilados en vuelo").dim()
-        ));
-    }
 
     terminal::blank();
     let compile = Duration::from_nanos(jit.total_compile_time_ns);
