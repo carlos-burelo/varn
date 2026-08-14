@@ -107,8 +107,8 @@ pub(crate) extern "C" fn jit_prepare_call(
                         }
                     }
                     varn_types::Value::NativeFn(ref b) => {
-                        let (f, _) = **b;
-                        ctx_ref.record_call_native();
+                        let (f, name) = **b;
+                        ctx_ref.record_call_native(f, Some(name));
                         let result = if arg_count == 0 {
                             ctx_ref.invoke_native(f, &[])
                         } else {
@@ -143,9 +143,10 @@ pub(crate) extern "C" fn jit_prepare_call(
                 ctx_ref.jit_native_result = instance_nv;
                 return 1 as *const crate::closure::VmClosure;
             }
-        } else if let Some(crate::heap::HeapObj::NativeFn(f, _name)) = ctx_ref.heap.get(heap_idx) {
+        } else if let Some(crate::heap::HeapObj::NativeFn(f, name)) = ctx_ref.heap.get(heap_idx) {
             let f = *f;
-            ctx_ref.record_call_native();
+            let name = *name;
+            ctx_ref.record_call_native(f, Some(name));
             let base = callee_base;
             let result = if arg_count <= 1 {
                 ctx_ref.invoke_native(f, &[])
@@ -200,8 +201,7 @@ pub(crate) extern "C" fn jit_push_self_frame(ctx: *mut ExecCtx, callee_base: usi
             }
         }
         ctx_ref
-            .frames
-            .push(crate::frame::CallFrame::new(closure, callee_base));
+            .frames.push(crate::frame::CallFrame::new(closure, callee_base));
     }
 }
 

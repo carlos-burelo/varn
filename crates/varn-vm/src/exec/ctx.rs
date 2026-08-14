@@ -1,5 +1,5 @@
 use crate::closure::VmUpvalue;
-use crate::frame::{CallFrame, TryHandler};
+use crate::frame::TryHandler;
 use crate::globals::GlobalStore;
 use crate::heap::Heap;
 use crate::loader::ModuleLoader;
@@ -28,7 +28,7 @@ pub(crate) use super::jit_helpers::*;
 #[repr(C)]
 pub struct ExecCtx {
     pub stack: Vec<VmValue>,
-    pub frames: Vec<CallFrame>,
+    pub frames: crate::frame_stack::FrameStack,
     pub globals: GlobalStore,
     pub heap: Heap,
     pub try_handlers: Vec<TryHandler>,
@@ -121,7 +121,7 @@ impl ExecCtx {
 
         let mut ctx = Self {
             stack: Vec::with_capacity(16384),
-            frames: Vec::with_capacity(512),
+            frames: crate::frame_stack::FrameStack::with_capacity(512),
             globals,
             heap,
             try_handlers: Vec::new(),
@@ -289,7 +289,7 @@ impl ExecCtx {
     pub(crate) fn fork_for_task(&self) -> Self {
         Self {
             stack: Vec::with_capacity(1024),
-            frames: Vec::with_capacity(64),
+            frames: crate::frame_stack::FrameStack::with_capacity(64),
             globals: self.globals.clone(),
             heap: self.heap.clone(),
             try_handlers: Vec::new(),

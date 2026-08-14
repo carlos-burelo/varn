@@ -3,6 +3,7 @@ pub(crate) mod closure;
 pub(crate) mod error;
 pub mod exec;
 pub(crate) mod frame;
+pub(crate) mod frame_stack;
 pub(crate) mod gc;
 pub(crate) mod generator;
 pub mod globals;

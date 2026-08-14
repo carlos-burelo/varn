@@ -92,16 +92,11 @@ impl ProfileCounters {
         self.calls_native.fetch_add(1, Ordering::Relaxed);
     }
 
-    #[inline(always)]
-    pub(crate) fn record_frame_push(&self) {
-        self.frame_pushes.fetch_add(1, Ordering::Relaxed);
-    }
-
-    #[inline(always)]
-    pub(crate) fn record_frame_pop(&self) {
-        self.frame_pops.fetch_add(1, Ordering::Relaxed);
-    }
 }
+
+// `frame_pushes` / `frame_pops` are bumped by `FrameStack` itself, next to the
+// `Vec` they count — see `crate::frame_stack`. They have no recorder here on
+// purpose: a recorder is something a new call site can forget to call.
 
 #[derive(Debug)]
 pub struct VmProfile {

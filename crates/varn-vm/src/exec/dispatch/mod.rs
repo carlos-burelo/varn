@@ -533,7 +533,6 @@ impl ExecCtx {
                                     break;
                                 } else {
                                     let popped = (*ctx).frames.pop().unwrap();
-                                    (*ctx).record_frame_pop();
                                     (*ctx).close_upvalues_above(popped.base);
                                 }
                             }
@@ -721,7 +720,6 @@ impl ExecCtx {
     pub(super) fn reg_return(&mut self, base: usize, src: usize) -> VmValue {
         let val = self.stack[base + src];
         let returning_frame_idx = self.frames.len().saturating_sub(1);
-        self.record_frame_pop();
         let frame = self.frames.pop().unwrap();
         self.close_upvalues_above(frame.base);
 

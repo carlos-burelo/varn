@@ -170,6 +170,30 @@ pub fn find_native_op_entry(op_id: u64) -> Option<&'static NativeOpEntry> {
         .copied()
 }
 
+static NAME_BY_FN: OnceLock<FxHashMap<usize, &'static str>> = OnceLock::new();
+
+/// Reverse index from a native function pointer back to its symbol name.
+///
+/// Call sites that reach a native through a resolved pointer — the JIT's
+/// `CallNativeOp` lowering bakes the address at compile time and keeps no
+/// op-id — have no name to report to the profiler. Without this they bump the
+/// call counter and vanish from the per-name table, which is how `bench -v`
+/// came to show 77k native calls against ~1.1k attributed ones.
+///
+/// Built once, only ever consulted from profiling paths.
+pub fn native_op_name_by_fn(f: varn_types::NativeFn) -> Option<&'static str> {
+    NAME_BY_FN
+        .get_or_init(|| {
+            let mut m = FxHashMap::with_capacity_and_hasher(512, Default::default());
+            for &entry in all_native_ops() {
+                m.entry(entry.func() as usize).or_insert(entry.symbol_name());
+            }
+            m
+        })
+        .get(&(f as usize))
+        .copied()
+}
+
 pub fn describe_op(id: u64) -> Option<OpMeta> {
     find_native_op_entry(id).map(|entry| OpMeta {
         name: entry.symbol_name(),

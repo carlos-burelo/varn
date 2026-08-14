@@ -63,24 +63,33 @@ impl ExecCtx {
         }
     }
 
+    /// The ONLY way to account for a native call: bumps the aggregate counter
+    /// and the per-name hotspot table together.
+    ///
+    /// These used to be two calls (`record_call_native` + `record_hotspot_native`)
+    /// and the second was missing at 6 of the 11 native call sites — every JIT
+    /// helper among them. `bench -v` reported 77 252 native calls with ~1 100
+    /// attributed, because the tier that runs 97% of the frames never named what
+    /// it called. Keep them fused so a new call site cannot report half.
+    ///
+    /// `name` is the source-level name when the site knows it (a bound method,
+    /// a global). `None` means the site only holds a resolved pointer — the JIT
+    /// bakes native addresses at compile time — and the name is recovered from
+    /// the builtin registry instead.
     #[inline(always)]
-    pub(crate) fn record_call_native(&self) {
+    pub(crate) fn record_call_native(&self, f: varn_types::NativeFn, name: Option<&str>) {
         if let Some(ref c) = self.profile_counters {
             c.record_call_native();
         }
-    }
-
-    #[inline(always)]
-    pub(crate) fn record_frame_push(&self) {
-        if let Some(ref c) = self.profile_counters {
-            c.record_frame_push();
-        }
-    }
-
-    #[inline(always)]
-    pub(crate) fn record_frame_pop(&self) {
-        if let Some(ref c) = self.profile_counters {
-            c.record_frame_pop();
+        if let Some(ref h) = self.hotspot_counters {
+            // An empty name counts as absent: several paths carry a
+            // `(NativeFn, &str)` pair whose name is `""` when the value was
+            // synthesized rather than resolved from a declaration.
+            let resolved = match name {
+                Some(n) if !n.is_empty() => n,
+                _ => varn_builtins::native_op_name_by_fn(f).unwrap_or("<nativo sin nombre>"),
+            };
+            h.borrow_mut().record_native_call(resolved);
         }
     }
 
@@ -95,13 +104,6 @@ impl ExecCtx {
     pub(crate) fn record_hotspot_method(&self, name: &str, jit: bool) {
         if let Some(ref h) = self.hotspot_counters {
             h.borrow_mut().record_method_call(name, jit);
-        }
-    }
-
-    #[inline(always)]
-    pub(crate) fn record_hotspot_native(&self, name: &str) {
-        if let Some(ref h) = self.hotspot_counters {
-            h.borrow_mut().record_native_call(name);
         }
     }
 

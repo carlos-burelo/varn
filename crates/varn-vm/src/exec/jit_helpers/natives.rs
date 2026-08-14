@@ -50,9 +50,10 @@ pub(crate) extern "C" fn jit_call_native_fast(
 
         if callee.is_heap() {
             let heap_obj = ctx_ref.heap.get(callee.as_heap_idx());
-            if let Some(crate::heap::HeapObj::NativeFn(f, _name)) = heap_obj {
+            if let Some(crate::heap::HeapObj::NativeFn(f, name)) = heap_obj {
                 let f = *f;
-                ctx_ref.record_call_native();
+                let name = *name;
+                ctx_ref.record_call_native(f, Some(name));
                 let arg_base = base + arg_start;
 
                 let result = if arg_count <= 1 {
@@ -130,7 +131,7 @@ unsafe fn call_native_from_stack(
     args_start: usize,
     total: usize,
 ) -> VmValue {
-    ctx_ref.record_call_native();
+    ctx_ref.record_call_native(f, None);
     let result = if total <= 16 {
         let mut buf = [VmValue::null(); 16];
         std::ptr::copy_nonoverlapping(

@@ -74,9 +74,8 @@ impl ExecCtx {
         if self.stack.len() < required {
             self.stack.resize(required, VmValue::null());
         }
-        self.record_frame_push();
-        self.frames
-            .push(crate::frame::CallFrame::new_owned(closure, base));
+        self
+            .frames.push(crate::frame::CallFrame::new_owned(closure, base));
         Ok(())
     }
 

@@ -44,8 +44,7 @@ impl ExecCtx {
                 match &bm.target {
                     varn_types::value::BoundMethodTarget::Native { func, name, .. } => {
                         let f = *func;
-                        self.record_call_native();
-                        self.record_hotspot_native(name);
+                        self.record_call_native(f, Some(name));
                         let has_placeholder = base + arg_start < self.stack.len();
                         let result = if has_placeholder {
                             self.stack[base + arg_start] = receiver;
@@ -129,7 +128,6 @@ impl ExecCtx {
                                 frame.return_reg = Some(dest as u16);
                                 frame.current_class = owner;
                                 self.record_call_vm_fast();
-                                self.record_frame_push();
                                 self.frames.push(frame);
                                 return Ok(true);
                             }
@@ -160,8 +158,7 @@ impl ExecCtx {
                     Some(crate::heap::HeapObj::NativeFn(f, name)) => {
                         let f = *f;
                         let name_str = *name;
-                        self.record_call_native();
-                        self.record_hotspot_native(name_str);
+                        self.record_call_native(f, Some(name_str));
                         let result = if arg_count <= 16 {
                             let mut buf: [MaybeUninit<VmValue>; 16] =
                                 unsafe { MaybeUninit::uninit().assume_init() };
@@ -227,7 +224,6 @@ impl ExecCtx {
                                 let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
                                 frame.return_reg = Some(dest as u16);
                                 self.record_call_vm_fast();
-                                self.record_frame_push();
                                 self.frames.push(frame);
                                 return Ok(true);
                             } else if nc.proto.has_rest && arg_count <= arity {
@@ -271,7 +267,6 @@ impl ExecCtx {
                                 let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
                                 frame.return_reg = Some(dest as u16);
                                 self.record_call_vm_fast();
-                                self.record_frame_push();
                                 self.frames.push(frame);
                                 return Ok(true);
                             }
@@ -363,7 +358,6 @@ impl ExecCtx {
                 frame.return_reg = Some(dest as u16);
                 frame.caller_base = Some(base);
                 self.record_call_vm_fast();
-                self.record_frame_push();
                 self.frames.push(frame);
                 return Ok(true);
             } else if closure_ref.proto.has_rest && arg_count <= arity {
@@ -411,7 +405,6 @@ impl ExecCtx {
                 frame._owned_closure = self.frames[frame_idx]._owned_closure.clone();
                 frame.return_reg = Some(dest as u16);
                 self.record_call_vm_fast();
-                self.record_frame_push();
                 self.frames.push(frame);
                 return Ok(true);
             }

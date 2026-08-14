@@ -75,7 +75,6 @@ pub fn unwind_to_handler(
     thrown: VmValue,
 ) {
     while ctx.frames.len() > handler.frame_depth {
-        ctx.record_frame_pop();
         let f = ctx.frames.pop().unwrap();
         ctx.close_upvalues_above(f.base);
     }
@@ -113,7 +112,6 @@ impl ExecCtx {
                 if self.stack.len() < required {
                     self.stack.resize(required, VmValue::null());
                 }
-                self.record_frame_push();
                 self.frames.push(frame);
 
                 if !self.gc_inhibited && self.heap.needs_minor_gc() {
@@ -160,7 +158,6 @@ impl ExecCtx {
                 if self.stack.len() < required {
                     self.stack.resize(required, VmValue::null());
                 }
-                self.record_frame_push();
                 self.frames.push(frame);
                 self.pending_constructors
                     .push((ctor_frame_idx, instance_nv));
@@ -169,7 +166,7 @@ impl ExecCtx {
                 }
             }
             PreparedCall::NativeImmediate(f, arg_count) => {
-                self.record_call_native();
+                self.record_call_native(f, None);
                 let args_start = self.stack.len() - arg_count;
 
                 let result = if arg_count <= 16 {
@@ -189,7 +186,7 @@ impl ExecCtx {
                 self.push(result);
             }
             PreparedCall::RawNativeImmediate(f, arg_count) => {
-                self.record_call_native();
+                self.record_call_native(f, None);
                 let args_start = self.stack.len() - arg_count;
 
                 let result = if arg_count <= 16 {
@@ -219,7 +216,7 @@ impl ExecCtx {
                 self.push(result);
             }
             PreparedCall::NativeConstructor(f, args, instance_nv) => {
-                self.record_call_native();
+                self.record_call_native(f, None);
                 let result =
                     (f)(self as &mut dyn NativeCtx, &args).map_err(|e| RuntimeError::new(e))?;
                 self.stack.pop();

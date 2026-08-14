@@ -114,7 +114,6 @@ pub(super) unsafe fn run_compiled_frame(
     }
 
     let frame = (*ctx).frames.pop().unwrap();
-    (*ctx).record_frame_pop();
     while (*ctx)
         .try_handlers
         .last()

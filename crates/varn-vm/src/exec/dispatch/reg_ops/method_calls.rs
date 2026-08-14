@@ -96,8 +96,7 @@ impl ExecCtx {
 
             if let Some((f, receiver)) = ic_native {
                 self.record_ic_hit_callmethod();
-                self.record_call_native();
-                self.record_hotspot_native(name.as_ref());
+                self.record_call_native(f, Some(name.as_ref()));
                 let result =
                     self.call_native_with_receiver(f, receiver, base, arg_start, arg_count)?;
                 self.stack[base + dest] = result;
@@ -137,8 +136,7 @@ impl ExecCtx {
                     val,
                     ICKind::NATIVE_VTABLE_METHOD,
                 );
-                self.record_call_native();
-                self.record_hotspot_native(name.as_ref());
+                self.record_call_native(f, Some(name.as_ref()));
                 let result =
                     self.call_native_with_receiver(f, this_val, base, arg_start, arg_count)?;
                 self.stack[base + dest] = result;
@@ -214,8 +212,7 @@ impl ExecCtx {
             None
         };
         if let Some((f, receiver)) = native_call {
-            self.record_call_native();
-            self.record_hotspot_native(name.as_ref());
+            self.record_call_native(f, Some(name.as_ref()));
             let result = self.call_native_with_receiver(f, receiver, base, arg_start, arg_count)?;
             self.stack[base + dest] = result;
             return Ok(false);
@@ -419,7 +416,6 @@ impl ExecCtx {
         frame.return_reg = Some(dest as u16);
         frame.caller_base = Some(base);
         frame.current_class = owner_class;
-        self.record_frame_push();
         self.frames.push(frame);
         Ok(true)
     }

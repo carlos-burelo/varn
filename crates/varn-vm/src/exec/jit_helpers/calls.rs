@@ -63,8 +63,7 @@ pub(crate) extern "C" fn jit_call(
                     }
 
                     ctx_ref
-                        .frames
-                        .push(crate::frame::CallFrame::new(&**closure, callee_base));
+                        .frames.push(crate::frame::CallFrame::new(&**closure, callee_base));
 
                     ctx_ref.jit_frame_prepushed = 1;
                     let res = (jit_fn)(
@@ -93,9 +92,10 @@ pub(crate) extern "C" fn jit_call(
                 if let Some(final_val) = jit_construct_fast(ctx_ref, &cls, base, args) {
                     return final_val;
                 }
-            } else if let Some(crate::heap::HeapObj::NativeFn(f, _)) = heap_obj {
+            } else if let Some(crate::heap::HeapObj::NativeFn(f, name)) = heap_obj {
                 let f = *f;
-                ctx_ref.record_call_native();
+                let name = *name;
+                ctx_ref.record_call_native(f, Some(name));
                 let arg_base = base + args.arg_start;
 
                 let result = if args.arg_count <= 1 {

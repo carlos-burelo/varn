@@ -109,7 +109,11 @@ impl Vm {
     }
 
     pub fn enable_profiling(&mut self) {
-        self.ctx.profile_counters = Some(ProfileCounters::new());
+        let counters = ProfileCounters::new();
+        // The frame stack counts its own pushes and pops, so it needs the same
+        // handle — see `crate::frame_stack`.
+        self.ctx.frames.set_counters(Some(counters.clone()));
+        self.ctx.profile_counters = Some(counters);
     }
 
     pub fn enable_hotspot_profiling(&mut self) {
