@@ -90,9 +90,18 @@ impl ObjData {
     /// Object literal with a statically known shape: one allocation, fields
     /// copied straight into the tail.
     pub fn with_shape(shape: Rc<Shape>, values: Vec<VmValue>) -> Rc<ObjData> {
+        Self::with_shape_slice(shape, &values)
+    }
+
+    /// As [`Self::with_shape`], for callers that already hold the values in a
+    /// buffer they own. The `Vec` form copies into the object's inline storage
+    /// and then drops the `Vec`, so building one just to pass it here is a
+    /// whole allocation with no purpose — which is what `JSON.parse` was doing
+    /// once per object.
+    pub fn with_shape_slice(shape: Rc<Shape>, values: &[VmValue]) -> Rc<ObjData> {
         let obj = Self::alloc(shape, values.len());
-        for (i, v) in values.into_iter().enumerate() {
-            obj.values[i].set(v);
+        for (i, v) in values.iter().enumerate() {
+            obj.values[i].set(*v);
         }
         obj
     }

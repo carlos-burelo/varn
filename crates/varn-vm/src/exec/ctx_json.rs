@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use varn_types::{NativeCtx, Value};
 
 thread_local! {
-    static JSON_SHAPE_CACHE: std::cell::RefCell<Option<(Vec<String>, std::rc::Rc<varn_types::Shape>)>> = const { std::cell::RefCell::new(None) };
+    static JSON_SHAPE_CACHE: ShapeCache = const { std::cell::RefCell::new(None) };
 }
 
 impl ExecCtx {
@@ -196,6 +196,34 @@ fn write_json_str(s: &str, out: &mut String) {
     out.push('"');
 }
 
+type ShapeCache = std::cell::RefCell<Option<(Vec<String>, std::rc::Rc<varn_types::Shape>)>>;
+
+/// Whether the cached shape's key at `idx` is `key`.
+fn key_matches_cached(cache: &ShapeCache, idx: usize, key: &str) -> bool {
+    match &*cache.borrow() {
+        Some((keys, _)) => keys.get(idx).map(|k| k.as_str()) == Some(key),
+        None => false,
+    }
+}
+
+/// The cached shape's first `n` keys, owned. Used to recover the keys of an
+/// object that matched the cache up to a point and then diverged.
+fn cached_key_prefix(cache: &ShapeCache, n: usize) -> Vec<String> {
+    match &*cache.borrow() {
+        Some((keys, _)) => keys.iter().take(n).cloned().collect(),
+        None => Vec::new(),
+    }
+}
+
+/// The cached shape, if it has exactly `n` keys — a prefix match is not a
+/// match, the object must have ended where the shape does.
+fn cached_shape_of_len(cache: &ShapeCache, n: usize) -> Option<std::rc::Rc<varn_types::Shape>> {
+    match &*cache.borrow() {
+        Some((keys, shape)) if keys.len() == n => Some(std::rc::Rc::clone(shape)),
+        _ => None,
+    }
+}
+
 struct VmSeed<'a>(&'a mut ExecCtx);
 
 impl<'de, 'a> DeserializeSeed<'de> for VmSeed<'a> {
@@ -272,41 +300,84 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
         Ok(self.0.alloc_array(items))
     }
 
+    /// Reads an object's fields straight into a fixed buffer, checking each key
+    /// against the cached shape as it arrives.
+    ///
+    /// This used to collect keys and values into two `Vec`s, then compare the
+    /// whole key list against the cache — two throwaway allocations per object,
+    /// plus a third inside `alloc_object_with_shape`, which copies the values
+    /// into the object's inline storage and drops the `Vec` again. A document
+    /// of 50 000 objects paid that 50 000 times per parse.
+    ///
+    /// Matching incrementally means a hit never materialises the keys at all:
+    /// the keys that matched ARE the cached ones. Only a mismatch has to
+    /// recover them, and it recovers the matched prefix from the cache rather
+    /// than from the parse.
     fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
     where
         A: MapAccess<'de>,
     {
-        let cap = map.size_hint().unwrap_or(4);
-        let mut keys = Vec::with_capacity(cap);
-        let mut values = Vec::with_capacity(cap);
+        /// Fields held without allocating. Objects wider than this fall back to
+        /// the growable path; JSON documents in the shape this matters for
+        /// (records in an array) are far narrower.
+        const INLINE_FIELDS: usize = 16;
+
+        let mut inline = [VmValue::null(); INLINE_FIELDS];
+        let mut spilled: Vec<VmValue> = Vec::new();
+        let mut n = 0usize;
+
+        // How many keys so far are the cached shape's, in order. `None` once a
+        // key has diverged — from then on keys are collected as owned strings.
+        let mut matched: Option<usize> = Some(0);
+        let mut owned_keys: Vec<String> = Vec::new();
+
         while let Some(key) = map.next_key::<Cow<'de, str>>()? {
             let val = map.next_value_seed(VmSeed(self.0))?;
-            keys.push(key);
-            values.push(val);
-        }
-
-        let shape_opt = JSON_SHAPE_CACHE.with(|c| {
-            let borrow = c.borrow();
-            if let Some((ref cached_keys, ref cached_shape)) = *borrow {
-                if cached_keys.len() == keys.len()
-                    && cached_keys
-                        .iter()
-                        .zip(keys.iter())
-                        .all(|(ck, k)| ck.as_str() == k.as_ref())
-                {
-                    return Some(std::rc::Rc::clone(cached_shape));
+            if n < INLINE_FIELDS {
+                inline[n] = val;
+            } else {
+                if spilled.is_empty() {
+                    spilled.extend_from_slice(&inline);
                 }
+                spilled.push(val);
             }
-            None
-        });
-        if let Some(cached_shape) = shape_opt {
-            return Ok(self.0.alloc_object_with_shape(&cached_shape, values));
+            n += 1;
+
+            match matched {
+                Some(k) if JSON_SHAPE_CACHE.with(|c| key_matches_cached(c, k, key.as_ref())) => {
+                    matched = Some(k + 1);
+                }
+                Some(k) => {
+                    // Diverged at `k`: the first `k` keys are the cached ones.
+                    owned_keys = JSON_SHAPE_CACHE.with(|c| cached_key_prefix(c, k));
+                    owned_keys.push(key.into_owned());
+                    matched = None;
+                }
+                None => owned_keys.push(key.into_owned()),
+            }
         }
 
-        let owned_keys: Vec<String> = keys.iter().map(|k| k.as_ref().to_string()).collect();
+        let values: &[VmValue] = if spilled.is_empty() {
+            &inline[..n]
+        } else {
+            &spilled
+        };
+
+        if matched == Some(n) {
+            if let Some(shape) = JSON_SHAPE_CACHE.with(|c| cached_shape_of_len(c, n)) {
+                return Ok(self.0.heap.alloc_object_with_shape_slice(&shape, values));
+            }
+        }
+
+        // No cached shape, or this object has a different one: build the object
+        // field by field so the shape is derived, then cache it for the objects
+        // that follow.
+        if matched.is_some() {
+            owned_keys = JSON_SHAPE_CACHE.with(|c| cached_key_prefix(c, matched.unwrap()));
+        }
         let obj = self.0.alloc_object();
-        for (k, v) in owned_keys.iter().zip(values.into_iter()) {
-            self.0.set_field(obj, k, v);
+        for (k, v) in owned_keys.iter().zip(values.iter()) {
+            self.0.set_field(obj, k, *v);
         }
         if let Some(shape) = self.0.get_object_shape(obj) {
             JSON_SHAPE_CACHE.with(|c| *c.borrow_mut() = Some((owned_keys, shape)));

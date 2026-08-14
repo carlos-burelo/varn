@@ -47,6 +47,15 @@ impl ObjRef {
         Self(super::ObjData::with_shape(shape, values))
     }
 
+    /// As [`Self::with_shape`], from a borrowed buffer — see
+    /// [`super::ObjData::with_shape_slice`].
+    pub fn with_shape_slice(
+        shape: Rc<super::Shape>,
+        values: &[crate::vm_value::VmValue],
+    ) -> Self {
+        Self(super::ObjData::with_shape_slice(shape, values))
+    }
+
     pub fn from_pairs<I>(pairs: I) -> Self
     where
         I: IntoIterator<Item = (RuntimeString, crate::vm_value::VmValue)>,

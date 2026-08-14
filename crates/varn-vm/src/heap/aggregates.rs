@@ -33,7 +33,17 @@ impl HeapInner {
         shape: &Rc<varn_types::Shape>,
         values: Vec<VmValue>,
     ) -> VmValue {
-        let oref = ObjRef::with_shape(Rc::clone(shape), values);
+        self.alloc_object_with_shape_slice(shape, &values)
+    }
+
+    /// As [`Self::alloc_object_with_shape`], without requiring the caller to
+    /// own a `Vec` it only builds to have it copied out and dropped.
+    pub(crate) fn alloc_object_with_shape_slice(
+        &mut self,
+        shape: &Rc<varn_types::Shape>,
+        values: &[VmValue],
+    ) -> VmValue {
+        let oref = ObjRef::with_shape_slice(Rc::clone(shape), values);
         VmValue::from_heap_idx(self.alloc(HeapObj::Object(oref)))
     }
 
