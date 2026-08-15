@@ -51,6 +51,7 @@ import "./50-opt-unsupported-phase3.vn"
 import "./51-opt-unsupported-phase4.vn"
 import "./52-math-trig.vn"
 import "./53-gc-class-vtable.vn"
+import "./53-int48-wrapping.vn"
 import "./54-channels.vn"
 import "./55-array-element-inference.vn"
 import "./56-tier-parity.vn"
@@ -72,5 +73,5 @@ import "./71-phase2-std-features.vn"
 import "./72-consolidated-std.vn"
 import "./73-str-charcode-json-shape.vn"
 
-print("\n73 side-effect modules executed in suite")
+print("\n74 side-effect modules executed in suite")
 assertSummary()
