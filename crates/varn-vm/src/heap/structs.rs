@@ -210,6 +210,15 @@ impl Heap {
         unsafe { (*self.inner.get()).jit_ancestry.clone() }
     }
 
+    /// `&mut` out of `&self`, which is the `UnsafeCell` contract the heap is
+    /// built on: the heap is shared by `Rc` across the VM and mutated through
+    /// shared handles, and the safety argument is single-threaded execution,
+    /// not the borrow checker. The `unsafe` on the signature is what carries
+    /// that obligation to the caller.
+    ///
+    /// Allowed at the site rather than for the workspace, so a new
+    /// `&mut`-from-`&self` that has NOT made this argument still fails.
+    #[allow(clippy::mut_from_ref)]
     #[inline(always)]
     pub(crate) unsafe fn inner_mut(&self) -> &mut HeapInner {
         &mut *self.inner.get()

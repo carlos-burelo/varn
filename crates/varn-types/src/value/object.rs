@@ -153,6 +153,10 @@ impl ObjData<[Cell<VmValue>]> {
         unsafe { (*self.overflow.get()).as_deref() }
     }
 
+    /// `&mut` out of `&self` is the `UnsafeCell` contract this object layout is
+    /// built on — see `ArrayRef::write` for the full argument. Allowed at the
+    /// site so a new one elsewhere still has to justify itself.
+    #[allow(clippy::mut_from_ref)]
     #[inline]
     fn overflow_mut(&self) -> &mut Vec<VmValue> {
         unsafe { (*self.overflow.get()).get_or_insert_with(Box::default) }

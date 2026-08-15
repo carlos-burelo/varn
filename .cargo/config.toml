@@ -1,9 +1,23 @@
-[build]
-jobs = 12
+# Committed cargo config: only settings that are true on every machine that
+# builds this repo. Anything describing ONE host belongs in the developer's
+# own `~/.cargo/config.toml`, which cargo merges on top of this one.
+#
+# `jobs = 12` used to live here. It described the author's i7-1355U and was
+# wrong everywhere else, including a CI runner; cargo's default is the machine's
+# own parallelism, which is the right answer on all of them.
 
 [target.x86_64-pc-windows-msvc]
+# rust-lld ships with the toolchain and links this workspace several times
+# faster than the MSVC linker.
 linker = "rust-lld.exe"
+# `target-cpu=native` is deliberate and load-bearing for benchmarking: every
+# perf number recorded in PLAN.md and README.md was measured with it. It also
+# makes the binary non-portable across CPUs, which is fine — nothing here ships
+# a build artifact, and CI runs what it builds on the same runner.
 rustflags = ["-C", "target-cpu=native"]
 
 [env]
+# Dev-checkout stdlib tier: the `std/` tree in this repo wins over the bundle
+# embedded in the binary. `VARN_STD=@embedded` forces the shipped one, which is
+# why the validation matrix has four cells and not two.
 VARN_STD = { value = "std", relative = true }

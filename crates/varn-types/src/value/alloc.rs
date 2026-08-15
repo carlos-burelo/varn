@@ -111,6 +111,18 @@ impl ArrayRef {
         unsafe { &*self.0.get() }
     }
 
+    /// # Why `mut_from_ref` is allowed here
+    ///
+    /// Handing out `&mut` from `&self` is exactly what `UnsafeCell` is for, and
+    /// it is the representation this VM is built on: object identity is the
+    /// address of the `Rc` (see `ObjRef`), so a value can never be reallocated
+    /// to be mutated. The safety argument is the VM's single-threaded
+    /// execution, not the borrow checker.
+    ///
+    /// Allowed at the site rather than for the workspace, so a NEW
+    /// `&mut`-from-`&self` somewhere that has not made this argument still
+    /// fails the build.
+    #[allow(clippy::mut_from_ref)]
     pub fn write(&self) -> &mut Vec<super::Value> {
         unsafe { &mut *self.0.get() }
     }
@@ -119,6 +131,8 @@ impl ArrayRef {
         unsafe { &*self.0.get() }
     }
 
+    /// Same interior-mutability contract as [`Self::write`].
+    #[allow(clippy::mut_from_ref)]
     pub fn borrow_mut(&self) -> &mut Vec<super::Value> {
         unsafe { &mut *self.0.get() }
     }
