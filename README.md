@@ -231,20 +231,43 @@ function* range(start: int, end: int) {
 
 ## Rendimiento (Varn vs Bun vs Node)
 
-Resultados de benchmark ejecutados con `benchmarks/compare.ps1` en build `release` sobre la suite pareada comparando el tiempo mínimo de ejecución en pared (wall-clock time):
+Resultados de `benchmarks/compare.ps1 -Runs 8` en build `release`, mínimo de
+tiempo de pared del **proceso completo** (incluye arranque, compilación y
+ejecución). Medidos el 2026-08-14 sobre un i7-1355U / Windows 11:
 
-| Benchmark | Varn | Bun | Node | vs Fastest Rival |
+| Benchmark | Varn | Bun | Node | vs mejor rival |
 |---| --- | --- | --- |---|
-| `fib` | **44.2 ms** | 89.2 ms | 115.6 ms | **2.02x WIN 🏆** |
-| `gc_alloc` | **44.7 ms** | 81.4 ms | 99.6 ms | **1.82x WIN 🏆** |
-| `dto` | **36.3 ms** | 62.1 ms | 79.7 ms | **1.71x WIN 🏆** |
-| `matrix` | **35.9 ms** | 55.4 ms | 72.1 ms | **1.54x WIN 🏆** |
-| `json_native` | **46.9 ms** | 79.7 ms | 105.0 ms | **1.70x WIN 🏆** |
-| `json_pure` | 451.8 ms | 383.7 ms | 543.8 ms | 0.85x |
-| `str_ops` | 1452.5 ms | 156.7 ms | 153.6 ms | 0.11x |
+| `fib` | **45.4 ms** | 87.9 ms | 117.1 ms | **1.94x WIN 🏆** |
+| `gc_alloc` | **46.7 ms** | 80.7 ms | 98.9 ms | **1.73x WIN 🏆** |
+| `json_native` | **43.5 ms** | 67.0 ms | 83.1 ms | **1.54x WIN 🏆** |
+| `dto` | **41.2 ms** | 62.0 ms | 81.9 ms | **1.50x WIN 🏆** |
+| `matrix` | **35.0 ms** | 52.4 ms | 66.1 ms | **1.50x WIN 🏆** |
+| `str_ops` | **114.6 ms** | 124.5 ms | 122.0 ms | **1.06x WIN 🏆** |
+| `json_pure` | 482.5 ms | 302.9 ms | 422.6 ms | 0.63x |
 
 > [!NOTE]
-> En microbenchmarks computacionales y de asignación (`fib`, `gc_alloc`, `dto`, `matrix`, `json_native`), la VM en registro con NaN-boxing y compilación JIT eager supera consistentemente a JavaScriptCore (Bun) y V8 (Node).
+> En microbenchmarks computacionales y de asignación (`fib`, `gc_alloc`, `dto`,
+> `matrix`, `json_native`), la VM en registro con NaN-boxing y el JIT Cranelift
+> superan consistentemente a JavaScriptCore (Bun) y V8 (Node).
+
+> [!IMPORTANT]
+> **Estas cifras caducan.** Una tabla desactualizada no es un detalle
+> cosmético: manda a optimizar un problema que ya no existe. La fila `str_ops`
+> llegó a decir *1452.5 ms / 0.11x* mucho después de que el número real fuera
+> este, y el trabajo que esa fila sugería habría sido tiempo tirado. Al cambiar
+> cualquier cosa que un benchmark toque, hay que volver a correr la tabla
+> entera — los rivales incluidos, que son el control de la máquina.
+
+`str_ops` gana en pared pero **no** en trabajo puro: sumando sólo las secciones
+cronometradas dentro del programa, Varn hace 111 ms contra los ~84 de Bun, y lo
+que da la vuelta al resultado es el arranque (15 ms contra 85). Las secciones
+que siguen detrás son las que construyen strings pequeñas
+(`concat_parts`, `prefix_suffix`, `int_to_str`) y `slice`; `search`, `split`,
+`equality` y `replace_all` ya ganan.
+
+`json_pure` es el único hueco real que queda: `parse` es ~1.9x más lento que
+JSC y ahí lo que corre es Rust nativo (`std/json.vn` son 11 líneas de binding),
+no código Varn.
 
 ---
 
