@@ -6,7 +6,6 @@ use crate::ssa::ir::{InstKind, Terminator};
 
 use super::super::{Builder, Result, VarId};
 
-
 impl Builder {
     pub(in crate::ssa::build) fn lower_try(
         &mut self,
@@ -22,7 +21,11 @@ impl Builder {
         }
     }
 
-    pub(in crate::ssa::build) fn lower_try_catch(&mut self, block: &[HirStmt], cc: &HirCatch) -> Result<()> {
+    pub(in crate::ssa::build) fn lower_try_catch(
+        &mut self,
+        block: &[HirStmt],
+        cc: &HirCatch,
+    ) -> Result<()> {
         let try_entry = self.current;
         let catch_b = self.new_block();
         let exit_b = self.new_block();
@@ -66,7 +69,11 @@ impl Builder {
         Ok(())
     }
 
-    pub(in crate::ssa::build) fn lower_try_finally(&mut self, block: &[HirStmt], fin: &[HirStmt]) -> Result<()> {
+    pub(in crate::ssa::build) fn lower_try_finally(
+        &mut self,
+        block: &[HirStmt],
+        fin: &[HirStmt],
+    ) -> Result<()> {
         self.finally_stack.push(fin.to_vec());
         let try_entry = self.current;
         let handler_b = self.new_block();

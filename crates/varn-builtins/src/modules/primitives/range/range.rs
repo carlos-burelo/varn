@@ -131,4 +131,3 @@ varn_contract! {
         }
     }
 }
-

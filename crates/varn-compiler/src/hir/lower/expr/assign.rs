@@ -1,4 +1,4 @@
-use varn_core::ast::operators::{AssignOp};
+use varn_core::ast::operators::AssignOp;
 use varn_core::ast::{Expr, ExprKind};
 
 use super::*;

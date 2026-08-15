@@ -340,4 +340,3 @@ impl std::hash::Hash for FunctionProto {
         self.required_caps.hash(state);
     }
 }
-

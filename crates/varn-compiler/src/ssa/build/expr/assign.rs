@@ -4,7 +4,6 @@ use crate::OptError;
 
 use super::{Builder, Result};
 
-
 impl Builder {
     /// Assignment and update (`x += 1`, `obj.p++`) over every target shape.
     pub(super) fn lower_assign_expr(&mut self, expr: &HirExpr) -> Result<Value> {

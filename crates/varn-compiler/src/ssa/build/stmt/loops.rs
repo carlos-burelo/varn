@@ -8,9 +8,12 @@ use crate::ssa::ir::{InstKind, Terminator};
 
 use super::super::{Builder, LoopCtx, Result, VarId};
 
-
 impl Builder {
-    pub(in crate::ssa::build) fn lower_while(&mut self, test: &HirExpr, body: &[HirStmt]) -> Result<()> {
+    pub(in crate::ssa::build) fn lower_while(
+        &mut self,
+        test: &HirExpr,
+        body: &[HirStmt],
+    ) -> Result<()> {
         let pre = self.current;
         let header = self.new_block();
         self.set_term(Terminator::Jump {
@@ -330,7 +333,11 @@ impl Builder {
         Ok(())
     }
 
-    pub(in crate::ssa::build) fn lower_do_while(&mut self, body: &[HirStmt], test: &HirExpr) -> Result<()> {
+    pub(in crate::ssa::build) fn lower_do_while(
+        &mut self,
+        body: &[HirStmt],
+        test: &HirExpr,
+    ) -> Result<()> {
         let pre = self.current;
         let body_b = self.new_block();
         self.set_term(Terminator::Jump {
@@ -376,5 +383,4 @@ impl Builder {
         self.current = exit_b;
         Ok(())
     }
-
 }

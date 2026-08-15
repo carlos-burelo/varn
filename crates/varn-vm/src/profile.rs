@@ -91,7 +91,6 @@ impl ProfileCounters {
     pub(crate) fn record_call_native(&self) {
         self.calls_native.fetch_add(1, Ordering::Relaxed);
     }
-
 }
 
 // `frame_pushes` / `frame_pops` are bumped by `FrameStack` itself, next to the

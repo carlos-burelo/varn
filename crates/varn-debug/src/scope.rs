@@ -1,9 +1,9 @@
 use varn_compiler::FunctionProto;
-use varn_types::chunk::Literal;
-use varn_types::chunk::PoolEntry;
 use varn_term::chalk::chalk;
 use varn_term::terminal;
 use varn_term::terminal::Section;
+use varn_types::chunk::Literal;
+use varn_types::chunk::PoolEntry;
 
 pub fn debug_scopes(proto: &FunctionProto, filename: &str) {
     Section::new("static scope tree")

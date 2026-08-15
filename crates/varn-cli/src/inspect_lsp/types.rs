@@ -55,7 +55,11 @@ pub fn debug_types(path: &str, source: &str, flags: &DebugFlags) {
     }
 
     let footer_msg = if std_hidden > 0 {
-        format!("{} symbols analyzed ({} std symbols hidden, use types:all to show)", analysis.symbols.len(), std_hidden)
+        format!(
+            "{} symbols analyzed ({} std symbols hidden, use types:all to show)",
+            analysis.symbols.len(),
+            std_hidden
+        )
     } else {
         format!("{} symbols analyzed", analysis.symbols.len())
     };

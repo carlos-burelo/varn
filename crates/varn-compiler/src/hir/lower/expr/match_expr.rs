@@ -1,6 +1,6 @@
 use varn_core::ast::pattern::MatchPattern;
 
-use varn_core::ast::expr::{MatchBody};
+use varn_core::ast::expr::MatchBody;
 use varn_core::ast::{Expr, StmtKind};
 
 use super::*;
@@ -101,5 +101,4 @@ impl<'a> Lowerer<'a> {
             MatchPattern::Sequence(_) | MatchPattern::Type { .. } => HirCaseTest::Wildcard,
         })
     }
-
 }

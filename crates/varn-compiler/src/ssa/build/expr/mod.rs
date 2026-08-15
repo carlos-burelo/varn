@@ -8,7 +8,6 @@ use crate::OptError;
 
 use super::{Builder, Result};
 
-
 mod assign;
 mod calls;
 mod class;
@@ -225,5 +224,4 @@ impl Builder {
             HirType::Ref,
         ))
     }
-
 }

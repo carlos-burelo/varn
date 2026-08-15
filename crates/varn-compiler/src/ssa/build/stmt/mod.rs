@@ -7,7 +7,6 @@ use crate::OptError;
 
 use super::{Builder, Result, VarId};
 
-
 mod branches;
 mod loops;
 mod modules;
@@ -203,5 +202,4 @@ impl Builder {
             }
         }
     }
-
 }

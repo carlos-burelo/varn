@@ -57,7 +57,11 @@ impl<'a> Lowerer<'a> {
         });
 
         let test = HirExpr::Binary {
-            op: if inclusive { HirBinOp::Le } else { HirBinOp::Lt },
+            op: if inclusive {
+                HirBinOp::Le
+            } else {
+                HirBinOp::Lt
+            },
             lhs: Box::new(HirExpr::Var(HirBinding::Local(loop_var))),
             rhs: Box::new(HirExpr::Var(HirBinding::Local(limit))),
             ty: HirType::Int,

@@ -9,4 +9,3 @@ pub struct SyntaxResult {
     pub program: Program,
     pub parse_errs: Vec<Diagnostic>,
 }
-

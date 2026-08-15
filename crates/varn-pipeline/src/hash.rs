@@ -6,4 +6,3 @@ pub fn fnv1a64(bytes: &[u8]) -> u64 {
     }
     hash
 }
-

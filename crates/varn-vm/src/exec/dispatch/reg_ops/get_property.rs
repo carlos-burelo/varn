@@ -134,7 +134,11 @@ impl ExecCtx {
                         let entry = varn_types::chunk::CacheEntry {
                             id: cls.id,
                             slot: 0,
-                            is_class: if is_str { ICKind::STR_LENGTH } else { ICKind::ARRAY_LENGTH },
+                            is_class: if is_str {
+                                ICKind::STR_LENGTH
+                            } else {
+                                ICKind::ARRAY_LENGTH
+                            },
                             vtable_ver: 0,
                         };
                         closure.ic_cache.borrow_mut()[cs_idx].find_or_insert(entry);

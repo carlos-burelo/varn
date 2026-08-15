@@ -6,9 +6,12 @@ use crate::ssa::ir::{InstKind, Terminator, Value};
 use super::super::VarId;
 use super::{Builder, Result};
 
-
 impl Builder {
-    pub(super) fn apply_optional(&mut self, obj: Value, property: &HirOptionalProperty) -> Result<Value> {
+    pub(super) fn apply_optional(
+        &mut self,
+        obj: Value,
+        property: &HirOptionalProperty,
+    ) -> Result<Value> {
         match property {
             HirOptionalProperty::Member(name) => Ok(self.emit(
                 InstKind::GetPropertyMaybe {
@@ -86,7 +89,11 @@ impl Builder {
         }
     }
 
-    pub(super) fn lower_match(&mut self, subject: &HirExpr, cases: &[HirMatchCase]) -> Result<Value> {
+    pub(super) fn lower_match(
+        &mut self,
+        subject: &HirExpr,
+        cases: &[HirMatchCase],
+    ) -> Result<Value> {
         let subj = self.lower_expr(subject)?;
         let merge = self.new_block();
         let mut chain_alive = true;
@@ -282,5 +289,4 @@ impl Builder {
             _ => {}
         }
     }
-
 }

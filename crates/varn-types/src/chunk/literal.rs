@@ -5,7 +5,6 @@ use std::rc::Rc;
 
 use varn_core::IntrinsicType;
 
-
 /// Serde variant labels for [`Literal`], one per kind, sourced from the single
 /// canonical [`IntrinsicType`] names. Round-trip keys on the numeric index, so
 /// these are identifiers only — but they stay the one canonical representation.
@@ -170,4 +169,3 @@ impl std::hash::Hash for Literal {
         }
     }
 }
-

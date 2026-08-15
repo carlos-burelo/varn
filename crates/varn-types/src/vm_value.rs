@@ -700,7 +700,6 @@ impl VmArray {
             _ => false,
         }
     }
-
 }
 
 /// Cold panic for a Boxed-only projection reached with a typed repr. Kept out

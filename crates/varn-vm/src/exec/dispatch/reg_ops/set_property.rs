@@ -64,7 +64,9 @@ impl ExecCtx {
                                 found_slot = Some((slot, ICKind::SHAPE_PROP));
                                 hit_found = true;
                                 break 'entries;
-                            } else if entry.is_class == ICKind::SHAPE_TRANSITION && guard.shape().id == entry.id {
+                            } else if entry.is_class == ICKind::SHAPE_TRANSITION
+                                && guard.shape().id == entry.id
+                            {
                                 found_slot = Some((slot, ICKind::SHAPE_TRANSITION));
                                 hit_found = true;
                                 break 'entries;

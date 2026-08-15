@@ -8,7 +8,10 @@ use rustc_hash::FxHashSet;
 
 type Result<T> = std::result::Result<T, OptError>;
 
-pub(super) fn assign_registers(ssa: &SsaFunc, nparams: usize) -> Result<(Vec<u8>, u8, u8, u8, u16)> {
+pub(super) fn assign_registers(
+    ssa: &SsaFunc,
+    nparams: usize,
+) -> Result<(Vec<u8>, u8, u8, u8, u16)> {
     let mut reg = vec![0u8; ssa.values.len()];
     let mut assigned = vec![false; ssa.values.len()];
 

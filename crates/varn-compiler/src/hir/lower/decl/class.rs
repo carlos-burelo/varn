@@ -8,9 +8,12 @@ use varn_core::ast::{Decl, Decorator, Expr, Modifiers, Param, Stmt, Visibility};
 
 use super::super::*;
 
-
 impl<'a> Lowerer<'a> {
-    pub(in crate::hir::lower) fn lower_class(&mut self, decl: &ClassDecl, scope: &mut Scope) -> R<HirClass> {
+    pub(in crate::hir::lower) fn lower_class(
+        &mut self,
+        decl: &ClassDecl,
+        scope: &mut Scope,
+    ) -> R<HirClass> {
         let name = decl.id.clone().unwrap_or_else(|| Rc::from("anonymous"));
         let mut class_decorators = Vec::new();
         for dec in &decl.decorators {
@@ -420,5 +423,4 @@ impl<'a> Lowerer<'a> {
             _ => return Err(OptError::Unsupported("hir: inline decl kind")),
         }
     }
-
 }

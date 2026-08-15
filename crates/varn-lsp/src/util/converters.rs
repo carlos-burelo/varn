@@ -33,4 +33,3 @@ use tower_lsp::lsp_types::CompletionItemKind;
 pub fn to_completion_kind(kind: SymbolKind) -> CompletionItemKind {
     crate::util::kinds::to_completion_kind(kind)
 }
-

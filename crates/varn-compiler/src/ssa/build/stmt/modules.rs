@@ -4,10 +4,9 @@
 use std::rc::Rc;
 
 use crate::hir::{HirExportSpec, HirExpr, HirImportKind, HirImportSpec, HirType};
-use crate::ssa::ir::{InstKind};
+use crate::ssa::ir::InstKind;
 
 use super::super::{Builder, Result};
-
 
 impl Builder {
     pub(in crate::ssa::build) fn lower_import(
@@ -66,7 +65,11 @@ impl Builder {
         Ok(())
     }
 
-    pub(in crate::ssa::build) fn lower_store_export(&mut self, name: &Rc<str>, slot: u16) -> Result<()> {
+    pub(in crate::ssa::build) fn lower_store_export(
+        &mut self,
+        name: &Rc<str>,
+        slot: u16,
+    ) -> Result<()> {
         let qualified_name = if let Some(ref src) = self.source_file {
             Rc::from(format!("{}::{}", src.replace('\\', "/"), name))
         } else {
@@ -154,7 +157,11 @@ impl Builder {
         Ok(())
     }
 
-    pub(in crate::ssa::build) fn lower_export_default_expr(&mut self, value: &HirExpr, slot: &Option<u16>) -> Result<()> {
+    pub(in crate::ssa::build) fn lower_export_default_expr(
+        &mut self,
+        value: &HirExpr,
+        slot: &Option<u16>,
+    ) -> Result<()> {
         let val = self.lower_expr(value)?;
         if let Some(slot_idx) = slot {
             self.emit_effect(InstKind::StoreModuleSlot {
@@ -164,5 +171,4 @@ impl Builder {
         }
         Ok(())
     }
-
 }

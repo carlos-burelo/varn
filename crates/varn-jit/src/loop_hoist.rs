@@ -394,4 +394,3 @@ pub fn diagnose_loops(code: &[u16], constants: &[PoolEntry]) -> Vec<LoopDiagnost
         })
         .collect()
 }
-

@@ -186,7 +186,8 @@ pub fn native_op_name_by_fn(f: varn_types::NativeFn) -> Option<&'static str> {
         .get_or_init(|| {
             let mut m = FxHashMap::with_capacity_and_hasher(512, Default::default());
             for &entry in all_native_ops() {
-                m.entry(entry.func() as usize).or_insert(entry.symbol_name());
+                m.entry(entry.func() as usize)
+                    .or_insert(entry.symbol_name());
             }
             m
         })

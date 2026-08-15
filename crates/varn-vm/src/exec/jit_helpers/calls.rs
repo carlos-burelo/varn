@@ -63,7 +63,8 @@ pub(crate) extern "C" fn jit_call(
                     }
 
                     ctx_ref
-                        .frames.push(crate::frame::CallFrame::new(&**closure, callee_base));
+                        .frames
+                        .push(crate::frame::CallFrame::new(&**closure, callee_base));
 
                     ctx_ref.jit_frame_prepushed = 1;
                     let res = (jit_fn)(

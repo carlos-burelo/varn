@@ -179,7 +179,6 @@ impl SemanticDB {
         }
         best_scope
     }
-
 }
 
 pub struct DocumentState {

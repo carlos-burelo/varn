@@ -4,7 +4,7 @@ use std::rc::Rc;
 use std::str::FromStr;
 
 use varn_core::ast::expr::{ArrayEl, TemplatePart};
-use varn_core::ast::operators::{UnaryOp};
+use varn_core::ast::operators::UnaryOp;
 use varn_core::ast::{Arg, Expr, ExprKind};
 
 use super::*;

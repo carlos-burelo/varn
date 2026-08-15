@@ -7,7 +7,6 @@ use varn_core::ast::{Expr, FunctionDecl, Param, Pattern, StmtKind};
 
 use super::super::*;
 
-
 impl<'a> Lowerer<'a> {
     pub(in crate::hir::lower) fn lower_function(
         &mut self,

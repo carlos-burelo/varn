@@ -101,7 +101,6 @@ impl SiteProfile {
         }
         self.megamorphic = true;
     }
-
 }
 
 #[derive(Clone, Debug, Default)]
@@ -123,4 +122,3 @@ impl FeedbackVector {
         }
     }
 }
-

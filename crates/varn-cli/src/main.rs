@@ -12,8 +12,8 @@ use clap::Parser;
 use cli::{Cli, Commands};
 // `varn-lexer` belongs to the crate for the `debug_binder` bin, not to `vn`.
 // The anchor keeps `unused_crate_dependencies` honest for this target.
-use varn_lexer as _;
 use std::process;
+use varn_lexer as _;
 use varn_term::terminal;
 
 fn main() {

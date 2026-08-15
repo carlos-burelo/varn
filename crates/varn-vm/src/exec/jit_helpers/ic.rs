@@ -46,7 +46,8 @@ pub(crate) extern "C" fn jit_invoke_virtual(
                         ctx_ref.stack.resize(required, VmValue::null());
                     }
                     ctx_ref
-                        .frames.push(crate::frame::CallFrame::new(&**closure, callee_base));
+                        .frames
+                        .push(crate::frame::CallFrame::new(&**closure, callee_base));
                     ctx_ref.jit_frame_prepushed = 1;
                     let res = (jit_fn)(
                         ctx_ref.stack.as_mut_ptr() as *mut std::ffi::c_void,
@@ -144,7 +145,10 @@ pub(crate) extern "C" fn jit_get_property_ic_fast(
             let slot_cache = &*closure_ref.ic_cache.as_ptr();
             let poly_slot = &slot_cache[cs_idx];
             for entry in &poly_slot.entries {
-                if entry.id != 0 && (entry.is_class == ICKind::ARRAY_LENGTH || entry.is_class == ICKind::STR_LENGTH) {
+                if entry.id != 0
+                    && (entry.is_class == ICKind::ARRAY_LENGTH
+                        || entry.is_class == ICKind::STR_LENGTH)
+                {
                     if let Some(v) = crate::exec::strings::fast_length(obj, &ctx_ref.heap) {
                         return v;
                     }

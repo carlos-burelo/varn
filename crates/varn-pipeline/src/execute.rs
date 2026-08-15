@@ -2,9 +2,9 @@ use crate::core;
 use crate::PipelineError;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
+use varn_compiler::FunctionProto;
 use varn_core::ModuleId;
 use varn_debug::flags::DebugFlags;
-use varn_compiler::FunctionProto;
 use varn_types::value::Closure;
 use varn_vm::loader::CompositeLoader;
 use varn_vm::Vm;
@@ -33,10 +33,7 @@ pub fn execute(
     for builtin_proto in core::core_protos_owned()? {
         if _debug.trace {
             let name = builtin_proto.name.as_deref().unwrap_or("<builtin>");
-            varn_term::terminal::tagged(
-                "pipeline:execute",
-                format_args!("running builtin {name}"),
-            );
+            varn_term::terminal::tagged("pipeline:execute", format_args!("running builtin {name}"));
         }
         let closure = Rc::new(Closure::new(Rc::new(builtin_proto), Vec::new(), Vec::new()));
         machine
@@ -109,8 +106,10 @@ pub fn execute(
 
                     match res_val {
                         Ok(resolved) => {
-                            let resolved =
-                                varn_vm::exec::host_values::open_resolved(&mut machine.ctx, resolved);
+                            let resolved = varn_vm::exec::host_values::open_resolved(
+                                &mut machine.ctx,
+                                resolved,
+                            );
                             let resolved_nv = machine.ctx.heap.intern(resolved);
 
                             if let Some(frame) = machine.ctx.frames.last() {

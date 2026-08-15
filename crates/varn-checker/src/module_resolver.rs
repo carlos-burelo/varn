@@ -586,8 +586,8 @@ fn resolve_inner(abs_path: &str, visiting: &mut Vec<String>) -> ExportMap {
         return FxHashMap::default();
     };
 
-    let bind = bind_cache_get(abs_path)
-        .unwrap_or_else(|| bind_and_cache(&program, Vec::new(), abs_path));
+    let bind =
+        bind_cache_get(abs_path).unwrap_or_else(|| bind_and_cache(&program, Vec::new(), abs_path));
 
     let mut exports = ExportMap::default();
     let base_dir = Path::new(abs_path).parent().unwrap_or(Path::new("."));

@@ -181,11 +181,7 @@ impl ExecCtx {
                             let varn_args: Vec<VmValue> = (0..arg_count)
                                 .map(|i| self.stack[base + arg_start + i])
                                 .collect();
-                            let slice = if arg_count > 1 {
-                                &varn_args[1..]
-                            } else {
-                                &[]
-                            };
+                            let slice = if arg_count > 1 { &varn_args[1..] } else { &[] };
                             self.invoke_native(f, slice)
                         }
                         .map_err(|e| crate::error::RuntimeError::new(e))?;

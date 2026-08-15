@@ -34,7 +34,8 @@ pub fn emit_function(
     phi_edges::split_phi_edges(&mut ssa);
 
     let nparams = f.params.len();
-    let (reg, scratch, null_reg, call_base, register_count) = regs::assign_registers(&ssa, nparams)?;
+    let (reg, scratch, null_reg, call_base, register_count) =
+        regs::assign_registers(&ssa, nparams)?;
     let param_kinds: Vec<_> = f.params.iter().map(|p| slot_kind_of(p.ty)).collect();
     let register_meta = derive_register_meta(&ssa, &reg, register_count, &param_kinds);
     let return_kind = slot_kind_of(f.return_ty);
@@ -265,7 +266,6 @@ fn emission_order(ssa: &SsaFunc) -> Vec<usize> {
     }
     order
 }
-
 
 #[allow(clippy::too_many_arguments)]
 fn emit_inst(

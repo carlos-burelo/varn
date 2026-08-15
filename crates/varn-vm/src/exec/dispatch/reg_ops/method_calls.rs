@@ -33,7 +33,8 @@ impl ExecCtx {
         // template into the heap on every construction just to hand it to
         // `prepare_call`. See `ExecCtx::construct_enum_variant`.
         if let Some(template) = self.enum_variant_template(this_val, name.as_ref()) {
-            if let Some(built) = self.construct_enum_variant(&template, base, arg_start, arg_count) {
+            if let Some(built) = self.construct_enum_variant(&template, base, arg_start, arg_count)
+            {
                 self.stack[base + dest] = built;
                 return Ok(false);
             }
@@ -187,7 +188,8 @@ impl ExecCtx {
                         } => {
                             if let Some(nc) = VmClosurePayload::downcast_from(&**method_closure) {
                                 if !nc.proto.is_generator && !nc.proto.is_async {
-                                    let val = Value::VmValue(Box::new(VmClosurePayload(nc.clone())));
+                                    let val =
+                                        Value::VmValue(Box::new(VmClosurePayload(nc.clone())));
                                     self.populate_method_ic(
                                         closure,
                                         cs,
@@ -334,7 +336,6 @@ impl ExecCtx {
         self.stack[base + dest] = result;
         Ok(false)
     }
-
 
     #[inline(always)]
     pub(crate) fn call_native_with_receiver(

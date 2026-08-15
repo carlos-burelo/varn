@@ -57,7 +57,6 @@ pub fn check(
         varn_debug::symbols::debug_symbols(&check_result, &program.filename, debug);
     }
 
-
     Ok(CheckResult {
         checker_result: check_result,
     })

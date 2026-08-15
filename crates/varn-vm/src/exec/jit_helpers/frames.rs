@@ -201,7 +201,8 @@ pub(crate) extern "C" fn jit_push_self_frame(ctx: *mut ExecCtx, callee_base: usi
             }
         }
         ctx_ref
-            .frames.push(crate::frame::CallFrame::new(closure, callee_base));
+            .frames
+            .push(crate::frame::CallFrame::new(closure, callee_base));
     }
 }
 

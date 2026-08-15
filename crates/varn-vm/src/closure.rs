@@ -148,6 +148,9 @@ impl VmValuePayload for VmClosurePayload {
 impl VmClosurePayload {
     #[inline(always)]
     pub fn downcast_from(payload: &dyn VmValuePayload) -> Option<&Rc<VmClosure>> {
-        payload.as_any().downcast_ref::<VmClosurePayload>().map(|w| &w.0)
+        payload
+            .as_any()
+            .downcast_ref::<VmClosurePayload>()
+            .map(|w| &w.0)
     }
 }

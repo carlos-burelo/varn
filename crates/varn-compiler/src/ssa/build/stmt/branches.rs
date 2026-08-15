@@ -5,7 +5,6 @@ use crate::ssa::ir::{BlockId, InstKind, Terminator, Value};
 
 use super::super::{Builder, LoopCtx, Result};
 
-
 impl Builder {
     pub(in crate::ssa::build) fn lower_if(
         &mut self,
@@ -116,7 +115,11 @@ impl Builder {
         Ok(self.add_block_param(merge, ty))
     }
 
-    pub(in crate::ssa::build) fn lower_switch(&mut self, disc: &HirExpr, cases: &[HirSwitchCase]) -> Result<()> {
+    pub(in crate::ssa::build) fn lower_switch(
+        &mut self,
+        disc: &HirExpr,
+        cases: &[HirSwitchCase],
+    ) -> Result<()> {
         let dv = self.lower_expr(disc)?;
         let n = cases.len();
         let bodies: Vec<BlockId> = (0..n).map(|_| self.new_block()).collect();
@@ -189,5 +192,4 @@ impl Builder {
         self.current = exit;
         Ok(())
     }
-
 }

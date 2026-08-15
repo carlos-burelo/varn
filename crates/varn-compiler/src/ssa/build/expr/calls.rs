@@ -5,7 +5,6 @@ use crate::ssa::ir::{InstKind, Value};
 
 use super::{Builder, Result};
 
-
 impl Builder {
     /// Every call and member-access form: plain calls, method calls, extension
     /// and native calls, `super`, optional chaining, fixed-slot field reads.

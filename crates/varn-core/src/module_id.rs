@@ -172,5 +172,4 @@ impl ImportSpecifier {
             Self::Relative(PathBuf::from(raw))
         }
     }
-
 }

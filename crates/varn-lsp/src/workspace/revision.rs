@@ -31,7 +31,6 @@ impl<T> Cached<T> {
             input_hash: hash_str(source),
         }
     }
-
 }
 
 fn hash_str(s: &str) -> u64 {

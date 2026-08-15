@@ -3,7 +3,6 @@ use crate::ssa::ir::{InstKind, Value};
 
 use super::{Builder, Result};
 
-
 impl Builder {
     /// Array, tuple, object and record construction.
     pub(super) fn lower_collection_expr(&mut self, expr: &HirExpr) -> Result<Value> {

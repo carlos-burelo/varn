@@ -3,7 +3,6 @@
 
 use super::super::ir::{InstKind, SsaFunc, Value};
 
-
 /// Which `ConstInt`s can ride along inside an arithmetic opcode.
 ///
 /// `AddImm`/`SubImm` carry a signed 8-bit operand, so `i + 1` needs no
@@ -83,4 +82,3 @@ pub(super) fn plan_immediates(ssa: &SsaFunc) -> Immediates {
         .collect();
     Immediates { imm, elided }
 }
-

@@ -290,4 +290,3 @@ fn freeze_pure_modules(vm: &mut Vm) {
         vm.ctx.linker.set_done(resolved, frozen_val);
     }
 }
-

@@ -5,7 +5,6 @@ use crate::ssa::ir::{InstKind, Value};
 
 use super::{Builder, Result};
 
-
 impl Builder {
     /// Operators: logical short-circuits, the conditional, binary and unary
     /// arithmetic, and template concatenation.

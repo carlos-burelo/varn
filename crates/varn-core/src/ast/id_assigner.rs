@@ -842,4 +842,3 @@ pub fn assign_ast_ids(program: &mut Program) {
     }
     program.metadata = metadata;
 }
-

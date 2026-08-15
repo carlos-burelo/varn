@@ -49,10 +49,7 @@ impl ObjRef {
 
     /// As [`Self::with_shape`], from a borrowed buffer — see
     /// [`super::ObjData::with_shape_slice`].
-    pub fn with_shape_slice(
-        shape: Rc<super::Shape>,
-        values: &[crate::vm_value::VmValue],
-    ) -> Self {
+    pub fn with_shape_slice(shape: Rc<super::Shape>, values: &[crate::vm_value::VmValue]) -> Self {
         Self(super::ObjData::with_shape_slice(shape, values))
     }
 

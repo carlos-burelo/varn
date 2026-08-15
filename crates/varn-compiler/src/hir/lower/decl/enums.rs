@@ -7,9 +7,12 @@ use varn_core::ast::{Decorator, Expr, ExprKind, Modifiers, Param, Stmt, Visibili
 
 use super::super::*;
 
-
 impl<'a> Lowerer<'a> {
-    pub(in crate::hir::lower) fn lower_enum(&mut self, decl: &EnumDecl, scope: &mut Scope) -> R<HirEnum> {
+    pub(in crate::hir::lower) fn lower_enum(
+        &mut self,
+        decl: &EnumDecl,
+        scope: &mut Scope,
+    ) -> R<HirEnum> {
         let name = decl.id.clone();
         let mut variants = Vec::new();
         let mut tag = 0i64;
@@ -260,7 +263,11 @@ impl<'a> Lowerer<'a> {
         })
     }
 
-    pub(in crate::hir::lower) fn lower_sum_type(&mut self, decl: &SumTypeDecl, scope: &mut Scope) -> R<HirEnum> {
+    pub(in crate::hir::lower) fn lower_sum_type(
+        &mut self,
+        decl: &SumTypeDecl,
+        scope: &mut Scope,
+    ) -> R<HirEnum> {
         let name = decl.id.clone();
         let mut variants = Vec::new();
         for (tag, variant) in decl.variants.iter().enumerate() {
@@ -312,5 +319,4 @@ impl<'a> Lowerer<'a> {
             static_blocks: Vec::new(),
         })
     }
-
 }

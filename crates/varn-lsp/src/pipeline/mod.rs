@@ -430,8 +430,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         extension_members,
     };
 
-    let positional_index =
-        crate::queries::indexes::PositionalIndex::build(&db.node_scopes);
+    let positional_index = crate::queries::indexes::PositionalIndex::build(&db.node_scopes);
 
     DocumentAnalysis {
         source,

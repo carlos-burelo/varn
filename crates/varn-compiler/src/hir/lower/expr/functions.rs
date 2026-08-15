@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use varn_core::ast::expr::{ArrowBody};
+use varn_core::ast::expr::ArrowBody;
 use varn_core::ast::{Expr, ExprKind};
 
 use super::*;

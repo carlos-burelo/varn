@@ -5,7 +5,6 @@ use crate::ssa::ir::{InstKind, Value};
 
 use super::{Builder, Result};
 
-
 impl Builder {
     pub(super) fn lower_class(&mut self, cls: &HirClass) -> Result<Value> {
         let name_idx = cls.name.clone();

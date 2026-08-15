@@ -43,7 +43,6 @@ impl Type {
         self.1 = true;
         self
     }
-
 }
 
 impl Default for Type {

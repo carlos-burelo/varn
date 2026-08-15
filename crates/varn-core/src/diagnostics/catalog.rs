@@ -170,7 +170,6 @@ impl ErrorCode {
             ErrorCode::ConstantPoolOverflow => "constant-pool-overflow",
         }
     }
-
 }
 
 impl std::fmt::Display for ErrorCode {

@@ -2,9 +2,9 @@ use super::check::CheckResult;
 use crate::PipelineError;
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
+use varn_compiler::FunctionProto;
 use varn_core::ast::Program;
 use varn_debug::flags::DebugFlags;
-use varn_compiler::FunctionProto;
 use varn_types::ModuleGraphArtifact;
 
 pub const CACHE_FORMAT_VERSION: u32 = varn_modules::artifact::BUILD_FINGERPRINT;

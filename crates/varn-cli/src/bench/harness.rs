@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use rustc_hash::FxHashMap;
-use varn_core::ModuleId;
 use varn_compiler::FunctionProto;
+use varn_core::ModuleId;
 use varn_types::value::Closure;
 use varn_vm::loader::CompositeLoader;
 use varn_vm::Vm;
@@ -96,8 +96,10 @@ pub fn run_vm_to_completion(machine: &mut Vm, closure: Rc<Closure>) -> Result<()
 
                     match res_val {
                         Ok(resolved) => {
-                            let resolved =
-                                varn_vm::exec::host_values::open_resolved(&mut machine.ctx, resolved);
+                            let resolved = varn_vm::exec::host_values::open_resolved(
+                                &mut machine.ctx,
+                                resolved,
+                            );
                             let resolved_nv = machine.ctx.heap.intern(resolved);
 
                             if let Some(frame) = machine.ctx.frames.last() {

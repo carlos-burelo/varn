@@ -65,4 +65,3 @@ fn split_one(ssa: &mut SsaFunc, br: BlockId, is_then: bool) {
         }
     }
 }
-

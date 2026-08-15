@@ -4,12 +4,12 @@
 use std::rc::Rc;
 
 use varn_core::ast::decl::{
-    ExportDecl, ExportDefaultDecl, ExtensionDecl, ExtensionMember, ImportDecl, ImportSpecifier, NamespaceDecl,
+    ExportDecl, ExportDefaultDecl, ExtensionDecl, ExtensionMember, ImportDecl, ImportSpecifier,
+    NamespaceDecl,
 };
 use varn_core::ast::{Decl, Param, Stmt, TypeNode};
 
 use super::super::*;
-
 
 impl<'a> Lowerer<'a> {
     pub(in crate::hir::lower) fn lower_namespace(
@@ -326,7 +326,6 @@ impl<'a> Lowerer<'a> {
             .map(|p| p as u16)
             .or_else(|| self.ann.get_slot_idx(offset).map(|s| s as u16))
     }
-
 }
 
 fn extension_type_name(target: &TypeNode) -> String {

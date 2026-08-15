@@ -88,7 +88,6 @@ impl Database {
     pub fn get_source(&self, file_id: FileId) -> Option<(u64, Arc<str>)> {
         self.sources.get(&file_id).map(|r| r.value().clone())
     }
-
 }
 
 impl Default for Database {

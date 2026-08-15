@@ -42,7 +42,6 @@ impl GenChannel {
     pub fn is_done(&self) -> bool {
         self.done.load(Ordering::SeqCst)
     }
-
 }
 
 #[derive(Clone, Debug)]
@@ -106,7 +105,6 @@ impl AsyncQueue {
             waiter.resolve(make_iter_result(Value::Null, true));
         }
     }
-
 }
 
 fn make_iter_result(value: Value, done: bool) -> Value {

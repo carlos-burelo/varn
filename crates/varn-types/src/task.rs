@@ -192,7 +192,6 @@ impl AsyncTask {
     pub fn cancel(&self) {
         self.reject_msg("Task cancelled");
     }
-
 }
 
 pub enum Poll {
