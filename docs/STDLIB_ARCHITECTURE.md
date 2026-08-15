@@ -77,31 +77,47 @@ flowchart TD
 
 ## 4.1 Defecto abierto: dos superficies de tipos para la misma stdlib
 
-El checker puede obtener los exports de un módulo `std:*` por **dos** caminos
-distintos, y **no coinciden**. `resolve_stdlib_module_exports_ref`
-(`crates/varn-checker/src/module_resolver.rs`) prueba primero un *interface
-blob* precompilado que viaja en el bundle, y sólo si no lo hay cae al fuente.
+**Estado: parcialmente arreglado.** Quedan en rojo las dos celdas `@embedded`
+de la matriz de validación.
 
-Medido el 2026-08-15 sobre `tests/main.vn`:
+**Por qué estuvo invisible tanto tiempo:** los diagnósticos del checker se
+descartaban para todo módulo alcanzado por `import`, así que una discrepancia
+sólo podía notarse en el archivo de entrada. Al propagarlos, la señal apareció;
+el defecto es anterior.
 
-| Camino | Qué pierde |
-|---|---|
-| interface blob (procedencia `@embedded`) | `Option<T>`: `Some("x")` infiere `str?`, así que `const o: Option<str> = Some("x")` es un error de tipos |
-| fuente del módulo (procedencia árbol) | `Partial<T>` y `Readonly<T>`: los tipos utilitarios de `std:types` no se resuelven |
+### Arreglado
 
-Ninguno de los dos es completo. El orden actual (blob primero) no es una
-preferencia de diseño: es el que satisface el corpus de pruebas de hoy.
-Invertirlo pone en verde `tests/70-result-extensions.vn` y en rojo
-`tests/42-stdlib-comprehensive-test.vn`.
+1. **`Option` y `Result` estaban declarados dos veces.** `std:result` los tiene
+   como enums; `std:types` declaraba `type Option<T> = T?` y
+   `type Result<T,E> = | Ok(..) | Err(..)`. Cuál ganaba dependía de qué ruta
+   poblaba primero la caché de exports, y eso cambiaba con la procedencia.
+   `std:types` ya no los declara; la forma nullable se escribe `T?`.
+2. **Exports y bind podían venir de portadores distintos.** El resolutor de
+   exports tenía un caso especial para `std:types` (leer el fuente) que el de
+   bind no tenía, así que ese módulo acababa con exports del fuente y bind del
+   blob — y la expansión de tipos mapeados vive en el bind. Ahora los dos pasan
+   por `stdlib_carrier`, una única lista ordenada.
 
-**Por qué estuvo invisible:** los diagnósticos del checker se descartaban para
-todo módulo alcanzado por `import`, así que la discrepancia sólo podía notarse
-en el archivo de entrada. Al propagarlos, las dos celdas `@embedded` de la
-matriz de validación se ponen rojas — el defecto es anterior, la señal es nueva.
+### Abierto
 
-Arreglarlo es hacer que la superficie de tipos tenga **una** definición: o el
-blob se genera desde la misma resolución que usa el fuente (y entonces es una
-caché, no una segunda fuente), o desaparece.
+`Partial<T>` y `Readonly<T>` no expanden cuando el módulo que los usa se
+alcanza por `import` bajo `VARN_STD=@embedded`. Como archivo de entrada
+funcionan en ambas procedencias.
+
+Ya **no** es una discrepancia de portador: ambas mitades salen de
+`Carrier::Embedded`. La diferencia que queda es qué función construye el bind:
+
+| Procedencia | Portador | Bind construido por | Clave |
+|---|---|---|---|
+| árbol `std/` | `Carrier::File` | `cache_get_or_insert_ref` | ruta absoluta |
+| `@embedded` | `Carrier::Embedded` | `bind_from_embedded_source` | `"std:types"` |
+
+Las dos parsean y llaman a `bind_and_cache`; la sospecha es que la clave
+virtual no sirve como directorio base para resolver lo que el bind necesita.
+
+El destino sigue siendo el mismo: **una** definición de la superficie de tipos.
+O el blob se genera desde la misma resolución que usa el fuente —y entonces es
+una caché y no una segunda fuente— o desaparece.
 
 ---
 

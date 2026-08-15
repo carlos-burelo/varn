@@ -259,6 +259,48 @@ pub fn resolve_stdlib_module_exports(specifier: &str) -> ExportMap {
         .clone()
 }
 
+/// Where a stdlib module's type surface is read from.
+///
+/// One ordered list, consulted by both `resolve_stdlib_module_exports_ref` and
+/// `resolve_stdlib_module_bind_ref`, because a module's export map and its
+/// bind describe the same module and must come from the same carrier.
+///
+/// They used not to. The exports resolver special-cased `std:types` to read
+/// source; the bind resolver went straight to the interface blob with no such
+/// case. So `std:types` had its exports from source and its bind from the
+/// blob — and mapped-type expansion lives in the bind, which is why
+/// `Partial<{x: int, y: str}>` did not reduce and rejected `{ x: 42 }`, but
+/// only under `VARN_STD=@embedded` (the tree checkout publishes no blob, so
+/// there both halves came from source and agreed).
+enum Carrier {
+    /// The precompiled interface that travels in the `.vnb` bundle.
+    Blob,
+    /// Module source compiled into the binary.
+    Embedded(&'static str),
+    /// Module source on disk, in a `std/` checkout.
+    File(String),
+}
+
+/// The carrier for `specifier`, decided once.
+fn stdlib_carrier(specifier: &str) -> Option<Carrier> {
+    let provider = varn_modules::provider::get()?;
+
+    // `std:types` must come from source. Its mapped types (`Partial`,
+    // `Readonly`, …) do not survive the postcard round trip the blob uses —
+    // the same reason `try_load_cache` refuses to serve it from the on-disk
+    // type cache, which shares that serialization. Losing the blob for one
+    // module costs a parse; getting it wrong costs silent type errors.
+    if specifier != "std:types" && provider.interface_blob(specifier).is_some() {
+        return Some(Carrier::Blob);
+    }
+    if let Some(source) = provider.embedded_source(specifier) {
+        return Some(Carrier::Embedded(source));
+    }
+    provider
+        .source_path(specifier)
+        .map(|p| Carrier::File(p.to_string_lossy().into_owned()))
+}
+
 pub fn resolve_stdlib_module_exports_ref(specifier: &str) -> Rc<ExportMap> {
     let id = ModuleId::stdlib(specifier);
     let key = id.as_str();
@@ -267,45 +309,30 @@ pub fn resolve_stdlib_module_exports_ref(specifier: &str) -> Rc<ExportMap> {
         return cached;
     }
 
-    if specifier == "std:types" {
-        if let Some(provider) = varn_modules::provider::get() {
-            if let Some(source) = provider.embedded_source(specifier) {
-                let mut visiting = vec![];
-                let result = resolve_from_embedded_source(specifier, source, &mut visiting);
-                export_cache_insert(key.to_string(), Rc::clone(&result));
-                return result;
-            }
-        }
-    }
-
-    // The interface blob and the module source are TWO type surfaces for the
-    // same stdlib, and they do not agree: measured 2026-08-15, the blob loses
-    // `Option<T>` (`Some("x")` infers `str?`), and resolving from source
-    // instead loses the `Partial<T>` / `Readonly<T>` utility types. Neither is
-    // complete, so the order below is not a preference — it is the one that
-    // happens to satisfy the current test corpus. See the note in
-    // docs/STDLIB_ARCHITECTURE.md before changing it.
-    if let Some((exports, _bind)) = resolve_from_interface_blob(specifier, &key) {
-        return exports;
-    }
-
-    if let Some(provider) = varn_modules::provider::get() {
-        if let Some(source) = provider.embedded_source(specifier) {
+    let result = match stdlib_carrier(specifier) {
+        Some(Carrier::Blob) => resolve_from_interface_blob(specifier, &key).map(|(e, _)| e),
+        Some(Carrier::Embedded(source)) => {
             let mut visiting = vec![];
-            let result = resolve_from_embedded_source(specifier, source, &mut visiting);
-            export_cache_insert(key.to_string(), Rc::clone(&result));
-            return result;
+            Some(resolve_from_embedded_source(
+                specifier,
+                source,
+                &mut visiting,
+            ))
         }
-        if let Some(path) = provider.source_path(specifier) {
-            let abs = path.to_string_lossy().into_owned();
+        Some(Carrier::File(abs)) => {
             let mut visiting = vec![];
-            let result = resolve_module_exports_ref(&abs, &mut visiting);
-            export_cache_insert(key.to_string(), Rc::clone(&result));
-            return result;
+            Some(resolve_module_exports_ref(&abs, &mut visiting))
         }
-    }
+        None => None,
+    };
 
-    Rc::new(FxHashMap::default())
+    match result {
+        Some(exports) => {
+            export_cache_insert(key.to_string(), Rc::clone(&exports));
+            exports
+        }
+        None => Rc::new(FxHashMap::default()),
+    }
 }
 
 pub fn resolve_stdlib_module_bind_ref(specifier: &str) -> Option<Rc<BindResult>> {
@@ -316,17 +343,13 @@ pub fn resolve_stdlib_module_bind_ref(specifier: &str) -> Option<Rc<BindResult>>
         return Some(cached);
     }
 
-    if let Some((_exports, bind)) = resolve_from_interface_blob(specifier, &key) {
-        return Some(bind);
+    // Same [`stdlib_carrier`] the export map came from. Picking independently
+    // here is what let `std:types` end up with source exports and a blob bind.
+    match stdlib_carrier(specifier)? {
+        Carrier::Blob => resolve_from_interface_blob(specifier, &key).map(|(_, bind)| bind),
+        Carrier::Embedded(source) => bind_from_embedded_source(specifier, source),
+        Carrier::File(abs) => cache_get_or_insert_ref(&abs),
     }
-
-    let provider = varn_modules::provider::get()?;
-
-    if let Some(source) = provider.embedded_source(specifier) {
-        return bind_from_embedded_source(specifier, source);
-    }
-    let path = provider.source_path(specifier)?;
-    cache_get_or_insert_ref(&path.to_string_lossy())
 }
 
 /// Lex + parse one module source and memoize the `Program` under `key`.

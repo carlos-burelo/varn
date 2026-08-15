@@ -16,7 +16,11 @@ import { sleep, TaskGroup, spawn, parallel } from 'std:task';
 import { Disposable, AsyncDisposable } from 'std:dispose';
 import { assert as testAssert, assertTrue, assertEqual, fail } from 'std:test';
 import * as types_mod from 'std:types';
-const { Option, some, none, isSome, isNone, unwrap, unwrapOr, Result, ok, err, tryRun, Partial, Required, Readonly, Record as TypedRecord } = types_mod;
+const { Partial, Required, Readonly, Record as TypedRecord } = types_mod;
+// Option/Result come from std:result, which is the only module that declares
+// them. `std:types` used to declare a second, incompatible pair; see the note
+// at the end of std/types.vn.
+import { Some, None, isSome, isNone, unwrapOpt, unwrapOptOr, Ok, Err, tryRun } from 'std:result';
 
 class ResourceImpl implements Disposable {
     disposed: bool = false;
@@ -164,19 +168,24 @@ async function runComprehensiveTest(): Task<void> {
     }
     assert("Disposable triggered dispose on scope exit", dispObj.disposed === true);
 
-    // 15. std:types (Option)
-    let optSome = some<int>(99);
-    let optNone = none<int>();
+    // 15. std:result (Option) — the ADT, so `Some(x)` is a constructor and the
+    // variants can be matched on, not a nullable in disguise.
+    let optSome = Some<int>(99);
+    let optNone = None;
     assert("Option some isSome", isSome(optSome));
     assert("Option none isSome", !isSome(optNone));
     assert("Option none isNone", isNone(optNone));
-    assert("Option unwrap", unwrap(optSome) === 99);
-    assert("Option unwrapOr some", unwrapOr(optSome, 50) === 99);
-    assert("Option unwrapOr none", unwrapOr(optNone, 50) === 50);
+    assert("Option unwrap", unwrapOpt(optSome) === 99);
+    assert("Option unwrapOr some", unwrapOptOr(optSome, 50) === 99);
+    assert("Option unwrapOr none", unwrapOptOr(optNone, 50) === 50);
+    match (optSome) {
+        Some(v) => assert("Option Some matched", v === 99),
+        None => assert("Option Some mis-match", false),
+    }
 
-    // 16. std:types (Result)
-    let resOk = ok<str, int>("success");
-    let resErr = err<str, int>(500);
+    // 16. std:result (Result)
+    let resOk = Ok<str, int>("success");
+    let resErr = Err<str, int>(500);
     match (resOk) {
         Ok(v) => assert("Result Ok matched", v === "success"),
         Err(_) => assert("Result Ok mis-match", false),

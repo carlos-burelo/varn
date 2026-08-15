@@ -83,3 +83,19 @@ export function unwrapOptOr<T>(opt: Option<T>, defaultVal: T): T {
         _ => defaultVal
     };
 }
+
+/**
+ * Runs `fn` and captures a thrown error as `Err` instead of propagating it.
+ *
+ * Moved here from `std:types`, which used to carry a second, incompatible
+ * `Result` type. This is the one place the type is declared, so it is the one
+ * place a function returning it belongs.
+ */
+export function tryRun<T>(fn: () => T): Result<T, Error> {
+    try {
+        return Ok<T, Error>(fn());
+    } catch (e) {
+        if (e instanceof Error) return Err<T, Error>(e);
+        return Err<T, Error>(new Error("" + e.toString()));
+    }
+}

@@ -60,53 +60,27 @@ export type Awaited<T> = T extends Task<infer U> ? U : T
  */
 export type Omit<T, K extends keyof T> = { [P in Exclude<keyof T, K>]: T[P] }
 
-export type Option<T> = T?
-
-export function some<T>(value: T): Option<T> {
-	return value
-}
-
-export function none<T>(): Option<T> {
-	return null
-}
-
-export function option<T>(value: T?): Option<T> {
-	return value
-}
-
-export function isSome<T>(value: Option<T>): bool {
-	return value !== null
-}
-
-export function isNone<T>(value: Option<T>): bool {
-	return value === null
-}
-
-export function unwrap<T>(value: Option<T>): T {
-	if (value === null) throw new Error("called unwrap on None")
-	return value as T
-}
-
-export function unwrapOr<T>(value: Option<T>, default_: T): T {
-	if (value === null) return default_
-	return value as T
-}
-
-export type Result<T, E> = | Ok(value: T) | Err(error: E)
-
-export function ok<T, E>(value: T): Result<T, E> {
-	return Ok(value)
-}
-
-export function err<T, E>(error: E): Result<T, E> {
-	return Err(error)
-}
-
-export function tryRun<T>(fn: () => T): Result<T, Error> {
-	try {
-		return ok<T, Error>(fn())
-	} catch (e) {
-		if (e instanceof Error) return err<T, Error>(e)
-		return err<T, Error>(new Error("" + e.toString()))
-	}
-}
+// `Option<T>` and `Result<T, E>` are NOT here. They live in `std:result`, as
+// the enums `Option<T> { Some(val), None }` and `Result<T, E> { Ok(val),
+// Err(err) }`.
+//
+// This module used to declare a SECOND, incompatible pair — `type Option<T> =
+// T?` and `type Result<T, E> = | Ok(value: T) | Err(error: E)` — with helpers
+// (`some`, `none`, `option`, `isSome`, `isNone`, `unwrap`, `unwrapOr`, `ok`,
+// `err`, `tryRun`) that shadowed `std:result`'s under different names.
+//
+// Two declarations of one name across two stdlib modules is not an API, it is
+// a collision, and which one a program got depended on which resolution path
+// filled the checker's export cache first — which differs by stdlib
+// PROVENANCE. `const o: Option<str> = Some("varn")` checked clean against the
+// `std/` tree and failed against the embedded bundle with "declared as
+// 'Option<str>' but initialised with 'str?'": same source, same compiler,
+// different answer. It stayed invisible because the diagnostics of imported
+// modules were being discarded.
+//
+// The nullable form this offered is already in the language: write `T?`. The
+// ADT, with `Some(x)` as a constructor and variants you can `match` on, is the
+// one worth having, and there is now exactly one of it.
+//
+// `tryRun` went with the block; `std:result` has no equivalent yet. Adding one
+// there is the right home for it.
