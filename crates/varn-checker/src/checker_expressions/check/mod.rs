@@ -18,7 +18,16 @@ impl Checker {
         self.check_expr_no_record(expr, bind);
         let start = expr.range.start.offset;
         let end = expr.range.end.offset.saturating_sub(1);
-        self.node_scopes.insert(expr.id, self.current_scope);
+        // By BYTE OFFSET, like the 18 `record_scope` sites, and only when a
+        // caller asked for the table. This line used to key by `expr.id` —
+        // mixing AST ids into a map whose only consumers (`scope_at_offset`
+        // and the LSP's `PositionalIndex`) read every key as an offset, so the
+        // ids landed in the positional index as positions that do not exist.
+        // It also ran unconditionally, building that map on the compile path
+        // for nobody to read.
+        if self.record_expr_types {
+            self.node_scopes.insert(start, self.current_scope);
+        }
         let ty = self.infer_type(expr, bind);
         self.resolved_expr_types.insert(expr.id, ty.clone());
 

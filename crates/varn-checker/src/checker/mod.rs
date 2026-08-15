@@ -356,17 +356,19 @@ impl Checker {
             return ty.clone();
         }
 
-        let ty = if self.record_expr_types {
-            let saved_scope = self.current_scope;
-            if let Some(scope) = self.node_scopes.get(&expr.id()) {
-                self.current_scope = *scope;
-            }
-            let ty = self.infer_type_internal(expr, bind);
-            self.current_scope = saved_scope;
-            ty
-        } else {
-            self.infer_type_internal(expr, bind)
-        };
+        // Inference does NOT depend on whether the caller wants a type table.
+        //
+        // This used to switch `current_scope` to `node_scopes[expr.id()]` when
+        // `record_expr_types` was on, which made the tooling path capable of
+        // inferring a different type than the compile path for the same
+        // expression. It was also reading a map written with a DIFFERENT key:
+        // `record_scope` inserts by byte offset at 18 sites, so a lookup by AST
+        // id either missed or — worse — hit an unrelated node whose offset
+        // happened to equal this node's id.
+        //
+        // Recording a type is a map insert. It is not allowed to change what
+        // the type is.
+        let ty = self.infer_type_internal(expr, bind);
 
         self.infer_cache.insert(key, ty.clone());
         ty
