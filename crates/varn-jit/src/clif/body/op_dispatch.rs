@@ -404,7 +404,7 @@ pub(crate) fn dispatch_opcode(
         }
         OpCode::Intrinsic | OpCode::IntrinsicDirect => {
             let m = &proto.register_meta;
-            floats::emit_intrinsic_op(b, op, actx, vars, state, m, code, ip, has_round)?;
+            floats::emit_intrinsic_op(b, op, actx, arr.loops, vars, state, m, code, ip, has_round)?;
         }
         OpCode::ToString => {
             let actx = actx.ok_or("clif: ToString outside alloc fn")?;

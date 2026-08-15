@@ -19,8 +19,10 @@ use super::emit::{self, meta_is_float, state_meta_int};
 pub(super) struct VarFile {
     /// One per VM register, indexed by register number.
     pub vars: Vec<Variable>,
-    /// One entry per (loop region header, receiver register).
+    /// One entry per (loop region header, array receiver register).
     pub cache_vars: HashMap<(usize, usize), emit::RegionCache>,
+    /// One entry per (loop region header, string receiver register).
+    pub str_caches: HashMap<(usize, usize), emit::StrRegionCache>,
     /// Flat list of every cache Variable, for the back-edge safepoint — it
     /// invalidates all of them at once and has no way to tell which region it
     /// sits in.
@@ -111,7 +113,11 @@ pub(super) fn declare(
     // the frontend's all-paths-defined rule and the sentinel share a def.
     let cache_vars: HashMap<(usize, usize), emit::RegionCache> = regions
         .iter()
-        .flat_map(|(h, e, regs, ro)| regs.iter().map(move |r| ((*h, *e, *r), ro.contains(r))))
+        .flat_map(|reg| {
+            reg.arrays
+                .iter()
+                .map(move |r| ((reg.header, reg.back_edge, *r), reg.read_only.contains(r)))
+        })
         .map(|((h, e, r), read_only)| {
             let payload = b.declare_var(types::I64);
             let view = read_only.then(|| {
@@ -125,11 +131,9 @@ pub(super) fn declare(
             // accesses agree on a single non-Boxed repr. If so, the
             // preheader can validate the disc once and the body skips
             // both repr branches per access.
-            let repr_validated_disc = if read_only {
-                expected_disc_for_receiver(code, pool, register_meta, h, e, r)
-            } else {
-                None
-            };
+            let repr_validated_disc = read_only
+                .then(|| expected_disc_for_receiver(code, pool, register_meta, h, e, r))
+                .flatten();
             (
                 (h, r),
                 emit::RegionCache {
@@ -140,13 +144,33 @@ pub(super) fn declare(
             )
         })
         .collect();
+    // One pair of Variables per (region, string receiver): the byte pointer
+    // and the byte length resolved once in the preheader.
+    let str_caches: HashMap<(usize, usize), emit::StrRegionCache> = regions
+        .iter()
+        .flat_map(|reg| reg.strings.iter().map(move |r| (reg.header, *r)))
+        .map(|key| {
+            (
+                key,
+                emit::StrRegionCache {
+                    bytes: b.declare_var(types::I64),
+                    len: b.declare_var(types::I64),
+                },
+            )
+        })
+        .collect();
+    // The back-edge safepoint zeroes every cache after a collection. A string
+    // cache holds a raw interior pointer, so leaving it out would be the one
+    // way this survives a GC — it must be in the same list as the payloads.
     let all_caches: Vec<Variable> = cache_vars
         .values()
         .flat_map(|c| std::iter::once(c.payload).chain(c.view.into_iter().flatten()))
+        .chain(str_caches.values().flat_map(|c| [c.bytes, c.len]))
         .collect();
     VarFile {
         vars,
         cache_vars,
+        str_caches,
         all_caches,
     }
 }

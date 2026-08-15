@@ -26,15 +26,13 @@
 //! register's representation loads raw, the `Boxed` arm converts, and anything
 //! else falls to the generic helper.
 
-use std::collections::HashMap;
-
 use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags, Type};
 use cranelift_codegen::isa::CallConv;
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_types::register_meta::RegisterMeta;
 
 use super::emit::{
-    array_disc, box_bool, box_f64, box_int, cached_payload, call_helper, find_cache, meta_is_float,
+    array_disc, box_bool, box_f64, box_int, cached_payload, call_helper, meta_is_float,
     state_meta_int, unbox_f64_coerce, use_boxed, use_f64, use_int, wrap_i48,
 };
 use super::kinds::K;
@@ -47,8 +45,7 @@ pub(crate) struct ArrCtx<'a> {
     pub helpers: &'a JitHelpers,
     pub cc: CallConv,
     pub exec_ctx: cranelift_codegen::ir::Value,
-    pub regions: &'a [super::emit::Region],
-    pub cache_vars: &'a HashMap<(usize, usize), super::emit::RegionCache>,
+    pub loops: super::emit::LoopCaches<'a>,
     pub register_meta: &'a [RegisterMeta],
     pub has_alloc: bool,
 }
@@ -171,7 +168,7 @@ pub(super) fn emit_array_length(
     let slow = b.create_block();
     let merge = b.create_block();
     b.append_block_param(merge, types::I64); // unboxed len
-    let cache = find_cache(c.regions, c.cache_vars, ip, src);
+    let cache = c.loops.array(ip, src);
     let len = match cache.and_then(|c| c.view) {
         // Hoisted length: `.length` inside a read-only region is one variable
         // read (see `RegionCache`).
@@ -241,7 +238,7 @@ pub(super) fn emit_array_get_index(
     let slow = b.create_block();
     let merge = b.create_block();
     b.append_block_param(merge, want.ty());
-    let cache = find_cache(c.regions, c.cache_vars, ip, obj_r);
+    let cache = c.loops.array(ip, obj_r);
     let lay = &c.helpers.array_layout;
 
     // Repr-validated fast path: the preheader already checked disc == expected
@@ -468,7 +465,7 @@ pub(super) fn emit_array_set_index(
 
     let slow = b.create_block();
     let merge = b.create_block();
-    let cache = find_cache(c.regions, c.cache_vars, ip, obj_r);
+    let cache = c.loops.array(ip, obj_r);
     let payload = cached_payload(
         b,
         c.exec_ctx,

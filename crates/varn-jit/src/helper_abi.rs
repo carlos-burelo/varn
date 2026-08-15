@@ -119,9 +119,16 @@ macro_rules! jit_helper_abi {
             /// `extern "C" fn(*mut ExecCtx, receiver, pos) -> VmValue` — direct
             /// `charCodeAt` without the stack-window flush/reload overhead.
             str_char_code_at => jit_str_char_code_at,
-            /// `extern "C" fn(*mut ExecCtx, receiver: VmValue, pos: i64) -> i64` —
-            /// ultra-lean `charCodeAt` with raw int pos/result, no VmValue boxing.
-            str_char_code_at_fast => jit_str_char_code_at_fast,
+            /// `extern "C" fn(*mut ExecCtx, receiver: VmValue) -> *const u8` —
+            /// address of the receiver's bytes when it is a heap-allocated ASCII
+            /// string, `0` otherwise. Hoisted out of a loop by
+            /// `preheader::emit_str_caches`; only valid while the region
+            /// allocates nothing.
+            str_ascii_bytes => jit_str_ascii_bytes,
+            /// `extern "C" fn(*mut ExecCtx, receiver: VmValue) -> i64` — byte
+            /// length of what `str_ascii_bytes` returned. Meaningless unless
+            /// that call answered non-zero for the same receiver.
+            str_ascii_len => jit_str_ascii_len,
             /// `extern "C" fn(*mut ExecCtx, receiver, start, end) -> VmValue` — direct
             /// `substring` without the stack-window flush/reload overhead.
             str_substring_intrinsic => jit_str_substring_intrinsic,

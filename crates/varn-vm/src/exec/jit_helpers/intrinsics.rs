@@ -28,6 +28,10 @@ pub(crate) extern "C" fn jit_dispatch_intrinsic(
 /// Dedicated fast path for `charCodeAt(pos)` / `codePointAt(pos)`.
 /// Takes the receiver and position directly — no stack-window staging,
 /// no flush/reload of all live boxed registers.
+///
+/// A negative `pos` is out of range, not position zero: see
+/// [`crate::exec::intrinsics::str`] for why all three implementations of this
+/// operation had to agree on that.
 pub(crate) extern "C" fn jit_str_char_code_at(
     ctx: *mut ExecCtx,
     receiver: VmValue,
@@ -36,7 +40,11 @@ pub(crate) extern "C" fn jit_str_char_code_at(
     unsafe {
         let ctx_ref = &mut *ctx;
         let heap = &mut ctx_ref.heap;
-        let idx = heap.as_int(pos).max(0) as usize;
+        let signed = heap.as_int(pos);
+        if signed < 0 {
+            return VmValue::from_int(-1);
+        }
+        let idx = signed as usize;
 
         // SSO string — always ASCII, bytes packed in the VmValue itself.
         if receiver.is_sso() {
@@ -70,46 +78,52 @@ pub(crate) extern "C" fn jit_str_char_code_at(
     }
 }
 
-/// Ultra-lean fast path for `charCodeAt(pos)` in JIT-compiled code.
+/// Address of `receiver`'s bytes, when it is a heap string whose content is
+/// ASCII — and therefore one where byte index equals character index, so a
+/// `charCodeAt` is a single indexed byte load.
 ///
-/// Differences from `jit_str_char_code_at`:
-/// - `pos` is a raw i64 (already unboxed by the JIT's int kind), not a VmValue.
-/// - Returns a raw i64 result, not a VmValue — the JIT keeps it as `K::Int`.
-/// - Skips SSO checks (irrelevant for loop-heavy benchmarks on heap strings).
-/// - The common path is: heap lookup → ascii check → byte load — 3 branches.
-#[inline(never)]
-pub(crate) extern "C" fn jit_str_char_code_at_fast(
-    ctx: *mut ExecCtx,
-    receiver: VmValue,
-    pos: i64,
-) -> i64 {
+/// `0` for everything else: an SSO string (its bytes live inside the `VmValue`
+/// and have no address), a non-ASCII string (byte index is not character
+/// index), or a receiver that is not a string at all. Callers treat `0` as
+/// "use the general path", so a new `HeapStr` variant is a missed
+/// optimisation, never a wrong answer.
+///
+/// # Safety of the returned pointer
+///
+/// It borrows into heap-owned memory and stays valid only while nothing
+/// allocates: an allocation can grow the slot `Vec` and move an `Inline`
+/// string's bytes with it, and a collection can free the object outright. The
+/// JIT resolves this exactly once, in the preheader of a loop region proven
+/// allocation-free (`scan::loop_regions`), and the back-edge safepoint zeroes
+/// the cache if a collection did run.
+pub(crate) extern "C" fn jit_str_ascii_bytes(ctx: *mut ExecCtx, receiver: VmValue) -> *const u8 {
     unsafe {
-        let heap = &(*ctx).heap;
-        let idx = pos.max(0) as usize;
-
-        if receiver.is_heap() {
-            if let Some(crate::heap::HeapObj::Str(h)) = heap.get(receiver.as_heap_idx()) {
-                if h.is_ascii_cached() {
-                    return h.as_str().as_bytes().get(idx).map_or(-1, |&b| b as i64);
-                }
-                // Non-ASCII or UNKNOWN: populate cache and use the right path.
-                h.is_ascii();
-                let s = h.as_str();
-                return if h.is_ascii_cached() {
-                    s.as_bytes().get(idx).map_or(-1, |&b| b as i64)
-                } else {
-                    s.chars().nth(idx).map_or(-1, |c| c as i64)
-                };
-            }
+        match ascii_view(&(*ctx).heap, receiver) {
+            Some(s) => s.as_ptr(),
+            None => std::ptr::null(),
         }
-        // SSO fallback (rare in hot loops on large strings).
-        if receiver.is_sso() {
-            let mut buf = [0u8; 5];
-            let len = receiver.sso_copy_bytes(&mut buf);
-            return if idx < len { buf[idx] as i64 } else { -1 };
-        }
-        -1
     }
+}
+
+/// Byte length of the view [`jit_str_ascii_bytes`] returned for the same
+/// receiver, or `0` when that call rejected it.
+pub(crate) extern "C" fn jit_str_ascii_len(ctx: *mut ExecCtx, receiver: VmValue) -> i64 {
+    unsafe { ascii_view(&(*ctx).heap, receiver).map_or(0, |s| s.len() as i64) }
+}
+
+/// The shared decision behind both accessors, so they cannot disagree about
+/// which receivers are byte-indexable.
+#[inline]
+fn ascii_view(heap: &crate::heap::Heap, receiver: VmValue) -> Option<&str> {
+    if !receiver.is_heap() {
+        return None;
+    }
+    let Some(crate::heap::HeapObj::Str(h)) = heap.get(receiver.as_heap_idx()) else {
+        return None;
+    };
+    // `is_ascii()` computes and memoises; `is_ascii_cached()` alone would
+    // answer "no" for a string nobody has classified yet.
+    h.is_ascii().then(|| h.as_str())
 }
 
 /// Dedicated fast path for `substring(start, end?)`.

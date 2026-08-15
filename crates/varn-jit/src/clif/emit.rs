@@ -341,20 +341,108 @@ pub(crate) struct RegionCache {
     pub repr_validated_disc: Option<i64>,
 }
 
-/// A loop region: `(header ip, back-edge ip, receivers, read-only receivers)`.
-pub(super) type Region = (usize, usize, Vec<usize>, Vec<usize>);
+/// What a loop region knows about one string receiver, resolved once in the
+/// region's preheader: the address of its bytes and how many there are.
+///
+/// Only a receiver whose content is **directly byte-indexable** gets one —
+/// heap-allocated and ASCII, so byte index equals character index. Anything
+/// else (SSO, non-ASCII, not a string at all) leaves `bytes` at `0` and every
+/// access in the body falls back to the helper, which handles the general
+/// case. The preconditions are the same two that let an array receiver carry a
+/// `view`: the region redefines nothing it caches, and it allocates nothing —
+/// so no collection and no `Vec` growth can move what `bytes` points at, and
+/// no `str_concat` can extend an `Ext` buffer under it.
+#[derive(Clone, Copy)]
+pub(crate) struct StrRegionCache {
+    /// Pointer to the first byte; `0` means the preheader rejected the
+    /// receiver, exactly like `RegionCache::payload`.
+    pub bytes: Variable,
+    /// Byte length, meaningful only when `bytes != 0`.
+    pub len: Variable,
+}
 
-pub(super) fn find_cache(
-    regions: &[Region],
-    cache_vars: &HashMap<(usize, usize), RegionCache>,
-    ip: usize,
-    r: usize,
-) -> Option<RegionCache> {
-    regions
-        .iter()
-        .filter(|(h, e, regs, _)| *h <= ip && ip < *e && regs.contains(&r))
-        .min_by_key(|(h, e, _, _)| e - h)
-        .map(|(h, _, _, _)| cache_vars[&(*h, r)])
+/// One loop region and everything hoistable out of it.
+///
+/// A struct rather than the 4-tuple this used to be: the fields are all
+/// `usize`/`Vec<usize>`, so a transposed pair compiles and silently hoists the
+/// wrong register — the same defect `NativeOpTarget` was introduced to close.
+pub(crate) struct Region {
+    /// First ip of the loop body.
+    pub header: usize,
+    /// ip of the `Loop` op that closes it; the region is `[header, back_edge)`.
+    pub back_edge: usize,
+    /// Array receivers the region never redefines.
+    pub arrays: Vec<usize>,
+    /// Of [`Self::arrays`], those the region never writes either.
+    pub read_only: Vec<usize>,
+    /// Every char-indexing intrinsic in the region that can be served from a
+    /// hoisted byte view, as `(ip of the intrinsic, register its receiver was
+    /// copied from)`.
+    ///
+    /// The site list is what the lowering looks an access up by, so the rule
+    /// for "which register does this intrinsic read" is applied ONCE, where
+    /// the region is planned. The alternative — re-deriving it at the access
+    /// — is two copies of a bytecode-shape assumption that must agree.
+    pub string_sites: Vec<(usize, usize)>,
+    /// The distinct receivers of [`Self::string_sites`]: one cache each.
+    pub strings: Vec<usize>,
+}
+
+impl Region {
+    fn contains_ip(&self, ip: usize) -> bool {
+        self.header <= ip && ip < self.back_edge
+    }
+}
+
+/// Everything the loop regions hoisted, as one value.
+///
+/// The regions and the two cache maps are only ever meaningful together — a
+/// cache is looked up BY the region that owns it — so they travel together
+/// rather than as three parallel parameters that a call site could pair up
+/// wrongly.
+#[derive(Clone, Copy)]
+pub(crate) struct LoopCaches<'a> {
+    pub regions: &'a [Region],
+    pub arrays: &'a HashMap<(usize, usize), RegionCache>,
+    pub strings: &'a HashMap<(usize, usize), StrRegionCache>,
+}
+
+impl LoopCaches<'_> {
+    /// The array-payload cache `r` should use at `ip`.
+    pub(super) fn array(&self, ip: usize, r: usize) -> Option<RegionCache> {
+        self.find(ip, r, |reg| &reg.arrays, self.arrays)
+    }
+
+    /// The hoisted byte view the char-indexing intrinsic AT `ip` reads from,
+    /// if its region planned one. Keyed by the site rather than by a register
+    /// the access site would have to re-derive.
+    pub(super) fn string_at(&self, ip: usize) -> Option<StrRegionCache> {
+        self.regions
+            .iter()
+            .filter(|reg| reg.contains_ip(ip))
+            .filter_map(|reg| {
+                let (_, r) = reg.string_sites.iter().find(|(site, _)| *site == ip)?;
+                Some((reg, *r))
+            })
+            .min_by_key(|(reg, _)| reg.back_edge - reg.header)
+            .and_then(|(reg, r)| self.strings.get(&(reg.header, r)).copied())
+    }
+
+    /// The cache belonging to the INNERMOST region that both contains `ip` and
+    /// hoisted `r`. One lookup rule for both kinds, so they cannot drift apart.
+    fn find<C: Copy>(
+        &self,
+        ip: usize,
+        r: usize,
+        receivers: impl Fn(&Region) -> &[usize],
+        cache_vars: &HashMap<(usize, usize), C>,
+    ) -> Option<C> {
+        self.regions
+            .iter()
+            .filter(|reg| reg.contains_ip(ip) && receivers(reg).contains(&r))
+            .min_by_key(|reg| reg.back_edge - reg.header)
+            .map(|reg| cache_vars[&(reg.header, r)])
+    }
 }
 
 /// Indirect call to a template-JIT runtime helper

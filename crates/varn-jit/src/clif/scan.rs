@@ -43,6 +43,41 @@ pub(super) fn block_starts(code: &[u16], pool: &[PoolEntry]) -> Result<Vec<usize
     Ok(starts)
 }
 
+/// The register a char-indexing `Intrinsic` at `ip` took its receiver from.
+///
+/// The call sequence stages the receiver into the intrinsic's own destination
+/// register — `Move r10 = r1` then `Intrinsic r10 = intrinsic(…)` — so the
+/// destination is rewritten every iteration and is never itself hoistable.
+/// The register worth caching is the one the `Move` copied FROM, and this
+/// walks the region forward to find the last `Move` that defined the staging
+/// register before `ip`.
+///
+/// `None` when the intrinsic is not char-indexing, or when its receiver was
+/// produced by something other than a plain `Move` (a property read, a call)
+/// — in which case there is no loop-invariant register to hang a cache on.
+fn str_receiver_source(
+    code: &[u16],
+    pool: &[PoolEntry],
+    header: usize,
+    ip: usize,
+) -> Result<Option<usize>, String> {
+    if !varn_core::intrinsic_ops::intrinsic_is_char_index((code[ip + 1] >> 8) as u8) {
+        return Ok(None);
+    }
+    let staged = (code[ip] >> 8) as usize;
+    let mut source = None;
+    let mut j = header;
+    while j < ip {
+        let info = decode(code, j, pool).ok_or("clif: undecodable opcode")?;
+        if OpCode::from_u8(code[j] as u8) == Some(OpCode::Move) && (code[j] >> 8) as usize == staged
+        {
+            source = Some((code[j + 1] >> 8) as usize);
+        }
+        j += info.len;
+    }
+    Ok(source)
+}
+
 /// Loop hoisting plan.
 ///
 /// Post-linearization (loop-aware RPO in ssa/emit) loops are CONTIGUOUS:
@@ -80,8 +115,20 @@ pub(super) fn loop_regions(
         if OpCode::from_u8(code[ip] as u8) == Some(OpCode::Loop) {
             let off = ((code[ip + 1] as u32) << 16 | code[ip + 2] as u32) as usize;
             let header = (ip + 3) - off;
-            if header > 0 && (!has_alloc || !alloc::has_alloc(&code[header..ip], pool)?) {
+            // The region gate reads `Intrinsic` by wire byte: a `charCodeAt`
+            // loop allocates nothing, and treating it as an allocation kept
+            // BOTH caches — the array payloads and the string bytes — out of
+            // exactly the loops that need them most.
+            let hoistable = header > 0
+                && (!has_alloc
+                    || !alloc::has_alloc_scan(
+                        &code[header..ip],
+                        pool,
+                        alloc::IntrinsicScan::ByWireByte,
+                    )?);
+            if hoistable {
                 let mut receivers: Vec<usize> = Vec::new();
+                let mut string_sites: Vec<(usize, usize)> = Vec::new();
                 let mut written: Vec<usize> = Vec::new();
                 let mut redefined: Vec<usize> = Vec::new();
                 let mut j = header;
@@ -99,6 +146,20 @@ pub(super) fn loop_regions(
                             written.push(dest);
                         }
                         OpCode::CallSelf => redefined.push((code[j + 1] >> 8) as usize),
+                        // An `Intrinsic` stages its receiver in `dest` and its
+                        // arguments in the registers above it, so `dest` is
+                        // both the receiver and the result slot: it IS
+                        // redefined, and the fallthrough arm below records
+                        // that. The register the receiver was COPIED FROM is
+                        // what can be hoisted, and the bytecode does not name
+                        // it here — so string caching keys off the copy source
+                        // found by `str_receiver_source`.
+                        OpCode::Intrinsic => {
+                            if let Some(src) = str_receiver_source(code, pool, header, j)? {
+                                string_sites.push((j, src));
+                            }
+                            redefined.push(dest);
+                        }
                         _ => {
                             if jinfo.def.is_some() {
                                 redefined.push(dest);
@@ -110,6 +171,13 @@ pub(super) fn loop_regions(
                 receivers.sort_unstable();
                 receivers.dedup();
                 receivers.retain(|r| !redefined.contains(r));
+                // A receiver redefined inside the region is not loop-invariant,
+                // so its sites go too — the cache would describe a string the
+                // loop has already replaced.
+                string_sites.retain(|(_, r)| !redefined.contains(r));
+                let mut strings: Vec<usize> = string_sites.iter().map(|(_, r)| *r).collect();
+                strings.sort_unstable();
+                strings.dedup();
                 // A receiver the region only READS gets the stronger cache:
                 // with no allocation in the region either, its element
                 // pointer, length and repr are all loop-invariant.
@@ -118,14 +186,22 @@ pub(super) fn loop_regions(
                     .copied()
                     .filter(|r| !written.contains(r))
                     .collect();
-                if !receivers.is_empty() {
+                if !receivers.is_empty() || !strings.is_empty() {
                     if super::trace() {
                         eprintln!(
-                            "CLIF REGION {:?}: [{header}..{ip}] recv={receivers:?} ro={read_only:?}",
+                            "CLIF REGION {:?}: [{header}..{ip}] recv={receivers:?} \
+                             ro={read_only:?} str={strings:?}",
                             proto.name
                         );
                     }
-                    regions.push((header, ip, receivers, read_only));
+                    regions.push(emit::Region {
+                        header,
+                        back_edge: ip,
+                        arrays: receivers,
+                        read_only,
+                        string_sites,
+                        strings,
+                    });
                 }
             }
         }

@@ -15,7 +15,10 @@ use super::abi::raw_signature;
 use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::debug::ClifDebugSink;
-use super::emit::{box_for_target, box_or_pass, call_helper, meta_is_float, meta_is_int, unbox_bool, unbox_f64_coerce, wrap_i48};
+use super::emit::{
+    box_for_target, box_or_pass, call_helper, meta_is_float, meta_is_int, unbox_bool,
+    unbox_f64_coerce, wrap_i48,
+};
 use super::fields;
 use super::floats;
 use super::generic;
@@ -76,6 +79,7 @@ pub(super) fn lower_raw(
     let vars::VarFile {
         vars,
         cache_vars,
+        str_caches,
         all_caches,
     } = vars::declare(
         &mut b,
@@ -105,6 +109,10 @@ pub(super) fn lower_raw(
         for v in c.view.into_iter().flatten() {
             b.def_var(v, zero);
         }
+    }
+    for c in str_caches.values() {
+        b.def_var(c.bytes, zero);
+        b.def_var(c.len, zero);
     }
 
     let (exec_ctx, alloc_env) = if frame_aware {
@@ -171,13 +179,17 @@ pub(super) fn lower_raw(
         }
     }
 
+    let loops = super::emit::LoopCaches {
+        regions: &regions,
+        arrays: &cache_vars,
+        strings: &str_caches,
+    };
     let arr = arrays::ArrCtx {
         vars: vars.as_slice(),
         helpers,
         cc,
         exec_ctx,
-        regions: &regions,
-        cache_vars: &cache_vars,
+        loops,
         register_meta: &proto.register_meta,
         has_alloc,
     };
@@ -252,9 +264,11 @@ pub(super) fn lower_raw(
                 preheader::emit_region_caches(
                     &mut b,
                     helpers,
+                    cc,
                     exec_ctx,
                     &vars,
                     &cache_vars,
+                    &str_caches,
                     &regions,
                     &state,
                     ip,
@@ -309,7 +323,19 @@ pub(super) fn lower_raw(
                 let off = ((code[ip + 1] as u32) << 16 | code[ip + 2] as u32) as usize;
                 let target_ip = (ip + 3) - off;
                 let target = blocks[&target_ip];
-                if has_alloc {
+                // The safepoint exists so a long allocating loop does not
+                // overflow the nursery into the old generation. A loop body
+                // that allocates NOTHING cannot overflow anything, so the two
+                // dependent loads and the branch it costs every iteration buy
+                // nothing there — and skipping it cannot delay a collection
+                // past the next allocation, which is the only place one can
+                // become necessary.
+                let body_allocates = alloc::has_alloc_scan(
+                    &code[target_ip..ip],
+                    pool,
+                    alloc::IntrinsicScan::ByWireByte,
+                )?;
+                if has_alloc && body_allocates {
                     if let Some(actx) = actx.as_ref() {
                         // Every cache Variable, payloads AND views: a collection
                         // here can move what a view points into, and the

@@ -16,13 +16,50 @@ use super::super::kinds::K;
 use super::super::liveness::Liveness;
 use crate::JitHelpers;
 
+/// How precisely an allocation scan reads `OpCode::Intrinsic`.
+///
+/// The two callers ask different questions of the same opcode list. A whole
+/// FUNCTION is scanned to decide whether it needs a frame, safepoints and
+/// root flushes, and there the cost of a false `true` is a slower prologue
+/// while the cost of a false `false` is a missed root — so it stays
+/// conservative. A loop REGION is scanned to decide whether a resolved
+/// pointer may be hoisted out of it, and there an `Intrinsic` that provably
+/// allocates nothing is the difference between hoisting and not.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum IntrinsicScan {
+    /// Every `Intrinsic` counts as allocating.
+    Conservative,
+    /// An `Intrinsic` counts only when
+    /// [`varn_core::intrinsic_ops::intrinsic_allocates`] says its wire byte can
+    /// allocate.
+    ByWireByte,
+}
+
+/// Conservative whole-function scan; see [`IntrinsicScan`].
 pub(crate) fn has_alloc(
     code: &[u16],
     pool: &[varn_types::chunk::PoolEntry],
 ) -> Result<bool, String> {
+    has_alloc_scan(code, pool, IntrinsicScan::Conservative)
+}
+
+pub(crate) fn has_alloc_scan(
+    code: &[u16],
+    pool: &[varn_types::chunk::PoolEntry],
+    scan: IntrinsicScan,
+) -> Result<bool, String> {
     let mut ip = 0usize;
     while ip < code.len() {
         let info = decode(code, ip, pool).ok_or("clif: undecodable opcode")?;
+        // The wire byte lives in the high half of the operand word, the same
+        // place `strings::emit_str_intrinsic_native` reads it from.
+        if scan == IntrinsicScan::ByWireByte
+            && OpCode::from_u8(code[ip] as u8) == Some(OpCode::Intrinsic)
+            && !varn_core::intrinsic_ops::intrinsic_allocates((code[ip + 1] >> 8) as u8)
+        {
+            ip += info.len;
+            continue;
+        }
         if matches!(
             OpCode::from_u8(code[ip] as u8),
             Some(

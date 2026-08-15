@@ -13,7 +13,7 @@ use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
 use cranelift_frontend::FunctionBuilder;
 use std::collections::HashMap;
 
-use super::emit::{self, emit_array_payload, RegionCache};
+use super::emit::{self, call_helper, emit_array_payload, RegionCache, StrRegionCache};
 use super::kinds::K;
 use crate::JitHelpers;
 
@@ -22,15 +22,19 @@ use crate::JitHelpers;
 pub(super) fn emit_region_caches(
     b: &mut FunctionBuilder,
     helpers: &JitHelpers,
+    cc: cranelift_codegen::isa::CallConv,
     exec_ctx: cranelift_codegen::ir::Value,
     vars: &[cranelift_frontend::Variable],
     cache_vars: &HashMap<(usize, usize), RegionCache>,
+    str_caches: &HashMap<(usize, usize), StrRegionCache>,
     regions: &[emit::Region],
     state: &[K],
     ip: usize,
 ) {
-    for (h, _, regs, _) in regions.iter().filter(|(h, _, _, _)| *h == ip) {
-        for &r in regs {
+    for region in regions.iter().filter(|reg| reg.header == ip) {
+        let h = &region.header;
+        emit_str_caches(b, helpers, cc, exec_ctx, vars, str_caches, region, state);
+        for &r in &region.arrays {
             if state[r] != K::Boxed {
                 continue;
             }
@@ -120,5 +124,58 @@ pub(super) fn emit_region_caches(
                 }
             }
         }
+    }
+}
+
+/// Resolve each string receiver of `region` to a byte pointer and a length.
+///
+/// Two helper calls per receiver, once per loop entry — the alternative is
+/// re-deriving both on every character. The helper answers `0` for anything it
+/// cannot serve as flat bytes (SSO, non-ASCII, not a string), and `0` is the
+/// same "unresolved" sentinel the array caches use, so the access sites need
+/// exactly one test to choose between the inline load and the general helper.
+///
+/// The length is read on the resolved path only. Reading it for a rejected
+/// receiver would be harmless here — it is a second call, not a load — but
+/// keeping the two in lockstep is what lets an access treat `bytes != 0` as
+/// proof that `len` describes the same string.
+fn emit_str_caches(
+    b: &mut FunctionBuilder,
+    helpers: &JitHelpers,
+    cc: cranelift_codegen::isa::CallConv,
+    exec_ctx: cranelift_codegen::ir::Value,
+    vars: &[cranelift_frontend::Variable],
+    str_caches: &HashMap<(usize, usize), StrRegionCache>,
+    region: &emit::Region,
+    state: &[K],
+) {
+    for &r in &region.strings {
+        let Some(cache) = str_caches.get(&(region.header, r)) else {
+            continue;
+        };
+        if state[r] != K::Boxed {
+            continue;
+        }
+        let recv = b.use_var(vars[r]);
+        let bytes = call_helper(b, cc, helpers.str_ascii_bytes, &[exec_ctx, recv]);
+
+        let resolved = b.create_block();
+        let rejected = b.create_block();
+        let done = b.create_block();
+        b.append_block_param(done, types::I64);
+        b.ins().brif(bytes, resolved, &[], rejected, &[]);
+
+        b.switch_to_block(resolved);
+        let len = call_helper(b, cc, helpers.str_ascii_len, &[exec_ctx, recv]);
+        b.ins().jump(done, &[len.into()]);
+
+        b.switch_to_block(rejected);
+        let zero = b.ins().iconst(types::I64, 0);
+        b.ins().jump(done, &[zero.into()]);
+
+        b.switch_to_block(done);
+        b.def_var(cache.bytes, bytes);
+        let len = b.block_params(done)[0];
+        b.def_var(cache.len, len);
     }
 }

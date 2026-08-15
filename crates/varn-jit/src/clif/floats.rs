@@ -103,6 +103,7 @@ pub(super) fn emit_intrinsic_op(
     b: &mut FunctionBuilder,
     op: OpCode,
     actx: Option<&AllocCtx>,
+    loops: super::emit::LoopCaches,
     vars: &[Variable],
     state: &[K],
     meta: &[RegisterMeta],
@@ -119,7 +120,7 @@ pub(super) fn emit_intrinsic_op(
     // String intrinsics: CharCodeAt, Substring, Slice — dedicated helpers
     // that bypass the flush/reload of all live boxed registers.
     let actx = actx.ok_or("clif: Intrinsic outside alloc fn")?;
-    if super::strings::emit_str_intrinsic_native(b, actx, vars, state, meta, code, ip) {
+    if super::strings::emit_str_intrinsic_native(b, actx, loops, vars, state, meta, code, ip) {
         return Ok(());
     }
     alloc::emit_intrinsic(b, actx, state, meta, code, ip);
