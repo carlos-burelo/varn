@@ -1,0 +1,112 @@
+// Three things this file pins, all of which were wrong and all of which are
+// invisible to a benchmark because they are about ANSWERS, not speed.
+//
+// 1. `charCodeAt` out of range. The intrinsic clamped a negative position to
+//    zero while the native `str` binding returned -1 for the same expression,
+//    so the answer depended on which path the call took.
+// 2. The CLIF lowering serves `charCodeAt` from a byte pointer hoisted out of
+//    the loop when the receiver is a heap ASCII string, and from a helper
+//    otherwise. Both arms must agree, in both tiers, for every receiver shape.
+// 3. `JSON.stringify` matched heap objects by tag and destructured only two of
+//    the four variants those tags cover, so a tuple serialized as `[]` and a
+//    record as `{}` — well-formed JSON with the contents dropped.
+
+import { stringify, parse } from "std:json"
+
+// ---------------------------------------------------------------- charCodeAt
+
+const ascii = "abcdefghij".repeat(8)   // heap, ASCII: the hoisted-bytes arm
+const small = "abc"                    // SSO: the helper arm
+const utf8 = "aé日x"                   // heap, non-ASCII: the helper arm
+
+assert("charCodeAt: heap ascii first",  ascii.charCodeAt(0) === 97)
+assert("charCodeAt: heap ascii last",   ascii.charCodeAt(79) === 106)
+assert("charCodeAt: heap ascii past end", ascii.charCodeAt(80) === -1)
+assert("charCodeAt: heap ascii negative", ascii.charCodeAt(-1) === -1)
+
+assert("charCodeAt: sso first",        small.charCodeAt(0) === 97)
+assert("charCodeAt: sso past end",     small.charCodeAt(3) === -1)
+assert("charCodeAt: sso negative",     small.charCodeAt(-1) === -1)
+
+// Char index, not byte index: `é` is two bytes, `日` three.
+assert("charCodeAt: non-ascii 0", utf8.charCodeAt(0) === 97)
+assert("charCodeAt: non-ascii 1", utf8.charCodeAt(1) === 233)
+assert("charCodeAt: non-ascii 2", utf8.charCodeAt(2) === 26085)
+assert("charCodeAt: non-ascii 3", utf8.charCodeAt(3) === 120)
+assert("charCodeAt: non-ascii past end", utf8.charCodeAt(4) === -1)
+assert("charCodeAt: non-ascii negative", utf8.charCodeAt(-1) === -1)
+
+// A loop long enough to be compiled and then rescued by OSR, which is what
+// puts the hoisted-bytes arm in play. The sum is the same however it is
+// served, and the out-of-range probe inside the loop keeps the fallback arm
+// live in the same compiled body.
+function scanSum(s: str, times: int): int {
+    let total = 0
+    let r = 0
+    const len = s.length
+    while (r < times) {
+        let i = 0
+        while (i < len) {
+            total = total + s.charCodeAt(i)
+            i = i + 1
+        }
+        total = total + s.charCodeAt(len)      // -1 every iteration
+        total = total + s.charCodeAt(0 - 1)    // -1 every iteration
+        r = r + 1
+    }
+    return total
+}
+
+// 80 ASCII chars: "abcdefghij" sums to 97+98+...+106 = 1015, eight times over.
+const oneScan = 1015 * 8
+assert("charCodeAt: cold loop", scanSum(ascii, 1) === oneScan - 2)
+// Enough back edges to cross the OSR threshold, so the same function is
+// answered by compiled code carrying the hoisted view.
+assert("charCodeAt: hot loop", scanSum(ascii, 2000) === (oneScan - 2) * 2000)
+// Same loop over receivers the hoist refuses: the cache stays 0 and every
+// access takes the helper.
+assert("charCodeAt: hot loop sso", scanSum(small, 2000) === (97 + 98 + 99 - 2) * 2000)
+assert("charCodeAt: hot loop non-ascii", scanSum(utf8, 2000) === (97 + 233 + 26085 + 120 - 2) * 2000)
+
+// --------------------------------------------------------------- indexOf etc
+
+const hay = "abcdefghij".repeat(50) + "needle"
+assert("indexOf: found", hay.indexOf("needle") === 500)
+assert("indexOf: absent", hay.indexOf("nope") === -1)
+assert("indexOf: empty needle", hay.indexOf("") === 0)
+assert("lastIndexOf: found", hay.lastIndexOf("abc") === 490)
+assert("lastIndexOf: absent", hay.lastIndexOf("nope") === -1)
+assert("includes: yes", hay.includes("efgh"))
+assert("includes: no", hay.includes("zzz") === false)
+// Char index, not byte index, when the prefix is not ASCII.
+const uhay = "日本語needle"
+assert("indexOf: non-ascii offset", uhay.indexOf("needle") === 3)
+
+// ------------------------------------------------------------ JSON.stringify
+
+assert("json: object", stringify({ a: 1, b: "x" }) === "{\"a\":1,\"b\":\"x\"}")
+assert("json: array", stringify([1, 2, 3]) === "[1,2,3]")
+assert("json: nested", stringify({ id: 1, tags: ["a", "b"] }) === "{\"id\":1,\"tags\":[\"a\",\"b\"]}")
+
+// Field order is declaration order, not hash order — the property that lets
+// the shape carry an ordered name list at all.
+assert("json: field order", stringify({ z: 1, a: 2, m: 3 }) === "{\"z\":1,\"a\":2,\"m\":3}")
+
+// Tuples and records: these used to come out as `[]` and `{}`.
+const tup = #[1, "two", true]
+assert("json: tuple keeps its elements", stringify(tup as dynamic) === "[1,\"two\",true]")
+
+const rec = #{ x: 3, y: 4 }
+assert("json: record keeps its fields", stringify(rec as dynamic) === "{\"x\":3,\"y\":4}")
+
+// Round trip through the parser's shape cache, with a NESTED object of the
+// same arity between two siblings: the inner object replaces the cache
+// mid-parse, and the outer ones must still be built with their own field
+// names. This passed before the cache was snapshotted per object too — it is
+// here to keep it passing, not as evidence that it once failed.
+const doc = "[{\"a\":1,\"b\":2},{\"a\":{\"c\":9,\"d\":8},\"b\":4},{\"a\":5,\"b\":6}]"
+const back = parse(doc) as dynamic[]
+assert("json: parse len", back.length === 3)
+assert("json: parse first", stringify(back[0]) === "{\"a\":1,\"b\":2}")
+assert("json: parse nested", stringify(back[1]) === "{\"a\":{\"c\":9,\"d\":8},\"b\":4}")
+assert("json: parse after nested", stringify(back[2]) === "{\"a\":5,\"b\":6}")

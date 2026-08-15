@@ -70,6 +70,7 @@ import "./69-tuples-records.vn"
 import "./70-result-extensions.vn"
 import "./71-phase2-std-features.vn"
 import "./72-consolidated-std.vn"
+import "./73-str-charcode-json-shape.vn"
 
-print("\n72 side-effect modules executed in suite")
+print("\n73 side-effect modules executed in suite")
 assertSummary()
