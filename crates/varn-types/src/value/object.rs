@@ -328,25 +328,26 @@ impl ObjData<[Cell<VmValue>]> {
             .into_iter()
     }
 
+    /// The fields in declaration order, as owned pairs.
+    ///
+    /// Field order comes from [`Shape::ordered_names`], which the shape
+    /// computed once. This used to sort a `Vec` built from the property
+    /// HashMap and then collect it into a second `Vec` — two allocations, N
+    /// `Rc` clones and a sort for every object visited, which `JSON.stringify`
+    /// paid a million times over a 50 000-record document.
+    ///
+    /// Readers on a hot path should prefer walking `shape().ordered_names()`
+    /// with [`Self::field_at`] directly: that allocates nothing at all.
     pub fn iter(&self) -> std::vec::IntoIter<(RuntimeString, VmValue)> {
-        let mut pairs: Vec<(RuntimeString, VmValue, usize)> = self
-            .shape()
-            .property_names
-            .iter()
-            .map(|(k, &idx)| {
-                (
-                    Rc::clone(k),
-                    self.field_at(idx).unwrap_or(VmValue::null()),
-                    idx,
-                )
-            })
-            .collect();
-        pairs.sort_unstable_by_key(|(_, _, idx)| *idx);
-        pairs
-            .into_iter()
-            .map(|(k, v, _)| (k, v))
-            .collect::<Vec<_>>()
-            .into_iter()
+        let names = self.shape().ordered_names();
+        let mut pairs = Vec::with_capacity(names.len());
+        for (slot, name) in names.iter().enumerate() {
+            pairs.push((
+                Rc::clone(name),
+                self.field_at(slot).unwrap_or(VmValue::null()),
+            ));
+        }
+        pairs.into_iter()
     }
 
     pub fn is_instance(&self) -> bool {

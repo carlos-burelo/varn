@@ -62,59 +62,85 @@ fn write_int(mut n: i64, out: &mut String) {
     out.push_str(s);
 }
 
+/// Serialize one VM value.
+///
+/// Scalars are decided from the NaN-box tag alone; everything else takes
+/// **one** heap lookup and matches the object it found. The chain this
+/// replaced asked `is_string`, then `is_array`, then `is_object`, and each of
+/// those resolved the heap slot on its own before the branch body resolved it
+/// a fourth time — four walks per object where the value's own tag already
+/// says which one can succeed.
+///
+/// Matching the variant directly also removes a silent hole: `is_array`
+/// accepts `Tuple` and `is_object` accepts `Record`, but the branch bodies
+/// only destructured `Array` and `Object`, so a tuple serialized as `[]` and a
+/// record as `{}` — valid JSON that had lost its contents.
 fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
     if val.is_null() {
         out.push_str("null");
-    } else if val.is_bool() {
+        return;
+    }
+    if val.is_bool() {
         out.push_str(if val.as_bool() { "true" } else { "false" });
-    } else if val.is_int() {
+        return;
+    }
+    if val.is_int() {
         write_int(val.as_int(), out);
-    } else if val.is_f64() {
+        return;
+    }
+    if val.is_f64() {
         let f = val.as_f64();
         if f.is_finite() {
             out.push_str(ryu::Buffer::new().format(f));
         } else {
             out.push_str("null");
         }
-    } else if ctx.is_string(val) {
-        let s = ctx.str_repr_borrowed(val);
-        write_json_str(&s, out);
-    } else if ctx.is_array(val) {
-        out.push('[');
-        let mut first = true;
-        if val.is_heap() {
-            if let Some(HeapObj::Array(a)) = ctx.heap.get(val.as_heap_idx()) {
-                for i in 0..a.len() {
-                    if !first {
-                        out.push(',');
-                    }
-                    first = false;
-                    write_json_vm(ctx, a.get_vm(i).unwrap(), out);
-                }
-            }
-        }
-        out.push(']');
-    } else if ctx.is_object(val) {
-        out.push('{');
-        let mut first = true;
-        if val.is_heap() {
-            if let Some(HeapObj::Object(o)) = ctx.heap.get(val.as_heap_idx()) {
-                for (k, nv) in o.borrow().iter() {
-                    if !first {
-                        out.push(',');
-                    }
-                    first = false;
-                    write_json_str(k.as_ref(), out);
-                    out.push(':');
-                    write_json_vm(ctx, nv, out);
-                }
-            }
-        }
-        out.push('}');
-    } else {
-        let extracted = ctx.extract(val);
-        write_value_json(&extracted, ctx, out);
+        return;
     }
+    if val.is_sso() {
+        let mut buf = [0u8; 5];
+        write_json_str(val.sso_as_str(&mut buf), out);
+        return;
+    }
+    if val.is_heap() {
+        match ctx.heap.get(val.as_heap_idx()) {
+            Some(HeapObj::Str(h)) => {
+                write_json_str(h.as_str(), out);
+                return;
+            }
+            Some(HeapObj::Array(a) | HeapObj::Tuple(a)) => {
+                out.push('[');
+                for i in 0..a.len() {
+                    if i > 0 {
+                        out.push(',');
+                    }
+                    write_json_vm(ctx, a.get_vm(i).unwrap_or_else(VmValue::null), out);
+                }
+                out.push(']');
+                return;
+            }
+            Some(HeapObj::Object(o) | HeapObj::Record(o)) => {
+                // Walked through the shape's ordered names instead of
+                // `ObjRef::iter()`: the pair list that would materialise here
+                // is one allocation and one `Rc` clone per field, per object.
+                let obj = o.borrow();
+                out.push('{');
+                for (slot, key) in obj.shape().ordered_names().iter().enumerate() {
+                    if slot > 0 {
+                        out.push(',');
+                    }
+                    write_json_str(key, out);
+                    out.push(':');
+                    write_json_vm(ctx, obj.field_at(slot).unwrap_or_else(VmValue::null), out);
+                }
+                out.push('}');
+                return;
+            }
+            _ => {}
+        }
+    }
+    let extracted = ctx.extract(val);
+    write_value_json(&extracted, ctx, out);
 }
 
 fn write_value_json(val: &Value, ctx: &ExecCtx, out: &mut String) {
@@ -196,31 +222,35 @@ fn write_json_str(s: &str, out: &mut String) {
     out.push('"');
 }
 
-type ShapeCache = std::cell::RefCell<Option<(Vec<String>, std::rc::Rc<varn_types::Shape>)>>;
+/// The last object shape a parse produced, with the key list it came from.
+///
+/// Both halves are behind `Rc` so an object can take a SNAPSHOT of the pair
+/// for the duration of its own `visit_map` — two refcount bumps — instead of
+/// reaching through the thread-local and the `RefCell` once per field.
+///
+/// Taking it once also closes a hazard rather than just saving work: the
+/// previous code re-read the thread-local per key AND once more at the end, so
+/// the entry it finally used need not be the one it compared the keys against
+/// — a nested object parsed mid-loop replaces the cache. **This is not a
+/// demonstrated bug**; the obvious reproducer (a nested object of the same
+/// arity between two siblings, pinned in `tests/73-str-charcode-json-shape.vn`)
+/// produces correct output on the previous code too. It is removed because a
+/// match against one entry and a build from another is a coincidence to rely
+/// on, not an invariant.
+type CacheEntry = (std::rc::Rc<Vec<String>>, std::rc::Rc<varn_types::Shape>);
+type ShapeCache = std::cell::RefCell<Option<CacheEntry>>;
 
-/// Whether the cached shape's key at `idx` is `key`.
-fn key_matches_cached(cache: &ShapeCache, idx: usize, key: &str) -> bool {
-    match &*cache.borrow() {
-        Some((keys, _)) => keys.get(idx).map(|k| k.as_str()) == Some(key),
-        None => false,
-    }
+/// The current cache entry, if any. Cheap enough to call once per object.
+fn cache_snapshot() -> Option<CacheEntry> {
+    JSON_SHAPE_CACHE.with(|c| c.borrow().clone())
 }
 
-/// The cached shape's first `n` keys, owned. Used to recover the keys of an
-/// object that matched the cache up to a point and then diverged.
-fn cached_key_prefix(cache: &ShapeCache, n: usize) -> Vec<String> {
-    match &*cache.borrow() {
+/// The snapshot's first `n` keys, owned — how an object that matched up to a
+/// point and then diverged recovers the names it never had to materialise.
+fn key_prefix(cached: &Option<CacheEntry>, n: usize) -> Vec<String> {
+    match cached {
         Some((keys, _)) => keys.iter().take(n).cloned().collect(),
         None => Vec::new(),
-    }
-}
-
-/// The cached shape, if it has exactly `n` keys — a prefix match is not a
-/// match, the object must have ended where the shape does.
-fn cached_shape_of_len(cache: &ShapeCache, n: usize) -> Option<std::rc::Rc<varn_types::Shape>> {
-    match &*cache.borrow() {
-        Some((keys, shape)) if keys.len() == n => Some(std::rc::Rc::clone(shape)),
-        _ => None,
     }
 }
 
@@ -326,8 +356,13 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
         let mut spilled: Vec<VmValue> = Vec::new();
         let mut n = 0usize;
 
-        // How many keys so far are the cached shape's, in order. `None` once a
-        // key has diverged — from then on keys are collected as owned strings.
+        // Taken once: the loop below parses nested values, which can replace
+        // the cache underneath it.
+        let cached = cache_snapshot();
+        let cached_keys = |k: usize| cached.as_ref().and_then(|(keys, _)| keys.get(k));
+
+        // How many keys so far are the snapshot's, in order. `None` once a key
+        // has diverged — from then on keys are collected as owned strings.
         let mut matched: Option<usize> = Some(0);
         let mut owned_keys: Vec<String> = Vec::new();
 
@@ -344,12 +379,12 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
             n += 1;
 
             match matched {
-                Some(k) if JSON_SHAPE_CACHE.with(|c| key_matches_cached(c, k, key.as_ref())) => {
+                Some(k) if cached_keys(k).map(String::as_str) == Some(key.as_ref()) => {
                     matched = Some(k + 1);
                 }
                 Some(k) => {
-                    // Diverged at `k`: the first `k` keys are the cached ones.
-                    owned_keys = JSON_SHAPE_CACHE.with(|c| cached_key_prefix(c, k));
+                    // Diverged at `k`: the first `k` keys are the snapshot's.
+                    owned_keys = key_prefix(&cached, k);
                     owned_keys.push(key.into_owned());
                     matched = None;
                 }
@@ -363,24 +398,29 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
             &spilled
         };
 
+        // A prefix match is not a match: the object must also have ENDED where
+        // the snapshot's key list does.
         if matched == Some(n) {
-            if let Some(shape) = JSON_SHAPE_CACHE.with(|c| cached_shape_of_len(c, n)) {
-                return Ok(self.0.heap.alloc_object_with_shape_slice(&shape, values));
+            if let Some((keys, shape)) = &cached {
+                if keys.len() == n {
+                    return Ok(self.0.heap.alloc_object_with_shape_slice(shape, values));
+                }
             }
         }
 
         // No cached shape, or this object has a different one: build the object
         // field by field so the shape is derived, then cache it for the objects
         // that follow.
-        if matched.is_some() {
-            owned_keys = JSON_SHAPE_CACHE.with(|c| cached_key_prefix(c, matched.unwrap()));
+        if let Some(k) = matched {
+            owned_keys = key_prefix(&cached, k);
         }
         let obj = self.0.alloc_object();
         for (k, v) in owned_keys.iter().zip(values.iter()) {
             self.0.set_field(obj, k, *v);
         }
         if let Some(shape) = self.0.get_object_shape(obj) {
-            JSON_SHAPE_CACHE.with(|c| *c.borrow_mut() = Some((owned_keys, shape)));
+            let entry = (std::rc::Rc::new(owned_keys), shape);
+            JSON_SHAPE_CACHE.with(|c| *c.borrow_mut() = Some(entry));
         }
         Ok(obj)
     }
