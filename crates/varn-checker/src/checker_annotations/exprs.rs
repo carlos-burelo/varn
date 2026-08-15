@@ -5,6 +5,7 @@ use crate::types::{Type, TypeContext};
 use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::{Arg, ArrayEl, Expr, ExprKind};
 use varn_core::intrinsic_ops::intrinsic_lookup;
+use varn_core::AnnKey;
 use varn_core::TypeKind;
 use varn_core::{NumericKind, TypeAnnotations};
 
@@ -53,7 +54,7 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                 Some(NumericOperand::Decimal) | None => None,
             };
             if let Some(k) = kind {
-                ann.record_numeric(expr.range.start.offset, k);
+                ann.record_numeric(AnnKey::expr(expr.id), k);
             }
         }
         ExprKind::Paren { expression } => annotate_expr(expression, ann, ctx),
@@ -97,11 +98,11 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                     let obj_ty = get_expr_type(object, ctx);
                     let obj_ty_nn = obj_ty.non_nullified();
                     let mut recorded = false;
-                    let key_offset = property.range.start.offset;
+                    let prop_key = AnnKey::expr(property.id);
                     if let TypeKind::Named(_, Some(ref origin_path)) = &obj_ty_nn.0 {
                         let key = format!("{}/{}", origin_path, prop_name);
                         if let Some(wire_byte) = intrinsic_lookup(&key) {
-                            ann.record_intrinsic(key_offset, wire_byte);
+                            ann.record_intrinsic(prop_key, wire_byte);
                             recorded = true;
                         }
                     }
@@ -114,10 +115,10 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                                         class, prop_name,
                                     )
                                 {
-                                    ann.record_intrinsic(key_offset, wire_byte);
+                                    ann.record_intrinsic(prop_key, wire_byte);
                                 } else if core_has_method(ctx.bind, class, prop_name) {
                                     ann.record_native_op(
-                                        key_offset,
+                                        prop_key,
                                         varn_core::op_id::core_method_op_id(class, prop_name),
                                     );
                                 }
@@ -130,7 +131,7 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
             if let ExprKind::Identifier { name } = &callee.kind {
                 if !ctx.locals.contains_key(name.as_ref()) {
                     if let Some(wire_byte) = ctx.bind.intrinsic_import_wire(name) {
-                        ann.record_intrinsic(callee.range.start.offset, wire_byte);
+                        ann.record_intrinsic(AnnKey::expr(callee.id), wire_byte);
                     }
                 }
             }
@@ -142,9 +143,9 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                 ..
             } = &callee.kind
             {
-                property.range.start.offset
+                AnnKey::expr(property.id)
             } else {
-                expr.range.start.offset
+                AnnKey::expr(expr.id)
             };
             record_cg_ty_at(result_key, &result_ty, ann, ctx);
         }
@@ -159,15 +160,15 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                 annotate_expr(property, ann, ctx);
                 let obj_ty = get_expr_type(object, ctx);
                 if matches!(obj_ty.non_nullified().0, TypeKind::Array(_)) {
-                    ann.record_array_index(expr.range.start.offset);
+                    ann.record_array_index(AnnKey::expr(expr.id));
                 }
                 let elem_ty = get_expr_type(expr, ctx);
-                record_cg_ty_at(property.range.start.offset, &elem_ty, ann, ctx);
+                record_cg_ty_at(AnnKey::expr(property.id), &elem_ty, ann, ctx);
             } else if let ExprKind::Identifier { name: prop_name } = &property.kind {
                 let obj_ty = get_expr_type(object, ctx);
                 let check_ty = obj_ty.non_nullified();
                 let member_ty = get_expr_type(expr, ctx);
-                record_cg_ty_at(property.range.start.offset, &member_ty, ann, ctx);
+                record_cg_ty_at(AnnKey::expr(property.id), &member_ty, ann, ctx);
 
                 let class_name = match &check_ty.0 {
                     TypeKind::Named(n, _origin) | TypeKind::Generic(n, _, _origin) => {
@@ -207,7 +208,7 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                                         if known_props.insert(m.name.clone()) {
                                             if m.name.as_ref() == prop_name.as_ref() {
                                                 ann.record_fixed_field_slot(
-                                                    property.range.start.offset,
+                                                    AnnKey::expr(property.id),
                                                     slot,
                                                 );
                                                 found = true;
@@ -399,14 +400,14 @@ fn project_cg_ty(ty: &Type, ctx: &AnnotateCtx) -> varn_core::CgTy {
 }
 
 pub(crate) fn record_cg_ty_at(
-    offset: u32,
+    key: AnnKey,
     ty: &Type,
     ann: &mut TypeAnnotations,
     ctx: &AnnotateCtx,
 ) {
     let cg = project_cg_ty(ty, ctx);
     if cg != varn_core::CgTy::Dynamic {
-        ann.record_cg_ty(offset, cg);
+        ann.record_cg_ty(key, cg);
     }
 }
 

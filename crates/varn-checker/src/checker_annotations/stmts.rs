@@ -4,6 +4,7 @@ use crate::binder::resolve_type_node;
 use crate::symbol::SymbolKind;
 use crate::types::{Type, TypeContext};
 use varn_core::ast::{Decl, ExportDecl, ForInit, ImportSpecifier, Stmt, StmtKind};
+use varn_core::AnnKey;
 use varn_core::TypeAnnotations;
 
 pub(crate) fn annotate_stmt(stmt: &Stmt, ann: &mut TypeAnnotations, ctx: &mut AnnotateCtx) {
@@ -137,7 +138,7 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
             if !f.modifiers.is_declare {
                 if let Some(rt) = &f.return_type {
                     let ty = resolve_type_node(rt, Some(ctx.bind));
-                    record_cg_ty_at(f.id_offset, &ty, ann, ctx);
+                    record_cg_ty_at(AnnKey::decl(f.id_offset), &ty, ann, ctx);
                 }
                 let mut local_ctx = ctx.clone();
                 local_ctx.evolved_locals.clear();
@@ -158,7 +159,7 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
                         } else {
                             Type::Dynamic
                         };
-                        record_cg_ty_at(p.range.start.offset, &ty, ann, ctx);
+                        record_cg_ty_at(AnnKey::decl(p.range.start.offset), &ty, ann, ctx);
                         local_ctx.locals.insert(name, ty);
                     }
                 }
@@ -176,7 +177,7 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
                 if let Some(id) = scope.resolve(name, &ctx.bind.scopes) {
                     let sym = ctx.bind.arena.get(id);
                     if let Some(slot_idx) = sym.slot_idx {
-                        ann.record_slot_idx(spec.range().start.offset, slot_idx);
+                        ann.record_slot_idx(AnnKey::decl(spec.range().start.offset), slot_idx);
                     }
                     if matches!(
                         sym.kind,
@@ -185,7 +186,7 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
                             | SymbolKind::Struct
                             | SymbolKind::Extension
                     ) {
-                        ann.record_type_only(spec.range().start.offset);
+                        ann.record_type_only(AnnKey::decl(spec.range().start.offset));
                     }
                 }
             }
@@ -207,7 +208,10 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
                     if let Some(name) = decl_primary_name(declaration) {
                         if let Some(sym) = exports.get(name.as_ref()) {
                             if let Some(slot_idx) = sym.slot_idx {
-                                ann.record_slot_idx(declaration.range().start.offset, slot_idx);
+                                ann.record_slot_idx(
+                                    AnnKey::decl(declaration.range().start.offset),
+                                    slot_idx,
+                                );
                             }
                         }
                     }
@@ -228,7 +232,7 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
                     }
                     if let Some(sym) = exports.get("default") {
                         if let Some(slot_idx) = sym.slot_idx {
-                            ann.record_slot_idx(range.start.offset, slot_idx);
+                            ann.record_slot_idx(AnnKey::decl(range.start.offset), slot_idx);
                         }
                     }
                 }
@@ -236,7 +240,10 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
                     for spec in specifiers {
                         if let Some(sym) = exports.get(&spec.exported.to_string()) {
                             if let Some(slot_idx) = sym.slot_idx {
-                                ann.record_slot_idx(spec.range.start.offset, slot_idx);
+                                ann.record_slot_idx(
+                                    AnnKey::decl(spec.range.start.offset),
+                                    slot_idx,
+                                );
                             }
                         }
                     }
@@ -245,7 +252,7 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
                     if let Some(ns) = alias {
                         if let Some(sym) = exports.get(&ns.to_string()) {
                             if let Some(slot_idx) = sym.slot_idx {
-                                ann.record_slot_idx(range.start.offset, slot_idx);
+                                ann.record_slot_idx(AnnKey::decl(range.start.offset), slot_idx);
                             }
                         }
                     }
@@ -339,7 +346,7 @@ fn annotate_method_body(
             } else {
                 Type::Dynamic
             };
-            record_cg_ty_at(p.range.start.offset, &ty, ann, ctx);
+            record_cg_ty_at(AnnKey::decl(p.range.start.offset), &ty, ann, ctx);
             local_ctx.locals.insert(name, ty);
         }
     }

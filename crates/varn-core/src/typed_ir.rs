@@ -21,9 +21,44 @@ pub struct ExprAnnotation {
     pub cg_ty: Option<crate::cg_ty::CgTy>,
 }
 
+/// What an annotation is attached to.
+///
+/// The key space is part of the key. This map used to be `HashMap<u32, _>`
+/// holding two unrelated numbering schemes at once — expressions and import
+/// specifiers, both under a byte offset — and a byte offset does not identify
+/// an expression: `x` and `x.y` begin at the same byte, so two nodes shared
+/// one record and only the disjointness of the fields they happened to set
+/// kept that from showing.
+///
+/// An expression has an `AstId`, so it uses it. A declaration site does not —
+/// only `Expr`, `Stmt` and `TypeNode` carry ids, and an import specifier, a
+/// parameter or a field is none of those — so it keeps a positional key. As
+/// separate variants, `Expr(7)` and `Decl(7)` are different keys and cannot
+/// collide.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum AnnKey {
+    /// An expression, by its AST id.
+    Expr(crate::ast::AstId),
+    /// A declaration site with no id of its own, by where it starts.
+    Decl(u32),
+}
+
+impl AnnKey {
+    /// Key for the expression `id`.
+    pub fn expr(id: crate::ast::AstId) -> Self {
+        AnnKey::Expr(id)
+    }
+
+    /// Key for the declaration starting at `offset`.
+    pub fn decl(offset: u32) -> Self {
+        AnnKey::Decl(offset)
+    }
+}
+
+/// Everything the checker tells the compiler about one annotated place.
 #[derive(Clone, Debug, Default)]
 pub struct TypeAnnotations {
-    inner: HashMap<u32, ExprAnnotation>,
+    inner: HashMap<AnnKey, ExprAnnotation>,
     module_caps: Vec<String>,
     reassigned_names: HashSet<String>,
 }
@@ -43,11 +78,9 @@ impl TypeAnnotations {
         &self.module_caps
     }
 
-    /// Every recorded annotation, for tooling that needs to see the whole
-    /// table rather than ask about one expression. Unordered — callers that
-    /// need a stable rendering must sort by key (`vn debug -p check:types`
-    /// does).
-    pub fn entries(&self) -> impl Iterator<Item = (&u32, &ExprAnnotation)> {
+    /// Every annotation. Unordered — callers that need a stable rendering
+    /// must sort (`vn debug -p check:types` does).
+    pub fn entries(&self) -> impl Iterator<Item = (&AnnKey, &ExprAnnotation)> {
         self.inner.iter()
     }
 
@@ -63,77 +96,80 @@ impl TypeAnnotations {
         self.reassigned_names.contains(name)
     }
 
-    pub fn record_numeric(&mut self, offset: u32, kind: NumericKind) {
-        self.inner.entry(offset).or_default().numeric = Some(kind);
+    pub fn record_numeric(&mut self, key: AnnKey, kind: NumericKind) {
+        self.inner.entry(key).or_default().numeric = Some(kind);
     }
 
-    pub fn get_numeric(&self, offset: u32) -> Option<NumericKind> {
-        self.inner.get(&offset)?.numeric
+    pub fn get_numeric(&self, key: AnnKey) -> Option<NumericKind> {
+        self.inner.get(&key)?.numeric
     }
 
-    pub fn record_type_only(&mut self, offset: u32) {
-        self.inner.entry(offset).or_default().type_only = true;
+    pub fn record_type_only(&mut self, key: AnnKey) {
+        self.inner.entry(key).or_default().type_only = true;
     }
 
-    pub fn record_call_mapping(&mut self, call_id: u32, mapping: Vec<Option<usize>>) {
-        self.inner.entry(call_id).or_default().call_mapping = Some(mapping);
+    pub fn is_type_only(&self, key: AnnKey) -> bool {
+        self.inner.get(&key).map_or(false, |a| a.type_only)
     }
 
-    pub fn get_call_mapping(&self, call_id: u32) -> Option<&Vec<Option<usize>>> {
-        self.inner.get(&call_id)?.call_mapping.as_ref()
+    pub fn record_call_mapping(&mut self, key: AnnKey, mapping: Vec<Option<usize>>) {
+        self.inner.entry(key).or_default().call_mapping = Some(mapping);
     }
 
-    pub fn record_slot_idx(&mut self, offset: u32, slot_idx: usize) {
-        self.inner.entry(offset).or_default().slot_idx = Some(slot_idx);
+    pub fn get_call_mapping(&self, key: AnnKey) -> Option<&Vec<Option<usize>>> {
+        self.inner.get(&key)?.call_mapping.as_ref()
     }
 
-    pub fn get_slot_idx(&self, offset: u32) -> Option<usize> {
-        self.inner.get(&offset)?.slot_idx
+    pub fn record_slot_idx(&mut self, key: AnnKey, slot_idx: usize) {
+        self.inner.entry(key).or_default().slot_idx = Some(slot_idx);
     }
 
-    pub fn record_intrinsic(&mut self, offset: u32, wire_byte: u8) {
-        self.inner.entry(offset).or_default().intrinsic = Some(wire_byte);
+    pub fn get_slot_idx(&self, key: AnnKey) -> Option<usize> {
+        self.inner.get(&key)?.slot_idx
     }
 
-    pub fn get_intrinsic(&self, offset: u32) -> Option<u8> {
-        self.inner.get(&offset)?.intrinsic
+    pub fn record_intrinsic(&mut self, key: AnnKey, wire_byte: u8) {
+        self.inner.entry(key).or_default().intrinsic = Some(wire_byte);
     }
 
-    pub fn record_native_op(&mut self, offset: u32, op_id: u64) {
-        self.inner.entry(offset).or_default().native_op = Some(op_id);
+    pub fn get_intrinsic(&self, key: AnnKey) -> Option<u8> {
+        self.inner.get(&key)?.intrinsic
     }
 
-    pub fn get_native_op(&self, offset: u32) -> Option<u64> {
-        self.inner.get(&offset)?.native_op
+    pub fn record_native_op(&mut self, key: AnnKey, op_id: u64) {
+        self.inner.entry(key).or_default().native_op = Some(op_id);
     }
 
-    /// Mark the computed-member expression at `offset` as a typed-array index access.
-    pub fn record_array_index(&mut self, offset: u32) {
-        self.inner.entry(offset).or_default().array_index = true;
+    pub fn get_native_op(&self, key: AnnKey) -> Option<u64> {
+        self.inner.get(&key)?.native_op
     }
 
-    /// Returns `true` when the object of the computed-member at `offset` is a known Array.
-    pub fn get_array_index(&self, offset: u32) -> bool {
-        self.inner.get(&offset).map_or(false, |a| a.array_index)
+    /// Mark the computed-member expression as a typed-array index access.
+    pub fn record_array_index(&mut self, key: AnnKey) {
+        self.inner.entry(key).or_default().array_index = true;
     }
 
-    /// Record the codegen projection of the expression's value type.
-    pub fn record_cg_ty(&mut self, offset: u32, ty: crate::cg_ty::CgTy) {
-        self.inner.entry(offset).or_default().cg_ty = Some(ty);
+    /// Whether the object of the computed-member is a known Array.
+    pub fn get_array_index(&self, key: AnnKey) -> bool {
+        self.inner.get(&key).map_or(false, |a| a.array_index)
     }
 
-    pub fn get_cg_ty(&self, offset: u32) -> Option<&crate::cg_ty::CgTy> {
-        self.inner.get(&offset)?.cg_ty.as_ref()
+    /// Record the codegen projection of the annotated place's value type.
+    pub fn record_cg_ty(&mut self, key: AnnKey, ty: crate::cg_ty::CgTy) {
+        self.inner.entry(key).or_default().cg_ty = Some(ty);
     }
 
-    /// Mark the member expression at `offset` as a statically-known class fixed field slot access.
-    pub fn record_fixed_field_slot(&mut self, offset: u32, slot: u16) {
-        self.inner.entry(offset).or_default().fixed_field_slot = Some(slot);
+    pub fn get_cg_ty(&self, key: AnnKey) -> Option<&crate::cg_ty::CgTy> {
+        self.inner.get(&key)?.cg_ty.as_ref()
     }
 
-    /// Returns the fixed field slot index when the member expression at `offset` is on a known class type.
-    pub fn get_fixed_field_slot(&self, offset: u32) -> Option<u16> {
-        self.inner.get(&offset)?.fixed_field_slot
+    /// Mark a member expression as a statically-known class fixed-field access.
+    pub fn record_fixed_field_slot(&mut self, key: AnnKey, slot: u16) {
+        self.inner.entry(key).or_default().fixed_field_slot = Some(slot);
+    }
+
+    pub fn get_fixed_field_slot(&self, key: AnnKey) -> Option<u16> {
+        self.inner.get(&key)?.fixed_field_slot
     }
 
     pub fn is_empty(&self) -> bool {

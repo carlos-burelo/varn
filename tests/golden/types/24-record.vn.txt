@@ -31,6 +31,6 @@
 35 | void
 36 | (...args: dynamic[]) => void
 37 | str
-## annotations (key = byte offset)
+## annotations (key names its space)
 ## reassigned names
 

@@ -436,91 +436,100 @@
 541 | dynamic[]
 542 | int
 543 | str
-## annotations (key = byte offset)
-850 | 14:10 | slot=2
-861 | 14:21 | slot=1
-997 | 18:28 | cg=Str native_op=5671629957611713757
-1230 | 22:41 | numeric=Int
-1236 | 22:47 | cg=Int intrinsic=0x10
-1299 | 23:41 | numeric=Int
-1305 | 23:47 | cg=Int intrinsic=0x10
-1372 | 24:43 | numeric=Int
-1378 | 24:49 | cg=Int intrinsic=0x10
-1444 | 25:43 | numeric=Int
-1450 | 25:49 | cg=Int intrinsic=0x10
-1515 | 27:40 | numeric=Int
-1521 | 27:46 | cg=Int intrinsic=0x10
-1583 | 28:40 | numeric=Int
-1589 | 28:46 | cg=Int intrinsic=0x10
-1651 | 29:40 | numeric=Int
-1657 | 29:46 | cg=Int intrinsic=0x10
-1781 | 32:35 | numeric=Int
-1786 | 32:40 | cg=Int intrinsic=0x10
-1843 | 33:35 | numeric=Int
-1848 | 33:40 | cg=Int intrinsic=0x10
-1906 | 34:35 | numeric=Int
-1911 | 34:40 | cg=Int intrinsic=0x10
-1971 | 35:35 | numeric=Int
-1976 | 35:40 | cg=Int intrinsic=0x10
-2041 | 36:42 | numeric=Int
-2046 | 36:47 | cg=Int intrinsic=0x10
-2110 | 37:42 | numeric=Int
-2115 | 37:47 | cg=Int intrinsic=0x10
-2415 | 43:10 | cg=Int
-2423 | 43:18 | cg=Str
-2431 | 43:26 | cg=Int
-2503 | 46:19 | cg=Int
-2522 | 47:12 | numeric=Int
-2570 | 49:16 | numeric=Int
-2602 | 50:21 | numeric=Int
-2612 | 50:31 | cg=Int intrinsic=0x10
-2643 | 51:17 | numeric=Int
-2677 | 53:17 | numeric=Int
-2687 | 53:27 | cg=Int intrinsic=0x10
-2747 | 54:17 | numeric=Int
-2757 | 54:27 | cg=Int intrinsic=0x10
-2768 | 54:38 | numeric=Int
-2813 | 55:13 | numeric=Int
-2947 | 61:17 | numeric=Int
-2989 | 62:33 | numeric=Int cg=Int
-3011 | 62:55 | numeric=Int
-3187 | 65:32 | numeric=Int cg=Int
-3212 | 65:57 | numeric=Int
-3213 | 65:58 | numeric=Int
-3375 | 68:36 | numeric=Int cg=Int
-3400 | 68:61 | numeric=Int
-3401 | 68:62 | numeric=Int
-3469 | 69:42 | numeric=Int cg=Int
-3493 | 69:66 | numeric=Int
-3494 | 69:67 | numeric=Int
-3640 | 73:26 | cg=Str native_op=5671629957611713757
-3688 | 74:26 | numeric=Int
-3692 | 74:30 | cg=Int intrinsic=0x16
-3746 | 75:27 | numeric=Int
-3750 | 75:31 | cg=Int intrinsic=0x16
-3807 | 76:33 | numeric=Int
-3811 | 76:37 | cg=Int intrinsic=0x16
-3860 | 77:30 | numeric=Int
-3864 | 77:34 | cg=Int intrinsic=0x17
-3923 | 78:31 | numeric=Int
-3927 | 78:35 | cg=Int intrinsic=0x17
-3984 | 79:29 | cg=Bool intrinsic=0x1a
-4030 | 80:28 | cg=Bool intrinsic=0x1a
-4188 | 83:37 | numeric=Int
-4193 | 83:42 | cg=Int intrinsic=0x16
-4326 | 87:24 | cg=Str
-4406 | 88:23 | cg=Str
-4466 | 89:24 | cg=Str
-4706 | 93:29 | cg=Str
-4911 | 97:42 | cg=Str
-5033 | 100:41 | cg=Str
-5610 | 109:27 | numeric=Int
-5615 | 109:32 | cg=Int
-5658 | 110:29 | cg=Str
-5668 | 110:39 | array_index
-5732 | 111:30 | cg=Str
-5742 | 111:40 | array_index
-5828 | 112:36 | cg=Str
-5838 | 112:46 | array_index
+## annotations (key names its space)
+decl 850 | 14:10 | slot=2
+decl 861 | 14:21 | slot=1
+decl 2415 | 43:10 | cg=Int
+decl 2423 | 43:18 | cg=Str
+decl 2431 | 43:26 | cg=Int
+expr 8 | ?:? | cg=Str native_op=5671629957611713757
+expr 20 | 22:41 | numeric=Int
+expr 24 | ?:? | cg=Int intrinsic=0x10
+expr 31 | 23:41 | numeric=Int
+expr 35 | ?:? | cg=Int intrinsic=0x10
+expr 42 | 24:43 | numeric=Int
+expr 46 | ?:? | cg=Int intrinsic=0x10
+expr 54 | 25:43 | numeric=Int
+expr 58 | ?:? | cg=Int intrinsic=0x10
+expr 67 | 27:40 | numeric=Int
+expr 71 | ?:? | cg=Int intrinsic=0x10
+expr 78 | 28:40 | numeric=Int
+expr 82 | ?:? | cg=Int intrinsic=0x10
+expr 90 | 29:40 | numeric=Int
+expr 94 | ?:? | cg=Int intrinsic=0x10
+expr 103 | 32:35 | numeric=Int
+expr 107 | ?:? | cg=Int intrinsic=0x10
+expr 114 | 33:35 | numeric=Int
+expr 118 | ?:? | cg=Int intrinsic=0x10
+expr 125 | 34:35 | numeric=Int
+expr 129 | ?:? | cg=Int intrinsic=0x10
+expr 136 | 35:35 | numeric=Int
+expr 140 | ?:? | cg=Int intrinsic=0x10
+expr 147 | 36:42 | numeric=Int
+expr 151 | ?:? | cg=Int intrinsic=0x10
+expr 159 | 37:42 | numeric=Int
+expr 163 | ?:? | cg=Int intrinsic=0x10
+expr 182 | ?:? | cg=Int
+expr 184 | 47:12 | numeric=Int
+expr 192 | 49:16 | numeric=Int
+expr 199 | 50:21 | numeric=Int
+expr 204 | ?:? | cg=Int intrinsic=0x10
+expr 209 | 51:17 | numeric=Int
+expr 215 | 53:17 | numeric=Int
+expr 220 | ?:? | cg=Int intrinsic=0x10
+expr 225 | 54:17 | numeric=Int
+expr 230 | ?:? | cg=Int intrinsic=0x10
+expr 231 | 54:38 | numeric=Int
+expr 237 | 55:13 | numeric=Int
+expr 244 | 61:17 | numeric=Int
+expr 251 | 62:33 | numeric=Int
+expr 252 | 62:33 | cg=Int
+expr 256 | 62:55 | numeric=Int
+expr 263 | 65:32 | numeric=Int
+expr 264 | 65:32 | cg=Int
+expr 268 | 65:57 | numeric=Int
+expr 270 | 65:58 | numeric=Int
+expr 278 | 68:36 | numeric=Int
+expr 279 | 68:36 | cg=Int
+expr 283 | 68:61 | numeric=Int
+expr 285 | 68:62 | numeric=Int
+expr 286 | 68:62 | numeric=Int
+expr 287 | 68:62 | numeric=Int
+expr 297 | 69:42 | numeric=Int
+expr 298 | 69:42 | cg=Int
+expr 302 | 69:66 | numeric=Int
+expr 304 | 69:67 | numeric=Int
+expr 305 | 69:67 | numeric=Int
+expr 306 | 69:67 | numeric=Int
+expr 307 | 69:67 | numeric=Int
+expr 320 | ?:? | cg=Str native_op=5671629957611713757
+expr 327 | 74:26 | numeric=Int
+expr 331 | ?:? | cg=Int intrinsic=0x16
+expr 338 | 75:27 | numeric=Int
+expr 342 | ?:? | cg=Int intrinsic=0x16
+expr 350 | 76:33 | numeric=Int
+expr 354 | ?:? | cg=Int intrinsic=0x16
+expr 361 | 77:30 | numeric=Int
+expr 365 | ?:? | cg=Int intrinsic=0x17
+expr 372 | 78:31 | numeric=Int
+expr 376 | ?:? | cg=Int intrinsic=0x17
+expr 387 | ?:? | cg=Bool intrinsic=0x1a
+expr 397 | ?:? | cg=Bool intrinsic=0x1a
+expr 407 | 83:37 | numeric=Int
+expr 411 | ?:? | cg=Int intrinsic=0x16
+expr 419 | 87:24 | cg=Str
+expr 430 | 88:23 | cg=Str
+expr 442 | 89:24 | cg=Str
+expr 455 | 93:29 | cg=Str
+expr 473 | 97:42 | cg=Str
+expr 488 | 100:41 | cg=Str
+expr 506 | 109:27 | numeric=Int
+expr 509 | ?:? | cg=Int
+expr 516 | 110:29 | cg=Str
+expr 518 | 110:39 | array_index
+expr 527 | 111:30 | cg=Str
+expr 529 | 111:40 | array_index
+expr 538 | 112:36 | cg=Str
+expr 540 | 112:46 | array_index
 ## reassigned names
 

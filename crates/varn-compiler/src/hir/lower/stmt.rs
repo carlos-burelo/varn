@@ -1,5 +1,6 @@
 use varn_core::ast::operators::AssignOp;
 use varn_core::ast::{Decl, ExprKind, ForInit, Pattern, Stmt, StmtKind};
+use varn_core::AnnKey;
 
 use super::*;
 
@@ -176,12 +177,12 @@ impl<'a> Lowerer<'a> {
                         }
                         if !matches!(op, AssignOp::Assign) {
                             let bop = compound_to_bin(*op)?;
-                            let ty = numeric_ty(self.ann, target.range.start.offset);
+                            let ty = numeric_ty(self.ann, AnnKey::expr(target.id));
                             let object_hir = self.lower_expr(object.as_ref(), scope)?;
                             if *computed {
                                 let index = self.lower_expr(property.as_ref(), scope)?;
                                 let value = self.lower_expr(value.as_ref(), scope)?;
-                                let is_arr = self.ann.get_array_index(target.range.start.offset);
+                                let is_arr = self.ann.get_array_index(AnnKey::expr(target.id));
                                 let current_val = HirExpr::Index {
                                     object: Box::new(object_hir.clone()),
                                     index: Box::new(index.clone()),
@@ -233,7 +234,7 @@ impl<'a> Lowerer<'a> {
                         if *computed {
                             let index = self.lower_expr(property.as_ref(), scope)?;
                             let value = self.lower_expr(value.as_ref(), scope)?;
-                            let is_arr = self.ann.get_array_index(target.range.start.offset);
+                            let is_arr = self.ann.get_array_index(AnnKey::expr(target.id));
                             out.push(HirStmt::SetIndex {
                                 object: object_hir,
                                 index,
@@ -251,7 +252,7 @@ impl<'a> Lowerer<'a> {
                             };
                             let value = self.lower_expr(value.as_ref(), scope)?;
                             if let Some(slot) =
-                                self.ann.get_fixed_field_slot(property.range.start.offset)
+                                self.ann.get_fixed_field_slot(AnnKey::expr(property.id))
                             {
                                 out.push(HirStmt::SetFixedField {
                                     object: object_hir,
@@ -279,7 +280,7 @@ impl<'a> Lowerer<'a> {
                         AssignOp::Assign => val_expr,
                         _ => {
                             let bop = compound_to_bin(*op)?;
-                            let ty = numeric_ty(self.ann, target.range.start.offset);
+                            let ty = numeric_ty(self.ann, AnnKey::expr(target.id));
                             HirExpr::Binary {
                                 op: bop,
                                 lhs: Box::new(HirExpr::Var(binding.clone())),

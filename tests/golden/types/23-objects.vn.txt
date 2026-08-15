@@ -130,41 +130,43 @@
 225 | void
 226 | (...args: dynamic[]) => void
 227 | str
-## annotations (key = byte offset)
-70 | 4:26 | cg=Array(Str) fixed_field=0
-92 | 5:9 | cg=Str
-125 | 6:14 | cg=Array(Str) fixed_field=0
-131 | 6:20 | cg=Fn native_op=17059365188679780804
-199 | 9:32 | cg=Array(Str) fixed_field=0
-205 | 9:38 | cg=Str native_op=8238581328922448208
-252 | 12:30 | cg=Class("Builder")
-265 | 12:43 | cg=Class("Builder")
-277 | 12:55 | cg=Class("Builder")
-292 | 12:70 | cg=Str
-458 | 19:14 | fixed_field=0
-482 | 20:14 | fixed_field=1
-628 | 29:14 | fixed_field=0
-654 | 30:14 | cg=Int fixed_field=1
-749 | 34:14 | fixed_field=1
-761 | 34:26 | fixed_field=0
-780 | 35:14 | fixed_field=0
-806 | 36:14 | cg=Int fixed_field=1
-814 | 36:22 | numeric=Int
-819 | 36:27 | cg=Int fixed_field=1
-871 | 38:35 | cg=Int fixed_field=1
-954 | 41:24 | fixed_field=0
-1008 | 43:17 | cg=Fn native_op=17059365188679780804
-1017 | 43:26 | fixed_field=0
-1047 | 44:23 | fixed_field=1
-1138 | 51:6 | cg=Fn
-1156 | 52:6 | cg=Fn
-1174 | 53:6 | cg=Fn
-1215 | 54:29 | numeric=Int
-1220 | 54:34 | cg=Int
-1249 | 55:17 | cg=Array(Int)
-1288 | 56:29 | numeric=Int array_index
-1291 | 56:32 | cg=Int
-1330 | 57:29 | numeric=Int array_index
-1333 | 57:32 | cg=Int
+## annotations (key names its space)
+decl 92 | 5:9 | cg=Str
+expr 10 | ?:? | cg=Array(Str) fixed_field=0
+expr 19 | ?:? | cg=Array(Str) fixed_field=0
+expr 20 | ?:? | cg=Fn native_op=17059365188679780804
+expr 31 | ?:? | cg=Array(Str) fixed_field=0
+expr 32 | ?:? | cg=Str native_op=8238581328922448208
+expr 46 | ?:? | cg=Class("Builder")
+expr 48 | ?:? | cg=Class("Builder")
+expr 50 | ?:? | cg=Class("Builder")
+expr 52 | ?:? | cg=Str
+expr 72 | ?:? | fixed_field=0
+expr 78 | ?:? | fixed_field=1
+expr 92 | ?:? | fixed_field=0
+expr 98 | ?:? | cg=Int fixed_field=1
+expr 111 | ?:? | fixed_field=1
+expr 114 | ?:? | fixed_field=0
+expr 119 | ?:? | fixed_field=0
+expr 125 | ?:? | cg=Int fixed_field=1
+expr 126 | 36:22 | numeric=Int
+expr 129 | ?:? | cg=Int fixed_field=1
+expr 136 | ?:? | cg=Int fixed_field=1
+expr 147 | ?:? | fixed_field=0
+expr 157 | ?:? | cg=Fn native_op=17059365188679780804
+expr 160 | ?:? | fixed_field=0
+expr 166 | ?:? | fixed_field=1
+expr 177 | ?:? | cg=Fn
+expr 183 | ?:? | cg=Fn
+expr 189 | ?:? | cg=Fn
+expr 195 | 54:29 | numeric=Int
+expr 198 | ?:? | cg=Int
+expr 205 | ?:? | cg=Array(Int)
+expr 210 | 56:29 | numeric=Int
+expr 211 | 56:29 | array_index
+expr 213 | 56:32 | cg=Int
+expr 219 | 57:29 | numeric=Int
+expr 220 | 57:29 | array_index
+expr 222 | 57:32 | cg=Int
 ## reassigned names
 

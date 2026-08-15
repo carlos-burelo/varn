@@ -1,5 +1,6 @@
 use rust_decimal::Decimal;
 use std::rc::Rc;
+use varn_core::AnnKey;
 
 use std::str::FromStr;
 
@@ -44,15 +45,14 @@ impl<'a> Lowerer<'a> {
                     let object_hir = self.lower_expr(object, scope)?;
                     if *computed {
                         let index = self.lower_expr(property, scope)?;
-                        let is_array = self.ann.get_array_index(expr.range.start.offset);
+                        let is_array = self.ann.get_array_index(AnnKey::expr(expr.id));
                         Ok(HirAssignTarget::Index {
                             object: object_hir,
                             index,
                             is_array,
                         })
                     } else {
-                        if let Some(slot) =
-                            self.ann.get_fixed_field_slot(property.range.start.offset)
+                        if let Some(slot) = self.ann.get_fixed_field_slot(AnnKey::expr(property.id))
                         {
                             return Ok(HirAssignTarget::SetFixedField {
                                 object: object_hir,
@@ -79,7 +79,7 @@ impl<'a> Lowerer<'a> {
     }
 
     pub(super) fn lower_expr(&mut self, expr: &Expr, scope: &mut Scope) -> R<HirExpr> {
-        let offset = expr.range.start.offset;
+        let key = AnnKey::expr(expr.id);
         match &expr.kind {
             ExprKind::IntLiteral { value, .. } => Ok(HirExpr::Int(*value)),
             ExprKind::FloatLiteral { value, .. } => Ok(HirExpr::Float(*value)),
@@ -88,7 +88,7 @@ impl<'a> Lowerer<'a> {
             ExprKind::NullLiteral => Ok(HirExpr::Null),
             ExprKind::This => Ok(HirExpr::This),
             ExprKind::New { callee, args, .. } => {
-                let hargs = self.lower_call_args(args, offset, scope)?;
+                let hargs = self.lower_call_args(args, key, scope)?;
                 let callee = Box::new(self.lower_expr(callee, scope)?);
                 Ok(HirExpr::Call {
                     callee,
@@ -101,7 +101,7 @@ impl<'a> Lowerer<'a> {
             ExprKind::Binary { op, left, right } => {
                 let lhs = Box::new(self.lower_expr(left, scope)?);
                 let rhs = Box::new(self.lower_expr(right, scope)?);
-                let ty = numeric_ty(self.ann, offset);
+                let ty = numeric_ty(self.ann, key);
                 Ok(HirExpr::Binary {
                     op: bin_op(*op)?,
                     lhs,
@@ -268,8 +268,8 @@ impl<'a> Lowerer<'a> {
         scope.resolve_in_current_frame(name).is_none() && !self.ann.is_reassigned_name(name)
     }
 
-    fn lower_call_args(&mut self, args: &[Arg], offset: u32, scope: &mut Scope) -> R<Vec<HirExpr>> {
-        if let Some(mapping) = self.ann.get_call_mapping(offset).cloned() {
+    fn lower_call_args(&mut self, args: &[Arg], key: AnnKey, scope: &mut Scope) -> R<Vec<HirExpr>> {
+        if let Some(mapping) = self.ann.get_call_mapping(key).cloned() {
             let mut out = Vec::with_capacity(mapping.len());
             for opt in &mapping {
                 match opt {

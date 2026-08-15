@@ -546,168 +546,194 @@
 806 | void
 807 | (...args: dynamic[]) => void
 808 | str
-## annotations (key = byte offset)
-437 | 8:10 | cg=Int
-483 | 10:7 | cg=Fn native_op=17059365188679780804
-498 | 11:7 | cg=Fn native_op=17059365188679780804
-513 | 12:7 | cg=Fn native_op=17059365188679780804
-559 | 14:21 | numeric=Int
-565 | 14:27 | cg=Int
-577 | 14:39 | numeric=Int
-601 | 15:15 | numeric=Int
-607 | 15:21 | array_index
-609 | 15:23 | cg=Int
-650 | 20:10 | cg=Int
-713 | 22:21 | numeric=Int
-724 | 22:32 | numeric=Int
-744 | 23:11 | cg=Fn native_op=17059365188679780804
-780 | 25:21 | numeric=Int
-791 | 25:32 | numeric=Int
-809 | 26:9 | array_index
-811 | 26:11 | cg=Int
-816 | 26:16 | numeric=Int
-867 | 29:21 | numeric=Int
-873 | 29:27 | cg=Int
-885 | 29:39 | numeric=Int
-909 | 30:15 | numeric=Int
-915 | 30:21 | array_index
-917 | 30:23 | cg=Int
-1147 | 38:10 | cg=Str
-1206 | 40:7 | cg=Fn native_op=17059365188679780804
-1221 | 41:7 | cg=Fn native_op=17059365188679780804
-1248 | 42:15 | array_index
-1256 | 42:23 | array_index
-1381 | 47:10 | cg=Int
-1439 | 49:7 | cg=Fn native_op=17059365188679780804
-1455 | 50:7 | cg=Fn native_op=17059365188679780804
-1476 | 51:12 | numeric=Int array_index
-1478 | 51:14 | cg=Int
-1483 | 51:19 | array_index
-1485 | 51:21 | cg=Int
-1503 | 54:10 | cg=Int
-1581 | 56:41 | numeric=Int
-1821 | 65:10 | cg=Int
-1881 | 67:7 | cg=Fn native_op=17059365188679780804
-1896 | 68:7 | cg=Fn native_op=17059365188679780804
-1911 | 69:7 | cg=Fn native_op=17059365188679780804
-1931 | 70:12 | cg=Int
-2173 | 76:10 | cg=Int
-2284 | 81:21 | numeric=Int
-2288 | 81:25 | numeric=Int
-2299 | 81:36 | numeric=Int
-2319 | 82:11 | cg=Fn native_op=17059365188679780804
-2324 | 82:16 | numeric=Int
-2342 | 83:11 | cg=Fn native_op=17059365188679780804
-2347 | 83:16 | numeric=Int
-2365 | 84:11 | cg=Fn native_op=17059365188679780804
-2403 | 86:23 | numeric=Int
-2418 | 86:38 | numeric=Int
-2456 | 87:27 | numeric=Int
-2471 | 87:42 | numeric=Int
-2536 | 89:29 | numeric=Int
-2547 | 89:40 | numeric=Int
-2579 | 90:23 | numeric=Int
-2585 | 90:29 | numeric=Int array_index
-2587 | 90:31 | numeric=Int cg=Int
-2602 | 90:46 | array_index
-2604 | 90:48 | numeric=Int cg=Int
-2645 | 92:13 | array_index
-2647 | 92:15 | numeric=Int cg=Int
-2698 | 95:12 | numeric=Int array_index
-2700 | 95:14 | cg=Int
-2705 | 95:19 | array_index
-2707 | 95:21 | numeric=Int cg=Int
-3232 | 105:10 | cg=Float
-3273 | 107:7 | cg=Fn native_op=17059365188679780804
-3350 | 111:13 | numeric=Float array_index
-3352 | 111:15 | cg=Float
-3357 | 111:20 | array_index
-3359 | 111:22 | cg=Float
-3438 | 117:10 | cg=Float
-3479 | 119:7 | cg=Fn native_op=17059365188679780804
-3563 | 123:13 | numeric=Float array_index
-3565 | 123:15 | cg=Float
-3570 | 123:20 | array_index
-3572 | 123:22 | cg=Float
-4410 | 140:10 | cg=Str
-4421 | 140:21 | cg=Str
-4479 | 142:10 | cg=Str
-4532 | 144:9 | cg=Fn native_op=17059365188679780804
-4551 | 145:9 | cg=Fn native_op=17059365188679780804
-4573 | 146:12 | cg=Str
-4584 | 146:23 | array_index
-4588 | 146:27 | cg=Int
-4607 | 149:10 | cg=Str
-4659 | 151:7 | cg=Fn native_op=17059365188679780804
-4679 | 152:12 | array_index
-4681 | 152:14 | cg=Int
-4699 | 155:10 | cg=Int
-4749 | 157:7 | cg=Fn native_op=17059365188679780804
-4769 | 158:12 | array_index
-4771 | 158:14 | cg=Int
-5185 | 166:10 | cg=Int
-5245 | 168:7 | cg=Fn native_op=17059365188679780804
-5261 | 169:7 | cg=Fn native_op=17059365188679780804
-5275 | 170:5 | array_index
-5277 | 170:7 | cg=Int
-5282 | 170:12 | numeric=Int array_index
-5284 | 170:14 | cg=Int
-5303 | 171:12 | numeric=Int array_index
-5305 | 171:14 | cg=Int
-5310 | 171:19 | array_index
-5312 | 171:21 | cg=Int
-5319 | 171:28 | cg=Int
-5341 | 174:10 | cg=Int
-5395 | 176:7 | cg=Fn native_op=17059365188679780804
-5411 | 177:7 | cg=Fn native_op=17059365188679780804
-5425 | 178:5 | array_index
-5427 | 178:7 | cg=Int
-5432 | 178:12 | numeric=Int array_index
-5434 | 178:14 | cg=Int
-5453 | 179:12 | numeric=Int array_index
-5455 | 179:14 | cg=Int
-5460 | 179:19 | array_index
-5462 | 179:21 | cg=Int
-5469 | 179:28 | cg=Int
-5491 | 182:10 | cg=Float
-5512 | 182:31 | cg=Array(Float)
-5582 | 184:21 | numeric=Int
-5590 | 184:29 | cg=Int
-5602 | 184:41 | numeric=Int
-5628 | 185:17 | numeric=Float
-5636 | 185:25 | array_index
-5640 | 185:29 | cg=Float
-5951 | 194:10 | cg=Str
-6003 | 196:10 | cg=Fn native_op=17059365188679780804
-6021 | 197:10 | cg=Fn native_op=17059365188679780804
-6062 | 199:10 | cg=Fn native_op=17059365188679780804
-6134 | 200:11 | cg=Fn native_op=17059365188679780804
-6184 | 202:12 | cg=Fn native_op=17059365188679780804
-6206 | 203:12 | cg=Fn native_op=17059365188679780804
-6233 | 204:15 | array_index
-6243 | 204:25 | array_index
-6253 | 204:35 | array_index
-6263 | 204:45 | array_index
-6279 | 204:61 | cg=Int
-6288 | 204:70 | numeric=Float array_index
-6295 | 204:77 | cg=Float
-6300 | 204:82 | array_index
-6307 | 204:89 | cg=Float
-6404 | 209:42 | numeric=Int cg=Int
-6469 | 210:42 | numeric=Int cg=Int
-6539 | 211:43 | cg=Str
-6623 | 212:42 | numeric=Int cg=Int
-6696 | 213:44 | numeric=Int cg=Int
-6775 | 214:42 | numeric=Int cg=Int
-6852 | 215:48 | numeric=Float cg=Float
-6918 | 216:48 | numeric=Float cg=Float
-6979 | 217:43 | numeric=Int cg=Int
-7001 | 217:65 | cg=Int
-7062 | 218:43 | numeric=Int cg=Int
-7131 | 219:43 | numeric=Float cg=Float
-7216 | 220:43 | cg=Str
-7360 | 224:9 | cg=Str
-7388 | 225:9 | cg=Str
-7419 | 226:9 | cg=Int
+## annotations (key names its space)
+decl 437 | 8:10 | cg=Int
+decl 650 | 20:10 | cg=Int
+decl 1147 | 38:10 | cg=Str
+decl 1381 | 47:10 | cg=Int
+decl 1503 | 54:10 | cg=Int
+decl 1821 | 65:10 | cg=Int
+decl 2173 | 76:10 | cg=Int
+decl 3232 | 105:10 | cg=Float
+decl 3438 | 117:10 | cg=Float
+decl 4410 | 140:10 | cg=Str
+decl 4421 | 140:21 | cg=Str
+decl 4479 | 142:10 | cg=Str
+decl 4607 | 149:10 | cg=Str
+decl 4699 | 155:10 | cg=Int
+decl 5185 | 166:10 | cg=Int
+decl 5341 | 174:10 | cg=Int
+decl 5491 | 182:10 | cg=Float
+decl 5512 | 182:31 | cg=Array(Float)
+decl 5951 | 194:10 | cg=Str
+expr 12 | ?:? | cg=Fn native_op=17059365188679780804
+expr 18 | ?:? | cg=Fn native_op=17059365188679780804
+expr 24 | ?:? | cg=Fn native_op=17059365188679780804
+expr 30 | 14:21 | numeric=Int
+expr 34 | ?:? | cg=Int
+expr 37 | 14:39 | numeric=Int
+expr 44 | 15:15 | numeric=Int
+expr 46 | 15:21 | array_index
+expr 48 | 15:23 | cg=Int
+expr 59 | 22:21 | numeric=Int
+expr 64 | 22:32 | numeric=Int
+expr 72 | ?:? | cg=Fn native_op=17059365188679780804
+expr 75 | 25:21 | numeric=Int
+expr 80 | 25:32 | numeric=Int
+expr 86 | 26:9 | array_index
+expr 88 | 26:11 | cg=Int
+expr 89 | 26:16 | numeric=Int
+expr 96 | 29:21 | numeric=Int
+expr 100 | ?:? | cg=Int
+expr 103 | 29:39 | numeric=Int
+expr 110 | 30:15 | numeric=Int
+expr 112 | 30:21 | array_index
+expr 114 | 30:23 | cg=Int
+expr 128 | ?:? | cg=Fn native_op=17059365188679780804
+expr 134 | ?:? | cg=Fn native_op=17059365188679780804
+expr 138 | 42:15 | array_index
+expr 141 | 42:23 | array_index
+expr 155 | ?:? | cg=Fn native_op=17059365188679780804
+expr 161 | ?:? | cg=Fn native_op=17059365188679780804
+expr 164 | 51:12 | numeric=Int
+expr 165 | 51:12 | array_index
+expr 167 | 51:14 | cg=Int
+expr 168 | 51:19 | array_index
+expr 170 | 51:21 | cg=Int
+expr 186 | 56:41 | numeric=Int
+expr 211 | ?:? | cg=Fn native_op=17059365188679780804
+expr 217 | ?:? | cg=Fn native_op=17059365188679780804
+expr 223 | ?:? | cg=Fn native_op=17059365188679780804
+expr 226 | 70:12 | cg=Int
+expr 246 | 81:21 | numeric=Int
+expr 248 | 81:25 | numeric=Int
+expr 253 | 81:36 | numeric=Int
+expr 261 | ?:? | cg=Fn native_op=17059365188679780804
+expr 262 | 82:16 | numeric=Int
+expr 269 | ?:? | cg=Fn native_op=17059365188679780804
+expr 270 | 83:16 | numeric=Int
+expr 277 | ?:? | cg=Fn native_op=17059365188679780804
+expr 280 | 86:23 | numeric=Int
+expr 285 | 86:38 | numeric=Int
+expr 290 | 87:27 | numeric=Int
+expr 295 | 87:42 | numeric=Int
+expr 303 | 89:29 | numeric=Int
+expr 308 | 89:40 | numeric=Int
+expr 315 | 90:23 | numeric=Int
+expr 317 | 90:29 | numeric=Int
+expr 318 | 90:29 | array_index
+expr 320 | 90:31 | numeric=Int cg=Int
+expr 321 | 90:31 | numeric=Int
+expr 325 | 90:46 | array_index
+expr 327 | 90:48 | numeric=Int cg=Int
+expr 328 | 90:48 | numeric=Int
+expr 334 | 92:13 | array_index
+expr 336 | 92:15 | numeric=Int cg=Int
+expr 337 | 92:15 | numeric=Int
+expr 343 | 95:12 | numeric=Int
+expr 344 | 95:12 | array_index
+expr 346 | 95:14 | cg=Int
+expr 347 | 95:19 | array_index
+expr 349 | 95:21 | numeric=Int cg=Int
+expr 350 | 95:21 | numeric=Int
+expr 365 | ?:? | cg=Fn native_op=17059365188679780804
+expr 380 | 111:13 | numeric=Float
+expr 381 | 111:13 | array_index
+expr 383 | 111:15 | cg=Float
+expr 384 | 111:20 | array_index
+expr 386 | 111:22 | cg=Float
+expr 400 | ?:? | cg=Fn native_op=17059365188679780804
+expr 415 | 123:13 | numeric=Float
+expr 416 | 123:13 | array_index
+expr 418 | 123:15 | cg=Float
+expr 419 | 123:20 | array_index
+expr 421 | 123:22 | cg=Float
+expr 443 | ?:? | cg=Fn native_op=17059365188679780804
+expr 449 | ?:? | cg=Fn native_op=17059365188679780804
+expr 452 | 146:12 | cg=Str
+expr 454 | 146:23 | array_index
+expr 456 | 146:27 | cg=Int
+expr 468 | ?:? | cg=Fn native_op=17059365188679780804
+expr 471 | 152:12 | array_index
+expr 473 | 152:14 | cg=Int
+expr 485 | ?:? | cg=Fn native_op=17059365188679780804
+expr 492 | 158:12 | array_index
+expr 494 | 158:14 | cg=Int
+expr 510 | ?:? | cg=Fn native_op=17059365188679780804
+expr 516 | ?:? | cg=Fn native_op=17059365188679780804
+expr 520 | 170:5 | array_index
+expr 522 | 170:7 | cg=Int
+expr 523 | 170:12 | numeric=Int
+expr 524 | 170:12 | array_index
+expr 526 | 170:14 | cg=Int
+expr 529 | 171:12 | numeric=Int
+expr 530 | 171:12 | numeric=Int
+expr 531 | 171:12 | array_index
+expr 533 | 171:14 | cg=Int
+expr 534 | 171:19 | array_index
+expr 536 | 171:21 | cg=Int
+expr 539 | ?:? | cg=Int
+expr 551 | ?:? | cg=Fn native_op=17059365188679780804
+expr 557 | ?:? | cg=Fn native_op=17059365188679780804
+expr 561 | 178:5 | array_index
+expr 563 | 178:7 | cg=Int
+expr 564 | 178:12 | numeric=Int
+expr 565 | 178:12 | array_index
+expr 567 | 178:14 | cg=Int
+expr 570 | 179:12 | numeric=Int
+expr 571 | 179:12 | numeric=Int
+expr 572 | 179:12 | array_index
+expr 574 | 179:14 | cg=Int
+expr 575 | 179:19 | array_index
+expr 577 | 179:21 | cg=Int
+expr 580 | ?:? | cg=Int
+expr 589 | 184:21 | numeric=Int
+expr 593 | ?:? | cg=Int
+expr 596 | 184:41 | numeric=Int
+expr 603 | 185:17 | numeric=Float
+expr 605 | 185:25 | array_index
+expr 607 | 185:29 | cg=Float
+expr 621 | ?:? | cg=Fn native_op=17059365188679780804
+expr 627 | ?:? | cg=Fn native_op=17059365188679780804
+expr 637 | ?:? | cg=Fn native_op=17059365188679780804
+expr 643 | ?:? | cg=Fn native_op=17059365188679780804
+expr 652 | ?:? | cg=Fn native_op=17059365188679780804
+expr 658 | ?:? | cg=Fn native_op=17059365188679780804
+expr 663 | 204:15 | array_index
+expr 666 | 204:25 | array_index
+expr 669 | 204:35 | array_index
+expr 672 | 204:45 | array_index
+expr 677 | ?:? | cg=Int
+expr 678 | 204:70 | numeric=Float
+expr 679 | 204:70 | array_index
+expr 681 | 204:77 | cg=Float
+expr 682 | 204:82 | array_index
+expr 684 | 204:89 | cg=Float
+expr 697 | 209:42 | numeric=Int
+expr 698 | 209:42 | cg=Int
+expr 705 | 210:42 | numeric=Int
+expr 706 | 210:42 | cg=Int
+expr 714 | 211:43 | cg=Str
+expr 721 | 212:42 | numeric=Int
+expr 722 | 212:42 | cg=Int
+expr 729 | 213:44 | numeric=Int
+expr 730 | 213:44 | cg=Int
+expr 737 | 214:42 | numeric=Int
+expr 738 | 214:42 | cg=Int
+expr 745 | 215:48 | numeric=Float
+expr 746 | 215:48 | cg=Float
+expr 753 | 216:48 | numeric=Float
+expr 754 | 216:48 | cg=Float
+expr 761 | 217:43 | numeric=Int
+expr 762 | 217:43 | cg=Int
+expr 764 | 217:65 | cg=Int
+expr 770 | 218:43 | numeric=Int
+expr 771 | 218:43 | cg=Int
+expr 778 | 219:43 | numeric=Float
+expr 779 | 219:43 | cg=Float
+expr 790 | 220:43 | cg=Str
+expr 797 | 224:9 | cg=Str
+expr 800 | 225:9 | cg=Str
+expr 803 | 226:9 | cg=Int
 ## reassigned names
 

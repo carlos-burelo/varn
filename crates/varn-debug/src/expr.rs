@@ -116,13 +116,32 @@ pub fn render_check_types(program: &Program, source: &str, check: &CheckResult) 
         let _ = writeln!(out, "{id} | {}", entry.ty);
     }
 
-    let _ = writeln!(out, "## annotations (key = byte offset)");
-    let mut by_offset: Vec<(&u32, &varn_core::ExprAnnotation)> =
+    let _ = writeln!(out, "## annotations (key names its space)");
+    let mut anns: Vec<(&varn_core::AnnKey, &varn_core::ExprAnnotation)> =
         check.type_annotations.entries().collect();
-    by_offset.sort_by_key(|(off, _)| **off);
-    for (offset, ann) in by_offset {
-        let (line, col) = line_col(source, *offset);
-        let _ = writeln!(out, "{offset} | {line}:{col} | {}", render_annotation(ann));
+    // Declarations first, then expressions, each by their own number. The two
+    // are different spaces, so there is no single ordering that mixes them
+    // meaningfully — printing them apart is the honest rendering.
+    anns.sort_by_key(|(k, _)| match k {
+        varn_core::AnnKey::Decl(off) => (0u8, *off),
+        varn_core::AnnKey::Expr(id) => (1u8, *id),
+    });
+    for (key, ann) in anns {
+        let (label, num, offset) = match key {
+            varn_core::AnnKey::Decl(off) => ("decl", *off, Some(*off)),
+            varn_core::AnnKey::Expr(id) => ("expr", *id, check.expr_table.get(id).map(|e| e.start)),
+        };
+        let where_ = match offset {
+            Some(off) => {
+                let (line, col) = line_col(source, off);
+                format!("{line}:{col}")
+            }
+            // An expression the checker annotated but never typed. Worth
+            // seeing rather than hiding: it means the two passes disagree
+            // about which nodes exist.
+            None => "?:?".to_owned(),
+        };
+        let _ = writeln!(out, "{label} {num} | {where_} | {}", render_annotation(ann));
     }
 
     let _ = writeln!(out, "## reassigned names");

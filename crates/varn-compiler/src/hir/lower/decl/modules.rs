@@ -2,6 +2,7 @@
 //! and exports.
 
 use std::rc::Rc;
+use varn_core::AnnKey;
 
 use varn_core::ast::decl::{
     ExportDecl, ExportDefaultDecl, ExtensionDecl, ExtensionMember, ImportDecl, ImportSpecifier,
@@ -166,7 +167,7 @@ impl<'a> Lowerer<'a> {
                     (local.clone(), HirImportKind::Namespace, range.start.offset)
                 }
             };
-            let slot = self.ann.get_slot_idx(off).map(|s| s as u16);
+            let slot = self.ann.get_slot_idx(AnnKey::decl(off)).map(|s| s as u16);
             specs.push(HirImportSpec { local, kind, slot });
         }
         Ok(HirStmt::Import {
@@ -212,7 +213,7 @@ impl<'a> Lowerer<'a> {
                             .export_names
                             .iter()
                             .position(|n| &**n == "default")
-                            .or_else(|| self.ann.get_slot_idx(range.start.offset))
+                            .or_else(|| self.ann.get_slot_idx(AnnKey::decl(range.start.offset)))
                             .map(|p| p as u16);
                         if let Some(slot) = slot {
                             out.push(HirStmt::StoreExport {
@@ -243,7 +244,7 @@ impl<'a> Lowerer<'a> {
                             .export_names
                             .iter()
                             .position(|n| &**n == "default")
-                            .or_else(|| self.ann.get_slot_idx(range.start.offset))
+                            .or_else(|| self.ann.get_slot_idx(AnnKey::decl(range.start.offset)))
                             .map(|p| p as u16);
                         if let Some(slot) = slot {
                             out.push(HirStmt::StoreExport { name, slot });
@@ -257,7 +258,7 @@ impl<'a> Lowerer<'a> {
                         .export_names
                         .iter()
                         .position(|n| &**n == "default")
-                        .or_else(|| self.ann.get_slot_idx(range.start.offset))
+                        .or_else(|| self.ann.get_slot_idx(AnnKey::decl(range.start.offset)))
                         .map(|p| p as u16);
                     out.push(HirStmt::ExportDefaultExpr { value, slot });
                     Ok(())
@@ -274,13 +275,13 @@ impl<'a> Lowerer<'a> {
                     let binding = self.resolve(&spec.local, scope);
                     let local_slot = self
                         .ann
-                        .get_slot_idx(spec.range.start.offset)
+                        .get_slot_idx(AnnKey::decl(spec.range.start.offset))
                         .map(|s| s as u16);
                     let exported_slot = self
                         .export_names
                         .iter()
                         .position(|n| &**n == &*spec.exported)
-                        .or_else(|| self.ann.get_slot_idx(spec.range.start.offset))
+                        .or_else(|| self.ann.get_slot_idx(AnnKey::decl(spec.range.start.offset)))
                         .map(|s| s as u16);
                     specs.push(HirExportSpec {
                         binding,
@@ -306,7 +307,7 @@ impl<'a> Lowerer<'a> {
                     self.export_names
                         .iter()
                         .position(|n| **n == **alias_name)
-                        .or_else(|| self.ann.get_slot_idx(range.start.offset))
+                        .or_else(|| self.ann.get_slot_idx(AnnKey::decl(range.start.offset)))
                         .map(|s| s as u16)
                 });
                 out.push(HirStmt::ExportAll {
@@ -324,7 +325,11 @@ impl<'a> Lowerer<'a> {
             .iter()
             .position(|n| **n == *name)
             .map(|p| p as u16)
-            .or_else(|| self.ann.get_slot_idx(offset).map(|s| s as u16))
+            .or_else(|| {
+                self.ann
+                    .get_slot_idx(AnnKey::decl(offset))
+                    .map(|s| s as u16)
+            })
     }
 }
 

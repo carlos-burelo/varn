@@ -1,12 +1,13 @@
 use varn_core::ast::operators::AssignOp;
 use varn_core::ast::{Expr, ExprKind};
+use varn_core::AnnKey;
 
 use super::*;
 
 impl<'a> Lowerer<'a> {
     /// Assignment (plain, compound, destructuring) and update expressions.
     pub(super) fn lower_assign_expr(&mut self, expr: &Expr, scope: &mut Scope) -> R<HirExpr> {
-        let offset = expr.range.start.offset;
+        let key = AnnKey::expr(expr.id);
         match &expr.kind {
             ExprKind::Assign { op, target, value } => {
                 if let ExprKind::Member {
@@ -35,7 +36,7 @@ impl<'a> Lowerer<'a> {
                                 });
                             } else {
                                 let bop = compound_to_bin(*op)?;
-                                let ty = numeric_ty(self.ann, target.range.start.offset);
+                                let ty = numeric_ty(self.ann, AnnKey::expr(target.id));
                                 let current_val = HirExpr::Index {
                                     object: Box::new(HirExpr::Super),
                                     index: Box::new(index.clone()),
@@ -72,7 +73,7 @@ impl<'a> Lowerer<'a> {
                                 });
                             } else {
                                 let bop = compound_to_bin(*op)?;
-                                let ty = numeric_ty(self.ann, target.range.start.offset);
+                                let ty = numeric_ty(self.ann, AnnKey::expr(target.id));
                                 let current_val = HirExpr::SuperMember { name: name.clone() };
                                 let new_val = HirExpr::Binary {
                                     op: bop,
@@ -98,12 +99,12 @@ impl<'a> Lowerer<'a> {
                             AssignOp::NullishAssign => HirLogicalOp::Nullish,
                             _ => unreachable!(),
                         };
-                        let ty = numeric_ty(self.ann, target.range.start.offset);
+                        let ty = numeric_ty(self.ann, AnnKey::expr(target.id));
                         let object_hir = self.lower_expr(object, scope)?;
                         if *computed {
                             let index = self.lower_expr(property, scope)?;
                             let value = self.lower_expr(value, scope)?;
-                            let is_arr = self.ann.get_array_index(target.range.start.offset);
+                            let is_arr = self.ann.get_array_index(AnnKey::expr(target.id));
                             let current_val = HirExpr::Index {
                                 object: Box::new(object_hir.clone()),
                                 index: Box::new(index.clone()),
@@ -156,12 +157,12 @@ impl<'a> Lowerer<'a> {
                     }
                     if !matches!(op, AssignOp::Assign) {
                         let bop = compound_to_bin(*op)?;
-                        let ty = numeric_ty(self.ann, target.range.start.offset);
+                        let ty = numeric_ty(self.ann, AnnKey::expr(target.id));
                         let object_hir = self.lower_expr(object, scope)?;
                         if *computed {
                             let index = self.lower_expr(property, scope)?;
                             let value = self.lower_expr(value, scope)?;
-                            let is_arr = self.ann.get_array_index(target.range.start.offset);
+                            let is_arr = self.ann.get_array_index(AnnKey::expr(target.id));
                             let current_val = HirExpr::Index {
                                 object: Box::new(object_hir.clone()),
                                 index: Box::new(index.clone()),
@@ -217,7 +218,7 @@ impl<'a> Lowerer<'a> {
                     let object_hir = self.lower_expr(object, scope)?;
                     let tgt = if *computed {
                         let index = self.lower_expr(property, scope)?;
-                        let is_array = self.ann.get_array_index(target.range.start.offset);
+                        let is_array = self.ann.get_array_index(AnnKey::expr(target.id));
                         HirAssignTarget::Index {
                             object: object_hir,
                             index,
@@ -273,7 +274,7 @@ impl<'a> Lowerer<'a> {
                     AssignOp::Assign => val_expr,
                     _ => {
                         let bop = compound_to_bin(*op)?;
-                        let ty = numeric_ty(self.ann, offset);
+                        let ty = numeric_ty(self.ann, key);
                         HirExpr::Binary {
                             op: bop,
                             lhs: Box::new(HirExpr::Var(binding.clone())),

@@ -180,29 +180,42 @@
 198 | void
 199 | (...args: dynamic[]) => void
 200 | str
-## annotations (key = byte offset)
-27 | 1:28 | numeric=Int
-68 | 2:28 | numeric=Int
-110 | 3:28 | numeric=Int
-152 | 4:28 | numeric=Float
-194 | 5:28 | numeric=Int
-236 | 6:28 | numeric=Int
-279 | 7:28 | numeric=Int
-325 | 8:28 | numeric=Float
-345 | 8:48 | numeric=Float
-391 | 9:28 | numeric=Float
-412 | 9:49 | numeric=Float
-459 | 10:28 | numeric=Int
-500 | 11:28 | numeric=Int
-541 | 12:28 | numeric=Int
-545 | 12:32 | numeric=Int
-587 | 13:28 | numeric=Int
-588 | 13:29 | numeric=Int
-635 | 14:28 | numeric=Int
-680 | 15:28 | numeric=Int
-725 | 16:28 | numeric=Int
-770 | 17:28 | numeric=Int
-809 | 18:28 | numeric=Int
-852 | 19:28 | numeric=Int
+## annotations (key names its space)
+expr 5 | 1:28 | numeric=Int
+expr 6 | 1:28 | numeric=Int
+expr 14 | 2:28 | numeric=Int
+expr 15 | 2:28 | numeric=Int
+expr 24 | 3:28 | numeric=Int
+expr 25 | 3:28 | numeric=Int
+expr 33 | 4:28 | numeric=Float
+expr 34 | 4:28 | numeric=Int
+expr 42 | 5:28 | numeric=Int
+expr 43 | 5:28 | numeric=Int
+expr 51 | 6:28 | numeric=Int
+expr 52 | 6:28 | numeric=Int
+expr 62 | 7:28 | numeric=Int
+expr 63 | 7:28 | numeric=Int
+expr 72 | 8:28 | numeric=Float
+expr 73 | 8:28 | numeric=Float
+expr 77 | 8:48 | numeric=Float
+expr 78 | 8:48 | numeric=Float
+expr 87 | 9:28 | numeric=Float
+expr 88 | 9:28 | numeric=Float
+expr 92 | 9:49 | numeric=Float
+expr 93 | 9:49 | numeric=Float
+expr 101 | 10:28 | numeric=Int
+expr 111 | 11:28 | numeric=Int
+expr 121 | 12:28 | numeric=Int
+expr 122 | 12:28 | numeric=Int
+expr 124 | 12:32 | numeric=Int
+expr 132 | 13:28 | numeric=Int
+expr 133 | 13:28 | numeric=Int
+expr 135 | 13:29 | numeric=Int
+expr 144 | 14:28 | numeric=Int
+expr 154 | 15:28 | numeric=Int
+expr 164 | 16:28 | numeric=Int
+expr 174 | 17:28 | numeric=Int
+expr 183 | 18:28 | numeric=Int
+expr 192 | 19:28 | numeric=Int
 ## reassigned names
 

@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use varn_core::AnnKey;
 
 use varn_core::ast::decl::{ExportDecl, ImportSpecifier};
 use varn_core::ast::operators::{AssignOp, BinaryOp, LogicalOp, UnaryOp, UpdateOp};
@@ -219,8 +220,8 @@ impl<'a> Lowerer<'a> {
     /// The codegen value type the checker recorded at `offset`
     /// (see the key convention in `checker_annotations`), interned into
     /// this module's `TyTable`. Absent annotation means `Dynamic`.
-    pub(super) fn value_ty(&mut self, offset: u32) -> HirType {
-        match self.ann.get_cg_ty(offset) {
+    pub(super) fn value_ty(&mut self, key: AnnKey) -> HirType {
+        match self.ann.get_cg_ty(key) {
             Some(cg) => self.ty_table.from_cg(cg),
             None => HirType::Dynamic,
         }
@@ -401,8 +402,8 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
     })
 }
 
-fn numeric_ty(ann: &TypeAnnotations, offset: u32) -> HirType {
-    match ann.get_numeric(offset) {
+fn numeric_ty(ann: &TypeAnnotations, key: AnnKey) -> HirType {
+    match ann.get_numeric(key) {
         Some(NumericKind::Int) => HirType::Int,
         Some(NumericKind::Float) => HirType::Float,
         _ => HirType::Dynamic,

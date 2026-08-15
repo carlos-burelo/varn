@@ -17,6 +17,7 @@ impl Checker {
         args: &[Arg],
         type_args: &[TypeNode],
         range: &SourceRange,
+        call_id: varn_core::ast::AstId,
         bind: &BindResult,
     ) {
         self.check_expr(callee, bind);
@@ -62,7 +63,7 @@ impl Checker {
         self.check_call_args_with_context(args, &params_for_context, bind);
 
         if let TypeKind::Fn(crate::types::FunctionType { params, .. }) = &effective_callee_ty.0 {
-            self.validate_call_arguments(args, params, range, bind);
+            self.validate_call_arguments(args, params, range, call_id, bind);
         }
 
         self.check_type_arg_constraints(callee, type_args, range, bind);
@@ -133,6 +134,7 @@ impl Checker {
         args: &[Arg],
         params: &[FunctionParam],
         range: &SourceRange,
+        call_id: varn_core::ast::AstId,
         bind: &BindResult,
     ) {
         let (call_info, extra_diags) = analyze_call_args(args, range);
@@ -140,7 +142,14 @@ impl Checker {
         let has_named = !call_info.named_labels.is_empty();
 
         let has_error = if has_named {
-            self.validate_named_call_arguments(args, params, &call_info.named_labels, range, bind)
+            self.validate_named_call_arguments(
+                args,
+                params,
+                &call_info.named_labels,
+                range,
+                call_id,
+                bind,
+            )
         } else {
             self.validate_positional_call_arguments(args, params, range, bind)
         };
@@ -183,6 +192,7 @@ impl Checker {
         params: &[FunctionParam],
         named_labels: &FxHashSet<&str>,
         range: &SourceRange,
+        call_id: varn_core::ast::AstId,
         bind: &BindResult,
     ) -> bool {
         let mut positional_param_idx = 0usize;
@@ -261,7 +271,9 @@ impl Checker {
             }
         }
 
-        self.call_mappings.insert(range.start.offset, mapping);
+        // Keyed by the CALL's ast id. It used to be the call's byte offset,
+        // which a nested expression starting at the same byte would share.
+        self.call_mappings.insert(call_id, mapping);
 
         has_error
     }

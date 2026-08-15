@@ -143,11 +143,11 @@
 181 | void
 182 | (...args: dynamic[]) => void
 183 | str
-## annotations (key = byte offset)
-298 | 8:24 | numeric=Int
-301 | 8:27 | cg=Int
-752 | 23:32 | cg=Str
-800 | 24:32 | numeric=Int
-803 | 24:35 | cg=Int
+## annotations (key names its space)
+expr 38 | 8:24 | numeric=Int
+expr 41 | ?:? | cg=Int
+expr 98 | ?:? | cg=Str
+expr 104 | 24:32 | numeric=Int
+expr 107 | ?:? | cg=Int
 ## reassigned names
 

@@ -194,54 +194,55 @@
 308 | void
 309 | (...args: dynamic[]) => void
 310 | str
-## annotations (key = byte offset)
-59 | 3:30 | fixed_field=0
-99 | 4:28 | fixed_field=0
-119 | 5:12 | cg=Fn
-167 | 5:60 | fixed_field=0
-255 | 10:27 | numeric=Int cg=Int
-308 | 11:27 | cg=Str
-365 | 12:27 | cg=Bool
-471 | 15:24 | cg=Str
-566 | 18:28 | numeric=Int
-573 | 18:35 | cg=Int
-610 | 19:23 | cg=Fn
-670 | 20:35 | cg=Str
-769 | 24:26 | cg=Array(Dynamic) fixed_field=0
-814 | 25:32 | cg=Array(Dynamic) fixed_field=0
-820 | 25:38 | cg=Fn native_op=17059365188679780804
-869 | 27:13 | numeric=Int
-874 | 27:18 | cg=Array(Dynamic) fixed_field=0
-880 | 27:24 | cg=Int
-927 | 28:21 | cg=Array(Dynamic) fixed_field=0
-933 | 28:27 | cg=Fn native_op=2532029292076510311
-983 | 31:13 | numeric=Int
-988 | 31:18 | cg=Array(Dynamic) fixed_field=0
-994 | 31:24 | cg=Int
-1036 | 32:16 | array_index
-1041 | 32:21 | cg=Array(Dynamic) fixed_field=0
-1047 | 32:27 | numeric=Int
-1052 | 32:32 | cg=Array(Dynamic) fixed_field=0
-1058 | 32:38 | cg=Int
-1112 | 34:35 | cg=Array(Dynamic) fixed_field=0
-1118 | 34:41 | cg=Int
-1161 | 35:34 | numeric=Int
-1166 | 35:39 | cg=Array(Dynamic) fixed_field=0
-1172 | 35:45 | cg=Int
-1261 | 39:32 | cg=Bool
-1275 | 40:5 | cg=Fn
-1288 | 41:5 | cg=Fn
-1301 | 42:5 | cg=Fn
-1335 | 43:26 | numeric=Int
-1339 | 43:30 | cg=Int
-1381 | 44:30 | cg=Nullable(Int)
-1425 | 45:30 | cg=Nullable(Int)
-1464 | 46:26 | numeric=Int
-1468 | 46:30 | cg=Int
-1510 | 48:28 | cg=Fn
-1589 | 49:45 | cg=Str
-1637 | 51:26 | cg=Fn
-1713 | 54:28 | cg=Str
-1737 | 54:52 | cg=Str intrinsic=0x20
+## annotations (key names its space)
+decl 119 | 5:12 | cg=Fn
+decl 1637 | 51:26 | cg=Fn
+expr 9 | ?:? | fixed_field=0
+expr 16 | ?:? | fixed_field=0
+expr 27 | ?:? | fixed_field=0
+expr 38 | 10:27 | numeric=Int
+expr 39 | 10:27 | cg=Int
+expr 48 | 11:27 | cg=Str
+expr 57 | 12:27 | cg=Bool
+expr 72 | 15:24 | cg=Str
+expr 86 | 18:28 | numeric=Int
+expr 90 | ?:? | cg=Int
+expr 97 | ?:? | cg=Fn
+expr 109 | ?:? | cg=Str
+expr 120 | ?:? | cg=Array(Dynamic) fixed_field=0
+expr 129 | ?:? | cg=Array(Dynamic) fixed_field=0
+expr 130 | ?:? | cg=Fn native_op=17059365188679780804
+expr 137 | 27:13 | numeric=Int
+expr 141 | ?:? | cg=Array(Dynamic) fixed_field=0
+expr 142 | ?:? | cg=Int
+expr 151 | ?:? | cg=Array(Dynamic) fixed_field=0
+expr 152 | ?:? | cg=Fn native_op=2532029292076510311
+expr 158 | 31:13 | numeric=Int
+expr 162 | ?:? | cg=Array(Dynamic) fixed_field=0
+expr 163 | ?:? | cg=Int
+expr 168 | 32:16 | array_index
+expr 171 | ?:? | cg=Array(Dynamic) fixed_field=0
+expr 172 | 32:27 | numeric=Int
+expr 176 | ?:? | cg=Array(Dynamic) fixed_field=0
+expr 177 | ?:? | cg=Int
+expr 185 | ?:? | cg=Array(Dynamic) fixed_field=0
+expr 186 | ?:? | cg=Int
+expr 190 | 35:34 | numeric=Int
+expr 194 | ?:? | cg=Array(Dynamic) fixed_field=0
+expr 195 | ?:? | cg=Int
+expr 207 | ?:? | cg=Bool
+expr 212 | ?:? | cg=Fn
+expr 218 | ?:? | cg=Fn
+expr 224 | ?:? | cg=Fn
+expr 230 | 43:26 | numeric=Int
+expr 233 | ?:? | cg=Int
+expr 243 | ?:? | cg=Nullable(Int)
+expr 253 | ?:? | cg=Nullable(Int)
+expr 259 | 46:26 | numeric=Int
+expr 262 | ?:? | cg=Int
+expr 269 | ?:? | cg=Fn
+expr 283 | ?:? | cg=Str
+expr 298 | 54:28 | cg=Str
+expr 304 | ?:? | cg=Str intrinsic=0x20
 ## reassigned names
 

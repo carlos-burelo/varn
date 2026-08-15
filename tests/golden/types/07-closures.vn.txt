@@ -98,29 +98,36 @@
 143 | void
 144 | (...args: dynamic[]) => void
 145 | str
-## annotations (key = byte offset)
-11 | 2:10 | cg=Fn
-21 | 2:20 | cg=Int
-72 | 3:24 | numeric=Int
-95 | 5:14 | cg=Fn
-123 | 6:15 | cg=Fn
-163 | 7:26 | numeric=Int cg=Int
-204 | 8:26 | numeric=Int cg=Int
-252 | 9:31 | numeric=Int cg=Int
-264 | 9:43 | cg=Int
-286 | 11:10 | cg=Fn
-361 | 14:13 | numeric=Int
-409 | 18:14 | cg=Fn
-437 | 19:14 | cg=Fn
-478 | 20:27 | numeric=Int cg=Int
-519 | 21:27 | numeric=Int cg=Int
-560 | 22:27 | numeric=Int cg=Int
-586 | 24:10 | cg=Fn
-603 | 24:27 | cg=Fn
-618 | 24:42 | cg=Fn
-708 | 27:28 | numeric=Int
-742 | 28:28 | numeric=Int
-767 | 29:19 | cg=Fn
-807 | 30:19 | numeric=Int cg=Int
+## annotations (key names its space)
+decl 11 | 2:10 | cg=Fn
+decl 21 | 2:20 | cg=Int
+decl 286 | 11:10 | cg=Fn
+decl 586 | 24:10 | cg=Fn
+decl 603 | 24:27 | cg=Fn
+decl 618 | 24:42 | cg=Fn
+expr 9 | 3:24 | numeric=Int
+expr 14 | 5:14 | cg=Fn
+expr 19 | 6:15 | cg=Fn
+expr 26 | 7:26 | numeric=Int
+expr 27 | 7:26 | cg=Int
+expr 35 | 8:26 | numeric=Int
+expr 36 | 8:26 | cg=Int
+expr 44 | 9:31 | numeric=Int
+expr 45 | 9:31 | cg=Int
+expr 48 | 9:43 | cg=Int
+expr 65 | 14:13 | numeric=Int
+expr 72 | 18:14 | cg=Fn
+expr 76 | 19:14 | cg=Fn
+expr 82 | 20:27 | numeric=Int
+expr 83 | 20:27 | cg=Int
+expr 90 | 21:27 | numeric=Int
+expr 91 | 21:27 | cg=Int
+expr 98 | 22:27 | numeric=Int
+expr 99 | 22:27 | cg=Int
+expr 118 | 27:28 | numeric=Int
+expr 124 | 28:28 | numeric=Int
+expr 129 | 29:19 | cg=Fn
+expr 137 | 30:19 | numeric=Int
+expr 138 | 30:19 | cg=Int
 ## reassigned names
 

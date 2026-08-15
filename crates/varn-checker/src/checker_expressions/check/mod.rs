@@ -362,7 +362,7 @@ impl Checker {
                 args,
                 type_args,
                 ..
-            } => self.check_call_expr(callee, args, type_args, &expr.range, bind),
+            } => self.check_call_expr(callee, args, type_args, &expr.range, expr.id, bind),
             ExprKind::New { callee, args, .. } => {
                 if let ExprKind::Identifier { name: cls_name } = &callee.kind {
                     if self.abstract_classes.contains(cls_name.as_ref()) {

@@ -72,19 +72,20 @@
 109 | void
 110 | (...args: dynamic[]) => void
 111 | str
-## annotations (key = byte offset)
-315 | 7:28 | numeric=Float
-412 | 10:30 | cg=Str native_op=14082731281044114842
-518 | 13:31 | cg=Str
-659 | 17:39 | cg=Str
-1261 | 29:10 | cg=Float
-1272 | 29:21 | cg=Float
-1298 | 29:47 | numeric=Float
-1342 | 30:34 | numeric=Float cg=Float
-1377 | 32:10 | cg=Decimal
-1390 | 32:23 | cg=Decimal
-1467 | 33:36 | cg=Decimal
-1737 | 39:18 | numeric=Float
-1774 | 40:31 | numeric=Float
+## annotations (key names its space)
+decl 1261 | 29:10 | cg=Float
+decl 1272 | 29:21 | cg=Float
+decl 1377 | 32:10 | cg=Decimal
+decl 1390 | 32:23 | cg=Decimal
+expr 11 | 7:28 | numeric=Float
+expr 25 | ?:? | cg=Str native_op=14082731281044114842
+expr 38 | ?:? | cg=Str
+expr 54 | ?:? | cg=Str
+expr 61 | 29:47 | numeric=Float
+expr 68 | 30:34 | numeric=Float
+expr 69 | 30:34 | cg=Float
+expr 86 | 33:36 | cg=Decimal
+expr 98 | 39:18 | numeric=Float
+expr 105 | 40:31 | numeric=Float
 ## reassigned names
 

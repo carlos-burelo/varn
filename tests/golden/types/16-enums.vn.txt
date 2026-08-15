@@ -68,22 +68,22 @@
 102 | void
 103 | (...args: dynamic[]) => void
 104 | str
-## annotations (key = byte offset)
-142 | 5:34 | cg=Class("Direction")
-194 | 6:46 | cg=Class("Direction")
-239 | 7:38 | cg=Class("Direction")
-259 | 7:58 | cg=Class("Direction")
-294 | 8:28 | numeric=Int
-305 | 8:39 | cg=Class("HttpMethod")
-310 | 8:44 | cg=Int
-354 | 9:28 | numeric=Int
-364 | 9:38 | cg=Class("Direction")
-369 | 9:43 | cg=Int
-397 | 11:10 | cg=Str
-409 | 11:22 | cg=Class("Direction")
-657 | 19:24 | cg=Str
-679 | 19:46 | cg=Class("Direction")
-729 | 20:24 | cg=Str
-751 | 20:46 | cg=Class("Direction")
+## annotations (key names its space)
+decl 397 | 11:10 | cg=Str
+decl 409 | 11:22 | cg=Class("Direction")
+expr 13 | ?:? | cg=Class("Direction")
+expr 22 | ?:? | cg=Class("Direction")
+expr 30 | ?:? | cg=Class("Direction")
+expr 33 | ?:? | cg=Class("Direction")
+expr 38 | 8:28 | numeric=Int
+expr 42 | ?:? | cg=Class("HttpMethod")
+expr 43 | ?:? | cg=Int
+expr 49 | 9:28 | numeric=Int
+expr 53 | ?:? | cg=Class("Direction")
+expr 54 | ?:? | cg=Int
+expr 84 | 19:24 | cg=Str
+expr 88 | ?:? | cg=Class("Direction")
+expr 95 | 20:24 | cg=Str
+expr 99 | ?:? | cg=Class("Direction")
 ## reassigned names
 

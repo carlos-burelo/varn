@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use varn_core::AnnKey;
 
 use varn_core::ast::{Arg, Expr, ExprKind};
 
@@ -9,6 +10,7 @@ impl<'a> Lowerer<'a> {
     /// templates, which both desugar into calls.
     pub(super) fn lower_call_expr(&mut self, expr: &Expr, scope: &mut Scope) -> R<HirExpr> {
         let offset = expr.range.start.offset;
+        let key = AnnKey::expr(expr.id);
         match &expr.kind {
             ExprKind::Call {
                 callee,
@@ -17,7 +19,7 @@ impl<'a> Lowerer<'a> {
                 ..
             } => {
                 if *optional {
-                    let hargs = self.lower_call_args(args, offset, scope)?;
+                    let hargs = self.lower_call_args(args, key, scope)?;
                     let callee_hir = self.lower_expr(callee, scope)?;
                     return Ok(HirExpr::OptionalChain {
                         object: Box::new(callee_hir),
@@ -29,10 +31,10 @@ impl<'a> Lowerer<'a> {
                 // method-form codegen (VM reads args[1]; JIT inlines
                 // fabs/sqrtsd/roundsd). Keyed at the callee identifier offset.
                 if let ExprKind::Identifier { .. } = &callee.kind {
-                    if let Some(wire_byte) = self.ann.get_intrinsic(callee.range.start.offset) {
+                    if let Some(wire_byte) = self.ann.get_intrinsic(AnnKey::expr(callee.id)) {
                         let has_spread = args.iter().any(|a| matches!(a, Arg::Spread(_)));
                         if !has_spread {
-                            let hargs = self.lower_call_args(args, offset, scope)?;
+                            let hargs = self.lower_call_args(args, key, scope)?;
                             // The checker recorded the result type at the
                             // expression start for a plain call. Dropping it
                             // (this was `Dynamic`) made the result register
@@ -40,7 +42,7 @@ impl<'a> Lowerer<'a> {
                             // `derive_register_meta` met the two to `Dynamic`
                             // and every float op consuming an intrinsic fell
                             // off the native f64 path onto the generic helper.
-                            let ty = self.value_ty(expr.range.start.offset);
+                            let ty = self.value_ty(AnnKey::expr(expr.id));
                             return Ok(HirExpr::IntrinsicCall {
                                 object: Box::new(HirExpr::Null),
                                 args: hargs,
@@ -60,7 +62,7 @@ impl<'a> Lowerer<'a> {
                         property,
                         computed: false,
                         ..
-                    } => Some(property.range.start.offset),
+                    } => Some(AnnKey::expr(property.id)),
                     _ => None,
                 };
                 if let Some(wire_byte) = method_key.and_then(|o| self.ann.get_intrinsic(o)) {
@@ -73,11 +75,11 @@ impl<'a> Lowerer<'a> {
                         let has_spread = args.iter().any(|a| matches!(a, Arg::Spread(_)));
                         if !has_spread {
                             let hobj = self.lower_expr(object, scope)?;
-                            let hargs = self.lower_call_args(args, offset, scope)?;
+                            let hargs = self.lower_call_args(args, key, scope)?;
                             // Method form keys at the method-name offset (a
                             // chain shares its expression start). Same reason
                             // as the free-function arm above.
-                            let ty = self.value_ty(method_key.unwrap_or(offset));
+                            let ty = self.value_ty(method_key.unwrap_or(key));
                             return Ok(HirExpr::IntrinsicCall {
                                 object: Box::new(hobj),
                                 args: hargs,
@@ -97,7 +99,7 @@ impl<'a> Lowerer<'a> {
                         let has_spread = args.iter().any(|a| matches!(a, Arg::Spread(_)));
                         if !has_spread {
                             let hobj = self.lower_expr(object, scope)?;
-                            let hargs = self.lower_call_args(args, offset, scope)?;
+                            let hargs = self.lower_call_args(args, key, scope)?;
                             return Ok(HirExpr::NativeMethodCall {
                                 object: Box::new(hobj),
                                 args: hargs,
@@ -116,7 +118,7 @@ impl<'a> Lowerer<'a> {
                     } = &callee.kind
                     {
                         let recv = self.lower_expr(object, scope)?;
-                        let call_args = self.lower_call_args(args, offset, scope)?;
+                        let call_args = self.lower_call_args(args, key, scope)?;
                         if *mem_opt {
                             return Ok(HirExpr::OptionalChain {
                                 object: Box::new(recv),
@@ -127,7 +129,7 @@ impl<'a> Lowerer<'a> {
                     }
                 }
 
-                let hargs = self.lower_call_args(args, offset, scope)?;
+                let hargs = self.lower_call_args(args, key, scope)?;
 
                 if matches!(callee.kind, ExprKind::Super) {
                     return Ok(HirExpr::SuperCall { args: hargs });
@@ -166,7 +168,7 @@ impl<'a> Lowerer<'a> {
                                     property: HirOptionalProperty::MethodCall(name.clone(), hargs),
                                 });
                             }
-                            let ty = self.value_ty(property.range.start.offset);
+                            let ty = self.value_ty(AnnKey::expr(property.id));
                             return Ok(HirExpr::MethodCall {
                                 recv,
                                 name: name.clone(),
@@ -184,7 +186,7 @@ impl<'a> Lowerer<'a> {
                         ty: HirType::Dynamic,
                     });
                 }
-                let call_ty = self.value_ty(offset);
+                let call_ty = self.value_ty(key);
                 let callee = Box::new(self.lower_expr(callee, scope)?);
                 Ok(HirExpr::Call {
                     callee,
@@ -208,8 +210,12 @@ impl<'a> Lowerer<'a> {
                             ExprKind::Identifier { name } => name.clone(),
                             _ => return Err(OptError::Unsupported("hir: non-identifier property")),
                         };
-                        if self.ann.get_slot_idx(offset).is_some() {
-                            let slot_idx = self.ann.get_slot_idx(offset).unwrap() as u16;
+                        // Module slots are recorded on export/import DECLARATIONS, so
+                        // the lookup stays in that space — the same byte-offset
+                        // match it has always made, now said out loud.
+                        if self.ann.get_slot_idx(AnnKey::decl(offset)).is_some() {
+                            let slot_idx =
+                                self.ann.get_slot_idx(AnnKey::decl(offset)).unwrap() as u16;
                             HirOptionalProperty::ModuleSlot(slot_idx)
                         } else if let Some(mangled) = self
                             .extension_members
@@ -228,10 +234,10 @@ impl<'a> Lowerer<'a> {
                     });
                 }
                 if *computed {
-                    let ty = self.value_ty(property.range.start.offset);
+                    let ty = self.value_ty(AnnKey::expr(property.id));
                     let object = Box::new(self.lower_expr(object, scope)?);
                     let index = Box::new(self.lower_expr(property, scope)?);
-                    let is_array = self.ann.get_array_index(offset);
+                    let is_array = self.ann.get_array_index(key);
                     return Ok(HirExpr::Index {
                         object,
                         index,
@@ -240,7 +246,7 @@ impl<'a> Lowerer<'a> {
                     });
                 }
 
-                if let Some(slot_idx) = self.ann.get_slot_idx(offset) {
+                if let Some(slot_idx) = self.ann.get_slot_idx(AnnKey::decl(offset)) {
                     let object_hir = self.lower_expr(object, scope)?;
                     return Ok(HirExpr::ModuleSlot {
                         object: Box::new(object_hir),
@@ -249,8 +255,8 @@ impl<'a> Lowerer<'a> {
                     });
                 }
 
-                if let Some(slot) = self.ann.get_fixed_field_slot(property.range.start.offset) {
-                    let ty = self.value_ty(property.range.start.offset);
+                if let Some(slot) = self.ann.get_fixed_field_slot(AnnKey::expr(property.id)) {
+                    let ty = self.value_ty(AnnKey::expr(property.id));
                     let object_hir = self.lower_expr(object, scope)?;
                     return Ok(HirExpr::GetFixedField {
                         object: Box::new(object_hir),
@@ -281,7 +287,7 @@ impl<'a> Lowerer<'a> {
                     ExprKind::Identifier { name } => name.clone(),
                     _ => return Err(OptError::Unsupported("hir: non-identifier property")),
                 };
-                let ty = self.value_ty(property.range.start.offset);
+                let ty = self.value_ty(AnnKey::expr(property.id));
                 let object = Box::new(self.lower_expr(object, scope)?);
                 Ok(HirExpr::Member { object, name, ty })
             }

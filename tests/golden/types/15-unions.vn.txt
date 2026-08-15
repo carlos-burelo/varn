@@ -103,29 +103,32 @@
 176 | void
 177 | (...args: dynamic[]) => void
 178 | str
-## annotations (key = byte offset)
-71 | 5:10 | cg=Str
-251 | 12:29 | cg=Str
-323 | 13:29 | cg=Str
-370 | 15:10 | cg=Int
-377 | 15:17 | cg=Nullable(Str)
-441 | 17:14 | cg=Int
-481 | 19:30 | numeric=Int cg=Int
-531 | 20:30 | numeric=Int cg=Int
-604 | 24:17 | cg=Float
-621 | 24:34 | cg=Float fixed_field=0
-660 | 25:28 | numeric=Float
-665 | 25:33 | cg=Float fixed_field=0
-677 | 25:45 | cg=Float fixed_field=0
-740 | 29:17 | cg=Float
-757 | 29:34 | cg=Float fixed_field=0
-798 | 30:28 | numeric=Float
-810 | 30:40 | cg=Float fixed_field=0
-824 | 30:54 | cg=Float fixed_field=0
-883 | 35:10 | cg=Float
-893 | 35:20 | cg=Array(Dynamic)
-1129 | 44:12 | cg=Float
-1175 | 45:28 | numeric=Float
-1188 | 45:41 | numeric=Float
+## annotations (key names its space)
+decl 71 | 5:10 | cg=Str
+decl 370 | 15:10 | cg=Int
+decl 377 | 15:17 | cg=Nullable(Str)
+decl 604 | 24:17 | cg=Float
+decl 740 | 29:17 | cg=Float
+decl 883 | 35:10 | cg=Float
+decl 893 | 35:20 | cg=Array(Dynamic)
+expr 34 | 12:29 | cg=Str
+expr 43 | 13:29 | cg=Str
+expr 60 | ?:? | cg=Int
+expr 65 | 19:30 | numeric=Int
+expr 66 | 19:30 | cg=Int
+expr 74 | 20:30 | numeric=Int
+expr 75 | 20:30 | cg=Int
+expr 87 | ?:? | cg=Float fixed_field=0
+expr 92 | 25:28 | numeric=Float
+expr 95 | ?:? | cg=Float fixed_field=0
+expr 98 | ?:? | cg=Float fixed_field=0
+expr 107 | ?:? | cg=Float fixed_field=0
+expr 112 | 30:28 | numeric=Float
+expr 113 | 30:28 | numeric=Float
+expr 117 | ?:? | cg=Float fixed_field=0
+expr 120 | ?:? | cg=Float fixed_field=0
+expr 161 | 44:12 | cg=Float
+expr 169 | 45:28 | numeric=Float
+expr 172 | 45:41 | numeric=Float
 ## reassigned names
 

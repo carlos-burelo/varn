@@ -83,12 +83,12 @@
 112 | void
 113 | (...args: dynamic[]) => void
 114 | str
-## annotations (key = byte offset)
-295 | 15:44 | cg=Nullable(Str)
-354 | 16:44 | cg=Nullable(Str)
-404 | 17:35 | cg=Nullable(Str)
-450 | 18:31 | numeric=Int
-556 | 20:36 | cg=Nullable(Str)
-629 | 21:45 | cg=Nullable(Str)
+## annotations (key names its space)
+expr 31 | ?:? | cg=Nullable(Str)
+expr 42 | ?:? | cg=Nullable(Str)
+expr 51 | ?:? | cg=Nullable(Str)
+expr 57 | 18:31 | numeric=Int
+expr 82 | ?:? | cg=Nullable(Str)
+expr 96 | ?:? | cg=Nullable(Str)
 ## reassigned names
 

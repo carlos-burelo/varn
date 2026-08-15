@@ -484,120 +484,125 @@
 765 | void
 766 | (...args: dynamic[]) => void
 767 | str
-## annotations (key = byte offset)
-160 | 10:14 | fixed_field=0
-184 | 11:14 | fixed_field=1
-270 | 14:39 | fixed_field=1
-283 | 14:52 | fixed_field=0
-309 | 16:12 | cg=Fn
-380 | 17:41 | fixed_field=0
-395 | 17:56 | fixed_field=1
-455 | 20:22 | fixed_field=0
-467 | 20:34 | fixed_field=1
-552 | 25:28 | numeric=Int
-554 | 25:30 | cg=Int fixed_field=0
-595 | 26:28 | numeric=Int
-597 | 26:30 | cg=Int fixed_field=1
-625 | 27:14 | cg=Fn
-660 | 28:28 | numeric=Int
-663 | 28:31 | cg=Int fixed_field=0
-704 | 29:28 | numeric=Int
-707 | 29:31 | cg=Int fixed_field=1
-735 | 30:14 | cg=Fn
-746 | 30:25 | numeric=Int
-782 | 31:28 | numeric=Int
-785 | 31:31 | cg=Int fixed_field=0
-827 | 32:28 | numeric=Int
-830 | 32:31 | cg=Int fixed_field=1
-859 | 33:14 | cg=Array(Int)
-897 | 34:28 | numeric=Int
-900 | 34:31 | cg=Int
-942 | 35:28 | numeric=Int array_index
-945 | 35:31 | cg=Int
-1281 | 42:50 | cg=Bool
-1311 | 43:14 | fixed_field=0
-1338 | 44:14 | fixed_field=1
-1367 | 45:14 | cg=Bool fixed_field=2
-1627 | 53:34 | cg=Bool fixed_field=2
-1673 | 54:36 | cg=Bool fixed_field=2
-1722 | 55:39 | fixed_field=0
-1770 | 56:40 | fixed_field=1
-1796 | 57:17 | cg=Fn
-1843 | 58:18 | cg=Bool fixed_field=2
-1881 | 58:56 | fixed_field=0
-1946 | 59:46 | fixed_field=1
-1996 | 63:21 | cg=Fn
-2055 | 64:35 | cg=Bool
-2101 | 65:36 | cg=Bool
-2147 | 66:35 | cg=Nullable(Str)
-2207 | 67:37 | cg=Nullable(Int)
-2252 | 69:22 | cg=Fn
-2308 | 70:36 | cg=Bool
-2355 | 71:36 | cg=Nullable(Int)
-2398 | 73:22 | cg=Fn
-2414 | 73:38 | numeric=Int
-2458 | 74:37 | cg=Nullable(Int)
-2504 | 76:25 | cg=Fn
-2520 | 76:41 | numeric=Int
-2583 | 77:56 | cg=Bool
-2833 | 84:14 | fixed_field=0
-2856 | 85:14 | fixed_field=1
-3001 | 91:17 | numeric=Int
-3030 | 92:23 | fixed_field=1
-3211 | 100:17 | cg=Fn native_op=17059365188679780804
-3220 | 100:26 | fixed_field=0
-3249 | 101:23 | fixed_field=1
-3399 | 108:29 | numeric=Int
-3404 | 108:34 | cg=Int
-3438 | 109:18 | cg=Array(Int)
-3477 | 110:29 | numeric=Int array_index
-3481 | 110:33 | cg=Int
-3520 | 111:29 | numeric=Int array_index
-3524 | 111:33 | cg=Int
-3563 | 112:29 | numeric=Int array_index
-3567 | 112:33 | cg=Int
-3713 | 115:10 | cg=Fn
-3727 | 115:24 | cg=Fn
-3740 | 115:37 | cg=Fn
-3810 | 119:10 | cg=Fn
-3824 | 119:24 | cg=Fn
-3989 | 125:22 | cg=Fn
-4039 | 126:29 | cg=Str
-4102 | 128:33 | numeric=Int
-4128 | 129:20 | cg=Fn
-4167 | 130:29 | numeric=Int cg=Int
-4370 | 133:10 | cg=Fn
-4381 | 133:21 | cg=Fn
-4507 | 137:13 | numeric=Int
-4516 | 137:22 | cg=Int
-4526 | 137:32 | array_index
-4531 | 137:37 | cg=Bool
-4542 | 137:48 | array_index
-4596 | 139:16 | numeric=Int
-4602 | 139:22 | cg=Int
-4623 | 139:43 | cg=Fn native_op=17059365188679780804
-4642 | 139:62 | cg=Fn native_op=17059365188679780804
-4665 | 140:9 | array_index
-4692 | 141:9 | array_index
-4697 | 141:14 | cg=Bool
-4783 | 147:22 | cg=Fn
-4817 | 148:17 | numeric=Int
-4840 | 149:9 | numeric=Int
-4876 | 152:1 | cg=Int
-4893 | 153:1 | cg=Int
-4910 | 154:1 | cg=Int
-4957 | 155:31 | numeric=Int
-5139 | 158:10 | cg=Fn
-5167 | 158:38 | cg=Fn
-5335 | 166:16 | cg=Fn
-5369 | 166:50 | numeric=Int
-5377 | 167:1 | cg=Int
-5388 | 168:1 | cg=Int
-5413 | 169:15 | cg=Int
-5453 | 170:30 | numeric=Int
-5485 | 172:16 | cg=Fn
-5528 | 173:1 | cg=Str
-5543 | 174:1 | cg=Str
-5572 | 175:15 | cg=Str
+## annotations (key names its space)
+decl 309 | 16:12 | cg=Fn
+decl 1281 | 42:50 | cg=Bool
+decl 1796 | 57:17 | cg=Fn
+decl 3713 | 115:10 | cg=Fn
+decl 3727 | 115:24 | cg=Fn
+decl 3740 | 115:37 | cg=Fn
+decl 3810 | 119:10 | cg=Fn
+decl 3824 | 119:24 | cg=Fn
+decl 4370 | 133:10 | cg=Fn
+decl 4381 | 133:21 | cg=Fn
+decl 5139 | 158:10 | cg=Fn
+decl 5167 | 158:38 | cg=Fn
+expr 13 | ?:? | fixed_field=0
+expr 19 | ?:? | fixed_field=1
+expr 29 | ?:? | fixed_field=1
+expr 32 | ?:? | fixed_field=0
+expr 43 | ?:? | fixed_field=0
+expr 48 | ?:? | fixed_field=1
+expr 56 | ?:? | fixed_field=0
+expr 59 | ?:? | fixed_field=1
+expr 70 | 25:28 | numeric=Int
+expr 73 | ?:? | cg=Int fixed_field=0
+expr 79 | 26:28 | numeric=Int
+expr 82 | ?:? | cg=Int fixed_field=1
+expr 89 | ?:? | cg=Fn
+expr 94 | 28:28 | numeric=Int
+expr 97 | ?:? | cg=Int fixed_field=0
+expr 103 | 29:28 | numeric=Int
+expr 106 | ?:? | cg=Int fixed_field=1
+expr 113 | ?:? | cg=Fn
+expr 115 | 30:25 | numeric=Int
+expr 122 | 31:28 | numeric=Int
+expr 125 | ?:? | cg=Int fixed_field=0
+expr 131 | 32:28 | numeric=Int
+expr 134 | ?:? | cg=Int fixed_field=1
+expr 141 | ?:? | cg=Array(Int)
+expr 146 | 34:28 | numeric=Int
+expr 149 | ?:? | cg=Int
+expr 155 | 35:28 | numeric=Int
+expr 156 | 35:28 | array_index
+expr 158 | 35:31 | cg=Int
+expr 174 | ?:? | fixed_field=0
+expr 180 | ?:? | fixed_field=1
+expr 186 | ?:? | cg=Bool fixed_field=2
+expr 213 | ?:? | cg=Bool fixed_field=2
+expr 220 | ?:? | cg=Bool fixed_field=2
+expr 228 | ?:? | fixed_field=0
+expr 236 | ?:? | fixed_field=1
+expr 244 | ?:? | cg=Bool fixed_field=2
+expr 250 | ?:? | fixed_field=0
+expr 262 | ?:? | fixed_field=1
+expr 269 | ?:? | cg=Fn
+expr 278 | ?:? | cg=Bool
+expr 287 | ?:? | cg=Bool
+expr 296 | ?:? | cg=Nullable(Str)
+expr 306 | ?:? | cg=Nullable(Int)
+expr 313 | ?:? | cg=Fn
+expr 322 | ?:? | cg=Bool
+expr 331 | ?:? | cg=Nullable(Int)
+expr 338 | ?:? | cg=Fn
+expr 340 | 73:38 | numeric=Int
+expr 351 | ?:? | cg=Nullable(Int)
+expr 358 | ?:? | cg=Fn
+expr 360 | 76:41 | numeric=Int
+expr 370 | ?:? | cg=Bool
+expr 383 | ?:? | fixed_field=0
+expr 389 | ?:? | fixed_field=1
+expr 407 | 91:17 | numeric=Int
+expr 415 | ?:? | fixed_field=1
+expr 436 | ?:? | cg=Fn native_op=17059365188679780804
+expr 439 | ?:? | fixed_field=0
+expr 445 | ?:? | fixed_field=1
+expr 464 | 108:29 | numeric=Int
+expr 468 | ?:? | cg=Int
+expr 475 | ?:? | cg=Array(Int)
+expr 480 | 110:29 | numeric=Int
+expr 481 | 110:29 | array_index
+expr 483 | 110:33 | cg=Int
+expr 489 | 111:29 | numeric=Int
+expr 490 | 111:29 | array_index
+expr 492 | 111:33 | cg=Int
+expr 498 | 112:29 | numeric=Int
+expr 499 | 112:29 | array_index
+expr 501 | 112:33 | cg=Int
+expr 542 | 125:22 | cg=Fn
+expr 551 | 126:29 | cg=Str
+expr 558 | 128:33 | numeric=Int
+expr 563 | 129:20 | cg=Fn
+expr 570 | 130:29 | numeric=Int
+expr 571 | 130:29 | cg=Int
+expr 593 | 137:13 | numeric=Int
+expr 597 | ?:? | cg=Int
+expr 598 | 137:32 | array_index
+expr 600 | 137:37 | cg=Bool
+expr 602 | 137:48 | array_index
+expr 611 | 139:16 | numeric=Int
+expr 614 | ?:? | cg=Int
+expr 621 | ?:? | cg=Fn native_op=17059365188679780804
+expr 627 | ?:? | cg=Fn native_op=17059365188679780804
+expr 631 | 140:9 | array_index
+expr 637 | 141:9 | array_index
+expr 639 | 141:14 | cg=Bool
+expr 648 | 147:22 | cg=Fn
+expr 655 | 148:17 | numeric=Int
+expr 659 | 149:9 | numeric=Int
+expr 667 | 152:1 | cg=Int
+expr 671 | 153:1 | cg=Int
+expr 675 | 154:1 | cg=Int
+expr 682 | 155:31 | numeric=Int
+expr 708 | 166:16 | cg=Fn
+expr 712 | 166:50 | numeric=Int
+expr 716 | 167:1 | cg=Int
+expr 720 | 168:1 | cg=Int
+expr 725 | 169:15 | cg=Int
+expr 732 | 170:30 | numeric=Int
+expr 737 | 172:16 | cg=Fn
+expr 745 | 173:1 | cg=Str
+expr 749 | 174:1 | cg=Str
+expr 754 | 175:15 | cg=Str
 ## reassigned names
 

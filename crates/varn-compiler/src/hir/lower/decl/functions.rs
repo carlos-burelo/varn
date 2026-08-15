@@ -2,6 +2,7 @@
 //! form (functions, methods, arrows).
 
 use std::rc::Rc;
+use varn_core::AnnKey;
 
 use varn_core::ast::{Expr, FunctionDecl, Param, Pattern, StmtKind};
 
@@ -26,7 +27,7 @@ impl<'a> Lowerer<'a> {
         )?;
         // Declared return type, recorded by the checker at the function's
         // name offset.
-        func.return_ty = self.value_ty(f.id_offset);
+        func.return_ty = self.value_ty(AnnKey::decl(f.id_offset));
         Ok((func, upvalues))
     }
 
@@ -96,7 +97,7 @@ impl<'a> Lowerer<'a> {
                 }
             };
             scope.define(pname.clone(), HirBinding::Param(i as u32));
-            let ty = self.value_ty(p.range.start.offset);
+            let ty = self.value_ty(AnnKey::decl(p.range.start.offset));
             params.push(HirParam {
                 name: pname,
                 ty,

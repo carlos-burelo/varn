@@ -226,36 +226,38 @@
 329 | void
 330 | (...args: dynamic[]) => void
 331 | str
-## annotations (key = byte offset)
-1156 | 49:10 | cg=Nullable(Int)
-1165 | 49:19 | cg=Nullable(Int)
-1211 | 53:10 | cg=Nullable(Int)
-1217 | 53:16 | cg=Nullable(Array(Nullable(Int)))
-1283 | 55:9 | numeric=Int
-1287 | 55:13 | cg=Int
-1325 | 56:12 | array_index
-1329 | 56:16 | cg=Nullable(Int)
-1347 | 59:10 | cg=Nullable(Array(Int))
-1352 | 59:15 | cg=Int
-1379 | 60:9 | numeric=Int
-1429 | 64:10 | cg=Nullable(Array(Array(Nullable(Int))))
-1436 | 64:17 | cg=Bool
-1692 | 72:31 | numeric=Int
-1694 | 72:33 | cg=Int
-1739 | 73:31 | array_index
-1741 | 73:33 | cg=Nullable(Int)
-1782 | 74:31 | array_index
-1784 | 74:33 | cg=Nullable(Int)
-1914 | 77:31 | numeric=Int array_index
-1916 | 77:33 | cg=Array(Int)
-1919 | 77:36 | cg=Int
-1960 | 78:31 | cg=Nullable(Int)
-2016 | 79:31 | cg=Nullable(Int)
-2068 | 80:31 | cg=Nullable(Int)
-2119 | 81:31 | cg=Nullable(Int)
-2177 | 82:31 | cg=Nullable(Array(Int))
-2227 | 83:31 | cg=Nullable(Array(Int))
-2276 | 84:31 | cg=Nullable(Array(Array(Nullable(Int))))
-2331 | 85:31 | cg=Nullable(Array(Array(Nullable(Int))))
+## annotations (key names its space)
+decl 1156 | 49:10 | cg=Nullable(Int)
+decl 1165 | 49:19 | cg=Nullable(Int)
+decl 1211 | 53:10 | cg=Nullable(Int)
+decl 1217 | 53:16 | cg=Nullable(Array(Nullable(Int)))
+decl 1347 | 59:10 | cg=Nullable(Array(Int))
+decl 1352 | 59:15 | cg=Int
+decl 1429 | 64:10 | cg=Nullable(Array(Array(Nullable(Int))))
+decl 1436 | 64:17 | cg=Bool
+expr 129 | 55:9 | numeric=Int
+expr 132 | ?:? | cg=Int
+expr 137 | 56:12 | array_index
+expr 139 | 56:16 | cg=Nullable(Int)
+expr 148 | 60:9 | numeric=Int
+expr 204 | 72:31 | numeric=Int
+expr 207 | ?:? | cg=Int
+expr 214 | 73:31 | array_index
+expr 216 | 73:33 | cg=Nullable(Int)
+expr 223 | 74:31 | array_index
+expr 225 | 74:33 | cg=Nullable(Int)
+expr 245 | 77:31 | numeric=Int
+expr 246 | 77:31 | array_index
+expr 247 | 77:31 | array_index
+expr 249 | 77:33 | cg=Array(Int)
+expr 250 | 77:36 | cg=Int
+expr 257 | 78:31 | cg=Nullable(Int)
+expr 266 | 79:31 | cg=Nullable(Int)
+expr 275 | 80:31 | cg=Nullable(Int)
+expr 284 | 81:31 | cg=Nullable(Int)
+expr 296 | 82:31 | cg=Nullable(Array(Int))
+expr 306 | 83:31 | cg=Nullable(Array(Int))
+expr 315 | 84:31 | cg=Nullable(Array(Array(Nullable(Int))))
+expr 324 | 85:31 | cg=Nullable(Array(Array(Nullable(Int))))
 ## reassigned names
 

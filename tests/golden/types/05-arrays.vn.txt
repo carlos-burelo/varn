@@ -393,79 +393,87 @@
 493 | void
 494 | (...args: dynamic[]) => void
 495 | str
-## annotations (key = byte offset)
-110 | 5:24 | numeric=Int
-115 | 5:29 | cg=Int
-153 | 6:24 | numeric=Int
-158 | 6:29 | cg=Int native_op=13148294879121262557
-200 | 7:24 | numeric=Int
-205 | 7:29 | cg=Int native_op=13148294879121262557
-254 | 8:29 | cg=Bool native_op=17834796676346375813
-297 | 9:30 | cg=Bool native_op=17834796676346375813
-335 | 10:24 | numeric=Int
-340 | 10:29 | cg=Array(Int) native_op=16675887620424095650
-352 | 10:41 | cg=Int
-390 | 11:24 | numeric=Int array_index
-395 | 11:29 | cg=Array(Int) native_op=16675887620424095650
-407 | 11:41 | cg=Int
-441 | 12:24 | numeric=Int
-448 | 12:31 | cg=Array(Int) native_op=16355213048525284072
-463 | 12:46 | cg=Int
-511 | 13:34 | cg=Str native_op=8238581328922448208
-568 | 14:34 | cg=Str native_op=8238581328922448208
-612 | 16:22 | cg=Array(Int) native_op=705378738777152342
-623 | 16:33 | numeric=Int
-677 | 17:24 | numeric=Int
-685 | 17:32 | cg=Int
-723 | 18:24 | numeric=Int array_index
-731 | 18:32 | cg=Int
-763 | 20:20 | cg=Array(Int) native_op=824143943159215474
-777 | 20:34 | numeric=Int
-854 | 21:24 | numeric=Int
-860 | 21:30 | cg=Int
-894 | 23:18 | cg=Fn native_op=4517219811331526510
-1035 | 26:20 | cg=Nullable(Int) native_op=6530791129385928027
-1047 | 26:32 | numeric=Int
-1110 | 29:17 | cg=Int native_op=8385572526351475697
-1127 | 29:34 | numeric=Int
-1158 | 30:24 | numeric=Int
-1199 | 32:29 | cg=Bool native_op=16781003032214271640
-1211 | 32:41 | numeric=Int
-1249 | 33:30 | cg=Bool native_op=16781003032214271640
-1261 | 33:42 | numeric=Int
-1305 | 34:34 | cg=Bool native_op=6573967687924892835
-1318 | 34:47 | numeric=Int
-1367 | 35:35 | cg=Bool native_op=6573967687924892835
-1380 | 35:48 | numeric=Int
-1417 | 37:21 | cg=Array(Str) native_op=16751447060142197724
-1448 | 38:24 | array_index
-1455 | 38:31 | cg=Str
-1496 | 40:23 | cg=Array(Int) native_op=7611089366941086646
-1530 | 41:24 | numeric=Int array_index
-1534 | 41:28 | cg=Int
-1577 | 43:31 | cg=Array(Array(Int)) native_op=8390877831292559631
-1608 | 44:24 | numeric=Int
-1613 | 44:29 | cg=Int
-1651 | 45:24 | array_index
-1656 | 45:29 | cg=Array(Int)
-1694 | 47:26 | cg=Array(Int) native_op=11758896777689091311
-1736 | 48:24 | numeric=Int
-1739 | 48:27 | cg=Int
-1786 | 51:14 | cg=Fn native_op=3671315545032441702
-1813 | 51:41 | numeric=Int
-1852 | 52:24 | numeric=Int
-1898 | 55:5 | cg=Fn native_op=17059365188679780804
-1930 | 56:24 | numeric=Int
-1934 | 56:28 | cg=Int
-1972 | 57:24 | numeric=Int array_index
-1976 | 57:28 | cg=Int
-2006 | 58:20 | cg=Int native_op=2532029292076510311
-2036 | 59:24 | numeric=Int
-2074 | 60:24 | numeric=Int
-2078 | 60:28 | cg=Int
-2157 | 63:24 | numeric=Int
-2164 | 63:31 | cg=Int
-2202 | 64:24 | numeric=Int array_index
-2209 | 64:31 | cg=Int
+## annotations (key names its space)
+expr 22 | 5:24 | numeric=Int
+expr 25 | ?:? | cg=Int
+expr 31 | 6:24 | numeric=Int
+expr 35 | ?:? | cg=Int native_op=13148294879121262557
+expr 42 | 7:24 | numeric=Int
+expr 46 | ?:? | cg=Int native_op=13148294879121262557
+expr 57 | ?:? | cg=Bool native_op=17834796676346375813
+expr 67 | ?:? | cg=Bool native_op=17834796676346375813
+expr 73 | 10:24 | numeric=Int
+expr 78 | ?:? | cg=Array(Int) native_op=16675887620424095650
+expr 81 | ?:? | cg=Int
+expr 87 | 11:24 | numeric=Int
+expr 88 | 11:24 | array_index
+expr 92 | ?:? | cg=Array(Int) native_op=16675887620424095650
+expr 95 | 11:41 | cg=Int
+expr 101 | 12:24 | numeric=Int
+expr 108 | ?:? | cg=Array(Int) native_op=16355213048525284072
+expr 112 | ?:? | cg=Int
+expr 125 | ?:? | cg=Str native_op=8238581328922448208
+expr 139 | ?:? | cg=Str native_op=8238581328922448208
+expr 146 | ?:? | cg=Array(Int) native_op=705378738777152342
+expr 148 | 16:33 | numeric=Int
+expr 155 | 17:24 | numeric=Int
+expr 158 | ?:? | cg=Int
+expr 164 | 18:24 | numeric=Int
+expr 165 | 18:24 | array_index
+expr 167 | 18:32 | cg=Int
+expr 174 | ?:? | cg=Array(Int) native_op=824143943159215474
+expr 176 | 20:34 | numeric=Int
+expr 177 | 20:34 | numeric=Int
+expr 185 | 21:24 | numeric=Int
+expr 188 | ?:? | cg=Int
+expr 195 | ?:? | cg=Fn native_op=4517219811331526510
+expr 213 | ?:? | cg=Nullable(Int) native_op=6530791129385928027
+expr 215 | 26:32 | numeric=Int
+expr 230 | ?:? | cg=Int native_op=8385572526351475697
+expr 232 | 29:34 | numeric=Int
+expr 239 | 30:24 | numeric=Int
+expr 249 | ?:? | cg=Bool native_op=16781003032214271640
+expr 251 | 32:41 | numeric=Int
+expr 262 | ?:? | cg=Bool native_op=16781003032214271640
+expr 264 | 33:42 | numeric=Int
+expr 277 | ?:? | cg=Bool native_op=6573967687924892835
+expr 279 | 34:47 | numeric=Int
+expr 280 | 34:47 | numeric=Int
+expr 295 | ?:? | cg=Bool native_op=6573967687924892835
+expr 297 | 35:48 | numeric=Int
+expr 298 | 35:48 | numeric=Int
+expr 307 | ?:? | cg=Array(Str) native_op=16751447060142197724
+expr 313 | 38:24 | array_index
+expr 315 | 38:31 | cg=Str
+expr 325 | ?:? | cg=Array(Int) native_op=7611089366941086646
+expr 330 | 41:24 | numeric=Int
+expr 331 | 41:24 | array_index
+expr 333 | 41:28 | cg=Int
+expr 346 | ?:? | cg=Array(Array(Int)) native_op=8390877831292559631
+expr 351 | 44:24 | numeric=Int
+expr 354 | ?:? | cg=Int
+expr 361 | 45:24 | array_index
+expr 363 | 45:29 | cg=Array(Int)
+expr 375 | ?:? | cg=Array(Int) native_op=11758896777689091311
+expr 382 | 48:24 | numeric=Int
+expr 385 | ?:? | cg=Int
+expr 397 | ?:? | cg=Fn native_op=3671315545032441702
+expr 403 | 51:41 | numeric=Int
+expr 410 | 52:24 | numeric=Int
+expr 423 | ?:? | cg=Fn native_op=17059365188679780804
+expr 429 | 56:24 | numeric=Int
+expr 432 | ?:? | cg=Int
+expr 438 | 57:24 | numeric=Int
+expr 439 | 57:24 | array_index
+expr 441 | 57:28 | cg=Int
+expr 448 | ?:? | cg=Int native_op=2532029292076510311
+expr 453 | 59:24 | numeric=Int
+expr 460 | 60:24 | numeric=Int
+expr 463 | ?:? | cg=Int
+expr 478 | 63:24 | numeric=Int
+expr 481 | ?:? | cg=Int
+expr 487 | 64:24 | numeric=Int
+expr 488 | 64:24 | array_index
+expr 490 | 64:31 | cg=Int
 ## reassigned names
 

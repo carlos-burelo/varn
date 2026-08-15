@@ -155,7 +155,7 @@ pub struct Checker {
     pub(crate) member_exists_cache: FxHashMap<(Type, Rc<str>), bool>,
     pub(crate) member_type_cache: FxHashMap<(Type, Rc<str>), Option<(Type, Option<usize>)>>,
     pub(crate) expected_type: Option<Type>,
-    pub(crate) call_mappings: FxHashMap<u32, Vec<Option<usize>>>,
+    pub(crate) call_mappings: FxHashMap<varn_core::ast::AstId, Vec<Option<usize>>>,
     pub(crate) reassigned_names: rustc_hash::FxHashSet<Rc<str>>,
     pub(crate) record_expr_types: bool,
     pub(crate) node_scopes: FxHashMap<u32, ScopeId>,
@@ -362,7 +362,7 @@ impl Checker {
         let mut annotations = collect_type_annotations(program, &bind, &expr_table);
 
         for (k, v) in checker.call_mappings {
-            annotations.record_call_mapping(k, v);
+            annotations.record_call_mapping(varn_core::AnnKey::expr(k), v);
         }
         for name in &checker.reassigned_names {
             annotations.record_reassigned_name(name);
