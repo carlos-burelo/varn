@@ -106,19 +106,18 @@ pub fn print_coverage(jit: &JitStatsSnapshot, records: &[CompileRecord], scope: 
     terminal::log(format!(
         "  {}",
         chalk(
-            "denominador = funciones que el JIT llegó a ver; el top level del \
-             módulo y los generadores no entran"
+            "denominador = funciones que el JIT llegó a ver, incluido el top level \
+             del módulo cuando OSR lo rescata; los generadores no entran"
         )
         .dim()
     ));
 
     terminal::blank();
     let frame_pct = |n: u64| -> String {
-        let total = jit.total_frames();
-        if total == 0 {
+        if jit.total_frames() == 0 {
             "—".to_owned()
         } else {
-            fmt_pct(n as f64 / total as f64)
+            fmt_pct(jit.frame_share_of(n))
         }
     };
     terminal::log(format!(
@@ -133,7 +132,7 @@ pub fn print_coverage(jit: &JitStatsSnapshot, records: &[CompileRecord], scope: 
     // 7.78 ms with OSR, and the frame counted as "interpreter" either way.
     // Split them, so the line that reads as a defect only counts frames that
     // really did run to the end on the interpreter.
-    let never_compiled = jit.interp_runs.saturating_sub(jit.osr_entries);
+    let never_compiled = jit.never_compiled_frames();
     terminal::log(format!(
         "{}  {}",
         row("frames intérprete", fmt_num(jit.interp_runs)),

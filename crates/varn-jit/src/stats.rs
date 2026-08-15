@@ -23,7 +23,12 @@ pub enum CompileOutcome {
     Routed,
     /// Rejected by a gate *before* Cranelift was asked. Carries the gate's
     /// reason; these are invisible to `compile_fail` and to `CLIF BAIL`.
-    Gated(&'static str),
+    ///
+    /// Owned rather than `&'static str` so the reason can name the threshold
+    /// that actually fired: the literal it used to carry said "> 250 words"
+    /// long after [`crate::SIZE_GATE_WORDS`] became 8192, which is a report
+    /// that misdescribes the build it came from.
+    Gated(String),
     /// Cranelift was asked and refused to lower it.
     Bailed(String),
 }
@@ -81,7 +86,12 @@ pub struct JitStatsSnapshot {
 }
 
 impl JitStatsSnapshot {
-    /// Frame entries that ran compiled code, cached or freshly lowered.
+    /// Frame entries that ENTERED through compiled code.
+    ///
+    /// Not the same question as "did this frame run as machine code": a frame
+    /// rescued by OSR entered on the interpreter and finished compiled, and it
+    /// is counted in `interp_runs`, not here. Use [`Self::machine_code_frames`]
+    /// for coverage and this one only where the ENTRY tier is the subject.
     pub fn clif_frames(&self) -> u64 {
         self.jit_runs
     }
@@ -91,13 +101,58 @@ impl JitStatsSnapshot {
         self.jit_runs + self.interp_runs
     }
 
-    /// Share of frame entries that ran as machine code, 0.0..=1.0.
+    /// Frame entries that executed machine code at all: entered compiled, or
+    /// entered interpreted and rescued mid-loop by on-stack replacement.
+    ///
+    /// This is the numerator every coverage figure wants. Counting only
+    /// `jit_runs` reports a program whose hot loops all run compiled as 0%
+    /// covered — measured on `bench_str_ops.vn`, where the headline said
+    /// "0 de 62 frames (0.0%)" while removing OSR (`VARN_JIT_OSR=4000000000`)
+    /// took `char_code` from 12.6 ms to 134.4 ms. Adding `osr_entries` to
+    /// `jit_runs` does NOT double-count the activation, because
+    /// [`Self::total_frames`] keeps counting it once, on the `interp_runs`
+    /// side: the two numerators partition the same denominator with
+    /// [`Self::never_compiled_frames`].
+    pub fn machine_code_frames(&self) -> u64 {
+        self.jit_runs + self.osr_entries
+    }
+
+    /// Frame entries that ran to completion on the interpreter — the ones a
+    /// coverage report should flag. The complement of
+    /// [`Self::machine_code_frames`] over [`Self::total_frames`].
+    pub fn never_compiled_frames(&self) -> u64 {
+        self.interp_runs.saturating_sub(self.osr_entries)
+    }
+
+    /// Share of frame entries that entered through compiled code, 0.0..=1.0.
+    /// See [`Self::clif_frames`] for why this is not the coverage figure.
     pub fn clif_frame_ratio(&self) -> f64 {
+        self.frame_share_of(self.jit_runs)
+    }
+
+    /// Share of frame entries that executed machine code, 0.0..=1.0.
+    pub fn machine_code_ratio(&self) -> f64 {
+        self.frame_share_of(self.machine_code_frames())
+    }
+
+    /// Share of frame entries that never left the interpreter, 0.0..=1.0.
+    /// This is what an opcode or VM breakdown must be scaled by: attributing
+    /// interpreter counters to a run needs the frames that really stayed
+    /// interpreted, not every frame that merely started that way.
+    pub fn never_compiled_ratio(&self) -> f64 {
+        self.frame_share_of(self.never_compiled_frames())
+    }
+
+    /// `n` as a share of all observed frame entries. 0.0 when nothing ran, so
+    /// that an empty snapshot reports "nothing covered" rather than dividing
+    /// by zero. Public because the coverage table shares this denominator
+    /// across rows the named ratios above do not cover.
+    pub fn frame_share_of(&self, n: u64) -> f64 {
         let total = self.total_frames();
         if total == 0 {
             return 0.0;
         }
-        self.jit_runs as f64 / total as f64
+        n as f64 / total as f64
     }
 
     /// Functions the JIT was asked about: routed, gated, or bailed.

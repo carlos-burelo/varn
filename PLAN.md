@@ -51,8 +51,18 @@ las cuatro.
    - intérprete: `VARN_NO_JIT=1 ...`
    - bundle: `VARN_STD=@embedded ...` (purgar con `vn cache clean` al cambiar)
 4. `cargo run --release --bin vn -- bench ./tests/main.vn -v` → la **cobertura
-   clif** debe seguir en `31 285 / 32 144` frames. Si cambia, el refactor movió
-   comportamiento, no sólo código.
+   clif** debe seguir en `31 321 / 32 159` frames (31 275 que entran compilados
+   más 46 rescatados por OSR). Si cambia, el refactor movió comportamiento, no
+   sólo código.
+
+   Dos correcciones sobre lo que decía antes esta línea. El `31 285` nunca se
+   reprodujo: el binario de `1d7656d` da 31 264 sobre las 72 pruebas de
+   entonces, y el denominador subió a 32 159 al añadirse
+   `tests/73-str-charcode-json-shape.vn`. Y el titular contaba sólo las
+   entradas compiladas, así que reportaba 880 frames «al intérprete» cuando 45
+   de ellos habían terminado compilados — la cobertura sale ahora de
+   `JitStatsSnapshot::machine_code_frames`, única definición que usan el
+   titular, la tabla y el escalado de los contadores del intérprete.
 
 Para tareas que tocan rutas calientes (P1, P5), además medición pareada.
 

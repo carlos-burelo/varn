@@ -226,8 +226,14 @@ impl Headline<'_> {
             ));
         } else if let Some(jit) = self.jit {
             terminal::blank();
-            let ratio = jit.clif_frame_ratio();
-            let colour = if jit.interp_runs == 0 {
+            // Coverage counts frames that EXECUTED machine code, which is not
+            // the same set as frames that entered compiled: an OSR frame
+            // entered on the interpreter and finished compiled. Reporting
+            // `clif_frames` here called `bench_str_ops.vn` 0.0% covered while
+            // OSR was giving it 10x — see `JitStatsSnapshot::machine_code_frames`.
+            let never_compiled = jit.never_compiled_frames();
+            let ratio = jit.machine_code_ratio();
+            let colour = if never_compiled == 0 {
                 chalk(fmt_pct(ratio)).green()
             } else {
                 chalk(fmt_pct(ratio)).yellow()
@@ -235,11 +241,22 @@ impl Headline<'_> {
             terminal::log(format!(
                 "  {} {} de {} frames ({})  {}",
                 chalk("cobertura clif").bold(),
-                fmt_num(jit.clif_frames()),
+                fmt_num(jit.machine_code_frames()),
                 fmt_num(jit.total_frames()),
                 colour,
                 chalk(format!("[ámbito: {}]", self.coverage_scope)).dim()
             ));
+            if jit.osr_entries > 0 {
+                terminal::log(format!(
+                    "      {}",
+                    chalk(format!(
+                        "incluye {} rescatados por OSR: entraron interpretados, \
+                         terminaron compilados",
+                        fmt_num(jit.osr_entries)
+                    ))
+                    .dim()
+                ));
+            }
 
             let off_clif = jit.compile_fail + jit.gate_rejected;
             if off_clif > 0 {
@@ -261,23 +278,25 @@ impl Headline<'_> {
                     ));
                 }
             }
-            if jit.interp_runs > 0 {
+            if never_compiled > 0 {
                 terminal::log(format!(
                     "  {} {}",
                     chalk("✗").red(),
-                    chalk(format!("{} frames al intérprete", fmt_num(jit.interp_runs))).red()
+                    chalk(format!("{} frames al intérprete", fmt_num(never_compiled))).red()
                 ));
                 if off_clif == 0 {
                     // Every function the JIT saw was routed, yet frames still
-                    // ran interpreted — so those frames belong to code the JIT
-                    // was never asked about (module top level, generators).
-                    // Reporting coverage off `functions_seen` alone would call
-                    // this 100% and be wrong.
+                    // ran interpreted end to end — so those frames belong to
+                    // code the JIT was never asked about (generators), or to
+                    // loops too short for OSR to pay for itself. Reporting
+                    // coverage off `functions_seen` alone would call this 100%
+                    // and be wrong.
                     terminal::log(format!(
                         "      {}",
                         chalk(
                             "ninguna función ofrecida al JIT falló: estos frames \
-                             corresponden a código que nunca se le ofrece"
+                             corresponden a código que nunca se le ofrece, o a bucles \
+                             por debajo del umbral de OSR"
                         )
                         .dim()
                     ));

@@ -326,7 +326,7 @@ pub fn compile(
         record(|| CompileRecord {
             name: fn_name(proto),
             words,
-            outcome: CompileOutcome::Gated("too large (>250 words)"),
+            outcome: CompileOutcome::Gated(format!("too large (>{SIZE_GATE_WORDS} words)")),
             compile_ns: 0,
             code_bytes: 0,
         });

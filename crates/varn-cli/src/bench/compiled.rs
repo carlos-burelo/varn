@@ -5,9 +5,9 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use varn_core::ModuleId;
-use varn_types::value::Closure;
 use varn_term::chalk::chalk;
 use varn_term::terminal;
+use varn_types::value::Closure;
 use varn_vm::Vm;
 
 use super::harness::{run_vm_to_completion, time_n, time_n_freq_setup, VmFactory};
@@ -171,11 +171,7 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
 
         print_coverage(&exec_jit, &records, "bundle .vnc");
 
-        let interp_share = if exec_jit.total_frames() > 0 {
-            Some(exec_jit.interp_runs as f64 / exec_jit.total_frames() as f64)
-        } else {
-            None
-        };
+        let interp_share = (exec_jit.total_frames() > 0).then(|| exec_jit.never_compiled_ratio());
         print_opcode_hotspots(&opcode_counts, interp_share);
         if let Some(ref mut profile) = vm_profile {
             let move_count = opcode_counts
