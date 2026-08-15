@@ -21,6 +21,34 @@ pub struct ExprInfo {
     pub symbol_id: Option<SymbolId>,
 }
 
+/// What the checker decided about one expression.
+///
+/// Keyed by [`varn_core::ast::AstId`] in [`CheckResult::expr_table`], which is
+/// the single record of the checker's answers. The positional map the editor
+/// queries (`CheckResult::expr_types`) is PROJECTED from this at the end of a
+/// check — it is an index, not a second opinion.
+#[derive(Clone, Debug)]
+pub struct TypeEntry {
+    pub ty: Type,
+    /// The symbol an identifier resolved to. Tooling data: filled only under
+    /// [`CheckOptions::record_types`], because it costs a scope resolve per
+    /// identifier and a compile never reads it.
+    pub symbol_id: Option<SymbolId>,
+    /// Byte range, so the positional projection can be built without walking
+    /// the AST a second time.
+    pub start: u32,
+    pub end: u32,
+    /// Order in which the checker visited this expression.
+    ///
+    /// The positional projection is first-wins, and offsets collide by
+    /// construction — `x` and `x.y` start at the same byte. Projecting in
+    /// `HashMap` order would pick a different winner per run; projecting in
+    /// visit order reproduces exactly what the inline writes used to produce.
+    /// Neither AST id order nor offset order does: ids are assigned pre-order
+    /// (parent before child) while the checker visits children first.
+    pub seq: u32,
+}
+
 impl std::fmt::Display for ExprInfo {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.ty)
@@ -30,6 +58,12 @@ impl std::fmt::Display for ExprInfo {
 pub struct CheckResult {
     pub bind: BindResult,
     pub diagnostics: varn_core::DiagnosticBag,
+    /// Positional index over [`Self::expr_table`], for editors asking "what is
+    /// at this cursor". Empty unless [`CheckOptions::record_types`] was set.
+    ///
+    /// Derived, never authored: it used to be written inline during checking,
+    /// alongside a separate id-keyed map, which is how the two came to hold
+    /// different things.
     pub expr_types: FxHashMap<u32, ExprInfo>,
     pub flattened_members: FxHashMap<Rc<str>, Vec<crate::types::ClassMemberInfo>>,
     pub type_annotations: varn_core::TypeAnnotations,
@@ -39,15 +73,13 @@ pub struct CheckResult {
     pub extension_set_members: FxHashMap<u32, Rc<str>>,
     pub node_scopes: FxHashMap<u32, crate::scope::ScopeId>,
     pub symbol_types: FxHashMap<SymbolId, crate::types::Type>,
-    /// Every expression's checked type, keyed by `Expr::id()`.
+    /// **The** record of what the checker decided, keyed by `Expr::id()`.
     ///
-    /// Distinct from [`Self::expr_types`], which is keyed by BYTE OFFSET and
-    /// only populated for tooling. Two maps, two key spaces, two lifetimes —
-    /// the collapse of the two is Phase 1 of the checker plan. Exposed here so
-    /// `vn debug -p check:types` can print what the checker actually decided
-    /// next to what reached codegen, which is the baseline that refactor is
-    /// verified against.
-    pub resolved_expr_types: FxHashMap<u32, crate::types::Type>,
+    /// Everything else that carries an expression's type is derived from this:
+    /// [`Self::expr_types`] is its positional projection, and the codegen
+    /// annotations are built by reading it. Written on every check, tooling or
+    /// not, because a compile needs these types too.
+    pub expr_table: FxHashMap<varn_core::ast::AstId, TypeEntry>,
 }
 
 impl CheckResult {
@@ -108,7 +140,9 @@ pub struct Checker {
     pub(crate) type_node_cache: FxHashMap<(u32, usize), Type>,
     pub(crate) symbol_type_params_cache: FxHashMap<(Rc<str>, u8), Vec<Rc<str>>>,
     pub(crate) symbol_types: FxHashMap<SymbolId, Type>,
-    pub(crate) resolved_expr_types: FxHashMap<u32, Type>,
+    pub(crate) expr_table: FxHashMap<varn_core::ast::AstId, TypeEntry>,
+    /// Counter behind [`TypeEntry::seq`].
+    pub(crate) expr_seq: u32,
     pub(crate) current_class: Option<Rc<str>>,
     pub(crate) active_type_params: FxHashSet<Rc<str>>,
     pub(crate) abstract_classes: FxHashSet<Rc<str>>,
@@ -237,7 +271,8 @@ impl Checker {
             type_node_cache: FxHashMap::with_capacity_and_hasher(1024, Default::default()),
             symbol_type_params_cache: FxHashMap::with_capacity_and_hasher(256, Default::default()),
             symbol_types: FxHashMap::default(),
-            resolved_expr_types: FxHashMap::default(),
+            expr_table: FxHashMap::with_capacity_and_hasher(2048, Default::default()),
+            expr_seq: 0,
             current_class: None,
             active_type_params: FxHashSet::default(),
             abstract_classes: FxHashSet::default(),
@@ -270,14 +305,42 @@ impl Checker {
         checker.check_stmts(&program.body, &bind);
         profile.check_stmts = started.elapsed();
 
-        // Tooling pass (LSP only): some declarations (parameters, methods,
-        // getters/setters, fields) are bound by the binder but never visited as
-        // expressions, so they have no `expr_types` entry at their own offset.
-        // Record every local symbol at its declaration offset so its name token
-        // resolves to itself — exactly like every other binding, with no
-        // positional heuristic. `or_insert` keeps any finer entry the checker
-        // already produced. Skipped for normal compilation.
+        // Positional projection of `expr_table`, for editors. Built here, from
+        // the one table, rather than written alongside it during the check:
+        // that is what keeps "what the checker decided" and "what the editor
+        // shows" from being two different answers.
         if record_expr_types {
+            let mut in_visit_order: Vec<(u32, u32, u32, ExprInfo)> = checker
+                .expr_table
+                .values()
+                .map(|e| {
+                    let info = ExprInfo {
+                        ty: e.ty.clone(),
+                        symbol_id: e.symbol_id,
+                    };
+                    (e.seq, e.start, e.end, info)
+                })
+                .collect();
+            in_visit_order.sort_by_key(|(seq, ..)| *seq);
+            for (_, start, end, info) in in_visit_order {
+                // Both ends of the range: a cursor on the last character of an
+                // expression is still on that expression.
+                if end != start {
+                    checker
+                        .expr_types
+                        .entry(start)
+                        .or_insert_with(|| info.clone());
+                    checker.expr_types.entry(end).or_insert(info);
+                } else {
+                    checker.expr_types.entry(start).or_insert(info);
+                }
+            }
+
+            // Declarations the binder created but no expression visits —
+            // parameters, methods, getters/setters, fields — have no entry in
+            // `expr_table` at all, so their own name token would resolve to
+            // nothing. `or_insert` keeps any finer entry the projection above
+            // already produced.
             for (id, sym) in bind.arena.all().iter().enumerate() {
                 if sym.origin_module.is_none() && sym.offset != 0 {
                     checker
@@ -295,8 +358,8 @@ impl Checker {
         final_diagnostics.extend(checker.diagnostics);
 
         let started = Instant::now();
-        let resolved_expr_types = std::mem::take(&mut checker.resolved_expr_types);
-        let mut annotations = collect_type_annotations(program, &bind, &resolved_expr_types);
+        let expr_table = std::mem::take(&mut checker.expr_table);
+        let mut annotations = collect_type_annotations(program, &bind, &expr_table);
 
         for (k, v) in checker.call_mappings {
             annotations.record_call_mapping(k, v);
@@ -351,7 +414,7 @@ impl Checker {
             extension_set_members: checker.extension_set_members,
             node_scopes,
             symbol_types,
-            resolved_expr_types,
+            expr_table,
         }
     }
 

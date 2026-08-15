@@ -11,7 +11,8 @@ use varn_core::TypeAnnotations;
 pub(crate) struct AnnotateCtx<'a> {
     pub(crate) bind: &'a BindResult,
     pub(crate) locals: rustc_hash::FxHashMap<std::rc::Rc<str>, Type>,
-    pub(crate) resolved_expr_types: &'a rustc_hash::FxHashMap<u32, Type>,
+    pub(crate) expr_table:
+        &'a rustc_hash::FxHashMap<varn_core::ast::AstId, crate::checker::TypeEntry>,
     /// Names currently bound to an evolving empty-array local whose element
     /// type the binder proved (Task A0.3'). Their entry in `locals` holds
     /// the advisory `Array<T>`; `resolved_expr_types` deliberately kept them
@@ -25,12 +26,12 @@ pub(crate) struct AnnotateCtx<'a> {
 impl<'a> AnnotateCtx<'a> {
     pub(crate) fn new(
         bind: &'a BindResult,
-        resolved_expr_types: &'a rustc_hash::FxHashMap<u32, Type>,
+        expr_table: &'a rustc_hash::FxHashMap<varn_core::ast::AstId, crate::checker::TypeEntry>,
     ) -> Self {
         Self {
             bind,
             locals: rustc_hash::FxHashMap::default(),
-            resolved_expr_types,
+            expr_table,
             evolved_locals: rustc_hash::FxHashSet::default(),
         }
     }
@@ -142,10 +143,10 @@ fn extract_caps_from_decorators(decorators: &[varn_core::ast::Decorator]) -> Vec
 pub fn collect_type_annotations(
     program: &Program,
     bind: &BindResult,
-    resolved_expr_types: &rustc_hash::FxHashMap<u32, Type>,
+    expr_table: &rustc_hash::FxHashMap<varn_core::ast::AstId, crate::checker::TypeEntry>,
 ) -> TypeAnnotations {
     let mut ann = TypeAnnotations::new();
-    let mut ctx = AnnotateCtx::new(bind, resolved_expr_types);
+    let mut ctx = AnnotateCtx::new(bind, expr_table);
     for stmt in &program.body {
         annotate_stmt(stmt, &mut ann, &mut ctx);
     }

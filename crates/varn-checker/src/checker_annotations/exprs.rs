@@ -341,8 +341,8 @@ pub(crate) fn get_expr_type(expr: &Expr, ctx: &AnnotateCtx) -> Type {
     if !ctx.evolved_locals.is_empty() && ctx.is_overlay_governed(expr) {
         return infer_expr_type(expr, Some(ctx));
     }
-    if let Some(ty) = ctx.resolved_expr_types.get(&expr.id) {
-        ty.clone()
+    if let Some(entry) = ctx.expr_table.get(&expr.id) {
+        entry.ty.clone()
     } else {
         infer_expr_type(expr, Some(ctx))
     }

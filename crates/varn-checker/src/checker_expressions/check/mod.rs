@@ -29,28 +29,32 @@ impl Checker {
             self.node_scopes.insert(start, self.current_scope);
         }
         let ty = self.infer_type(expr, bind);
-        self.resolved_expr_types.insert(expr.id, ty.clone());
 
-        let mut symbol_id = None;
-        if let ExprKind::Identifier { name } = &expr.kind {
-            let scope = bind.scopes.get(self.current_scope);
-            symbol_id = scope.resolve(name.as_ref(), &bind.scopes);
-        }
-
-        if self.record_expr_types {
-            self.expr_types
-                .entry(start)
-                .or_insert(crate::checker::ExprInfo {
-                    ty: ty.clone(),
-                    symbol_id,
-                });
-
-            if start != end {
-                self.expr_types
-                    .entry(end)
-                    .or_insert(crate::checker::ExprInfo { ty, symbol_id });
+        // Resolving the identifier's symbol costs a scope walk and only tooling
+        // reads it, so it is not paid for on a compile.
+        let symbol_id = match (&expr.kind, self.record_expr_types) {
+            (ExprKind::Identifier { name }, true) => {
+                let scope = bind.scopes.get(self.current_scope);
+                scope.resolve(name.as_ref(), &bind.scopes)
             }
-        }
+            _ => None,
+        };
+
+        // ONE write, into the one table. The positional map the editor reads is
+        // projected from this after the check (`project_positional_types`);
+        // writing both here is how they came to disagree.
+        let seq = self.expr_seq;
+        self.expr_seq += 1;
+        self.expr_table.insert(
+            expr.id,
+            crate::checker::TypeEntry {
+                ty,
+                symbol_id,
+                start,
+                end,
+                seq,
+            },
+        );
     }
 
     fn check_expr_no_record(&mut self, expr: &Expr, bind: &BindResult) {
