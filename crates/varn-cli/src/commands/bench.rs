@@ -18,6 +18,7 @@ pub fn execute(args: BenchArgs) -> Result<(), CliError> {
             show_output: args.show_output,
             verbose: args.verbose,
             all_rows: args.all_rows,
+            min_clif_coverage: args.min_clif_coverage,
         },
     )
 }

@@ -354,7 +354,9 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     varn_builtins::set_print_silent(false);
     varn_builtins::set_testing_silent(false);
 
-    Ok(())
+    // Last, so the report is on screen even when the guard fails: a threshold
+    // breach is something to read the numbers about, not instead of.
+    super::enforce_coverage_floor(&exec_jit, opts.min_clif_coverage)
 }
 
 fn export_names_of(filename: &str) -> Vec<Rc<str>> {

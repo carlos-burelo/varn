@@ -191,5 +191,6 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
     varn_builtins::set_print_silent(false);
     varn_builtins::set_testing_silent(false);
 
-    Ok(())
+    // Same placement as `source::run`: report first, verdict after.
+    super::enforce_coverage_floor(&exec_jit, opts.min_clif_coverage)
 }

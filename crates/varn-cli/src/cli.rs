@@ -129,6 +129,14 @@ pub struct BenchArgs {
     /// Show phase and breakdown rows that measured zero or negligible time.
     #[arg(long)]
     pub all_rows: bool,
+
+    /// Exit non-zero when clif coverage falls below this percentage of frames.
+    ///
+    /// The regression guard PLAN.md asks for by hand. Reading it off the
+    /// printed headline would mean parsing a localized, digit-grouped string;
+    /// the comparison belongs where the number is computed.
+    #[arg(long, value_name = "PCT")]
+    pub min_clif_coverage: Option<f64>,
 }
 
 #[derive(Args)]
