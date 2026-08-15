@@ -60,11 +60,11 @@ pub fn check(
     debug: &DebugFlags,
     strict: bool,
 ) -> PipelineResult<CheckResult> {
-    let check_result = if strict {
-        Checker::check_strict(program)
-    } else {
-        Checker::check(program)
-    };
+    let mut options = varn_checker::CheckOptions::compile();
+    if strict {
+        options = options.strict();
+    }
+    let check_result = Checker::check_with(program, options);
     report_diagnostics(&check_result.diagnostics, &program.filename, source)?;
 
     if debug.symbols {

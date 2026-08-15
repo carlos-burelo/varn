@@ -98,7 +98,12 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             .map_err(|e| format!("{e}"))
     })?;
 
-    let check_result = Checker::check_with_profile(&program);
+    // The COMPILE configuration, deliberately. This used to call
+    // `check_with_profile`, which was `check_for_lsp` under another name: the
+    // reported breakdown described a check that also built the per-expression
+    // type table, which a real compile never builds. `profile` is filled by
+    // every check, so nothing is lost by asking for the right one.
+    let check_result = Checker::check_with(&program, varn_checker::CheckOptions::compile());
 
     let optimize_samples = std::cell::RefCell::new(Vec::with_capacity(runs));
     let compile_samples = time_n(runs, || {
@@ -245,7 +250,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
 
         varn_core::assign_ast_ids(&mut program);
 
-        let check_result = Checker::check_with_profile(&program);
+        let check_result = Checker::check_with(&program, varn_checker::CheckOptions::compile());
 
         let mut proto = varn_compiler::compile_module(
             &program,

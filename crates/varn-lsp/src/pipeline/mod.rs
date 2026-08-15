@@ -115,7 +115,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     }
 
     varn_core::assign_ast_ids(&mut program);
-    let result = varn_checker::Checker::check_for_lsp(&program);
+    let result = varn_checker::Checker::check_with(&program, varn_checker::CheckOptions::tooling());
 
     for d in &result.diagnostics {
         let severity = match d.kind {

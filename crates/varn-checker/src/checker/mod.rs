@@ -134,21 +134,54 @@ pub struct Checker {
     pub(crate) expected_object_members_cache: FxHashMap<Type, Vec<ObjectTypeMember>>,
 }
 
+/// What a caller wants from a check, beyond the diagnostics.
+///
+/// One options struct instead of four constructors. `check_for_lsp` and
+/// `check_with_profile` used to be byte-for-byte the same call under two
+/// names, so a reader could not tell whether they were meant to differ — and
+/// `vn bench` picked `check_with_profile`, which meant the timings it reported
+/// were the TOOLING configuration, not the one that compiles. Profiling is not
+/// an option at all: `CheckResult::profile` is always filled.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CheckOptions {
+    /// Build the per-expression type table (`CheckResult::expr_types`).
+    ///
+    /// Tooling needs it to answer "what is at this cursor". A compile does
+    /// not, and building it costs an insert per expression. It must never
+    /// change what any type IS — see the comment in `Checker::infer_type`.
+    pub record_types: bool,
+    /// Warn wherever a type fell back to `dynamic` rather than being inferred.
+    pub warn_implicit_dynamic: bool,
+}
+
+impl CheckOptions {
+    /// What a compile wants: diagnostics and annotations, no type table.
+    pub fn compile() -> Self {
+        Self::default()
+    }
+
+    /// What an editor wants: the type table as well.
+    pub fn tooling() -> Self {
+        Self {
+            record_types: true,
+            ..Self::default()
+        }
+    }
+
+    pub fn strict(mut self) -> Self {
+        self.warn_implicit_dynamic = true;
+        self
+    }
+}
+
 impl Checker {
+    /// Check `program` for a compile. See [`Checker::check_with`] for tooling.
     pub fn check(program: &Program) -> CheckResult {
-        Self::check_internal(program, false, false)
+        Self::check_with(program, CheckOptions::compile())
     }
 
-    pub fn check_strict(program: &Program) -> CheckResult {
-        Self::check_internal(program, false, true)
-    }
-
-    pub fn check_for_lsp(program: &Program) -> CheckResult {
-        Self::check_internal(program, true, false)
-    }
-
-    pub fn check_with_profile(program: &Program) -> CheckResult {
-        Self::check_internal(program, true, false)
+    pub fn check_with(program: &Program, options: CheckOptions) -> CheckResult {
+        Self::check_internal(program, options.record_types, options.warn_implicit_dynamic)
     }
 
     fn check_internal(

@@ -12,7 +12,7 @@ pub mod scope;
 pub mod symbol;
 pub mod types;
 pub use binder::{BindResult, Binder, ClassMemberInfo, ClassMemberKind};
-pub use checker::{CheckProfile, CheckResult, Checker, ExprInfo};
+pub use checker::{CheckOptions, CheckProfile, CheckResult, Checker, ExprInfo};
 pub use scope::{CheckerScope, ScopeArena, ScopeId, ScopeKind};
 pub use symbol::{Symbol, SymbolArena, SymbolId, SymbolKind};
 pub use types::Type;
