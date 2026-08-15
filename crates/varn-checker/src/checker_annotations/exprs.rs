@@ -338,14 +338,56 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
     }
 }
 
+/// The type of `expr`, as the CHECKER decided it.
+///
+/// A lookup, with one documented exception. It used to be a three-way choice
+/// between two inference engines:
+///
+/// ```text
+/// if overlay-governed      -> binder::infer_expr_type   (second engine)
+/// else if in the table     -> the checker's answer
+/// else                     -> binder::infer_expr_type   (second engine again)
+/// ```
+///
+/// The third arm is gone. It was measured over all 74 files of the test corpus
+/// with a trace on both fallbacks: it fired **zero** times, while the overlay
+/// fired 75 (44 identifiers, 29 members, 2 binaries — every one of them the
+/// evolving-empty-array case). Dead defensive code that nonetheless made a
+/// second type system reachable from the path that feeds codegen.
+///
+/// A missing entry is a BUG IN THE CHECKER, and is treated as one.
+///
+/// `check_expr` records every expression it visits, so the annotations pass
+/// asking about a node the table does not have means the two disagree about
+/// which nodes exist. Answering `Dynamic` there would be a silent precision
+/// loss, and precision is the point: `Dynamic` is what stops the backend from
+/// emitting `AddInt`, an unboxed array read, a fixed-field slot. So the miss
+/// trips a `debug_assert` — every `cargo test` and every debug build fails on
+/// it — and the release path degrades rather than inventing a second opinion.
+/// Recovering the type from another engine would trade a loud bug for a quiet
+/// disagreement between what was checked and what is compiled.
+///
+/// The overlay arm is the last remaining second opinion. Folding it in means
+/// the checker itself recording the refined `Array<T>` — see
+/// `bind.evolved_array_types`, which it can already reach — and deciding
+/// whether `x[i]` on an evolving array reports errors as its element type or
+/// as `dynamic`. That is a semantic choice, not a refactor.
 pub(crate) fn get_expr_type(expr: &Expr, ctx: &AnnotateCtx) -> Type {
     if !ctx.evolved_locals.is_empty() && ctx.is_overlay_governed(expr) {
         return infer_expr_type(expr, Some(ctx));
     }
-    if let Some(entry) = ctx.expr_table.get(&expr.id) {
-        entry.ty.clone()
-    } else {
-        infer_expr_type(expr, Some(ctx))
+    match ctx.expr_table.get(&expr.id) {
+        Some(entry) => entry.ty.clone(),
+        None => {
+            debug_assert!(
+                false,
+                "checker did not type expression {} ({:?}) — the annotations pass \
+                 walks a node `check_expr` never visited, so codegen would lose \
+                 its type. Fix the checker's traversal, do not widen to dynamic.",
+                expr.id, expr.range
+            );
+            Type::Dynamic
+        }
     }
 }
 
