@@ -37,7 +37,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 pub use token::{ParsedNumber, Token, TokenKind};
 pub use type_tag::{TypeTag, VmValuePayload};
-pub use typed_ir::{NumericKind, TypeAnnotations};
+pub use typed_ir::{ExprAnnotation, NumericKind, TypeAnnotations};
 
 /// Version of the runtime:* host API surface. Bump on any breaking change
 /// (signature change, symbol removal). Additive changes do NOT bump — a std

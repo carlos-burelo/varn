@@ -1,0 +1,247 @@
+# check:types 14-generics.vn
+## checker types (key = expr id)
+6 | T
+7 | T
+8 | Box
+10 | T
+14 | T
+15 | Box
+21 | Box<U>
+22 | Box
+23 | U
+24 | (_: T) => U
+25 | T
+26 | Box
+33 | T
+35 | void
+36 | (label: str, cond: bool) => void
+37 | str
+38 | bool
+39 | int
+40 | (v: T) => T
+41 | int
+42 | int
+44 | void
+45 | (label: str, cond: bool) => void
+46 | str
+47 | bool
+48 | str
+49 | (v: T) => T
+50 | str
+51 | str
+53 | void
+54 | (label: str, cond: bool) => void
+55 | str
+56 | bool
+57 | bool
+58 | (v: T) => T
+59 | bool
+60 | bool
+66 | B
+68 | void
+69 | (label: str, cond: bool) => void
+70 | str
+71 | bool
+72 | str
+73 | (a: A, b: B) => B
+74 | int
+75 | str
+76 | str
+79 | Box<int>
+80 | Box
+81 | int
+83 | void
+84 | (label: str, cond: bool) => void
+85 | str
+86 | bool
+87 | int
+88 | () => int
+89 | Box<int>
+91 | int
+94 | Box<str>
+95 | (f: (_: int) => U) => Box<U>
+96 | Box<int>
+98 | (n: int) => str
+99 | str
+100 | int
+102 | void
+103 | (label: str, cond: bool) => void
+104 | str
+105 | bool
+106 | str
+107 | () => str
+108 | Box<str>
+110 | str
+117 | dynamic[]
+118 | T[]
+119 | GenericStack
+121 | dynamic[]
+125 | void
+126 | (item: T) => void
+127 | T[]
+128 | GenericStack
+131 | T
+137 | bool
+138 | int
+139 | T[]
+140 | GenericStack
+143 | int
+145 | null
+147 | T
+148 | () => T
+149 | T[]
+150 | GenericStack
+158 | bool
+159 | int
+160 | T[]
+161 | GenericStack
+164 | int
+166 | null
+168 | T
+169 | T[]
+170 | GenericStack
+172 | int
+173 | int
+174 | T[]
+175 | GenericStack
+178 | int
+182 | int
+183 | T[]
+184 | GenericStack
+190 | bool
+191 | int
+192 | T[]
+193 | GenericStack
+196 | int
+199 | GenericStack<int>
+200 | GenericStack
+202 | void
+203 | (label: str, cond: bool) => void
+204 | str
+205 | bool
+206 | GenericStack<int>
+209 | void
+210 | (item: int) => void
+211 | GenericStack<int>
+213 | int
+215 | void
+216 | (item: int) => void
+217 | GenericStack<int>
+219 | int
+221 | void
+222 | (item: int) => void
+223 | GenericStack<int>
+225 | int
+227 | void
+228 | (label: str, cond: bool) => void
+229 | str
+230 | bool
+231 | int
+232 | GenericStack<int>
+234 | int
+236 | void
+237 | (label: str, cond: bool) => void
+238 | str
+239 | bool
+240 | int?
+241 | () => int?
+242 | GenericStack<int>
+244 | int
+246 | void
+247 | (label: str, cond: bool) => void
+248 | str
+249 | bool
+250 | int?
+251 | () => int?
+252 | GenericStack<int>
+254 | int
+256 | void
+257 | (label: str, cond: bool) => void
+258 | str
+259 | bool
+260 | int
+261 | GenericStack<int>
+263 | int
+266 | Box<str>
+267 | (f: (_: int) => U) => Box<U>
+268 | Box<int>
+270 | (n: int) => str
+273 | str
+274 | int
+276 | void
+277 | (label: str, cond: bool) => void
+278 | str
+279 | bool
+280 | str
+281 | () => str
+282 | Box<str>
+284 | str
+290 | U
+291 | (_: T) => U
+292 | T
+294 | void
+295 | (label: str, cond: bool) => void
+296 | str
+297 | bool
+298 | str
+299 | (f: (_: T) => U, val: T) => U
+300 | (x: int) => str
+301 | str
+302 | () => str
+303 | int
+305 | int
+306 | str
+308 | void
+309 | (...args: dynamic[]) => void
+310 | str
+## annotations (key = byte offset)
+59 | 3:30 | fixed_field=0
+99 | 4:28 | fixed_field=0
+119 | 5:12 | cg=Fn
+167 | 5:60 | fixed_field=0
+255 | 10:27 | numeric=Int cg=Int
+308 | 11:27 | cg=Str
+365 | 12:27 | cg=Bool
+471 | 15:24 | cg=Str
+566 | 18:28 | numeric=Int
+573 | 18:35 | cg=Int
+610 | 19:23 | cg=Fn
+670 | 20:35 | cg=Str
+769 | 24:26 | cg=Array(Dynamic) fixed_field=0
+814 | 25:32 | cg=Array(Dynamic) fixed_field=0
+820 | 25:38 | cg=Fn native_op=17059365188679780804
+869 | 27:13 | numeric=Int
+874 | 27:18 | cg=Array(Dynamic) fixed_field=0
+880 | 27:24 | cg=Int
+927 | 28:21 | cg=Array(Dynamic) fixed_field=0
+933 | 28:27 | cg=Fn native_op=2532029292076510311
+983 | 31:13 | numeric=Int
+988 | 31:18 | cg=Array(Dynamic) fixed_field=0
+994 | 31:24 | cg=Int
+1036 | 32:16 | array_index
+1041 | 32:21 | cg=Array(Dynamic) fixed_field=0
+1047 | 32:27 | numeric=Int
+1052 | 32:32 | cg=Array(Dynamic) fixed_field=0
+1058 | 32:38 | cg=Int
+1112 | 34:35 | cg=Array(Dynamic) fixed_field=0
+1118 | 34:41 | cg=Int
+1161 | 35:34 | numeric=Int
+1166 | 35:39 | cg=Array(Dynamic) fixed_field=0
+1172 | 35:45 | cg=Int
+1261 | 39:32 | cg=Bool
+1275 | 40:5 | cg=Fn
+1288 | 41:5 | cg=Fn
+1301 | 42:5 | cg=Fn
+1335 | 43:26 | numeric=Int
+1339 | 43:30 | cg=Int
+1381 | 44:30 | cg=Nullable(Int)
+1425 | 45:30 | cg=Nullable(Int)
+1464 | 46:26 | numeric=Int
+1468 | 46:30 | cg=Int
+1510 | 48:28 | cg=Fn
+1589 | 49:45 | cg=Str
+1637 | 51:26 | cg=Fn
+1713 | 54:28 | cg=Str
+1737 | 54:52 | cg=Str intrinsic=0x20
+## reassigned names
+

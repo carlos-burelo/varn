@@ -1,0 +1,163 @@
+# check:types 53-int48-wrapping.vn
+## checker types (key = expr id)
+3 | int
+6 | int
+7 | int
+9 | void
+10 | (label: str, cond: bool) => void
+11 | str
+12 | bool
+13 | int
+14 | int
+16 | void
+17 | (label: str, cond: bool) => void
+18 | str
+19 | bool
+20 | int
+21 | int
+22 | int
+24 | void
+25 | (label: str, cond: bool) => void
+26 | str
+27 | bool
+28 | int
+29 | int
+30 | int
+31 | int
+32 | int
+34 | void
+35 | (label: str, cond: bool) => void
+36 | str
+37 | bool
+38 | int
+39 | int
+40 | int
+41 | int
+42 | int
+44 | void
+45 | (label: str, cond: bool) => void
+46 | str
+47 | bool
+48 | int
+49 | int
+50 | int
+51 | int
+52 | int
+53 | int
+55 | void
+56 | (label: str, cond: bool) => void
+57 | str
+58 | bool
+59 | int
+60 | int
+61 | int
+62 | int
+63 | int
+64 | int
+66 | void
+67 | (label: str, cond: bool) => void
+68 | str
+69 | bool
+70 | int
+71 | int
+72 | int
+73 | int
+74 | int
+76 | void
+77 | (label: str, cond: bool) => void
+78 | str
+79 | bool
+80 | int
+81 | int
+82 | int
+83 | int
+84 | int
+85 | int
+86 | int
+87 | int
+94 | int
+97 | int
+99 | bool
+100 | int
+101 | int
+104 | int
+105 | int
+106 | int
+107 | int
+108 | int
+110 | int
+111 | int
+112 | int
+113 | int
+114 | int
+116 | int
+118 | void
+119 | (label: str, cond: bool) => void
+120 | str
+121 | bool
+122 | int
+123 | (start: int, step: int, times: int) => int
+124 | int
+125 | int
+126 | int
+127 | int
+128 | (start: int, step: int, times: int) => int
+129 | int
+130 | int
+131 | int
+133 | void
+134 | (label: str, cond: bool) => void
+135 | str
+136 | bool
+137 | int
+138 | (start: int, step: int, times: int) => int
+139 | int
+140 | int
+141 | int
+142 | int
+144 | void
+145 | (label: str, cond: bool) => void
+146 | str
+147 | bool
+148 | int
+149 | (start: int, step: int, times: int) => int
+150 | int
+151 | int
+152 | int
+153 | int
+154 | int
+155 | int
+156 | int
+158 | void
+159 | (...args: dynamic[]) => void
+160 | str
+## annotations (key = byte offset)
+959 | 19:37 | numeric=Int
+1024 | 20:37 | numeric=Int
+1136 | 23:37 | numeric=Int
+1137 | 23:38 | numeric=Int
+1199 | 24:37 | numeric=Int
+1200 | 24:38 | numeric=Int
+1385 | 28:27 | numeric=Int
+1386 | 28:28 | numeric=Int
+1550 | 31:31 | numeric=Int
+1551 | 31:32 | numeric=Int
+1748 | 35:41 | numeric=Int
+1749 | 35:42 | numeric=Int
+1879 | 38:35 | numeric=Int
+1880 | 38:36 | numeric=Int
+1881 | 38:37 | numeric=Int
+2096 | 43:10 | cg=Int
+2107 | 43:21 | cg=Int
+2119 | 43:33 | cg=Int
+2130 | 43:44 | cg=Int
+2198 | 46:12 | numeric=Int
+2229 | 47:19 | numeric=Int
+2256 | 48:13 | numeric=Int
+2409 | 56:5 | numeric=Int cg=Int
+2461 | 56:57 | cg=Int
+2549 | 58:39 | numeric=Int cg=Int
+2770 | 62:43 | numeric=Int cg=Int
+2806 | 62:79 | numeric=Int
+## reassigned names
+

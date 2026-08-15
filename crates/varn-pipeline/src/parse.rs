@@ -43,9 +43,6 @@ pub fn parse(
     if debug.modules {
         varn_debug::modules::debug_modules(&program);
     }
-    if debug.expr {
-        varn_debug::expr::debug_expr(&program, debug.expr_range);
-    }
     if debug.graph {}
 
     Ok(program)

@@ -43,6 +43,18 @@ impl TypeAnnotations {
         &self.module_caps
     }
 
+    /// Every recorded annotation, for tooling that needs to see the whole
+    /// table rather than ask about one expression. Unordered — callers that
+    /// need a stable rendering must sort by key (`vn debug -p check:types`
+    /// does).
+    pub fn entries(&self) -> impl Iterator<Item = (&u32, &ExprAnnotation)> {
+        self.inner.iter()
+    }
+
+    pub fn reassigned_names(&self) -> impl Iterator<Item = &str> {
+        self.reassigned_names.iter().map(|s| s.as_str())
+    }
+
     pub fn record_reassigned_name(&mut self, name: &str) {
         self.reassigned_names.insert(name.to_owned());
     }

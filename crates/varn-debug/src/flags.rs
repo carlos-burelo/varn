@@ -14,6 +14,11 @@ pub struct DebugFlags {
     pub types_range: Option<(u32, u32)>,
     pub expr: bool,
     pub expr_range: Option<(u32, u32)>,
+    /// `check:types` — deterministic, diffable dump of the checker's type
+    /// table and the annotations that reach codegen. The baseline the checker
+    /// refactor is verified against, so it is deliberately NOT part of
+    /// `check` or `all`: those are for reading, this one is for diffing.
+    pub check_types: bool,
     pub errors: bool,
     pub trace: bool,
     pub calls: bool,
@@ -85,6 +90,7 @@ pub fn print_phases() {
         eprintln!("  {name:<10} {desc}");
     }
     eprintln!("\nSub-fases:");
+    eprintln!("  check:types  (volcado determinista y diffeable: tabla de tipos + anotaciones)");
     eprintln!("  clif:route  clif:kinds  clif:ir  clif:asm  clif:all");
     eprintln!("  roots:diff  roots:summary  roots:all");
     eprintln!("  lsp:hovers  lsp:semantic  lsp:types  lsp:completions");
@@ -130,7 +136,17 @@ impl DebugFlags {
             if phase.is_empty() {
                 continue;
             }
-            if let Some(range_str) = phase.strip_prefix("types:") {
+            if let Some(sub) = phase.strip_prefix("check:") {
+                match sub {
+                    "types" => flags.check_types = true,
+                    unknown => {
+                        return Err(CliError::usage(format!(
+                            "unknown check debug sub-phase: '{unknown}'\n\
+                             Valid sub-phases: types"
+                        )));
+                    }
+                }
+            } else if let Some(range_str) = phase.strip_prefix("types:") {
                 flags.types = true;
                 if range_str == "all" {
                     flags.types_all = true;
@@ -294,6 +310,7 @@ impl DebugFlags {
             || self.bails
             || self.summary
             || self.roots
+            || self.check_types
     }
 
     pub fn lsp_all(&mut self) {

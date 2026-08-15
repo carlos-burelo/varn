@@ -1,0 +1,90 @@
+# check:types 26-numeric-coercion.vn
+## checker types (key = expr id)
+3 | int
+6 | int
+8 | void
+9 | (label: str, cond: bool) => void
+10 | str
+11 | bool
+12 | float
+13 | float
+16 | int
+18 | void
+19 | (label: str, cond: bool) => void
+20 | str
+21 | bool
+22 | str
+23 | () => str
+24 | decimal
+26 | str
+29 | int
+31 | void
+32 | (label: str, cond: bool) => void
+33 | str
+34 | bool
+35 | str
+36 | () => str
+37 | bigint
+39 | str
+42 | int
+45 | int
+47 | void
+48 | (label: str, cond: bool) => void
+49 | str
+50 | bool
+51 | str
+52 | () => str
+53 | bigint
+55 | str
+61 | float
+62 | float
+63 | float
+65 | void
+66 | (label: str, cond: bool) => void
+67 | str
+68 | bool
+69 | float
+70 | (x: float) => float
+71 | int
+72 | float
+78 | decimal
+79 | decimal
+80 | decimal
+82 | void
+83 | (label: str, cond: bool) => void
+84 | str
+85 | bool
+86 | decimal
+87 | (x: decimal) => decimal
+88 | int
+89 | decimal
+92 | int
+95 | float
+98 | float
+99 | int
+100 | float
+102 | void
+103 | (label: str, cond: bool) => void
+104 | str
+105 | bool
+106 | float
+107 | float
+109 | void
+110 | (...args: dynamic[]) => void
+111 | str
+## annotations (key = byte offset)
+315 | 7:28 | numeric=Float
+412 | 10:30 | cg=Str native_op=14082731281044114842
+518 | 13:31 | cg=Str
+659 | 17:39 | cg=Str
+1261 | 29:10 | cg=Float
+1272 | 29:21 | cg=Float
+1298 | 29:47 | numeric=Float
+1342 | 30:34 | numeric=Float cg=Float
+1377 | 32:10 | cg=Decimal
+1390 | 32:23 | cg=Decimal
+1467 | 33:36 | cg=Decimal
+1737 | 39:18 | numeric=Float
+1774 | 40:31 | numeric=Float
+## reassigned names
+

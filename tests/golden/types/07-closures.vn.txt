@@ -1,0 +1,126 @@
+# check:types 07-closures.vn
+## checker types (key = expr id)
+8 | (x: int) => int
+9 | int
+10 | int
+11 | int
+14 | (a: int) => int
+15 | (n: int) => (a: int) => int
+16 | int
+19 | (a: int) => int
+20 | (n: int) => (a: int) => int
+21 | int
+23 | void
+24 | (label: str, cond: bool) => void
+25 | str
+26 | bool
+27 | int
+28 | (a: int) => int
+29 | int
+30 | int
+32 | void
+33 | (label: str, cond: bool) => void
+34 | str
+35 | bool
+36 | int
+37 | (a: int) => int
+38 | int
+39 | int
+41 | void
+42 | (label: str, cond: bool) => void
+43 | str
+44 | bool
+45 | int
+46 | (a: int) => int
+47 | int
+48 | int
+49 | (a: int) => int
+50 | int
+58 | int
+60 | () => int
+63 | int
+64 | int
+65 | int
+66 | int
+67 | int
+69 | int
+72 | () => int
+73 | () => () => int
+76 | () => int
+77 | () => () => int
+79 | void
+80 | (label: str, cond: bool) => void
+81 | str
+82 | bool
+83 | int
+84 | () => int
+85 | int
+87 | void
+88 | (label: str, cond: bool) => void
+89 | str
+90 | bool
+91 | int
+92 | () => int
+93 | int
+95 | void
+96 | (label: str, cond: bool) => void
+97 | str
+98 | bool
+99 | int
+100 | () => int
+101 | int
+109 | (x: A) => C
+110 | C
+111 | (a: B) => C
+112 | B
+113 | (b: A) => B
+114 | A
+117 | (n: int) => int
+118 | int
+119 | int
+120 | int
+123 | (n: int) => int
+124 | int
+125 | int
+126 | int
+129 | (c: int) => int
+130 | (f: (a: B) => C, g: (b: A) => B) => (c: A) => C
+131 | (n: int) => int
+132 | (n: int) => int
+134 | void
+135 | (label: str, cond: bool) => void
+136 | str
+137 | bool
+138 | int
+139 | (c: int) => int
+140 | int
+141 | int
+143 | void
+144 | (...args: dynamic[]) => void
+145 | str
+## annotations (key = byte offset)
+11 | 2:10 | cg=Fn
+21 | 2:20 | cg=Int
+72 | 3:24 | numeric=Int
+95 | 5:14 | cg=Fn
+123 | 6:15 | cg=Fn
+163 | 7:26 | numeric=Int cg=Int
+204 | 8:26 | numeric=Int cg=Int
+252 | 9:31 | numeric=Int cg=Int
+264 | 9:43 | cg=Int
+286 | 11:10 | cg=Fn
+361 | 14:13 | numeric=Int
+409 | 18:14 | cg=Fn
+437 | 19:14 | cg=Fn
+478 | 20:27 | numeric=Int cg=Int
+519 | 21:27 | numeric=Int cg=Int
+560 | 22:27 | numeric=Int cg=Int
+586 | 24:10 | cg=Fn
+603 | 24:27 | cg=Fn
+618 | 24:42 | cg=Fn
+708 | 27:28 | numeric=Int
+742 | 28:28 | numeric=Int
+767 | 29:19 | cg=Fn
+807 | 30:19 | numeric=Int cg=Int
+## reassigned names
+

@@ -1,0 +1,471 @@
+# check:types 05-arrays.vn
+## checker types (key = expr id)
+3 | int[]
+4 | int
+5 | int
+6 | int
+7 | int
+8 | int
+9 | int
+10 | int
+11 | int
+14 | str[]
+15 | str
+16 | str
+17 | str
+19 | void
+20 | (label: str, cond: bool) => void
+21 | str
+22 | bool
+23 | int
+24 | int[]
+26 | int
+28 | void
+29 | (label: str, cond: bool) => void
+30 | str
+31 | bool
+32 | int
+33 | (search: int) => int
+34 | int[]
+36 | int
+37 | int
+39 | void
+40 | (label: str, cond: bool) => void
+41 | str
+42 | bool
+43 | int
+44 | (search: int) => int
+45 | int[]
+47 | int
+48 | int
+49 | int
+51 | void
+52 | (label: str, cond: bool) => void
+53 | str
+54 | bool
+55 | (search: int) => bool
+56 | int[]
+58 | int
+60 | void
+61 | (label: str, cond: bool) => void
+62 | str
+63 | bool
+64 | bool
+65 | (search: int) => bool
+66 | int[]
+68 | int
+70 | void
+71 | (label: str, cond: bool) => void
+72 | str
+73 | bool
+74 | int
+75 | int[]
+76 | (start: int?, end: int?) => int[]
+77 | int[]
+79 | int
+80 | int
+82 | int
+84 | void
+85 | (label: str, cond: bool) => void
+86 | str
+87 | bool
+88 | int
+89 | int[]
+90 | (start: int?, end: int?) => int[]
+91 | int[]
+93 | int
+94 | int
+95 | int
+96 | int
+98 | void
+99 | (label: str, cond: bool) => void
+100 | str
+101 | bool
+102 | int
+103 | int[]
+104 | (...items: int[][]) => int[]
+105 | int[]
+106 | int
+107 | int
+109 | int[]
+110 | int
+111 | int
+113 | int
+115 | void
+116 | (label: str, cond: bool) => void
+117 | str
+118 | bool
+119 | str
+120 | (separator: str?) => str
+121 | int[]
+122 | int
+123 | int
+124 | int
+126 | str
+127 | str
+129 | void
+130 | (label: str, cond: bool) => void
+131 | str
+132 | bool
+133 | str
+134 | (separator: str?) => str
+135 | int[]
+136 | int
+137 | int
+138 | int
+140 | str
+143 | int[]
+144 | (callback: (item: int, index: int, array: int[]) => U) => U[]
+145 | int[]
+147 | (n: int) => int
+148 | int
+149 | int
+150 | int
+152 | void
+153 | (label: str, cond: bool) => void
+154 | str
+155 | bool
+156 | int
+157 | int[]
+159 | int
+161 | void
+162 | (label: str, cond: bool) => void
+163 | str
+164 | bool
+165 | int
+166 | int[]
+167 | int
+168 | int
+171 | int[]
+172 | (predicate: (item: int, index: int, array: int[]) => bool) => int[]
+173 | int[]
+175 | (n: int) => bool
+176 | bool
+177 | int
+178 | int
+179 | int
+180 | int
+182 | void
+183 | (label: str, cond: bool) => void
+184 | str
+185 | bool
+186 | int
+187 | int[]
+189 | int
+192 | int | dynamic
+193 | (callback: (acc: U, item: int, index: int, array: int[]) => U, initial: U?) => U
+194 | int[]
+196 | (acc: U, n: int) => dynamic
+197 | dynamic
+198 | U
+199 | int
+200 | int
+202 | void
+203 | (label: str, cond: bool) => void
+204 | str
+205 | bool
+206 | int | dynamic
+207 | int
+210 | int?
+211 | (predicate: (item: int, index: int, array: int[]) => bool) => int?
+212 | int[]
+214 | (n: int) => bool
+215 | bool
+216 | int
+217 | int
+219 | void
+220 | (label: str, cond: bool) => void
+221 | str
+222 | bool
+223 | int?
+224 | int
+227 | int
+228 | (predicate: (item: int, index: int, array: int[]) => bool) => int
+229 | int[]
+231 | (n: int) => bool
+232 | bool
+233 | int
+234 | int
+236 | void
+237 | (label: str, cond: bool) => void
+238 | str
+239 | bool
+240 | int
+241 | int
+243 | void
+244 | (label: str, cond: bool) => void
+245 | str
+246 | bool
+247 | (predicate: (item: int, index: int, array: int[]) => bool) => bool
+248 | int[]
+250 | (n: int) => bool
+251 | bool
+252 | int
+253 | int
+255 | void
+256 | (label: str, cond: bool) => void
+257 | str
+258 | bool
+259 | bool
+260 | (predicate: (item: int, index: int, array: int[]) => bool) => bool
+261 | int[]
+263 | (n: int) => bool
+264 | bool
+265 | int
+266 | int
+268 | void
+269 | (label: str, cond: bool) => void
+270 | str
+271 | bool
+272 | (predicate: (item: int, index: int, array: int[]) => bool) => bool
+273 | int[]
+274 | int
+275 | int
+276 | int
+278 | (n: int) => bool
+279 | bool
+280 | int
+281 | int
+282 | int
+283 | int
+285 | void
+286 | (label: str, cond: bool) => void
+287 | str
+288 | bool
+289 | bool
+290 | (predicate: (item: int, index: int, array: int[]) => bool) => bool
+291 | int[]
+292 | int
+293 | int
+294 | int
+296 | (n: int) => bool
+297 | bool
+298 | int
+299 | int
+300 | int
+301 | int
+304 | str[]
+305 | (compareFn: (a: str, b: str) => int?) => str[]
+306 | str[]
+309 | void
+310 | (label: str, cond: bool) => void
+311 | str
+312 | bool
+313 | str
+314 | str[]
+315 | int
+316 | str
+319 | int[]
+320 | () => int[]
+321 | int[]
+322 | int
+323 | int
+324 | int
+327 | void
+328 | (label: str, cond: bool) => void
+329 | str
+330 | bool
+331 | int
+332 | int[]
+333 | int
+334 | int
+337 | int[][]
+338 | (depth: int?) => int[][]
+339 | int[][]
+340 | int[]
+341 | int
+342 | int
+343 | int[]
+344 | int
+345 | int
+348 | void
+349 | (label: str, cond: bool) => void
+350 | str
+351 | bool
+352 | int
+353 | int[][]
+355 | int
+357 | void
+358 | (label: str, cond: bool) => void
+359 | str
+360 | bool
+361 | int[]
+362 | int[][]
+363 | int
+364 | int
+367 | int[]
+368 | (callback: (item: int[], index: int, array: int[][]) => U[]) => U[]
+369 | int[][]
+370 | int[]
+371 | int
+372 | int
+373 | int[]
+374 | int
+376 | (a: int[]) => int[]
+377 | int[]
+379 | void
+380 | (label: str, cond: bool) => void
+381 | str
+382 | bool
+383 | int
+384 | int[]
+386 | int
+389 | int
+391 | void
+392 | (callback: (item: int, index: int, array: int[]) => void) => void
+393 | int[]
+394 | int
+395 | int
+396 | int
+398 | (n: int) => void
+401 | int
+402 | int
+403 | int
+404 | int
+405 | int
+407 | void
+408 | (label: str, cond: bool) => void
+409 | str
+410 | bool
+411 | int
+412 | int
+415 | int[]
+416 | int
+417 | int
+418 | int
+420 | void
+421 | (item: int) => void
+422 | int[]
+424 | int
+426 | void
+427 | (label: str, cond: bool) => void
+428 | str
+429 | bool
+430 | int
+431 | int[]
+433 | int
+435 | void
+436 | (label: str, cond: bool) => void
+437 | str
+438 | bool
+439 | int
+440 | int[]
+441 | int
+442 | int
+445 | int
+446 | () => int
+447 | int[]
+450 | void
+451 | (label: str, cond: bool) => void
+452 | str
+453 | bool
+454 | int
+455 | int
+457 | void
+458 | (label: str, cond: bool) => void
+459 | str
+460 | bool
+461 | int
+462 | int[]
+464 | int
+467 | int[]
+468 | int[]
+469 | int
+470 | int
+471 | int[]
+472 | int
+473 | int
+475 | void
+476 | (label: str, cond: bool) => void
+477 | str
+478 | bool
+479 | int
+480 | int[]
+482 | int
+484 | void
+485 | (label: str, cond: bool) => void
+486 | str
+487 | bool
+488 | int
+489 | int[]
+490 | int
+491 | int
+493 | void
+494 | (...args: dynamic[]) => void
+495 | str
+## annotations (key = byte offset)
+110 | 5:24 | numeric=Int
+115 | 5:29 | cg=Int
+153 | 6:24 | numeric=Int
+158 | 6:29 | cg=Int native_op=13148294879121262557
+200 | 7:24 | numeric=Int
+205 | 7:29 | cg=Int native_op=13148294879121262557
+254 | 8:29 | cg=Bool native_op=17834796676346375813
+297 | 9:30 | cg=Bool native_op=17834796676346375813
+335 | 10:24 | numeric=Int
+340 | 10:29 | cg=Array(Int) native_op=16675887620424095650
+352 | 10:41 | cg=Int
+390 | 11:24 | numeric=Int array_index
+395 | 11:29 | cg=Array(Int) native_op=16675887620424095650
+407 | 11:41 | cg=Int
+441 | 12:24 | numeric=Int
+448 | 12:31 | cg=Array(Int) native_op=16355213048525284072
+463 | 12:46 | cg=Int
+511 | 13:34 | cg=Str native_op=8238581328922448208
+568 | 14:34 | cg=Str native_op=8238581328922448208
+612 | 16:22 | cg=Array(Int) native_op=705378738777152342
+623 | 16:33 | numeric=Int
+677 | 17:24 | numeric=Int
+685 | 17:32 | cg=Int
+723 | 18:24 | numeric=Int array_index
+731 | 18:32 | cg=Int
+763 | 20:20 | cg=Array(Int) native_op=824143943159215474
+777 | 20:34 | numeric=Int
+854 | 21:24 | numeric=Int
+860 | 21:30 | cg=Int
+894 | 23:18 | cg=Fn native_op=4517219811331526510
+1035 | 26:20 | cg=Nullable(Int) native_op=6530791129385928027
+1047 | 26:32 | numeric=Int
+1110 | 29:17 | cg=Int native_op=8385572526351475697
+1127 | 29:34 | numeric=Int
+1158 | 30:24 | numeric=Int
+1199 | 32:29 | cg=Bool native_op=16781003032214271640
+1211 | 32:41 | numeric=Int
+1249 | 33:30 | cg=Bool native_op=16781003032214271640
+1261 | 33:42 | numeric=Int
+1305 | 34:34 | cg=Bool native_op=6573967687924892835
+1318 | 34:47 | numeric=Int
+1367 | 35:35 | cg=Bool native_op=6573967687924892835
+1380 | 35:48 | numeric=Int
+1417 | 37:21 | cg=Array(Str) native_op=16751447060142197724
+1448 | 38:24 | array_index
+1455 | 38:31 | cg=Str
+1496 | 40:23 | cg=Array(Int) native_op=7611089366941086646
+1530 | 41:24 | numeric=Int array_index
+1534 | 41:28 | cg=Int
+1577 | 43:31 | cg=Array(Array(Int)) native_op=8390877831292559631
+1608 | 44:24 | numeric=Int
+1613 | 44:29 | cg=Int
+1651 | 45:24 | array_index
+1656 | 45:29 | cg=Array(Int)
+1694 | 47:26 | cg=Array(Int) native_op=11758896777689091311
+1736 | 48:24 | numeric=Int
+1739 | 48:27 | cg=Int
+1786 | 51:14 | cg=Fn native_op=3671315545032441702
+1813 | 51:41 | numeric=Int
+1852 | 52:24 | numeric=Int
+1898 | 55:5 | cg=Fn native_op=17059365188679780804
+1930 | 56:24 | numeric=Int
+1934 | 56:28 | cg=Int
+1972 | 57:24 | numeric=Int array_index
+1976 | 57:28 | cg=Int
+2006 | 58:20 | cg=Int native_op=2532029292076510311
+2036 | 59:24 | numeric=Int
+2074 | 60:24 | numeric=Int
+2078 | 60:28 | cg=Int
+2157 | 63:24 | numeric=Int
+2164 | 63:31 | cg=Int
+2202 | 64:24 | numeric=Int array_index
+2209 | 64:31 | cg=Int
+## reassigned names
+

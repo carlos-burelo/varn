@@ -71,6 +71,13 @@ pub fn check(
         varn_debug::symbols::debug_symbols(&check_result, &program.filename, debug);
     }
 
+    // After the check, not after the parse: this dump is the checker's answers,
+    // and the old `debug_expr` hook fired in `parse` where none of them exist
+    // yet — which is why it could only ever print "not implemented".
+    if debug.check_types {
+        varn_debug::expr::debug_check_types(program, source, &check_result);
+    }
+
     Ok(CheckResult {
         checker_result: check_result,
     })

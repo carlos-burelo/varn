@@ -1,0 +1,526 @@
+# check:types 73-str-charcode-json-shape.vn
+## checker types (key = expr id)
+5 | str
+6 | (n: int) => str
+7 | str
+9 | int
+12 | str
+15 | str
+17 | void
+18 | (label: str, cond: bool) => void
+19 | str
+20 | bool
+21 | int
+22 | (pos: int) => int
+23 | str
+25 | int
+26 | int
+28 | void
+29 | (label: str, cond: bool) => void
+30 | str
+31 | bool
+32 | int
+33 | (pos: int) => int
+34 | str
+36 | int
+37 | int
+39 | void
+40 | (label: str, cond: bool) => void
+41 | str
+42 | bool
+43 | int
+44 | (pos: int) => int
+45 | str
+47 | int
+48 | int
+49 | int
+51 | void
+52 | (label: str, cond: bool) => void
+53 | str
+54 | bool
+55 | int
+56 | (pos: int) => int
+57 | str
+59 | int
+60 | int
+61 | int
+62 | int
+64 | void
+65 | (label: str, cond: bool) => void
+66 | str
+67 | bool
+68 | int
+69 | (pos: int) => int
+70 | str
+72 | int
+73 | int
+75 | void
+76 | (label: str, cond: bool) => void
+77 | str
+78 | bool
+79 | int
+80 | (pos: int) => int
+81 | str
+83 | int
+84 | int
+85 | int
+87 | void
+88 | (label: str, cond: bool) => void
+89 | str
+90 | bool
+91 | int
+92 | (pos: int) => int
+93 | str
+95 | int
+96 | int
+97 | int
+98 | int
+100 | void
+101 | (label: str, cond: bool) => void
+102 | str
+103 | bool
+104 | int
+105 | (pos: int) => int
+106 | str
+108 | int
+109 | int
+111 | void
+112 | (label: str, cond: bool) => void
+113 | str
+114 | bool
+115 | int
+116 | (pos: int) => int
+117 | str
+119 | int
+120 | int
+122 | void
+123 | (label: str, cond: bool) => void
+124 | str
+125 | bool
+126 | int
+127 | (pos: int) => int
+128 | str
+130 | int
+131 | int
+133 | void
+134 | (label: str, cond: bool) => void
+135 | str
+136 | bool
+137 | int
+138 | (pos: int) => int
+139 | str
+141 | int
+142 | int
+144 | void
+145 | (label: str, cond: bool) => void
+146 | str
+147 | bool
+148 | int
+149 | (pos: int) => int
+150 | str
+152 | int
+153 | int
+154 | int
+156 | void
+157 | (label: str, cond: bool) => void
+158 | str
+159 | bool
+160 | int
+161 | (pos: int) => int
+162 | str
+164 | int
+165 | int
+166 | int
+167 | int
+174 | int
+177 | int
+180 | int
+181 | str
+184 | bool
+185 | int
+186 | int
+190 | int
+192 | bool
+193 | int
+194 | int
+197 | int
+198 | int
+199 | int
+200 | int
+201 | int
+202 | (pos: int) => int
+203 | str
+205 | int
+207 | int
+208 | int
+209 | int
+210 | int
+211 | int
+213 | int
+214 | int
+215 | int
+216 | int
+217 | int
+218 | (pos: int) => int
+219 | str
+221 | int
+223 | int
+224 | int
+225 | int
+226 | int
+227 | int
+228 | (pos: int) => int
+229 | str
+231 | int
+232 | int
+233 | int
+235 | int
+236 | int
+237 | int
+238 | int
+239 | int
+241 | int
+244 | int
+245 | int
+246 | int
+248 | void
+249 | (label: str, cond: bool) => void
+250 | str
+251 | bool
+252 | int
+253 | (s: str, times: int) => int
+254 | str
+255 | int
+256 | int
+257 | int
+258 | int
+260 | void
+261 | (label: str, cond: bool) => void
+262 | str
+263 | bool
+264 | int
+265 | (s: str, times: int) => int
+266 | str
+267 | int
+268 | int
+269 | int
+270 | int
+271 | int
+272 | int
+273 | int
+275 | void
+276 | (label: str, cond: bool) => void
+277 | str
+278 | bool
+279 | int
+280 | (s: str, times: int) => int
+281 | str
+282 | int
+283 | int
+284 | int
+285 | int
+286 | int
+287 | int
+288 | int
+289 | int
+290 | int
+291 | int
+292 | int
+294 | void
+295 | (label: str, cond: bool) => void
+296 | str
+297 | bool
+298 | int
+299 | (s: str, times: int) => int
+300 | str
+301 | int
+302 | int
+303 | int
+304 | int
+305 | int
+306 | int
+307 | int
+308 | int
+309 | int
+310 | int
+311 | int
+312 | int
+313 | int
+316 | str
+317 | str
+318 | (n: int) => str
+319 | str
+321 | int
+322 | str
+324 | void
+325 | (label: str, cond: bool) => void
+326 | str
+327 | bool
+328 | int
+329 | (search: str) => int
+330 | str
+332 | str
+333 | int
+335 | void
+336 | (label: str, cond: bool) => void
+337 | str
+338 | bool
+339 | int
+340 | (search: str) => int
+341 | str
+343 | str
+344 | int
+345 | int
+347 | void
+348 | (label: str, cond: bool) => void
+349 | str
+350 | bool
+351 | int
+352 | (search: str) => int
+353 | str
+355 | str
+356 | int
+358 | void
+359 | (label: str, cond: bool) => void
+360 | str
+361 | bool
+362 | int
+363 | (search: str) => int
+364 | str
+366 | str
+367 | int
+369 | void
+370 | (label: str, cond: bool) => void
+371 | str
+372 | bool
+373 | int
+374 | (search: str) => int
+375 | str
+377 | str
+378 | int
+379 | int
+381 | void
+382 | (label: str, cond: bool) => void
+383 | str
+384 | bool
+385 | (search: str) => bool
+386 | str
+388 | str
+390 | void
+391 | (label: str, cond: bool) => void
+392 | str
+393 | bool
+394 | bool
+395 | (search: str) => bool
+396 | str
+398 | str
+399 | bool
+402 | str
+404 | void
+405 | (label: str, cond: bool) => void
+406 | str
+407 | bool
+408 | int
+409 | (search: str) => int
+410 | str
+412 | str
+413 | int
+415 | void
+416 | (label: str, cond: bool) => void
+417 | str
+418 | bool
+419 | str
+420 | (value: int | float | str | bool | null | Json[] | #{ [key: str]: Json }, space: int?) => str
+421 | #{ a: int, b: str }
+422 | int
+423 | str
+424 | str
+426 | void
+427 | (label: str, cond: bool) => void
+428 | str
+429 | bool
+430 | str
+431 | (value: int | float | str | bool | null | Json[] | #{ [key: str]: Json }, space: int?) => str
+432 | int[]
+433 | int
+434 | int
+435 | int
+436 | str
+438 | void
+439 | (label: str, cond: bool) => void
+440 | str
+441 | bool
+442 | str
+443 | (value: int | float | str | bool | null | Json[] | #{ [key: str]: Json }, space: int?) => str
+444 | #{ id: int, tags: str[] }
+445 | int
+446 | str[]
+447 | str
+448 | str
+449 | str
+451 | void
+452 | (label: str, cond: bool) => void
+453 | str
+454 | bool
+455 | str
+456 | (value: int | float | str | bool | null | Json[] | #{ [key: str]: Json }, space: int?) => str
+457 | #{ z: int, a: int, m: int }
+458 | int
+459 | int
+460 | int
+461 | str
+464 | #[int, str, bool]
+465 | int
+466 | str
+467 | bool
+469 | void
+470 | (label: str, cond: bool) => void
+471 | str
+472 | bool
+473 | str
+474 | (value: int | float | str | bool | null | Json[] | #{ [key: str]: Json }, space: int?) => str
+475 | dynamic
+476 | #[int, str, bool]
+477 | str
+480 | #{ readonly x: int, readonly y: int }
+481 | int
+482 | int
+484 | void
+485 | (label: str, cond: bool) => void
+486 | str
+487 | bool
+488 | str
+489 | (value: int | float | str | bool | null | Json[] | #{ [key: str]: Json }, space: int?) => str
+490 | dynamic
+491 | #{ readonly x: int, readonly y: int }
+492 | str
+495 | str
+498 | dynamic[]
+499 | int | float | str | bool | null | Json[] | #{ [key: str]: Json }
+500 | (text: str) => int | float | str | bool | null | Json[] | #{ [key: str]: Json }
+501 | str
+503 | void
+504 | (label: str, cond: bool) => void
+505 | str
+506 | bool
+507 | int
+508 | dynamic[]
+510 | int
+512 | void
+513 | (label: str, cond: bool) => void
+514 | str
+515 | bool
+516 | str
+517 | (value: int | float | str | bool | null | Json[] | #{ [key: str]: Json }, space: int?) => str
+518 | dynamic
+519 | dynamic[]
+520 | int
+521 | str
+523 | void
+524 | (label: str, cond: bool) => void
+525 | str
+526 | bool
+527 | str
+528 | (value: int | float | str | bool | null | Json[] | #{ [key: str]: Json }, space: int?) => str
+529 | dynamic
+530 | dynamic[]
+531 | int
+532 | str
+534 | void
+535 | (label: str, cond: bool) => void
+536 | str
+537 | bool
+538 | str
+539 | (value: int | float | str | bool | null | Json[] | #{ [key: str]: Json }, space: int?) => str
+540 | dynamic
+541 | dynamic[]
+542 | int
+543 | str
+## annotations (key = byte offset)
+850 | 14:10 | slot=2
+861 | 14:21 | slot=1
+997 | 18:28 | cg=Str native_op=5671629957611713757
+1230 | 22:41 | numeric=Int
+1236 | 22:47 | cg=Int intrinsic=0x10
+1299 | 23:41 | numeric=Int
+1305 | 23:47 | cg=Int intrinsic=0x10
+1372 | 24:43 | numeric=Int
+1378 | 24:49 | cg=Int intrinsic=0x10
+1444 | 25:43 | numeric=Int
+1450 | 25:49 | cg=Int intrinsic=0x10
+1515 | 27:40 | numeric=Int
+1521 | 27:46 | cg=Int intrinsic=0x10
+1583 | 28:40 | numeric=Int
+1589 | 28:46 | cg=Int intrinsic=0x10
+1651 | 29:40 | numeric=Int
+1657 | 29:46 | cg=Int intrinsic=0x10
+1781 | 32:35 | numeric=Int
+1786 | 32:40 | cg=Int intrinsic=0x10
+1843 | 33:35 | numeric=Int
+1848 | 33:40 | cg=Int intrinsic=0x10
+1906 | 34:35 | numeric=Int
+1911 | 34:40 | cg=Int intrinsic=0x10
+1971 | 35:35 | numeric=Int
+1976 | 35:40 | cg=Int intrinsic=0x10
+2041 | 36:42 | numeric=Int
+2046 | 36:47 | cg=Int intrinsic=0x10
+2110 | 37:42 | numeric=Int
+2115 | 37:47 | cg=Int intrinsic=0x10
+2415 | 43:10 | cg=Int
+2423 | 43:18 | cg=Str
+2431 | 43:26 | cg=Int
+2503 | 46:19 | cg=Int
+2522 | 47:12 | numeric=Int
+2570 | 49:16 | numeric=Int
+2602 | 50:21 | numeric=Int
+2612 | 50:31 | cg=Int intrinsic=0x10
+2643 | 51:17 | numeric=Int
+2677 | 53:17 | numeric=Int
+2687 | 53:27 | cg=Int intrinsic=0x10
+2747 | 54:17 | numeric=Int
+2757 | 54:27 | cg=Int intrinsic=0x10
+2768 | 54:38 | numeric=Int
+2813 | 55:13 | numeric=Int
+2947 | 61:17 | numeric=Int
+2989 | 62:33 | numeric=Int cg=Int
+3011 | 62:55 | numeric=Int
+3187 | 65:32 | numeric=Int cg=Int
+3212 | 65:57 | numeric=Int
+3213 | 65:58 | numeric=Int
+3375 | 68:36 | numeric=Int cg=Int
+3400 | 68:61 | numeric=Int
+3401 | 68:62 | numeric=Int
+3469 | 69:42 | numeric=Int cg=Int
+3493 | 69:66 | numeric=Int
+3494 | 69:67 | numeric=Int
+3640 | 73:26 | cg=Str native_op=5671629957611713757
+3688 | 74:26 | numeric=Int
+3692 | 74:30 | cg=Int intrinsic=0x16
+3746 | 75:27 | numeric=Int
+3750 | 75:31 | cg=Int intrinsic=0x16
+3807 | 76:33 | numeric=Int
+3811 | 76:37 | cg=Int intrinsic=0x16
+3860 | 77:30 | numeric=Int
+3864 | 77:34 | cg=Int intrinsic=0x17
+3923 | 78:31 | numeric=Int
+3927 | 78:35 | cg=Int intrinsic=0x17
+3984 | 79:29 | cg=Bool intrinsic=0x1a
+4030 | 80:28 | cg=Bool intrinsic=0x1a
+4188 | 83:37 | numeric=Int
+4193 | 83:42 | cg=Int intrinsic=0x16
+4326 | 87:24 | cg=Str
+4406 | 88:23 | cg=Str
+4466 | 89:24 | cg=Str
+4706 | 93:29 | cg=Str
+4911 | 97:42 | cg=Str
+5033 | 100:41 | cg=Str
+5610 | 109:27 | numeric=Int
+5615 | 109:32 | cg=Int
+5658 | 110:29 | cg=Str
+5668 | 110:39 | array_index
+5732 | 111:30 | cg=Str
+5742 | 111:40 | array_index
+5828 | 112:36 | cg=Str
+5838 | 112:46 | array_index
+## reassigned names
+

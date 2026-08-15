@@ -1,0 +1,170 @@
+# check:types 23-objects.vn
+## checker types (key = expr id)
+7 | dynamic[]
+8 | str[]
+9 | Builder
+11 | dynamic[]
+15 | void
+16 | (item: str) => void
+17 | str[]
+18 | Builder
+21 | str
+23 | Builder
+27 | str
+28 | (separator: str?) => str
+29 | str[]
+30 | Builder
+33 | str
+36 | str
+37 | () => str
+38 | Builder
+39 | (s: str) => Builder
+40 | Builder
+41 | (s: str) => Builder
+42 | Builder
+43 | (s: str) => Builder
+44 | Builder
+45 | Builder
+47 | str
+49 | str
+51 | str
+54 | void
+55 | (label: str, cond: bool) => void
+56 | str
+57 | bool
+58 | str
+59 | str
+69 | T
+70 | T
+71 | Node
+73 | T
+75 | null
+76 | Node<T>?
+77 | Node
+79 | null
+89 | null
+90 | Node<T>?
+91 | LinkedList
+93 | null
+95 | int
+96 | int
+97 | LinkedList
+99 | int
+104 | Node<T>
+105 | Node
+106 | T
+108 | Node<T>?
+109 | Node<T>?
+110 | Node<T>
+112 | Node<T>?
+113 | LinkedList
+116 | Node<T>
+117 | Node<T>?
+118 | LinkedList
+120 | Node<T>
+122 | int
+123 | int
+124 | LinkedList
+126 | int
+127 | int
+128 | LinkedList
+130 | int
+134 | int
+135 | LinkedList
+142 | T[]
+145 | Node<T>?
+146 | LinkedList
+149 | bool
+150 | Node<T>?
+151 | null
+154 | void
+155 | (item: T) => void
+156 | T[]
+158 | T
+159 | Node<T>
+162 | Node<T>?
+163 | Node<T>
+164 | Node<T>?
+165 | Node<T>
+168 | T[]
+171 | LinkedList<int>
+172 | LinkedList
+174 | void
+175 | (v: int) => void
+176 | LinkedList<int>
+178 | int
+180 | void
+181 | (v: int) => void
+182 | LinkedList<int>
+184 | int
+186 | void
+187 | (v: int) => void
+188 | LinkedList<int>
+190 | int
+192 | void
+193 | (label: str, cond: bool) => void
+194 | str
+195 | bool
+196 | int
+197 | LinkedList<int>
+199 | int
+202 | int[]
+203 | () => int[]
+204 | LinkedList<int>
+207 | void
+208 | (label: str, cond: bool) => void
+209 | str
+210 | bool
+211 | int
+212 | int[]
+213 | int
+214 | int
+216 | void
+217 | (label: str, cond: bool) => void
+218 | str
+219 | bool
+220 | int
+221 | int[]
+222 | int
+223 | int
+225 | void
+226 | (...args: dynamic[]) => void
+227 | str
+## annotations (key = byte offset)
+70 | 4:26 | cg=Array(Str) fixed_field=0
+92 | 5:9 | cg=Str
+125 | 6:14 | cg=Array(Str) fixed_field=0
+131 | 6:20 | cg=Fn native_op=17059365188679780804
+199 | 9:32 | cg=Array(Str) fixed_field=0
+205 | 9:38 | cg=Str native_op=8238581328922448208
+252 | 12:30 | cg=Class("Builder")
+265 | 12:43 | cg=Class("Builder")
+277 | 12:55 | cg=Class("Builder")
+292 | 12:70 | cg=Str
+458 | 19:14 | fixed_field=0
+482 | 20:14 | fixed_field=1
+628 | 29:14 | fixed_field=0
+654 | 30:14 | cg=Int fixed_field=1
+749 | 34:14 | fixed_field=1
+761 | 34:26 | fixed_field=0
+780 | 35:14 | fixed_field=0
+806 | 36:14 | cg=Int fixed_field=1
+814 | 36:22 | numeric=Int
+819 | 36:27 | cg=Int fixed_field=1
+871 | 38:35 | cg=Int fixed_field=1
+954 | 41:24 | fixed_field=0
+1008 | 43:17 | cg=Fn native_op=17059365188679780804
+1017 | 43:26 | fixed_field=0
+1047 | 44:23 | fixed_field=1
+1138 | 51:6 | cg=Fn
+1156 | 52:6 | cg=Fn
+1174 | 53:6 | cg=Fn
+1215 | 54:29 | numeric=Int
+1220 | 54:34 | cg=Int
+1249 | 55:17 | cg=Array(Int)
+1288 | 56:29 | numeric=Int array_index
+1291 | 56:32 | cg=Int
+1330 | 57:29 | numeric=Int array_index
+1333 | 57:32 | cg=Int
+## reassigned names
+

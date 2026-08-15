@@ -39,6 +39,15 @@ pub struct CheckResult {
     pub extension_set_members: FxHashMap<u32, Rc<str>>,
     pub node_scopes: FxHashMap<u32, crate::scope::ScopeId>,
     pub symbol_types: FxHashMap<SymbolId, crate::types::Type>,
+    /// Every expression's checked type, keyed by `Expr::id()`.
+    ///
+    /// Distinct from [`Self::expr_types`], which is keyed by BYTE OFFSET and
+    /// only populated for tooling. Two maps, two key spaces, two lifetimes —
+    /// the collapse of the two is Phase 1 of the checker plan. Exposed here so
+    /// `vn debug -p check:types` can print what the checker actually decided
+    /// next to what reached codegen, which is the baseline that refactor is
+    /// verified against.
+    pub resolved_expr_types: FxHashMap<u32, crate::types::Type>,
 }
 
 impl CheckResult {
@@ -253,8 +262,8 @@ impl Checker {
         final_diagnostics.extend(checker.diagnostics);
 
         let started = Instant::now();
-        let mut annotations =
-            collect_type_annotations(program, &bind, &checker.resolved_expr_types);
+        let resolved_expr_types = std::mem::take(&mut checker.resolved_expr_types);
+        let mut annotations = collect_type_annotations(program, &bind, &resolved_expr_types);
 
         for (k, v) in checker.call_mappings {
             annotations.record_call_mapping(k, v);
@@ -309,6 +318,7 @@ impl Checker {
             extension_set_members: checker.extension_set_members,
             node_scopes,
             symbol_types,
+            resolved_expr_types,
         }
     }
 

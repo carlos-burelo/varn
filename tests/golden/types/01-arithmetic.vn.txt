@@ -1,0 +1,208 @@
+# check:types 01-arithmetic.vn
+## checker types (key = expr id)
+2 | void
+3 | (label: str, cond: bool) => void
+4 | str
+5 | bool
+6 | int
+7 | int
+8 | int
+9 | int
+11 | void
+12 | (label: str, cond: bool) => void
+13 | str
+14 | bool
+15 | int
+16 | int
+17 | int
+18 | int
+19 | int
+21 | void
+22 | (label: str, cond: bool) => void
+23 | str
+24 | bool
+25 | int
+26 | int
+27 | int
+28 | int
+30 | void
+31 | (label: str, cond: bool) => void
+32 | str
+33 | bool
+34 | float
+35 | int
+36 | int
+37 | int
+39 | void
+40 | (label: str, cond: bool) => void
+41 | str
+42 | bool
+43 | int
+44 | int
+45 | int
+46 | int
+48 | void
+49 | (label: str, cond: bool) => void
+50 | str
+51 | bool
+52 | int
+53 | int
+54 | int
+55 | int
+56 | int
+57 | int
+59 | void
+60 | (label: str, cond: bool) => void
+61 | str
+62 | bool
+63 | int
+64 | int
+65 | int
+66 | int
+68 | void
+69 | (label: str, cond: bool) => void
+70 | str
+71 | bool
+72 | bool
+73 | float
+74 | float
+75 | float
+76 | float
+77 | bool
+78 | float
+79 | float
+80 | float
+81 | float
+83 | void
+84 | (label: str, cond: bool) => void
+85 | str
+86 | bool
+87 | bool
+88 | float
+89 | float
+90 | float
+91 | float
+92 | bool
+93 | float
+94 | float
+95 | float
+96 | float
+98 | void
+99 | (label: str, cond: bool) => void
+100 | str
+101 | bool
+102 | int
+103 | int
+104 | int
+105 | int
+106 | int
+108 | void
+109 | (label: str, cond: bool) => void
+110 | str
+111 | bool
+112 | int
+113 | int
+114 | int
+115 | int
+116 | int
+118 | void
+119 | (label: str, cond: bool) => void
+120 | str
+121 | bool
+122 | int
+123 | int
+124 | int
+125 | int
+126 | int
+127 | int
+129 | void
+130 | (label: str, cond: bool) => void
+131 | str
+132 | bool
+133 | int
+134 | int
+135 | int
+136 | int
+137 | int
+138 | int
+139 | int
+141 | void
+142 | (label: str, cond: bool) => void
+143 | str
+144 | bool
+145 | int
+146 | int
+147 | int
+148 | int
+149 | int
+151 | void
+152 | (label: str, cond: bool) => void
+153 | str
+154 | bool
+155 | int
+156 | int
+157 | int
+158 | int
+159 | int
+161 | void
+162 | (label: str, cond: bool) => void
+163 | str
+164 | bool
+165 | int
+166 | int
+167 | int
+168 | int
+169 | int
+171 | void
+172 | (label: str, cond: bool) => void
+173 | str
+174 | bool
+175 | int
+176 | int
+177 | int
+178 | int
+180 | void
+181 | (label: str, cond: bool) => void
+182 | str
+183 | bool
+184 | int
+185 | int
+186 | int
+187 | int
+189 | void
+190 | (label: str, cond: bool) => void
+191 | str
+192 | bool
+193 | int
+194 | int
+195 | int
+196 | int
+198 | void
+199 | (...args: dynamic[]) => void
+200 | str
+## annotations (key = byte offset)
+27 | 1:28 | numeric=Int
+68 | 2:28 | numeric=Int
+110 | 3:28 | numeric=Int
+152 | 4:28 | numeric=Float
+194 | 5:28 | numeric=Int
+236 | 6:28 | numeric=Int
+279 | 7:28 | numeric=Int
+325 | 8:28 | numeric=Float
+345 | 8:48 | numeric=Float
+391 | 9:28 | numeric=Float
+412 | 9:49 | numeric=Float
+459 | 10:28 | numeric=Int
+500 | 11:28 | numeric=Int
+541 | 12:28 | numeric=Int
+545 | 12:32 | numeric=Int
+587 | 13:28 | numeric=Int
+588 | 13:29 | numeric=Int
+635 | 14:28 | numeric=Int
+680 | 15:28 | numeric=Int
+725 | 16:28 | numeric=Int
+770 | 17:28 | numeric=Int
+809 | 18:28 | numeric=Int
+852 | 19:28 | numeric=Int
+## reassigned names
+

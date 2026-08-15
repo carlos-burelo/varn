@@ -1,0 +1,713 @@
+# check:types 55-array-element-inference.vn
+## checker types (key = expr id)
+0 | int
+7 | dynamic[]
+9 | void
+10 | (item: dynamic) => void
+11 | dynamic[]
+13 | int
+15 | void
+16 | (item: dynamic) => void
+17 | dynamic[]
+19 | int
+21 | void
+22 | (item: dynamic) => void
+23 | dynamic[]
+25 | int
+28 | int
+30 | bool
+31 | int
+32 | int
+33 | dynamic[]
+35 | int
+36 | int
+37 | int
+38 | int
+39 | int
+42 | dynamic
+43 | int
+44 | dynamic
+45 | int
+46 | dynamic
+47 | dynamic[]
+48 | int
+50 | int
+57 | dynamic[]
+59 | bool
+60 | int
+61 | int
+62 | int
+63 | int
+64 | int
+65 | int
+66 | int
+69 | void
+70 | (item: dynamic) => void
+71 | dynamic[]
+73 | int
+75 | bool
+76 | int
+77 | int
+78 | int
+79 | int
+80 | int
+81 | int
+82 | int
+85 | int
+86 | dynamic
+87 | dynamic[]
+88 | int
+89 | int
+90 | int
+91 | int
+94 | int
+96 | bool
+97 | int
+98 | int
+99 | dynamic[]
+101 | int
+102 | int
+103 | int
+104 | int
+105 | int
+108 | dynamic
+109 | int
+110 | dynamic
+111 | int
+112 | dynamic
+113 | dynamic[]
+114 | int
+116 | int
+123 | dynamic[]
+125 | void
+126 | (item: dynamic) => void
+127 | dynamic[]
+129 | int
+131 | void
+132 | (item: dynamic) => void
+133 | dynamic[]
+135 | str
+137 | str
+138 | dynamic
+139 | dynamic[]
+140 | int
+141 | dynamic
+142 | dynamic[]
+143 | int
+150 | int[]
+152 | void
+153 | (item: int) => void
+154 | int[]
+156 | int
+158 | void
+159 | (item: int) => void
+160 | int[]
+162 | int
+164 | int
+165 | int
+166 | int[]
+167 | int
+168 | int
+169 | int[]
+170 | int
+177 | int
+179 | bool
+180 | int
+181 | dynamic
+182 | dynamic
+184 | int
+185 | int
+186 | int
+187 | int
+188 | int
+191 | dynamic
+192 | int
+193 | dynamic
+194 | int
+195 | dynamic
+196 | dynamic
+197 | int
+199 | int
+206 | dynamic[]
+208 | void
+209 | (item: dynamic) => void
+210 | dynamic[]
+212 | int
+214 | void
+215 | (item: dynamic) => void
+216 | dynamic[]
+218 | int
+220 | void
+221 | (item: dynamic) => void
+222 | dynamic[]
+224 | int
+226 | int
+227 | (arr: dynamic) => int
+228 | dynamic[]
+235 | int
+238 | dynamic[]
+241 | dynamic[]
+244 | dynamic[]
+246 | bool
+247 | int
+248 | int
+249 | int
+250 | int
+251 | int
+252 | int
+253 | int
+254 | int
+255 | int
+258 | void
+259 | (item: dynamic) => void
+260 | dynamic[]
+262 | int
+263 | int
+264 | int
+266 | void
+267 | (item: dynamic) => void
+268 | dynamic[]
+270 | int
+271 | int
+272 | int
+274 | void
+275 | (item: dynamic) => void
+276 | dynamic[]
+278 | int
+280 | bool
+281 | int
+282 | int
+283 | int
+284 | int
+285 | int
+286 | int
+287 | int
+290 | bool
+291 | int
+292 | int
+293 | int
+294 | int
+295 | int
+296 | int
+297 | int
+301 | int
+303 | bool
+304 | int
+305 | int
+306 | int
+307 | int
+308 | int
+309 | int
+310 | int
+313 | dynamic
+314 | int
+315 | dynamic
+316 | int
+317 | dynamic
+318 | dynamic
+319 | dynamic[]
+320 | int
+321 | int
+322 | int
+323 | int
+324 | int
+325 | dynamic
+326 | dynamic[]
+327 | int
+328 | int
+329 | int
+330 | int
+331 | int
+333 | int
+334 | dynamic
+335 | dynamic[]
+336 | int
+337 | int
+338 | int
+339 | int
+340 | int
+341 | int
+343 | dynamic
+344 | dynamic
+345 | dynamic[]
+346 | int
+347 | dynamic
+348 | dynamic[]
+349 | int
+350 | int
+351 | int
+352 | int
+353 | int
+360 | dynamic[]
+362 | void
+363 | (item: dynamic) => void
+364 | dynamic[]
+366 | int
+369 | float
+373 | float[][]
+374 | float[]
+375 | float
+376 | float
+378 | float
+379 | float
+380 | float
+381 | float
+382 | float[]
+383 | int
+384 | float
+385 | float[]
+386 | int
+388 | float
+395 | dynamic[]
+397 | void
+398 | (item: dynamic) => void
+399 | dynamic[]
+401 | int
+404 | float
+408 | #{ a: float[] }
+409 | float[]
+410 | float
+411 | float
+413 | float
+414 | float
+415 | float
+416 | float
+417 | float[]
+418 | int
+419 | float
+420 | float[]
+421 | int
+423 | float
+429 | str
+430 | str
+431 | str
+438 | dynamic[]
+440 | void
+441 | (item: dynamic) => void
+442 | dynamic[]
+444 | int
+446 | void
+447 | (item: dynamic) => void
+448 | dynamic[]
+450 | int
+452 | str
+453 | (prefix: str) => str
+454 | dynamic
+455 | dynamic[]
+456 | int
+463 | dynamic[]
+465 | void
+466 | (item: dynamic) => void
+467 | dynamic[]
+469 | int
+471 | dynamic
+472 | dynamic[]
+473 | int
+480 | dynamic[]
+482 | void
+483 | (item: dynamic) => void
+484 | dynamic[]
+486 | int
+488 | int
+489 | bool
+490 | dynamic
+491 | dynamic
+492 | dynamic
+493 | dynamic[]
+494 | int
+496 | str
+497 | int
+498 | int
+505 | int[]
+507 | void
+508 | (item: int) => void
+509 | int[]
+511 | int
+513 | void
+514 | (item: int) => void
+515 | int[]
+517 | int
+519 | int
+520 | int
+521 | int[]
+522 | int
+523 | int
+524 | int
+525 | int[]
+526 | int
+527 | int
+529 | int
+530 | int
+531 | int
+532 | int[]
+533 | int
+534 | int
+535 | int[]
+536 | int
+537 | int
+538 | int[]
+546 | int[]
+548 | void
+549 | (item: int) => void
+550 | int[]
+552 | int
+554 | void
+555 | (item: int) => void
+556 | int[]
+558 | int
+560 | int
+561 | int
+562 | int[]
+563 | int
+564 | int
+565 | int
+566 | int[]
+567 | int
+568 | int
+570 | int
+571 | int
+572 | int
+573 | int[]
+574 | int
+575 | int
+576 | int[]
+577 | int
+578 | int
+579 | int[]
+587 | float
+589 | bool
+590 | int
+591 | int
+592 | float[]
+594 | int
+595 | int
+596 | int
+597 | int
+598 | int
+601 | float
+602 | float
+603 | float
+604 | float
+605 | float
+606 | float[]
+607 | int
+609 | float
+616 | dynamic[]
+618 | void
+619 | (item: dynamic) => void
+620 | dynamic[]
+622 | int
+624 | void
+625 | (item: dynamic) => void
+626 | dynamic[]
+628 | int
+629 | int
+632 | dynamic[]
+634 | void
+635 | (item: dynamic) => void
+636 | dynamic[]
+638 | str
+640 | void
+641 | (item: dynamic) => void
+642 | dynamic[]
+644 | int
+647 | float[]
+649 | void
+650 | (item: float) => void
+651 | float[]
+653 | float
+655 | void
+656 | (item: float) => void
+657 | float[]
+659 | float
+660 | float
+662 | str
+663 | dynamic
+664 | dynamic[]
+665 | int
+666 | dynamic
+667 | dynamic[]
+668 | int
+669 | dynamic
+670 | dynamic[]
+671 | int
+672 | dynamic
+673 | dynamic[]
+674 | int
+675 | int
+676 | dynamic[]
+678 | float
+679 | float
+680 | float[]
+681 | int
+682 | float
+683 | float[]
+684 | int
+686 | bool
+687 | bool
+690 | void
+691 | (...args: dynamic[]) => void
+692 | str
+694 | void
+695 | (label: str, cond: bool) => void
+696 | str
+697 | bool
+698 | int
+699 | () => int
+700 | int
+702 | void
+703 | (label: str, cond: bool) => void
+704 | str
+705 | bool
+706 | int
+707 | () => int
+708 | int
+710 | void
+711 | (label: str, cond: bool) => void
+712 | str
+713 | bool
+714 | str
+715 | () => str
+716 | str
+718 | void
+719 | (label: str, cond: bool) => void
+720 | str
+721 | bool
+722 | int
+723 | () => int
+724 | int
+726 | void
+727 | (label: str, cond: bool) => void
+728 | str
+729 | bool
+730 | int
+731 | () => int
+732 | int
+734 | void
+735 | (label: str, cond: bool) => void
+736 | str
+737 | bool
+738 | int
+739 | () => int
+740 | int
+742 | void
+743 | (label: str, cond: bool) => void
+744 | str
+745 | bool
+746 | float
+747 | () => float
+748 | float
+750 | void
+751 | (label: str, cond: bool) => void
+752 | str
+753 | bool
+754 | float
+755 | () => float
+756 | float
+758 | void
+759 | (label: str, cond: bool) => void
+760 | str
+761 | bool
+762 | int
+763 | () => int
+764 | int
+765 | () => int
+767 | void
+768 | (label: str, cond: bool) => void
+769 | str
+770 | bool
+771 | int
+772 | () => int
+773 | int
+775 | void
+776 | (label: str, cond: bool) => void
+777 | str
+778 | bool
+779 | float
+780 | (arr: float[]) => float
+781 | float[]
+782 | float
+783 | float
+784 | float
+786 | void
+787 | (label: str, cond: bool) => void
+788 | str
+789 | bool
+790 | str
+791 | () => str
+792 | str
+794 | bool
+797 | str
+798 | () => str
+800 | str
+801 | () => str
+803 | int
+804 | () => int
+806 | void
+807 | (...args: dynamic[]) => void
+808 | str
+## annotations (key = byte offset)
+437 | 8:10 | cg=Int
+483 | 10:7 | cg=Fn native_op=17059365188679780804
+498 | 11:7 | cg=Fn native_op=17059365188679780804
+513 | 12:7 | cg=Fn native_op=17059365188679780804
+559 | 14:21 | numeric=Int
+565 | 14:27 | cg=Int
+577 | 14:39 | numeric=Int
+601 | 15:15 | numeric=Int
+607 | 15:21 | array_index
+609 | 15:23 | cg=Int
+650 | 20:10 | cg=Int
+713 | 22:21 | numeric=Int
+724 | 22:32 | numeric=Int
+744 | 23:11 | cg=Fn native_op=17059365188679780804
+780 | 25:21 | numeric=Int
+791 | 25:32 | numeric=Int
+809 | 26:9 | array_index
+811 | 26:11 | cg=Int
+816 | 26:16 | numeric=Int
+867 | 29:21 | numeric=Int
+873 | 29:27 | cg=Int
+885 | 29:39 | numeric=Int
+909 | 30:15 | numeric=Int
+915 | 30:21 | array_index
+917 | 30:23 | cg=Int
+1147 | 38:10 | cg=Str
+1206 | 40:7 | cg=Fn native_op=17059365188679780804
+1221 | 41:7 | cg=Fn native_op=17059365188679780804
+1248 | 42:15 | array_index
+1256 | 42:23 | array_index
+1381 | 47:10 | cg=Int
+1439 | 49:7 | cg=Fn native_op=17059365188679780804
+1455 | 50:7 | cg=Fn native_op=17059365188679780804
+1476 | 51:12 | numeric=Int array_index
+1478 | 51:14 | cg=Int
+1483 | 51:19 | array_index
+1485 | 51:21 | cg=Int
+1503 | 54:10 | cg=Int
+1581 | 56:41 | numeric=Int
+1821 | 65:10 | cg=Int
+1881 | 67:7 | cg=Fn native_op=17059365188679780804
+1896 | 68:7 | cg=Fn native_op=17059365188679780804
+1911 | 69:7 | cg=Fn native_op=17059365188679780804
+1931 | 70:12 | cg=Int
+2173 | 76:10 | cg=Int
+2284 | 81:21 | numeric=Int
+2288 | 81:25 | numeric=Int
+2299 | 81:36 | numeric=Int
+2319 | 82:11 | cg=Fn native_op=17059365188679780804
+2324 | 82:16 | numeric=Int
+2342 | 83:11 | cg=Fn native_op=17059365188679780804
+2347 | 83:16 | numeric=Int
+2365 | 84:11 | cg=Fn native_op=17059365188679780804
+2403 | 86:23 | numeric=Int
+2418 | 86:38 | numeric=Int
+2456 | 87:27 | numeric=Int
+2471 | 87:42 | numeric=Int
+2536 | 89:29 | numeric=Int
+2547 | 89:40 | numeric=Int
+2579 | 90:23 | numeric=Int
+2585 | 90:29 | numeric=Int array_index
+2587 | 90:31 | numeric=Int cg=Int
+2602 | 90:46 | array_index
+2604 | 90:48 | numeric=Int cg=Int
+2645 | 92:13 | array_index
+2647 | 92:15 | numeric=Int cg=Int
+2698 | 95:12 | numeric=Int array_index
+2700 | 95:14 | cg=Int
+2705 | 95:19 | array_index
+2707 | 95:21 | numeric=Int cg=Int
+3232 | 105:10 | cg=Float
+3273 | 107:7 | cg=Fn native_op=17059365188679780804
+3350 | 111:13 | numeric=Float array_index
+3352 | 111:15 | cg=Float
+3357 | 111:20 | array_index
+3359 | 111:22 | cg=Float
+3438 | 117:10 | cg=Float
+3479 | 119:7 | cg=Fn native_op=17059365188679780804
+3563 | 123:13 | numeric=Float array_index
+3565 | 123:15 | cg=Float
+3570 | 123:20 | array_index
+3572 | 123:22 | cg=Float
+4410 | 140:10 | cg=Str
+4421 | 140:21 | cg=Str
+4479 | 142:10 | cg=Str
+4532 | 144:9 | cg=Fn native_op=17059365188679780804
+4551 | 145:9 | cg=Fn native_op=17059365188679780804
+4573 | 146:12 | cg=Str
+4584 | 146:23 | array_index
+4588 | 146:27 | cg=Int
+4607 | 149:10 | cg=Str
+4659 | 151:7 | cg=Fn native_op=17059365188679780804
+4679 | 152:12 | array_index
+4681 | 152:14 | cg=Int
+4699 | 155:10 | cg=Int
+4749 | 157:7 | cg=Fn native_op=17059365188679780804
+4769 | 158:12 | array_index
+4771 | 158:14 | cg=Int
+5185 | 166:10 | cg=Int
+5245 | 168:7 | cg=Fn native_op=17059365188679780804
+5261 | 169:7 | cg=Fn native_op=17059365188679780804
+5275 | 170:5 | array_index
+5277 | 170:7 | cg=Int
+5282 | 170:12 | numeric=Int array_index
+5284 | 170:14 | cg=Int
+5303 | 171:12 | numeric=Int array_index
+5305 | 171:14 | cg=Int
+5310 | 171:19 | array_index
+5312 | 171:21 | cg=Int
+5319 | 171:28 | cg=Int
+5341 | 174:10 | cg=Int
+5395 | 176:7 | cg=Fn native_op=17059365188679780804
+5411 | 177:7 | cg=Fn native_op=17059365188679780804
+5425 | 178:5 | array_index
+5427 | 178:7 | cg=Int
+5432 | 178:12 | numeric=Int array_index
+5434 | 178:14 | cg=Int
+5453 | 179:12 | numeric=Int array_index
+5455 | 179:14 | cg=Int
+5460 | 179:19 | array_index
+5462 | 179:21 | cg=Int
+5469 | 179:28 | cg=Int
+5491 | 182:10 | cg=Float
+5512 | 182:31 | cg=Array(Float)
+5582 | 184:21 | numeric=Int
+5590 | 184:29 | cg=Int
+5602 | 184:41 | numeric=Int
+5628 | 185:17 | numeric=Float
+5636 | 185:25 | array_index
+5640 | 185:29 | cg=Float
+5951 | 194:10 | cg=Str
+6003 | 196:10 | cg=Fn native_op=17059365188679780804
+6021 | 197:10 | cg=Fn native_op=17059365188679780804
+6062 | 199:10 | cg=Fn native_op=17059365188679780804
+6134 | 200:11 | cg=Fn native_op=17059365188679780804
+6184 | 202:12 | cg=Fn native_op=17059365188679780804
+6206 | 203:12 | cg=Fn native_op=17059365188679780804
+6233 | 204:15 | array_index
+6243 | 204:25 | array_index
+6253 | 204:35 | array_index
+6263 | 204:45 | array_index
+6279 | 204:61 | cg=Int
+6288 | 204:70 | numeric=Float array_index
+6295 | 204:77 | cg=Float
+6300 | 204:82 | array_index
+6307 | 204:89 | cg=Float
+6404 | 209:42 | numeric=Int cg=Int
+6469 | 210:42 | numeric=Int cg=Int
+6539 | 211:43 | cg=Str
+6623 | 212:42 | numeric=Int cg=Int
+6696 | 213:44 | numeric=Int cg=Int
+6775 | 214:42 | numeric=Int cg=Int
+6852 | 215:48 | numeric=Float cg=Float
+6918 | 216:48 | numeric=Float cg=Float
+6979 | 217:43 | numeric=Int cg=Int
+7001 | 217:65 | cg=Int
+7062 | 218:43 | numeric=Int cg=Int
+7131 | 219:43 | numeric=Float cg=Float
+7216 | 220:43 | cg=Str
+7360 | 224:9 | cg=Str
+7388 | 225:9 | cg=Str
+7419 | 226:9 | cg=Int
+## reassigned names
+
