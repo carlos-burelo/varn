@@ -43,12 +43,22 @@ impl Checker {
         // ONE write, into the one table. The positional map the editor reads is
         // projected from this after the check (`project_positional_types`);
         // writing both here is how they came to disagree.
+        // The refinement lane: what a prover established beyond what the
+        // checker committed to. Computed here, once, so nothing downstream
+        // has to re-derive it from a different engine. See `checker::refine`.
+        let refined = self.refine(expr, bind);
+        debug_assert!(
+            refined.as_ref().map_or(true, |r| !r.is_dynamic()),
+            "a refinement must tell codegen MORE than the checked type, and              `dynamic` is the absence of information"
+        );
+
         let seq = self.expr_seq;
         self.expr_seq += 1;
         self.expr_table.insert(
             expr.id,
             crate::checker::TypeEntry {
                 ty,
+                refined,
                 symbol_id,
                 start,
                 end,

@@ -4,7 +4,7 @@ pub(crate) mod stmts;
 use crate::types::{Type, TypeContext};
 use crate::BindResult;
 use stmts::annotate_stmt;
-use varn_core::ast::{Decl, ExportDecl, Expr, ExprKind, Program, StmtKind};
+use varn_core::ast::{Decl, ExportDecl, Program, StmtKind};
 use varn_core::TypeAnnotations;
 
 #[derive(Clone)]
@@ -13,14 +13,6 @@ pub(crate) struct AnnotateCtx<'a> {
     pub(crate) locals: rustc_hash::FxHashMap<std::rc::Rc<str>, Type>,
     pub(crate) expr_table:
         &'a rustc_hash::FxHashMap<varn_core::ast::AstId, crate::checker::TypeEntry>,
-    /// Names currently bound to an evolving empty-array local whose element
-    /// type the binder proved (Task A0.3'). Their entry in `locals` holds
-    /// the advisory `Array<T>`; `resolved_expr_types` deliberately kept them
-    /// (and their `x[i]` reads) `Dynamic` for diagnostics, so `get_expr_type`
-    /// must recompute governed expressions from `locals` instead. Kept in
-    /// lockstep with `locals` (save/restore at block/for boundaries,
-    /// cleared when entering a nested closure body).
-    pub(crate) evolved_locals: rustc_hash::FxHashSet<std::rc::Rc<str>>,
 }
 
 impl<'a> AnnotateCtx<'a> {
@@ -32,43 +24,6 @@ impl<'a> AnnotateCtx<'a> {
             bind,
             locals: rustc_hash::FxHashMap::default(),
             expr_table,
-            evolved_locals: rustc_hash::FxHashSet::default(),
-        }
-    }
-
-    /// Whether `expr`'s value type is (transitively) governed by an evolving
-    /// empty-array local (Task A0.3'). The checker recorded a deliberately
-    /// `Dynamic` diagnostic type for these expressions in
-    /// `resolved_expr_types` (design rule 4), so `get_expr_type` must
-    /// recompute the more precise, codegen-only type from the `locals`
-    /// overlay via `infer_expr_type`. Restricted to exactly the shapes the
-    /// overlay can answer soundly — an evolved-array identifier, an `x[i]`
-    /// index read or `x.length` on one, and arithmetic/paren/unary built
-    /// from those — so no other expression's checker-derived type is ever
-    /// overridden.
-    pub(crate) fn is_overlay_governed(&self, expr: &Expr) -> bool {
-        match &expr.kind {
-            ExprKind::Identifier { name } => self.evolved_locals.contains(name.as_ref()),
-            ExprKind::Paren { expression } => self.is_overlay_governed(expression),
-            ExprKind::Unary { operand, .. } => self.is_overlay_governed(operand),
-            ExprKind::Member {
-                object,
-                computed: true,
-                ..
-            } => self.is_overlay_governed(object),
-            ExprKind::Member {
-                object,
-                property,
-                computed: false,
-                ..
-            } => {
-                matches!(&property.kind, ExprKind::Identifier { name } if name.as_ref() == "length")
-                    && self.is_overlay_governed(object)
-            }
-            ExprKind::Binary { left, right, .. } => {
-                self.is_overlay_governed(left) || self.is_overlay_governed(right)
-            }
-            _ => false,
         }
     }
 }

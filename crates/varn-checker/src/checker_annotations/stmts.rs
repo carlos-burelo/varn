@@ -16,12 +16,10 @@ pub(crate) fn annotate_stmt(stmt: &Stmt, ann: &mut TypeAnnotations, ctx: &mut An
         StmtKind::Return { .. } => {}
         StmtKind::Block { stmts } => {
             let old_locals = ctx.locals.clone();
-            let old_evolved = ctx.evolved_locals.clone();
             for s in stmts {
                 annotate_stmt(s, ann, ctx);
             }
             ctx.locals = old_locals;
-            ctx.evolved_locals = old_evolved;
         }
         StmtKind::If {
             test,
@@ -45,7 +43,6 @@ pub(crate) fn annotate_stmt(stmt: &Stmt, ann: &mut TypeAnnotations, ctx: &mut An
             body,
         } => {
             let old_locals = ctx.locals.clone();
-            let old_evolved = ctx.evolved_locals.clone();
             if let Some(init_box) = init {
                 match init_box.as_ref() {
                     ForInit::Expr(e) => annotate_expr(e, ann, ctx),
@@ -67,7 +64,6 @@ pub(crate) fn annotate_stmt(stmt: &Stmt, ann: &mut TypeAnnotations, ctx: &mut An
                                     }
                                     _ => None,
                                 });
-                                ctx.evolved_locals.remove(name.as_ref());
                                 if let Some(ann_node) = type_ann {
                                     let ty = resolve_type_node(ann_node, Some(ctx.bind));
                                     ctx.locals.insert(name, ty);
@@ -90,7 +86,6 @@ pub(crate) fn annotate_stmt(stmt: &Stmt, ann: &mut TypeAnnotations, ctx: &mut An
             }
             annotate_stmt(body, ann, ctx);
             ctx.locals = old_locals;
-            ctx.evolved_locals = old_evolved;
         }
         StmtKind::Decl(decl) => annotate_decl(decl, ann, ctx),
         _ => {}
@@ -117,16 +112,13 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
                     });
                     if let Some(ann_node) = type_ann {
                         let ty = resolve_type_node(ann_node, Some(ctx.bind));
-                        ctx.evolved_locals.remove(name.as_ref());
                         ctx.locals.insert(name, ty);
                     } else if let Some(evolved) =
                         ctx.bind.evolved_array_types.get(&id_offset).cloned()
                     {
-                        ctx.evolved_locals.insert(name.clone());
                         ctx.locals.insert(name, evolved);
                     } else if let Some(init) = &d.init {
                         let ty = get_expr_type(init, ctx);
-                        ctx.evolved_locals.remove(name.as_ref());
                         ctx.locals.insert(name, ty);
                     }
                 } else {
@@ -141,7 +133,6 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
                     record_cg_ty_at(AnnKey::decl(f.id_offset), &ty, ann, ctx);
                 }
                 let mut local_ctx = ctx.clone();
-                local_ctx.evolved_locals.clear();
                 for p in &f.params {
                     let name_opt = match &p.pattern {
                         varn_core::ast::Pattern::Identifier { name, .. } => Some(name.clone()),
@@ -325,7 +316,6 @@ fn annotate_method_body(
     ctx: &AnnotateCtx,
 ) {
     let mut local_ctx = ctx.clone();
-    local_ctx.evolved_locals.clear();
     if let Some(ty) = this_ty {
         local_ctx
             .locals
@@ -402,7 +392,6 @@ fn ungovern_pattern_names(pattern: &varn_core::ast::Pattern, ctx: &mut AnnotateC
     let mut bound = Vec::new();
     collect_pattern_names(pattern, &mut bound);
     for name in bound {
-        ctx.evolved_locals.remove(name.as_ref());
         ctx.locals.remove(name.as_ref());
     }
 }

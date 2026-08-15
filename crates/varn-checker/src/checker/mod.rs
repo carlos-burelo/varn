@@ -1,5 +1,6 @@
 pub(crate) mod compat;
 mod decls;
+mod refine;
 mod stmts;
 use crate::binder::{BindResult, Binder};
 use crate::scope::ScopeId;
@@ -29,7 +30,30 @@ pub struct ExprInfo {
 /// check — it is an index, not a second opinion.
 #[derive(Clone, Debug)]
 pub struct TypeEntry {
+    /// The type the program was CHECKED against. Every diagnostic is reported
+    /// against this and nothing else.
     pub ty: Type,
+    /// The strongest fact PROVED about this value, when it is stronger than
+    /// [`Self::ty`]. Consumed only by codegen; `None` means nothing is known
+    /// beyond the checked type.
+    ///
+    /// This lane exists because a prover and a type checker want opposite
+    /// failure modes. `binder::array_evolve` states it as design rule 4: a
+    /// proof that turns out weaker than reality must cost an OPTIMISATION,
+    /// never a spurious error in a valid program — `let a = []; a.push(1);
+    /// return a[0]` has to keep compiling inside a `: str` function even
+    /// though the element is provably `int`. Keeping the proof out of `ty`
+    /// is what guarantees that structurally.
+    ///
+    /// What changed is where it is computed. The refined type used to be
+    /// re-derived at annotation time by running the binder's syntactic
+    /// inference over an overlay environment — a second inference engine
+    /// reachable from the path that feeds the backend. Now the checker proves
+    /// it once, here, and everything downstream reads it.
+    ///
+    /// Invariant: when present, `refined` is a NARROWING of `ty`. It may only
+    /// ever tell codegen more, never something else.
+    pub refined: Option<Type>,
     /// The symbol an identifier resolved to. Tooling data: filled only under
     /// [`CheckOptions::record_types`], because it costs a scope resolve per
     /// identifier and a compile never reads it.
