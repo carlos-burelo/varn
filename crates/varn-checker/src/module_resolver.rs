@@ -278,6 +278,13 @@ pub fn resolve_stdlib_module_exports_ref(specifier: &str) -> Rc<ExportMap> {
         }
     }
 
+    // The interface blob and the module source are TWO type surfaces for the
+    // same stdlib, and they do not agree: measured 2026-08-15, the blob loses
+    // `Option<T>` (`Some("x")` infers `str?`), and resolving from source
+    // instead loses the `Partial<T>` / `Readonly<T>` utility types. Neither is
+    // complete, so the order below is not a preference — it is the one that
+    // happens to satisfy the current test corpus. See the note in
+    // docs/STDLIB_ARCHITECTURE.md before changing it.
     if let Some((exports, _bind)) = resolve_from_interface_blob(specifier, &key) {
         return exports;
     }

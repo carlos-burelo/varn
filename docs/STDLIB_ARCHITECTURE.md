@@ -75,6 +75,36 @@ flowchart TD
 
 ---
 
+## 4.1 Defecto abierto: dos superficies de tipos para la misma stdlib
+
+El checker puede obtener los exports de un módulo `std:*` por **dos** caminos
+distintos, y **no coinciden**. `resolve_stdlib_module_exports_ref`
+(`crates/varn-checker/src/module_resolver.rs`) prueba primero un *interface
+blob* precompilado que viaja en el bundle, y sólo si no lo hay cae al fuente.
+
+Medido el 2026-08-15 sobre `tests/main.vn`:
+
+| Camino | Qué pierde |
+|---|---|
+| interface blob (procedencia `@embedded`) | `Option<T>`: `Some("x")` infiere `str?`, así que `const o: Option<str> = Some("x")` es un error de tipos |
+| fuente del módulo (procedencia árbol) | `Partial<T>` y `Readonly<T>`: los tipos utilitarios de `std:types` no se resuelven |
+
+Ninguno de los dos es completo. El orden actual (blob primero) no es una
+preferencia de diseño: es el que satisface el corpus de pruebas de hoy.
+Invertirlo pone en verde `tests/70-result-extensions.vn` y en rojo
+`tests/42-stdlib-comprehensive-test.vn`.
+
+**Por qué estuvo invisible:** los diagnósticos del checker se descartaban para
+todo módulo alcanzado por `import`, así que la discrepancia sólo podía notarse
+en el archivo de entrada. Al propagarlos, las dos celdas `@embedded` de la
+matriz de validación se ponen rojas — el defecto es anterior, la señal es nueva.
+
+Arreglarlo es hacer que la superficie de tipos tenga **una** definición: o el
+blob se genera desde la misma resolución que usa el fuente (y entonces es una
+caché, no una segunda fuente), o desaparece.
+
+---
+
 ## 5. Integración con Bindings Nativos LBI
 
 Los archivos de la stdlib exponen una API limpia con tipos estáticos mientras delegan el trabajo pesado a funciones nativas mediante anotaciones especiales:

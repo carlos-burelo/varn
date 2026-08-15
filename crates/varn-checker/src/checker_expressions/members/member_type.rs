@@ -392,6 +392,15 @@ impl Checker {
                     intrinsic_member_info(bind, varn_core::IntrinsicType::Str.as_str(), key)
                 }
             }
+            // A tuple's length is known at check time — it is the arity of the
+            // type itself. The runtime has always answered `.length` on a
+            // tuple (the heap stores it as an array; `is_array` accepts
+            // `Tuple`), but the checker had no member table for tuples at all,
+            // so `#[1, "a", true].length` was rejected in any file the checker
+            // actually looked at. It went unnoticed because imported modules
+            // had their diagnostics discarded, and `tests/69-tuples-records.vn`
+            // is only ever reached through an import.
+            TypeKind::Tuple(_) if key == "length" => Some((Type::Int, None)),
             TypeKind::Intrinsic(tag) => {
                 if let Some(info) = intrinsic_member_info(bind, tag.name(), key) {
                     Some(info)

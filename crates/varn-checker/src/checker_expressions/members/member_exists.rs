@@ -239,6 +239,16 @@ impl Checker {
                 self.member_exists(&ty, key, bind)
             }
             TypeKind::Object(members) => members.iter().any(|m| m.name() == key),
+            // Mirrors the `TypeKind::Tuple` arm of `find_member_info_uncached`.
+            //
+            // Having to say it twice is the defect, not the answer: "which
+            // members does this type have" is walked once here for existence
+            // and once there for the type, and the two can disagree — as they
+            // did, which is why adding it in one place left the diagnostic
+            // still firing. Collapsing `member_exists` into
+            // `find_member_info(..).is_some()` is the real fix; it is a change
+            // across a 15k-line crate and does not belong in this one.
+            TypeKind::Tuple(_) => key == "length",
             TypeKind::Array(_) => {
                 if let Some(b) = &bind.core {
                     if let Some(members) = b

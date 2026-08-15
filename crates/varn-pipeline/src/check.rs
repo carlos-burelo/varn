@@ -11,6 +11,49 @@ pub struct CheckResult {
     pub checker_result: varn_checker::CheckResult,
 }
 
+/// What a checker run means for the build: errors stop it, warnings are
+/// printed, silence passes.
+///
+/// Shared by the entry file and by every module reached through `import`
+/// ([`crate::module_precompile::build_module_graph`]). It has to be one
+/// function: the module graph used to call the checker for its type
+/// annotations and drop `diagnostics` on the floor, so `let x: int = "s"` was
+/// a hard error in the file you ran and silently fine in the file it imported.
+/// A rule about validity that two call sites apply differently is not a rule.
+pub fn report_diagnostics(
+    diagnostics: &varn_core::DiagnosticBag,
+    filename: &str,
+    source: &str,
+) -> PipelineResult<()> {
+    if diagnostics.is_empty() {
+        return Ok(());
+    }
+    let error_count = diagnostics.iter().filter(|d| d.is_error()).count();
+    let msgs: Vec<String> = diagnostics
+        .iter()
+        .map(|d| crate::fmt::format_diagnostic(d, source))
+        .collect();
+
+    if error_count == 0 {
+        for m in msgs {
+            varn_term::terminal::log(m);
+        }
+        return Ok(());
+    }
+
+    let footer = format!(
+        "\n{}: could not compile `{}` due to {} previous error{}",
+        chalk("error").red().bold(),
+        filename,
+        error_count,
+        if error_count > 1 { "s" } else { "" }
+    );
+    Err(PipelineError::new(
+        3,
+        format!("{}\n{}", msgs.join("\n"), footer),
+    ))
+}
+
 pub fn check(
     program: &Program,
     source: &str,
@@ -22,36 +65,7 @@ pub fn check(
     } else {
         Checker::check(program)
     };
-    if !check_result.diagnostics.is_empty() {
-        let mut msgs = Vec::new();
-        let error_count = check_result
-            .diagnostics
-            .iter()
-            .filter(|d| d.is_error())
-            .count();
-
-        for d in &check_result.diagnostics {
-            msgs.push(crate::fmt::format_diagnostic(d, source));
-        }
-
-        if error_count > 0 {
-            let footer = format!(
-                "\n{}: could not compile `{}` due to {} previous error{}",
-                chalk("error").red().bold(),
-                program.filename,
-                error_count,
-                if error_count > 1 { "s" } else { "" }
-            );
-            return Err(PipelineError::new(
-                3,
-                format!("{}\n{}", msgs.join("\n"), footer),
-            ));
-        } else {
-            for m in msgs {
-                varn_term::terminal::log(m);
-            }
-        }
-    }
+    report_diagnostics(&check_result.diagnostics, &program.filename, source)?;
 
     if debug.symbols {
         varn_debug::symbols::debug_symbols(&check_result, &program.filename, debug);

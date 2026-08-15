@@ -180,11 +180,17 @@ pub fn build_module_graph(
         if module_path == canonical_entry {
             continue;
         }
-        let Some((_, program)) = node_sources.get(&module_path) else {
+        let Some((module_source, program)) = node_sources.get(&module_path) else {
             continue;
         };
 
         let check = varn_checker::Checker::check(program);
+        // The source was already sitting here, bound to `_`, while the
+        // diagnostics this produced went unread — which is what made a type
+        // error invisible as soon as the file was reached through `import`
+        // instead of being run directly.
+        crate::check::report_diagnostics(&check.diagnostics, &program.filename, module_source)
+            .map_err(|e| e.message)?;
         let exports = if program.filename.starts_with("std:")
             || program.filename.starts_with("core:")
             || program.filename.starts_with("runtime:")
