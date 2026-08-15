@@ -2,7 +2,9 @@ use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj, HeapStr};
 use crate::value::VmValue;
 use varn_core::intrinsic_ops::str::StrOp;
-use varn_types::str_util::{byte_to_char_idx, char_len, char_range_to_bytes};
+use varn_types::str_util::{
+    byte_to_char_idx, char_len, char_range_to_bytes, find_bytes, rfind_bytes,
+};
 
 fn not_a_string() -> RuntimeError {
     RuntimeError::new("str intrinsic: operand is not a string")
@@ -133,7 +135,17 @@ pub(crate) fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<Vm
     match op {
         o if o == StrOp::CharCodeAt as u8 || o == StrOp::CodePointAt as u8 => {
             let (s, ascii) = view(recv, heap, &mut recv_buf)?;
-            let pos = req_int(args, 1, heap).max(0) as usize;
+            // A negative position is out of range, not position zero.
+            // `.max(0)` here made `"abc".charCodeAt(-1)` answer 97 through the
+            // intrinsic while the LBI binding (`str::char_code_at`) answered
+            // -1 for the same expression — a tier divergence on a value the
+            // program can compute, and the LBI's answer is the one that
+            // matches JS (`NaN` there, -1 here).
+            let signed = req_int(args, 1, heap);
+            if signed < 0 {
+                return Ok(VmValue::from_int(-1));
+            }
+            let pos = signed as usize;
             let code = if ascii {
                 s.as_bytes().get(pos).map(|&b| b as i64)
             } else {
@@ -152,8 +164,7 @@ pub(crate) fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<Vm
             if n.is_empty() {
                 return Ok(VmValue::from_int(0));
             }
-            let idx = s
-                .find(n)
+            let idx = find_bytes(s, n)
                 .map(|b| byte_to_char_idx(s, ascii, b))
                 .unwrap_or(-1);
             return Ok(VmValue::from_int(idx));
@@ -164,8 +175,7 @@ pub(crate) fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<Vm
             if n.is_empty() {
                 return Ok(VmValue::from_int(char_len(s, ascii) as i64));
             }
-            let idx = s
-                .rfind(n)
+            let idx = rfind_bytes(s, n)
                 .map(|b| byte_to_char_idx(s, ascii, b))
                 .unwrap_or(-1);
             return Ok(VmValue::from_int(idx));
@@ -183,7 +193,7 @@ pub(crate) fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<Vm
         o if o == StrOp::Includes as u8 => {
             let (s, _) = view(recv, heap, &mut recv_buf)?;
             let (n, _) = view(arg(args, 1), heap, &mut needle_buf)?;
-            return Ok(VmValue::from_bool(s.contains(n)));
+            return Ok(VmValue::from_bool(find_bytes(s, n).is_some()));
         }
         _ => {}
     }

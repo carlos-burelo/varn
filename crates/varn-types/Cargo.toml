@@ -16,6 +16,7 @@ dev-tools = []
 [dependencies]
 varn-core    = { path = "../varn-core" }
 
+memchr       = { workspace = true }
 rust_decimal = { workspace = true }
 rustc-hash   = { workspace = true }
 serde        = { workspace = true, features = ["rc"] }

@@ -1,5 +1,7 @@
 use varn_op_macros::varn_contract;
-use varn_types::str_util::{byte_to_char_idx, char_len, char_range_to_bytes};
+use varn_types::str_util::{
+    byte_to_char_idx, char_len, char_range_to_bytes, find_bytes, rfind_bytes,
+};
 use varn_types::{NativeCtx, NativeFnResult, VmValue};
 
 pub struct Str;
@@ -68,20 +70,20 @@ varn_contract! {
         fn trimEnd(_ctx: &mut dyn NativeCtx, this: &str) -> String { this.trim_end().to_string() }
 
 
-        fn includes(_ctx: &mut dyn NativeCtx, this: &str, search: &str) -> bool { this.contains(search) }
-        fn contains(_ctx: &mut dyn NativeCtx, this: &str, search: &str) -> bool { this.contains(search) }
+        fn includes(_ctx: &mut dyn NativeCtx, this: &str, search: &str) -> bool { find_bytes(this, search).is_some() }
+        fn contains(_ctx: &mut dyn NativeCtx, this: &str, search: &str) -> bool { find_bytes(this, search).is_some() }
         fn startsWith(_ctx: &mut dyn NativeCtx, this: &str, search: &str) -> bool { this.starts_with(search) }
         fn endsWith(_ctx: &mut dyn NativeCtx, this: &str, search: &str) -> bool { this.ends_with(search) }
 
         fn indexOf(_ctx: &mut dyn NativeCtx, this: &str, search: &str) -> i64 {
             if search.is_empty() { return 0; }
             let ascii = this.is_ascii();
-            this.find(search).map(|b| byte_to_char_idx(this, ascii, b)).unwrap_or(-1)
+            find_bytes(this, search).map(|b| byte_to_char_idx(this, ascii, b)).unwrap_or(-1)
         }
         fn lastIndexOf(_ctx: &mut dyn NativeCtx, this: &str, search: &str) -> i64 {
             let ascii = this.is_ascii();
             if search.is_empty() { return char_len(this, ascii) as i64; }
-            this.rfind(search).map(|b| byte_to_char_idx(this, ascii, b)).unwrap_or(-1)
+            rfind_bytes(this, search).map(|b| byte_to_char_idx(this, ascii, b)).unwrap_or(-1)
         }
 
 

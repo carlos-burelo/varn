@@ -39,6 +39,11 @@ tokio        = { version = "1", features = ["full"] }
 semver       = "1"
 sha2         = "0.10"
 hex          = "0.4"
+# SIMD substring search. Already in the build graph via `serde_json`, so this
+# is a new edge rather than new code: `str::find` uses the scalar Two-Way
+# algorithm, and `indexOf`/`includes` over a large haystack is the one place
+# that difference is measurable.
+memchr       = "2"
 
 # `unused_crate_dependencies` is the automated form of the manifest audit:
 # a declared dependency no crate target imports becomes a warning instead of

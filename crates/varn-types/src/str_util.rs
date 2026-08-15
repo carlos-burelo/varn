@@ -34,6 +34,23 @@ pub fn char_range_to_bytes(s: &str, ascii: bool, si: usize, ei: usize) -> (usize
     (bs, be)
 }
 
+/// Byte offset of the first occurrence of `needle` in `haystack`.
+///
+/// `memmem` rather than `str::find`: the standard library's Two-Way search is
+/// scalar, and these are the string ops that run over a whole buffer. Both
+/// answer in byte offsets and both are exact-match, so the result is
+/// identical — only the scan is different.
+#[inline]
+pub fn find_bytes(haystack: &str, needle: &str) -> Option<usize> {
+    memchr::memmem::find(haystack.as_bytes(), needle.as_bytes())
+}
+
+/// Byte offset of the LAST occurrence of `needle` in `haystack`.
+#[inline]
+pub fn rfind_bytes(haystack: &str, needle: &str) -> Option<usize> {
+    memchr::memmem::rfind(haystack.as_bytes(), needle.as_bytes())
+}
+
 /// Char index of a byte offset (as produced by `str::find`/`rfind`).
 #[inline]
 pub fn byte_to_char_idx(s: &str, ascii: bool, byte_idx: usize) -> i64 {
