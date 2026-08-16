@@ -10,6 +10,54 @@ use crate::error::{RuntimeError, VmResult};
 use crate::value::VmValue;
 use varn_types::NativeCtx;
 
+impl ExecCtx {
+    /// Give a generator body its own execution context.
+    ///
+    /// The context is a FORK of this one, and the globals are the reason.
+    /// `crate::globals::resolve` rewrites every global access into
+    /// `LoadGlobalIdx <slot>`, and those slot indices belong to exactly one
+    /// `GlobalStore`. The generator's proto was resolved against THIS
+    /// context's store; handing the body a fresh empty one made every such
+    /// load read past the end of an empty vector. The symptom was
+    /// `value is not callable: 0` for any global function the inliner had not
+    /// already folded into the generator body — which is why `yield f()`
+    /// worked for a small `f` and died for a large one, an `async` one, or
+    /// another generator.
+    ///
+    /// Forking also carries `modules`, `precompiled`, `loader` and the JIT
+    /// linker, so a generator body reaches the same code the caller does. It
+    /// is the same move `fork_for_task` already makes for an async task.
+    ///
+    /// The store is cloned, not shared: `GlobalStore::clone` deliberately
+    /// keeps its id, so indices handed out before the clone still name the
+    /// same globals. A global DEFINED after the generator was created is
+    /// therefore not visible to it, and one the body defines does not escape —
+    /// the same boundary an async task already has.
+    pub(crate) fn build_generator(
+        &mut self,
+        closure: std::rc::Rc<crate::closure::VmClosure>,
+        args: Vec<VmValue>,
+        current_class: Option<std::rc::Rc<varn_types::ClassObj>>,
+    ) -> VmValue {
+        let mut gen_ctx = Box::new(self.fork_for_task());
+        gen_ctx.gc_inhibited = true;
+        gen_ctx.stack = args;
+
+        let required = closure.proto.register_count as usize;
+        if gen_ctx.stack.len() < required {
+            gen_ctx.stack.resize(required, VmValue::null());
+        }
+        let mut frame = crate::frame::CallFrame::new_owned(closure, 0);
+        frame.current_class = current_class;
+        gen_ctx.frames.push(frame);
+
+        let driver = crate::generator::NanSyncGenDriver::new(gen_ctx);
+        self.heap.intern(varn_types::value::Value::Generator(
+            varn_types::generator::GeneratorObj(driver),
+        ))
+    }
+}
+
 /// What a constructor frame's return actually yields.
 ///
 /// A `constructor` returns the instance, not whatever its body returned —
@@ -97,6 +145,14 @@ pub fn unwind_to_handler(ctx: &mut ExecCtx, handler: crate::frame::TryHandler, t
 impl ExecCtx {
     pub(crate) fn dispatch_prepared_call(&mut self, call: PreparedCall) -> VmResult<()> {
         match call {
+            PreparedCall::Generator {
+                closure,
+                args,
+                current_class,
+            } => {
+                let value = self.build_generator(closure, args, current_class);
+                self.push(value);
+            }
             PreparedCall::Frame(frame) => {
                 if self.frames.len() >= 10000 {
                     return Err(RuntimeError::new(

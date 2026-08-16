@@ -6,9 +6,20 @@ use varn_types::value::Value;
 use crate::exec::{ExecCtx, VmSuspend};
 use crate::value::VmValue;
 
-fn make_iter_result(value: Value, done: bool) -> Value {
+/// `{ value, done }`, built straight from the yielded slot.
+///
+/// The yielded value stays a `VmValue` all the way through on purpose. This
+/// used to `heap.extract` it into a `Value` and then push it back through
+/// `value_to_nv`, which cannot represent anything heap-allocated without a
+/// heap to intern into — it has a `debug_assert!(false, "must be pre-interned")`
+/// for exactly that and returns null in release. So `yield [1, 2]` and
+/// `yield { a: 1 }` came out as `null`, while `yield 7` and short strings
+/// survived because they fit inline. The generator shares its caller's heap
+/// (`Heap` is an `Rc<UnsafeCell<…>>` handle), so the index is valid on both
+/// sides and the round trip bought nothing.
+fn make_iter_result(value: VmValue, done: bool) -> Value {
     varn_types::value::new_object(varn_types::value::ObjRef::from_pairs([
-        (Rc::from("value"), varn_types::value::value_to_nv(&value)),
+        (Rc::from("value"), value),
         (Rc::from("done"), varn_types::VmValue::from_bool(done)),
     ]))
 }
@@ -49,7 +60,7 @@ impl GeneratorDriver for NanSyncGenDriver {
         let mut inner = self.inner.borrow_mut();
 
         if inner.done {
-            return Ok(make_iter_result(Value::Null, true));
+            return Ok(make_iter_result(VmValue::null(), true));
         }
 
         if inner.started {
@@ -76,8 +87,7 @@ impl GeneratorDriver for NanSyncGenDriver {
                 dest_reg,
             }) => {
                 inner.resume_dest = Some(dest_reg);
-                let val = inner.ctx.heap.extract(nv);
-                Ok(make_iter_result(val, false))
+                Ok(make_iter_result(nv, false))
             }
             Some(VmSuspend::Task(_)) | Some(VmSuspend::Await { .. }) => {
                 inner.done = true;
@@ -86,8 +96,7 @@ impl GeneratorDriver for NanSyncGenDriver {
             None => {
                 inner.done = true;
                 let ret = result.map_err(|e| e.message)?;
-                let val = inner.ctx.heap.extract(ret);
-                Ok(make_iter_result(val, true))
+                Ok(make_iter_result(ret, true))
             }
         }
     }

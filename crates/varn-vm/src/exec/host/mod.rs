@@ -296,6 +296,11 @@ impl NativeCtx for ExecCtx {
                 self.run_until(depth).map_err(|e| e.message)
             }
             PreparedCall::PushValue(nv) => Ok(nv),
+            PreparedCall::Generator {
+                closure,
+                args,
+                current_class,
+            } => Ok(self.build_generator(closure, args, current_class)),
             PreparedCall::Constructor(frame, instance_nv) => {
                 let depth = self.frames.len();
                 let required = frame.base + frame.closure().proto.register_count as usize;

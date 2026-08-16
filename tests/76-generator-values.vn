@@ -1,0 +1,83 @@
+// A generator's body runs in its own ExecCtx, and two things about that
+// context were wrong.
+//
+// Its globals were a fresh empty `GlobalStore`, while the body's bytecode
+// already carried `LoadGlobalIdx <slot>` resolved against the CALLER's store —
+// so every global read past the end of an empty vector. It only showed up when
+// the inliner had not already folded the callee away, which is why a small
+// function worked and a large one, an async one, or another generator died
+// with "value is not callable: 0".
+//
+// And a yielded value made a lossy round trip through `value_to_nv`, which
+// cannot represent anything heap-allocated: `yield [1, 2]` came back `null`
+// while `yield 7` survived.
+
+function bigEnoughNotToInline(n: int): int {
+    let s = 0
+    for (let i = 0; i < n; i = i + 1) {
+        s = s + i * 3 - 1
+        if (s > 1000000) { s = s % 7 }
+    }
+    return s
+}
+
+function* callsAGlobal() {
+    yield bigEnoughNotToInline(5)
+}
+assert("generator calls a non-inlined global", callsAGlobal().next().value === 25)
+
+let moduleCounter = 0
+function bumpCounter(): int {
+    moduleCounter = moduleCounter + 1
+    return moduleCounter
+}
+function* touchesModuleState() {
+    yield bumpCounter()
+    yield bumpCounter()
+}
+const counted = touchesModuleState()
+assert("generator sees module state, first", counted.next().value === 1)
+assert("generator sees module state, second", counted.next().value === 2)
+
+// One generator per shape: mixing them makes the yield type a union, and the
+// point here is the value crossing out of the generator, not the union rules.
+function* yieldsStrings() {
+    yield "a string"
+}
+assert("yielded string", yieldsStrings().next().value === "a string")
+
+function* yieldsArrays() {
+    yield [1, 2, 3]
+}
+const yieldedArray = yieldsArrays().next().value
+assert("yielded array survives", yieldedArray.length === 3 && yieldedArray[1] === 2)
+
+function* yieldsObjects() {
+    yield { a: 1, b: 2 }
+}
+const yieldedObject = yieldsObjects().next().value
+assert("yielded object survives", yieldedObject.a === 1 && yieldedObject.b === 2)
+
+function* inner() {
+    yield 41
+}
+function* yieldsAGenerator() {
+    yield inner()
+}
+const nested = yieldsAGenerator().next().value
+assert("generator yields a generator that still runs", nested.next().value === 41)
+
+// No return annotation on purpose: `Generator<T>` has one parameter, so a
+// generator's `return` value has nowhere to be declared, and annotating the
+// function makes the checker compare `return [9, 9]` against
+// `Generator<int[]>` itself. That is a separate gap.
+function* returnsAHeapValue() {
+    yield [1]
+    return [9, 9]
+}
+const returning = returnsAHeapValue()
+returning.next()
+const finalResult = returning.next()
+assert("returned heap value survives", finalResult.done && finalResult.value[0] === 9)
+
+print("[PASSED] 76. Generator values ")

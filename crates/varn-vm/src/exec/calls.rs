@@ -1,13 +1,10 @@
 use crate::closure::{VmClosure, VmClosurePayload, VmUpvalue};
 use crate::error::{RuntimeError, VmResult};
-use crate::exec::ExecCtx;
 use crate::frame::CallFrame;
-use crate::globals::GlobalStore;
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 
 use std::rc::Rc;
-use varn_types::generator::GeneratorObj;
 use varn_types::value::BoundMethodTarget;
 use varn_types::value::LazyTask;
 use varn_types::{FunctionProto, Literal, PoolEntry, Value, VmArray};
@@ -106,6 +103,40 @@ pub(crate) fn try_prepare_call_fast(
     }
 }
 
+/// Take the generator's arguments off the stack and package its closure, so
+/// the caller's context can build the generator's own context by forking
+/// itself. Shared by the bare-closure and bound-method paths — writing it
+/// twice is what let the empty-globals bug live in both.
+fn describe_generator(
+    nc: &Rc<VmClosure>,
+    arg_count: usize,
+    current_class: Option<Rc<varn_types::ClassObj>>,
+    stack: &mut Vec<VmValue>,
+    heap: &mut Heap,
+    settings: crate::settings::ExecSettings,
+) -> PreparedCall {
+    let args_start = stack.len() - arg_count;
+    let args: Vec<VmValue> = stack.drain(args_start..).collect();
+    let constants = resolve_constants(&nc.proto, heap);
+    // Read AFTER the drain: an upvalue points at a stack location, and the
+    // argument window is gone by now.
+    let upvalues = nc
+        .upvalues
+        .iter()
+        .map(|uv| VmUpvalue::closed(uv.read(stack)))
+        .collect();
+    PreparedCall::Generator {
+        closure: Rc::new(VmClosure::with_upvalues(
+            nc.proto.clone(),
+            upvalues,
+            Rc::new(constants),
+            settings,
+        )),
+        args,
+        current_class,
+    }
+}
+
 pub(crate) fn prepare_call(
     callee_nv: VmValue,
     arg_count: usize,
@@ -124,36 +155,8 @@ pub(crate) fn prepare_call(
                 let nc = nc.clone();
                 bundle_rest_args(&nc.proto, &mut arg_count, stack, heap);
                 if nc.proto.is_generator {
-                    let args_start = stack.len() - arg_count;
-                    let arg_nvs: Vec<VmValue> = stack.drain(args_start..).collect();
-                    let mut gen_ctx = Box::new(ExecCtx::new(GlobalStore::new(), settings));
-                    gen_ctx.heap = heap.clone();
-                    gen_ctx.gc_inhibited = true;
-                    gen_ctx.stack.clear();
-                    gen_ctx.stack.extend(arg_nvs);
-                    let constants = resolve_constants(&nc.proto, heap);
-                    let upvalues = nc
-                        .upvalues
-                        .iter()
-                        .map(|uv| {
-                            let nv = uv.read(stack);
-                            VmUpvalue::closed(nv)
-                        })
-                        .collect();
-                    let closure = Rc::new(VmClosure::with_upvalues(
-                        nc.proto.clone(),
-                        upvalues,
-                        Rc::new(constants),
-                        settings,
-                    ));
-                    let required = nc.proto.register_count as usize;
-                    if gen_ctx.stack.len() < required {
-                        gen_ctx.stack.resize(required, VmValue::null());
-                    }
-                    gen_ctx.frames.push(CallFrame::new_owned(closure, 0));
-                    let driver = crate::generator::NanSyncGenDriver::new(gen_ctx);
-                    return Ok(PreparedCall::PushValue(
-                        heap.intern(Value::Generator(GeneratorObj(driver))),
+                    return Ok(describe_generator(
+                        &nc, arg_count, None, stack, heap, settings,
                     ));
                 }
                 if nc.proto.is_async {
@@ -241,38 +244,13 @@ pub(crate) fn prepare_call(
                             stack[base] = recv_nv;
                         }
                         if nc.proto.is_generator {
-                            let args_start = stack.len() - full_arg_count;
-                            let arg_nvs: Vec<VmValue> = stack.drain(args_start..).collect();
-                            let mut gen_ctx = Box::new(ExecCtx::new(GlobalStore::new(), settings));
-                            gen_ctx.heap = heap.clone();
-                            gen_ctx.gc_inhibited = true;
-                            gen_ctx.stack.clear();
-                            gen_ctx.stack.extend(arg_nvs);
-                            let constants = resolve_constants(&nc.proto, heap);
-                            let upvalues = nc
-                                .upvalues
-                                .iter()
-                                .map(|uv| {
-                                    let nv = uv.read(stack);
-                                    VmUpvalue::closed(nv)
-                                })
-                                .collect();
-                            let closure = Rc::new(VmClosure::with_upvalues(
-                                nc.proto.clone(),
-                                upvalues,
-                                Rc::new(constants),
+                            return Ok(describe_generator(
+                                &nc,
+                                full_arg_count,
+                                owner_class,
+                                stack,
+                                heap,
                                 settings,
-                            ));
-                            let required = nc.proto.register_count as usize;
-                            if gen_ctx.stack.len() < required {
-                                gen_ctx.stack.resize(required, VmValue::null());
-                            }
-                            let mut frame = CallFrame::new_owned(closure, 0);
-                            frame.current_class = owner_class;
-                            gen_ctx.frames.push(frame);
-                            let driver = crate::generator::NanSyncGenDriver::new(gen_ctx);
-                            return Ok(PreparedCall::PushValue(
-                                heap.intern(Value::Generator(GeneratorObj(driver))),
                             ));
                         }
                         if nc.proto.is_async {
@@ -469,4 +447,22 @@ pub enum PreparedCall {
     RawNativeImmediate(varn_types::NativeFn, usize),
     NativeConstructor(varn_types::NativeFn, Vec<VmValue>, VmValue),
     PushValue(VmValue),
+    /// A generator body, described but not yet built.
+    ///
+    /// Building it needs a whole `ExecCtx` of its own, and that context must be
+    /// a FORK of the one making the call — same globals above all. Global
+    /// access is rewritten to `LoadGlobalIdx <slot>` against ONE store (see
+    /// `crate::globals::resolve`), so a generator handed a fresh empty store
+    /// reads slot indices into an empty vector: `function* g() { yield f() }`
+    /// died with "value is not callable: 0" for any `f` the inliner had not
+    /// already folded away.
+    ///
+    /// `prepare_call` cannot fork — it holds `stack` and `heap` split off the
+    /// context precisely so it does not need it — so it describes the
+    /// generator and [`ExecCtx::dispatch_prepared_call`] materialises it.
+    Generator {
+        closure: Rc<VmClosure>,
+        args: Vec<VmValue>,
+        current_class: Option<Rc<varn_types::ClassObj>>,
+    },
 }
