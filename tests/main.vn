@@ -72,6 +72,7 @@ import "./70-result-extensions.vn"
 import "./71-phase2-std-features.vn"
 import "./72-consolidated-std.vn"
 import "./73-str-charcode-json-shape.vn"
+import "./74-regalloc-interference.vn"
 
-print("\n74 side-effect modules executed in suite")
+print("\n75 side-effect modules executed in suite")
 assertSummary()

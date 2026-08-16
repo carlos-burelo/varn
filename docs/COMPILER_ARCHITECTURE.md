@@ -145,5 +145,14 @@ Calcula los intervalos de vida (*live ranges*) de cada registro virtual para det
 ### Asignación de Registros Nativos (`regalloc_post`)
 Reasigna los registros para minimizar el tamaño del frame de la VM, reutilizando slots de registros que ya no estén activos.
 
+El coloreado está sujeto a dos restricciones **duras**, ambas de corrección:
+
+- **interferencia** — dos registros cuyos rangos de vida se solapan nunca comparten color;
+- **frame del llamado** — un registro vivo a través de una llamada se colorea por debajo de la ventana de argumentos de esa llamada, para que el frame del callee no lo pise.
+
+Pueden ser conjuntamente infactibles para un orden de asignación dado: todos los colores bajo el techo pueden pertenecer ya a un vecino. El pase **no puede** mover una ventana de argumentos, así que en ese caso abandona la función entera y conserva la asignación que emitió el SSA. Elegir un color ilegal es un miscompile silencioso, no una degradación.
+
+Cuatro verificadores revisan el mapeo final antes de escribirlo: interferencia, ventanas de llamada, frames de callee y sitios de construcción (`BuildArray` / `BuildObjectWithShape`).
+
 ### Inferidor de Tipos de Slot (`slot_kinds`)
 Inspecciona los tipos asignados a cada registro (`Float`, `Int`, `ObjectRef`, `Any`) y construye el mapa de metadatos `register_meta` necesario para que el JIT compila instrucciones nativas x86-64 sin comprobaciones redundantes.

@@ -1,0 +1,78 @@
+// Register coalescing must never alias two registers whose live ranges
+// overlap. The post-pass colourer used to fall back to the first callee
+// register when it ran out of legal colours, folding a value onto one that was
+// still live — a silent miscompile, since none of the other verifiers look at
+// interference.
+//
+// The shape that triggers it: an object literal with more than one field,
+// passed to a function small enough to inline, whose result feeds an
+// intrinsic. A single-field literal hides it — the aliased register happens to
+// still hold the right value.
+//
+// Each case lives in its own function on purpose. The trigger needs a small,
+// densely packed register space; piling the cases into one module body spreads
+// them out and the colourer never runs out of colours.
+//
+// Three cases were checked against the broken colourer and fail on it:
+// twoFields, receiverOutlivesTheCall, twoObjectsOneCall. The rest cover
+// neighbouring shapes that route through the same contiguous-window path but
+// do not, on their own, exhaust the colours.
+
+interface HasId {
+    id: int
+}
+
+function readId(v: HasId): int {
+    return v.id
+}
+
+function twoFields() {
+    const o = { id: 7, extra: "z" }
+    assert("inlined member + intrinsic, 2 fields", readId(o).toString() === "7")
+}
+
+function threeFields() {
+    const o = { id: 41, extra: "z", other: true }
+    assert("inlined member + intrinsic, 3 fields", readId(o).toString() === "41")
+}
+
+function literalAtCallSite() {
+    assert("object literal at the call site", readId({ id: 5, extra: "q" }).toString() === "5")
+}
+
+function receiverOutlivesTheCall() {
+    const o = { id: 9, extra: "keep" }
+    const text = readId(o).toString()
+    assert("receiver survives the call", o.id === 9)
+    assert("result survives the call", text === "9")
+}
+
+function addIds(a: HasId, b: HasId): int {
+    return a.id + b.id
+}
+
+function twoObjectsOneCall() {
+    const left = { id: 3, extra: "l" }
+    const right = { id: 4, extra: "r" }
+    assert("two multi-field objects across one call", addIds(left, right).toString() === "7")
+}
+
+function throughAnArray() {
+    const ids = [{ id: 1, extra: "a" }, { id: 2, extra: "b" }]
+    assert("array of multi-field objects", readId(ids[1]).toString() === "2")
+}
+
+function throughATuple() {
+    const left = { id: 3, extra: "l" }
+    const right = { id: 4, extra: "r" }
+    const pair = #[readId(left), readId(right)]
+    assert("tuple of inlined results", pair[0] === 3 && pair[1] === 4)
+}
+
+twoFields()
+threeFields()
+literalAtCallSite()
+receiverOutlivesTheCall()
+twoObjectsOneCall()
+throughAnArray()
+throughATuple()

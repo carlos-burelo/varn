@@ -13,6 +13,10 @@ use crate::liveness::{LiveRange, LivenessAnalyzer};
 
 pub(crate) use varn_types::bytecode::decode;
 
+#[cfg(test)]
+#[path = "regalloc_post_tests.rs"]
+mod tests;
+
 struct ScanResult {
     defs: HashMap<u8, usize>,
 
@@ -140,13 +144,27 @@ fn collect_consecutive_blocks(code: &[u16], constants: &[PoolEntry]) -> Vec<(u8,
     blocks
 }
 
+/// Re-colour the function's registers by liveness, coalescing `Move` copies.
+///
+/// Two constraints are hard, and both are correctness — not heuristics:
+///
+/// * **interference** — registers whose live ranges overlap never share a
+///   colour;
+/// * **callee frame** — a register live across a call is coloured below that
+///   call's argument window, so the callee's frame cannot clobber it. This is
+///   the `max_allowed_color` ceiling.
+///
+/// They can be jointly infeasible for a given assignment order: every colour
+/// under the ceiling may already belong to a neighbour. There is no third
+/// option — this pass cannot move an argument window — so infeasibility is
+/// reported as `None` and the caller leaves the function's allocation alone.
 fn color_with_base(
     ranges: &[LiveRange],
     base: u8,
     copies: &[(u8, u8)],
     scan: &ScanResult,
     blocks: &[(u8, u8)],
-) -> HashMap<u8, u8> {
+) -> Option<HashMap<u8, u8>> {
     let mut coloring: HashMap<u8, u8> = HashMap::new();
 
     let ranges_by_vreg: HashMap<u8, &LiveRange> =
@@ -248,19 +266,37 @@ fn color_with_base(
             }
         }
 
-        let color = color_opt.unwrap_or_else(|| {
-            (base..)
-                .take_while(|&c| c <= max_allowed_color)
-                .find(|c| !neighbor_colors.contains(c))
-                .unwrap_or(base)
-        });
+        let color = match color_opt {
+            Some(c) => c,
+            // No colour satisfies both hard constraints at once. This pass
+            // cannot widen the search — moving an argument window is the
+            // caller's allocation, not ours — so the function keeps the
+            // registers the SSA emitter gave it.
+            None => (base..=max_allowed_color).find(|c| !neighbor_colors.contains(c))?,
+        };
 
         for offset in 0..count {
             coloring.insert(reg + offset, color + offset);
         }
     }
 
-    coloring
+    Some(coloring)
+}
+
+/// The colouring contract, re-checked against the mapping that is about to be
+/// written: two registers whose live ranges overlap must not land on the same
+/// physical register.
+///
+/// [`color_with_base`] is supposed to guarantee this, and for a long time it
+/// silently did not — it fell back to `base` whenever the search came up empty,
+/// handing out a colour it had already ruled out. Nothing downstream noticed:
+/// the other verifiers check call windows and build sites, never interference.
+fn verify_interference(ranges: &[LiveRange], mapping: &HashMap<u8, u8>) -> bool {
+    let m = |r: u8| mapping.get(&r).copied().unwrap_or(r);
+    ranges.iter().all(|range| {
+        let color = m(range.vreg as u8);
+        range.interference.iter().all(|&n| m(n as u8) != color)
+    })
 }
 
 fn verify_call_constraints(
@@ -798,7 +834,10 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         }
     }
     let blocks = collect_consecutive_blocks(&proto.chunk.code, &proto.chunk.constants);
-    let raw_mapping = color_with_base(&ranges, base, &copies, &scan, &blocks);
+    let raw_mapping = match color_with_base(&ranges, base, &copies, &scan, &blocks) {
+        Some(m) => m,
+        None => return,
+    };
 
     let mapping: HashMap<u8, u8> = raw_mapping
         .into_iter()
@@ -806,6 +845,10 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         .collect();
 
     if mapping.is_empty() {
+        return;
+    }
+
+    if !verify_interference(&ranges, &mapping) {
         return;
     }
 
