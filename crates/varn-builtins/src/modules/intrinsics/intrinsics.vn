@@ -3,10 +3,9 @@ export declare class Generator<T> {
     return(value?: T): { value: T; done: bool; };
 }
 
-export declare class AsyncGenerator<T> {
-    next(value?: dynamic): Task<{ value: T; done: bool; }>;
-    return(value?: T): Task<{ value: T; done: bool; }>;
-}
+// No `AsyncGenerator`: `async function*` is rejected by the parser, so nothing
+// can produce one. `AsyncIterator` below stays — it is implementable by hand,
+// and `Symbol.asyncIterator` exists at runtime.
 
 export interface Iterator<T> {
     next(): { value: T; done: bool; };

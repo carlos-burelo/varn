@@ -470,6 +470,29 @@ impl Checker {
         result
     }
 
+    /// Run `f` with the traversal state that says "we are inside a function
+    /// body": `return` is legal, and `break`/`continue` cannot reach a loop or
+    /// switch outside the body.
+    ///
+    /// Object-literal methods, getters and setters used to skip this, so every
+    /// `return` inside one was reported as WR4007, "a 'return' statement can
+    /// only be used within a function body".
+    pub(crate) fn in_function_body<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
+        let saved_in_function = self.in_function;
+        let saved_loop_depth = self.loop_depth;
+        let saved_switch_depth = self.switch_depth;
+        self.in_function = true;
+        self.loop_depth = 0;
+        self.switch_depth = 0;
+
+        let result = f(self);
+
+        self.in_function = saved_in_function;
+        self.loop_depth = saved_loop_depth;
+        self.switch_depth = saved_switch_depth;
+        result
+    }
+
     pub(crate) fn infer_type(&mut self, expr: &Expr, bind: &BindResult) -> Type {
         let key = (expr.id(), self.current_scope, self.infer_env_rev);
         if let Some(ty) = self.infer_cache.get(&key) {

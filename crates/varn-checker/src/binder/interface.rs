@@ -108,13 +108,16 @@ impl super::Binder {
                 params,
                 return_type,
                 optional,
+                is_async,
                 range,
-                ..
             } => {
-                let ret = return_type
-                    .as_ref()
-                    .map(|m| resolve_type_node(m, Some(self)))
-                    .unwrap_or(Type::Dynamic);
+                let ret = crate::types::async_fn_return(
+                    return_type
+                        .as_ref()
+                        .map(|m| resolve_type_node(m, Some(self)))
+                        .unwrap_or(Type::Dynamic),
+                    *is_async,
+                );
                 let params_list = params
                     .iter()
                     .map(|p| {
@@ -160,7 +163,7 @@ impl super::Binder {
                 members.push(ClassMemberInfo {
                     name: key.clone(),
                     kind: ClassMemberKind::Method,
-                    is_async: false,
+                    is_async: *is_async,
                     is_generator: false,
                     is_static: false,
                     is_optional: *optional,

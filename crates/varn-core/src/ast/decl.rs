@@ -191,6 +191,10 @@ pub enum InterfaceMember {
         params: Vec<Param>,
         return_type: Option<TypeNode>,
         optional: bool,
+        /// An `async` signature declares an implementation that returns a
+        /// `Task`, exactly as it does on a class. Without it, an interface
+        /// could not describe any async API.
+        is_async: bool,
         range: SourceRange,
     },
     Index {

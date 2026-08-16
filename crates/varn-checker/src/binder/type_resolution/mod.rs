@@ -148,6 +148,7 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
                         params,
                         return_type,
                         optional,
+                        is_async,
                         ..
                     } => {
                         let resolved_params = params
@@ -178,10 +179,13 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
                             })
                             .collect::<Vec<_>>();
 
-                        let ret = return_type
-                            .as_ref()
-                            .map(|m| resolve_type_node(m, ctx))
-                            .unwrap_or(Type::Dynamic);
+                        let ret = crate::types::async_fn_return(
+                            return_type
+                                .as_ref()
+                                .map(|m| resolve_type_node(m, ctx))
+                                .unwrap_or(Type::Dynamic),
+                            *is_async,
+                        );
                         ObjectTypeMember::Method {
                             name: key.clone(),
                             params: resolved_params,

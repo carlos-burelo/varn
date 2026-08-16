@@ -54,6 +54,15 @@ pub fn parse_interface_decl(s: &mut TokenStream) -> Result<InterfaceDecl, String
 pub fn parse_interface_member(s: &mut TokenStream) -> Result<InterfaceMember, String> {
     let mem_range = s.range();
     let readonly = s.eat(TokenKind::Readonly);
+    // `async` only makes sense on a method signature, but `async` is also a
+    // legal member name, so it is only consumed as a modifier when something
+    // that can start a member follows it.
+    let is_async = s.check(TokenKind::Async)
+        && !matches!(
+            s.peek_kind(1),
+            TokenKind::LParen | TokenKind::Colon | TokenKind::Question | TokenKind::LAngle
+        )
+        && s.eat(TokenKind::Async);
 
     if s.check(TokenKind::LBracket) {
         s.advance();
@@ -102,9 +111,13 @@ pub fn parse_interface_member(s: &mut TokenStream) -> Result<InterfaceMember, St
             params,
             return_type,
             optional,
+            is_async,
             range: mem_range,
         })
     } else {
+        if is_async {
+            return Err(String::from("unexpected `async` before interface property"));
+        }
         s.expect(TokenKind::Colon)?;
         let type_ann = parse_type(s)?;
         s.eat(TokenKind::Semicolon);

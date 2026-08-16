@@ -81,6 +81,25 @@ arrows. Todo consumidor río abajo — inferencia de llamadas, acceso a miembros
 Es idempotente: `async f(): Task<int>` y `async f(): int` describen el mismo
 valor. Y `void` no es excepción — `async f(): void` vale `Task<void>`.
 
+Las formas que pueden llevar `async`: función libre, método de clase, método de
+extensión, función de namespace, arrow, expresión de función, método en literal
+de objeto, y **firma de interfaz** (`interface F { async load(): int }` — sin
+ella una interfaz no podría describir ninguna API asíncrona).
+
+### Lo que NO se admite
+
+`async function*`. Un generador se conduce de forma síncrona, así que un
+`await` dentro no tiene dónde suspenderse: el frame reanudado se corrompía
+(`value is not callable: 0.0000…64 (type: float)`), y sin `await` el modificador
+simplemente se ignoraba. El parser lo rechaza en todas las formas
+(`crates/varn-parser/src/modifiers.rs`). Por eso `core:intrinsics` tampoco
+declara `AsyncGenerator`: nada puede producir uno. `AsyncIterator` sí sigue —
+se implementa a mano y `Symbol.asyncIterator` existe en runtime.
+
+Getters y setters **en literales de objeto**. `HirObjectProp` no tiene variante
+de accesor, así que el compilador los descartaba y la propiedad se leía `null`.
+Los métodos sí bajan (`HirObjectProp::Method`) y funcionan.
+
 La comprobación del cuerpo es aparte y usa la anotación cruda del AST
 (`expected_return_type`), no el tipo del símbolo, así que `return 1` dentro de
 `async f(): int` sigue contrastándose contra `int`.

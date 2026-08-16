@@ -24,6 +24,28 @@ async function localFn(): int { return 5 }
 async function localFnInferred() { return 6 }
 
 const localArrow = async (): int => { return 7 }
+const localFnExpr = async function (): int { return 14 }
+// Not async, but the same gap: the checker had no arm for function
+// expressions, so this used to read as `(...args: dynamic[]) => void` and the
+// call site got `dynamic`. Pinned here for the signature, not the value.
+const syncFnExpr = function (x: int): int { return x * 2 }
+
+const literal = {
+    async method(): int { return 15 },
+    plainMethod(x: int): int { return x + 1 }
+}
+
+interface AsyncApi {
+    async load(): int
+    async nothing(): void
+    plain(): str
+}
+
+class ApiImpl implements AsyncApi {
+    async load(): int { return 16 }
+    async nothing(): void { }
+    plain(): str { return "p" }
+}
 
 extension on LocalBox {
     async extensionMethod(): int { return 8 }
@@ -51,6 +73,23 @@ async function runAsyncShapes() {
     assert("imported function", await importedAsyncFn() === 11)
     assert("namespace function", await AsyncNs.fn() === 12)
     assert("imported free method helper", await asyncImportedMethod() === 13)
+
+    // Forms that could not even be written before: an `async function`
+    // expression did not parse, an object literal dropped its methods, and an
+    // interface could not carry `async` on a signature.
+    assert("async function expression", await localFnExpr() === 14)
+    assert("function expression keeps its signature", syncFnExpr(7) === 14)
+    assert("object literal async method", await literal.method() === 15)
+    assert("object literal plain method", literal.plainMethod(1) === 2)
+
+    const api: AsyncApi = new ApiImpl()
+    // Held before awaiting on purpose: the golden records this as `Task<int>`,
+    // which is the only place the interface's `async` is observable — a
+    // missing wrap is a warning, and warnings do not fail a run.
+    const pending = api.load()
+    assert("async through an interface", await pending === 16)
+    await api.nothing()
+    assert("plain method through an interface", api.plain() === "p")
 }
 
 await runAsyncShapes()

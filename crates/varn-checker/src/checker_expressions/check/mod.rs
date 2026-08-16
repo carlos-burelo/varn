@@ -165,18 +165,7 @@ impl Checker {
                     self.record_scope(body.range.start.offset);
                 }
 
-                let saved_in_function = self.in_function;
-                let saved_loop_depth = self.loop_depth;
-                let saved_switch_depth = self.switch_depth;
-                self.in_function = true;
-                self.loop_depth = 0;
-                self.switch_depth = 0;
-
-                self.check_stmt(body, bind);
-
-                self.in_function = saved_in_function;
-                self.loop_depth = saved_loop_depth;
-                self.switch_depth = saved_switch_depth;
+                self.in_function_body(|c| c.check_stmt(body, bind));
 
                 self.current_scope = saved_scope;
                 self.expected_return_type = saved_expected;

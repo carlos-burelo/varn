@@ -173,6 +173,12 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             }
             s.restore(save);
             s.advance();
+            // Not an arrow, so the only thing `async` can introduce here is a
+            // function expression — and `function` still has to be consumed.
+            // Without this the stream was handed to the inner parser still
+            // sitting on `function`, and `async function () {}` failed with
+            // "Expected LParen, got Function".
+            s.expect(TokenKind::Function)?;
             parse_function_expr_inner(s, true)
         }
 
@@ -283,6 +289,7 @@ fn parse_function_expr(s: &mut TokenStream) -> Result<Expr, String> {
 fn parse_function_expr_inner(s: &mut TokenStream, is_async: bool) -> Result<Expr, String> {
     let range = s.range();
     let is_generator = s.eat(TokenKind::Star);
+    crate::modifiers::reject_async_generator(is_async, is_generator)?;
     let id = if s.check(TokenKind::Identifier) {
         Some(s.consume_lexeme())
     } else {

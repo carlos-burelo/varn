@@ -9,125 +9,100 @@
 35 | int
 38 | () => Task<int>
 42 | int
+45 | () => Task<int>
 49 | int
-55 | LocalBox
-56 | LocalBox
-58 | void
-59 | (label: str, cond: bool) => void
-60 | str
-61 | bool
-62 | int
-63 | Task<int>
-64 | () => Task<int>
-65 | LocalBox
+52 | (x: int) => int
+56 | int
+57 | int
+58 | int
+61 | #{ method(): Task<int>, plainMethod(x: int): int }
+64 | int
 67 | int
-69 | void
-70 | (label: str, cond: bool) => void
-71 | str
-72 | bool
-73 | int
-74 | Task<int>
-75 | () => Task<int>
-76 | LocalBox
-78 | int
-80 | void
-81 | Task<void>
-82 | () => Task<void>
-83 | LocalBox
-86 | void
-87 | (label: str, cond: bool) => void
-88 | str
-89 | bool
-90 | int
-91 | int[]
-92 | int[]
-93 | Task<int[]>
-94 | () => Task<int[]>
-95 | LocalBox
-97 | int
-98 | int
-100 | void
-101 | (label: str, cond: bool) => void
-102 | str
-103 | bool
-104 | int
-105 | Task<int>
-106 | () => Task<int>
-107 | LocalBox
-109 | int
-111 | void
-112 | (label: str, cond: bool) => void
-113 | str
-114 | bool
-115 | int
-116 | Task<int>
-117 | () => Task<int>
+68 | int
+69 | int
+80 | int
+86 | str
+94 | int
+100 | LocalBox
+101 | LocalBox
+103 | void
+104 | (label: str, cond: bool) => void
+105 | str
+106 | bool
+107 | int
+108 | Task<int>
+109 | () => Task<int>
+110 | LocalBox
+112 | int
+114 | void
+115 | (label: str, cond: bool) => void
+116 | str
+117 | bool
 118 | int
-120 | void
-121 | (label: str, cond: bool) => void
-122 | str
-123 | bool
-124 | int
-125 | Task<int>
-126 | () => Task<int>
-127 | int
-129 | void
-130 | (label: str, cond: bool) => void
-131 | str
-132 | bool
-133 | int
-134 | Task<int>
-135 | () => Task<int>
-136 | int
-138 | void
-139 | (label: str, cond: bool) => void
-140 | str
-141 | bool
+119 | Task<int>
+120 | () => Task<int>
+121 | LocalBox
+123 | int
+125 | void
+126 | Task<void>
+127 | () => Task<void>
+128 | LocalBox
+131 | void
+132 | (label: str, cond: bool) => void
+133 | str
+134 | bool
+135 | int
+136 | int[]
+137 | int[]
+138 | Task<int[]>
+139 | () => Task<int[]>
+140 | LocalBox
 142 | int
-143 | Task<int>
-144 | () => Task<int>
-145 | LocalBox
-147 | int
-150 | ImportedAsyncBox
-151 | ImportedAsyncBox
-153 | void
-154 | (label: str, cond: bool) => void
-155 | str
-156 | bool
-157 | int
-158 | Task<int>
-159 | () => Task<int>
-160 | ImportedAsyncBox
-162 | int
-164 | void
-165 | (label: str, cond: bool) => void
-166 | str
-167 | bool
-168 | int
-169 | int[]
-170 | int[]
-171 | Task<int[]>
-172 | () => Task<int[]>
-173 | ImportedAsyncBox
-175 | int
-176 | int
-178 | void
-179 | (label: str, cond: bool) => void
-180 | str
-181 | bool
-182 | int
-183 | Task<int>
-184 | () => Task<int>
-185 | int
-187 | void
-188 | (label: str, cond: bool) => void
-189 | str
-190 | bool
-191 | int
-192 | Task<int>
-193 | () => Task<int>
-194 | AsyncNs
-196 | int
+143 | int
+145 | void
+146 | (label: str, cond: bool) => void
+147 | str
+148 | bool
+149 | int
+150 | Task<int>
+151 | () => Task<int>
+152 | LocalBox
+154 | int
+156 | void
+157 | (label: str, cond: bool) => void
+158 | str
+159 | bool
+160 | int
+161 | Task<int>
+162 | () => Task<int>
+163 | int
+165 | void
+166 | (label: str, cond: bool) => void
+167 | str
+168 | bool
+169 | int
+170 | Task<int>
+171 | () => Task<int>
+172 | int
+174 | void
+175 | (label: str, cond: bool) => void
+176 | str
+177 | bool
+178 | int
+179 | Task<int>
+180 | () => Task<int>
+181 | int
+183 | void
+184 | (label: str, cond: bool) => void
+185 | str
+186 | bool
+187 | int
+188 | Task<int>
+189 | () => Task<int>
+190 | LocalBox
+192 | int
+195 | ImportedAsyncBox
+196 | ImportedAsyncBox
 198 | void
 199 | (label: str, cond: bool) => void
 200 | str
@@ -135,49 +110,159 @@
 202 | int
 203 | Task<int>
 204 | () => Task<int>
-205 | int
-207 | void
-208 | Task<void>
-209 | () => Task<void>
-211 | void
-212 | (...args: dynamic[]) => void
-213 | str
+205 | ImportedAsyncBox
+207 | int
+209 | void
+210 | (label: str, cond: bool) => void
+211 | str
+212 | bool
+213 | int
+214 | int[]
+215 | int[]
+216 | Task<int[]>
+217 | () => Task<int[]>
+218 | ImportedAsyncBox
+220 | int
+221 | int
+223 | void
+224 | (label: str, cond: bool) => void
+225 | str
+226 | bool
+227 | int
+228 | Task<int>
+229 | () => Task<int>
+230 | int
+232 | void
+233 | (label: str, cond: bool) => void
+234 | str
+235 | bool
+236 | int
+237 | Task<int>
+238 | () => Task<int>
+239 | AsyncNs
+241 | int
+243 | void
+244 | (label: str, cond: bool) => void
+245 | str
+246 | bool
+247 | int
+248 | Task<int>
+249 | () => Task<int>
+250 | int
+252 | void
+253 | (label: str, cond: bool) => void
+254 | str
+255 | bool
+256 | int
+257 | Task<int>
+258 | () => Task<int>
+259 | int
+261 | void
+262 | (label: str, cond: bool) => void
+263 | str
+264 | bool
+265 | int
+266 | (x: int) => int
+267 | int
+268 | int
+270 | void
+271 | (label: str, cond: bool) => void
+272 | str
+273 | bool
+274 | int
+275 | Task<int>
+276 | () => Task<int>
+277 | #{ method(): Task<int>, plainMethod(x: int): int }
+279 | int
+281 | void
+282 | (label: str, cond: bool) => void
+283 | str
+284 | bool
+285 | int
+286 | (x: int) => int
+287 | #{ method(): Task<int>, plainMethod(x: int): int }
+289 | int
+290 | int
+293 | ApiImpl
+294 | ApiImpl
+297 | Task<int>
+298 | () => Task<int>
+299 | AsyncApi
+302 | void
+303 | (label: str, cond: bool) => void
+304 | str
+305 | bool
+306 | int
+307 | Task<int>
+308 | int
+310 | void
+311 | Task<void>
+312 | () => Task<void>
+313 | AsyncApi
+316 | void
+317 | (label: str, cond: bool) => void
+318 | str
+319 | bool
+320 | str
+321 | () => str
+322 | AsyncApi
+324 | str
+326 | void
+327 | Task<void>
+328 | () => Task<void>
+330 | void
+331 | (...args: dynamic[]) => void
+332 | str
 ## annotations (key names its space)
 decl 719 | 13:10 | slot=2
 decl 740 | 13:31 | slot=3
 decl 757 | 13:48 | slot=0
 decl 766 | 13:57 | slot=1
 decl 1057 | 23:16 | cg=Int
-expr 61 | 35:28 | numeric=Int
-expr 66 | ?:? | cg=Int
-expr 72 | 36:50 | numeric=Int
-expr 77 | ?:? | cg=Int
-expr 84 | ?:? | cg=Fn
-expr 89 | 38:47 | numeric=Int
-expr 90 | 38:47 | array_index
-expr 96 | ?:? | cg=Array(Int)
-expr 97 | 38:74 | cg=Int
-expr 103 | 39:50 | numeric=Int
-expr 108 | ?:? | cg=Int
-expr 114 | 41:30 | numeric=Int
-expr 116 | 41:36 | cg=Int
-expr 123 | 42:52 | numeric=Int
-expr 125 | 42:58 | cg=Int
-expr 132 | 43:27 | numeric=Int
-expr 134 | 43:33 | cg=Int
-expr 141 | 44:32 | numeric=Int
-expr 146 | ?:? | cg=Int
-expr 156 | 49:37 | numeric=Int
-expr 161 | ?:? | cg=Int
-expr 167 | 50:39 | numeric=Int
-expr 168 | 50:39 | array_index
-expr 174 | ?:? | cg=Array(Int)
-expr 175 | 50:62 | cg=Int
-expr 181 | 51:33 | numeric=Int
-expr 183 | 51:39 | cg=Int
-expr 190 | 52:34 | numeric=Int
-expr 195 | ?:? | cg=Int
-expr 201 | 53:43 | numeric=Int
-expr 203 | 53:49 | cg=Int
+expr 56 | 31:52 | numeric=Int
+expr 67 | 35:39 | numeric=Int
+expr 106 | 57:28 | numeric=Int
+expr 111 | ?:? | cg=Int
+expr 117 | 58:50 | numeric=Int
+expr 122 | ?:? | cg=Int
+expr 129 | ?:? | cg=Fn
+expr 134 | 60:47 | numeric=Int
+expr 135 | 60:47 | array_index
+expr 141 | ?:? | cg=Array(Int)
+expr 142 | 60:74 | cg=Int
+expr 148 | 61:50 | numeric=Int
+expr 153 | ?:? | cg=Int
+expr 159 | 63:30 | numeric=Int
+expr 161 | 63:36 | cg=Int
+expr 168 | 64:52 | numeric=Int
+expr 170 | 64:58 | cg=Int
+expr 177 | 65:27 | numeric=Int
+expr 179 | 65:33 | cg=Int
+expr 186 | 66:32 | numeric=Int
+expr 191 | ?:? | cg=Int
+expr 201 | 71:37 | numeric=Int
+expr 206 | ?:? | cg=Int
+expr 212 | 72:39 | numeric=Int
+expr 213 | 72:39 | array_index
+expr 219 | ?:? | cg=Array(Int)
+expr 220 | 72:62 | cg=Int
+expr 226 | 73:33 | numeric=Int
+expr 228 | 73:39 | cg=Int
+expr 235 | 74:34 | numeric=Int
+expr 240 | ?:? | cg=Int
+expr 246 | 75:43 | numeric=Int
+expr 248 | 75:49 | cg=Int
+expr 255 | 80:41 | numeric=Int
+expr 257 | 80:47 | cg=Int
+expr 264 | 81:55 | numeric=Int
+expr 265 | 81:55 | cg=Int
+expr 273 | 82:43 | numeric=Int
+expr 278 | ?:? | cg=Int
+expr 284 | 83:43 | numeric=Int
+expr 288 | ?:? | cg=Int
+expr 300 | ?:? | cg=Int
+expr 305 | 90:42 | numeric=Int
+expr 314 | ?:? | cg=Fn
+expr 323 | ?:? | cg=Str
 ## reassigned names
 

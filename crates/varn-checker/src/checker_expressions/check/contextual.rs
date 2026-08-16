@@ -165,12 +165,27 @@ impl Checker {
                     if let Some(fn_scope) = self.next_child_scope(bind) {
                         self.current_scope = fn_scope;
                     }
-                    self.check_stmt(body, bind);
+                    self.in_function_body(|c| c.check_stmt(body, bind));
                     self.current_scope = saved_scope;
                     self.expected_return_type = saved_expected;
                 }
-                ObjectProp::Getter { body, .. } | ObjectProp::Setter { body, .. } => {
-                    self.check_stmt(body, bind)
+                // Accessors parse inside an object literal, but the compiler has
+                // no `HirObjectProp` for them: they are lowered away, and the
+                // property reads back as `null`. Silently dropping a written
+                // accessor is worse than not having them, so say so.
+                ObjectProp::Getter { body, range, .. } | ObjectProp::Setter { body, range, .. } => {
+                    self.emit(
+                        Diagnostic::error(
+                            ErrorCode::UnsupportedExpression,
+                            "getters and setters are not supported in object literals — \
+                             declare a class, or use a method"
+                                .to_string(),
+                        )
+                        .with_range(*range),
+                    );
+                    let saved_expected = self.expected_return_type.take();
+                    self.in_function_body(|c| c.check_stmt(body, bind));
+                    self.expected_return_type = saved_expected;
                 }
                 ObjectProp::Spread { argument, .. } => self.check_expr(argument, bind),
             }

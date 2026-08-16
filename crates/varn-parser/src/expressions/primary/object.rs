@@ -70,6 +70,7 @@ pub(super) fn parse_object_expr(s: &mut TokenStream) -> Result<Expr, String> {
 
         let is_async = s.eat(TokenKind::Async);
         let is_generator = s.eat(TokenKind::Star);
+        crate::modifiers::reject_async_generator(is_async, is_generator)?;
         let key = parse_prop_key(s)?;
 
         if s.check(TokenKind::LParen) {

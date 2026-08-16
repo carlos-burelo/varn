@@ -129,6 +129,13 @@ impl Checker {
                 body,
                 is_async,
             } => self.infer_arrow_type(expr, params, return_type, body, *is_async, bind),
+            ExprKind::Function {
+                params,
+                return_type,
+                is_async,
+                is_generator,
+                ..
+            } => self.infer_function_expr_type(params, return_type, *is_async, *is_generator, bind),
             ExprKind::Object { properties } => self.infer_object_type(properties, bind, expr),
             ExprKind::Tuple { elements } => {
                 let elem_tys: Vec<Type> =
@@ -381,19 +388,49 @@ impl Checker {
         for prop in properties {
             match prop {
                 varn_core::ast::ObjectProp::Property { key, value, .. } => {
-                    let name = match key {
-                        varn_core::ast::expr::PropKey::Identifier(n) => n.clone(),
-                        varn_core::ast::expr::PropKey::Str(s) => s.clone(),
-                        _ => continue,
+                    let Some(name) = prop_key_name(key) else {
+                        continue;
                     };
                     let ty = self.infer_type(value, bind);
                     members.push(ObjectTypeMember::Property {
-                        name: Rc::from(name.as_str()),
+                        name,
                         ty,
                         optional: false,
                         readonly: false,
                     });
                 }
+                // A method written in method syntax is a member like any other.
+                // Leaving it out made `{ m() {} }` type as `#{ }`, so calling
+                // `obj.m()` failed with "property 'm' does not exist".
+                varn_core::ast::ObjectProp::Method {
+                    key,
+                    params,
+                    return_type,
+                    is_async,
+                    ..
+                } => {
+                    let Some(name) = prop_key_name(key) else {
+                        continue;
+                    };
+                    let ret = return_type
+                        .as_ref()
+                        .map(|rt| self.resolve_type_node_cached(rt, bind))
+                        .unwrap_or(Type::Dynamic);
+                    members.push(ObjectTypeMember::Method {
+                        name,
+                        params: self.signature_params(params, bind),
+                        return_type: Box::new(crate::types::async_fn_return(ret, *is_async)),
+                        optional: false,
+                        is_arrow: false,
+                    });
+                }
+                // Accessors in an object literal contribute no member: the
+                // compiler has no `HirObjectProp` for them and drops them, so
+                // the value would read back as `null`. `check_object_literal`
+                // rejects them outright; typing them here would only invent a
+                // member the runtime cannot produce.
+                varn_core::ast::ObjectProp::Getter { .. }
+                | varn_core::ast::ObjectProp::Setter { .. } => {}
                 varn_core::ast::ObjectProp::Spread { argument, .. } => {
                     let spread_ty = self.infer_type(argument, bind);
                     if let varn_core::TypeKind::Object(spread_members) = &spread_ty.0 {
@@ -402,13 +439,92 @@ impl Checker {
                         }
                     }
                 }
-                _ => {}
             }
         }
         Type::object(members)
+    }
+
+    /// The type of a `function (…) {}` expression.
+    ///
+    /// The checker had no arm for these at all, so they fell through to the
+    /// catch-all and every one of them read as `(...args: dynamic[]) => void`:
+    /// the declared parameters and return type were thrown away, and calling
+    /// one yielded `dynamic`.
+    ///
+    /// Without a return annotation the answer is `dynamic`, not `void`.
+    /// Inferring it from the body would need the function's own scope, and
+    /// walking into it here would desync the check pass's child-scope cursor.
+    /// `dynamic` says "unknown"; `void` said "returns nothing", which was
+    /// simply false.
+    pub(crate) fn infer_function_expr_type(
+        &mut self,
+        params: &[varn_core::ast::Param],
+        return_type: &Option<varn_core::ast::TypeNode>,
+        is_async: bool,
+        is_generator: bool,
+        bind: &BindResult,
+    ) -> Type {
+        let declared = return_type
+            .as_ref()
+            .map(|rt| self.resolve_type_node_cached(rt, bind));
+        let ret = if is_generator {
+            Type::generic(
+                varn_core::IntrinsicType::Generator.as_str(),
+                vec![declared.unwrap_or(Type::Dynamic)],
+            )
+        } else {
+            crate::types::async_fn_return(declared.unwrap_or(Type::Dynamic), is_async)
+        };
+        Type::fn_(crate::types::FunctionType {
+            params: self.signature_params(params, bind),
+            return_type: Box::new(ret),
+            is_arrow: false,
+            type_params: Vec::new(),
+        })
+    }
+
+    fn signature_params(
+        &mut self,
+        params: &[varn_core::ast::Param],
+        bind: &BindResult,
+    ) -> Vec<crate::types::FunctionParam> {
+        params
+            .iter()
+            .map(|p| {
+                let mut ty = p
+                    .type_ann
+                    .as_ref()
+                    .or(match &p.pattern {
+                        varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                        _ => None,
+                    })
+                    .map(|ann| self.resolve_type_node_cached(ann, bind))
+                    .unwrap_or(Type::Dynamic);
+                if p.is_rest && !matches!(ty.0, varn_core::TypeKind::Array(_)) {
+                    ty = Type::array(ty);
+                }
+                crate::types::FunctionParam {
+                    name: Some(Rc::from(crate::binder::pattern_lead_name(&p.pattern))),
+                    ty,
+                    optional: p.is_optional || p.default.is_some(),
+                    is_rest: p.is_rest,
+                }
+            })
+            .collect()
     }
 }
 
 fn widen_literal(ty: Type) -> Type {
     crate::binder::widen_literal(ty)
+}
+
+/// The member name a property key contributes to an object type. Computed keys
+/// (`{ [k]: v }`) name no single member, so they contribute none.
+fn prop_key_name(key: &varn_core::ast::expr::PropKey) -> Option<Rc<str>> {
+    match key {
+        varn_core::ast::expr::PropKey::Identifier(n) | varn_core::ast::expr::PropKey::Str(n) => {
+            Some(Rc::from(n.as_str()))
+        }
+        _ => None,
+    }
 }

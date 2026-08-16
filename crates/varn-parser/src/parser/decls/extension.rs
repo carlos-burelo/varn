@@ -59,6 +59,7 @@ fn parse_extension_member(s: &mut TokenStream) -> Result<ExtensionMember, String
     let range = s.range();
     let is_async = s.eat(TokenKind::Async);
     let is_generator = s.eat(TokenKind::Star);
+    crate::modifiers::reject_async_generator(is_async, is_generator)?;
 
     let is_get = s.check(TokenKind::Get) && {
         let nk = s.peek_kind(1);
