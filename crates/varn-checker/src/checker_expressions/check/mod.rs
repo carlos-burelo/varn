@@ -205,10 +205,7 @@ impl Checker {
             ExprKind::Await { argument } => {
                 self.check_expr(argument, bind);
                 let arg_ty = self.infer_type(argument, bind);
-                if !arg_ty.is_dynamic()
-                    && !matches!(&arg_ty.0, TypeKind::Generic(n, _, _) if n.as_ref() == IntrinsicType::Task.as_str() || n.as_ref() == IntrinsicType::TaskHandle.as_str())
-                    && !matches!(&arg_ty.0, TypeKind::Intrinsic(TypeTag::Void))
-                {
+                if !arg_ty.is_dynamic() && !crate::types::is_awaitable(&arg_ty) {
                     self.emit(
                         Diagnostic::warning(
                             ErrorCode::TypeMismatch,

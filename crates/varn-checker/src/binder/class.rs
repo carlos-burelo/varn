@@ -6,7 +6,7 @@ use crate::types::{FunctionParam, FunctionType, Type};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
 use varn_core::ast::{ClassDecl, ClassMember, Pattern, Stmt};
-use varn_core::{IntrinsicType, TypeKind};
+use varn_core::TypeKind;
 
 impl super::Binder {
     pub(super) fn bind_class(&mut self, c: &ClassDecl) {
@@ -307,18 +307,13 @@ impl super::Binder {
                 ..
             } => {
                 let key_rc: Rc<str> = Rc::from(key.as_ref());
-                let ret = return_type
-                    .as_ref()
-                    .map(|ann| resolve_type_node(ann, Some(self)))
-                    .unwrap_or(if modifiers.is_async {
-                        Type::generic_with_origin(
-                            Rc::from(IntrinsicType::Task.as_str()),
-                            vec![Type::Void],
-                            Some(Rc::from("std/async")),
-                        )
-                    } else {
-                        Type::Void
-                    });
+                let ret = crate::types::async_fn_return(
+                    return_type
+                        .as_ref()
+                        .map(|ann| resolve_type_node(ann, Some(self)))
+                        .unwrap_or(Type::Void),
+                    modifiers.is_async,
+                );
 
                 let ps: Vec<FunctionParam> = params
                     .iter()

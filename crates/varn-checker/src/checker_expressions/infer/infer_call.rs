@@ -54,37 +54,9 @@ impl Checker {
             ret
         };
 
-        let is_async_callee = if let ExprKind::Identifier { name } = &callee.kind {
-            let scope = bind.scopes.get(self.current_scope);
-            scope
-                .resolve(name, &bind.scopes)
-                .map(|id| bind.arena.get(id).is_async)
-                .unwrap_or(false)
-        } else if self.extension_calls.contains_key(&expr.range.start.offset) {
-            self.extension_calls
-                .get(&expr.range.start.offset)
-                .and_then(|mangled| {
-                    let scope = bind.scopes.get(bind.global_scope);
-                    scope.resolve(mangled, &bind.scopes)
-                })
-                .map(|id| bind.arena.get(id).is_async)
-                .unwrap_or(false)
-        } else {
-            false
-        };
-
-        if is_async_callee
-            && !matches!(&ret.0, TypeKind::Generic(n, _, _) if n.as_ref() == varn_core::IntrinsicType::Task.as_str())
-            && !ret.is_dynamic()
-            && ret != Type::Void
-        {
-            Type::generic(
-                varn_core::IntrinsicType::Task.as_str().to_owned(),
-                vec![ret],
-            )
-        } else {
-            ret
-        }
+        // No `async` patch-up here: the callee's type already says `Task<R>`
+        // if it is async — see `crate::types::async_fn_return`.
+        ret
     }
 
     pub(super) fn infer_arrow_type(
@@ -93,6 +65,7 @@ impl Checker {
         params: &[Param],
         return_type: &Option<varn_core::ast::TypeNode>,
         body: &varn_core::ast::ArrowBody,
+        is_async: bool,
         bind: &BindResult,
     ) -> Type {
         let expected_params: Vec<FunctionParam> = self
@@ -188,7 +161,7 @@ impl Checker {
 
         Type::fn_(FunctionType {
             params: ps,
-            return_type: Box::new(ret_ty),
+            return_type: Box::new(crate::types::async_fn_return(ret_ty, is_async)),
             is_arrow: true,
             type_params: vec![],
         })

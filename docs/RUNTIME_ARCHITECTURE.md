@@ -65,6 +65,28 @@ Un event loop real es un cambio de diseño pendiente, no una descripción del pr
 
 ## 3. Mecánica de Suspensión y Reanudación (`async`/`await`)
 
+### Cómo tipa el checker una función `async`
+
+Varn no obliga a envolver el valor en un `Promise`: declarar la función `async`
+es lo que hace que la llamada produzca una tarea. Así que `async f(): int`
+declara **un cuerpo que devuelve `int`** y **un valor de tipo `Task<int>`**.
+
+Esa conversión ocurre en **un solo sitio**, `crate::types::async_fn_return` en
+`varn-checker`, aplicado donde se construye el `FunctionType`: funciones
+libres, métodos de clase, métodos de extensión, funciones de namespace y
+arrows. Todo consumidor río abajo — inferencia de llamadas, acceso a miembros,
+`await`, el LSP — lee el tipo y ya está; ninguno vuelve a preguntar
+`is_async`.
+
+Es idempotente: `async f(): Task<int>` y `async f(): int` describen el mismo
+valor. Y `void` no es excepción — `async f(): void` vale `Task<void>`.
+
+La comprobación del cuerpo es aparte y usa la anotación cruda del AST
+(`expected_return_type`), no el tipo del símbolo, así que `return 1` dentro de
+`async f(): int` sigue contrastándose contra `int`.
+
+### Suspensión
+
 `OpCode::Await` no llama a nadie: guarda el `IP` del frame, deja
 `VmSuspend::Await { value, dest_reg }` en el contexto y retorna al driver. El
 driver (`run_lazy_task_sync`) decide cómo obtener el valor:

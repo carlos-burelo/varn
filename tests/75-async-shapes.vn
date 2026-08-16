@@ -1,0 +1,58 @@
+// Varn has no explicit Promise wrapper: writing `async` is what makes the call
+// produce a task. So `async f(): int` declares a body returning `int` and a
+// value of type `Task<int>`, and `await` on that call must find something to
+// unwrap.
+//
+// That rule used to live in five separate places, each covering a different
+// subset of callables, so `await` on an imported method, a namespace function
+// or an async arrow reported "'await' applied to non-Future type". Every shape
+// that can be `async` is exercised here; the types themselves are pinned in
+// tests/golden/types/75-async-shapes.txt, which is where a regression would
+// show up — a wrong type here is a warning, not a runtime failure.
+
+import { asyncImportedMethod, importedAsyncFn, AsyncNs, ImportedAsyncBox } from "./75-async-shapes-lib.vn"
+
+class LocalBox {
+    async method(): int { return 1 }
+    async noReturnType() { return 2 }
+    async returnsVoid(): void { }
+    async returnsArray(): int[] { return [3] }
+    async alreadyTask(): Task<int> { return 4 }
+}
+
+async function localFn(): int { return 5 }
+async function localFnInferred() { return 6 }
+
+const localArrow = async (): int => { return 7 }
+
+extension on LocalBox {
+    async extensionMethod(): int { return 8 }
+}
+
+async function runAsyncShapes() {
+    const box = new LocalBox()
+
+    assert("local method", await box.method() === 1)
+    assert("local method, return type inferred", await box.noReturnType() === 2)
+    await box.returnsVoid()
+    assert("local method returning an array", (await box.returnsArray())[0] === 3)
+    assert("declared Task is not wrapped twice", await box.alreadyTask() === 4)
+
+    assert("local function", await localFn() === 5)
+    assert("local function, return type inferred", await localFnInferred() === 6)
+    assert("async arrow", await localArrow() === 7)
+    assert("extension method", await box.extensionMethod() === 8)
+
+    // The four shapes below reach the checker through a module boundary or a
+    // namespace, which is where the rule used to be missing entirely.
+    const imported = new ImportedAsyncBox()
+    assert("imported class method", await imported.method() === 9)
+    assert("imported generic method", (await imported.all())[0] === 10)
+    assert("imported function", await importedAsyncFn() === 11)
+    assert("namespace function", await AsyncNs.fn() === 12)
+    assert("imported free method helper", await asyncImportedMethod() === 13)
+}
+
+await runAsyncShapes()
+
+print("[PASSED] 75. Async shapes ")

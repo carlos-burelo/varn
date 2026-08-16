@@ -1,0 +1,183 @@
+# check:types 75-async-shapes.vn
+## checker types (key = expr id)
+8 | int
+11 | int
+18 | int[]
+19 | int
+24 | int
+30 | int
+35 | int
+38 | () => Task<int>
+42 | int
+49 | int
+55 | LocalBox
+56 | LocalBox
+58 | void
+59 | (label: str, cond: bool) => void
+60 | str
+61 | bool
+62 | int
+63 | Task<int>
+64 | () => Task<int>
+65 | LocalBox
+67 | int
+69 | void
+70 | (label: str, cond: bool) => void
+71 | str
+72 | bool
+73 | int
+74 | Task<int>
+75 | () => Task<int>
+76 | LocalBox
+78 | int
+80 | void
+81 | Task<void>
+82 | () => Task<void>
+83 | LocalBox
+86 | void
+87 | (label: str, cond: bool) => void
+88 | str
+89 | bool
+90 | int
+91 | int[]
+92 | int[]
+93 | Task<int[]>
+94 | () => Task<int[]>
+95 | LocalBox
+97 | int
+98 | int
+100 | void
+101 | (label: str, cond: bool) => void
+102 | str
+103 | bool
+104 | int
+105 | Task<int>
+106 | () => Task<int>
+107 | LocalBox
+109 | int
+111 | void
+112 | (label: str, cond: bool) => void
+113 | str
+114 | bool
+115 | int
+116 | Task<int>
+117 | () => Task<int>
+118 | int
+120 | void
+121 | (label: str, cond: bool) => void
+122 | str
+123 | bool
+124 | int
+125 | Task<int>
+126 | () => Task<int>
+127 | int
+129 | void
+130 | (label: str, cond: bool) => void
+131 | str
+132 | bool
+133 | int
+134 | Task<int>
+135 | () => Task<int>
+136 | int
+138 | void
+139 | (label: str, cond: bool) => void
+140 | str
+141 | bool
+142 | int
+143 | Task<int>
+144 | () => Task<int>
+145 | LocalBox
+147 | int
+150 | ImportedAsyncBox
+151 | ImportedAsyncBox
+153 | void
+154 | (label: str, cond: bool) => void
+155 | str
+156 | bool
+157 | int
+158 | Task<int>
+159 | () => Task<int>
+160 | ImportedAsyncBox
+162 | int
+164 | void
+165 | (label: str, cond: bool) => void
+166 | str
+167 | bool
+168 | int
+169 | int[]
+170 | int[]
+171 | Task<int[]>
+172 | () => Task<int[]>
+173 | ImportedAsyncBox
+175 | int
+176 | int
+178 | void
+179 | (label: str, cond: bool) => void
+180 | str
+181 | bool
+182 | int
+183 | Task<int>
+184 | () => Task<int>
+185 | int
+187 | void
+188 | (label: str, cond: bool) => void
+189 | str
+190 | bool
+191 | int
+192 | Task<int>
+193 | () => Task<int>
+194 | AsyncNs
+196 | int
+198 | void
+199 | (label: str, cond: bool) => void
+200 | str
+201 | bool
+202 | int
+203 | Task<int>
+204 | () => Task<int>
+205 | int
+207 | void
+208 | Task<void>
+209 | () => Task<void>
+211 | void
+212 | (...args: dynamic[]) => void
+213 | str
+## annotations (key names its space)
+decl 719 | 13:10 | slot=2
+decl 740 | 13:31 | slot=3
+decl 757 | 13:48 | slot=0
+decl 766 | 13:57 | slot=1
+decl 1057 | 23:16 | cg=Int
+expr 61 | 35:28 | numeric=Int
+expr 66 | ?:? | cg=Int
+expr 72 | 36:50 | numeric=Int
+expr 77 | ?:? | cg=Int
+expr 84 | ?:? | cg=Fn
+expr 89 | 38:47 | numeric=Int
+expr 90 | 38:47 | array_index
+expr 96 | ?:? | cg=Array(Int)
+expr 97 | 38:74 | cg=Int
+expr 103 | 39:50 | numeric=Int
+expr 108 | ?:? | cg=Int
+expr 114 | 41:30 | numeric=Int
+expr 116 | 41:36 | cg=Int
+expr 123 | 42:52 | numeric=Int
+expr 125 | 42:58 | cg=Int
+expr 132 | 43:27 | numeric=Int
+expr 134 | 43:33 | cg=Int
+expr 141 | 44:32 | numeric=Int
+expr 146 | ?:? | cg=Int
+expr 156 | 49:37 | numeric=Int
+expr 161 | ?:? | cg=Int
+expr 167 | 50:39 | numeric=Int
+expr 168 | 50:39 | array_index
+expr 174 | ?:? | cg=Array(Int)
+expr 175 | 50:62 | cg=Int
+expr 181 | 51:33 | numeric=Int
+expr 183 | 51:39 | cg=Int
+expr 190 | 52:34 | numeric=Int
+expr 195 | ?:? | cg=Int
+expr 201 | 53:43 | numeric=Int
+expr 203 | 53:49 | cg=Int
+## reassigned names
+

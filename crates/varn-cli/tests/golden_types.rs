@@ -18,7 +18,8 @@ use std::path::{Path, PathBuf};
 
 /// Corpus. Small enough to eyeball a diff, wide enough to cover the shapes the
 /// checker treats specially: generics, unions, enums/ADTs, tuples and records,
-/// narrowing, closures, extensions, and the utility types from `std:types`.
+/// narrowing, closures, extensions, async callables, and the utility types
+/// from `std:types`.
 const CORPUS: &[&str] = &[
     "01-arithmetic.vn",
     "05-arrays.vn",
@@ -37,6 +38,7 @@ const CORPUS: &[&str] = &[
     "69-tuples-records.vn",
     "70-result-extensions.vn",
     "73-str-charcode-json-shape.vn",
+    "75-async-shapes.vn",
 ];
 
 fn repo_root() -> PathBuf {

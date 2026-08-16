@@ -127,8 +127,8 @@ impl Checker {
                 params,
                 return_type,
                 body,
-                ..
-            } => self.infer_arrow_type(expr, params, return_type, body, bind),
+                is_async,
+            } => self.infer_arrow_type(expr, params, return_type, body, *is_async, bind),
             ExprKind::Object { properties } => self.infer_object_type(properties, bind, expr),
             ExprKind::Tuple { elements } => {
                 let elem_tys: Vec<Type> =
@@ -186,16 +186,7 @@ impl Checker {
             }
             ExprKind::Await { argument } => {
                 let inner = self.infer_type(argument, bind);
-                match &inner.0 {
-                    TypeKind::Generic(name, args, _)
-                        if (name.as_ref() == IntrinsicType::Task.as_str()
-                            || name.as_ref() == IntrinsicType::TaskHandle.as_str())
-                            && args.len() == 1 =>
-                    {
-                        args[0].clone()
-                    }
-                    _ => inner,
-                }
+                crate::types::awaited(&inner)
             }
             ExprKind::NonNull { expression } => {
                 let ty = self.infer_type(expression, bind);

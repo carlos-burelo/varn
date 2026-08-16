@@ -57,11 +57,14 @@ impl super::super::Binder {
                             is_rest: p.is_rest,
                         });
                     }
-                    let ret_ty = method
-                        .return_type
-                        .as_ref()
-                        .map(|rt| resolve_type_node(rt, Some(self)))
-                        .unwrap_or(Type::Void);
+                    let ret_ty = crate::types::async_fn_return(
+                        method
+                            .return_type
+                            .as_ref()
+                            .map(|rt| resolve_type_node(rt, Some(self)))
+                            .unwrap_or(Type::Void),
+                        method.modifiers.is_async,
+                    );
                     let fn_type = Type::fn_(crate::types::FunctionType {
                         params: param_types,
                         return_type: Box::new(ret_ty),

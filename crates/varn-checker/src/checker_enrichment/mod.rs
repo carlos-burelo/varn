@@ -53,14 +53,7 @@ pub fn enrich_call_returns(bind: &mut BindResult) {
                 let inferred = collect_inferred_return_types_raw(&ctx, &sym_map, stmt, bind, None);
                 let ret_ty = types::join_types(inferred);
                 if !ret_ty.is_dynamic() {
-                    let final_ret = if *is_async {
-                        crate::types::Type::generic(
-                            varn_core::IntrinsicType::Task.as_str().to_owned(),
-                            vec![ret_ty],
-                        )
-                    } else {
-                        ret_ty
-                    };
+                    let final_ret = crate::types::async_fn_return(ret_ty, *is_async);
                     let sym = bind.arena.get_mut(*sym_id);
                     if let Some(crate::types::Type(varn_core::TypeKind::Fn(ft), _)) = &mut sym.ty {
                         ft.return_type = Box::new(final_ret);
@@ -85,14 +78,7 @@ pub fn enrich_call_returns(bind: &mut BindResult) {
                 );
                 let ret = types::join_types(inferred);
                 if !ret.is_dynamic() {
-                    let final_ret = if *is_async {
-                        crate::types::Type::generic(
-                            varn_core::IntrinsicType::Task.as_str().to_owned(),
-                            vec![ret],
-                        )
-                    } else {
-                        ret
-                    };
+                    let final_ret = crate::types::async_fn_return(ret, *is_async);
                     if let Some(ft_map) = bind.class_methods.get_mut(class_name) {
                         if let Some(crate::types::Type(varn_core::TypeKind::Fn(ft), _)) =
                             ft_map.get_mut(key)

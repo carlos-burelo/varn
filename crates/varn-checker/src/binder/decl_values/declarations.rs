@@ -149,10 +149,13 @@ impl super::super::Binder {
                 vec![Type::Dynamic],
             )
         } else {
-            f.return_type
-                .as_ref()
-                .map(|ann| resolve_type_node(ann, Some(self)))
-                .unwrap_or(Type::Void)
+            crate::types::async_fn_return(
+                f.return_type
+                    .as_ref()
+                    .map(|ann| resolve_type_node(ann, Some(self)))
+                    .unwrap_or(Type::Void),
+                f.modifiers.is_async,
+            )
         };
         let fn_type = Type::fn_(FunctionType {
             params: params.clone(),

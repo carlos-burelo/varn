@@ -1,4 +1,3 @@
-mod async_members;
 mod collectors;
 mod infer_call;
 mod infer_impl;

@@ -23,19 +23,11 @@ pub(super) fn build_enrich_context(bind: &BindResult) -> (EnrichContext, FxHashM
 
             if sym.kind == SymbolKind::Function {
                 if let Type(TypeKind::Fn(FunctionType { return_type, .. }), _) = ty {
+                    // Already `Task<R>` for async functions — the binder wrapped
+                    // it when it built the type.
                     let raw = return_type.as_ref().clone();
                     if !raw.is_dynamic() {
-                        let call_ret = if sym.is_async
-                            && !matches!(&raw.0, TypeKind::Generic(name, _, _) if name.as_ref() == varn_core::IntrinsicType::Task.as_str())
-                        {
-                            Type::generic(
-                                varn_core::IntrinsicType::Task.as_str().to_owned(),
-                                vec![raw],
-                            )
-                        } else {
-                            raw
-                        };
-                        fn_map.insert(sym.name.clone(), call_ret);
+                        fn_map.insert(sym.name.clone(), raw);
                     }
                 }
             }

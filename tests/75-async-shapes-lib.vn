@@ -1,0 +1,33 @@
+// Companion module for 75-async-shapes.vn. The point is the module boundary:
+// an async method or function only loses its `Task` wrap when the checker sees
+// it from another module.
+
+export class ImportedAsyncBox<T = int> {
+    items: Array<T>;
+
+    constructor() {
+        this.items = [];
+    }
+
+    async method(): int {
+        return 9;
+    }
+
+    async all(): Array<int> {
+        return [10];
+    }
+}
+
+export async function importedAsyncFn(): int {
+    return 11;
+}
+
+export namespace AsyncNs {
+    export async function fn(): int {
+        return 12;
+    }
+}
+
+export async function asyncImportedMethod(): int {
+    return 13;
+}

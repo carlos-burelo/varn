@@ -39,11 +39,13 @@ impl super::super::Binder {
         for decl in body {
             match decl {
                 Decl::Function(f) => {
-                    let ret = f
-                        .return_type
-                        .as_ref()
-                        .map(|m| resolve_type_node(m, Some(self)))
-                        .unwrap_or(Type::Void);
+                    let ret = crate::types::async_fn_return(
+                        f.return_type
+                            .as_ref()
+                            .map(|m| resolve_type_node(m, Some(self)))
+                            .unwrap_or(Type::Void),
+                        f.modifiers.is_async,
+                    );
                     let params_list = f
                         .params
                         .iter()

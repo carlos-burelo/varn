@@ -9,7 +9,6 @@ use varn_core::TypeKind;
 use varn_core::TypeTag;
 
 use super::super::helpers::base_type;
-use super::async_members::is_async_member;
 
 pub(super) fn infer_member_type(
     checker: &mut Checker,
@@ -33,27 +32,6 @@ pub(super) fn infer_member_type(
         return crate::binder::infer_expr_type(expr, Some(bind));
     };
 
-    let wrap_async_method_type = |ty: Type| {
-        if !is_async_member(&obj_ty, prop_name.as_ref(), bind) {
-            return ty;
-        }
-        match &ty.0 {
-            TypeKind::Fn(ft)
-                if !matches!(&ft.return_type.0, TypeKind::Generic(name, _, _) if name.as_ref() == varn_core::IntrinsicType::Task.as_str())
-                    && *ft.return_type != Type::Void
-                    && !ft.return_type.is_dynamic() =>
-            {
-                let mut wrapped = ft.clone();
-                wrapped.return_type = Box::new(Type::generic(
-                    varn_core::IntrinsicType::Task.as_str().to_owned(),
-                    vec![(*ft.return_type).clone()],
-                ));
-                Type::fn_(wrapped)
-            }
-            _ => ty,
-        }
-    };
-
     match &obj_ty.0 {
         TypeKind::Named(class_name, _origin) | TypeKind::Generic(class_name, _, _origin) => {
             let mapping = if let TypeKind::Generic(_, type_args, _orig) = &obj_ty.0 {
@@ -65,7 +43,7 @@ pub(super) fn infer_member_type(
             if let Some(res) = checker.find_member_info(&obj_ty, prop_name.as_ref(), bind) {
                 let m_ty = res.0;
                 if !m_ty.is_dynamic() {
-                    return wrap_async_method_type(map_generics_cached(checker, &m_ty, &mapping));
+                    return map_generics_cached(checker, &m_ty, &mapping);
                 }
             }
         }
@@ -92,7 +70,7 @@ pub(super) fn infer_member_type(
             if let Some(res) = checker.find_member_info(&obj_ty, prop_name.as_ref(), bind) {
                 let m_ty = res.0;
                 if !m_ty.is_dynamic() {
-                    return wrap_async_method_type(map_generics_cached(checker, &m_ty, &mapping));
+                    return map_generics_cached(checker, &m_ty, &mapping);
                 }
             }
         }
@@ -100,7 +78,7 @@ pub(super) fn infer_member_type(
             if let Some(res) = checker.find_member_info(&obj_ty, prop_name.as_ref(), bind) {
                 let m_ty = res.0;
                 if !m_ty.is_dynamic() {
-                    return wrap_async_method_type(m_ty);
+                    return m_ty;
                 }
             }
         }
