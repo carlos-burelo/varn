@@ -264,7 +264,7 @@ Evitar:
 
 Cambios de parser/checker/compiler/vm:
 
-* Validar contra tests/main.vn. Nota: `cargo test` no es un indicador de correctitud absoluta ni la verdad definitiva de estabilidad. Las pruebas reales de estabilidad del sistema que cubren ~95% de las features son:
+* Validar contra tests/main.vn. **NO ejecutar `cargo test`**: es irrelevante como señal de correctitud y no hace falta correrlo. Las pruebas reales de estabilidad del sistema que cubren ~95% de las features son:
   1. `cargo run --release --bin vn -- bench ./tests/main.vn -v`
   2. `cargo run --release --bin vn -- run ./tests/main.vn`
 * Validar también con `VARN_NO_JIT=1` para cubrir intérprete y JIT por separado (el flag ya se propaga a isolates, generadores y bench).
@@ -384,5 +384,6 @@ Reglas de compilación y ejecución para el agente:
 2. NUNCA ejecutar `cargo clean` a menos que sea strictly necesario por corrupción de artefactos de build.
 3. Para ciclos rápidos de iteración y validación, utilizar `--profile quick` o compilaciones incrementales para no invalidar cachés.
 4. Para benchmarks y pruebas de estabilidad final, usar `cargo run --release --bin vn -- bench ./tests/main.vn -v`.
+5. NO ejecutar `cargo test`. La suite de Rust no es la señal de correctitud del lenguaje; la validación se hace contra `tests/main.vn` (ver `<validation>`).
 
 </hardware_and_compilation_profile>
