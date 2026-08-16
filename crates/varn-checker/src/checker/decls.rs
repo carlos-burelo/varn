@@ -116,9 +116,9 @@ impl Checker {
                                 .or_else(|| bind.arena.get(sym_id).ty.clone())
                             {
                                 if let TypeKind::Fn(ref mut ft) = fn_ty.0 {
-                                    ft.return_type = Box::new(Type::generic(
-                                        varn_core::IntrinsicType::Generator.as_str(),
-                                        vec![inferred_yield],
+                                    ft.return_type = Box::new(crate::types::generator_of(
+                                        inferred_yield,
+                                        f.modifiers.is_async,
                                     ));
                                 }
                                 self.symbol_types.insert(sym_id, fn_ty.clone());

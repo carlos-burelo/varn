@@ -29,6 +29,20 @@ pub fn async_fn_return(ret: Type, is_async: bool) -> Type {
     Type::generic(IntrinsicType::Task.as_str().to_owned(), vec![ret])
 }
 
+/// The type a generator function's *value* has, given the type its `yield`s
+/// produce. `async function*` produces an `AsyncGenerator<T>` — same shape as
+/// `Generator<T>`, since the driver settles the body's awaits inside `next()`,
+/// but a distinct name so `for await` and the `await` inside the body are
+/// meaningful in the type system.
+pub fn generator_of(yielded: Type, is_async: bool) -> Type {
+    let name = if is_async {
+        "AsyncGenerator"
+    } else {
+        IntrinsicType::Generator.as_str()
+    };
+    Type::generic(name.to_owned(), vec![yielded])
+}
+
 /// Whether `await` on this type has something to unwrap. `Task` is what async
 /// functions produce; `TaskHandle` is what `spawn` produces.
 pub fn is_awaitable(ty: &Type) -> bool {

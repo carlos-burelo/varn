@@ -2,13 +2,13 @@ import { spawn$, sleep$, parallel$, channel$,
          Sender, Receiver, Channel, ChannelClosed,
          IsolateHandle, spawnIsolate$ } from "runtime:task";
 
-import { Generator, Iterator, AsyncIterator, TaskHandle } from "core:intrinsics";
+import { Generator, AsyncGenerator, Iterator, AsyncIterator, TaskHandle } from "core:intrinsics";
 
 export function channel<T = dynamic>(capacity: int): Channel<T> {
     return channel$<T>(capacity);
 }
 
-export { Sender, Receiver, Channel, ChannelClosed, IsolateHandle, Generator, Iterator, AsyncIterator, TaskHandle };
+export { Sender, Receiver, Channel, ChannelClosed, IsolateHandle, Generator, AsyncGenerator, Iterator, AsyncIterator, TaskHandle };
 
 export function parallel<T>(tasks: Array<Task<T>>): Task<Array<T>> {
     return parallel$(tasks);

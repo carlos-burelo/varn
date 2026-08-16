@@ -8,7 +8,77 @@ use crate::value::VmValue;
 use super::ctx::ExecCtx;
 use super::VmSuspend;
 
+/// What happened to a rejection delivered into a suspended frame.
+pub(crate) enum Rejection {
+    /// A `try` handler in the suspended frame took it; the context can run on.
+    Caught,
+    /// Nothing caught it — the caller decides what "unhandled" means.
+    Unhandled(varn_types::Value),
+}
+
 impl ExecCtx {
+    /// Drive an awaited value to a settled state, blocking the thread if the
+    /// task is still pending.
+    ///
+    /// Shared by [`Self::run_lazy_task_sync`] and the async generator driver:
+    /// `await` means the same thing in an async function body and in an
+    /// `async function*` body, and writing it twice is how the two would
+    /// drift.
+    pub(crate) fn settle_awaited(
+        &mut self,
+        value: varn_types::Value,
+    ) -> Result<varn_types::Value, varn_types::Value> {
+        match value {
+            varn_types::Value::Task(lazy) => {
+                let handle = self.run_lazy_task_sync(lazy.as_ref());
+                match handle.peek_state() {
+                    varn_types::task::TaskState::Resolved(v) => Ok(v),
+                    varn_types::task::TaskState::Rejected(v) => Err(v),
+                    varn_types::task::TaskState::Pending => Ok(varn_types::Value::Null),
+                }
+            }
+            varn_types::Value::TaskHandle(handle) => match handle.peek_state() {
+                varn_types::task::TaskState::Resolved(v) => Ok(v),
+                varn_types::task::TaskState::Rejected(v) => Err(v),
+                varn_types::task::TaskState::Pending => Self::wait_task_handle_value(handle),
+            },
+            // `await` on anything else is the identity — that is what makes
+            // awaiting a plain value, or a `next()` that already settled, a
+            // no-op rather than an error.
+            other => Ok(other),
+        }
+    }
+
+    /// Put a settled `await` result where the suspended frame expects it.
+    pub(crate) fn resume_with_awaited(&mut self, dest_reg: u16, resolved: varn_types::Value) {
+        let resolved = crate::exec::host_values::open_resolved(self, resolved);
+        let nv = self.heap.intern(resolved);
+        let Some(frame) = self.frames.last() else {
+            return;
+        };
+        let slot = frame.base + dest_reg as usize;
+        if slot >= self.stack.len() {
+            self.stack.resize(slot + 1, VmValue::null());
+        }
+        self.stack[slot] = nv;
+    }
+
+    /// Deliver a rejected `await` into the suspended frame, unwinding to its
+    /// nearest `try` handler if it has one.
+    pub(crate) fn reject_awaited(&mut self, thrown: varn_types::Value) -> Rejection {
+        let thrown = crate::exec::host_values::open_rejected(self, thrown);
+        let thrown_nv = self.heap.intern(thrown.clone());
+        let err = crate::exec::exceptions::build_thrown_error(thrown_nv, &self.heap, &self.frames);
+        match self.try_handlers.pop() {
+            Some(handler) => {
+                let thrown_val = err.thrown.unwrap_or(VmValue::null());
+                crate::exec::frame_ctrl::unwind_to_handler(self, handler, thrown_val);
+                Rejection::Caught
+            }
+            None => Rejection::Unhandled(thrown),
+        }
+    }
+
     pub fn wait_task_handle(task: varn_types::AsyncTask) -> Result<varn_types::Value, String> {
         Self::wait_task_handle_value(task).map_err(|v| format!("{v}"))
     }
@@ -115,58 +185,15 @@ impl ExecCtx {
             match fork.run() {
                 Ok(result) => match fork.vm_suspend.take() {
                     Some(VmSuspend::Await { value, dest_reg }) => {
-                        let res_val = match value {
-                            varn_types::Value::Task(lazy) => {
-                                let h = fork.run_lazy_task_sync(lazy.as_ref());
-                                match h.peek_state() {
-                                    varn_types::task::TaskState::Resolved(v) => Ok(v),
-                                    varn_types::task::TaskState::Rejected(v) => Err(v),
-                                    _ => Ok(varn_types::Value::Null),
-                                }
-                            }
-                            varn_types::Value::TaskHandle(handle) => match handle.peek_state() {
-                                varn_types::task::TaskState::Resolved(v) => Ok(v),
-                                varn_types::task::TaskState::Rejected(v) => Err(v),
-                                _ => ExecCtx::wait_task_handle_value(handle.clone()),
-                            },
-                            other => Ok(other),
-                        };
-
-                        match res_val {
-                            Ok(resolved) => {
-                                let resolved =
-                                    crate::exec::host_values::open_resolved(&mut fork, resolved);
-                                let resolved_nv = fork.heap.intern(resolved);
-                                if let Some(frame) = fork.frames.last() {
-                                    let base = frame.base;
-                                    let slot = base + dest_reg as usize;
-                                    if slot < fork.stack.len() {
-                                        fork.stack[slot] = resolved_nv;
-                                    } else {
-                                        fork.stack.resize(slot + 1, VmValue::null());
-                                        fork.stack[slot] = resolved_nv;
-                                    }
-                                }
-                            }
-                            Err(thrown) => {
-                                let thrown =
-                                    crate::exec::host_values::open_rejected(&mut fork, thrown);
-                                let thrown_nv = fork.heap.intern(thrown.clone());
-                                let err = crate::exec::exceptions::build_thrown_error(
-                                    thrown_nv,
-                                    &fork.heap,
-                                    &fork.frames,
-                                );
-                                if let Some(handler) = fork.try_handlers.pop() {
-                                    let thrown_val = err.thrown.unwrap_or(VmValue::null());
-                                    crate::exec::frame_ctrl::unwind_to_handler(
-                                        &mut fork, handler, thrown_val,
-                                    );
-                                } else {
+                        match fork.settle_awaited(value) {
+                            Ok(resolved) => fork.resume_with_awaited(dest_reg, resolved),
+                            Err(thrown) => match fork.reject_awaited(thrown) {
+                                Rejection::Caught => {}
+                                Rejection::Unhandled(thrown) => {
                                     output.reject(thrown);
                                     break;
                                 }
-                            }
+                            },
                         }
                     }
                     None => {

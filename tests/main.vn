@@ -75,6 +75,7 @@ import "./73-str-charcode-json-shape.vn"
 import "./74-regalloc-interference.vn"
 import "./75-async-shapes.vn"
 import "./76-generator-values.vn"
+import "./77-async-generators.vn"
 
-print("\n77 side-effect modules executed in suite")
+print("\n78 side-effect modules executed in suite")
 assertSummary()

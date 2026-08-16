@@ -148,7 +148,6 @@ pub fn parse_class_member(
 
     let is_generator = s.eat(TokenKind::Star);
     mods.is_generator = is_generator;
-    crate::modifiers::reject_async_generator(mods.is_async, is_generator)?;
 
     if mods.is_static && s.check(TokenKind::LBrace) {
         let body = super::super::stmts::parse_block(s)?;

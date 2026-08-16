@@ -47,11 +47,12 @@ impl ExecCtx {
         if gen_ctx.stack.len() < required {
             gen_ctx.stack.resize(required, VmValue::null());
         }
+        let is_async = closure.proto.is_async;
         let mut frame = crate::frame::CallFrame::new_owned(closure, 0);
         frame.current_class = current_class;
         gen_ctx.frames.push(frame);
 
-        let driver = crate::generator::NanSyncGenDriver::new(gen_ctx);
+        let driver = crate::generator::NanGenDriver::new(gen_ctx, is_async);
         self.heap.intern(varn_types::value::Value::Generator(
             varn_types::generator::GeneratorObj(driver),
         ))

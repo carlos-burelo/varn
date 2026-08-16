@@ -1,0 +1,107 @@
+// `async function*` — a generator whose body may `await`.
+//
+// Everything on the consumer side was already built: `for await (… of …)`
+// lowers to `Symbol.asyncIterator` plus an `await` on each `next()`, the
+// runtime has `Symbol.asyncIterator`, and `GeneratorDriver` carried an
+// `is_async()` hook with no implementation behind it. What was missing was the
+// producer: a driver that settles the body's awaits instead of refusing them.
+//
+// Varn settles inside `next()`, so `AsyncGenerator<T>.next()` hands back a
+// settled `{ value, done }` rather than a task. `await` on a non-task is the
+// identity, which is why `for await` reads the same over an async generator
+// and over a plain one.
+
+import { sleep } from "std:task"
+
+async function tenTimes(n: int): int {
+    return n * 10
+}
+
+async function* awaitsThenYields() {
+    yield await tenTimes(1)
+    yield await tenTimes(2)
+    yield await tenTimes(3)
+}
+
+async function* awaitsBetweenYields() {
+    const first = await tenTimes(4)
+    yield first
+    // `int / int` is a float in Varn, so step by subtraction instead.
+    const second = await tenTimes(first - 35)
+    yield second
+}
+
+async function* yieldsHeapValues() {
+    yield [await tenTimes(1), await tenTimes(2)]
+}
+
+async function* throwsAfterAYield() {
+    yield 1
+    throw new Error("boom")
+}
+
+async function* catchesItsOwnRejection() {
+    try {
+        await failing()
+        yield -1
+    } catch (e) {
+        yield 99
+    }
+}
+
+async function failing(): int {
+    throw new Error("rejected")
+}
+
+async function runAsyncGenerators() {
+    // Manual driving: each `next()` runs the body up to the next `yield`,
+    // settling every `await` on the way.
+    const manual = awaitsThenYields()
+    assert("async generator first yield", manual.next().value === 10)
+    assert("async generator second yield", manual.next().value === 20)
+    assert("async generator third yield", manual.next().value === 30)
+    assert("async generator finishes", manual.next().done)
+
+    // More than one await between two yields.
+    const between = awaitsBetweenYields()
+    assert("await before the first yield", between.next().value === 40)
+    assert("await between yields", between.next().value === 50)
+
+    let total = 0
+    for await (const v of awaitsThenYields()) {
+        total = total + v
+    }
+    assert("for await sums every yield", total === 60)
+
+    // A plain `for..of` works too: the values are already settled.
+    let plain = 0
+    for (const v of awaitsThenYields()) {
+        plain = plain + v
+    }
+    assert("plain for..of over an async generator", plain === 60)
+
+    const heaps = yieldsHeapValues().next().value
+    assert("async generator yields a heap value", heaps.length === 2 && heaps[1] === 20)
+
+    // A generator can await a real suspension, not just an already-settled task.
+    async function* awaitsSleep() {
+        await sleep(1)
+        yield 7
+    }
+    assert("async generator awaits a real suspension", awaitsSleep().next().value === 7)
+
+    // A rejected `await` unwinds to a `try` inside the generator body, exactly
+    // as it does inside an async function.
+    assert("async generator catches its own rejection", catchesItsOwnRejection().next().value === 99)
+
+    // Not covered here: a `throw` that escapes the body. It is not catchable at
+    // the `next()` call site for a plain `function*` either — the driver
+    // surfaces it as a runtime error rather than a Varn throw — so it is a
+    // generator gap, not an async one.
+    const throwing = throwsAfterAYield()
+    assert("yield before a later throw still arrives", throwing.next().value === 1)
+}
+
+await runAsyncGenerators()
+
+print("[PASSED] 77. Async generators ")

@@ -46,23 +46,17 @@ fn assert_accepted(source: &str) {
     assert!(out.is_empty(), "expected no diagnostics, got:\n{out}");
 }
 
-const ASYNC_GENERATOR: &str = "`async` generators are not supported";
-
-/// A generator is driven synchronously, so `await` inside one has nothing to
-/// suspend into: it used to corrupt the resumed frame
-/// (`value is not callable: 0.0000…64 (type: float)`), and without `await` the
-/// `async` was simply ignored — the value typed as `Generator<T>` and `next()`
-/// returned the item object rather than a task.
+/// `async function*` is supported in every form that can carry both
+/// modifiers. It was briefly refused, because the `async` was silently ignored
+/// and the body could not call anything that suspends; both of those were
+/// generator defects, fixed separately.
 #[test]
-fn async_generators_are_rejected_in_every_form() {
-    assert_rejected("async function* g() { yield 1 }", ASYNC_GENERATOR);
-    assert_rejected("class C { async *m() { yield 1 } }", ASYNC_GENERATOR);
-    assert_rejected("const o = { async *m() { yield 1 } }", ASYNC_GENERATOR);
-    assert_rejected(
-        "extension on int { async *m() { yield 1 } }",
-        ASYNC_GENERATOR,
-    );
-    assert_rejected("const f = async function* () { yield 1 }", ASYNC_GENERATOR);
+fn async_generators_are_accepted_in_every_form() {
+    assert_accepted("async function* g() { yield 1 }");
+    assert_accepted("class C { async *m() { yield 1 } }");
+    assert_accepted("const o = { async *m() { yield 1 } }");
+    assert_accepted("extension on int { async *m() { yield 1 } }");
+    assert_accepted("const f = async function* () { yield 1 }");
 }
 
 #[test]

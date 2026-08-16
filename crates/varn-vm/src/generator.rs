@@ -24,38 +24,51 @@ fn make_iter_result(value: VmValue, done: bool) -> Value {
     ]))
 }
 
-struct NanSyncGenInner {
+struct NanGenInner {
     ctx: Box<ExecCtx>,
     started: bool,
     done: bool,
     resume_dest: Option<u8>,
 }
 
-impl std::fmt::Debug for NanSyncGenInner {
+impl std::fmt::Debug for NanGenInner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "NanSyncGenInner(done={})", self.done)
+        write!(f, "NanGenInner(done={})", self.done)
     }
 }
 
+/// Drives a generator body: runs it until it suspends, hands back
+/// `{ value, done }`, and resumes it on the next call.
+///
+/// One driver serves both `function*` and `async function*`. They differ in a
+/// single arm: what happens when the body suspends on `await`. A sync
+/// generator has nothing to suspend into and says so; an async one settles the
+/// awaited value and keeps running until the body reaches a `yield` or
+/// finishes. Everything else — resume protocol, done bookkeeping, and the four
+/// GC tracing walks — is identical, so it is written once.
 #[derive(Debug)]
-pub struct NanSyncGenDriver {
-    inner: RefCell<NanSyncGenInner>,
+pub struct NanGenDriver {
+    inner: RefCell<NanGenInner>,
+    /// `async function*`: `await` inside the body is settled here rather than
+    /// rejected.
+    is_async: bool,
 }
 
-impl NanSyncGenDriver {
-    pub(crate) fn new(ctx: Box<ExecCtx>) -> Rc<Self> {
-        Rc::new(NanSyncGenDriver {
-            inner: RefCell::new(NanSyncGenInner {
+impl NanGenDriver {
+    pub(crate) fn new(ctx: Box<ExecCtx>, is_async: bool) -> Rc<Self> {
+        Rc::new(NanGenDriver {
+            inner: RefCell::new(NanGenInner {
                 ctx,
                 started: false,
                 done: false,
                 resume_dest: None,
             }),
+            is_async,
         })
     }
 }
 
-impl GeneratorDriver for NanSyncGenDriver {
+impl GeneratorDriver for NanGenDriver {
     fn next(&self, input: Value) -> Result<Value, String> {
         let mut inner = self.inner.borrow_mut();
 
@@ -79,24 +92,43 @@ impl GeneratorDriver for NanSyncGenDriver {
         }
         inner.started = true;
 
-        let result = inner.ctx.run_until(0);
+        // One `next()` can suspend several times: every `await` on the way to
+        // the next `yield` comes back through here.
+        loop {
+            let result = inner.ctx.run_until(0);
 
-        match inner.ctx.vm_suspend.take() {
-            Some(VmSuspend::Yield {
-                value: nv,
-                dest_reg,
-            }) => {
-                inner.resume_dest = Some(dest_reg);
-                Ok(make_iter_result(nv, false))
-            }
-            Some(VmSuspend::Task(_)) | Some(VmSuspend::Await { .. }) => {
-                inner.done = true;
-                Err("cannot use `await` inside a sync generator (`function*`)".to_string())
-            }
-            None => {
-                inner.done = true;
-                let ret = result.map_err(|e| e.message)?;
-                Ok(make_iter_result(ret, true))
+            match inner.ctx.vm_suspend.take() {
+                Some(VmSuspend::Yield {
+                    value: nv,
+                    dest_reg,
+                }) => {
+                    inner.resume_dest = Some(dest_reg);
+                    return Ok(make_iter_result(nv, false));
+                }
+                Some(VmSuspend::Await { value, dest_reg }) if self.is_async => {
+                    match inner.ctx.settle_awaited(value) {
+                        Ok(resolved) => inner.ctx.resume_with_awaited(dest_reg, resolved),
+                        Err(thrown) => match inner.ctx.reject_awaited(thrown) {
+                            crate::exec::ctx_tasks::Rejection::Caught => {}
+                            crate::exec::ctx_tasks::Rejection::Unhandled(thrown) => {
+                                inner.done = true;
+                                return Err(format!("{thrown}"));
+                            }
+                        },
+                    }
+                }
+                Some(VmSuspend::Task(_)) | Some(VmSuspend::Await { .. }) => {
+                    inner.done = true;
+                    return Err(
+                        "cannot use `await` inside a sync generator — declare it `async function*`"
+                            .to_string(),
+                    );
+                }
+                None => {
+                    inner.done = true;
+                    let ret = result.map_err(|e| e.message)?;
+                    return Ok(make_iter_result(ret, true));
+                }
             }
         }
     }
@@ -106,7 +138,7 @@ impl GeneratorDriver for NanSyncGenDriver {
     }
 
     fn is_async(&self) -> bool {
-        false
+        self.is_async
     }
 
     fn trace_vm_values(&self, callback: &mut dyn FnMut(varn_types::VmValue)) {

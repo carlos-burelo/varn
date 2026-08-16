@@ -5,7 +5,7 @@ mod display;
 mod object_member_impl;
 mod type_impl;
 
-pub use async_fn::{async_fn_return, awaited, is_awaitable};
+pub use async_fn::{async_fn_return, awaited, generator_of, is_awaitable};
 
 use rustc_hash::FxHashMap;
 use std::fmt;

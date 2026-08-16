@@ -118,7 +118,6 @@ pub(super) fn parse_function_decl(
     let range = s.range();
     s.expect(TokenKind::Function)?;
     let is_generator = s.eat(TokenKind::Star);
-    crate::modifiers::reject_async_generator(is_async_pre, is_generator)?;
 
     let id_offset = s.range().start.offset;
     let id = s.expect_id()?;

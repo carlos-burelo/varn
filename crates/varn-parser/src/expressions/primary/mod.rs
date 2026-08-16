@@ -289,7 +289,6 @@ fn parse_function_expr(s: &mut TokenStream) -> Result<Expr, String> {
 fn parse_function_expr_inner(s: &mut TokenStream, is_async: bool) -> Result<Expr, String> {
     let range = s.range();
     let is_generator = s.eat(TokenKind::Star);
-    crate::modifiers::reject_async_generator(is_async, is_generator)?;
     let id = if s.check(TokenKind::Identifier) {
         Some(s.consume_lexeme())
     } else {

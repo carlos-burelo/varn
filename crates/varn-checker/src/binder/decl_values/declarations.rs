@@ -144,10 +144,7 @@ impl super::super::Binder {
             .collect();
 
         let ret = if f.modifiers.is_generator {
-            Type::generic(
-                varn_core::IntrinsicType::Generator.as_str(),
-                vec![Type::Dynamic],
-            )
+            crate::types::generator_of(Type::Dynamic, f.modifiers.is_async)
         } else {
             crate::types::async_fn_return(
                 f.return_type

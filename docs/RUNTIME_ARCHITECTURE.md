@@ -86,15 +86,31 @@ extensión, función de namespace, arrow, expresión de función, método en lit
 de objeto, y **firma de interfaz** (`interface F { async load(): int }` — sin
 ella una interfaz no podría describir ninguna API asíncrona).
 
-### Lo que NO se admite
+### Generadores async
 
-`async function*`. Un generador se conduce de forma síncrona, así que un
-`await` dentro no tiene dónde suspenderse: el frame reanudado se corrompía
-(`value is not callable: 0.0000…64 (type: float)`), y sin `await` el modificador
-simplemente se ignoraba. El parser lo rechaza en todas las formas
-(`crates/varn-parser/src/modifiers.rs`). Por eso `core:intrinsics` tampoco
-declara `AsyncGenerator`: nada puede producir uno. `AsyncIterator` sí sigue —
-se implementa a mano y `Symbol.asyncIterator` existe en runtime.
+`async function*` produce un `AsyncGenerator<T>`: un generador cuyo cuerpo
+puede `await`.
+
+Un único driver (`NanGenDriver`) sirve a las dos formas. Se diferencian en un
+solo brazo: qué pasa cuando el cuerpo suspende en `await`. Un `function*` no
+tiene dónde suspenderse y lo dice; un `async function*` **liquida** el valor
+esperado y sigue corriendo hasta el siguiente `yield` o hasta terminar. Una
+sola llamada a `next()` puede suspender varias veces.
+
+La liquidación es la misma que usa una función async: `settle_awaited` /
+`resume_with_awaited` / `reject_awaited` en `ctx_tasks.rs`, compartidas con
+`run_lazy_task_sync` para que `await` signifique lo mismo en los dos sitios.
+Un rechazo se desenrolla al `try` más cercano del cuerpo del generador.
+
+Consecuencia de diseño: como se liquida **dentro** de `next()`, éste devuelve
+un `{ value, done }` ya resuelto, no una tarea. `AsyncGenerator<T>` tiene por
+eso la misma forma que `Generator<T>`, con nombre distinto para que `for await`
+y el `await` del cuerpo signifiquen algo en el sistema de tipos. Y como
+`await` sobre un no-task es la identidad, `for await` funciona igual sobre un
+generador async que sobre uno síncrono — un generador responde a los dos
+protocolos, `Symbol.iterator` y `Symbol.asyncIterator`.
+
+### Lo que NO se admite
 
 Getters y setters **en literales de objeto**. `HirObjectProp` no tiene variante
 de accesor, así que el compilador los descartaba y la propiedad se leía `null`.

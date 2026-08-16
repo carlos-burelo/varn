@@ -468,10 +468,7 @@ impl Checker {
             .as_ref()
             .map(|rt| self.resolve_type_node_cached(rt, bind));
         let ret = if is_generator {
-            Type::generic(
-                varn_core::IntrinsicType::Generator.as_str(),
-                vec![declared.unwrap_or(Type::Dynamic)],
-            )
+            crate::types::generator_of(declared.unwrap_or(Type::Dynamic), is_async)
         } else {
             crate::types::async_fn_return(declared.unwrap_or(Type::Dynamic), is_async)
         };
