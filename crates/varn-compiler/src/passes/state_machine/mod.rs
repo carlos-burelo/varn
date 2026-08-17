@@ -32,7 +32,21 @@ pub const FIRST_RESUME: u32 = 2;
 /// Transforma `func` si es suspendible. Devuelve el tamaño del objeto de
 /// estado en palabras, o `0` si no la transformó.
 pub fn run(func: &mut SsaFunc) -> u16 {
-    if !func.is_async && !func.is_generator {
+    // `func.is_async` es SIEMPRE false para el top-level de módulo (ver
+    // SsaFunc::is_async): este gate nunca alcanza `suspend::analyze` para
+    // `<module>` aunque haya `await` de nivel superior. El plan siguiente
+    // necesita otra señal para el top-level, no ampliar esta condición sin
+    // más.
+    //
+    // `is_generator` queda excluido aquí a propósito, junto con `is_async`:
+    // `function*`/`async function*` (generador, con o sin `async` — las dos
+    // formas ponen `is_generator = true`) caen en el mismo
+    // `points.is_empty()` de abajo que una `async` sin `await` cuando no
+    // tienen `yield` — la forma declarada por sí sola no basta para
+    // distinguirlos — pero `Yielded` es semántica de otro plan: darle
+    // `state_size = 1` hoy sería una ambigüedad servida en bandeja a quien
+    // construya el camino de coste cero sobre este campo.
+    if !func.is_async || func.is_generator {
         return 0;
     }
     let points = suspend::analyze(func);
