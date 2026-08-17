@@ -6,7 +6,18 @@ use super::ir::{Block, InstKind, SsaFunc, Terminator, Value};
 
 pub fn dump(func: &SsaFunc) -> String {
     let mut out = String::new();
-    let _ = writeln!(out, "fn {}:", func.name);
+    let mut flags = Vec::new();
+    if func.is_async {
+        flags.push("async");
+    }
+    if func.is_generator {
+        flags.push("generator");
+    }
+    if flags.is_empty() {
+        let _ = writeln!(out, "fn {}:", func.name);
+    } else {
+        let _ = writeln!(out, "fn {}: [{}]", func.name, flags.join(", "));
+    }
     for (i, block) in func.blocks.iter().enumerate() {
         dump_block(&mut out, func, i as u32, block);
     }

@@ -841,6 +841,8 @@ pub fn build_function(
         values: b.values,
         pinned_vars: b.pinned_vars,
         nlocals: func.locals,
+        is_async: func.is_async,
+        is_generator: func.is_generator,
     };
     simplify_phis(&mut ssa);
     Ok(ssa)
