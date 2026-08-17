@@ -18,9 +18,10 @@
 - **Criterio de fallo del paso 1:** cualquier diff de bytecode.
 - **Compilación:** `cargo build --release` debe terminar con **cero warnings nuevos**. El workspace tiene `unused_crate_dependencies = "warn"`.
 - **Baseline:** `ed0af33`. El spec está en `9493cdd`.
+- **Los números de línea de este plan describen el árbol en `ed0af33`.** En cuanto una tarea edita un fichero, los números de las tareas posteriores sobre ESE fichero quedan desplazados. Afecta a `crates/varn-types/src/generator.rs` (tareas 2 y 3) y a `crates/varn-vm/src/exec/ctx.rs` (tareas 2 y 4). **Localizar siempre por símbolo; usar el número sólo como pista.**
 - Directorio de trabajo temporal, usado por todas las tareas:
   `C:\Users\x\AppData\Local\Temp\claude\c--Users-x-dev-varn\bda2e401-8480-4efd-a75b-a3cad75ca949\scratchpad`
-  En los comandos aparece como `$SCRATCH`. Exportarlo una vez por sesión:
+  En los comandos aparece como `$SCRATCH`. **El shell del harness no conserva estado entre llamadas**, así que hay que exportarlo en cada llamada que lo use, y los scripts generados definen su propia ruta internamente:
   ```bash
   export SCRATCH="/c/Users/x/AppData/Local/Temp/claude/c--Users-x-dev-varn/bda2e401-8480-4efd-a75b-a3cad75ca949/scratchpad"
   mkdir -p "$SCRATCH/baseline"
@@ -127,7 +128,9 @@ Todas las tareas siguientes lo invocan. Crearlo una vez.
 cat > "$SCRATCH/verify.sh" <<'EOF'
 #!/usr/bin/env bash
 # Matriz de 4 contra la referencia. Sale != 0 si algo difiere.
+# Define su propia ruta: el shell del harness no conserva exports entre llamadas.
 set -u
+SCRATCH="/c/Users/x/AppData/Local/Temp/claude/c--Users-x-dev-varn/bda2e401-8480-4efd-a75b-a3cad75ca949/scratchpad"
 cd /c/Users/x/dev/varn/varn-lang || exit 1
 B="$SCRATCH/baseline"
 O="$SCRATCH/current"
@@ -359,7 +362,14 @@ Esperado: ningún sitio construye un `AsyncQueue` fuera de su propia definición
 
 - [ ] **Step 2: Borrar la definición**
 
-En `crates/varn-types/src/generator.rs`, borrar las líneas 64-117 completas: `AsyncQueueInner`, `AsyncQueue`, su `impl Default`, su `impl AsyncQueue` y la función libre `make_iter_result` (sólo la usaba `AsyncQueue`).
+En `crates/varn-types/src/generator.rs`, borrar por **símbolo, no por número de línea** — la Task 2 ya quitó `GenChannel` de este mismo fichero y desplazó todo lo que venía después. Borrar estos cuatro bloques completos:
+
+- `pub struct AsyncQueueInner { ... }` (con su `#[derive(Debug)]`)
+- `pub struct AsyncQueue(pub Rc<RefCell<AsyncQueueInner>>);` (con su `#[derive(Clone, Debug)]`)
+- `impl Default for AsyncQueue { ... }` e `impl AsyncQueue { ... }`
+- la función libre `fn make_iter_result(value: Value, done: bool) -> Value { ... }` al final del fichero — sólo la usaba `AsyncQueue`
+
+Referencia: en `ed0af33` ocupaban las líneas 64-117.
 
 El fichero debe quedar con `GeneratorDriver` y `GeneratorObj` y nada más. Revisar los `use` de cabecera: `AsyncTask`, `RefCell`, `AtomicBool`, `Ordering` probablemente dejan de usarse. Quitar los que sobren.
 
@@ -442,10 +452,12 @@ Esperado: exactamente 3 líneas (declaración + dos inicializaciones). **Si algu
 
 - [ ] **Step 2: Borrar el campo**
 
-En `crates/varn-vm/src/exec/ctx.rs`, borrar:
-- línea 44: `pub deferred_tasks: FxHashMap<usize, Rc<LazyTask>>,`
-- línea 137: `deferred_tasks: FxHashMap::default(),`
-- línea 305: `deferred_tasks: FxHashMap::default(),`
+En `crates/varn-vm/src/exec/ctx.rs`, borrar por **símbolo, no por número de línea** — la Task 2 ya quitó `gen_channel` de este mismo fichero y desplazó lo que venía después:
+
+- la declaración del campo: `pub deferred_tasks: FxHashMap<usize, Rc<LazyTask>>,`
+- sus **dos** inicializaciones `deferred_tasks: FxHashMap::default(),` — una en el constructor `new`, otra en `fork_for_task`
+
+Referencia: en `ed0af33` eran las líneas 44, 137 y 305. Confirmar con `grep -n deferred_tasks crates/varn-vm/src/exec/ctx.rs` que salen exactamente tres.
 
 Comprobar si `LazyTask` sigue usado en el fichero tras el borrado; si no, quitar su `use`.
 
@@ -565,7 +577,9 @@ La prueba de este refactor es que no cambia nada. Se materializa como un script,
 cat > "$SCRATCH/bytecode_identity.sh" <<'EOF'
 #!/usr/bin/env bash
 # El bytecode debe ser identico al de referencia. Sale != 0 si difiere.
+# Define su propia ruta: el shell del harness no conserva exports entre llamadas.
 set -u
+SCRATCH="/c/Users/x/AppData/Local/Temp/claude/c--Users-x-dev-varn/bda2e401-8480-4efd-a75b-a3cad75ca949/scratchpad"
 cd /c/Users/x/dev/varn/varn-lang || exit 1
 ./target/release/vn.exe debug -p bytecode ./tests/main.vn > "$SCRATCH/current/bytecode-main.txt" 2>&1
 if diff -q "$SCRATCH/baseline/bytecode-main.txt" "$SCRATCH/current/bytecode-main.txt" >/dev/null 2>&1; then
