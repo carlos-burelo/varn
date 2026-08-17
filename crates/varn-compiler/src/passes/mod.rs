@@ -7,6 +7,7 @@ pub mod escape;
 pub mod fixed_fields;
 pub mod licm;
 pub mod monomorphize;
+pub mod state_machine;
 pub mod tco;
 
 use crate::hir::ctor_summary::CtorSummaries;

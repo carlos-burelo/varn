@@ -17,10 +17,13 @@ pub fn try_compile_function(
 ) -> Result<FunctionProto, OptError> {
     let mut ssa = build::build_function(f, &[], Some(source_file.clone()))?;
     crate::passes::optimize_with(&mut ssa, &crate::hir::ctor_summary::current());
+    let state_size = crate::passes::state_machine::run(&mut ssa);
     if let Err(why) = verify::verify(&ssa) {
         panic!("ssa: verify failed for {}: {}", f.name, why);
     }
-    emit::emit_function(ssa, f, source_file)
+    let mut proto = emit::emit_function(ssa, f, source_file)?;
+    proto.state_size = state_size;
+    Ok(proto)
 }
 
 pub fn lower_module(
@@ -34,10 +37,12 @@ pub fn lower_module(
         Some(source_file.clone()),
     )?;
     crate::passes::optimize_with(&mut ssa, &crate::hir::ctor_summary::current());
+    let state_size = crate::passes::state_machine::run(&mut ssa);
     if let Err(why) = verify::verify(&ssa) {
         panic!("ssa: verify failed for top-level: {}", why);
     }
     let mut proto = emit::emit_function(ssa, &module.top_level, source_file)?;
     proto.export_names = export_names;
+    proto.state_size = state_size;
     Ok(proto)
 }
