@@ -33,27 +33,32 @@
 //! dispararse. Para una def muerta el clamp colapsa el intervalo a un
 //! punto, que es el comportamiento correcto.
 //!
-//! ## Orden de `ssa.blocks` es compatible con dominancia
+//! ## Orden de `ssa.blocks`: suposición NO verificada
 //!
 //! `live_across` filtra con `def[v] < idx && end[v] > idx`. El término
-//! `def[v] < idx` sólo es sano si el orden del vector `ssa.blocks` es
+//! `def[v] < idx` REQUIERE que el orden del vector `ssa.blocks` sea
 //! compatible con dominancia (si `D` domina a `U`, `índice(D) < índice(U)`).
-//! Ese invariante se cumple:
 //!
-//! - `passes/cfg.rs::get_reachable` recorre el grafo desde `func.entry` con
-//!   una `VecDeque` (`push_back`/`pop_front`) — BFS — y `compact_cfg`
-//!   renumera los bloques en ese orden.
-//! - BFS desde `entry` es compatible con dominancia: si `D` domina a `U`,
-//!   todo camino de `entry` a `U` pasa por `D`, luego `dist(D) < dist(U)`,
-//!   y BFS asigna índices en orden no decreciente de distancia, así que
-//!   `índice(D) < índice(U)`.
-//! - `passes/mod.rs:54` llama a `cfg::simplify_and_compact`
-//!   incondicionalmente dentro del bucle de `optimize_with`, que siempre da
-//!   al menos una vuelta.
+//! Cuando `compact_cfg` renumera, lo hace en BFS desde `entry`
+//! (`passes/cfg.rs::get_reachable` usa una `VecDeque` con
+//! `push_back`/`pop_front`), y BFS SÍ es compatible con dominancia: si `D`
+//! domina a `U`, todo camino de `entry` a `U` pasa por `D`, luego
+//! `dist(D) < dist(U)`, y BFS numera en orden no decreciente de distancia.
+//! `passes/mod.rs:54` llama a `cfg::simplify_and_compact` incondicionalmente
+//! dentro del bucle de `optimize_with`, que siempre da al menos una vuelta.
 //!
-//! Precondición: `Liveness::analyze` asume una función que pasó por
-//! `passes::optimize_with`. Si se llamara sobre SSA que se saltó los pases,
-//! este invariante no está garantizado.
+//! Pero `compact_cfg` sale temprano SIN renumerar cuando no hay bloques
+//! inalcanzables que descartar (`passes/cfg.rs:225-227`) — el caso común.
+//! Ahí el orden es el que dejó la construcción del SSA, que no está
+//! verificado que sea compatible con dominancia. Correr los pases no
+//! implica renumerar.
+//!
+//! Por tanto la compatibilidad con dominancia de `ssa.blocks` es, hoy, una
+//! SUPOSICIÓN NO VERIFICADA — no un invariante comprobado. Quien necesite
+//! la garantía real tiene dos caminos: comprobarla explícitamente dentro de
+//! `analyze` (numerar bloques por un BFS/RPO propio en vez de confiar en el
+//! orden de `ssa.blocks`), o responder `live_across` a partir de
+//! `live_in`/`live_out` por bloque, que no depende del orden del vector.
 
 use super::ir::{InstKind, SsaFunc, Terminator, Value};
 use rustc_hash::FxHashSet;
