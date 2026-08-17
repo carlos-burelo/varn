@@ -129,7 +129,9 @@ Salida: una función normal (`poll`) más un layout de estado.
 2. **Liveness a través de cada suspensión.** El conjunto de valores SSA vivos
    *cruzando* un punto de suspensión es exactamente lo que debe guardarse.
 3. **Partir el CFG** en cada suspensión. Cada región resultante es un estado.
-4. **Emitir `poll`**, con entrada por tabla de saltos sobre `state.st`.
+4. **Emitir `poll`**, con entrada por cadena de comparación sobre `state.st`
+   (§3.8: Varn no tiene salto indexado, y con 1-2 estados por función no hace
+   falta).
 
 **El objeto de estado mide el máximo live-set que cruza una suspensión, no el
 tamaño del frame.** Lo que no cruza un `await` se queda en registros y nunca
@@ -180,6 +182,10 @@ Las tres decisiones de §2 se refuerzan entre sí:
   isolate y lo que cruza va por `SendValue`.
 - El objeto de estado es un objeto de heap normal, con shape normal, que el GC
   **ya sabe trazar**. Mueren los cuatro recorridos custom de `NanGenDriver`.
+
+§3.8 concreta esto: el objeto es un `ObjData` con shape sintética, y mientras
+la corrutina no suspende ni siquiera existe — el estado vive en los registros
+del marco de `poll`.
 
 ### 3.3 Camino de coste cero
 
@@ -293,6 +299,122 @@ de disciplina.
 
 La superficie del lenguaje no cambia. Sólo la implementación.
 
+### 3.8 Mecánica del pase
+
+Ronda de diseño posterior al spec original, decidida con las cifras de P2a
+delante (127 puntos de suspensión, 13 en `try`, 7 en bucle, conjuntos vivos de
+0 a 8 con 34 vacíos). Cierra las cinco decisiones que §3.1–§3.3 dejaban
+abiertas.
+
+#### El objeto de estado es un `ObjData`
+
+No una variante nueva de `HeapObj`. `ObjData` **ya** es un DST con cola inline
+de `Cell<VmValue>`, alocado por `ObjData::alloc(shape, n)`, `#[repr(C)]` con el
+orden de campos fijado, y **el JIT ya sondea su layout** (`JitObjectLayout`,
+con camino rápido inline). Es exactamente la estructura que hace falta, ya
+construida y ya optimizada: reusarla da ese camino rápido el primer día.
+
+El pase conoce el slot de cada valor en compilación, así que emite acceso por
+**índice fijo** y se salta el lookup por nombre. La `shape` queda como
+metadato de depuración, no como camino caliente.
+
+Descartado añadir `HeapObj::Coro`: ahorraría una palabra por estado a cambio de
+una variante más en un enum de 24, sus brazos de GC, intern, extract,
+`TypeTag`, `Display` y `Hash`, y un `JitCoroLayout` que replicaría el sondeo
+que `JitObjectLayout` ya hace. Descartado también un `Slab` fuera del heap: el
+GC dejaría de ver los valores guardados y haría falta trazado explícito, que es
+justo la deuda de `NanGenDriver` que este proyecto borra.
+
+#### `poll` es una función de bytecode normal
+
+Su prólogo compara el discriminante con `JumpIfTrue` encadenados. **No existe
+opcode de salto indexado en Varn** (sólo `Jump`, `JumpIfFalse`, `JumpIfTrue`,
+`Loop`), y las cifras dicen que no hace falta: con 127 puntos repartidos en
+~100 ficheros, una función típica tiene 1-2 estados. Una cadena de 1-2
+comparaciones bien predichas suele batir a un salto indirecto mal predicho.
+
+Añadir un `JumpTable` se justifica **si aparece medida** una función con muchos
+estados, no antes: tocaría el enum de opcodes, el decodificador —que este repo
+mantiene como fuente única de formas de instrucción—, el dispatch del
+intérprete, el lowering de Cranelift y el regalloc.
+
+Que `poll` sea una función corriente es lo que hace que el intérprete, el
+tiering y Cranelift la traten sin caso especial. Es la propiedad que permite
+borrar `jit_await`, `jit_yield`, `jit_suspend_buf` y el `longjmp` **sin
+construir nada que los sustituya**.
+
+#### El estado vive en el marco de registros de `poll` hasta que suspende
+
+Consecuencia de combinar las dos decisiones anteriores con el camino de coste
+cero, y la pieza que ninguna producía por separado.
+
+Como `poll` es una función normal, sus registros ya viven en `ExecCtx::stack`,
+que el GC ya escanea como raíces. El estado no necesita slots aparte: **es el
+rango de registros del propio marco de `poll`**. Mientras la corrutina no
+suspende no hay objeto, no hay alocación y no hay trazado nuevo — hay una
+llamada normal.
+
+Al devolver `Pending` se copia a un `ObjData` exactamente el subconjunto que
+`Liveness::live_after` reporta. Al reanudar se copia de vuelta a los registros
+del marco nuevo. Con `live` entre 0 y 8, esas copias son de 0 a 8 palabras, y
+sólo se pagan en la suspensión real.
+
+#### El coste cero no depende de conocer el callee
+
+`FunctionProto` publica el tamaño de su estado, igual que ya publica
+`register_count`. El llamante lo lee **en runtime**, así que el camino de coste
+cero vale también para despacho dinámico: métodos de interfaz, callbacks,
+`dynamic`.
+
+Esto va más allá de lo que §3.3 proponía. El tamaño *es* conocible en runtime;
+limitarlo al callee estático dejaría fuera todo el despacho dinámico del
+lenguaje sin necesidad técnica.
+
+#### Un protocolo, dos implementaciones
+
+```rust
+enum Poll<T> { Ready(T), Pending, Yielded(T) }
+```
+
+Dos productores:
+
+1. **Estado de corrutina** — generado por el pase, un `ObjData`.
+2. **Futuro hoja** — para el host. `AsyncTask` sobrevive pero adelgaza: una
+   sola ranura de waker, sin `Mutex`, sin `AtomicU32`, sin `TASK_POOL`
+   `thread_local`, `!Send`.
+
+No es un sistema dual: es un protocolo con dos formas de producirlo, como Rust
+tiene `async fn` y futuros hoja implementados a mano. Responde a un hecho
+medido: **19 sitios** (red, canales, isolates, timers) se resuelven desde fuera
+y ninguna máquina de estados puede representarlos.
+
+`LazyTask` y `Value::Task` **mueren**: llamar a una `async` construye su estado
+directamente, sin capturar closure y args para diferirlos.
+
+Descartado hacer que también los natives devuelvan objetos de estado: los 19
+sitios tendrían que fabricar estados sintéticos con un discriminante que no
+corresponde a ningún corte de CFG, y el scheduler necesitaría un `poll` nativo
+especial de todas formas — el segundo concepto reaparecería disfrazado.
+
+#### Las tareas siguen siendo perezosas
+
+Llamar a una `async` no la arranca. **No es un cambio**: Varn ya se comporta
+así hoy, verificado por sonda.
+
+Y deja de ser un detalle para ser **requisito**: repartir una tarea a otro
+isolate (§3.6) sólo es posible si no ha empezado a correr localmente. Una tarea
+sin arrancar es closure + args, trivialmente enviable si sus capturas lo son;
+una que ya ejecutó su primer tramo tiene estado local. Semántica eager estilo
+JS y reparto multinúcleo son incompatibles.
+
+#### Efecto lateral: el tiering encaja mejor
+
+Hoy una función `async` es un marco largo que se entra una vez, así que el
+umbral por conteo de entradas apenas la ve. Con máquinas de estados, `poll` se
+entra **una vez por suspensión**: un bucle que hace `await` genera muchas
+entradas y cruza el umbral de forma natural. El modelo de tiering existente
+encaja mejor con el diseño nuevo que con el actual.
+
 ---
 
 ## 4. Flujo de datos: un `await` de principio a fin
@@ -304,20 +426,23 @@ async function f(): int { const r = await g(); return r + 1 }
 1. **Compilación.** El pase parte `f` en dos estados: antes y después del
    `await`. `r` cruza la suspensión, así que es campo del estado. El resultado
    de `g()` no cruza nada más, así que nada más se guarda.
-2. **Llamada.** El llamante reserva el estado de `f` en su pila (tamaño
-   conocido) y llama a `f$poll`.
+2. **Llamada.** El llamante lee `proto.state_size` de `f` —en runtime, así que
+   da igual si `f` se conoce estáticamente— y llama a `f$poll`. El estado vive
+   como los registros del marco de `f$poll`, que el GC ya escanea (§3.8).
 3. **Estado 0.** Llama a `g$poll`.
    - Si `g` devuelve `Ready(v)`: `f` sigue de largo al estado 1 sin suspender.
      **No se alocó ninguna tarea, ni para `f` ni para `g`.**
-   - Si devuelve `Pending`: `f` guarda `st = 1`, su estado se mueve al heap y
-     el scheduler lo registra como hijo del scope actual, esperando a `g`.
+   - Si devuelve `Pending`: `f` guarda `st = 1`, copia a un `ObjData` el
+     subconjunto que `live_after` reporta —aquí sólo `r`— y el scheduler lo
+     registra como hijo del scope actual, esperando a `g`.
 4. **Suspensión.** `f$poll` devuelve `Pending`. El scheduler pasa a la
    siguiente tarea de `ready`. Si `ready` se vacía, entra en
    `io.poll(deadline)`.
 5. **Despertar.** Cuando `g` se completa, `settle` escribe el resultado y
    empuja a `f` a `ready`.
-6. **Reanudación.** `f$poll` entra por la tabla de saltos en `st = 1`, lee `r`
-   del estado, calcula `r + 1` y devuelve `Ready`.
+6. **Reanudación.** `f$poll` entra por la cadena de comparación en `st = 1`
+   (§3.8: no hay salto indexado, y con 1-2 estados no hace falta), copia `r`
+   del `ObjData` de vuelta a los registros, calcula `r + 1` y devuelve `Ready`.
 
 ---
 
@@ -446,10 +571,18 @@ Los que el plan de implementación debe cerrar con decisión explícita:
    lo resuelve con scopes "shielded". Sin regla, `dispose` asíncrono es
    inseguro.
 2. **`try`/`catch` cruzando suspensión** (§5.3). El punto más delicado del
-   pase.
+   pase. `try_handlers` vive hoy en `ExecCtx` y tiene que pasar a ser parte del
+   estado, con el desenrollado funcionando al entrar por `poll`. **Medido en
+   P2a: 13 de 127 puntos (10,2%)** — minoría, pero la cifra es del corpus
+   actual, que no contiene ningún `try` con control de flujo antes del `await`.
+   No leerla como «el `try` es raro, ya lo haremos en fase 2».
 3. **Bucles con `await` dentro.** El corte del CFG debe tratar back-edges: un
    estado es reentrable. Es estándar, pero es donde se rompen las
-   implementaciones ingenuas.
+   implementaciones ingenuas. **Medido en P2a: 7 de 127 puntos (5,5%)**.
+3b. **El `assert_eq!` de `compute_try_depth_in`** pasa a correr en la ruta de
+   compilación cuando P2b consuma `analyze`, donde un pánico sería sobre código
+   de usuario. Su premisa es cierta desde `fac22b4`, pero merece revisión al
+   conectarlo.
 4. **Cancelación cruzando isolates.** Requiere mensaje al scheduler destino y
    un punto de recogida.
 5. **Granularidad del reparto.** Repartir tareas triviales cuesta más que
