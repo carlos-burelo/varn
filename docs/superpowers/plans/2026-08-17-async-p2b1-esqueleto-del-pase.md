@@ -279,6 +279,8 @@ async function sinAwait(x: int): int { return x + 1; }
 async function conAwait(x: int): int { return await sinAwait(x); }
 function normal(x: int): int { return x + 1; }
 function* gen(): int { yield 1; }
+function* genSinYield(): void { return; }
+async function* agenSinYield(): void { return; }
 print(await conAwait(1));
 EOF
 cd /c/Users/x/dev/varn/varn-lang
@@ -293,6 +295,8 @@ Anotar del volcado cuáles tienen puntos de suspensión. Expectativa a verificar
 | `conAwait` | sí | 1 | 0 (aún no se transforma) |
 | `normal` | no | 0 | 0 |
 | `gen` | generador | 1 | 0 (aún no) |
+| `genSinYield` | generador | 0 | 0 (generador, no async — gate lo excluye aunque no tenga puntos) |
+| `agenSinYield` | async + generador | 0 | 0 (`is_generator` excluye aunque `is_async` sea true y no suspenda) |
 
 - [ ] **Step 2: Implementar**
 
