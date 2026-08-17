@@ -112,7 +112,6 @@ impl HeapInner {
                 VmValue::from_heap_idx(self.alloc(HeapObj::Spread(inner)))
             }
             Value::Generator(g) => VmValue::from_heap_idx(self.alloc(HeapObj::Generator(g))),
-            Value::AsyncQueue(q) => VmValue::from_heap_idx(self.alloc(HeapObj::AsyncQueue(q))),
             Value::VmValue(payload) => {
                 if let Some(vref) = payload.as_any().downcast_ref::<VmValueRef>() {
                     vref.0
@@ -196,7 +195,6 @@ impl HeapInner {
                 HeapObj::Decimal(d) => Value::Decimal(d.clone()),
                 HeapObj::Char(c) => Value::Char(*c),
                 HeapObj::Generator(g) => Value::Generator(g.clone()),
-                HeapObj::AsyncQueue(q) => Value::AsyncQueue(q.clone()),
                 HeapObj::Spread(inner) => Value::Spread(Box::new(self.extract(*inner))),
                 HeapObj::VmValue(payload) => Value::VmValue(payload.clone_payload()),
                 HeapObj::Module(m) => Value::Module(m.clone()),

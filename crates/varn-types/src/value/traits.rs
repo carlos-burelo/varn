@@ -79,7 +79,6 @@ impl Value {
             Value::Set(_) => TypeTag::Set,
             Value::Symbol(_) => TypeTag::Symbol,
             Value::Generator(_) => TypeTag::Generator,
-            Value::AsyncQueue(_) => TypeTag::AsyncQueue,
             Value::Char(_) => TypeTag::Char,
             Value::EnumVariant(_) => TypeTag::Enum,
             Value::VmValue(_payload) => TypeTag::VmRef,
@@ -138,7 +137,6 @@ impl std::hash::Hash for Value {
             Value::Set(s) => Rc::as_ptr(&s.0).hash(state),
             Value::Symbol(s) => s.hash(state),
             Value::Generator(g) => g.hash(state),
-            Value::AsyncQueue(q) => Rc::as_ptr(&q.0).hash(state),
             Value::Char(c) => c.hash(state),
             Value::EnumVariant(data) => {
                 data.variant_name.hash(state);
@@ -173,7 +171,6 @@ impl PartialEq for Value {
             (Value::Class(a), Value::Class(b)) => Rc::ptr_eq(a, b),
             (Value::Symbol(a), Value::Symbol(b)) => a == b,
             (Value::Generator(a), Value::Generator(b)) => a == b,
-            (Value::AsyncQueue(a), Value::AsyncQueue(b)) => Rc::ptr_eq(&a.0, &b.0),
             (Value::Char(a), Value::Char(b)) => a == b,
             (Value::EnumVariant(a), Value::EnumVariant(b)) => {
                 a.variant_name == b.variant_name
@@ -277,7 +274,6 @@ impl fmt::Display for Value {
             }
             Value::Symbol(s) => write!(f, "{s}"),
             Value::Generator(_) => write!(f, "[Generator]"),
-            Value::AsyncQueue(_) => write!(f, "[AsyncQueue]"),
             Value::Char(c) => write!(f, "'{c}'"),
             Value::EnumVariant(data) => {
                 write!(f, "{}({})", data.variant_name, data.payload)

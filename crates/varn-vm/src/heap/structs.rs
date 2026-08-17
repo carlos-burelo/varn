@@ -92,7 +92,6 @@ impl HeapInner {
             HeapObj::Task(t) => Some(Rc::as_ptr(t) as usize),
             HeapObj::TaskHandle(th) => Some(th.identity()),
             HeapObj::Generator(g) => Some(Rc::as_ptr(&g.0) as *const () as usize),
-            HeapObj::AsyncQueue(q) => Some(Rc::as_ptr(&q.0) as usize),
             HeapObj::VmClosure(c) => Some(Rc::as_ptr(c) as usize),
             _ => None,
         }

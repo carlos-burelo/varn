@@ -274,14 +274,6 @@ impl TricolorMarker {
                         }
                     }
                 }
-                HeapObj::AsyncQueue(q) => {
-                    let inner = q.0.borrow();
-                    for v in &inner.queue {
-                        if let Some(ci) = heap.value_heap_idx(v) {
-                            self.mark_gray(ci);
-                        }
-                    }
-                }
                 HeapObj::TaskHandle(task) => match task.peek_state() {
                     varn_types::TaskState::Resolved(v) | varn_types::TaskState::Rejected(v) => {
                         if let Some(ci) = heap.value_heap_idx(&v) {

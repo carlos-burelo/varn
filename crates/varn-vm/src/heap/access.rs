@@ -92,10 +92,6 @@ impl HeapInner {
                 .identity_index
                 .get(&(Rc::as_ptr(&g.0) as *const () as usize))
                 .copied(),
-            varn_types::Value::AsyncQueue(q) => self
-                .identity_index
-                .get(&(Rc::as_ptr(&q.0) as usize))
-                .copied(),
             varn_types::Value::VmValue(payload) => {
                 if let Some(wrapper) = payload.as_any().downcast_ref::<VmClosurePayload>() {
                     let closure_ptr = std::rc::Rc::as_ptr(&wrapper.0) as *const () as usize;

@@ -5,7 +5,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use varn_core::VmValuePayload;
 use varn_types::{
-    generator::{AsyncQueue, GeneratorObj},
+    generator::GeneratorObj,
     value::{
         BoundMethod, EnumVariantData, FrozenModuleObj, MapRef, ModuleObj, ObjRef, RangeData,
         RuntimeSymbol, SetRef,
@@ -43,7 +43,6 @@ pub enum HeapObj {
     Decimal(Box<rust_decimal::Decimal>),
     Char(char),
     Generator(GeneratorObj),
-    AsyncQueue(AsyncQueue),
     Spread(VmValue),
     VmValue(Box<dyn VmValuePayload>),
 }
@@ -77,7 +76,6 @@ impl HeapObj {
             HeapObj::Decimal(_) => TypeTag::Decimal,
             HeapObj::Char(_) => TypeTag::Char,
             HeapObj::Generator(_) => TypeTag::Generator,
-            HeapObj::AsyncQueue(_) => TypeTag::AsyncQueue,
             HeapObj::Spread(_) => TypeTag::Array,
             HeapObj::Buffer(_) | HeapObj::VmValue(_) => TypeTag::VmRef,
         }

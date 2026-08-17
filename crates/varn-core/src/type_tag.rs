@@ -31,7 +31,6 @@ pub enum TypeTag {
     TypeError,
     RangeError,
     VmRef,
-    AsyncQueue,
     TaskHandle,
 }
 
@@ -63,7 +62,6 @@ impl TypeTag {
             Self::Enum => "enum",
             Self::NativeFn => "native_fn",
             Self::VmRef => "vm_ref",
-            Self::AsyncQueue => "AsyncQueue",
             Self::TaskHandle => "TaskHandle",
             Self::Error => "Error",
             Self::TypeError => "TypeError",

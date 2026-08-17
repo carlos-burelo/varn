@@ -10,7 +10,7 @@ mod sendable;
 mod shape;
 mod task;
 mod traits;
-use crate::generator::{AsyncQueue, GeneratorObj};
+use crate::generator::GeneratorObj;
 pub use crate::native::NativeFn;
 use crate::task::AsyncTask;
 pub use alloc::{
@@ -130,7 +130,6 @@ pub enum Value {
     Set(SetRef),
     Symbol(RuntimeSymbol),
     Generator(GeneratorObj),
-    AsyncQueue(AsyncQueue),
     Char(char),
     EnumVariant(Box<EnumVariantData>),
     VmValue(Box<dyn VmValuePayload>),
