@@ -32,11 +32,15 @@ pub struct SsaFunc {
     pub pinned_vars: rustc_hash::FxHashSet<VarId>,
     pub nlocals: u32,
 
-    /// Forma de la función, propagada desde HIR. El pase de máquinas de estados
-    /// las necesita para decidir qué variantes de `Poll` puede emitir el cuerpo:
-    /// `async` produce Pending/Ready, `function*` produce Yielded/Ready, y
-    /// `async function*` las tres.
+    // Forma de la función, propagada desde HIR (`is_async` e `is_generator`
+    // debajo). El pase de máquinas de estados las necesita para decidir qué
+    // variantes de `Poll` puede emitir el cuerpo: `async` produce
+    // Pending/Ready, `function*` produce Yielded/Ready, y `async function*`
+    // las tres.
+    /// Si la función es `async`. Ver nota sobre esta y `is_generator` arriba.
     pub is_async: bool,
+    /// Si la función es `function*` (generadora). Ver nota sobre esta y
+    /// `is_async` arriba.
     pub is_generator: bool,
 }
 

@@ -175,7 +175,7 @@ pub(crate) fn inst_uses(kind: &InstKind) -> Vec<Value> {
     out
 }
 
-fn term_value_uses(t: &Terminator) -> Vec<Value> {
+pub(crate) fn term_value_uses(t: &Terminator) -> Vec<Value> {
     match t {
         Terminator::Return(Some(v)) => vec![*v],
         Terminator::Throw(v) => vec![*v],
@@ -184,7 +184,7 @@ fn term_value_uses(t: &Terminator) -> Vec<Value> {
     }
 }
 
-fn out_edges(t: &Terminator) -> Vec<(BlockId, &Vec<Value>)> {
+pub(crate) fn out_edges(t: &Terminator) -> Vec<(BlockId, &Vec<Value>)> {
     match t {
         Terminator::Jump { target, args } => vec![(*target, args)],
         Terminator::Branch {

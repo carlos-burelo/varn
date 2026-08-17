@@ -189,8 +189,10 @@ impl Liveness {
     /// que el objeto de estado de una máquina de estados tiene que guardar.
     ///
     /// A diferencia de la numeración lineal de puntos, esto **no depende del
-    /// orden del vector `ssa.blocks`**: parte de `live_out[b]` y camina hacia
-    /// atrás por las instrucciones del bloque aplicando la transferencia
+    /// orden del vector `ssa.blocks`**: parte de `live_out[b]`, le une lo que
+    /// usa el terminador del bloque (se ejecuta después de toda instrucción,
+    /// así que sus usos ya están vivos en este punto), y desde ahí camina
+    /// hacia atrás por las instrucciones aplicando la transferencia
     /// `live = (live - def(inst)) ∪ uses(inst)`. Sólo usa información local al
     /// bloque más su `live_out`, ambos independientes del orden del vector.
     ///
@@ -200,7 +202,27 @@ impl Liveness {
     /// estabilidad.
     pub fn live_after(&self, ssa: &SsaFunc, b: usize, i: usize) -> Vec<Value> {
         let block = &ssa.blocks[b];
+        debug_assert!(
+            i < block.insts.len(),
+            "live_after: i {i} fuera de rango para b{b} ({} insts)",
+            block.insts.len()
+        );
         let mut live: FxHashSet<u32> = self.live_out[b].clone();
+
+        // El terminador se ejecuta después de todas las instrucciones del
+        // bloque, así que arranca el recorrido hacia atrás: lo que usa
+        // (el `cond` de un Branch, el valor de Return/Throw, los args de
+        // Jump/Branch hacia sus sucesores) tiene que estar vivo en el punto
+        // que sigue a la última instrucción. El terminador no define nada,
+        // así que aquí sólo hay unión, nunca resta.
+        for u in crate::ssa::verify::term_value_uses(&block.term) {
+            live.insert(u.0);
+        }
+        for (_, args) in crate::ssa::verify::out_edges(&block.term) {
+            for a in args {
+                live.insert(a.0);
+            }
+        }
 
         // Recorre hacia atrás hasta pasar la instrucción i+1: el estado que
         // queda es "vivo justo después de i".
