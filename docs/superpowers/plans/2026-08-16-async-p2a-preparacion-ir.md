@@ -576,16 +576,27 @@ Contrastar contra la tabla del paso 1. **Los cuatro casos deben salir como dice 
 
 - [ ] **Step 5: Medir el corpus real — el producto de este plan**
 
+> **No medir sobre `tests/main.vn`.** El volcado SSA se invoca una sola vez, para el módulo de entrada (`compile.rs:90`), a diferencia del de bytecode que además recorre el grafo de módulos (`compile.rs:127`). Y esa vía tampoco serviría: `graph_build.modules` guarda `FunctionProto`, no SSA — a esa altura el SSA ya no existe. `main.vn` es un driver que importa el resto, así que medirlo daría casi cero.
+>
+> Los ficheros de `tests/` **sí** compilan por separado como módulo de entrada. Verificado: `tests/21-async.vn` da 7 funciones en SSA con 19 `await` en fuente. Recorrerlos uno a uno mide código real por el camino que funciona.
+
 ```bash
 export SCRATCH="/c/Users/x/AppData/Local/Temp/claude/c--Users-x-dev-varn/bda2e401-8480-4efd-a75b-a3cad75ca949/scratchpad"
 cd /c/Users/x/dev/varn/varn-lang
-./target/release/vn.exe debug -p suspend ./tests/main.vn > "$SCRATCH/suspend-main.txt" 2>&1
-echo "puntos de suspension totales: $(grep -c 'Await\|Yield' "$SCRATCH/suspend-main.txt")"
-echo "dentro de try:               $(grep -c 'in_try=true' "$SCRATCH/suspend-main.txt")"
-echo "dentro de bucle:             $(grep -c 'in_loop=true' "$SCRATCH/suspend-main.txt")"
+: > "$SCRATCH/suspend-corpus.txt"
+for f in tests/*.vn std/*.vn; do
+  echo "### $f" >> "$SCRATCH/suspend-corpus.txt"
+  ./target/release/vn.exe debug -p suspend "$f" 2>&1 \
+    | sed 's/\x1b\[[0-9;]*m//g' >> "$SCRATCH/suspend-corpus.txt"
+done
+echo "puntos de suspension totales: $(grep -cE 'Await|Yield' "$SCRATCH/suspend-corpus.txt")"
+echo "dentro de try:               $(grep -c 'in_try=true' "$SCRATCH/suspend-corpus.txt")"
+echo "dentro de bucle:             $(grep -c 'in_loop=true' "$SCRATCH/suspend-corpus.txt")"
 echo "--- distribucion del tamano de live ---"
-grep -oE 'live=[0-9]+' "$SCRATCH/suspend-main.txt" | sort -t= -k2 -n | uniq -c | tail -20
+grep -oE 'live=[0-9]+' "$SCRATCH/suspend-corpus.txt" | sort -t= -k2 -n | uniq -c
 ```
+
+Referencia de cordura: el corpus tiene 139 `await` y 103 apariciones de `async` en fuente. Si el total de puntos sale muy por debajo de eso, el análisis no está llegando a todas las funciones y hay que averiguar por qué antes de usar las cifras. Algunos ficheros pueden fallar al compilar sueltos si dependen de otros; eso es esperable y no invalida la medición — anotar cuántos fallaron.
 
 Anotar las cuatro cifras en el informe. **Son la entrada de la decisión de diseño de P2b**: si casi ningún punto cae en un `try` o en un bucle, el pase puede aterrizar primero el caso recto y tratar esos dos como fases posteriores; si son mayoría, hay que resolverlos desde el día uno.
 
