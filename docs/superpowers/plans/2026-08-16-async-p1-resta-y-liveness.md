@@ -15,7 +15,7 @@
 - **Prohibido `cargo test`.** Es irrelevante como señal de correctitud en este repo. La validación es `tests/main.vn`.
 - **Matriz de 4 obligatoria** al cerrar cada tarea: `run` × `VARN_NO_JIT` × procedencia de la std (árbol / `@embedded`). Purgar con `vn cache clean` al cambiar de procedencia.
 - **Criterio de fallo del paso 0:** cualquier cambio de comportamiento significa que algo no estaba muerto. Parar e investigar, no adaptar.
-- **Criterio de fallo del paso 1:** cualquier diff de bytecode.
+- **Criterio de fallo del paso 1:** cualquier diff en el corpus de asignación de registros (`bytecode_identity.sh`). **No** es comparación byte a byte de `tests/main.vn`: la asignación de registros ya es no determinista en `ed0af33` — ver Task 0, paso 3.
 - **Compilación:** `cargo build --release` debe terminar con **cero warnings nuevos**. El workspace tiene `unused_crate_dependencies = "warn"`.
 - **Baseline:** `ed0af33`. El spec está en `9493cdd`.
 - **Los números de línea de este plan describen el árbol en `ed0af33`.** En cuanto una tarea edita un fichero, los números de las tareas posteriores sobre ESE fichero quedan desplazados. Afecta a `crates/varn-types/src/generator.rs` (tareas 2 y 3) y a `crates/varn-vm/src/exec/ctx.rs` (tareas 2 y 4). **Localizar siempre por símbolo; usar el número sólo como pista.**
@@ -100,15 +100,28 @@ wc -l "$SCRATCH"/baseline/*.txt
 
 Esperado: los cuatro ficheros con contenido y sin fallos. Si alguno viene rojo **en el baseline**, parar: el árbol no está sano y ninguna comparación posterior significaría nada.
 
-- [ ] **Step 3: Capturar el bytecode de referencia**
+- [ ] **Step 3: Capturar el corpus de asignación de registros**
 
-Oráculo del paso 1. Se captura ahora para que también cubra el paso 0.
+Oráculo del paso 1.
+
+> **No se compara `tests/main.vn` byte a byte.** En `ed0af33` la asignación de registros **ya es no determinista** entre corridas: 5/5 corridas distintas sobre un fichero de 2 funciones, con `VARN_NO_JIT=1`, independiente del grafo de módulos. El diff es una permutación de registros físicos (`r6`↔`r7`) con los mismos opcodes. El orden de volcado de los bloques `MODULE BYTECODE` también varía. Es un defecto pre-existente, no algo que introduzca este plan.
+>
+> El oráculo es un corpus fijo de ficheros sueltos con los números de registro canonicalizados, verificado estable 5/5. El gate real de correctitud sigue siendo la matriz de 4, que sí es determinista.
+
+Crear en `$SCRATCH/corpus/` seis ficheros que ejerciten los caminos de la liveness: `01-loops.vn` (bucles anidados, back-edges), `02-try.vn` (try/catch/finally, arista `InstKind::Try`), `03-branches.vn` (if/else con args de bloque), `04-floats.vn` (mezcla int/float, pools segregados), `05-presion.vn` (10 temporales vivos a la vez), `06-closures.vn` (`LoadCaptured`/`StoreCaptured`).
 
 ```bash
 cd /c/Users/x/dev/varn/varn-lang
-./target/release/vn.exe debug -p bytecode ./tests/main.vn > "$SCRATCH/baseline/bytecode-main.txt" 2>&1
-wc -l "$SCRATCH/baseline/bytecode-main.txt"
+norm() { sed -e 's/\x1b\[[0-9;]*m//g' -e 's/\br[0-9]\+/rN/g' -e 's/\[[0-9]\+\]/[N]/g'; }
+: > "$SCRATCH/baseline/corpus.txt"
+for f in "$SCRATCH"/corpus/*.vn; do
+  echo "### $(basename "$f")" >> "$SCRATCH/baseline/corpus.txt"
+  ./target/release/vn.exe debug -p bytecode "$f" 2>&1 | norm >> "$SCRATCH/baseline/corpus.txt"
+done
+wc -l "$SCRATCH/baseline/corpus.txt"
 ```
+
+Antes de aceptarlo como oráculo, **confirmar que es estable**: repetir la captura cinco veces y comprobar que las cinco salidas son idénticas. Si no lo son, el corpus toca algo no determinista adicional y hay que reducirlo hasta que lo sea.
 
 - [ ] **Step 4: Guardar el recuento de líneas de partida**
 
@@ -544,7 +557,7 @@ sustituye el paso 3."
 
 ## Task 6: Extraer la liveness SSA a módulo propio
 
-Fin del paso 0, comienzo del paso 1. Refactor puro con el criterio más duro del plan: **bytecode idéntico byte a byte**.
+Fin del paso 0, comienzo del paso 1. Refactor puro con el criterio más duro del plan: **la asignación de registros del corpus no puede cambiar**.
 
 **Files:**
 - Create: `crates/varn-compiler/src/ssa/liveness.rs`
@@ -569,34 +582,16 @@ Fin del paso 0, comienzo del paso 1. Refactor puro con el criterio más duro del
   ```
   El plan siguiente (pase de máquinas de estados) consume `live_across` para elegir los campos del objeto de estado.
 
-- [ ] **Step 1: Escribir la prueba de identidad de bytecode**
+- [ ] **Step 1: Comprobar que el oráculo sigue verde antes de tocar el compilador**
 
-La prueba de este refactor es que no cambia nada. Se materializa como un script, no como un test de Rust.
+El script `bytecode_identity.sh` y su corpus los creó la Task 0. Aquí sólo se ejecuta.
 
 ```bash
-cat > "$SCRATCH/bytecode_identity.sh" <<'EOF'
-#!/usr/bin/env bash
-# El bytecode debe ser identico al de referencia. Sale != 0 si difiere.
-# Define su propia ruta: el shell del harness no conserva exports entre llamadas.
-set -u
-SCRATCH="/c/Users/x/AppData/Local/Temp/claude/c--Users-x-dev-varn/bda2e401-8480-4efd-a75b-a3cad75ca949/scratchpad"
-cd /c/Users/x/dev/varn/varn-lang || exit 1
-./target/release/vn.exe debug -p bytecode ./tests/main.vn > "$SCRATCH/current/bytecode-main.txt" 2>&1
-if diff -q "$SCRATCH/baseline/bytecode-main.txt" "$SCRATCH/current/bytecode-main.txt" >/dev/null 2>&1; then
-  echo "OK   bytecode identico"
-  exit 0
-else
-  echo "DIFF bytecode cambio"
-  diff "$SCRATCH/baseline/bytecode-main.txt" "$SCRATCH/current/bytecode-main.txt" | head -40
-  exit 1
-fi
-EOF
-chmod +x "$SCRATCH/bytecode_identity.sh"
-mkdir -p "$SCRATCH/current"
+export SCRATCH="/c/Users/x/AppData/Local/Temp/claude/c--Users-x-dev-varn/bda2e401-8480-4efd-a75b-a3cad75ca949/scratchpad"
 "$SCRATCH/bytecode_identity.sh"
 ```
 
-Esperado ahora: `OK bytecode identico` (aún no se ha tocado el compilador). Si da `DIFF`, alguna de las tareas 1-5 cambió el bytecode y hay que investigarlo antes de seguir.
+Esperado: `OK corpus de registros identico`, exit 0. Aún no se ha tocado el compilador. Si da `DIFF`, alguna de las tareas 1-5 cambió la asignación de registros y hay que investigarlo **antes** de empezar la extracción — de lo contrario el diff de esta tarea mezclaría dos causas.
 
 - [ ] **Step 2: Crear el módulo con el análisis extraído**
 
@@ -796,13 +791,15 @@ cd /c/Users/x/dev/varn/varn-lang && cargo build --release 2>&1 | grep -E "^(erro
 
 Esperado: sin salida.
 
-- [ ] **Step 6: Verificar identidad de bytecode — el criterio de esta tarea**
+- [ ] **Step 6: Verificar el corpus de registros — el criterio de esta tarea**
 
 ```bash
 "$SCRATCH/bytecode_identity.sh"
 ```
 
-Esperado: `OK bytecode identico`. **Cualquier diff tumba la tarea**: significa que la extracción cambió el análisis. Comparar el orden de iteración y los tipos (`FxHashSet` no tiene orden estable, pero el resultado del dataflow sí es determinista; si aparece un diff, sospechar de un cambio accidental en la recolección de `succ` o en el orden de `order.sort_by_key`).
+Esperado: `OK corpus de registros identico`, exit 0. **Cualquier diff tumba la tarea**: significa que la extracción cambió el análisis. Si aparece, sospechar de un cambio accidental en la recolección de `succ`, en el orden de inserción de `defs`/`uses`, o en la propagación de `end` desde `live_out`.
+
+El corpus está canonicalizado por registro, así que **no** salta ante la permutación `r6`↔`r7` que el árbol ya produce de por sí. Lo que sí detecta: un cambio en la secuencia de opcodes, un `Move` de más o de menos, o un cambio en el número de registros que necesita una función — que es exactamente lo que rompería una liveness mal extraída.
 
 - [ ] **Step 7: Verificar comportamiento**
 
@@ -842,7 +839,7 @@ git commit -m "refactor(compiler): extraer liveness SSA a modulo propio
 assign_registers mezclaba analizar y asignar en una funcion de ~200
 lineas. El dataflow pasa a ssa/liveness.rs con dos consumidores: la
 asignacion de registros y el pase de maquinas de estados del plan
-siguiente. Bytecode identico byte a byte.
+siguiente. Asignacion de registros sin cambios en el corpus.
 
 end es un intervalo lineal, no liveness exacta por punto: sobre-
 aproximacion conservadora, correcta para ambos consumidores, con coste
