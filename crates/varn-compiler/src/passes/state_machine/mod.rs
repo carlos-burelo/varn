@@ -42,6 +42,12 @@ pub fn run(func: &mut SsaFunc) -> u16 {
         // actual (`run_lazy_task_sync`), que aún está vivo.
         return 0;
     }
-    // Caso trivial: la Task 4 lo trata.
-    0
+    // Una `async` que no suspende sigue siendo una máquina de estados: de un
+    // solo estado. No hay CFG que partir ni valores que guardar, así que el
+    // objeto de estado es sólo el discriminante.
+    //
+    // El caso importa por sí mismo: es donde el camino de coste cero se ve
+    // más claro (el estado nunca sale de los registros del marco), y es la
+    // forma que ejercita toda la fontanería sin tocar la parte arriesgada.
+    1
 }

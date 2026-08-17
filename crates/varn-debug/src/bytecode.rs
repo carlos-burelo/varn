@@ -95,6 +95,7 @@ fn lo(w: u16) -> usize {
 fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
     let indent = "  ".repeat(depth);
     let name = proto.name.as_deref().unwrap_or("<anonymous>");
+    let state_size_flag = (proto.state_size != 0).then(|| format!("state_size={}", proto.state_size));
     let flags: Vec<&str> = [
         proto.is_async.then_some("async"),
         proto.is_generator.then_some("gen"),
@@ -103,6 +104,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
     ]
     .into_iter()
     .flatten()
+    .chain(state_size_flag.as_deref())
     .collect();
     let flags_str = if flags.is_empty() {
         String::new()
