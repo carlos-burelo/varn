@@ -125,10 +125,17 @@ pub fn compile(
     }
 
     if debug.bytecode {
-        for (path, module_proto) in graph_build.modules.iter() {
+        // `graph_build.modules` es un `std::collections::HashMap`: su orden de
+        // iteración se siembra al azar en cada arranque de proceso, así que sin
+        // ordenar aquí el volcado sale con los módulos barajados de una corrida
+        // a otra. El bytecode en sí no cambia — sólo su presentación —, pero eso
+        // basta para que `diff` sobre dos volcados sea inservible como oráculo.
+        let mut paths: Vec<&String> = graph_build.modules.keys().collect();
+        paths.sort_unstable();
+        for path in paths {
             if path != &graph_build.entry_path {
                 eprintln!("\n=== MODULE BYTECODE: {} ===", path);
-                varn_debug::bytecode::debug_bytecode(module_proto, debug);
+                varn_debug::bytecode::debug_bytecode(&graph_build.modules[path], debug);
             }
         }
     }
