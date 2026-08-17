@@ -79,6 +79,26 @@ pub struct FunctionProto {
     /// compilación**: lo lee en runtime. Eso es lo que mete al despacho
     /// dinámico (métodos de interfaz, callbacks, `dynamic`) en el camino de
     /// coste cero. Ver spec §3.8.
+    ///
+    /// **Dimensiona el objeto de estado; no decide si la función suspende.**
+    /// `state_size == 1` no distingue dos casos reales: una `async` trivial
+    /// que nunca suspende, y una `async` que sí suspende pero cuyo conjunto
+    /// vivo a través de la suspensión está vacío (34 de los 127 puntos de
+    /// suspensión del spec §3.8 son así — no es un caso raro). Un camino de
+    /// coste cero construido leyendo sólo `state_size == 1` miscompilaría el
+    /// segundo grupo entero. Si hace falta saber si la función suspende de
+    /// verdad, la fuente es `varn_compiler::ssa::suspend::analyze`, no este
+    /// campo.
+    ///
+    /// `#[serde(default)]` es para artefactos escritos por una build previa
+    /// a la existencia de este campo — no protege la compatibilidad general
+    /// del formato: `.vnc`/`.vnb`/`.vnm` serializan con `postcard`, que es
+    /// posicional y no autodescriptivo, así que insertar un campo en medio
+    /// del struct sin cambiar nada más desplazaría los campos siguientes en
+    /// vez de aplicar el default. Lo que de verdad invalida las cachés
+    /// viejas es `BUILD_FINGERPRINT` (`varn-modules/build.rs`), que cubre
+    /// las fuentes de `varn-types` y `varn-compiler` y por tanto cambia con
+    /// cualquier cambio de forma de `FunctionProto`.
     #[serde(default)]
     pub state_size: u16,
 
