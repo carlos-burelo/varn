@@ -18,24 +18,32 @@
 //! | `>= FIRST_RESUME` | `Pending`; el número es el punto de reanudación |
 //!
 //! El llamante lee `state[0]` tras la llamada — algo que ya iba a hacer.
+//!
+//! Esta convención cubre sólo uno de los dos productores de `Poll` que
+//! define el spec §3.8: el **estado de corrutina** — las funciones que este
+//! pase transforma. El otro productor es el **futuro hoja del host**
+//! (`varn_types::AsyncTask`), y ése NO tiene `state[0]`: no es una función
+//! del VM con objeto de estado propio, así que el scheduler necesita un
+//! `poll` nativo aparte para él (el spec ya lo anticipa). `state[0]` no es
+//! "la" representación de `Poll`, es la de uno de los dos productores.
+//!
+//! Las constantes (`STATE_DONE`, `STATE_YIELDED`, `FIRST_RESUME`) viven en
+//! `varn_types` (`chunk::proto`), no aquí: son un contrato de RUNTIME que el
+//! sitio de llamada y el scheduler leen, y ninguno de los dos depende de
+//! `varn-compiler` para poder importarlas desde este módulo.
 
 use crate::ssa::ir::SsaFunc;
 use crate::ssa::suspend;
-
-/// `state[0]` cuando la máquina terminó.
-pub const STATE_DONE: u32 = 0;
-/// `state[0]` cuando la máquina emitió un valor y sigue viva.
-pub const STATE_YIELDED: u32 = 1;
-/// Primer discriminante que denota un punto de reanudación.
-pub const FIRST_RESUME: u32 = 2;
 
 /// Transforma `func` si es suspendible. Devuelve el tamaño del objeto de
 /// estado en palabras, o `0` si no la transformó.
 pub fn run(func: &mut SsaFunc) -> u16 {
     // `func.is_async` es SIEMPRE false para el top-level de módulo (ver
     // SsaFunc::is_async): este gate nunca alcanza `suspend::analyze` para
-    // `<module>` aunque haya `await` de nivel superior. El plan siguiente
-    // necesita otra señal para el top-level, no ampliar esta condición sin
+    // `<module>` aunque haya `await` de nivel superior. La señal que sí
+    // sirve para el top-level ya existe y ya está nombrada en el doc de
+    // `SsaFunc::is_async` (ssa/ir.rs): `suspend::analyze(func)` no vacío. El
+    // plan siguiente debe usar esa señal ahí, no ampliar esta condición sin
     // más.
     //
     // `is_generator` queda excluido aquí a propósito, junto con `is_async`:
