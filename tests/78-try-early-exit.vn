@@ -21,10 +21,7 @@ function conBreak(): void {
         try {
             if (i == 1) { break; }
         } catch (e) {
-            // Inalcanzable: nada lanza aquí dentro. El cuerpo no puede quedar
-            // vacío — un `catch {}` vacío junto a `break`/`return` dispara otro
-            // fallo distinto, un pánico del verificador de SSA
-            // ("pred bN has no edge to bM"), que se rastrea aparte.
+            // Inalcanzable: nada lanza aquí dentro.
             testigo = testigo + 1;
         }
     }
@@ -105,3 +102,67 @@ function lanzaYCapturaTrasBreak(): bool {
 }
 
 assert("tras salir por break, try/catch posterior sigue funcionando", lanzaYCapturaTrasBreak())
+
+// Bug hermano de éste, separado: una salida temprana (`break`/`return`, NO
+// `continue`) desde dentro de un `try` con un `catch { }` de cuerpo VACÍO,
+// dentro de un bucle, hacía panicar al compilador ("ssa: verify failed ...:
+// pred bN has no edge to bM"), no a la VM. `jump_forwarding` (pase de
+// simplificación del CFG) trataba el bloque `catch` vacío como un eslabón de
+// reenvío puro (`catch: jump siguiente`) y, al reenviarlo, vaciaba su lista
+// de preds sin saber que uno de ellos era la arista de excepción del `Try`
+// que lo señala como handler — arista que no vive en ningún terminador y
+// que el pase no sabe reescribir. El bloque quedaba con bookkeeping de preds
+// mentiroso; `merge_blocks` confiaba en él para fusionar de más, y el
+// verificador de SSA lo cazaba más adelante. Arreglado en el propio pase:
+// ver comentario de `jump_forwarding` en crates/varn-compiler/src/passes/cfg.rs.
+
+function vacioConBreak(): int {
+    let pasos = 0;
+    for (let i = 0; i < 3; i = i + 1) {
+        try {
+            pasos = pasos + 1;
+            if (i == 1) { break; }
+        } catch (e) { }
+    }
+    return pasos;
+}
+
+assert("catch vacio + break dentro de bucle no revienta el verificador", vacioConBreak() === 2)
+
+function vacioConReturn(): int {
+    let pasos = 0;
+    for (let i = 0; i < 3; i = i + 1) {
+        try {
+            pasos = pasos + 1;
+            if (i == 1) { return pasos; }
+        } catch (e) { }
+    }
+    return -1;
+}
+
+assert("catch vacio + return dentro de bucle no revienta el verificador", vacioConReturn() === 2)
+
+function vacioConContinue(): int {
+    let pasos = 0;
+    for (let i = 0; i < 3; i = i + 1) {
+        try {
+            if (i == 1) { continue; }
+            pasos = pasos + 1;
+        } catch (e) { }
+    }
+    return pasos;
+}
+
+assert("catch vacio + continue dentro de bucle no revienta el verificador", vacioConContinue() === 2)
+
+// Control: fuera de bucle ya funcionaba (nunca dependió de `jump_forwarding`
+// vaciando preds de un bloque destino de bucle). Si este fallara, el fallo
+// estaría en otra parte del manejo de `catch` vacío, no en el CFG de bucles.
+function retornaFueraDeBucle(): int {
+    try {
+        return 42;
+    } catch (e) { }
+    return -1;
+}
+
+assert("control: catch vacio + return fuera de bucle (ya funcionaba)", retornaFueraDeBucle() === 42)

@@ -83,6 +83,19 @@ fn fold_redundant_branches(func: &mut SsaFunc) -> bool {
     changed
 }
 
+/// Colapsa cadenas `a -> b -> c` cuando `b` es un bloque vacío que solo
+/// salta a `c`: redirige a `a` directo a `c` y quita `b` de en medio.
+///
+/// `b.preds` puede traer aristas que esta función no sabe reescribir: la
+/// arista de excepción de un `Try { handler: b }` en algún bloque no
+/// terminador vive en `preds` (así se construyó el IR) pero no en ningún
+/// `Terminator::Jump`/`Branch` que apunte a `b`, así que el bucle de abajo
+/// nunca la encuentra para redirigirla. Si esa arista existe, `b` sigue
+/// siendo un destino real (el handler) y su propio `jump c` (que no se
+/// toca) sigue siendo una arista real hacia `c`. Por eso solo se quita de
+/// `b.preds` — y de `c.preds`, y solo cuando `b` se queda sin ningún pred
+/// real — lo que el bucle efectivamente demostró haber redirigido; nunca se
+/// asume que enumerar los preds fue lo mismo que redirigirlos todos.
 fn jump_forwarding(func: &mut SsaFunc) -> bool {
     let mut changed = false;
     let n = func.blocks.len();
@@ -145,17 +158,29 @@ fn jump_forwarding(func: &mut SsaFunc) -> bool {
                         }
                     }
 
-                    for (a_id, new_term) in updates {
-                        func.blocks[a_id.0 as usize].term = new_term;
-                        func.blocks[c_id.0 as usize].preds.push(a_id);
+                    for (a_id, new_term) in &updates {
+                        func.blocks[a_id.0 as usize].term = new_term.clone();
+                        func.blocks[c_id.0 as usize].preds.push(*a_id);
                         changed = true;
                     }
 
-                    func.blocks[b_id.0 as usize].preds.clear();
+                    // Solo se quitan de b_id.preds los preds que el bucle de
+                    // arriba probó que redirigió (los que tenían una arista de
+                    // terminador hacia b_id). Cualquier otro se queda: sigue
+                    // siendo un pred real que este pase no sabe reescribir.
+                    func.blocks[b_id.0 as usize]
+                        .preds
+                        .retain(|p| !updates.iter().any(|(a_id, _)| a_id == p));
 
-                    let c_preds = &mut func.blocks[c_id.0 as usize].preds;
-                    if let Some(pos) = c_preds.iter().position(|p| *p == b_id) {
-                        c_preds.remove(pos);
+                    // b_id deja de ser un pred real de c_id únicamente cuando
+                    // ya no le queda ninguna arista entrante propia: si le
+                    // queda una (la de excepción, por ejemplo), su `jump c_id`
+                    // original sigue siendo una arista real hacia c_id.
+                    if func.blocks[b_id.0 as usize].preds.is_empty() {
+                        let c_preds = &mut func.blocks[c_id.0 as usize].preds;
+                        if let Some(pos) = c_preds.iter().position(|p| *p == b_id) {
+                            c_preds.remove(pos);
+                        }
                     }
                 }
             }
@@ -210,6 +235,16 @@ fn merge_blocks(func: &mut SsaFunc) -> bool {
                             }
                         }
                     }
+
+                    // b_id queda completamente absorbido en a_id: el único
+                    // pred que tenía (a_id, comprobado arriba) ya no lo
+                    // referencia — su term acaba de reemplazarse por el de
+                    // b_id. No dejar aquí un pred obsoleto: no es la causa de
+                    // ningún bug conocido hoy, pero es la clase de dato
+                    // colgante que convierte una corrupción de otro pase en
+                    // un pánico de verify() en vez de en un bloque muerto
+                    // que compact_cfg simplemente descarta.
+                    func.blocks[b_id.0 as usize].preds.clear();
 
                     func.blocks[a_id.0 as usize].term = b_term;
                     changed = true;
