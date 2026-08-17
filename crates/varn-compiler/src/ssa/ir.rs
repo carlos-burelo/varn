@@ -32,15 +32,19 @@ pub struct SsaFunc {
     pub pinned_vars: rustc_hash::FxHashSet<VarId>,
     pub nlocals: u32,
 
-    // Forma de la función, propagada desde HIR (`is_async` e `is_generator`
-    // debajo). El pase de máquinas de estados las necesita para decidir qué
-    // variantes de `Poll` puede emitir el cuerpo: `async` produce
-    // Pending/Ready, `function*` produce Yielded/Ready, y `async function*`
-    // las tres.
-    /// Si la función es `async`. Ver nota sobre esta y `is_generator` arriba.
+    // Forma DECLARADA de la función, propagada desde HIR (`is_async` e
+    // `is_generator` debajo) — no dice si el cuerpo suspende de verdad. El
+    // top-level de un módulo (`<module>`) es SIEMPRE `is_async: false` aunque
+    // contenga `await` de nivel superior: HIR no le da forma `async` al
+    // top-level, así que este campo no lo refleja. Un consumidor que use
+    // `is_async`/`is_generator` como puerta para decidir si un cuerpo puede
+    // suspender se saltaría ese caso. La fuente de verdad sobre suspensión
+    // real, con los puntos concretos, es `crate::ssa::suspend::analyze`.
+    /// Si la función se DECLARÓ `async`. No implica que el cuerpo suspenda
+    /// (ver nota arriba) ni lo contrario. Ver también `is_generator`.
     pub is_async: bool,
-    /// Si la función es `function*` (generadora). Ver nota sobre esta y
-    /// `is_async` arriba.
+    /// Si la función se DECLARÓ `function*` (generadora). Misma salvedad que
+    /// `is_async` arriba: forma declarada, no comportamiento real del cuerpo.
     pub is_generator: bool,
 }
 
