@@ -83,6 +83,7 @@ pub fn lower_to_ssa(
     match ssa::build::build_function(&module.top_level, &module.functions, source_file.clone()) {
         Ok(mut f) => {
             crate::passes::optimize_with(&mut f, &hir::ctor_summary::current());
+            crate::passes::state_machine::run(&mut f);
             funcs.push(f);
         }
         Err(OptError::Unsupported(msg)) => {
@@ -94,6 +95,7 @@ pub fn lower_to_ssa(
         match ssa::build::build_function(f, &[], source_file.clone()) {
             Ok(mut sf) => {
                 crate::passes::optimize_with(&mut sf, &hir::ctor_summary::current());
+                crate::passes::state_machine::run(&mut sf);
                 funcs.push(sf);
             }
             Err(OptError::Unsupported(msg)) => {
