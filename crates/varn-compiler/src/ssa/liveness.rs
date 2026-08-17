@@ -5,15 +5,15 @@
 //!
 //! ## Numeración de puntos
 //!
-//! Los índices de `def`/`end`/`term_idx` numeran puntos en el orden del
-//! vector `ssa.blocks` — NO en orden de emisión: `emit/mod.rs` recorre los
-//! bloques con `emission_order`, un RPO consciente de bucles que puede
-//! reordenar bloques respecto a `ssa.blocks`. Un consumidor que asuma orden
-//! de emisión leería mal los índices.
+//! Los índices de `def`/`end` numeran puntos en el orden del vector
+//! `ssa.blocks` — NO en orden de emisión: `emit/mod.rs` recorre los bloques
+//! con `emission_order`, un RPO consciente de bucles que puede reordenar
+//! bloques respecto a `ssa.blocks`. Un consumidor que asuma orden de emisión
+//! leería mal los índices.
 //!
-//! Dentro de un bloque `b` cuyos params ocupan el punto `P`: la instrucción
-//! `i` ocupa el punto `P + 1 + i`, y el terminador ocupa
-//! `term_idx[b] = P + 1 + n` (`n` = número de instrucciones del bloque).
+//! Dentro de un bloque cuyos params ocupan el punto `P`: la instrucción `i`
+//! ocupa el punto `P + 1 + i`, y el terminador ocupa el punto `P + 1 + n`
+//! (`n` = número de instrucciones del bloque).
 //!
 //! ## `end` es un intervalo lineal
 //!
@@ -48,11 +48,6 @@ pub struct Liveness {
     pub live_in: Vec<FxHashSet<u32>>,
     /// Bloque -> conjunto de valores vivos a la salida del bloque.
     pub live_out: Vec<FxHashSet<u32>>,
-    /// Bloque -> punto de su terminador.
-    pub term_idx: Vec<u32>,
-    /// Bloque -> punto de sus params (el `P` de la fórmula en el doc del
-    /// módulo). Ver `inst_point`.
-    pub block_start: Vec<u32>,
 }
 
 impl Liveness {
@@ -62,13 +57,11 @@ impl Liveness {
         let mut def = vec![u32::MAX; nvals];
         let mut last = vec![0u32; nvals];
         let mut term_idx = vec![0u32; nblocks];
-        let mut block_start = vec![0u32; nblocks];
         let mut defs: Vec<FxHashSet<u32>> = vec![FxHashSet::default(); nblocks];
         let mut uses: Vec<FxHashSet<u32>> = vec![FxHashSet::default(); nblocks];
         let mut succ: Vec<Vec<usize>> = vec![Vec::new(); nblocks];
         let mut idx = 0u32;
         for (b, block) in ssa.blocks.iter().enumerate() {
-            block_start[b] = idx;
             let mut local_defined: FxHashSet<u32> = FxHashSet::default();
             for p in &block.params {
                 if def[p.0 as usize] == u32::MAX {
@@ -173,14 +166,7 @@ impl Liveness {
             end,
             live_in,
             live_out,
-            term_idx,
-            block_start,
         }
-    }
-
-    /// Punto de la instrucción `i` del bloque `b`.
-    pub fn inst_point(&self, b: usize, i: usize) -> u32 {
-        self.block_start[b] + 1 + i as u32
     }
 
     /// Valores vivos DESPUÉS de ejecutar la instrucción `i` del bloque `b`.
