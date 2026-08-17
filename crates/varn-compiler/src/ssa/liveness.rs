@@ -3,11 +3,36 @@
 //! Dos consumidores: la asignación de registros (`emit::regs`) y el pase de
 //! máquinas de estados. Tenerlo dos veces es como se separan.
 //!
-//! `end` es un intervalo LINEAL, no liveness exacta por punto: para un valor
-//! definido dentro de un bucle y usado en la cabecera, el intervalo abarca
-//! todo el bucle. Es una sobre-aproximación conservadora — nunca declara
-//! muerto algo vivo — así que es correcta para asignar registros y correcta
-//! para elegir campos de estado, a costa de guardar de más en bucles.
+//! ## Numeración de puntos
+//!
+//! Los índices de `def`/`end`/`term_idx` numeran puntos en el orden del
+//! vector `ssa.blocks` — NO en orden de emisión: `emit/mod.rs` recorre los
+//! bloques con `emission_order`, un RPO consciente de bucles que puede
+//! reordenar bloques respecto a `ssa.blocks`. Un consumidor que asuma orden
+//! de emisión leería mal los índices.
+//!
+//! Dentro de un bloque `b` cuyos params ocupan el punto `P`: la instrucción
+//! `i` ocupa el punto `P + 1 + i`, y el terminador ocupa
+//! `term_idx[b] = P + 1 + n` (`n` = número de instrucciones del bloque).
+//!
+//! ## `end` es un intervalo lineal
+//!
+//! `end` es un intervalo LINEAL, no liveness exacta por punto: un valor
+//! definido *fuera* de un bucle y usado *dentro* de él fuerza que la
+//! propagación `live_out -> term_idx` extienda su `end` hasta el terminador
+//! del bloque de retorno (el latch), así que el intervalo abarca todo el
+//! bucle aunque el valor no se use en absoluto entre la cabecera y ese
+//! punto. Es una sobre-aproximación conservadora para intervalos bien
+//! formados — nunca declara muerto algo vivo — así que es correcta para
+//! asignar registros y correcta para elegir campos de estado, a costa de
+//! guardar de más en bucles.
+//!
+//! Excepción: el clamp final de `analyze` (`end[v] = def[v]` cuando
+//! `end[v] < def[v]`) colapsa el intervalo a un punto. Si ese `end` bajo
+//! viene de un uso real numerado antes de la definición, ese punto vivo
+//! queda fuera del intervalo resultante — posible porque `ssa/verify.rs`
+//! sólo exige dominancia, no que `ssa.blocks` esté en orden topológico, así
+//! que no está garantizado que no ocurra.
 
 use super::ir::{InstKind, SsaFunc, Terminator, Value};
 use rustc_hash::FxHashSet;
@@ -143,7 +168,26 @@ impl Liveness {
     /// Valores vivos cruzando el punto `idx`: definidos antes y todavía vivos
     /// después. Es la consulta que necesita el pase de máquinas de estados
     /// para decidir qué guarda el objeto de estado.
+    ///
+    /// Precondición: `idx` debe ser el punto de una INSTRUCCIÓN, nunca el de
+    /// un terminador (ningún `term_idx[b]`). En un terminador el predicado
+    /// `end[v] > idx` subaproxima: excluye los valores para los que
+    /// `end[v] == term_idx[b]` exactamente, que es justo el caso de un valor
+    /// vivo únicamente porque cruza por la arista de retorno de un bucle
+    /// (`v` en `live_out[b]` con `end[v] == term_idx[b]`) — vivo de verdad
+    /// cruzando ese punto, pero el predicado lo declararía muerto. En
+    /// puntos de instrucción el predicado es correcto en los cuatro bordes;
+    /// los consumidores reales (`InstKind::Await`/`InstKind::Yield`) sólo
+    /// consultan ahí. Omitir un valor vivo del objeto de estado del pase de
+    /// máquinas de estados sería un miscompile silencioso, así que este
+    /// método rechaza la precondición en debug en vez de devolver un
+    /// resultado sub-aproximado en silencio.
     pub fn live_across(&self, idx: u32) -> Vec<u32> {
+        debug_assert!(
+            !self.term_idx.contains(&idx),
+            "live_across: idx {idx} es punto de un terminador; el predicado \
+             end[v] > idx subaproxima ahi (ver doc del metodo)"
+        );
         (0..self.def.len() as u32)
             .filter(|&v| {
                 let d = self.def[v as usize];
