@@ -415,6 +415,59 @@ entra **una vez por suspensión**: un bucle que hace `await` genera muchas
 entradas y cruza el umbral de forma natural. El modelo de tiering existente
 encaja mejor con el diseño nuevo que con el actual.
 
+### 3.9 Verificación de la mecánica contra el bytecode
+
+§3.8 fijó las decisiones razonando sobre las estructuras de Rust. Esta sección
+las contrasta contra el bytecode y el IR reales, antes de escribir el pase.
+**Conclusión: no hace falta ningún opcode nuevo.**
+
+#### Acceso a los slots del estado
+
+`GetFixedField { object, slot: u16 }` y
+`SetFixedField { object, value, slot: u16 }` existen como `InstKind` y como
+opcode, y toman el slot como **constante**. Es acceso indexado sin lookup de
+shape: exactamente lo que §3.8 pedía cuando dijo que el pase emite acceso por
+índice fijo y la `shape` queda como metadato.
+
+`BuildObjectWithShape` construye el objeto. La decisión 1 —reusar `ObjData` en
+vez de añadir `HeapObj::Coro`— queda validada contra el bytecode, no sólo
+contra la estructura.
+
+#### Partir un bloque
+
+`Block { params: Vec<Value>, insts, term, preds }`: SSA con **argumentos de
+bloque**, no con phis. Partir en la instrucción `i` es:
+
+1. crear un bloque nuevo con los `insts[i+1..]` del original;
+2. poner al original `Terminator::Jump { target: nuevo, args }`;
+3. arreglar `preds` del nuevo y de los sucesores del original.
+
+Los pases ya mutan `func.blocks` directamente —`passes/cfg.rs` hace
+`func.blocks = new_blocks`—, así que no hace falta API nueva.
+
+#### Crear valores SSA desde un pase
+
+`ValueDef { ty: HirType }`, y `values.push(...)` sólo aparece hoy en
+`build/mod.rs:78`. Un pase que cree valores necesita su propio helper; es
+trivial, pero conviene saber que no existe.
+
+#### Lo que sigue sin resolverse
+
+- El literal que hoy devuelve `state_machine::run` es un **tamaño en
+  palabras** y coincide numéricamente con `STATE_YIELDED = 1`, que es un
+  **discriminante**. Namespaces distintos, cero contacto en código hoy. Debe
+  ganar nombre propio antes de que el emisor escriba `state[0]`.
+- La firma de `run` devolviendo `u16` no basta al partir el CFG: hará falta
+  devolver también el layout (valor SSA → slot).
+- El gate necesita invertir el orden para el top-level (analizar primero,
+  decidir después), lo que choca con el pre-filtro O(n) que evitaría correr
+  liveness completa en el 48% de funciones `async` triviales. Los dos se
+  resuelven juntos o ninguno.
+- `await using` no está modelado como suspensión:
+  `InstKind::Dispose { is_await: true }` baja a un `CallMethod disposeAsync`
+  seco. Cuando el modelo nuevo lo haga esperar de verdad, `suspend::analyze`
+  tendrá que contarlo o el estado se pierde.
+
 ---
 
 ## 4. Flujo de datos: un `await` de principio a fin
