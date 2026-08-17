@@ -13,7 +13,7 @@ pub mod task;
 pub mod value;
 pub mod vm_value;
 pub use chunk::{Chunk, FunctionProto, Literal, PoolEntry};
-pub use generator::{AsyncQueue, GenChannel, GeneratorDriver, GeneratorObj};
+pub use generator::{AsyncQueue, GeneratorDriver, GeneratorObj};
 pub use marshal::{FromVm, IntoVm, VnArray, VnStr};
 pub use module_graph::{ModuleGraphArtifact, PackageNode};
 pub use native::{

@@ -2,7 +2,6 @@ use crate::task::AsyncTask;
 use crate::value::Value;
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 pub trait GeneratorDriver: std::fmt::Debug {
     fn next(&self, input: Value) -> Result<Value, String>;
@@ -15,33 +14,6 @@ pub trait GeneratorDriver: std::fmt::Debug {
     /// `trace_vm_values` reports that can hold a nursery index.
     fn trace_vm_values_mut(&self, _callback: &mut dyn FnMut(&mut crate::VmValue)) {}
     fn trace_closures(&self, _callback: &mut dyn FnMut(usize)) {}
-}
-
-#[derive(Debug)]
-pub struct GenChannel {
-    pub output: RefCell<Option<AsyncTask>>,
-    pub done: AtomicBool,
-    pub started: AtomicBool,
-    pub cancel_signal: AsyncTask,
-    pub resume_value: RefCell<Option<Result<Value, Value>>>,
-    pub wake_signal: RefCell<Option<AsyncTask>>,
-}
-
-impl GenChannel {
-    pub fn new() -> Rc<Self> {
-        Rc::new(GenChannel {
-            output: RefCell::new(None),
-            done: AtomicBool::new(false),
-            started: AtomicBool::new(false),
-            cancel_signal: AsyncTask::pending(),
-            resume_value: RefCell::new(None),
-            wake_signal: RefCell::new(None),
-        })
-    }
-
-    pub fn is_done(&self) -> bool {
-        self.done.load(Ordering::SeqCst)
-    }
 }
 
 #[derive(Clone, Debug)]

@@ -16,7 +16,6 @@ use varn_types::{FunctionProto, NativeCtx};
 use crate::linker::Linker;
 
 use super::VmSuspend;
-use varn_types::generator::GenChannel;
 
 // The JIT helper entry points are named through `ctx::` by `jit::helpers` and
 // by the `jit_helper_abi!` list, which knows only bare fn names. A glob rather
@@ -40,7 +39,6 @@ pub struct ExecCtx {
     pub pending_constructors: Vec<(usize, VmValue)>,
     pub pending_setters: Vec<(usize, VmValue)>,
     pub vm_suspend: Option<VmSuspend>,
-    pub gen_channel: Option<Rc<GenChannel>>,
     pub deferred_tasks: FxHashMap<usize, Rc<LazyTask>>,
     pub module_exports: FxHashMap<usize, VmValue>,
     pub opcode_counts: Option<Rc<Vec<std::sync::atomic::AtomicU64>>>,
@@ -133,7 +131,6 @@ impl ExecCtx {
             pending_constructors: Vec::new(),
             pending_setters: Vec::new(),
             vm_suspend: None,
-            gen_channel: None,
             deferred_tasks: FxHashMap::default(),
             module_exports: FxHashMap::default(),
             opcode_counts: None,
@@ -301,7 +298,6 @@ impl ExecCtx {
             pending_constructors: Vec::new(),
             pending_setters: Vec::new(),
             vm_suspend: None,
-            gen_channel: None,
             deferred_tasks: FxHashMap::default(),
             module_exports: FxHashMap::default(),
             opcode_counts: None,
