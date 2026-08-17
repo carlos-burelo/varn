@@ -800,12 +800,26 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         }
     }
 
-    let all_regs: Vec<u16> = scan
+    let mut all_regs: Vec<u16> = scan
         .defs
         .keys()
         .filter(|&&r| r >= base)
         .map(|&r| r as u16)
         .collect();
+    // `scan.defs` es un `std::collections::HashMap`, así que usa `RandomState`:
+    // su orden de iteración se siembra al azar en CADA arranque de proceso.
+    //
+    // Ese orden no se queda aquí. Llega intacto a `ranges` (el analizador
+    // recorre `vregs_used` en orden y empuja los `LiveRange` en ese mismo
+    // orden), y `color_with_base` ordena con `sort_by`, que es ESTABLE y sólo
+    // desempata por `start`. Dos vregs definidos en el mismo punto empatan, el
+    // empate conserva el orden de entrada, y quien va primero se lleva el color
+    // más bajo.
+    //
+    // Resultado sin este `sort`: dos compilaciones del mismo binario sobre la
+    // misma fuente producen bytecode con los registros físicos permutados
+    // (mismos opcodes, mismo recuento). Ordenar hace la asignación reproducible.
+    all_regs.sort_unstable();
 
     if all_regs.is_empty() {
         return;
