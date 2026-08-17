@@ -97,7 +97,7 @@ impl Builder {
                     Some(e) => Some(self.lower_expr(e)?),
                     None => None,
                 };
-                self.emit_exiting_finallys(0)?;
+                self.emit_region_exits(0)?;
                 if self.is_open() {
                     self.set_term(Terminator::Return(v));
                 }
@@ -132,7 +132,7 @@ impl Builder {
                     .last()
                     .ok_or(OptError::Unsupported("ssa: break outside loop"))?
                     .clone();
-                self.emit_exiting_finallys(loop_ctx.finally_depth)?;
+                self.emit_region_exits(loop_ctx.try_region_depth)?;
                 if self.is_open() {
                     let from = self.current;
                     self.set_term(Terminator::Jump {
@@ -149,7 +149,7 @@ impl Builder {
                     .last()
                     .ok_or(OptError::Unsupported("ssa: continue outside loop"))?
                     .clone();
-                self.emit_exiting_finallys(loop_ctx.finally_depth)?;
+                self.emit_region_exits(loop_ctx.try_region_depth)?;
                 if self.is_open() {
                     let from = self.current;
                     self.set_term(Terminator::Jump {

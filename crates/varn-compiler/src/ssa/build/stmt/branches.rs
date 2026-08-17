@@ -170,7 +170,7 @@ impl Builder {
         self.loops.push(LoopCtx {
             continue_target: cont,
             break_target: exit,
-            finally_depth: self.finally_stack.len(),
+            try_region_depth: self.open_try_regions.len(),
         });
         for (i, case) in cases.iter().enumerate() {
             self.seal_block(bodies[i]);

@@ -40,7 +40,7 @@ impl Builder {
         self.loops.push(LoopCtx {
             continue_target: header,
             break_target: exit_b,
-            finally_depth: self.finally_stack.len(),
+            try_region_depth: self.open_try_regions.len(),
         });
         self.current = body_b;
         self.lower_block(body)?;
@@ -93,7 +93,7 @@ impl Builder {
         self.loops.push(LoopCtx {
             continue_target: update_b,
             break_target: exit_b,
-            finally_depth: self.finally_stack.len(),
+            try_region_depth: self.open_try_regions.len(),
         });
         self.current = body_b;
         self.lower_block(body)?;
@@ -198,7 +198,7 @@ impl Builder {
         self.loops.push(LoopCtx {
             continue_target: header,
             break_target: exit_b,
-            finally_depth: self.finally_stack.len(),
+            try_region_depth: self.open_try_regions.len(),
         });
         self.current = body_b;
         let value = self.emit(
@@ -281,7 +281,7 @@ impl Builder {
         self.loops.push(LoopCtx {
             continue_target: update_b,
             break_target: exit_b,
-            finally_depth: self.finally_stack.len(),
+            try_region_depth: self.open_try_regions.len(),
         });
         self.current = body_b;
         let idx_b = self.read_var(idx_var, body_b)?;
@@ -352,7 +352,7 @@ impl Builder {
         self.loops.push(LoopCtx {
             continue_target: latch,
             break_target: exit_b,
-            finally_depth: self.finally_stack.len(),
+            try_region_depth: self.open_try_regions.len(),
         });
         self.current = body_b;
         self.lower_block(body)?;

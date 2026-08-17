@@ -15,7 +15,7 @@ type Result<T> = std::result::Result<T, OptError>;
 struct LoopCtx {
     continue_target: BlockId,
     break_target: BlockId,
-    finally_depth: usize,
+    try_region_depth: usize,
 }
 
 struct Builder {
@@ -35,7 +35,7 @@ struct Builder {
 
     current: BlockId,
     pinned_vars: FxHashSet<VarId>,
-    finally_stack: Vec<Vec<HirStmt>>,
+    open_try_regions: Vec<Vec<HirStmt>>,
     source_file: Option<Rc<str>>,
 }
 
@@ -52,7 +52,7 @@ impl Builder {
             next_synthetic: 0,
             current: BlockId(0),
             pinned_vars,
-            finally_stack: Vec::new(),
+            open_try_regions: Vec::new(),
             source_file,
         };
         let entry = b.new_block();

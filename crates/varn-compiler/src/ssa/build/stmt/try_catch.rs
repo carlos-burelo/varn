@@ -32,9 +32,9 @@ impl Builder {
 
         let try_val = self.emit(InstKind::Try { handler: catch_b }, HirType::Dynamic);
 
-        self.finally_stack.push(Vec::new());
+        self.open_try_regions.push(Vec::new());
         self.lower_block(block)?;
-        self.finally_stack.pop();
+        self.open_try_regions.pop();
 
         if self.is_open() {
             self.emit_effect(InstKind::PopTry);
@@ -76,7 +76,7 @@ impl Builder {
         block: &[HirStmt],
         fin: &[HirStmt],
     ) -> Result<()> {
-        self.finally_stack.push(fin.to_vec());
+        self.open_try_regions.push(fin.to_vec());
         let try_entry = self.current;
         let handler_b = self.new_block();
         let exit_b = self.new_block();
@@ -85,7 +85,7 @@ impl Builder {
 
         self.lower_block(block)?;
 
-        self.finally_stack.pop();
+        self.open_try_regions.pop();
 
         if self.is_open() {
             self.emit_effect(InstKind::PopTry);
@@ -117,7 +117,7 @@ impl Builder {
         cc: &HirCatch,
         fin: &[HirStmt],
     ) -> Result<()> {
-        self.finally_stack.push(fin.to_vec());
+        self.open_try_regions.push(fin.to_vec());
         let try_entry = self.current;
         let handler_b = self.new_block();
         let exit_b = self.new_block();
@@ -126,7 +126,7 @@ impl Builder {
 
         self.lower_block(block)?;
 
-        self.finally_stack.pop();
+        self.open_try_regions.pop();
 
         if self.is_open() {
             self.emit_effect(InstKind::PopTry);
@@ -145,7 +145,7 @@ impl Builder {
         self.current = handler_b;
         let caught_err = self.emit(InstKind::CatchParam { try_val }, HirType::Dynamic);
 
-        self.finally_stack.push(fin.to_vec());
+        self.open_try_regions.push(fin.to_vec());
         let catch_entry = self.current;
         let handler2_b = self.new_block();
         let try_val2 = self.emit(
@@ -161,7 +161,7 @@ impl Builder {
 
         self.lower_block(&cc.body)?;
 
-        self.finally_stack.pop();
+        self.open_try_regions.pop();
 
         if self.is_open() {
             self.emit_effect(InstKind::PopTry);
@@ -187,11 +187,11 @@ impl Builder {
         Ok(())
     }
 
-    pub(in crate::ssa::build) fn emit_exiting_finallys(&mut self, depth: usize) -> Result<()> {
-        if depth >= self.finally_stack.len() {
+    pub(in crate::ssa::build) fn emit_region_exits(&mut self, depth: usize) -> Result<()> {
+        if depth >= self.open_try_regions.len() {
             return Ok(());
         }
-        let fins: Vec<Vec<HirStmt>> = self.finally_stack[depth..].to_vec();
+        let fins: Vec<Vec<HirStmt>> = self.open_try_regions[depth..].to_vec();
         for fin in fins.iter().rev() {
             self.emit_effect(InstKind::PopTry);
             self.lower_block(fin)?;
