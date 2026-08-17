@@ -28,8 +28,6 @@ pub enum VmSuspend {
         value: VmValue,
         dest_reg: u8,
     },
-    Task(varn_types::AsyncTask),
-
     Await {
         value: varn_types::Value,
         dest_reg: u16,

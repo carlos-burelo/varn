@@ -149,7 +149,6 @@ pub fn execute(
                         }
                     }
                 }
-                Some(varn_vm::exec::VmSuspend::Task(_task)) => {}
                 Some(varn_vm::exec::VmSuspend::Yield { .. }) => {}
             },
             Err(e) => {

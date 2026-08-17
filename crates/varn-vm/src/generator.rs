@@ -117,7 +117,7 @@ impl GeneratorDriver for NanGenDriver {
                         },
                     }
                 }
-                Some(VmSuspend::Task(_)) | Some(VmSuspend::Await { .. }) => {
+                Some(VmSuspend::Await { .. }) => {
                     inner.done = true;
                     return Err(
                         "cannot use `await` inside a sync generator — declare it `async function*`"

@@ -139,7 +139,6 @@ pub fn run_vm_to_completion(machine: &mut Vm, closure: Rc<Closure>) -> Result<()
                         }
                     }
                 }
-                Some(varn_vm::exec::VmSuspend::Task(_task)) => {}
                 Some(varn_vm::exec::VmSuspend::Yield { .. }) => {}
             },
             Err(e) => {
