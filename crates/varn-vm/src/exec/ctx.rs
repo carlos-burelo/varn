@@ -10,7 +10,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 use varn_core::{IntrinsicType, ModuleId};
-use varn_types::value::LazyTask;
 use varn_types::{FunctionProto, NativeCtx};
 
 use crate::linker::Linker;
@@ -39,7 +38,6 @@ pub struct ExecCtx {
     pub pending_constructors: Vec<(usize, VmValue)>,
     pub pending_setters: Vec<(usize, VmValue)>,
     pub vm_suspend: Option<VmSuspend>,
-    pub deferred_tasks: FxHashMap<usize, Rc<LazyTask>>,
     pub module_exports: FxHashMap<usize, VmValue>,
     pub opcode_counts: Option<Rc<Vec<std::sync::atomic::AtomicU64>>>,
     pub profile_counters: Option<Arc<ProfileCounters>>,
@@ -131,7 +129,6 @@ impl ExecCtx {
             pending_constructors: Vec::new(),
             pending_setters: Vec::new(),
             vm_suspend: None,
-            deferred_tasks: FxHashMap::default(),
             module_exports: FxHashMap::default(),
             opcode_counts: None,
             profile_counters: None,
@@ -298,7 +295,6 @@ impl ExecCtx {
             pending_constructors: Vec::new(),
             pending_setters: Vec::new(),
             vm_suspend: None,
-            deferred_tasks: FxHashMap::default(),
             module_exports: FxHashMap::default(),
             opcode_counts: None,
             profile_counters: None,
