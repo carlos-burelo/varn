@@ -32,33 +32,6 @@
 //! `end[v] >= term_idx[def_block] > def[v]` y el clamp no llega a
 //! dispararse. Para una def muerta el clamp colapsa el intervalo a un
 //! punto, que es el comportamiento correcto.
-//!
-//! ## Orden de `ssa.blocks`: suposición NO verificada
-//!
-//! `live_across` filtra con `def[v] < idx && end[v] > idx`. El término
-//! `def[v] < idx` REQUIERE que el orden del vector `ssa.blocks` sea
-//! compatible con dominancia (si `D` domina a `U`, `índice(D) < índice(U)`).
-//!
-//! Cuando `compact_cfg` renumera, lo hace en BFS desde `entry`
-//! (`passes/cfg.rs::get_reachable` usa una `VecDeque` con
-//! `push_back`/`pop_front`), y BFS SÍ es compatible con dominancia: si `D`
-//! domina a `U`, todo camino de `entry` a `U` pasa por `D`, luego
-//! `dist(D) < dist(U)`, y BFS numera en orden no decreciente de distancia.
-//! `passes/mod.rs:54` llama a `cfg::simplify_and_compact` incondicionalmente
-//! dentro del bucle de `optimize_with`, que siempre da al menos una vuelta.
-//!
-//! Pero `compact_cfg` sale temprano SIN renumerar cuando no hay bloques
-//! inalcanzables que descartar (`passes/cfg.rs:225-227`) — el caso común.
-//! Ahí el orden es el que dejó la construcción del SSA, que no está
-//! verificado que sea compatible con dominancia. Correr los pases no
-//! implica renumerar.
-//!
-//! Por tanto la compatibilidad con dominancia de `ssa.blocks` es, hoy, una
-//! SUPOSICIÓN NO VERIFICADA — no un invariante comprobado. Quien necesite
-//! la garantía real tiene dos caminos: comprobarla explícitamente dentro de
-//! `analyze` (numerar bloques por un BFS/RPO propio en vez de confiar en el
-//! orden de `ssa.blocks`), o responder `live_across` a partir de
-//! `live_in`/`live_out` por bloque, que no depende del orden del vector.
 
 use super::ir::{InstKind, SsaFunc, Terminator, Value};
 use rustc_hash::FxHashSet;
@@ -210,34 +183,38 @@ impl Liveness {
         self.block_start[b] + 1 + i as u32
     }
 
-    /// Valores vivos cruzando el punto `idx`: definidos antes y todavía vivos
-    /// después. Es la consulta que necesita el pase de máquinas de estados
-    /// para decidir qué guarda el objeto de estado.
+    /// Valores vivos DESPUÉS de ejecutar la instrucción `i` del bloque `b`.
     ///
-    /// Precondición: `idx` debe ser el punto de una INSTRUCCIÓN, nunca el de
-    /// un terminador (ningún `term_idx[b]`). En un terminador el predicado
-    /// `end[v] > idx` subaproxima: excluye los valores para los que
-    /// `end[v] == term_idx[b]` exactamente, que es justo el caso de un valor
-    /// vivo únicamente porque cruza por la arista de retorno de un bucle
-    /// (`v` en `live_out[b]` con `end[v] == term_idx[b]`) — vivo de verdad
-    /// cruzando ese punto, pero el predicado lo declararía muerto. En
-    /// puntos de instrucción el predicado es correcto en los cuatro bordes;
-    /// los consumidores reales (`InstKind::Await`/`InstKind::Yield`) sólo
-    /// consultan ahí. Omitir un valor vivo del objeto de estado del pase de
-    /// máquinas de estados sería un miscompile silencioso, así que este
-    /// método rechaza la precondición (con `assert!`, también en release)
-    /// en vez de devolver un resultado sub-aproximado en silencio.
-    pub fn live_across(&self, idx: u32) -> Vec<u32> {
-        assert!(
-            !self.term_idx.contains(&idx),
-            "live_across: idx {idx} es punto de un terminador; el predicado \
-             end[v] > idx subaproxima ahi (ver doc del metodo)"
-        );
-        (0..self.def.len() as u32)
-            .filter(|&v| {
-                let d = self.def[v as usize];
-                d != u32::MAX && d < idx && self.end[v as usize] > idx
-            })
-            .collect()
+    /// Es el conjunto que debe sobrevivir a una suspensión situada en `i`: lo
+    /// que el objeto de estado de una máquina de estados tiene que guardar.
+    ///
+    /// A diferencia de la numeración lineal de puntos, esto **no depende del
+    /// orden del vector `ssa.blocks`**: parte de `live_out[b]` y camina hacia
+    /// atrás por las instrucciones del bloque aplicando la transferencia
+    /// `live = (live - def(inst)) ∪ uses(inst)`. Sólo usa información local al
+    /// bloque más su `live_out`, ambos independientes del orden del vector.
+    ///
+    /// El resultado viene ordenado por índice de valor, para que dos
+    /// invocaciones sobre el mismo IR den la misma respuesta en el mismo orden
+    /// — un consumidor que derive de aquí el layout de un objeto necesita esa
+    /// estabilidad.
+    pub fn live_after(&self, ssa: &SsaFunc, b: usize, i: usize) -> Vec<Value> {
+        let block = &ssa.blocks[b];
+        let mut live: FxHashSet<u32> = self.live_out[b].clone();
+
+        // Recorre hacia atrás hasta pasar la instrucción i+1: el estado que
+        // queda es "vivo justo después de i".
+        for inst in block.insts[i + 1..].iter().rev() {
+            if let Some(d) = inst.dest {
+                live.remove(&d.0);
+            }
+            for u in crate::ssa::verify::inst_uses(&inst.kind) {
+                live.insert(u.0);
+            }
+        }
+
+        let mut out: Vec<Value> = live.into_iter().map(Value).collect();
+        out.sort_unstable_by_key(|v| v.0);
+        out
     }
 }
