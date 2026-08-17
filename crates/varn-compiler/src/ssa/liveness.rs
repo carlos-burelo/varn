@@ -44,8 +44,6 @@ pub struct Liveness {
     pub def: Vec<u32>,
     /// Valor -> último punto donde el valor sigue vivo.
     pub end: Vec<u32>,
-    /// Bloque -> conjunto de valores vivos a la entrada del bloque.
-    pub live_in: Vec<FxHashSet<u32>>,
     /// Bloque -> conjunto de valores vivos a la salida del bloque.
     pub live_out: Vec<FxHashSet<u32>>,
 }
@@ -164,7 +162,6 @@ impl Liveness {
         Liveness {
             def,
             end,
-            live_in,
             live_out,
         }
     }
