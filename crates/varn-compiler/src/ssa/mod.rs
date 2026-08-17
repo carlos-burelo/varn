@@ -6,6 +6,7 @@ pub mod build;
 pub mod dump;
 pub mod emit;
 pub mod ir;
+pub mod liveness;
 pub mod uses;
 pub mod verify;
 
