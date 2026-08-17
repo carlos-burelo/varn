@@ -121,6 +121,7 @@ pub fn emit_function(
         cache_count: cache_count as usize,
         chunk,
         required_caps: Vec::new(),
+        state_size: 0,
         register_meta,
         exception_table: Vec::new(),
         param_kinds,

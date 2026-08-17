@@ -39,6 +39,17 @@ pub struct FunctionProto {
     #[serde(default)]
     pub required_caps: Vec<std::rc::Rc<str>>,
 
+    /// Palabras que ocupa el objeto de estado de esta función si es una
+    /// máquina de estados; `0` si no lo es.
+    ///
+    /// Lo publica el proto —igual que `register_count`— para que el sitio de
+    /// llamada pueda reservar el estado **sin conocer el callee en
+    /// compilación**: lo lee en runtime. Eso es lo que mete al despacho
+    /// dinámico (métodos de interfaz, callbacks, `dynamic`) en el camino de
+    /// coste cero. Ver spec §3.8.
+    #[serde(default)]
+    pub state_size: u16,
+
     #[serde(default)]
     pub register_meta: Vec<crate::register_meta::RegisterMeta>,
 
@@ -319,6 +330,7 @@ impl PartialEq for FunctionProto {
             && self.cache_count == other.cache_count
             && self.chunk == other.chunk
             && self.required_caps == other.required_caps
+            && self.state_size == other.state_size
     }
 }
 
@@ -338,5 +350,6 @@ impl std::hash::Hash for FunctionProto {
         self.cache_count.hash(state);
         self.chunk.hash(state);
         self.required_caps.hash(state);
+        self.state_size.hash(state);
     }
 }

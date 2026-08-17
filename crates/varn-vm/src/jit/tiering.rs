@@ -363,6 +363,7 @@ mod jit_epoch_tests {
             chunk: varn_types::chunk::Chunk::new(),
             exception_table: Vec::new(),
             required_caps: Vec::new(),
+            state_size: 0,
             register_meta: Vec::new(),
             param_kinds: Vec::new(),
             return_kind: SlotKind::Dynamic,
