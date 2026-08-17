@@ -4,7 +4,7 @@
 
 **Goal:** Poner en pie el pase de máquinas de estados con su convención de retorno y su fontanería, y hacerlo transformar el caso trivial —una `async` sin ningún `await`— con comportamiento idéntico. Sin partir todavía ningún CFG.
 
-**Architecture:** Cuatro pasos, cada uno verificable por separado. Se fija la convención `Poll` (que no puede ser un valor de retorno, porque una función del VM devuelve un solo `VmValue`); se publica `state_size` en `FunctionProto`; se registra el pase en el pipeline como identidad, verificado con oráculo byte a byte; y sólo entonces transforma la única forma que no requiere partir nada: una función `async` cuyo cuerpo no suspende.
+**Architecture:** Tres tareas, cada una verificable por separado. Se fija la convención `Poll` (que no puede ser un valor de retorno, porque una función del VM devuelve un solo `VmValue`); se publica `state_size` en `FunctionProto`; se registra el pase en el pipeline como identidad, verificado con oráculo byte a byte; y sólo entonces transforma la única forma que no requiere partir nada: una función `async` cuyo cuerpo no suspende.
 
 **Tech Stack:** Rust, `varn-compiler` (`ssa/`, `passes/`), `varn-types` (`FunctionProto`). Verificación con el binario `vn`, nunca con `cargo test`.
 
@@ -72,7 +72,7 @@ El pase va en `passes/state_machine/` (directorio, no fichero suelto) porque va 
 - Modify: `crates/varn-compiler/src/ssa/emit/mod.rs`
 
 **Interfaces:**
-- Produces: `FunctionProto.state_size: u16`, `0` para toda función no transformada. Las tareas 3 y 4 lo rellenan; el camino de coste cero de planes posteriores lo lee en runtime.
+- Produces: `FunctionProto.state_size: u16`, `0` para toda función no transformada. La Task 3 lo rellena para el caso trivial; el camino de coste cero de planes posteriores lo lee en runtime.
 
 - [ ] **Step 1: Confirmar el punto de partida**
 
