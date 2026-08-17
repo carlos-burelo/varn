@@ -22,27 +22,59 @@
 //! propagación `live_out -> term_idx` extienda su `end` hasta el terminador
 //! del bloque de retorno (el latch), así que el intervalo abarca todo el
 //! bucle aunque el valor no se use en absoluto entre la cabecera y ese
-//! punto. Es una sobre-aproximación conservadora para intervalos bien
-//! formados — nunca declara muerto algo vivo — así que es correcta para
-//! asignar registros y correcta para elegir campos de estado, a costa de
-//! guardar de más en bucles.
+//! punto. Es una sobre-aproximación conservadora — nunca declara muerto algo
+//! vivo — así que es correcta para asignar registros y correcta para elegir
+//! campos de estado, a costa de guardar de más en bucles.
 //!
-//! Excepción: el clamp final de `analyze` (`end[v] = def[v]` cuando
-//! `end[v] < def[v]`) colapsa el intervalo a un punto. Si ese `end` bajo
-//! viene de un uso real numerado antes de la definición, ese punto vivo
-//! queda fuera del intervalo resultante — posible porque `ssa/verify.rs`
-//! sólo exige dominancia, no que `ssa.blocks` esté en orden topológico, así
-//! que no está garantizado que no ocurra.
+//! Disparador del clamp final de `analyze` (`end[v] = def[v]` cuando
+//! `end[v] < def[v]`): dispara exactamente para definiciones sin ningún
+//! uso. Si `v` tiene algún uso, entonces `v ∈ live_out[def_block]`, luego
+//! `end[v] >= term_idx[def_block] > def[v]` y el clamp no llega a
+//! dispararse. Para una def muerta el clamp colapsa el intervalo a un
+//! punto, que es el comportamiento correcto.
+//!
+//! ## Orden de `ssa.blocks` es compatible con dominancia
+//!
+//! `live_across` filtra con `def[v] < idx && end[v] > idx`. El término
+//! `def[v] < idx` sólo es sano si el orden del vector `ssa.blocks` es
+//! compatible con dominancia (si `D` domina a `U`, `índice(D) < índice(U)`).
+//! Ese invariante se cumple:
+//!
+//! - `passes/cfg.rs::get_reachable` recorre el grafo desde `func.entry` con
+//!   una `VecDeque` (`push_back`/`pop_front`) — BFS — y `compact_cfg`
+//!   renumera los bloques en ese orden.
+//! - BFS desde `entry` es compatible con dominancia: si `D` domina a `U`,
+//!   todo camino de `entry` a `U` pasa por `D`, luego `dist(D) < dist(U)`,
+//!   y BFS asigna índices en orden no decreciente de distancia, así que
+//!   `índice(D) < índice(U)`.
+//! - `passes/mod.rs:54` llama a `cfg::simplify_and_compact`
+//!   incondicionalmente dentro del bucle de `optimize_with`, que siempre da
+//!   al menos una vuelta.
+//!
+//! Precondición: `Liveness::analyze` asume una función que pasó por
+//! `passes::optimize_with`. Si se llamara sobre SSA que se saltó los pases,
+//! este invariante no está garantizado.
 
 use super::ir::{InstKind, SsaFunc, Terminator, Value};
 use rustc_hash::FxHashSet;
 
+#[derive(Debug)]
 pub struct Liveness {
+    /// Valor -> punto de definición. `u32::MAX` si el valor nunca se
+    /// define; todo consumidor debe comprobar este centinela antes de
+    /// usar el índice.
     pub def: Vec<u32>,
+    /// Valor -> último punto donde el valor sigue vivo.
     pub end: Vec<u32>,
+    /// Bloque -> conjunto de valores vivos a la entrada del bloque.
     pub live_in: Vec<FxHashSet<u32>>,
+    /// Bloque -> conjunto de valores vivos a la salida del bloque.
     pub live_out: Vec<FxHashSet<u32>>,
+    /// Bloque -> punto de su terminador.
     pub term_idx: Vec<u32>,
+    /// Bloque -> punto de sus params (el `P` de la fórmula en el doc del
+    /// módulo). Ver `inst_point`.
+    pub block_start: Vec<u32>,
 }
 
 impl Liveness {
@@ -52,11 +84,13 @@ impl Liveness {
         let mut def = vec![u32::MAX; nvals];
         let mut last = vec![0u32; nvals];
         let mut term_idx = vec![0u32; nblocks];
+        let mut block_start = vec![0u32; nblocks];
         let mut defs: Vec<FxHashSet<u32>> = vec![FxHashSet::default(); nblocks];
         let mut uses: Vec<FxHashSet<u32>> = vec![FxHashSet::default(); nblocks];
         let mut succ: Vec<Vec<usize>> = vec![Vec::new(); nblocks];
         let mut idx = 0u32;
         for (b, block) in ssa.blocks.iter().enumerate() {
+            block_start[b] = idx;
             let mut local_defined: FxHashSet<u32> = FxHashSet::default();
             for p in &block.params {
                 if def[p.0 as usize] == u32::MAX {
@@ -162,7 +196,13 @@ impl Liveness {
             live_in,
             live_out,
             term_idx,
+            block_start,
         }
+    }
+
+    /// Punto de la instrucción `i` del bloque `b`.
+    pub fn inst_point(&self, b: usize, i: usize) -> u32 {
+        self.block_start[b] + 1 + i as u32
     }
 
     /// Valores vivos cruzando el punto `idx`: definidos antes y todavía vivos
@@ -180,10 +220,10 @@ impl Liveness {
     /// los consumidores reales (`InstKind::Await`/`InstKind::Yield`) sólo
     /// consultan ahí. Omitir un valor vivo del objeto de estado del pase de
     /// máquinas de estados sería un miscompile silencioso, así que este
-    /// método rechaza la precondición en debug en vez de devolver un
-    /// resultado sub-aproximado en silencio.
+    /// método rechaza la precondición (con `assert!`, también en release)
+    /// en vez de devolver un resultado sub-aproximado en silencio.
     pub fn live_across(&self, idx: u32) -> Vec<u32> {
-        debug_assert!(
+        assert!(
             !self.term_idx.contains(&idx),
             "live_across: idx {idx} es punto de un terminador; el predicado \
              end[v] > idx subaproxima ahi (ver doc del metodo)"

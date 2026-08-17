@@ -161,7 +161,7 @@ El JIT participa por el mismo canal: `jit_helpers/suspend.rs` deja el mismo
 Las funciones generadoras (`function*`) usan el mismo canal de suspensión que `await`:
 - Al ejecutar `yield valor`, la VM deja `VmSuspend::Yield { value, dest_reg }`.
 - El generador guarda su `ExecCtx` completo (`NanSyncGenDriver` en `varn-vm/src/generator.rs`), no un frame aislado: la reanudación reentra en ese contexto y escribe el valor enviado por `.next(v)` en `dest_reg`.
-- La ejecución se congela entre llamadas a `.next()`; un generador que emita `VmSuspend::Await` o `Task` se trata como generador asíncrono.
+- La ejecución se congela entre llamadas a `.next()`; un generador que emita `VmSuspend::Await` se trata como generador asíncrono.
 
 ---
 
