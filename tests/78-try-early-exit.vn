@@ -1,0 +1,107 @@
+// Salir de un `try { } catch { }` por `break`, `continue` o `return` debe
+// cerrar la región guardada.
+//
+// La bajada a SSA registra las regiones con acción de salida en
+// `finally_stack`, y `break`/`continue`/`return` emiten un `PopTry` por cada
+// región que abandonan recorriendo esa pila. El `try/catch` sin `finally` no
+// se registraba, así que una salida temprana se iba sin emitir su `PopTry` y
+// dejaba un handler colgante en la pila `try_handlers` de la VM, apuntando a
+// un frame ya muerto.
+//
+// Síntoma observable: el siguiente `throw` del programa lo intercepta ese
+// handler fantasma en vez del `catch` que le corresponde. Cuando el frame ya
+// no existe, la VM lee registros fuera de rango y revienta; cuando existe a
+// medias, el error desaparece sin mensaje y el proceso sale con código 0 —
+// un programa que debe fallar reporta éxito.
+
+let testigo = 0;
+
+function conBreak(): void {
+    for (let i = 0; i < 3; i = i + 1) {
+        try {
+            if (i == 1) { break; }
+        } catch (e) {
+            // Inalcanzable: nada lanza aquí dentro. El cuerpo no puede quedar
+            // vacío — un `catch {}` vacío junto a `break`/`return` dispara otro
+            // fallo distinto, un pánico del verificador de SSA
+            // ("pred bN has no edge to bM"), que se rastrea aparte.
+            testigo = testigo + 1;
+        }
+    }
+}
+
+function conContinue(): void {
+    for (let i = 0; i < 3; i = i + 1) {
+        try {
+            if (i == 1) { continue; }
+        } catch (e) {
+            testigo = testigo + 1;
+        }
+    }
+}
+
+function conReturn(): void {
+    for (let i = 0; i < 3; i = i + 1) {
+        try {
+            if (i == 1) { return; }
+        } catch (e) {
+            testigo = testigo + 1;
+        }
+    }
+}
+
+// Lanza DESPUÉS de haber salido de la región por la vía temprana. Si quedó un
+// handler colgante, éste se traga el error y el `catch` de fuera nunca corre.
+function lanzaTrasSalir(via: str): void {
+    if (via === "break") { conBreak(); }
+    if (via === "continue") { conContinue(); }
+    if (via === "return") { conReturn(); }
+    throw new Error("debe llegar al catch del llamante");
+}
+
+function capturaEnElSitioCorrecto(via: str): bool {
+    let llego = false;
+    try {
+        lanzaTrasSalir(via);
+    } catch (e) {
+        llego = true;
+    }
+    return llego;
+}
+
+assert("break fuera de try/catch no deja handler colgante", capturaEnElSitioCorrecto("break"))
+assert("continue fuera de try/catch no deja handler colgante", capturaEnElSitioCorrecto("continue"))
+assert("return fuera de try/catch no deja handler colgante", capturaEnElSitioCorrecto("return"))
+
+// El caso con `finally` ya funcionaba: sirve de control. Si éste fallara, el
+// fallo estaría en el mecanismo de salida entero y no en el `try/catch` pelado.
+function conBreakYFinally(): int {
+    let pasos = 0;
+    for (let i = 0; i < 3; i = i + 1) {
+        try {
+            if (i == 1) { break; }
+        } catch (e) {
+        } finally {
+            pasos = pasos + 1;
+        }
+    }
+    return pasos;
+}
+
+assert("control: try/catch/finally con break ejecuta sus finally", conBreakYFinally() === 2)
+
+// La región debe cerrarse, no quedarse abierta: tras salir por `break`, un
+// `throw` dentro del mismo bucle en una iteración posterior no existe, pero sí
+// debe poder lanzarse y capturarse con normalidad más adelante en la función.
+function lanzaYCapturaTrasBreak(): bool {
+    conBreak();
+    let ok = false;
+    try {
+        throw new Error("local");
+    } catch (e) {
+        ok = true;
+    }
+    return ok;
+}
+
+assert("tras salir por break, try/catch posterior sigue funcionando", lanzaYCapturaTrasBreak())

@@ -32,7 +32,9 @@ impl Builder {
 
         let try_val = self.emit(InstKind::Try { handler: catch_b }, HirType::Dynamic);
 
+        self.finally_stack.push(Vec::new());
         self.lower_block(block)?;
+        self.finally_stack.pop();
 
         if self.is_open() {
             self.emit_effect(InstKind::PopTry);

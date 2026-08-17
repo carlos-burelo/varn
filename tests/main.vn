@@ -76,6 +76,7 @@ import "./74-regalloc-interference.vn"
 import "./75-async-shapes.vn"
 import "./76-generator-values.vn"
 import "./77-async-generators.vn"
+import "./78-try-early-exit.vn"
 
-print("\n78 side-effect modules executed in suite")
+print("\n79 side-effect modules executed in suite")
 assertSummary()
