@@ -15,6 +15,12 @@ Este documento detalla el diseño interno del compilador de **Varn**, comprendie
   - [Optimización de Recursión Final (`tco`)](#optimización-de-recursión-final-tco)
   - [Acceso Directo a Campos por Shape (`fixed_fields`)](#acceso-directo-a-campos-por-shape-fixed_fields)
   - [Simplificación del Grafo de Flujo de Control (`cfg`)](#simplificación-del-grafo-de-flujo-de-control-cfg)
+  - [Movimiento de Código Invariante de Bucle (`licm`)](#movimiento-de-código-invariante-de-bucle-licm)
+  - [Eliminación de Subexpresiones Comunes (`cse`)](#eliminación-de-subexpresiones-comunes-cse)
+  - [Análisis de Escape (`escape`)](#análisis-de-escape-escape)
+  - [Monomorfización (`monomorphize`)](#monomorfización-monomorphize)
+  - [Identidades Algebraicas (`algebraic`)](#identidades-algebraicas-algebraic)
+  - [Pase Post-Bucle: Máquinas de Estados (`state_machine`)](#pase-post-bucle-máquinas-de-estados-state_machine)
 - [5. Emisión de Bytecode y Estructura de `FunctionProto`](#5-emisión-de-bytecode-y-estructura-de-functionproto)
 - [6. Post-Passes del Backend (`varn-regalloc`)](#6-post-passes-del-backend-varn-regalloc)
   - [Análisis de Vida de Registros (`liveness`)](#análisis-de-vida-de-registros-liveness)
@@ -36,26 +42,32 @@ flowchart TD
     subgraph varn-compiler ["varn-compiler: Optimización & lowering SSA"]
         A --> B["Lowering a HIR\n(High-Level IR)"]
         B --> C["Construcción de Grafo SSA\n(Basic Blocks + phi nodes)"]
-        
-        subgraph Loop ["Bucle de Optimización de Punto Fijo"]
-            C --> D["const_fold & Propagación"]
-            D --> E["fixed_fields Optimization"]
-            E --> F["Tail Call Optimization (TCO)"]
-            F --> G["Dead Code Elimination (DCE)"]
-            G --> H["CFG Simplification"]
-            H -.->|¿Cambios pendientes?| D
+
+        subgraph Loop ["Bucle de Optimización de Punto Fijo (optimize_with)"]
+            C --> D["tco\n(Tail Call Optimization)"]
+            D --> E["const_fold\n(Plegado de constantes)"]
+            E --> F["monomorphize"]
+            F --> G["algebraic\n(Identidades algebraicas)"]
+            G --> H["cse\n(Common Subexpression Elimination)"]
+            H --> I["fixed_fields\n(Acceso directo por Shape)"]
+            I --> J["escape\n(Análisis de escape)"]
+            J --> K["licm\n(Loop-Invariant Code Motion)"]
+            K --> L["dce\n(Dead Code Elimination)"]
+            L --> M["cfg\n(Simplificación de bloques)"]
+            M -.->|¿Cambios pendientes?| D
         end
 
-        Loop --> I["Emisión a Bytecode Inicial\n(FunctionProto / Chunk)"]
+        Loop --> N["state_machine\n(Máquinas de estados: async / generator)"]
+        N --> O["Emisión a Bytecode Inicial\n(FunctionProto / Chunk)"]
     end
 
     subgraph varn-regalloc ["varn-regalloc: Post-passes de registros"]
-        I --> J["liveness Analysis\n(Liveness ranges por registro)"]
-        J --> K["regalloc_post\n(Reorganización compacta de registros)"]
-        K --> L["slot_kinds Metadata\n(Clasificación float/int/ptr para JIT)"]
+        O --> P["liveness Analysis\n(Liveness ranges por registro)"]
+        P --> Q["regalloc_post\n(Reorganización compacta de registros)"]
+        Q --> R["slot_kinds Metadata\n(Clasificación float/int/ptr para JIT)"]
     end
 
-    L --> M["Bytecode Final Executable / JIT Input"]
+    R --> S["Bytecode Final Executable / JIT Input"]
 ```
 
 ---
@@ -121,6 +133,24 @@ Sustituye búsquedas dinámicas de propiedades en objetos por accesos directos p
 
 ### Simplificación del Grafo de Flujo de Control (`cfg`)
 Fusiona bloques básicos contiguos que carecen de bifurcaciones intermedias.
+
+### Movimiento de Código Invariante de Bucle (`licm`)
+Saca fuera del cuerpo de un bucle las instrucciones cuyo resultado no cambia entre iteraciones, siempre que el sacado sea puro y libre de alocación (aritmética/comparaciones sobre `Int`/`Float` probados, sin excepciones posibles): así se ejecutan una vez en vez de en cada vuelta.
+
+### Eliminación de Subexpresiones Comunes (`cse`)
+Deduplica, bloque a bloque, cómputos ya vistos (relecturas de un mismo campo, literales rematerializados) mediante una tabla local — sin necesidad de teoría de aliasing porque el ámbito es un único bloque básico.
+
+### Análisis de Escape (`escape`)
+Hermano de `fixed_fields` un nivel más difícil: reemplaza por sus campos en SSA una instancia de clase construida por un `constructor call` que nunca escapa de la función, usando el resumen entre funciones de `hir::ctor_summary`.
+
+### Monomorfización (`monomorphize`)
+Especializa indexado genérico (`GetIndex`/`SetIndex`) a operaciones monomórficas de array (`ArrayGetIndex`/`ArraySetIndex`) cuando los metadatos de tipo estático o el origen de la asignación SSA confirman el layout de array.
+
+### Identidades Algebraicas (`algebraic`)
+Simplifica aritmética cuyo resultado ya es uno de sus operandos o una constante conociendo sólo uno de los dos lados (`i + 0`, `x * 1`, `n - n`) — el complemento de `const_fold`, que sólo actúa cuando **ambos** operandos son conocidos.
+
+### Pase Post-Bucle: Máquinas de Estados (`state_machine`)
+Corre **fuera** del bucle de punto fijo, una sola vez, después de él y antes de la asignación de registros — no dentro, porque transforma una función en otra de forma distinta y volver a pasarle `licm`/`cse`/`cfg` por encima sería reoptimizar una máquina de estados como si fuera código normal. Convierte una función suspendible (`async`/`function*`) en una máquina de estados según la convención `Poll` (discriminante en `state[0]`, ver `varn_types::chunk::proto`) y publica `FunctionProto::state_size`, el tamaño en palabras del objeto de estado. Hoy sólo reconoce el caso trivial —una `async` que nunca suspende— sin partir ningún CFG; los cortes llegan en un plan posterior. Ver spec `docs/superpowers/specs/2026-08-16-modelo-asincrono-design.md` §3.1 y §3.8.
 
 ---
 
