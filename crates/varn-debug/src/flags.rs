@@ -39,6 +39,7 @@ pub struct DebugFlags {
     pub hir: bool,
 
     pub ssa: bool,
+    pub suspend: bool,
 
     pub clif: bool,
     pub clif_route: bool,
@@ -70,6 +71,10 @@ pub const PHASES: &[(&str, &str)] = &[
     ("bytecode", "bytecode por función"),
     ("hir", "HIR previo a SSA"),
     ("ssa", "forma SSA"),
+    (
+        "suspend",
+        "puntos de suspensión Await/Yield con su conjunto vivo, in_try, in_loop",
+    ),
     ("clif", "lowering Cranelift (route, kinds, ir, asm)"),
     ("tiers", "tier por función: clif / gate / bail"),
     (
@@ -242,6 +247,7 @@ impl DebugFlags {
                     "lsp" => flags.lsp = true,
                     "hir" => flags.hir = true,
                     "ssa" => flags.ssa = true,
+                    "suspend" => flags.suspend = true,
                     "tiers" => flags.tiers = true,
                     "bails" => flags.bails = true,
                     "roots" => flags.roots = true,
@@ -305,6 +311,7 @@ impl DebugFlags {
             || self.lsp
             || self.hir
             || self.ssa
+            || self.suspend
             || self.clif
             || self.tiers
             || self.bails

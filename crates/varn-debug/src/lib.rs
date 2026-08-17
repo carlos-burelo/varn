@@ -15,6 +15,7 @@ pub mod roots;
 pub mod scope;
 pub mod ssa;
 pub mod summary;
+pub mod suspend;
 pub mod symbols;
 pub mod tiers;
 pub mod tokens;
