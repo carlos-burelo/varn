@@ -103,6 +103,16 @@ pub fn analyze(ssa: &SsaFunc) -> Vec<SuspendPoint> {
 /// legítimo — se entra en pánico con el detalle en vez de adivinar cuál de
 /// los dos vale, porque este análisis es la única fuente de verdad que
 /// usará el pase de máquinas de estados para decidir el estado guardado.
+///
+/// Esta premisa se sostiene, y se sostiene por una razón concreta: hasta
+/// `fac22b4` NO se sostenía. `lower_try_catch` no registraba su región, así
+/// que un `break`/`continue`/`return` que salía en temprano de un `try` sin
+/// `finally` no emitía el `PopTry` correspondiente — dejaba tanto la
+/// profundidad descuadrada entre caminos (justo lo que este `assert_eq!`
+/// cazaba) como un handler colgante en la VM. `fac22b4` arregló la bajada
+/// para cerrar la región en toda salida temprana, no este análisis; el
+/// `assert_eq!` sigue en pie como guardián de esa invariante — si algo
+/// vuelve a romper la bajada, es la señal que lo va a atrapar.
 fn compute_try_depth_in(ssa: &SsaFunc) -> Vec<i32> {
     let n = ssa.blocks.len();
     let mut depth_in: Vec<Option<i32>> = vec![None; n];
