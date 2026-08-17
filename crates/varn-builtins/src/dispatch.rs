@@ -409,18 +409,6 @@ impl varn_types::NativeCtx for DevNullModuleCtx {
     fn spawn_vm(&mut self, _c: VmValue, _a: &[VmValue]) -> Result<VmValue, String> {
         Ok(VmValue::null())
     }
-    fn set_timer(
-        &mut self,
-        _ms: u64,
-        _r: bool,
-        _c: VmValue,
-        _a: &[VmValue],
-    ) -> Result<usize, String> {
-        Ok(0)
-    }
-    fn clear_timer(&mut self, _id: usize) -> Result<(), String> {
-        Ok(())
-    }
     fn suspend_timer(&mut self, _ms: u64) -> VmValue {
         VmValue::null()
     }

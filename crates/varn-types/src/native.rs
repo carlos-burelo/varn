@@ -211,18 +211,6 @@ impl NativeCtx for DummyCtx {
     fn spawn_vm(&mut self, _callee: VmValue, _args: &[VmValue]) -> Result<VmValue, String> {
         Err("DummyCtx".into())
     }
-    fn set_timer(
-        &mut self,
-        _ms: u64,
-        _repeat: bool,
-        _callee: VmValue,
-        _args: &[VmValue],
-    ) -> Result<usize, String> {
-        Err("DummyCtx".into())
-    }
-    fn clear_timer(&mut self, _id: usize) -> Result<(), String> {
-        Err("DummyCtx".into())
-    }
     fn suspend_timer(&mut self, _ms: u64) -> VmValue {
         VmValue::null()
     }
@@ -300,18 +288,6 @@ impl<'a> NativeCtx for StaticInitCtx<'a> {
     }
     fn spawn_vm(&mut self, _callee: VmValue, _args: &[VmValue]) -> Result<VmValue, String> {
         Err("spawn_vm unavailable in static init context".into())
-    }
-    fn set_timer(
-        &mut self,
-        _ms: u64,
-        _repeat: bool,
-        _callee: VmValue,
-        _args: &[VmValue],
-    ) -> Result<usize, String> {
-        Err("set_timer unavailable in static init context".into())
-    }
-    fn clear_timer(&mut self, _id: usize) -> Result<(), String> {
-        Err("clear_timer unavailable in static init context".into())
     }
     fn suspend_timer(&mut self, _ms: u64) -> VmValue {
         VmValue::null()

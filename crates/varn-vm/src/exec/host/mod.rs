@@ -333,20 +333,6 @@ impl NativeCtx for ExecCtx {
         Ok(self.heap.intern(task))
     }
 
-    fn set_timer(
-        &mut self,
-        _ms: u64,
-        _repeat: bool,
-        _callee: VmValue,
-        _args: &[VmValue],
-    ) -> Result<usize, String> {
-        Err("no timer".into())
-    }
-
-    fn clear_timer(&mut self, _id: usize) -> Result<(), String> {
-        Ok(())
-    }
-
     /// Timers block the calling thread.
     ///
     /// There is no event loop to hand them to: tasks run on a synchronous

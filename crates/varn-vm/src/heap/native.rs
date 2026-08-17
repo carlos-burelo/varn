@@ -188,20 +188,6 @@ impl NativeCtx for Heap {
         Err("spawn_vm unavailable on bare Heap (use ExecCtx)".into())
     }
 
-    fn set_timer(
-        &mut self,
-        _ms: u64,
-        _repeat: bool,
-        _callee: VmValue,
-        _args: &[VmValue],
-    ) -> Result<usize, String> {
-        Err("set_timer unavailable on bare Heap".into())
-    }
-
-    fn clear_timer(&mut self, _id: usize) -> Result<(), String> {
-        Ok(())
-    }
-
     fn suspend_timer(&mut self, _ms: u64) -> VmValue {
         VmValue::null()
     }

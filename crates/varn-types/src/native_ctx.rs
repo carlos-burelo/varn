@@ -127,14 +127,6 @@ pub trait NativeCtx {
     fn call_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String>;
     fn spawn_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String>;
 
-    fn set_timer(
-        &mut self,
-        ms: u64,
-        repeat: bool,
-        callee: VmValue,
-        args: &[VmValue],
-    ) -> Result<usize, String>;
-    fn clear_timer(&mut self, id: usize) -> Result<(), String>;
     fn suspend_timer(&mut self, ms: u64) -> VmValue;
 
     fn has_capability(&self, _cap: &str) -> bool {
