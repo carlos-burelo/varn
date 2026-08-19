@@ -1,10 +1,10 @@
-use mio::event::Event;
 use mio::net::{TcpListener, TcpStream};
 use mio::{Events, Interest, Poll, Token, Waker};
 use rustc_hash::FxHashMap;
 use std::io::{ErrorKind, Read, Write};
-use std::net::SocketAddr;
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 use varn_types::{AsyncTask, Value};
@@ -18,26 +18,34 @@ pub fn next_socket_id() -> i64 {
 
 struct PendingRead {
     len: usize,
-    task: AsyncTask<Value>,
+    task: AsyncTask,
 }
 
 struct PendingWrite {
     data: Vec<u8>,
     written: usize,
-    task: AsyncTask<Value>,
+    task: AsyncTask,
 }
 
 struct StreamState {
     stream: TcpStream,
     is_connecting: bool,
-    pending_connect: Option<AsyncTask<Value>>,
+    pending_connect: Option<AsyncTask>,
     pending_read: Option<PendingRead>,
     pending_write: Option<PendingWrite>,
 }
 
 struct ListenerState {
     listener: TcpListener,
-    pending_accepts: Vec<AsyncTask<Value>>,
+    pending_accepts: Vec<AsyncTask>,
+}
+
+enum DriverCommand {
+    RegisterListener(i64),
+    RegisterStream(i64),
+    DeregisterListener(TcpListener),
+    DeregisterStream(TcpStream),
+    Wake,
 }
 
 struct IoRegistry {
@@ -47,7 +55,9 @@ struct IoRegistry {
 
 pub struct IoDriver {
     registry: Arc<Mutex<IoRegistry>>,
+    cmd_tx: Sender<DriverCommand>,
     waker: Arc<Waker>,
+    #[allow(dead_code)]
     is_running: Arc<AtomicBool>,
 }
 
@@ -66,6 +76,7 @@ impl IoDriver {
             streams: FxHashMap::default(),
         }));
         let is_running = Arc::new(AtomicBool::new(true));
+        let (cmd_tx, cmd_rx) = channel::<DriverCommand>();
 
         let reg_clone = Arc::clone(&registry);
         let run_clone = Arc::clone(&is_running);
@@ -73,11 +84,12 @@ impl IoDriver {
         std::thread::Builder::new()
             .name("varn-mio-driver".into())
             .spawn(move || {
-                Self::run_event_loop(poll, reg_clone, run_clone);
+                Self::run_event_loop(poll, cmd_rx, reg_clone, run_clone);
             })?;
 
         Ok(Self {
             registry,
+            cmd_tx,
             waker,
             is_running,
         })
@@ -85,13 +97,47 @@ impl IoDriver {
 
     fn run_event_loop(
         mut poll: Poll,
+        cmd_rx: Receiver<DriverCommand>,
         registry: Arc<Mutex<IoRegistry>>,
         is_running: Arc<AtomicBool>,
     ) {
         let mut events = Events::with_capacity(1024);
 
         while is_running.load(Ordering::Relaxed) {
-            if let Err(e) = poll.poll(&mut events, Some(Duration::from_millis(100))) {
+            // Process all pending registration/deregistration commands before polling
+            while let Ok(cmd) = cmd_rx.try_recv() {
+                match cmd {
+                    DriverCommand::RegisterListener(id) => {
+                        let mut reg = registry.lock().unwrap();
+                        if let Some(lstate) = reg.listeners.get_mut(&id) {
+                            let _ = poll.registry().register(
+                                &mut lstate.listener,
+                                Token(id as usize),
+                                Interest::READABLE,
+                            );
+                        }
+                    }
+                    DriverCommand::RegisterStream(id) => {
+                        let mut reg = registry.lock().unwrap();
+                        if let Some(sstate) = reg.streams.get_mut(&id) {
+                            let _ = poll.registry().register(
+                                &mut sstate.stream,
+                                Token(id as usize),
+                                Interest::READABLE | Interest::WRITABLE,
+                            );
+                        }
+                    }
+                    DriverCommand::DeregisterListener(mut listener) => {
+                        let _ = poll.registry().deregister(&mut listener);
+                    }
+                    DriverCommand::DeregisterStream(mut stream) => {
+                        let _ = poll.registry().deregister(&mut stream);
+                    }
+                    DriverCommand::Wake => {}
+                }
+            }
+
+            if let Err(e) = poll.poll(&mut events, Some(Duration::from_millis(50))) {
                 if e.kind() == ErrorKind::Interrupted {
                     continue;
                 }
@@ -107,10 +153,12 @@ impl IoDriver {
                 let id = token.0 as i64;
                 let mut reg = registry.lock().unwrap();
 
-                // 1. Check if event is on a Listener
+                // 1. Check Listener event
                 if let Some(listener_state) = reg.listeners.get_mut(&id) {
                     if event.is_readable() {
-                        let mut resolved_conns: Vec<(AsyncTask<Value>, i64)> = Vec::new();
+                        let mut resolved_conns: Vec<(AsyncTask, i64)> = Vec::new();
+                        let mut new_streams: Vec<(i64, StreamState)> = Vec::new();
+
                         while let Some(task) = listener_state.pending_accepts.pop() {
                             match listener_state.listener.accept() {
                                 Ok((mut stream, _)) => {
@@ -122,7 +170,7 @@ impl IoDriver {
                                         Interest::READABLE | Interest::WRITABLE,
                                     );
                                     resolved_conns.push((task, conn_id));
-                                    reg.streams.insert(
+                                    new_streams.push((
                                         conn_id,
                                         StreamState {
                                             stream,
@@ -131,7 +179,7 @@ impl IoDriver {
                                             pending_read: None,
                                             pending_write: None,
                                         },
-                                    );
+                                    ));
                                 }
                                 Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
                                     listener_state.pending_accepts.push(task);
@@ -143,6 +191,10 @@ impl IoDriver {
                             }
                         }
 
+                        for (conn_id, state) in new_streams {
+                            reg.streams.insert(conn_id, state);
+                        }
+
                         drop(reg);
                         for (task, conn_id) in resolved_conns {
                             task.settle(Ok(Value::Int(conn_id)));
@@ -151,7 +203,7 @@ impl IoDriver {
                     }
                 }
 
-                // 2. Check if event is on a Stream
+                // 2. Check Stream event
                 if let Some(stream_state) = reg.streams.get_mut(&id) {
                     // 2a. Pending Connect
                     if stream_state.is_connecting && (event.is_writable() || event.is_readable()) {
@@ -217,24 +269,26 @@ impl IoDriver {
         let addr: SocketAddr = format!("127.0.0.1:{port}")
             .parse()
             .map_err(|e| std::io::Error::new(ErrorKind::InvalidInput, e))?;
-        let mut listener = TcpListener::bind(addr)?;
+        let listener = TcpListener::bind(addr)?;
         let id = next_socket_id();
-        let token = Token(id as usize);
 
-        let mut reg = self.registry.lock().unwrap();
-        reg.listeners.insert(
-            id,
-            ListenerState {
-                listener,
-                pending_accepts: Vec::new(),
-            },
-        );
+        {
+            let mut reg = self.registry.lock().unwrap();
+            reg.listeners.insert(
+                id,
+                ListenerState {
+                    listener,
+                    pending_accepts: Vec::new(),
+                },
+            );
+        }
 
+        let _ = self.cmd_tx.send(DriverCommand::RegisterListener(id));
         let _ = self.waker.wake();
         Ok(id)
     }
 
-    pub fn accept(&self, listener_id: i64) -> AsyncTask<Value> {
+    pub fn accept(&self, listener_id: i64) -> AsyncTask {
         let mut reg = self.registry.lock().unwrap();
         let listener_state = match reg.listeners.get_mut(&listener_id) {
             Some(l) => l,
@@ -259,12 +313,16 @@ impl IoDriver {
                         pending_write: None,
                     },
                 );
+                drop(reg);
+                let _ = self.cmd_tx.send(DriverCommand::RegisterStream(conn_id));
                 let _ = self.waker.wake();
                 AsyncTask::resolved(Value::Int(conn_id))
             }
             Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
                 let task = AsyncTask::pending();
                 listener_state.pending_accepts.push(task.clone());
+                drop(reg);
+                let _ = self.cmd_tx.send(DriverCommand::Wake);
                 let _ = self.waker.wake();
                 task
             }
@@ -272,11 +330,10 @@ impl IoDriver {
         }
     }
 
-    pub fn connect(&self, host: &str, port: i64) -> AsyncTask<Value> {
+    pub fn connect(&self, host: &str, port: i64) -> AsyncTask {
         let addr: SocketAddr = match format!("{host}:{port}").parse() {
             Ok(a) => a,
             Err(_) => {
-                // If not raw IP, resolve or error
                 if let Ok(mut addrs) = format!("{host}:{port}").to_socket_addrs() {
                     match addrs.next() {
                         Some(a) => a,
@@ -294,7 +351,7 @@ impl IoDriver {
             }
         };
 
-        let mut stream = match TcpStream::connect(addr) {
+        let stream = match TcpStream::connect(addr) {
             Ok(s) => s,
             Err(_) => {
                 let t = AsyncTask::pending();
@@ -319,6 +376,9 @@ impl IoDriver {
                     pending_write: None,
                 },
             );
+            drop(reg);
+            let _ = self.cmd_tx.send(DriverCommand::RegisterStream(conn_id));
+            let _ = self.waker.wake();
             task.settle(Ok(Value::Int(conn_id)));
             return task;
         }
@@ -334,11 +394,13 @@ impl IoDriver {
                 pending_write: None,
             },
         );
+        drop(reg);
+        let _ = self.cmd_tx.send(DriverCommand::RegisterStream(conn_id));
         let _ = self.waker.wake();
         task
     }
 
-    pub fn read(&self, conn_id: i64, len: usize) -> AsyncTask<Value> {
+    pub fn read(&self, conn_id: i64, len: usize) -> AsyncTask {
         let mut reg = self.registry.lock().unwrap();
         let stream_state = match reg.streams.get_mut(&conn_id) {
             Some(s) => s,
@@ -361,6 +423,7 @@ impl IoDriver {
             Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
                 let task = AsyncTask::pending();
                 stream_state.pending_read = Some(PendingRead { len, task: task.clone() });
+                drop(reg);
                 let _ = self.waker.wake();
                 task
             }
@@ -368,7 +431,7 @@ impl IoDriver {
         }
     }
 
-    pub fn write(&self, conn_id: i64, data: Vec<u8>) -> AsyncTask<Value> {
+    pub fn write(&self, conn_id: i64, data: Vec<u8>) -> AsyncTask {
         let mut reg = self.registry.lock().unwrap();
         let stream_state = match reg.streams.get_mut(&conn_id) {
             Some(s) => s,
@@ -389,6 +452,7 @@ impl IoDriver {
                     written: n,
                     task: task.clone(),
                 });
+                drop(reg);
                 let _ = self.waker.wake();
                 task
             }
@@ -399,6 +463,7 @@ impl IoDriver {
                     written: 0,
                     task: task.clone(),
                 });
+                drop(reg);
                 let _ = self.waker.wake();
                 task
             }
@@ -409,6 +474,7 @@ impl IoDriver {
     pub fn close(&self, conn_id: i64) {
         let mut reg = self.registry.lock().unwrap();
         if let Some(mut stream_state) = reg.streams.remove(&conn_id) {
+            let _ = stream_state.stream.shutdown(std::net::Shutdown::Both);
             if let Some(task) = stream_state.pending_connect.take() {
                 task.settle(Ok(Value::Int(-1)));
             }
@@ -418,7 +484,8 @@ impl IoDriver {
             if let Some(pw) = stream_state.pending_write.take() {
                 pw.task.settle(Ok(Value::Int(-1)));
             }
-            let _ = stream_state.stream.shutdown(std::net::Shutdown::Both);
+            drop(reg);
+            let _ = self.cmd_tx.send(DriverCommand::DeregisterStream(stream_state.stream));
             let _ = self.waker.wake();
         }
     }
@@ -429,6 +496,8 @@ impl IoDriver {
             for task in listener_state.pending_accepts.drain(..) {
                 task.settle(Ok(Value::Int(-1)));
             }
+            drop(reg);
+            let _ = self.cmd_tx.send(DriverCommand::DeregisterListener(listener_state.listener));
             let _ = self.waker.wake();
         }
     }

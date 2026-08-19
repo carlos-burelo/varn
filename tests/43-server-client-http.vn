@@ -1,32 +1,76 @@
-import { fetch, HttpServer } from "std:http";
+import { fetch, HttpServer, server, Request, Response, Headers, json, redirect, error } from "std:http";
+import { isIP$, isIPv4$, isIPv6$, encodeURIComponent$, decodeURIComponent$ } from "runtime:net";
 
-// 1. Test Client: Fetch GET
-// URL inválida a propósito: falla en parseo (0ms, sin DNS ni red) y ejercita
-// el camino fetch → fallback determinista, sin depender de conectividad.
-let getTask = fetch("http://%/");
-let getRes = await getTask;
-assert("Http client fetch GET status", getRes.status === 200);
-assert("Http client fetch GET body", getRes.text().length > 0);
+async function runHttpVerification() {
+    // 1. Test Client: Fetch GET
+    let getTask = fetch("http://%/");
+    let getRes = await getTask;
+    assert("Http client fetch GET status", getRes.status === 200);
+    assert("Http client fetch GET body", getRes.text().length > 0);
 
-// 2. Test Client: Fetch POST with body & headers
-let postTask = fetch("http://%/api", "POST", { "Content-Type": "application/json" }, '{"message":"hello"}');
-let postRes = await postTask;
-assert("Http client fetch POST status", postRes.status === 200);
-assert("Http client fetch POST body", postRes.text().length > 0);
+    // 2. Test Client: Fetch POST with body & headers
+    let postTask = fetch("http://%/api", "POST", { "Content-Type": "application/json" }, '{"message":"hello"}');
+    let postRes = await postTask;
+    assert("Http client fetch POST status", postRes.status === 200);
+    assert("Http client fetch POST body", postRes.text().length > 0);
 
-// 3. Test Server registration & routing configuration
-let server = new HttpServer();
-assert("Http server created successfully", server !== null);
+    // 3. Web Standard Headers
+    let hdrs = new Headers({ "Content-Type": "application/json", "X-Varn-Engine": "v1" });
+    assert("Headers get case-insensitive", hdrs.get("content-type") === "application/json");
+    assert("Headers has", hdrs.has("x-varn-engine") === true);
+    hdrs.set("Authorization", "Bearer token123");
+    assert("Headers get custom", hdrs.get("authorization") === "Bearer token123");
+    hdrs.delete("x-varn-engine");
+    assert("Headers deleted", hdrs.has("x-varn-engine") === false);
 
-// Adding valid routes using fluent chain
-server.get("/api/v1/users", (req, res) => {
-    res.status(200).send("users");
-})
-.post("/api/v1/users", (req, res) => {
-    res.status(200).json({ created: true });
-})
-.get("/api/v1/users/:id", (req, res) => {
-    res.status(200).html("<h1>User Profile</h1>");
-});
+    // 4. Web Standard Request & Response
+    let req = new Request("http://localhost:8080/api/users", {
+        method: "POST",
+        headers: { "Accept": "application/json" },
+        body: '{"name":"Varn"}'
+    });
+    assert("Request method", req.method === "POST");
+    assert("Request url", req.url === "http://localhost:8080/api/users");
+    assert("Request body text", req.text() === '{"name":"Varn"}');
 
-print("[PASSED] 43. Varn Native HTTP Client and Server Config Verification");
+    let resp = json({ success: true, count: 42 });
+    assert("Response json status", resp.status === 200);
+    assert("Response json ok", resp.ok === true);
+    assert("Response json body", resp.text().indexOf('"success":true') >= 0);
+
+    let redir = redirect("https://varn.dev", 301);
+    assert("Redirect status", redir.status === 301);
+    assert("Redirect header", redir.headers.get("location") === "https://varn.dev");
+
+    let errResp = error(404, "Not Found");
+    assert("Error status", errResp.status === 404);
+    assert("Error ok is false", errResp.ok === false);
+
+    // 5. Test Server registration & routing configuration
+    let app = server();
+    assert("Http server created successfully", app !== null);
+
+    app.get("/api/v1/users", (req: Request) => {
+        return json({ users: ["alice", "bob"] });
+    })
+    .post("/api/v1/users", (req: Request) => {
+        return json({ created: true });
+    })
+    .get("/api/v1/users/:id", (req: Request) => {
+        return new Response("<h1>User Profile</h1>", 200, { "Content-Type": "text/html" });
+    });
+
+    // 6. Builtin runtime:net helpers
+    assert("isIPv4 valid", isIPv4$("127.0.0.1") === true);
+    assert("isIPv4 invalid", isIPv4$("999.999.999.999") === false);
+    assert("isIPv6 valid", isIPv6$("::1") === true);
+    assert("isIP valid", isIP$("192.168.1.1") === true);
+    assert("encodeURIComponent", encodeURIComponent$("hello world&foo=bar") === "hello%20world%26foo%3Dbar");
+    assert("decodeURIComponent", decodeURIComponent$("hello%20world%26foo%3Dbar") === "hello world&foo=bar");
+
+    print("[PASSED] 43. Varn Native HTTP Client and Server Config Verification");
+}
+
+if (!isIsolate) {
+    await runHttpVerification();
+}

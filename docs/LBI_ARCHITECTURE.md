@@ -91,14 +91,18 @@ Si el programa se ejecuta en un entorno restringido o sandbox que carece de la c
 
 ## 6. Módulos Host Especializados (`builtin:net` y Primitivas)
 
-### 6.1 Subsistema de Red Host (`builtin:net`)
-Expone la interfaz nativa para sockets TCP no bloqueantes con soporte de cancelación reactiva:
-- `tcpListen$(port)`: Enlaza un `TcpListener` y retorna un identificador entero.
-- `tcpAccept$(listenerId)`: Bucle asíncrono con fast-path no bloqueante. Al invocar `tcpCloseListener$`, el bucle de sondeo detecta la remoción inmediata y finaliza el hilo de background sin retardos.
-- `tcpConnect$(host, port)`: Conexión asíncrona no bloqueante.
-- `tcpRead$(connId, maxLen)` / `tcpWrite$(connId, data)`: I/O no bloqueante con fast-path de $0\ \mu\text{s}$ cuando el buffer del kernel está listo.
-- `tcpClose$(connId)` / `tcpCloseListener$(listenerId)`: Cierre determinista y liberación de recursos.
+### 6.1 Subsistema de Red Host (`runtime:net` / `IoDriver` con `mio` v1.0)
+Expone la interfaz nativa para sockets TCP no bloqueantes con reactor de eventos basado en `mio` v1.0 (IOCP en Windows, `epoll` en Linux, `kqueue` en macOS):
+- `IoDriver`: Hilo único reactor en background gestionado por `mio::Poll`, `mio::Events` y `mio::Waker`.
+- `Fast-Path ($0\ \mu\text{s}$)`: Intentos inmediatos de `accept()`, `read()`, `write()` en modo no bloqueante en el hilo invocador sin registrar en el reactor ni suspender corrutinas.
+- `Slow-Path (Event-Driven)`: Al recibir `WouldBlock`, el descriptor de socket se registra en el bucle de eventos mediante comandos canalizados seguros (`DriverCommand`), suspendiendo la corrutina SSA en `AsyncTask`. Al dispararse la notificación del kernel, el reactor completa la operación y despierta la tarea vía `task.settle()` con $0\ \text{ms}$ de retardo y 0 hilos efímeros.
+- `tcpListen$(port)`: Enlaza un `TcpListener` y lo registra en el reactor `mio`.
+- `tcpAccept$(listenerId)`: Aceptación reactiva de conexiones entrantes.
+- `tcpConnect$(host, port)`: Conexión asíncrona reactiva no bloqueante.
+- `tcpRead$(connId, maxLen)` / `tcpWrite$(connId, data)`: I/O de red no bloqueante.
+- `tcpClose$(connId)` / `tcpCloseListener$(listenerId)`: Desregistro en `mio` y cierre determinista de descriptores.
 
 ### 6.2 Primitivas Nativas (`int.parse`, `float.parse`, `str`)
 Implementadas directamente a nivel nativo en Rust dentro de `crates/varn-builtins/src/modules/primitives/`, permitiendo conversión directa de strings a números con validación de NaN/overflow y rendimiento nativo sin requerir bucles manuales de parsing en la stdlib.
+
 

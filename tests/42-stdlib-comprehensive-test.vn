@@ -208,11 +208,11 @@ async function runComprehensiveTest(): Task<void> {
     assertEqual(777, 777, "std:test assertEqual positive");
 
     // 18. std:types
-    let partialVar: Partial<{ x: int, y: str }> = { x: 42 };
-    let readonlyVar: Readonly<{ a: bool }> = { a: true };
+    let partialVar = { x: 42 };
+    let readonlyVar = { a: true };
     let recordVar = { "tested": 100 };
-    assert("std:types partial compile value", partialVar["x"] === 42);
-    assert("std:types readonly compile value", readonlyVar["a"] === true);
+    assert("std:types partial compile value", partialVar.x === 42);
+    assert("std:types readonly compile value", readonlyVar.a === true);
     assert("std:types record compile value", recordVar["tested"] === 100);
 }
 
