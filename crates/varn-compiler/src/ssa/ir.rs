@@ -49,8 +49,33 @@ pub struct SsaFunc {
 }
 
 impl SsaFunc {
+    #[inline]
     pub fn block(&self, id: BlockId) -> &Block {
         &self.blocks[id.0 as usize]
+    }
+
+    #[inline]
+    pub fn block_mut(&mut self, id: BlockId) -> &mut Block {
+        &mut self.blocks[id.0 as usize]
+    }
+
+    #[inline]
+    pub fn alloc_value(&mut self, ty: HirType) -> Value {
+        let v = Value(self.values.len() as u32);
+        self.values.push(ValueDef { ty });
+        v
+    }
+
+    #[inline]
+    pub fn alloc_block(&mut self) -> BlockId {
+        let id = BlockId(self.blocks.len() as u32);
+        self.blocks.push(Block {
+            params: Vec::new(),
+            insts: Vec::new(),
+            term: Terminator::Unreachable,
+            preds: Vec::new(),
+        });
+        id
     }
 
     pub fn value_ty(&self, v: Value) -> HirType {

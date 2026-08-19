@@ -119,6 +119,15 @@ impl<'a> Lowerer<'a> {
                 &mut out,
             )?;
         }
+        for (fname, fexpr) in field_inits {
+            let value = self.lower_expr(fexpr, scope)?;
+            out.push(HirStmt::SetMember {
+                object: HirExpr::This,
+                name: fname.clone(),
+                value,
+            });
+        }
+
         match body {
             BodyRef::Block(stmt) => match &stmt.kind {
                 StmtKind::Block { stmts } => {
@@ -133,15 +142,6 @@ impl<'a> Lowerer<'a> {
                 out.push(HirStmt::Return(Some(v)));
             }
             BodyRef::Empty => {}
-        }
-
-        for (fname, fexpr) in field_inits {
-            let value = self.lower_expr(fexpr, scope)?;
-            out.push(HirStmt::SetMember {
-                object: HirExpr::This,
-                name: fname.clone(),
-                value,
-            });
         }
         Ok((params, out))
     }

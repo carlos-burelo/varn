@@ -1,4 +1,4 @@
-// std:http — Clean, modern, object-oriented HTTP client and server APIs for Varn.
+// std:http — Web-standard (WinterCG / Bun) aligned HTTP client and server APIs for Varn.
 
 import {
     tcpListen$,
@@ -31,31 +31,67 @@ export class HttpStatus {
     static ServiceUnavailable = #{ code: 503, message: "Service Unavailable" };
 }
 
-function parseInt(s: str): int {
-    let val = 0;
-    let keep = true;
-    for (let i = 0; i < s.length; i = i + 1) {
-        if (keep) {
-            let c = s[i];
-            let digit = -1;
-            if (c === "0") digit = 0;
-            else if (c === "1") digit = 1;
-            else if (c === "2") digit = 2;
-            else if (c === "3") digit = 3;
-            else if (c === "4") digit = 4;
-            else if (c === "5") digit = 5;
-            else if (c === "6") digit = 6;
-            else if (c === "7") digit = 7;
-            else if (c === "8") digit = 8;
-            else if (c === "9") digit = 9;
-            if (digit >= 0) {
-                val = val * 10 + digit;
-            } else {
-                keep = false;
+// -----------------------------------------------------------------------------
+// Web Standard Headers (Case-Insensitive)
+// -----------------------------------------------------------------------------
+export class Headers {
+    private _map: { [key: str]: str } = {};
+
+    constructor(init?: dynamic) {
+        this._map = {};
+        if (init !== null && typeof init === "object") {
+            for (let k in init) {
+                this.set(k, init[k]);
             }
         }
     }
-    return val;
+
+    get(name: str): str? {
+        let key = name.toLowerCase();
+        return this._map[key];
+    }
+
+    set(name: str, value: str): void {
+        let key = name.toLowerCase();
+        this._map[key] = value;
+    }
+
+    has(name: str): bool {
+        let key = name.toLowerCase();
+        return this._map[key] !== null;
+    }
+
+    delete(name: str): void {
+        let key = name.toLowerCase();
+        let newMap: { [key: str]: str } = {};
+        for (let k in this._map) {
+            if (k !== key) {
+                newMap[k] = this._map[k];
+            }
+        }
+        this._map = newMap;
+    }
+
+    append(name: str, value: str): void {
+        let key = name.toLowerCase();
+        let existing = this._map[key];
+        if (existing !== null) {
+            this._map[key] = existing + ", " + value;
+        } else {
+            this._map[key] = value;
+        }
+    }
+
+    toObject(): { [key: str]: str } {
+        let result: { [key: str]: str } = {};
+        for (let k in this._map) {
+            let v = this._map[k];
+            if (v !== null) {
+                result[k] = v;
+            }
+        }
+        return result;
+    }
 }
 
 class RawRequest {
@@ -109,7 +145,7 @@ async function readHttpRequest(connId: int): Task<RawRequest?> {
             if (req !== null) {
                 let contentLenStr = req.headers["content-length"];
                 if (contentLenStr !== null) {
-                    let contentLen = parseInt(contentLenStr);
+                    let contentLen = int.parse(contentLenStr);
                     if (req.body.length >= contentLen) {
                         req.body = req.body.slice(0, contentLen);
                         keepReading = false;
@@ -147,7 +183,7 @@ function parseRawResponse(raw: str): RawResponse? {
     let firstLine = lines[0];
     let parts = firstLine.split(" ");
     if (parts.length >= 2) {
-        resp.status = parseInt(parts[1]);
+        resp.status = int.parse(parts[1]);
         if (parts.length >= 3) {
             resp.statusText = parts[2];
         }
@@ -179,11 +215,13 @@ async function readHttpResponse(connId: int): Task<RawResponse?> {
             if (resp !== null) {
                 let contentLenStr = resp.headers["content-length"];
                 if (contentLenStr !== null) {
-                    let contentLen = parseInt(contentLenStr);
+                    let contentLen = int.parse(contentLenStr);
                     if (resp.body.length >= contentLen) {
                         resp.body = resp.body.slice(0, contentLen);
                         keepReading = false;
                     }
+                } else {
+                    keepReading = false;
                 }
             }
         } else {
@@ -224,28 +262,72 @@ function matchRoutePattern(pattern: str, path: str): { [key: str]: str }? {
     return null;
 }
 
-export class HttpRequest {
-    method: str;
-    path: str;
-    query: { [key: str]: str };
-    params: { [key: str]: str };
-    body: str;
-    headers: { [key: str]: str };
+// -----------------------------------------------------------------------------
+// Web Standard Request
+// -----------------------------------------------------------------------------
+export class Request {
+    url: str = "";
+    method: str = "GET";
+    headers: Headers = new Headers({});
+    body: str = "";
+    path: str = "";
+    query: { [key: str]: str } = {};
+    params: { [key: str]: str } = {};
+
+    constructor(url: str = "", methodOrInit: dynamic = "GET", headers: dynamic = {}, body: str = "") {
+        this.url = url;
+        this.path = url;
+        this.query = {};
+        this.params = {};
+        if (typeof methodOrInit === "object" && methodOrInit !== null) {
+            let m = methodOrInit["method"];
+            if (m !== null) {
+                this.method = m;
+            } else {
+                this.method = "GET";
+            }
+            this.headers = new Headers(methodOrInit["headers"]);
+            let b = methodOrInit["body"];
+            if (b !== null) {
+                this.body = b;
+            } else {
+                this.body = "";
+            }
+        } else {
+            if (typeof methodOrInit === "str") {
+                this.method = methodOrInit;
+            } else {
+                this.method = "GET";
+            }
+            this.headers = new Headers(headers);
+            this.body = body;
+        }
+    }
+
+    text(): str {
+        return this.body;
+    }
 
     json(): Json {
         return jsonParse(this.body);
     }
 }
 
+export class HttpRequest extends Request {}
+
+// -----------------------------------------------------------------------------
+// Server Response Builder (for callback style compatibility)
+// -----------------------------------------------------------------------------
 export class HttpResponse {
-    private connId: int;
-    private isSent: bool = false;
+    connId: int;
+    isSent: bool = false;
     private statusCode: int = 200;
     private responseHeaders: { [key: str]: str } = {};
     private responseContentType: str = "text/plain";
 
     constructor(connId: int) {
         this.connId = connId;
+        this.responseHeaders = {};
     }
 
     status(code: int): HttpResponse {
@@ -299,40 +381,117 @@ export class HttpResponse {
     }
 }
 
+// -----------------------------------------------------------------------------
+// Web Standard Response
+// -----------------------------------------------------------------------------
+export class Response {
+    status: int = 200;
+    statusText: str = "OK";
+    ok: bool = true;
+    body: str = "";
+    headers: Headers = new Headers({});
+    url: str = "";
+
+    constructor(
+        bodyOrStatus: dynamic = "",
+        statusOrStatusText: dynamic = 200,
+        headersOrOk: dynamic = {},
+        bodyPos: str = "",
+        headersPos: dynamic = {}
+    ) {
+        if (typeof bodyOrStatus === "int" || typeof bodyOrStatus === "float") {
+            let st = bodyOrStatus as int;
+            this.status = st;
+            this.statusText = typeof statusOrStatusText === "str" ? statusOrStatusText : (st >= 200 && st < 300 ? "OK" : (st === 404 ? "Not Found" : (st === 500 ? "Internal Server Error" : "Status")));
+            this.ok = st >= 200 && st < 300;
+            this.body = bodyPos;
+            this.headers = new Headers(headersPos);
+        } else {
+            this.body = typeof bodyOrStatus === "str" ? bodyOrStatus : "";
+            let st = (typeof statusOrStatusText === "int" || typeof statusOrStatusText === "float") ? (statusOrStatusText as int) : 200;
+            this.status = st;
+            this.statusText = st >= 200 && st < 300 ? "OK" : (st === 404 ? "Not Found" : (st === 500 ? "Internal Server Error" : "Status"));
+            this.ok = st >= 200 && st < 300;
+            this.headers = new Headers(headersOrOk);
+        }
+    }
+
+    text(): str {
+        return this.body;
+    }
+
+    json(): Json {
+        return jsonParse(this.body);
+    }
+}
+
+export function json(data: Json, status: int = 200, headers: dynamic = {}): Response {
+    let body = jsonStringify(data);
+    let h = new Headers(headers);
+    if (!h.has("content-type")) {
+        h.set("Content-Type", "application/json");
+    }
+    let res = new Response(body, status, h.toObject());
+    return res;
+}
+
+export function redirect(url: str, status: int = 302): Response {
+    let hdrs = { "Location": url };
+    return new Response("", status, hdrs);
+}
+
+export function error(status: int = 500, message: str = "Internal Server Error"): Response {
+    return new Response(message, status, { "Content-Type": "text/plain" });
+}
+
+// -----------------------------------------------------------------------------
+// Web Standard HttpServer (WinterCG / Bun aligned)
+// -----------------------------------------------------------------------------
 export class HttpServer {
     private _port: int = 0;
     private _listenerId: int = -1;
     private _isListening: bool = false;
-    private _routes: { [key: str]: (req: HttpRequest, res: HttpResponse) => void } = {};
+    private _routes: { [key: str]: dynamic } = {};
+    private _fetchHandler: dynamic = null;
 
-    constructor() {}
+    constructor(fetchHandler?: dynamic) {
+        this._routes = {};
+        if (fetchHandler !== null) {
+            this._fetchHandler = fetchHandler;
+        }
+    }
 
     private _routeKey(method: str, pattern: str): str {
         return method.toUpperCase() + ":" + pattern;
     }
 
-    get(pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
+    get(pattern: str, handler: dynamic): HttpServer {
         this._routes[this._routeKey("GET", pattern)] = handler;
         return this;
     }
 
-    post(pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
+    post(pattern: str, handler: dynamic): HttpServer {
         this._routes[this._routeKey("POST", pattern)] = handler;
         return this;
     }
 
-    put(pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
+    put(pattern: str, handler: dynamic): HttpServer {
         this._routes[this._routeKey("PUT", pattern)] = handler;
         return this;
     }
 
-    delete(pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
+    delete(pattern: str, handler: dynamic): HttpServer {
         this._routes[this._routeKey("DELETE", pattern)] = handler;
         return this;
     }
 
-    route(method: str, pattern: str, handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer {
+    route(method: str, pattern: str, handler: dynamic): HttpServer {
         this._routes[this._routeKey(method, pattern)] = handler;
+        return this;
+    }
+
+    all(pattern: str, handler: dynamic): HttpServer {
+        this._routes[this._routeKey("*", pattern)] = handler;
         return this;
     }
 
@@ -343,6 +502,15 @@ export class HttpServer {
         this._isListening = true;
 
         spawn(this._acceptLoop());
+    }
+
+    close(): void {
+        if (!this._isListening) return;
+        this._isListening = false;
+        if (this._listenerId !== -1) {
+            tcpCloseListener$(this._listenerId);
+            this._listenerId = -1;
+        }
     }
 
     private async _acceptLoop(): Task<void> {
@@ -360,25 +528,52 @@ export class HttpServer {
         }
     }
 
+    private async _sendWebResponse(connId: int, responseObj: Response): Task<void> {
+        let status = responseObj.status;
+        let statusText = responseObj.statusText;
+        let responseStr = "HTTP/1.1 " + status.toString() + " " + statusText + "\r\n";
+        
+        let hdrs = responseObj.headers;
+        if (hdrs !== null) {
+            let hdrMap = hdrs.toObject();
+            for (let name in hdrMap) {
+                responseStr = responseStr + name + ": " + hdrMap[name] + "\r\n";
+            }
+        }
+        
+        let body = responseObj.body;
+        responseStr = responseStr + "Content-Length: " + body.length.toString() + "\r\n\r\n" + body;
+        
+        await tcpWrite$(connId, responseStr);
+        tcpClose$(connId);
+    }
+
     private async _handleConnection(connId: int): Task<void> {
         let rawReq = await readHttpRequest(connId);
         if (rawReq !== null) {
-            let matchedHandler: ((req: HttpRequest, res: HttpResponse) => void)? = null;
-            let matchedPattern = "";
+            let matchedHandler: dynamic = null;
             let matchedParams: { [key: str]: str } = {};
 
             for (let routeKey in this._routes) {
                 let parts = routeKey.split(":");
                 let method = parts[0];
                 let pattern = parts[1];
-                if (method === rawReq.method.toUpperCase()) {
-                    let params = matchRoutePattern(pattern, rawReq.path);
-                    if (params !== null) {
+                if (method === "*" || method === rawReq.method.toUpperCase()) {
+                    if (pattern === "*") {
                         matchedHandler = this._routes[routeKey];
-                        matchedPattern = pattern;
-                        matchedParams = params;
+                        matchedParams = {};
+                    } else {
+                        let params = matchRoutePattern(pattern, rawReq.path);
+                        if (params !== null) {
+                            matchedHandler = this._routes[routeKey];
+                            matchedParams = params;
+                        }
                     }
                 }
+            }
+
+            if (matchedHandler === null && this._fetchHandler !== null) {
+                matchedHandler = this._fetchHandler;
             }
 
             if (matchedHandler !== null) {
@@ -390,70 +585,72 @@ export class HttpServer {
                     queryStr = rawReq.path.slice(qIdx + 1);
                 }
                 
-                let reqObj = new HttpRequest();
-                reqObj.method = rawReq.method;
+                let reqObj = new Request(rawReq.path, rawReq.method, rawReq.headers, rawReq.body);
                 reqObj.path = pathOnly;
-                reqObj.headers = rawReq.headers;
-                reqObj.body = rawReq.body;
                 
                 let queryObj: { [key: str]: str } = {};
                 if (queryStr.length > 0) {
                     let pairs = queryStr.split("&");
-                    for (let pair of pairs) {
-                        let eq = pair.indexOf("=");
-                        if (eq >= 0) {
-                            queryObj[pair.slice(0, eq)] = pair.slice(eq + 1);
+                    for (let i = 0; i < pairs.length; i = i + 1) {
+                        let pair = pairs[i];
+                        let eqIdx = pair.indexOf("=");
+                        if (eqIdx > 0) {
+                            let k = pair.slice(0, eqIdx);
+                            let v = pair.slice(eqIdx + 1);
+                            queryObj[k] = v;
                         } else {
-                            queryObj[pair] = "";
+                            queryObj[pair] = "true";
                         }
                     }
                 }
                 reqObj.query = queryObj;
                 reqObj.params = matchedParams;
-
+                
                 let resObj = new HttpResponse(connId);
-                matchedHandler(reqObj, resObj);
+                let result = await matchedHandler(reqObj, resObj);
+                
+                // If handler returned a Web Standard Response
+                if (result !== null && typeof result === "object" && !resObj.isSent) {
+                    let finalResp = result as Response;
+                    if (finalResp.status !== null) {
+                        await this._sendWebResponse(connId, finalResp);
+                        resObj.isSent = true;
+                    }
+                }
             } else {
-                let notFoundResponse = "HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\nContent-Type: text/plain\r\n\r\nNot Found";
-                await tcpWrite$(connId, notFoundResponse);
+                let notFoundRes = "HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\nContent-Type: text/plain\r\n\r\nNot Found";
+                await tcpWrite$(connId, notFoundRes);
                 tcpClose$(connId);
             }
         } else {
             tcpClose$(connId);
         }
     }
-
-    close(): void {
-        if (!this._isListening) return;
-        this._isListening = false;
-        tcpCloseListener$(this._listenerId);
-    }
 }
 
-export class Response {
-    status: int;
-    statusText: str;
-    ok: bool;
-    body: str;
-    headers: { [key: str]: str };
-
-    constructor(status: int, statusText: str, ok: bool, body: str, headers: { [key: str]: str }) {
-        this.status = status;
-        this.statusText = statusText;
-        this.ok = ok;
-        this.body = body;
-        this.headers = headers;
+// -----------------------------------------------------------------------------
+// Bun.serve / WinterCG Standard serve() Initializer
+// -----------------------------------------------------------------------------
+export function serve(handlerOrOptions: dynamic, port: int = 3000): HttpServer {
+    let server = new HttpServer();
+    if (typeof handlerOrOptions === "function") {
+        server.all("*", handlerOrOptions);
+        server.listen(port);
+    } else if (typeof handlerOrOptions === "object") {
+        let targetPort = port;
+        if (handlerOrOptions["port"] !== null) {
+            targetPort = handlerOrOptions["port"];
+        }
+        let fetchFn = handlerOrOptions["fetch"];
+        server.all("*", fetchFn);
+        server.listen(targetPort);
     }
-
-    text(): str {
-        return this.body;
-    }
-
-    json(): Json {
-        return jsonParse(this.body);
-    }
+    return server;
 }
 
+// -----------------------------------------------------------------------------
+// Web Standard fetch() Implementation
+// -----------------------------------------------------------------------------
 async function doFetch(connId: int, parsedUrl: Url, method: str, headers: { [key: str]: str }, body: str): Task<Response> {
     let requestStr = method + " " + parsedUrl.path;
     const queryStr = parsedUrl.query.toString();
@@ -490,7 +687,7 @@ async function doFetch(connId: int, parsedUrl: Url, method: str, headers: { [key
     if (writeRes === -1) {
         tcpClose$(connId);
         let mock_body = "<!DOCTYPE html><html><body>Offline mock response for " + parsedUrl.toString() + "</body></html>";
-        return new Response(200, "OK", true, mock_body, {});
+        return new Response(mock_body, 200, {});
     }
     
     const rawResp = await readHttpResponse(connId);
@@ -498,14 +695,12 @@ async function doFetch(connId: int, parsedUrl: Url, method: str, headers: { [key
     
     if (rawResp === null) {
         let mock_body = "<!DOCTYPE html><html><body>Offline mock response for " + parsedUrl.toString() + "</body></html>";
-        return new Response(200, "OK", true, mock_body, {});
+        return new Response(mock_body, 200, {});
     }
     
     return new Response(
-        rawResp.status,
-        rawResp.statusText,
-        rawResp.status >= 200 && rawResp.status < 300,
         rawResp.body,
+        rawResp.status,
         rawResp.headers
     );
 }
@@ -513,7 +708,7 @@ async function doFetch(connId: int, parsedUrl: Url, method: str, headers: { [key
 export async function fetch(
     url: str,
     method: str = "GET",
-    headers: { [key: str]: str } = {},
+    headers: dynamic = {},
     body: str = "",
     timeoutMs: int = 5000
 ): Task<Response> {
@@ -531,15 +726,54 @@ export async function fetch(
     let connId = await tcpConnect$(host, port);
     if (connId === -1) {
         let mock_body = "<!DOCTYPE html><html><body>Offline mock response for " + url + "</body></html>";
-        return new Response(200, "OK", true, mock_body, {});
+        return new Response(mock_body, 200, {});
     }
     
-    return await doFetch(connId, parsedUrl, method, headers, body);
+    let headerMap: { [key: str]: str } = {};
+    if (headers !== null && typeof headers === "object") {
+        for (let k in headers) {
+            headerMap[k] = headers[k];
+        }
+    }
+    
+    return await doFetch(connId, parsedUrl, method, headerMap, body);
+}
+
+export async function get(url: str, headers: dynamic = {}): Task<Response> {
+    return await fetch(url, "GET", headers, "");
+}
+
+export async function post(url: str, body: str = "", headers: dynamic = {}): Task<Response> {
+    return await fetch(url, "POST", headers, body);
+}
+
+export async function put(url: str, body: str = "", headers: dynamic = {}): Task<Response> {
+    return await fetch(url, "PUT", headers, body);
+}
+
+export async function del(url: str, headers: dynamic = {}): Task<Response> {
+    return await fetch(url, "DELETE", headers, "");
+}
+
+export function server(fetchHandler?: dynamic): HttpServer {
+    return new HttpServer(fetchHandler);
 }
 
 export const Http = {
-    Request: HttpRequest,
-    Response: HttpResponse,
+    Headers: Headers,
+    Request: Request,
+    Response: Response,
     Server: HttpServer,
+    HttpStatus: HttpStatus,
+    serve,
+    server,
     fetch,
+    get,
+    post,
+    put,
+    del,
+    delete: del,
+    json,
+    redirect,
+    error,
 };

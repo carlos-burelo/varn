@@ -186,3 +186,15 @@ Cuatro verificadores revisan el mapeo final antes de escribirlo: interferencia, 
 
 ### Inferidor de Tipos de Slot (`slot_kinds`)
 Inspecciona los tipos asignados a cada registro (`Float`, `Int`, `ObjectRef`, `Any`) y construye el mapa de metadatos `register_meta` necesario para que el JIT compila instrucciones nativas x86-64 sin comprobaciones redundantes.
+
+---
+
+## 7. Frontend y Lowering Semántico
+
+### 7.1 Sintaxis Moderna de Literales de Objetos
+- **Property Shorthand**: La sintaxis `{ a, b }` se desazucara automáticamente a `{ a: a, b: b }` tanto en el parser (`varn-parser`) como en el lowering (`varn-compiler`).
+- **Nombres de Propiedades Contextuales**: Identificadores coincidentes con palabras clave contextuales (como `get`, `post`, `set`, `delete`, `type`) se aceptan como claves de propiedades válidas en literales de objetos sin requerir comillas obligatorias `{ get: fn, post: fn }`.
+
+### 7.2 Orden Determinista de Inicialización de Constructores
+En `varn-compiler` (`hir/lower/decl/functions.rs`), la inicialización de campos de clases por defecto (`field_inits`) se compila e inyecta **estrictamente antes** del cuerpo del constructor. Esto garantiza que todos los campos declarados con valores iniciales (`field: Type = default_val`) existan y no sean `null` si el código del constructor invoca métodos de la propia instancia (`this.method()`).
+

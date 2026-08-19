@@ -39,6 +39,7 @@ tokio        = { version = "1", features = ["full"] }
 semver       = "1"
 sha2         = "0.10"
 hex          = "0.4"
+mio          = { version = "1.0", features = ["net", "os-poll"] }
 # SIMD substring search. Already in the build graph via `serde_json`, so this
 # is a new edge rather than new code: `str::find` uses the scalar Two-Way
 # algorithm, and `indexOf`/`includes` over a large haystack is the one place

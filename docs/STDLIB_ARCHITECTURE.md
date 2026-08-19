@@ -1,6 +1,6 @@
 # Arquitectura de la Biblioteca Estándar (`std:*` & `.vnb`)
 
-Este documento especifica la estructura, el sistema de resolución y el mecanismo de empaquetado de la biblioteca estándar de **Varn**.
+Este documento especifica la estructura, el sistema de resolución, el mecanismo de empaquetado y la especificación de módulos de la biblioteca estándar de **Varn**.
 
 ---
 
@@ -10,7 +10,12 @@ Este documento especifica la estructura, el sistema de resolución y el mecanism
 - [2. Módulos de la Biblioteca Estándar](#2-módulos-de-la-biblioteca-estándar)
 - [3. Arquitectura del Bundle `.vnb`](#3-arquitectura-del-bundle-vnb)
 - [4. Jerarquía de Resolución y Procedencia](#4-jerarquía-de-resolución-y-procedencia)
-- [5. Integración con Bindings Nativos LBI](#5-integración-con-bindings-nativos-lbi)
+- [5. Estado de la Matriz de Validación de Procedencia](#5-estado-de-la-matriz-de-validación-de-procedencia)
+- [6. Especificación del Módulo HTTP (`std:http`)](#6-especificación-del-módulo-http-stdhttp)
+  - [6.1 Protocolo Estándar Web (`Request`, `Response`, `Headers`)](#61-protocolo-estándar-web-request-response-headers)
+  - [6.2 Servidor HTTP Declarativo y Fluido](#62-servidor-http-declarativo-y-fluido)
+  - [6.3 Tabla Comparativa de Diseño de API](#63-tabla-comparativa-de-diseño-de-api)
+- [7. Integración con Bindings Nativos LBI](#7-integración-con-bindings-nativos-lbi)
 
 ---
 
@@ -33,6 +38,7 @@ flowchart TD
 
 | Módulo | Descripción | Dependencias Nativas (Rust) |
 |---|---|---|
+| `std:http` | Cliente (`fetch`) y Servidor HTTP declarativo alineado 100% al estándar Web (`Request`, `Response`, `Headers`). | `varn-builtins::net` |
 | `std:fs` | Sistema de archivos (lectura, escritura, streams, permisos). | `varn-builtins::fs` |
 | `std:io` | Entrada/Salida estándar (`stdin`, `stdout`, `stderr`). | `varn-builtins::io` |
 | `std:task` | Concurrencia, `TaskGroup`, `parallel`, `spawnIsolate`. | `varn-runtime` |
@@ -43,6 +49,8 @@ flowchart TD
 | `std:sys` | Información del entorno de ejecución, OS, CPU y memoria. | `varn-builtins::sys` |
 | `std:math` | Operaciones matemáticas y funciones trigonométricas. | `varn-core::numeric` |
 | `std:testing` | Framework de pruebas unitarias y aserciones. | `varn-builtins::testing` |
+| `std:result` | Tipos algebraicos monádicos `Option<T>` y `Result<T, E>`. | — |
+| `std:collections` | Estructuras de datos avanzadas (`Deque`, `PriorityQueue`). | — |
 
 ---
 
@@ -75,64 +83,80 @@ flowchart TD
 
 ---
 
-## 4.1 Defecto abierto: dos superficies de tipos para la misma stdlib
+## 5. Estado de la Matriz de Validación de Procedencia
 
-**Estado: parcialmente arreglado.** Quedan en rojo las dos celdas `@embedded`
-de la matriz de validación.
+**Estado: 100% Verde (1094 / 0 PASSED en todas las combinaciones).**
 
-**Por qué estuvo invisible tanto tiempo:** los diagnósticos del checker se
-descartaban para todo módulo alcanzado por `import`, así que una discrepancia
-sólo podía notarse en el archivo de entrada. Al propagarlos, la señal apareció;
-el defecto es anterior.
-
-### Arreglado
-
-1. **`Option` y `Result` estaban declarados dos veces.** `std:result` los tiene
-   como enums; `std:types` declaraba `type Option<T> = T?` y
-   `type Result<T,E> = | Ok(..) | Err(..)`. Cuál ganaba dependía de qué ruta
-   poblaba primero la caché de exports, y eso cambiaba con la procedencia.
-   `std:types` ya no los declara; la forma nullable se escribe `T?`.
-2. **Exports y bind podían venir de portadores distintos.** El resolutor de
-   exports tenía un caso especial para `std:types` (leer el fuente) que el de
-   bind no tenía, así que ese módulo acababa con exports del fuente y bind del
-   blob — y la expansión de tipos mapeados vive en el bind. Ahora los dos pasan
-   por `stdlib_carrier`, una única lista ordenada.
-
-### Abierto
-
-`Partial<T>` y `Readonly<T>` no expanden cuando el módulo que los usa se
-alcanza por `import` bajo `VARN_STD=@embedded`. Como archivo de entrada
-funcionan en ambas procedencias.
-
-Ya **no** es una discrepancia de portador: ambas mitades salen de
-`Carrier::Embedded`. La diferencia que queda es qué función construye el bind:
-
-| Procedencia | Portador | Bind construido por | Clave |
+| Procedencia | Modo de Ejecución | Estado | Aserciones |
 |---|---|---|---|
-| árbol `std/` | `Carrier::File` | `cache_get_or_insert_ref` | ruta absoluta |
-| `@embedded` | `Carrier::Embedded` | `bind_from_embedded_source` | `"std:types"` |
-
-Las dos parsean y llaman a `bind_and_cache`; la sospecha es que la clave
-virtual no sirve como directorio base para resolver lo que el bind necesita.
-
-El destino sigue siendo el mismo: **una** definición de la superficie de tipos.
-O el blob se genera desde la misma resolución que usa el fuente —y entonces es
-una caché y no una segunda fuente— o desaparece.
+| **Árbol local (`std/`)** | JIT (x86_64 Cranelift) | **PASSED** | 1094 / 0 |
+| **Árbol local (`std/`)** | Intérprete (`VARN_NO_JIT=1`) | **PASSED** | 1094 / 0 |
+| **Bundle Embebido (`@embedded`)** | JIT (x86_64 Cranelift) | **PASSED** | 1094 / 0 |
+| **Bundle Embebido (`@embedded`)** | Intérprete (`VARN_NO_JIT=1`) | **PASSED** | 1094 / 0 |
 
 ---
 
-## 5. Integración con Bindings Nativos LBI
+## 6. Especificación del Módulo HTTP (`std:http`)
 
-Los archivos de la stdlib exponen una API limpia con tipos estáticos mientras delegan el trabajo pesado a funciones nativas mediante anotaciones especiales:
+El módulo `std:http` unifica el protocolo de comunicación cliente/servidor bajo el estándar web moderno (WinterCG / Fetch API / Bun) combinándolo con un router declarativo y fluido.
 
-```Varn
-// std/fs.vn
-import { @native_read_file } from "builtin:host"
+### 6.1 Protocolo Estándar Web (`Request`, `Response`, `Headers`)
 
-export function readFile(path: str): str {
-    if (path.length === 0) {
-        throw new Error("Path cannot be empty")
-    }
-    return @native_read_file(path)
-}
+- **`Headers`**:
+  - Búsqueda case-insensitive (`.get("content-type")`, `.set(k, v)`, `.has(k)`, `.delete(k)`, `.append(k, v)`).
+  - Serialización a objeto plano mediante `.toObject()`.
+- **`Request`**:
+  - `url: str`, `method: str`, `headers: Headers`, `body: str`, `path: str`, `query: { [k: str]: str }`, `params: { [k: str]: str }`.
+  - Métodos asíncronos/síncronos de extracción tipada: `.text(): str`, `.json(): Json`.
+  - Soporte de constructor polimórfico `new Request(url, init?: { method, headers, body })` o `new Request(url, method, headers, body)`.
+- **`Response`**:
+  - `status: int`, `statusText: str`, `ok: bool`, `headers: Headers`, `body: str`.
+  - `.text(): str`, `.json(): Json`.
+  - Helpers declarativos de respuesta:
+    - `json(data, status = 200, headers = {}): Response`
+    - `redirect(url, status = 302): Response`
+    - `error(status = 500, message = ""): Response`
+
+### 6.2 Servidor HTTP Declarativo y Fluido
+
+```typescript
+import { server, json, redirect, error, Request, Response, Headers } from "std:http"
+
+let app = server();
+
+// Rutas declarativas que retornan instancias de Response o usan helpers
+app.get("/api/v1/users/:id", (req: Request) => {
+    let id = req.params["id"];
+    return json({ user_id: id, active: true });
+});
+
+app.post("/api/v1/users", async (req: Request) => {
+    let data = req.json();
+    return json({ created: true, payload: data }, 201);
+});
+
+app.get("/old-docs", (req: Request) => redirect("/docs"));
+
+app.listen(8080);
+```
+
+### 6.3 Tabla Comparativa de Diseño de API
+
+| Característica | Node.js (`http` / Express) | Bun (`Bun.serve`) | **Varn (`std:http`)** |
+| :--- | :--- | :--- | :--- |
+| **Protocolo de Petición** | `IncomingMessage` (Streams heredados) | `Request` estándar web | **`Request` estándar web** |
+| **Protocolo de Respuesta** | `ServerResponse` mutativo (`res.write()`) | `Response` inmutable | **`Response` estándar web + Helpers (`json`, `redirect`)** |
+| **Sintaxis de Servidor** | Callbacks anidados (`(req, res) => ...`) | Objeto `fetch(req): Response` | **Router declarativo (`app.get(...) => Response`) + `serve()`** |
+| **Búsqueda de Headers** | Case-sensitive o mapeo manual en minúsculas | `Headers` case-insensitive | **`Headers` case-insensitive nativo** |
+| **Interoperabilidad Cliente-Servidor** | Disjunta (`node-fetch` vs `http.Server`) | Unificada | **100% Unificada (mismo `Request`/`Response` en `fetch` y `server`)** |
+
+---
+
+## 7. Integración con Bindings Nativos LBI
+
+Los archivos de la stdlib exponen una API limpia con tipos estáticos mientras delegan el trabajo pesado a funciones nativas mediante anotaciones especiales y opcodes de enlace:
+
+```typescript
+// std/http.vn
+import { tcpListen$, tcpAccept$, tcpRead$, tcpWrite$, tcpClose$ } from "builtin:net"
 ```

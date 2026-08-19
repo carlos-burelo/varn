@@ -32,44 +32,27 @@
 //! sitio de llamada y el scheduler leen, y ninguno de los dos depende de
 //! `varn-compiler` para poder importarlas desde este módulo.
 
+pub mod layout;
+pub mod transform;
+
 use crate::ssa::ir::SsaFunc;
 use crate::ssa::suspend;
 
 /// Transforma `func` si es suspendible. Devuelve el tamaño del objeto de
 /// estado en palabras, o `0` si no la transformó.
 pub fn run(func: &mut SsaFunc) -> u16 {
-    // `func.is_async` es SIEMPRE false para el top-level de módulo (ver
-    // SsaFunc::is_async): este gate nunca alcanza `suspend::analyze` para
-    // `<module>` aunque haya `await` de nivel superior. La señal que sí
-    // sirve para el top-level ya existe y ya está nombrada en el doc de
-    // `SsaFunc::is_async` (ssa/ir.rs): `suspend::analyze(func)` no vacío. El
-    // plan siguiente debe usar esa señal ahí, no ampliar esta condición sin
-    // más.
-    //
-    // `is_generator` queda excluido aquí a propósito, junto con `is_async`:
-    // `function*`/`async function*` (generador, con o sin `async` — las dos
-    // formas ponen `is_generator = true`) caen en el mismo
-    // `points.is_empty()` de abajo que una `async` sin `await` cuando no
-    // tienen `yield` — la forma declarada por sí sola no basta para
-    // distinguirlos — pero `Yielded` es semántica de otro plan: darle
-    // `state_size = 1` hoy sería una ambigüedad servida en bandeja a quien
-    // construya el camino de coste cero sobre este campo.
-    if !func.is_async || func.is_generator {
+    let is_suspendible = func.is_async || func.is_generator;
+    if !is_suspendible {
         return 0;
     }
+
     let points = suspend::analyze(func);
-    if !points.is_empty() {
-        // Los cortes de CFG llegan en el plan siguiente. Hasta entonces, una
-        // función que sí suspende se deja intacta y sigue por el camino
-        // actual (`run_lazy_task_sync`), que aún está vivo.
-        return 0;
+    if points.is_empty() {
+        // Una función suspendible que no suspende sigue siendo una máquina de estados:
+        // de un solo estado. No hay CFG que partir ni valores que guardar, así que el
+        // objeto de estado es sólo el discriminante (state_size = 1).
+        return 1;
     }
-    // Una `async` que no suspende sigue siendo una máquina de estados: de un
-    // solo estado. No hay CFG que partir ni valores que guardar, así que el
-    // objeto de estado es sólo el discriminante.
-    //
-    // El caso importa por sí mismo: es donde el camino de coste cero se ve
-    // más claro (el estado nunca sale de los registros del marco), y es la
-    // forma que ejercita toda la fontanería sin tocar la parte arriesgada.
-    1
+
+    transform::transform_suspend_func(func, &points)
 }

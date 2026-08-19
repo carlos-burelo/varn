@@ -86,3 +86,19 @@ Cada función nativa puede requerir una capacidad de seguridad explícita:
 ```
 
 Si el programa se ejecuta en un entorno restringido o sandbox que carece de la capacidad `fs.write`, la invocación de la función nativa fallará inmediatamente arrojando una excepción de seguridad sin ejecutar la llamada al sistema operativo.
+
+---
+
+## 6. Módulos Host Especializados (`builtin:net` y Primitivas)
+
+### 6.1 Subsistema de Red Host (`builtin:net`)
+Expone la interfaz nativa para sockets TCP no bloqueantes con soporte de cancelación reactiva:
+- `tcpListen$(port)`: Enlaza un `TcpListener` y retorna un identificador entero.
+- `tcpAccept$(listenerId)`: Bucle asíncrono con fast-path no bloqueante. Al invocar `tcpCloseListener$`, el bucle de sondeo detecta la remoción inmediata y finaliza el hilo de background sin retardos.
+- `tcpConnect$(host, port)`: Conexión asíncrona no bloqueante.
+- `tcpRead$(connId, maxLen)` / `tcpWrite$(connId, data)`: I/O no bloqueante con fast-path de $0\ \mu\text{s}$ cuando el buffer del kernel está listo.
+- `tcpClose$(connId)` / `tcpCloseListener$(listenerId)`: Cierre determinista y liberación de recursos.
+
+### 6.2 Primitivas Nativas (`int.parse`, `float.parse`, `str`)
+Implementadas directamente a nivel nativo en Rust dentro de `crates/varn-builtins/src/modules/primitives/`, permitiendo conversión directa de strings a números con validación de NaN/overflow y rendimiento nativo sin requerir bucles manuales de parsing en la stdlib.
+

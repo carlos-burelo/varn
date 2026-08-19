@@ -37,9 +37,7 @@ async function wrapTask<T>(task: Task<T>, group: TaskGroupImpl<T>): T {
         }
         return res;
     } catch (e) {
-        if (group.isCancelled) {
-            throw new Error("TaskGroup cancelled");
-        }
+        group.cancel();
         throw e;
     }
 }
@@ -70,7 +68,7 @@ class TaskGroupImpl<T = dynamic> {
     }
 
     dispose(): void {
-        this.isCancelled = true;
+        this.cancel();
     }
 
     cancel(): void {
@@ -90,4 +88,18 @@ export function TaskGroup<T = dynamic>(): TaskGroupImpl<T> {
 
 export function task_group<T>(): TaskGroupImpl<T> {
     return new TaskGroupImpl<T>();
+}
+
+export function setTimeout(callback: () => void, ms: int): TaskHandle<void> {
+    async function timerRunner(): Task<void> {
+        await sleep(ms);
+        callback();
+    }
+    return spawn(timerRunner);
+}
+
+export function clearTimeout(handle: TaskHandle<void>): void {
+    if (handle !== null) {
+        handle.cancel();
+    }
 }

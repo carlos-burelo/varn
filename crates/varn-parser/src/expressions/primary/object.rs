@@ -25,10 +25,14 @@ pub(super) fn parse_object_expr(s: &mut TokenStream) -> Result<Expr, String> {
 
         let is_getter = s.check(TokenKind::Get)
             && s.peek_kind(1) != TokenKind::LParen
-            && s.peek_kind(1) != TokenKind::Colon;
+            && s.peek_kind(1) != TokenKind::Colon
+            && s.peek_kind(1) != TokenKind::Comma
+            && s.peek_kind(1) != TokenKind::RBrace;
         let is_setter = s.check(TokenKind::Set)
             && s.peek_kind(1) != TokenKind::LParen
-            && s.peek_kind(1) != TokenKind::Colon;
+            && s.peek_kind(1) != TokenKind::Colon
+            && s.peek_kind(1) != TokenKind::Comma
+            && s.peek_kind(1) != TokenKind::RBrace;
 
         if is_getter {
             s.advance();
@@ -68,7 +72,14 @@ pub(super) fn parse_object_expr(s: &mut TokenStream) -> Result<Expr, String> {
             continue;
         }
 
-        let is_async = s.eat(TokenKind::Async);
+        let is_async = s.check(TokenKind::Async)
+            && s.peek_kind(1) != TokenKind::Colon
+            && s.peek_kind(1) != TokenKind::Comma
+            && s.peek_kind(1) != TokenKind::RBrace
+            && s.peek_kind(1) != TokenKind::LParen;
+        if is_async {
+            s.advance();
+        }
         let is_generator = s.eat(TokenKind::Star);
         let key = parse_prop_key(s)?;
 

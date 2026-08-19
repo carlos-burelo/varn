@@ -2,7 +2,7 @@
 
 Matriz de estado, jerarquía de dependencias y tamaños de los **19 crates** del workspace de **Varn**.
 
-Los tamaños son líneas de Rust medidas sobre el árbol actual (104 870 líneas en 579 archivos). Este documento no publica porcentajes de cobertura: la suite de Rust son 85 tests, y la prueba real de integridad es `tests/main.vn` (991 aserciones) bajo las cuatro combinaciones de procedencia de std y JIT descritas en [CONTRIBUTING.md](../CONTRIBUTING.md).
+Los tamaños son líneas de Rust medidas sobre el árbol actual. Este documento no publica porcentajes de cobertura: la suite de Rust son 85 tests, y la prueba real de integridad es `tests/main.vn` (1094 aserciones) bajo las cuatro combinaciones de procedencia de std y JIT descritas en [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ---
 
