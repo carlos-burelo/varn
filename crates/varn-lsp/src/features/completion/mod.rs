@@ -2,7 +2,7 @@ mod autoimport;
 mod calls;
 mod imports;
 mod keywords;
-mod members;
+pub mod members;
 mod scope;
 
 use tower_lsp::lsp_types::{

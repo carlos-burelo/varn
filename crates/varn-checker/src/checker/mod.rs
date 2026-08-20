@@ -16,6 +16,8 @@ use varn_core::Diagnostic;
 pub(crate) use crate::checker_annotations::collect_type_annotations;
 pub(crate) use crate::checker_enrichment::enrich_call_returns;
 
+use crate::semantic_info::{CallResolution, MemberResolution};
+
 #[derive(Clone, Debug)]
 pub struct ExprInfo {
     pub ty: Type,
@@ -43,34 +45,12 @@ pub struct TypeEntry {
     /// never a spurious error in a valid program — `let a = []; a.push(1);
     /// return a[0]` has to keep compiling inside a `: str` function even
     /// though the element is provably `int`. Keeping the proof out of `ty`
-    /// is what guarantees that structurally.
-    ///
-    /// What changed is where it is computed. The refined type used to be
-    /// re-derived at annotation time by running the binder's syntactic
-    /// inference over an overlay environment — a second inference engine
-    /// reachable from the path that feeds the backend. Now the checker proves
-    /// it once, here, and everything downstream reads it.
-    ///
-    /// Invariant: when present, `refined` is a NARROWING of `ty`. It may only
-    /// ever tell codegen more, never something else.
+    /// isolates the type system from the analyser's reach.
     pub refined: Option<Type>,
-    /// The symbol an identifier resolved to. Tooling data: filled only under
-    /// [`CheckOptions::record_types`], because it costs a scope resolve per
-    /// identifier and a compile never reads it.
-    pub symbol_id: Option<SymbolId>,
-    /// Byte range, so the positional projection can be built without walking
-    /// the AST a second time.
     pub start: u32,
     pub end: u32,
-    /// Order in which the checker visited this expression.
-    ///
-    /// The positional projection is first-wins, and offsets collide by
-    /// construction — `x` and `x.y` start at the same byte. Projecting in
-    /// `HashMap` order would pick a different winner per run; projecting in
-    /// visit order reproduces exactly what the inline writes used to produce.
-    /// Neither AST id order nor offset order does: ids are assigned pre-order
-    /// (parent before child) while the checker visits children first.
     pub seq: u32,
+    pub symbol_id: Option<SymbolId>,
 }
 
 impl std::fmt::Display for ExprInfo {
@@ -97,6 +77,8 @@ pub struct CheckResult {
     pub extension_set_members: FxHashMap<u32, Rc<str>>,
     pub node_scopes: FxHashMap<u32, crate::scope::ScopeId>,
     pub symbol_types: FxHashMap<SymbolId, crate::types::Type>,
+    pub member_resolutions: FxHashMap<u32, MemberResolution>,
+    pub call_resolutions: FxHashMap<u32, CallResolution>,
     /// **The** record of what the checker decided, keyed by `Expr::id()`.
     ///
     /// Everything else that carries an expression's type is derived from this:
@@ -190,6 +172,8 @@ pub struct Checker {
     pub(crate) switch_depth: u32,
     pub(crate) in_function: bool,
     pub(crate) expected_object_members_cache: FxHashMap<Type, Vec<ObjectTypeMember>>,
+    pub(crate) member_resolutions: FxHashMap<u32, MemberResolution>,
+    pub(crate) call_resolutions: FxHashMap<u32, CallResolution>,
 }
 
 /// What a caller wants from a check, beyond the diagnostics.
@@ -323,6 +307,16 @@ impl Checker {
                 512,
                 Default::default(),
             ),
+            member_resolutions: if record_expr_types {
+                FxHashMap::with_capacity_and_hasher(512, Default::default())
+            } else {
+                FxHashMap::default()
+            },
+            call_resolutions: if record_expr_types {
+                FxHashMap::with_capacity_and_hasher(512, Default::default())
+            } else {
+                FxHashMap::default()
+            },
         };
 
         let started = Instant::now();
@@ -334,30 +328,22 @@ impl Checker {
         // that is what keeps "what the checker decided" and "what the editor
         // shows" from being two different answers.
         if record_expr_types {
-            let mut in_visit_order: Vec<(u32, u32, u32, ExprInfo)> = checker
+            let mut entries: Vec<(u32, u32, u32, ExprInfo)> = checker
                 .expr_table
                 .values()
                 .map(|e| {
+                    let span_len = e.end.saturating_sub(e.start);
                     let info = ExprInfo {
                         ty: e.ty.clone(),
                         symbol_id: e.symbol_id,
                     };
-                    (e.seq, e.start, e.end, info)
+                    (e.start, span_len, e.seq, info)
                 })
                 .collect();
-            in_visit_order.sort_by_key(|(seq, ..)| *seq);
-            for (_, start, end, info) in in_visit_order {
-                // Both ends of the range: a cursor on the last character of an
-                // expression is still on that expression.
-                if end != start {
-                    checker
-                        .expr_types
-                        .entry(start)
-                        .or_insert_with(|| info.clone());
-                    checker.expr_types.entry(end).or_insert(info);
-                } else {
-                    checker.expr_types.entry(start).or_insert(info);
-                }
+            // Sort by span length DESCENDING, so smaller/innermost (more specific) spans overwrite larger parent spans at the same start offset
+            entries.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.2.cmp(&b.2)));
+            for (start, _len, _seq, info) in entries {
+                checker.expr_types.insert(start, info);
             }
 
             // Declarations the binder created but no expression visits —
@@ -438,6 +424,8 @@ impl Checker {
             extension_set_members: checker.extension_set_members,
             node_scopes,
             symbol_types,
+            member_resolutions: checker.member_resolutions,
+            call_resolutions: checker.call_resolutions,
             expr_table,
         }
     }

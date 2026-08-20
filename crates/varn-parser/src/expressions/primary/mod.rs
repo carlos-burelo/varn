@@ -147,6 +147,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
         TokenKind::LBrace => parse_object_expr(s),
 
         TokenKind::LParen => {
+            let start_range = s.range();
             let pos_before_lparen = s.save();
             s.advance();
             if s.check(TokenKind::RParen) {
@@ -155,8 +156,9 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             }
             let expr = parse_seq_expr(s)?;
             s.expect(TokenKind::RParen)?;
+            let full_range = s.span_from(start_range);
             Ok(Expr::new_with_range(
-                range,
+                full_range,
                 ExprKind::Paren {
                     expression: Box::new(expr),
                 },
@@ -172,20 +174,17 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 return Ok(arrow);
             }
             s.restore(save);
+            let start_range = s.range();
             s.advance();
-            // Not an arrow, so the only thing `async` can introduce here is a
-            // function expression — and `function` still has to be consumed.
-            // Without this the stream was handed to the inner parser still
-            // sitting on `function`, and `async function () {}` failed with
-            // "Expected LParen, got Function".
             s.expect(TokenKind::Function)?;
-            parse_function_expr_inner(s, true)
+            parse_function_expr_inner_with_start(s, true, start_range)
         }
 
         TokenKind::Class => parse_class_expr(s),
         TokenKind::Match => parse_match_expr(s),
 
         TokenKind::Hash => {
+            let start_range = s.range();
             if s.peek_kind(1) == TokenKind::LBracket {
                 s.advance();
                 s.advance();
@@ -195,14 +194,16 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
                     s.eat(TokenKind::Comma);
                 }
                 s.expect(TokenKind::RBracket)?;
-                Ok(Expr::new_with_range(range, ExprKind::Tuple { elements }))
+                let full_range = s.span_from(start_range);
+                Ok(Expr::new_with_range(full_range, ExprKind::Tuple { elements }))
             } else if s.peek_kind(1) == TokenKind::LBrace {
                 s.advance();
                 let obj = parse_object_expr(s)?;
+                let full_range = s.span_from(start_range);
                 let ExprKind::Object { properties } = obj.kind else {
                     unreachable!()
                 };
-                Ok(Expr::new_with_range(range, ExprKind::Record { properties }))
+                Ok(Expr::new_with_range(full_range, ExprKind::Record { properties }))
             } else {
                 Err(format!("Unexpected `#` at {}:{}", s.line(), s.column()))
             }
@@ -227,7 +228,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
 }
 
 fn parse_array_expr(s: &mut TokenStream) -> Result<Expr, String> {
-    let range = s.range();
+    let start_range = s.range();
     s.advance();
     let mut elements = vec![];
 
@@ -247,7 +248,8 @@ fn parse_array_expr(s: &mut TokenStream) -> Result<Expr, String> {
     }
 
     s.expect(TokenKind::RBracket)?;
-    Ok(Expr::new_with_range(range, ExprKind::Array { elements }))
+    let full_range = s.span_from(start_range);
+    Ok(Expr::new_with_range(full_range, ExprKind::Array { elements }))
 }
 
 fn parse_new_expr(s: &mut TokenStream, range: varn_core::SourceRange) -> Result<Expr, String> {
@@ -271,8 +273,9 @@ fn parse_new_expr(s: &mut TokenStream, range: varn_core::SourceRange) -> Result<
     } else {
         vec![]
     };
+    let full_range = s.span_from(range);
     Ok(Expr::new_with_range(
-        range,
+        full_range,
         ExprKind::New {
             callee: Box::new(callee),
             type_args,
@@ -282,12 +285,12 @@ fn parse_new_expr(s: &mut TokenStream, range: varn_core::SourceRange) -> Result<
 }
 
 fn parse_function_expr(s: &mut TokenStream) -> Result<Expr, String> {
+    let start_range = s.range();
     s.advance();
-    parse_function_expr_inner(s, false)
+    parse_function_expr_inner_with_start(s, false, start_range)
 }
 
-fn parse_function_expr_inner(s: &mut TokenStream, is_async: bool) -> Result<Expr, String> {
-    let range = s.range();
+fn parse_function_expr_inner_with_start(s: &mut TokenStream, is_async: bool, start_range: varn_core::SourceRange) -> Result<Expr, String> {
     let is_generator = s.eat(TokenKind::Star);
     let id = if s.check(TokenKind::Identifier) {
         Some(s.consume_lexeme())
@@ -301,8 +304,9 @@ fn parse_function_expr_inner(s: &mut TokenStream, is_async: bool) -> Result<Expr
         None
     };
     let body = crate::parser::parse_block(s)?;
+    let full_range = s.span_from(start_range);
     Ok(Expr::new_with_range(
-        range,
+        full_range,
         ExprKind::Function {
             fn_id: id,
             params,
@@ -315,10 +319,10 @@ fn parse_function_expr_inner(s: &mut TokenStream, is_async: bool) -> Result<Expr
 }
 
 fn parse_class_expr(s: &mut TokenStream) -> Result<Expr, String> {
-    let range = s.range();
     let decl = crate::parser::parse_class_decl(s, vec![], false)?;
+    let full_range = decl.range.clone();
     Ok(Expr::new_with_range(
-        range,
+        full_range,
         ExprKind::ClassExpr {
             declaration: Box::new(decl),
         },

@@ -1,14 +1,29 @@
+pub mod auto_import;
+pub mod interface_impl;
+pub mod match_arms;
+pub mod organize_imports;
+
 use std::collections::HashMap;
 use tower_lsp::lsp_types::{
     CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionParams, Position, Range, TextEdit,
     WorkspaceEdit,
 };
 
-pub fn build_code_action(params: CodeActionParams) -> Option<Vec<CodeActionOrCommand>> {
-    let mut actions = Vec::new();
-    let uri = params.text_document.uri;
+use crate::document::DocumentState;
+use crate::index::ProjectIndex;
 
-    for diag in params.context.diagnostics {
+pub fn build_code_action(
+    params: CodeActionParams,
+    state: Option<&DocumentState>,
+    index: Option<&ProjectIndex>,
+) -> Option<Vec<CodeActionOrCommand>> {
+    let mut actions = Vec::new();
+    let uri = &params.text_document.uri;
+    let cursor_line = params.range.start.line;
+    let cursor_col = params.range.start.character;
+
+    // 1. Diagnostic suggestions and Quickfixes
+    for diag in &params.context.diagnostics {
         if let Some(data) = &diag.data {
             if let Some(suggestions) = data.get("suggestions").and_then(|s| s.as_array()) {
                 for sug in suggestions {
@@ -87,45 +102,30 @@ pub fn build_code_action(params: CodeActionParams) -> Option<Vec<CodeActionOrCom
         }
 
         // Auto-Import suggestion for undefined variables
-        if diag.message.contains("undefined variable:") {
-            if let Some(var_name) = diag.message.split("undefined variable:").nth(1) {
-                let sym_name = var_name.trim();
-                if !sym_name.is_empty() {
-                    let mut changes = HashMap::new();
-                    changes.insert(
-                        uri.clone(),
-                        vec![TextEdit {
-                            range: Range {
-                                start: Position {
-                                    line: 0,
-                                    character: 0,
-                                },
-                                end: Position {
-                                    line: 0,
-                                    character: 0,
-                                },
-                            },
-                            new_text: format!("import {{ {sym_name} }} from \"std:math\"\n"),
-                        }],
-                    );
+        if let Some(st) = state {
+            let auto_imports = auto_import::generate_auto_imports_action(st, index, uri, diag);
+            actions.extend(auto_imports);
+        }
+    }
 
-                    let action = CodeAction {
-                        title: format!("💡 Import {{ {sym_name} }}"),
-                        kind: Some(CodeActionKind::QUICKFIX),
-                        diagnostics: Some(vec![diag.clone()]),
-                        edit: Some(WorkspaceEdit {
-                            changes: Some(changes),
-                            document_changes: None,
-                            change_annotations: None,
-                        }),
-                        command: None,
-                        is_preferred: Some(true),
-                        disabled: None,
-                        data: None,
-                    };
-                    actions.push(CodeActionOrCommand::CodeAction(action));
-                }
-            }
+    // 2. Semantic Code Actions (Match arms, Interface Implementation, Organize Imports)
+    if let Some(st) = state {
+        if let Some(match_action) =
+            match_arms::generate_match_arms_action(st, uri, cursor_line, cursor_col)
+        {
+            actions.push(match_action);
+        }
+
+        if let Some(iface_action) =
+            interface_impl::generate_interface_impl_action(st, index, uri, cursor_line, cursor_col)
+        {
+            actions.push(iface_action);
+        }
+
+        if let Some(organize_action) =
+            organize_imports::generate_organize_imports_action(st, uri)
+        {
+            actions.push(organize_action);
         }
     }
 

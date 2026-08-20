@@ -19,6 +19,7 @@ varn-jit      = { path = "../varn-jit" }
 serde         = { workspace = true }
 serde_json    = { workspace = true }
 ryu           = { workspace = true }
+memchr        = { workspace = true }
 
 
 [lints]

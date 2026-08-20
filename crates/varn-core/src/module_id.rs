@@ -158,7 +158,7 @@ pub enum ImportSpecifier {
 
 impl ImportSpecifier {
     pub fn parse(raw: &str) -> Self {
-        if raw.starts_with('.') {
+        if is_file_specifier(raw) {
             Self::Relative(PathBuf::from(raw))
         } else if raw.starts_with("runtime:") {
             Self::Runtime(Arc::from(raw))
@@ -169,7 +169,18 @@ impl ImportSpecifier {
         } else if raw.starts_with("pkg:") {
             Self::Package(Arc::from(raw))
         } else {
-            Self::Relative(PathBuf::from(raw))
+            Self::Package(Arc::from(raw))
         }
     }
+}
+
+fn is_file_specifier(raw: &str) -> bool {
+    if raw.starts_with('.') || raw.starts_with('/') || raw.starts_with('\\') {
+        return true;
+    }
+    let b = raw.as_bytes();
+    if b.len() >= 2 && b[0].is_ascii_alphabetic() && b[1] == b':' {
+        return true;
+    }
+    false
 }

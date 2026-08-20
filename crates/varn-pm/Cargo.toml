@@ -8,6 +8,7 @@ varn-term      = { path = "../varn-term" }
 varn-modules = { path = "../varn-modules" }
 serde      = { workspace = true }
 serde_json = { workspace = true }
+toml       = { workspace = true }
 semver     = { workspace = true }
 ureq = { version = "2", features = ["json"] }
 sha2 = { workspace = true }

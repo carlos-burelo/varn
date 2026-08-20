@@ -118,6 +118,7 @@ pub fn run_tests(args: TestArgs) -> Result<(), CliError> {
                     debug: Default::default(),
                     trace: false,
                     strict: false,
+                    capabilities: Default::default(),
                 });
                 let elapsed = t0.elapsed();
 

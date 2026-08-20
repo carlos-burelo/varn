@@ -803,6 +803,9 @@ impl ExecCtx {
         if v.is_bool() {
             return TypeTag::Bool.name();
         }
+        if v.is_sso() {
+            return TypeTag::Str.name();
+        }
         if !v.is_heap() {
             return "unknown";
         }

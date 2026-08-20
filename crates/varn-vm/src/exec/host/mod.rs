@@ -447,4 +447,8 @@ impl NativeCtx for ExecCtx {
     fn stringify_json(&mut self, value: VmValue) -> Result<String, String> {
         self.json_stringify(value)
     }
+
+    fn capabilities(&self) -> &varn_types::capabilities::CapabilitySet {
+        &self.capabilities
+    }
 }

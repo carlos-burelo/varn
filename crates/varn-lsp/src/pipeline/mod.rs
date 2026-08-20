@@ -55,6 +55,7 @@ fn stable_global_key(
 }
 
 pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
+    varn_builtins::register_provider();
     let path = uri_to_path(&uri);
     let (raw_tokens, lexeme_buf, lex_errs) = varn_lexer::scan(&source, &path);
 
@@ -428,6 +429,9 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
             .map(|(k, v)| (k.to_string(), v))
             .collect(),
         extension_members,
+        member_resolutions: result.member_resolutions,
+        call_resolutions: result.call_resolutions,
+        bind: result.bind,
     };
 
     let positional_index = crate::queries::indexes::PositionalIndex::build(&db.node_scopes);
@@ -443,6 +447,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         db,
         import_paths,
         positional_index,
+        ast: Some(program),
     }
 }
 

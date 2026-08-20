@@ -184,7 +184,8 @@ pub fn build_module_graph(
             continue;
         };
 
-        let check = varn_checker::Checker::check(program);
+        let check =
+            varn_checker::Checker::check_with(program, varn_checker::CheckOptions::compile());
         // The source was already sitting here, bound to `_`, while the
         // diagnostics this produced went unread — which is what made a type
         // error invisible as soon as the file was reached through `import`
@@ -276,7 +277,11 @@ pub fn resolve_import_specifier(
 
         ImportSpecifier::Runtime(_) => Ok(Some(specifier.to_owned())),
         ImportSpecifier::Relative(rel) => {
-            let joined = module_dir.join(&rel);
+            let joined = if rel.is_absolute() {
+                rel.clone()
+            } else {
+                module_dir.join(&rel)
+            };
             if joined.exists() {
                 if let Ok(canonical) = std::fs::canonicalize(&joined) {
                     return Ok(Some(varn_modules::normalize_path_string(

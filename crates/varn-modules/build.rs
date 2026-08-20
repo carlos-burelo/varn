@@ -1,17 +1,12 @@
 use std::io::Write;
 use std::path::Path;
 
-/// Crates whose sources shape compiled artifacts: `.vnc`/`.vnb` bytecode
-/// payloads and `.vnm` checker interface blobs. Any source change here must
-/// invalidate on-disk caches, so they all feed the build fingerprint.
+/// Crates whose type definitions shape serialized binary artifact schemas
+/// (`.vnc`/`.vnb` bytecode payloads and `.vnm` checker interface blobs).
+/// Isolating the watch list to schema-defining crates enables true independent
+/// incremental compilation across all frontend, compiler, VM and CLI crates.
 const FINGERPRINTED_CRATES: &[&str] = &[
-    "varn-core",
-    "varn-lexer",
-    "varn-parser",
-    "varn-checker",
     "varn-types",
-    "varn-compiler",
-    "varn-regalloc",
     "varn-modules",
 ];
 
@@ -45,8 +40,6 @@ fn hash_dir(dir: &Path, hash: &mut u64) {
         if p.is_dir() {
             hash_dir(&p, hash);
         } else if p.extension().and_then(|e| e.to_str()) == Some("rs") {
-            // Name + content; no absolute paths, so the value is stable for
-            // identical checkouts (release pairs vn + std.vnb from one build).
             fnv1a(p.file_name().unwrap().to_string_lossy().as_bytes(), hash);
             if let Ok(bytes) = std::fs::read(&p) {
                 fnv1a(&bytes, hash);

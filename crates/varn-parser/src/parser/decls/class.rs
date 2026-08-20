@@ -62,6 +62,7 @@ pub fn parse_class_decl(
     }
     s.expect(TokenKind::RBrace)?;
 
+    let full_range = s.span_from(range);
     Ok(ClassDecl {
         id: id.map(|name| name.into()),
         ast_id: 0,
@@ -78,7 +79,7 @@ pub fn parse_class_decl(
         },
         decorators,
         doc: None,
-        range,
+        range: full_range,
     })
 }
 
@@ -151,7 +152,11 @@ pub fn parse_class_member(
 
     if mods.is_static && s.check(TokenKind::LBrace) {
         let body = super::super::stmts::parse_block(s)?;
-        return Ok(ClassMember::StaticBlock { body, range });
+        let full_range = s.span_from(range);
+        return Ok(ClassMember::StaticBlock {
+            body,
+            range: full_range,
+        });
     }
 
     if s.check(TokenKind::Constructor) {
@@ -166,10 +171,11 @@ pub fn parse_class_member(
         } else {
             super::super::stmts::parse_block(s)?
         };
+        let full_range = s.span_from(range);
         return Ok(ClassMember::Constructor {
             params,
             body,
-            range,
+            range: full_range,
         });
     }
     if s.check(TokenKind::Destructor) {
@@ -183,7 +189,11 @@ pub fn parse_class_member(
         } else {
             super::super::stmts::parse_block(s)?
         };
-        return Ok(ClassMember::Destructor { body, range });
+        let full_range = s.span_from(range);
+        return Ok(ClassMember::Destructor {
+            body,
+            range: full_range,
+        });
     }
 
     let is_get = s.check(TokenKind::Get) && {
@@ -214,12 +224,13 @@ pub fn parse_class_member(
             s.eat_semicolon();
             None
         };
+        let full_range = s.span_from(range);
         return Ok(ClassMember::Getter {
             key: key.into(),
             return_type,
             body,
             modifiers: mods,
-            range,
+            range: full_range,
         });
     }
     if is_set {
@@ -237,12 +248,13 @@ pub fn parse_class_member(
             s.eat_semicolon();
             None
         };
+        let full_range = s.span_from(range);
         return Ok(ClassMember::Setter {
             key: key.into(),
             param,
             body,
             modifiers: mods,
-            range,
+            range: full_range,
         });
     }
 
@@ -269,6 +281,7 @@ pub fn parse_class_member(
             s.eat_semicolon();
             None
         };
+        let full_range = s.span_from(range);
         return Ok(ClassMember::Method {
             key: key.into(),
             type_params,
@@ -277,7 +290,7 @@ pub fn parse_class_member(
             body,
             modifiers: mods,
             decorators,
-            range,
+            range: full_range,
         });
     }
 
@@ -295,13 +308,14 @@ pub fn parse_class_member(
         None
     };
     s.eat_semicolon();
+    let full_range = s.span_from(range);
     Ok(ClassMember::Property {
         key: key.into(),
         type_ann,
         init,
         modifiers: mods,
         decorators,
-        range,
+        range: full_range,
     })
 }
 

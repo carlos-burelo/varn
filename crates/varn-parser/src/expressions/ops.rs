@@ -81,7 +81,7 @@ pub(super) fn try_parse_arrow(s: &mut TokenStream) -> Result<Option<Expr>, Strin
 }
 
 fn parse_arrow_attempt(s: &mut TokenStream) -> Result<Expr, String> {
-    let range = s.range();
+    let start_range = s.range();
     let is_async = s.eat(TokenKind::Async);
 
     let params = if s.check(TokenKind::LParen) {
@@ -118,8 +118,9 @@ fn parse_arrow_attempt(s: &mut TokenStream) -> Result<Expr, String> {
         ArrowBody::Expr(parse_assign_expr(s)?)
     };
 
+    let full_range = s.span_from(start_range);
     Ok(Expr::new_with_range(
-        range,
+        full_range,
         ExprKind::Arrow {
             params,
             return_type,
@@ -130,7 +131,7 @@ fn parse_arrow_attempt(s: &mut TokenStream) -> Result<Expr, String> {
 }
 
 pub(super) fn parse_yield_expr(s: &mut TokenStream) -> Result<Expr, String> {
-    let range = s.range();
+    let start_range = s.range();
     s.advance();
     let delegate = s.eat(TokenKind::Star);
     let argument = if !s.check(TokenKind::Semicolon) && !s.check(TokenKind::RBrace) && !s.is_eof() {
@@ -138,8 +139,9 @@ pub(super) fn parse_yield_expr(s: &mut TokenStream) -> Result<Expr, String> {
     } else {
         None
     };
+    let full_range = s.span_from(start_range);
     Ok(Expr::new_with_range(
-        range,
+        full_range,
         ExprKind::Yield { argument, delegate },
     ))
 }

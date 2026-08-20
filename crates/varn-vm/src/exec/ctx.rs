@@ -103,6 +103,7 @@ pub struct ExecCtx {
     /// at its next safepoint. Keep this LAST: `ExecCtx` is `#[repr(C)]` and
     /// JIT code addresses leading fields by raw offset.
     pub gc_inhibited: bool,
+    pub capabilities: varn_types::capabilities::CapabilitySet,
 }
 
 impl ExecCtx {
@@ -149,6 +150,7 @@ impl ExecCtx {
             osr_request: None,
             resources: varn_types::ResourceStore::new(),
             gc_inhibited: false,
+            capabilities: varn_types::capabilities::CapabilitySet::allow_all(),
         };
 
         if fresh {
@@ -315,6 +317,7 @@ impl ExecCtx {
             osr_request: None,
             resources: varn_types::ResourceStore::new(),
             gc_inhibited: false,
+            capabilities: self.capabilities.clone(),
         }
     }
 

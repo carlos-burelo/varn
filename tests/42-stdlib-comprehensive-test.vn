@@ -15,8 +15,7 @@ import { sleep, TaskGroup, spawn, parallel } from 'std:task';
 // Import the remaining 5 standard library modules
 import { Disposable, AsyncDisposable } from 'std:dispose';
 import { assert as testAssert, assertTrue, assertEqual, fail } from 'std:test';
-import * as types_mod from 'std:types';
-const { Partial, Required, Readonly, Record as TypedRecord } = types_mod;
+import { Partial, Required, Readonly, Mutable } from 'std:types';
 // Option/Result come from std:result, which is the only module that declares
 // them. `std:types` used to declare a second, incompatible pair; see the note
 // at the end of std/types.vn.
@@ -208,11 +207,16 @@ async function runComprehensiveTest(): Task<void> {
     assertEqual(777, 777, "std:test assertEqual positive");
 
     // 18. std:types
-    let partialVar = { x: 42 };
-    let readonlyVar = { a: true };
-    let recordVar = { "tested": 100 };
+    let partialVar: Partial<{ x: int, y: str }> = { x: 42 };
+    let readonlyVar: Readonly<{ a: bool }> = { a: true };
+    let requiredVar: Required<{ x?: int, y?: str }> = { x: 10, y: "yes" };
+    let mutableVar: Mutable<{ readonly a: bool }> = { a: false };
+    let recordVar: Record<str, int> = { "tested": 100 };
+
     assert("std:types partial compile value", partialVar.x === 42);
     assert("std:types readonly compile value", readonlyVar.a === true);
+    assert("std:types required compile value", requiredVar.x === 10 && requiredVar.y === "yes");
+    assert("std:types mutable compile value", mutableVar.a === false);
     assert("std:types record compile value", recordVar["tested"] === 100);
 }
 

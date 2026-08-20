@@ -34,40 +34,7 @@ impl DocumentState {
     }
 
     pub fn checker_symbol_at(&self, line: u32, col: u32) -> Option<&SymbolRecord> {
-        let tok = self.identifier_token_at(line, col)?;
-        if let Some(sid) = self.checker_symbol_id_at(line, col) {
-            if let Some(s) = self.symbols.iter().find(|s| s.symbol_id == Some(sid)) {
-                if s.kind == varn_checker::SymbolKind::Function
-                    || s.kind == varn_checker::SymbolKind::Method
-                {
-                    if let Some(cls) = self.symbols.iter().find(|c| {
-                        c.name == tok.lexeme
-                            && matches!(
-                                c.kind,
-                                varn_checker::SymbolKind::Class
-                                    | varn_checker::SymbolKind::Struct
-                                    | varn_checker::SymbolKind::Interface
-                            )
-                    }) {
-                        return Some(cls);
-                    }
-                }
-                return Some(s);
-            }
-        }
-
-        self.symbols
-            .iter()
-            .find(|s| {
-                s.name == tok.lexeme
-                    && matches!(
-                        s.kind,
-                        varn_checker::SymbolKind::Class
-                            | varn_checker::SymbolKind::Struct
-                            | varn_checker::SymbolKind::Interface
-                            | varn_checker::SymbolKind::Enum
-                    )
-            })
-            .or_else(|| self.symbols.iter().find(|s| s.name == tok.lexeme))
+        let sid = self.checker_symbol_id_at(line, col)?;
+        self.symbols.iter().find(|s| s.symbol_id == Some(sid))
     }
 }

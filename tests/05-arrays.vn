@@ -63,4 +63,22 @@ const spread = [...[1, 2], ...[3, 4]]
 assert("spread array", spread.length === 4)
 assert("spread value", spread[2] === 3)
 
+// Semantic identity verification: Array<T> vs T[]
+let explicitGeneric: Array<int> = [10, 20, 30];
+let explicitBracket: int[] = explicitGeneric;
+let crossGeneric: Array<int> = explicitBracket;
+assert("Array<T> to T[] assign", explicitBracket.length === 3 && explicitBracket[1] === 20);
+assert("T[] to Array<T> assign", crossGeneric.length === 3 && crossGeneric[2] === 30);
+
+function takeBracket(arr: str[]): int { return arr.length; }
+function takeGeneric(arr: Array<str>): int { return arr.length; }
+let strGenericList: Array<str> = ["a", "b", "c"];
+let strBracketList: str[] = ["x", "y", "z"];
+assert("takeBracket with Array<str>", takeBracket(strGenericList) === 3);
+assert("takeGeneric with str[]", takeGeneric(strBracketList) === 3);
+
+let nestedGen: Array<Array<int>> = [[1, 2], [3, 4]];
+let nestedBrk: int[][] = nestedGen;
+assert("nested Array<Array<T>> to T[][]", nestedBrk[1][0] === 3);
+
 print("[PASSED] 5. Array methods ")

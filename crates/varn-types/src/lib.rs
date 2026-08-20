@@ -1,4 +1,5 @@
 pub mod bytecode;
+pub mod capabilities;
 pub mod chunk;
 pub mod generator;
 pub mod loop_analysis;

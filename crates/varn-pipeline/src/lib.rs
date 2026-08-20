@@ -21,9 +21,9 @@ pub use check::check as phase_check;
 pub use compile::{CompileOutput, CACHE_FORMAT_VERSION};
 pub use core::core_protos_owned;
 pub use error::PipelineError;
-pub use execute::execute;
+pub use execute::{execute, execute_with_caps};
 pub use lex::lex as phase_lex;
-pub use opts::{parse_debug_opt, DebugFlags, RunOpts};
+pub use opts::{parse_debug_opt, CapabilitySet, DebugFlags, RunOpts};
 pub use parse::parse as phase_parse;
 
 type PipelineResult<T> = Result<T, PipelineError>;
@@ -71,12 +71,13 @@ pub fn run(opts: &RunOpts) -> PipelineResult<()> {
         debug.trace = true;
     }
 
-    execute(
+    execute_with_caps(
         compiled.entry_proto,
         compiled.precompiled,
         &source,
         &opts.file_path,
         &debug,
+        opts.capabilities.clone(),
     )
 }
 
@@ -92,12 +93,13 @@ fn run_wrc(opts: &RunOpts) -> PipelineResult<()> {
         debug.trace = true;
     }
 
-    execute(
+    execute_with_caps(
         compiled.entry_proto,
         compiled.precompiled,
         "",
         &opts.file_path,
         &debug,
+        opts.capabilities.clone(),
     )
 }
 

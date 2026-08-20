@@ -4,6 +4,7 @@ use varn_core::ast::TypeNode;
 use varn_core::TypeKind;
 
 use super::contexts::{is_member_optional, MappedContext};
+use super::keyed_access::collect_type_keys;
 use super::resolve_type_node;
 use super::template::collect_string_literals;
 
@@ -16,7 +17,17 @@ pub(super) fn resolve_mapped(
     source_obj: Option<Type>,
     ctx: Option<&dyn TypeContext>,
 ) -> Type {
-    let keys = collect_string_literals(&source);
+    let keys = if let Some(ref obj) = source_obj {
+        let k = collect_type_keys(obj, ctx);
+        if k.is_empty() {
+            collect_string_literals(&source)
+        } else {
+            k
+        }
+    } else {
+        collect_string_literals(&source)
+    };
+
     if keys.is_empty() {
         use varn_core::TypeTag;
         let key_ty = match &source.0 {
@@ -39,13 +50,14 @@ pub(super) fn resolve_mapped(
         }
         return Type::Dynamic;
     }
+
     let members: Vec<ObjectTypeMember> = keys
         .into_iter()
         .map(|key| {
             let mapped_ctx = MappedContext {
                 inner: ctx,
                 key_var: key_var.to_owned(),
-                key_value: Type::Str,
+                key_value: Type::named(key.to_string()),
             };
             let value_ty = resolve_type_node(value_node, Some(&mapped_ctx));
             let member_optional = if optional {

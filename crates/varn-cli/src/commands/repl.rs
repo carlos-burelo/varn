@@ -64,6 +64,7 @@ fn run_snippet(source: &str) {
         debug: DebugFlags::default(),
         trace: false,
         strict: false,
+        capabilities: Default::default(),
     };
     if let Err(e) = crate::pipeline::run(&opts) {
         terminal::error(&e);

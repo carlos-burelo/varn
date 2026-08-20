@@ -3,7 +3,7 @@ use crate::checker::Checker;
 use crate::symbol::SymbolId;
 use crate::types::{ObjectTypeMember, Type};
 use rustc_hash::FxHashMap;
-use varn_core::ast::operators::BinaryOp;
+use varn_core::ast::operators::{BinaryOp, UnaryOp};
 use varn_core::ast::{Expr, ExprKind};
 use varn_core::TypeKind;
 
@@ -16,6 +16,11 @@ impl Checker {
                 ..
             } | ExprKind::Logical { .. }
                 | ExprKind::Is { .. }
+                | ExprKind::Identifier { .. }
+                | ExprKind::Unary {
+                    op: UnaryOp::Not,
+                    ..
+                }
         )
     }
 
@@ -33,54 +38,113 @@ impl Checker {
         let mut narrowings = Vec::new();
 
         match &expr.kind {
-            ExprKind::Binary { left, right, op } => {
-                let is_eq = *op == varn_core::ast::operators::BinaryOp::Eq;
-                let is_neq = *op == varn_core::ast::operators::BinaryOp::NotEq;
+            ExprKind::Unary {
+                op: UnaryOp::Not,
+                operand,
+                ..
+            } => {
+                narrowings.extend(self.extract_narrowings(operand, bind, !is_true_branch));
+            }
 
-                if let (
-                    ExprKind::Unary {
-                        op: varn_core::ast::operators::UnaryOp::Typeof,
-                        operand: typeof_op,
-                        ..
-                    },
-                    ExprKind::StrLiteral { value },
-                ) = (&left.kind, &right.kind)
-                {
+            ExprKind::Identifier { name } => {
+                let scope = bind.scopes.get(self.current_scope);
+                if let Some(id) = scope.resolve(name, &bind.scopes) {
+                    let original_ty = self
+                        .symbol_types
+                        .get(&id)
+                        .cloned()
+                        .or_else(|| bind.arena.get(id).ty.clone());
+                    if let Some(ty) = original_ty {
+                        if is_true_branch {
+                            let narrowed = ty.non_nullified();
+                            if !narrowed.is_dynamic() && narrowed != ty {
+                                narrowings.push((id, narrowed));
+                            }
+                        } else if ty.is_nullable() {
+                            narrowings.push((id, Type::Null));
+                        }
+                    }
+                }
+            }
+
+            ExprKind::Binary { left, right, op } => {
+                let is_eq = *op == BinaryOp::Eq;
+                let is_neq = *op == BinaryOp::NotEq;
+
+                // 1. typeof x === "str" / "int" / "float" / "bool" / etc.
+                let typeof_check = match (&left.kind, &right.kind) {
+                    (
+                        ExprKind::Unary {
+                            op: UnaryOp::Typeof,
+                            operand: typeof_op,
+                            ..
+                        },
+                        ExprKind::StrLiteral { value },
+                    ) => Some((typeof_op, value.as_ref())),
+                    (
+                        ExprKind::StrLiteral { value },
+                        ExprKind::Unary {
+                            op: UnaryOp::Typeof,
+                            operand: typeof_op,
+                            ..
+                        },
+                    ) => Some((typeof_op, value.as_ref())),
+                    _ => None,
+                };
+
+                if let Some((typeof_op, value)) = typeof_check {
                     if (is_eq && is_true_branch) || (is_neq && !is_true_branch) {
                         if let ExprKind::Identifier { name } = &typeof_op.kind {
                             let scope = bind.scopes.get(self.current_scope);
                             if let Some(id) = scope.resolve(name, &bind.scopes) {
-                                let narrowed_ty =
-                                    crate::binder::resolve_primitive(value, Some(bind));
+                                let narrowed_ty = match value {
+                                    "str" => Type::Str,
+                                    "int" => Type::Int,
+                                    "float" => Type::Float,
+                                    "bool" => Type::Bool,
+                                    "bigint" => Type::BigInt,
+                                    "decimal" => Type::Decimal,
+                                    "char" => Type::Char,
+                                    "null" => Type::Null,
+                                    _ => crate::binder::resolve_primitive(value, Some(bind)),
+                                };
                                 narrowings.push((id, narrowed_ty));
                             }
                         }
                     }
                 }
 
-                if let (ExprKind::Identifier { name }, ExprKind::NullLiteral) =
-                    (&left.kind, &right.kind)
-                {
-                    let scope = bind.scopes.get(self.current_scope);
-                    if let Some(id) = scope.resolve(name, &bind.scopes) {
-                        if (is_neq && is_true_branch) || (is_eq && !is_true_branch) {
-                            let original_ty = self
-                                .symbol_types
-                                .get(&id)
-                                .cloned()
-                                .or_else(|| bind.arena.get(id).ty.clone());
-                            if let Some(ty) = original_ty {
-                                let narrowed = ty.non_nullified();
-                                if !narrowed.is_dynamic() {
-                                    narrowings.push((id, narrowed));
+                // 2. x !== null / null !== x / x === null / null === x
+                let (ident_name, is_null_check) = match (&left.kind, &right.kind) {
+                    (ExprKind::Identifier { name }, ExprKind::NullLiteral) => (Some(name), true),
+                    (ExprKind::NullLiteral, ExprKind::Identifier { name }) => (Some(name), true),
+                    _ => (None, false),
+                };
+
+                if is_null_check {
+                    if let Some(name) = ident_name {
+                        let scope = bind.scopes.get(self.current_scope);
+                        if let Some(id) = scope.resolve(name, &bind.scopes) {
+                            if (is_neq && is_true_branch) || (is_eq && !is_true_branch) {
+                                let original_ty = self
+                                    .symbol_types
+                                    .get(&id)
+                                    .cloned()
+                                    .or_else(|| bind.arena.get(id).ty.clone());
+                                if let Some(ty) = original_ty {
+                                    let narrowed = ty.non_nullified();
+                                    if !narrowed.is_dynamic() {
+                                        narrowings.push((id, narrowed));
+                                    }
                                 }
+                            } else if &**name != "_" && &**name != "__variant__" {
+                                narrowings.push((id, Type::Null));
                             }
-                        } else if &**name != "_" && &**name != "__variant__" {
-                            narrowings.push((id, Type::Null));
                         }
                     }
                 }
 
+                // 3. Discriminated union property check: obj.kind === "foo"
                 if is_eq || is_neq {
                     if let ExprKind::Member {
                         object,
@@ -169,6 +233,7 @@ impl Checker {
                     }
                 }
 
+                // 4. Instanceof narrowing: x instanceof User
                 if *op == BinaryOp::Instanceof {
                     if let (
                         ExprKind::Identifier { name },
@@ -258,16 +323,21 @@ impl Checker {
     ) -> Option<(SymbolId, Vec<Type>)> {
         if let ExprKind::Member {
             object,
+            property,
             computed: false,
             ..
         } = &subject.kind
         {
-            if let ExprKind::Identifier { name: obj_name } = &object.kind {
+            if let (
+                ExprKind::Identifier { name: obj_name },
+                ExprKind::Identifier { name: _prop_name },
+            ) = (&object.kind, &property.kind)
+            {
                 let scope = bind.scopes.get(self.current_scope);
-                let id = scope.resolve(obj_name, &bind.scopes)?;
-                let sym = bind.arena.get(id);
-                if let Some(Type(TypeKind::Union(members), _)) = &sym.ty {
-                    return Some((id, members.clone()));
+                if let Some(id) = scope.resolve(obj_name, &bind.scopes) {
+                    if let Some(Type(TypeKind::Union(members), _)) = &bind.arena.get(id).ty {
+                        return Some((id, members.clone()));
+                    }
                 }
             }
         }
@@ -276,36 +346,29 @@ impl Checker {
 
     pub(crate) fn union_member_matches_disc(
         &self,
-        member: &Type,
+        m: &Type,
         disc_ty: Option<&Type>,
         subject: Option<&Expr>,
         bind: &BindResult,
     ) -> bool {
-        let disc_ty = match disc_ty {
-            Some(t) => t,
-            None => return false,
+        let Some(disc_ty) = disc_ty else { return false };
+        let Some(subject) = subject else { return false };
+        let ExprKind::Member {
+            property,
+            computed: false,
+            ..
+        } = &subject.kind
+        else {
+            return false;
         };
-        let prop_name = match subject {
-            Some(s) => match &s.kind {
-                ExprKind::Member {
-                    property,
-                    computed: false,
-                    ..
-                } => {
-                    if let ExprKind::Identifier { name } = &property.kind {
-                        name.as_ref()
-                    } else {
-                        return false;
-                    }
-                }
-                _ => return false,
-            },
-            None => return false,
+        let ExprKind::Identifier { name: prop_name } = &property.kind else {
+            return false;
         };
-        match &member.0 {
+
+        match &m.0 {
             TypeKind::Object(fields) => fields.iter().any(|f| match f {
                 ObjectTypeMember::Property { name, ty, .. } => {
-                    name.as_ref() == prop_name && ty == disc_ty
+                    name.as_ref() == prop_name.as_ref() && ty == disc_ty
                 }
                 _ => false,
             }),
@@ -313,40 +376,40 @@ impl Checker {
                 .get_interface_members_local(cn.as_ref())
                 .or_else(|| bind.get_class_entry(cn.as_ref()).map(|e| &e.members))
                 .is_some_and(|ms| {
-                    ms.iter()
-                        .any(|cm| cm.name.as_ref() == prop_name && cm.ty == *disc_ty)
+                    ms.iter().any(|cm| {
+                        cm.name.as_ref() == prop_name.as_ref() && cm.ty == *disc_ty
+                    })
                 }),
             _ => false,
         }
     }
+
     fn merge_narrowings(
         &self,
         left: Vec<(SymbolId, Type)>,
         right: Vec<(SymbolId, Type)>,
         is_union: bool,
     ) -> Vec<(SymbolId, Type)> {
-        let mut result = Vec::new();
-        let mut right_map: FxHashMap<SymbolId, Type> = right.into_iter().collect();
-
-        for (id, ty_l) in left {
-            if let Some(ty_r) = right_map.remove(&id) {
-                let merged = if is_union {
-                    Type::union(vec![ty_l, ty_r])
-                } else {
-                    ty_l
-                };
-                result.push((id, merged));
-            } else if !is_union {
-                result.push((id, ty_l));
-            }
+        let mut map: FxHashMap<SymbolId, Vec<Type>> = FxHashMap::default();
+        for (id, ty) in left {
+            map.entry(id).or_default().push(ty);
+        }
+        for (id, ty) in right {
+            map.entry(id).or_default().push(ty);
         }
 
-        if !is_union {
-            for (id, ty_r) in right_map {
-                result.push((id, ty_r));
+        let mut merged = Vec::new();
+        for (id, types) in map {
+            if types.len() == 1 {
+                if !is_union {
+                    merged.push((id, types[0].clone()));
+                }
+            } else if is_union {
+                merged.push((id, Type::union(types)));
+            } else {
+                merged.push((id, Type(TypeKind::Intersection(types), false)));
             }
         }
-
-        result
+        merged
     }
 }

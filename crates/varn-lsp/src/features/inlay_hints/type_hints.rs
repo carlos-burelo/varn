@@ -1,17 +1,15 @@
 use tower_lsp::lsp_types::{InlayHint, InlayHintKind, InlayHintLabel, Position};
 use varn_checker::SymbolKind;
+use varn_core::ast::{Expr, ExprKind, Program, Stmt, StmtKind};
 use varn_core::TypeKind;
 
 use crate::document::DocumentState;
 
-pub fn build_inlay_hints(state: &DocumentState) -> Vec<InlayHint> {
+pub fn build_type_hints(state: &DocumentState) -> Vec<InlayHint> {
     let mut hints = Vec::new();
 
     for s in &state.symbols {
-        if s.line == u32::MAX {
-            continue;
-        }
-        if s.is_from_stdlib {
+        if s.line == u32::MAX || s.is_from_stdlib {
             continue;
         }
 
@@ -45,15 +43,15 @@ pub fn build_inlay_hints(state: &DocumentState) -> Vec<InlayHint> {
         }
     }
 
+    if let Some(program) = &state.ast {
+        collect_pipeline_hints(state, program, &mut hints);
+    }
+
     hints
 }
 
 fn fn_return_hint(state: &DocumentState, sym: &crate::document::SymbolRecord) -> Option<InlayHint> {
     if sym.has_explicit_type {
-        return None;
-    }
-
-    if line_has_explicit_return_annotation(state, sym.line) {
         return None;
     }
 
@@ -88,55 +86,80 @@ fn fn_return_hint(state: &DocumentState, sym: &crate::document::SymbolRecord) ->
     })
 }
 
-fn line_has_explicit_return_annotation(state: &DocumentState, line: u32) -> bool {
-    let line_tokens: Vec<_> = state.tokens.iter().filter(|t| t.line == line).collect();
+fn find_rparen_col_on_line(state: &DocumentState, line: u32, after_col: u32) -> Option<u32> {
     let mut depth = 0i32;
-    let mut after_last_rparen = false;
-    let mut found_colon_after_rparen = false;
-    for tok in &line_tokens {
-        match tok.kind {
-            varn_core::TokenKind::LParen => {
-                depth += 1;
-                after_last_rparen = false;
-            }
-            varn_core::TokenKind::RParen => {
-                depth -= 1;
-                if depth == 0 {
-                    after_last_rparen = true;
-                    found_colon_after_rparen = false;
-                }
-            }
-            varn_core::TokenKind::Colon if after_last_rparen => {
-                found_colon_after_rparen = true;
-            }
-            varn_core::TokenKind::LBrace if found_colon_after_rparen => {
-                return true;
-            }
-            _ => {}
-        }
-    }
-    false
-}
-
-fn find_rparen_col_on_line(state: &DocumentState, line: u32, fn_col: u32) -> Option<u32> {
-    let mut depth = 0i32;
-    let mut rparen_col = None;
+    let mut last_rparen_col = None;
     for tok in state
         .tokens
         .iter()
-        .filter(|t| t.line == line && t.col >= fn_col)
+        .filter(|t| t.line == line && t.col >= after_col)
     {
         match tok.kind {
             varn_core::TokenKind::LParen => depth += 1,
             varn_core::TokenKind::RParen => {
                 depth -= 1;
                 if depth == 0 {
-                    rparen_col = Some(tok.col + tok.length.saturating_sub(1));
+                    last_rparen_col = Some(tok.col + tok.length.saturating_sub(1));
                     break;
                 }
             }
             _ => {}
         }
     }
-    rparen_col
+    last_rparen_col
+}
+
+fn collect_pipeline_hints(state: &DocumentState, program: &Program, hints: &mut Vec<InlayHint>) {
+    for stmt in &program.body {
+        collect_pipeline_in_stmt(state, stmt, hints);
+    }
+}
+
+fn collect_pipeline_in_stmt(state: &DocumentState, stmt: &Stmt, hints: &mut Vec<InlayHint>) {
+    match &stmt.kind {
+        StmtKind::Expr { expression } => collect_pipeline_in_expr(state, expression, hints),
+        StmtKind::Block { stmts } => {
+            for s in stmts {
+                collect_pipeline_in_stmt(state, s, hints);
+            }
+        }
+        StmtKind::If {
+            test,
+            consequent,
+            alternate,
+        } => {
+            collect_pipeline_in_expr(state, test, hints);
+            collect_pipeline_in_stmt(state, consequent, hints);
+            if let Some(alt) = alternate {
+                collect_pipeline_in_stmt(state, alt, hints);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn collect_pipeline_in_expr(state: &DocumentState, expr: &Expr, hints: &mut Vec<InlayHint>) {
+    if let ExprKind::Pipeline { left, right } = &expr.kind {
+        if let Some(info) = state.db.expr_types.get(&right.id) {
+            let ty_str = info.ty.to_string();
+            if !ty_str.is_empty() && ty_str != "unknown" && ty_str != "void" {
+                let r_end = &right.range.end;
+                hints.push(InlayHint {
+                    position: Position {
+                        line: r_end.line.saturating_sub(1),
+                        character: r_end.column,
+                    },
+                    label: InlayHintLabel::String(format!(": {ty_str}")),
+                    kind: Some(InlayHintKind::TYPE),
+                    text_edits: None,
+                    tooltip: None,
+                    padding_left: Some(true),
+                    padding_right: Some(false),
+                    data: None,
+                });
+            }
+        }
+        collect_pipeline_in_expr(state, left, hints);
+        collect_pipeline_in_expr(state, right, hints);
+    }
 }

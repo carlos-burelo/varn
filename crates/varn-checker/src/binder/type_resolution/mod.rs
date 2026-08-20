@@ -350,12 +350,8 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
         } => {
             let resolved_source = resolve_type_node(source, ctx);
 
-            let source_obj = if !*optional {
-                if let TypeKind::KeyOf(inner) = &source.kind {
-                    Some(resolve_type_node(inner, ctx))
-                } else {
-                    None
-                }
+            let source_obj = if let TypeKind::KeyOf(inner) = &source.kind {
+                Some(resolve_type_node(inner, ctx))
             } else {
                 None
             };

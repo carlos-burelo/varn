@@ -49,7 +49,7 @@ fn params_in(name: &str, bind: &BindResult) -> Vec<Rc<str>> {
 
 /// `{ T -> int }` for a `Generic("Channel", [int])` receiver. Empty when the
 /// class declares no parameters or the receiver carries no arguments.
-fn generic_mapping(
+pub(crate) fn generic_mapping(
     name: &str,
     args: &[Type],
     origin: Option<&Rc<str>>,
@@ -273,6 +273,16 @@ impl Checker {
                     if let Some(members) = b.class_members.get(name.as_ref()) {
                         if let Some(m) = members.members.iter().find(|m| m.name.as_ref() == key) {
                             return Some((m.ty.clone(), m.symbol_id));
+                        }
+                    }
+                    if let Some(members) = b.flattened_members.get(name.as_ref()) {
+                        if let Some(m) = members.iter().find(|m| m.name.as_ref() == key) {
+                            return Some((m.ty.clone(), m.symbol_id));
+                        }
+                    }
+                    if let Some(methods) = b.class_methods.get(name.as_ref()) {
+                        if let Some(ty) = methods.get(key) {
+                            return Some((ty.clone(), None));
                         }
                     }
                 }

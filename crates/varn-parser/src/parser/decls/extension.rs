@@ -46,12 +46,13 @@ pub fn parse_extension_decl(s: &mut TokenStream) -> Result<ExtensionDecl, String
     }
     s.expect(TokenKind::RBrace)?;
 
+    let full_range = s.span_from(range);
     Ok(ExtensionDecl {
         id,
         ast_id: 0,
         target,
         members,
-        range,
+        range: full_range,
     })
 }
 
@@ -83,12 +84,13 @@ fn parse_extension_member(s: &mut TokenStream) -> Result<ExtensionMember, String
             None
         };
         let body = super::super::stmts::parse_block(s)?;
+        let full_range = s.span_from(range);
         return Ok(ExtensionMember::Getter {
             key,
             return_type,
             body,
             modifiers: Modifiers::default(),
-            range,
+            range: full_range,
         });
     }
 
@@ -102,12 +104,13 @@ fn parse_extension_member(s: &mut TokenStream) -> Result<ExtensionMember, String
         let param = super::super::patterns::parse_single_param(s)?;
         s.expect(TokenKind::RParen)?;
         let body = super::super::stmts::parse_block(s)?;
+        let full_range = s.span_from(range);
         return Ok(ExtensionMember::Setter {
             key,
             param,
             body,
             modifiers: Modifiers::default(),
-            range,
+            range: full_range,
         });
     }
 
@@ -126,6 +129,7 @@ fn parse_extension_member(s: &mut TokenStream) -> Result<ExtensionMember, String
     };
     let body = super::super::stmts::parse_block(s)?;
 
+    let full_range = s.span_from(range);
     Ok(ExtensionMember::Method(FunctionDecl {
         id,
         ast_id: 0,
@@ -141,6 +145,6 @@ fn parse_extension_member(s: &mut TokenStream) -> Result<ExtensionMember, String
         },
         decorators: vec![],
         doc: None,
-        range,
+        range: full_range,
     }))
 }

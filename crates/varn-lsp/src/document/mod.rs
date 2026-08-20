@@ -1,5 +1,6 @@
 mod chain_queries;
 pub mod import;
+pub(crate) mod receiver_ast;
 mod resolution;
 mod symbol_queries;
 
@@ -148,6 +149,12 @@ pub struct SemanticDB {
     pub flattened_members: FxHashMap<String, Vec<varn_checker::types::ClassMemberInfo>>,
 
     pub extension_members: HashMap<String, Vec<MemberRecord>>,
+
+    pub member_resolutions: FxHashMap<u32, varn_checker::MemberResolution>,
+
+    pub call_resolutions: FxHashMap<u32, varn_checker::CallResolution>,
+
+    pub bind: varn_checker::BindResult,
 }
 
 impl SemanticDB {
@@ -195,6 +202,7 @@ pub struct DocumentState {
 
     pub import_paths: Vec<String>,
     pub positional_index: crate::queries::indexes::PositionalIndex,
+    pub ast: Option<varn_core::ast::Program>,
 }
 
 unsafe impl Send for DocumentState {}

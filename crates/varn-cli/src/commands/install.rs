@@ -10,7 +10,7 @@ pub fn execute() -> Result<(), CliError> {
         std::env::current_dir().map_err(|e| CliError::fatal(format!("cannot get cwd: {e}")))?;
 
     let manifest_path = find_project_manifest(&cwd)
-        .ok_or_else(|| CliError::fatal("no varn.json found — run `vn init` first".to_owned()))?;
+        .ok_or_else(|| CliError::fatal("no varn.toml found — run `vn init` first".to_owned()))?;
     let project_root = manifest_path.parent().unwrap_or(&cwd).to_path_buf();
 
     let lock_path = lockfile::lock_path(&project_root);
@@ -30,7 +30,7 @@ pub fn execute() -> Result<(), CliError> {
         let manifest = ProjectManifest::load(&manifest_path).map_err(|e| CliError::fatal(e))?;
         let deps = manifest.parsed_deps().map_err(|e| CliError::fatal(e))?;
         if deps.is_empty() {
-            terminal::log("No dependencies declared in varn.json.");
+            terminal::log("No dependencies declared in varn.toml.");
             return Ok(());
         }
         terminal::log(format!("Resolving {} dependency(ies)...", deps.len()));

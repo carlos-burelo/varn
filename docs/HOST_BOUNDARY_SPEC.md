@@ -66,3 +66,13 @@ if path.is_empty() {
 ```
 
 La VM interceptará este error y elevará una excepción recuperable en el código Varn (`try / catch`).
+
+---
+
+## 5. Sistema de Capacidades y Seguridad de Grano Fino (*Capabilities*)
+
+El acceso a recursos externos del sistema operativo (disco, red, variables de entorno, procesos, FFI) se encuentra estrictamente mediado por el `CapabilitySet` en la interfaz `NativeCtx`:
+
+- **Fast-path Bitmask (`u64`)**: Comprobación bit a bit en 1 ciclo de CPU (`0.3ns`) para operaciones no restringidas (`CAP_FS_READ`, `CAP_FS_WRITE`, `CAP_NET_CLIENT`, `CAP_NET_SERVER`, `CAP_SYS_ENV`, `CAP_SYS_EXEC`, `CAP_SYS_FFI`).
+- **Filtros granulares de rutas y hosts**: Validación al momento de abrir el recurso (`open()`, `connect()`).
+- **Aislamiento en Sandbox (`--sandbox`)**: Ejecución con cero permisos que bloquea determinísticamente cualquier intento de interacción con el host retornando `SecurityError: Permission denied (...)`.

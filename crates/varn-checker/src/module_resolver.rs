@@ -293,7 +293,10 @@ fn stdlib_carrier(specifier: &str) -> Option<Carrier> {
     if specifier != "std:types" && provider.interface_blob(specifier).is_some() {
         return Some(Carrier::Blob);
     }
-    if let Some(source) = provider.embedded_source(specifier) {
+    if let Some(source) = provider
+        .embedded_source(specifier)
+        .or_else(|| provider.bundled_source(specifier))
+    {
         return Some(Carrier::Embedded(source));
     }
     provider

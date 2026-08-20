@@ -60,6 +60,20 @@ pub fn resolve_token(
     }
 
     // (2) The checker recorded this exact occurrence.
+    if let Some(mem_res) = state.db.member_resolutions.get(&tok.offset) {
+        return Some(match mem_res.member_kind {
+            varn_checker::ResolvedMemberKind::EnumMember => TT_ENUM_MEMBER,
+            varn_checker::ResolvedMemberKind::Method
+            | varn_checker::ResolvedMemberKind::StaticMethod
+            | varn_checker::ResolvedMemberKind::ExtensionMethod => TT_FUNCTION,
+            varn_checker::ResolvedMemberKind::Property
+            | varn_checker::ResolvedMemberKind::StaticProperty
+            | varn_checker::ResolvedMemberKind::ExtensionProperty
+            | varn_checker::ResolvedMemberKind::Getter
+            | varn_checker::ResolvedMemberKind::Setter => TT_PROPERTY,
+        });
+    }
+
     if let Some(info) = state.db.expr_types.get(&tok.offset) {
         if let Some(sid) = info.symbol_id.filter(|s| *s < state.db.arena.len()) {
             let sym = state.db.arena.get(sid);
@@ -122,11 +136,7 @@ pub fn resolve_token(
     if tok.kind.is_keyword() {
         return Some(TT_KEYWORD);
     }
-    Some(if next_is_lparen {
-        TT_FUNCTION
-    } else {
-        TT_VARIABLE
-    })
+    None
 }
 
 fn member_tt(ty: &Type) -> u32 {

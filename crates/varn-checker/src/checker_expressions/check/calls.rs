@@ -66,6 +66,59 @@ impl Checker {
             self.validate_call_arguments(args, params, range, call_id, bind);
         }
 
+        if self.record_expr_types {
+            if let TypeKind::Fn(ft) = &effective_callee_ty.0 {
+                let callee_name = match &callee.kind {
+                    ExprKind::Identifier { name } => Some(std::rc::Rc::from(name.as_ref())),
+                    ExprKind::Member { property, .. } => {
+                        if let ExprKind::Identifier { name } = &property.kind {
+                            Some(std::rc::Rc::from(name.as_ref()))
+                        } else {
+                            None
+                        }
+                    }
+                    _ => None,
+                };
+                let params = ft
+                    .params
+                    .iter()
+                    .map(|p| crate::semantic_info::CallParamInfo {
+                        name: p.name.clone(),
+                        ty: p.ty.clone(),
+                        optional: p.optional,
+                        is_rest: p.is_rest,
+                    })
+                    .collect();
+
+                let mut arg_to_param_map = Vec::with_capacity(args.len());
+                for (i, arg) in args.iter().enumerate() {
+                    match arg {
+                        Arg::Named { label, .. } => {
+                            if let Some(pos) =
+                                ft.params.iter().position(|p| p.name.as_deref() == Some(label.as_str()))
+                            {
+                                arg_to_param_map.push(pos);
+                            } else {
+                                arg_to_param_map.push(i);
+                            }
+                        }
+                        Arg::Positional(_) | Arg::Spread(_) => {
+                            arg_to_param_map.push(i);
+                        }
+                    }
+                }
+
+                let call_res = crate::semantic_info::CallResolution {
+                    callee_name,
+                    params,
+                    return_ty: *ft.return_type.clone(),
+                    arg_to_param_map,
+                };
+                self.call_resolutions.insert(range.start.offset, call_res.clone());
+                self.call_resolutions.insert(callee.range.start.offset, call_res);
+            }
+        }
+
         self.check_type_arg_constraints(callee, type_args, range, bind);
     }
 

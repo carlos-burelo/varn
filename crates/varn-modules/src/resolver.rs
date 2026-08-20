@@ -42,12 +42,16 @@ impl ModuleResolver {
             }
             ImportSpecifier::Runtime(s) => Ok(ModuleId::Runtime(s)),
             ImportSpecifier::Relative(rel) => {
-                let base = match referrer {
-                    ModuleId::Local(s) => PathBuf::from(s.as_ref()),
-                    _ => PathBuf::from("."),
+                let joined = if rel.is_absolute() {
+                    rel
+                } else {
+                    let base = match referrer {
+                        ModuleId::Local(s) => PathBuf::from(s.as_ref()),
+                        _ => PathBuf::from("."),
+                    };
+                    let base_dir = base.parent().unwrap_or(Path::new("."));
+                    base_dir.join(&rel)
                 };
-                let base_dir = base.parent().unwrap_or(Path::new("."));
-                let joined = base_dir.join(&rel);
                 let normalized = normalize_components(&joined);
                 let path_str = normalize_path_string(normalized.to_string_lossy().into_owned());
                 Ok(ModuleId::local_str(&path_str))

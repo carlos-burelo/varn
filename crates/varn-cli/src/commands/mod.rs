@@ -7,7 +7,9 @@ pub mod completions;
 pub mod debug;
 pub mod doctor;
 pub mod eval;
+pub mod fmt;
 pub mod init;
+
 pub mod install;
 pub mod lsp;
 pub mod pkg;

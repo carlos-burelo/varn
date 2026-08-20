@@ -7,7 +7,8 @@ import {
     tcpRead$,
     tcpWrite$,
     tcpClose$,
-    tcpCloseListener$
+    tcpCloseListener$,
+    parseHttpRequest$
 } from "runtime:net";
 
 import { parse as jsonParse, stringify as jsonStringify, Json } from "std:json";
@@ -102,34 +103,14 @@ class RawRequest {
 }
 
 function parseRawRequest(raw: str): RawRequest? {
-    let headerEnd = raw.indexOf("\r\n\r\n");
-    if (headerEnd < 0) return null;
-    
-    let headerPart = raw.slice(0, headerEnd);
-    let bodyPart = raw.slice(headerEnd + 4);
-    
-    let lines = headerPart.split("\r\n");
-    if (lines.length === 0) return null;
+    let parsed: dynamic = parseHttpRequest$(raw);
+    if (parsed === null) return null;
     
     let req = new RawRequest();
-    
-    let firstLine = lines[0];
-    let parts = firstLine.split(" ");
-    if (parts.length < 2) return null;
-    req.method = parts[0];
-    req.path = parts[1];
-    
-    for (let i = 1; i < lines.length; i = i + 1) {
-        let line = lines[i];
-        let colon = line.indexOf(":");
-        if (colon > 0) {
-            let key = line.slice(0, colon).trim().toLowerCase();
-            let val = line.slice(colon + 1).trim();
-            req.headers[key] = val;
-        }
-    }
-    
-    req.body = bodyPart;
+    req.method = parsed.method;
+    req.path = parsed.path;
+    req.headers = parsed.headers;
+    req.body = parsed.body;
     return req;
 }
 

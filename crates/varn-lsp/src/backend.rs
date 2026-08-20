@@ -5,7 +5,11 @@ use tower_lsp::jsonrpc::Result as LspResult;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer};
 
+use crate::features::call_hierarchy::{
+    incoming_calls, outgoing_calls, prepare_call_hierarchy,
+};
 use crate::features::code_action::build_code_action;
+use crate::features::compiler_inspect::execute_command;
 use crate::features::completion::build_completion_response;
 use crate::features::definition::build_goto_definition;
 use crate::features::diagnostics::convert_diagnostics;
@@ -13,12 +17,16 @@ use crate::features::document_highlight::build_document_highlights;
 use crate::features::folding::build_folding_ranges;
 use crate::features::formatting::build_formatting;
 use crate::features::hover::build_hover;
+use crate::features::implementation::build_goto_implementation;
 use crate::features::inlay_hints::build_inlay_hints;
+use crate::features::on_type_formatting::build_on_type_formatting;
 use crate::features::references::build_references;
 use crate::features::rename::{build_prepare_rename, build_rename};
+use crate::features::selection_range::build_selection_ranges;
 use crate::features::semantic_tokens::{build_semantic_tokens, LEGEND};
 use crate::features::signature_help::build_signature_help;
 use crate::features::symbols::build_document_symbols;
+use crate::features::type_definition::build_goto_type_definition;
 use crate::features::workspace_symbols::build_workspace_symbols;
 use crate::workspace::Workspace;
 
@@ -155,7 +163,23 @@ impl LanguageServer for Backend {
                     ..Default::default()
                 }),
                 definition_provider: Some(OneOf::Left(true)),
+                type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
+                implementation_provider: Some(ImplementationProviderCapability::Simple(true)),
                 references_provider: Some(OneOf::Left(true)),
+                call_hierarchy_provider: Some(CallHierarchyServerCapability::Simple(true)),
+                selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
+                document_on_type_formatting_provider: Some(DocumentOnTypeFormattingOptions {
+                    first_trigger_character: "}".to_string(),
+                    more_trigger_character: Some(vec![";".to_string(), "\n".to_string()]),
+                }),
+                execute_command_provider: Some(ExecuteCommandOptions {
+                    commands: vec![
+                        "varn.showBytecode".to_string(),
+                        "varn.showSSA".to_string(),
+                        "varn.evalSelection".to_string(),
+                    ],
+                    work_done_progress_options: Default::default(),
+                }),
                 rename_provider: Some(OneOf::Right(RenameOptions {
                     prepare_provider: Some(true),
                     work_done_progress_options: Default::default(),
@@ -431,7 +455,10 @@ impl LanguageServer for Backend {
     }
 
     async fn code_action(&self, params: CodeActionParams) -> LspResult<Option<CodeActionResponse>> {
-        Ok(build_code_action(params))
+        let uri = params.text_document.uri.to_string();
+        let state = self.workspace.get(&uri);
+        let index = self.workspace.index.read().ok();
+        Ok(build_code_action(params, state.as_deref(), index.as_deref()))
     }
 
     async fn semantic_tokens_full(
@@ -540,9 +567,134 @@ impl LanguageServer for Backend {
         let result = self
             .workspace
             .get(&uri_str)
-            .map(|a| crate::features::code_lens::build_code_lenses(&uri, &a));
+            .map(|a| crate::features::code_lens::build_code_lenses(&uri, &a, Some(&self.workspace)));
         self.log_slow("code_lens", start.elapsed()).await;
         Ok(result)
+    }
+
+    async fn goto_type_definition(
+        &self,
+        params: GotoDefinitionParams,
+    ) -> LspResult<Option<GotoDefinitionResponse>> {
+        let start = Instant::now();
+        let uri = params
+            .text_document_position_params
+            .text_document
+            .uri
+            .to_string();
+        let pos = params.text_document_position_params.position;
+        let result = {
+            let state = self.workspace.get(&uri);
+            let index = self.workspace.index.read().ok();
+            state.as_deref().and_then(|a| {
+                build_goto_type_definition(a, index.as_deref(), pos.line, pos.character)
+            })
+        };
+        self.log_slow("goto_type_definition", start.elapsed()).await;
+        Ok(result)
+    }
+
+    async fn goto_implementation(
+        &self,
+        params: GotoDefinitionParams,
+    ) -> LspResult<Option<GotoDefinitionResponse>> {
+        let start = Instant::now();
+        let uri = params
+            .text_document_position_params
+            .text_document
+            .uri
+            .to_string();
+        let pos = params.text_document_position_params.position;
+        let result = self.workspace.get(&uri).and_then(|a| {
+            build_goto_implementation(&a, &self.workspace, pos.line, pos.character)
+        });
+        self.log_slow("goto_implementation", start.elapsed()).await;
+        Ok(result)
+    }
+
+    async fn prepare_call_hierarchy(
+        &self,
+        params: CallHierarchyPrepareParams,
+    ) -> LspResult<Option<Vec<CallHierarchyItem>>> {
+        let start = Instant::now();
+        let uri = params
+            .text_document_position_params
+            .text_document
+            .uri
+            .to_string();
+        let pos = params.text_document_position_params.position;
+        let result = self
+            .workspace
+            .get(&uri)
+            .and_then(|a| prepare_call_hierarchy(&a, pos.line, pos.character));
+        self.log_slow("prepare_call_hierarchy", start.elapsed()).await;
+        Ok(result)
+    }
+
+    async fn incoming_calls(
+        &self,
+        params: CallHierarchyIncomingCallsParams,
+    ) -> LspResult<Option<Vec<CallHierarchyIncomingCall>>> {
+        let start = Instant::now();
+        let result = incoming_calls(params.item, &self.workspace);
+        self.log_slow("incoming_calls", start.elapsed()).await;
+        Ok(result)
+    }
+
+    async fn outgoing_calls(
+        &self,
+        params: CallHierarchyOutgoingCallsParams,
+    ) -> LspResult<Option<Vec<CallHierarchyOutgoingCall>>> {
+        let start = Instant::now();
+        let result = outgoing_calls(params.item, &self.workspace);
+        self.log_slow("outgoing_calls", start.elapsed()).await;
+        Ok(result)
+    }
+
+    async fn selection_range(
+        &self,
+        params: SelectionRangeParams,
+    ) -> LspResult<Option<Vec<SelectionRange>>> {
+        let start = Instant::now();
+        let uri = params.text_document.uri.to_string();
+        let result = self
+            .workspace
+            .get(&uri)
+            .map(|a| build_selection_ranges(&a, &params.positions));
+        self.log_slow("selection_range", start.elapsed()).await;
+        Ok(result)
+    }
+
+    async fn on_type_formatting(
+        &self,
+        params: DocumentOnTypeFormattingParams,
+    ) -> LspResult<Option<Vec<TextEdit>>> {
+        let start = Instant::now();
+        let uri = params.text_document_position.text_document.uri.to_string();
+        let pos = params.text_document_position.position;
+        let result = self.workspace.get(&uri).and_then(|a| {
+            build_on_type_formatting(&a.source, pos, &params.ch, params.options)
+        });
+        self.log_slow("on_type_formatting", start.elapsed()).await;
+        Ok(result)
+    }
+
+    async fn execute_command(
+        &self,
+        params: ExecuteCommandParams,
+    ) -> LspResult<Option<serde_json::Value>> {
+        let start = Instant::now();
+        let result = execute_command(&params.command, params.arguments, &self.workspace);
+        self.log_slow("execute_command", start.elapsed()).await;
+        match result {
+            Ok(v) => Ok(v),
+            Err(e) => {
+                self.client
+                    .log_message(MessageType::ERROR, format!("execute_command error: {e}"))
+                    .await;
+                Ok(None)
+            }
+        }
     }
 }
 

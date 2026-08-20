@@ -193,7 +193,6 @@ fn parse_conditional_expr(s: &mut TokenStream) -> Result<Expr, String> {
 }
 
 pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> Result<Expr, String> {
-    let start = s.range();
     let mut left = parse_unary_expr(s)?;
 
     loop {
@@ -259,9 +258,10 @@ pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> Result<E
             s.advance();
             let ty = parse_type(s)?;
             let ty_range = *ty.clone().range();
+            let range = left.range().to(ty_range);
             left = if kind == TokenKind::As {
                 Expr::new_with_range(
-                    start.to(ty_range),
+                    range,
                     ExprKind::As {
                         expression: Box::new(left),
                         type_ann: ty,
@@ -269,7 +269,7 @@ pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> Result<E
                 )
             } else if kind == TokenKind::Is {
                 Expr::new_with_range(
-                    start.to(ty_range),
+                    range,
                     ExprKind::Is {
                         expression: Box::new(left),
                         type_ann: ty,
@@ -277,7 +277,7 @@ pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> Result<E
                 )
             } else {
                 Expr::new_with_range(
-                    start.to(ty_range),
+                    range,
                     ExprKind::Satisfies {
                         expression: Box::new(left),
                         type_ann: ty,

@@ -40,6 +40,7 @@ pub fn parse_interface_decl(s: &mut TokenStream) -> Result<InterfaceDecl, String
     }
     s.expect(TokenKind::RBrace)?;
 
+    let full_range = s.span_from(range);
     Ok(InterfaceDecl {
         id,
         ast_id: 0,
@@ -47,16 +48,13 @@ pub fn parse_interface_decl(s: &mut TokenStream) -> Result<InterfaceDecl, String
         extends,
         body,
         doc: None,
-        range,
+        range: full_range,
     })
 }
 
 pub fn parse_interface_member(s: &mut TokenStream) -> Result<InterfaceMember, String> {
     let mem_range = s.range();
     let readonly = s.eat(TokenKind::Readonly);
-    // `async` only makes sense on a method signature, but `async` is also a
-    // legal member name, so it is only consumed as a modifier when something
-    // that can start a member follows it.
     let is_async = s.check(TokenKind::Async)
         && !matches!(
             s.peek_kind(1),
@@ -71,10 +69,11 @@ pub fn parse_interface_member(s: &mut TokenStream) -> Result<InterfaceMember, St
         s.expect(TokenKind::Colon)?;
         let return_type = parse_type(s)?;
         s.eat(TokenKind::Semicolon);
+        let full_range = s.span_from(mem_range);
         return Ok(InterfaceMember::Index {
             param,
             return_type,
-            range: mem_range,
+            range: full_range,
         });
     }
     if s.check(TokenKind::LParen) {
@@ -82,10 +81,11 @@ pub fn parse_interface_member(s: &mut TokenStream) -> Result<InterfaceMember, St
         s.expect(TokenKind::Colon)?;
         let return_type = parse_type(s)?;
         s.eat(TokenKind::Semicolon);
+        let full_range = s.span_from(mem_range);
         return Ok(InterfaceMember::Callable {
             params,
             return_type,
-            range: mem_range,
+            range: full_range,
         });
     }
 
@@ -105,6 +105,7 @@ pub fn parse_interface_member(s: &mut TokenStream) -> Result<InterfaceMember, St
             None
         };
         s.eat(TokenKind::Semicolon);
+        let full_range = s.span_from(mem_range);
         Ok(InterfaceMember::Method {
             key: key.into(),
             type_params,
@@ -112,7 +113,7 @@ pub fn parse_interface_member(s: &mut TokenStream) -> Result<InterfaceMember, St
             return_type,
             optional,
             is_async,
-            range: mem_range,
+            range: full_range,
         })
     } else {
         if is_async {
@@ -121,12 +122,13 @@ pub fn parse_interface_member(s: &mut TokenStream) -> Result<InterfaceMember, St
         s.expect(TokenKind::Colon)?;
         let type_ann = parse_type(s)?;
         s.eat(TokenKind::Semicolon);
+        let full_range = s.span_from(mem_range);
         Ok(InterfaceMember::Property {
             key: key.into(),
             type_ann,
             optional,
             readonly,
-            range: mem_range,
+            range: full_range,
         })
     }
 }
@@ -150,13 +152,14 @@ pub fn parse_sum_type_or_alias(s: &mut TokenStream) -> Result<Decl, String> {
 
     let alias = parse_type(s)?;
     s.eat_semicolon();
+    let full_range = s.span_from(range);
     Ok(Decl::TypeAlias(TypeAliasDecl {
         id,
         ast_id: 0,
         type_params,
         alias,
         doc: None,
-        range,
+        range: full_range,
     }))
 }
 
@@ -169,8 +172,8 @@ fn parse_sum_type_body(
     let mut variants = Vec::new();
 
     while s.check(TokenKind::Pipe) {
+        let v_start = s.range();
         s.advance();
-        let vrange = s.range();
         let vname = s.expect_lexeme(TokenKind::Identifier)?;
 
         let mut fields = Vec::new();
@@ -191,6 +194,7 @@ fn parse_sum_type_body(
             s.expect(TokenKind::RParen)?;
         }
 
+        let vrange = s.span_from(v_start);
         variants.push(SumVariant {
             name: vname,
             fields,
@@ -198,13 +202,14 @@ fn parse_sum_type_body(
         });
     }
 
+    let full_range = s.span_from(range);
     Ok(SumTypeDecl {
         id,
         ast_id: 0,
         type_params,
         variants,
         doc: None,
-        range,
+        range: full_range,
     })
 }
 
@@ -308,11 +313,12 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
                     }
                 };
 
+                let f_full_range = s.span_from(field_range);
                 payload_fields.push(EnumField {
                     name: field_name,
                     ty,
                     init,
-                    range: field_range,
+                    range: f_full_range,
                 });
                 if s.check(TokenKind::Comma) {
                     s.advance();
@@ -327,11 +333,12 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
             None
         };
 
+        let full_mem_range = s.span_from(mem_range);
         members.push(EnumMember {
             id: name,
             init,
             payload_fields,
-            range: mem_range,
+            range: full_mem_range,
         });
 
         let has_comma = s.eat(TokenKind::Comma);
@@ -355,6 +362,7 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
     }
 
     s.expect(TokenKind::RBrace)?;
+    let full_range = s.span_from(range);
     Ok(EnumDecl {
         id,
         ast_id: 0,
@@ -363,7 +371,7 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
         members,
         body,
         doc: None,
-        range,
+        range: full_range,
     })
 }
 
@@ -384,12 +392,13 @@ pub fn parse_namespace_decl(s: &mut TokenStream) -> Result<NamespaceDecl, String
         }
     }
     s.expect(TokenKind::RBrace)?;
+    let full_range = s.span_from(range);
     Ok(NamespaceDecl {
         id,
         ast_id: 0,
         body,
         doc: None,
-        range,
+        range: full_range,
     })
 }
 
@@ -413,20 +422,22 @@ pub fn parse_struct_decl(s: &mut TokenStream) -> Result<StructDecl, String> {
         } else {
             None
         };
+        let full_field_range = s.span_from(field_range);
         fields.push(StructField {
             name,
             type_ann,
             default,
-            range: field_range,
+            range: full_field_range,
         });
         s.eat(TokenKind::Comma);
     }
     s.expect(TokenKind::RBrace)?;
+    let full_range = s.span_from(range);
     Ok(StructDecl {
         id,
         ast_id: 0,
         fields,
         doc: None,
-        range,
+        range: full_range,
     })
 }

@@ -1,0 +1,77 @@
+print("=== PRUEBA DE CONTROL-FLOW TYPE NARROWING Y NULL-SAFETY ===");
+
+// 1. Narrowing con x !== null
+function processOptional(val: str?): int {
+    if (val !== null) {
+        // 'val' se reduce a 'str' automáticamente; .length es válido sin error
+        return val.length;
+    }
+    return 0;
+}
+
+assert("processOptional with string", processOptional("hello") === 5);
+assert("processOptional with null", processOptional(null) === 0);
+
+// 2. Narrowing con null !== x
+function processInverted(val: str?): int {
+    if (null !== val) {
+        return val.length;
+    }
+    return -1;
+}
+
+assert("processInverted with string", processInverted("varn") === 4);
+assert("processInverted with null", processInverted(null) === -1);
+
+// 3. Narrowing con Truthiness: if (val)
+function processTruthy(val: str?): bool {
+    if (val) {
+        return val.length > 0;
+    }
+    return false;
+}
+
+assert("processTruthy with string", processTruthy("active") === true);
+assert("processTruthy with null", processTruthy(null) === false);
+
+// 4. Narrowing con typeof
+function processTypeof(val: dynamic): str {
+    if (typeof val === "str") {
+        return val.toUpperCase();
+    } else if (typeof val === "int") {
+        return "number:" + val;
+    }
+    return "other";
+}
+
+assert("processTypeof string", processTypeof("abc") === "ABC");
+assert("processTypeof int", processTypeof(42) === "number:42");
+
+// 5. Narrowing con Instanceof
+class Animal {
+    name: str;
+    constructor(name: str) {
+        this.name = name;
+    }
+}
+
+class Dog extends Animal {
+    bark(): str {
+        return "woof";
+    }
+}
+
+function speak(a: Animal): str {
+    if (a instanceof Dog) {
+        return a.bark();
+    }
+    return a.name;
+}
+
+let d = new Dog("Rex");
+let a = new Animal("Generic");
+
+assert("speak Dog", speak(d) === "woof");
+assert("speak Animal", speak(a) === "Generic");
+
+print("[PASSED] 79. Control-Flow Type Narrowing");

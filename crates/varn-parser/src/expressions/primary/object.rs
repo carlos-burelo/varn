@@ -15,9 +15,10 @@ pub(super) fn parse_object_expr(s: &mut TokenStream) -> Result<Expr, String> {
         if s.check(TokenKind::DotDotDot) {
             s.advance();
             let arg = super::super::parse_assign_expr(s)?;
+            let full_prop_range = s.span_from(prop_range);
             properties.push(ObjectProp::Spread {
                 argument: arg,
-                range: prop_range,
+                range: full_prop_range,
             });
             s.eat(TokenKind::Comma);
             continue;
@@ -45,11 +46,12 @@ pub(super) fn parse_object_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 None
             };
             let body = crate::parser::parse_block(s)?;
+            let full_prop_range = s.span_from(prop_range);
             properties.push(ObjectProp::Getter {
                 key,
                 body: Box::new(body),
                 return_type,
-                range: prop_range,
+                range: full_prop_range,
             });
             s.eat(TokenKind::Comma);
             continue;
@@ -62,11 +64,12 @@ pub(super) fn parse_object_expr(s: &mut TokenStream) -> Result<Expr, String> {
             let param = crate::parser::parse_single_param(s)?;
             s.expect(TokenKind::RParen)?;
             let body = crate::parser::parse_block(s)?;
+            let full_prop_range = s.span_from(prop_range);
             properties.push(ObjectProp::Setter {
                 key,
                 param,
                 body: Box::new(body),
-                range: prop_range,
+                range: full_prop_range,
             });
             s.eat(TokenKind::Comma);
             continue;
@@ -91,6 +94,7 @@ pub(super) fn parse_object_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 None
             };
             let body = crate::parser::parse_block(s)?;
+            let full_prop_range = s.span_from(prop_range);
             properties.push(ObjectProp::Method {
                 key,
                 params,
@@ -98,7 +102,7 @@ pub(super) fn parse_object_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 return_type,
                 is_async,
                 is_generator,
-                range: prop_range,
+                range: full_prop_range,
             });
             s.eat(TokenKind::Comma);
             continue;
@@ -126,19 +130,21 @@ pub(super) fn parse_object_expr(s: &mut TokenStream) -> Result<Expr, String> {
         };
 
         let computed = matches!(&key, PropKey::Computed(_));
+        let full_prop_range = s.span_from(prop_range);
         properties.push(ObjectProp::Property {
             key,
             value,
             shorthand,
             computed,
-            range: prop_range,
+            range: full_prop_range,
         });
         s.eat(TokenKind::Comma);
     }
 
     s.expect(TokenKind::RBrace)?;
+    let full_range = s.span_from(range);
     Ok(Expr::new_with_range(
-        range,
+        full_range,
         varn_core::ast::ExprKind::Object { properties },
     ))
 }

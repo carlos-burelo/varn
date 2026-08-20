@@ -9,7 +9,9 @@ varn-lexer   = { path = "../varn-lexer" }
 varn-parser  = { path = "../varn-parser" }
 varn-checker = { path = "../varn-checker" }
 varn-modules  = { path = "../varn-modules" }
-varn-builtins = { path = "../varn-builtins" }
+varn-builtins = { path = "../varn-builtins", features = ["runtime"] }
+varn-types    = { path = "../varn-types" }
+varn-compiler = { path = "../varn-compiler" }
 
 tower-lsp  = { workspace = true }
 tokio      = { workspace = true }

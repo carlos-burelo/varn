@@ -18,7 +18,8 @@ pub const CORE_SYMBOL: &str = "core:symbol";
 pub const PKG_PREFIX: &str = "pkg:";
 pub const ENV_DIR_NAME: &str = ".vn";
 pub const MODULES_DIR_NAME: &str = "packages";
-pub const PACKAGE_MANIFEST_FILE: &str = "varn.json";
+pub const PACKAGE_MANIFEST_FILE: &str = "varn.toml";
+pub const PACKAGE_MANIFEST_FILE_VN: &str = "vn.toml";
 pub const VARN_FILE_EXTENSION: &str = "vn";
 pub const DEFAULT_PACKAGE_VERSION: &str = "0.0.0";
 pub const RELATIVE_EXPORT_PREFIX: &str = "./";
@@ -93,10 +94,14 @@ pub use spec::{ModuleKind, ModuleSpec};
 
 pub fn is_pkg_specifier(specifier: &str) -> bool {
     specifier.starts_with(PKG_PREFIX)
+        || (!specifier.starts_with('.')
+            && !specifier.starts_with('/')
+            && !specifier.starts_with('\\')
+            && !specifier.contains(':'))
 }
 
 pub fn split_pkg_specifier(specifier: &str) -> Option<(String, Option<String>)> {
-    let raw = specifier.strip_prefix(PKG_PREFIX)?;
+    let raw = specifier.strip_prefix(PKG_PREFIX).unwrap_or(specifier);
     if raw.is_empty() {
         return None;
     }
@@ -272,30 +277,40 @@ fn find_package_root(base_dir: &Path, package_name: &str) -> Option<PathBuf> {
         }
 
         // Check if dir itself is the requested package
-        let manifest_file = dir.join(PACKAGE_MANIFEST_FILE);
-        if manifest_file.exists() {
-            if let Ok(manifest) = load_package_manifest(dir) {
-                if manifest.name.as_deref() == Some(package_name) {
-                    return Some(dir.to_path_buf());
-                }
+        if let Ok(manifest) = load_package_manifest(dir) {
+            if manifest.name.as_deref() == Some(package_name) {
+                return Some(dir.to_path_buf());
             }
         }
     }
     None
 }
 
-#[derive(serde::Deserialize)]
-struct RawManifest {
+#[derive(serde::Deserialize, Default)]
+struct PackageSection {
     name: Option<String>,
     version: Option<String>,
     main: Option<String>,
+}
+
+#[derive(serde::Deserialize, Default)]
+struct RawManifest {
+    #[serde(default)]
+    package: Option<PackageSection>,
+    #[serde(default)]
+    project: Option<PackageSection>,
+
+    name: Option<String>,
+    version: Option<String>,
+    main: Option<String>,
+
     #[serde(default)]
     exports: std::collections::HashMap<String, String>,
     #[serde(default)]
     dependencies: std::collections::HashMap<String, String>,
-    #[serde(default)]
+    #[serde(default, alias = "dev-dependencies", alias = "dev_dependencies")]
     dev_dependencies: std::collections::HashMap<String, String>,
-    #[serde(default)]
+    #[serde(default, alias = "peer-dependencies", alias = "peer_dependencies")]
     peer_dependencies: std::collections::HashMap<String, String>,
     #[serde(default)]
     workspaces: Vec<String>,
@@ -314,24 +329,37 @@ pub struct PackageManifest {
 }
 
 fn load_package_manifest(package_root: &Path) -> Result<PackageManifest, String> {
-    let manifest_path = package_root.join(PACKAGE_MANIFEST_FILE);
-    if !manifest_path.exists() {
+    let manifest_path = if package_root.join(PACKAGE_MANIFEST_FILE).exists() {
+        package_root.join(PACKAGE_MANIFEST_FILE)
+    } else if package_root.join(PACKAGE_MANIFEST_FILE_VN).exists() {
+        package_root.join(PACKAGE_MANIFEST_FILE_VN)
+    } else {
         return Err(format!(
             "missing {} in package root {}",
             PACKAGE_MANIFEST_FILE,
             package_root.display()
         ));
-    }
+    };
 
     let raw = std::fs::read_to_string(&manifest_path)
         .map_err(|e| format!("cannot read {}: {e}", manifest_path.display()))?;
-    let parsed: RawManifest = serde_json::from_str(&raw)
+    let parsed: RawManifest = toml::from_str(&raw)
         .map_err(|e| format!("invalid {}: {e}", manifest_path.display()))?;
 
+    let name = parsed.package.as_ref().and_then(|p| p.name.clone())
+        .or_else(|| parsed.project.as_ref().and_then(|p| p.name.clone()))
+        .or(parsed.name);
+    let version = parsed.package.as_ref().and_then(|p| p.version.clone())
+        .or_else(|| parsed.project.as_ref().and_then(|p| p.version.clone()))
+        .or(parsed.version);
+    let main = parsed.package.as_ref().and_then(|p| p.main.clone())
+        .or_else(|| parsed.project.as_ref().and_then(|p| p.main.clone()))
+        .or(parsed.main);
+
     Ok(PackageManifest {
-        name: parsed.name,
-        version: parsed.version,
-        main: parsed.main,
+        name,
+        version,
+        main,
         exports: parsed.exports,
         dependencies: parsed.dependencies,
         dev_dependencies: parsed.dev_dependencies,
@@ -380,14 +408,20 @@ fn enforce_dependency_constraint(
         return Ok(());
     };
 
-    if required.starts_with("path:") || required == "*" {
+    let req_str = if let Some((_, semver_part)) = required.rsplit_once('@') {
+        semver_part
+    } else {
+        required.as_str()
+    };
+
+    if required.starts_with("path:") || req_str == "*" {
         return Ok(());
     }
 
-    let req = VersionReq::parse(required).map_err(|e| {
+    let req = VersionReq::parse(req_str).map_err(|e| {
         format!(
             "invalid semver constraint '{}' for dependency '{}': {}",
-            required, package_name, e
+            req_str, package_name, e
         )
     })?;
     let resolved = Version::parse(resolved_version).map_err(|e| {
@@ -399,7 +433,7 @@ fn enforce_dependency_constraint(
     if !req.matches(&resolved) {
         return Err(format!(
             "dependency constraint mismatch for '{}': requires '{}', resolved '{}'",
-            package_name, required, resolved_version
+            package_name, req_str, resolved_version
         ));
     }
     Ok(())
@@ -410,22 +444,9 @@ fn nearest_owner_manifest(base_dir: &Path) -> Option<PackageManifest> {
         if dir.ends_with(Path::new(ENV_DIR_NAME).join(MODULES_DIR_NAME)) {
             continue;
         }
-        let manifest = dir.join(PACKAGE_MANIFEST_FILE);
-        if !manifest.exists() {
-            continue;
+        if let Ok(manifest) = load_package_manifest(dir) {
+            return Some(manifest);
         }
-        let raw = std::fs::read_to_string(&manifest).ok()?;
-        let parsed: RawManifest = serde_json::from_str(&raw).ok()?;
-        return Some(PackageManifest {
-            name: parsed.name,
-            version: parsed.version,
-            main: parsed.main,
-            exports: parsed.exports,
-            dependencies: parsed.dependencies,
-            dev_dependencies: parsed.dev_dependencies,
-            peer_dependencies: parsed.peer_dependencies,
-            workspaces: parsed.workspaces,
-        });
     }
     None
 }

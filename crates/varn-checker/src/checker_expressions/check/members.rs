@@ -126,6 +126,90 @@ impl Checker {
             self.emit(diag);
         }
 
+        if self.record_expr_types {
+            let final_mem_ty = self
+                .find_member_info(&check_ty, prop_name.as_ref(), bind)
+                .map(|(t, _)| t)
+                .unwrap_or_else(|| self.infer_type(expr, bind));
+
+            let is_static = if let ExprKind::Identifier { name } = &object.kind {
+                bind.scopes
+                    .get(bind.global_scope)
+                    .resolve(name.as_ref(), &bind.scopes)
+                    .map(|sid| {
+                        matches!(
+                            bind.arena.get(sid).kind,
+                            crate::symbol::SymbolKind::Class
+                                | crate::symbol::SymbolKind::Interface
+                                | crate::symbol::SymbolKind::Enum
+                                | crate::symbol::SymbolKind::Namespace
+                                | crate::symbol::SymbolKind::Struct
+                        )
+                    })
+                    .unwrap_or(false)
+            } else {
+                false
+            };
+
+            let is_enum = matches!(&check_ty.0, TypeKind::EnumVariant { .. })
+                || if let TypeKind::Named(n, _) = &check_ty.0 {
+                    bind.scopes
+                        .get(bind.global_scope)
+                        .resolve(n.as_ref(), &bind.scopes)
+                        .map(|sid| bind.arena.get(sid).kind == crate::symbol::SymbolKind::Enum)
+                        .unwrap_or(false)
+                } else {
+                    false
+                };
+
+            let member_kind = if is_enum {
+                crate::semantic_info::ResolvedMemberKind::EnumMember
+            } else if self.extension_members.contains_key(&property.range.start.offset) {
+                if matches!(final_mem_ty.0, TypeKind::Fn(_)) {
+                    crate::semantic_info::ResolvedMemberKind::ExtensionMethod
+                } else {
+                    crate::semantic_info::ResolvedMemberKind::ExtensionProperty
+                }
+            } else if is_static {
+                if matches!(final_mem_ty.0, TypeKind::Fn(_)) {
+                    crate::semantic_info::ResolvedMemberKind::StaticMethod
+                } else {
+                    crate::semantic_info::ResolvedMemberKind::StaticProperty
+                }
+            } else if matches!(final_mem_ty.0, TypeKind::Fn(_)) {
+                crate::semantic_info::ResolvedMemberKind::Method
+            } else {
+                crate::semantic_info::ResolvedMemberKind::Property
+            };
+
+            let origin_module = match &check_ty.0 {
+                TypeKind::Named(_, orig) | TypeKind::Generic(_, _, orig) => orig.clone(),
+                TypeKind::Intrinsic(tag) => Some(std::rc::Rc::from(match tag {
+                    varn_core::TypeTag::Map => "core:map",
+                    varn_core::TypeTag::Set => "core:set",
+                    varn_core::TypeTag::Range => "core:range",
+                    varn_core::TypeTag::Array => "core:array",
+                    varn_core::TypeTag::Str => "core:str",
+                    varn_core::TypeTag::TaskHandle => "core:task",
+                    _ => "core:primitives",
+                })),
+                _ => None,
+            };
+
+            self.member_resolutions.insert(
+                property.range.start.offset,
+                crate::semantic_info::MemberResolution {
+                    receiver_ty: check_ty.clone(),
+                    member_name: std::rc::Rc::from(prop_name.as_ref()),
+                    member_kind,
+                    member_ty: final_mem_ty,
+                    origin_module,
+                    def_range: None,
+                    doc: None,
+                },
+            );
+        }
+
         let class_name = match &obj_ty.0 {
             TypeKind::Named(n, _origin) | TypeKind::Generic(n, _, _origin) => Some(n.as_ref()),
             _ => None,

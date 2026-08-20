@@ -40,6 +40,23 @@ impl ExecCtx {
             }
         }
 
+        // Direct fast-path for high-frequency intrinsic Array methods (push, pop).
+        // Eliminates method table lookup, BoundMethod allocation, and indirect call overhead.
+        if this_val.is_heap() {
+            if let Some(crate::heap::HeapObj::Array(arr)) = self.heap.get(this_val.as_heap_idx()) {
+                if name.as_ref() == "push" && arg_count == 1 {
+                    let val = self.stack[base + arg_start];
+                    arr.push_vm(val);
+                    self.stack[base + dest] = VmValue::null();
+                    return Ok(false);
+                } else if name.as_ref() == "pop" && arg_count == 0 {
+                    let val = arr.pop_vm().unwrap_or(VmValue::null());
+                    self.stack[base + dest] = val;
+                    return Ok(false);
+                }
+            }
+        }
+
         let is_megamorphic = closure
             .feedback
             .borrow()

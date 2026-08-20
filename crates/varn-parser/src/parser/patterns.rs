@@ -62,6 +62,7 @@ fn parse_param(s: &mut TokenStream) -> Result<Param, String> {
         None
     };
 
+    let full_range = s.span_from(range);
     Ok(Param {
         pattern,
         type_ann,
@@ -69,7 +70,7 @@ fn parse_param(s: &mut TokenStream) -> Result<Param, String> {
         is_rest,
         is_optional,
         modifiers: mods,
-        range,
+        range: full_range,
     })
 }
 
@@ -81,9 +82,10 @@ pub fn parse_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
         TokenKind::DotDotDot => {
             s.advance();
             let inner = parse_pattern(s)?;
+            let full_range = s.span_from(range);
             Ok(Pattern::Rest {
                 argument: Box::new(inner),
-                range,
+                range: full_range,
             })
         }
         TokenKind::Placeholder => {
@@ -94,10 +96,11 @@ pub fn parse_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
             } else {
                 None
             };
+            let full_range = s.span_from(range);
             Ok(Pattern::Identifier {
                 name: String::from("_").into(),
                 type_ann,
-                range,
+                range: full_range,
             })
         }
         _ => {
@@ -108,10 +111,11 @@ pub fn parse_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
             } else {
                 None
             };
+            let full_range = s.span_from(range);
             Ok(Pattern::Identifier {
                 name,
                 type_ann,
-                range,
+                range: full_range,
             })
         }
     }
@@ -142,10 +146,11 @@ fn parse_array_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
         s.eat(TokenKind::Comma);
     }
     s.expect(TokenKind::RBracket)?;
+    let full_range = s.span_from(range);
     Ok(Pattern::Array {
         elements,
         rest,
-        range,
+        range: full_range,
     })
 }
 
@@ -189,27 +194,30 @@ fn parse_object_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
         };
         let value = if s.eat(TokenKind::Eq) {
             let default = parse_expr(s)?;
+            let assign_range = s.span_from(prop_range);
             Pattern::Assignment {
                 left: Box::new(value),
                 right: Box::new(default),
-                range: prop_range,
+                range: assign_range,
             }
         } else {
             value
         };
+        let full_prop_range = s.span_from(prop_range);
         properties.push(ObjPatternProp {
             key,
             value,
             shorthand,
-            range: prop_range,
+            range: full_prop_range,
         });
         s.eat(TokenKind::Comma);
     }
     s.expect(TokenKind::RBrace)?;
+    let full_range = s.span_from(range);
     Ok(Pattern::Object {
         properties,
         rest,
-        range,
+        range: full_range,
     })
 }
 
@@ -219,9 +227,10 @@ pub fn parse_decorator_list(s: &mut TokenStream) -> Result<Vec<Decorator>, Strin
         let range = s.range();
         s.advance();
         let expr = parse_decorator_expr(s)?;
+        let full_range = s.span_from(range);
         decorators.push(Decorator {
             expression: expr,
-            range,
+            range: full_range,
         });
     }
     Ok(decorators)

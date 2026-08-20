@@ -101,6 +101,7 @@ Expone la interfaz nativa para sockets TCP no bloqueantes con reactor de eventos
 - `tcpConnect$(host, port)`: Conexión asíncrona reactiva no bloqueante.
 - `tcpRead$(connId, maxLen)` / `tcpWrite$(connId, data)`: I/O de red no bloqueante.
 - `tcpClose$(connId)` / `tcpCloseListener$(listenerId)`: Desregistro en `mio` y cierre determinista de descriptores.
+- `parseHttpRequest$(raw)`: Parser HTTP/1.1 de ultra-alta velocidad vectorizado con instrucciones **SIMD (AVX2 / SSE4.2 / NEON)** mediante `httparse`, parseando cabeceras y estructura en un solo paso con $0$ alocaciones intermedias de strings.
 
 ### 6.2 Primitivas Nativas (`int.parse`, `float.parse`, `str`)
 Implementadas directamente a nivel nativo en Rust dentro de `crates/varn-builtins/src/modules/primitives/`, permitiendo conversión directa de strings a números con validación de NaN/overflow y rendimiento nativo sin requerir bucles manuales de parsing en la stdlib.

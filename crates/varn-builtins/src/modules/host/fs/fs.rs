@@ -17,8 +17,18 @@ varn_contract! {
     module: "runtime:fs",
     contract: "src/modules/host/fs/fs_runtime.vn",
     impl FsRuntime {
-        fn open(_ctx: &mut dyn NativeCtx, path: &str, mode: &str) -> Result<i64, String> {
+        fn open(ctx: &mut dyn NativeCtx, path: &str, mode: &str) -> Result<i64, String> {
             use std::fs::OpenOptions;
+            if mode == "r" {
+                if !ctx.check_fs_read(path) {
+                    return Err(format!("SecurityError: Permission denied (fs.read) for path '{path}'"));
+                }
+            } else {
+                if !ctx.check_fs_write(path) {
+                    return Err(format!("SecurityError: Permission denied (fs.write) for path '{path}'"));
+                }
+            }
+
             let file = match mode {
                 "r" => OpenOptions::new().read(true).open(path),
                 "w" => OpenOptions::new().write(true).create(true).truncate(true).open(path),
@@ -84,10 +94,18 @@ varn_contract! {
                 }
             })
         }
-        fn exists(_ctx: &mut dyn NativeCtx, path: &str) -> Result<bool, String> {
+
+        fn exists(ctx: &mut dyn NativeCtx, path: &str) -> Result<bool, String> {
+            if !ctx.check_fs_read(path) {
+                return Ok(false);
+            }
             Ok(std::path::Path::new(path).exists())
         }
+
         fn stat(ctx: &mut dyn NativeCtx, path: &str) -> Result<VmValue, String> {
+            if !ctx.check_fs_read(path) {
+                return Err(format!("SecurityError: Permission denied (fs.read) for path '{path}'"));
+            }
             let meta = fs::metadata(path).map_err(|e| e.to_string())?;
             let mtime = meta
                 .modified()
@@ -106,13 +124,25 @@ varn_contract! {
             ctx.set_field(obj, "mtime", mtime_nv);
             Ok(obj)
         }
-        fn mkdir(_ctx: &mut dyn NativeCtx, path: &str) -> Result<(), String> {
+
+        fn mkdir(ctx: &mut dyn NativeCtx, path: &str) -> Result<(), String> {
+            if !ctx.check_fs_write(path) {
+                return Err(format!("SecurityError: Permission denied (fs.write) for path '{path}'"));
+            }
             fs::create_dir(path).map_err(|e| e.to_string())
         }
-        fn mkdirAll(_ctx: &mut dyn NativeCtx, path: &str) -> Result<(), String> {
+
+        fn mkdirAll(ctx: &mut dyn NativeCtx, path: &str) -> Result<(), String> {
+            if !ctx.check_fs_write(path) {
+                return Err(format!("SecurityError: Permission denied (fs.write) for path '{path}'"));
+            }
             fs::create_dir_all(path).map_err(|e| e.to_string())
         }
+
         fn readDir(ctx: &mut dyn NativeCtx, path: &str) -> Result<Vec<VmValue>, String> {
+            if !ctx.check_fs_read(path) {
+                return Err(format!("SecurityError: Permission denied (fs.read) for path '{path}'"));
+            }
             let entries = fs::read_dir(path).map_err(|e| e.to_string())?;
             let mut out = Vec::new();
             for entry in entries.flatten() {
@@ -122,7 +152,11 @@ varn_contract! {
             }
             Ok(out)
         }
-        fn remove(_ctx: &mut dyn NativeCtx, path: &str) -> Result<(), String> {
+
+        fn remove(ctx: &mut dyn NativeCtx, path: &str) -> Result<(), String> {
+            if !ctx.check_fs_write(path) {
+                return Err(format!("SecurityError: Permission denied (fs.write) for path '{path}'"));
+            }
             let p = std::path::Path::new(path);
             if p.is_dir() {
                 fs::remove_dir(p).map_err(|e| e.to_string())
@@ -130,7 +164,11 @@ varn_contract! {
                 fs::remove_file(p).map_err(|e| e.to_string())
             }
         }
-        fn removeAll(_ctx: &mut dyn NativeCtx, path: &str) -> Result<(), String> {
+
+        fn removeAll(ctx: &mut dyn NativeCtx, path: &str) -> Result<(), String> {
+            if !ctx.check_fs_write(path) {
+                return Err(format!("SecurityError: Permission denied (fs.write) for path '{path}'"));
+            }
             let p = std::path::Path::new(path);
             if p.is_dir() {
                 fs::remove_dir_all(p).map_err(|e| e.to_string())
@@ -138,9 +176,14 @@ varn_contract! {
                 fs::remove_file(p).map_err(|e| e.to_string())
             }
         }
-        fn rename(_ctx: &mut dyn NativeCtx, from: &str, to: &str) -> Result<(), String> {
+
+        fn rename(ctx: &mut dyn NativeCtx, from: &str, to: &str) -> Result<(), String> {
+            if !ctx.check_fs_read(from) || !ctx.check_fs_write(to) {
+                return Err(format!("SecurityError: Permission denied (fs.write) for path '{to}'"));
+            }
             fs::rename(from, to).map_err(|e| e.to_string())
         }
+
         fn tempDir(_ctx: &mut dyn NativeCtx) -> Result<String, String> {
             Ok(std::env::temp_dir().to_string_lossy().into_owned())
         }

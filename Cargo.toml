@@ -40,6 +40,8 @@ semver       = "1"
 sha2         = "0.10"
 hex          = "0.4"
 mio          = { version = "1.0", features = ["net", "os-poll"] }
+httparse     = { version = "1.9", default-features = false, features = ["std"] }
+toml         = "0.8"
 # SIMD substring search. Already in the build graph via `serde_json`, so this
 # is a new edge rather than new code: `str::find` uses the scalar Two-Way
 # algorithm, and `indexOf`/`includes` over a large haystack is the one place
@@ -62,10 +64,12 @@ panic = "abort"
 opt-level = 1
 
 # Fast-iteration optimized build: keeps opt-level 3 for representative
-# JIT/VM perf, but thin LTO + parallel codegen ~= 2x faster rebuilds.
-# Use `cargo build --profile quick` while iterating on the perf branch;
+# JIT/VM perf, but disables LTO for instant linking (sub-5s rebuilds).
+# Use `cargo build --profile quick --bin vn` while iterating;
 # keep `release` for final benchmarks / distribution.
 [profile.quick]
 inherits = "release"
-lto = "thin"
+opt-level = 3
+lto = false
 codegen-units = 16
+debug = 0

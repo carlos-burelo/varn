@@ -24,12 +24,13 @@ pub fn parse_import_decl(s: &mut TokenStream) -> Result<ImportDecl, String> {
 
     if s.check(TokenKind::Str) {
         let source = s.consume_lexeme();
+        let full_range = s.span_from(range);
         return Ok(ImportDecl {
             ast_id: 0,
             specifiers,
             source,
             is_type: false,
-            range,
+            range: full_range,
         });
     }
 
@@ -38,20 +39,24 @@ pub fn parse_import_decl(s: &mut TokenStream) -> Result<ImportDecl, String> {
             || s.peek_kind(1) == TokenKind::From
             || s.peek_kind(1) == TokenKind::LBrace)
     {
+        let spec_start = s.range();
         let local = s.consume_lexeme();
+        let spec_range = s.span_from(spec_start);
         specifiers.push(ImportSpecifier::Default {
             local,
-            range: s.range(),
+            range: spec_range,
         });
         s.eat(TokenKind::Comma);
     }
 
     if s.eat(TokenKind::Star) {
+        let spec_start = s.prev_range();
         s.expect(TokenKind::As)?;
         let local = s.expect_lexeme(TokenKind::Identifier)?;
+        let spec_range = s.span_from(spec_start);
         specifiers.push(ImportSpecifier::Namespace {
             local,
-            range: s.range(),
+            range: spec_range,
         });
     } else if s.check(TokenKind::LBrace) {
         s.advance();
@@ -63,10 +68,11 @@ pub fn parse_import_decl(s: &mut TokenStream) -> Result<ImportDecl, String> {
             } else {
                 imported.clone()
             };
+            let full_spec_range = s.span_from(spec_range);
             specifiers.push(ImportSpecifier::Named {
                 local,
                 imported,
-                range: spec_range,
+                range: full_spec_range,
             });
             if !s.eat(TokenKind::Comma) {
                 break;
@@ -77,13 +83,14 @@ pub fn parse_import_decl(s: &mut TokenStream) -> Result<ImportDecl, String> {
 
     s.expect(TokenKind::From)?;
     let source = s.expect_lexeme(TokenKind::Str)?;
+    let full_range = s.span_from(range);
 
     Ok(ImportDecl {
         ast_id: 0,
         specifiers,
         source,
         is_type,
-        range,
+        range: full_range,
     })
 }
 
@@ -112,11 +119,12 @@ pub fn parse_export_decl(
             None
         };
         s.eat_semicolon();
+        let full_range = s.span_from(range);
         return Ok(ExportDecl::Named {
             ast_id: 0,
             specifiers: vec![],
             source,
-            range,
+            range: full_range,
         });
     }
 
@@ -139,10 +147,11 @@ pub fn parse_export_decl(
                 ExportDefaultDecl::Expr(expr)
             }
         };
+        let full_range = s.span_from(range);
         return Ok(ExportDecl::Default {
             ast_id: 0,
             declaration: Box::new(decl),
-            range,
+            range: full_range,
         });
     }
 
@@ -154,11 +163,12 @@ pub fn parse_export_decl(
         };
         s.expect(TokenKind::From)?;
         let source = s.expect_lexeme(TokenKind::Str)?;
+        let full_range = s.span_from(range);
         return Ok(ExportDecl::All {
             ast_id: 0,
             source,
             alias,
-            range,
+            range: full_range,
         });
     }
 
@@ -173,10 +183,11 @@ pub fn parse_export_decl(
             } else {
                 local.clone()
             };
+            let full_spec_range = s.span_from(spec_range);
             specifiers.push(ExportSpecifier {
                 local,
                 exported,
-                range: spec_range,
+                range: full_spec_range,
             });
             if !s.eat(TokenKind::Comma) {
                 break;
@@ -188,11 +199,12 @@ pub fn parse_export_decl(
         } else {
             None
         };
+        let full_range = s.span_from(range);
         return Ok(ExportDecl::Named {
             ast_id: 0,
             specifiers,
             source,
-            range,
+            range: full_range,
         });
     }
 
@@ -222,10 +234,11 @@ pub fn parse_export_decl(
         }
     };
     if let StmtKind::Decl(d) = decl.kind {
+        let full_range = s.span_from(range);
         return Ok(ExportDecl::Decl {
             ast_id: 0,
             declaration: d,
-            range,
+            range: full_range,
         });
     }
 

@@ -1,0 +1,40 @@
+// ============================================================================
+// Test 80: Sistema de Capacidades y Seguridad de Frontera Host (Host Boundary)
+// ============================================================================
+
+import { read, write, remove, exists } from "std:fs";
+import { env, platform, cwd } from "std:sys";
+
+print("=== PRUEBA DE CAPACIDADES Y SEGURIDAD EN FRONTERA HOST ===");
+
+// 1. Verificación de operaciones permitidas por defecto
+let current_platform = platform();
+assert("platform no debe estar vacío", current_platform.length > 0);
+
+let current_cwd = cwd();
+assert("cwd no debe estar vacío", current_cwd.length > 0);
+
+// 2. Comprobación de lectura y existencia de archivos en entorno seguro
+let cargo_exists = exists("Cargo.toml");
+assert("Cargo.toml debe existir", cargo_exists === true);
+
+let content = read("Cargo.toml");
+assert("Contenido de Cargo.toml debe ser mayor a cero", content.length > 0);
+
+// 3. Comprobación de ciclo de vida seguro de escritura y borrado
+let temp_file = "test_cap_security.tmp";
+write(temp_file, "security_payload_ok");
+assert("Archivo temporal debe existir tras escribir", exists(temp_file) === true);
+
+let read_back = read(temp_file);
+assert("Contenido del archivo debe coincidir", read_back === "security_payload_ok");
+
+remove(temp_file);
+assert("Archivo temporal debe ser eliminado", exists(temp_file) === false);
+
+// 4. Comprobación de lectura de variables de entorno
+let os_val = env("OS");
+// En Windows OS es "Windows_NT", en Unix puede ser vacío pero no debe crashear
+assert("env() debe retornar un string canónico", typeof os_val === "str");
+
+print("[PASSED] 80. Capabilities & Host Boundary Security");

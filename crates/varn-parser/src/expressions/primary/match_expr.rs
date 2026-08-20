@@ -21,8 +21,9 @@ pub(super) fn parse_match_expr(s: &mut TokenStream) -> Result<Expr, String> {
         cases.extend(parse_match_case(s)?);
     }
     s.expect(TokenKind::RBrace)?;
+    let full_range = s.span_from(range);
     Ok(Expr::new_with_range(
-        range,
+        full_range,
         varn_core::ast::ExprKind::Match {
             subject: Box::new(subject),
             cases,
@@ -51,13 +52,14 @@ fn parse_match_case(s: &mut TokenStream) -> Result<Vec<MatchCase>, String> {
     };
     s.eat(TokenKind::Comma);
 
+    let full_case_range = s.span_from(range);
     let cases = patterns
         .into_iter()
         .map(|pattern| MatchCase {
             pattern,
             guard: guard.clone(),
             body: body.clone(),
-            range,
+            range: full_case_range,
         })
         .collect();
     Ok(cases)

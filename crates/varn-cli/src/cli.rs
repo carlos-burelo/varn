@@ -31,6 +31,8 @@ pub enum Commands {
 
     Test(TestArgs),
 
+    Fmt(FmtArgs),
+
     #[command(subcommand)]
     Pkg(PkgCommands),
 
@@ -64,6 +66,34 @@ pub struct RunArgs {
 
     #[arg(long)]
     pub strict: bool,
+
+    /// Grant all permissions (bypasses security sandbox)
+    #[arg(short = 'A', long = "allow-all")]
+    pub allow_all: bool,
+
+    /// Allow reading files (optional comma-separated paths: --allow-read=./data,./config)
+    #[arg(long = "allow-read", value_name = "PATHS", num_args = 0..=1, default_missing_value = "*", require_equals = true)]
+    pub allow_read: Option<String>,
+
+    /// Allow writing files (optional comma-separated paths: --allow-write=./tmp)
+    #[arg(long = "allow-write", value_name = "PATHS", num_args = 0..=1, default_missing_value = "*", require_equals = true)]
+    pub allow_write: Option<String>,
+
+    /// Allow network connections (optional comma-separated hosts: --allow-net=api.stripe.com)
+    #[arg(long = "allow-net", value_name = "HOSTS", num_args = 0..=1, default_missing_value = "*", require_equals = true)]
+    pub allow_net: Option<String>,
+
+    /// Allow reading environment variables (optional comma-separated names)
+    #[arg(long = "allow-env", value_name = "VARS", num_args = 0..=1, default_missing_value = "*", require_equals = true)]
+    pub allow_env: Option<String>,
+
+    /// Allow FFI native C library calls
+    #[arg(long = "allow-ffi")]
+    pub allow_ffi: bool,
+
+    /// Restrict execution in a pure zero-permission sandbox (no fs, no net, no env, no ffi)
+    #[arg(long = "sandbox")]
+    pub sandbox: bool,
 }
 
 #[derive(Args)]
@@ -251,6 +281,20 @@ pub struct TestArgs {
     pub fail_fast: bool,
 
     /// Show detailed execution log and outputs for every test
+    #[arg(short, long)]
+    pub verbose: bool,
+}
+
+#[derive(Args)]
+pub struct FmtArgs {
+    /// File or directory to format (default: current directory)
+    pub path: Option<String>,
+
+    /// Check if files are formatted without modifying them
+    #[arg(long)]
+    pub check: bool,
+
+    /// Show formatted file names
     #[arg(short, long)]
     pub verbose: bool,
 }

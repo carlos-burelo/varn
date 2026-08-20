@@ -1,4 +1,5 @@
 pub mod driver;
+pub mod http_parser;
 
 use driver::driver;
 use urlencoding::{decode, encode};
@@ -29,7 +30,10 @@ varn_contract! {
                 .map_err(|e| format!("Net.decodeURIComponent: {e}"))
         }
 
-        fn tcpListen(_ctx: &mut dyn NativeCtx, port: i64) -> Result<i64, String> {
+        fn tcpListen(ctx: &mut dyn NativeCtx, port: i64) -> Result<i64, String> {
+            if !ctx.check_net_listen(port) {
+                return Err(format!("SecurityError: Permission denied (net.server) on port {port}"));
+            }
             match driver().listen(port) {
                 Ok(id) => Ok(id),
                 Err(_) => Ok(-1),
@@ -42,6 +46,9 @@ varn_contract! {
         }
 
         fn tcpConnect(ctx: &mut dyn NativeCtx, host: &str, port: i64) -> Result<VmValue, String> {
+            if !ctx.check_net_connect(host) {
+                return Err(format!("SecurityError: Permission denied (net.client) to host '{host}'"));
+            }
             let task = driver().connect(host, port);
             Ok(ctx.intern(Value::TaskHandle(task)))
         }
@@ -64,6 +71,10 @@ varn_contract! {
         fn tcpCloseListener(_ctx: &mut dyn NativeCtx, listener_id: i64) -> Result<(), String> {
             driver().close_listener(listener_id);
             Ok(())
+        }
+
+        fn parseHttpRequest(ctx: &mut dyn NativeCtx, raw: &str) -> Result<VmValue, String> {
+            http_parser::parse_http_request(ctx, raw)
         }
     }
 }

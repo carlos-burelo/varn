@@ -55,15 +55,21 @@ pub fn classify(path: &Path) -> Option<StdSource> {
         .then(|| StdSource::SourceTree(path.to_path_buf()))
 }
 
-/// `"std"` key in the project's varn.json, resolved relative to the manifest.
+/// `"std"` key in the project's varn.toml, resolved relative to the manifest.
 pub fn project_std_override(project_root: &Path) -> Option<PathBuf> {
-    let raw =
-        std::fs::read_to_string(project_root.join(crate::artifact::PACKAGE_MANIFEST_FILE)).ok()?;
+    let manifest_path = if project_root.join(crate::artifact::PACKAGE_MANIFEST_FILE).exists() {
+        project_root.join(crate::artifact::PACKAGE_MANIFEST_FILE)
+    } else if project_root.join(crate::artifact::PACKAGE_MANIFEST_FILE_VN).exists() {
+        project_root.join(crate::artifact::PACKAGE_MANIFEST_FILE_VN)
+    } else {
+        return None;
+    };
+    let raw = std::fs::read_to_string(&manifest_path).ok()?;
     #[derive(serde::Deserialize)]
     struct StdKey {
         std: Option<String>,
     }
-    let parsed: StdKey = serde_json::from_str(&raw).ok()?;
+    let parsed: StdKey = toml::from_str(&raw).ok()?;
     let rel = parsed.std?;
     let p = PathBuf::from(&rel);
     Some(if p.is_absolute() {

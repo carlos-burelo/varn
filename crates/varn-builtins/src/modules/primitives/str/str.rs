@@ -40,11 +40,14 @@ varn_contract! {
         fn join(ctx: &mut dyn NativeCtx, arr: ::varn_types::VnArray, sep: Option<&str>) -> String {
             let sep = sep.unwrap_or("");
             let len = arr.len(ctx);
+            if len == 0 {
+                return String::new();
+            }
             let mut vals = Vec::with_capacity(len);
             for i in 0..len {
                 vals.push(arr.get(ctx, i).unwrap_or_else(VmValue::null));
             }
-            let mut out = String::new();
+            let mut out = String::with_capacity(len.saturating_mul(sep.len() + 12));
             for (i, &v) in vals.iter().enumerate() {
                 if i > 0 {
                     out.push_str(sep);

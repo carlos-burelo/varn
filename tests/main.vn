@@ -77,6 +77,8 @@ import "./75-async-shapes.vn"
 import "./76-generator-values.vn"
 import "./77-async-generators.vn"
 import "./78-try-early-exit.vn"
+import "./79-control-flow-narrowing.vn"
+import "./80-capabilities-security.vn"
 
-print("\n79 side-effect modules executed in suite")
+print("\n81 side-effect modules executed in suite")
 assertSummary()

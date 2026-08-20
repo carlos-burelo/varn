@@ -101,8 +101,21 @@ impl DepOrigin {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct PackageSection {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub version: Option<String>,
+    #[serde(default)]
+    pub main: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ProjectManifest {
+    #[serde(default)]
+    pub package: Option<PackageSection>,
+
     #[serde(default)]
     pub name: Option<String>,
     #[serde(default)]
@@ -116,10 +129,10 @@ pub struct ProjectManifest {
     #[serde(default)]
     pub dependencies: HashMap<String, String>,
 
-    #[serde(default)]
+    #[serde(default, alias = "dev-dependencies", alias = "dev_dependencies")]
     pub dev_dependencies: HashMap<String, String>,
 
-    #[serde(default)]
+    #[serde(default, alias = "peer-dependencies", alias = "peer_dependencies")]
     pub peer_dependencies: HashMap<String, String>,
 
     #[serde(default)]
@@ -127,16 +140,28 @@ pub struct ProjectManifest {
 }
 
 impl ProjectManifest {
+    pub fn get_name(&self) -> Option<&str> {
+        self.package.as_ref().and_then(|p| p.name.as_deref()).or(self.name.as_deref())
+    }
+
+    pub fn get_version(&self) -> Option<&str> {
+        self.package.as_ref().and_then(|p| p.version.as_deref()).or(self.version.as_deref())
+    }
+
+    pub fn get_main(&self) -> Option<&str> {
+        self.package.as_ref().and_then(|p| p.main.as_deref()).or(self.main.as_deref())
+    }
+
     pub fn load(path: &Path) -> Result<Self, String> {
         let raw = std::fs::read_to_string(path)
             .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
-        serde_json::from_str(&raw).map_err(|e| format!("invalid {}: {e}", path.display()))
+        toml::from_str(&raw).map_err(|e| format!("invalid {}: {e}", path.display()))
     }
 
     pub fn save(&self, path: &Path) -> Result<(), String> {
-        let json = serde_json::to_string_pretty(self)
+        let content = toml::to_string_pretty(self)
             .map_err(|e| format!("cannot serialize manifest: {e}"))?;
-        std::fs::write(path, json).map_err(|e| format!("cannot write {}: {e}", path.display()))
+        std::fs::write(path, content).map_err(|e| format!("cannot write {}: {e}", path.display()))
     }
 
     pub fn parsed_deps(&self) -> Result<HashMap<String, DepOrigin>, String> {
@@ -167,9 +192,13 @@ pub fn find_project_manifest(start: &Path) -> Option<PathBuf> {
             continue;
         }
 
-        let candidate = dir.join(varn_modules::PACKAGE_MANIFEST_FILE);
-        if candidate.exists() {
-            return Some(candidate);
+        let toml_candidate = dir.join(varn_modules::PACKAGE_MANIFEST_FILE);
+        if toml_candidate.exists() {
+            return Some(toml_candidate);
+        }
+        let vn_toml = dir.join(varn_modules::PACKAGE_MANIFEST_FILE_VN);
+        if vn_toml.exists() {
+            return Some(vn_toml);
         }
     }
     None

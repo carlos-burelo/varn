@@ -7,6 +7,7 @@ use varn_core::ModuleId;
 use varn_debug::flags::DebugFlags;
 use varn_types::value::Closure;
 use varn_vm::loader::CompositeLoader;
+use varn_types::capabilities::CapabilitySet;
 use varn_vm::Vm;
 
 type PipelineResult<T> = Result<T, PipelineError>;
@@ -14,9 +15,20 @@ type PipelineResult<T> = Result<T, PipelineError>;
 pub fn execute(
     proto: FunctionProto,
     precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
+    source: &str,
+    path: &str,
+    debug: &DebugFlags,
+) -> PipelineResult<()> {
+    execute_with_caps(proto, precompiled, source, path, debug, CapabilitySet::allow_all())
+}
+
+pub fn execute_with_caps(
+    proto: FunctionProto,
+    precompiled: Rc<FxHashMap<ModuleId, Rc<FunctionProto>>>,
     _source: &str,
     _path: &str,
     _debug: &DebugFlags,
+    capabilities: CapabilitySet,
 ) -> PipelineResult<()> {
     let loader = std::sync::Arc::new(CompositeLoader::new(vec![
         Box::new(crate::stdlib_loader::FileLoader),
@@ -24,6 +36,7 @@ pub fn execute(
     ]));
     let settings = varn_vm::ExecSettings::from_env(_debug.trace);
     let mut machine = Vm::new(precompiled.clone(), settings).with_loader(loader);
+    machine.ctx.capabilities = capabilities;
     varn_vm::prefill_native_modules(&mut machine);
 
     if _debug.trace {

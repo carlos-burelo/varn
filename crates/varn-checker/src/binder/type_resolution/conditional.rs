@@ -136,13 +136,31 @@ fn type_satisfies_extends(check: &Type, extends: &Type) -> bool {
     {
         return true;
     }
+
+    if let (TypeKind::Intrinsic(t1), TypeKind::Intrinsic(t2)) = (&check.0, &extends.0) {
+        return t1 == t2;
+    }
+
     match (&check.0, &extends.0) {
         (_, TypeKind::Union(members)) => members.iter().any(|m| type_satisfies_extends(check, m)),
 
-        (TypeKind::Generic(cn, _, _), TypeKind::Generic(en, _, _)) => cn == en,
+        (TypeKind::Generic(cn, ca, _), TypeKind::Generic(en, ea, _)) => {
+            cn == en
+                && ca.len() == ea.len()
+                && ca
+                    .iter()
+                    .zip(ea.iter())
+                    .all(|(c, e)| type_satisfies_extends(c, e))
+        }
 
         (TypeKind::Named(cn, _), TypeKind::Named(en, _)) => cn == en,
 
-        _ => std::mem::discriminant(&check.0) == std::mem::discriminant(&extends.0),
+        (TypeKind::Array(c), TypeKind::Array(e)) => type_satisfies_extends(c, e),
+
+        (TypeKind::Fn(f_check), TypeKind::Fn(f_extends)) => {
+            type_satisfies_extends(&f_check.return_type, &f_extends.return_type)
+        }
+
+        _ => check == extends,
     }
 }

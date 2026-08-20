@@ -17,10 +17,12 @@ pub fn resolve_version(origin: &DepOrigin) -> Result<ResolvedVersion, String> {
                     path.display()
                 ));
             }
-            let version = if let Ok(manifest) =
-                crate::manifest::ProjectManifest::load(&path.join("varn.json"))
-            {
-                manifest.version.unwrap_or_else(|| "0.0.0-local".to_owned())
+            let version = if let Some(mpath) = crate::manifest::find_project_manifest(path) {
+                if let Ok(manifest) = crate::manifest::ProjectManifest::load(&mpath) {
+                    manifest.get_version().unwrap_or("0.0.0-local").to_owned()
+                } else {
+                    "0.0.0-local".to_owned()
+                }
             } else {
                 "0.0.0-local".to_owned()
             };

@@ -10,5 +10,6 @@ pub fn execute(args: EvalArgs) -> Result<(), CliError> {
         debug: Default::default(),
         trace: false,
         strict: false,
+        capabilities: Default::default(),
     })
 }

@@ -16,6 +16,7 @@ runtime = [
     "dep:chrono",
     "dep:libloading",
     "dep:mio",
+    "dep:httparse",
 ]
 
 [dependencies]
@@ -39,6 +40,7 @@ urlencoding  = { version = "2", optional = true }
 chrono       = { version = "0.4", optional = true }
 libloading   = { version = "0.8", optional = true }
 mio          = { workspace = true, optional = true }
+httparse     = { workspace = true, optional = true }
 rustc-hash   = { workspace = true }
 
 [lints]

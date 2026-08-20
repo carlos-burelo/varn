@@ -129,8 +129,41 @@ pub trait NativeCtx {
 
     fn suspend_timer(&mut self, ms: u64) -> VmValue;
 
-    fn has_capability(&self, _cap: &str) -> bool {
-        true
+    fn capabilities(&self) -> &crate::capabilities::CapabilitySet {
+        static DEFAULT_CAPS: crate::capabilities::CapabilitySet = crate::capabilities::CapabilitySet::allow_all();
+        &DEFAULT_CAPS
+    }
+
+    fn has_capability(&self, cap: &str) -> bool {
+        self.capabilities().has_capability(cap)
+    }
+
+    fn check_fs_read(&self, path: &str) -> bool {
+        self.capabilities().check_fs_read(std::path::Path::new(path))
+    }
+
+    fn check_fs_write(&self, path: &str) -> bool {
+        self.capabilities().check_fs_write(std::path::Path::new(path))
+    }
+
+    fn check_net_connect(&self, host: &str) -> bool {
+        self.capabilities().check_net_connect(host)
+    }
+
+    fn check_net_listen(&self, port: i64) -> bool {
+        self.capabilities().check_net_listen(port)
+    }
+
+    fn check_env(&self, key: &str) -> bool {
+        self.capabilities().check_env(key)
+    }
+
+    fn check_ffi(&self) -> bool {
+        self.capabilities().check_ffi()
+    }
+
+    fn check_exec(&self) -> bool {
+        self.capabilities().check_exec()
     }
 
     fn resources(&mut self) -> &mut ResourceStore;

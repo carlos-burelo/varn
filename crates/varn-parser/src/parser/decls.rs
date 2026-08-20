@@ -71,13 +71,14 @@ pub(super) fn parse_var_decl_after_head(
         declarators.push(parse_var_declarator_suffix(s, dec_range, id, is_declare)?);
     }
 
+    let full_range = s.span_from(range);
     Ok(VariableDecl {
         kind,
         ast_id: 0,
         declarators,
         is_declare,
         doc: None,
-        range,
+        range: full_range,
     })
 }
 
@@ -101,11 +102,12 @@ fn parse_var_declarator_suffix(
         None
     };
 
+    let full_range = s.span_from(range);
     Ok(VarDeclarator {
         id,
         type_ann,
         init,
-        range,
+        range: full_range,
     })
 }
 
@@ -142,6 +144,7 @@ pub(super) fn parse_function_decl(
         super::stmts::parse_block(s)?
     };
 
+    let full_range = s.span_from(range);
     Ok(FunctionDecl {
         id,
         ast_id: 0,
@@ -158,6 +161,6 @@ pub(super) fn parse_function_decl(
         },
         decorators,
         doc: None,
-        range,
+        range: full_range,
     })
 }

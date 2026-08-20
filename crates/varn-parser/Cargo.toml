@@ -9,5 +9,8 @@ profiling = []
 [dependencies]
 varn-core = { path = "../varn-core" }
 
+[dev-dependencies]
+varn-lexer = { path = "../varn-lexer" }
+
 [lints]
 workspace = true

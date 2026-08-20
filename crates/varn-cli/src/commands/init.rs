@@ -17,7 +17,7 @@ pub fn execute(args: InitArgs) -> Result<(), CliError> {
     }
 
     let main_path = base.join("main.vn").to_string_lossy().to_string();
-    let manifest_path = base.join("varn.json").to_string_lossy().to_string();
+    let manifest_path = base.join("varn.toml").to_string_lossy().to_string();
     let wr_dir = base.join(".vn").to_string_lossy().to_string();
 
     if Path::new(&main_path).exists() {
@@ -32,16 +32,12 @@ pub fn execute(args: InitArgs) -> Result<(), CliError> {
         .map_err(|e| CliError::fatal(format!("no se puede escribir '{main_path}': {e}")))?;
 
     let manifest_content = format!(
-        r#"{{
-  "project": {{
-    "name": "{name}",
-    "version": "0.1.0"
-  }},
-  "bin": {{
-    "main": "main.vn"
-  }},
-  "dependencies": {{}}
-}}
+        r#"[package]
+name = "{name}"
+version = "0.1.0"
+main = "main.vn"
+
+[dependencies]
 "#
     );
     std::fs::write(&manifest_path, manifest_content)
@@ -61,7 +57,7 @@ pub fn execute(args: InitArgs) -> Result<(), CliError> {
     }
 
     let gitignore_path = wr_base.join(".gitignore").to_string_lossy().to_string();
-    std::fs::write(&gitignore_path, ".env\npackages/\ncache/\n")
+    std::fs::write(&gitignore_path, ".env\npackages/\n")
         .map_err(|e| CliError::fatal(format!("no se puede escribir '{gitignore_path}': {e}")))?;
 
     println!("Proyecto inicializado en '{dir}'");

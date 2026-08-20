@@ -9,14 +9,15 @@ use varn_core::SourceRange;
 use varn_core::TokenKind;
 
 pub fn parse_unary_expr(s: &mut TokenStream) -> Result<Expr, String> {
-    let range = s.range();
+    let start_range = s.range();
 
     macro_rules! prefix_unary {
         ($op:expr) => {{
             s.advance();
             let o = parse_unary_expr(s)?;
+            let full_range = s.span_from(start_range);
             Ok(Expr::new_with_range(
-                range,
+                full_range,
                 ExprKind::Unary {
                     op: $op,
                     prefix: true,
@@ -37,8 +38,9 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<Expr, String> {
         TokenKind::Await => {
             s.advance();
             let argument = parse_unary_expr(s)?;
+            let full_range = s.span_from(start_range);
             Ok(Expr::new_with_range(
-                range,
+                full_range,
                 ExprKind::Await {
                     argument: Box::new(argument),
                 },
@@ -47,8 +49,9 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<Expr, String> {
         TokenKind::PlusPlus => {
             s.advance();
             let o = parse_unary_expr(s)?;
+            let full_range = s.span_from(start_range);
             Ok(Expr::new_with_range(
-                range,
+                full_range,
                 ExprKind::Update {
                     op: UpdateOp::Increment,
                     prefix: true,
@@ -59,8 +62,9 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<Expr, String> {
         TokenKind::MinusMinus => {
             s.advance();
             let o = parse_unary_expr(s)?;
+            let full_range = s.span_from(start_range);
             Ok(Expr::new_with_range(
-                range,
+                full_range,
                 ExprKind::Update {
                     op: UpdateOp::Decrement,
                     prefix: true,
@@ -76,12 +80,13 @@ fn parse_postfix_expr(s: &mut TokenStream) -> Result<Expr, String> {
     let mut expr = parse_call_expr(s)?;
 
     loop {
-        let range = s.range();
+        let op_range = s.range();
         match s.kind() {
             TokenKind::PlusPlus => {
                 s.advance();
+                let full_range = expr.range().to(op_range);
                 expr = Expr::new_with_range(
-                    range,
+                    full_range,
                     ExprKind::Update {
                         op: UpdateOp::Increment,
                         prefix: false,
@@ -91,8 +96,9 @@ fn parse_postfix_expr(s: &mut TokenStream) -> Result<Expr, String> {
             }
             TokenKind::MinusMinus => {
                 s.advance();
+                let full_range = expr.range().to(op_range);
                 expr = Expr::new_with_range(
-                    range,
+                    full_range,
                     ExprKind::Update {
                         op: UpdateOp::Decrement,
                         prefix: false,
@@ -292,10 +298,11 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
             }
 
             TokenKind::Bang => {
-                let range = s.range();
+                let op_range = s.range();
                 s.advance();
+                let full_range = expr.range().to(op_range);
                 expr = Expr::new_with_range(
-                    range,
+                    full_range,
                     ExprKind::NonNull {
                         expression: Box::new(expr),
                     },
@@ -303,9 +310,9 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
             }
 
             TokenKind::Question if !is_ternary_question(s) => {
-                let range = s.range();
+                let op_range = s.range();
                 s.advance();
-                let full_range = expr.range().to(range);
+                let full_range = expr.range().to(op_range);
                 expr = Expr::new_with_range(
                     full_range,
                     ExprKind::Try {

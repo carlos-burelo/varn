@@ -4,6 +4,7 @@ mod commands;
 mod cpu_freq;
 mod doctor_impl;
 mod error;
+mod formatter;
 mod inspect_lsp;
 mod pipeline;
 mod tester;
@@ -81,6 +82,7 @@ fn dispatch(cmd: Commands) -> Result<(), error::CliError> {
         Commands::Debug(args) => commands::debug::execute(args),
         Commands::Build(args) => commands::build::execute(args),
         Commands::Test(args) => commands::test::execute(args),
+        Commands::Fmt(args) => commands::fmt::execute(args),
         Commands::Pkg(sub) => commands::pkg::execute(sub),
         Commands::Doctor => commands::doctor::execute(),
         Commands::Cache(sub) => commands::cache::execute(sub),
@@ -100,6 +102,7 @@ fn implicit_run(mut args: Vec<String>) -> Vec<String> {
         "debug",
         "build",
         "test",
+        "fmt",
         "pkg",
         "init",
         "doctor",

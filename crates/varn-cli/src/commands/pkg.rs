@@ -17,12 +17,12 @@ fn execute_tree() -> Result<(), CliError> {
     let cwd =
         std::env::current_dir().map_err(|e| CliError::fatal(format!("cannot get cwd: {e}")))?;
     let manifest_path = varn_pm::manifest::find_project_manifest(&cwd)
-        .ok_or_else(|| CliError::fatal("no varn.json found — run `vn init` first".to_owned()))?;
+        .ok_or_else(|| CliError::fatal("no varn.toml found — run `vn init` first".to_owned()))?;
     let project_root = manifest_path.parent().unwrap_or(&cwd);
 
     let manifest = varn_pm::ProjectManifest::load(&manifest_path).map_err(CliError::fatal)?;
-    let project_name = manifest.name.as_deref().unwrap_or("project");
-    let version = manifest.version.as_deref().unwrap_or("0.0.0");
+    let project_name = manifest.get_name().unwrap_or("project");
+    let version = manifest.get_version().unwrap_or("0.0.0");
 
     terminal::log(format!(
         "{project_name}@{version} ({})",
@@ -60,7 +60,7 @@ fn execute_doctor() -> Result<(), CliError> {
     let cwd =
         std::env::current_dir().map_err(|e| CliError::fatal(format!("cannot get cwd: {e}")))?;
     let manifest_path = varn_pm::manifest::find_project_manifest(&cwd)
-        .ok_or_else(|| CliError::fatal("no varn.json found — run `vn init` first".to_owned()))?;
+        .ok_or_else(|| CliError::fatal("no varn.toml found — run `vn init` first".to_owned()))?;
     let project_root = manifest_path.parent().unwrap_or(&cwd);
 
     terminal::log("Auditing project package integrity...");

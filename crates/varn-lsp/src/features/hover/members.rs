@@ -3,92 +3,105 @@ use crate::document::{MemberKind, MemberRecord};
 use super::format::format_inner_member;
 
 pub fn format_member_sig(parent_name: &str, member: &MemberRecord) -> String {
-    if member.type_str.contains("Enum") {
+    if member.type_str.contains("Enum") || member.kind == MemberKind::EnumMember {
         return format_enum_member(parent_name, &member.name, &member.init_value);
     }
-    let is_type_like = matches!(
-        member.kind,
-        MemberKind::Class
-            | MemberKind::Interface
-            | MemberKind::Namespace
-            | MemberKind::Enum
-            | MemberKind::EnumMember
-            | MemberKind::Struct
-    );
-    let static_kw = if member.is_static && !is_type_like {
-        "static "
-    } else {
-        ""
-    };
-    let parent_is_unknown = parent_name.is_empty() || parent_name == "dynamic";
-    let prefix = if parent_is_unknown || parent_name == member.name {
-        String::new()
-    } else {
-        format!("{}.", parent_name)
-    };
+
+    let clean_parent = parent_name.trim().trim_end_matches(['.', ')', '(']);
+    let has_parent = !clean_parent.is_empty() && clean_parent != "dynamic" && clean_parent != member.name;
 
     match member.kind {
         MemberKind::Property | MemberKind::Variable | MemberKind::Getter => {
-            format!(
-                "{}{}{}: {}",
-                static_kw, prefix, member.name, member.type_str
-            )
+            if member.is_static && has_parent {
+                format!("(static property) {}.{}: {}", clean_parent, member.name, member.type_str)
+            } else if has_parent {
+                format!("(property) {}.{}: {}", clean_parent, member.name, member.type_str)
+            } else {
+                format!("(property) {}: {}", member.name, member.type_str)
+            }
         }
         MemberKind::Setter => {
-            format!(
-                "{}{}{}({})",
-                static_kw, prefix, member.name, member.params_str
-            )
+            if member.is_static && has_parent {
+                format!("(static setter) {}.{}({})", clean_parent, member.name, member.params_str)
+            } else if has_parent {
+                format!("(setter) {}.{}({})", clean_parent, member.name, member.params_str)
+            } else {
+                format!("(setter) {}({})", member.name, member.params_str)
+            }
         }
         MemberKind::Constructor => {
-            format!("constructor({})", member.params_str)
+            if has_parent {
+                format!("constructor {}({})", clean_parent, member.params_str)
+            } else {
+                format!("constructor({})", member.params_str)
+            }
         }
         MemberKind::Method | MemberKind::Function => {
-            let kw = if member.kind == MemberKind::Function {
-                "function "
-            } else {
-                ""
-            };
-            if member.is_arrow {
+            if member.is_static && has_parent {
                 format!(
-                    "{}{}{}: {}",
-                    static_kw, prefix, member.name, member.type_str
+                    "(static method) {}.{}({}): {}",
+                    clean_parent, member.name, member.params_str, member.type_str
+                )
+            } else if has_parent {
+                format!(
+                    "(method) {}.{}({}): {}",
+                    clean_parent, member.name, member.params_str, member.type_str
                 )
             } else {
                 format!(
-                    "{}{}{}{}({}): {}",
-                    kw, static_kw, prefix, member.name, member.params_str, member.type_str
+                    "function {}({}): {}",
+                    member.name, member.params_str, member.type_str
                 )
             }
         }
-        MemberKind::Class => format_nested_class(parent_name, member),
-        MemberKind::Interface => format_nested_interface(parent_name, member),
-        MemberKind::Namespace => format_nested_namespace(parent_name, member),
+        MemberKind::Class => format_nested_class(clean_parent, member),
+        MemberKind::Interface => format_nested_interface(clean_parent, member),
+        MemberKind::Namespace => format_nested_namespace(clean_parent, member),
         MemberKind::Enum => {
-            format!("enum {}{}.{}", static_kw, parent_name, member.name)
+            if has_parent {
+                format!("enum {}.{}", clean_parent, member.name)
+            } else {
+                format!("enum {}", member.name)
+            }
         }
-        MemberKind::EnumMember => format_enum_member(parent_name, &member.name, &member.init_value),
+        MemberKind::EnumMember => format_enum_member(clean_parent, &member.name, &member.init_value),
         MemberKind::Struct => {
-            format!("struct {}{}.{}", static_kw, parent_name, member.name)
+            if has_parent {
+                format!("struct {}.{}", clean_parent, member.name)
+            } else {
+                format!("struct {}", member.name)
+            }
         }
     }
 }
 
 pub fn format_enum_member(enum_name: &str, member_name: &str, init_value: &str) -> String {
-    if init_value.is_empty() {
-        format!("{enum_name}.{member_name}")
+    let clean_enum = enum_name.trim().trim_end_matches(['.', ')', '(']);
+    let prefix = if !clean_enum.is_empty() && clean_enum != "dynamic" {
+        format!("{}.", clean_enum)
     } else {
-        format!("{enum_name}.{member_name} = {init_value}")
+        String::new()
+    };
+
+    if init_value.is_empty() {
+        format!("(enum member) {prefix}{member_name}")
+    } else {
+        format!("(enum member) {prefix}{member_name} = {init_value}")
     }
 }
 
 fn format_nested_class(parent_name: &str, m: &MemberRecord) -> String {
     use super::format::format_type_params_str;
     let tp = format_type_params_str(&m.ty);
+    let prefix = if !parent_name.is_empty() && parent_name != "dynamic" {
+        format!("{}.", parent_name)
+    } else {
+        String::new()
+    };
     if m.members.is_empty() {
-        return format!("class {}.{}{}", parent_name, m.name, tp);
+        return format!("class {}{}{}", prefix, m.name, tp);
     }
-    let mut lines = vec![format!("class {}.{}{} {{", parent_name, m.name, tp)];
+    let mut lines = vec![format!("class {}{}{} {{", prefix, m.name, tp)];
     for inner in &m.members {
         lines.push(format_inner_member(inner));
     }
@@ -99,10 +112,15 @@ fn format_nested_class(parent_name: &str, m: &MemberRecord) -> String {
 fn format_nested_interface(parent_name: &str, m: &MemberRecord) -> String {
     use super::format::format_type_params_str;
     let tp = format_type_params_str(&m.ty);
+    let prefix = if !parent_name.is_empty() && parent_name != "dynamic" {
+        format!("{}.", parent_name)
+    } else {
+        String::new()
+    };
     if m.members.is_empty() {
-        return format!("interface {}.{}{}", parent_name, m.name, tp);
+        return format!("interface {}{}{}", prefix, m.name, tp);
     }
-    let mut lines = vec![format!("interface {}.{}{} {{", parent_name, m.name, tp)];
+    let mut lines = vec![format!("interface {}{}{} {{", prefix, m.name, tp)];
     for inner in &m.members {
         lines.push(format_inner_member(inner));
     }
@@ -111,10 +129,15 @@ fn format_nested_interface(parent_name: &str, m: &MemberRecord) -> String {
 }
 
 fn format_nested_namespace(parent_name: &str, m: &MemberRecord) -> String {
+    let prefix = if !parent_name.is_empty() && parent_name != "dynamic" {
+        format!("{}.", parent_name)
+    } else {
+        String::new()
+    };
     if m.members.is_empty() {
-        return format!("namespace {}.{}", parent_name, m.name);
+        return format!("namespace {}{}", prefix, m.name);
     }
-    let mut lines = vec![format!("namespace {}.{} {{", parent_name, m.name)];
+    let mut lines = vec![format!("namespace {}{} {{", prefix, m.name)];
     for inner in &m.members {
         lines.push(format_inner_member(inner));
     }

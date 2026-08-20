@@ -10,6 +10,11 @@ pub enum ReceiverInfo {
         origin: Option<String>,
     },
 
+    Typed {
+        ty: varn_checker::Type,
+        is_instance: bool,
+    },
+
     Anonymous(Vec<MemberRecord>),
 }
 
@@ -19,6 +24,102 @@ pub fn build_member_completions(
     use_snippets: bool,
 ) -> Vec<CompletionItem> {
     match info {
+        ReceiverInfo::Typed { ty, is_instance } => {
+            let members = varn_checker::get_members_of_type(&ty, &state.db.bind);
+            let mut seen = std::collections::HashSet::new();
+            let mut items = Vec::new();
+
+            for m in members {
+                if m.is_static != !is_instance {
+                    continue;
+                }
+                if !seen.insert(m.name.to_string()) {
+                    continue;
+                }
+                let is_method = matches!(
+                    m.kind,
+                    varn_checker::ResolvedMemberKind::Method
+                        | varn_checker::ResolvedMemberKind::StaticMethod
+                        | varn_checker::ResolvedMemberKind::ExtensionMethod
+                );
+                let (insert_text, insert_text_format) = if is_method {
+                    if use_snippets {
+                        (format!("{}($0)", m.name), Some(InsertTextFormat::SNIPPET))
+                    } else {
+                        (m.name.to_string(), None)
+                    }
+                } else {
+                    (m.name.to_string(), None)
+                };
+
+                let detail = match &m.ty.0 {
+                    varn_core::TypeKind::Fn(ft) => {
+                        let params = ft
+                            .params
+                            .iter()
+                            .map(|p| {
+                                let n = p.name.as_deref().unwrap_or("arg");
+                                format!("{}: {}", n, p.ty)
+                            })
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        format!("({}): {}", params, ft.return_type)
+                    }
+                    _ => m.ty.to_string(),
+                };
+
+                let kind = match m.kind {
+                    varn_checker::ResolvedMemberKind::Method
+                    | varn_checker::ResolvedMemberKind::StaticMethod
+                    | varn_checker::ResolvedMemberKind::ExtensionMethod => {
+                        tower_lsp::lsp_types::CompletionItemKind::METHOD
+                    }
+                    varn_checker::ResolvedMemberKind::Property
+                    | varn_checker::ResolvedMemberKind::StaticProperty
+                    | varn_checker::ResolvedMemberKind::ExtensionProperty => {
+                        tower_lsp::lsp_types::CompletionItemKind::PROPERTY
+                    }
+                    varn_checker::ResolvedMemberKind::Getter => {
+                        tower_lsp::lsp_types::CompletionItemKind::PROPERTY
+                    }
+                    varn_checker::ResolvedMemberKind::Setter => {
+                        tower_lsp::lsp_types::CompletionItemKind::PROPERTY
+                    }
+                    varn_checker::ResolvedMemberKind::EnumMember => {
+                        tower_lsp::lsp_types::CompletionItemKind::ENUM_MEMBER
+                    }
+                };
+
+                items.push(CompletionItem {
+                    label: m.name.to_string(),
+                    kind: Some(kind),
+                    detail: Some(detail),
+                    insert_text: Some(insert_text),
+                    insert_text_format,
+                    ..Default::default()
+                });
+            }
+
+            if is_instance {
+                if let Some(tn) = match &ty.0 {
+                    varn_core::TypeKind::Named(n, _) | varn_core::TypeKind::Generic(n, _, _) => {
+                        Some(n.as_ref())
+                    }
+                    varn_core::TypeKind::Intrinsic(t) => Some(t.name()),
+                    _ => None,
+                } {
+                    if let Some(exts) = state.db.extension_members.get(tn) {
+                        for m in exts {
+                            if seen.insert(m.name.clone()) {
+                                items.push(member_to_completion_item(m, use_snippets));
+                            }
+                        }
+                    }
+                }
+            }
+
+            items
+        }
         ReceiverInfo::Named {
             name,
             is_instance,
@@ -174,89 +275,36 @@ pub fn dot_receiver(
             ty = ty.non_nullified();
         }
 
-        match &ty.0 {
-            varn_core::TypeKind::Object(members) => {
-                let recs = members.iter().filter_map(type_member_to_record).collect();
-                return Some(ReceiverInfo::Anonymous(recs));
+        let mut is_instance = true;
+        if let Some(sid) = info.symbol_id.filter(|s| *s < state.db.arena.len()) {
+            let sym = state.db.arena.get(sid);
+            if matches!(
+                sym.kind,
+                varn_checker::SymbolKind::Class
+                    | varn_checker::SymbolKind::Namespace
+                    | varn_checker::SymbolKind::Interface
+                    | varn_checker::SymbolKind::Enum
+                    | varn_checker::SymbolKind::Struct
+            ) {
+                is_instance = false;
             }
-            varn_core::TypeKind::Tuple(elems) => {
-                let mut recs: Vec<MemberRecord> = elems
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, elem_ty)| MemberRecord {
-                        name: idx.to_string(),
-                        type_str: elem_ty.to_string(),
-                        params_str: String::new(),
-                        is_static: false,
-                        is_optional: false,
-                        kind: MemberKind::Property,
-                        is_arrow: false,
-                        is_async: false,
-                        is_generator: false,
-                        line: 0,
-                        col: 0,
-                        init_value: String::new(),
-                        ty: elem_ty.clone(),
-                        symbol_id: None,
-                        members: Vec::new(),
-                    })
-                    .collect();
-                recs.push(MemberRecord {
-                    name: "length".to_string(),
-                    type_str: "int".to_string(),
-                    params_str: String::new(),
-                    is_static: false,
-                    is_optional: false,
-                    kind: MemberKind::Property,
-                    is_arrow: false,
-                    is_async: false,
-                    is_generator: false,
-                    line: 0,
-                    col: 0,
-                    init_value: String::new(),
-                    ty: varn_checker::Type(
-                        varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Int),
-                        false,
-                    ),
-                    symbol_id: None,
-                    members: Vec::new(),
-                });
-                return Some(ReceiverInfo::Anonymous(recs));
-            }
-            varn_core::TypeKind::Intrinsic(tag) => {
-                if tag.is_primitive() || tag == &varn_core::TypeTag::Array {
-                    return Some(ReceiverInfo::Named {
-                        name: tag.name().to_owned(),
-                        is_instance: true,
-                        origin: None,
-                    });
-                }
-            }
-            varn_core::TypeKind::Named(name, origin)
-            | varn_core::TypeKind::Generic(name, _, origin) => {
-                let mut is_instance = true;
-                if let Some(sym) = state
-                    .symbols
-                    .iter()
-                    .find(|s| s.name.as_str() == name.as_ref())
-                {
-                    if matches!(
-                        sym.kind,
-                        varn_checker::SymbolKind::Class
-                            | varn_checker::SymbolKind::Namespace
-                            | varn_checker::SymbolKind::Interface
-                            | varn_checker::SymbolKind::Enum
-                    ) {
-                        is_instance = false;
-                    }
-                }
-                return Some(ReceiverInfo::Named {
-                    name: name.to_string(),
-                    is_instance,
-                    origin: origin.as_ref().map(|s| s.to_string()),
-                });
-            }
-            _ => {}
+        }
+
+        return Some(ReceiverInfo::Typed { ty, is_instance });
+    }
+
+    if let Some((sid, ty)) = state.db.resolve_at(&before.lexeme, before.offset) {
+        if sid < state.db.arena.len() {
+            let sym = state.db.arena.get(sid);
+            let is_instance = !matches!(
+                sym.kind,
+                varn_checker::SymbolKind::Class
+                    | varn_checker::SymbolKind::Namespace
+                    | varn_checker::SymbolKind::Interface
+                    | varn_checker::SymbolKind::Enum
+                    | varn_checker::SymbolKind::Struct
+            );
+            return Some(ReceiverInfo::Typed { ty, is_instance });
         }
     }
 
@@ -350,82 +398,72 @@ fn dot_receiver_source_fallback(
     line: u32,
     col: u32,
 ) -> Option<ReceiverInfo> {
-    if col < 2 {
-        return None;
-    }
-    let src_line = state.source.lines().nth(line as usize)?;
-    let id_end = (col as usize)
-        .saturating_sub(2)
-        .min(src_line.len().saturating_sub(1));
+    // Find the receiver token before the dot at (line, col)
+    let dot_tok = state
+        .tokens
+        .iter()
+        .filter(|t| t.line == line && t.col < col && (t.kind == TokenKind::Dot || t.kind == TokenKind::QuestionDot))
+        .max_by_key(|t| t.col)?;
 
-    let bytes = src_line.as_bytes();
-    if id_end >= bytes.len() {
-        return None;
-    }
-    if !bytes[id_end].is_ascii_alphanumeric() && bytes[id_end] != b'_' {
-        return None;
-    }
+    let receiver_tok = state
+        .tokens
+        .iter()
+        .filter(|t| t.line == line && t.col < dot_tok.col)
+        .max_by_key(|t| t.col)?;
 
-    let mut start = id_end;
-    while start > 0 && (bytes[start - 1].is_ascii_alphanumeric() || bytes[start - 1] == b'_') {
-        start -= 1;
-    }
-    let name = &src_line[start..=id_end];
-    if name.is_empty() {
-        return None;
-    }
-
-    let sym = state.symbols.iter().find(|s| s.name == name)?;
-    match sym.kind {
-        varn_checker::SymbolKind::Class
-        | varn_checker::SymbolKind::Namespace
-        | varn_checker::SymbolKind::Interface
-        | varn_checker::SymbolKind::Enum => Some(ReceiverInfo::Named {
-            name: sym.name.clone(),
-            is_instance: false,
-            origin: sym.origin.clone(),
-        }),
-
-        varn_checker::SymbolKind::Let
-        | varn_checker::SymbolKind::Var
-        | varn_checker::SymbolKind::Const
-        | varn_checker::SymbolKind::Parameter => {
-            if !sym.members.is_empty() {
-                return Some(ReceiverInfo::Anonymous(sym.members.clone()));
+    if receiver_tok.kind == TokenKind::Identifier {
+        if let Some((sid, ty)) = state.db.resolve_at(&receiver_tok.lexeme, receiver_tok.offset) {
+            if sid < state.db.arena.len() {
+                let sym = state.db.arena.get(sid);
+                if matches!(
+                    sym.kind,
+                    varn_checker::SymbolKind::Class
+                        | varn_checker::SymbolKind::Namespace
+                        | varn_checker::SymbolKind::Interface
+                        | varn_checker::SymbolKind::Enum
+                        | varn_checker::SymbolKind::Struct
+                ) {
+                    return Some(ReceiverInfo::Named {
+                        name: sym.name.to_string(),
+                        is_instance: false,
+                        origin: sym.origin_module.as_deref().map(str::to_string),
+                    });
+                }
             }
-            if sym.type_str.is_empty() {
-                return None;
+
+            match &ty.0 {
+                varn_core::TypeKind::Object(members) => {
+                    let recs = members.iter().filter_map(type_member_to_record).collect();
+                    return Some(ReceiverInfo::Anonymous(recs));
+                }
+                varn_core::TypeKind::Array(_) => {
+                    return Some(ReceiverInfo::Named {
+                        name: IntrinsicType::Array.as_str().to_owned(),
+                        is_instance: true,
+                        origin: None,
+                    });
+                }
+                varn_core::TypeKind::Intrinsic(tag) => {
+                    return Some(ReceiverInfo::Named {
+                        name: tag.name().to_owned(),
+                        is_instance: true,
+                        origin: None,
+                    });
+                }
+                varn_core::TypeKind::Named(name, origin)
+                | varn_core::TypeKind::Generic(name, _, origin) => {
+                    return Some(ReceiverInfo::Named {
+                        name: name.to_string(),
+                        is_instance: true,
+                        origin: origin.as_ref().map(|s| s.to_string()),
+                    });
+                }
+                _ => {}
             }
-            if sym.type_str.ends_with("[]") {
-                return Some(ReceiverInfo::Named {
-                    name: IntrinsicType::Array.as_str().to_owned(),
-                    is_instance: true,
-                    origin: None,
-                });
-            }
-            let class_name = sym.type_str.split('<').next()?.trim();
-            state
-                .symbols
-                .iter()
-                .find(|s| {
-                    s.name == class_name
-                        && !s.members.is_empty()
-                        && matches!(
-                            s.kind,
-                            varn_checker::SymbolKind::Class
-                                | varn_checker::SymbolKind::Interface
-                                | varn_checker::SymbolKind::Namespace
-                        )
-                })
-                .map(|s| ReceiverInfo::Named {
-                    name: s.name.clone(),
-                    is_instance: true,
-                    origin: s.origin.clone(),
-                })
         }
-
-        _ => None,
     }
+
+    None
 }
 pub fn pattern_receiver(state: &DocumentState, line: u32, col: u32) -> Option<ReceiverInfo> {
     let line_toks: Vec<_> = state.tokens.iter().filter(|t| t.line == line).collect();

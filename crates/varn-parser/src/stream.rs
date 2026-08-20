@@ -216,6 +216,24 @@ impl TokenStream {
         }
     }
 
+    #[inline]
+    pub fn prev_range(&self) -> SourceRange {
+        if self.pos > 0 {
+            self.tokens[self.pos - 1].range
+        } else {
+            self.range()
+        }
+    }
+
+    #[inline]
+    pub fn span_from(&self, start_range: SourceRange) -> SourceRange {
+        let end_range = self.prev_range();
+        SourceRange {
+            start: start_range.start,
+            end: end_range.end,
+        }
+    }
+
     pub fn save(&self) -> usize {
         self.pos
     }

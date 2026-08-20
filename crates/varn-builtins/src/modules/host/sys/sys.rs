@@ -25,11 +25,17 @@ varn_contract! {
         fn exit(_ctx: &mut dyn NativeCtx, code: Option<i64>) -> Result<(), String> {
             std::process::exit(code.unwrap_or(0) as i32)
         }
-        fn env(_ctx: &mut dyn NativeCtx, key: &str) -> Result<String, String> {
+        fn env(ctx: &mut dyn NativeCtx, key: &str) -> Result<String, String> {
+            if !ctx.check_env(key) {
+                return Err(format!("SecurityError: Permission denied (sys.env) for variable '{key}'"));
+            }
             Ok(std::env::var(key).unwrap_or_default())
         }
-        fn setEnv(_ctx: &mut dyn NativeCtx, _key: &str, _val: &str) -> Result<(), String> {
-
+        fn setEnv(ctx: &mut dyn NativeCtx, key: &str, val: &str) -> Result<(), String> {
+            if !ctx.check_env(key) {
+                return Err(format!("SecurityError: Permission denied (sys.env) for variable '{key}'"));
+            }
+            std::env::set_var(key, val);
             Ok(())
         }
         fn now(_ctx: &mut dyn NativeCtx) -> Result<f64, String> {
