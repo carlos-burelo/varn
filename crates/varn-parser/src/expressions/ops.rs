@@ -119,7 +119,7 @@ fn parse_arrow_attempt(s: &mut TokenStream) -> Result<Expr, String> {
     };
 
     let full_range = s.span_from(start_range);
-    Ok(Expr::new_with_range(
+    Ok(s.expr(
         full_range,
         ExprKind::Arrow {
             params,
@@ -140,7 +140,7 @@ pub(super) fn parse_yield_expr(s: &mut TokenStream) -> Result<Expr, String> {
         None
     };
     let full_range = s.span_from(start_range);
-    Ok(Expr::new_with_range(
+    Ok(s.expr(
         full_range,
         ExprKind::Yield { argument, delegate },
     ))

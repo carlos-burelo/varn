@@ -11,7 +11,7 @@
 //    the four variants those tags cover, so a tuple serialized as `[]` and a
 //    record as `{}` — well-formed JSON with the contents dropped.
 
-import { stringify, parse } from "std:json"
+import { JSON } from "std:json"
 
 // ---------------------------------------------------------------- charCodeAt
 
@@ -84,20 +84,20 @@ assert("indexOf: non-ascii offset", uhay.indexOf("needle") === 3)
 
 // ------------------------------------------------------------ JSON.stringify
 
-assert("json: object", stringify({ a: 1, b: "x" }) === "{\"a\":1,\"b\":\"x\"}")
-assert("json: array", stringify([1, 2, 3]) === "[1,2,3]")
-assert("json: nested", stringify({ id: 1, tags: ["a", "b"] }) === "{\"id\":1,\"tags\":[\"a\",\"b\"]}")
+assert("json: object", JSON.stringify({ a: 1, b: "x" }) === "{\"a\":1,\"b\":\"x\"}")
+assert("json: array", JSON.stringify([1, 2, 3]) === "[1,2,3]")
+assert("json: nested", JSON.stringify({ id: 1, tags: ["a", "b"] }) === "{\"id\":1,\"tags\":[\"a\",\"b\"]}")
 
 // Field order is declaration order, not hash order — the property that lets
 // the shape carry an ordered name list at all.
-assert("json: field order", stringify({ z: 1, a: 2, m: 3 }) === "{\"z\":1,\"a\":2,\"m\":3}")
+assert("json: field order", JSON.stringify({ z: 1, a: 2, m: 3 }) === "{\"z\":1,\"a\":2,\"m\":3}")
 
 // Tuples and records: these used to come out as `[]` and `{}`.
 const tup = #[1, "two", true]
-assert("json: tuple keeps its elements", stringify(tup as dynamic) === "[1,\"two\",true]")
+assert("json: tuple keeps its elements", JSON.stringify(tup as dynamic) === "[1,\"two\",true]")
 
 const rec = #{ x: 3, y: 4 }
-assert("json: record keeps its fields", stringify(rec as dynamic) === "{\"x\":3,\"y\":4}")
+assert("json: record keeps its fields", JSON.stringify(rec as dynamic) === "{\"x\":3,\"y\":4}")
 
 // Round trip through the parser's shape cache, with a NESTED object of the
 // same arity between two siblings: the inner object replaces the cache
@@ -105,8 +105,8 @@ assert("json: record keeps its fields", stringify(rec as dynamic) === "{\"x\":3,
 // names. This passed before the cache was snapshotted per object too — it is
 // here to keep it passing, not as evidence that it once failed.
 const doc = "[{\"a\":1,\"b\":2},{\"a\":{\"c\":9,\"d\":8},\"b\":4},{\"a\":5,\"b\":6}]"
-const back = parse(doc) as dynamic[]
+const back = JSON.parse(doc) as dynamic[]
 assert("json: parse len", back.length === 3)
-assert("json: parse first", stringify(back[0]) === "{\"a\":1,\"b\":2}")
-assert("json: parse nested", stringify(back[1]) === "{\"a\":{\"c\":9,\"d\":8},\"b\":4}")
-assert("json: parse after nested", stringify(back[2]) === "{\"a\":5,\"b\":6}")
+assert("json: parse first", JSON.stringify(back[0]) === "{\"a\":1,\"b\":2}")
+assert("json: parse nested", JSON.stringify(back[1]) === "{\"a\":{\"c\":9,\"d\":8},\"b\":4}")
+assert("json: parse after nested", JSON.stringify(back[2]) === "{\"a\":5,\"b\":6}")

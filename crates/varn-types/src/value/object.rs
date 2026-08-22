@@ -148,6 +148,12 @@ impl ObjData<[Cell<VmValue>]> {
         self.inline_len as usize
     }
 
+    /// Direct reference to the object's inline fields buffer.
+    #[inline(always)]
+    pub fn inline_slice(&self) -> &[Cell<VmValue>] {
+        &self.values
+    }
+
     #[inline(always)]
     fn overflow(&self) -> Option<&Vec<VmValue>> {
         unsafe { (*self.overflow.get()).as_deref() }

@@ -1,249 +1,251 @@
 import { platform } from "std:sys";
 
-export const sep = platform() === "windows" ? "\\" : "/";
-export const delimiter = platform() === "windows" ? ";" : ":";
+export namespace Path {
+    export const sep = platform() === "windows" ? "\\" : "/";
+    export const delimiter = platform() === "windows" ? ";" : ":";
 
-export function normalize(p: str): str {
-    if (p.length === 0) {
-        return ".";
-    }
-    
-    // Check Windows drive prefix, e.g. "C:" or "C:\"
-    let drive = "";
-    let rest = p;
-    if (p.length >= 2 && p[1] === ":") {
-        drive = p.slice(0, 2);
-        rest = p.slice(2);
-    }
-    
-    let isAbs = rest.startsWith("/") || rest.startsWith("\\");
-    
-    // Split segments by / and \
-    let normalizedPath = "";
-    for (let i = 0; i < rest.length; i = i + 1) {
-        let c = rest[i];
-        if (c === "\\") {
-            normalizedPath = normalizedPath + "/";
-        } else {
-            normalizedPath = normalizedPath + c;
+    export function normalize(p: str): str {
+        if (p.length === 0) {
+            return ".";
         }
-    }
-    
-    let rawSegments = normalizedPath.split("/");
-    let segments: str[] = [];
-    
-    for (let segment of rawSegments) {
-        if (segment === "" || segment === ".") {
-            continue;
+        
+        // Check Windows drive prefix, e.g. "C:" or "C:\"
+        let drive = "";
+        let rest = p;
+        if (p.length >= 2 && p[1] === ":") {
+            drive = p.slice(0, 2);
+            rest = p.slice(2);
         }
-        if (segment === "..") {
-            if (segments.length > 0 && segments[segments.length - 1] !== "..") {
-                segments.pop();
-            } else if (!isAbs) {
-                segments.push("..");
+        
+        let isAbs = rest.startsWith("/") || rest.startsWith("\\");
+        
+        // Split segments by / and \
+        let normalizedPath = "";
+        for (let i = 0; i < rest.length; i = i + 1) {
+            let c = rest[i];
+            if (c === "\\") {
+                normalizedPath = normalizedPath + "/";
+            } else {
+                normalizedPath = normalizedPath + c;
             }
-        } else {
-            segments.push(segment);
         }
-    }
-    
-    let resolved = "";
-    for (let i = 0; i < segments.length; i = i + 1) {
-        if (i > 0) {
-            resolved = resolved + sep + segments[i];
-        } else {
-            resolved = segments[i];
+        
+        let rawSegments = normalizedPath.split("/");
+        let segments: str[] = [];
+        
+        for (let segment of rawSegments) {
+            if (segment === "" || segment === ".") {
+                continue;
+            }
+            if (segment === "..") {
+                if (segments.length > 0 && segments[segments.length - 1] !== "..") {
+                    segments.pop();
+                } else if (!isAbs) {
+                    segments.push("..");
+                }
+            } else {
+                segments.push(segment);
+            }
         }
-    }
-    
-    if (isAbs) {
+        
+        let resolved = "";
+        for (let i = 0; i < segments.length; i = i + 1) {
+            if (i > 0) {
+                resolved = resolved + sep + segments[i];
+            } else {
+                resolved = segments[i];
+            }
+        }
+        
+        if (isAbs) {
+            if (drive.length > 0) {
+                return drive + sep + resolved;
+            } else {
+                return sep + resolved;
+            }
+        }
+        
+        if (resolved.length === 0) {
+            if (drive.length > 0) {
+                return drive;
+            }
+            return ".";
+        }
+        
         if (drive.length > 0) {
-            return drive + sep + resolved;
-        } else {
-            return sep + resolved;
+            return drive + resolved;
         }
+        
+        return resolved;
     }
-    
-    if (resolved.length === 0) {
-        if (drive.length > 0) {
-            return drive;
-        }
-        return ".";
-    }
-    
-    if (drive.length > 0) {
-        return drive + resolved;
-    }
-    
-    return resolved;
-}
 
-export function dirname(p: str): str {
-    if (p.length === 0) {
-        return ".";
-    }
-    
-    // Trim trailing separators
-    let end = p.length;
-    let keepTrimming = true;
-    while (keepTrimming) {
-        if (end > 0) {
-            let lastChar = p[end - 1];
-            if (lastChar === "/" || lastChar === "\\") {
-                end = end - 1;
+    export function dirname(p: str): str {
+        if (p.length === 0) {
+            return ".";
+        }
+        
+        // Trim trailing separators
+        let end = p.length;
+        let keepTrimming = true;
+        while (keepTrimming) {
+            if (end > 0) {
+                let lastChar = p[end - 1];
+                if (lastChar === "/" || lastChar === "\\") {
+                    end = end - 1;
+                } else {
+                    keepTrimming = false;
+                }
             } else {
                 keepTrimming = false;
             }
-        } else {
-            keepTrimming = false;
         }
-    }
-    
-    if (end === 0) {
-        return p[0];
-    }
-    
-    // Check if it's Windows drive letter like C:
-    if (end === 2 && p[1] === ":") {
-        return p;
-    }
-    
-    // Find last separator before end
-    let i = end - 1;
-    let foundSep = -1;
-    let keepSearching = true;
-    while (keepSearching) {
-        if (i >= 0) {
-            let c = p[i];
-            if (c === "/" || c === "\\") {
-                foundSep = i;
-                keepSearching = false;
+        
+        if (end === 0) {
+            return p[0];
+        }
+        
+        // Check if it's Windows drive letter like C:
+        if (end === 2 && p[1] === ":") {
+            return p;
+        }
+        
+        // Find last separator before end
+        let i = end - 1;
+        let foundSep = -1;
+        let keepSearching = true;
+        while (keepSearching) {
+            if (i >= 0) {
+                let c = p[i];
+                if (c === "/" || c === "\\") {
+                    foundSep = i;
+                    keepSearching = false;
+                } else {
+                    i = i - 1;
+                }
             } else {
-                i = i - 1;
+                keepSearching = false;
             }
-        } else {
-            keepSearching = false;
         }
-    }
-    
-    if (foundSep === -1) {
-        if (p.length >= 2 && p[1] === ":") {
-            return p.slice(0, 2);
+        
+        if (foundSep === -1) {
+            if (p.length >= 2 && p[1] === ":") {
+                return p.slice(0, 2);
+            }
+            return ".";
         }
-        return ".";
-    }
-    
-    if (foundSep === 0) {
-        return p[0];
-    }
-    
-    if (foundSep === 2 && p[1] === ":") {
-        return p.slice(0, 3);
-    }
-    
-    let dirEnd = foundSep;
-    let keepTrimmingDir = true;
-    while (keepTrimmingDir) {
-        if (dirEnd > 0) {
-            let lastChar = p[dirEnd - 1];
-            if (lastChar === "/" || lastChar === "\\") {
-                dirEnd = dirEnd - 1;
+        
+        if (foundSep === 0) {
+            return p[0];
+        }
+        
+        if (foundSep === 2 && p[1] === ":") {
+            return p.slice(0, 3);
+        }
+        
+        let dirEnd = foundSep;
+        let keepTrimmingDir = true;
+        while (keepTrimmingDir) {
+            if (dirEnd > 0) {
+                let lastChar = p[dirEnd - 1];
+                if (lastChar === "/" || lastChar === "\\") {
+                    dirEnd = dirEnd - 1;
+                } else {
+                    keepTrimmingDir = false;
+                }
             } else {
                 keepTrimmingDir = false;
             }
-        } else {
-            keepTrimmingDir = false;
         }
+        
+        if (dirEnd === 0) {
+            return p[0];
+        }
+        
+        if (dirEnd === 2 && p[1] === ":") {
+            return p.slice(0, 2);
+        }
+        
+        return p.slice(0, dirEnd);
     }
-    
-    if (dirEnd === 0) {
-        return p[0];
-    }
-    
-    if (dirEnd === 2 && p[1] === ":") {
-        return p.slice(0, 2);
-    }
-    
-    return p.slice(0, dirEnd);
-}
 
-export function basename(p: str, ext?: str): str {
-    if (p.length === 0) {
-        return "";
-    }
-    
-    // Trim trailing separators
-    let end = p.length;
-    let keepTrimming = true;
-    while (keepTrimming) {
-        if (end > 0) {
-            let lastChar = p[end - 1];
-            if (lastChar === "/" || lastChar === "\\") {
-                end = end - 1;
+    export function basename(p: str, ext?: str): str {
+        if (p.length === 0) {
+            return "";
+        }
+        
+        // Trim trailing separators
+        let end = p.length;
+        let keepTrimming = true;
+        while (keepTrimming) {
+            if (end > 0) {
+                let lastChar = p[end - 1];
+                if (lastChar === "/" || lastChar === "\\") {
+                    end = end - 1;
+                } else {
+                    keepTrimming = false;
+                }
             } else {
                 keepTrimming = false;
             }
-        } else {
-            keepTrimming = false;
         }
-    }
-    
-    if (end === 2 && p[1] === ":") {
-        return "";
-    }
-    
-    if (end === 0) {
-        return "";
-    }
-    
-    // Find last separator before end
-    let start = 0;
-    let i = end - 1;
-    let keepSearching = true;
-    while (keepSearching) {
-        if (i >= 0) {
-            let c = p[i];
-            if (c === "/" || c === "\\") {
-                start = i + 1;
+        
+        if (end === 2 && p[1] === ":") {
+            return "";
+        }
+        
+        if (end === 0) {
+            return "";
+        }
+        
+        // Find last separator before end
+        let start = 0;
+        let i = end - 1;
+        let keepSearching = true;
+        while (keepSearching) {
+            if (i >= 0) {
+                let c = p[i];
+                if (c === "/" || c === "\\") {
+                    start = i + 1;
+                    keepSearching = false;
+                } else {
+                    i = i - 1;
+                }
+            } else {
                 keepSearching = false;
-            } else {
-                i = i - 1;
-            }
-        } else {
-            keepSearching = false;
-        }
-    }
-    
-    let base = p.slice(start, end);
-    if (ext !== null && base.endsWith(ext)) {
-        return base.slice(0, base.length - ext.length);
-    }
-    return base;
-}
-
-export function extname(p: str): str {
-    let base = basename(p);
-    let idx = base.lastIndexOf(".");
-    if (idx >= 0) {
-        return base.slice(idx);
-    }
-    return "";
-}
-
-export function isAbsolute(p: str): bool {
-    return p.startsWith("/") || p.startsWith("\\") || (p.length >= 2 && p[1] === ":");
-}
-
-export function join(...segments: str[]): str {
-    let out = "";
-    for (let segment of segments) {
-        if (segment.length > 0) {
-            if (out.length > 0 && !out.endsWith(sep) && !segment.startsWith(sep)) {
-                out = out + sep + segment;
-            } else {
-                out = out + segment;
             }
         }
+        
+        let base = p.slice(start, end);
+        if (ext !== null && base.endsWith(ext)) {
+            return base.slice(0, base.length - ext.length);
+        }
+        return base;
     }
-    return normalize(out);
+
+    export function extname(p: str): str {
+        let base = basename(p);
+        let idx = base.lastIndexOf(".");
+        if (idx >= 0) {
+            return base.slice(idx);
+        }
+        return "";
+    }
+
+    export function isAbsolute(p: str): bool {
+        return p.startsWith("/") || p.startsWith("\\") || (p.length >= 2 && p[1] === ":");
+    }
+
+    export function join(...segments: str[]): str {
+        let out = "";
+        for (let segment of segments) {
+            if (segment.length > 0) {
+                if (out.length > 0 && !out.endsWith(sep) && !segment.startsWith(sep)) {
+                    out = out + sep + segment;
+                } else {
+                    out = out + segment;
+                }
+            }
+        }
+        return normalize(out);
+    }
 }

@@ -1,0 +1,95 @@
+// Test Suite 85: Level 1 StdLib Enhancements (std:sqlite, std:ws, std:compress with Tar and Zip)
+
+import { describe, test, expect, assertEqual } from "std:test";
+import { Database } from "std:sqlite";
+import { Compress, Tar, Zip } from "std:compress";
+import { WebSocketClient } from "std:ws";
+import { exists, mkdir, write, remove, removeAll } from "std:fs";
+import { Path } from "std:path";
+
+describe("Level 1 StdLib Enhancements", () => {
+    test("std:sqlite in-memory database operations", () => {
+        let db = new Database(":memory:");
+        
+        let created = db.exec("CREATE TABLE heroes (id INTEGER PRIMARY KEY, name TEXT, power REAL, active INTEGER);");
+        assertEqual(created, 0);
+
+        let ins1 = db.exec("INSERT INTO heroes (id, name, power, active) VALUES (1, 'Varn', 999.5, 1);");
+        assertEqual(ins1, 1);
+
+        let ins2 = db.exec("INSERT INTO heroes (id, name, power, active) VALUES (2, 'Rust', 850.0, 1);");
+        assertEqual(ins2, 1);
+
+        // Test calling db.all with 0 rest arguments
+        let allRows = db.all("SELECT id, name, power, active FROM heroes ORDER BY id ASC;");
+        assertEqual(allRows.length, 2);
+        assertEqual(allRows[0].name, "Varn");
+        assertEqual(allRows[0].id, 1);
+        assertEqual(allRows[1].name, "Rust");
+        assertEqual(allRows[1].id, 2);
+
+        // Test calling db.get with rest argument 1
+        let singleRow = db.get("SELECT id, name FROM heroes WHERE id = ?;", 1);
+        expect(singleRow !== null).toBe(true);
+        if (singleRow !== null) {
+            assertEqual(singleRow?.name, "Varn");
+        }
+
+        db.close();
+    });
+
+    test("std:compress unified compression and archives", () => {
+        // Gzip & Deflate byte compression
+        let text = "Varn programming language high-performance computing!";
+        let gz = Compress.gzip(text);
+        expect(gz.length > 0).toBe(true);
+        let gunzipped = Compress.gunzip(gz);
+        assertEqual(gunzipped, text);
+
+        let def = Compress.deflate(text);
+        expect(def.length > 0).toBe(true);
+        let inflated = Compress.inflate(def);
+        assertEqual(inflated, text);
+
+        // Tar and Zip archive tests
+        let testDir = "./tmp_test_archive";
+        if (!exists(testDir)) {
+            mkdir(testDir);
+        }
+        write(Path.join(testDir, "test.txt"), "Archive content 123");
+
+        let tarPath = "./tmp_test.tar";
+        let tarCreated = Tar.create(testDir, tarPath);
+        expect(tarCreated).toBe(true);
+        expect(exists(tarPath)).toBe(true);
+
+        let tarExtractDir = "./tmp_test_tar_out";
+        let tarExtracted = Tar.extract(tarPath, tarExtractDir);
+        expect(tarExtracted).toBe(true);
+        expect(exists(Path.join(tarExtractDir, "test.txt"))).toBe(true);
+
+        let zipPath = "./tmp_test.zip";
+        let zipCreated = Zip.create(testDir, zipPath);
+        expect(zipCreated).toBe(true);
+        expect(exists(zipPath)).toBe(true);
+
+        let zipExtractDir = "./tmp_test_zip_out";
+        let zipExtracted = Zip.extract(zipPath, zipExtractDir);
+        expect(zipExtracted).toBe(true);
+        expect(exists(Path.join(zipExtractDir, "test.txt"))).toBe(true);
+
+        // Cleanup
+        remove(Path.join(testDir, "test.txt"));
+        remove(Path.join(tarExtractDir, "test.txt"));
+        remove(Path.join(zipExtractDir, "test.txt"));
+        removeAll(testDir);
+        removeAll(tarExtractDir);
+        removeAll(zipExtractDir);
+        remove(tarPath);
+        remove(zipPath);
+    });
+
+    test("std:ws client API shape verification", () => {
+        expect(typeof WebSocketClient === "class").toBe(true);
+    });
+});

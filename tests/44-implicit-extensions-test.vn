@@ -1,9 +1,6 @@
 import { File, exists as fsExists, remove as fsRemove } from "std:fs";
 import { Reader, Writer } from "std:io";
 
-import * as fsMod from "runtime:fs";
-import * as ioMod from "runtime:io";
-
 function runTest(): void {
     let testFile = "./temp_implicit_ext.txt";
     let backupFile = "./temp_implicit_ext.bak";

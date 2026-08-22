@@ -1,0 +1,76 @@
+// Test Suite 86: Tagged Template Functions End-to-End
+
+import { describe, test, expect, assertEqual } from "std:test";
+import { Database } from "std:sqlite";
+
+function customTag(strings: str[], ...values: dynamic[]): str {
+    let res = "";
+    for (let i = 0; i < strings.length; i = i + 1) {
+        res = res + strings[i];
+        if (i < values.length) {
+            res = res + "[" + values[i] + "]";
+        }
+    }
+    return res;
+}
+
+class Formatter {
+    prefix: str = ">> ";
+
+    format(strings: str[], ...values: dynamic[]): str {
+        let res = this.prefix;
+        for (let i = 0; i < strings.length; i = i + 1) {
+            res = res + strings[i];
+            if (i < values.length) {
+                res = res + values[i];
+            }
+        }
+        return res;
+    }
+}
+
+describe("Tagged Template Functions", () => {
+    test("Free-function tagged template", () => {
+        let name = "Varn";
+        let version = 1;
+        let output = customTag`Language: ${name}, Version: ${version}!`;
+        assertEqual(output, "Language: [Varn], Version: [1]!");
+
+        // Constant template without interpolations
+        let rawOnly = customTag`No interpolations here.`;
+        assertEqual(rawOnly, "No interpolations here.");
+    });
+
+    test("Class-method tagged template", () => {
+        let fmt = new Formatter();
+        let user = "Alice";
+        let score = 95;
+        let formatted = fmt.format`Player ${user} scored ${score} points`;
+        assertEqual(formatted, ">> Player Alice scored 95 points");
+    });
+
+    test("Safe SQL parameterized queries with db.sql and db.sqlOne", () => {
+        let db = new Database(":memory:");
+        db.exec("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT, role TEXT, active INTEGER);");
+        db.exec("INSERT INTO users VALUES (1, 'Alice', 'admin', 1);");
+        db.exec("INSERT INTO users VALUES (2, 'Bob', 'editor', 1);");
+        db.exec("INSERT INTO users VALUES (3, 'Charlie', 'viewer', 0);");
+
+        let targetRole = "admin";
+        let isActive = 1;
+        let rows = db.sql`SELECT id, name, role FROM users WHERE role = ${targetRole} AND active = ${isActive};`;
+        assertEqual(rows.length, 1);
+        assertEqual(rows[0].name, "Alice");
+        assertEqual(rows[0].id, 1);
+
+        let targetId = 2;
+        let singleUser = db.sqlOne`SELECT id, name, role FROM users WHERE id = ${targetId};`;
+        expect(singleUser !== null).toBe(true);
+        if (singleUser !== null) {
+            assertEqual(singleUser?.name, "Bob");
+            assertEqual(singleUser?.role, "editor");
+        }
+
+        db.close();
+    });
+});

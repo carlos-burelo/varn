@@ -1,3 +1,3 @@
-// expect: error[Varn3001]
+// expect: error[VN4016]
 // using requires a type with dispose(); int does not have it
 using x = 42

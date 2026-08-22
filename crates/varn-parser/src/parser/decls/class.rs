@@ -27,6 +27,12 @@ pub fn parse_class_decl(
         vec![]
     };
 
+    let primary_params = if s.check(TokenKind::LParen) {
+        Some(super::super::patterns::parse_params(s)?)
+    } else {
+        None
+    };
+
     let super_class = if s.eat(TokenKind::Extends) {
         Some(parse_new_callee_expr(s)?)
     } else {
@@ -65,9 +71,10 @@ pub fn parse_class_decl(
     let full_range = s.span_from(range);
     Ok(ClassDecl {
         id: id.map(|name| name.into()),
-        ast_id: 0,
+        ast_id: s.next_ast_id(),
         id_offset,
         type_params,
+        primary_params,
         super_class,
         super_type_args,
         implements,

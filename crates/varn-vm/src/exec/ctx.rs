@@ -104,6 +104,7 @@ pub struct ExecCtx {
     /// JIT code addresses leading fields by raw offset.
     pub gc_inhibited: bool,
     pub capabilities: varn_types::capabilities::CapabilitySet,
+    pub metadata: FxHashMap<String, FxHashMap<String, VmValue>>,
 }
 
 impl ExecCtx {
@@ -151,6 +152,7 @@ impl ExecCtx {
             resources: varn_types::ResourceStore::new(),
             gc_inhibited: false,
             capabilities: varn_types::capabilities::CapabilitySet::allow_all(),
+            metadata: FxHashMap::default(),
         };
 
         if fresh {
@@ -318,6 +320,7 @@ impl ExecCtx {
             resources: varn_types::ResourceStore::new(),
             gc_inhibited: false,
             capabilities: self.capabilities.clone(),
+            metadata: FxHashMap::default(),
         }
     }
 
@@ -360,6 +363,12 @@ impl ExecCtx {
         let vm_suspend_start = all_vals.len();
         if let Some(VmSuspend::Yield { value, .. }) = &self.vm_suspend {
             all_vals.push(*value);
+        }
+        let metadata_start = all_vals.len();
+        for map in self.metadata.values() {
+            for &v in map.values() {
+                all_vals.push(v);
+            }
         }
 
         self.heap.minor_gc(&mut all_vals, &[]);
@@ -411,6 +420,16 @@ impl ExecCtx {
 
         if let Some(VmSuspend::Yield { value, .. }) = &mut self.vm_suspend {
             *value = all_vals[vm_suspend_start];
+        }
+
+        {
+            let mut medi = metadata_start;
+            for map in self.metadata.values_mut() {
+                for v in map.values_mut() {
+                    *v = all_vals[medi];
+                    medi += 1;
+                }
+            }
         }
     }
 
@@ -476,58 +495,15 @@ impl ExecCtx {
                 roots.push(v.as_heap_idx());
             }
         }
+        for map in self.metadata.values() {
+            for &v in map.values() {
+                if v.is_heap() {
+                    roots.push(v.as_heap_idx());
+                }
+            }
+        }
         let _ = self.heap.collect(&roots);
     }
 }
 
-#[derive(Default, Debug, Clone, Copy)]
-#[repr(C)]
-pub struct JmpBuf {
-    pub rdi: u64,
-    pub rsi: u64,
-    pub rbx: u64,
-    pub rbp: u64,
-    pub r12: u64,
-    pub r13: u64,
-    pub r14: u64,
-    pub r15: u64,
-    pub rsp: u64,
-    pub rip: u64,
-}
-
-#[unsafe(naked)]
-pub(crate) unsafe extern "C" fn my_setjmp(_buf: *mut JmpBuf) -> i32 {
-    std::arch::naked_asm!(
-        "mov [rcx + 0],  rdi",
-        "mov [rcx + 8],  rsi",
-        "mov [rcx + 16], rbx",
-        "mov [rcx + 24], rbp",
-        "mov [rcx + 32], r12",
-        "mov [rcx + 40], r13",
-        "mov [rcx + 48], r14",
-        "mov [rcx + 56], r15",
-        "lea r10, [rsp + 8]",
-        "mov [rcx + 64], r10",
-        "mov r10, [rsp]",
-        "mov [rcx + 72], r10",
-        "xor eax, eax",
-        "ret"
-    );
-}
-
-#[unsafe(naked)]
-pub(crate) unsafe extern "C" fn my_longjmp(_buf: *const JmpBuf, _val: i32) -> ! {
-    std::arch::naked_asm!(
-        "mov rdi, [rcx + 0]",
-        "mov rsi, [rcx + 8]",
-        "mov rbx, [rcx + 16]",
-        "mov rbp, [rcx + 24]",
-        "mov r12, [rcx + 32]",
-        "mov r13, [rcx + 40]",
-        "mov r14, [rcx + 48]",
-        "mov r15, [rcx + 56]",
-        "mov rsp, [rcx + 64]",
-        "mov eax, edx",
-        "jmp qword ptr [rcx + 72]"
-    );
-}
+pub use crate::arch::{vm_longjmp as my_longjmp, vm_setjmp as my_setjmp, JmpBuf};

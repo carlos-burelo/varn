@@ -1,4 +1,4 @@
-// expect: error[Varn4101]
+// expect: error[VN4101]
 class Base {
     greet(): str { return "hello" }
 }

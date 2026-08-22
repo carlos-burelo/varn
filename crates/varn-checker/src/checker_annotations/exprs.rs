@@ -176,7 +176,7 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                     _ => None,
                 };
                 if let Some(cn) = class_name {
-                    if ctx.bind.type_members.classes.contains_key(cn) {
+                    if ctx.bind.is_user_class(cn) {
                         let mut hierarchy = Vec::new();
                         let mut current: Option<std::rc::Rc<str>> = Some(std::rc::Rc::from(cn));
                         while let Some(c) = current {
@@ -187,7 +187,7 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
 
                         if !hierarchy
                             .iter()
-                            .all(|c| ctx.bind.type_members.classes.contains_key(c.as_ref()))
+                            .all(|c| ctx.bind.is_user_class(c.as_ref()))
                         {
                             return;
                         }

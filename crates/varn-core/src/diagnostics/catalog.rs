@@ -25,6 +25,11 @@ pub enum ErrorCode {
     InvalidDecoratorTarget = 2013,
     ArrowWithoutParens = 2014,
     InvalidGeneratorYield = 2015,
+    CircularModuleDependency = 2016,
+    ExportNotFound = 2017,
+    InvalidRestElement = 2018,
+    MultipleRestElements = 2019,
+    ConstWithoutInitializer = 2020,
 
     TypeMismatch = 3001,
     UnknownSymbol = 3002,
@@ -41,6 +46,11 @@ pub enum ErrorCode {
     InvalidInstanceofTarget = 3013,
     InvalidAsCast = 3014,
     InvalidSatisfies = 3015,
+    TupleIndexOutOfBounds = 3016,
+    TupleArityMismatch = 3017,
+    RecordShapeMismatch = 3018,
+    InvalidConstAssertion = 3019,
+    InfiniteTypeExpansion = 3020,
 
     TypeArgInferenceFailed = 3201,
     ConstraintViolation = 3202,
@@ -62,6 +72,12 @@ pub enum ErrorCode {
     InvalidThrowOperand = 4008,
     DuplicateCaseLabel = 4009,
     InvalidPipelineReceiver = 4010,
+    AwaitOutsideAsync = 4011,
+    YieldOutsideGenerator = 4012,
+    RedundantMatchArm = 4013,
+    InvalidDestructuringTarget = 4014,
+    MatchPatternTypeMismatch = 4015,
+    InvalidUsingTarget = 4016,
 
     MissingOverride = 4101,
     SpuriousOverride = 4102,
@@ -74,6 +90,26 @@ pub enum ErrorCode {
     InvalidSuperCall = 4109,
     DuplicateMemberName = 4110,
     InvalidExtensionTarget = 4111,
+    AmbiguousExtensionMethod = 4112,
+    InvalidExtensionReceiver = 4113,
+    SuperOutsideMethod = 4114,
+
+    InvalidIsolateTransfer = 4201,
+    ChannelClosedError = 4202,
+    InvalidTaskSpawn = 4203,
+    InvalidChannelCapacity = 4204,
+    IsolateExecutionTimeout = 4205,
+    InvalidMutexAccess = 4206,
+
+    PermissionDenied = 4301,
+    CapabilityViolation = 4302,
+    InvalidHostHandle = 4303,
+    RestrictedApiAccess = 4304,
+
+    InvalidDecoratorSignature = 4401,
+    MetadataNotFound = 4402,
+    InvalidReflectionTarget = 4403,
+    ReflectionSecurityViolation = 4404,
 
     UnsupportedExpression = 5001,
     UnsupportedStatement = 5002,
@@ -111,6 +147,11 @@ impl ErrorCode {
             ErrorCode::InvalidDecoratorTarget => "invalid-decorator-target",
             ErrorCode::ArrowWithoutParens => "arrow-without-parens",
             ErrorCode::InvalidGeneratorYield => "invalid-generator-yield",
+            ErrorCode::CircularModuleDependency => "circular-module-dependency",
+            ErrorCode::ExportNotFound => "export-not-found",
+            ErrorCode::InvalidRestElement => "invalid-rest-element",
+            ErrorCode::MultipleRestElements => "multiple-rest-elements",
+            ErrorCode::ConstWithoutInitializer => "const-without-initializer",
 
             ErrorCode::TypeMismatch => "type-mismatch",
             ErrorCode::UnknownSymbol => "unknown-symbol",
@@ -127,6 +168,11 @@ impl ErrorCode {
             ErrorCode::InvalidInstanceofTarget => "invalid-instanceof-target",
             ErrorCode::InvalidAsCast => "invalid-as-cast",
             ErrorCode::InvalidSatisfies => "invalid-satisfies",
+            ErrorCode::TupleIndexOutOfBounds => "tuple-index-out-of-bounds",
+            ErrorCode::TupleArityMismatch => "tuple-arity-mismatch",
+            ErrorCode::RecordShapeMismatch => "record-shape-mismatch",
+            ErrorCode::InvalidConstAssertion => "invalid-const-assertion",
+            ErrorCode::InfiniteTypeExpansion => "infinite-type-expansion",
 
             ErrorCode::TypeArgInferenceFailed => "type-arg-inference-failed",
             ErrorCode::ConstraintViolation => "constraint-violation",
@@ -148,6 +194,12 @@ impl ErrorCode {
             ErrorCode::InvalidThrowOperand => "invalid-throw-operand",
             ErrorCode::DuplicateCaseLabel => "duplicate-case-label",
             ErrorCode::InvalidPipelineReceiver => "invalid-pipeline-receiver",
+            ErrorCode::AwaitOutsideAsync => "await-outside-async",
+            ErrorCode::YieldOutsideGenerator => "yield-outside-generator",
+            ErrorCode::RedundantMatchArm => "redundant-match-arm",
+            ErrorCode::InvalidDestructuringTarget => "invalid-destructuring-target",
+            ErrorCode::MatchPatternTypeMismatch => "match-pattern-type-mismatch",
+            ErrorCode::InvalidUsingTarget => "invalid-using-target",
 
             ErrorCode::MissingOverride => "missing-override",
             ErrorCode::SpuriousOverride => "spurious-override",
@@ -160,6 +212,26 @@ impl ErrorCode {
             ErrorCode::InvalidSuperCall => "invalid-super-call",
             ErrorCode::DuplicateMemberName => "duplicate-member-name",
             ErrorCode::InvalidExtensionTarget => "invalid-extension-target",
+            ErrorCode::AmbiguousExtensionMethod => "ambiguous-extension-method",
+            ErrorCode::InvalidExtensionReceiver => "invalid-extension-receiver",
+            ErrorCode::SuperOutsideMethod => "super-outside-method",
+
+            ErrorCode::InvalidIsolateTransfer => "invalid-isolate-transfer",
+            ErrorCode::ChannelClosedError => "channel-closed-error",
+            ErrorCode::InvalidTaskSpawn => "invalid-task-spawn",
+            ErrorCode::InvalidChannelCapacity => "invalid-channel-capacity",
+            ErrorCode::IsolateExecutionTimeout => "isolate-execution-timeout",
+            ErrorCode::InvalidMutexAccess => "invalid-mutex-access",
+
+            ErrorCode::PermissionDenied => "permission-denied",
+            ErrorCode::CapabilityViolation => "capability-violation",
+            ErrorCode::InvalidHostHandle => "invalid-host-handle",
+            ErrorCode::RestrictedApiAccess => "restricted-api-access",
+
+            ErrorCode::InvalidDecoratorSignature => "invalid-decorator-signature",
+            ErrorCode::MetadataNotFound => "metadata-not-found",
+            ErrorCode::InvalidReflectionTarget => "invalid-reflection-target",
+            ErrorCode::ReflectionSecurityViolation => "reflection-security-violation",
 
             ErrorCode::UnsupportedExpression => "unsupported-expression",
             ErrorCode::UnsupportedStatement => "unsupported-statement",
@@ -170,10 +242,25 @@ impl ErrorCode {
             ErrorCode::ConstantPoolOverflow => "constant-pool-overflow",
         }
     }
+
+    pub fn category(self) -> &'static str {
+        match self as u32 {
+            1000..=1999 => "Lexer",
+            2000..=2999 => "Parser",
+            3000..=3999 => "TypeChecker",
+            4000..=4999 => "Semantic",
+            5000..=5999 => "Compiler",
+            _ => "General",
+        }
+    }
+
+    pub fn code_number(self) -> u32 {
+        self as u32
+    }
 }
 
 impl std::fmt::Display for ErrorCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "WR{}", *self as u32)
+        write!(f, "VN{}", *self as u32)
     }
 }

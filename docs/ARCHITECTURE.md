@@ -133,12 +133,17 @@ Value Encoding:         [1 11111111111 11] [TAG 4-bit] [Payload 48-bit          
 
 ---
 
-## 6. Backend JIT x86-64 (`varn-jit`)
+## 6. Backend JIT Nativo y Abstracción de Arquitectura (`varn-jit` & `varn-vm::arch`)
 
-`varn-jit` proporciona compilación eager a código máquina x86-64 utilizando el backend Cranelift:
+`varn-jit` proporciona compilación eager a código de máquina nativo utilizando el backend **Cranelift** multi-arquitectura:
 
-- Compila funciones en el hot-path directamente a instrucciones de máquina nativas.
-- Si una función contiene opcodes no soportados (bailouts), la VM conmuta de forma transparente al intérprete sin interrumpir la ejecución.
+- **Generación Multi-Target**: A través de `cranelift_native::builder()` y el Target ISA correspondiente, compila funciones directamente a instrucciones nativas para la arquitectura del host (**x86-64**, **AArch64 / ARM64**, **RISC-V 64**, etc.) respetando las convenciones de llamadas (`CallConv`) de cada plataforma.
+- **Capa de Abstracción de Arquitectura (`varn-vm::arch`)**: Las operaciones de bajo nivel dependientes de la arquitectura del CPU y del sistema operativo (búferes de salto `JmpBuf`, `vm_setjmp`, `vm_longjmp` para la recuperación de pánicos del JIT y suspensión asíncrona) están aisladas en submódulos dedicados:
+  - `x86_64_windows.rs`: Windows x86_64 ABI (`rcx`, `rdx`, registros callee-saved).
+  - `x86_64_sysv.rs`: System V AMD64 ABI para Linux y macOS x86_64 (`rdi`, `rsi`).
+  - `aarch64.rs`: ARM64 AAPCS ABI para macOS Apple Silicon, Linux AArch64 y Windows on ARM (`x19-x30`, `sp`, `d8-d15`).
+  - `fallback.rs`: Fallback portable en C estándar para RISC-V u otras arquitecturas.
+- **Bailouts Transparentes**: Si una función contiene opcodes no soportados o entra en un camino no compenable, la VM conmuta de forma transparente al intérprete sin interrumpir la ejecución.
 
 ---
 

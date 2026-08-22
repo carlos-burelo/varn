@@ -35,6 +35,11 @@ impl IntrinsicType {
     pub const TypeError: Self = Self(TypeTag::TypeError);
     pub const RangeError: Self = Self(TypeTag::RangeError);
     pub const Range: Self = Self(TypeTag::Range);
+    pub const Buffer: Self = Self(TypeTag::Buffer);
+    pub const Regex: Self = Self(TypeTag::Regex);
+    pub const DateTime: Self = Self(TypeTag::DateTime);
+    pub const Duration: Self = Self(TypeTag::Duration);
+    pub const UUID: Self = Self(TypeTag::UUID);
 
     pub const fn as_str(self) -> &'static str {
         self.0.name()
@@ -63,11 +68,17 @@ impl IntrinsicType {
             "TaskHandle" => Some(Self::TaskHandle),
             "Generator" => Some(Self::Generator),
             "Range" => Some(Self::Range),
+            "Buffer" => Some(Self::Buffer),
             "Error" => Some(Self::Error),
             "TypeError" => Some(Self::TypeError),
             "RangeError" => Some(Self::RangeError),
             _ => None,
         }
+    }
+
+    #[inline]
+    pub fn is_intrinsic(s: &str) -> bool {
+        Self::from_str(s).is_some()
     }
 
     pub fn is_scalar_primitive(self) -> bool {
@@ -84,39 +95,56 @@ impl std::fmt::Display for IntrinsicType {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum MemberKey {
     Tag,
-
     Value0,
-
     RawValue,
-
     Length,
-
+    Size,
+    Name,
+    VariantName,
+    Variant,
     Callable,
-
     ToString,
-
     ValueOf,
-
     IterNext,
-
     IterDone,
-
     IterValue,
+    Push,
+    Pop,
+    Shift,
+    Unshift,
+    Slice,
+    Join,
+    IndexOf,
+    Includes,
+    Split,
 }
 
 impl MemberKey {
-    pub fn as_str(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Tag => "__tag",
             Self::Value0 => "value0",
             Self::RawValue => "rawValue",
             Self::Length => "length",
+            Self::Size => "size",
+            Self::Name => "name",
+            Self::VariantName => "__variant_name__",
+            Self::Variant => "__variant__",
             Self::Callable => "()",
             Self::ToString => "toString",
             Self::ValueOf => "valueOf",
             Self::IterNext => "next",
             Self::IterDone => "done",
             Self::IterValue => "value",
+            Self::Push => "push",
+            Self::Pop => "pop",
+            Self::Shift => "shift",
+            Self::Unshift => "unshift",
+            Self::Slice => "slice",
+            Self::Join => "join",
+            Self::IndexOf => "indexOf",
+            Self::Includes => "includes",
+            Self::Split => "split",
         }
     }
 
@@ -126,12 +154,25 @@ impl MemberKey {
             "value0" => Some(Self::Value0),
             "rawValue" => Some(Self::RawValue),
             "length" => Some(Self::Length),
+            "size" => Some(Self::Size),
+            "name" => Some(Self::Name),
+            "__variant_name__" => Some(Self::VariantName),
+            "__variant__" => Some(Self::Variant),
             "()" => Some(Self::Callable),
             "toString" => Some(Self::ToString),
             "valueOf" => Some(Self::ValueOf),
             "next" => Some(Self::IterNext),
             "done" => Some(Self::IterDone),
             "value" => Some(Self::IterValue),
+            "push" => Some(Self::Push),
+            "pop" => Some(Self::Pop),
+            "shift" => Some(Self::Shift),
+            "unshift" => Some(Self::Unshift),
+            "slice" => Some(Self::Slice),
+            "join" => Some(Self::Join),
+            "indexOf" => Some(Self::IndexOf),
+            "includes" => Some(Self::Includes),
+            "split" => Some(Self::Split),
             _ => None,
         }
     }

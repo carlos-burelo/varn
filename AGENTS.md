@@ -382,3 +382,39 @@ Reglas de compilación y ejecución para el agente:
 7. Transparencia Total de Errores y Cero Hardcoding: Si un código estándar, sintaxis o comportamiento del lenguaje falla o produce un error en tiempo de compilación o runtime, NUNCA ocultarlo, maquillar el test ni aplicar workarounds silenciosos para fingir que funciona. DEBE reportarse inmediatamente al usuario detallando el error exacto, el opcode/fase afectada y la causa raíz para ser reparada en el compilador/VM.
 
 </hardware_and_compilation_profile>
+
+<type_system_governance_and_zero_magic_strings>
+
+Reglas de Gobernanza de Tipos y Prohibición de Magic Strings:
+
+1. PROHIBICIÓN ABSOLUTA DE ALIAS DE TIPOS:
+   Varn tiene nombres de tipos canónicos únicos y definitivos. NUNCA introducir ni aceptar aliases de cadena para tipos en ninguna parte del compilador, VM, runtime, checker, LSP ni stdlib:
+   - Cadena de texto: `str` (NUNCA `string`, NUNCA `String` salvo clase stdlib).
+   - Entero: `int` (NUNCA `integer`, NUNCA `i64`, NUNCA `number`).
+   - Flotante: `float` (NUNCA `f64`, NUNCA `double`, NUNCA `number`).
+   - Booleano: `bool` (NUNCA `boolean`).
+   - Carácter: `char` (NUNCA `character`).
+   Si el agente introduce un alias sin autorización explícita del usuario, es un error de arquitectura.
+
+2. PROHIBICIÓN ESTRICTA DE MAGIC STRINGS:
+   Queda terminantemente prohibido usar listas o patrones de cadenas de texto literales (ej. `matches!(name, "str" | "Array" | "Map" | "int" | ...)`) para clasificar, filtrar o excluir tipos o miembros en cualquier fase del pipeline (lexer, parser, checker, ssa/codegen, vm, runtime).
+   
+3. ÚNICA FUENTE DE VERDAD (SINGLE SOURCE OF TRUTH):
+   Todo tipo primitivo, intrínseco o miembro nativo con representación dedicada en la VM o el host DEBE estar formalmente catalogado en:
+   - `crates/varn-core/src/type_tag.rs` (`TypeTag`)
+   - `crates/varn-core/src/intrinsics.rs` (`IntrinsicType` para tipos, `MemberKey` para propiedades/métodos como `length`, `size`, `name`, `rawValue`, `next`, `push`, etc.)
+
+4. CONSULTAS SEMÁNTICAS EN LUGAR DE STRINGS:
+   - Para verificar si un nombre/tipo es un primitivo/intrínseco del lenguaje: consultar `varn_core::IntrinsicType::is_intrinsic(name)` o `type.is_primitive()`.
+   - Para verificar propiedades/métodos intrínsecos: comparar contra `varn_core::MemberKey::*.as_str()`.
+   - Para verificar si una entidad es una clase definida por el usuario con layout de campos fijos (`HeapObj::Object` con slots indexados): consultar `bind.is_user_class(name)`.
+   - Para verificar si una entidad de clase proviene de las cabeceras/builtins del runtime: consultar `class_info.is_builtin_or_intrinsic`.
+
+5. PROTOCOLO PARA AÑADIR NUEVOS TIPOS AL LENGUAJE:
+   Cuando se agregue un nuevo tipo nativo o primitivo al compilador/runtime:
+   a) Registrar la variante en `TypeTag` (`crates/varn-core/src/type_tag.rs`).
+   b) Registrar la constante y su mapeo en `IntrinsicType` (`crates/varn-core/src/intrinsics.rs`).
+   c) Si tiene representación heap dedicada en la VM, añadir la variante a `HeapObj` y sus manejadores de GC/marcado.
+   d) NUNCA añadir filtros ad-hoc de cadenas de texto en checkers, optimizadores o generadores de código.
+
+</type_system_governance_and_zero_magic_strings>

@@ -361,6 +361,15 @@ pub(crate) struct StrRegionCache {
     pub len: Variable,
 }
 
+/// What a loop region knows about one object receiver, resolved once in the
+/// region's preheader: the base pointer to its inline field values.
+#[derive(Clone, Copy)]
+pub(crate) struct ObjRegionCache {
+    /// Base address of inline fields (`objdata + values_off`); `0` means the
+    /// preheader rejected the receiver.
+    pub data_base: Variable,
+}
+
 /// One loop region and everything hoistable out of it.
 ///
 /// A struct rather than the 4-tuple this used to be: the fields are all
@@ -378,14 +387,11 @@ pub(crate) struct Region {
     /// Every char-indexing intrinsic in the region that can be served from a
     /// hoisted byte view, as `(ip of the intrinsic, register its receiver was
     /// copied from)`.
-    ///
-    /// The site list is what the lowering looks an access up by, so the rule
-    /// for "which register does this intrinsic read" is applied ONCE, where
-    /// the region is planned. The alternative — re-deriving it at the access
-    /// — is two copies of a bytecode-shape assumption that must agree.
     pub string_sites: Vec<(usize, usize)>,
     /// The distinct receivers of [`Self::string_sites`]: one cache each.
     pub strings: Vec<usize>,
+    /// Object receivers of fixed-field accesses that the region never redefines.
+    pub objects: Vec<usize>,
 }
 
 impl Region {
@@ -396,21 +402,27 @@ impl Region {
 
 /// Everything the loop regions hoisted, as one value.
 ///
-/// The regions and the two cache maps are only ever meaningful together — a
+/// The regions and the cache maps are only ever meaningful together — a
 /// cache is looked up BY the region that owns it — so they travel together
-/// rather than as three parallel parameters that a call site could pair up
+/// rather than as parallel parameters that a call site could pair up
 /// wrongly.
 #[derive(Clone, Copy)]
 pub(crate) struct LoopCaches<'a> {
     pub regions: &'a [Region],
     pub arrays: &'a HashMap<(usize, usize), RegionCache>,
     pub strings: &'a HashMap<(usize, usize), StrRegionCache>,
+    pub objects: &'a HashMap<(usize, usize), ObjRegionCache>,
 }
 
 impl LoopCaches<'_> {
     /// The array-payload cache `r` should use at `ip`.
     pub(super) fn array(&self, ip: usize, r: usize) -> Option<RegionCache> {
         self.find(ip, r, |reg| &reg.arrays, self.arrays)
+    }
+
+    /// The object-data cache `r` should use at `ip`.
+    pub(super) fn object(&self, ip: usize, r: usize) -> Option<ObjRegionCache> {
+        self.find(ip, r, |reg| &reg.objects, self.objects)
     }
 
     /// The hoisted byte view the char-indexing intrinsic AT `ip` reads from,
@@ -429,7 +441,7 @@ impl LoopCaches<'_> {
     }
 
     /// The cache belonging to the INNERMOST region that both contains `ip` and
-    /// hoisted `r`. One lookup rule for both kinds, so they cannot drift apart.
+    /// hoisted `r`. One lookup rule for all kinds, so they cannot drift apart.
     fn find<C: Copy>(
         &self,
         ip: usize,
@@ -659,4 +671,62 @@ pub(super) fn wrap_i48(
 ) -> cranelift_codegen::ir::Value {
     let s = b.ins().ishl_imm(v, 16);
     b.ins().sshr_imm(s, 16)
+}
+
+/// Resolve boxed object `obj` to its inline field base address (`objdata + values_off`),
+/// branching to `invalid` if it is not a valid nursery/old-gen object.
+pub(super) fn emit_object_data_base(
+    b: &mut FunctionBuilder,
+    exec_ctx: cranelift_codegen::ir::Value,
+    obj: cranelift_codegen::ir::Value,
+    olay: &crate::JitObjectLayout,
+    alay: &crate::JitArrayLayout,
+    heap_off: usize,
+    invalid: cranelift_codegen::ir::Block,
+) -> cranelift_codegen::ir::Value {
+    let m = MemFlags::trusted();
+
+    // 1. Heap-pointer tag check.
+    let tag = b.ins().band_imm(obj, HEAP_MASK);
+    let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_EXPECT);
+    let chk = b.create_block();
+    b.ins().brif(is_heap, chk, &[], invalid, &[]);
+    b.switch_to_block(chk);
+
+    // 2. Heap index + generation select → slot address.
+    let raw = b.ins().band_imm(obj, 0xFFFF_FFFF);
+    let rc = b.ins().load(types::I64, m, exec_ctx, heap_off as i32);
+    let old_bit = b.ins().band_imm(raw, 0x8000_0000);
+    let base_old = b.ins().load(
+        types::I64,
+        m,
+        rc,
+        (alay.slots_vec_off + alay.slots_ptr_off) as i32,
+    );
+    let base_nur = b.ins().load(
+        types::I64,
+        m,
+        rc,
+        (alay.nursery_slots_vec_off + alay.slots_ptr_off) as i32,
+    );
+    let idx_old = b.ins().band_imm(raw, 0x7FFF_FFFF);
+    let base = b.ins().select(old_bit, base_old, base_nur);
+    let idx = b.ins().select(old_bit, idx_old, raw);
+    let byte_off = b.ins().imul_imm(idx, alay.slot_size as i64);
+    let slot_addr = b.ins().iadd(base, byte_off);
+
+    // 3. Slot discriminant must be HeapObj::Object.
+    let tagb = b.ins().uload8(types::I64, m, slot_addr, 0);
+    let is_obj = b.ins().icmp_imm(IntCC::Equal, tagb, olay.object_tag as i64);
+    let ok = b.create_block();
+    b.ins().brif(is_obj, ok, &[], invalid, &[]);
+    b.switch_to_block(ok);
+
+    // 4. Load the object's ObjData pointer.
+    let objdata = b
+        .ins()
+        .load(types::I64, m, slot_addr, olay.payload_off as i32);
+
+    // 5. Compute the inline values base: objdata + values_off
+    b.ins().iadd_imm(objdata, olay.values_off as i64)
 }

@@ -3,10 +3,12 @@
     "hostApi": 3,
     "modules": [
         { "id": "std:buffer" },
+        { "id": "std:cli", "pure": true },
         { "id": "std:collections", "pure": true },
+        { "id": "std:compress" },
         { "id": "std:crypto" },
-        { "id": "std:dispose" },
-        { "id": "std:extensions" },
+        { "id": "std:csv", "pure": true },
+        { "id": "std:env", "pure": true },
         { "id": "std:ffi" },
         { "id": "std:fs" },
         { "id": "std:http" },
@@ -15,13 +17,16 @@
         { "id": "std:math", "pure": true },
         { "id": "std:net" },
         { "id": "std:path", "pure": true },
+        { "id": "std:process" },
         { "id": "std:reflect" },
+        { "id": "std:regex" },
         { "id": "std:result", "pure": true },
+        { "id": "std:sqlite" },
         { "id": "std:sys" },
         { "id": "std:task" },
         { "id": "std:test" },
-        { "id": "std:testing" },
         { "id": "std:time" },
-        { "id": "std:types", "pure": true }
+        { "id": "std:types", "pure": true },
+        { "id": "std:ws" }
     ]
 }

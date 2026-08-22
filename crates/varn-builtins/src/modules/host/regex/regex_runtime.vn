@@ -1,0 +1,8 @@
+// runtime:regex — low-level host regular expression operations.
+
+export declare function compile$(pattern: str, flags: str): int;
+export declare function test$(handle: int, text: str): bool;
+export declare function exec$(handle: int, text: str): dynamic;
+export declare function findAll$(handle: int, text: str): dynamic;
+export declare function replace$(handle: int, text: str, replacement: str): str;
+export declare function split$(handle: int, text: str): dynamic;

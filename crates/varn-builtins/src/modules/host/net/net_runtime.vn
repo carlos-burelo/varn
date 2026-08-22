@@ -14,3 +14,4 @@ export declare function tcpWrite$(connId: int, data: str): Task<int>;
 export declare function tcpClose$(connId: int): void;
 export declare function tcpCloseListener$(listenerId: int): void;
 export declare function parseHttpRequest$(raw: str): dynamic;
+export declare function sendHttpResponse$(connId: int, status: int, statusText: str, headers: dynamic, body: str): Task<int>;

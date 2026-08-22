@@ -1,0 +1,11 @@
+// runtime:compress — low-level host compression, decompression and archive operations.
+
+export declare function gzip$(data: str): int[];
+export declare function gunzip$(bytes: int[]): str;
+export declare function deflate$(data: str): int[];
+export declare function inflate$(bytes: int[]): str;
+
+export declare function tarCreate$(sourceDir: str, tarPath: str): bool;
+export declare function tarExtract$(tarPath: str, destDir: str): bool;
+export declare function zipCreate$(sourceDir: str, zipPath: str): bool;
+export declare function zipExtract$(zipPath: str, destDir: str): bool;

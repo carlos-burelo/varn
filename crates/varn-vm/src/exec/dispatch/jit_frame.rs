@@ -33,6 +33,61 @@ pub(super) enum JitFrameOutcome {
     Failed(RuntimeError),
 }
 
+impl JitFrameOutcome {
+    #[inline(always)]
+    pub(super) fn into_result(self) -> Option<VmResult<VmValue>> {
+        match self {
+            JitFrameOutcome::Continue => None,
+            JitFrameOutcome::Done(v) => Some(Ok(v)),
+            JitFrameOutcome::Failed(e) => Some(Err(e)),
+        }
+    }
+}
+
+/// Run one clif frame under its OWN jump buffer.
+#[inline(never)]
+unsafe fn execute_jit_frame(
+    ctx: *mut ExecCtx,
+    jit_fn: varn_jit::JitFn,
+    closure_ptr: *const VmClosure,
+    base: usize,
+) -> Result<VmValue, i32> {
+    let saved = (*ctx).jit_jmp_buf;
+    let is_outer = saved.is_null();
+    let mut jmp_buf = crate::exec::ctx::JmpBuf::default();
+    let jmp_res = std::hint::black_box(crate::exec::ctx::my_setjmp(&mut jmp_buf));
+
+    if jmp_res == 0 {
+        (*ctx).jit_jmp_buf = &mut jmp_buf as *mut crate::exec::ctx::JmpBuf;
+        if is_outer {
+            (*ctx).jit_suspend_buf = (*ctx).jit_jmp_buf;
+        }
+        (*ctx).jit_frame_prepushed = 1;
+        let required = base + (&(*closure_ptr).proto).register_count as usize;
+        if (*ctx).stack.len() < required {
+            (*ctx).stack.resize(required, VmValue::null());
+        }
+        let val = (jit_fn)(
+            (*ctx).stack.as_mut_ptr() as *mut std::ffi::c_void,
+            closure_ptr as *const std::ffi::c_void,
+            base,
+            ctx as *mut std::ffi::c_void,
+        );
+        std::hint::black_box(ctx);
+        (*ctx).jit_jmp_buf = saved;
+        if is_outer {
+            (*ctx).jit_suspend_buf = std::ptr::null_mut();
+        }
+        Ok(val)
+    } else {
+        (*ctx).jit_jmp_buf = saved;
+        if is_outer {
+            (*ctx).jit_suspend_buf = std::ptr::null_mut();
+        }
+        Err(jmp_res)
+    }
+}
+
 /// Enter `jit_fn` for the frame at `frame_idx` and reconcile whatever comes
 /// back.
 ///
@@ -42,9 +97,6 @@ pub(super) enum JitFrameOutcome {
 /// the top frame — the caller reads it back after the compiled code has had a
 /// chance to push and pop frames of its own.
 #[allow(clippy::too_many_arguments)]
-// Same suppression `run_until_inner_raw` carries, for the same reason: this
-// code reaches `ExecCtx` fields through `*ctx` throughout, and an autoref
-// there is exactly what it means to.
 #[allow(dangerous_implicit_autorefs)]
 pub(super) unsafe fn run_compiled_frame(
     ctx: *mut ExecCtx,
@@ -76,7 +128,7 @@ pub(super) unsafe fn run_compiled_frame(
     }
 
     let base = (*ctx).frames[frame_idx].base;
-    let res = ExecCtx::execute_jit_frame(ctx, jit_fn, closure_ptr, base);
+    let res = execute_jit_frame(ctx, jit_fn, closure_ptr, base);
 
     let res = match res {
         Ok(val) => val,
@@ -109,23 +161,35 @@ pub(super) unsafe fn run_compiled_frame(
             }
         }
     };
-    if (*ctx).settings.trace {
-        (*ctx).trace_event("JIT EXIT", frame_idx, closure, 0, None);
-    }
 
+    // A compiled frame that executed a non-tail call pushed caller frames
+    // beneath its own callee(s); the frame that just returned is the one
+    // at the top of the stack NOW, which is not necessarily `frame_idx` if
+    // a helper popped it itself. Read it live.
+    let returning_frame_idx = (*ctx).frames.len().saturating_sub(1);
     let frame = (*ctx).frames.pop().unwrap();
-    while (*ctx)
-        .try_handlers
-        .last()
-        .map(|h| h.frame_depth > (*ctx).frames.len())
-        .unwrap_or(false)
-    {
-        (*ctx).try_handlers.pop();
-    }
     (*ctx).close_upvalues_above(frame.base);
-    (*ctx).stack.truncate(frame.base);
+    let is_module_frame = frame.closure().proto.name.as_deref() == Some("<module>")
+        && !frame.closure().proto.chunk.source_file.is_empty();
 
-    let final_val = resolve_constructor_return(&mut *ctx, frame_idx, res);
+    if let Some(caller) = (*ctx).frames.last() {
+        let caller_req = caller.base + caller.closure().proto.register_count as usize;
+        if (*ctx).stack.len() < caller_req {
+            (*ctx).stack.resize(caller_req, VmValue::null());
+        } else {
+            (*ctx).stack.truncate(caller_req);
+        }
+    }
+
+    let final_val = resolve_constructor_return(&mut *ctx, returning_frame_idx, res);
+
+    if is_module_frame {
+        let source_file = frame.closure().proto.chunk.source_file.to_string();
+        let module_exports = (*ctx).module_exports.remove(&returning_frame_idx);
+        let cached = module_exports.unwrap_or(final_val);
+        let module_id = varn_core::ModuleId::from_canonical_str(&source_file);
+        (*ctx).modules.insert(module_id, cached);
+    }
 
     if let Some(return_reg) = frame.return_reg {
         let caller_base = (*ctx).frames.last().map(|f| f.base).unwrap_or(0);
@@ -133,20 +197,8 @@ pub(super) unsafe fn run_compiled_frame(
     }
 
     if (*ctx).frames.len() == depth {
-        return JitFrameOutcome::Done(final_val);
-    }
-    JitFrameOutcome::Continue
-}
-
-/// Convenience for the caller: turn an outcome into the loop's own control
-/// flow is not possible across a function boundary, so this is only the
-/// `VmResult` half of it.
-impl JitFrameOutcome {
-    pub(super) fn into_result(self) -> Option<VmResult<VmValue>> {
-        match self {
-            JitFrameOutcome::Continue => None,
-            JitFrameOutcome::Done(v) => Some(Ok(v)),
-            JitFrameOutcome::Failed(e) => Some(Err(e)),
-        }
+        JitFrameOutcome::Done(final_val)
+    } else {
+        JitFrameOutcome::Continue
     }
 }

@@ -1,4 +1,4 @@
-// expect: error[Varn4107]
+// expect: error[VN4107]
 abstract class Shape {
     abstract area(): float
 }

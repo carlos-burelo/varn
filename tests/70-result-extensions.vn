@@ -1,15 +1,15 @@
 // Test suite for std:result ADTs (Result, Option) and std:extensions
 
 import { Result, Option, Ok, Err, Some, None, isOk, isErr, unwrap, unwrapOr, isSome, isNone } from "std:result";
-import { sha256$, base64Enc$ } from "runtime:crypto";
+import { sha256, base64Enc } from "std:crypto";
 
 extension StringExtensions on str {
     sha256(): str {
-        return sha256$(this);
+        return sha256(this);
     }
 
     toBase64(): str {
-        return base64Enc$(this);
+        return base64Enc(this);
     }
 }
 

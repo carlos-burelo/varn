@@ -235,6 +235,16 @@ impl super::Binder {
                     }
                 }
             }
+            ExprKind::With { object, properties } => {
+                self.bind_expr(object);
+                for prop in properties {
+                    match prop {
+                        ObjectProp::Property { value, .. } => self.bind_expr(value),
+                        ObjectProp::Spread { argument, .. } => self.bind_expr(argument),
+                        _ => {}
+                    }
+                }
+            }
             ExprKind::Template { parts } => {
                 for p in parts {
                     if let TemplatePart::Interpolation(e) = p {
@@ -457,8 +467,10 @@ impl super::Binder {
                 self.escape_array_candidate(name);
             }
             self.bind_expr(property);
-        } else if !matches!(&property.kind, ExprKind::Identifier { name: p } if p.as_ref() == "length")
-        {
+        } else if !matches!(
+            &property.kind,
+            ExprKind::Identifier { name: p } if p.as_ref() == varn_core::MemberKey::Length.as_str()
+        ) {
             self.escape_array_candidate(name);
         }
         true
@@ -611,7 +623,7 @@ fn bind_match_pattern_vars(b: &mut super::Binder, pattern: &MatchPattern) {
         }
         MatchPattern::Record { fields, .. } => {
             let variant_name = fields.first().and_then(|(key, sub)| {
-                if key.as_ref() == "__variant__" {
+                if key.as_ref() == varn_core::MemberKey::Variant.as_str() {
                     if let Some(MatchPattern::Identifier(n)) = sub {
                         return Some(n.clone());
                     }

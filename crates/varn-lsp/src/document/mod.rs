@@ -28,6 +28,7 @@ pub struct LspDiag {
     pub end_line: u32,
     pub end_col: u32,
     pub severity: u8,
+    pub code: Option<varn_core::ErrorCode>,
     pub related: Vec<RelatedLocation>,
     pub suggestions: Vec<varn_core::Suggestion>,
 }

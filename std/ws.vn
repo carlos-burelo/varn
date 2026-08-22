@@ -1,0 +1,38 @@
+import {
+    wsConnect$,
+    wsSend$,
+    wsRead$,
+    wsClose$
+} from "runtime:ws";
+
+export class WebSocketClient {
+    private _id: int = -1;
+    private _isOpen: bool = false;
+
+    constructor(url: str) {
+        this._id = wsConnect$(url);
+        this._isOpen = this._id >= 0;
+    }
+
+    get isOpen(): bool {
+        return this._isOpen;
+    }
+
+    send(message: str): bool {
+        if (!this._isOpen) return false;
+        return wsSend$(this._id, message);
+    }
+
+    receive(): str? {
+        if (!this._isOpen) return null;
+        return wsRead$(this._id);
+    }
+
+    close(): void {
+        if (this._isOpen) {
+            wsClose$(this._id);
+            this._isOpen = false;
+            this._id = -1;
+        }
+    }
+}

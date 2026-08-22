@@ -146,10 +146,14 @@ impl Checker {
                 type_args: _,
                 payload_ty,
             } => {
-                if key == "name" || key == "__variant_name__" {
+                if key == varn_core::MemberKey::Name.as_str()
+                    || key == varn_core::MemberKey::VariantName.as_str()
+                {
                     return Some((Type::Str, None));
                 }
-                if key == "__tag" || key == "rawValue" {
+                if key == varn_core::MemberKey::Tag.as_str()
+                    || key == varn_core::MemberKey::RawValue.as_str()
+                {
                     return Some((Type::Int, None));
                 }
                 if let Some(res) = self.find_member_info_uncached(payload_ty, key, bind) {
@@ -184,7 +188,9 @@ impl Checker {
                     return None;
                 }
 
-                if name.as_ref() == varn_core::IntrinsicType::Str.as_str() && key == "length" {
+                if name.as_ref() == varn_core::IntrinsicType::Str.as_str()
+                    && key == varn_core::MemberKey::Length.as_str()
+                {
                     return Some((Type::Int, None));
                 }
 
@@ -201,10 +207,14 @@ impl Checker {
                         });
 
                 if is_enum {
-                    if key == "rawValue" || key == "__tag" {
+                    if key == varn_core::MemberKey::RawValue.as_str()
+                        || key == varn_core::MemberKey::Tag.as_str()
+                    {
                         return Some((Type::Int, None));
                     }
-                    if key == "name" || key == "__variant_name__" {
+                    if key == varn_core::MemberKey::Name.as_str()
+                        || key == varn_core::MemberKey::VariantName.as_str()
+                    {
                         return Some((Type::Str, None));
                     }
 
@@ -396,7 +406,7 @@ impl Checker {
                 self.find_member_info_uncached(&array_ty, key, bind)
             }
             TypeKind::Intrinsic(varn_core::TypeTag::Str) => {
-                if key == "length" {
+                if key == varn_core::MemberKey::Length.as_str() {
                     Some((Type::Int, None))
                 } else {
                     intrinsic_member_info(bind, varn_core::IntrinsicType::Str.as_str(), key)
@@ -410,7 +420,9 @@ impl Checker {
             // actually looked at. It went unnoticed because imported modules
             // had their diagnostics discarded, and `tests/69-tuples-records.vn`
             // is only ever reached through an import.
-            TypeKind::Tuple(_) if key == "length" => Some((Type::Int, None)),
+            TypeKind::Tuple(_) if key == varn_core::MemberKey::Length.as_str() => {
+                Some((Type::Int, None))
+            }
             TypeKind::Intrinsic(tag) => {
                 if let Some(info) = intrinsic_member_info(bind, tag.name(), key) {
                     Some(info)
@@ -453,7 +465,7 @@ impl Checker {
                 type_args: _,
                 payload_ty,
             } => {
-                if key == "name" {
+                if key == varn_core::MemberKey::Name.as_str() {
                     return Some(ObjectTypeMember::Property {
                         name: Rc::from(key),
                         ty: Type::Str,
@@ -461,7 +473,7 @@ impl Checker {
                         readonly: true,
                     });
                 }
-                if key == "__tag" {
+                if key == varn_core::MemberKey::Tag.as_str() {
                     return Some(ObjectTypeMember::Property {
                         name: Rc::from(key),
                         ty: Type::Int,

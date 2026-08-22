@@ -17,6 +17,12 @@ runtime = [
     "dep:libloading",
     "dep:mio",
     "dep:httparse",
+    "dep:regex",
+    "dep:flate2",
+    "dep:rusqlite",
+    "dep:tar",
+    "dep:zip",
+    "dep:tungstenite",
 ]
 
 [dependencies]
@@ -33,15 +39,22 @@ serde_json   = { workspace = true }
 rand         = { version = "0.8", optional = true }
 sha2         = { workspace = true, optional = true }
 hmac         = { version = "0.12", optional = true }
-uuid         = { version = "1", features = ["v4"], optional = true }
+uuid         = { version = "1", features = ["v4", "v7"], optional = true }
 base64       = { version = "0.21", optional = true }
 hex          = { workspace = true, optional = true }
 urlencoding  = { version = "2", optional = true }
 chrono       = { version = "0.4", optional = true }
+regex        = { workspace = true, optional = true }
+flate2       = { workspace = true, optional = true }
+rusqlite     = { workspace = true, optional = true }
+tar          = { workspace = true, optional = true }
+zip          = { workspace = true, optional = true }
+tungstenite  = { workspace = true, optional = true }
 libloading   = { version = "0.8", optional = true }
 mio          = { workspace = true, optional = true }
 httparse     = { workspace = true, optional = true }
 rustc-hash   = { workspace = true }
+parking_lot  = { workspace = true }
 
 [lints]
 workspace = true

@@ -1,4 +1,4 @@
-import { parse, stringify } from "std:json";
+import { JSON } from "std:json";
 
 let items = [];
 for (let i = 0; i < 50000; i = i + 1) {
@@ -10,8 +10,8 @@ for (let i = 0; i < 50000; i = i + 1) {
     });
 }
 
-let jsonStr = stringify(items);
+let jsonStr = JSON.stringify(items);
 print("Stringify done, len: " + jsonStr.length);
 
-let parsed = parse(jsonStr) as dynamic[];
+let parsed = JSON.parse(jsonStr) as dynamic[];
 print("Parse done, len: " + parsed.length);

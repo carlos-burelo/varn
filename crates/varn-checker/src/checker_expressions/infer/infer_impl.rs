@@ -92,6 +92,15 @@ impl Checker {
                 }
             }
             ExprKind::Call { .. } => self.infer_call_type(expr, bind),
+            ExprKind::TaggedTemplate { tag, .. } => {
+                let tag_ty = self.infer_type(tag, bind).non_nullified();
+                if let TypeKind::Fn(ft) = &tag_ty.0 {
+                    ft.return_type.as_ref().clone()
+                } else {
+                    Type::Dynamic
+                }
+            }
+            ExprKind::With { object, .. } => self.infer_type(object, bind),
             ExprKind::Conditional {
                 consequent,
                 alternate,
@@ -358,6 +367,9 @@ impl Checker {
         bind: &BindResult,
     ) -> Type {
         let obj_ty = self.infer_type(object, bind);
+        if matches!(property.kind, varn_core::ast::ExprKind::Range { .. }) {
+            return obj_ty;
+        }
         let prop_ty = self.infer_type(property, bind);
         match &obj_ty.0 {
             TypeKind::Array(inner) if matches!(prop_ty.0, TypeKind::Intrinsic(TypeTag::Int)) => {

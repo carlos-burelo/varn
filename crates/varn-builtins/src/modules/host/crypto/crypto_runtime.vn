@@ -3,6 +3,9 @@
 export declare function sha256$(data: str): str;
 export declare function sha512$(data: str): str;
 export declare function uuid$(): str;
+export declare function uuidV4$(): str;
+export declare function uuidV7$(): str;
+export declare function uuidValidate$(s: str): bool;
 export declare function randomBytes$(size: int): int[];
 export declare function randomHex$(size: int): str;
 export declare function base64Enc$(data: str): str;

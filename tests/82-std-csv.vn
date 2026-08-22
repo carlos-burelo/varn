@@ -1,0 +1,85 @@
+import { CSV } from "std:csv";
+import { JSON } from "std:json";
+import { assert, assertEqual } from "std:test";
+
+// 1. Basic CSV parsing with header and automatic type coercion via CSV.parse
+let csvBasic = "id,name,age,active,score\n1,Alice,30,true,95.5\n2,Bob,25,false,88.0\n3,Charlie,35,true,99.25";
+let users = CSV.parse(csvBasic);
+
+assertEqual(users.length, 3);
+assertEqual(users[0].id, 1);
+assertEqual(users[0].name, "Alice");
+assertEqual(users[0].age, 30);
+assertEqual(users[0].active, true);
+assertEqual(users[0].score, 95.5);
+
+assertEqual(users[1].id, 2);
+assertEqual(users[1].name, "Bob");
+assertEqual(users[1].active, false);
+
+// 2. Custom delimiter parsing (semicolon)
+let csvSemi = "id;product;price;inStock\n101;Mechanical Keyboard;129.99;true\n102;Wireless Mouse;49.50;false";
+let products = CSV.parse(csvSemi, { delimiter: ";" });
+
+assertEqual(products.length, 2);
+assertEqual(products[0].id, 101);
+assertEqual(products[0].product, "Mechanical Keyboard");
+assertEqual(products[0].price, 129.99);
+assertEqual(products[0].inStock, true);
+
+assertEqual(products[1].id, 102);
+assertEqual(products[1].product, "Wireless Mouse");
+assertEqual(products[1].price, 49.50);
+assertEqual(products[1].inStock, false);
+
+// 3. RFC 4180 Escaped quotes, commas inside quotes, and newlines inside quotes
+let csvQuotes = "id,title,description\n1,\"Special, Item\",\"Item with \"\"double quotes\"\" inside\"\n2,\"Multi-line\nItem\",\"Second line content\"";
+let items = CSV.parse(csvQuotes);
+
+assertEqual(items.length, 2);
+assertEqual(items[0].id, 1);
+assertEqual(items[0].title, "Special, Item");
+assertEqual(items[0].description, "Item with \"double quotes\" inside");
+
+assertEqual(items[1].id, 2);
+assertEqual(items[1].title, "Multi-line\nItem");
+assertEqual(items[1].description, "Second line content");
+
+// 4. Raw Matrix Parsing (hasHeader = false)
+let csvMatrix = "10,20,30\n40,50,60\n70,80,90";
+let matrix = CSV.parse(csvMatrix, { hasHeader: false });
+
+assertEqual(matrix.length, 3);
+assertEqual(matrix[0][0], 10);
+assertEqual(matrix[0][1], 20);
+assertEqual(matrix[0][2], 30);
+assertEqual(matrix[1][0], 40);
+assertEqual(matrix[2][2], 90);
+
+// 5. Stringify Objects to CSV
+let serialized = CSV.stringify(users);
+assert(serialized.startsWith("id,name,age,active,score\n"));
+assert(serialized.includes("1,Alice,30,true,95.5"));
+assert(serialized.includes("2,Bob,25,false,88"));
+
+// 6. Roundtrip Serialization / Deserialization
+let roundtrip = CSV.parse(serialized);
+assertEqual(roundtrip.length, 3);
+assertEqual(roundtrip[0].id, 1);
+assertEqual(roundtrip[0].name, "Alice");
+assertEqual(roundtrip[2].id, 3);
+assertEqual(roundtrip[2].score, 99.25);
+
+// 7. Stringify Raw Rows (Arrays of Arrays)
+let serializedMatrix = CSV.stringify(matrix);
+let roundtripMatrix = CSV.parse(serializedMatrix, { hasHeader: false });
+assertEqual(roundtripMatrix.length, 3);
+assertEqual(roundtripMatrix[1][1], 50);
+
+// 8. JSON Namespace validation (JSON.parse, JSON.stringify)
+let jsonObj = JSON.parse("{\"message\": \"hello\", \"status\": 200}");
+assertEqual((jsonObj as dynamic).status, 200);
+let jsonStr = JSON.stringify(jsonObj);
+assert(jsonStr.includes("\"status\":200"));
+
+print("[PASSED] 82. Canonical std:csv & std:json Namespaces (RFC 4180 parsing, types, custom delimiters & stringification)");

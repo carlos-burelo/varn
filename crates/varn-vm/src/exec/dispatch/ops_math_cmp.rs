@@ -1,5 +1,7 @@
 use crate::closure::VmClosure;
 use crate::error::VmResult;
+use crate::exec::arith;
+use crate::exec::compare;
 use crate::exec::ctx::ExecCtx;
 use crate::value::VmValue;
 use varn_core::OpCode;
@@ -18,39 +20,78 @@ impl ExecCtx {
         _closure: &VmClosure,
         first_reg: usize,
     ) -> VmResult<bool> {
+        let read_binary_operands = |code: &[u16], ip: &mut usize, stack: &[VmValue]| -> (VmValue, VmValue) {
+            let w1 = code[*ip];
+            *ip += 1;
+            (stack[base + hi(w1)], stack[base + lo(w1)])
+        };
+
         match op {
-            OpCode::Add
-            | OpCode::Sub
-            | OpCode::Mul
-            | OpCode::Div
-            | OpCode::Mod
-            | OpCode::Pow
-            | OpCode::BitAnd
-            | OpCode::BitOr
-            | OpCode::BitXor
-            | OpCode::Shl
-            | OpCode::Shr
-            | OpCode::Ushr => {
-                let w1 = code[*ip];
-                *ip += 1;
-                let (src1, src2) = (hi(w1), lo(w1));
-                let a = self.stack[base + src1];
-                let b = self.stack[base + src2];
-                let r = self.exec_arith(op, a, b)?;
-                self.stack[base + first_reg] = r;
+            // Generic arithmetic
+            OpCode::Add => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = arith::add(a, b, &mut self.heap);
             }
+            OpCode::Sub => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = arith::sub(a, b, &mut self.heap);
+            }
+            OpCode::Mul => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = arith::mul(a, b, &mut self.heap);
+            }
+            OpCode::Div => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = arith::div(a, b, &mut self.heap)?;
+            }
+            OpCode::Mod => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = arith::modulo(a, b, &mut self.heap)?;
+            }
+            OpCode::Pow => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = arith::pow(a, b, &mut self.heap)?;
+            }
+            OpCode::BitAnd => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = arith::bit_and(a, b, &mut self.heap);
+            }
+            OpCode::BitOr => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = arith::bit_or(a, b, &mut self.heap);
+            }
+            OpCode::BitXor => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = arith::bit_xor(a, b, &mut self.heap);
+            }
+            OpCode::Shl => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = arith::shl(a, b, &mut self.heap);
+            }
+            OpCode::Shr => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = arith::shr(a, b, &mut self.heap);
+            }
+            OpCode::Ushr => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = arith::ushr(a, b, &mut self.heap);
+            }
+
+            // Unary operators
             OpCode::Negate => {
                 let src = hi(code[*ip]);
                 *ip += 1;
                 let v = self.stack[base + src];
-                self.stack[base + first_reg] = crate::exec::arith::negate(v, &mut self.heap);
+                self.stack[base + first_reg] = arith::negate(v, &mut self.heap);
             }
             OpCode::Not => {
                 let src = hi(code[*ip]);
                 *ip += 1;
                 let v = self.stack[base + src];
-                self.stack[base + first_reg] = crate::exec::compare::logical_not(v);
+                self.stack[base + first_reg] = compare::logical_not(v);
             }
+
+            // Immediate arithmetic
             OpCode::AddImm => {
                 let w1 = code[*ip];
                 *ip += 1;
@@ -58,16 +99,16 @@ impl ExecCtx {
                 let imm = lo(w1) as i8 as i64;
                 let v = self.stack[base + src];
                 if self.heap.is_int(v) {
-                    let (r, overflow) = self.heap.as_int(v).overflowing_add(imm);
+                    let a_val = self.heap.as_int(v);
+                    let (r, overflow) = a_val.overflowing_add(imm);
                     self.stack[base + first_reg] = if overflow {
-                        VmValue::from_f64(self.heap.as_int(v) as f64 + imm as f64)
+                        VmValue::from_f64(a_val as f64 + imm as f64)
                     } else {
                         self.heap.make_int(r)
                     };
                 } else {
                     let imm_v = self.heap.make_int(imm);
-                    self.stack[base + first_reg] =
-                        crate::exec::arith::add(v, imm_v, &mut self.heap);
+                    self.stack[base + first_reg] = arith::add(v, imm_v, &mut self.heap);
                 }
             }
             OpCode::SubImm => {
@@ -77,215 +118,302 @@ impl ExecCtx {
                 let imm = lo(w1) as i8 as i64;
                 let v = self.stack[base + src];
                 if self.heap.is_int(v) {
-                    let (r, overflow) = self.heap.as_int(v).overflowing_sub(imm);
+                    let a_val = self.heap.as_int(v);
+                    let (r, overflow) = a_val.overflowing_sub(imm);
                     self.stack[base + first_reg] = if overflow {
-                        VmValue::from_f64(self.heap.as_int(v) as f64 - imm as f64)
+                        VmValue::from_f64(a_val as f64 - imm as f64)
                     } else {
                         self.heap.make_int(r)
                     };
                 } else {
                     let imm_v = self.heap.make_int(imm);
-                    self.stack[base + first_reg] =
-                        crate::exec::arith::sub(v, imm_v, &mut self.heap);
+                    self.stack[base + first_reg] = arith::sub(v, imm_v, &mut self.heap);
                 }
             }
-            OpCode::AddInt
-            | OpCode::SubInt
-            | OpCode::MulInt
-            | OpCode::DivInt
-            | OpCode::ModInt
-            | OpCode::PowInt => {
-                let w1 = code[*ip];
-                *ip += 1;
-                let (src1, src2) = (hi(w1), lo(w1));
-                let a = self.stack[base + src1];
-                let b = self.stack[base + src2];
-                let res = if self.heap.is_int(a) && self.heap.is_int(b) {
+
+            // Integer-specialized arithmetic
+            OpCode::AddInt => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
                     let a_val = self.heap.as_int(a);
                     let b_val = self.heap.as_int(b);
-                    match op {
-                        OpCode::AddInt => self.heap.make_int(a_val.wrapping_add(b_val)),
-                        OpCode::SubInt => self.heap.make_int(a_val.wrapping_sub(b_val)),
-                        OpCode::MulInt => self.heap.make_int(a_val.wrapping_mul(b_val)),
-                        OpCode::DivInt => {
-                            if b_val == 0 {
-                                return Err(crate::error::RuntimeError::new("division by zero"));
-                            }
-                            VmValue::from_f64(a_val as f64 / b_val as f64)
-                        }
-                        OpCode::ModInt => {
-                            if b_val == 0 {
-                                return Err(crate::error::RuntimeError::new("modulo by zero"));
-                            }
-                            self.heap.make_int(a_val % b_val)
-                        }
-                        OpCode::PowInt => {
-                            if b_val < 0 {
-                                return Err(crate::error::RuntimeError::new(
-                                    "negative exponent in integer power",
-                                ));
-                            }
-                            let e = u32::try_from(b_val).unwrap_or(u32::MAX);
-                            self.heap.make_int(a_val.wrapping_pow(e))
-                        }
-                        _ => unreachable!("{op:?} reached the int-arith body; the enclosing arm matches only Add/Sub/Mul/Div/Mod/PowInt"),
-                    }
+                    self.heap.make_int(a_val.wrapping_add(b_val))
                 } else {
-                    let generic_op = match op {
-                        OpCode::AddInt => OpCode::Add,
-                        OpCode::SubInt => OpCode::Sub,
-                        OpCode::MulInt => OpCode::Mul,
-                        OpCode::DivInt => OpCode::Div,
-                        OpCode::ModInt => OpCode::Mod,
-                        OpCode::PowInt => OpCode::Pow,
-                        _ => unreachable!("{op:?} has no generic int-arith counterpart; the enclosing arm matches only Add/Sub/Mul/Div/Mod/PowInt"),
-                    };
-                    self.exec_arith(generic_op, a, b)?
+                    arith::add(a, b, &mut self.heap)
                 };
-                self.stack[base + first_reg] = res;
             }
-            OpCode::LtInt
-            | OpCode::GtInt
-            | OpCode::LteInt
-            | OpCode::GteInt
-            | OpCode::EqInt
-            | OpCode::NeqInt => {
-                let w1 = code[*ip];
-                *ip += 1;
-                let (src1, src2) = (hi(w1), lo(w1));
-                let a = self.stack[base + src1];
-                let b = self.stack[base + src2];
-                let res = if self.heap.is_int(a) && self.heap.is_int(b) {
+            OpCode::SubInt => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
                     let a_val = self.heap.as_int(a);
                     let b_val = self.heap.as_int(b);
-                    let cmp_res = match op {
-                        OpCode::LtInt => a_val < b_val,
-                        OpCode::GtInt => a_val > b_val,
-                        OpCode::LteInt => a_val <= b_val,
-                        OpCode::GteInt => a_val >= b_val,
-                        OpCode::EqInt => a_val == b_val,
-                        OpCode::NeqInt => a_val != b_val,
-                        _ => unreachable!("{op:?} reached the int-compare body; the enclosing arm matches only Lt/Gt/Lte/Gte/Eq/NeqInt"),
-                    };
-                    VmValue::from_bool(cmp_res)
+                    self.heap.make_int(a_val.wrapping_sub(b_val))
                 } else {
-                    let generic_op = match op {
-                        OpCode::LtInt => OpCode::Lt,
-                        OpCode::GtInt => OpCode::Gt,
-                        OpCode::LteInt => OpCode::Lte,
-                        OpCode::GteInt => OpCode::Gte,
-                        OpCode::EqInt => OpCode::Eq,
-                        OpCode::NeqInt => OpCode::Neq,
-                        _ => unreachable!("{op:?} has no generic int-compare counterpart; the enclosing arm matches only Lt/Gt/Lte/Gte/Eq/NeqInt"),
-                    };
-                    self.exec_cmp(generic_op, a, b)
+                    arith::sub(a, b, &mut self.heap)
                 };
-                self.stack[base + first_reg] = res;
             }
-            OpCode::AddFloat
-            | OpCode::SubFloat
-            | OpCode::MulFloat
-            | OpCode::DivFloat
-            | OpCode::ModFloat
-            | OpCode::PowFloat => {
-                let w1 = code[*ip];
-                *ip += 1;
-                let (src1, src2) = (hi(w1), lo(w1));
-                let a = self.stack[base + src1];
-                let b = self.stack[base + src2];
-                let res = if (a.is_f64() || self.heap.is_int(a))
-                    && (b.is_f64() || self.heap.is_int(b))
-                {
-                    match op {
-                        OpCode::AddFloat => {
-                            VmValue::from_f64(self.heap.to_f64_val(a) + self.heap.to_f64_val(b))
-                        }
-                        OpCode::SubFloat => {
-                            VmValue::from_f64(self.heap.to_f64_val(a) - self.heap.to_f64_val(b))
-                        }
-                        OpCode::MulFloat => {
-                            VmValue::from_f64(self.heap.to_f64_val(a) * self.heap.to_f64_val(b))
-                        }
-                        OpCode::DivFloat => {
-                            let bv = self.heap.to_f64_val(b);
-                            if bv == 0.0 {
-                                return Err(crate::error::RuntimeError::new("division by zero"));
-                            }
-                            VmValue::from_f64(self.heap.to_f64_val(a) / bv)
-                        }
-                        OpCode::ModFloat => {
-                            let bv = self.heap.to_f64_val(b);
-                            if bv == 0.0 {
-                                return Err(crate::error::RuntimeError::new("modulo by zero"));
-                            }
-                            VmValue::from_f64(self.heap.to_f64_val(a) % bv)
-                        }
-                        OpCode::PowFloat => {
-                            VmValue::from_f64(self.heap.to_f64_val(a).powf(self.heap.to_f64_val(b)))
-                        }
-                        _ => unreachable!("{op:?} reached the float-arith body; the enclosing arm matches only Add/Sub/Mul/Div/Mod/PowFloat"),
+            OpCode::MulInt => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
+                    let a_val = self.heap.as_int(a);
+                    let b_val = self.heap.as_int(b);
+                    self.heap.make_int(a_val.wrapping_mul(b_val))
+                } else {
+                    arith::mul(a, b, &mut self.heap)
+                };
+            }
+            OpCode::DivInt => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
+                    let a_val = self.heap.as_int(a);
+                    let b_val = self.heap.as_int(b);
+                    if b_val == 0 {
+                        return Err(crate::error::RuntimeError::new("division by zero"));
                     }
+                    VmValue::from_f64(a_val as f64 / b_val as f64)
                 } else {
-                    let generic_op = match op {
-                        OpCode::AddFloat => OpCode::Add,
-                        OpCode::SubFloat => OpCode::Sub,
-                        OpCode::MulFloat => OpCode::Mul,
-                        OpCode::DivFloat => OpCode::Div,
-                        OpCode::ModFloat => OpCode::Mod,
-                        OpCode::PowFloat => OpCode::Pow,
-                        _ => unreachable!("{op:?} has no generic float-arith counterpart; the enclosing arm matches only Add/Sub/Mul/Div/Mod/PowFloat"),
-                    };
-                    self.exec_arith(generic_op, a, b)?
+                    arith::div(a, b, &mut self.heap)?
                 };
-                self.stack[base + first_reg] = res;
             }
-            OpCode::LtFloat
-            | OpCode::GtFloat
-            | OpCode::LteFloat
-            | OpCode::GteFloat
-            | OpCode::EqFloat
-            | OpCode::NeqFloat => {
-                let w1 = code[*ip];
-                *ip += 1;
-                let (src1, src2) = (hi(w1), lo(w1));
-                let a = self.stack[base + src1];
-                let b = self.stack[base + src2];
-                let res = if (a.is_f64() || self.heap.is_int(a))
+            OpCode::ModInt => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
+                    let a_val = self.heap.as_int(a);
+                    let b_val = self.heap.as_int(b);
+                    if b_val == 0 {
+                        return Err(crate::error::RuntimeError::new("modulo by zero"));
+                    }
+                    self.heap.make_int(a_val % b_val)
+                } else {
+                    arith::modulo(a, b, &mut self.heap)?
+                };
+            }
+            OpCode::PowInt => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
+                    let a_val = self.heap.as_int(a);
+                    let b_val = self.heap.as_int(b);
+                    if b_val < 0 {
+                        return Err(crate::error::RuntimeError::new(
+                            "negative exponent in integer power",
+                        ));
+                    }
+                    let e = u32::try_from(b_val).unwrap_or(u32::MAX);
+                    self.heap.make_int(a_val.wrapping_pow(e))
+                } else {
+                    arith::pow(a, b, &mut self.heap)?
+                };
+            }
+
+            // Integer comparisons
+            OpCode::LtInt => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(if self.heap.is_int(a) && self.heap.is_int(b) {
+                    self.heap.as_int(a) < self.heap.as_int(b)
+                } else {
+                    compare::lt_heap(a, b, &self.heap)
+                });
+            }
+            OpCode::GtInt => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(if self.heap.is_int(a) && self.heap.is_int(b) {
+                    self.heap.as_int(a) > self.heap.as_int(b)
+                } else {
+                    compare::gt_heap(a, b, &self.heap)
+                });
+            }
+            OpCode::LteInt => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(if self.heap.is_int(a) && self.heap.is_int(b) {
+                    self.heap.as_int(a) <= self.heap.as_int(b)
+                } else {
+                    compare::lte_heap(a, b, &self.heap)
+                });
+            }
+            OpCode::GteInt => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(if self.heap.is_int(a) && self.heap.is_int(b) {
+                    self.heap.as_int(a) >= self.heap.as_int(b)
+                } else {
+                    compare::gte_heap(a, b, &self.heap)
+                });
+            }
+            OpCode::EqInt => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(if self.heap.is_int(a) && self.heap.is_int(b) {
+                    self.heap.as_int(a) == self.heap.as_int(b)
+                } else {
+                    compare::eq(a, b, &self.heap)
+                });
+            }
+            OpCode::NeqInt => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(if self.heap.is_int(a) && self.heap.is_int(b) {
+                    self.heap.as_int(a) != self.heap.as_int(b)
+                } else {
+                    compare::neq(a, b, &self.heap)
+                });
+            }
+
+            // Float-specialized arithmetic
+            OpCode::AddFloat => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = if (a.is_f64() || self.heap.is_int(a))
                     && (b.is_f64() || self.heap.is_int(b))
                 {
-                    let cmp_res = match op {
-                            OpCode::LtFloat => self.heap.to_f64_val(a) < self.heap.to_f64_val(b),
-                            OpCode::GtFloat => self.heap.to_f64_val(a) > self.heap.to_f64_val(b),
-                            OpCode::LteFloat => self.heap.to_f64_val(a) <= self.heap.to_f64_val(b),
-                            OpCode::GteFloat => self.heap.to_f64_val(a) >= self.heap.to_f64_val(b),
-                            OpCode::EqFloat => self.heap.to_f64_val(a) == self.heap.to_f64_val(b),
-                            OpCode::NeqFloat => self.heap.to_f64_val(a) != self.heap.to_f64_val(b),
-                            _ => unreachable!("{op:?} reached the float-compare body; the enclosing arm matches only Lt/Gt/Lte/Gte/Eq/NeqFloat"),
-                        };
-                    VmValue::from_bool(cmp_res)
+                    VmValue::from_f64(self.heap.to_f64_val(a) + self.heap.to_f64_val(b))
                 } else {
-                    let generic_op = match op {
-                            OpCode::LtFloat => OpCode::Lt,
-                            OpCode::GtFloat => OpCode::Gt,
-                            OpCode::LteFloat => OpCode::Lte,
-                            OpCode::GteFloat => OpCode::Gte,
-                            OpCode::EqFloat => OpCode::Eq,
-                            OpCode::NeqFloat => OpCode::Neq,
-                            _ => unreachable!("{op:?} has no generic float-compare counterpart; the enclosing arm matches only Lt/Gt/Lte/Gte/Eq/NeqFloat"),
-                        };
-                    self.exec_cmp(generic_op, a, b)
+                    arith::add(a, b, &mut self.heap)
                 };
-                self.stack[base + first_reg] = res;
             }
-            OpCode::Eq | OpCode::Neq | OpCode::Lt | OpCode::Lte | OpCode::Gt | OpCode::Gte => {
-                let w1 = code[*ip];
-                *ip += 1;
-                let (src1, src2) = (hi(w1), lo(w1));
-                let a = self.stack[base + src1];
-                let b = self.stack[base + src2];
-                let r = self.exec_cmp(op, a, b);
-                self.stack[base + first_reg] = r;
+            OpCode::SubFloat => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = if (a.is_f64() || self.heap.is_int(a))
+                    && (b.is_f64() || self.heap.is_int(b))
+                {
+                    VmValue::from_f64(self.heap.to_f64_val(a) - self.heap.to_f64_val(b))
+                } else {
+                    arith::sub(a, b, &mut self.heap)
+                };
             }
+            OpCode::MulFloat => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = if (a.is_f64() || self.heap.is_int(a))
+                    && (b.is_f64() || self.heap.is_int(b))
+                {
+                    VmValue::from_f64(self.heap.to_f64_val(a) * self.heap.to_f64_val(b))
+                } else {
+                    arith::mul(a, b, &mut self.heap)
+                };
+            }
+            OpCode::DivFloat => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = if (a.is_f64() || self.heap.is_int(a))
+                    && (b.is_f64() || self.heap.is_int(b))
+                {
+                    let bv = self.heap.to_f64_val(b);
+                    if bv == 0.0 {
+                        return Err(crate::error::RuntimeError::new("division by zero"));
+                    }
+                    VmValue::from_f64(self.heap.to_f64_val(a) / bv)
+                } else {
+                    arith::div(a, b, &mut self.heap)?
+                };
+            }
+            OpCode::ModFloat => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = if (a.is_f64() || self.heap.is_int(a))
+                    && (b.is_f64() || self.heap.is_int(b))
+                {
+                    let bv = self.heap.to_f64_val(b);
+                    if bv == 0.0 {
+                        return Err(crate::error::RuntimeError::new("modulo by zero"));
+                    }
+                    VmValue::from_f64(self.heap.to_f64_val(a) % bv)
+                } else {
+                    arith::modulo(a, b, &mut self.heap)?
+                };
+            }
+            OpCode::PowFloat => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = if (a.is_f64() || self.heap.is_int(a))
+                    && (b.is_f64() || self.heap.is_int(b))
+                {
+                    VmValue::from_f64(self.heap.to_f64_val(a).powf(self.heap.to_f64_val(b)))
+                } else {
+                    arith::pow(a, b, &mut self.heap)?
+                };
+            }
+
+            // Float comparisons
+            OpCode::LtFloat => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(if (a.is_f64() || self.heap.is_int(a))
+                    && (b.is_f64() || self.heap.is_int(b))
+                {
+                    self.heap.to_f64_val(a) < self.heap.to_f64_val(b)
+                } else {
+                    compare::lt_heap(a, b, &self.heap)
+                });
+            }
+            OpCode::GtFloat => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(if (a.is_f64() || self.heap.is_int(a))
+                    && (b.is_f64() || self.heap.is_int(b))
+                {
+                    self.heap.to_f64_val(a) > self.heap.to_f64_val(b)
+                } else {
+                    compare::gt_heap(a, b, &self.heap)
+                });
+            }
+            OpCode::LteFloat => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(if (a.is_f64() || self.heap.is_int(a))
+                    && (b.is_f64() || self.heap.is_int(b))
+                {
+                    self.heap.to_f64_val(a) <= self.heap.to_f64_val(b)
+                } else {
+                    compare::lte_heap(a, b, &self.heap)
+                });
+            }
+            OpCode::GteFloat => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(if (a.is_f64() || self.heap.is_int(a))
+                    && (b.is_f64() || self.heap.is_int(b))
+                {
+                    self.heap.to_f64_val(a) >= self.heap.to_f64_val(b)
+                } else {
+                    compare::gte_heap(a, b, &self.heap)
+                });
+            }
+            OpCode::EqFloat => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(if (a.is_f64() || self.heap.is_int(a))
+                    && (b.is_f64() || self.heap.is_int(b))
+                {
+                    self.heap.to_f64_val(a) == self.heap.to_f64_val(b)
+                } else {
+                    compare::eq(a, b, &self.heap)
+                });
+            }
+            OpCode::NeqFloat => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(if (a.is_f64() || self.heap.is_int(a))
+                    && (b.is_f64() || self.heap.is_int(b))
+                {
+                    self.heap.to_f64_val(a) != self.heap.to_f64_val(b)
+                } else {
+                    compare::neq(a, b, &self.heap)
+                });
+            }
+
+            // Generic comparisons
+            OpCode::Eq => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(compare::eq(a, b, &self.heap));
+            }
+            OpCode::Neq => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(compare::neq(a, b, &self.heap));
+            }
+            OpCode::Lt => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(compare::lt_heap(a, b, &self.heap));
+            }
+            OpCode::Lte => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(compare::lte_heap(a, b, &self.heap));
+            }
+            OpCode::Gt => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(compare::gt_heap(a, b, &self.heap));
+            }
+            OpCode::Gte => {
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
+                self.stack[base + first_reg] = VmValue::from_bool(compare::gte_heap(a, b, &self.heap));
+            }
+
+            // String operations
             OpCode::ToString => {
                 let src = hi(code[*ip]);
                 *ip += 1;
@@ -293,30 +421,13 @@ impl ExecCtx {
                 self.stack[base + first_reg] = crate::exec::strings::to_string(v, &mut self.heap);
             }
             OpCode::StrConcat => {
-                let w1 = code[*ip];
-                *ip += 1;
-                let (src1, src2) = (hi(w1), lo(w1));
-                let a = self.stack[base + src1];
-                let b = self.stack[base + src2];
-                // Delegated rather than reimplemented: `str_concat` is where
-                // the stack-first `StrBuf` and the `s = s + x` accumulation
-                // fast path live. This arm used to build its result in a
-                // `String` and copy it into the heap string — two allocations
-                // for what that one does in one, and no accumulation path at
-                // all, so a concat loop was quadratic here and linear through
-                // the generic `Add`.
+                let (a, b) = read_binary_operands(code, ip, &self.stack);
                 self.stack[base + first_reg] =
                     crate::exec::strings::str_concat(a, b, &mut self.heap);
             }
             OpCode::BuildStr => {
                 let count = hi(code[*ip]);
                 *ip += 1;
-
-                // One stack-first buffer for every part: strings borrow,
-                // ints/bools/null format in place. Only a result that
-                // outgrows the inline capacity touches the allocator, and
-                // then once — the `String` this replaced always allocated,
-                // and its contents were copied again into the heap string.
                 let mut out = crate::strbuf::StrBuf::new();
                 for i in 0..count {
                     let reg_idx = hi(code[*ip + i]);
@@ -330,15 +441,10 @@ impl ExecCtx {
                 let src = hi(code[*ip]);
                 *ip += 1;
                 let v = self.stack[base + src];
-                let len = self.exec_str_length(v)?;
-                self.stack[base + first_reg] = len;
+                self.stack[base + first_reg] = self.exec_str_length(v)?;
             }
             OpCode::StrSlice => {
-                let w1 = code[*ip];
-                *ip += 1;
-                let (src1, src2) = (hi(w1), lo(w1));
-                let s = self.stack[base + src1];
-                let idx = self.stack[base + src2];
+                let (s, idx) = read_binary_operands(code, ip, &self.stack);
                 self.stack[base + first_reg] = self.exec_str_slice(s, idx)?;
             }
             _ => return Ok(false),

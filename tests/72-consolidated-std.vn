@@ -3,7 +3,7 @@
 import { DateTime, formatDurationMs } from "std:time";
 import { parseDotEnv, parseArgs } from "std:sys";
 import { uuidV4, isValidUuid } from "std:crypto";
-import { describe, test, expect } from "std:testing";
+import { describe, test, expect } from "std:test";
 
 describe("Consolidated StdLib Enrichments", () => {
     test("std:time DateTime and formatDurationMs", () => {

@@ -1,2 +1,2 @@
-// expect: error[Varn4005]
+// expect: error[VN4005]
 break

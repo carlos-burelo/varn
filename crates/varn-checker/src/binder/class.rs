@@ -49,6 +49,109 @@ impl super::Binder {
         let mut methods: FxHashMap<Rc<str>, Type> = FxHashMap::default();
         let mut members: Vec<ClassMemberInfo> = Vec::new();
 
+        if let Some(primary_params) = &c.primary_params {
+            let ps: Vec<FunctionParam> = primary_params
+                .iter()
+                .map(|p| {
+                    let mut ty = p
+                        .type_ann
+                        .as_ref()
+                        .or(match &p.pattern {
+                            Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                            _ => None,
+                        })
+                        .map(|ann| resolve_type_node(ann, Some(self)))
+                        .unwrap_or(Type::Dynamic);
+                    if p.is_rest && !matches!(ty.0, TypeKind::Array(_)) {
+                        ty = Type::array(ty);
+                    }
+                    FunctionParam {
+                        name: Some(Rc::from(pattern_lead_name(&p.pattern))),
+                        ty,
+                        optional: p.is_optional || p.default.is_some(),
+                        is_rest: p.is_rest,
+                    }
+                })
+                .collect();
+
+            let fn_ty = Type::fn_(FunctionType {
+                params: ps,
+                return_type: Box::new(Type::Void),
+                is_arrow: false,
+                type_params: vec![],
+            });
+
+            let mut sym = Symbol::new(
+                SymbolKind::Method,
+                Rc::from("constructor"),
+                c.range.start.line,
+            )
+            .with_type(fn_ty.clone());
+            sym.col = c.range.start.column;
+            sym.offset = c.range.start.offset;
+            let symbol_id = self.arena.push(sym);
+
+            members.push(ClassMemberInfo {
+                name: Rc::from("constructor"),
+                kind: ClassMemberKind::Constructor,
+                is_async: false,
+                is_generator: false,
+                is_static: false,
+                is_optional: false,
+                line: c.range.start.line.saturating_sub(1),
+                col: c.range.start.column,
+                offset: c.range.start.offset,
+                ty: fn_ty,
+                members: Vec::new(),
+                visibility: None,
+                is_abstract: false,
+                is_readonly: false,
+                is_override: false,
+                symbol_id: Some(symbol_id),
+                ..Default::default()
+            });
+
+            for p in primary_params {
+                let name_str = pattern_lead_name(&p.pattern);
+                let key_rc: Rc<str> = Rc::from(name_str);
+                let ty = p
+                    .type_ann
+                    .as_ref()
+                    .or(match &p.pattern {
+                        Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                        _ => None,
+                    })
+                    .map(|ann| resolve_type_node(ann, Some(self)))
+                    .unwrap_or(Type::Dynamic);
+
+                let mut sym = Symbol::new(SymbolKind::Property, key_rc.clone(), p.range.start.line)
+                    .with_type(ty.clone());
+                sym.col = p.range.start.column;
+                sym.offset = p.range.start.offset;
+                let symbol_id = self.arena.push(sym);
+
+                members.push(ClassMemberInfo {
+                    name: key_rc,
+                    kind: ClassMemberKind::Property,
+                    is_async: false,
+                    is_generator: false,
+                    is_static: false,
+                    is_optional: false,
+                    line: p.range.start.line.saturating_sub(1),
+                    col: p.range.start.column,
+                    offset: p.range.start.offset,
+                    ty,
+                    members: Vec::new(),
+                    visibility: p.modifiers.visibility,
+                    is_abstract: false,
+                    is_readonly: p.modifiers.is_readonly,
+                    is_override: false,
+                    symbol_id: Some(symbol_id),
+                    ..Default::default()
+                });
+            }
+        }
+
         for member in &c.body {
             self.collect_class_member(member, name.as_ref(), &mut methods, &mut members);
         }
@@ -180,10 +283,11 @@ impl super::Binder {
             ty: cls_type,
             members: final_members,
             visibility: None,
-            is_abstract: false,
+            is_abstract: c.modifiers.is_abstract,
             is_readonly: false,
             is_override: false,
             symbol_id: None,
+            ..Default::default()
         };
 
         self.type_members.classes.insert(name, class_info);
@@ -257,7 +361,50 @@ impl super::Binder {
                     is_readonly: false,
                     is_override: false,
                     symbol_id: Some(symbol_id),
+                    ..Default::default()
                 });
+
+                for p in params {
+                    if p.modifiers.visibility.is_some() || p.modifiers.is_readonly {
+                        let name_str = pattern_lead_name(&p.pattern);
+                        let key_rc: Rc<str> = Rc::from(name_str);
+                        let ty = p
+                            .type_ann
+                            .as_ref()
+                            .or(match &p.pattern {
+                                Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                                _ => None,
+                            })
+                            .map(|ann| resolve_type_node(ann, Some(self)))
+                            .unwrap_or(Type::Dynamic);
+
+                        let mut sym = Symbol::new(SymbolKind::Property, key_rc.clone(), p.range.start.line)
+                            .with_type(ty.clone());
+                        sym.col = p.range.start.column;
+                        sym.offset = p.range.start.offset;
+                        let symbol_id = self.arena.push(sym);
+
+                        members.push(ClassMemberInfo {
+                            name: key_rc,
+                            kind: ClassMemberKind::Property,
+                            is_async: false,
+                            is_generator: false,
+                            is_static: false,
+                            is_optional: false,
+                            line: p.range.start.line.saturating_sub(1),
+                            col: p.range.start.column,
+                            offset: p.range.start.offset,
+                            ty,
+                            members: Vec::new(),
+                            visibility: p.modifiers.visibility,
+                            is_abstract: false,
+                            is_readonly: p.modifiers.is_readonly,
+                            is_override: false,
+                            symbol_id: Some(symbol_id),
+                            ..Default::default()
+                        });
+                    }
+                }
             }
             ClassMember::Property {
                 key,
@@ -295,7 +442,8 @@ impl super::Binder {
                     is_readonly: modifiers.is_readonly,
                     is_override: modifiers.is_override,
                     symbol_id: Some(symbol_id),
-                });
+                                ..Default::default()
+                                });
             }
             ClassMember::Method {
                 key,
@@ -376,7 +524,8 @@ impl super::Binder {
                     is_readonly: false,
                     is_override: modifiers.is_override,
                     symbol_id: Some(symbol_id),
-                });
+                                ..Default::default()
+                                });
             }
             ClassMember::Getter {
                 key,
@@ -414,7 +563,8 @@ impl super::Binder {
                     is_readonly: false,
                     is_override: false,
                     symbol_id: Some(symbol_id),
-                });
+                                ..Default::default()
+                                });
             }
             ClassMember::Setter {
                 key,
@@ -447,7 +597,8 @@ impl super::Binder {
                     is_readonly: false,
                     is_override: false,
                     symbol_id: Some(symbol_id),
-                });
+                                ..Default::default()
+                                });
             }
             _ => {}
         }

@@ -134,7 +134,7 @@ impl<'a> Scanner<'a> {
             .partition_point(|&s| s <= pos)
             .saturating_sub(1);
         let line = (line_idx + 1) as u32;
-        let col = (pos - self.line_starts[line_idx]) as u32;
+        let col = (pos - self.line_starts[line_idx] + 1) as u32;
         (line, col)
     }
 

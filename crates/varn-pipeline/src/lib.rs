@@ -124,7 +124,7 @@ fn compile_source(
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_else(|_| path.to_owned());
     let path = canonical_path.as_str();
-    let (tokens, lexeme_buf) = lex::lex(source, path, verbose, debug);
+    let (tokens, lexeme_buf) = lex::lex(source, path, verbose, debug)?;
     let mut program = parse::parse(tokens, lexeme_buf, source, path, verbose, debug)?;
     varn_core::assign_ast_ids(&mut program);
     let check_result = check::check(&program, source, debug, strict)?;

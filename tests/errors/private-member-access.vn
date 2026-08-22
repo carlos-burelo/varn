@@ -1,4 +1,4 @@
-// expect: error[Varn4104]
+// expect: error[VN4104]
 class Wallet {
     private balance: int = 0
 }

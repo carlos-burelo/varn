@@ -135,6 +135,11 @@ macro_rules! jit_helper_abi {
             /// `extern "C" fn(*mut ExecCtx, receiver, start, end) -> VmValue` — direct
             /// `slice` without the stack-window flush/reload overhead.
             str_slice_intrinsic => jit_str_slice_intrinsic,
+            str_starts_with_intrinsic => jit_str_starts_with_intrinsic,
+            str_ends_with_intrinsic => jit_str_ends_with_intrinsic,
+            str_includes_intrinsic => jit_str_includes_intrinsic,
+            str_index_of_intrinsic => jit_str_index_of_intrinsic,
+            str_last_index_of_intrinsic => jit_str_last_index_of_intrinsic,
             jit_is_native_fn => jit_is_native_fn,
             jit_call_native_fast => jit_call_native_fast,
             jit_call_native_op => jit_call_native_op,

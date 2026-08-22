@@ -234,6 +234,31 @@ impl<'a> Lowerer<'a> {
                     });
                 }
                 if *computed {
+                    if let ExprKind::Range {
+                        start,
+                        end,
+                        inclusive,
+                    } = &property.kind
+                    {
+                        let recv = Box::new(self.lower_expr(object, scope)?);
+                        let hstart = self.lower_expr(start, scope)?;
+                        let mut hend = self.lower_expr(end, scope)?;
+                        if *inclusive {
+                            hend = HirExpr::Binary {
+                                op: HirBinOp::Add,
+                                lhs: Box::new(hend),
+                                rhs: Box::new(HirExpr::Int(1)),
+                                ty: HirType::Int,
+                            };
+                        }
+                        let ty = self.value_ty(AnnKey::expr(expr.id));
+                        return Ok(HirExpr::MethodCall {
+                            recv,
+                            name: Rc::from("slice"),
+                            args: vec![hstart, hend],
+                            ty,
+                        });
+                    }
                     let ty = self.value_ty(AnnKey::expr(property.id));
                     let object = Box::new(self.lower_expr(object, scope)?);
                     let index = Box::new(self.lower_expr(property, scope)?);
@@ -341,11 +366,55 @@ impl<'a> Lowerer<'a> {
                 }
             }
             ExprKind::TaggedTemplate { tag, template, .. } => {
+                let mut strings = Vec::new();
+                let mut values = Vec::new();
+
+                if let ExprKind::Template { parts } = &template.kind {
+                    for part in parts {
+                        match part {
+                            varn_core::ast::TemplatePart::Literal(s) => {
+                                strings.push(HirArrayEl::Expr(HirExpr::Str(Rc::from(s.as_str()))));
+                            }
+                            varn_core::ast::TemplatePart::Interpolation(e) => {
+                                values.push(self.lower_expr(e, scope)?);
+                            }
+                        }
+                    }
+                } else {
+                    let htpl = self.lower_expr(template, scope)?;
+                    values.push(htpl);
+                }
+
+                let strings_array = HirExpr::Array(strings);
+                let mut call_args = Vec::with_capacity(1 + values.len());
+                call_args.push(strings_array);
+                call_args.extend(values);
+
+                if let ExprKind::Member {
+                    object,
+                    property,
+                    computed: false,
+                    optional: false,
+                } = &tag.kind
+                {
+                    if let ExprKind::Identifier { name } = &property.kind {
+                        let recv = Box::new(self.lower_expr(object, scope)?);
+                        let ty = self.value_ty(AnnKey::expr(property.id));
+                        return Ok(HirExpr::MethodCall {
+                            recv,
+                            name: name.clone(),
+                            args: call_args,
+                            ty,
+                        });
+                    }
+                }
+
                 let htag = self.lower_expr(tag, scope)?;
-                let htpl = self.lower_expr(template, scope)?;
-                Ok(HirExpr::TaggedTemplate {
-                    tag: Box::new(htag),
-                    template: Box::new(htpl),
+                let ty = self.value_ty(AnnKey::expr(expr.id));
+                Ok(HirExpr::Call {
+                    callee: Box::new(htag),
+                    args: call_args,
+                    ty,
                 })
             }
             other => unreachable!("lower_call_expr: {other:?} is not handled here"),

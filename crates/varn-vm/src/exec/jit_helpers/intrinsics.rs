@@ -176,3 +176,114 @@ pub(crate) extern "C" fn jit_str_slice_intrinsic(
         }
     }
 }
+
+/// Dedicated fast path for `startsWith(search)`.
+/// Avoids the generic intrinsic dispatcher's flush/reload overhead.
+pub(crate) extern "C" fn jit_str_starts_with_intrinsic(
+    ctx: *mut ExecCtx,
+    receiver: VmValue,
+    search: VmValue,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let heap = &mut ctx_ref.heap;
+        let args = [receiver, search];
+        match crate::exec::intrinsics::str::dispatch(
+            varn_core::intrinsic_ops::str::StrOp::StartsWith as u8,
+            &args,
+            heap,
+        ) {
+            Ok(v) => v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+    }
+}
+
+/// Dedicated fast path for `endsWith(search)`.
+/// Avoids the generic intrinsic dispatcher's flush/reload overhead.
+pub(crate) extern "C" fn jit_str_ends_with_intrinsic(
+    ctx: *mut ExecCtx,
+    receiver: VmValue,
+    search: VmValue,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let heap = &mut ctx_ref.heap;
+        let args = [receiver, search];
+        match crate::exec::intrinsics::str::dispatch(
+            varn_core::intrinsic_ops::str::StrOp::EndsWith as u8,
+            &args,
+            heap,
+        ) {
+            Ok(v) => v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+    }
+}
+
+/// Dedicated fast path for `includes(search)`.
+/// Avoids the generic intrinsic dispatcher's flush/reload overhead.
+pub(crate) extern "C" fn jit_str_includes_intrinsic(
+    ctx: *mut ExecCtx,
+    receiver: VmValue,
+    search: VmValue,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let heap = &mut ctx_ref.heap;
+        let args = [receiver, search];
+        match crate::exec::intrinsics::str::dispatch(
+            varn_core::intrinsic_ops::str::StrOp::Includes as u8,
+            &args,
+            heap,
+        ) {
+            Ok(v) => v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+    }
+}
+
+/// Dedicated fast path for `indexOf(search)`.
+/// Avoids the generic intrinsic dispatcher's flush/reload overhead.
+pub(crate) extern "C" fn jit_str_index_of_intrinsic(
+    ctx: *mut ExecCtx,
+    receiver: VmValue,
+    search: VmValue,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let heap = &mut ctx_ref.heap;
+        let args = [receiver, search];
+        match crate::exec::intrinsics::str::dispatch(
+            varn_core::intrinsic_ops::str::StrOp::IndexOf as u8,
+            &args,
+            heap,
+        ) {
+            Ok(v) => v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+    }
+}
+
+/// Dedicated fast path for `lastIndexOf(search)`.
+/// Avoids the generic intrinsic dispatcher's flush/reload overhead.
+pub(crate) extern "C" fn jit_str_last_index_of_intrinsic(
+    ctx: *mut ExecCtx,
+    receiver: VmValue,
+    search: VmValue,
+) -> VmValue {
+    unsafe {
+        let ctx_ref = &mut *ctx;
+        let heap = &mut ctx_ref.heap;
+        let args = [receiver, search];
+        match crate::exec::intrinsics::str::dispatch(
+            varn_core::intrinsic_ops::str::StrOp::LastIndexOf as u8,
+            &args,
+            heap,
+        ) {
+            Ok(v) => v,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
+    }
+}
+

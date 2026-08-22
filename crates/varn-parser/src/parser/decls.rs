@@ -1,16 +1,15 @@
 mod class;
+mod extension;
 mod modules;
 pub mod type_decls;
 
 pub use class::parse_class_decl;
+pub(super) use extension::parse_extension_decl;
 pub(super) use modules::{parse_export_decl, parse_import_decl};
 pub(super) use type_decls::{
     parse_enum_decl, parse_interface_decl, parse_namespace_decl, parse_struct_decl,
     parse_sum_type_or_alias,
 };
-
-pub(super) use self::extension::parse_extension_decl;
-mod extension;
 
 use crate::expressions::parse_expr;
 use crate::stream::TokenStream;
@@ -74,7 +73,7 @@ pub(super) fn parse_var_decl_after_head(
     let full_range = s.span_from(range);
     Ok(VariableDecl {
         kind,
-        ast_id: 0,
+        ast_id: s.next_ast_id(),
         declarators,
         is_declare,
         doc: None,
@@ -139,7 +138,7 @@ pub(super) fn parse_function_decl(
             return Err("declare function cannot have a body".to_owned());
         }
         s.eat_semicolon();
-        varn_core::ast::Stmt::new_with_range(s.range(), varn_core::ast::StmtKind::Empty)
+        s.stmt(s.range(), varn_core::ast::StmtKind::Empty)
     } else {
         super::stmts::parse_block(s)?
     };
@@ -147,7 +146,7 @@ pub(super) fn parse_function_decl(
     let full_range = s.span_from(range);
     Ok(FunctionDecl {
         id,
-        ast_id: 0,
+        ast_id: s.next_ast_id(),
         id_offset,
         type_params,
         params,

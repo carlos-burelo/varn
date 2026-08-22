@@ -134,6 +134,11 @@ impl Checker {
             }
 
             Decl::Class(c) => {
+                if c.modifiers.is_abstract {
+                    if let Some(id) = &c.id {
+                        self.abstract_classes.insert(id.clone());
+                    }
+                }
                 let name = c.id.clone().unwrap_or_else(|| Rc::from("<anon>"));
                 let saved_class = self.current_class.replace(name);
                 let saved_scope = self.current_scope;

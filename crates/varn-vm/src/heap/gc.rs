@@ -79,6 +79,29 @@ impl HeapInner {
             .retain(|_, &mut packed| check(packed, &self.objects));
     }
 
+    pub(crate) fn update_interners_after_minor_gc(&mut self, fwd: &[Option<u32>]) {
+        let update_interner = |packed: &mut u32| -> bool {
+            if crate::nursery::is_nursery_idx(*packed) {
+                if let Some(Some(new_packed)) = fwd.get(*packed as usize) {
+                    *packed = *new_packed;
+                    true
+                } else {
+                    false
+                }
+            } else {
+                true
+            }
+        };
+
+        self.object_interner.retain(|_, p| update_interner(p));
+        self.map_interner.retain(|_, p| update_interner(p));
+        self.set_interner.retain(|_, p| update_interner(p));
+        self.array_interner.retain(|_, p| update_interner(p));
+        self.string_interner.retain(|_, p| update_interner(p));
+        self.symbol_interner.retain(|_, p| update_interner(p));
+        self.identity_index.retain(|_, p| update_interner(p));
+    }
+
     /// Run a full collection, returning how many slots were freed.
     ///
     /// Infallible: marking and sweeping walk structures the heap already owns

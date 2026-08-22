@@ -2,12 +2,29 @@ import {
     sha256$,
     sha512$,
     uuid$,
+    uuidV4$,
+    uuidV7$,
+    uuidValidate$,
     randomBytes$,
     randomHex$,
     base64Enc$,
     base64Dec$,
     hmac$
 } from "runtime:crypto";
+
+export namespace UUID {
+    export function v4(): str {
+        return uuidV4$();
+    }
+
+    export function v7(): str {
+        return uuidV7$();
+    }
+
+    export function isValid(s: str): bool {
+        return uuidValidate$(s);
+    }
+}
 
 export function sha256(data: str): str {
     return sha256$(data);

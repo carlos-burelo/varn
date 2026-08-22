@@ -2,7 +2,7 @@ use crate::expressions::helpers::unescape_string;
 use crate::stream::TokenStream;
 use varn_core::ast::{Expr, TemplatePart};
 
-pub(super) fn parse_template(s: &mut TokenStream) -> Result<Expr, String> {
+pub(crate) fn parse_template(s: &mut TokenStream) -> Result<Expr, String> {
     let range = s.range();
     let mut parts = vec![];
 
@@ -16,10 +16,7 @@ pub(super) fn parse_template(s: &mut TokenStream) -> Result<Expr, String> {
     parts.push(TemplatePart::Literal(unescape_string(literal_text)));
 
     if !is_head {
-        return Ok(Expr::new_with_range(
-            range,
-            varn_core::ast::ExprKind::Template { parts },
-        ));
+        return Ok(s.expr(range, varn_core::ast::ExprKind::Template { parts }));
     }
 
     loop {
@@ -40,8 +37,5 @@ pub(super) fn parse_template(s: &mut TokenStream) -> Result<Expr, String> {
         }
     }
 
-    Ok(Expr::new_with_range(
-        range,
-        varn_core::ast::ExprKind::Template { parts },
-    ))
+    Ok(s.expr(range, varn_core::ast::ExprKind::Template { parts }))
 }

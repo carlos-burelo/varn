@@ -3,7 +3,7 @@ use crate::binder::BindResult;
 use crate::symbol::SymbolId;
 use crate::types::Type;
 use varn_core::ast::{ForInit, Stmt, StmtKind};
-use varn_core::{Diagnostic, ErrorCode, IntrinsicType, TypeKind, TypeTag};
+use varn_core::{Diagnostic, ErrorCode, TypeKind, TypeTag};
 
 impl Checker {
     pub(crate) fn check_stmts(&mut self, stmts: &[Stmt], bind: &BindResult) {
@@ -215,19 +215,7 @@ impl Checker {
                 let right_ty = self.infer_type(right, bind);
                 let elem_ty = match &right_ty.0 {
                     TypeKind::Array(inner) => (**inner).clone(),
-                    TypeKind::Generic(name, args, _)
-                        if (name.as_ref() == IntrinsicType::Array.as_str()
-                            || name.as_ref() == "Iterator"
-                            || name.as_ref() == "AsyncIterator"
-                            || name.as_ref() == "AsyncGenerator"
-                            || name.as_ref() == "Receiver"
-                            || name.as_ref() == "List"
-                            || name.as_ref() == IntrinsicType::Set.as_str()
-                            || name.as_ref() == IntrinsicType::Generator.as_str())
-                            && args.len() == 1 =>
-                    {
-                        args[0].clone()
-                    }
+                    TypeKind::Generic(_name, args, _) if args.len() == 1 => args[0].clone(),
                     TypeKind::Intrinsic(TypeTag::Range) => Type::Int,
                     _ => Type::Dynamic,
                 };
@@ -336,7 +324,7 @@ impl Checker {
                     if d.init.is_none() {
                         self.emit(
                             Diagnostic::error(
-                                ErrorCode::InvalidStatement,
+                                ErrorCode::ConstWithoutInitializer,
                                 "'using' declaration must have an initializer",
                             )
                             .with_range(d.range),
@@ -357,7 +345,7 @@ impl Checker {
                         && !self.member_exists_cached(&init_ty, dispose_method, bind)
                     {
                         self.emit(
-                            Diagnostic::error(ErrorCode::TypeMismatch, format!(
+                            Diagnostic::error(ErrorCode::InvalidUsingTarget, format!(
                                 "type '{init_ty}' does not implement {interface_name}: missing '{dispose_method}()' method"
                             ))
                             .with_range(d.range),

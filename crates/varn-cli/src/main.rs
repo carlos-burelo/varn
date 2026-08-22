@@ -67,7 +67,11 @@ fn main() {
     let result = dispatch(cli.command);
 
     if let Err(e) = result {
-        terminal::error(&e);
+        if e.exit_code == 3 {
+            eprintln!("{e}");
+        } else {
+            terminal::error(&e);
+        }
         process::exit(e.exit_code);
     }
 }

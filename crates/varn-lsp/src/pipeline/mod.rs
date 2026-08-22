@@ -68,6 +68,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
             end_line: e.range.end.line.saturating_sub(1),
             end_col: e.range.end.column,
             severity: SEVERITY_ERROR,
+            code: Some(e.code),
             related: Vec::new(),
             suggestions: Vec::new(),
         });
@@ -110,6 +111,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
             end_line: e.range.end.line.saturating_sub(1),
             end_col: e.range.end.column,
             severity: SEVERITY_ERROR,
+            code: Some(e.code),
             related: Vec::new(),
             suggestions: Vec::new(),
         });
@@ -133,6 +135,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
             end_line: d.range.end.line.saturating_sub(1),
             end_col: d.range.end.column,
             severity,
+            code: Some(d.code),
             related,
             suggestions: d.suggestions.clone(),
         });
@@ -161,6 +164,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
                 end_line: 0,
                 end_col: 0,
                 severity: SEVERITY_ERROR,
+                code: Some(varn_core::ErrorCode::InvalidImportPath),
                 related: Vec::new(),
                 suggestions: Vec::new(),
             },

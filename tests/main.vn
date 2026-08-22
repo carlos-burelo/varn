@@ -79,6 +79,14 @@ import "./77-async-generators.vn"
 import "./78-try-early-exit.vn"
 import "./79-control-flow-narrowing.vn"
 import "./80-capabilities-security.vn"
+import "./82-std-csv.vn"
+import "./83-canonical-types-regex-uuid-time.vn"
+import "./84-stdlib-process-compress-cli-env.vn"
+import "./85-stdlib-sqlite-ws-archive.vn"
+import "./86-tagged-templates.vn"
+import "./87-primary-constructors-nullish-assign.vn"
+import "./88-range-indexing.vn"
+import "./89-raw-strings-and-with-expressions.vn"
 
-print("\n81 side-effect modules executed in suite")
+print("\n89 side-effect modules executed in suite")
 assertSummary()

@@ -32,6 +32,11 @@ pub enum TypeTag {
     RangeError,
     VmRef,
     TaskHandle,
+    Buffer,
+    Regex,
+    DateTime,
+    Duration,
+    UUID,
 }
 
 impl TypeTag {
@@ -63,6 +68,11 @@ impl TypeTag {
             Self::NativeFn => "native_fn",
             Self::VmRef => "vm_ref",
             Self::TaskHandle => "TaskHandle",
+            Self::Buffer => "Buffer",
+            Self::Regex => "Regex",
+            Self::DateTime => "DateTime",
+            Self::Duration => "Duration",
+            Self::UUID => "UUID",
             Self::Error => "Error",
             Self::TypeError => "TypeError",
             Self::RangeError => "RangeError",
@@ -93,6 +103,7 @@ impl TypeTag {
             "Generator" | "generator" => Some(Self::Generator),
             "Task" => Some(Self::Task),
             "Range" => Some(Self::Range),
+            "Buffer" => Some(Self::Buffer),
             "enum" => Some(Self::Enum),
             _ => None,
         }

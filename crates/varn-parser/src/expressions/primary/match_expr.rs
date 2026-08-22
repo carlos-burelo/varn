@@ -22,7 +22,7 @@ pub(super) fn parse_match_expr(s: &mut TokenStream) -> Result<Expr, String> {
     }
     s.expect(TokenKind::RBrace)?;
     let full_range = s.span_from(range);
-    Ok(Expr::new_with_range(
+    Ok(s.expr(
         full_range,
         varn_core::ast::ExprKind::Match {
             subject: Box::new(subject),
@@ -90,7 +90,7 @@ fn parse_identifier_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, S
     }
 
     if s.check(TokenKind::Dot) {
-        let id_expr = Expr::new_with_range(
+        let id_expr = s.expr(
             id_range,
             varn_core::ast::ExprKind::Identifier { name: name.clone() },
         );
@@ -98,16 +98,17 @@ fn parse_identifier_match_pattern(s: &mut TokenStream) -> Result<MatchPattern, S
         let prop_name = s.lexeme().to_owned();
         let prop_tok = s.consume();
         let prop_range = prop_tok.range;
-        let expr = Expr::new_with_range(
+        let prop_expr = s.expr(
+            prop_range,
+            varn_core::ast::ExprKind::Identifier {
+                name: prop_name.into(),
+            },
+        );
+        let expr = s.expr(
             id_range.to(prop_range),
             varn_core::ast::ExprKind::Member {
                 object: Box::new(id_expr),
-                property: Box::new(Expr::new_with_range(
-                    prop_range,
-                    varn_core::ast::ExprKind::Identifier {
-                        name: prop_name.into(),
-                    },
-                )),
+                property: Box::new(prop_expr),
                 computed: false,
                 optional: false,
             },
@@ -138,15 +139,15 @@ fn parse_variant_tuple_pattern(
             if s.eat(TokenKind::Colon) {
                 parse_match_pattern(s)?;
             }
-            bindings.push(MatchBinding {
-                name: name.into(),
-                range,
-            });
+            bindings.push(MatchBinding { name, range });
         } else {
-            break;
+            return Err(format!(
+                "expected binding name or `_` in variant pattern, got {:?}",
+                s.kind()
+            ));
         }
-        if s.check(TokenKind::Comma) {
-            s.advance();
+        if !s.eat(TokenKind::Comma) {
+            break;
         }
     }
     s.expect(TokenKind::RParen)?;
@@ -159,44 +160,25 @@ fn parse_variant_tuple_pattern(
 
 fn parse_variant_record_pattern(
     s: &mut TokenStream,
-    enum_name: String,
+    _name: String,
 ) -> Result<MatchPattern, String> {
-    use varn_core::ast::MatchBinding;
-    let variant_name = enum_name.clone();
     s.advance();
-    let mut bindings: Vec<MatchBinding> = Vec::new();
+    let mut fields: Vec<(std::rc::Rc<str>, Option<MatchPattern>)> = Vec::new();
     while !s.check(TokenKind::RBrace) && !s.is_eof() {
-        let range = s.range();
-        if s.check(TokenKind::DotDotDot) {
-            s.advance();
-            break;
-        }
-        if s.check(TokenKind::Placeholder) {
-            s.advance();
-            bindings.push(MatchBinding {
-                name: "_".into(),
-                range,
-            });
-        } else if s.check(TokenKind::Identifier) {
-            let name = s.consume_lexeme();
-            if s.eat(TokenKind::Colon) {
-                parse_match_pattern(s)?;
-            }
-            bindings.push(MatchBinding {
-                name: name.into(),
-                range,
-            });
+        let field_name = s.expect_id()?;
+        let sub = if s.eat(TokenKind::Colon) {
+            Some(parse_match_pattern(s)?)
         } else {
+            None
+        };
+        fields.push((field_name, sub));
+        if !s.eat(TokenKind::Comma) {
             break;
-        }
-        if s.check(TokenKind::Comma) {
-            s.advance();
         }
     }
     s.expect(TokenKind::RBrace)?;
-    Ok(MatchPattern::EnumVariant {
-        enum_name: enum_name.into(),
-        variant_name: variant_name.into(),
-        bindings,
+    Ok(MatchPattern::Record {
+        fields,
+        rest: false,
     })
 }

@@ -181,6 +181,61 @@ impl super::Scanner<'_> {
         let start = self.pos;
         let (sl, sc) = self.location();
 
+        if quote == b'"' && self.peek(1) == b'"' && self.peek(2) == b'"' {
+            self.cur_col += 3;
+            self.pos += 3;
+            let mut content_start = self.pos;
+            if !self.is_eof() && self.peek(0) == b'\r' && self.peek(1) == b'\n' {
+                self.cur_line += 1;
+                self.cur_col = 1;
+                self.pos += 2;
+                content_start = self.pos;
+            } else if !self.is_eof() && self.peek(0) == b'\n' {
+                self.cur_line += 1;
+                self.cur_col = 1;
+                self.pos += 1;
+                content_start = self.pos;
+            }
+
+            while !self.is_eof() {
+                if self.peek(0) == b'"' && self.peek(1) == b'"' && self.peek(2) == b'"' {
+                    break;
+                }
+                if self.peek(0) == b'\n' {
+                    self.cur_line += 1;
+                    self.cur_col = 1;
+                    self.pos += 1;
+                } else if self.peek(0) == b'\r' && self.peek(1) == b'\n' {
+                    self.cur_line += 1;
+                    self.cur_col = 1;
+                    self.pos += 2;
+                } else {
+                    self.advance_byte();
+                }
+            }
+            let content_end = self.pos;
+            if !self.is_eof() {
+                self.cur_col += 3;
+                self.pos += 3;
+            }
+            let (el, ec) = self.location();
+            push_token(
+                tokens,
+                lexemes,
+                self.src,
+                crate::token_kind::RAW_STR,
+                sl,
+                sc,
+                start as u32,
+                el,
+                ec,
+                self.pos as u32,
+                content_start,
+                content_end,
+            );
+            return;
+        }
+
         self.cur_col += 1;
         self.pos += 1;
         let content_start = self.pos;

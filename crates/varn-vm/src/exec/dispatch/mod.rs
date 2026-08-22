@@ -43,73 +43,6 @@ impl ExecCtx {
         unsafe { Self::run_until_inner_raw(self as *mut ExecCtx, depth) }
     }
 
-    /// Run one clif frame under its OWN jump buffer.
-    ///
-    /// Every clif frame installs one, not just the outermost. A clif frame is
-    /// a native stack frame, so a `throw` raised several clif frames deep used
-    /// to `longjmp` straight past the ones in between — destroying their
-    /// native state while their `CallFrame`s stayed live with `ip == 0`, which
-    /// the frame loop then re-entered from the top, forever. (`assert(
-    /// safeDivide(10, 0) === -1)` in tests/11-errors.vn hung allocating.)
-    ///
-    /// With a buffer per frame the unwind is one hop: the innermost frame
-    /// catches, its own frame loop handles the throw if the handler belongs at
-    /// or above it, and otherwise returns the error to `clif_call_fallback`,
-    /// which re-raises against the buffer this function has by then RESTORED
-    /// to its parent's. Each clif frame therefore unwinds its own native stack
-    /// in turn. A null saved buffer means we are outermost: the error leaves
-    /// as `Err`, exactly as before.
-    ///
-    /// Suspension is the one thing that still needs the OUTERMOST buffer — an
-    /// intermediate clif frame cannot park in the middle of a native function
-    /// — so `jit_suspend_buf` is pinned by the outermost frame and is what
-    /// `jit_await`/`jit_yield` jump to. That preserves today's behaviour
-    /// exactly; it does not make suspension nest.
-    #[inline(never)]
-    unsafe fn execute_jit_frame(
-        ctx: *mut ExecCtx,
-        jit_fn: varn_jit::JitFn,
-        closure_ptr: *const crate::closure::VmClosure,
-        base: usize,
-    ) -> Result<VmValue, i32> {
-        let saved = (*ctx).jit_jmp_buf;
-        let is_outer = saved.is_null();
-        let mut jmp_buf = super::ctx::JmpBuf::default();
-        let jmp_res = std::hint::black_box(super::ctx::my_setjmp(&mut jmp_buf));
-
-        if jmp_res == 0 {
-            (*ctx).jit_jmp_buf = &mut jmp_buf as *mut super::ctx::JmpBuf;
-            if is_outer {
-                (*ctx).jit_suspend_buf = (*ctx).jit_jmp_buf;
-            }
-            (*ctx).jit_frame_prepushed = 1;
-            // Explicit borrow of the `Rc` field: an implicit autoref through a
-            // raw pointer is what `dangerous_implicit_autorefs` warns about.
-            let required = base + (&(*closure_ptr).proto).register_count as usize;
-            if (*ctx).stack.len() < required {
-                (*ctx).stack.resize(required, crate::value::VmValue::null());
-            }
-            let val = (jit_fn)(
-                (*ctx).stack.as_mut_ptr() as *mut std::ffi::c_void,
-                closure_ptr as *const std::ffi::c_void,
-                base,
-                ctx as *mut std::ffi::c_void,
-            );
-            std::hint::black_box(ctx);
-            (*ctx).jit_jmp_buf = saved;
-            if is_outer {
-                (*ctx).jit_suspend_buf = std::ptr::null_mut();
-            }
-            Ok(val)
-        } else {
-            (*ctx).jit_jmp_buf = saved;
-            if is_outer {
-                (*ctx).jit_suspend_buf = std::ptr::null_mut();
-            }
-            Err(jmp_res)
-        }
-    }
-
     #[inline(never)]
     #[allow(dangerous_implicit_autorefs)]
     unsafe fn run_until_inner_raw(ctx: *mut ExecCtx, depth: usize) -> VmResult<VmValue> {
@@ -753,41 +686,6 @@ impl ExecCtx {
         final_val
     }
 
-    pub(super) fn exec_arith(&mut self, op: OpCode, a: VmValue, b: VmValue) -> VmResult<VmValue> {
-        use crate::exec::arith;
-        // Only div/mod/pow can fail — by zero divisor or negative exponent.
-        // The rest are total, and their signatures now say so.
-        match op {
-            OpCode::Add => Ok(arith::add(a, b, &mut self.heap)),
-            OpCode::Sub => Ok(arith::sub(a, b, &mut self.heap)),
-            OpCode::Mul => Ok(arith::mul(a, b, &mut self.heap)),
-            OpCode::Div => arith::div(a, b, &mut self.heap),
-            OpCode::Mod => arith::modulo(a, b, &mut self.heap),
-            OpCode::Pow => arith::pow(a, b, &mut self.heap),
-            OpCode::BitAnd => Ok(arith::bit_and(a, b, &mut self.heap)),
-            OpCode::BitOr => Ok(arith::bit_or(a, b, &mut self.heap)),
-            OpCode::BitXor => Ok(arith::bit_xor(a, b, &mut self.heap)),
-            OpCode::Shl => Ok(arith::shl(a, b, &mut self.heap)),
-            OpCode::Shr => Ok(arith::shr(a, b, &mut self.heap)),
-            OpCode::Ushr => Ok(arith::ushr(a, b, &mut self.heap)),
-            _ => unreachable!(
-                "{op:?} is not an arithmetic opcode; callers narrow to the twelve above"
-            ),
-        }
-    }
-
-    pub(super) fn exec_cmp(&mut self, op: OpCode, a: VmValue, b: VmValue) -> VmValue {
-        use crate::exec::compare;
-        VmValue::from_bool(match op {
-            OpCode::Eq => compare::eq(a, b, &self.heap),
-            OpCode::Neq => compare::neq(a, b, &self.heap),
-            OpCode::Lt => compare::lt_heap(a, b, &self.heap),
-            OpCode::Lte => compare::lte_heap(a, b, &self.heap),
-            OpCode::Gt => compare::gt_heap(a, b, &self.heap),
-            OpCode::Gte => compare::gte_heap(a, b, &self.heap),
-            _ => unreachable!(),
-        })
-    }
 
     pub(crate) fn exec_typeof(&self, v: VmValue) -> &'static str {
         use varn_core::TypeTag;

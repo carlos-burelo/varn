@@ -1,0 +1,7 @@
+// runtime:sqlite — low-level host SQLite database operations.
+
+export declare function open$(path: str): int;
+export declare function close$(dbId: int): bool;
+export declare function exec$(dbId: int, sql: str): int;
+export declare function queryAll$(dbId: int, sql: str, params: dynamic[]): dynamic[];
+export declare function queryOne$(dbId: int, sql: str, params: dynamic[]): dynamic;

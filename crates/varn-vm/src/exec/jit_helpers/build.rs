@@ -99,17 +99,12 @@ pub(crate) extern "C" fn jit_build_record_with_shape(
 
 pub(crate) extern "C" fn jit_range(
     ctx: *mut ExecCtx,
-    start_reg: usize,
-    end_reg: usize,
+    start_val: VmValue,
+    end_val: VmValue,
     flag: usize,
 ) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
-        let frame_idx = ctx_ref.frames.len() - 1;
-        let base = ctx_ref.frames[frame_idx].base;
-        let start_val = ctx_ref.stack[base + start_reg];
-        let end_val = ctx_ref.stack[base + end_reg];
-
         let mut temp = vec![start_val, end_val];
         match crate::exec::advanced::invoke_runtime_static(
             "__range__",

@@ -1,3 +1,4 @@
+pub mod arch;
 pub(crate) mod clif_link;
 pub(crate) mod closure;
 pub(crate) mod error;

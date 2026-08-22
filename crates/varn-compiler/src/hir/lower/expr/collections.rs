@@ -122,6 +122,36 @@ impl<'a> Lowerer<'a> {
                 }
                 Ok(HirExpr::Object { properties: props })
             }
+            ExprKind::With { object, properties } => {
+                let mut props = Vec::with_capacity(1 + properties.len());
+                let base = self.lower_expr(object, scope)?;
+                props.push(HirObjectProp::Spread(base));
+                for prop in properties {
+                    match prop {
+                        ObjectProp::Property { key, value, .. } => {
+                            let k = match key {
+                                PropKey::Computed(e) => {
+                                    HirPropKey::Computed(self.lower_expr(e, scope)?)
+                                }
+                                PropKey::Identifier(s) | PropKey::Str(s) => {
+                                    HirPropKey::Static(Rc::from(s.as_str()))
+                                }
+                                PropKey::Int(n) => {
+                                    HirPropKey::Static(Rc::from(n.to_string().as_str()))
+                                }
+                            };
+                            let val = self.lower_expr(value, scope)?;
+                            props.push(HirObjectProp::Property { key: k, value: val });
+                        }
+                        ObjectProp::Spread { argument, .. } => {
+                            let arg = self.lower_expr(argument, scope)?;
+                            props.push(HirObjectProp::Spread(arg));
+                        }
+                        _ => {}
+                    }
+                }
+                Ok(HirExpr::Object { properties: props })
+            }
             other => unreachable!("lower_collection_expr: {other:?} is not handled here"),
         }
     }

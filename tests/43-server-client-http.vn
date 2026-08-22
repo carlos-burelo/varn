@@ -1,5 +1,5 @@
 import { fetch, HttpServer, server, Request, Response, Headers, json, redirect, error } from "std:http";
-import { isIP$, isIPv4$, isIPv6$, encodeURIComponent$, decodeURIComponent$ } from "runtime:net";
+import { isIP, isIPv4, isIPv6, encodeURIComponent, decodeURIComponent } from "std:net";
 
 async function runHttpVerification() {
     // 1. Test Client: Fetch GET
@@ -60,13 +60,13 @@ async function runHttpVerification() {
         return new Response("<h1>User Profile</h1>", 200, { "Content-Type": "text/html" });
     });
 
-    // 6. Builtin runtime:net helpers
-    assert("isIPv4 valid", isIPv4$("127.0.0.1") === true);
-    assert("isIPv4 invalid", isIPv4$("999.999.999.999") === false);
-    assert("isIPv6 valid", isIPv6$("::1") === true);
-    assert("isIP valid", isIP$("192.168.1.1") === true);
-    assert("encodeURIComponent", encodeURIComponent$("hello world&foo=bar") === "hello%20world%26foo%3Dbar");
-    assert("decodeURIComponent", decodeURIComponent$("hello%20world%26foo%3Dbar") === "hello world&foo=bar");
+    // 6. Net helpers from std:net
+    assert("isIPv4 valid", isIPv4("127.0.0.1") === true);
+    assert("isIPv4 invalid", isIPv4("999.999.999.999") === false);
+    assert("isIPv6 valid", isIPv6("::1") === true);
+    assert("isIP valid", isIP("192.168.1.1") === true);
+    assert("encodeURIComponent", encodeURIComponent("hello world&foo=bar") === "hello%20world%26foo%3Dbar");
+    assert("decodeURIComponent", decodeURIComponent("hello%20world%26foo%3Dbar") === "hello world&foo=bar");
 
     print("[PASSED] 43. Varn Native HTTP Client and Server Config Verification");
 }

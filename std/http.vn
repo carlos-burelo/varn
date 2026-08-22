@@ -8,10 +8,11 @@ import {
     tcpWrite$,
     tcpClose$,
     tcpCloseListener$,
-    parseHttpRequest$
+    parseHttpRequest$,
+    sendHttpResponse$
 } from "runtime:net";
 
-import { parse as jsonParse, stringify as jsonStringify, Json } from "std:json";
+import { JSON, Json } from "std:json";
 import { Url } from "std:net";
 import { spawn } from "std:task";
 
@@ -212,37 +213,6 @@ async function readHttpResponse(connId: int): Task<RawResponse?> {
     return resp;
 }
 
-function matchRoutePattern(pattern: str, path: str): { [key: str]: str }? {
-    let pathOnly = path;
-    let qIdx = path.indexOf("?");
-    if (qIdx >= 0) {
-        pathOnly = path.slice(0, qIdx);
-    }
-
-    let pp = pattern.split("/");
-    let ps = pathOnly.split("/");
-    if (pp.length !== ps.length) {
-        return null;
-    }
-
-    let params: { [key: str]: str } = {};
-    let isMatch = true;
-    for (let i = 0; i < pp.length; i = i + 1) {
-        let seg = pp[i];
-        let val = ps[i];
-        if (seg.startsWith(":")) {
-            params[seg.slice(1)] = val;
-        } else if (seg !== val) {
-            isMatch = false;
-        }
-    }
-
-    if (isMatch) {
-        return params;
-    }
-    return null;
-}
-
 // -----------------------------------------------------------------------------
 // Web Standard Request
 // -----------------------------------------------------------------------------
@@ -290,7 +260,7 @@ export class Request {
     }
 
     json(): Json {
-        return jsonParse(this.body);
+        return JSON.parse(this.body);
     }
 }
 
@@ -354,7 +324,7 @@ export class HttpResponse {
     }
 
     json(data: Json): void {
-        this.type("application/json").send(jsonStringify(data));
+        this.type("application/json").send(JSON.stringify(data));
     }
 
     html(htmlContent: str): void {
@@ -402,12 +372,12 @@ export class Response {
     }
 
     json(): Json {
-        return jsonParse(this.body);
+        return JSON.parse(this.body);
     }
 }
 
 export function json(data: Json, status: int = 200, headers: dynamic = {}): Response {
-    let body = jsonStringify(data);
+    let body = JSON.stringify(data);
     let h = new Headers(headers);
     if (!h.has("content-type")) {
         h.set("Content-Type", "application/json");
@@ -426,54 +396,118 @@ export function error(status: int = 500, message: str = "Internal Server Error")
 }
 
 // -----------------------------------------------------------------------------
+// Precompiled Dynamic Route Entry
+// -----------------------------------------------------------------------------
+class DynamicRoute {
+    method: str;
+    segments: str[];
+    paramNames: { [key: int]: str };
+    isWildcard: bool;
+    handler: dynamic;
+
+    constructor(method: str, pattern: str, handler: dynamic) {
+        this.method = method.toUpperCase();
+        this.handler = handler;
+        this.isWildcard = pattern === "*";
+        this.segments = [];
+        this.paramNames = {};
+
+        if (!this.isWildcard) {
+            let segs = pattern.split("/");
+            for (let i = 0; i < segs.length; i = i + 1) {
+                let s = segs[i];
+                if (s.startsWith(":")) {
+                    this.segments.push(":");
+                    this.paramNames[i] = s.slice(1);
+                } else {
+                    this.segments.push(s);
+                }
+            }
+        }
+    }
+
+    match(method: str, pathSegments: str[]): { [key: str]: str }? {
+        if (this.method !== "*" && this.method !== method) {
+            return null;
+        }
+
+        if (this.isWildcard) {
+            return {};
+        }
+
+        if (this.segments.length !== pathSegments.length) {
+            return null;
+        }
+
+        let params: { [key: str]: str } = {};
+        for (let i = 0; i < this.segments.length; i = i + 1) {
+            let seg = this.segments[i];
+            let reqSeg = pathSegments[i];
+            if (seg === ":") {
+                let paramName = this.paramNames[i];
+                if (paramName !== null) {
+                    params[paramName] = reqSeg;
+                }
+            } else if (seg !== reqSeg) {
+                return null;
+            }
+        }
+
+        return params;
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Web Standard HttpServer (WinterCG / Bun aligned)
 // -----------------------------------------------------------------------------
 export class HttpServer {
     private _port: int = 0;
     private _listenerId: int = -1;
     private _isListening: bool = false;
-    private _routes: { [key: str]: dynamic } = {};
+    private _staticRoutes: { [key: str]: dynamic } = {};
+    private _dynamicRoutes: DynamicRoute[] = [];
     private _fetchHandler: dynamic = null;
 
     constructor(fetchHandler?: dynamic) {
-        this._routes = {};
+        this._staticRoutes = {};
+        this._dynamicRoutes = [];
         if (fetchHandler !== null) {
             this._fetchHandler = fetchHandler;
         }
     }
 
-    private _routeKey(method: str, pattern: str): str {
-        return method.toUpperCase() + ":" + pattern;
+    private _registerRoute(method: str, pattern: str, handler: dynamic): HttpServer {
+        let m = method.toUpperCase();
+        if (pattern === "*" || pattern.indexOf(":") >= 0) {
+            this._dynamicRoutes.push(new DynamicRoute(m, pattern, handler));
+        } else {
+            this._staticRoutes[m + ":" + pattern] = handler;
+        }
+        return this;
     }
 
     get(pattern: str, handler: dynamic): HttpServer {
-        this._routes[this._routeKey("GET", pattern)] = handler;
-        return this;
+        return this._registerRoute("GET", pattern, handler);
     }
 
     post(pattern: str, handler: dynamic): HttpServer {
-        this._routes[this._routeKey("POST", pattern)] = handler;
-        return this;
+        return this._registerRoute("POST", pattern, handler);
     }
 
     put(pattern: str, handler: dynamic): HttpServer {
-        this._routes[this._routeKey("PUT", pattern)] = handler;
-        return this;
+        return this._registerRoute("PUT", pattern, handler);
     }
 
     delete(pattern: str, handler: dynamic): HttpServer {
-        this._routes[this._routeKey("DELETE", pattern)] = handler;
-        return this;
+        return this._registerRoute("DELETE", pattern, handler);
     }
 
     route(method: str, pattern: str, handler: dynamic): HttpServer {
-        this._routes[this._routeKey(method, pattern)] = handler;
-        return this;
+        return this._registerRoute(method, pattern, handler);
     }
 
     all(pattern: str, handler: dynamic): HttpServer {
-        this._routes[this._routeKey("*", pattern)] = handler;
-        return this;
+        return this._registerRoute("*", pattern, handler);
     }
 
     listen(port: int): void {
@@ -510,54 +544,23 @@ export class HttpServer {
     }
 
     private async _sendWebResponse(connId: int, responseObj: Response): Task<void> {
-        let status = responseObj.status;
-        let statusText = responseObj.statusText;
-        let responseStr = "HTTP/1.1 " + status.toString() + " " + statusText + "\r\n";
-        
-        let hdrs = responseObj.headers;
-        if (hdrs !== null) {
-            let hdrMap = hdrs.toObject();
-            for (let name in hdrMap) {
-                responseStr = responseStr + name + ": " + hdrMap[name] + "\r\n";
-            }
-        }
-        
-        let body = responseObj.body;
-        responseStr = responseStr + "Content-Length: " + body.length.toString() + "\r\n\r\n" + body;
-        
-        await tcpWrite$(connId, responseStr);
-        tcpClose$(connId);
+        let hdrs = responseObj.headers !== null ? responseObj.headers.toObject() : {};
+        await sendHttpResponse$(connId, responseObj.status, responseObj.statusText, hdrs, responseObj.body);
     }
 
     private async _handleConnection(connId: int): Task<void> {
-        let rawReq = await readHttpRequest(connId);
-        if (rawReq !== null) {
-            let matchedHandler: dynamic = null;
-            let matchedParams: { [key: str]: str } = {};
-
-            for (let routeKey in this._routes) {
-                let parts = routeKey.split(":");
-                let method = parts[0];
-                let pattern = parts[1];
-                if (method === "*" || method === rawReq.method.toUpperCase()) {
-                    if (pattern === "*") {
-                        matchedHandler = this._routes[routeKey];
-                        matchedParams = {};
-                    } else {
-                        let params = matchRoutePattern(pattern, rawReq.path);
-                        if (params !== null) {
-                            matchedHandler = this._routes[routeKey];
-                            matchedParams = params;
-                        }
-                    }
+        let keepAlive = true;
+        while (keepAlive) {
+            let rawReq = await readHttpRequest(connId);
+            if (rawReq !== null) {
+                let connHdr = rawReq.headers["connection"];
+                if (connHdr !== null && connHdr.toLowerCase() === "close") {
+                    keepAlive = false;
                 }
-            }
 
-            if (matchedHandler === null && this._fetchHandler !== null) {
-                matchedHandler = this._fetchHandler;
-            }
+                let matchedHandler: dynamic = null;
+                let matchedParams: { [key: str]: str } = {};
 
-            if (matchedHandler !== null) {
                 let pathOnly = rawReq.path;
                 let queryStr = "";
                 let qIdx = rawReq.path.indexOf("?");
@@ -565,47 +568,78 @@ export class HttpServer {
                     pathOnly = rawReq.path.slice(0, qIdx);
                     queryStr = rawReq.path.slice(qIdx + 1);
                 }
-                
-                let reqObj = new Request(rawReq.path, rawReq.method, rawReq.headers, rawReq.body);
-                reqObj.path = pathOnly;
-                
-                let queryObj: { [key: str]: str } = {};
-                if (queryStr.length > 0) {
-                    let pairs = queryStr.split("&");
-                    for (let i = 0; i < pairs.length; i = i + 1) {
-                        let pair = pairs[i];
-                        let eqIdx = pair.indexOf("=");
-                        if (eqIdx > 0) {
-                            let k = pair.slice(0, eqIdx);
-                            let v = pair.slice(eqIdx + 1);
-                            queryObj[k] = v;
-                        } else {
-                            queryObj[pair] = "true";
+
+                let reqMethod = rawReq.method.toUpperCase();
+
+                // Tier 1: Fast O(1) Static Route Lookup
+                let staticKey = reqMethod + ":" + pathOnly;
+                let staticHandler = this._staticRoutes[staticKey];
+                if (staticHandler === null) {
+                    staticHandler = this._staticRoutes["*:" + pathOnly];
+                }
+
+                if (staticHandler !== null) {
+                    matchedHandler = staticHandler;
+                    matchedParams = {};
+                } else if (this._dynamicRoutes.length > 0) {
+                    // Tier 2: Precompiled Dynamic Segment Matching
+                    let pathSegments = pathOnly.split("/");
+                    for (let route of this._dynamicRoutes) {
+                        let params = route.match(reqMethod, pathSegments);
+                        if (params !== null) {
+                            matchedHandler = route.handler;
+                            matchedParams = params;
+                            break;
                         }
                     }
                 }
-                reqObj.query = queryObj;
-                reqObj.params = matchedParams;
-                
-                let resObj = new HttpResponse(connId);
-                let result = await matchedHandler(reqObj, resObj);
-                
-                // If handler returned a Web Standard Response
-                if (result !== null && typeof result === "object" && !resObj.isSent) {
-                    let finalResp = result as Response;
-                    if (finalResp.status !== null) {
-                        await this._sendWebResponse(connId, finalResp);
-                        resObj.isSent = true;
+
+                if (matchedHandler === null && this._fetchHandler !== null) {
+                    matchedHandler = this._fetchHandler;
+                }
+
+                if (matchedHandler !== null) {
+                    let reqObj = new Request(rawReq.path, rawReq.method, rawReq.headers, rawReq.body);
+                    reqObj.path = pathOnly;
+                    
+                    let queryObj: { [key: str]: str } = {};
+                    if (queryStr.length > 0) {
+                        let pairs = queryStr.split("&");
+                        for (let i = 0; i < pairs.length; i = i + 1) {
+                            let pair = pairs[i];
+                            let eqIdx = pair.indexOf("=");
+                            if (eqIdx > 0) {
+                                let k = pair.slice(0, eqIdx);
+                                let v = pair.slice(eqIdx + 1);
+                                queryObj[k] = v;
+                            } else {
+                                queryObj[pair] = "true";
+                            }
+                        }
                     }
+                    reqObj.query = queryObj;
+                    reqObj.params = matchedParams;
+                    
+                    let resObj = new HttpResponse(connId);
+                    let result = await matchedHandler(reqObj, resObj);
+                    
+                    // If handler returned a Web Standard Response
+                    if (result !== null && typeof result === "object" && !resObj.isSent) {
+                        let finalResp = result as Response;
+                        if (finalResp.status !== null) {
+                            await this._sendWebResponse(connId, finalResp);
+                            resObj.isSent = true;
+                        }
+                    }
+                } else {
+                    let notFoundHeaders: { [key: str]: str } = { "Content-Type": "text/plain" };
+                    await sendHttpResponse$(connId, 404, "Not Found", notFoundHeaders, "Not Found");
                 }
             } else {
-                let notFoundRes = "HTTP/1.1 404 Not Found\r\nContent-Length: 9\r\nContent-Type: text/plain\r\n\r\nNot Found";
-                await tcpWrite$(connId, notFoundRes);
-                tcpClose$(connId);
+                keepAlive = false;
             }
-        } else {
-            tcpClose$(connId);
         }
+        tcpClose$(connId);
     }
 }
 

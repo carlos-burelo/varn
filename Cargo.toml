@@ -47,6 +47,12 @@ toml         = "0.8"
 # algorithm, and `indexOf`/`includes` over a large haystack is the one place
 # that difference is measurable.
 memchr       = "2"
+regex        = "1.10"
+flate2       = "1.0"
+rusqlite     = { version = "0.31", features = ["bundled"] }
+tar          = "0.4"
+zip          = { version = "2.2", default-features = false, features = ["deflate"] }
+tungstenite  = "0.21"
 
 # `unused_crate_dependencies` is the automated form of the manifest audit:
 # a declared dependency no crate target imports becomes a warning instead of

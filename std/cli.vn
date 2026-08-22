@@ -1,0 +1,43 @@
+import { args$ } from "runtime:sys";
+
+export interface ParsedArgs {
+    flags: { [key: str]: str };
+    positionals: str[];
+}
+
+export namespace CLI {
+    export function parse(rawArgs?: str[]): ParsedArgs {
+        let input = rawArgs !== null ? rawArgs : args$();
+        let flags: { [key: str]: str } = {};
+        let positionals: str[] = [];
+
+        for (let i = 0; i < input.length; i = i + 1) {
+            let arg = input[i];
+            if (arg.startsWith("--")) {
+                let body = arg.slice(2);
+                let eqIdx = body.indexOf("=");
+                if (eqIdx > 0) {
+                    let k = body.slice(0, eqIdx);
+                    let v = body.slice(eqIdx + 1);
+                    flags[k] = v;
+                } else {
+                    flags[body] = "true";
+                }
+            } else if (arg.startsWith("-")) {
+                let flag = arg.slice(1);
+                flags[flag] = "true";
+            } else {
+                positionals.push(arg);
+            }
+        }
+
+        return {
+            flags: flags,
+            positionals: positionals
+        };
+    }
+}
+
+export function parseArgs(rawArgs?: str[]): ParsedArgs {
+    return CLI.parse(rawArgs);
+}

@@ -1,0 +1,50 @@
+import {
+    compile$,
+    test$,
+    exec$,
+    findAll$,
+    replace$,
+    split$
+} from "runtime:regex";
+
+export interface RegexMatch {
+    match: str;
+    index: int;
+    groups: str[];
+}
+
+export class Regex {
+    private handle: int;
+    pattern: str;
+    flags: str;
+
+    constructor(pattern: str, flags: str = "") {
+        this.pattern = pattern;
+        this.flags = flags;
+        this.handle = compile$(pattern, flags);
+    }
+
+    static compile(pattern: str, flags: str = ""): Regex {
+        return new Regex(pattern, flags);
+    }
+
+    test(text: str): bool {
+        return test$(this.handle, text);
+    }
+
+    exec(text: str): RegexMatch? {
+        return exec$(this.handle, text) as RegexMatch?;
+    }
+
+    findAll(text: str): RegexMatch[] {
+        return findAll$(this.handle, text) as RegexMatch[];
+    }
+
+    replace(text: str, replacement: str): str {
+        return replace$(this.handle, text, replacement);
+    }
+
+    split(text: str): str[] {
+        return split$(this.handle, text) as str[];
+    }
+}

@@ -1,15 +1,13 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fs;
 use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::{Arc, LazyLock, Mutex, RwLock};
 use varn_op_macros::varn_contract;
 use varn_types::{NativeCtx, VmValue};
 
 static NEXT_FD: AtomicI64 = AtomicI64::new(1);
-
-thread_local! {
-    static FILES: RefCell<HashMap<i64, fs::File>> = RefCell::new(HashMap::new());
-}
+static FILES: LazyLock<RwLock<HashMap<i64, Arc<Mutex<fs::File>>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 pub struct FsRuntime;
 
@@ -37,62 +35,60 @@ varn_contract! {
             }.map_err(|e| e.to_string())?;
 
             let fd = NEXT_FD.fetch_add(1, Ordering::Relaxed);
-            FILES.with(|files| {
-                files.borrow_mut().insert(fd, file);
-            });
+            FILES.write().unwrap().insert(fd, Arc::new(Mutex::new(file)));
             Ok(fd)
         }
 
         fn readFd(_ctx: &mut dyn NativeCtx, fd: i64, len: i64) -> Result<String, String> {
-            FILES.with(|files| {
-                let mut files_map = files.borrow_mut();
-                let file = files_map.get_mut(&fd).ok_or_else(|| format!("invalid file descriptor {fd}"))?;
+            let file_arc = {
+                let map = FILES.read().unwrap();
+                map.get(&fd).cloned().ok_or_else(|| format!("invalid file descriptor {fd}"))?
+            };
+            let mut file = file_arc.lock().unwrap();
 
-                use std::io::Read;
-                let mut buf = vec![0u8; len as usize];
-                let bytes_read = file.read(&mut buf).map_err(|e| e.to_string())?;
-                buf.truncate(bytes_read);
-                String::from_utf8(buf).map_err(|e| e.to_string())
-            })
+            use std::io::Read;
+            let mut buf = vec![0u8; len as usize];
+            let bytes_read = file.read(&mut buf).map_err(|e| e.to_string())?;
+            buf.truncate(bytes_read);
+            String::from_utf8(buf).map_err(|e| e.to_string())
         }
 
         fn writeFd(_ctx: &mut dyn NativeCtx, fd: i64, data: &str) -> Result<i64, String> {
-            FILES.with(|files| {
-                let mut files_map = files.borrow_mut();
-                let file = files_map.get_mut(&fd).ok_or_else(|| format!("invalid file descriptor {fd}"))?;
+            let file_arc = {
+                let map = FILES.read().unwrap();
+                map.get(&fd).cloned().ok_or_else(|| format!("invalid file descriptor {fd}"))?
+            };
+            let mut file = file_arc.lock().unwrap();
 
-                use std::io::Write;
-                file.write_all(data.as_bytes()).map_err(|e| e.to_string())?;
-                Ok(data.as_bytes().len() as i64)
-            })
+            use std::io::Write;
+            file.write_all(data.as_bytes()).map_err(|e| e.to_string())?;
+            Ok(data.as_bytes().len() as i64)
         }
 
         fn seek(_ctx: &mut dyn NativeCtx, fd: i64, offset: i64, whence: i64) -> Result<i64, String> {
-            FILES.with(|files| {
-                let mut files_map = files.borrow_mut();
-                let file = files_map.get_mut(&fd).ok_or_else(|| format!("invalid file descriptor {fd}"))?;
+            let file_arc = {
+                let map = FILES.read().unwrap();
+                map.get(&fd).cloned().ok_or_else(|| format!("invalid file descriptor {fd}"))?
+            };
+            let mut file = file_arc.lock().unwrap();
 
-                use std::io::{Seek, SeekFrom};
-                let seek_from = match whence {
-                    0 => SeekFrom::Start(offset as u64),
-                    1 => SeekFrom::Current(offset),
-                    2 => SeekFrom::End(offset),
-                    _ => return Err(format!("invalid seek whence {whence}")),
-                };
-                let pos = file.seek(seek_from).map_err(|e| e.to_string())?;
-                Ok(pos as i64)
-            })
+            use std::io::{Seek, SeekFrom};
+            let seek_from = match whence {
+                0 => SeekFrom::Start(offset as u64),
+                1 => SeekFrom::Current(offset),
+                2 => SeekFrom::End(offset),
+                _ => return Err(format!("invalid seek whence {whence}")),
+            };
+            let pos = file.seek(seek_from).map_err(|e| e.to_string())?;
+            Ok(pos as i64)
         }
 
         fn close(_ctx: &mut dyn NativeCtx, fd: i64) -> Result<(), String> {
-            FILES.with(|files| {
-                let mut files_map = files.borrow_mut();
-                if files_map.remove(&fd).is_some() {
-                    Ok(())
-                } else {
-                    Err(format!("invalid file descriptor {fd}"))
-                }
-            })
+            if FILES.write().unwrap().remove(&fd).is_some() {
+                Ok(())
+            } else {
+                Err(format!("invalid file descriptor {fd}"))
+            }
         }
 
         fn exists(ctx: &mut dyn NativeCtx, path: &str) -> Result<bool, String> {

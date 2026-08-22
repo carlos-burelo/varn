@@ -80,6 +80,7 @@ pub(super) fn lower_raw(
         vars,
         cache_vars,
         str_caches,
+        obj_caches,
         all_caches,
     } = vars::declare(
         &mut b,
@@ -113,6 +114,9 @@ pub(super) fn lower_raw(
     for c in str_caches.values() {
         b.def_var(c.bytes, zero);
         b.def_var(c.len, zero);
+    }
+    for c in obj_caches.values() {
+        b.def_var(c.data_base, zero);
     }
 
     let (exec_ctx, alloc_env) = if frame_aware {
@@ -168,7 +172,17 @@ pub(super) fn lower_raw(
         }
         if let Some(ref actx) = actx {
             let fb = alloc::frame_base_addr(&mut b, actx);
-            b.ins().store(MemFlags::trusted(), p, fb, (r * 8) as i32);
+            let boxed_p = if proto.param_kinds.get(i) == Some(&SlotKind::Int) {
+                super::emit::box_int(&mut b, p)
+            } else if proto.param_kinds.get(i) == Some(&SlotKind::Bool) {
+                super::emit::box_bool(&mut b, p)
+            } else if proto.param_kinds.get(i) == Some(&SlotKind::Float) {
+                let f = b.use_var(vars[r]);
+                super::emit::box_f64(&mut b, f)
+            } else {
+                p
+            };
+            b.ins().store(MemFlags::trusted(), boxed_p, fb, (r * 8) as i32);
         }
     }
 
@@ -183,6 +197,7 @@ pub(super) fn lower_raw(
         regions: &regions,
         arrays: &cache_vars,
         strings: &str_caches,
+        objects: &obj_caches,
     };
     let arr = arrays::ArrCtx {
         vars: vars.as_slice(),
@@ -199,6 +214,7 @@ pub(super) fn lower_raw(
         cc,
         exec_ctx,
         register_meta: &proto.register_meta,
+        loop_caches: loops,
     };
     let gbl = globals::GblCtx {
         vars: vars.as_slice(),
@@ -269,6 +285,7 @@ pub(super) fn lower_raw(
                     &vars,
                     &cache_vars,
                     &str_caches,
+                    &obj_caches,
                     &regions,
                     &state,
                     ip,

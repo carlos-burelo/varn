@@ -5,6 +5,7 @@ pub(crate) mod class;
 pub(crate) mod collections;
 pub(crate) mod compare;
 pub(crate) mod ctx;
+pub(crate) mod ctx_csv;
 pub(crate) mod ctx_frames;
 pub(crate) mod ctx_json;
 pub(crate) mod ctx_modules;

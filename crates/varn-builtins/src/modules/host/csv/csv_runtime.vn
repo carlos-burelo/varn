@@ -1,0 +1,4 @@
+// runtime:csv — low-level host CSV operations.
+
+export declare function parse$(text: str, delimiter: str, hasHeader: bool, trim: bool): dynamic;
+export declare function stringify$(data: dynamic, delimiter: str): str;

@@ -1,0 +1,47 @@
+import { CSV } from "std:csv";
+
+// 1. Generate 50,000 transaction records in CSV format
+let categories = ["Electronics", "Apparel", "Home", "Books", "Sports"];
+let statuses = ["COMPLETED", "PENDING", "CANCELLED", "COMPLETED", "COMPLETED"];
+
+let rows: str[] = [];
+rows.push("id,customer,product,category,quantity,unitPrice,status,timestamp");
+
+for (let i = 0; i < 50000; i = i + 1) {
+    let cat = categories[i % 5];
+    let stat = statuses[i % 5];
+    let qty = (i % 10) + 1;
+    let price = ((i % 200) + 5) * 1.5;
+    rows.push(i + ",Customer_" + (i % 1000) + ",Product_" + (i % 500) + "," + cat + "," + qty + "," + price + "," + stat + ",2026-08-21T12:00:00Z");
+}
+
+let csvText = rows.join("\n");
+
+// 2. Real-world Data Ingestion, Filtering, Aggregation and Serialization Pipeline
+let parsed = CSV.parse(csvText);
+
+let completedSales: dynamic[] = [];
+let categoryRevenue = new Map<float>();
+let totalRevenue = 0.0;
+
+for (let i = 0; i < parsed.length; i = i + 1) {
+    let row = parsed[i];
+    if (row.status === "COMPLETED") {
+        let lineTotal: float = (row.quantity as float) * (row.unitPrice as float);
+        totalRevenue = totalRevenue + lineTotal;
+
+        let catName: str = row.category as str;
+        let currentRev = categoryRevenue.get(catName);
+        if (currentRev == null) {
+            categoryRevenue.set(catName, lineTotal);
+        } else {
+            categoryRevenue.set(catName, (currentRev as float) + lineTotal);
+        }
+
+        completedSales.push(row);
+    }
+}
+
+let serializedExport = CSV.stringify(completedSales);
+
+print("CSV Pipeline: Completed Sales = " + completedSales.length + ", Total Revenue = $" + totalRevenue + ", Export bytes = " + serializedExport.length);

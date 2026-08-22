@@ -14,7 +14,7 @@ use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_types::register_meta::RegisterMeta;
 
 use super::emit::{
-    box_or_pass, call_helper, call_helper_void, meta_is_float, unbox_f64_coerce, use_boxed,
+    self, box_or_pass, call_helper, call_helper_void, meta_is_float, unbox_f64_coerce, use_boxed,
     HEAP_EXPECT, HEAP_MASK,
 };
 use super::kinds::K;
@@ -27,6 +27,7 @@ pub(crate) struct FldCtx<'a> {
     pub cc: CallConv,
     pub exec_ctx: cranelift_codegen::ir::Value,
     pub register_meta: &'a [RegisterMeta],
+    pub loop_caches: emit::LoopCaches<'a>,
 }
 
 /// Resolve boxed object `obj` + `slot` to the inline field's machine address,
@@ -138,6 +139,21 @@ pub(super) fn emit_get_fixed_field(
     let cont = b.create_block();
     b.append_block_param(cont, types::I64);
 
+    let slot_off = (slot * 8) as i32;
+    if let Some(cache) = c.loop_caches.object(ip, obj_r) {
+        let base = b.use_var(cache.data_base);
+        let ok_cache = b.ins().icmp_imm(IntCC::NotEqual, base, 0);
+        let fast_blk = b.create_block();
+        let unhoisted_blk = b.create_block();
+        b.ins().brif(ok_cache, fast_blk, &[], unhoisted_blk, &[]);
+
+        b.switch_to_block(fast_blk);
+        let val = b.ins().load(types::I64, MemFlags::trusted(), base, slot_off);
+        b.ins().jump(cont, &[val.into()]);
+
+        b.switch_to_block(unhoisted_blk);
+    }
+
     let field = emit_object_field_addr(b, c, obj, slot, slow, false);
     let val = b.ins().load(types::I64, MemFlags::trusted(), field, 0);
     b.ins().jump(cont, &[val.into()]);
@@ -157,10 +173,6 @@ pub(super) fn emit_get_fixed_field(
     if meta_is_float(c.register_meta, first_reg) {
         let f = unbox_f64_coerce(b, v);
         b.def_var(c.vars[first_reg], f);
-    } else if super::emit::meta_is_int(c.register_meta, first_reg) {
-        let sh = b.ins().ishl_imm(v, 16);
-        let un = b.ins().sshr_imm(sh, 16);
-        b.def_var(c.vars[first_reg], un);
     } else {
         b.def_var(c.vars[first_reg], v);
     }
@@ -185,6 +197,21 @@ pub(super) fn emit_set_fixed_field(
 
     let slow = b.create_block();
     let cont = b.create_block();
+
+    let slot_off = (slot * 8) as i32;
+    if let Some(cache) = c.loop_caches.object(ip, first_reg) {
+        let base = b.use_var(cache.data_base);
+        let ok_cache = b.ins().icmp_imm(IntCC::NotEqual, base, 0);
+        let fast_blk = b.create_block();
+        let unhoisted_blk = b.create_block();
+        b.ins().brif(ok_cache, fast_blk, &[], unhoisted_blk, &[]);
+
+        b.switch_to_block(fast_blk);
+        b.ins().store(MemFlags::trusted(), val, base, slot_off);
+        b.ins().jump(cont, &[]);
+
+        b.switch_to_block(unhoisted_blk);
+    }
 
     let field = emit_object_field_addr(b, c, obj, slot, slow, true);
     b.ins().store(MemFlags::trusted(), val, field, 0);

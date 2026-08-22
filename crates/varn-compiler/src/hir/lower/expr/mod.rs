@@ -132,6 +132,7 @@ impl<'a> Lowerer<'a> {
             ExprKind::Array { .. }
             | ExprKind::Tuple { .. }
             | ExprKind::Record { .. }
+            | ExprKind::With { .. }
             | ExprKind::Object { .. } => self.lower_collection_expr(expr, scope),
 
             ExprKind::Function { .. } | ExprKind::Arrow { .. } | ExprKind::ClassExpr { .. } => {

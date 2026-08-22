@@ -13,7 +13,10 @@ use cranelift_codegen::ir::{condcodes::IntCC, types, InstBuilder, MemFlags};
 use cranelift_frontend::FunctionBuilder;
 use std::collections::HashMap;
 
-use super::emit::{self, call_helper, emit_array_payload, RegionCache, StrRegionCache};
+use super::emit::{
+    self, call_helper, emit_array_payload, emit_object_data_base, ObjRegionCache, RegionCache,
+    StrRegionCache,
+};
 use super::kinds::K;
 use crate::JitHelpers;
 
@@ -27,6 +30,7 @@ pub(super) fn emit_region_caches(
     vars: &[cranelift_frontend::Variable],
     cache_vars: &HashMap<(usize, usize), RegionCache>,
     str_caches: &HashMap<(usize, usize), StrRegionCache>,
+    obj_caches: &HashMap<(usize, usize), ObjRegionCache>,
     regions: &[emit::Region],
     state: &[K],
     ip: usize,
@@ -34,6 +38,7 @@ pub(super) fn emit_region_caches(
     for region in regions.iter().filter(|reg| reg.header == ip) {
         let h = &region.header;
         emit_str_caches(b, helpers, cc, exec_ctx, vars, str_caches, region, state);
+        emit_obj_caches(b, helpers, exec_ctx, vars, obj_caches, region, state);
         for &r in &region.arrays {
             if state[r] != K::Boxed {
                 continue;
@@ -177,5 +182,48 @@ fn emit_str_caches(
         b.def_var(cache.bytes, bytes);
         let len = b.block_params(done)[0];
         b.def_var(cache.len, len);
+    }
+}
+
+/// Resolve each object receiver of `region` to its inline field base address.
+fn emit_obj_caches(
+    b: &mut FunctionBuilder,
+    helpers: &JitHelpers,
+    exec_ctx: cranelift_codegen::ir::Value,
+    vars: &[cranelift_frontend::Variable],
+    obj_caches: &HashMap<(usize, usize), ObjRegionCache>,
+    region: &emit::Region,
+    state: &[K],
+) {
+    for &r in &region.objects {
+        let Some(cache) = obj_caches.get(&(region.header, r)) else {
+            continue;
+        };
+        if state[r] != K::Boxed {
+            continue;
+        }
+        let obj = b.use_var(vars[r]);
+        let invalid = b.create_block();
+        let done = b.create_block();
+        b.append_block_param(done, types::I64);
+
+        let data_base = emit_object_data_base(
+            b,
+            exec_ctx,
+            obj,
+            &helpers.object_layout,
+            &helpers.array_layout,
+            helpers.heap_field_offset,
+            invalid,
+        );
+        b.ins().jump(done, &[data_base.into()]);
+
+        b.switch_to_block(invalid);
+        let z = b.ins().iconst(types::I64, 0);
+        b.ins().jump(done, &[z.into()]);
+
+        b.switch_to_block(done);
+        let resolved = b.block_params(done)[0];
+        b.def_var(cache.data_base, resolved);
     }
 }

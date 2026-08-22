@@ -67,7 +67,7 @@ impl Checker {
             TypeKind::Intrinsic(varn_core::TypeTag::Dynamic) => true,
             TypeKind::Intrinsic(varn_core::TypeTag::Never) => false,
             TypeKind::Intrinsic(varn_core::TypeTag::Str) => {
-                if key == "length" {
+                if key == varn_core::MemberKey::Length.as_str() {
                     return true;
                 }
                 if let Some(b) = &bind.core {
@@ -98,7 +98,10 @@ impl Checker {
                 type_args: _,
                 payload_ty,
             } => {
-                if key == "rawValue" || key == "__tag" || key == "name" || key == "__variant_name__"
+                if key == varn_core::MemberKey::RawValue.as_str()
+                    || key == varn_core::MemberKey::Tag.as_str()
+                    || key == varn_core::MemberKey::Name.as_str()
+                    || key == varn_core::MemberKey::VariantName.as_str()
                 {
                     return true;
                 }
@@ -129,7 +132,9 @@ impl Checker {
                     }
                 }
 
-                if name.as_ref() == varn_core::IntrinsicType::Str.as_str() && key == "length" {
+                if name.as_ref() == varn_core::IntrinsicType::Str.as_str()
+                    && key == varn_core::MemberKey::Length.as_str()
+                {
                     return true;
                 }
 
@@ -146,10 +151,10 @@ impl Checker {
                         });
 
                 if is_enum {
-                    if key == "rawValue"
-                        || key == "__tag"
-                        || key == "name"
-                        || key == "__variant_name__"
+                    if key == varn_core::MemberKey::RawValue.as_str()
+                        || key == varn_core::MemberKey::Tag.as_str()
+                        || key == varn_core::MemberKey::Name.as_str()
+                        || key == varn_core::MemberKey::VariantName.as_str()
                     {
                         return true;
                     }
@@ -248,7 +253,7 @@ impl Checker {
             // still firing. Collapsing `member_exists` into
             // `find_member_info(..).is_some()` is the real fix; it is a change
             // across a 15k-line crate and does not belong in this one.
-            TypeKind::Tuple(_) => key == "length",
+            TypeKind::Tuple(_) => key == varn_core::MemberKey::Length.as_str(),
             TypeKind::Array(_) => {
                 if let Some(b) = &bind.core {
                     if let Some(members) = b

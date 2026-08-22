@@ -238,21 +238,19 @@ pub fn parse_decorator_list(s: &mut TokenStream) -> Result<Vec<Decorator>, Strin
 
 fn parse_decorator_expr(s: &mut TokenStream) -> Result<Expr, String> {
     let range = s.range();
-    let name = s.expect_lexeme(TokenKind::Identifier)?;
-    let mut expr = Expr::new_with_range(range, ExprKind::Identifier { name });
+    let name = s.expect_id()?;
+    let mut expr = s.expr(range, ExprKind::Identifier { name });
 
     while s.eat(TokenKind::Dot) {
         let prop_range = s.range();
         let prop = s.consume_lexeme();
         let start_range = *expr.range();
-        expr = Expr::new_with_range(
+        let prop_expr = s.expr(prop_range, ExprKind::Identifier { name: prop });
+        expr = s.expr(
             start_range.to(prop_range),
             ExprKind::Member {
                 object: Box::new(expr),
-                property: Box::new(Expr::new_with_range(
-                    prop_range,
-                    ExprKind::Identifier { name: prop },
-                )),
+                property: Box::new(prop_expr),
                 computed: false,
                 optional: false,
             },
@@ -262,7 +260,7 @@ fn parse_decorator_expr(s: &mut TokenStream) -> Result<Expr, String> {
     if s.check(TokenKind::LParen) {
         let (type_args, args, call_range) = parse_call_args_pub(s)?;
         let start_range = *expr.range();
-        expr = Expr::new_with_range(
+        expr = s.expr(
             start_range.to(call_range),
             ExprKind::Call {
                 callee: Box::new(expr),

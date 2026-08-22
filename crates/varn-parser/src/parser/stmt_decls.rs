@@ -30,12 +30,9 @@ pub(super) fn try_parse_decl_stmt_mode(
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
             };
-            decl.doc = s.take_pending_doc().map(|doc| doc.to_string());
-            let range = decl.range.clone();
-            Ok(Stmt::new_with_range(
-                range,
-                StmtKind::Decl(Box::new(Decl::Function(decl))),
-            ))
+            decl.doc = s.current_doc();
+            let range = decl.range;
+            Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Function(decl)))))
         }
         TokenKind::Async if next_kind == TokenKind::Function => {
             s.advance();
@@ -44,36 +41,27 @@ pub(super) fn try_parse_decl_stmt_mode(
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
             };
-            decl.doc = s.take_pending_doc().map(|doc| doc.to_string());
-            let range = decl.range.clone();
-            Ok(Stmt::new_with_range(
-                range,
-                StmtKind::Decl(Box::new(Decl::Function(decl))),
-            ))
+            decl.doc = s.current_doc();
+            let range = decl.range;
+            Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Function(decl)))))
         }
         TokenKind::Class | TokenKind::Abstract => {
             let mut decl = match super::decls::parse_class_decl(s, decorators, is_declare) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
             };
-            decl.doc = s.take_pending_doc().map(|doc| doc.to_string());
-            let range = decl.range.clone();
-            Ok(Stmt::new_with_range(
-                range,
-                StmtKind::Decl(Box::new(Decl::Class(decl))),
-            ))
+            decl.doc = s.current_doc();
+            let range = decl.range;
+            Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Class(decl)))))
         }
         TokenKind::Interface => {
             let mut decl = match super::decls::parse_interface_decl(s) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
             };
-            decl.doc = s.take_pending_doc().map(|doc| doc.to_string());
-            let range = decl.range.clone();
-            Ok(Stmt::new_with_range(
-                range,
-                StmtKind::Decl(Box::new(Decl::Interface(decl))),
-            ))
+            decl.doc = s.current_doc();
+            let range = decl.range;
+            Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Interface(decl)))))
         }
         TokenKind::Type => {
             let mut decl = match super::decls::parse_sum_type_or_alias(s) {
@@ -81,98 +69,77 @@ pub(super) fn try_parse_decl_stmt_mode(
                 Err(err) => return Some(Err(err)),
             };
             match &mut decl {
-                Decl::TypeAlias(d) => d.doc = s.take_pending_doc().map(|doc| doc.to_string()),
-                Decl::SumType(d) => d.doc = s.take_pending_doc().map(|doc| doc.to_string()),
+                Decl::TypeAlias(d) => d.doc = s.current_doc(),
+                Decl::SumType(d) => d.doc = s.current_doc(),
                 _ => {}
             }
-            let range = decl.range().clone();
-            Ok(Stmt::new_with_range(range, StmtKind::Decl(Box::new(decl))))
+            let range = *decl.range();
+            Ok(s.stmt(range, StmtKind::Decl(Box::new(decl))))
         }
         TokenKind::Enum => {
             let mut decl = match super::decls::parse_enum_decl(s) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
             };
-            decl.doc = s.take_pending_doc().map(|doc| doc.to_string());
-            let range = decl.range.clone();
-            Ok(Stmt::new_with_range(
-                range,
-                StmtKind::Decl(Box::new(Decl::Enum(decl))),
-            ))
+            decl.doc = s.current_doc();
+            let range = decl.range;
+            Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Enum(decl)))))
         }
         TokenKind::Namespace | TokenKind::Module => {
             let mut decl = match super::decls::parse_namespace_decl(s) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
             };
-            decl.doc = s.take_pending_doc().map(|doc| doc.to_string());
-            let range = decl.range.clone();
-            Ok(Stmt::new_with_range(
-                range,
-                StmtKind::Decl(Box::new(Decl::Namespace(decl))),
-            ))
+            decl.doc = s.current_doc();
+            let range = decl.range;
+            Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Namespace(decl)))))
         }
         TokenKind::Struct => {
             let mut decl = match super::decls::parse_struct_decl(s) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
             };
-            decl.doc = s.take_pending_doc().map(|doc| doc.to_string());
-            let range = decl.range.clone();
-            Ok(Stmt::new_with_range(
-                range,
-                StmtKind::Decl(Box::new(Decl::Struct(decl))),
-            ))
+            decl.doc = s.current_doc();
+            let range = decl.range;
+            Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Struct(decl)))))
         }
         TokenKind::Extension => {
             let decl = match super::decls::parse_extension_decl(s) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
             };
-            let range = decl.range.clone();
-            Ok(Stmt::new_with_range(
-                range,
-                StmtKind::Decl(Box::new(Decl::Extension(decl))),
-            ))
+            let range = decl.range;
+            Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Extension(decl)))))
         }
         TokenKind::Let | TokenKind::Const | TokenKind::Var => {
             let mut decl = match super::decls::parse_var_decl_with_declare(s, is_declare) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
             };
-            decl.doc = s.take_pending_doc().map(|doc| doc.to_string());
+            decl.doc = s.current_doc();
             s.eat_semicolon();
-            let range = decl.range.clone();
-            Ok(Stmt::new_with_range(
-                range,
-                StmtKind::Decl(Box::new(Decl::Variable(decl))),
-            ))
+            let range = decl.range;
+            Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Variable(decl)))))
         }
         TokenKind::Import => {
             let decl = match super::decls::parse_import_decl(s) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
             };
-            let _ = s.take_pending_doc();
+            let _ = s.current_doc();
             s.eat_semicolon();
-            let range = decl.range.clone();
-            Ok(Stmt::new_with_range(
-                range,
-                StmtKind::Decl(Box::new(Decl::Import(decl))),
-            ))
+            let range = decl.range;
+            Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Import(decl)))))
         }
         TokenKind::Export => {
             let decl = match super::decls::parse_export_decl(s, decorators) {
                 Ok(decl) => decl,
                 Err(err) => return Some(Err(err)),
             };
-            let _ = s.take_pending_doc();
+            let _ = s.current_doc();
             s.eat_semicolon();
-            let range = decl.range().clone();
-            Ok(Stmt::new_with_range(
-                range,
-                StmtKind::Decl(Box::new(Decl::Export(decl))),
-            ))
+            let range = *decl.range();
+            Ok(s.stmt(range, StmtKind::Decl(Box::new(Decl::Export(decl)))))
         }
         _ => return None,
     };

@@ -124,6 +124,7 @@ pub(crate) fn set_property(obj: VmValue, key: &str, val: VmValue, heap: &mut Hea
 pub(crate) fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmResult<VmValue> {
     if obj.is_heap() {
         let idx = obj.as_heap_idx();
+        // eprintln!("[get_fixed_field] obj={:?} idx={} (nursery={}) slot={}", obj, idx, crate::nursery::is_nursery_idx(idx), slot);
 
         enum FoundField {
             Vm(VmValue),
@@ -158,16 +159,24 @@ pub(crate) fn get_fixed_field(obj: VmValue, slot: usize, heap: &mut Heap) -> VmR
             None => {}
         }
     }
-    Err(RuntimeError::new(format!(
-        "OpGetFixedField: slot {} out of range on obj {:?} (heap_obj={:?})",
-        slot,
-        obj,
-        if obj.is_heap() {
-            heap.get(obj.as_heap_idx())
+        let details = if obj.is_heap() {
+            match heap.get(obj.as_heap_idx()) {
+                Some(HeapObj::Object(o)) => format!(
+                    "Object[inline_len={}, slot_count={}, props={:?}]",
+                    o.inline_len(),
+                    o.slot_count(),
+                    o.shape().property_names
+                ),
+                Some(other) => format!("{:?}", other),
+                None => "None".to_string(),
+            }
         } else {
-            None
-        }
-    )))
+            format!("{:?}", obj)
+        };
+        Err(RuntimeError::new(format!(
+            "OpGetFixedField: slot {} out of range on obj {:?} (details: {})",
+            slot, obj, details
+        )))
 }
 
 #[inline(always)]
@@ -247,7 +256,9 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
     let idx = obj.as_heap_idx();
     match heap.get(idx).cloned() {
         Some(HeapObj::Object(o)) | Some(HeapObj::Record(o)) => o.get(key),
-        Some(HeapObj::Array(a)) | Some(HeapObj::Tuple(a)) if key == "length" => {
+        Some(HeapObj::Array(a)) | Some(HeapObj::Tuple(a))
+            if key == varn_core::MemberKey::Length.as_str() =>
+        {
             Some(VmValue::from_int(a.len() as i64))
         }
         _ => None,
@@ -283,12 +294,16 @@ fn get_class_for_value(val: &Value, heap: &Heap) -> Option<Rc<ClassObj>> {
 
 fn resolve_intrinsic_method_property(obj: &Value, key: &str, heap: &mut Heap) -> Option<Value> {
     if let Value::Generator(_) = obj {
-        if key == "next" {
-            return Some(Value::native_bound(obj.clone(), generator_next, "next"));
+        if key == varn_core::MemberKey::IterNext.as_str() {
+            return Some(Value::native_bound(
+                obj.clone(),
+                generator_next,
+                varn_core::MemberKey::IterNext.as_str(),
+            ));
         }
     }
 
-    if matches!(obj, Value::EnumVariant(_)) && key == "name" {
+    if matches!(obj, Value::EnumVariant(_)) && key == varn_core::MemberKey::Name.as_str() {
         return None;
     }
 
@@ -297,7 +312,7 @@ fn resolve_intrinsic_method_property(obj: &Value, key: &str, heap: &mut Heap) ->
         return Some(bind_method_to_receiver(obj.clone(), method, Some(owner)));
     }
 
-    if key == "name" {
+    if key == varn_core::MemberKey::Name.as_str() {
         return Some(Value::Str(Rc::from(cls.name.as_str())));
     }
 
@@ -320,7 +335,7 @@ fn resolve_specialized_value_property(
             None
         }
         Value::Array(arr) => {
-            if key == "length" {
+            if key == varn_core::MemberKey::Length.as_str() {
                 return Some(Ok(Value::Int(arr.len() as i64)));
             }
             if let Ok(n) = key.parse::<usize>() {
@@ -334,7 +349,7 @@ fn resolve_specialized_value_property(
             None
         }
         Value::Str(s) => {
-            if key == "length" {
+            if key == varn_core::MemberKey::Length.as_str() {
                 return Some(Ok(Value::Int(s.len() as i64)));
             }
             None
@@ -345,13 +360,7 @@ fn resolve_specialized_value_property(
                 .and_then(|k| m.0.borrow().get(&k).copied());
             found.map(|nv| Ok(heap.extract(nv)))
         }
-        Value::Set(_) => {
-            if key == "size" || key == "length" {
-                None
-            } else {
-                None
-            }
-        }
+        Value::Set(_) => None,
         Value::EnumVariant(ev) => {
             if let Value::Object(o) = &ev.payload {
                 let guard = o.borrow();

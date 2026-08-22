@@ -9,8 +9,7 @@ use varn_types::bytecode::decode;
 use varn_types::register_meta::RegisterMeta;
 
 use super::super::emit::{
-    box_or_pass, call_helper_void, meta_is_float, state_meta_int, unbox_bool, unbox_f64_coerce,
-    wrap_i48,
+    box_or_pass, call_helper_void, meta_is_float, unbox_bool, unbox_f64_coerce, wrap_i48,
 };
 use super::super::kinds::K;
 use super::super::liveness::Liveness;
@@ -206,10 +205,6 @@ pub(crate) fn def_result(
     if meta_is_float(actx.register_meta, dest) {
         let f = unbox_f64_coerce(b, res);
         b.def_var(actx.vars[dest], f);
-    } else if state_meta_int(actx.register_meta, dest) {
-        let sh = b.ins().ishl_imm(res, 16);
-        let un = b.ins().sshr_imm(sh, 16);
-        b.def_var(actx.vars[dest], un);
     } else {
         b.def_var(actx.vars[dest], res);
     }

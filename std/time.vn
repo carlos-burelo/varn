@@ -28,7 +28,7 @@ export type DurationParts = {
     sign?: int;
 };
 
-export type DurationLike = str | int | DurationParts;
+export type DurationLike = Duration | str | int | DurationParts;
 
 function int_div(a: int, b: int): int {
     // `/` on two ints is int/int -> float by design, so the exact quotient
@@ -198,11 +198,13 @@ export class Duration {
     }
 
     static from(input: DurationLike): Duration {
-        if (input instanceof str) {
-            let ms = parseIsoDuration$(input);
+        if (input instanceof Duration) {
+            return input as Duration;
+        } else if (input instanceof str) {
+            let ms = parseIsoDuration$(input as str);
             return new Duration(ms);
         } else if (input instanceof int) {
-            return new Duration(input);
+            return new Duration(input as int);
         } else {
             let parts = input as DurationParts;
             let ms = 0;
@@ -225,48 +227,24 @@ export class Duration {
         return new Duration(-this.totalMilliseconds);
     }
 
-    add(other: Duration | DurationLike): Duration {
-        let other_ms = 0;
-        if (other instanceof Duration) {
-            other_ms = other.totalMilliseconds;
-        } else {
-            let od = Duration.from(other);
-            other_ms = od.totalMilliseconds;
-        }
-        return new Duration(this.totalMilliseconds + other_ms);
+    add(other: DurationLike): Duration {
+        let od = Duration.from(other);
+        return new Duration(this.totalMilliseconds + od.totalMilliseconds);
     }
 
-    subtract(other: Duration | DurationLike): Duration {
-        let other_ms = 0;
-        if (other instanceof Duration) {
-            other_ms = other.totalMilliseconds;
-        } else {
-            let od = Duration.from(other);
-            other_ms = od.totalMilliseconds;
-        }
-        return new Duration(this.totalMilliseconds - other_ms);
+    subtract(other: DurationLike): Duration {
+        let od = Duration.from(other);
+        return new Duration(this.totalMilliseconds - od.totalMilliseconds);
     }
 
-    compare(other: Duration | DurationLike): int {
-        let other_ms = 0;
-        if (other instanceof Duration) {
-            other_ms = other.totalMilliseconds;
-        } else {
-            let od = Duration.from(other);
-            other_ms = od.totalMilliseconds;
-        }
-        return this.totalMilliseconds - other_ms;
+    compare(other: DurationLike): int {
+        let od = Duration.from(other);
+        return this.totalMilliseconds - od.totalMilliseconds;
     }
 
-    equals(other: Duration | DurationLike): bool {
-        let other_ms = 0;
-        if (other instanceof Duration) {
-            other_ms = other.totalMilliseconds;
-        } else {
-            let od = Duration.from(other);
-            other_ms = od.totalMilliseconds;
-        }
-        return this.totalMilliseconds === other_ms;
+    equals(other: DurationLike): bool {
+        let od = Duration.from(other);
+        return this.totalMilliseconds === od.totalMilliseconds;
     }
 
     toString(): str {
@@ -279,7 +257,7 @@ export class Duration {
 }
 
 export class DateTime {
-    private timestamp: int;
+    timestamp: int;
 
     constructor(timestampMs?: int) {
         if (timestampMs !== null) {
@@ -327,7 +305,7 @@ export class DateTime {
     }
 
     diff(other: DateTime): int {
-        return this.timestamp - other.toMs;
+        return this.timestamp - other.timestamp;
     }
 }
 

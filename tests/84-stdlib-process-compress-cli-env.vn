@@ -1,0 +1,70 @@
+import { Process } from "std:process";
+import { Compress } from "std:compress";
+import { CLI } from "std:cli";
+import { Env } from "std:env";
+import { Path } from "std:path";
+import { assert, assertEqual } from "std:test";
+
+// ==========================================
+// 1. Process Execution (std:process)
+// ==========================================
+let procRes = Process.exec("echo VarnProcessTest");
+assertEqual(procRes.exitCode, 0);
+assertEqual(procRes.success, true);
+assert(procRes.stdout.includes("VarnProcessTest"));
+
+// ==========================================
+// 2. Compression & Decompression (std:compress)
+// ==========================================
+let originalText = "Varn Language: Fast, Type-Safe, High-Performance Systems Language with Register VM!";
+
+// Gzip roundtrip
+let gzipped = Compress.gzip(originalText);
+assert(gzipped.length > 0);
+let unzipped = Compress.gunzip(gzipped);
+assertEqual(unzipped, originalText);
+
+// Deflate / Inflate roundtrip
+let deflated = Compress.deflate(originalText);
+assert(deflated.length > 0);
+let inflated = Compress.inflate(deflated);
+assertEqual(inflated, originalText);
+
+// ==========================================
+// 3. CLI Argument Parser (std:cli)
+// ==========================================
+let sampleArgs = ["--port=9000", "--host=localhost", "-d", "serve", "api/v1"];
+let parsed = CLI.parse(sampleArgs);
+assertEqual(parsed.flags["port"], "9000");
+assertEqual(parsed.flags["host"], "localhost");
+assertEqual(parsed.flags["d"], "true");
+assertEqual(parsed.positionals.length, 2);
+assertEqual(parsed.positionals[0], "serve");
+assertEqual(parsed.positionals[1], "api/v1");
+
+// ==========================================
+// 4. Environment Variables (std:env)
+// ==========================================
+Env.set("VARN_TEST_PORT", "8080");
+assertEqual(Env.get("VARN_TEST_PORT"), "8080");
+assertEqual(Env.getInt("VARN_TEST_PORT", 3000), 8080);
+assertEqual(Env.getInt("VARN_NON_EXISTING_KEY", 5000), 5000);
+
+Env.set("VARN_DEBUG_FLAG", "true");
+assertEqual(Env.getBool("VARN_DEBUG_FLAG", false), true);
+
+let dotEnvContent = "# Configuration\nAPP_NAME=VarnServer\nPORT=4000\nDEBUG=true\n";
+let envMap = Env.parse(dotEnvContent);
+assertEqual(envMap["APP_NAME"], "VarnServer");
+assertEqual(envMap["PORT"], "4000");
+assertEqual(envMap["DEBUG"], "true");
+
+// ==========================================
+// 5. Canonical Path Namespace (std:path)
+// ==========================================
+let joinedPath = Path.join("src", "modules", "app.vn");
+assert(joinedPath.includes("src") && joinedPath.includes("app.vn"));
+assertEqual(Path.extname("archive.tar.gz"), ".gz");
+assertEqual(Path.extname("index.html"), ".html");
+
+print("[PASSED] 84. Overhauled StdLib (std:process, std:compress, std:cli, std:env & Path namespace)");

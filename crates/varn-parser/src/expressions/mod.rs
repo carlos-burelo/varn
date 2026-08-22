@@ -135,10 +135,7 @@ pub fn parse_seq_expr(s: &mut TokenStream) -> Result<Expr, String> {
     } else {
         start
     };
-    Ok(Expr::new_with_range(
-        range,
-        ExprKind::Sequence { expressions: exprs },
-    ))
+    Ok(s.expr(range, ExprKind::Sequence { expressions: exprs }))
 }
 
 pub(super) fn parse_assign_expr(s: &mut TokenStream) -> Result<Expr, String> {
@@ -158,7 +155,7 @@ pub(super) fn parse_assign_expr(s: &mut TokenStream) -> Result<Expr, String> {
         s.advance();
         let right = parse_assign_expr(s)?;
         let range = left.range().to(*right.range());
-        return Ok(Expr::new_with_range(
+        return Ok(s.expr(
             range,
             ExprKind::Assign {
                 op,
@@ -179,7 +176,7 @@ fn parse_conditional_expr(s: &mut TokenStream) -> Result<Expr, String> {
         s.expect(TokenKind::Colon)?;
         let alternate = parse_assign_expr(s)?;
         let range = expr.range().to(*alternate.range());
-        return Ok(Expr::new_with_range(
+        return Ok(s.expr(
             range,
             ExprKind::Conditional {
                 test: Box::new(expr),
@@ -213,7 +210,7 @@ pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> Result<E
 
             let range = left.range().to(*right.range());
             if let Some(logical) = token_to_logical_op(op_kind) {
-                left = Expr::new_with_range(
+                left = s.expr(
                     range,
                     ExprKind::Logical {
                         op: logical,
@@ -222,7 +219,7 @@ pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> Result<E
                     },
                 );
             } else if op_kind == TokenKind::DotDot || op_kind == TokenKind::DotDotEq {
-                left = Expr::new_with_range(
+                left = s.expr(
                     range,
                     ExprKind::Range {
                         start: Box::new(left),
@@ -231,7 +228,7 @@ pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> Result<E
                     },
                 );
             } else if op_kind == TokenKind::PipeGt {
-                left = Expr::new_with_range(
+                left = s.expr(
                     range,
                     ExprKind::Pipeline {
                         left: Box::new(left),
@@ -239,7 +236,7 @@ pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> Result<E
                     },
                 );
             } else if let Some(bin) = token_to_binary_op(op_kind) {
-                left = Expr::new_with_range(
+                left = s.expr(
                     range,
                     ExprKind::Binary {
                         op: bin,
@@ -260,7 +257,7 @@ pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> Result<E
             let ty_range = *ty.clone().range();
             let range = left.range().to(ty_range);
             left = if kind == TokenKind::As {
-                Expr::new_with_range(
+                s.expr(
                     range,
                     ExprKind::As {
                         expression: Box::new(left),
@@ -268,7 +265,7 @@ pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> Result<E
                     },
                 )
             } else if kind == TokenKind::Is {
-                Expr::new_with_range(
+                s.expr(
                     range,
                     ExprKind::Is {
                         expression: Box::new(left),
@@ -276,7 +273,7 @@ pub(super) fn parse_binary_expr(s: &mut TokenStream, min_prec: Prec) -> Result<E
                     },
                 )
             } else {
-                Expr::new_with_range(
+                s.expr(
                     range,
                     ExprKind::Satisfies {
                         expression: Box::new(left),

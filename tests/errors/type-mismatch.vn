@@ -1,2 +1,2 @@
-// expect: error[Varn3001]
+// expect: error[VN3001]
 const x: int = "hello"

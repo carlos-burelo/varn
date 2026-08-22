@@ -29,16 +29,14 @@ pub struct FunctionType {
     pub type_params: Vec<Rc<str>>,
 }
 
+pub type SemanticTypeKind =
+    TypeKind<Box<Type>, Rc<str>, Vec<Type>, FunctionType, Vec<ObjectTypeMember>, ()>;
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub struct Type(
-    pub TypeKind<Box<Type>, Rc<str>, Vec<Type>, FunctionType, Vec<ObjectTypeMember>, ()>,
-    pub bool,
-);
+pub struct Type(pub SemanticTypeKind, pub bool);
 
 impl Type {
-    pub fn kind(
-        &self,
-    ) -> &TypeKind<Box<Type>, Rc<str>, Vec<Type>, FunctionType, Vec<ObjectTypeMember>, ()> {
+    pub fn kind(&self) -> &SemanticTypeKind {
         &self.0
     }
 
@@ -117,6 +115,7 @@ pub struct ClassMemberInfo {
     pub is_abstract: bool,
     pub is_readonly: bool,
     pub is_override: bool,
+    pub is_builtin_or_intrinsic: bool,
     pub symbol_id: Option<usize>,
 }
 

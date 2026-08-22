@@ -169,11 +169,13 @@ pub enum TokenKind {
     Parallel = 158,
 
     Start = 159,
+
+    RawStr = 160,
 }
 
 impl TokenKind {
     pub fn from_u32(v: u32) -> Self {
-        if v <= 159 {
+        if v <= 160 {
             unsafe { std::mem::transmute::<u32, TokenKind>(v) }
         } else {
             TokenKind::Dynamic
@@ -196,6 +198,7 @@ impl TokenKind {
                 | BigIntLiteral
                 | DecimalLiteral
                 | Str
+                | RawStr
                 | Char
                 | Template
                 | TemplateHead
@@ -409,6 +412,7 @@ impl TokenKind {
             TokenKind::Destructor => "destructor",
             TokenKind::Match => "match",
             TokenKind::At => "@",
+            TokenKind::RawStr => "string",
             _ => "unknown",
         }
     }

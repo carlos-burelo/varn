@@ -1,0 +1,116 @@
+import { JSON } from "std:json";
+
+class Route {
+    method: str;
+    segments: str[];
+    handler: (req: ReqContext) => ResContext;
+
+    constructor(method: str, pattern: str, handler: (req: ReqContext) => ResContext) {
+        this.method = method;
+        this.handler = handler;
+        this.segments = [];
+
+        let rawSegs = pattern.split("/");
+        for (let i = 0; i < rawSegs.length; i = i + 1) {
+            let s = rawSegs[i];
+            if (s.length > 0) {
+                this.segments.push(s);
+            }
+        }
+    }
+
+    match(method: str, pathSegments: str[]): { [key: str]: str }? {
+        if (this.method !== "*" && this.method !== method) {
+            return null;
+        }
+        if (this.segments.length !== pathSegments.length) {
+            return null;
+        }
+
+        let params: { [key: str]: str } = {};
+        for (let i = 0; i < this.segments.length; i = i + 1) {
+            let seg = this.segments[i];
+            let reqSeg = pathSegments[i];
+            if (seg.startsWith(":")) {
+                let pName = seg.slice(1);
+                params[pName] = reqSeg;
+            } else if (seg !== reqSeg) {
+                return null;
+            }
+        }
+        return params;
+    }
+}
+
+class ReqContext {
+    method: str;
+    url: str;
+    path: str;
+    headers: { [key: str]: str };
+    params: { [key: str]: str };
+    query: { [key: str]: str };
+    user: str?;
+
+    constructor(method: str, url: str, headers: { [key: str]: str }) {
+        this.method = method;
+        this.url = url;
+        this.headers = headers;
+        this.params = {};
+        this.query = {};
+        this.user = null;
+        this.path = url;
+    }
+}
+
+class ResContext {
+    status: int;
+    headers: { [key: str]: str };
+    body: str;
+
+    constructor(status: int, body: str, headers: { [key: str]: str }) {
+        this.status = status;
+        this.body = body;
+        this.headers = headers;
+    }
+}
+
+class Router {
+    routes: Route[];
+
+    constructor() {
+        this.routes = [];
+    }
+
+    add(method: str, pattern: str, handler: (req: ReqContext) => ResContext): void {
+        this.routes.push(new Route(method, pattern, handler));
+    }
+
+    dispatch(req: ReqContext): ResContext {
+        let segs: str[] = [];
+        let rawSegs = req.path.split("/");
+        for (let i = 0; i < rawSegs.length; i = i + 1) {
+            let s = rawSegs[i];
+            if (s.length > 0) {
+                segs.push(s);
+            }
+        }
+
+        for (let i = 0; i < this.routes.length; i = i + 1) {
+            let r = this.routes[i];
+            let matchedParams = r.match(req.method, segs);
+            if (matchedParams != null) {
+                req.params = matchedParams;
+                let h = r.handler;
+                return h(req);
+            }
+        }
+
+        return new ResContext(404, "Not Found", {});
+    }
+}
+
+let router = new Router();
+router.add("GET", "/api/v1/health", (req: ReqContext) => new ResContext(200, "OK", {}));
+
+let res = router.dispatch(new ReqContext("GET", "/api/v1/health", {}));
+print("Status: " + res.status + ", Body: " + res.body);

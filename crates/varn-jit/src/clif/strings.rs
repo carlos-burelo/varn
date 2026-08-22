@@ -109,6 +109,81 @@ pub(super) fn emit_str_intrinsic_native(
         return true;
     }
 
+    // StartsWith: 2 args (receiver + search), result is bool.
+    if op == StrOp::StartsWith as u8 && arg_count == 2 {
+        let receiver = box_or_pass(b, vars, state, dest);
+        let search = box_or_pass(b, vars, state, dest + 1);
+
+        let res = call_helper(
+            b,
+            actx.cc,
+            actx.helpers.str_starts_with_intrinsic,
+            &[actx.exec_ctx, receiver, search],
+        );
+        b.def_var(vars[dest], res);
+        return true;
+    }
+
+    // EndsWith: 2 args (receiver + search), result is bool.
+    if op == StrOp::EndsWith as u8 && arg_count == 2 {
+        let receiver = box_or_pass(b, vars, state, dest);
+        let search = box_or_pass(b, vars, state, dest + 1);
+
+        let res = call_helper(
+            b,
+            actx.cc,
+            actx.helpers.str_ends_with_intrinsic,
+            &[actx.exec_ctx, receiver, search],
+        );
+        b.def_var(vars[dest], res);
+        return true;
+    }
+
+    // Includes: 2 args (receiver + search), result is bool.
+    if op == StrOp::Includes as u8 && arg_count == 2 {
+        let receiver = box_or_pass(b, vars, state, dest);
+        let search = box_or_pass(b, vars, state, dest + 1);
+
+        let res = call_helper(
+            b,
+            actx.cc,
+            actx.helpers.str_includes_intrinsic,
+            &[actx.exec_ctx, receiver, search],
+        );
+        b.def_var(vars[dest], res);
+        return true;
+    }
+
+    // IndexOf: 2 args (receiver + search), result is int.
+    if op == StrOp::IndexOf as u8 && arg_count == 2 {
+        let receiver = box_or_pass(b, vars, state, dest);
+        let search = box_or_pass(b, vars, state, dest + 1);
+
+        let res = call_helper(
+            b,
+            actx.cc,
+            actx.helpers.str_index_of_intrinsic,
+            &[actx.exec_ctx, receiver, search],
+        );
+        b.def_var(vars[dest], res);
+        return true;
+    }
+
+    // LastIndexOf: 2 args (receiver + search), result is int.
+    if op == StrOp::LastIndexOf as u8 && arg_count == 2 {
+        let receiver = box_or_pass(b, vars, state, dest);
+        let search = box_or_pass(b, vars, state, dest + 1);
+
+        let res = call_helper(
+            b,
+            actx.cc,
+            actx.helpers.str_last_index_of_intrinsic,
+            &[actx.exec_ctx, receiver, search],
+        );
+        b.def_var(vars[dest], res);
+        return true;
+    }
+
     false
 }
 

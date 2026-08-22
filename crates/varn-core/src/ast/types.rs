@@ -3,17 +3,19 @@ use super::expr::{AstId, Expr};
 use crate::kinds::TypeKind;
 use crate::source::SourceRange;
 
+pub type AstTypeKind = TypeKind<
+    Box<TypeNode>,
+    String,
+    Vec<TypeNode>,
+    (Vec<TypeParam>, Box<TypeNode>),
+    Vec<InterfaceMember>,
+    Box<Expr>,
+>;
+
 #[derive(Clone, Debug)]
 pub struct TypeNode {
     pub id: AstId,
-    pub kind: TypeKind<
-        Box<TypeNode>,
-        String,
-        Vec<TypeNode>,
-        (Vec<TypeParam>, Box<TypeNode>),
-        Vec<InterfaceMember>,
-        Box<Expr>,
-    >,
+    pub kind: AstTypeKind,
     pub range: SourceRange,
 }
 

@@ -113,11 +113,35 @@ fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
             }
             Some(HeapObj::Array(a) | HeapObj::Tuple(a)) => {
                 out.push('[');
-                for i in 0..a.len() {
-                    if i > 0 {
-                        out.push(',');
+                match a.repr() {
+                    varn_types::ArrayRepr::Boxed(items) => {
+                        for (i, &elem) in items.iter().enumerate() {
+                            if i > 0 {
+                                out.push(',');
+                            }
+                            write_json_vm(ctx, elem, out);
+                        }
                     }
-                    write_json_vm(ctx, a.get_vm(i).unwrap_or_else(VmValue::null), out);
+                    varn_types::ArrayRepr::I64(items) => {
+                        for (i, &elem) in items.iter().enumerate() {
+                            if i > 0 {
+                                out.push(',');
+                            }
+                            write_int(elem, out);
+                        }
+                    }
+                    varn_types::ArrayRepr::F64(items) => {
+                        for (i, &elem) in items.iter().enumerate() {
+                            if i > 0 {
+                                out.push(',');
+                            }
+                            if elem.is_finite() {
+                                out.push_str(ryu::Buffer::new().format(elem));
+                            } else {
+                                out.push_str("null");
+                            }
+                        }
+                    }
                 }
                 out.push(']');
                 return;
@@ -126,9 +150,18 @@ fn write_json_vm(ctx: &ExecCtx, val: VmValue, out: &mut String) {
                 let obj = o.borrow();
                 out.push('{');
                 let shape = obj.shape();
-                for (slot, prefix) in shape.json_prefixes().iter().enumerate() {
-                    out.push_str(prefix);
-                    write_json_vm(ctx, obj.field_at(slot).unwrap_or_else(VmValue::null), out);
+                let prefixes = shape.json_prefixes();
+                let inline = obj.inline_slice();
+                if inline.len() >= prefixes.len() {
+                    for (slot, prefix) in prefixes.iter().enumerate() {
+                        out.push_str(prefix);
+                        write_json_vm(ctx, inline[slot].get(), out);
+                    }
+                } else {
+                    for (slot, prefix) in prefixes.iter().enumerate() {
+                        out.push_str(prefix);
+                        write_json_vm(ctx, obj.field_at(slot).unwrap_or_else(VmValue::null), out);
+                    }
                 }
                 out.push('}');
                 return;
@@ -428,10 +461,12 @@ impl<'de, 'a> Visitor<'de> for VmVisitor<'a> {
 }
 
 fn fast_parse_json(ctx: &mut ExecCtx, text: &str) -> Option<VmValue> {
+    let cached_shape = cache_snapshot();
     let mut parser = FastJsonParser {
         bytes: text.as_bytes(),
         pos: 0,
         ctx,
+        cached_shape,
     };
     let val = parser.parse_value()?;
     parser.skip_whitespace();
@@ -446,6 +481,7 @@ struct FastJsonParser<'a, 'ctx> {
     bytes: &'a [u8],
     pos: usize,
     ctx: &'ctx mut ExecCtx,
+    cached_shape: Option<CacheEntry>,
 }
 
 impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
@@ -520,6 +556,9 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
         if memchr::memchr(b'\\', candidate).is_none() {
             self.pos = start + end_rel + 1;
             let s = std::str::from_utf8(candidate).ok()?;
+            if let Some(sso) = VmValue::try_from_sso(s) {
+                return Some(sso);
+            }
             return Some(self.ctx.heap.alloc_str_dynamic(s));
         }
 
@@ -568,12 +607,26 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
         let start = self.pos;
         let mut i = start;
         let mut is_float = false;
-        if i < self.bytes.len() && self.bytes[i] == b'-' {
+        let negative = if i < self.bytes.len() && self.bytes[i] == b'-' {
             i += 1;
-        }
+            true
+        } else {
+            false
+        };
+        let digits_start = i;
+        let mut int_val: i64 = 0;
+        let mut overflow = false;
         while i < self.bytes.len() {
             let b = self.bytes[i];
             if b.is_ascii_digit() {
+                if !is_float && !overflow {
+                    let d = (b - b'0') as i64;
+                    if let Some(next) = int_val.checked_mul(10).and_then(|v| v.checked_add(d)) {
+                        int_val = next;
+                    } else {
+                        overflow = true;
+                    }
+                }
                 i += 1;
             } else if b == b'.' || b == b'e' || b == b'E' || b == b'+' || b == b'-' {
                 is_float = true;
@@ -582,16 +635,15 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
                 break;
             }
         }
-        if i == start {
+        if i == digits_start {
             return None;
         }
         self.pos = i;
-        let num_str = std::str::from_utf8(&self.bytes[start..i]).ok()?;
-        if !is_float {
-            if let Ok(val) = num_str.parse::<i64>() {
-                return Some(VmValue::from_int(val));
-            }
+        if !is_float && !overflow {
+            let val = if negative { -int_val } else { int_val };
+            return Some(VmValue::from_int(val));
         }
+        let num_str = std::str::from_utf8(&self.bytes[start..i]).ok()?;
         let f = num_str.parse::<f64>().ok()?;
         Some(VmValue::from_f64(f))
     }
@@ -599,7 +651,8 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
     #[inline]
     fn parse_array(&mut self) -> Option<VmValue> {
         self.pos += 1;
-        let mut items = Vec::with_capacity(32);
+        let est_capacity = ((self.bytes.len() - self.pos) / 32).clamp(16, 65536);
+        let mut items = Vec::with_capacity(est_capacity);
         loop {
             self.skip_whitespace();
             if self.pos < self.bytes.len() && self.bytes[self.pos] == b']' {
@@ -639,8 +692,6 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
         let mut spilled: Vec<VmValue> = Vec::new();
         let mut n = 0usize;
 
-        let cached = cache_snapshot();
-        let cached_keys = |k: usize| cached.as_ref().and_then(|(keys, _)| keys.get(k));
         let mut matched: Option<usize> = Some(0);
         let mut owned_keys: Vec<String> = Vec::new();
 
@@ -675,16 +726,29 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
             }
             n += 1;
 
-            match matched {
-                Some(k) if cached_keys(k).map(String::as_str) == Some(key_str) => {
+            let cached_match = matched.and_then(|k| {
+                self.cached_shape
+                    .as_ref()
+                    .and_then(|(keys, _)| keys.get(k))
+                    .map(|expected| (k, expected.as_str() == key_str))
+            });
+
+            match cached_match {
+                Some((k, true)) => {
                     matched = Some(k + 1);
                 }
-                Some(k) => {
-                    owned_keys = key_prefix(&cached, k);
+                Some((k, false)) => {
+                    owned_keys = key_prefix(&self.cached_shape, k);
                     owned_keys.push(key_str.to_owned());
                     matched = None;
                 }
-                None => owned_keys.push(key_str.to_owned()),
+                None => {
+                    if let Some(k) = matched {
+                        owned_keys = key_prefix(&self.cached_shape, k);
+                        matched = None;
+                    }
+                    owned_keys.push(key_str.to_owned());
+                }
             }
 
             self.skip_whitespace();
@@ -710,7 +774,7 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
         };
 
         if matched == Some(n) {
-            if let Some((keys, shape)) = &cached {
+            if let Some((keys, shape)) = &self.cached_shape {
                 if keys.len() == n {
                     return Some(self.ctx.heap.alloc_object_with_shape_slice(shape, values));
                 }
@@ -718,7 +782,7 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
         }
 
         if let Some(k) = matched {
-            owned_keys = key_prefix(&cached, k);
+            owned_keys = key_prefix(&self.cached_shape, k);
         }
         let obj = self.ctx.alloc_object();
         for (k, v) in owned_keys.iter().zip(values.iter()) {
@@ -726,6 +790,7 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
         }
         if let Some(shape) = self.ctx.get_object_shape(obj) {
             let entry = (std::rc::Rc::new(owned_keys), shape);
+            self.cached_shape = Some(entry.clone());
             JSON_SHAPE_CACHE.with(|c| *c.borrow_mut() = Some(entry));
         }
         Some(obj)

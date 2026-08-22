@@ -100,7 +100,8 @@ impl super::Binder {
                     is_readonly: false,
                     is_override: false,
                     symbol_id: Some(symbol_id),
-                });
+                                ..Default::default()
+                                });
             }
             InterfaceMember::Method {
                 key,
@@ -177,7 +178,8 @@ impl super::Binder {
                     is_readonly: false,
                     is_override: false,
                     symbol_id: Some(symbol_id),
-                });
+                                ..Default::default()
+                                });
             }
             InterfaceMember::Index {
                 param,
@@ -209,6 +211,7 @@ impl super::Binder {
                     is_readonly: false,
                     is_override: false,
                     symbol_id: None,
+                    ..Default::default()
                 });
             }
             InterfaceMember::Callable {
@@ -263,6 +266,7 @@ impl super::Binder {
                     is_readonly: false,
                     is_override: false,
                     symbol_id: None,
+                    ..Default::default()
                 });
             }
         }

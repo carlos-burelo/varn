@@ -121,7 +121,7 @@ impl ExecCtx {
             }
         }
 
-        if name.as_ref() == "length" {
+        if name.as_ref() == varn_core::MemberKey::Length.as_str() {
             if let Some(v) = crate::exec::strings::fast_length(obj, &self.heap) {
                 self.stack[base + dest] = v;
                 if cs_idx < cache_len && !is_megamorphic {

@@ -129,6 +129,7 @@ pub(super) fn loop_regions(
             if hoistable {
                 let mut receivers: Vec<usize> = Vec::new();
                 let mut string_sites: Vec<(usize, usize)> = Vec::new();
+                let mut objects: Vec<usize> = Vec::new();
                 let mut written: Vec<usize> = Vec::new();
                 let mut redefined: Vec<usize> = Vec::new();
                 let mut j = header;
@@ -144,6 +145,15 @@ pub(super) fn loop_regions(
                         OpCode::ArraySetIndex => {
                             receivers.push(dest);
                             written.push(dest);
+                        }
+                        OpCode::GetFixedField => {
+                            let obj_r = (code[j + 1] >> 8) as usize;
+                            objects.push(obj_r);
+                            redefined.push(dest);
+                        }
+                        OpCode::SetFixedField => {
+                            let obj_r = dest;
+                            objects.push(obj_r);
                         }
                         OpCode::CallSelf => redefined.push((code[j + 1] >> 8) as usize),
                         // An `Intrinsic` stages its receiver in `dest` and its
@@ -171,6 +181,9 @@ pub(super) fn loop_regions(
                 receivers.sort_unstable();
                 receivers.dedup();
                 receivers.retain(|r| !redefined.contains(r));
+                objects.sort_unstable();
+                objects.dedup();
+                objects.retain(|r| !redefined.contains(r));
                 // A receiver redefined inside the region is not loop-invariant,
                 // so its sites go too — the cache would describe a string the
                 // loop has already replaced.
@@ -186,11 +199,11 @@ pub(super) fn loop_regions(
                     .copied()
                     .filter(|r| !written.contains(r))
                     .collect();
-                if !receivers.is_empty() || !strings.is_empty() {
+                if !receivers.is_empty() || !strings.is_empty() || !objects.is_empty() {
                     if super::trace() {
                         eprintln!(
                             "CLIF REGION {:?}: [{header}..{ip}] recv={receivers:?} \
-                             ro={read_only:?} str={strings:?}",
+                             ro={read_only:?} str={strings:?} obj={objects:?}",
                             proto.name
                         );
                     }
@@ -201,6 +214,7 @@ pub(super) fn loop_regions(
                         read_only,
                         string_sites,
                         strings,
+                        objects,
                     });
                 }
             }

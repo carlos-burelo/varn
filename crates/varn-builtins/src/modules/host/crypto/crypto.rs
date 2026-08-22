@@ -20,6 +20,15 @@ varn_contract! {
         fn uuid(_ctx: &mut dyn NativeCtx) -> Result<String, String> {
             Ok(uuid::Uuid::new_v4().to_string())
         }
+        fn uuidV4(_ctx: &mut dyn NativeCtx) -> Result<String, String> {
+            Ok(uuid::Uuid::new_v4().to_string())
+        }
+        fn uuidV7(_ctx: &mut dyn NativeCtx) -> Result<String, String> {
+            Ok(uuid::Uuid::now_v7().to_string())
+        }
+        fn uuidValidate(_ctx: &mut dyn NativeCtx, s: &str) -> Result<bool, String> {
+            Ok(uuid::Uuid::parse_str(s).is_ok())
+        }
         fn randomBytes(_ctx: &mut dyn NativeCtx, size: i64) -> Result<Vec<VmValue>, String> {
             if size < 0 {
                 return Err("crypto.randomBytes: size must be non-negative".to_string());

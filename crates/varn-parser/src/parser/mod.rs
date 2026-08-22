@@ -145,7 +145,7 @@ impl Parser {
         let s = &mut self.stream;
         while s.eat(TokenKind::Semicolon) {}
         if s.is_eof() {
-            return Ok(varn_core::ast::Stmt::new_with_range(
+            return Ok(s.stmt(
                 s.range(),
                 varn_core::ast::StmtKind::Empty,
             ));

@@ -234,12 +234,11 @@ pub(crate) fn prepare_call(
                         // shifting it. A caller that staged only the args (no
                         // placeholder) is one short, and gets the receiver
                         // inserted in front instead.
-                        let arity = nc.proto.arity;
                         let mut full_arg_count = arg_count;
                         let base = stack.len() - arg_count;
-                        if arg_count < arity {
-                            stack.insert(base, recv_nv);
-                            full_arg_count += 1;
+                        if base >= stack.len() {
+                            stack.push(recv_nv);
+                            full_arg_count = 1;
                         } else {
                             stack[base] = recv_nv;
                         }

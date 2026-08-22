@@ -1,0 +1,6 @@
+// runtime:process — low-level host process execution operations.
+
+export declare function exec$(command: str): dynamic;
+export declare function spawnProcess$(command: str, args: str[]): int;
+export declare function waitProcess$(pid: int): dynamic;
+export declare function killProcess$(pid: int): bool;

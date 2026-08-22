@@ -1,4 +1,4 @@
-// expect: error[Varn3001]
+// expect: error[VN3001]
 import { channel } from "std:task";
 
 async function main(): void {

@@ -35,6 +35,8 @@ enum Token {
 const t1 = Token.Number(123)
 const t2 = Token.Identifier(name: "hello")
 
+Token.Number(456) // Another instance of Number variant
+
 assert("positional payload name", t1.name === "Number")
 assert("positional payload value", t1.value === 123)
 assert("named payload name", t2.name === "hello")

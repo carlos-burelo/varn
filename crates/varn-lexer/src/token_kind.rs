@@ -155,3 +155,4 @@ pub(crate) const DOC_COMMENT: u32 = 154;
 pub(crate) const PLACEHOLDER: u32 = 155;
 
 pub(crate) const DECIMAL_LITERAL: u32 = 156;
+pub(crate) const RAW_STR: u32 = 160;

@@ -51,6 +51,7 @@ impl super::super::Binder {
                             is_readonly: false,
                             is_override: false,
                             symbol_id: None,
+                            ..Default::default()
                         })
                     }
                     ObjectProp::Method {
@@ -107,6 +108,7 @@ impl super::super::Binder {
                             is_readonly: false,
                             is_override: false,
                             symbol_id: None,
+                            ..Default::default()
                         })
                     }
                     ObjectProp::Getter { key, .. } => {
@@ -131,6 +133,7 @@ impl super::super::Binder {
                             is_readonly: false,
                             is_override: false,
                             symbol_id: None,
+                            ..Default::default()
                         })
                     }
                     ObjectProp::Setter { key, .. } => {
@@ -155,6 +158,7 @@ impl super::super::Binder {
                             is_readonly: false,
                             is_override: false,
                             symbol_id: None,
+                            ..Default::default()
                         })
                     }
                     _ => None,

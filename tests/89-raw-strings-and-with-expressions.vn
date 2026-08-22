@@ -1,0 +1,77 @@
+// Test Suite 89: Raw String Literals ("""...""") and `with` Expressions
+
+import { describe, test, expect, assertEqual } from "std:test";
+
+class User(public id: int, public name: str, public role: str = "guest") {}
+
+class ServerNode(public host: str, public port: int, public isMaster: bool = false) {}
+
+describe("Raw String Literals (\"\"\"...\"\"\")", () => {
+    test("Raw string with unescaped quotes, backslashes and multiline content", () => {
+        let jsonStr = """{
+  "name": "Varn",
+  "path": "C:\Program Files\Varn",
+  "escapes": "\n \t \r"
+}""";
+
+        expect(jsonStr.includes("\"name\": \"Varn\"")).toBe(true);
+        expect(jsonStr.includes("C:\Program Files\Varn")).toBe(true);
+        expect(jsonStr.includes("""\n \t \r""")).toBe(true);
+    });
+
+    test("Single-line raw string with double quotes", () => {
+        let text = """Hello "world" and 'quotes' without escapes!""";
+        assertEqual(text, "Hello \"world\" and 'quotes' without escapes!");
+    });
+});
+
+describe("`with` Expressions (Non-destructive Mutation)", () => {
+    test("`with` expression on Class instances", () => {
+        let u1 = new User(10, "Alice", "admin");
+        let u2 = u1 with { name: "Bob", role: "editor" };
+
+        // u2 has modified fields + preserved base fields
+        assertEqual(u2.id, 10);
+        assertEqual(u2.name, "Bob");
+        assertEqual(u2.role, "editor");
+
+        // u1 remains strictly immutable
+        assertEqual(u1.id, 10);
+        assertEqual(u1.name, "Alice");
+        assertEqual(u1.role, "admin");
+    });
+
+    test("`with` expression on Plain Objects", () => {
+        let baseConfig = {
+            host: "localhost",
+            port: 3000,
+            debug: true
+        };
+
+        let prodConfig = baseConfig with {
+            port: 8080,
+            debug: false
+        };
+
+        assertEqual(prodConfig.host, "localhost");
+        assertEqual(prodConfig.port, 8080);
+        assertEqual(prodConfig.debug, false);
+
+        // Original config preserved
+        assertEqual(baseConfig.port, 3000);
+        assertEqual(baseConfig.debug, true);
+    });
+
+    test("Chained or nested `with` expressions", () => {
+        let node1 = new ServerNode("10.0.0.1", 5000, false);
+        let node2 = node1 with { port: 5001 };
+        let node3 = node2 with { isMaster: true };
+
+        assertEqual(node3.host, "10.0.0.1");
+        assertEqual(node3.port, 5001);
+        assertEqual(node3.isMaster, true);
+
+        assertEqual(node1.port, 5000);
+        assertEqual(node1.isMaster, false);
+    });
+});

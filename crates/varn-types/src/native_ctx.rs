@@ -250,6 +250,30 @@ pub trait NativeCtx {
     fn stringify_json(&mut self, _value: VmValue) -> Result<String, String> {
         Err("stringify_json not supported in this context".to_string())
     }
+
+    fn parse_csv(
+        &mut self,
+        _text: &str,
+        _delimiter: u8,
+        _has_header: bool,
+        _trim: bool,
+    ) -> Result<VmValue, String> {
+        Err("parse_csv not supported in this context".to_string())
+    }
+
+    fn stringify_csv(&mut self, _value: VmValue, _delimiter: u8) -> Result<String, String> {
+        Err("stringify_csv not supported in this context".to_string())
+    }
+
+    fn define_metadata(&mut self, _target: VmValue, _key: &str, _value: VmValue) {}
+
+    fn get_metadata(&self, _target: VmValue, _key: &str) -> Option<VmValue> {
+        None
+    }
+
+    fn has_metadata(&self, _target: VmValue, _key: &str) -> bool {
+        false
+    }
 }
 
 pub type NativeFnResult = Result<VmValue, String>;

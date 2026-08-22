@@ -2,10 +2,12 @@ import { parse$, stringify$ } from "runtime:json";
 
 export type Json = int | float | str | bool | null | Json[] | { [key: str]: Json };
 
-export function parse(text: str): Json {
-    return parse$(text) as Json;
-}
+export namespace JSON {
+    export function parse(text: str): Json {
+        return parse$(text) as Json;
+    }
 
-export function stringify(value: Json, space?: int): str {
-    return stringify$(value);
+    export function stringify(value: Json, space?: int): str {
+        return stringify$(value);
+    }
 }

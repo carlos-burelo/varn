@@ -107,6 +107,18 @@ impl BindResult {
             .or_else(|| self.core.as_ref().and_then(|b| b.class_members.get(name)))
     }
 
+    /// Determines whether `name` identifies a user-defined class or struct with fixed field
+    /// slot layout in the VM heap (excluding intrinsic / primitive built-in types).
+    #[inline]
+    pub fn is_user_class(&self, name: &str) -> bool {
+        if varn_core::IntrinsicType::is_intrinsic(name) {
+            return false;
+        }
+        self.get_class_entry(name)
+            .map(|entry| !entry.is_builtin_or_intrinsic)
+            .unwrap_or(false)
+    }
+
     pub fn get_interface_members_local(&self, name: &str) -> Option<&Vec<ClassMemberInfo>> {
         self.type_members.interfaces.get(name).or_else(|| {
             self.core

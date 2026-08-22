@@ -1,0 +1,46 @@
+import {
+    exec$,
+    spawnProcess$,
+    waitProcess$,
+    killProcess$
+} from "runtime:process";
+
+export interface ProcessResult {
+    exitCode: int;
+    stdout: str;
+    stderr: str;
+    success: bool;
+}
+
+export class ChildProcess {
+    pid: int;
+
+    constructor(pid: int) {
+        this.pid = pid;
+    }
+
+    wait(): { exitCode: int, success: bool } {
+        return waitProcess$(this.pid);
+    }
+
+    kill(): bool {
+        return killProcess$(this.pid);
+    }
+}
+
+export namespace Process {
+    export function exec(command: str): ProcessResult {
+        let raw: dynamic = exec$(command);
+        return {
+            exitCode: raw.exitCode as int,
+            stdout: raw.stdout as str,
+            stderr: raw.stderr as str,
+            success: raw.success as bool
+        };
+    }
+
+    export function spawn(command: str, args: str[] = []): ChildProcess {
+        let pid = spawnProcess$(command, args);
+        return new ChildProcess(pid);
+    }
+}

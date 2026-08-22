@@ -175,10 +175,14 @@ fn infer_member(
         match &obj_ty.0 {
             TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin) => {
                 if let Some(variants) = ctx.get_enum_members(name.as_ref(), origin.as_deref()) {
-                    if prop_name.as_ref() == "rawValue" || prop_name.as_ref() == "__tag" {
+                    if prop_name.as_ref() == varn_core::MemberKey::RawValue.as_str()
+                        || prop_name.as_ref() == varn_core::MemberKey::Tag.as_str()
+                    {
                         return Type::Int;
                     }
-                    if prop_name.as_ref() == "name" || prop_name.as_ref() == "__variant_name__" {
+                    if prop_name.as_ref() == varn_core::MemberKey::Name.as_str()
+                        || prop_name.as_ref() == varn_core::MemberKey::VariantName.as_str()
+                    {
                         return Type::Str;
                     }
                     let mut found_tys = Vec::new();
@@ -219,10 +223,10 @@ fn infer_member(
                 }
             }
             TypeKind::Array(inner) => {
-                if prop_name.as_ref() == "length" {
+                if prop_name.as_ref() == varn_core::MemberKey::Length.as_str() {
                     return Type::Int;
                 }
-                if prop_name.as_ref() == "push" {
+                if prop_name.as_ref() == varn_core::MemberKey::Push.as_str() {
                     return Type::fn_(FunctionType {
                         params: vec![crate::types::FunctionParam {
                             name: Some(Rc::from("item")),

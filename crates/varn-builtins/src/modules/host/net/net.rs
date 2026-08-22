@@ -76,5 +76,49 @@ varn_contract! {
         fn parseHttpRequest(ctx: &mut dyn NativeCtx, raw: &str) -> Result<VmValue, String> {
             http_parser::parse_http_request(ctx, raw)
         }
+
+        fn sendHttpResponse(
+            ctx: &mut dyn NativeCtx,
+            conn_id: i64,
+            status: i64,
+            status_text: &str,
+            headers: VmValue,
+            body: &str,
+        ) -> Result<VmValue, String> {
+            use std::io::Write;
+            let mut out = Vec::with_capacity(128 + body.len());
+            let _ = write!(&mut out, "HTTP/1.1 {status} {status_text}\r\n");
+
+            let mut has_content_length = false;
+            let mut has_content_type = false;
+
+            if !headers.is_null() {
+                ctx.object_for_each(headers, &mut |key, val| {
+                    let lower = key.to_lowercase();
+                    if lower == "content-length" {
+                        has_content_length = true;
+                    } else if lower == "content-type" {
+                        has_content_type = true;
+                    }
+                    if let Some(val_str) = ctx.str_owned(val) {
+                        let _ = write!(&mut out, "{key}: {val_str}\r\n");
+                    }
+                });
+            }
+
+            if !has_content_type {
+                let _ = write!(&mut out, "Content-Type: text/plain\r\n");
+            }
+
+            if !has_content_length {
+                let _ = write!(&mut out, "Content-Length: {}\r\n", body.len());
+            }
+
+            let _ = write!(&mut out, "\r\n");
+            out.extend_from_slice(body.as_bytes());
+
+            let task = driver().write(conn_id, out);
+            Ok(ctx.intern(Value::TaskHandle(task)))
+        }
     }
 }

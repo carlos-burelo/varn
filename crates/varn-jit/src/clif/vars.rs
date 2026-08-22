@@ -23,6 +23,8 @@ pub(super) struct VarFile {
     pub cache_vars: HashMap<(usize, usize), emit::RegionCache>,
     /// One entry per (loop region header, string receiver register).
     pub str_caches: HashMap<(usize, usize), emit::StrRegionCache>,
+    /// One entry per (loop region header, object receiver register).
+    pub obj_caches: HashMap<(usize, usize), emit::ObjRegionCache>,
     /// Flat list of every cache Variable, for the back-edge safepoint — it
     /// invalidates all of them at once and has no way to tell which region it
     /// sits in.
@@ -159,6 +161,19 @@ pub(super) fn declare(
             )
         })
         .collect();
+    // One Variable per (region, object receiver): the inline field data base pointer.
+    let obj_caches: HashMap<(usize, usize), emit::ObjRegionCache> = regions
+        .iter()
+        .flat_map(|reg| reg.objects.iter().map(move |r| (reg.header, *r)))
+        .map(|key| {
+            (
+                key,
+                emit::ObjRegionCache {
+                    data_base: b.declare_var(types::I64),
+                },
+            )
+        })
+        .collect();
     // The back-edge safepoint zeroes every cache after a collection. A string
     // cache holds a raw interior pointer, so leaving it out would be the one
     // way this survives a GC — it must be in the same list as the payloads.
@@ -166,11 +181,13 @@ pub(super) fn declare(
         .values()
         .flat_map(|c| std::iter::once(c.payload).chain(c.view.into_iter().flatten()))
         .chain(str_caches.values().flat_map(|c| [c.bytes, c.len]))
+        .chain(obj_caches.values().map(|c| c.data_base))
         .collect();
     VarFile {
         vars,
         cache_vars,
         str_caches,
+        obj_caches,
         all_caches,
     }
 }

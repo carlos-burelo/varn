@@ -7,6 +7,16 @@ use varn_core::TokenKind;
 pub(super) fn parse_object_expr(s: &mut TokenStream) -> Result<Expr, String> {
     let range = s.range();
     s.advance();
+    let properties = parse_object_body(s)?;
+    s.expect(TokenKind::RBrace)?;
+    let full_range = s.span_from(range);
+    Ok(s.expr(
+        full_range,
+        varn_core::ast::ExprKind::Object { properties },
+    ))
+}
+
+pub(crate) fn parse_object_body(s: &mut TokenStream) -> Result<Vec<ObjectProp>, String> {
     let mut properties = vec![];
 
     while !s.check(TokenKind::RBrace) && !s.is_eof() {
@@ -123,7 +133,7 @@ pub(super) fn parse_object_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 PropKey::Identifier(n) => n.clone(),
                 _ => return Err(String::from("shorthand property must be an identifier")),
             };
-            Expr::new_with_range(
+            s.expr(
                 prop_range,
                 varn_core::ast::ExprKind::Identifier { name: name.into() },
             )
@@ -141,12 +151,7 @@ pub(super) fn parse_object_expr(s: &mut TokenStream) -> Result<Expr, String> {
         s.eat(TokenKind::Comma);
     }
 
-    s.expect(TokenKind::RBrace)?;
-    let full_range = s.span_from(range);
-    Ok(Expr::new_with_range(
-        full_range,
-        varn_core::ast::ExprKind::Object { properties },
-    ))
+    Ok(properties)
 }
 
 fn parse_prop_key(s: &mut TokenStream) -> Result<PropKey, String> {

@@ -1,0 +1,98 @@
+import { Regex } from "std:regex";
+import { UUID } from "std:crypto";
+import { DateTime, Duration, Instant, PlainDateTime } from "std:time";
+import { assert, assertEqual } from "std:test";
+
+// ==========================================
+// 1. Regex (Inmutable & Stateless)
+// ==========================================
+
+let reEmail = Regex.compile("^([a-zA-Z0-9_\\.-]+)@([a-zA-Z0-9\\.-]+)\\.([a-zA-Z]{2,6})$");
+assertEqual(reEmail.test("dev@varn-lang.org"), true);
+assertEqual(reEmail.test("invalid-email-format"), false);
+
+// Exec with capture groups
+let matchRes = reEmail.exec("contact@google.com");
+assert(matchRes != null);
+if (matchRes != null) {
+    assertEqual(matchRes.match, "contact@google.com");
+    assertEqual(matchRes.index, 0);
+    assertEqual(matchRes.groups.length, 3);
+    assertEqual(matchRes.groups[0], "contact");
+    assertEqual(matchRes.groups[1], "google");
+    assertEqual(matchRes.groups[2], "com");
+}
+
+// FindAll
+let reDigits = Regex.compile("[0-9]+");
+let allDigits = reDigits.findAll("order 1024 has 42 items and cost 99 dollars");
+assertEqual(allDigits.length, 3);
+assertEqual(allDigits[0].match, "1024");
+assertEqual(allDigits[1].match, "42");
+assertEqual(allDigits[2].match, "99");
+
+// Replace
+let reSpaces = Regex.compile("\\s+");
+let normalized = reSpaces.replace("hello    world\tfrom   varn", " ");
+assertEqual(normalized, "hello world from varn");
+
+// Split
+let reDelim = Regex.compile("[,;\\s]+");
+let parts = reDelim.split("alpha,beta; gamma   delta");
+assertEqual(parts.length, 4);
+assertEqual(parts[0], "alpha");
+assertEqual(parts[1], "beta");
+assertEqual(parts[2], "gamma");
+assertEqual(parts[3], "delta");
+
+// Stateless test (calling .test multiple times has NO side-effect state mutations)
+let reWord = Regex.compile("test");
+assertEqual(reWord.test("test string"), true);
+assertEqual(reWord.test("test string"), true);
+assertEqual(reWord.test("test string"), true);
+
+
+// ==========================================
+// 2. UUID (v4 & v7)
+// ==========================================
+
+let idV4 = UUID.v4();
+assertEqual(idV4.length, 36);
+assertEqual(UUID.isValid(idV4), true);
+
+let idV7 = UUID.v7();
+assertEqual(idV7.length, 36);
+assertEqual(UUID.isValid(idV7), true);
+
+assertEqual(UUID.isValid("not-a-valid-uuid"), false);
+assertEqual(UUID.isValid("550e8400-e29b-41d4-a716-446655440000"), true);
+
+
+// ==========================================
+// 3. DateTime & Duration (Canonical Time Types)
+// ==========================================
+
+let nowDt = DateTime.now();
+assert(nowDt.toMs > 0);
+
+let iso = nowDt.toISOString();
+assert(iso.includes("T"));
+assert(iso.endsWith("Z"));
+
+let dt2 = nowDt.addSeconds(10);
+assertEqual(dt2.diff(nowDt), 10000);
+
+let dur1 = new Duration(5000);
+assertEqual(dur1.totalMilliseconds, 5000);
+assertEqual(dur1.seconds, 5);
+
+let dur2 = new Duration(2500);
+let durSum = dur1.add(dur2);
+assertEqual(durSum.totalMilliseconds, 7500);
+
+let pdt = new PlainDateTime(2026, 8, 22, 14, 30, 0, 0);
+assertEqual(pdt.year, 2026);
+assertEqual(pdt.month, 8); // Mes canónico 8 (Agosto), NUNCA base 0
+assertEqual(pdt.day, 22);
+
+print("[PASSED] 83. First-Class Canonical Types (Regex stateless, UUID v4/v7, DateTime & Duration with 1-based months)");

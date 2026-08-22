@@ -1,9 +1,13 @@
-// expect: warning[Varn4001]
-type Color = "red" | "green" | "blue"
+// expect: warning[VN4001]
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
 
 function describe(c: Color): str {
     return match (c) {
-        "red" => "rojo",
-        "green" => "verde"
+        Color.Red => "rojo",
+        Color.Green => "verde",
     }
 }

@@ -13,7 +13,8 @@ use varn_core::TokenKind;
 
 use self::match_expr::parse_match_expr;
 use self::object::parse_object_expr;
-use self::template::parse_template;
+pub(crate) use self::object::parse_object_body;
+pub(crate) use self::template::parse_template;
 
 pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
     let range = s.range();
@@ -30,7 +31,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 _ => parse_int_radix(&raw)
                     .ok_or_else(|| format!("integer literal `{}` overflows i64", raw))?,
             };
-            Ok(Expr::new_with_range(
+            Ok(s.expr(
                 range,
                 ExprKind::IntLiteral {
                     value,
@@ -44,11 +45,10 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             let value: f64 = match pre_parsed {
                 Some(ParsedNumber::Float(v)) => v,
                 _ => raw
-                    .replace('_', "")
                     .parse()
-                    .map_err(|_| format!("float literal `{}` is not a valid number", raw))?,
+                    .map_err(|_| format!("invalid float literal: {}", raw))?,
             };
-            Ok(Expr::new_with_range(
+            Ok(s.expr(
                 range,
                 ExprKind::FloatLiteral {
                     value,
@@ -56,22 +56,37 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 },
             ))
         }
-        TokenKind::BigIntLiteral => Ok(Expr::new_with_range(
-            range,
-            ExprKind::BigIntLiteral {
-                raw: s.consume_lexeme().into(),
-            },
-        )),
-        TokenKind::DecimalLiteral => Ok(Expr::new_with_range(
-            range,
-            ExprKind::DecimalLiteral {
-                raw: s.consume_lexeme().into(),
-            },
-        )),
+        TokenKind::BigIntLiteral => {
+            let raw = s.consume_lexeme();
+            Ok(s.expr(
+                range,
+                ExprKind::BigIntLiteral {
+                    raw: raw.into(),
+                },
+            ))
+        }
+        TokenKind::DecimalLiteral => {
+            let raw = s.consume_lexeme();
+            Ok(s.expr(
+                range,
+                ExprKind::DecimalLiteral {
+                    raw: raw.into(),
+                },
+            ))
+        }
+        TokenKind::RawStr => {
+            let value = s.consume_lexeme().to_string();
+            Ok(s.expr(
+                range,
+                ExprKind::StrLiteral {
+                    value: value.into(),
+                },
+            ))
+        }
         TokenKind::Str => {
             let value = unescape_string(s.lexeme());
             s.advance();
-            Ok(Expr::new_with_range(
+            Ok(s.expr(
                 range,
                 ExprKind::StrLiteral {
                     value: value.into(),
@@ -81,33 +96,33 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
         TokenKind::Char => {
             let ch = unescape_string(s.lexeme()).chars().next().unwrap_or('\0');
             s.advance();
-            Ok(Expr::new_with_range(
+            Ok(s.expr(
                 range,
                 ExprKind::CharLiteral { value: ch },
             ))
         }
         TokenKind::True => {
             s.advance();
-            Ok(Expr::new_with_range(
+            Ok(s.expr(
                 range,
                 ExprKind::BoolLiteral { value: true },
             ))
         }
         TokenKind::False => {
             s.advance();
-            Ok(Expr::new_with_range(
+            Ok(s.expr(
                 range,
                 ExprKind::BoolLiteral { value: false },
             ))
         }
         TokenKind::Null => {
             s.advance();
-            Ok(Expr::new_with_range(range, ExprKind::NullLiteral))
+            Ok(s.expr(range, ExprKind::NullLiteral))
         }
         TokenKind::RegularExpression => {
             let raw = s.consume_lexeme();
             let (pattern, flags) = split_regex(&raw);
-            Ok(Expr::new_with_range(
+            Ok(s.expr(
                 range,
                 ExprKind::RegexLiteral {
                     pattern: pattern.into(),
@@ -118,15 +133,16 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
 
         TokenKind::Template | TokenKind::TemplateHead => parse_template(s),
 
-        TokenKind::Identifier => Ok(Expr::new_with_range(
-            range,
-            ExprKind::Identifier {
-                name: s.consume_lexeme(),
-            },
-        )),
+        TokenKind::Identifier => {
+            let name = s.consume_lexeme();
+            Ok(s.expr(
+                range,
+                ExprKind::Identifier { name },
+            ))
+        }
         TokenKind::Placeholder => {
             s.advance();
-            Ok(Expr::new_with_range(
+            Ok(s.expr(
                 range,
                 ExprKind::Identifier {
                     name: Rc::from("_"),
@@ -136,11 +152,11 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
 
         TokenKind::This => {
             s.advance();
-            Ok(Expr::new_with_range(range, ExprKind::This))
+            Ok(s.expr(range, ExprKind::This))
         }
         TokenKind::Super => {
             s.advance();
-            Ok(Expr::new_with_range(range, ExprKind::Super))
+            Ok(s.expr(range, ExprKind::Super))
         }
 
         TokenKind::LBracket => parse_array_expr(s),
@@ -157,7 +173,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             let expr = parse_seq_expr(s)?;
             s.expect(TokenKind::RParen)?;
             let full_range = s.span_from(start_range);
-            Ok(Expr::new_with_range(
+            Ok(s.expr(
                 full_range,
                 ExprKind::Paren {
                     expression: Box::new(expr),
@@ -195,7 +211,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 }
                 s.expect(TokenKind::RBracket)?;
                 let full_range = s.span_from(start_range);
-                Ok(Expr::new_with_range(full_range, ExprKind::Tuple { elements }))
+                Ok(s.expr(full_range, ExprKind::Tuple { elements }))
             } else if s.peek_kind(1) == TokenKind::LBrace {
                 s.advance();
                 let obj = parse_object_expr(s)?;
@@ -203,7 +219,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 let ExprKind::Object { properties } = obj.kind else {
                     unreachable!()
                 };
-                Ok(Expr::new_with_range(full_range, ExprKind::Record { properties }))
+                Ok(s.expr(full_range, ExprKind::Record { properties }))
             } else {
                 Err(format!("Unexpected `#` at {}:{}", s.line(), s.column()))
             }
@@ -213,7 +229,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             let kind = s.kind();
             if kind.can_be_identifier() {
                 let name = s.consume_lexeme();
-                Ok(Expr::new_with_range(range, ExprKind::Identifier { name }))
+                Ok(s.expr(range, ExprKind::Identifier { name }))
             } else {
                 Err(format!(
                     "Unexpected token {:?} ({:?}) in expression at {}:{}",
@@ -249,7 +265,7 @@ fn parse_array_expr(s: &mut TokenStream) -> Result<Expr, String> {
 
     s.expect(TokenKind::RBracket)?;
     let full_range = s.span_from(start_range);
-    Ok(Expr::new_with_range(full_range, ExprKind::Array { elements }))
+    Ok(s.expr(full_range, ExprKind::Array { elements }))
 }
 
 fn parse_new_expr(s: &mut TokenStream, range: varn_core::SourceRange) -> Result<Expr, String> {
@@ -274,7 +290,7 @@ fn parse_new_expr(s: &mut TokenStream, range: varn_core::SourceRange) -> Result<
         vec![]
     };
     let full_range = s.span_from(range);
-    Ok(Expr::new_with_range(
+    Ok(s.expr(
         full_range,
         ExprKind::New {
             callee: Box::new(callee),
@@ -290,7 +306,11 @@ fn parse_function_expr(s: &mut TokenStream) -> Result<Expr, String> {
     parse_function_expr_inner_with_start(s, false, start_range)
 }
 
-fn parse_function_expr_inner_with_start(s: &mut TokenStream, is_async: bool, start_range: varn_core::SourceRange) -> Result<Expr, String> {
+fn parse_function_expr_inner_with_start(
+    s: &mut TokenStream,
+    is_async: bool,
+    start_range: varn_core::SourceRange,
+) -> Result<Expr, String> {
     let is_generator = s.eat(TokenKind::Star);
     let id = if s.check(TokenKind::Identifier) {
         Some(s.consume_lexeme())
@@ -305,7 +325,7 @@ fn parse_function_expr_inner_with_start(s: &mut TokenStream, is_async: bool, sta
     };
     let body = crate::parser::parse_block(s)?;
     let full_range = s.span_from(start_range);
-    Ok(Expr::new_with_range(
+    Ok(s.expr(
         full_range,
         ExprKind::Function {
             fn_id: id,
@@ -321,7 +341,7 @@ fn parse_function_expr_inner_with_start(s: &mut TokenStream, is_async: bool, sta
 fn parse_class_expr(s: &mut TokenStream) -> Result<Expr, String> {
     let decl = crate::parser::parse_class_decl(s, vec![], false)?;
     let full_range = decl.range.clone();
-    Ok(Expr::new_with_range(
+    Ok(s.expr(
         full_range,
         ExprKind::ClassExpr {
             declaration: Box::new(decl),

@@ -448,7 +448,70 @@ impl NativeCtx for ExecCtx {
         self.json_stringify(value)
     }
 
+    fn parse_csv(
+        &mut self,
+        text: &str,
+        delimiter: u8,
+        has_header: bool,
+        trim: bool,
+    ) -> Result<VmValue, String> {
+        crate::exec::ctx_csv::parse_csv(self, text, delimiter, has_header, trim)
+    }
+
+    fn stringify_csv(&mut self, value: VmValue, delimiter: u8) -> Result<String, String> {
+        crate::exec::ctx_csv::stringify_csv(self, value, delimiter)
+    }
+
     fn capabilities(&self) -> &varn_types::capabilities::CapabilitySet {
         &self.capabilities
+    }
+
+    fn define_metadata(&mut self, target: VmValue, key: &str, value: VmValue) {
+        let target_k = self.target_meta_key(target);
+        self.metadata
+            .entry(target_k)
+            .or_default()
+            .insert(key.to_string(), value);
+    }
+
+    fn get_metadata(&self, target: VmValue, key: &str) -> Option<VmValue> {
+        let target_k = self.target_meta_key(target);
+        self.metadata
+            .get(&target_k)
+            .and_then(|m| m.get(key))
+            .copied()
+    }
+
+    fn has_metadata(&self, target: VmValue, key: &str) -> bool {
+        let target_k = self.target_meta_key(target);
+        self.metadata
+            .get(&target_k)
+            .map(|m| m.contains_key(key))
+            .unwrap_or(false)
+    }
+}
+
+impl ExecCtx {
+    pub(crate) fn target_meta_key(&self, v: VmValue) -> String {
+        if v.is_heap() {
+            if let Some(obj) = self.heap.get(v.as_heap_idx()) {
+                match obj {
+                    HeapObj::Class(ref cls) => format!("class:{:p}", std::rc::Rc::as_ptr(cls)),
+                    HeapObj::VmClosure(ref c) => {
+                        format!("fn:{:p}", std::rc::Rc::as_ptr(&c.proto))
+                    }
+                    HeapObj::Object(ref oref) => {
+                        format!("obj:{:p}", std::rc::Rc::as_ptr(&oref.0))
+                    }
+                    _ => format!("heap:{:x}", v.as_heap_idx()),
+                }
+            } else {
+                format!("heap:{:x}", v.as_heap_idx())
+            }
+        } else if v.is_int() {
+            format!("int:{}", v.as_int())
+        } else {
+            self.heap.str_repr(v)
+        }
     }
 }

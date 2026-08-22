@@ -9,13 +9,19 @@ impl super::Binder {
     pub(super) fn bind_import(&mut self, i: &ImportDecl) {
         let in_stdlib_context = self.source_file.starts_with("core:")
             || self.source_file.starts_with("std:")
+            || self.source_file.starts_with("runtime:")
             || varn_modules::std_root::in_source_tree(self.source_file.as_ref());
-        if i.source.starts_with("core:") && !in_stdlib_context {
+        if (i.source.starts_with("core:") || i.source.starts_with("runtime:")) && !in_stdlib_context {
+            let kind = if i.source.starts_with("core:") {
+                "an intrinsic"
+            } else {
+                "a private runtime"
+            };
             self.diagnostics.push(
                 Diagnostic::error(
                     ErrorCode::InvalidImportPath,
                     format!(
-                        "'{}' is an intrinsic module and cannot be imported; use 'std:' equivalents",
+                        "'{}' is {kind} module and cannot be imported by user code; use 'std:' equivalents",
                         i.source
                     ),
                 )

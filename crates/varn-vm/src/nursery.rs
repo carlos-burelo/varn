@@ -253,6 +253,9 @@ impl Nursery {
 
         let n_promoted = self.forwarding.iter().filter(|f| f.is_some()).count();
         self.minor_gc_promoted += n_promoted as u64;
+
+        old_gen.update_interners_after_minor_gc(&self.forwarding);
+
         self.objects.clear();
         self.forwarding.clear();
     }

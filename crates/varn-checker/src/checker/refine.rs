@@ -81,8 +81,10 @@ impl Checker {
                 if *computed {
                     // `x[i]` on a proved `Array<T>` is a `T`.
                     Some((**elem).clone())
-                } else if matches!(&property.kind, ExprKind::Identifier { name } if name.as_ref() == "length")
-                {
+                } else if matches!(
+                    &property.kind,
+                    ExprKind::Identifier { name } if name.as_ref() == varn_core::MemberKey::Length.as_str()
+                ) {
                     Some(Type::Int)
                 } else {
                     None

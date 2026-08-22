@@ -33,8 +33,8 @@ pub fn format_diagnostic(diagnostic: &Diagnostic, source: &str) -> String {
         code = diagnostic.code,
         msg = diagnostic.message,
         path = diagnostic.file,
-        line = diagnostic.range.start.line,
-        col = diagnostic.range.start.column,
+        line = diagnostic.range.start.line.max(1),
+        col = diagnostic.range.start.column.max(1),
     );
 
     render_snippet(&mut out, source, diagnostic.range, color, margin);

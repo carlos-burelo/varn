@@ -6,14 +6,14 @@ use std::rc::Rc;
 use varn_core::ast::decl::{Decl, StructField};
 use varn_core::ast::{
     EnumDecl, EnumField, EnumMember, InterfaceDecl, InterfaceMember, NamespaceDecl, StmtKind,
-    StructDecl, SumField, SumTypeDecl, SumVariant, TypeAliasDecl, TypeNode,
+    StructDecl, SumField, SumTypeDecl, SumVariant, TypeAliasDecl,
 };
 use varn_core::TokenKind;
 
 pub fn parse_interface_decl(s: &mut TokenStream) -> Result<InterfaceDecl, String> {
     let range = s.range();
     s.expect(TokenKind::Interface)?;
-    let id = s.expect_lexeme(TokenKind::Identifier)?;
+    let id = s.expect_id()?;
     let type_params = if s.check(TokenKind::LAngle) {
         parse_type_params(s)?
     } else {
@@ -43,7 +43,7 @@ pub fn parse_interface_decl(s: &mut TokenStream) -> Result<InterfaceDecl, String
     let full_range = s.span_from(range);
     Ok(InterfaceDecl {
         id,
-        ast_id: 0,
+        ast_id: s.next_ast_id(),
         type_params,
         extends,
         body,
@@ -104,9 +104,9 @@ pub fn parse_interface_member(s: &mut TokenStream) -> Result<InterfaceMember, St
         } else {
             None
         };
-        s.eat(TokenKind::Semicolon);
+        s.eat_semicolon();
         let full_range = s.span_from(mem_range);
-        Ok(InterfaceMember::Method {
+        return Ok(InterfaceMember::Method {
             key: key.into(),
             type_params,
             params,
@@ -114,39 +114,40 @@ pub fn parse_interface_member(s: &mut TokenStream) -> Result<InterfaceMember, St
             optional,
             is_async,
             range: full_range,
-        })
-    } else {
-        if is_async {
-            return Err(String::from("unexpected `async` before interface property"));
-        }
-        s.expect(TokenKind::Colon)?;
-        let type_ann = parse_type(s)?;
-        s.eat(TokenKind::Semicolon);
-        let full_range = s.span_from(mem_range);
-        Ok(InterfaceMember::Property {
-            key: key.into(),
-            type_ann,
-            optional,
-            readonly,
-            range: full_range,
-        })
+        });
     }
+
+    let type_ann = if s.eat(TokenKind::Colon) {
+        parse_type(s)?
+    } else {
+        s.type_node(s.range(), varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Dynamic))
+    };
+    s.eat_semicolon();
+    let full_range = s.span_from(mem_range);
+    Ok(InterfaceMember::Property {
+        key: key.into(),
+        type_ann,
+        optional,
+        readonly,
+        range: full_range,
+    })
 }
 
 pub fn parse_sum_type_or_alias(s: &mut TokenStream) -> Result<Decl, String> {
     let range = s.range();
     s.expect(TokenKind::Type)?;
-    let id = s.expect_lexeme(TokenKind::Identifier)?;
+    let id = s.expect_id()?;
+
     let type_params = if s.check(TokenKind::LAngle) {
         parse_type_params(s)?
     } else {
         vec![]
     };
+
     s.expect(TokenKind::Eq)?;
 
     if s.check(TokenKind::Pipe) {
         let decl = parse_sum_type_body(id, type_params, range, s)?;
-        s.eat_semicolon();
         return Ok(Decl::SumType(decl));
     }
 
@@ -155,7 +156,7 @@ pub fn parse_sum_type_or_alias(s: &mut TokenStream) -> Result<Decl, String> {
     let full_range = s.span_from(range);
     Ok(Decl::TypeAlias(TypeAliasDecl {
         id,
-        ast_id: 0,
+        ast_id: s.next_ast_id(),
         type_params,
         alias,
         doc: None,
@@ -174,13 +175,13 @@ fn parse_sum_type_body(
     while s.check(TokenKind::Pipe) {
         let v_start = s.range();
         s.advance();
-        let vname = s.expect_lexeme(TokenKind::Identifier)?;
+        let vname = s.expect_id()?;
 
         let mut fields = Vec::new();
         if s.check(TokenKind::LParen) {
             s.advance();
             while !s.check(TokenKind::RParen) && !s.is_eof() {
-                let fname = s.expect_lexeme(TokenKind::Identifier)?;
+                let fname = s.expect_id()?;
                 s.expect(TokenKind::Colon)?;
                 let fty = parse_type(s)?;
                 fields.push(SumField {
@@ -205,7 +206,7 @@ fn parse_sum_type_body(
     let full_range = s.span_from(range);
     Ok(SumTypeDecl {
         id,
-        ast_id: 0,
+        ast_id: s.next_ast_id(),
         type_params,
         variants,
         doc: None,
@@ -216,7 +217,7 @@ fn parse_sum_type_body(
 pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
     let range = s.range();
     s.expect(TokenKind::Enum)?;
-    let id = s.expect_lexeme(TokenKind::Identifier)?;
+    let id = s.expect_id()?;
 
     let type_params = if s.check(TokenKind::LAngle) {
         parse_type_params(s)?
@@ -244,7 +245,7 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
         }
 
         let mem_range = s.range();
-        let name = s.expect_lexeme(TokenKind::Identifier)?;
+        let name = s.expect_id()?;
 
         let mut payload_fields: Vec<EnumField> = Vec::new();
         if s.check(TokenKind::LParen) {
@@ -266,44 +267,40 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
                     TokenKind::IntegerLiteral => {
                         let expr = crate::expressions::parse_expr(s)?;
                         (
-                            TypeNode {
-                                id: 0,
-                                kind: varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Int),
-                                range: field_range,
-                            },
+                            s.type_node(
+                                field_range,
+                                varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Int),
+                            ),
                             Some(expr),
                         )
                     }
                     TokenKind::FloatLiteral => {
                         let expr = crate::expressions::parse_expr(s)?;
                         (
-                            TypeNode {
-                                id: 0,
-                                kind: varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Float),
-                                range: field_range,
-                            },
+                            s.type_node(
+                                field_range,
+                                varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Float),
+                            ),
                             Some(expr),
                         )
                     }
                     TokenKind::Str => {
                         let expr = crate::expressions::parse_expr(s)?;
                         (
-                            TypeNode {
-                                id: 0,
-                                kind: varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Str),
-                                range: field_range,
-                            },
+                            s.type_node(
+                                field_range,
+                                varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Str),
+                            ),
                             Some(expr),
                         )
                     }
                     TokenKind::True | TokenKind::False => {
                         let expr = crate::expressions::parse_expr(s)?;
                         (
-                            TypeNode {
-                                id: 0,
-                                kind: varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Bool),
-                                range: field_range,
-                            },
+                            s.type_node(
+                                field_range,
+                                varn_core::TypeKind::Intrinsic(varn_core::TypeTag::Bool),
+                            ),
                             Some(expr),
                         )
                     }
@@ -365,7 +362,7 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
     let full_range = s.span_from(range);
     Ok(EnumDecl {
         id,
-        ast_id: 0,
+        ast_id: s.next_ast_id(),
         type_params,
         implements,
         members,
@@ -378,7 +375,7 @@ pub fn parse_enum_decl(s: &mut TokenStream) -> Result<EnumDecl, String> {
 pub fn parse_namespace_decl(s: &mut TokenStream) -> Result<NamespaceDecl, String> {
     let range = s.range();
     s.advance();
-    let id = s.expect_lexeme(TokenKind::Identifier)?;
+    let id = s.expect_id()?;
     s.expect(TokenKind::LBrace)?;
     let mut body = vec![];
     while !s.check(TokenKind::RBrace) && !s.is_eof() {
@@ -395,7 +392,7 @@ pub fn parse_namespace_decl(s: &mut TokenStream) -> Result<NamespaceDecl, String
     let full_range = s.span_from(range);
     Ok(NamespaceDecl {
         id,
-        ast_id: 0,
+        ast_id: s.next_ast_id(),
         body,
         doc: None,
         range: full_range,
@@ -405,7 +402,7 @@ pub fn parse_namespace_decl(s: &mut TokenStream) -> Result<NamespaceDecl, String
 pub fn parse_struct_decl(s: &mut TokenStream) -> Result<StructDecl, String> {
     let range = s.range();
     s.expect(TokenKind::Struct)?;
-    let id = s.expect_lexeme(TokenKind::Identifier)?;
+    let id = s.expect_id()?;
     s.expect(TokenKind::LBrace)?;
     let mut fields = vec![];
     while !s.check(TokenKind::RBrace) && !s.is_eof() {
@@ -414,7 +411,7 @@ pub fn parse_struct_decl(s: &mut TokenStream) -> Result<StructDecl, String> {
             break;
         }
         let field_range = s.range();
-        let name = s.expect_lexeme(TokenKind::Identifier)?;
+        let name = s.expect_id()?;
         s.expect(TokenKind::Colon)?;
         let type_ann = parse_type(s)?;
         let default = if s.eat(TokenKind::Eq) {
@@ -435,7 +432,7 @@ pub fn parse_struct_decl(s: &mut TokenStream) -> Result<StructDecl, String> {
     let full_range = s.span_from(range);
     Ok(StructDecl {
         id,
-        ast_id: 0,
+        ast_id: s.next_ast_id(),
         fields,
         doc: None,
         range: full_range,

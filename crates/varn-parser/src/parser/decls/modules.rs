@@ -26,7 +26,7 @@ pub fn parse_import_decl(s: &mut TokenStream) -> Result<ImportDecl, String> {
         let source = s.consume_lexeme();
         let full_range = s.span_from(range);
         return Ok(ImportDecl {
-            ast_id: 0,
+            ast_id: s.next_ast_id(),
             specifiers,
             source,
             is_type: false,
@@ -50,9 +50,9 @@ pub fn parse_import_decl(s: &mut TokenStream) -> Result<ImportDecl, String> {
     }
 
     if s.eat(TokenKind::Star) {
-        let spec_start = s.prev_range();
+        let spec_start = s.range();
         s.expect(TokenKind::As)?;
-        let local = s.expect_lexeme(TokenKind::Identifier)?;
+        let local = s.expect_id()?;
         let spec_range = s.span_from(spec_start);
         specifiers.push(ImportSpecifier::Namespace {
             local,
@@ -82,13 +82,13 @@ pub fn parse_import_decl(s: &mut TokenStream) -> Result<ImportDecl, String> {
     }
 
     s.expect(TokenKind::From)?;
-    let source = s.expect_lexeme(TokenKind::Str)?;
+    let source = s.consume_str();
     let full_range = s.span_from(range);
 
     Ok(ImportDecl {
-        ast_id: 0,
+        ast_id: s.next_ast_id(),
         specifiers,
-        source,
+        source: source.into(),
         is_type,
         range: full_range,
     })
@@ -114,14 +114,14 @@ pub fn parse_export_decl(
         }
         s.expect(TokenKind::RBrace)?;
         let source = if s.eat(TokenKind::From) {
-            Some(s.expect_lexeme(TokenKind::Str)?)
+            Some(s.consume_str().into())
         } else {
             None
         };
         s.eat_semicolon();
         let full_range = s.span_from(range);
         return Ok(ExportDecl::Named {
-            ast_id: 0,
+            ast_id: s.next_ast_id(),
             specifiers: vec![],
             source,
             range: full_range,
@@ -133,12 +133,12 @@ pub fn parse_export_decl(
             TokenKind::Function | TokenKind::Async => {
                 let is_async = s.eat(TokenKind::Async);
                 let mut fn_decl = parse_function_decl(s, decorators.clone(), is_async, is_declare)?;
-                fn_decl.doc = s.take_pending_doc().map(|doc| doc.to_string());
+                fn_decl.doc = s.current_doc();
                 ExportDefaultDecl::Function(fn_decl)
             }
             TokenKind::Class | TokenKind::Abstract => {
                 let mut cls = parse_class_decl(s, decorators.clone(), is_declare)?;
-                cls.doc = s.take_pending_doc().map(|doc| doc.to_string());
+                cls.doc = s.current_doc();
                 ExportDefaultDecl::Class(cls)
             }
             _ => {
@@ -149,7 +149,7 @@ pub fn parse_export_decl(
         };
         let full_range = s.span_from(range);
         return Ok(ExportDecl::Default {
-            ast_id: 0,
+            ast_id: s.next_ast_id(),
             declaration: Box::new(decl),
             range: full_range,
         });
@@ -162,11 +162,11 @@ pub fn parse_export_decl(
             None
         };
         s.expect(TokenKind::From)?;
-        let source = s.expect_lexeme(TokenKind::Str)?;
+        let source = s.consume_str();
         let full_range = s.span_from(range);
         return Ok(ExportDecl::All {
-            ast_id: 0,
-            source,
+            ast_id: s.next_ast_id(),
+            source: source.into(),
             alias,
             range: full_range,
         });
@@ -195,13 +195,13 @@ pub fn parse_export_decl(
         }
         s.expect(TokenKind::RBrace)?;
         let source = if s.eat(TokenKind::From) {
-            Some(s.expect_lexeme(TokenKind::Str)?)
+            Some(s.consume_str().into())
         } else {
             None
         };
         let full_range = s.span_from(range);
         return Ok(ExportDecl::Named {
-            ast_id: 0,
+            ast_id: s.next_ast_id(),
             specifiers,
             source,
             range: full_range,
@@ -236,7 +236,7 @@ pub fn parse_export_decl(
     if let StmtKind::Decl(d) = decl.kind {
         let full_range = s.span_from(range);
         return Ok(ExportDecl::Decl {
-            ast_id: 0,
+            ast_id: s.next_ast_id(),
             declaration: d,
             range: full_range,
         });

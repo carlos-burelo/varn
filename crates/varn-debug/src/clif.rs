@@ -1,5 +1,6 @@
 //! `vn debug -p clif` — Cranelift backend introspection, per function.
 
+#[cfg(target_arch = "x86_64")]
 use iced_x86::{Decoder, DecoderOptions, Formatter, Instruction, IntelFormatter};
 use varn_jit::clif::debug::{inspect, ClifInspection};
 use varn_jit::clif::lower::NoLinker;
@@ -131,7 +132,7 @@ fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
             let n = code.bytes.len();
             let raw_end = (code.raw_off + code.raw_len).min(n);
             let entry = code.entry_off.min(n);
-            eprintln!("    {DIM}x86-64 raw@{}:{R}", code.raw_off);
+            eprintln!("    {DIM}machine code raw@{}:{R}", code.raw_off);
             eprint!(
                 "{}",
                 disasm(
@@ -139,13 +140,14 @@ fn render_one(insp: &ClifInspection, flags: &DebugFlags) {
                     code.raw_off as u64
                 )
             );
-            eprintln!("    {DIM}x86-64 wrapper@{}:{R}", code.entry_off);
+            eprintln!("    {DIM}machine code wrapper@{}:{R}", code.entry_off);
             eprint!("{}", disasm(&code.bytes[entry..], entry as u64));
         }
     }
 }
 
 /// Decode `bytes` (x86-64) into Intel-syntax text, one instruction per line.
+#[cfg(target_arch = "x86_64")]
 fn disasm(bytes: &[u8], rip: u64) -> String {
     let mut decoder = Decoder::with_ip(64, bytes, rip, DecoderOptions::NONE);
     let mut formatter = IntelFormatter::new();
@@ -157,6 +159,18 @@ fn disasm(bytes: &[u8], rip: u64) -> String {
         line.clear();
         formatter.format(&inst, &mut line);
         out.push_str(&format!("      {:016x}  {line}\n", inst.ip()));
+    }
+    out
+}
+
+/// Portable byte dump for non-x86 architectures.
+#[cfg(not(target_arch = "x86_64"))]
+fn disasm(bytes: &[u8], rip: u64) -> String {
+    let mut out = String::new();
+    for (i, chunk) in bytes.chunks(16).enumerate() {
+        let addr = rip + (i * 16) as u64;
+        let hex: Vec<String> = chunk.iter().map(|b| format!("{b:02x}")).collect();
+        out.push_str(&format!("      {:016x}  {}\n", addr, hex.join(" ")));
     }
     out
 }

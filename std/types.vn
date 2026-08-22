@@ -1,4 +1,18 @@
-// std:types — Utility types implemented via mapped types and keyof
+// std:types — Utility types and core interfaces for Varn
+
+/**
+ * An object that can be synchronously disposed via `using`.
+ */
+export interface Disposable {
+    dispose(): void
+}
+
+/**
+ * An object that can be asynchronously disposed via `await using`.
+ */
+export interface AsyncDisposable {
+    disposeAsync(): void
+}
 
 /**
  * Makes all properties of T optional.

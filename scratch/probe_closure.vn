@@ -1,0 +1,21 @@
+class ReqContext {
+    path: str;
+    constructor(path: str) {
+        this.path = path;
+    }
+}
+
+class Route {
+    handler: (req: ReqContext) => str;
+    constructor(handler: (req: ReqContext) => str) {
+        this.handler = handler;
+    }
+}
+
+function myHelper(msg: str): str {
+    return "Helper: " + msg;
+}
+
+let r = new Route((req: ReqContext) => myHelper(req.path));
+let h = r.handler;
+print(h(new ReqContext("/api/v1/health")));

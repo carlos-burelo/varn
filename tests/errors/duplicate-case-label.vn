@@ -1,4 +1,4 @@
-// expect: error[Varn4009]
+// expect: error[VN4009]
 let x = 1
 switch (x) {
     case 1:

@@ -1,0 +1,104 @@
+// Test Suite 87: Primary Constructors (C# & TypeScript styles) and Null-Coalescing Assignment (??=)
+
+import { describe, test, expect, assertEqual } from "std:test";
+
+// C# / Kotlin style Primary Constructor
+class User(public id: int, public name: str, private role: str = "guest") {
+    greet(): str {
+        return `User #${this.id}: ${this.name} [${this.role}]`;
+    }
+
+    getRole(): str {
+        return this.role;
+    }
+}
+
+// C# / Kotlin style without explicit modifiers
+class Point(x: int, y: int) {
+    sum(): int {
+        return this.x + this.y;
+    }
+}
+
+// TypeScript style Parameter Properties in constructor
+class Hero {
+    constructor(public id: int, public name: str, private power: float = 95.5) {}
+
+    getPower(): float {
+        return this.power;
+    }
+}
+
+class AppConfig {
+    timeout: int? = null;
+    retries: int? = null;
+}
+
+describe("Primary Constructors & Parameter Properties", () => {
+    test("C# style Primary Constructor with default values and methods", () => {
+        let u1 = new User(1, "Alice", "admin");
+        assertEqual(u1.id, 1);
+        assertEqual(u1.name, "Alice");
+        assertEqual(u1.getRole(), "admin");
+        assertEqual(u1.greet(), "User #1: Alice [admin]");
+
+        let u2 = new User(2, "Bob");
+        assertEqual(u2.id, 2);
+        assertEqual(u2.name, "Bob");
+        assertEqual(u2.getRole(), "guest");
+        assertEqual(u2.greet(), "User #2: Bob [guest]");
+    });
+
+    test("C# style Primary Constructor basic fields", () => {
+        let pt = new Point(10, 25);
+        assertEqual(pt.x, 10);
+        assertEqual(pt.y, 25);
+        assertEqual(pt.sum(), 35);
+    });
+
+    test("TypeScript style Parameter Properties", () => {
+        let h1 = new Hero(101, "Superman");
+        assertEqual(h1.id, 101);
+        assertEqual(h1.name, "Superman");
+        assertEqual(h1.getPower(), 95.5);
+
+        let h2 = new Hero(102, "Batman", 80.0);
+        assertEqual(h2.id, 102);
+        assertEqual(h2.name, "Batman");
+        assertEqual(h2.getPower(), 80.0);
+    });
+});
+
+describe("Null-Coalescing Assignment (??=)", () => {
+    test("Variable ??= assignment", () => {
+        let a: int? = null;
+        a ??= 42;
+        assertEqual(a, 42);
+
+        // Should short-circuit and NOT reassign since `a` is not null
+        a ??= 999;
+        assertEqual(a, 42);
+    });
+
+    test("Member ??= assignment", () => {
+        let cfg = new AppConfig();
+        expect(cfg.timeout === null).toBe(true);
+
+        cfg.timeout ??= 3000;
+        assertEqual(cfg.timeout, 3000);
+
+        cfg.timeout ??= 8000;
+        assertEqual(cfg.timeout, 3000);
+    });
+
+    test("Array element ??= assignment", () => {
+        let items: dynamic[] = [null, "existing", null];
+        items[0] ??= "filled_0";
+        items[1] ??= "overwritten_1";
+        items[2] ??= "filled_2";
+
+        assertEqual(items[0], "filled_0");
+        assertEqual(items[1], "existing");
+        assertEqual(items[2], "filled_2");
+    });
+});

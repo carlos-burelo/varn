@@ -1,4 +1,4 @@
-// expect: error[Varn3010]
+// expect: error[VN3010]
 const x: float = 1.5
 const y: float = 2.5
 const z = x & y

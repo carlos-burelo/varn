@@ -88,12 +88,17 @@ pub fn convert_diagnostics(state: &DocumentState) -> Vec<LspDiagnostic> {
                 tags.push(DiagnosticTag::DEPRECATED);
             }
             let tags = if tags.is_empty() { None } else { Some(tags) };
+            let code = d
+                .code
+                .map(|c| tower_lsp::lsp_types::NumberOrString::String(c.to_string()));
 
             LspDiagnostic {
                 range: range_on_line(d.line, d.col, d.end_col),
                 severity: Some(severity),
+                code,
+                code_description: None,
                 message: d.message.clone(),
-                source: Some("varn-lsp".into()),
+                source: Some("varn".into()),
                 tags,
                 related_information,
                 data,

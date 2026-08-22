@@ -49,7 +49,7 @@ pub(super) fn infer_member_type(
         }
 
         TypeKind::Array(elem) => {
-            if prop_name.as_ref() == "length" {
+            if prop_name.as_ref() == varn_core::MemberKey::Length.as_str() {
                 return Type::intrinsic(TypeTag::Int);
             }
 

@@ -71,7 +71,7 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
             //
             // Placed after the user/stdlib alias lookups so an explicitly
             // declared `Array<T>` alias still wins.
-            if name.as_str() == "Array" {
+            if name.as_str() == varn_core::IntrinsicType::Array.as_str() {
                 if let [el] = resolved_args.as_slice() {
                     return Type::array(el.clone());
                 }

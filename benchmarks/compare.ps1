@@ -41,13 +41,18 @@ if (-not (Test-Path $vn)) {
 
 # Master list of benchmarks
 $AllBenchmarks = @(
-    @{ Name = 'fib';          Vn = 'bench_fib.vn';        TS = 'bench_fib.ts';        Py = 'py/fib.py' }
-    @{ Name = 'gc_alloc';     Vn = 'bench_gc_alloc.vn';   TS = 'bench_gc_alloc.ts';   Py = 'py/gc_alloc.py' }
-    @{ Name = 'dto';          Vn = 'bench_dto_local.vn';  TS = 'bench_dto.ts';        Py = 'py/dto.py' }
-    @{ Name = 'matrix';       Vn = 'bench_matrix.vn';     TS = 'bench_matrix.ts';     Py = 'py/matrix.py' }
-    @{ Name = 'str_ops';      Vn = 'bench_str_ops.vn';    TS = 'bench_str_ops.ts';    Py = $null }
-    @{ Name = 'json_native';  Vn = 'bench_json.vn';       TS = 'bench_json.ts';       Py = $null }
-    @{ Name = 'json_pure';    Vn = 'bench_json_pure.vn';  TS = 'bench_json_pure.ts';  Py = $null }
+    @{ Name = 'fib';                 Vn = 'bench_fib.vn';                 TS = 'bench_fib.ts';                 Py = 'py/fib.py' }
+    @{ Name = 'gc_alloc';            Vn = 'bench_gc_alloc.vn';            TS = 'bench_gc_alloc.ts';            Py = 'py/gc_alloc.py' }
+    @{ Name = 'dto';                 Vn = 'bench_dto_local.vn';           TS = 'bench_dto.ts';                 Py = 'py/dto.py' }
+    @{ Name = 'matrix';              Vn = 'bench_matrix.vn';              TS = 'bench_matrix.ts';              Py = 'py/matrix.py' }
+    @{ Name = 'str_ops';             Vn = 'bench_str_ops.vn';             TS = 'bench_str_ops.ts';             Py = $null }
+    @{ Name = 'json_native';         Vn = 'bench_json.vn';                TS = 'bench_json.ts';                Py = $null }
+    @{ Name = 'json_pure';           Vn = 'bench_json_pure.vn';           TS = 'bench_json_pure.ts';           Py = $null }
+    @{ Name = 'csv_pipeline';        Vn = 'bench_csv_pipeline.vn';        TS = 'bench_csv_pipeline.ts';        Py = $null }
+    @{ Name = 'collection_pipeline'; Vn = 'bench_collection_pipeline.vn'; TS = 'bench_collection_pipeline.ts'; Py = $null }
+    @{ Name = 'http_routing';        Vn = 'bench_http_routing.vn';        TS = 'bench_http_routing.ts';        Py = $null }
+    @{ Name = 'csv_etl';             Vn = 'bench_csv_etl.vn';             TS = 'bench_csv_etl.ts';             Py = $null }
+    @{ Name = 'json_api_payloads';   Vn = 'bench_json_api_payloads.vn';   TS = 'bench_json_api_payloads.ts';   Py = $null }
 )
 
 if ($Only) {

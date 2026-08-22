@@ -100,6 +100,7 @@ impl super::super::Binder {
                         is_readonly: false,
                         is_override: false,
                         symbol_id,
+                        ..Default::default()
                     });
                 }
                 Decl::Class(c) => {
@@ -131,6 +132,7 @@ impl super::super::Binder {
                         is_readonly: false,
                         is_override: false,
                         symbol_id,
+                        ..Default::default()
                     });
                 }
                 Decl::Variable(v) => {
@@ -165,6 +167,7 @@ impl super::super::Binder {
                             is_readonly: false,
                             is_override: false,
                             symbol_id,
+                            ..Default::default()
                         });
                     }
                 }
@@ -188,6 +191,7 @@ impl super::super::Binder {
                         is_readonly: false,
                         is_override: false,
                         symbol_id,
+                        ..Default::default()
                     });
                 }
                 Decl::TypeAlias(t) => {
@@ -212,6 +216,7 @@ impl super::super::Binder {
                         is_readonly: false,
                         is_override: false,
                         symbol_id,
+                        ..Default::default()
                     });
                 }
                 Decl::Enum(e) => {
@@ -239,6 +244,7 @@ impl super::super::Binder {
                         is_readonly: false,
                         is_override: false,
                         symbol_id,
+                        ..Default::default()
                     });
                 }
                 Decl::Struct(s) => {
@@ -266,6 +272,7 @@ impl super::super::Binder {
                         is_readonly: false,
                         is_override: false,
                         symbol_id,
+                        ..Default::default()
                     });
                 }
                 Decl::Interface(i) => {
@@ -293,6 +300,7 @@ impl super::super::Binder {
                         is_readonly: false,
                         is_override: false,
                         symbol_id,
+                        ..Default::default()
                     });
                 }
                 Decl::Export(e) => {
@@ -347,7 +355,8 @@ impl super::super::Binder {
                 is_readonly: false,
                 is_override: false,
                 symbol_id: Some(symbol_id),
-            });
+                        ..Default::default()
+                        });
         }
         let struct_info = ClassMemberInfo {
             name: s.id.clone(),
@@ -366,6 +375,7 @@ impl super::super::Binder {
             is_readonly: false,
             is_override: false,
             symbol_id: None,
+            ..Default::default()
         };
         self.type_members.classes.insert(s.id.clone(), struct_info);
     }

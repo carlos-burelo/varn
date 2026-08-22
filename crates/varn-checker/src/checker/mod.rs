@@ -319,6 +319,12 @@ impl Checker {
             },
         };
 
+        for (name, class_info) in &bind.type_members.classes {
+            if class_info.is_abstract {
+                checker.abstract_classes.insert(name.clone());
+            }
+        }
+
         let started = Instant::now();
         checker.check_stmts(&program.body, &bind);
         profile.check_stmts = started.elapsed();

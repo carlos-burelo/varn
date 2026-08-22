@@ -1,0 +1,387 @@
+use std::collections::HashMap;
+use varn_core::OpCode;
+use varn_types::bytecode::decode;
+use varn_types::chunk::PoolEntry;
+
+pub(crate) fn remap_bytecode(code: &mut Vec<u16>, constants: &[PoolEntry], mapping: &HashMap<u8, u8>) {
+    fn m(mapping: &HashMap<u8, u8>, r: u8) -> u8 {
+        mapping.get(&r).copied().unwrap_or(r)
+    }
+
+    let mut offset = 0;
+    while offset < code.len() {
+        let info = match decode(code, offset, constants) {
+            Some(i) => i,
+            None => break,
+        };
+
+        if !info.opaque {
+            let op = match OpCode::from_u16(code[offset]) {
+                Some(op) => op,
+                None => {
+                    offset += info.len;
+                    continue;
+                }
+            };
+
+            let get = |off: usize| code.get(offset + off).copied().unwrap_or(0);
+            let w0 = get(0);
+            let w1 = get(1);
+            let w2 = get(2);
+            let w3 = get(3);
+            let w4 = get(4);
+
+            let dest0 = (w0 >> 8) as u8;
+            let hi1 = (w1 >> 8) as u8;
+            let lo1 = (w1 & 0xff) as u8;
+            let hi2 = (w2 >> 8) as u8;
+            let lo2 = (w2 & 0xff) as u8;
+            let hi3 = (w3 >> 8) as u8;
+            let lo3 = (w3 & 0xff) as u8;
+            let hi4 = (w4 >> 8) as u8;
+            let lo4 = (w4 & 0xff) as u8;
+
+            #[inline(always)]
+            fn pack(a: u8, b: u8) -> u16 {
+                ((a as u16) << 8) | (b as u16)
+            }
+
+            #[inline(always)]
+            fn pack_op(op: OpCode, reg: u8) -> u16 {
+                ((reg as u16) << 8) | (op as u8 as u16)
+            }
+
+            if OpCode::from_u16(code[offset]) == Some(OpCode::Try) {
+                let w1 = code.get(offset + 1).copied().unwrap_or(0);
+                let old_err_reg = (w1 >> 8) as u8;
+                let new_err_reg = m(mapping, old_err_reg);
+                code[offset + 1] = ((new_err_reg as u16) << 8) | 0;
+            }
+
+            match op {
+                OpCode::PopTry | OpCode::Nop => {}
+
+                OpCode::LoadNull
+                | OpCode::LoadTrue
+                | OpCode::LoadFalse
+                | OpCode::LoadIntZero
+                | OpCode::LoadIntOne
+                | OpCode::LoadIntMinusOne => {
+                    let op_byte = code[offset] & 0xFF;
+                    code[offset] = ((m(mapping, dest0) as u16) << 8) | op_byte;
+                }
+                OpCode::LoadUpvalue => {
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                }
+
+                OpCode::Move
+                | OpCode::Negate
+                | OpCode::Not
+                | OpCode::ToString
+                | OpCode::IsNull
+                | OpCode::IsArray
+                | OpCode::Typeof
+                | OpCode::WrapSpread
+                | OpCode::ArrayLength
+                | OpCode::ArrayPop
+                | OpCode::StrLength
+                | OpCode::GetEnumTag
+                | OpCode::Await
+                | OpCode::ObjectKeys => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    code[offset + 1] = pack(m(mapping, hi1), 0);
+                }
+
+                OpCode::ArrayPush | OpCode::Inherit => {
+                    code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
+                }
+                OpCode::Yield | OpCode::Return => {
+                    code[offset + 1] = pack(hi1, m(mapping, lo1));
+                }
+                OpCode::Throw => {
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                }
+                OpCode::StoreUpvalue => {
+                    code[offset + 1] = pack(hi1, m(mapping, lo1));
+                }
+                OpCode::CloseUpvalue => {
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                }
+                OpCode::AssertNotNull => {
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                }
+                OpCode::ObjectMerge => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    code[offset + 1] = pack(m(mapping, hi1), 0);
+                }
+
+                OpCode::Jump | OpCode::Loop => {}
+
+                OpCode::LoadConst
+                | OpCode::LoadInt
+                | OpCode::LoadGlobal
+                | OpCode::LoadGlobalIdx => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                }
+
+                OpCode::MakeClass => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    code[offset + 1] = pack(m(mapping, hi1), 0);
+                }
+
+                OpCode::GetSuper => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                }
+
+                OpCode::StoreGlobal
+                | OpCode::DefineGlobal
+                | OpCode::StoreGlobalIdx
+                | OpCode::DefineGlobalIdx => {
+                    code[offset + 1] = pack(m(mapping, hi1), 0);
+                }
+
+                OpCode::Add
+                | OpCode::Sub
+                | OpCode::Mul
+                | OpCode::Div
+                | OpCode::Mod
+                | OpCode::Pow
+                | OpCode::Eq
+                | OpCode::Neq
+                | OpCode::Lt
+                | OpCode::Lte
+                | OpCode::Gt
+                | OpCode::Gte
+                | OpCode::BitAnd
+                | OpCode::BitOr
+                | OpCode::BitXor
+                | OpCode::Shl
+                | OpCode::Shr
+                | OpCode::Ushr
+                | OpCode::StrConcat
+                | OpCode::StrSlice
+                | OpCode::In
+                | OpCode::Instanceof
+                | OpCode::AddInt
+                | OpCode::SubInt
+                | OpCode::MulInt
+                | OpCode::DivInt
+                | OpCode::ModInt
+                | OpCode::PowInt
+                | OpCode::LtInt
+                | OpCode::GtInt
+                | OpCode::LteInt
+                | OpCode::GteInt
+                | OpCode::EqInt
+                | OpCode::NeqInt
+                | OpCode::AddFloat
+                | OpCode::SubFloat
+                | OpCode::MulFloat
+                | OpCode::DivFloat
+                | OpCode::ModFloat
+                | OpCode::PowFloat
+                | OpCode::LtFloat
+                | OpCode::GtFloat
+                | OpCode::LteFloat
+                | OpCode::GteFloat
+                | OpCode::EqFloat
+                | OpCode::NeqFloat => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
+                }
+                OpCode::ArrayExtend => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    code[offset + 1] = pack(m(mapping, hi1), 0);
+                }
+                OpCode::Spawn => {
+                    code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
+                }
+                OpCode::InvokeRuntimeStatic => {
+                    code[offset + 1] = pack(m(mapping, hi1), 0);
+                    code[offset + 3] = pack(hi3, m(mapping, lo3));
+                    code[offset + 4] = pack(m(mapping, hi4), lo4);
+                }
+
+                OpCode::LoadModuleSlot => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                }
+                OpCode::GetPropertyMaybe | OpCode::GetFixedField | OpCode::GetSymbol => {
+                    let new_dest = m(mapping, dest0);
+                    let new_obj = if dest0 == hi1 {
+                        new_dest
+                    } else {
+                        m(mapping, hi1)
+                    };
+                    code[offset] = pack_op(op, new_dest);
+                    code[offset + 1] = pack(new_obj, lo1);
+                }
+
+                OpCode::BindMethod => {
+                    code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
+                }
+
+                OpCode::MakeEnumVariant => {
+                    code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
+                }
+
+                OpCode::SetFixedField => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                }
+                OpCode::DeclareField => {
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                }
+                OpCode::Method
+                | OpCode::DefineStatic
+                | OpCode::DefineGetter
+                | OpCode::DefineSetter
+                | OpCode::DefineStaticGetter
+                | OpCode::DefineStaticSetter => {
+                    code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
+                }
+
+                OpCode::JumpIfFalse | OpCode::JumpIfTrue => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                }
+
+                OpCode::GetProperty => {
+                    let new_dest = m(mapping, dest0);
+                    let new_obj = if dest0 == hi1 {
+                        new_dest
+                    } else {
+                        m(mapping, hi1)
+                    };
+                    code[offset] = pack_op(op, new_dest);
+                    code[offset + 1] = pack(new_obj, lo1);
+                }
+                OpCode::SetProperty => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                }
+
+                OpCode::Call => {
+                    let arg_count = hi2;
+                    let arg_start = lo2;
+                    code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
+                    code[offset + 2] = pack(arg_count, m(mapping, arg_start));
+                }
+
+                OpCode::CallSelf => {
+                    let arg_count = hi2;
+                    let arg_start = lo2;
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                    code[offset + 2] = pack(arg_count, m(mapping, arg_start));
+                }
+
+                OpCode::CallSpread => {
+                    code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
+                    code[offset + 2] = pack(hi2, m(mapping, lo2));
+                }
+
+                OpCode::InvokeVirtual => {
+                    code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
+                    code[offset + 3] = pack(hi3, m(mapping, lo3));
+                }
+
+                OpCode::CallMethod => {
+                    code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
+                    code[offset + 3] = pack(hi3, m(mapping, lo3));
+                }
+
+                OpCode::LoadModule | OpCode::StoreModuleSlot => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                }
+
+                OpCode::MakeClosure => {
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                    let uv_count = lo1 as usize;
+                    for i in 0..uv_count {
+                        let desc_off = offset + 3 + i;
+                        if desc_off < code.len() {
+                            let desc = code[desc_off];
+                            let is_local = (desc >> 8) as u8;
+                            let local_idx = (desc & 0xff) as u8;
+                            if is_local == 1 {
+                                code[desc_off] = pack(is_local, m(mapping, local_idx));
+                            }
+                        }
+                    }
+                }
+
+                OpCode::BuildObject => {
+                    let count = lo1 as usize;
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                    for i in 0..count {
+                        let w_off = offset + 2 + i * 2 + 1;
+                        if w_off < code.len() {
+                            let pair = code[w_off];
+                            let val_reg = (pair >> 8) as u8;
+                            code[w_off] = pack(m(mapping, val_reg), pair as u8);
+                        }
+                    }
+                }
+
+                OpCode::BuildObjectWithShape | OpCode::BuildRecord => {
+                    code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
+                }
+
+                OpCode::BuildArray | OpCode::BuildTuple => {
+                    let start = lo1 as usize;
+                    code[offset + 1] = pack(m(mapping, hi1), m(mapping, start as u8));
+                }
+
+                OpCode::GetIndex | OpCode::ArrayGetIndex => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
+                }
+
+                OpCode::SetIndex | OpCode::ArraySetIndex => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
+                }
+
+                OpCode::ObjectRest => {
+                    code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
+                }
+
+                OpCode::Intrinsic => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                }
+                // Both operands are ordinary registers here (no call window),
+                // so `src` in the high byte gets remapped like any other use;
+                // the low byte is the wire byte, not a register.
+                OpCode::IntrinsicDirect => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                }
+                OpCode::CallNativeOp => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                }
+                OpCode::LoadStaticFn => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                }
+                OpCode::AddImm | OpCode::SubImm => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    code[offset + 1] = pack(m(mapping, hi1), lo1);
+                }
+
+                OpCode::BuildStr => {
+                    code[offset] = pack_op(op, m(mapping, dest0));
+                    let count = hi1 as usize;
+                    for i in 0..count {
+                        let w_off = offset + 2 + i;
+                        if w_off < code.len() {
+                            let reg = (code[w_off] >> 8) as u8;
+                            code[w_off] = pack(m(mapping, reg), 0);
+                        }
+                    }
+                }
+
+                _ => {}
+            }
+        }
+
+        offset += info.len;
+    }
+}

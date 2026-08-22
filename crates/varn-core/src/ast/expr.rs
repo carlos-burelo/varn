@@ -179,6 +179,10 @@ pub enum ExprKind {
         expression: Box<Expr>,
         type_ann: super::types::TypeNode,
     },
+    With {
+        object: Box<Expr>,
+        properties: Vec<ObjectProp>,
+    },
 }
 
 #[derive(Clone, Debug)]

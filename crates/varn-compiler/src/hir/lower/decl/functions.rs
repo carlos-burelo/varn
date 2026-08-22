@@ -48,7 +48,7 @@ impl<'a> Lowerer<'a> {
         let prev_fn = self.current_fn.take();
         self.current_fn = Some(name.clone());
 
-        let built = self.lower_function_body(params_ast, body, field_inits, scope);
+        let built = self.lower_function_body(params_ast, has_this, body, field_inits, scope);
 
         self.current_fn = prev_fn;
         let (params, mut body) = match built {
@@ -81,6 +81,7 @@ impl<'a> Lowerer<'a> {
     fn lower_function_body(
         &mut self,
         params_ast: &[Param],
+        has_this: bool,
         body: BodyRef<'_>,
         field_inits: &[(Rc<str>, &Expr)],
         scope: &mut Scope,
@@ -126,6 +127,23 @@ impl<'a> Lowerer<'a> {
                 name: fname.clone(),
                 value,
             });
+        }
+
+        if has_this {
+            for (i, p) in params_ast.iter().enumerate() {
+                let should_assign = p.modifiers.visibility.is_some()
+                    || p.modifiers.is_readonly
+                    || matches!(body, BodyRef::Empty);
+                if should_assign {
+                    if let Pattern::Identifier { name, .. } = &p.pattern {
+                        out.push(HirStmt::SetMember {
+                            object: HirExpr::This,
+                            name: name.clone(),
+                            value: HirExpr::Var(HirBinding::Param(i as u32)),
+                        });
+                    }
+                }
+            }
         }
 
         match body {

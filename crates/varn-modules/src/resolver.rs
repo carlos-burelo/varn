@@ -40,7 +40,24 @@ impl ModuleResolver {
                 }
                 Ok(ModuleId::Core(s))
             }
-            ImportSpecifier::Runtime(s) => Ok(ModuleId::Runtime(s)),
+            ImportSpecifier::Runtime(s) => {
+                let in_intrinsic_context = matches!(
+                    referrer,
+                    ModuleId::Core(_) | ModuleId::Std(_) | ModuleId::Runtime(_)
+                ) || match referrer {
+                    ModuleId::Local(ref_path) => {
+                        super::std_root::in_source_tree(ref_path.as_ref())
+                    }
+                    _ => false,
+                };
+                if !in_intrinsic_context {
+                    return Err(format!(
+                        "'{}' is a private runtime module and cannot be imported by user code; use 'std:' equivalents",
+                        spec
+                    ));
+                }
+                Ok(ModuleId::Runtime(s))
+            }
             ImportSpecifier::Relative(rel) => {
                 let joined = if rel.is_absolute() {
                     rel

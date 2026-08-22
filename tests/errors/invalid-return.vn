@@ -1,2 +1,2 @@
-// expect: error[Varn4007]
+// expect: error[VN4007]
 return 1

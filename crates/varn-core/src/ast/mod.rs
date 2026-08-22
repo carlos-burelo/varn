@@ -1,6 +1,5 @@
 pub mod decl;
 pub mod expr;
-pub mod id_assigner;
 pub mod operators;
 pub mod pattern;
 pub mod program;
@@ -18,16 +17,20 @@ pub use expr::{
     Arg, ArrayEl, ArrowBody, AstId, Expr, ExprKind, MatchBody, MatchCase, ObjectProp, PropKey,
     TemplatePart,
 };
-pub use id_assigner::assign_ast_ids;
 pub use operators::{
     AssignOp, BinaryOp, LogicalOp, Modifiers, UnaryOp, UpdateOp, VarKind, Visibility,
 };
 pub use pattern::{ArrayPatternEl, MatchBinding, MatchPattern, ObjPatternProp, Param, Pattern};
 pub use stmt::{CatchClause, ForInit, Stmt, StmtKind, SwitchCase, VarDeclarator, VariableDecl};
-pub use types::{Decorator, TypeNode, TypeParam};
+pub use types::{AstTypeKind, Decorator, TypeNode, TypeParam};
 
 use crate::source::SourceRange;
 use rustc_hash::FxHashMap;
+
+/// No-op backwards-compatible function: AST IDs are now assigned directly
+/// during single-pass parsing in `varn-parser`.
+#[inline(always)]
+pub fn assign_ast_ids(_program: &mut Program) {}
 
 #[derive(Default, Clone, Debug)]
 pub struct AstMetadata {

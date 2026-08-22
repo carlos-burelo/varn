@@ -49,7 +49,7 @@ pub fn parse_extension_decl(s: &mut TokenStream) -> Result<ExtensionDecl, String
     let full_range = s.span_from(range);
     Ok(ExtensionDecl {
         id,
-        ast_id: 0,
+        ast_id: s.next_ast_id(),
         target,
         members,
         range: full_range,
@@ -132,7 +132,7 @@ fn parse_extension_member(s: &mut TokenStream) -> Result<ExtensionMember, String
     let full_range = s.span_from(range);
     Ok(ExtensionMember::Method(FunctionDecl {
         id,
-        ast_id: 0,
+        ast_id: s.next_ast_id(),
         id_offset,
         type_params,
         params,

@@ -1,0 +1,60 @@
+// Test Suite 88: Range Indexing in Strings and Arrays (arr[a..b], str[a..b])
+
+import { describe, test, expect, assertEqual } from "std:test";
+
+describe("Range Indexing (Slicing)", () => {
+    test("String exclusive and inclusive range indexing", () => {
+        let text = "Hello, World!";
+
+        // Exclusive range [0..5]
+        let greeting = text[0..5];
+        assertEqual(greeting, "Hello");
+
+        // Inclusive range [0..=4]
+        let greetingInc = text[0..=4];
+        assertEqual(greetingInc, "Hello");
+
+        // Substring inside text
+        let world = text[7..12];
+        assertEqual(world, "World");
+
+        let worldInc = text[7..=11];
+        assertEqual(worldInc, "World");
+    });
+
+    test("Array exclusive and inclusive range indexing", () => {
+        let numbers = [10, 20, 30, 40, 50, 60];
+
+        // Exclusive slice [1..4] -> indices 1, 2, 3
+        let slice1 = numbers[1..4];
+        assertEqual(slice1.length, 3);
+        assertEqual(slice1[0], 20);
+        assertEqual(slice1[1], 30);
+        assertEqual(slice1[2], 40);
+
+        // Inclusive slice [1..=3] -> indices 1, 2, 3
+        let slice2 = numbers[1..=3];
+        assertEqual(slice2.length, 3);
+        assertEqual(slice2[0], 20);
+        assertEqual(slice2[1], 30);
+        assertEqual(slice2[2], 40);
+
+        // Slice from start
+        let head = numbers[0..2];
+        assertEqual(head.length, 2);
+        assertEqual(head[0], 10);
+        assertEqual(head[1], 20);
+    });
+
+    test("Range indexing with dynamic variable bounds", () => {
+        let fruits = ["apple", "banana", "cherry", "date", "elderberry"];
+        let start = 1;
+        let end = 4;
+
+        let picked = fruits[start..end];
+        assertEqual(picked.length, 3);
+        assertEqual(picked[0], "banana");
+        assertEqual(picked[1], "cherry");
+        assertEqual(picked[2], "date");
+    });
+});

@@ -544,6 +544,27 @@ impl Checker {
             ExprKind::TaggedTemplate { tag, template, .. } => {
                 self.check_expr(tag, bind);
                 self.check_expr(template, bind);
+                let tag_ty = self.infer_type(tag, bind).non_nullified();
+                if let TypeKind::Fn(ft) = &tag_ty.0 {
+                    self.record_type(expr.range.start.offset, ft.return_type.as_ref().clone());
+                }
+            }
+
+            ExprKind::With { object, properties } => {
+                self.check_expr(object, bind);
+                for prop in properties {
+                    match prop {
+                        varn_core::ast::ObjectProp::Property { value, .. } => {
+                            self.check_expr(value, bind);
+                        }
+                        varn_core::ast::ObjectProp::Spread { argument, .. } => {
+                            self.check_expr(argument, bind);
+                        }
+                        _ => {}
+                    }
+                }
+                let obj_ty = self.infer_type(object, bind);
+                self.record_type(expr.range.start.offset, obj_ty);
             }
 
             ExprKind::Identifier { name } => {

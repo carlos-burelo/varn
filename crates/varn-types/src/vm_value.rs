@@ -415,7 +415,7 @@ impl VmArray {
     /// is single-threaded and never re-enters an array mutation underneath a
     /// live read, so this holds by construction.
     #[inline(always)]
-    fn repr(&self) -> &ArrayRepr {
+    pub fn repr(&self) -> &ArrayRepr {
         unsafe { &*self.0.get() }
     }
 

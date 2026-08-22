@@ -15,18 +15,17 @@ pub fn parse(
     let program = varn_parser::parse(tokens, lexeme_buf, path).map_err(|errs| {
         let msgs: Vec<String> = errs
             .iter()
-            .map(|e| {
-                crate::fmt::format_error_with_context(
-                    source,
-                    path,
-                    e.range.start.line,
-                    e.range.start.column,
-                    "parse",
-                    &e.message,
-                )
-            })
+            .map(|e| varn_core::diagnostics::format_diagnostic(e, source))
             .collect();
-        PipelineError::fatal(msgs.join("\n"))
+        let error_count = errs.len();
+        let footer = format!(
+            "\n{}: could not compile `{}` due to {} previous error{}",
+            varn_term::chalk::chalk("error").red().bold(),
+            path,
+            error_count,
+            if error_count > 1 { "s" } else { "" }
+        );
+        PipelineError::new(3, format!("{}\n{}", msgs.join("\n"), footer))
     })?;
 
     if verbose {

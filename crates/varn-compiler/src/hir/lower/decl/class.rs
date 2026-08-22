@@ -36,6 +36,16 @@ impl<'a> Lowerer<'a> {
         let mut static_blocks_ast: Vec<&Stmt> = Vec::new();
         let mut destructor_ast: Option<&Stmt> = None;
 
+        if let Some(primary_params) = &decl.primary_params {
+            for p in primary_params {
+                if let varn_core::ast::Pattern::Identifier { name, .. } = &p.pattern {
+                    if !fields.contains(name) {
+                        fields.push(name.clone());
+                    }
+                }
+            }
+        }
+
         for member in &decl.body {
             match member {
                 ClassMember::Property {
@@ -51,13 +61,24 @@ impl<'a> Lowerer<'a> {
                         };
                         static_fields.push((key.clone(), val));
                     } else {
-                        fields.push(key.clone());
+                        if !fields.contains(key) {
+                            fields.push(key.clone());
+                        }
                         if let Some(e) = init {
                             field_inits.push((key.clone(), e));
                         }
                     }
                 }
                 ClassMember::Constructor { params, body, .. } => {
+                    for p in params {
+                        if p.modifiers.visibility.is_some() || p.modifiers.is_readonly {
+                            if let varn_core::ast::Pattern::Identifier { name, .. } = &p.pattern {
+                                if !fields.contains(name) {
+                                    fields.push(name.clone());
+                                }
+                            }
+                        }
+                    }
                     ctor_member = Some((params, body));
                 }
                 ClassMember::Method {
@@ -108,17 +129,20 @@ impl<'a> Lowerer<'a> {
                 &field_inits,
                 scope,
             )?,
-            None => self.lower_function_like(
-                Rc::from("constructor"),
-                &[],
-                false,
-                false,
-                false,
-                true,
-                BodyRef::Empty,
-                &field_inits,
-                scope,
-            )?,
+            None => {
+                let primary = decl.primary_params.as_deref().unwrap_or(&[]);
+                self.lower_function_like(
+                    Rc::from("constructor"),
+                    primary,
+                    false,
+                    false,
+                    false,
+                    true,
+                    BodyRef::Empty,
+                    &field_inits,
+                    scope,
+                )?
+            }
         };
 
         let mut methods = Vec::new();

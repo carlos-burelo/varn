@@ -356,7 +356,8 @@ impl super::super::Binder {
                 is_readonly: false,
                 is_override: false,
                 symbol_id: Some(variant_sym_id),
-            });
+                        ..Default::default()
+                        });
         }
 
         let child = self
@@ -481,6 +482,7 @@ impl super::super::Binder {
             is_readonly: false,
             is_override: false,
             symbol_id: None,
+            ..Default::default()
         };
 
         self.type_members.classes.insert(e.id.clone(), class_info);

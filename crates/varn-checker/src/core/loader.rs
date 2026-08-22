@@ -87,7 +87,9 @@ fn build_core_members() -> CoreMembers {
             }
 
             for (k, v) in &rb.type_members.classes {
-                members.class_members.insert(k.clone(), v.clone());
+                let mut v = v.clone();
+                v.is_builtin_or_intrinsic = true;
+                members.class_members.insert(k.clone(), v);
             }
             for (k, v) in &rb.type_members.interfaces {
                 members.interface_members.insert(k.clone(), v.clone());

@@ -1,21 +1,20 @@
 import { Duration, PlainDateTime, nowInstant, Instant } from 'std:time';
 import { List, Stack, Queue, Record } from 'std:collections';
 import { Http } from 'std:http';
-import { parse as jsonParse, stringify as jsonStringify } from 'std:json';
+import { JSON } from 'std:json';
 import { uuid, sha256 } from 'std:crypto';
 import { write as fsWrite, exists as fsExists, read as fsRead } from 'std:fs';
 import { write as ioWrite, writeln as ioWriteln } from 'std:io';
 import { PI as mathPI, abs as mathAbs, min as mathMin, max as mathMax } from 'std:math';
 import { platform as sysPlatform, cwd as sysCwd } from 'std:sys';
 import { isIP as netIsIP, Query, Url } from 'std:net';
-import { normalize as pathNormalize, dirname as pathDirname, basename as pathBasename, extname as pathExtname, join as pathJoin } from 'std:path';
+import { Path } from 'std:path';
 import { defineMetadata, getMetadata, hasMetadata, MetaKey } from 'std:reflect';
 import { sleep, TaskGroup, spawn, parallel } from 'std:task';
 
-// Import the remaining 5 standard library modules
-import { Disposable, AsyncDisposable } from 'std:dispose';
+// Import standard library modules
+import { Disposable, AsyncDisposable, Partial, Required, Readonly, Mutable } from 'std:types';
 import { assert as testAssert, assertTrue, assertEqual, fail } from 'std:test';
-import { Partial, Required, Readonly, Mutable } from 'std:types';
 // Option/Result come from std:result, which is the only module that declares
 // them. `std:types` used to declare a second, incompatible pair; see the note
 // at the end of std/types.vn.
@@ -51,8 +50,8 @@ async function runComprehensiveTest(): Task<void> {
     assert("Crypto SHA256", hash.length === 64);
 
     // 4. std:json
-    let serialized = jsonStringify({ test: "json", value: 123 });
-    let parsed = jsonParse(serialized);
+    let serialized = JSON.stringify({ test: "json", value: 123 });
+    let parsed = JSON.parse(serialized);
     assert("JSON parse field", parsed["test"] === "json");
     assert("JSON parse int", parsed["value"] === 123);
 
@@ -111,12 +110,12 @@ async function runComprehensiveTest(): Task<void> {
     let isWindows = sysPlatform() === "windows";
     let expectedNormalize = isWindows ? "a\\c" : "a/c";
     let expectedJoin = isWindows ? "a\\b\\c" : "a/b/c";
-    assert("Path normalize", pathNormalize("a/b/../c") === expectedNormalize);
-    assert("Path dirname", pathDirname("a/b/c") === "a/b");
-    assert("Path basename", pathBasename("a/b/file.txt") === "file.txt");
-    let ext_res = pathExtname("file.txt");
+    assert("Path normalize", Path.normalize("a/b/../c") === expectedNormalize);
+    assert("Path dirname", Path.dirname("a/b/c") === "a/b");
+    assert("Path basename", Path.basename("a/b/file.txt") === "file.txt");
+    let ext_res = Path.extname("file.txt");
     assert("Path extname", ext_res === ".txt");
-    assert("Path join", pathJoin("a", "b", "c") === expectedJoin);
+    assert("Path join", Path.join("a", "b", "c") === expectedJoin);
 
     // 11. std:reflect
     defineMetadata("my_key", "my_val", list);

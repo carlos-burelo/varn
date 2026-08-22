@@ -44,12 +44,13 @@ impl ExecCtx {
         // Eliminates method table lookup, BoundMethod allocation, and indirect call overhead.
         if this_val.is_heap() {
             if let Some(crate::heap::HeapObj::Array(arr)) = self.heap.get(this_val.as_heap_idx()) {
-                if name.as_ref() == "push" && arg_count == 1 {
+                if name.as_ref() == varn_core::MemberKey::Push.as_str() && arg_count == 1 {
                     let val = self.stack[base + arg_start];
                     arr.push_vm(val);
+                    self.heap.write_barrier(this_val.as_heap_idx(), val);
                     self.stack[base + dest] = VmValue::null();
                     return Ok(false);
-                } else if name.as_ref() == "pop" && arg_count == 0 {
+                } else if name.as_ref() == varn_core::MemberKey::Pop.as_str() && arg_count == 0 {
                     let val = arr.pop_vm().unwrap_or(VmValue::null());
                     self.stack[base + dest] = val;
                     return Ok(false);

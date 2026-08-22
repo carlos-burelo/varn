@@ -1,19 +1,32 @@
+use crate::PipelineError;
 use std::rc::Rc;
 use varn_core::Token;
 use varn_debug::flags::DebugFlags;
 
-pub fn lex(source: &str, path: &str, verbose: bool, debug: &DebugFlags) -> (Vec<Token>, Rc<[u8]>) {
+type PipelineResult<T> = Result<T, PipelineError>;
+
+pub fn lex(
+    source: &str,
+    path: &str,
+    verbose: bool,
+    debug: &DebugFlags,
+) -> PipelineResult<(Vec<Token>, Rc<[u8]>)> {
     let (tokens, lexeme_buf, errors) = varn_lexer::scan(source, path);
 
-    for e in &errors {
-        varn_term::terminal::error(crate::fmt::format_error_with_context(
-            source,
+    if !errors.is_empty() {
+        let msgs: Vec<String> = errors
+            .iter()
+            .map(|e| varn_core::diagnostics::format_diagnostic(e, source))
+            .collect();
+        let error_count = errors.len();
+        let footer = format!(
+            "\n{}: could not compile `{}` due to {} previous error{}",
+            varn_term::chalk::chalk("error").red().bold(),
             path,
-            e.range.start.line,
-            e.range.start.column,
-            "lex",
-            &e.message,
-        ));
+            error_count,
+            if error_count > 1 { "s" } else { "" }
+        );
+        return Err(PipelineError::new(3, format!("{}\n{}", msgs.join("\n"), footer)));
     }
 
     if verbose {
@@ -24,5 +37,5 @@ pub fn lex(source: &str, path: &str, verbose: bool, debug: &DebugFlags) -> (Vec<
         varn_debug::tokens::debug_tokens(&tokens, &lexeme_buf, path);
     }
 
-    (tokens, lexeme_buf)
+    Ok((tokens, lexeme_buf))
 }

@@ -16,7 +16,7 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             s.advance();
             let o = parse_unary_expr(s)?;
             let full_range = s.span_from(start_range);
-            Ok(Expr::new_with_range(
+            Ok(s.expr(
                 full_range,
                 ExprKind::Unary {
                     op: $op,
@@ -39,7 +39,7 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             s.advance();
             let argument = parse_unary_expr(s)?;
             let full_range = s.span_from(start_range);
-            Ok(Expr::new_with_range(
+            Ok(s.expr(
                 full_range,
                 ExprKind::Await {
                     argument: Box::new(argument),
@@ -50,7 +50,7 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             s.advance();
             let o = parse_unary_expr(s)?;
             let full_range = s.span_from(start_range);
-            Ok(Expr::new_with_range(
+            Ok(s.expr(
                 full_range,
                 ExprKind::Update {
                     op: UpdateOp::Increment,
@@ -63,7 +63,7 @@ pub fn parse_unary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             s.advance();
             let o = parse_unary_expr(s)?;
             let full_range = s.span_from(start_range);
-            Ok(Expr::new_with_range(
+            Ok(s.expr(
                 full_range,
                 ExprKind::Update {
                     op: UpdateOp::Decrement,
@@ -85,7 +85,7 @@ fn parse_postfix_expr(s: &mut TokenStream) -> Result<Expr, String> {
             TokenKind::PlusPlus => {
                 s.advance();
                 let full_range = expr.range().to(op_range);
-                expr = Expr::new_with_range(
+                expr = s.expr(
                     full_range,
                     ExprKind::Update {
                         op: UpdateOp::Increment,
@@ -97,7 +97,7 @@ fn parse_postfix_expr(s: &mut TokenStream) -> Result<Expr, String> {
             TokenKind::MinusMinus => {
                 s.advance();
                 let full_range = expr.range().to(op_range);
-                expr = Expr::new_with_range(
+                expr = s.expr(
                     full_range,
                     ExprKind::Update {
                         op: UpdateOp::Decrement,
@@ -123,16 +123,17 @@ pub fn parse_new_callee_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 let tok = s.consume();
                 let prop_range = tok.range;
                 let start_range = *expr.range();
-                expr = Expr::new_with_range(
+                let prop_expr = s.expr(
+                    prop_range,
+                    ExprKind::Identifier {
+                        name: prop_name.into(),
+                    },
+                );
+                expr = s.expr(
                     start_range.to(prop_range),
                     ExprKind::Member {
                         object: Box::new(expr),
-                        property: Box::new(Expr::new_with_range(
-                            prop_range,
-                            ExprKind::Identifier {
-                                name: prop_name.into(),
-                            },
-                        )),
+                        property: Box::new(prop_expr),
                         computed: false,
                         optional: false,
                     },
@@ -143,7 +144,7 @@ pub fn parse_new_callee_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 let idx = parse_expr(s)?;
                 let bracket_tok = s.expect_token(TokenKind::RBracket)?;
                 let start_range = *expr.range();
-                expr = Expr::new_with_range(
+                expr = s.expr(
                     start_range.to(bracket_tok.range),
                     ExprKind::Member {
                         object: Box::new(expr),
@@ -170,16 +171,17 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 let prop_tok = s.consume();
                 let prop_range = prop_tok.range;
                 let start_range = *expr.range();
-                expr = Expr::new_with_range(
+                let prop_expr = s.expr(
+                    prop_range,
+                    ExprKind::Identifier {
+                        name: prop_name.into(),
+                    },
+                );
+                expr = s.expr(
                     start_range.to(prop_range),
                     ExprKind::Member {
                         object: Box::new(expr),
-                        property: Box::new(Expr::new_with_range(
-                            prop_range,
-                            ExprKind::Identifier {
-                                name: prop_name.into(),
-                            },
-                        )),
+                        property: Box::new(prop_expr),
                         computed: false,
                         optional: false,
                     },
@@ -192,7 +194,7 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
                     let idx = parse_expr(s)?;
                     let bracket_tok = s.expect_token(TokenKind::RBracket)?;
                     let start_range = *expr.range();
-                    expr = Expr::new_with_range(
+                    expr = s.expr(
                         start_range.to(bracket_tok.range),
                         ExprKind::Member {
                             object: Box::new(expr),
@@ -204,7 +206,7 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 } else if s.check(TokenKind::LParen) {
                     let (type_args, args, call_range) = parse_call_args(s)?;
                     let start_range = *expr.range();
-                    expr = Expr::new_with_range(
+                    expr = s.expr(
                         start_range.to(call_range),
                         ExprKind::Call {
                             callee: Box::new(expr),
@@ -218,16 +220,17 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
                     let prop_tok = s.consume();
                     let prop_range = prop_tok.range;
                     let start_range = *expr.range();
-                    expr = Expr::new_with_range(
+                    let prop_expr = s.expr(
+                        prop_range,
+                        ExprKind::Identifier {
+                            name: prop_name.into(),
+                        },
+                    );
+                    expr = s.expr(
                         start_range.to(prop_range),
                         ExprKind::Member {
                             object: Box::new(expr),
-                            property: Box::new(Expr::new_with_range(
-                                prop_range,
-                                ExprKind::Identifier {
-                                    name: prop_name.into(),
-                                },
-                            )),
+                            property: Box::new(prop_expr),
                             computed: false,
                             optional: true,
                         },
@@ -242,7 +245,7 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 let idx = parse_expr(s)?;
                 let bracket_tok = s.expect_token(TokenKind::RBracket)?;
                 let start_range = *expr.range();
-                expr = Expr::new_with_range(
+                expr = s.expr(
                     start_range.to(bracket_tok.range),
                     ExprKind::Member {
                         object: Box::new(expr),
@@ -257,7 +260,7 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 let idx = parse_expr(s)?;
                 let bracket_tok = s.expect_token(TokenKind::RBracket)?;
                 let start_range = *expr.range();
-                expr = Expr::new_with_range(
+                expr = s.expr(
                     start_range.to(bracket_tok.range),
                     ExprKind::Member {
                         object: Box::new(expr),
@@ -270,7 +273,7 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
             TokenKind::LParen => {
                 let (type_args, args, call_range) = parse_call_args(s)?;
                 let start_range = *expr.range();
-                expr = Expr::new_with_range(
+                expr = s.expr(
                     start_range.to(call_range),
                     ExprKind::Call {
                         callee: Box::new(expr),
@@ -301,7 +304,7 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 let op_range = s.range();
                 s.advance();
                 let full_range = expr.range().to(op_range);
-                expr = Expr::new_with_range(
+                expr = s.expr(
                     full_range,
                     ExprKind::NonNull {
                         expression: Box::new(expr),
@@ -313,10 +316,37 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 let op_range = s.range();
                 s.advance();
                 let full_range = expr.range().to(op_range);
-                expr = Expr::new_with_range(
+                expr = s.expr(
                     full_range,
                     ExprKind::Try {
                         expression: Box::new(expr),
+                    },
+                );
+            }
+            TokenKind::Template | TokenKind::TemplateHead => {
+                let template_expr = super::primary::parse_template(s)?;
+                let start_range = *expr.range();
+                let full_range = start_range.to(*template_expr.range());
+                expr = s.expr(
+                    full_range,
+                    ExprKind::TaggedTemplate {
+                        tag: Box::new(expr),
+                        template: Box::new(template_expr),
+                    },
+                );
+            }
+            TokenKind::With => {
+                s.advance();
+                s.expect(TokenKind::LBrace)?;
+                let properties = super::primary::parse_object_body(s)?;
+                let rbrace_tok = s.expect_token(TokenKind::RBrace)?;
+                let start_range = *expr.range();
+                let full_range = start_range.to(rbrace_tok.range);
+                expr = s.expr(
+                    full_range,
+                    ExprKind::With {
+                        object: Box::new(expr),
+                        properties,
                     },
                 );
             }
@@ -402,7 +432,7 @@ fn try_parse_generic_call(
         return Err("not a generic call".to_owned());
     }
     let (_, args, call_range) = parse_call_args(s)?;
-    Ok(Expr::new_with_range(
+    Ok(s.expr(
         expr_range.to(call_range),
         ExprKind::Call {
             callee: Box::new(callee),

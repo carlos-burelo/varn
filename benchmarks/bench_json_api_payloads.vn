@@ -1,0 +1,73 @@
+import { JSON } from "std:json";
+
+// Real-world JSON API Payloads: Complex Nested Object Serialization, Deserialization, and Hierarchy Traversal
+
+let rawPayloads: str[] = [];
+
+// 1. Generate 5,000 nested JSON documents
+for (let i = 0; i < 5000; i = i + 1) {
+    let orgId = "org_" + (i % 50);
+    let doc = {
+        "requestId": "req_" + i,
+        "organization": {
+            "id": orgId,
+            "tier": (i % 2 === 0) ? "enterprise" : "pro",
+            "settings": {
+                "maxUsers": 1000,
+                "features": ["sso", "audit_logs", "custom_roles", "api_access"]
+            }
+        },
+        "user": {
+            "id": "usr_" + (i % 500),
+            "email": "user" + i + "@company.com",
+            "roles": [
+                { "role": "admin", "scope": "global" },
+                { "role": "editor", "scope": "projects" }
+            ],
+            "metadata": {
+                "lastLogin": "2026-08-21T12:00:00Z",
+                "loginCount": (i % 30) + 1,
+                "ip": "192.168.1." + (i % 254)
+            }
+        },
+        "auditEvents": [
+            { "event": "login", "status": "success", "ts": 1724241600 },
+            { "event": "api_call", "endpoint": "/v1/data", "status": "success", "ts": 1724241605 }
+        ]
+    };
+
+    rawPayloads.push(JSON.stringify(doc));
+}
+
+// 2. Parse, inspect, and aggregate nested JSON payloads
+let totalAuditEvents = 0;
+let totalLogins = 0;
+let enterpriseCount = 0;
+let totalFeaturesCount = 0;
+
+for (let i = 0; i < rawPayloads.length; i = i + 1) {
+    let parsed = JSON.parse(rawPayloads[i]) as { [key: str]: dynamic };
+    
+    let org = parsed["organization"] as { [key: str]: dynamic };
+    if (org["tier"] === "enterprise") {
+        enterpriseCount = enterpriseCount + 1;
+    }
+    
+    let settings = org["settings"] as { [key: str]: dynamic };
+    let features = settings["features"] as dynamic[];
+    totalFeaturesCount = totalFeaturesCount + features.length;
+
+    let user = parsed["user"] as { [key: str]: dynamic };
+    let meta = user["metadata"] as { [key: str]: dynamic };
+    totalLogins = totalLogins + (meta["loginCount"] as int);
+
+    let events = parsed["auditEvents"] as dynamic[];
+    totalAuditEvents = totalAuditEvents + events.length;
+}
+
+print("JSON API Payloads Benchmark:");
+print("  Processed payloads: " + rawPayloads.length);
+print("  Enterprise Orgs: " + enterpriseCount);
+print("  Total User Logins: " + totalLogins);
+print("  Total Features Mapped: " + totalFeaturesCount);
+print("  Total Audit Events: " + totalAuditEvents);
