@@ -11,7 +11,7 @@ use varn_core::TypeTag;
 use super::super::helpers::base_type;
 
 pub(super) fn infer_member_type(
-    checker: &mut Checker,
+    checker: &mut Checker<'_>,
     expr: &Expr,
     object: &Expr,
     property: &Expr,
@@ -29,7 +29,7 @@ pub(super) fn infer_member_type(
     };
 
     let ExprKind::Identifier { name: prop_name } = &property.kind else {
-        return crate::binder::infer_expr_type(expr, Some(bind));
+        return crate::binder::infer_expr_type(expr, Some(&crate::binder::BindView::new(bind, checker.resolver)));
     };
 
     match &obj_ty.0 {
@@ -84,7 +84,7 @@ pub(super) fn infer_member_type(
         }
     }
 
-    crate::binder::infer_expr_type(expr, Some(bind))
+    crate::binder::infer_expr_type(expr, Some(&crate::binder::BindView::new(bind, checker.resolver)))
 }
 
 pub(crate) fn normalize_for_binary(ty: &Type) -> Type {
@@ -103,7 +103,7 @@ pub(crate) fn normalize_for_binary(ty: &Type) -> Type {
 }
 
 pub(super) fn infer_binary_type(
-    checker: &mut Checker,
+    checker: &mut Checker<'_>,
     op: &varn_core::ast::operators::BinaryOp,
     left: &Expr,
     right: &Expr,

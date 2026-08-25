@@ -1,3 +1,4 @@
+use varn_checker::module_resolver::ImportResolver;
 use tower_lsp::lsp_types::{CompletionItem, CompletionItemKind};
 
 use crate::constants::STD_PREFIX;
@@ -114,7 +115,7 @@ pub fn build_module_export_completions(module_path: &str, doc_uri: &str) -> Vec<
 }
 
 fn build_stdlib_export_completions(module_path: &str) -> Vec<CompletionItem> {
-    let exports = varn_checker::module_resolver::resolve_stdlib_module_exports(module_path);
+    let exports = crate::workspace::resolver::with_resolver(|r| r.stdlib_exports(module_path)).as_ref().clone();
     let mut items: Vec<CompletionItem> = exports
         .into_iter()
         .filter(|(name, _)| !name.contains('.'))
@@ -152,7 +153,7 @@ fn build_relative_export_completions(module_path: &str, doc_uri: &str) -> Vec<Co
         joined.to_string_lossy().into_owned()
     };
 
-    let exports = varn_checker::module_resolver::resolve_module_exports(&abs_str, &mut Vec::new());
+    let exports = crate::workspace::resolver::with_resolver(|r| r.module_exports(&abs_str, &mut Vec::new())).as_ref().clone();
 
     let mut items: Vec<CompletionItem> = exports
         .into_iter()

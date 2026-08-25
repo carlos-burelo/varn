@@ -10,7 +10,7 @@ use varn_core::ast::{
     VariableDecl,
 };
 
-impl super::super::Binder {
+impl<'r> super::super::Binder<'r> {
     pub(crate) fn bind_variable(&mut self, v: &VariableDecl) {
         let sym_kind = match v.kind {
             VarKind::Const => SymbolKind::Const,

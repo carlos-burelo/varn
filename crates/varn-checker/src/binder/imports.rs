@@ -5,7 +5,7 @@ use varn_core::{Diagnostic, ErrorCode, TypeKind};
 use crate::module_resolver;
 use crate::symbol::{Symbol, SymbolKind};
 
-impl super::Binder {
+impl<'r> super::Binder<'r> {
     pub(super) fn bind_import(&mut self, i: &ImportDecl) {
         let in_stdlib_context = self.source_file.starts_with("core:")
             || self.source_file.starts_with("std:")
@@ -40,7 +40,7 @@ impl super::Binder {
             if is_package {
                 module_resolver::resolve_package_specifier_path(base_path, &i.source)
             } else {
-                module_resolver::resolve_specifier_path(base_path, &i.source)
+                self.resolver.resolve_specifier(base_path, &i.source)
             }
         } else {
             None
@@ -50,7 +50,7 @@ impl super::Binder {
 
         let relative_exports = if let Some(abs) = &resolved_target {
             let mut visiting = vec![self.source_file.to_string()];
-            Some(module_resolver::resolve_module_exports_ref(
+            Some(self.resolver.module_exports(
                 abs,
                 &mut visiting,
             ))
@@ -59,7 +59,7 @@ impl super::Binder {
         };
 
         let stdlib_exports = if is_stdlib {
-            Some(module_resolver::resolve_stdlib_module_exports_ref(
+            Some(self.resolver.stdlib_exports(
                 &i.source,
             ))
         } else {

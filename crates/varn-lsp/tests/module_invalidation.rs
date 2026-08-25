@@ -76,3 +76,58 @@ fn dependent_file_sees_updated_export_type_after_edit() {
 
     let _ = fs::remove_dir_all(&dir);
 }
+
+/// The same guarantee, one hop further out.
+///
+/// `update_file` evicts the edited module and walks `reverse_deps` to reach
+/// everything that transitively imports it. A one-hop test cannot tell a real
+/// walk from an eviction that only ever looks at direct importers, so the chain
+/// here is `a <- b <- c` and the assertion is on `c`.
+#[test]
+fn a_transitive_importer_also_sees_the_updated_export() {
+    let dir = std::env::temp_dir().join(format!("varn-lsp-transitive-{}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    let a_path = dir.join("a.vn");
+    let b_path = dir.join("b.vn");
+    let c_path = dir.join("c.vn");
+
+    fs::write(&a_path, "export function foo(): int {\n  return 1\n}\n").unwrap();
+    fs::write(
+        &b_path,
+        "import { foo } from \"./a.vn\"\n\nexport function relay(): int {\n  return foo()\n}\n",
+    )
+    .unwrap();
+    fs::write(
+        &c_path,
+        "import { relay } from \"./b.vn\"\n\nlet x: int = relay()\n",
+    )
+    .unwrap();
+
+    let a_uri = to_uri(&a_path);
+    let b_uri = to_uri(&b_path);
+    let c_uri = to_uri(&c_path);
+
+    let ws = Workspace::new();
+    ws.update_file(a_uri.clone(), fs::read_to_string(&a_path).unwrap());
+    ws.update_file(b_uri.clone(), fs::read_to_string(&b_path).unwrap());
+    ws.update_file(c_uri.clone(), fs::read_to_string(&c_path).unwrap());
+
+    assert_eq!(
+        error_count(&ws.get(&c_uri).unwrap()),
+        0,
+        "the chain must type-check before the edit"
+    );
+
+    // `foo` returns str now, so `relay`'s declared `int` return breaks, and
+    // with it `c.vn`. Reaching `c` requires walking a -> b -> c.
+    fs::write(&a_path, "export function foo(): str {\n  return \"hi\"\n}\n").unwrap();
+    ws.update_file(a_uri, fs::read_to_string(&a_path).unwrap());
+
+    let b_after = ws.get(&b_uri).unwrap();
+    assert!(
+        error_count(&b_after) > 0,
+        "b.vn imports a.vn directly and must report the mismatch; got none"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}

@@ -65,7 +65,7 @@ pub(crate) fn annotate_stmt(stmt: &Stmt, ann: &mut TypeAnnotations, ctx: &mut An
                                     _ => None,
                                 });
                                 if let Some(ann_node) = type_ann {
-                                    let ty = resolve_type_node(ann_node, Some(ctx.bind));
+                                    let ty = resolve_type_node(ann_node, Some(ctx));
                                     ctx.locals.insert(name, ty);
                                 } else if let Some(init_expr) = &d.init {
                                     let ty = get_expr_type(init_expr, ctx);
@@ -111,7 +111,7 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
                         _ => None,
                     });
                     if let Some(ann_node) = type_ann {
-                        let ty = resolve_type_node(ann_node, Some(ctx.bind));
+                        let ty = resolve_type_node(ann_node, Some(ctx));
                         ctx.locals.insert(name, ty);
                     } else if let Some(evolved) =
                         ctx.bind.evolved_array_types.get(&id_offset).cloned()
@@ -129,7 +129,7 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
         Decl::Function(f) => {
             if !f.modifiers.is_declare {
                 if let Some(rt) = &f.return_type {
-                    let ty = resolve_type_node(rt, Some(ctx.bind));
+                    let ty = resolve_type_node(rt, Some(ctx));
                     record_cg_ty_at(AnnKey::decl(f.id_offset), &ty, ann, ctx);
                 }
                 let mut local_ctx = ctx.clone();
@@ -146,7 +146,7 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
                             _ => None,
                         });
                         let ty = if let Some(ann_node) = type_ann {
-                            resolve_type_node(ann_node, Some(ctx.bind))
+                            resolve_type_node(ann_node, Some(ctx))
                         } else {
                             Type::Dynamic
                         };
@@ -186,9 +186,9 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
             let exports = if ctx.bind.source_file.starts_with("std:")
                 || ctx.bind.source_file.starts_with("core:")
             {
-                crate::module_resolver::resolve_stdlib_module_exports_ref(&ctx.bind.source_file)
+                ctx.resolver.stdlib_exports(&ctx.bind.source_file)
             } else {
-                crate::module_resolver::resolve_module_exports_ref(
+                ctx.resolver.module_exports(
                     &ctx.bind.source_file,
                     &mut vec![],
                 )
@@ -256,7 +256,7 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
             };
             let this_ty = Type::named_with_origin(
                 class_name.clone(),
-                ctx.bind.source_file().map(std::rc::Rc::from),
+                TypeContext::source_file(ctx).map(std::rc::Rc::from),
             );
             for member in &c.body {
                 match member {
@@ -332,7 +332,7 @@ fn annotate_method_body(
                 _ => None,
             });
             let ty = if let Some(ann_node) = type_ann {
-                resolve_type_node(ann_node, Some(ctx.bind))
+                resolve_type_node(ann_node, Some(ctx))
             } else {
                 Type::Dynamic
             };

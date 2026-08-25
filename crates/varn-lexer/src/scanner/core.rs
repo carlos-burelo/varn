@@ -59,11 +59,14 @@ impl super::Scanner<'_> {
             if c == b'/' {
                 let next = self.peek(1);
                 if next == b'/' {
+                    let comment_start = self.pos;
                     self.advance_bytes(2);
                     self.skip_line_comment();
+                    self.push_trivia(varn_core::TriviaKind::Line, comment_start);
                     continue;
                 }
                 if next == b'*' {
+                    let comment_start = self.pos;
                     self.advance_bytes(2);
 
                     if self.config.emit_doc_comments && self.peek(0) == b'*' && self.peek(1) != b'/'
@@ -72,6 +75,7 @@ impl super::Scanner<'_> {
                         self.last_kind = DOC_COMMENT;
                     } else {
                         self.skip_block_comment();
+                        self.push_trivia(varn_core::TriviaKind::Block, comment_start);
                     }
                     continue;
                 }

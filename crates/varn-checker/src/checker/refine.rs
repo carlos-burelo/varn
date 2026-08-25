@@ -47,7 +47,7 @@ use crate::binder::BindResult;
 use crate::checker::Checker;
 use crate::types::Type;
 
-impl Checker {
+impl<'r> Checker<'r> {
     /// The strongest proved type for `expr`, when stronger than what the
     /// checker recorded. `None` means "nothing beyond the checked type".
     ///

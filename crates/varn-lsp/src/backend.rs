@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use std::time::Instant;
 
 use tower_lsp::jsonrpc::Result as LspResult;
@@ -28,13 +27,15 @@ use crate::features::signature_help::build_signature_help;
 use crate::features::symbols::build_document_symbols;
 use crate::features::type_definition::build_goto_type_definition;
 use crate::features::workspace_symbols::build_workspace_symbols;
-use crate::workspace::Workspace;
+use crate::analysis::AnalysisHandle;
 
 const SLOW_REQUEST_MS: u128 = 30;
 
 pub struct Backend {
     pub client: Client,
-    pub workspace: Arc<Workspace>,
+    /// The analysis thread. `Backend` holds no analysis state of its own —
+    /// none of it is `Send`, so it cannot live next to the request handlers.
+    analysis: AnalysisHandle,
     /// Why the active std is unusable, if it is. Reported once on
     /// `initialized`; until it is fixed, `std:` imports resolve to nothing.
     std_error: Option<&'static str>,
@@ -44,7 +45,7 @@ impl Backend {
     pub fn new(client: Client, std_error: Option<&'static str>) -> Self {
         Self {
             client,
-            workspace: Arc::new(Workspace::new()),
+            analysis: AnalysisHandle::spawn(),
             std_error,
         }
     }
@@ -62,9 +63,25 @@ impl Backend {
         }
     }
 
+    /// Re-analyse `uri` and publish its diagnostics.
+    ///
+    /// The debounce stays here, on the async side. Waiting costs nothing before
+    /// submitting, whereas waiting *on* the analysis thread would park every
+    /// other request behind a keystroke.
     async fn analyze_and_publish(&self, uri: Url, source: String, is_eager: bool) {
         let uri_str = uri.to_string();
-        let (_file_id, _rev, cancel_token) = self.workspace.update_source(&uri_str, &source);
+
+        let cancel_token = self
+            .analysis
+            .run({
+                let uri_str = uri_str.clone();
+                let source = source.clone();
+                move |a| a.workspace.update_source(&uri_str, &source).2
+            })
+            .await;
+        let Some(cancel_token) = cancel_token else {
+            return;
+        };
 
         if !is_eager {
             tokio::time::sleep(std::time::Duration::from_millis(150)).await;
@@ -73,58 +90,54 @@ impl Backend {
             }
         }
 
-        let workspace = Arc::clone(&self.workspace);
-        let client = self.client.clone();
-        let uri_clone = uri.clone();
-        let uri_str_clone = uri_str.clone();
+        let start = Instant::now();
+        // Everything that touches `DocumentState` happens inside this closure;
+        // only the report — plain LSP types and counts — comes back out.
+        let report = self
+            .analysis
+            .run({
+                let uri_str = uri_str.clone();
+                move |a| {
+                    if cancel_token.is_cancelled() {
+                        return None;
+                    }
+                    a.workspace.update_file(uri_str.clone(), source);
+                    let analysis = a.workspace.get(&uri_str)?;
+                    let user_syms = analysis
+                        .symbols
+                        .iter()
+                        .filter(|s| s.line != u32::MAX)
+                        .count();
+                    Some((
+                        convert_diagnostics(&analysis),
+                        analysis.tokens.len(),
+                        user_syms,
+                        analysis.symbols.len() - user_syms,
+                    ))
+                }
+            })
+            .await
+            .flatten();
 
-        tokio::task::spawn_blocking(move || {
-            if cancel_token.is_cancelled() {
-                return;
-            }
+        let Some((diags, tokens, user_syms, stdlib_syms)) = report else {
+            return;
+        };
 
-            let start = Instant::now();
-            workspace.update_file(uri_str_clone.clone(), source);
-
-            if cancel_token.is_cancelled() {
-                return;
-            }
-
-            let analysis = match workspace.get(&uri_str_clone) {
-                Some(a) => a,
-                None => return,
-            };
-
-            let diags = convert_diagnostics(&analysis);
-
-            let file_name = uri_str_clone
-                .rsplit(['/', '\\'])
-                .next()
-                .unwrap_or(&uri_str_clone)
-                .to_owned();
-
-            let user_syms_count = analysis
-                .symbols
-                .iter()
-                .filter(|s| s.line != u32::MAX)
-                .count();
-            let stdlib_syms_count = analysis.symbols.len() - user_syms_count;
-
-            let rt = tokio::runtime::Handle::current();
-            let _ = rt.block_on(client.log_message(
+        let file_name = uri_str
+            .rsplit(['/', '\\'])
+            .next()
+            .unwrap_or(&uri_str)
+            .to_owned();
+        self.client
+            .log_message(
                 MessageType::LOG,
                 format!(
-                    "── {file_name}  ({} tokens | {} user symbols | {} stdlib) [{}ms]",
-                    analysis.tokens.len(),
-                    user_syms_count,
-                    stdlib_syms_count,
+                    "── {file_name}  ({tokens} tokens | {user_syms} user symbols | {stdlib_syms} stdlib) [{}ms]",
                     start.elapsed().as_millis(),
                 ),
-            ));
-
-            drop(analysis);
-            let _ = rt.block_on(client.publish_diagnostics(uri_clone, diags, None));
-        });
+            )
+            .await;
+        self.client.publish_diagnostics(uri, diags, None).await;
     }
 }
 
@@ -226,57 +239,90 @@ impl LanguageServer for Backend {
             self.client.show_message(MessageType::ERROR, msg).await;
         }
 
-        let workspace = Arc::clone(&self.workspace);
+        // Directory walk and file reads are I/O and stay off the analysis
+        // thread; only the analysis of each file is submitted to it. Doing the
+        // walk there would park every request behind the initial scan.
+        let analysis = self.analysis.clone();
         let client = self.client.clone();
-        tokio::task::spawn_blocking(move || {
-            let current_dir = match std::env::current_dir() {
-                Ok(d) => d,
-                Err(_) => return,
+        tokio::spawn(async move {
+            let Ok(current_dir) = std::env::current_dir() else {
+                return;
             };
-            let rt = tokio::runtime::Handle::current();
-            let _ = rt.block_on(client.log_message(
-                MessageType::INFO,
-                format!("Indexing workspace: scanning {:?}", current_dir),
-            ));
+            client
+                .log_message(
+                    MessageType::INFO,
+                    format!("Indexing workspace: scanning {:?}", current_dir),
+                )
+                .await;
+
             let start = std::time::Instant::now();
-            let mut files = Vec::new();
-            walk_dir(&current_dir, &mut files);
-            let _ = rt.block_on(client.log_message(
-                MessageType::INFO,
-                format!("Indexing workspace: found {} files to index", files.len()),
-            ));
+            let files = tokio::task::spawn_blocking(move || {
+                let mut files = Vec::new();
+                walk_dir(&current_dir, &mut files);
+                files
+            })
+            .await
+            .unwrap_or_default();
+
             let total = files.len();
-            for (idx, path) in files.iter().enumerate() {
-                if let Ok(abs_path) = std::fs::canonicalize(&path) {
-                    if let Ok(uri) = Url::from_file_path(&abs_path) {
-                        if let Ok(source) = std::fs::read_to_string(&abs_path) {
+            client
+                .log_message(
+                    MessageType::INFO,
+                    format!("Indexing workspace: found {total} files to index"),
+                )
+                .await;
+
+            for (idx, path) in files.into_iter().enumerate() {
+                let read = tokio::task::spawn_blocking(move || {
+                    let abs_path = std::fs::canonicalize(&path).ok()?;
+                    let uri = Url::from_file_path(&abs_path).ok()?;
+                    let source = std::fs::read_to_string(&abs_path).ok()?;
+                    Some((abs_path, uri, source))
+                })
+                .await
+                .ok()
+                .flatten();
+
+                if let Some((abs_path, uri, source)) = read {
+                    let elapsed = analysis
+                        .run(move |a| {
                             let file_start = std::time::Instant::now();
-                            workspace.update_file(uri.to_string(), source);
-                            let elapsed = file_start.elapsed();
-                            if elapsed.as_millis() >= SLOW_REQUEST_MS {
-                                let _ = rt.block_on(client.log_message(
+                            a.workspace.update_file(uri.to_string(), source);
+                            file_start.elapsed()
+                        })
+                        .await;
+                    if let Some(elapsed) = elapsed {
+                        if elapsed.as_millis() >= SLOW_REQUEST_MS {
+                            client
+                                .log_message(
                                     MessageType::WARNING,
                                     format!(
                                         "[perf] slow index {} ({}ms)",
                                         abs_path.display(),
                                         elapsed.as_millis()
                                     ),
-                                ));
-                            }
+                                )
+                                .await;
                         }
                     }
                 }
+
                 if (idx + 1) % 25 == 0 || idx + 1 == total {
-                    let _ = rt.block_on(client.log_message(
-                        MessageType::LOG,
-                        format!("[{}/{}] Indexing...", idx + 1, total),
-                    ));
+                    client
+                        .log_message(
+                            MessageType::LOG,
+                            format!("[{}/{}] Indexing...", idx + 1, total),
+                        )
+                        .await;
                 }
             }
-            let _ = rt.block_on(client.log_message(
-                MessageType::INFO,
-                format!("Workspace indexed successfully in {:?}", start.elapsed()),
-            ));
+
+            client
+                .log_message(
+                    MessageType::INFO,
+                    format!("Workspace indexed successfully in {:?}", start.elapsed()),
+                )
+                .await;
         });
     }
 
@@ -304,8 +350,8 @@ impl LanguageServer for Backend {
     }
 
     async fn did_close(&self, params: DidCloseTextDocumentParams) {
-        self.workspace
-            .remove_file(params.text_document.uri.as_str());
+        let uri = params.text_document.uri.to_string();
+        self.analysis.submit(move |a| a.workspace.remove_file(&uri));
     }
 
     async fn hover(&self, params: HoverParams) -> LspResult<Option<Hover>> {
@@ -317,9 +363,10 @@ impl LanguageServer for Backend {
             .to_string();
         let pos = params.text_document_position_params.position;
         let result = self
-            .workspace
-            .get(&uri)
-            .and_then(|a| build_hover(&a, pos.line, pos.character));
+            .analysis
+            .run(move |an| an.workspace.get(&uri).and_then(|a| build_hover(&a, pos.line, pos.character)))
+            .await
+            .flatten();
         self.log_slow("hover", start.elapsed()).await;
         Ok(result)
     }
@@ -334,20 +381,25 @@ impl LanguageServer for Backend {
             .and_then(|c| c.trigger_character.as_deref());
         let trigger_kind = format!("{:?}", params.context.as_ref().map(|c| c.trigger_kind));
 
-        let (resp, log) = {
-            let state = match self.workspace.get(&uri) {
-                Some(a) => a,
-                None => return Ok(None),
-            };
-            let index = self.workspace.index.read().ok();
-            build_completion_response(
-                &state,
-                pos.line,
-                pos.character,
-                trigger_char,
-                trigger_kind,
-                index.as_deref(),
-            )
+        let trigger_char = trigger_char.map(str::to_owned);
+        let Some((resp, log)) = self
+            .analysis
+            .run(move |an| {
+                let state = an.workspace.get(&uri)?;
+                let index = an.workspace.index.read().ok();
+                Some(build_completion_response(
+                    &state,
+                    pos.line,
+                    pos.character,
+                    trigger_char.as_deref(),
+                    trigger_kind,
+                    index.as_deref(),
+                ))
+            })
+            .await
+            .flatten()
+        else {
+            return Ok(None);
         };
         if let Some(msg) = log {
             self.client.log_message(MessageType::LOG, msg).await;
@@ -368,9 +420,10 @@ impl LanguageServer for Backend {
             .to_string();
         let pos = params.text_document_position_params.position;
         let result = self
-            .workspace
-            .get(&uri)
-            .and_then(|a| build_signature_help(&a, pos.line, pos.character));
+            .analysis
+            .run(move |an| an.workspace.get(&uri).and_then(|a| build_signature_help(&a, pos.line, pos.character)))
+            .await
+            .flatten();
         self.log_slow("signature_help", start.elapsed()).await;
         Ok(result)
     }
@@ -386,13 +439,17 @@ impl LanguageServer for Backend {
             .uri
             .to_string();
         let pos = params.text_document_position_params.position;
-        let result = {
-            let state = self.workspace.get(&uri);
-            let index = self.workspace.index.read().ok();
-            state
-                .as_deref()
-                .and_then(|a| build_goto_definition(a, index.as_deref(), pos.line, pos.character))
-        };
+        let result = self
+            .analysis
+            .run(move |an| {
+                let state = an.workspace.get(&uri);
+                let index = an.workspace.index.read().ok();
+                state
+                    .as_deref()
+                    .and_then(|a| build_goto_definition(a, index.as_deref(), pos.line, pos.character))
+            })
+            .await
+            .flatten();
         self.log_slow("goto_definition", start.elapsed()).await;
         Ok(result)
     }
@@ -402,9 +459,13 @@ impl LanguageServer for Backend {
         let uri = params.text_document_position.text_document.uri.to_string();
         let pos = params.text_document_position.position;
         let result = self
-            .workspace
-            .get(&uri)
-            .and_then(|a| build_references(&a, &self.workspace, pos.line, pos.character));
+            .analysis
+            .run(move |an| {
+                let state = an.workspace.get(&uri)?;
+                build_references(&state, &an.workspace, pos.line, pos.character)
+            })
+            .await
+            .flatten();
         self.log_slow("references", start.elapsed()).await;
         Ok(result)
     }
@@ -415,9 +476,11 @@ impl LanguageServer for Backend {
     ) -> LspResult<Option<PrepareRenameResponse>> {
         let start = Instant::now();
         let uri = params.text_document.uri.to_string();
-        let result = self.workspace.get(&uri).and_then(|a| {
-            build_prepare_rename(&a, params.position.line, params.position.character)
-        });
+        let result = self
+            .analysis
+            .run(move |an| an.workspace.get(&uri).and_then(|a| { build_prepare_rename(&a, params.position.line, params.position.character) }))
+            .await
+            .flatten();
         self.log_slow("prepare_rename", start.elapsed()).await;
         Ok(result)
     }
@@ -426,19 +489,23 @@ impl LanguageServer for Backend {
         let start = Instant::now();
         let uri = params.text_document_position.text_document.uri.to_string();
         let pos = params.text_document_position.position;
-        let result = {
-            let index = self.workspace.index.read().ok();
-            self.workspace.get(&uri).and_then(|a| {
+        let new_name = params.new_name;
+        let result = self
+            .analysis
+            .run(move |an| {
+                let state = an.workspace.get(&uri)?;
+                let index = an.workspace.index.read().ok();
                 build_rename(
-                    &a,
-                    &self.workspace,
+                    &state,
+                    &an.workspace,
                     index.as_deref(),
                     pos.line,
                     pos.character,
-                    params.new_name,
+                    new_name,
                 )
             })
-        };
+            .await
+            .flatten();
         self.log_slow("rename", start.elapsed()).await;
         Ok(result)
     }
@@ -449,16 +516,26 @@ impl LanguageServer for Backend {
     ) -> LspResult<Option<DocumentSymbolResponse>> {
         let start = Instant::now();
         let uri = params.text_document.uri.to_string();
-        let result = self.workspace.get(&uri).map(|a| build_document_symbols(&a));
+        let result = self
+            .analysis
+            .run(move |an| an.workspace.get(&uri).map(|a| build_document_symbols(&a)))
+            .await
+            .flatten();
         self.log_slow("document_symbol", start.elapsed()).await;
         Ok(result)
     }
 
     async fn code_action(&self, params: CodeActionParams) -> LspResult<Option<CodeActionResponse>> {
         let uri = params.text_document.uri.to_string();
-        let state = self.workspace.get(&uri);
-        let index = self.workspace.index.read().ok();
-        Ok(build_code_action(params, state.as_deref(), index.as_deref()))
+        Ok(self
+            .analysis
+            .run(move |an| {
+                let state = an.workspace.get(&uri);
+                let index = an.workspace.index.read().ok();
+                build_code_action(params, state.as_deref(), index.as_deref())
+            })
+            .await
+            .flatten())
     }
 
     async fn semantic_tokens_full(
@@ -467,23 +544,29 @@ impl LanguageServer for Backend {
     ) -> LspResult<Option<SemanticTokensResult>> {
         let start = Instant::now();
         let uri = params.text_document.uri.to_string();
-        let result = self.workspace.get(&uri).map(|a| {
-            let raw = build_semantic_tokens(&a);
-            let tokens = raw
-                .chunks_exact(5)
-                .map(|c| SemanticToken {
-                    delta_line: c[0],
-                    delta_start: c[1],
-                    length: c[2],
-                    token_type: c[3],
-                    token_modifiers_bitset: c[4],
+        let result = self
+            .analysis
+            .run(move |an| {
+                an.workspace.get(&uri).map(|a| {
+                    let raw = build_semantic_tokens(&a);
+                    let tokens = raw
+                        .chunks_exact(5)
+                        .map(|c| SemanticToken {
+                            delta_line: c[0],
+                            delta_start: c[1],
+                            length: c[2],
+                            token_type: c[3],
+                            token_modifiers_bitset: c[4],
+                        })
+                        .collect();
+                    SemanticTokens {
+                        result_id: None,
+                        data: tokens,
+                    }
                 })
-                .collect();
-            SemanticTokens {
-                result_id: None,
-                data: tokens,
-            }
-        });
+            })
+            .await
+            .flatten();
         self.log_slow("semantic_tokens_full", start.elapsed()).await;
         Ok(result.map(SemanticTokensResult::Tokens))
     }
@@ -500,9 +583,10 @@ impl LanguageServer for Backend {
             .to_string();
         let pos = params.text_document_position_params.position;
         let result = self
-            .workspace
-            .get(&uri)
-            .map(|a| build_document_highlights(&a, pos.line, pos.character));
+            .analysis
+            .run(move |an| an.workspace.get(&uri).map(|a| build_document_highlights(&a, pos.line, pos.character)))
+            .await
+            .flatten();
         self.log_slow("document_highlight", start.elapsed()).await;
         Ok(result)
     }
@@ -513,7 +597,11 @@ impl LanguageServer for Backend {
     ) -> LspResult<Option<Vec<FoldingRange>>> {
         let start = Instant::now();
         let uri = params.text_document.uri.to_string();
-        let result = self.workspace.get(&uri).map(|a| build_folding_ranges(&a));
+        let result = self
+            .analysis
+            .run(move |an| an.workspace.get(&uri).map(|a| build_folding_ranges(&a)))
+            .await
+            .flatten();
         self.log_slow("folding_range", start.elapsed()).await;
         Ok(result)
     }
@@ -524,11 +612,16 @@ impl LanguageServer for Backend {
     ) -> LspResult<Option<Vec<SymbolInformation>>> {
         let start = Instant::now();
         let results = self
-            .workspace
-            .index
-            .read()
-            .ok()
-            .map(|idx| build_workspace_symbols(&idx, &params.query))
+            .analysis
+            .run(move |an| {
+                an.workspace
+                    .index
+                    .read()
+                    .ok()
+                    .map(|idx| build_workspace_symbols(&idx, &params.query))
+                    .unwrap_or_default()
+            })
+            .await
             .unwrap_or_default();
         self.log_slow("symbol", start.elapsed()).await;
         Ok(if results.is_empty() {
@@ -541,7 +634,11 @@ impl LanguageServer for Backend {
     async fn inlay_hint(&self, params: InlayHintParams) -> LspResult<Option<Vec<InlayHint>>> {
         let start = Instant::now();
         let uri = params.text_document.uri.to_string();
-        let result = self.workspace.get(&uri).map(|a| build_inlay_hints(&a));
+        let result = self
+            .analysis
+            .run(move |an| an.workspace.get(&uri).map(|a| build_inlay_hints(&a)))
+            .await
+            .flatten();
         self.log_slow("inlay_hint", start.elapsed()).await;
         Ok(result)
     }
@@ -553,9 +650,10 @@ impl LanguageServer for Backend {
         let start = Instant::now();
         let uri = params.text_document.uri.to_string();
         let result = self
-            .workspace
-            .get(&uri)
-            .and_then(|a| build_formatting(&a.source, params.options));
+            .analysis
+            .run(move |an| an.workspace.get(&uri).and_then(|a| build_formatting(&a.source, params.options)))
+            .await
+            .flatten();
         self.log_slow("formatting", start.elapsed()).await;
         Ok(result)
     }
@@ -565,9 +663,17 @@ impl LanguageServer for Backend {
         let uri = params.text_document.uri;
         let uri_str = uri.to_string();
         let result = self
-            .workspace
-            .get(&uri_str)
-            .map(|a| crate::features::code_lens::build_code_lenses(&uri, &a, Some(&self.workspace)));
+            .analysis
+            .run(move |an| {
+                let state = an.workspace.get(&uri_str)?;
+                Some(crate::features::code_lens::build_code_lenses(
+                    &uri,
+                    &state,
+                    Some(&an.workspace),
+                ))
+            })
+            .await
+            .flatten();
         self.log_slow("code_lens", start.elapsed()).await;
         Ok(result)
     }
@@ -583,13 +689,17 @@ impl LanguageServer for Backend {
             .uri
             .to_string();
         let pos = params.text_document_position_params.position;
-        let result = {
-            let state = self.workspace.get(&uri);
-            let index = self.workspace.index.read().ok();
-            state.as_deref().and_then(|a| {
-                build_goto_type_definition(a, index.as_deref(), pos.line, pos.character)
+        let result = self
+            .analysis
+            .run(move |an| {
+                let state = an.workspace.get(&uri);
+                let index = an.workspace.index.read().ok();
+                state.as_deref().and_then(|a| {
+                    build_goto_type_definition(a, index.as_deref(), pos.line, pos.character)
+                })
             })
-        };
+            .await
+            .flatten();
         self.log_slow("goto_type_definition", start.elapsed()).await;
         Ok(result)
     }
@@ -605,9 +715,14 @@ impl LanguageServer for Backend {
             .uri
             .to_string();
         let pos = params.text_document_position_params.position;
-        let result = self.workspace.get(&uri).and_then(|a| {
-            build_goto_implementation(&a, &self.workspace, pos.line, pos.character)
-        });
+        let result = self
+            .analysis
+            .run(move |an| {
+                let state = an.workspace.get(&uri)?;
+                build_goto_implementation(&state, &an.workspace, pos.line, pos.character)
+            })
+            .await
+            .flatten();
         self.log_slow("goto_implementation", start.elapsed()).await;
         Ok(result)
     }
@@ -624,9 +739,10 @@ impl LanguageServer for Backend {
             .to_string();
         let pos = params.text_document_position_params.position;
         let result = self
-            .workspace
-            .get(&uri)
-            .and_then(|a| prepare_call_hierarchy(&a, pos.line, pos.character));
+            .analysis
+            .run(move |an| an.workspace.get(&uri).and_then(|a| prepare_call_hierarchy(&a, pos.line, pos.character)))
+            .await
+            .flatten();
         self.log_slow("prepare_call_hierarchy", start.elapsed()).await;
         Ok(result)
     }
@@ -636,7 +752,11 @@ impl LanguageServer for Backend {
         params: CallHierarchyIncomingCallsParams,
     ) -> LspResult<Option<Vec<CallHierarchyIncomingCall>>> {
         let start = Instant::now();
-        let result = incoming_calls(params.item, &self.workspace);
+        let result = self
+            .analysis
+            .run(move |an| incoming_calls(params.item, &an.workspace))
+            .await
+            .flatten();
         self.log_slow("incoming_calls", start.elapsed()).await;
         Ok(result)
     }
@@ -646,7 +766,11 @@ impl LanguageServer for Backend {
         params: CallHierarchyOutgoingCallsParams,
     ) -> LspResult<Option<Vec<CallHierarchyOutgoingCall>>> {
         let start = Instant::now();
-        let result = outgoing_calls(params.item, &self.workspace);
+        let result = self
+            .analysis
+            .run(move |an| outgoing_calls(params.item, &an.workspace))
+            .await
+            .flatten();
         self.log_slow("outgoing_calls", start.elapsed()).await;
         Ok(result)
     }
@@ -658,9 +782,10 @@ impl LanguageServer for Backend {
         let start = Instant::now();
         let uri = params.text_document.uri.to_string();
         let result = self
-            .workspace
-            .get(&uri)
-            .map(|a| build_selection_ranges(&a, &params.positions));
+            .analysis
+            .run(move |an| an.workspace.get(&uri).map(|a| build_selection_ranges(&a, &params.positions)))
+            .await
+            .flatten();
         self.log_slow("selection_range", start.elapsed()).await;
         Ok(result)
     }
@@ -672,9 +797,11 @@ impl LanguageServer for Backend {
         let start = Instant::now();
         let uri = params.text_document_position.text_document.uri.to_string();
         let pos = params.text_document_position.position;
-        let result = self.workspace.get(&uri).and_then(|a| {
-            build_on_type_formatting(&a.source, pos, &params.ch, params.options)
-        });
+        let result = self
+            .analysis
+            .run(move |an| an.workspace.get(&uri).and_then(|a| { build_on_type_formatting(&a.source, pos, &params.ch, params.options) }))
+            .await
+            .flatten();
         self.log_slow("on_type_formatting", start.elapsed()).await;
         Ok(result)
     }
@@ -684,7 +811,11 @@ impl LanguageServer for Backend {
         params: ExecuteCommandParams,
     ) -> LspResult<Option<serde_json::Value>> {
         let start = Instant::now();
-        let result = execute_command(&params.command, params.arguments, &self.workspace);
+        let result = self
+            .analysis
+            .run(move |an| execute_command(&params.command, params.arguments, &an.workspace))
+            .await
+            .unwrap_or(Ok(None));
         self.log_slow("execute_command", start.elapsed()).await;
         match result {
             Ok(v) => Ok(v),

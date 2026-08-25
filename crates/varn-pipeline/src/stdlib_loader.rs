@@ -1,3 +1,4 @@
+use varn_checker::module_resolver::ImportResolver;
 use std::cell::RefCell;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
@@ -196,7 +197,8 @@ fn compile_source_inner(
     reject_type_errors: bool,
 ) -> Result<FunctionProto, String> {
     let program = crate::quiet_parse::parse_module(source, path, "")?;
-    let check = varn_checker::Checker::check(&program);
+    let check =
+        crate::resolver::with_resolver(|r| varn_checker::Checker::check(&program, r));
     if reject_type_errors && check.diagnostics.has_errors() {
         // The stdlib goes through the same checker as user code. Silently
         // dropping these diagnostics let `std/*.vn` carry types the backend
@@ -213,9 +215,9 @@ fn compile_source_inner(
     }
     let exports =
         if path.starts_with("std:") || path.starts_with("core:") || path.starts_with("runtime:") {
-            varn_checker::module_resolver::resolve_stdlib_module_exports_ref(path)
+            crate::resolver::with_resolver(|r| r.stdlib_exports(path))
         } else {
-            varn_checker::module_resolver::resolve_module_exports_ref(path, &mut vec![])
+            crate::resolver::with_resolver(|r| r.module_exports(path, &mut vec![]))
         };
     let mut export_names: Vec<std::rc::Rc<str>> = exports
         .keys()
@@ -291,8 +293,8 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
             continue;
         }
 
-        let exports = varn_checker::module_resolver::resolve_stdlib_module_exports_ref(&m.id);
-        let bind = match varn_checker::module_resolver::resolve_stdlib_module_bind_ref(&m.id) {
+        let exports = crate::resolver::with_resolver(|r| r.stdlib_exports(&m.id));
+        let bind = match crate::resolver::with_resolver(|r| r.stdlib_bind(&m.id)) {
             Some(b) => b,
             None => {
                 let err_msg = match compile_source_checked(&source, &m.id) {

@@ -82,6 +82,14 @@ impl TokenStream {
         }
     }
 
+    /// Cursor into the token vector. Used by error recovery to detect that a
+    /// pass made no progress, which is what keeps the program loop from
+    /// spinning on a token it just failed to parse.
+    #[inline]
+    pub fn pos(&self) -> usize {
+        self.pos
+    }
+
     #[inline]
     pub fn line(&self) -> u32 {
         self.token().range.start.line
@@ -94,6 +102,20 @@ impl TokenStream {
         } else {
             0
         }
+    }
+
+    /// Zero-width range at the end of the previous token.
+    ///
+    /// Where a diagnostic belongs when the offending thing is the *absence* of
+    /// a token: anchoring it to the current token would underline whatever
+    /// followed — often the next, perfectly valid, line.
+    #[inline]
+    pub fn prev_end_range(&self) -> SourceRange {
+        if self.pos == 0 {
+            return self.range();
+        }
+        let end = self.tokens[self.pos - 1].range.end;
+        SourceRange { start: end, end }
     }
 
     #[inline]

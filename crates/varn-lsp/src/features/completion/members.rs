@@ -1,3 +1,4 @@
+use varn_checker::module_resolver::ImportResolver;
 use crate::document::{DocumentState, MemberKind, MemberRecord};
 use crate::util::kinds::member_to_completion_kind;
 use tower_lsp::lsp_types::{CompletionItem, InsertTextFormat};
@@ -25,7 +26,9 @@ pub fn build_member_completions(
 ) -> Vec<CompletionItem> {
     match info {
         ReceiverInfo::Typed { ty, is_instance } => {
-            let members = varn_checker::get_members_of_type(&ty, &state.db.bind);
+            let members = crate::workspace::resolver::with_resolver(|r| {
+                varn_checker::get_members_of_type(r, &ty, &state.db.bind)
+            });
             let mut seen = std::collections::HashSet::new();
             let mut items = Vec::new();
 
@@ -132,10 +135,10 @@ pub fn build_member_completions(
                     || origin_mod.starts_with("core:")
                 {
                     target_bind =
-                        varn_checker::module_resolver::resolve_stdlib_module_bind_ref(origin_mod);
+                        crate::workspace::resolver::with_resolver(|r| r.stdlib_bind(origin_mod));
                 } else {
                     target_bind =
-                        varn_checker::module_resolver::resolve_module_bind_ref(origin_mod);
+                        crate::workspace::resolver::with_resolver(|r| r.module_bind(origin_mod));
                 }
             }
 

@@ -17,6 +17,7 @@ pub(super) fn assign_slots(exports: &mut ExportMap) {
 }
 
 pub(super) fn collect_exports(
+    resolver: &dyn super::ImportResolver,
     stmts: &[Stmt],
     bind: &BindResult,
     abs_path: &str,
@@ -74,11 +75,11 @@ pub(super) fn collect_exports(
                 ..
             } => {
                 let src_exports = if super::paths::is_known_module(src) {
-                    super::stdlib::resolve_stdlib_module_exports_ref(src)
+                    resolver.stdlib_exports(src)
                 } else {
-                    let src_abs = super::paths::resolve_relative(base_dir, src);
-                    super::store::record_dep(abs_path, &src_abs);
-                    super::resolve_module_exports_ref(&src_abs, visiting)
+                    let src_abs = super::paths::resolve_relative(resolver, base_dir, src);
+                    resolver.record_dep(abs_path, &src_abs);
+                    resolver.module_exports(&src_abs, visiting)
                 };
                 for spec in specifiers {
                     if let Some(sym) = src_exports.get(&spec.local.to_string()) {
@@ -95,11 +96,11 @@ pub(super) fn collect_exports(
                 ..
             } => {
                 let src_exports = if super::paths::is_known_module(source) {
-                    super::stdlib::resolve_stdlib_module_exports_ref(source)
+                    resolver.stdlib_exports(source)
                 } else {
-                    let src_abs = super::paths::resolve_relative(base_dir, source);
-                    super::store::record_dep(abs_path, &src_abs);
-                    super::resolve_module_exports_ref(&src_abs, visiting)
+                    let src_abs = super::paths::resolve_relative(resolver, base_dir, source);
+                    resolver.record_dep(abs_path, &src_abs);
+                    resolver.module_exports(&src_abs, visiting)
                 };
                 for (name, sym) in src_exports.iter() {
                     out.entry(name.clone()).or_insert_with(|| {
@@ -117,14 +118,14 @@ pub(super) fn collect_exports(
                 let src_abs = if super::paths::is_known_module(source) {
                     source.to_string()
                 } else {
-                    let src_abs = super::paths::resolve_relative(base_dir, source);
-                    super::store::record_dep(abs_path, &src_abs);
+                    let src_abs = super::paths::resolve_relative(resolver, base_dir, source);
+                    resolver.record_dep(abs_path, &src_abs);
                     src_abs
                 };
                 let src_exports = if super::paths::is_known_module(source) {
-                    super::stdlib::resolve_stdlib_module_exports_ref(source)
+                    resolver.stdlib_exports(source)
                 } else {
-                    super::resolve_module_exports_ref(&src_abs, visiting)
+                    resolver.module_exports(&src_abs, visiting)
                 };
                 let mut ns_sym = Symbol::new(SymbolKind::Namespace, ns.clone(), 0);
                 ns_sym.ty = Some(Type::named_with_origin("*", Some(src_abs.clone())));

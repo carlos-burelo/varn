@@ -1,6 +1,5 @@
 mod chain_queries;
 pub mod import;
-pub(crate) mod receiver_ast;
 mod resolution;
 mod symbol_queries;
 
@@ -195,6 +194,9 @@ pub struct DocumentState {
     pub diagnostics: Vec<LspDiag>,
     pub symbols: Vec<SymbolRecord>,
     pub tokens: Vec<TokenRecord>,
+    /// Comments, in source order. Parallel to `tokens`, never mixed into them —
+    /// see [`varn_core::Trivia`].
+    pub trivia: Vec<varn_core::Trivia>,
     pub symbol_map: HashMap<String, SymbolKind>,
 
     pub type_param_names: HashSet<String>,
@@ -206,8 +208,15 @@ pub struct DocumentState {
     pub ast: Option<varn_core::ast::Program>,
 }
 
-unsafe impl Send for DocumentState {}
-unsafe impl Sync for DocumentState {}
+// `DocumentState` is deliberately neither `Send` nor `Sync`. It is built on
+// `Rc` throughout — `BindResult`, `Type`, every interned name — so sharing one
+// across threads races on non-atomic refcounts. It used to carry
+// `unsafe impl Send`/`Sync`, which did not make that safe; it silenced the
+// check that forbade it.
+//
+// Its owner is the analysis thread (`crate::analysis`), and the missing impls
+// are what keep it there: a request handler that tried to return one from the
+// analysis closure fails to compile.
 
 pub type DocumentAnalysis = DocumentState;
 

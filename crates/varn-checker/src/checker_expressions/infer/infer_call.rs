@@ -8,7 +8,7 @@ use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
 use super::collect_checked_return_types;
 
-impl Checker {
+impl<'r> Checker<'r> {
     pub(super) fn infer_call_type(&mut self, expr: &Expr, bind: &BindResult) -> Type {
         let (callee, type_args, args) = match &expr.kind {
             ExprKind::Call {

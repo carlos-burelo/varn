@@ -62,12 +62,29 @@ impl Parser {
         let started = Instant::now();
 
         while !self.stream.is_eof() {
+            let stmt_start = self.stream.range();
+            let loop_entry = self.stream.pos();
             match self.parse_stmt_or_decl() {
                 Ok(stmt) => body.push(stmt),
                 Err(msg) => {
                     self.diagnostics
                         .error(ErrorCode::InvalidStatement, msg, self.stream.range());
-                    self.recover();
+                    self.recover(stmt_start);
+                    // Forward progress, guaranteed here rather than inside
+                    // `recover`: recovery legitimately stops without consuming
+                    // when the cursor already sits on the next statement's
+                    // keyword, and advancing there would eat that statement.
+                    // Only a round that consumed *nothing at all* can spin.
+                    if self.stream.pos() == loop_entry && !self.stream.is_eof() {
+                        self.stream.advance();
+                    }
+                    // Preserve the unparseable span instead of dropping it, so
+                    // every byte of source stays reachable from the tree.
+                    let recovered = self.stream.span_from(stmt_start);
+                    let stmt = self
+                        .stream
+                        .stmt(recovered, varn_core::ast::StmtKind::Error);
+                    body.push(stmt);
                 }
             }
         }
@@ -90,7 +107,17 @@ impl Parser {
         (prog, errors, profile)
     }
 
-    fn recover(&mut self) {
+    /// Skip to the next plausible statement boundary and return the span that
+    /// was skipped, for the caller to preserve as [`StmtKind::Error`].
+    ///
+    /// Recovery used to discard that span outright, which is why a half-typed
+    /// statement disappeared from the tree together with every symbol it would
+    /// have bound — and why the editor had nothing to answer from.
+    ///
+    /// Stopping without consuming anything is correct and expected: the cursor
+    /// may already be parked on the next statement's keyword. Forward progress
+    /// is therefore the *caller's* obligation — see `parse_program_partial`.
+    fn recover(&mut self, start: varn_core::SourceRange) -> varn_core::SourceRange {
         #[cfg(feature = "profiling")]
         let started = Instant::now();
         let mut depth: i32 = 0;
@@ -137,6 +164,7 @@ impl Parser {
         {
             self.stream.profile.recover += started.elapsed();
         }
+        self.stream.span_from(start)
     }
 
     fn parse_stmt_or_decl(&mut self) -> Result<varn_core::ast::Stmt, String> {

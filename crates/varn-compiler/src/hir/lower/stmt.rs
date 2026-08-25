@@ -131,6 +131,14 @@ impl<'a> Lowerer<'a> {
     ) -> R<()> {
         match &stmt.kind {
             StmtKind::Empty => {}
+            // Editor-only node, same reasoning as `ExprKind::Missing` in
+            // `lower_expr`: compiles use the strict parser, which never returns
+            // a tree once a syntax error was reported.
+            StmtKind::Error => {
+                return Err(OptError::Unsupported(
+                    "hir: unparsed statement (parse error reached lowering)",
+                ))
+            }
             StmtKind::Block { stmts } => {
                 scope.push_block();
                 for s in stmts {

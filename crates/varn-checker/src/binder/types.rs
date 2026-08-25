@@ -1,5 +1,4 @@
 use crate::core::loader::CoreMembers;
-use crate::module_resolver::resolve_module_bind_ref;
 use crate::scope::{ScopeArena, ScopeId};
 use crate::symbol::{Symbol, SymbolArena, SymbolId};
 use crate::types::{ClassMemberInfo, Type};
@@ -178,6 +177,21 @@ impl BindResult {
         self.arena.get(id).intrinsic_wire
     }
 
+    /// The alias `name` declares in *this* module, if any.
+    ///
+    /// The `_local` suffix marks it as resolution-free, like its siblings
+    /// above: following an alias declared elsewhere needs a [`BindView`].
+    pub fn get_alias_node_local(&self, name: &str) -> Option<(Vec<String>, TypeNode)> {
+        let scope = self.scopes.get(self.global_scope);
+        let id = scope.resolve(name, &self.scopes)?;
+        let sym = self.arena.get(id);
+        let node = sym.alias_node.as_ref()?;
+        Some((
+            sym.type_params.iter().map(|s| s.to_string()).collect(),
+            *node.clone(),
+        ))
+    }
+
     pub fn has_named_type(&self, name: &str) -> bool {
         self.type_members.classes.contains_key(name)
             || self.type_members.interfaces.contains_key(name)
@@ -196,31 +210,57 @@ impl BindResult {
     }
 }
 
-impl TypeContext for BindResult {
+/// A bound module paired with the capability to follow its imports.
+///
+/// [`BindResult`] is **data**: cached as `Rc<BindResult>`, serialized to the
+/// interface blobs on disk, shared between modules. Reaching another module is
+/// a **capability**. Fusing the two — which is what `impl TypeContext for
+/// BindResult` used to do — meant a serializable data structure carried the
+/// power to read the filesystem, and could only exercise it through ambient
+/// global state, because a `'static` cached value cannot hold a resolver.
+///
+/// Splitting them lets the same bound module be viewed under different
+/// resolvers, and keeps the lifetime off the type that gets serialized.
+pub struct BindView<'r> {
+    pub bind: &'r BindResult,
+    pub resolver: &'r dyn crate::module_resolver::ImportResolver,
+}
+
+impl<'r> BindView<'r> {
+    pub fn new(
+        bind: &'r BindResult,
+        resolver: &'r dyn crate::module_resolver::ImportResolver,
+    ) -> Self {
+        Self { bind, resolver }
+    }
+
+    /// The bind for `origin`, when it names a module other than this one.
+    fn foreign(&self, origin: Option<&str>) -> Option<Rc<BindResult>> {
+        let origin = origin?;
+        if origin == self.bind.source_file.as_ref() {
+            return None;
+        }
+        self.resolver.module_bind(origin)
+    }
+}
+
+impl TypeContext for BindView<'_> {
     fn get_interface_members(
         &self,
         name: &str,
         origin: Option<&str>,
     ) -> Option<Vec<ClassMemberInfo>> {
-        if let Some(origin) = origin {
-            if origin != self.source_file.as_ref() {
-                if let Some(rb) = resolve_module_bind_ref(origin) {
-                    return rb.get_interface_members_local(name).cloned();
-                }
-            }
+        if let Some(rb) = self.foreign(origin) {
+            return rb.get_interface_members_local(name).cloned();
         }
-        self.get_interface_members_local(name).cloned()
+        self.bind.get_interface_members_local(name).cloned()
     }
 
     fn get_class_members(&self, name: &str, origin: Option<&str>) -> Option<Vec<ClassMemberInfo>> {
-        if let Some(origin) = origin {
-            if origin != self.source_file.as_ref() {
-                if let Some(rb) = resolve_module_bind_ref(origin) {
-                    return rb.get_class_entry(name).map(|e| e.members.clone());
-                }
-            }
+        if let Some(rb) = self.foreign(origin) {
+            return rb.get_class_entry(name).map(|e| e.members.clone());
         }
-        self.get_class_entry(name).map(|e| e.members.clone())
+        self.bind.get_class_entry(name).map(|e| e.members.clone())
     }
 
     fn get_namespace_members(
@@ -228,41 +268,33 @@ impl TypeContext for BindResult {
         name: &str,
         origin: Option<&str>,
     ) -> Option<Vec<ClassMemberInfo>> {
-        if let Some(origin) = origin {
-            if origin != self.source_file.as_ref() {
-                if let Some(rb) = resolve_module_bind_ref(origin) {
-                    return rb.get_namespace_members_local(name).cloned();
-                }
-            }
+        if let Some(rb) = self.foreign(origin) {
+            return rb.get_namespace_members_local(name).cloned();
         }
-        self.get_namespace_members_local(name).cloned()
+        self.bind.get_namespace_members_local(name).cloned()
     }
 
     fn get_enum_members(&self, name: &str, origin: Option<&str>) -> Option<Vec<ClassMemberInfo>> {
-        if let Some(origin) = origin {
-            if origin != self.source_file.as_ref() {
-                if let Some(rb) = resolve_module_bind_ref(origin) {
-                    return rb.get_enum_members_local(name).cloned();
-                }
-            }
+        if let Some(rb) = self.foreign(origin) {
+            return rb.get_enum_members_local(name).cloned();
         }
-        self.get_enum_members_local(name).cloned()
+        self.bind.get_enum_members_local(name).cloned()
     }
 
     fn resolve_symbol(&self, name: &str) -> Option<Type> {
-        let scope = self.scopes.get(self.global_scope);
-        let id = scope.resolve(name, &self.scopes)?;
-        self.arena.get(id).ty.clone()
+        let scope = self.bind.scopes.get(self.bind.global_scope);
+        let id = scope.resolve(name, &self.bind.scopes)?;
+        self.bind.arena.get(id).ty.clone()
     }
 
     fn source_file(&self) -> Option<&str> {
-        Some(self.source_file.as_ref())
+        Some(self.bind.source_file.as_ref())
     }
 
     fn get_alias_node(&self, name: &str) -> Option<(Vec<String>, TypeNode)> {
-        let scope = self.scopes.get(self.global_scope);
-        let id = scope.resolve(name, &self.scopes)?;
-        let sym = self.arena.get(id);
+        let scope = self.bind.scopes.get(self.bind.global_scope);
+        let id = scope.resolve(name, &self.bind.scopes)?;
+        let sym = self.bind.arena.get(id);
         let node = sym.alias_node.as_ref()?;
         Some((
             sym.type_params.iter().map(|s| s.to_string()).collect(),
@@ -270,8 +302,17 @@ impl TypeContext for BindResult {
         ))
     }
 
+    fn resolver(&self) -> Option<&dyn crate::module_resolver::ImportResolver> {
+        Some(self.resolver)
+    }
+
     fn get_extension_method(&self, type_name: &str, method_name: &str) -> Option<Type> {
-        let mangled = self.extensions.methods.get(type_name)?.get(method_name)?;
+        let mangled = self
+            .bind
+            .extensions
+            .methods
+            .get(type_name)?
+            .get(method_name)?;
         self.resolve_symbol(mangled)
     }
 }

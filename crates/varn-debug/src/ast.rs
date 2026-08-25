@@ -35,6 +35,18 @@ fn print_stmt(stmt: &Stmt, indent: &str, is_last: bool) {
             }
         }
         StmtKind::Empty => terminal::log(format!("{indent}{marker}{}", chalk("EmptyStmt").dim())),
+        StmtKind::Error => terminal::log(format!(
+            "{indent}{marker}{} {}",
+            chalk("ErrorStmt").bold(),
+            chalk(&format!(
+                "{}:{}..{}:{}",
+                stmt.range.start.line,
+                stmt.range.start.column,
+                stmt.range.end.line,
+                stmt.range.end.column
+            ))
+            .dim()
+        )),
         StmtKind::Expr { expression } => {
             terminal::log(format!("{indent}{marker}{}", chalk("ExprStmt").bold()));
             print_expr(expression, &child_indent, true);

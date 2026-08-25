@@ -1,3 +1,4 @@
+pub mod resolver;
 pub mod revision;
 pub mod std_sources;
 use crate::db::{CancellationToken, Database, FileId};
@@ -36,9 +37,19 @@ impl Workspace {
         (file_id, rev, token)
     }
 
-    /// Heavy pipeline analysis with Query Firewall check.
+    /// Re-analyse one file, evicting only what its change can invalidate.
+    ///
+    /// Two firewalls, at different scopes:
+    ///
+    /// 1. **Module graph.** Only the edited module and its transitive importers
+    ///    are evicted from the resolver. Everything else — the whole stdlib
+    ///    above all — keeps its bind. This used to be a blanket `reset()` of
+    ///    the entire graph on every keystroke.
+    /// 2. **Dependents.** Their re-analysis is gated on the edited file's
+    ///    *exports* changing. Editing a function body leaves the export map
+    ///    identical, so nothing downstream is touched.
     pub fn update_file(&self, uri: String, source: String) {
-        varn_checker::module_resolver::invalidate_module_cache();
+        resolver::invalidate(&Self::module_id_of(&uri));
 
         let file_id = self.db.intern(&uri);
         // Only store text that is actually new. `set_source` cancels the
@@ -83,12 +94,8 @@ impl Workspace {
         self.files.insert(uri.clone(), state);
 
         for (dep_uri, dep_source) in dependents {
-            let dep_path = crate::document::uri_to_path(&dep_uri);
-            let dep_canonical =
-                varn_modules::canonical_or_original(std::path::Path::new(&dep_path));
-            varn_checker::module_resolver::invalidate_module(&varn_core::ModuleId::local_str(
-                &dep_canonical,
-            ));
+            // No eviction needed here: invalidating the edited module above
+            // already evicted everything that transitively imports it.
             let dep_state = Arc::new(run_pipeline(dep_source, dep_uri.clone()));
             {
                 let mut idx = self.index.write().unwrap();
@@ -103,7 +110,16 @@ impl Workspace {
         }
     }
 
+    /// The module id a document URI denotes, canonicalized the same way the
+    /// resolver keys its graph — otherwise an invalidation silently misses.
+    fn module_id_of(uri: &str) -> varn_core::ModuleId {
+        let path = crate::document::uri_to_path(uri);
+        let canonical = varn_modules::canonical_or_original(std::path::Path::new(&path));
+        varn_core::ModuleId::local_str(&canonical)
+    }
+
     pub fn remove_file(&self, uri: &str) {
+        resolver::invalidate(&Self::module_id_of(uri));
         let file_id = self.db.intern(uri);
         self.exports.remove(&file_id);
         self.files.remove(uri);

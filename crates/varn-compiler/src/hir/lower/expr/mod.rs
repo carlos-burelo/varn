@@ -86,6 +86,14 @@ impl<'a> Lowerer<'a> {
             ExprKind::StrLiteral { value } => Ok(HirExpr::Str(Rc::from(value.as_str()))),
             ExprKind::BoolLiteral { value } => Ok(HirExpr::Bool(*value)),
             ExprKind::NullLiteral => Ok(HirExpr::Null),
+            // Editor-only node. Compiles go through `varn_parser::parse`, which
+            // refuses to return a program once any syntax error was reported —
+            // only `parse_partial` (the LSP) yields a tree containing holes. So
+            // this is unreachable in practice; it stays as a hard stop in case a
+            // future caller switches the compile path to the tolerant parser.
+            ExprKind::Missing => Err(OptError::Unsupported(
+                "hir: incomplete expression (parse error reached lowering)",
+            )),
             ExprKind::This => Ok(HirExpr::This),
             ExprKind::New { callee, args, .. } => {
                 let hargs = self.lower_call_args(args, key, scope)?;

@@ -30,7 +30,12 @@ fn map_class_member_kind(k: crate::binder::ClassMemberKind) -> crate::semantic_i
     }
 }
 
+/// Every member reachable on `ty`, including those declared in other modules.
+///
+/// `resolver` is what makes the cross-module half possible; without it this
+/// could only answer for types declared locally.
 pub fn get_members_of_type(
+    resolver: &dyn crate::module_resolver::ImportResolver,
     ty: &Type,
     bind: &BindResult,
 ) -> Vec<crate::semantic_info::ResolvedMemberSummary> {
@@ -135,11 +140,11 @@ pub fn get_members_of_type(
                     varn_core::IntrinsicType::Array.as_str().to_owned(),
                     vec![*inner.clone()],
                 );
-                return get_members_of_type(&array_ty, bind);
+                return get_members_of_type(resolver, &array_ty, bind);
             }
             TypeKind::Named(cn, origin) | TypeKind::Generic(cn, _, origin) => {
                 let mapping = if let TypeKind::Generic(_, args, _) = &ty.0 {
-                    member_type::generic_mapping(cn.as_ref(), args, origin.as_ref(), bind)
+                    member_type::generic_mapping(resolver, cn.as_ref(), args, origin.as_ref(), bind)
                 } else {
                     rustc_hash::FxHashMap::default()
                 };
@@ -221,7 +226,7 @@ pub fn get_members_of_type(
                 // 3. Check external / stdlib module binds
                 let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
                 if let Some(ext_bind) =
-                    crate::module_resolver::find_module_bind_for_type_ref(cn, &origin_modules)
+                    resolver.find_bind_for_type(cn, &origin_modules)
                 {
                     if let Some(entry) = ext_bind.type_members.classes.get(cn) {
                         for m in &entry.members {
@@ -252,11 +257,11 @@ pub fn get_members_of_type(
                     true,
                 );
                 let str_ty = Type::named("str".to_owned());
-                return get_members_of_type(&str_ty, bind);
+                return get_members_of_type(resolver, &str_ty, bind);
             }
             TypeKind::Intrinsic(tag) => {
                 let named_ty = Type::named(tag.name().to_owned());
-                return get_members_of_type(&named_ty, bind);
+                return get_members_of_type(resolver, &named_ty, bind);
             }
             _ => {}
         }
@@ -264,7 +269,7 @@ pub fn get_members_of_type(
         results
 }
 
-impl Checker {
+impl<'r> Checker<'r> {
     pub(crate) fn collect_member_names(&self, ty: &Type, bind: &BindResult) -> Vec<Rc<str>> {
         match &ty.0 {
             TypeKind::Object(members) => members

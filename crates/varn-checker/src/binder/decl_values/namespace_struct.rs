@@ -7,7 +7,7 @@ use crate::scope::ScopeKind;
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::Type;
 
-impl super::super::Binder {
+impl<'r> super::super::Binder<'r> {
     pub(crate) fn bind_namespace(&mut self, n: &NamespaceDecl) {
         let mut sym =
             Symbol::new(SymbolKind::Namespace, n.id.clone(), n.range.start.line).with_type(

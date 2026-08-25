@@ -8,7 +8,7 @@ use std::rc::Rc;
 use varn_core::ast::{ClassDecl, ClassMember, Pattern, Stmt};
 use varn_core::TypeKind;
 
-impl super::Binder {
+impl<'r> super::Binder<'r> {
     pub(super) fn bind_class(&mut self, c: &ClassDecl) {
         let name: Rc<str> =
             c.id.as_ref()
@@ -614,7 +614,7 @@ impl super::Binder {
         }
         if let Some(origin) = origin {
             let mut visiting = Vec::new();
-            let exports = crate::module_resolver::resolve_module_exports(origin, &mut visiting);
+            let exports = self.resolver.module_exports(origin, &mut visiting);
             if let Some(sym) = exports.get(name) {
                 if sym.kind == SymbolKind::Class {
                     return self.type_members.classes.get(name).map(|e| &e.members);
@@ -634,7 +634,7 @@ impl super::Binder {
         }
         if let Some(origin) = origin {
             let mut visiting = Vec::new();
-            let exports = crate::module_resolver::resolve_module_exports(origin, &mut visiting);
+            let exports = self.resolver.module_exports(origin, &mut visiting);
             if let Some(sym) = exports.get(name) {
                 if sym.kind == SymbolKind::Interface {
                     return self.type_members.interfaces.get(name);

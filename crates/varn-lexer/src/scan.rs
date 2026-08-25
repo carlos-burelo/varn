@@ -8,7 +8,33 @@ pub fn scan(
     std::rc::Rc<[u8]>,
     Vec<varn_core::Diagnostic>,
 ) {
-    scan_with_config(source, filename, crate::scanner::LexerConfig::default())
+    let (tokens, buf, diags, _) =
+        scan_inner(source, filename, crate::scanner::LexerConfig::default());
+    (tokens, buf, diags)
+}
+
+/// [`scan`] plus the comments it would otherwise drop.
+///
+/// Separate entry point rather than a fourth element on `scan`: only tooling
+/// that reproduces source needs trivia, and every other caller — the whole
+/// compile path — would pay the churn for a value it discards.
+pub fn scan_with_trivia(
+    source: &str,
+    filename: &str,
+) -> (
+    Vec<varn_core::Token>,
+    std::rc::Rc<[u8]>,
+    Vec<varn_core::Diagnostic>,
+    Vec<varn_core::Trivia>,
+) {
+    scan_inner(
+        source,
+        filename,
+        crate::scanner::LexerConfig {
+            emit_trivia: true,
+            ..Default::default()
+        },
+    )
 }
 
 fn parse_num_lexeme(kind: varn_core::TokenKind, lexeme: &str) -> Option<varn_core::ParsedNumber> {
@@ -41,12 +67,26 @@ fn parse_num_lexeme(kind: varn_core::TokenKind, lexeme: &str) -> Option<varn_cor
 
 pub fn scan_with_config(
     source: &str,
+    filename: &str,
+    config: crate::scanner::LexerConfig,
+) -> (
+    Vec<varn_core::Token>,
+    std::rc::Rc<[u8]>,
+    Vec<varn_core::Diagnostic>,
+) {
+    let (tokens, buf, diags, _) = scan_inner(source, filename, config);
+    (tokens, buf, diags)
+}
+
+fn scan_inner(
+    source: &str,
     _filename: &str,
     config: crate::scanner::LexerConfig,
 ) -> (
     Vec<varn_core::Token>,
     std::rc::Rc<[u8]>,
     Vec<varn_core::Diagnostic>,
+    Vec<varn_core::Trivia>,
 ) {
     use varn_core::{SourceLocation, SourceRange, Token, TokenKind};
 
@@ -55,6 +95,7 @@ pub fn scan_with_config(
     let mut scanner = Scanner::with_config(src_bytes, config);
     let (records, lexeme_buf) = scanner.scan_all();
     let diagnostics = scanner.diagnostics.take();
+    let trivia = std::mem::take(&mut scanner.trivia);
 
     let tokens: Vec<varn_core::Token> = records
         .into_iter()
@@ -90,5 +131,5 @@ pub fn scan_with_config(
         .collect();
 
     let rc_buf: std::rc::Rc<[u8]> = lexeme_buf.into();
-    (tokens, rc_buf, diagnostics)
+    (tokens, rc_buf, diagnostics, trivia)
 }

@@ -8,7 +8,7 @@ use varn_core::ast::{Expr, ExprKind};
 use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
-impl Checker {
+impl<'r> Checker<'r> {
     pub(super) fn check_binary_expr(
         &mut self,
         left: &Expr,

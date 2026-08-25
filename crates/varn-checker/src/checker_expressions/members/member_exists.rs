@@ -28,10 +28,15 @@ fn check_in_bind(name: &Rc<str>, key: &str, ext_bind: &crate::binder::BindResult
     false
 }
 
-fn check_origin_module(name: &Rc<str>, origin: &Option<Rc<str>>, key: &str) -> bool {
+fn check_origin_module(
+    resolver: &dyn crate::module_resolver::ImportResolver,
+    name: &Rc<str>,
+    origin: &Option<Rc<str>>,
+    key: &str,
+) -> bool {
     let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
     if let Some(ext_bind) =
-        crate::module_resolver::find_module_bind_for_type_ref(name, &origin_modules)
+        resolver.find_bind_for_type(name, &origin_modules)
     {
         if check_in_bind(name, key, &ext_bind) {
             return true;
@@ -40,7 +45,7 @@ fn check_origin_module(name: &Rc<str>, origin: &Option<Rc<str>>, key: &str) -> b
 
     if origin.is_none() {
         for spec in varn_modules::std_module_ids() {
-            if let Some(bind) = crate::module_resolver::resolve_stdlib_module_bind_ref(spec) {
+            if let Some(bind) = resolver.stdlib_bind(spec) {
                 if check_in_bind(name, key, &bind) {
                     return true;
                 }
@@ -50,7 +55,7 @@ fn check_origin_module(name: &Rc<str>, origin: &Option<Rc<str>>, key: &str) -> b
     false
 }
 
-impl Checker {
+impl<'r> Checker<'r> {
     pub(crate) fn member_exists_cached(&mut self, ty: &Type, key: &str, bind: &BindResult) -> bool {
         let ty_key = (ty.clone(), Rc::from(key));
         if let Some(exists) = self.member_exists_cache.get(&ty_key) {
@@ -114,12 +119,12 @@ impl Checker {
                 if name.as_ref() == "*" {
                     if let Some(origin_path) = origin {
                         let exports = if crate::module_resolver::is_known_module(origin_path) {
-                            Some(crate::module_resolver::resolve_stdlib_module_exports_ref(
+                            Some(self.resolver.stdlib_exports(
                                 origin_path,
                             ))
                         } else {
                             let mut visiting = Vec::new();
-                            Some(crate::module_resolver::resolve_module_exports_ref(
+                            Some(self.resolver.module_exports(
                                 origin_path,
                                 &mut visiting,
                             ))
@@ -144,7 +149,7 @@ impl Checker {
                         .core
                         .as_ref()
                         .map_or(false, |b| b.enum_members.contains_key(name.as_ref()))
-                    || crate::module_resolver::find_module_bind_for_type_ref(name, &origin_modules)
+                    || self.resolver.find_bind_for_type(name, &origin_modules)
                         .as_ref()
                         .map_or(false, |eb| {
                             eb.get_enum_members_local(name.as_ref()).is_some()
@@ -164,7 +169,7 @@ impl Checker {
                         variants.extend(members.iter().map(|m| m.name.clone()));
                     }
                     if let Some(ext_bind) =
-                        crate::module_resolver::find_module_bind_for_type_ref(name, &origin_modules)
+                        self.resolver.find_bind_for_type(name, &origin_modules)
                     {
                         if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
                             variants.extend(members.iter().map(|m| m.name.clone()));
@@ -177,7 +182,7 @@ impl Checker {
                             }
                         }
                         if let Some(ext_bind) =
-                            crate::module_resolver::find_module_bind_for_type_ref(
+                            self.resolver.find_bind_for_type(
                                 name,
                                 &origin_modules,
                             )
@@ -234,7 +239,7 @@ impl Checker {
                     return self.member_exists(&Type::named(parent.clone()), key, bind);
                 }
 
-                if check_origin_module(name, origin, key) {
+                if check_origin_module(self.resolver, name, origin, key) {
                     return true;
                 }
                 false

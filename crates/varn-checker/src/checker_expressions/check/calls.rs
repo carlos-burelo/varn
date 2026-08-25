@@ -10,7 +10,7 @@ use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
 use super::members::extension_type_name;
 
-impl Checker {
+impl<'r> Checker<'r> {
     pub(super) fn check_call_expr(
         &mut self,
         callee: &Expr,

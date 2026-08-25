@@ -64,7 +64,9 @@ pub fn check(
     if strict {
         options = options.strict();
     }
-    let check_result = Checker::check_with(program, options);
+    let check_result = crate::resolver::with_resolver(|r| {
+        Checker::check_with(program, r, options)
+    });
     report_diagnostics(&check_result.diagnostics, &program.filename, source)?;
 
     if debug.symbols {

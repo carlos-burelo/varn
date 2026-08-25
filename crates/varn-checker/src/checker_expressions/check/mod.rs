@@ -13,7 +13,7 @@ use varn_core::ast::operators::BinaryOp;
 use varn_core::ast::{ArrowBody, Expr, ExprKind, MatchBody, MatchPattern, TemplatePart};
 use varn_core::{Diagnostic, ErrorCode, IntrinsicType, Suggestion, TypeKind, TypeTag};
 
-impl Checker {
+impl<'r> Checker<'r> {
     pub(crate) fn check_expr(&mut self, expr: &Expr, bind: &BindResult) {
         self.check_expr_no_record(expr, bind);
         let start = expr.range.start.offset;
@@ -69,6 +69,10 @@ impl Checker {
 
     fn check_expr_no_record(&mut self, expr: &Expr, bind: &BindResult) {
         match &expr.kind {
+            // Nothing to check: the parser already reported the syntax error.
+            // Emitting a second diagnostic here would paint the file red for
+            // code the user is still in the middle of typing.
+            ExprKind::Missing => {}
             ExprKind::Arrow {
                 params,
                 return_type,

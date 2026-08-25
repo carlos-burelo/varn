@@ -1,3 +1,4 @@
+pub mod resolver;
 pub mod cache;
 mod check;
 mod compile;

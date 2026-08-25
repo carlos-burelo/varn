@@ -1,21 +1,22 @@
 use super::types_compatible_impl;
-use crate::binder::BindResult;
+use crate::binder::BindView;
 use crate::types::{ClassMemberInfo, ClassMemberKind, ObjectTypeMember, Type};
 use crate::types::{FunctionParam, FunctionType};
 use rustc_hash::{FxHashMap, FxHashSet};
 use varn_core::TypeKind;
 
-pub(super) fn is_known_named(bind: &BindResult, name: &str) -> bool {
-    bind.has_named_type(name)
+pub(super) fn is_known_named(bind: &BindView, name: &str) -> bool {
+    bind.bind.has_named_type(name)
         || bind
+            .bind
             .scopes
-            .get(bind.global_scope)
-            .resolve(name, &bind.scopes)
+            .get(bind.bind.global_scope)
+            .resolve(name, &bind.bind.scopes)
             .is_some()
 }
 
 pub(super) fn named_members(
-    bind: &BindResult,
+    bind: &BindView,
     name: &str,
     origin: Option<&str>,
 ) -> Option<Vec<ClassMemberInfo>> {
@@ -30,7 +31,7 @@ pub(super) fn compatible_named(
     origin_decl: Option<&str>,
     inferred: &str,
     origin_inf: Option<&str>,
-    bind: Option<&BindResult>,
+    bind: Option<&BindView>,
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
     in_progress: &mut FxHashSet<(Type, Type, usize)>,
 ) -> bool {
@@ -53,7 +54,7 @@ pub(super) fn compatible_named(
 fn class_members_compatible(
     decl_members: &[ClassMemberInfo],
     inf_members: &[ClassMemberInfo],
-    bind: &BindResult,
+    bind: &BindView,
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
     in_progress: &mut FxHashSet<(Type, Type, usize)>,
 ) -> bool {
@@ -97,7 +98,7 @@ fn class_members_compatible(
 pub(super) fn class_members_match_object(
     decl_members: &[ClassMemberInfo],
     inf_fields: &[ObjectTypeMember],
-    bind: &BindResult,
+    bind: &BindView,
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
     in_progress: &mut FxHashSet<(Type, Type, usize)>,
 ) -> bool {
@@ -158,7 +159,7 @@ pub(super) fn class_members_match_object(
 pub(super) fn object_matches_class_members(
     decl_fields: &[ObjectTypeMember],
     inf_members: &[ClassMemberInfo],
-    bind: &BindResult,
+    bind: &BindView,
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
     in_progress: &mut FxHashSet<(Type, Type, usize)>,
 ) -> bool {
@@ -217,7 +218,7 @@ fn fn_signature_compatible_type(
     return_type: &Type,
     is_arrow: bool,
     inferred: &Type,
-    bind: Option<&BindResult>,
+    bind: Option<&BindView>,
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
     in_progress: &mut FxHashSet<(Type, Type, usize)>,
 ) -> bool {
@@ -249,7 +250,7 @@ pub(super) fn types_compatible_with_fn_signature(
     params: &[FunctionParam],
     return_type: &Type,
     is_arrow: bool,
-    bind: Option<&BindResult>,
+    bind: Option<&BindView>,
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
     in_progress: &mut FxHashSet<(Type, Type, usize)>,
 ) -> bool {

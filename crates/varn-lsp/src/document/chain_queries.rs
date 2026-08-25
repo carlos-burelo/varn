@@ -3,6 +3,27 @@ use varn_core::TokenKind;
 
 use super::{ChainResult, DocumentState, MemberKind, MemberRecord, TokenRecord};
 
+/// The name a type is known by, when it has one.
+///
+/// `None` for types that name no declaration — unions, tuples, function types,
+/// `dynamic` — because the callers want a *declaration* to look members up on,
+/// and there is none.
+fn type_name_of(ty: &varn_checker::Type) -> Option<String> {
+    use varn_core::TypeKind;
+    match &ty.0 {
+        TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(n.to_string()),
+        TypeKind::Intrinsic(tag) => {
+            if *tag == varn_core::TypeTag::Dynamic {
+                None
+            } else {
+                Some(tag.name().to_owned())
+            }
+        }
+        TypeKind::Array(_) => Some(varn_core::IntrinsicType::Array.as_str().to_owned()),
+        _ => None,
+    }
+}
+
 impl DocumentState {
     pub fn offset_at_line_col(&self, line: u32, col: u32) -> u32 {
         let mut curr_line = 0;
@@ -235,7 +256,24 @@ impl DocumentState {
         None
     }
 
+    /// The name of the type `tok`'s member access is reading from.
+    ///
+    /// The checker records this per member access, typed, in
+    /// `member_resolutions[offset].receiver_ty` — so that is where it comes
+    /// from. This used to re-walk the entire AST from the root on every hover
+    /// and goto (O(AST) per request) through a hand-written `match` that had to
+    /// grow a case for each new `ExprKind`, and already had holes.
+    ///
+    /// The token fallback below is not a workaround for that: it answers the
+    /// case the checker legitimately has nothing to say about, a member read off
+    /// a `dynamic` value.
     pub fn resolve_receiver_type_name_at(&self, tok: &TokenRecord) -> String {
+        if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
+            if let Some(name) = type_name_of(&res.receiver_ty) {
+                return name;
+            }
+        }
+
         let tok_idx_opt = self.tokens.iter().position(|t| t.offset == tok.offset);
         let tok_idx = match tok_idx_opt {
             Some(i) if i >= 2 => i,
@@ -247,18 +285,6 @@ impl DocumentState {
             return "dynamic".to_string();
         }
 
-        // 1. If AST is available, find the ExprKind::Member enclosing this token
-        if let Some(ast) = &self.ast {
-            if let Some(rec_ty) =
-                super::receiver_ast::find_member_receiver_type(ast, &self.db, tok.offset)
-            {
-                if !rec_ty.is_empty() && rec_ty != "unknown" && rec_ty != "dynamic" {
-                    return rec_ty;
-                }
-            }
-        }
-
-        // 2. Fallback to token before dot
         let prev_tok = &self.tokens[tok_idx - 2];
         if prev_tok.kind == TokenKind::Identifier || prev_tok.kind.can_be_identifier() {
             if let Some((sid, ty)) = self.db.resolve_at(&prev_tok.lexeme, prev_tok.offset) {

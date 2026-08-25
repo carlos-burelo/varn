@@ -42,6 +42,18 @@ pub enum StmtKind {
     },
     Decl(Box<Decl>),
 
+    /// A span the parser could not parse, preserved rather than discarded.
+    ///
+    /// `Stmt::range` covers the recovered text, so consumers that want the
+    /// tokens re-slice the token stream by range — the tokens are not copied
+    /// into the tree. Keeping the node (instead of dropping the statement, as
+    /// recovery used to) is what guarantees every byte of source stays
+    /// reachable from the tree.
+    ///
+    /// Checker: ignored, no diagnostic (the parser already reported one).
+    /// Compiler: hard error before lowering.
+    Error,
+
     If {
         test: Box<Expr>,
         consequent: Box<Stmt>,

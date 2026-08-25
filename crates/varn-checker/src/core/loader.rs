@@ -1,16 +1,10 @@
 use crate::binder::BindResult;
-use crate::module_resolver::{resolve_stdlib_module_bind_ref, resolve_stdlib_module_exports_ref};
+use crate::module_resolver::ImportResolver;
 use crate::symbol::Symbol;
 use crate::types::{ClassMemberInfo, Type};
 use rustc_hash::FxHashMap;
-use std::cell::RefCell;
 use std::rc::Rc;
 use varn_modules::spec::CORE_PREFIX;
-
-thread_local! {
-    static CORE_EXPORTS: RefCell<Option<Rc<FxHashMap<Rc<str>, Symbol>>>> = RefCell::new(None);
-    static CORE_MEMBERS: RefCell<Option<Rc<CoreMembers>>> = RefCell::new(None);
-}
 
 #[derive(Clone, Default)]
 pub struct CoreMembers {
@@ -28,54 +22,30 @@ pub fn is_core_file(filename: &str) -> bool {
     filename.contains("varn-builtins") || filename.starts_with(CORE_PREFIX)
 }
 
-pub fn load_global_exports() -> FxHashMap<Rc<str>, Symbol> {
-    CORE_EXPORTS.with(|c| {
-        let mut guard = c.borrow_mut();
-        if guard.is_none() {
-            *guard = Some(Rc::new(build_core_exports()));
-        }
-        guard.as_ref().unwrap().as_ref().clone()
-    })
+pub fn merge_core_members(bind: &mut BindResult, resolver: &dyn ImportResolver) {
+    bind.core = Some(resolver.core_members());
 }
 
-pub fn global_exports_ref() -> Rc<FxHashMap<Rc<str>, Symbol>> {
-    CORE_EXPORTS.with(|c| {
-        let mut guard = c.borrow_mut();
-        if guard.is_none() {
-            *guard = Some(Rc::new(build_core_exports()));
-        }
-        Rc::clone(guard.as_ref().unwrap())
-    })
-}
-
-pub fn core_members_ref() -> Rc<CoreMembers> {
-    CORE_MEMBERS.with(|c| {
-        let mut guard = c.borrow_mut();
-        if guard.is_none() {
-            *guard = Some(Rc::new(build_core_members()));
-        }
-        Rc::clone(guard.as_ref().unwrap())
-    })
-}
-
-pub fn merge_core_members(bind: &mut BindResult) {
-    bind.core = Some(core_members_ref());
-}
-
-fn build_core_exports() -> FxHashMap<Rc<str>, Symbol> {
+/// Build the prelude's global symbols from `resolver`'s stdlib.
+///
+/// Memoized by the resolver, not here: the result is a function of which
+/// stdlib is active, so it must not outlive a change of stdlib.
+pub(crate) fn build_core_exports(
+    resolver: &dyn ImportResolver,
+) -> FxHashMap<Rc<str>, Symbol> {
     let mut globals = FxHashMap::default();
     for spec in varn_modules::core_module_ids() {
-        for (k, v) in resolve_stdlib_module_exports_ref(spec).as_ref() {
+        for (k, v) in resolver.stdlib_exports(spec).as_ref() {
             globals.insert(Rc::from(k.as_str()), v.clone());
         }
     }
     globals
 }
 
-fn build_core_members() -> CoreMembers {
+pub(crate) fn build_core_members(resolver: &dyn ImportResolver) -> CoreMembers {
     let mut members = CoreMembers::default();
     for spec in varn_modules::core_module_ids() {
-        if let Some(rb) = resolve_stdlib_module_bind_ref(spec) {
+        if let Some(rb) = resolver.stdlib_bind(spec) {
             let scope = rb.scopes.get(rb.global_scope);
             for (name, &sid) in &scope.bindings {
                 let sym = rb.arena.get(sid);

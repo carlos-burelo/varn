@@ -34,20 +34,15 @@ pub(super) fn compute_source_hash(source: &str) -> u64 {
     hasher.finish()
 }
 
-pub(super) fn get_cache_dir() -> PathBuf {
-    super::store::PROJECT_ROOT.with(|r| {
-        let mut guard = r.borrow_mut();
-        if guard.is_none() {
-            let current_dir =
-                std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-            let root = varn_modules::artifact::find_project_root(&current_dir);
-            *guard = Some(root);
-        }
-        varn_modules::artifact::get_types_cache_dir(guard.as_ref().unwrap())
-    })
+pub(super) fn get_cache_dir(resolver: &super::DiskResolver) -> PathBuf {
+    resolver.types_cache_dir()
 }
 
-pub(super) fn try_load_cache(virtual_id: &str, source: &str) -> Option<CachedModule> {
+pub(super) fn try_load_cache(
+    resolver: &super::DiskResolver,
+    virtual_id: &str,
+    source: &str,
+) -> Option<CachedModule> {
     if virtual_id == "std:types" {
         return None;
     }
@@ -60,7 +55,7 @@ pub(super) fn try_load_cache(virtual_id: &str, source: &str) -> Option<CachedMod
         format!("file_{:x}", hasher.finish())
     };
 
-    let cache_dir = get_cache_dir();
+    let cache_dir = get_cache_dir(resolver);
     let cache_file = cache_dir.join(format!("{}.{:x}.vnm", name, hash));
     if !cache_file.exists() {
         return None;
@@ -83,12 +78,18 @@ pub(super) fn try_load_cache(virtual_id: &str, source: &str) -> Option<CachedMod
     }
 }
 
-pub(super) fn save_to_cache(virtual_id: &str, source: &str, exports: &ExportMap, bind: &BindResult) {
+pub(super) fn save_to_cache(
+    resolver: &super::DiskResolver,
+    virtual_id: &str,
+    source: &str,
+    exports: &ExportMap,
+    bind: &BindResult,
+) {
     if virtual_id == "std:types" {
         return;
     }
     let hash = compute_source_hash(source);
-    let cache_dir = get_cache_dir();
+    let cache_dir = get_cache_dir(resolver);
     let _ = std::fs::create_dir_all(&cache_dir);
     let name = if virtual_id.contains(':') {
         virtual_id.replace(':', "_")

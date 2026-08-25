@@ -6,7 +6,7 @@ use crate::types::Type;
 use std::rc::Rc;
 use varn_core::ast::{ExtensionDecl, ExtensionMember, Pattern};
 
-impl super::super::Binder {
+impl<'r> super::super::Binder<'r> {
     pub(crate) fn bind_extension(&mut self, e: &ExtensionDecl) {
         let type_name = type_node_to_name(&e.target);
 

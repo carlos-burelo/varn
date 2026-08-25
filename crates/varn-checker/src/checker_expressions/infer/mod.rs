@@ -10,7 +10,7 @@ use varn_core::ast::{Expr, ExprKind};
 
 pub(crate) use self::collectors::collect_checked_return_types;
 
-impl Checker {
+impl<'r> Checker<'r> {
     pub(crate) fn infer_type_internal(&mut self, expr: &Expr, bind: &BindResult) -> Type {
         if let ExprKind::Identifier { name } = &expr.kind {
             let scope = bind.scopes.get(self.current_scope);

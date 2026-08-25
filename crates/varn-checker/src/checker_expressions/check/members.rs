@@ -7,7 +7,7 @@ use varn_core::ast::{Expr, ExprKind};
 use varn_core::source::SourceRange;
 use varn_core::{Diagnostic, ErrorCode, Suggestion, TypeKind};
 
-impl Checker {
+impl<'r> Checker<'r> {
     pub(super) fn check_extension_assignment(&mut self, target: &Expr, bind: &BindResult) {
         let ExprKind::Member {
             object,

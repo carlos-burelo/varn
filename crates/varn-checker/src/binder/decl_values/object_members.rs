@@ -6,7 +6,7 @@ use crate::binder::{pattern_lead_name, ClassMemberInfo, ClassMemberKind};
 use crate::types::Type;
 use std::rc::Rc;
 
-impl super::super::Binder {
+impl<'r> super::super::Binder<'r> {
     pub(crate) fn collect_object_members(&self, props: &[ObjectProp]) -> Vec<ClassMemberInfo> {
         use crate::types::FunctionType;
         use varn_core::TypeKind;

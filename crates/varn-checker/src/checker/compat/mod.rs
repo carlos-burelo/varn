@@ -1,6 +1,6 @@
 mod helpers;
 
-use crate::binder::BindResult;
+use crate::binder::{BindResult, BindView};
 use crate::types::{ObjectTypeMember, Type};
 use rustc_hash::{FxHashMap, FxHashSet};
 use varn_core::{IntrinsicType, MemberKey, TypeKind};
@@ -44,7 +44,7 @@ fn simple_types_compatible(declared: &Type, inferred: &Type) -> bool {
 pub(crate) fn types_compatible(
     declared: &Type,
     inferred: &Type,
-    bind: Option<&BindResult>,
+    bind: Option<&BindView>,
 ) -> bool {
     let mut cache = FxHashMap::default();
     types_compatible_with_cache(declared, inferred, bind, &mut cache)
@@ -53,7 +53,7 @@ pub(crate) fn types_compatible(
 pub(crate) fn types_compatible_with_cache(
     declared: &Type,
     inferred: &Type,
-    bind: Option<&BindResult>,
+    bind: Option<&BindView>,
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
 ) -> bool {
     if declared.is_dynamic() || inferred.is_dynamic() {
@@ -72,7 +72,7 @@ pub(crate) fn types_compatible_with_cache(
 pub(super) fn types_compatible_impl(
     declared: &Type,
     inferred: &Type,
-    bind: Option<&BindResult>,
+    bind: Option<&BindView>,
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
     in_progress: &mut FxHashSet<(Type, Type, usize)>,
 ) -> bool {
@@ -88,7 +88,7 @@ pub(super) fn types_compatible_impl(
     let key = (
         declared.clone(),
         inferred.clone(),
-        bind.map_or(0usize, |b| b as *const BindResult as usize),
+        bind.map_or(0usize, |b| b.bind as *const BindResult as usize),
     );
     if let Some(cached) = cache.get(&key) {
         return *cached;

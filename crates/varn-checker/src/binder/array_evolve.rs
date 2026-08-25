@@ -107,7 +107,7 @@ pub(crate) struct ArrayCandidate {
     escaped: bool,
 }
 
-impl Binder {
+impl<'r> Binder<'r> {
     /// Registers a qualifying empty-array declarator. Called from
     /// `bind_variable` immediately after the symbol is bound, with
     /// `self.current` still the declaring block's scope.

@@ -1,3 +1,4 @@
+use varn_checker::module_resolver::ImportResolver;
 use crate::hash::fnv1a64;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
@@ -185,7 +186,13 @@ pub fn build_module_graph(
         };
 
         let check =
-            varn_checker::Checker::check_with(program, varn_checker::CheckOptions::compile());
+            crate::resolver::with_resolver(|r| {
+                varn_checker::Checker::check_with(
+                    program,
+                    r,
+                    varn_checker::CheckOptions::compile(),
+                )
+            });
         // The source was already sitting here, bound to `_`, while the
         // diagnostics this produced went unread — which is what made a type
         // error invisible as soon as the file was reached through `import`
@@ -196,12 +203,9 @@ pub fn build_module_graph(
             || program.filename.starts_with("core:")
             || program.filename.starts_with("runtime:")
         {
-            varn_checker::module_resolver::resolve_stdlib_module_exports_ref(&program.filename)
+            crate::resolver::with_resolver(|r| r.stdlib_exports(&program.filename))
         } else {
-            varn_checker::module_resolver::resolve_module_exports_ref(
-                &program.filename,
-                &mut vec![],
-            )
+            crate::resolver::with_resolver(|r| r.module_exports(&program.filename, &mut vec![]))
         };
         let mut export_names: Vec<std::rc::Rc<str>> = exports
             .keys()

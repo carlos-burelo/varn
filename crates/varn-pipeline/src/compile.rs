@@ -1,3 +1,4 @@
+use varn_checker::module_resolver::ImportResolver;
 use super::check::CheckResult;
 use crate::PipelineError;
 use rustc_hash::FxHashMap;
@@ -29,7 +30,7 @@ pub fn compile(
     }
 
     let exports =
-        varn_checker::module_resolver::resolve_module_exports_ref(&program.filename, &mut vec![]);
+        crate::resolver::with_resolver(|r| r.module_exports(&program.filename, &mut vec![]));
     let mut export_names: Vec<std::rc::Rc<str>> = exports
         .keys()
         .map(|k| std::rc::Rc::from(k.as_str()))

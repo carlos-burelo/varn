@@ -8,6 +8,41 @@ use varn_core::ast::{Expr, ExprKind};
 use varn_core::SourceRange;
 use varn_core::TokenKind;
 
+/// Parse the property name introduced by `.` or `?.`, called with the dot
+/// already consumed.
+///
+/// A property always sits on the same line as its dot: multi-line chains lead
+/// with the dot (`\n  .bar()`), never trail it. So a token on a later line is
+/// the *next statement*, not this member's name.
+///
+/// Taking it anyway — which is what an unconditional `consume()` did — ate the
+/// following declaration whole. `const n = g.` followed by `const m = 42`
+/// parsed as `Member(g, "const")` plus a bare assignment `m = 42`: `m` was
+/// never declared, and the user got `property 'const' does not exist on type
+/// 'str'` for code they had not written yet.
+///
+/// Yields [`ExprKind::Missing`] **without consuming** when there is no name, so
+/// the enclosing declaration still parses and still binds its symbols. That is
+/// what lets the editor answer `g.<cursor>` from the checker rather than from a
+/// token-stream heuristic.
+fn parse_property_name(s: &mut TokenStream) -> Expr {
+    if s.is_eof() || s.line() > s.prev_line() {
+        // Anchor at the dot, not at the current token: the current token is on
+        // the next line and is usually valid code the user did not write wrong.
+        let range = s.prev_end_range();
+        s.push_error("expected a property name after `.`".to_owned(), range);
+        return s.expr(range, ExprKind::Missing);
+    }
+    let name = s.lexeme().to_owned();
+    let tok = s.consume();
+    s.expr(
+        tok.range,
+        ExprKind::Identifier {
+            name: name.into(),
+        },
+    )
+}
+
 pub fn parse_unary_expr(s: &mut TokenStream) -> Result<Expr, String> {
     let start_range = s.range();
 
@@ -119,16 +154,9 @@ pub fn parse_new_callee_expr(s: &mut TokenStream) -> Result<Expr, String> {
         match s.kind() {
             TokenKind::Dot => {
                 s.advance();
-                let prop_name = s.lexeme().to_owned();
-                let tok = s.consume();
-                let prop_range = tok.range;
+                let prop_expr = parse_property_name(s);
+                let prop_range = *prop_expr.range();
                 let start_range = *expr.range();
-                let prop_expr = s.expr(
-                    prop_range,
-                    ExprKind::Identifier {
-                        name: prop_name.into(),
-                    },
-                );
                 expr = s.expr(
                     start_range.to(prop_range),
                     ExprKind::Member {
@@ -167,16 +195,9 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
         match s.kind() {
             TokenKind::Dot => {
                 s.advance();
-                let prop_name = s.lexeme().to_owned();
-                let prop_tok = s.consume();
-                let prop_range = prop_tok.range;
+                let prop_expr = parse_property_name(s);
+                let prop_range = *prop_expr.range();
                 let start_range = *expr.range();
-                let prop_expr = s.expr(
-                    prop_range,
-                    ExprKind::Identifier {
-                        name: prop_name.into(),
-                    },
-                );
                 expr = s.expr(
                     start_range.to(prop_range),
                     ExprKind::Member {
@@ -216,16 +237,9 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
                         },
                     );
                 } else {
-                    let prop_name = s.lexeme().to_owned();
-                    let prop_tok = s.consume();
-                    let prop_range = prop_tok.range;
+                    let prop_expr = parse_property_name(s);
+                    let prop_range = *prop_expr.range();
                     let start_range = *expr.range();
-                    let prop_expr = s.expr(
-                        prop_range,
-                        ExprKind::Identifier {
-                            name: prop_name.into(),
-                        },
-                    );
                     expr = s.expr(
                         start_range.to(prop_range),
                         ExprKind::Member {

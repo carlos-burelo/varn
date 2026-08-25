@@ -1,4 +1,4 @@
-use crate::binder::BindResult;
+use crate::binder::{BindResult, BindView};
 use crate::checker_call_types::infer_call_type;
 use crate::checker_enrichment::index::EnrichContext;
 use crate::types::Type;
@@ -10,7 +10,7 @@ pub(super) fn collect_inferred_return_types_raw(
     ctx: &EnrichContext,
     sym_map: &FxHashMap<Rc<str>, Type>,
     stmt: &Stmt,
-    bind: &BindResult,
+    bind: &BindView,
     current_class: Option<&str>,
 ) -> Vec<Type> {
     let mut results = Vec::new();
@@ -22,7 +22,7 @@ fn collect_returns_recursive(
     ctx: &EnrichContext,
     sym_map: &FxHashMap<Rc<str>, Type>,
     stmt: &Stmt,
-    bind: &BindResult,
+    bind: &BindView,
     current_class: Option<&str>,
     results: &mut Vec<Type>,
 ) {
@@ -99,9 +99,10 @@ pub(super) fn enrich_stmts_for_vars(
     sym_map: &mut FxHashMap<Rc<str>, Type>,
     stmt: &Stmt,
     bind: &mut BindResult,
+    resolver: &dyn crate::module_resolver::ImportResolver,
     current_class: Option<&str>,
 ) {
-    enrich_vars_recursive(ctx, sym_map, stmt, bind, current_class);
+    enrich_vars_recursive(ctx, sym_map, stmt, bind, resolver, current_class);
 }
 
 fn enrich_vars_recursive(
@@ -109,6 +110,7 @@ fn enrich_vars_recursive(
     sym_map: &mut FxHashMap<Rc<str>, Type>,
     stmt: &Stmt,
     bind: &mut BindResult,
+    resolver: &dyn crate::module_resolver::ImportResolver,
     current_class: Option<&str>,
 ) {
     match &stmt.kind {
@@ -140,7 +142,7 @@ fn enrich_vars_recursive(
                         &ctx.class_methods,
                         sym_map,
                         init,
-                        Some(bind),
+                        Some(&BindView::new(bind, resolver)),
                         current_class,
                     );
                     if let Some(t) = ty {
@@ -152,7 +154,7 @@ fn enrich_vars_recursive(
         }
         StmtKind::Block { stmts } => {
             for s in stmts {
-                enrich_vars_recursive(ctx, sym_map, s, bind, current_class);
+                enrich_vars_recursive(ctx, sym_map, s, bind, resolver, current_class);
             }
         }
         StmtKind::If {
@@ -160,23 +162,23 @@ fn enrich_vars_recursive(
             alternate,
             ..
         } => {
-            enrich_vars_recursive(ctx, sym_map, consequent, bind, current_class);
+            enrich_vars_recursive(ctx, sym_map, consequent, bind, resolver, current_class);
             if let Some(alt) = alternate {
-                enrich_vars_recursive(ctx, sym_map, alt, bind, current_class);
+                enrich_vars_recursive(ctx, sym_map, alt, bind, resolver, current_class);
             }
         }
         StmtKind::While { body, .. } | StmtKind::DoWhile { body, .. } => {
-            enrich_vars_recursive(ctx, sym_map, body, bind, current_class);
+            enrich_vars_recursive(ctx, sym_map, body, bind, resolver, current_class);
         }
         StmtKind::For { body, .. }
         | StmtKind::ForIn { body, .. }
         | StmtKind::ForOf { body, .. } => {
-            enrich_vars_recursive(ctx, sym_map, body, bind, current_class);
+            enrich_vars_recursive(ctx, sym_map, body, bind, resolver, current_class);
         }
         StmtKind::Switch { cases, .. } => {
             for case in cases {
                 for s in &case.body {
-                    enrich_vars_recursive(ctx, sym_map, s, bind, current_class);
+                    enrich_vars_recursive(ctx, sym_map, s, bind, resolver, current_class);
                 }
             }
         }
@@ -185,16 +187,16 @@ fn enrich_vars_recursive(
             catch,
             finally,
         } => {
-            enrich_vars_recursive(ctx, sym_map, block, bind, current_class);
+            enrich_vars_recursive(ctx, sym_map, block, bind, resolver, current_class);
             if let Some(c) = catch {
-                enrich_vars_recursive(ctx, sym_map, &c.body, bind, current_class);
+                enrich_vars_recursive(ctx, sym_map, &c.body, bind, resolver, current_class);
             }
             if let Some(f) = finally {
-                enrich_vars_recursive(ctx, sym_map, f, bind, current_class);
+                enrich_vars_recursive(ctx, sym_map, f, bind, resolver, current_class);
             }
         }
         StmtKind::Labeled { body, .. } => {
-            enrich_vars_recursive(ctx, sym_map, body, bind, current_class);
+            enrich_vars_recursive(ctx, sym_map, body, bind, resolver, current_class);
         }
         _ => {}
     }

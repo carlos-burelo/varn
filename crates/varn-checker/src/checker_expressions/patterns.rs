@@ -3,7 +3,7 @@ use crate::checker::Checker;
 use crate::types::Type;
 use varn_core::TypeKind;
 
-impl Checker {
+impl<'r> Checker<'r> {
     pub(crate) fn check_pattern(
         &mut self,
         pattern: &varn_core::ast::Pattern,
@@ -156,8 +156,8 @@ impl Checker {
         let mut def_bind: Option<std::rc::Rc<BindResult>> = None;
         if fields.is_none() {
             if let Some(o) = &origin {
-                let mb = crate::module_resolver::resolve_module_bind_ref(o.as_ref())
-                    .or_else(|| crate::module_resolver::resolve_stdlib_module_bind_ref(o.as_ref()));
+                let mb = self.resolver.module_bind(o.as_ref())
+                    .or_else(|| self.resolver.stdlib_bind(o.as_ref()));
                 if let Some(mb) = mb {
                     fields = mb.sum_variant_fields.get(variant).cloned();
                     def_bind = Some(mb);

@@ -5,7 +5,7 @@ use crate::types::Type;
 use varn_core::ast::{ForInit, Stmt, StmtKind};
 use varn_core::{Diagnostic, ErrorCode, TypeKind, TypeTag};
 
-impl Checker {
+impl<'r> Checker<'r> {
     pub(crate) fn check_stmts(&mut self, stmts: &[Stmt], bind: &BindResult) {
         self.check_stmts_with_guards(stmts, bind);
     }

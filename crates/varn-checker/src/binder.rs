@@ -16,15 +16,19 @@ pub(crate) mod type_inference;
 mod type_resolution;
 mod types;
 
-use crate::module_resolver::resolve_module_bind_ref;
+use crate::module_resolver::ImportResolver;
 pub use crate::types::{ClassMemberInfo, ClassMemberKind, TypeContext};
 pub use inference_utils::build_fn_type;
 pub use type_inference::{infer_expr_type, pattern_lead_name, widen_literal};
 pub use type_resolution::{resolve_primitive, resolve_type_node};
-pub use types::{BindResult, Extensions, PendingEnrich, TypeMembers};
+pub use types::{BindResult, BindView, Extensions, PendingEnrich, TypeMembers};
 use varn_core::ast::{Pattern, TypeNode, VarKind};
 
-pub struct Binder {
+pub struct Binder<'r> {
+    /// How this binder reaches other modules. Borrowed, not owned: the
+    /// resolver constructs binders while binding a module's imports, so an
+    /// owning handle would make the ownership circular.
+    pub(crate) resolver: &'r dyn ImportResolver,
     pub(crate) arena: SymbolArena,
     pub(crate) scopes: ScopeArena,
     pub(crate) current: ScopeId,
@@ -44,7 +48,11 @@ pub struct Binder {
     pub(crate) evolved_array_types: FxHashMap<u32, Type>,
 }
 
-impl TypeContext for Binder {
+impl TypeContext for Binder<'_> {
+    fn resolver(&self) -> Option<&dyn crate::module_resolver::ImportResolver> {
+        Some(self.resolver)
+    }
+
     fn get_interface_members(
         &self,
         name: &str,
@@ -52,7 +60,7 @@ impl TypeContext for Binder {
     ) -> Option<Vec<ClassMemberInfo>> {
         if let Some(origin) = origin {
             if origin != self.source_file.as_ref() {
-                if let Some(rb) = resolve_module_bind_ref(origin) {
+                if let Some(rb) = self.resolver.module_bind(origin) {
                     return rb.type_members.interfaces.get(name).cloned();
                 }
             }
@@ -63,7 +71,7 @@ impl TypeContext for Binder {
     fn get_class_members(&self, name: &str, origin: Option<&str>) -> Option<Vec<ClassMemberInfo>> {
         if let Some(origin) = origin {
             if origin != self.source_file.as_ref() {
-                if let Some(rb) = resolve_module_bind_ref(origin) {
+                if let Some(rb) = self.resolver.module_bind(origin) {
                     return rb.type_members.classes.get(name).map(|e| e.members.clone());
                 }
             }
@@ -81,7 +89,7 @@ impl TypeContext for Binder {
     ) -> Option<Vec<ClassMemberInfo>> {
         if let Some(origin) = origin {
             if origin != self.source_file.as_ref() {
-                if let Some(rb) = resolve_module_bind_ref(origin) {
+                if let Some(rb) = self.resolver.module_bind(origin) {
                     return rb.type_members.namespaces.get(name).cloned();
                 }
             }
@@ -92,7 +100,7 @@ impl TypeContext for Binder {
     fn get_enum_members(&self, name: &str, origin: Option<&str>) -> Option<Vec<ClassMemberInfo>> {
         if let Some(origin) = origin {
             if origin != self.source_file.as_ref() {
-                if let Some(rb) = resolve_module_bind_ref(origin) {
+                if let Some(rb) = self.resolver.module_bind(origin) {
                     return rb.type_members.enums.get(name).cloned();
                 }
             }
@@ -122,28 +130,35 @@ impl TypeContext for Binder {
     }
 }
 
-impl Binder {
-    pub fn bind(program: &Program) -> BindResult {
-        Self::bind_with_globals_iter(program, FxHashMap::default())
+impl<'r> Binder<'r> {
+    pub fn bind(program: &Program, resolver: &'r dyn ImportResolver) -> BindResult {
+        Self::bind_with_globals_iter(program, resolver, FxHashMap::default())
     }
 
     pub fn bind_with_global_refs(
         program: &Program,
+        resolver: &'r dyn ImportResolver,
         globals: &FxHashMap<Rc<str>, Symbol>,
     ) -> BindResult {
         Self::bind_with_globals_iter(
             program,
+            resolver,
             globals
                 .iter()
                 .map(|(name, sym)| (name.clone(), sym.clone())),
         )
     }
 
-    fn bind_with_globals_iter<I>(program: &Program, globals: I) -> BindResult
+    fn bind_with_globals_iter<I>(
+        program: &Program,
+        resolver: &'r dyn ImportResolver,
+        globals: I,
+    ) -> BindResult
     where
         I: IntoIterator<Item = (Rc<str>, Symbol)>,
     {
         let mut b = Binder {
+            resolver,
             arena: SymbolArena::default(),
             scopes: ScopeArena::default(),
             current: 0,

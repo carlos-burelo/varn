@@ -9,6 +9,10 @@ pub(super) struct InferBindingContext<'a> {
 }
 
 impl TypeContext for InferBindingContext<'_> {
+    fn resolver(&self) -> Option<&dyn crate::module_resolver::ImportResolver> {
+        self.inner.and_then(|c| c.resolver())
+    }
+
     fn resolve_symbol(&self, name: &str) -> Option<Type> {
         if let Some(ty) = self.bindings.get(name) {
             return Some(ty.clone());
@@ -80,6 +84,10 @@ pub(super) struct MappedContext<'a> {
 }
 
 impl TypeContext for MappedContext<'_> {
+    fn resolver(&self) -> Option<&dyn crate::module_resolver::ImportResolver> {
+        self.inner.and_then(|c| c.resolver())
+    }
+
     fn resolve_symbol(&self, name: &str) -> Option<Type> {
         if name == self.key_var {
             return Some(self.key_value.clone());
@@ -125,6 +133,10 @@ pub(super) struct AliasSubstitutionContext<'a> {
 }
 
 impl TypeContext for AliasSubstitutionContext<'_> {
+    fn resolver(&self) -> Option<&dyn crate::module_resolver::ImportResolver> {
+        self.inner.and_then(|c| c.resolver())
+    }
+
     fn resolve_symbol(&self, name: &str) -> Option<Type> {
         if let Some(pos) = self.params.iter().position(|p| p == name) {
             return Some(self.args[pos].clone());

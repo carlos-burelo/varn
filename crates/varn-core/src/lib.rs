@@ -14,6 +14,7 @@ pub mod opcode;
 pub mod paths;
 pub mod source;
 pub mod token;
+pub mod trivia;
 pub mod type_tag;
 pub mod typed_ir;
 pub mod well_known;
@@ -36,6 +37,7 @@ use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 pub use token::{ParsedNumber, Token, TokenKind};
+pub use trivia::{Trivia, TriviaKind};
 pub use type_tag::{TypeTag, VmValuePayload};
 pub use typed_ir::{AnnKey, ExprAnnotation, NumericKind, TypeAnnotations};
 

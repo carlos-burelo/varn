@@ -4,7 +4,7 @@ use crate::types::{FunctionType, ObjectTypeMember, Type, TypeContext};
 use varn_core::ast::{ArrayEl, ObjectProp, Param, PropKey};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
-impl Checker {
+impl<'r> Checker<'r> {
     pub(super) fn apply_contextual_arrow_params(
         &mut self,
         params: &[Param],
@@ -81,11 +81,12 @@ impl Checker {
                 let resolved = match &ty.0 {
                     TypeKind::Object(m) => m.clone(),
                     TypeKind::Named(name, origin) | TypeKind::Generic(name, _, origin) => {
-                        let members = bind
+                        let view = crate::binder::BindView::new(bind, self.resolver);
+                        let members = view
                             .get_class_members(name, origin.as_deref())
-                            .or_else(|| bind.get_interface_members(name, origin.as_deref()))
-                            .or_else(|| bind.get_namespace_members(name, origin.as_deref()))
-                            .or_else(|| bind.get_enum_members(name, origin.as_deref()))
+                            .or_else(|| view.get_interface_members(name, origin.as_deref()))
+                            .or_else(|| view.get_namespace_members(name, origin.as_deref()))
+                            .or_else(|| view.get_enum_members(name, origin.as_deref()))
                             .unwrap_or_default();
 
                         members

@@ -77,7 +77,7 @@ pub(super) fn op_str(op: &BinaryOp) -> &'static str {
     }
 }
 
-impl Checker {
+impl<'r> Checker<'r> {
     pub(crate) fn is_subclass_or_same(
         &self,
         candidate: &str,

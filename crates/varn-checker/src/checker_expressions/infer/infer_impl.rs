@@ -8,7 +8,7 @@ use varn_core::{Diagnostic, ErrorCode, IntrinsicType, TypeKind, TypeTag};
 
 use super::member_binary::{infer_binary_type, infer_member_type};
 
-impl Checker {
+impl<'r> Checker<'r> {
     pub(super) fn infer_type_impl(&mut self, expr: &Expr, bind: &BindResult) -> Type {
         match &expr.kind {
             ExprKind::Identifier { name } => {
@@ -26,7 +26,9 @@ impl Checker {
                         return ty;
                     }
                 }
-                bind.resolve_symbol(name.as_ref()).unwrap_or(Type::Dynamic)
+                crate::binder::BindView::new(bind, self.resolver)
+                    .resolve_symbol(name.as_ref())
+                    .unwrap_or(Type::Dynamic)
             }
             ExprKind::This => self
                 .current_class
@@ -355,6 +357,10 @@ impl Checker {
                     _ => res,
                 }
             }
+            // A hole the parser left where the source had no expression. The
+            // syntax error is already reported; typing it as `Dynamic` lets the
+            // enclosing declaration still bind and still answer editor queries.
+            ExprKind::Missing => Type::Dynamic,
             _ => Type::Dynamic,
         }
     }

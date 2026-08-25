@@ -3,11 +3,10 @@ use varn_core::ast::{Pattern, SumTypeDecl};
 
 use super::super::type_inference::infer_expr_type;
 use super::super::type_resolution::resolve_type_node;
-use crate::module_resolver;
 use crate::symbol::{Symbol, SymbolKind};
 use crate::types::Type;
 
-impl super::super::Binder {
+impl<'r> super::super::Binder<'r> {
     pub(crate) fn bind_pattern(
         &mut self,
         pattern: &Pattern,
@@ -100,7 +99,7 @@ impl super::super::Binder {
                                     }
                                     let origin_path = origin.as_deref()?;
                                     let mut visiting = vec![self.source_file.to_string()];
-                                    let exports = module_resolver::resolve_module_exports_ref(
+                                    let exports = self.resolver.module_exports(
                                         origin_path,
                                         &mut visiting,
                                     );

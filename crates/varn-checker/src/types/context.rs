@@ -25,4 +25,14 @@ pub trait TypeContext {
     fn get_extension_method(&self, _type_name: &str, _method_name: &str) -> Option<Type> {
         None
     }
+
+    /// How this context reaches other modules, when it can.
+    ///
+    /// Type resolution has to expand generic aliases declared in `std:types`,
+    /// which means resolving a module from inside the type resolver. Exposing
+    /// it here keeps that a property of the context that was passed in, rather
+    /// than something the resolver reaches for globally.
+    fn resolver(&self) -> Option<&dyn crate::module_resolver::ImportResolver> {
+        None
+    }
 }

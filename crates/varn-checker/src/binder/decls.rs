@@ -14,7 +14,7 @@ fn type_only(kind: crate::symbol::SymbolKind) -> bool {
     matches!(kind, K::Interface | K::TypeAlias)
 }
 
-impl super::Binder {
+impl<'r> super::Binder<'r> {
     pub(super) fn bind_decl(&mut self, decl: &Decl) {
         match decl {
             Decl::Variable(v) => self.bind_variable(v),
@@ -110,6 +110,10 @@ impl super::Binder {
 
     pub(super) fn bind_expr(&mut self, expr: &Expr) {
         match &expr.kind {
+            // A hole binds nothing, but its parent still binds normally — that
+            // is the whole point of keeping the node instead of dropping the
+            // statement that contains it.
+            ExprKind::Missing => {}
             ExprKind::Arrow {
                 params,
                 return_type,

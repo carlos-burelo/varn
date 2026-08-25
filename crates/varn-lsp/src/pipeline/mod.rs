@@ -1,3 +1,4 @@
+use varn_checker::module_resolver::ImportResolver;
 mod extensions;
 mod format;
 mod params;
@@ -10,7 +11,7 @@ use crate::document::{
     uri_to_path, DocumentAnalysis, LspDiag, RelatedLocation, SymbolRecord, TokenRecord,
 };
 use varn_checker::types::FunctionType;
-use varn_checker::{module_resolver, SymbolKind};
+use varn_checker::SymbolKind;
 use varn_core::ast::{Decl, Stmt, StmtKind};
 use varn_core::{DiagnosticKind, TokenKind, TypeKind};
 
@@ -57,7 +58,10 @@ fn stable_global_key(
 pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     varn_builtins::register_provider();
     let path = uri_to_path(&uri);
-    let (raw_tokens, lexeme_buf, lex_errs) = varn_lexer::scan(&source, &path);
+    // `scan_with_trivia`, not `scan`: the editor has to reproduce the source
+    // (comment folding today, formatting later), and comments are the one part
+    // the scanner would otherwise drop unrecoverably.
+    let (raw_tokens, lexeme_buf, lex_errs, trivia) = varn_lexer::scan_with_trivia(&source, &path);
 
     let mut diagnostics: Vec<LspDiag> = Vec::new();
     for e in lex_errs {
@@ -118,7 +122,9 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     }
 
     varn_core::assign_ast_ids(&mut program);
-    let result = varn_checker::Checker::check_with(&program, varn_checker::CheckOptions::tooling());
+    let result = crate::workspace::resolver::with_resolver(|r| {
+        varn_checker::Checker::check_with(&program, r, varn_checker::CheckOptions::tooling())
+    });
 
     for d in &result.diagnostics {
         let severity = match d.kind {
@@ -189,9 +195,9 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
             || origin.starts_with("runtime:")
             || origin.starts_with("core:")
         {
-            module_resolver::resolve_stdlib_module_bind_ref(origin)
+            crate::workspace::resolver::with_resolver(|r| r.stdlib_bind(origin))
         } else {
-            module_resolver::resolve_module_bind_ref(origin)
+            crate::workspace::resolver::with_resolver(|r| r.module_bind(origin))
         }
     }
 
@@ -221,7 +227,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
                     .map(|ms| symbols::map_enum_members(ms, &tokens))
                     .or_else(|| {
                         sym.origin_module.as_ref().and_then(|origin| {
-                            module_resolver::resolve_module_bind(origin).and_then(|rb| {
+                            crate::workspace::resolver::with_resolver(|r| r.module_bind(origin)).map(|b| (*b).clone()).and_then(|rb| {
                                 rb.get_enum_members_local(
                                     sym.original_name.as_ref().unwrap_or(&sym.name),
                                 )
@@ -250,7 +256,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
                     })
                     .or_else(|| {
                         sym.origin_module.as_ref().and_then(|origin| {
-                            module_resolver::resolve_module_bind(origin).and_then(|rb| {
+                            crate::workspace::resolver::with_resolver(|r| r.module_bind(origin)).map(|b| (*b).clone()).and_then(|rb| {
                                 let name = sym.original_name.as_ref().unwrap_or(&sym.name);
                                 rb.get_flattened_members(name)
                                     .or_else(|| rb.get_class_entry(name).map(|e| &e.members))
@@ -292,7 +298,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
                     .map(|ms| symbols::map_members(ms, &tokens))
                     .or_else(|| {
                         sym.origin_module.as_ref().and_then(|origin| {
-                            module_resolver::resolve_module_bind(origin).and_then(|rb| {
+                            crate::workspace::resolver::with_resolver(|r| r.module_bind(origin)).map(|b| (*b).clone()).and_then(|rb| {
                                 rb.type_members
                                     .namespaces
                                     .get(sym.original_name.as_ref().unwrap_or(&sym.name))
@@ -446,6 +452,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         diagnostics,
         symbols: all_symbols,
         tokens,
+        trivia,
         symbol_map,
         type_param_names,
         db,

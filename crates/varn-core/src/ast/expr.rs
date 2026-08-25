@@ -51,6 +51,17 @@ pub enum ExprKind {
     Identifier {
         name: Rc<str>,
     },
+    /// A hole where an expression was expected but the source did not supply
+    /// one — `g.` with nothing after the dot, `const x = ` with no initializer.
+    ///
+    /// The parser emits this instead of failing so the enclosing construct
+    /// still parses and still binds its symbols; that is what lets the editor
+    /// answer questions about half-typed code. The parser has already reported
+    /// the syntax error, so the checker types this as `Dynamic` **silently** —
+    /// a second diagnostic here would paint the file red while typing.
+    ///
+    /// The compiler must reject it before lowering: it is never executable.
+    Missing,
     This,
     Super,
     Array {

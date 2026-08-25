@@ -10,7 +10,12 @@ use varn_core::TypeKind;
 /// and additionally follows `origin` into the declaring module: a generic type
 /// can flow in as a call's return type (`channel<int>()` -> `Channel<int>`)
 /// without `Channel` itself ever being imported here.
-fn class_type_params(name: &str, origin: Option<&Rc<str>>, bind: &BindResult) -> Vec<Rc<str>> {
+fn class_type_params(
+    resolver: &dyn crate::module_resolver::ImportResolver,
+    name: &str,
+    origin: Option<&Rc<str>>,
+    bind: &BindResult,
+) -> Vec<Rc<str>> {
     let local = params_in(name, bind);
     if !local.is_empty() {
         return local;
@@ -23,12 +28,12 @@ fn class_type_params(name: &str, origin: Option<&Rc<str>>, bind: &BindResult) ->
         return params.clone();
     }
     let origins: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
-    if let Some(b) = crate::module_resolver::find_module_bind_for_type_ref(name, &origins) {
+    if let Some(b) = resolver.find_bind_for_type(name, &origins) {
         return params_in(name, &b);
     }
     if origin.is_none() {
         for spec in varn_modules::std_module_ids() {
-            if let Some(b) = crate::module_resolver::resolve_stdlib_module_bind_ref(spec) {
+            if let Some(b) = resolver.stdlib_bind(spec) {
                 let params = params_in(name, &b);
                 if !params.is_empty() {
                     return params;
@@ -50,6 +55,7 @@ fn params_in(name: &str, bind: &BindResult) -> Vec<Rc<str>> {
 /// `{ T -> int }` for a `Generic("Channel", [int])` receiver. Empty when the
 /// class declares no parameters or the receiver carries no arguments.
 pub(crate) fn generic_mapping(
+    resolver: &dyn crate::module_resolver::ImportResolver,
     name: &str,
     args: &[Type],
     origin: Option<&Rc<str>>,
@@ -58,7 +64,7 @@ pub(crate) fn generic_mapping(
     if args.is_empty() {
         return FxHashMap::default();
     }
-    class_type_params(name, origin, bind)
+    class_type_params(resolver, name, origin, bind)
         .into_iter()
         .zip(args.iter().cloned())
         .collect()
@@ -116,7 +122,7 @@ fn intrinsic_member_info(
         })
 }
 
-impl Checker {
+impl<'r> Checker<'r> {
     pub(crate) fn find_member_info(
         &mut self,
         ty: &Type,
@@ -165,12 +171,12 @@ impl Checker {
                 if name.as_ref() == "*" {
                     if let Some(origin_path) = origin {
                         let exports = if crate::module_resolver::is_known_module(origin_path) {
-                            Some(crate::module_resolver::resolve_stdlib_module_exports_ref(
+                            Some(self.resolver.stdlib_exports(
                                 origin_path,
                             ))
                         } else {
                             let mut visiting = Vec::new();
-                            Some(crate::module_resolver::resolve_module_exports_ref(
+                            Some(self.resolver.module_exports(
                                 origin_path,
                                 &mut visiting,
                             ))
@@ -200,7 +206,7 @@ impl Checker {
                         .core
                         .as_ref()
                         .map_or(false, |b| b.enum_members.contains_key(name.as_ref()))
-                    || crate::module_resolver::find_module_bind_for_type_ref(name, &origin_modules)
+                    || self.resolver.find_bind_for_type(name, &origin_modules)
                         .as_ref()
                         .map_or(false, |eb| {
                             eb.get_enum_members_local(name.as_ref()).is_some()
@@ -223,7 +229,7 @@ impl Checker {
                         variants.extend(members.iter().map(|m| m.name.clone()));
                     }
                     if let Some(ext_bind) =
-                        crate::module_resolver::find_module_bind_for_type_ref(name, &origin_modules)
+                        self.resolver.find_bind_for_type(name, &origin_modules)
                     {
                         if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
                             variants.extend(members.iter().map(|m| m.name.clone()));
@@ -239,7 +245,7 @@ impl Checker {
                             }
                         }
                         if let Some(ext_bind) =
-                            crate::module_resolver::find_module_bind_for_type_ref(
+                            self.resolver.find_bind_for_type(
                                 name,
                                 &origin_modules,
                             )
@@ -302,7 +308,7 @@ impl Checker {
 
                 let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
                 let ext_bind_opt =
-                    crate::module_resolver::find_module_bind_for_type_ref(name, &origin_modules);
+                    self.resolver.find_bind_for_type(name, &origin_modules);
                 let candidates: Box<dyn Iterator<Item = Rc<crate::binder::BindResult>>> =
                     if let Some(b) = ext_bind_opt {
                         Box::new(std::iter::once(b))
@@ -311,7 +317,7 @@ impl Checker {
                             varn_modules::std_module_ids()
                                 .into_iter()
                                 .filter_map(|spec| {
-                                    crate::module_resolver::resolve_stdlib_module_bind_ref(spec)
+                                    self.resolver.stdlib_bind(spec)
                                 }),
                         )
                     } else {
@@ -351,7 +357,7 @@ impl Checker {
                 // an unbound `T`.
                 self.find_member_info_uncached(&base, key, bind)
                     .map(|(member_ty, sym)| {
-                        let mapping = generic_mapping(name.as_ref(), args, origin.as_ref(), bind);
+                        let mapping = generic_mapping(self.resolver, name.as_ref(), args, origin.as_ref(), bind);
                         if mapping.is_empty() {
                             (member_ty, sym)
                         } else {
@@ -491,12 +497,12 @@ impl Checker {
                 if name.as_ref() == "*" {
                     if let Some(origin_path) = origin {
                         let exports = if crate::module_resolver::is_known_module(origin_path) {
-                            Some(crate::module_resolver::resolve_stdlib_module_exports_ref(
+                            Some(self.resolver.stdlib_exports(
                                 origin_path,
                             ))
                         } else {
                             let mut visiting = Vec::new();
-                            Some(crate::module_resolver::resolve_module_exports_ref(
+                            Some(self.resolver.module_exports(
                                 origin_path,
                                 &mut visiting,
                             ))
@@ -538,7 +544,7 @@ impl Checker {
                     if let Some(m) = entry.members.iter().find(|m| m.name.as_ref() == key) {
                         // Same substitution as `find_member_info_uncached`: the
                         // member's type is written in the class's parameters.
-                        let mapping = generic_mapping(name.as_ref(), args, origin.as_ref(), bind);
+                        let mapping = generic_mapping(self.resolver, name.as_ref(), args, origin.as_ref(), bind);
                         return Some(ObjectTypeMember::Property {
                             name: m.name.clone(),
                             ty: if mapping.is_empty() {

@@ -1,5 +1,6 @@
 //! Benchmarking a `.vn` source file through the full pipeline.
 
+use varn_checker::module_resolver::ImportResolver;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
@@ -105,7 +106,9 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     // reported breakdown described a check that also built the per-expression
     // type table, which a real compile never builds. `profile` is filled by
     // every check, so nothing is lost by asking for the right one.
-    let check_result = Checker::check_with(&program, varn_checker::CheckOptions::compile());
+    let check_result = varn_pipeline::resolver::with_resolver(|r| {
+        Checker::check_with(&program, r, varn_checker::CheckOptions::compile())
+    });
 
     let optimize_samples = std::cell::RefCell::new(Vec::with_capacity(runs));
     let compile_samples = time_n(runs, || {
@@ -253,7 +256,9 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
 
         varn_core::assign_ast_ids(&mut program);
 
-        let check_result = Checker::check_with(&program, varn_checker::CheckOptions::compile());
+        let check_result = varn_pipeline::resolver::with_resolver(|r| {
+        Checker::check_with(&program, r, varn_checker::CheckOptions::compile())
+    });
 
         let mut proto = varn_compiler::compile_module(
             &program,
@@ -368,7 +373,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
 }
 
 fn export_names_of(filename: &str) -> Vec<Rc<str>> {
-    let exports = varn_checker::module_resolver::resolve_module_exports_ref(filename, &mut vec![]);
+    let exports = varn_pipeline::resolver::with_resolver(|r| r.module_exports(filename, &mut vec![]));
     let mut names: Vec<Rc<str>> = exports.keys().map(|k| Rc::from(k.as_str())).collect();
     names.sort();
     names

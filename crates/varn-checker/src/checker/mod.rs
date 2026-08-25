@@ -2,7 +2,7 @@ pub(crate) mod compat;
 mod decls;
 mod refine;
 mod stmts;
-use crate::binder::{BindResult, Binder};
+use crate::binder::{BindResult, BindView, Binder};
 use crate::scope::ScopeId;
 use crate::symbol::SymbolId;
 use crate::types::{ObjectTypeMember, Type};
@@ -130,7 +130,11 @@ pub struct CheckProfile {
     pub finalize: Duration,
 }
 
-pub struct Checker {
+pub struct Checker<'r> {
+    /// How this checker reaches other modules. Borrowed for the duration of one
+    /// check, so the checker owns no module cache and nothing it holds can go
+    /// stale behind another thread's invalidation.
+    pub(crate) resolver: &'r dyn crate::module_resolver::ImportResolver,
     pub(crate) diagnostics: varn_core::DiagnosticBag,
     pub(crate) source_file: std::rc::Rc<str>,
     pub(crate) current_scope: crate::scope::ScopeId,
@@ -216,18 +220,33 @@ impl CheckOptions {
     }
 }
 
-impl Checker {
+impl<'r> Checker<'r> {
     /// Check `program` for a compile. See [`Checker::check_with`] for tooling.
-    pub fn check(program: &Program) -> CheckResult {
-        Self::check_with(program, CheckOptions::compile())
+    ///
+    /// `resolver` supplies the modules `program` imports. It is a parameter
+    /// rather than ambient state so that a check is a function of its
+    /// arguments: two callers with different module graphs cannot interfere,
+    /// and nothing the checker consults can be invalidated behind its back.
+    pub fn check(program: &Program, resolver: &'r dyn crate::module_resolver::ImportResolver) -> CheckResult {
+        Self::check_with(program, resolver, CheckOptions::compile())
     }
 
-    pub fn check_with(program: &Program, options: CheckOptions) -> CheckResult {
-        Self::check_internal(program, options.record_types, options.warn_implicit_dynamic)
+    pub fn check_with(
+        program: &Program,
+        resolver: &'r dyn crate::module_resolver::ImportResolver,
+        options: CheckOptions,
+    ) -> CheckResult {
+        Self::check_internal(
+            program,
+            resolver,
+            options.record_types,
+            options.warn_implicit_dynamic,
+        )
     }
 
     fn check_internal(
         program: &Program,
+        resolver: &'r dyn crate::module_resolver::ImportResolver,
         record_expr_types: bool,
         warn_implicit_dynamic: bool,
     ) -> CheckResult {
@@ -236,7 +255,7 @@ impl Checker {
         let is_builtin = crate::core::is_core_file(&program.filename);
         let globals_ref = if !is_builtin {
             let started = Instant::now();
-            let globals = crate::core::global_exports_ref();
+            let globals = resolver.core_exports();
             profile.load_globals = started.elapsed();
             Some(globals)
         } else {
@@ -245,22 +264,23 @@ impl Checker {
 
         let started = Instant::now();
         let mut bind = match globals_ref {
-            Some(globals) => Binder::bind_with_global_refs(program, &globals),
-            None => Binder::bind(program),
+            Some(globals) => Binder::bind_with_global_refs(program, resolver, &globals),
+            None => Binder::bind(program, resolver),
         };
         profile.bind = started.elapsed();
 
         let started = Instant::now();
-        crate::core::merge_core_members(&mut bind);
+        crate::core::merge_core_members(&mut bind, resolver);
         profile.merge_core_members = started.elapsed();
 
         let started = Instant::now();
-        enrich_call_returns(&mut bind);
+        enrich_call_returns(&mut bind, resolver);
         profile.enrich_call_returns = started.elapsed();
 
         let source_file: std::rc::Rc<str> = std::rc::Rc::from(bind.source_file.as_ref());
 
         let mut checker = Checker {
+            resolver,
             current_scope: bind.global_scope,
             diagnostics: varn_core::DiagnosticBag::new(),
             source_file: source_file.clone(),
@@ -375,7 +395,7 @@ impl Checker {
 
         let started = Instant::now();
         let expr_table = std::mem::take(&mut checker.expr_table);
-        let mut annotations = collect_type_annotations(program, &bind, &expr_table);
+        let mut annotations = collect_type_annotations(program, &bind, resolver, &expr_table);
 
         for (k, v) in checker.call_mappings {
             annotations.record_call_mapping(varn_core::AnnKey::expr(k), v);
@@ -529,7 +549,16 @@ impl Checker {
         inferred: &Type,
         bind: Option<&BindResult>,
     ) -> bool {
-        compat::types_compatible_with_cache(declared, inferred, bind, &mut self.compat_cache)
+        // The view is built here, at the one funnel every caller passes
+        // through, so none of the 22 call sites has to carry a resolver.
+        let resolver = self.resolver;
+        let view = bind.map(|b| BindView::new(b, resolver));
+        compat::types_compatible_with_cache(
+            declared,
+            inferred,
+            view.as_ref(),
+            &mut self.compat_cache,
+        )
     }
 
     pub(crate) fn mark_infer_env_dirty(&mut self) {
@@ -548,7 +577,8 @@ impl Checker {
         if let Some(cached) = self.type_node_cache.get(&key) {
             return cached.clone();
         }
-        let resolved = crate::binder::resolve_type_node(node, Some(bind));
+        let view = crate::binder::BindView::new(bind, self.resolver);
+        let resolved = crate::binder::resolve_type_node(node, Some(&view));
         self.type_node_cache.insert(key, resolved.clone());
         resolved
     }

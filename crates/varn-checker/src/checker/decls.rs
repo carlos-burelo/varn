@@ -2,11 +2,11 @@ use std::rc::Rc;
 
 use crate::binder::BindResult;
 use crate::checker::Checker;
-use crate::types::{ClassMemberKind, Type, TypeContext};
+use crate::types::{ClassMemberKind, Type};
 use varn_core::ast::{ClassMember, Decl, ExprKind, ExtensionMember};
 use varn_core::{Diagnostic, ErrorCode, TypeKind};
 
-impl Checker {
+impl<'r> Checker<'r> {
     pub(crate) fn check_decls(&mut self, decls: &[Decl], bind: &BindResult) {
         for decl in decls {
             self.check_decl(decl, bind);
@@ -151,7 +151,7 @@ impl Checker {
                     c.id.as_ref()
                         .and_then(|cls_id| bind.class_parents.get(cls_id));
                 while let Some(parent_name) = parent {
-                    if let Some(m) = bind.get_class_members(parent_name, None) {
+                    if let Some(m) = bind.get_class_entry(parent_name).map(|e| e.members.clone()) {
                         superclass_members.extend(m);
                     }
                     parent = bind.class_parents.get(parent_name);
@@ -443,7 +443,7 @@ impl Checker {
                                 if param_ty.is_dynamic() {
                                     if let Some(ref class_name) = self.current_class {
                                         if let Some(members) =
-                                            bind.get_class_members(class_name, None)
+                                            bind.get_class_entry(class_name).map(|e| e.members.clone())
                                         {
                                             if let Some(m) = members
                                                 .iter()

@@ -4,46 +4,20 @@ use varn_core::{IntrinsicType, TypeKind};
 use super::contexts::AliasSubstitutionContext;
 use super::resolve_type_node;
 
+/// Expand `name<args>` when `name` is a generic alias declared in `std:types`.
+///
+/// The bind comes from the context's resolver, which memoizes it and refuses
+/// to re-enter a module it is already binding — `std:types` resolves type
+/// nodes while binding, and so asks for itself. That guard used to live here
+/// as a thread-local flag beside a thread-local cache of the module.
 pub(super) fn try_stdlib_generic_alias(
     name: &str,
     args: &[Type],
     ctx: Option<&dyn TypeContext>,
 ) -> Option<Type> {
-    use crate::binder::BindResult;
-    use std::cell::Cell;
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    let bind_rc = ctx?.resolver()?.stdlib_bind("std:types")?;
 
-    thread_local! {
-        static STD_TYPES: RefCell<Option<Rc<BindResult>>> = RefCell::new(None);
-        static STD_TYPES_LOADING: Cell<bool> = Cell::new(false);
-    }
-
-    let needs_init = STD_TYPES.with(|c| c.borrow().is_none());
-    if needs_init {
-        let already_loading = STD_TYPES_LOADING.with(|flag| {
-            if flag.get() {
-                true
-            } else {
-                flag.set(true);
-                false
-            }
-        });
-        if already_loading {
-            return None;
-        }
-
-        let resolved = crate::module_resolver::resolve_stdlib_module_bind_ref("std:types");
-        STD_TYPES.with(|c| {
-            *c.borrow_mut() = resolved;
-        });
-        STD_TYPES_LOADING.with(|flag| flag.set(false));
-    }
-
-    let bind_rc = STD_TYPES.with(|c| c.borrow().as_ref().map(Rc::clone))?;
-    let bind = bind_rc.as_ref();
-
-    let (params, alias_node) = bind.get_alias_node(name)?;
+    let (params, alias_node) = bind_rc.get_alias_node_local(name)?;
     if params.is_empty() || params.len() != args.len() {
         return None;
     }

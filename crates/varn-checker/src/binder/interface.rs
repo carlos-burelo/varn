@@ -7,7 +7,7 @@ use std::rc::Rc;
 use varn_core::ast::{InterfaceDecl, InterfaceMember, Pattern};
 use varn_core::TypeKind;
 
-impl super::Binder {
+impl<'r> super::Binder<'r> {
     pub(super) fn bind_interface(&mut self, i: &InterfaceDecl) {
         let name_rc: Rc<str> = Rc::from(i.id.as_ref());
         let origin_rc: Option<Rc<str>> = if self.source_file.is_empty() {

@@ -1,3 +1,4 @@
+use varn_checker::module_resolver::ImportResolver;
 use std::collections::HashMap;
 
 use super::format::extract_enum_init_value;
@@ -123,9 +124,9 @@ pub fn inject_stdlib_symbols(
                 || origin_mod.starts_with("core:")
             {
                 target_bind =
-                    varn_checker::module_resolver::resolve_stdlib_module_bind_ref(origin_mod);
+                    crate::workspace::resolver::with_resolver(|r| r.stdlib_bind(origin_mod));
             } else {
-                target_bind = varn_checker::module_resolver::resolve_module_bind_ref(origin_mod);
+                target_bind = crate::workspace::resolver::with_resolver(|r| r.module_bind(origin_mod));
             }
         }
         let bind_to_use = target_bind.as_ref().map(|b| b.as_ref()).unwrap_or(bind);

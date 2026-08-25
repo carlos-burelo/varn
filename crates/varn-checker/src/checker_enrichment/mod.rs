@@ -2,12 +2,17 @@ mod index;
 mod traverse;
 mod types;
 
-use crate::binder::{BindResult, PendingEnrich};
+use crate::binder::{BindResult, BindView, PendingEnrich};
 use index::build_enrich_context;
 use traverse::{collect_inferred_return_types_raw, enrich_stmts_for_vars};
 use varn_core::ast::{Expr, Stmt};
 
-pub fn enrich_call_returns(bind: &mut BindResult) {
+/// `resolver` is threaded in rather than reached for ambiently: enrichment
+/// infers call return types, which means resolving imported signatures.
+pub fn enrich_call_returns(
+    bind: &mut BindResult,
+    resolver: &dyn crate::module_resolver::ImportResolver,
+) {
     if bind.pending_enrich.is_empty() {
         return;
     }
@@ -34,7 +39,7 @@ pub fn enrich_call_returns(bind: &mut BindResult) {
                     &ctx.class_methods,
                     &sym_map,
                     expr,
-                    Some(bind),
+                    Some(&BindView::new(bind, resolver)),
                     None,
                 );
                 if let Some(t) = ty {
@@ -50,7 +55,7 @@ pub fn enrich_call_returns(bind: &mut BindResult) {
                 is_async,
             } => {
                 let stmt: &Stmt = unsafe { &**body };
-                let inferred = collect_inferred_return_types_raw(&ctx, &sym_map, stmt, bind, None);
+                let inferred = collect_inferred_return_types_raw(&ctx, &sym_map, stmt, &BindView::new(bind, resolver), None);
                 let ret_ty = types::join_types(inferred);
                 if !ret_ty.is_dynamic() {
                     let final_ret = crate::types::async_fn_return(ret_ty, *is_async);
@@ -59,7 +64,7 @@ pub fn enrich_call_returns(bind: &mut BindResult) {
                         ft.return_type = Box::new(final_ret);
                     }
                 }
-                enrich_stmts_for_vars(&ctx, &mut sym_map, stmt, bind, None);
+                enrich_stmts_for_vars(&ctx, &mut sym_map, stmt, bind, resolver, None);
             }
 
             PendingEnrich::Method {
@@ -73,7 +78,7 @@ pub fn enrich_call_returns(bind: &mut BindResult) {
                     &ctx,
                     &sym_map,
                     stmt,
-                    bind,
+                    &BindView::new(bind, resolver),
                     Some(class_name.as_ref()),
                 );
                 let ret = types::join_types(inferred);
@@ -105,7 +110,14 @@ pub fn enrich_call_returns(bind: &mut BindResult) {
                         }
                     }
                 }
-                enrich_stmts_for_vars(&ctx, &mut sym_map, stmt, bind, Some(class_name.as_ref()));
+                enrich_stmts_for_vars(
+                    &ctx,
+                    &mut sym_map,
+                    stmt,
+                    bind,
+                    resolver,
+                    Some(class_name.as_ref()),
+                );
             }
 
             PendingEnrich::Getter {
@@ -118,7 +130,7 @@ pub fn enrich_call_returns(bind: &mut BindResult) {
                     &ctx,
                     &sym_map,
                     stmt,
-                    bind,
+                    &BindView::new(bind, resolver),
                     Some(class_name.as_ref()),
                 );
                 let ret = types::join_types(inferred);
@@ -141,7 +153,14 @@ pub fn enrich_call_returns(bind: &mut BindResult) {
                         }
                     }
                 }
-                enrich_stmts_for_vars(&ctx, &mut sym_map, stmt, bind, Some(class_name.as_ref()));
+                enrich_stmts_for_vars(
+                    &ctx,
+                    &mut sym_map,
+                    stmt,
+                    bind,
+                    resolver,
+                    Some(class_name.as_ref()),
+                );
             }
 
             PendingEnrich::Setter {
@@ -150,7 +169,14 @@ pub fn enrich_call_returns(bind: &mut BindResult) {
                 body,
             } => {
                 let stmt: &Stmt = unsafe { &**body };
-                enrich_stmts_for_vars(&ctx, &mut sym_map, stmt, bind, Some(class_name.as_ref()));
+                enrich_stmts_for_vars(
+                    &ctx,
+                    &mut sym_map,
+                    stmt,
+                    bind,
+                    resolver,
+                    Some(class_name.as_ref()),
+                );
             }
         }
     }

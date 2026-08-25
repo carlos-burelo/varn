@@ -7,7 +7,7 @@ use varn_core::ast::operators::{BinaryOp, UnaryOp};
 use varn_core::ast::{Expr, ExprKind};
 use varn_core::TypeKind;
 
-impl Checker {
+impl<'r> Checker<'r> {
     pub(crate) fn can_extract_narrowings(&self, expr: &Expr) -> bool {
         matches!(
             &expr.kind,
@@ -106,7 +106,7 @@ impl Checker {
                                     "decimal" => Type::Decimal,
                                     "char" => Type::Char,
                                     "null" => Type::Null,
-                                    _ => crate::binder::resolve_primitive(value, Some(bind)),
+                                    _ => crate::binder::resolve_primitive(value, Some(&crate::binder::BindView::new(bind, self.resolver))),
                                 };
                                 narrowings.push((id, narrowed_ty));
                             }
@@ -294,12 +294,12 @@ impl Checker {
                     if let Some(id) = scope.resolve(arg_name, &bind.scopes) {
                         if is_true_branch {
                             let narrowed_ty =
-                                crate::binder::resolve_type_node(type_ann, Some(bind));
+                                crate::binder::resolve_type_node(type_ann, Some(&crate::binder::BindView::new(bind, self.resolver)));
                             narrowings.push((id, narrowed_ty));
                         } else {
                             if let Some(original_ty) = &bind.arena.get(id).ty {
                                 let target_ty =
-                                    crate::binder::resolve_type_node(type_ann, Some(bind));
+                                    crate::binder::resolve_type_node(type_ann, Some(&crate::binder::BindView::new(bind, self.resolver)));
                                 let narrowed = original_ty.minus(&target_ty);
                                 if narrowed != *original_ty {
                                     narrowings.push((id, narrowed));
