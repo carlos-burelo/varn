@@ -272,6 +272,16 @@ mp.values -> (method) Map<int>.values(): int[]
 
 La tabla no podía expresar un callback genérico, y reconstruía `Map<int>` troceando su forma impresa.
 
+**Hecho: una sola construcción de la clave de símbolo, y references/rename sobre miembros.**
+
+Había tres constructores de `global_key`. Dos discrepaban: `stable_global_key` normaliza una ruta desnuda a un `file://` URI y `pipeline/symbols.rs` interpolaba `origin_module` crudo — para cualquier símbolo cuyo origen fuese una ruta, claves que nunca comparan iguales. Latente (ahí el origen siempre es `std:`/`core:`/`runtime:`), pero el contrato declarado no se cumplía. Ahora hay un solo constructor.
+
+El tercero **sí estaba vivo**. `references` y `rename` derivaban el *objetivo* con `symbol_global_key_for_id` (forma `u:`/`m:`) y cada *candidato* con `token_global_key` (forma `member:{tipo}:{nombre}` para miembros de clase). Dos formas para una misma pregunta: sobre un miembro nunca podían comparar iguales, así que **"find all references" sobre un campo devolvía nada y "rename" no editaba nada**, en silencio.
+
+Pasó desapercibido porque sobre una función top-level ambas formas coinciden — y eso es lo primero que se prueba a mano. El arreglo es simetría: una sola función deriva ambos lados, así que coinciden por construcción.
+
+Verificado contra el servidor vivo: `references` sobre un campo pasó de `null` a 4 (declaración, `this.value`, dos `w.value`); `rename` de 0 ediciones a 4. Fijado en `tests/member_references_test.rs`, que empareja siempre el caso miembro con el caso función para que un arreglo no pueda cambiar uno por otro.
+
 **Pendiente:** el resto del modelo paralelo. `SymbolRecord`/`MemberRecord` los consumen 16 archivos; borrarlos exige reescribir hover, completion, symbols, definition, inlay hints e index builder para proyectar de `CheckResult`. Quedan 18 literales `"dynamic"`/`"unknown"` como identidad de tipo, todos fuera del camino del receptor.
 
 **Invariante:** el LSP no construye estructuras semánticas. Proyecta `CheckResult` a tipos LSP en el momento de responder.

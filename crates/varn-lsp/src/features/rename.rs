@@ -2,7 +2,6 @@ use crate::document::{DocumentState, TokenRecord};
 use crate::util::converters::range_on_line;
 use std::collections::HashMap;
 use tower_lsp::lsp_types::{PrepareRenameResponse, TextEdit, Url, WorkspaceEdit};
-use varn_checker::symbol::SymbolId;
 use varn_core::TokenKind;
 
 pub fn build_prepare_rename(
@@ -11,7 +10,7 @@ pub fn build_prepare_rename(
     col: u32,
 ) -> Option<PrepareRenameResponse> {
     let token = find_ident_at(state, line, col)?;
-    let sid = resolve_symbol_id(state, token.offset)?;
+    let sid = state.resolve_symbol_id_at_offset(token.offset)?;
 
     if sid >= state.db.arena.len() {
         return None;
@@ -34,8 +33,10 @@ pub fn build_rename(
     new_name: String,
 ) -> Option<WorkspaceEdit> {
     let token = find_ident_at(state, line, col)?;
-    let target_id: SymbolId = resolve_symbol_id(state, token.offset)?;
-    let target_key = symbol_global_key_for_id(state, target_id)?;
+    // Same symmetry rule as `references`: the target and the candidates must be
+    // keyed by the same function, or renaming a class member silently edits
+    // nothing. See the note in `features/references.rs`.
+    let target_key = state.token_global_key(token.offset)?;
 
     let target_name = token.lexeme.as_str();
     let mut changes: HashMap<Url, Vec<TextEdit>> = HashMap::new();
@@ -99,13 +100,7 @@ fn find_ident_at(state: &DocumentState, line: u32, col: u32) -> Option<&TokenRec
     })
 }
 
-fn resolve_symbol_id(state: &DocumentState, offset: u32) -> Option<SymbolId> {
-    state.resolve_symbol_id_at_offset(offset)
-}
 
-fn symbol_global_key_for_id(state: &DocumentState, id: SymbolId) -> Option<String> {
-    state.symbol_global_key_for_id(id)
-}
 
 fn token_global_key(state: &DocumentState, offset: u32) -> Option<String> {
     state.token_global_key(offset)

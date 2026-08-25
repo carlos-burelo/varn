@@ -15,7 +15,7 @@ use varn_checker::SymbolKind;
 use varn_core::ast::{Decl, Stmt, StmtKind};
 use varn_core::{DiagnosticKind, TokenKind, TypeKind};
 
-fn stable_global_key(
+pub(super) fn stable_global_key(
     uri: &str,
     name: &str,
     kind: SymbolKind,

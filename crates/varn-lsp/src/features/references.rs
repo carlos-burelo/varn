@@ -1,6 +1,5 @@
 use crate::document::DocumentState;
 use tower_lsp::lsp_types::{Location, Position, Range, Url};
-use varn_checker::symbol::SymbolId;
 
 pub fn build_references(
     state: &DocumentState,
@@ -15,8 +14,17 @@ pub fn build_references(
             && (t.kind == varn_core::TokenKind::Identifier || t.kind.can_be_identifier())
     })?;
 
-    let target_id: SymbolId = state.resolve_symbol_id_at_offset(token.offset)?;
-    let target_key = symbol_global_key_for_id(state, target_id)?;
+    // Derive the target with the *same* function that derives the candidates.
+    //
+    // These used to disagree: the target came from `symbol_global_key_for_id`,
+    // which yields the `u:`/`m:` form, while each candidate came from
+    // `token_global_key`, which yields a `member:{type}:{name}` key when the
+    // token is a class member. For a member the two shapes can never compare
+    // equal, so "find all references" on a field or method returned nothing at
+    // all — while it worked on a top-level function, where both shapes coincide.
+    //
+    // Symmetry is the fix: one function, so both sides agree by construction.
+    let target_key = state.token_global_key(token.offset)?;
     let target_name = token.lexeme.as_str();
 
     let mut locs: Vec<Location> = Vec::new();
@@ -71,9 +79,6 @@ pub fn build_references(
     }
 }
 
-fn symbol_global_key_for_id(state: &DocumentState, id: SymbolId) -> Option<String> {
-    state.symbol_global_key_for_id(id)
-}
 
 fn token_global_key(state: &DocumentState, offset: u32) -> Option<String> {
     state.token_global_key(offset)

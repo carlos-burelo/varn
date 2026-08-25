@@ -192,12 +192,21 @@ pub fn inject_stdlib_symbols(
             type_params: sym.type_params.iter().map(|s| s.to_string()).collect(),
             ty: inferred_ty,
             symbol_id: None,
-            global_key: if let Some(origin_mod) = sym.origin_module.as_deref() {
-                let canonical_name = sym.original_name.as_deref().unwrap_or(sym.name.as_ref());
-                format!("m:{origin_mod}#{:?}:{canonical_name}", sym.kind)
-            } else {
-                format!("u:{uri}#{:?}:{}", sym.kind, sym.name)
-            },
+            // Built by the one constructor, not a second `format!` beside it.
+            // This site used to interpolate `origin_module` raw while
+            // `stable_global_key` normalizes a bare filesystem path into a
+            // `file://` URI — so for any symbol whose origin was a path the two
+            // produced keys that could never compare equal, and references and
+            // rename would miss it without saying so.
+            global_key: super::stable_global_key(
+                uri,
+                sym.name.as_ref(),
+                sym.kind,
+                None,
+                sym.origin_module.as_deref(),
+                sym.original_name.as_deref(),
+                false,
+            ),
             full_range: sym.full_range,
             is_from_stdlib: true,
             origin: sym.origin_module.as_deref().map(|s| s.to_owned()),
