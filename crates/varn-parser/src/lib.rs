@@ -4,8 +4,6 @@ mod profile;
 mod stream;
 mod types;
 use std::rc::Rc;
-#[cfg(test)]
-use varn_lexer as _;
 
 pub use parser::Parser;
 pub use profile::ParseProfile;

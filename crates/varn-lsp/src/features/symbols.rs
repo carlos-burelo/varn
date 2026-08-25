@@ -9,10 +9,38 @@ pub fn build_document_symbols(state: &DocumentState) -> DocumentSymbolResponse {
     let mut sorted: Vec<SymbolView<'_>> = state
         .symbols()
         .filter(|s| s.line() != u32::MAX && !s.is_from_stdlib())
+        .filter(|s| is_outlinable(s.name(), s.kind()))
         .collect();
     sorted.sort_by_key(|s| (s.line(), s.col()));
 
     DocumentSymbolResponse::Nested(nest_symbols(state, &sorted))
+}
+
+/// Whether a symbol belongs in the outline the user reads.
+///
+/// The binder puts more than declarations into scope: an `extension` block
+/// lowers each member to a mangled global (`__ext_str_shout`) and binds the
+/// receiver as a parameter named `this`. Both are real symbols and neither is
+/// something the author wrote, so an outline listing them is showing its own
+/// implementation.
+fn is_outlinable(name: &str, kind: SymbolKind) -> bool {
+    if name.starts_with("__ext_") {
+        return false;
+    }
+    !matches!(
+        kind,
+        // Part of their function's signature, not siblings of it.
+        SymbolKind::Parameter
+            | SymbolKind::TypeParameter
+            // A type's members are supplied by `members_of`, from the checker's
+            // own member table. They used to *also* appear at the top level,
+            // because nesting was done by line range and a class carries no end
+            // line — so every field showed up twice, once inside its class and
+            // once beside it.
+            | SymbolKind::Property
+            | SymbolKind::Method
+            | SymbolKind::EnumMember
+    )
 }
 
 fn is_container(kind: SymbolKind) -> bool {

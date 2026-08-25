@@ -1,5 +1,6 @@
 mod chain_queries;
 pub mod import;
+pub mod position;
 mod resolution;
 mod symbol_queries;
 

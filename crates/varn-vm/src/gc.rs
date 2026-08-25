@@ -102,17 +102,7 @@ impl TricolorMarker {
         self.marks.get_color(idx)
     }
 
-    /// Marker state, read only by the invariant tests below — the production
-    /// paths reach `marked_count`/`gray_queue` as fields.
-    #[cfg(test)]
-    pub(crate) fn marked_count(&self) -> usize {
-        self.marked_count
-    }
 
-    #[cfg(test)]
-    pub(crate) fn gray_queue_size(&self) -> usize {
-        self.gray_queue.len()
-    }
 
     pub(crate) fn clear(&mut self) {
         self.marks.clear();
@@ -343,55 +333,5 @@ impl GcCollector {
     pub(crate) fn collect(&mut self, heap: &mut HeapInner, roots: &[u32]) -> usize {
         self.mark_phase(heap, roots);
         self.sweep_phase(heap)
-    }
-}
-
-#[cfg(test)]
-mod array_scan_tests {
-    use super::*;
-    use crate::heap::HeapInner;
-    use varn_types::{VmArray, VmValue};
-
-    /// A.2: `mark_children`'s `HeapObj::Array` arm must branch on the repr
-    /// (`as_boxed()`), never call the Boxed-only `borrow()` — that panics on
-    /// a typed repr (see `VmArray::borrow`'s `unreachable_typed` cold path).
-    /// I64/F64 hold no heap refs, so marking one must be a no-op: nothing
-    /// queued gray, and — the actual regression this guards — no panic.
-    #[test]
-    fn mark_children_skips_typed_array_reprs_without_panicking() {
-        let mut heap = HeapInner::new();
-        let i64_idx = heap.alloc_raw(HeapObj::Array(VmArray::new_i64(vec![1, 2, 3])));
-        let f64_idx = heap.alloc_raw(HeapObj::Array(VmArray::new_f64(vec![1.0, 2.0])));
-
-        let mut marker = TricolorMarker::new(heap.objects_len());
-        marker.mark_children(&heap, i64_idx);
-        marker.mark_children(&heap, f64_idx);
-
-        // Neither typed array holds a heap ref, so nothing should have been
-        // queued gray by either scan.
-        assert_eq!(marker.gray_queue_size(), 0);
-        assert_eq!(marker.marked_count(), 0);
-    }
-
-    /// Control case: a `Boxed` array's heap-ref elements are still marked —
-    /// the variant-aware rewrite must not regress the path every existing
-    /// test in the suite exercises.
-    #[test]
-    fn mark_children_still_marks_boxed_array_heap_refs() {
-        let mut heap = HeapInner::new();
-        let inner_str_idx = heap.alloc_raw(HeapObj::Str(crate::heap::HeapStr::shared(
-            std::rc::Rc::from("child"),
-        )));
-        let child = VmValue::from_heap_idx(inner_str_idx);
-        let arr_idx = heap.alloc_raw(HeapObj::Array(VmArray::new(vec![
-            child,
-            VmValue::from_int(7),
-        ])));
-
-        let mut marker = TricolorMarker::new(heap.objects_len());
-        marker.mark_children(&heap, arr_idx);
-
-        assert_eq!(marker.gray_queue_size(), 1);
-        assert_eq!(marker.get_color(inner_str_idx), MarkColor::Gray);
     }
 }

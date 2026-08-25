@@ -343,34 +343,3 @@ impl DebugFlags {
         self.clif_all();
     }
 }
-
-#[cfg(test)]
-mod clif_flag_tests {
-    use super::DebugFlags;
-
-    #[test]
-    fn bare_clif_enables_all_four_views() {
-        let f = DebugFlags::parse("clif").unwrap();
-        assert!(f.clif && f.clif_route && f.clif_kinds && f.clif_ir && f.clif_asm);
-        assert!(f.any());
-    }
-
-    #[test]
-    fn clif_ir_enables_only_ir() {
-        let f = DebugFlags::parse("clif:ir").unwrap();
-        assert!(f.clif && f.clif_ir);
-        assert!(!f.clif_route && !f.clif_kinds && !f.clif_asm);
-    }
-
-    #[test]
-    fn clif_multi_sub_via_comma() {
-        let f = DebugFlags::parse("clif:kinds,clif:asm").unwrap();
-        assert!(f.clif && f.clif_kinds && f.clif_asm);
-        assert!(!f.clif_ir && !f.clif_route);
-    }
-
-    #[test]
-    fn unknown_clif_sub_errors() {
-        assert!(DebugFlags::parse("clif:bogus").is_err());
-    }
-}

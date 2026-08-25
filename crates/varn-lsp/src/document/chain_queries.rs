@@ -103,23 +103,17 @@ fn type_name_of(ty: &varn_checker::Type) -> Option<String> {
 }
 
 impl DocumentState {
+    /// Byte offset of a cursor position.
+    ///
+    /// Delegates to [`crate::document::position`] so that a cursor and an
+    /// incremental edit range resolve through the same walk — the version that
+    /// lived here counted `char`s, which disagrees with the UTF-16 units the
+    /// protocol sends as soon as a line holds an astral character.
     pub fn offset_at_line_col(&self, line: u32, col: u32) -> u32 {
-        let mut curr_line = 0;
-        let mut curr_col = 0;
-        let mut byte_offset = 0;
-        for ch in self.source.chars() {
-            if curr_line == line && curr_col == col {
-                return byte_offset as u32;
-            }
-            if ch == '\n' {
-                curr_line += 1;
-                curr_col = 0;
-            } else if ch != '\r' {
-                curr_col += 1;
-            }
-            byte_offset += ch.len_utf8();
-        }
-        byte_offset as u32
+        crate::document::position::byte_offset(
+            &self.source,
+            tower_lsp::lsp_types::Position::new(line, col),
+        ) as u32
     }
 
     pub fn resolve_chain_at(&self, line: u32, col: u32) -> Option<ChainResult<'_>> {

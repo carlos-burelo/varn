@@ -397,13 +397,31 @@ Lo que se queda fuera del hilo de análisis: el debounce (esperar ahí aparcarí
 `Rc → Arc` queda disponible como evolución posterior si alguna vez se quiere análisis paralelo por archivo. Nota sobre su viabilidad: el sistema de tipos ya enruta su puntero de nombres por un único alias —
 `SemanticTypeKind = TypeKind<Box<Type>, Rc<str>, …>` (`checker/src/types/mod.rs:32`) — de modo que una línea voltea el sharing de strings de todo el sistema de tipos. El obstáculo real no es el `Rc`, son los `RefCell` de los `thread_local`, que este plan elimina de todos modos.
 
-### L6 — Superficie LSP
+### L6 — Superficie LSP — 🔄 en curso
 
 **Invariante:** las features son funciones puras `fn(&Analysis, FilePos) -> Option<T>`. Sin acceso al workspace, sin I/O.
 
 Hoy `references`, `implementation` y `code_lens` reciben `&Workspace` por parámetro, lo que las hace intesteables sin levantar el servidor.
 
-Protocolo a completar: sync incremental, `completionItem/resolve`, pull diagnostics, deltas de semantic tokens, `didChangeWatchedFiles` (el cliente ya crea el watcher y el servidor no implementa el handler), `didChangeConfiguration`, `$/progress` para el indexado, y `workspaceFolders` en lugar del `std::env::set_current_dir` global de `backend.rs:134`.
+**Hecho: `didChangeWatchedFiles`.** El cliente registraba el watcher `**/*.vn` desde siempre y el handler no existía — un `git checkout`, un rebase o una edición desde otra herramienta dejaban al servidor respondiendo con la versión leída al arrancar, sin nada que dijera que estaba obsoleta. Los borrados evictan; creaciones y cambios releen de disco y reanalizan, lo que invalida además todo módulo que importe el archivo. La lectura va en `spawn_blocking`: es I/O y no pertenece al hilo de análisis.
+
+**Hecho: `didChangeConfiguration`.** `Varn.inlayHints.enabled` venía declarado en el manifiesto de la extensión, con descripción y valor por defecto, y **no lo leía nadie**: no había handler de configuración. Un ajuste que no hace nada es peor que uno ausente — el usuario concluye que la función está rota, no el interruptor. Se honra ahora tanto en el handshake (`initializationOptions`) como en el cambio posterior; un payload que no lo menciona deja el valor como está.
+
+**Hecho: sync incremental.** El servidor anunciaba `TextDocumentSyncKind::FULL`, así que cada pulsación reenviaba el buffer entero por stdio y lo re-serializaba en ambos extremos — trabajo proporcional al tamaño del archivo para una edición que no lo es. Ahora anuncia `INCREMENTAL`: la notificación trae el rango sustituido más su texto.
+
+El texto nuevo se ensambla **en el hilo de análisis**, contra la base que lo posee. Espejar el texto del lado async habría sido una segunda copia de lo único de lo que todo el servidor es una proyección, y las dos copias divergen justo cuando una edición compite con un análisis.
+
+Colateral obligado: las posiciones del protocolo son **unidades UTF-16**, y el único mapeo que existía (`offset_at_line_col`) contaba `char`s. Coincide para todo el BMP y se desplaza uno por cada carácter astral — un emoji en un literal antes del cursor bastaba para que hover señalara el token de al lado. Hay ahora un solo mapeo (`document/position.rs`) y tanto el cursor de una petición como el rango de una edición pasan por él: dos preguntas idénticas no pueden volver a responderse distinto.
+
+Cubierto por `tests/incremental_sync_test.rs` (inserción, borrado, rango multilínea, lote en orden, cambio sin rango, UTF-16, clamp fuera de rango, CRLF, rango invertido) y verificado contra el servidor vivo: tras una edición por rangos que renombra un parámetro en dos líneas, `hover` responde `greeting: str` — solo posible si el servidor ensambló el texto editado.
+
+**Hecho: `$/progress` para el indexado.** El índice inicial recorre el workspace entero; hasta que termina, un goto definition hacia un archivo que nadie abrió falla. Eso se reportaba escribiendo contadores en el output channel, donde el usuario no mira: el servidor parecía inactivo mientras trabajaba y roto mientras estaba incompleto. `$/progress` solo se emite si el cliente lo anuncia (`window.workDoneProgress`) — mandarle `window/workDoneProgress/create` a uno que no lo soporta es una petición que responderá con error —, y cuando falta, el helper degrada a no-op sin que el llamante escriba una rama.
+
+**Hecho: `backend.rs` dejó de ser un god file.** 944 líneas mezclaban ciclo de vida, sincronización, ajustes, indexado y 28 handlers. Los handlers repetían todos la misma forma —tomar posición, correr un cierre en el hilo de análisis, cronometrar—, así que esa forma es hoy `Backend::query` y cada handler es una llamada. El resto se fue por dominio: `capabilities.rs` (declaración, no comportamiento), `lifecycle.rs`, `settings.rs`, `progress.rs`, `sync/`.
+
+**Aplazado por medición, no por olvido:** `completionItem/resolve`. Los items solo llevan un `detail` derivado del tipo, barato de calcular, y la latencia por pulsación medida son los 5–7 ms de análisis — no el payload. Se implementa cuando una medición señale el payload como coste.
+
+**Pendiente:** pull diagnostics, deltas de semantic tokens, y `workspaceFolders` en lugar del `std::env::set_current_dir` global de `backend/mod.rs`. Este último **no es solo LSP**: `varn-checker/src/module_resolver/graph.rs` y `varn-modules/src/std_root.rs` resuelven contra `current_dir()`, así que quitarlo exige inyectarles la raíz y valida con la matriz completa, no con la suite del LSP.
 
 ### L7 — Extensión
 

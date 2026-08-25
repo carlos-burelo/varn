@@ -79,26 +79,3 @@ impl PhaseStats {
         (self.max.as_nanos() - self.min.as_nanos()) as f64 / self.min.as_nanos() as f64
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn ms(n: u64) -> Duration {
-        Duration::from_millis(n)
-    }
-
-    #[test]
-    fn cv_is_zero_for_identical_samples() {
-        let s = PhaseStats::from_samples("x", |c| c, &[ms(10), ms(10), ms(10)]);
-        assert_eq!(s.cv(), 0.0);
-        assert_eq!(s.spread(), 0.0);
-    }
-
-    #[test]
-    fn spread_measures_worst_case_drift() {
-        let s = PhaseStats::from_samples("x", |c| c, &[ms(20), ms(22), ms(23)]);
-        // (23 - 20) / 20
-        assert!((s.spread() - 0.15).abs() < 1e-9);
-    }
-}

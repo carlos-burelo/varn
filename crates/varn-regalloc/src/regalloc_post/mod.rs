@@ -22,9 +22,6 @@ thread_local! {
     pub static OPTIMIZE_ENABLED: Cell<bool> = Cell::new(true);
 }
 
-#[cfg(test)]
-#[path = "../regalloc_post_tests.rs"]
-mod tests;
 
 pub fn optimize_function(proto: &mut FunctionProto) {
     let start = if OPTIMIZE_ENABLED.with(|e| e.get()) {

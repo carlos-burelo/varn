@@ -37,6 +37,16 @@ impl Workspace {
         (file_id, rev, token)
     }
 
+    /// The current text of `uri`, if the server holds any.
+    ///
+    /// Incremental edits are stated against this text, so it is the one that
+    /// must answer — not the source stored on the last analysed
+    /// `DocumentState`, which lags by a debounce.
+    pub fn source_of(&self, uri: &str) -> Option<String> {
+        let file_id = self.db.intern(uri);
+        self.db.get_source(file_id).map(|(_, text)| text.to_string())
+    }
+
     /// Re-analyse one file, evicting only what its change can invalidate.
     ///
     /// Two firewalls, at different scopes:
