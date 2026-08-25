@@ -3,6 +3,68 @@ use varn_core::TokenKind;
 
 use super::{ChainResult, DocumentState, MemberKind, MemberRecord, TokenRecord};
 
+/// Turn the checker's verdict on a member access into the record the editor
+/// features consume.
+///
+/// Everything here is read off [`varn_checker::MemberResolution`] — no signature
+/// is reconstructed, so a member reports exactly what the stdlib declares.
+fn member_record_from(res: &varn_checker::MemberResolution) -> MemberRecord {
+    use varn_checker::ResolvedMemberKind as R;
+
+    let (type_str, params_str) = match &res.member_ty.0 {
+        varn_core::TypeKind::Fn(ft) => {
+            let params = ft
+                .params
+                .iter()
+                .map(|p| {
+                    format!(
+                        "{}: {}{}",
+                        p.name.as_deref().unwrap_or("_"),
+                        p.ty,
+                        if p.optional { "?" } else { "" }
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            (ft.return_type.to_string(), params)
+        }
+        _ => (res.member_ty.to_string(), String::new()),
+    };
+
+    let kind = match res.member_kind {
+        R::EnumMember => MemberKind::EnumMember,
+        R::Method | R::StaticMethod | R::ExtensionMethod => MemberKind::Method,
+        R::Getter => MemberKind::Getter,
+        R::Setter => MemberKind::Setter,
+        R::Property | R::StaticProperty | R::ExtensionProperty => MemberKind::Property,
+    };
+
+    // `u32::MAX` is the "no source location" sentinel the features already test
+    // for; a member from a precompiled interface blob has no range.
+    let (line, col) = res
+        .def_range
+        .map(|r| (r.start.line.saturating_sub(1), r.start.column))
+        .unwrap_or((u32::MAX, 0));
+
+    MemberRecord {
+        name: res.member_name.to_string(),
+        type_str,
+        params_str,
+        is_static: matches!(res.member_kind, R::StaticMethod | R::StaticProperty),
+        is_optional: false,
+        kind,
+        is_arrow: false,
+        is_async: false,
+        is_generator: false,
+        line,
+        col,
+        init_value: String::new(),
+        ty: res.member_ty.clone(),
+        symbol_id: None,
+        members: Vec::new(),
+    }
+}
+
 /// The name a type is known by, when it has one.
 ///
 /// `None` for types that name no declaration — unions, tuples, function types,
@@ -58,16 +120,20 @@ impl DocumentState {
             })
             .unwrap_or(false);
 
+        // The checker resolved this member access: report what it decided.
+        //
+        // This used to consult a hand-written table of builtin signatures
+        // (`Map.set`, `Range.toArray`, `Array.length`, …) *before* asking the
+        // checker, so for every type it covered the table won — and the table
+        // was a transcription of `std/` kept in sync by hand, matched by string
+        // surgery on the receiver's printed type (`split('<')`, `ends_with("[]")`).
+        // Any drift from the real stdlib surfaced as a confidently wrong hover.
         if after_dot {
-            let parent_name = self.resolve_receiver_type_name_at(tok);
-
-            // 1. Check for known builtin members (Map.set, Range.toArray, Array.length, etc.)
-            if let Some(builtin_m) =
-                crate::util::intrinsic_members::resolve_builtin_member(&parent_name, &tok.lexeme)
-            {
+            if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
                 return Some(ChainResult::DynamicMember {
-                    member: builtin_m,
-                    parent_name,
+                    member: member_record_from(res),
+                    parent_name: type_name_of(&res.receiver_ty)
+                        .unwrap_or_else(|| "dynamic".to_owned()),
                 });
             }
         }

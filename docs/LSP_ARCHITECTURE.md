@@ -259,7 +259,20 @@ Cubierto por `tests/receiver_from_checker_test.rs`, con los casos que el walk fa
 | `xs[0].length` | tipo del elemento |
 | `s.trim().length` | tipo de retorno del miembro anterior |
 
-**Pendiente:** el resto del modelo paralelo. `SymbolRecord`/`MemberRecord` los consumen 17 archivos; borrarlos exige reescribir hover, completion, symbols, definition, inlay hints e index builder para proyectar de `CheckResult`. Quedan 18 literales `"dynamic"`/`"unknown"` como identidad de tipo, todos fuera del camino del receptor.
+**Hecho: los miembros builtin vienen de la stdlib.**
+
+`util/intrinsic_members.rs` (153 líneas) **borrado**. Era una transcripción a mano de las firmas de `std/` —`Map.set`, `Range.toArray`, `Array.length`— indexada troceando el tipo impreso del receptor (`split('<')`, `ends_with("[]")`), y **respondía antes que el checker**: para todo tipo que cubría, la tabla ganaba. Cualquier divergencia con `std/` salía como un hover seguro de sí mismo y equivocado.
+
+Ahora `resolve_chain_at` lee `member_resolutions[offset]` y construye el registro desde lo que el checker decidió. La mejora es medible en fidelidad, no solo en procedencia:
+
+```
+a.map     -> (method) int[].map(callback: (item: int, index: int, array: int[]) => U): U[]
+mp.values -> (method) Map<int>.values(): int[]
+```
+
+La tabla no podía expresar un callback genérico, y reconstruía `Map<int>` troceando su forma impresa.
+
+**Pendiente:** el resto del modelo paralelo. `SymbolRecord`/`MemberRecord` los consumen 16 archivos; borrarlos exige reescribir hover, completion, symbols, definition, inlay hints e index builder para proyectar de `CheckResult`. Quedan 18 literales `"dynamic"`/`"unknown"` como identidad de tipo, todos fuera del camino del receptor.
 
 **Invariante:** el LSP no construye estructuras semánticas. Proyecta `CheckResult` a tipos LSP en el momento de responder.
 
@@ -404,9 +417,9 @@ Código que este plan borra sin reemplazo directo:
 | Ruta | Líneas | Motivo |
 |---|---|---|
 | `lsp/src/pipeline/` | ~460 | modelo paralelo; se proyecta de `CheckResult` |
-| `lsp/src/document/receiver_ast.rs` | 361 | sustituido por `member_resolutions` |
+| ~~`lsp/src/document/receiver_ast.rs`~~ | 365 | ✅ borrado — sustituido por `member_resolutions` |
 | `lsp/src/document/chain_queries.rs` | 350 | heurística de tres capas sobre strings |
-| `lsp/src/util/intrinsic_members.rs` | 153 | los miembros intrínsecos vienen del checker |
+| ~~`lsp/src/util/intrinsic_members.rs`~~ | 153 | ✅ borrado — los miembros vienen del checker |
 | `lsp/src/queries/indexes.rs` | 41 | reemplazado por `SpatialIndex`; hoy se construye y nunca se consulta |
 | `lsp/src/workspace/revision.rs::Cached` | — | nunca se construye |
 | `SymbolRecord` / `MemberRecord` / `global_key` | — | modelo paralelo |

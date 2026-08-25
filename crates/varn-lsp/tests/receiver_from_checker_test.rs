@@ -73,3 +73,37 @@ fn a_resolved_member_reports_its_own_type() {
         "hover on `length` must name the member and its type; got {text:?}"
     );
 }
+
+/// Builtin members report what the standard library declares.
+///
+/// A hand-written table of these signatures used to answer *before* the
+/// checker, so it won for every type it covered — and it was a transcription of
+/// `std/` kept in sync by hand, indexed by string surgery on the receiver's
+/// printed type (`split('<')`, `ends_with("[]")`). It could not express a
+/// generic callback, so `map` came back flattened.
+///
+/// The assertions below are on the fidelity the table could not reach: the
+/// callback's own parameter types, and a generic receiver preserved as
+/// `Map<int>` rather than rebuilt from its printed form.
+#[test]
+fn builtin_member_signatures_come_from_the_stdlib() {
+    let state = analyze(
+        "const a: int[] = [1, 2, 3]\n\
+         const j = a.map((x: int): int => x * 2)\n\
+         const mp: Map<int> = new Map<int>()\n\
+         const vs = mp.values()\n",
+    );
+
+    let map_hover = hover_text(&state, 1, 12);
+    assert!(
+        map_hover.contains("item: int") && map_hover.contains("array: int[]"),
+        "`map` must carry the callback's declared parameter types; got {map_hover:?}"
+    );
+
+    let values_hover = hover_text(&state, 3, 14);
+    assert!(
+        values_hover.contains("Map<int>") && values_hover.contains("int[]"),
+        "`values` must report the generic receiver and element type from std; \
+         got {values_hover:?}"
+    );
+}
