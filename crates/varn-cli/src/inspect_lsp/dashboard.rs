@@ -17,17 +17,17 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
             BLUE = BLUE,
             RESET = R
         ));
-        for sym in &analysis.symbols {
-            if sym.line == u32::MAX {
+        for sym in analysis.symbols() {
+            if sym.line() == u32::MAX {
                 continue;
             }
-            let kind_str = format!("{:?}", sym.kind);
+            let kind_str = format!("{:?}", sym.kind());
             varn_term::terminal::log(format!(
                 "    {DIM}{:<12}{RESET} {BOLD}{:<20}{RESET} : {YELLOW}{:<20}{RESET} {DIM}(ln:{}){RESET}",
                 kind_str,
-                sym.name,
-                sym.type_str,
-                sym.line + 1,
+                sym.name(),
+                sym.type_str(),
+                sym.line() + 1,
                 DIM = DIM,
                 RESET = R,
                 BOLD = BOLD,

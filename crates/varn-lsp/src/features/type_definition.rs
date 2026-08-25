@@ -30,10 +30,10 @@ pub fn build_goto_type_definition(
     let type_name = extract_type_identifier(&target_type)?;
 
     // 2. Search for the type definition in the current document
-    for sym in &state.symbols {
-        if sym.name == type_name
+    for sym in state.symbols() {
+        if sym.name() == type_name
             && matches!(
-                sym.kind,
+                sym.kind(),
                 SymbolKind::Class
                     | SymbolKind::Interface
                     | SymbolKind::Enum
@@ -41,18 +41,18 @@ pub fn build_goto_type_definition(
                     | SymbolKind::TypeAlias
             )
         {
-            if sym.line != u32::MAX {
+            if sym.line() != u32::MAX {
                 let url = Url::parse(&state.uri).ok()?;
                 let loc = Location::new(
                     url,
                     Range {
                         start: Position {
-                            line: sym.line,
-                            character: sym.col,
+                            line: sym.line(),
+                            character: sym.col(),
                         },
                         end: Position {
-                            line: sym.end_line,
-                            character: sym.end_col,
+                            line: sym.end_line(),
+                            character: sym.end_col(),
                         },
                     },
                 );

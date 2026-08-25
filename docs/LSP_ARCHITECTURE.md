@@ -282,7 +282,44 @@ Pasó desapercibido porque sobre una función top-level ambas formas coinciden �
 
 Verificado contra el servidor vivo: `references` sobre un campo pasó de `null` a 4 (declaración, `this.value`, dos `w.value`); `rename` de 0 ediciones a 4. Fijado en `tests/member_references_test.rs`, que empareja siempre el caso miembro con el caso función para que un arreglo no pueda cambiar uno por otro.
 
-**Pendiente:** el resto del modelo paralelo. `SymbolRecord`/`MemberRecord` los consumen 16 archivos; borrarlos exige reescribir hover, completion, symbols, definition, inlay hints e index builder para proyectar de `CheckResult`. Quedan 18 literales `"dynamic"`/`"unknown"` como identidad de tipo, todos fuera del camino del receptor.
+**Hecho: los miembros de extensión los devuelve el checker.**
+
+`get_members_of_type` se documentaba como "every member reachable on `ty`" y no incluía los declarados en un bloque `extension`, que son tan alcanzables como cualquier otro. El LSP compensaba con `pipeline/extensions.rs` (147 líneas): una tabla paralela, con clave `String`, que solo el tooling veía.
+
+El arreglo va en el checker, no en el LSP: `collect_extension_members` completa el contrato, etiquetando cada uno como `ExtensionMethod`/`ExtensionProperty` para que el llamante distinga. La tabla del LSP está **borrada**.
+
+Cubierto por `varn-checker/tests/extension_members_test.rs`, incluido el caso que un `return` temprano podría romper en silencio: la rama intrínseca de `str` delega en la nombrada, así que ambas deben exponer los mismos miembros.
+
+**Hecho: el modelo paralelo dejó de ser un modelo.**
+
+El campo que hacía de `SymbolRecord`/`MemberRecord` una segunda base de datos semántica era `members`: una tabla de miembros construida **para cada símbolo en cada pulsación**, con su propia cadena de fallbacks cross-module. Está borrada, y con ella:
+
+| Borrado | Líneas |
+|---|---|
+| Bloque constructor en `pipeline/mod.rs` | 90 |
+| `map_members` / `map_enum_members` | ~70 |
+| Cadena de fallbacks de namespace + `resolve_bind_any` | ~25 |
+| Tabla de miembros de stdlib inyectados en `symbols.rs` | ~30 |
+| `format_inner_member`, `member_to_doc`, `extract_enum_init_value` | ~60 |
+
+Los consumidores pasaron a preguntar al checker: `hover` (cuerpo de clase/interfaz/namespace y anidados), `document symbols`, `completion` (ambas ramas de receptor), `index/builder`, y la búsqueda de miembro de `chain_queries` — por `member_resolutions` en el sitio de uso y por las tablas de tipo del propio checker en el de declaración.
+
+Colateral: la clave de miembro perdió el sufijo de `symbol_id` que nadie podía usar, así que `definition.rs` pasó de comparar **por prefijo** a comparar por igualdad, y el formato coincide ya con el de `token_global_key` — la tercera divergencia de clave, cerrada.
+
+**Hecho: `SymbolRecord`, `MemberRecord` y `MemberKind` borrados.**
+
+| Antes | Ahora |
+|---|---|
+| `MemberRecord` (15 campos) | `varn_checker::ResolvedMemberSummary` |
+| `MemberKind` (13 variantes) | `ResolvedMemberKind`, ampliado con `NestedType(_)` y `Constructor` |
+| `SymbolRecord` (21 campos, materializado por símbolo en cada tecla) | `SymbolView<'_>`, que **presta** `varn_checker::Symbol` y deriva el resto a demanda |
+| `ChainResult::Member` + `::DynamicMember` | una sola variante: no hay tabla que prestar, así que no hay dos casos |
+
+`DocumentState.symbols` pasó de `Vec<SymbolRecord>` a `Vec<SymbolId>`, más un único `resolved_types` que preserva **exactamente** la regla original (el tipo registrado en el offset del símbolo si no es `dynamic`, si no el declarado). Ese detalle importaba: cambiarlo por `symbol_types` del checker habría alterado el tipo que reporta cada hover, y no era validable barato.
+
+`ResolvedMemberKind` ganó `NestedType(NestedTypeKind)` y `Constructor` porque `MemberKind` distinguía tipos anidados y el enum del checker los aplanaba a `Property` — el LSP recuperaba la distinción desde su enum paralelo, que es precisamente por lo que ese enum sobrevivía a la tabla a la que pertenecía.
+
+También cayó `inject_stdlib_symbols`: el pipeline recorre la arena, que ya contiene los símbolos importados. borrarlos exige reescribir hover, completion, symbols, definition, inlay hints e index builder para proyectar de `CheckResult`. Quedan 18 literales `"dynamic"`/`"unknown"` como identidad de tipo, todos fuera del camino del receptor.
 
 **Invariante:** el LSP no construye estructuras semánticas. Proyecta `CheckResult` a tipos LSP en el momento de responder.
 

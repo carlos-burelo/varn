@@ -85,44 +85,21 @@ pub fn build_call_argument_completions(
                 }
             }
         } else if let TypeKind::Named(name, _) = current_ty {
-            if let Some(sym) = state.symbols.iter().find(|s| s.name == name.as_ref()) {
-                if let Some(ctor) = sym
-                    .members
-                    .iter()
-                    .find(|m| m.kind == crate::document::MemberKind::Constructor)
-                {
-                    if let TypeKind::Fn(f) = &ctor.ty.0 {
-                        for p in &f.params {
-                            if let Some(name) = &p.name {
-                                fn_params.push(name.to_string());
-                            }
-                        }
-                    }
-                }
-            }
+            // Straight off the checker's class entry. `ResolvedMemberKind` has no
+            // `Constructor` — it flattens one to `Property` — so the summary API
+            // cannot answer this; the class entry can.
+            push_constructor_params(state, name.as_ref(), &mut fn_params);
         }
     } else if callee_tok.kind == TokenKind::Identifier || callee_tok.kind.can_be_identifier() {
-        if let Some(sym) = state.symbols.iter().find(|s| s.name == callee_tok.lexeme) {
-            if let TypeKind::Fn(f) = &sym.ty.0 {
+        if let Some(sym) = state.symbols().find(|s| s.name() == callee_tok.lexeme) {
+            if let TypeKind::Fn(f) = &sym.ty().0 {
                 for p in &f.params {
                     if let Some(name) = &p.name {
                         fn_params.push(name.to_string());
                     }
                 }
-            } else if matches!(sym.kind, varn_checker::SymbolKind::Class) {
-                if let Some(ctor) = sym
-                    .members
-                    .iter()
-                    .find(|m| m.kind == crate::document::MemberKind::Constructor)
-                {
-                    if let TypeKind::Fn(f) = &ctor.ty.0 {
-                        for p in &f.params {
-                            if let Some(name) = &p.name {
-                                fn_params.push(name.to_string());
-                            }
-                        }
-                    }
-                }
+            } else if matches!(sym.kind(), varn_checker::SymbolKind::Class) {
+                push_constructor_params(state, &callee_tok.lexeme, &mut fn_params);
             }
         }
     }
@@ -161,5 +138,30 @@ pub fn build_call_argument_completions(
         None
     } else {
         Some(items)
+    }
+}
+
+/// Append the parameter names of `class_name`'s constructor.
+///
+/// Read from the checker's own class entry rather than from a mirrored member
+/// table: `ResolvedMemberKind` flattens a constructor to `Property`, so the
+/// summary API genuinely cannot answer this one.
+fn push_constructor_params(state: &DocumentState, class_name: &str, out: &mut Vec<String>) {
+    let Some(entry) = state.db.bind.get_class_entry(class_name) else {
+        return;
+    };
+    let Some(ctor) = entry
+        .members
+        .iter()
+        .find(|m| m.kind == varn_checker::ClassMemberKind::Constructor)
+    else {
+        return;
+    };
+    if let TypeKind::Fn(f) = &ctor.ty.0 {
+        for p in &f.params {
+            if let Some(name) = &p.name {
+                out.push(name.to_string());
+            }
+        }
     }
 }

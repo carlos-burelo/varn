@@ -51,9 +51,9 @@ pub fn build_rename(
 
         let mut candidate_names = std::collections::HashSet::new();
         candidate_names.insert(target_name.to_owned());
-        for sym in &file_state.symbols {
-            if sym.global_key == target_key {
-                candidate_names.insert(sym.name.clone());
+        for sym in file_state.symbols() {
+            if sym.global_key(true) == target_key || sym.global_key(false) == target_key {
+                candidate_names.insert(sym.name().to_owned());
             }
         }
 

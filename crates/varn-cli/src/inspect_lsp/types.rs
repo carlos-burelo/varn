@@ -20,11 +20,11 @@ pub fn debug_types(path: &str, source: &str, flags: &DebugFlags) {
     let mut entries = Vec::new();
     let mut std_hidden = 0;
 
-    for sym in &analysis.symbols {
+    for sym in analysis.symbols() {
         let show_std = flags.types_all;
-        if (show_std || !sym.is_from_stdlib) && in_range(sym.line + 1) {
+        if (show_std || !sym.is_from_stdlib()) && in_range(sym.line() + 1) {
             entries.push(sym.clone());
-        } else if sym.is_from_stdlib {
+        } else if sym.is_from_stdlib() {
             std_hidden += 1;
         }
     }
@@ -33,11 +33,11 @@ pub fn debug_types(path: &str, source: &str, flags: &DebugFlags) {
         let mut table = Table::new(["Loc", "Kind", "Name", "Type Details"]);
 
         for s in entries {
-            let loc = format!("{}:{}", s.line + 1, s.col + 1);
-            let kind = s.kind.label();
+            let loc = format!("{}:{}", s.line() + 1, s.col() + 1);
+            let kind = s.kind().label();
             let details = format_sym_details(&s);
 
-            let name_prefix = if s.is_from_stdlib {
+            let name_prefix = if s.is_from_stdlib() {
                 format!("{} ", chalk("[std]").dim())
             } else {
                 String::new()
@@ -46,7 +46,7 @@ pub fn debug_types(path: &str, source: &str, flags: &DebugFlags) {
             table.row([
                 chalk(loc).dim().to_string(),
                 chalk(kind).yellow().to_string(),
-                format!("{}{}", name_prefix, chalk(&s.name).bold()),
+                format!("{}{}", name_prefix, chalk(&s.name()).bold()),
                 chalk(details).dim().to_string(),
             ]);
         }
@@ -66,22 +66,19 @@ pub fn debug_types(path: &str, source: &str, flags: &DebugFlags) {
     varn_term::terminal::log(chalk(format!("── {footer_msg} ──")).dim());
 }
 
-fn format_sym_details(s: &varn_lsp::document::SymbolRecord) -> String {
-    match s.kind {
+fn format_sym_details(s: &varn_lsp::document::SymbolView<'_>) -> String {
+    match s.kind() {
         SymbolKind::Function => {
-            let async_prefix = if s.is_async { "async " } else { "" };
-            format!("{async_prefix}{}", s.ty)
+            let async_prefix = if s.is_async() { "async " } else { "" };
+            format!("{async_prefix}{}", s.ty())
         }
         SymbolKind::Class | SymbolKind::Interface => {
             let mut parts = Vec::new();
-            if !s.type_params.is_empty() {
-                parts.push(format!("<{}>", s.type_params.join(", ")));
-            }
-            if !s.members.is_empty() {
-                parts.push(format!("{{ {} members }}", s.members.len()));
+            if !s.type_params().is_empty() {
+                parts.push(format!("<{}>", s.type_params().join(", ")));
             }
             parts.join(" ")
         }
-        _ => s.ty.to_string(),
+        _ => s.ty().to_string(),
     }
 }

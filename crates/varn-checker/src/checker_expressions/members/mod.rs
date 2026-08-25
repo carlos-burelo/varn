@@ -8,24 +8,33 @@ use crate::checker::Checker;
 use crate::types::{ObjectTypeMember, Type};
 use varn_core::TypeKind;
 
+fn nested(k: crate::semantic_info::NestedTypeKind) -> crate::semantic_info::ResolvedMemberKind {
+    crate::semantic_info::ResolvedMemberKind::NestedType(k)
+}
+
 fn map_class_member_kind(k: crate::binder::ClassMemberKind) -> crate::semantic_info::ResolvedMemberKind {
     match k {
         crate::binder::ClassMemberKind::Method | crate::binder::ClassMemberKind::Function => {
             crate::semantic_info::ResolvedMemberKind::Method
         }
-        crate::binder::ClassMemberKind::Property
-        | crate::binder::ClassMemberKind::Variable
-        | crate::binder::ClassMemberKind::Constructor => {
+        crate::binder::ClassMemberKind::Property | crate::binder::ClassMemberKind::Variable => {
             crate::semantic_info::ResolvedMemberKind::Property
+        }
+        crate::binder::ClassMemberKind::Constructor => {
+            crate::semantic_info::ResolvedMemberKind::Constructor
         }
         crate::binder::ClassMemberKind::Getter => crate::semantic_info::ResolvedMemberKind::Getter,
         crate::binder::ClassMemberKind::Setter => crate::semantic_info::ResolvedMemberKind::Setter,
-        crate::binder::ClassMemberKind::Class
-        | crate::binder::ClassMemberKind::Interface
-        | crate::binder::ClassMemberKind::Namespace
-        | crate::binder::ClassMemberKind::Enum
-        | crate::binder::ClassMemberKind::Struct => {
-            crate::semantic_info::ResolvedMemberKind::Property
+        crate::binder::ClassMemberKind::Class => nested(crate::semantic_info::NestedTypeKind::Class),
+        crate::binder::ClassMemberKind::Interface => {
+            nested(crate::semantic_info::NestedTypeKind::Interface)
+        }
+        crate::binder::ClassMemberKind::Namespace => {
+            nested(crate::semantic_info::NestedTypeKind::Namespace)
+        }
+        crate::binder::ClassMemberKind::Enum => nested(crate::semantic_info::NestedTypeKind::Enum),
+        crate::binder::ClassMemberKind::Struct => {
+            nested(crate::semantic_info::NestedTypeKind::Struct)
         }
     }
 }
@@ -42,6 +51,8 @@ pub fn get_members_of_type(
         let mut results: Vec<crate::semantic_info::ResolvedMemberSummary> = Vec::new();
         let mut seen = rustc_hash::FxHashSet::default();
 
+        // `at` is the declaration site: `None` for members with no source of
+        // their own (interface blobs, tuple indices, intrinsic properties).
         let add_member = |results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
                           seen: &mut rustc_hash::FxHashSet<Rc<str>>,
                           name: Rc<str>,
@@ -58,9 +69,38 @@ pub fn get_members_of_type(
                     is_static,
                     optional,
                     readonly,
+                    def_line: None,
+                    def_col: 0,
+                    is_async: false,
+                    is_generator: false,
                 });
             }
         };
+
+        /// `add_member` for members that come from a `ClassMemberInfo`, which
+        /// carries the declaration site the editor needs.
+        fn add_declared(
+            results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
+            seen: &mut rustc_hash::FxHashSet<Rc<str>>,
+            m: &crate::types::ClassMemberInfo,
+            ty: Type,
+            kind: crate::semantic_info::ResolvedMemberKind,
+        ) {
+            if seen.insert(m.name.clone()) {
+                results.push(crate::semantic_info::ResolvedMemberSummary {
+                    name: m.name.clone(),
+                    ty,
+                    kind,
+                    is_static: m.is_static,
+                    optional: m.is_optional,
+                    readonly: m.is_readonly,
+                    def_line: (m.line > 0).then_some(m.line),
+                    def_col: m.col,
+                    is_async: m.is_async,
+                    is_generator: m.is_generator,
+                });
+            }
+        }
 
         match &ty.0 {
             TypeKind::Object(members) => {
@@ -161,31 +201,13 @@ pub fn get_members_of_type(
                 if let Some(entry) = bind.type_members.classes.get(cn) {
                     for m in &entry.members {
                         let kind = map_class_member_kind(m.kind);
-                        add_member(
-                            &mut results,
-                            &mut seen,
-                            m.name.clone(),
-                            map_ty(&m.ty),
-                            kind,
-                            m.is_static,
-                            m.is_optional,
-                            m.is_readonly,
-                        );
+                        add_declared(&mut results, &mut seen, m, map_ty(&m.ty), kind);
                     }
                 }
                 if let Some(entry) = bind.type_members.interfaces.get(cn) {
                     for m in entry {
                         let kind = map_class_member_kind(m.kind);
-                        add_member(
-                            &mut results,
-                            &mut seen,
-                            m.name.clone(),
-                            map_ty(&m.ty),
-                            kind,
-                            m.is_static,
-                            m.is_optional,
-                            m.is_readonly,
-                        );
+                        add_declared(&mut results, &mut seen, m, map_ty(&m.ty), kind);
                     }
                 }
 
@@ -194,31 +216,13 @@ pub fn get_members_of_type(
                     if let Some(entry) = b.class_members.get(cn.as_ref()) {
                         for m in &entry.members {
                             let kind = map_class_member_kind(m.kind);
-                            add_member(
-                                &mut results,
-                                &mut seen,
-                                m.name.clone(),
-                                map_ty(&m.ty),
-                                kind,
-                                m.is_static,
-                                m.is_optional,
-                                m.is_readonly,
-                            );
+                            add_declared(&mut results, &mut seen, m, map_ty(&m.ty), kind);
                         }
                     }
                     if let Some(members) = b.flattened_members.get(cn.as_ref()) {
                         for m in members {
                             let kind = map_class_member_kind(m.kind);
-                            add_member(
-                                &mut results,
-                                &mut seen,
-                                m.name.clone(),
-                                map_ty(&m.ty),
-                                kind,
-                                m.is_static,
-                                m.is_optional,
-                                m.is_readonly,
-                            );
+                            add_declared(&mut results, &mut seen, m, map_ty(&m.ty), kind);
                         }
                     }
                 }
@@ -231,16 +235,7 @@ pub fn get_members_of_type(
                     if let Some(entry) = ext_bind.type_members.classes.get(cn) {
                         for m in &entry.members {
                             let kind = map_class_member_kind(m.kind);
-                            add_member(
-                                &mut results,
-                                &mut seen,
-                                m.name.clone(),
-                                map_ty(&m.ty),
-                                kind,
-                                m.is_static,
-                                m.is_optional,
-                                m.is_readonly,
-                            );
+                            add_declared(&mut results, &mut seen, m, map_ty(&m.ty), kind);
                         }
                     }
                 }
@@ -266,7 +261,104 @@ pub fn get_members_of_type(
             _ => {}
         }
 
+        collect_extension_members(&mut results, &mut seen, ty, bind);
         results
+}
+
+/// Append the extension methods, getters and setters declared for `ty`.
+///
+/// Without this, `get_members_of_type` did not live up to its own contract —
+/// "every member reachable on `ty`" — because an `extension` block declares
+/// members that are as reachable as any other. The language server kept its own
+/// table to fill the gap, so extensions had a second, parallel definition that
+/// only tooling could see.
+fn collect_extension_members(
+    results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
+    seen: &mut rustc_hash::FxHashSet<Rc<str>>,
+    ty: &Type,
+    bind: &BindResult,
+) {
+    let Some(type_name) = extension_key(ty) else {
+        return;
+    };
+    let scope = bind.scopes.get(bind.global_scope);
+
+    // Extension bodies take the receiver as a leading `this` parameter. It is an
+    // implementation detail of the lowering, not part of the member's signature.
+    let strip_this = |ft: &crate::types::FunctionType| {
+        let mut params = ft.params.clone();
+        if params.first().and_then(|p| p.name.as_deref()) == Some("this") {
+            params.remove(0);
+        }
+        crate::types::FunctionType {
+            params,
+            return_type: ft.return_type.clone(),
+            is_arrow: ft.is_arrow,
+            type_params: ft.type_params.clone(),
+        }
+    };
+
+    let push = |name: &Rc<str>,
+                    mangled: &Rc<str>,
+                    kind: crate::semantic_info::ResolvedMemberKind,
+                    as_return: bool,
+                    results: &mut Vec<crate::semantic_info::ResolvedMemberSummary>,
+                    seen: &mut rustc_hash::FxHashSet<Rc<str>>| {
+        let Some(sid) = scope.resolve(mangled, &bind.scopes) else {
+            return;
+        };
+        let sym = bind.arena.get(sid);
+        let Some(Type(TypeKind::Fn(ft), _)) = &sym.ty else {
+            return;
+        };
+        // A getter reads as its return type; a method reads as its signature.
+        let member_ty = if as_return {
+            ft.return_type.as_ref().clone()
+        } else {
+            Type(TypeKind::Fn(strip_this(ft)), false)
+        };
+        if seen.insert(name.clone()) {
+            results.push(crate::semantic_info::ResolvedMemberSummary {
+                name: name.clone(),
+                ty: member_ty,
+                kind,
+                is_static: false,
+                optional: false,
+                readonly: false,
+                def_line: (sym.line > 0).then_some(sym.line),
+                def_col: sym.col,
+                is_async: sym.is_async,
+                is_generator: sym.is_generator,
+            });
+        }
+    };
+
+    use crate::semantic_info::ResolvedMemberKind as K;
+    if let Some(methods) = bind.extensions.methods.get(type_name.as_ref()) {
+        for (name, mangled) in methods {
+            push(name, mangled, K::ExtensionMethod, false, results, seen);
+        }
+    }
+    if let Some(getters) = bind.extensions.getters.get(type_name.as_ref()) {
+        for (name, mangled) in getters {
+            push(name, mangled, K::ExtensionProperty, true, results, seen);
+        }
+    }
+    if let Some(setters) = bind.extensions.setters.get(type_name.as_ref()) {
+        for (name, mangled) in setters {
+            push(name, mangled, K::ExtensionProperty, true, results, seen);
+        }
+    }
+}
+
+/// The name `extension` blocks are keyed by for `ty`.
+fn extension_key(ty: &Type) -> Option<Rc<str>> {
+    match &ty.0 {
+        TypeKind::Named(n, _) | TypeKind::Generic(n, _, _) => Some(n.clone()),
+        TypeKind::Intrinsic(tag) => Some(Rc::from(tag.name())),
+        TypeKind::Array(_) => Some(Rc::from(varn_core::IntrinsicType::Array.as_str())),
+        _ => None,
+    }
 }
 
 impl<'r> Checker<'r> {

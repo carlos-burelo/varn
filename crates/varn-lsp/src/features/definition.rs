@@ -47,6 +47,8 @@ pub fn build_goto_definition(
     // 2. Resolve members and dynamic chains.
     if let Some(chain) = state.resolve_chain_at(line, col) {
         match chain {
+            // One arm, not two identical ones: `Member` and `DynamicMember`
+            // carried the same fields and were handled the same way.
             ChainResult::Member {
                 member,
                 parent_name,
@@ -54,52 +56,19 @@ pub fn build_goto_definition(
                 if let Some(loc) = resolve_member_location(index, &parent_name, &member.name) {
                     return Some(GotoDefinitionResponse::Scalar(loc));
                 }
-                if member.line != u32::MAX {
-                    if let Some(sid) = member.symbol_id {
-                        if let Some(loc) = resolve_symbol_location(state, sid) {
-                            return Some(GotoDefinitionResponse::Scalar(loc));
-                        }
-                    }
-                    let pos = Position {
-                        line: member.line,
-                        character: member.col,
-                    };
+                // The checker locates a member declared in source; one read out
+                // of a precompiled interface has no line to jump to.
+                if let Some(line) = member.def_line {
                     let url = Url::parse(&state.uri).ok()?;
                     return Some(GotoDefinitionResponse::Scalar(Location::new(
                         url,
-                        zero_range(pos.line, pos.character),
-                    )));
-                }
-            }
-            ChainResult::DynamicMember {
-                member,
-                parent_name,
-            } => {
-                if let Some(loc) = resolve_member_location(index, &parent_name, &member.name) {
-                    return Some(GotoDefinitionResponse::Scalar(loc));
-                }
-                if member.line != u32::MAX {
-                    if let Some(sid) = member.symbol_id {
-                        if let Some(loc) = resolve_symbol_location(state, sid) {
-                            return Some(GotoDefinitionResponse::Scalar(loc));
-                        }
-                    }
-                    let pos = Position {
-                        line: member.line,
-                        character: member.col,
-                    };
-                    let url = Url::parse(&state.uri).ok()?;
-                    return Some(GotoDefinitionResponse::Scalar(Location::new(
-                        url,
-                        zero_range(pos.line, pos.character),
+                        zero_range(line.saturating_sub(1), member.def_col),
                     )));
                 }
             }
             ChainResult::Symbol(sym_rec) => {
-                if let Some(sid) = sym_rec.symbol_id {
-                    if let Some(loc) = resolve_symbol_location(state, sid) {
-                        return Some(GotoDefinitionResponse::Scalar(loc));
-                    }
+                if let Some(loc) = resolve_symbol_location(state, sym_rec.id) {
+                    return Some(GotoDefinitionResponse::Scalar(loc));
                 }
             }
         }
@@ -173,10 +142,11 @@ fn resolve_member_location(
 ) -> Option<Location> {
     let idx = index?;
     let entries = idx.definitions_of(member_name);
-    let prefix = format!("member:{parent_name}:{member_name}:");
-    let entry_opt = entries
-        .iter()
-        .find(|(_, entry)| entry.global_key.starts_with(&prefix));
+    // Equality, not a prefix. The key used to carry a trailing symbol id that
+    // the lookup had to ignore, so it matched by prefix — a key with a
+    // component nobody could use is a key in the wrong shape.
+    let key = format!("member:{parent_name}:{member_name}");
+    let entry_opt = entries.iter().find(|(_, entry)| entry.global_key == key);
     if let Some((uri, entry)) = entry_opt {
         let url = Url::parse(uri).ok()?;
         let pos = Position {

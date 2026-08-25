@@ -37,7 +37,7 @@ fn print_scope_tree(
         let sym = symbol_arena.get(*sym_id);
         println!(
             "{}  - Binding: {} (SymbolId: {}, Kind: {:?}, Type: {:?})",
-            indent_str, name, sym_id, sym.kind, sym.ty
+            indent_str, name, sym_id, sym.kind(), sym.ty()
         );
     }
     for &child_id in &scope.children {

@@ -1,67 +1,83 @@
 use varn_checker::SymbolKind;
 use varn_core::TokenKind;
 
-use super::{ChainResult, DocumentState, MemberKind, MemberRecord, TokenRecord};
+use super::{ChainResult, DocumentState, TokenRecord};
 
-/// Turn the checker's verdict on a member access into the record the editor
-/// features consume.
+/// The checker's verdict on a member access, as a summary.
 ///
-/// Everything here is read off [`varn_checker::MemberResolution`] — no signature
-/// is reconstructed, so a member reports exactly what the stdlib declares.
-fn member_record_from(res: &varn_checker::MemberResolution) -> MemberRecord {
+/// A pass-through, not a translation: every field is read off
+/// [`varn_checker::MemberResolution`]. This used to build a parallel
+/// `MemberRecord` with the signature pre-flattened into `String`s.
+fn summary_from_resolution(
+    res: &varn_checker::MemberResolution,
+) -> varn_checker::ResolvedMemberSummary {
     use varn_checker::ResolvedMemberKind as R;
-
-    let (type_str, params_str) = match &res.member_ty.0 {
-        varn_core::TypeKind::Fn(ft) => {
-            let params = ft
-                .params
-                .iter()
-                .map(|p| {
-                    format!(
-                        "{}: {}{}",
-                        p.name.as_deref().unwrap_or("_"),
-                        p.ty,
-                        if p.optional { "?" } else { "" }
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join(", ");
-            (ft.return_type.to_string(), params)
-        }
-        _ => (res.member_ty.to_string(), String::new()),
-    };
-
-    let kind = match res.member_kind {
-        R::EnumMember => MemberKind::EnumMember,
-        R::Method | R::StaticMethod | R::ExtensionMethod => MemberKind::Method,
-        R::Getter => MemberKind::Getter,
-        R::Setter => MemberKind::Setter,
-        R::Property | R::StaticProperty | R::ExtensionProperty => MemberKind::Property,
-    };
-
-    // `u32::MAX` is the "no source location" sentinel the features already test
-    // for; a member from a precompiled interface blob has no range.
-    let (line, col) = res
-        .def_range
-        .map(|r| (r.start.line.saturating_sub(1), r.start.column))
-        .unwrap_or((u32::MAX, 0));
-
-    MemberRecord {
-        name: res.member_name.to_string(),
-        type_str,
-        params_str,
+    varn_checker::ResolvedMemberSummary {
+        name: res.member_name.clone(),
+        ty: res.member_ty.clone(),
+        kind: res.member_kind,
         is_static: matches!(res.member_kind, R::StaticMethod | R::StaticProperty),
-        is_optional: false,
-        kind,
-        is_arrow: false,
+        optional: false,
+        readonly: false,
+        def_line: res.def_range.map(|r| r.start.line),
+        def_col: res.def_range.map(|r| r.start.column).unwrap_or(0),
         is_async: false,
         is_generator: false,
-        line,
-        col,
-        init_value: String::new(),
-        ty: res.member_ty.clone(),
-        symbol_id: None,
-        members: Vec::new(),
+    }
+}
+
+/// A member as the checker's own type tables declare it.
+///
+/// Used at the declaration site, where no member *access* was resolved.
+fn summary_from_class_member(
+    m: &varn_checker::types::ClassMemberInfo,
+) -> varn_checker::ResolvedMemberSummary {
+    use varn_checker::{ClassMemberKind as C, NestedTypeKind as N, ResolvedMemberKind as R};
+    varn_checker::ResolvedMemberSummary {
+        name: m.name.clone(),
+        ty: m.ty.clone(),
+        kind: match m.kind {
+            C::Method | C::Function => R::Method,
+            C::Constructor => R::Constructor,
+            C::Getter => R::Getter,
+            C::Setter => R::Setter,
+            C::Class => R::NestedType(N::Class),
+            C::Interface => R::NestedType(N::Interface),
+            C::Namespace => R::NestedType(N::Namespace),
+            C::Enum => R::NestedType(N::Enum),
+            C::Struct => R::NestedType(N::Struct),
+            C::Variable | C::Property => R::Property,
+        },
+        is_static: m.is_static,
+        optional: m.is_optional,
+        readonly: m.is_readonly,
+        def_line: (m.line > 0).then_some(m.line),
+        def_col: m.col,
+        is_async: m.is_async,
+        is_generator: m.is_generator,
+    }
+}
+
+/// A summary for a member the checker typed but recorded no *access* for — a
+/// member read off a `dynamic` value, or named at its own declaration.
+fn summary_of(
+    name: std::rc::Rc<str>,
+    ty: varn_checker::Type,
+    kind: varn_checker::ResolvedMemberKind,
+    line: u32,
+    col: u32,
+) -> varn_checker::ResolvedMemberSummary {
+    varn_checker::ResolvedMemberSummary {
+        name,
+        ty,
+        kind,
+        is_static: false,
+        optional: false,
+        readonly: false,
+        def_line: (line > 0).then_some(line),
+        def_col: col,
+        is_async: false,
+        is_generator: false,
     }
 }
 
@@ -130,8 +146,8 @@ impl DocumentState {
         // Any drift from the real stdlib surfaced as a confidently wrong hover.
         if after_dot {
             if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
-                return Some(ChainResult::DynamicMember {
-                    member: member_record_from(res),
+                return Some(ChainResult::Member {
+                    member: summary_from_resolution(res),
                     parent_name: type_name_of(&res.receiver_ty)
                         .unwrap_or_else(|| "dynamic".to_owned()),
                 });
@@ -140,26 +156,6 @@ impl DocumentState {
 
         if let Some(info) = self.db.expr_types.get(&tok.offset) {
             let is_fn = matches!(info.ty.0, varn_core::TypeKind::Fn(_));
-            let (type_str, params_str) = match &info.ty.0 {
-                varn_core::TypeKind::Fn(ft) => {
-                    let mut params = Vec::new();
-                    for p in &ft.params {
-                        let name_str = p
-                            .name
-                            .as_ref()
-                            .map(|n| n.to_string())
-                            .unwrap_or_else(|| "_".to_string());
-                        params.push(format!(
-                            "{}: {}{}",
-                            name_str,
-                            p.ty,
-                            if p.optional { "?" } else { "" }
-                        ));
-                    }
-                    (ft.return_type.to_string(), params.join(", "))
-                }
-                _ => (info.ty.to_string(), String::new()),
-            };
 
             if let Some(sid) = info.symbol_id {
                 if sid < self.db.arena.len() {
@@ -180,97 +176,64 @@ impl DocumentState {
                             String::new()
                         };
 
-                        let name = tok.lexeme.as_str();
-                        let by_id =
-                            |m: &&MemberRecord| m.name.as_str() == name && m.symbol_id == Some(sid);
-                        let hit = self
-                            .symbols
-                            .iter()
-                            .find_map(|s| s.members.iter().find(by_id).map(|m| (s, m)));
-                        if let Some((s, member)) = hit {
-                            let clean_parent = if !parent_name.is_empty() && parent_name != "dynamic" {
+                        if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
+                            let clean_parent = if !parent_name.is_empty()
+                                && parent_name != "dynamic"
+                            {
                                 parent_name
                             } else {
-                                s.name.clone()
+                                type_name_of(&res.receiver_ty)
+                                    .unwrap_or_else(|| "dynamic".to_owned())
                             };
                             return Some(ChainResult::Member {
-                                member,
+                                member: summary_from_resolution(res),
                                 parent_name: clean_parent,
                             });
                         }
-                        let resolved_type_str = if !type_str.is_empty() && type_str != "dynamic" {
-                            type_str
-                        } else {
-                            sym.ty
-                                .as_ref()
-                                .map(|t| t.to_string())
-                                .unwrap_or_else(|| "dynamic".to_string())
-                        };
 
-                        return Some(ChainResult::DynamicMember {
-                            member: MemberRecord {
-                                name: sym.name.to_string(),
-                                type_str: resolved_type_str,
-                                params_str,
-                                is_static: false,
-                                is_optional: false,
-                                kind: if is_fn || sym.kind == SymbolKind::Method {
-                                    MemberKind::Method
+                        return Some(ChainResult::Member {
+                            member: summary_of(
+                                sym.name.clone(),
+                                info.ty.clone(),
+                                if is_fn || sym.kind == SymbolKind::Method {
+                                    varn_checker::ResolvedMemberKind::Method
                                 } else if sym.kind == SymbolKind::EnumMember {
-                                    MemberKind::EnumMember
+                                    varn_checker::ResolvedMemberKind::EnumMember
                                 } else {
-                                    MemberKind::Property
+                                    varn_checker::ResolvedMemberKind::Property
                                 },
-                                is_arrow: false,
-                                is_async: sym.is_async,
-                                is_generator: sym.is_generator,
-                                line: sym.line,
-                                col: sym.col,
-                                init_value: String::new(),
-                                ty: info.ty.clone(),
-                                symbol_id: Some(sid),
-                                members: Vec::new(),
-                            },
+                                sym.line,
+                                sym.col,
+                            ),
                             parent_name,
                         });
                     }
 
                     if after_dot {
                         let parent_name = self.resolve_receiver_type_name_at(tok);
-                        return Some(ChainResult::DynamicMember {
-                            member: MemberRecord {
-                                name: tok.lexeme.clone(),
-                                type_str,
-                                params_str,
-                                is_static: false,
-                                is_optional: false,
-                                kind: if is_fn {
-                                    MemberKind::Method
+                        return Some(ChainResult::Member {
+                            member: summary_of(
+                                std::rc::Rc::from(tok.lexeme.as_str()),
+                                info.ty.clone(),
+                                if is_fn {
+                                    varn_checker::ResolvedMemberKind::Method
                                 } else {
-                                    MemberKind::Property
+                                    varn_checker::ResolvedMemberKind::Property
                                 },
-                                is_arrow: false,
-                                is_async: false,
-                                is_generator: false,
-                                line: tok.line,
-                                col: tok.col,
-                                init_value: String::new(),
-                                ty: info.ty.clone(),
-                                symbol_id: None,
-                                members: Vec::new(),
-                            },
+                                tok.line,
+                                tok.col,
+                            ),
                             parent_name,
                         });
                     }
 
                     if sid_matches {
                         let found = self
-                            .symbols
-                            .iter()
-                            .find(|s| s.symbol_id == Some(sid))
+                            .symbols()
+                            .find(|s| s.id == sid)
                             .or_else(|| {
-                                self.symbols.iter().find(|s| {
-                                    !s.is_from_stdlib && s.line == sym.line && s.col == sym.col
+                                self.symbols().find(|s| {
+                                    !s.is_from_stdlib() && s.line() == sym.line && s.col() == sym.col
                                 })
                             });
                         if let Some(s) = found {
@@ -282,39 +245,29 @@ impl DocumentState {
                 let parent_name = self.resolve_receiver_type_name_at(tok);
 
                 if let Some(sid) = self.checker_symbol_id_at_token(tok) {
-                    if let Some(s) = self.symbols.iter().find(|s| s.symbol_id == Some(sid)) {
+                    if let Some(s) = self.symbols().find(|s| s.id == sid) {
                         return Some(ChainResult::Symbol(s));
                     }
                 }
-                return Some(ChainResult::DynamicMember {
-                    member: MemberRecord {
-                        name: tok.lexeme.clone(),
-                        type_str,
-                        params_str,
-                        is_static: false,
-                        is_optional: false,
-                        kind: if is_fn {
-                            MemberKind::Method
+                return Some(ChainResult::Member {
+                    member: summary_of(
+                        std::rc::Rc::from(tok.lexeme.as_str()),
+                        info.ty.clone(),
+                        if is_fn {
+                            varn_checker::ResolvedMemberKind::Method
                         } else {
-                            MemberKind::Property
+                            varn_checker::ResolvedMemberKind::Property
                         },
-                        is_arrow: false,
-                        is_async: false,
-                        is_generator: false,
-                        line: tok.line,
-                        col: tok.col,
-                        init_value: String::new(),
-                        ty: info.ty.clone(),
-                        symbol_id: None,
-                        members: Vec::new(),
-                    },
+                        tok.line,
+                        tok.col,
+                    ),
                     parent_name,
                 });
             }
         }
 
         if let Some(sid) = self.checker_symbol_id_at_token(tok) {
-            if let Some(s) = self.symbols.iter().find(|s| s.symbol_id == Some(sid)) {
+            if let Some(s) = self.symbols().find(|s| s.id == sid) {
                 return Some(ChainResult::Symbol(s));
             }
         }
@@ -378,44 +331,59 @@ impl DocumentState {
         "dynamic".to_string()
     }
 
-    pub fn member_at_pos(
-        &self,
-        line: u32,
-        col: u32,
-    ) -> Option<(String, SymbolKind, &MemberRecord)> {
+    /// The member the cursor sits on, and the type it belongs to.
+    ///
+    /// `member_resolutions[offset]` is the checker's record of exactly this, so
+    /// it is the answer. This used to scan every symbol's mirrored member tree,
+    /// recursively, comparing names and line/column — an O(symbols x members)
+    /// walk per request that could only find members the mirror happened to
+    /// contain.
+    pub fn member_at_pos(&self, line: u32, col: u32) -> Option<(String, varn_checker::ResolvedMemberSummary)> {
         let tok = self.identifier_token_at(line, col)?;
 
-        if let Some(info) = self.db.expr_types.get(&tok.offset) {
-            if let Some(sid) = info.symbol_id {
-                let name = tok.lexeme.as_str();
-                let member_pred = |m: &&MemberRecord| {
-                    m.name.as_str() == name
-                        && (m.symbol_id == Some(sid) || (m.line == tok.line && m.col == tok.col))
-                };
-                if let Some(s) = self
-                    .symbols
-                    .iter()
-                    .find(|s| s.members.iter().any(|m| member_pred(&m)))
-                {
-                    let member = s.members.iter().find(member_pred).unwrap();
-                    return Some((s.name.clone(), s.kind, member));
-                }
-            }
+        // A member *access*: the checker recorded the receiver and the member.
+        if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
+            let parent = type_name_of(&res.receiver_ty).unwrap_or_else(|| "dynamic".to_owned());
+            return Some((parent, summary_from_resolution(res)));
         }
 
-        for sym in self.symbols.iter().filter(|s| !s.is_from_stdlib) {
-            if let Some(member) =
-                self.find_member_at_pos_recursive(&sym.members, line, tok.col, &tok.lexeme)
-            {
-                let parent_name = self
-                    .find_direct_parent_name_recursive(&sym.members, member)
-                    .unwrap_or(&sym.name)
-                    .to_owned();
-                return Some((parent_name, sym.kind, member));
-            }
-        }
+        // A member *declaration*. There is no access here, so nothing was
+        // resolved — but the cursor still sits on a member, and callers that
+        // key by member (references, rename) must get the same answer at the
+        // declaration as at every use, or they silently match nothing.
+        self.declared_member_at(tok)
+    }
 
-        None
+    /// The member a declaration-site token declares, and its owning type.
+    ///
+    /// Found by asking which type's member table claims this symbol, which is
+    /// the checker's own record of ownership — not a mirror of it.
+    fn declared_member_at(&self, tok: &TokenRecord) -> Option<(String, varn_checker::ResolvedMemberSummary)> {
+        let sid = self.resolve_symbol_id_at_offset(tok.offset)?;
+        let members = &self.db.bind.type_members;
+
+        let owner = members
+            .classes
+            .iter()
+            .find(|(_, e)| e.members.iter().any(|m| m.symbol_id == Some(sid)))
+            .map(|(name, e)| (name.clone(), e.members.iter().find(|m| m.symbol_id == Some(sid))))
+            .or_else(|| {
+                members.interfaces.iter().find_map(|(name, ms)| {
+                    ms.iter()
+                        .any(|m| m.symbol_id == Some(sid))
+                        .then(|| (name.clone(), ms.iter().find(|m| m.symbol_id == Some(sid))))
+                })
+            })
+            .or_else(|| {
+                members.namespaces.iter().find_map(|(name, ms)| {
+                    ms.iter()
+                        .any(|m| m.symbol_id == Some(sid))
+                        .then(|| (name.clone(), ms.iter().find(|m| m.symbol_id == Some(sid))))
+                })
+            })?;
+
+        let (type_name, info) = (owner.0, owner.1?);
+        Some((type_name.to_string(), summary_from_class_member(info)))
     }
 
     pub(crate) fn expr_info_at_token(
@@ -433,40 +401,5 @@ impl DocumentState {
         None
     }
 
-    #[allow(clippy::only_used_in_recursion)]
-    fn find_direct_parent_name_recursive<'a>(
-        &'a self,
-        members: &'a [MemberRecord],
-        target: &MemberRecord,
-    ) -> Option<&'a str> {
-        for m in members {
-            if m.members.iter().any(|inner| std::ptr::eq(inner, target)) {
-                return Some(&m.name);
-            }
-            if let Some(name) = self.find_direct_parent_name_recursive(&m.members, target) {
-                return Some(name);
-            }
-        }
-        None
-    }
 
-    #[allow(clippy::only_used_in_recursion)]
-    fn find_member_at_pos_recursive<'a>(
-        &'a self,
-        members: &'a [MemberRecord],
-        line: u32,
-        col: u32,
-        name: &str,
-    ) -> Option<&'a MemberRecord> {
-        for m in members {
-            if m.line == line && m.name == name && col >= m.col && col < m.col + m.name.len() as u32
-            {
-                return Some(m);
-            }
-            if let Some(found) = self.find_member_at_pos_recursive(&m.members, line, col, name) {
-                return Some(found);
-            }
-        }
-        None
-    }
 }

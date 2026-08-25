@@ -79,9 +79,9 @@ pub fn generate_auto_imports_action(
 
     // Fallback: check symbols in DocumentState stdlib symbols
     if actions.is_empty() {
-        for s in &state.symbols {
-            if s.is_from_stdlib && s.name == sym_name {
-                if let Some(origin) = &s.origin {
+        for s in state.symbols() {
+            if s.is_from_stdlib() && s.name() == sym_name {
+                if let Some(origin) = &s.origin() {
                     if let Some(action) = create_import_action(uri, diag, sym_name, origin) {
                         actions.push(action);
                     }

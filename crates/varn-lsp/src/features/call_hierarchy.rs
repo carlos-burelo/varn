@@ -17,45 +17,45 @@ pub fn prepare_call_hierarchy(
     let token = state.identifier_token_at(line, col)?;
     let target_name = &token.lexeme;
 
-    for sym in &state.symbols {
-        if sym.name == *target_name
+    for sym in state.symbols() {
+        if sym.name() == *target_name
             && matches!(
-                sym.kind,
+                sym.kind(),
                 SymbolKind::Function | SymbolKind::Method
             )
-            && sym.line != u32::MAX
+            && sym.line() != u32::MAX
         {
             let url = Url::parse(&state.uri).ok()?;
             let range = Range {
                 start: Position {
-                    line: sym.line,
-                    character: sym.col,
+                    line: sym.line(),
+                    character: sym.col(),
                 },
                 end: Position {
-                    line: sym.end_line,
-                    character: sym.end_col,
+                    line: sym.end_line(),
+                    character: sym.end_col(),
                 },
             };
             let selection_range = Range {
                 start: Position {
-                    line: sym.line,
-                    character: sym.col,
+                    line: sym.line(),
+                    character: sym.col(),
                 },
                 end: Position {
-                    line: sym.line,
-                    character: sym.col + sym.name.len() as u32,
+                    line: sym.line(),
+                    character: sym.col() + sym.name().len() as u32,
                 },
             };
 
             let item = CallHierarchyItem {
-                name: sym.name.clone(),
+                name: sym.name().to_owned(),
                 kind: LspSymbolKind::FUNCTION,
                 tags: None,
-                detail: Some(sym.type_str.clone()),
+                detail: Some(sym.type_str()),
                 uri: url,
                 range,
                 selection_range,
-                data: Some(serde_json::Value::String(sym.global_key.clone())),
+                data: Some(serde_json::Value::String(sym.global_key(true))),
             };
             return Some(vec![item]);
         }

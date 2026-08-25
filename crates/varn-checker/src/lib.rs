@@ -17,7 +17,8 @@ pub use checker::{CheckOptions, CheckProfile, CheckResult, Checker, ExprInfo, Ty
 pub use checker_expressions::members::get_members_of_type;
 pub use scope::{CheckerScope, ScopeArena, ScopeId, ScopeKind};
 pub use semantic_info::{
-    CallParamInfo, CallResolution, MemberResolution, ResolvedMemberKind, ResolvedMemberSummary,
+    CallParamInfo, CallResolution, MemberResolution, NestedTypeKind, ResolvedMemberKind,
+    ResolvedMemberSummary,
 };
 pub use symbol::{Symbol, SymbolArena, SymbolId, SymbolKind};
 pub use types::Type;

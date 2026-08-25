@@ -1,6 +1,4 @@
-use varn_checker::module_resolver::ImportResolver;
-use crate::document::{DocumentState, MemberKind, MemberRecord};
-use crate::util::kinds::member_to_completion_kind;
+use crate::document::DocumentState;
 use tower_lsp::lsp_types::{CompletionItem, InsertTextFormat};
 use varn_core::{IntrinsicType, TokenKind};
 
@@ -16,7 +14,7 @@ pub enum ReceiverInfo {
         is_instance: bool,
     },
 
-    Anonymous(Vec<MemberRecord>),
+    Anonymous(Vec<varn_checker::ResolvedMemberSummary>),
 }
 
 pub fn build_member_completions(
@@ -91,6 +89,21 @@ pub fn build_member_completions(
                     varn_checker::ResolvedMemberKind::EnumMember => {
                         tower_lsp::lsp_types::CompletionItemKind::ENUM_MEMBER
                     }
+                    varn_checker::ResolvedMemberKind::Constructor => {
+                        tower_lsp::lsp_types::CompletionItemKind::CONSTRUCTOR
+                    }
+                    varn_checker::ResolvedMemberKind::NestedType(k) => match k {
+                        varn_checker::NestedTypeKind::Interface => {
+                            tower_lsp::lsp_types::CompletionItemKind::INTERFACE
+                        }
+                        varn_checker::NestedTypeKind::Namespace => {
+                            tower_lsp::lsp_types::CompletionItemKind::MODULE
+                        }
+                        varn_checker::NestedTypeKind::Enum => {
+                            tower_lsp::lsp_types::CompletionItemKind::ENUM
+                        }
+                        _ => tower_lsp::lsp_types::CompletionItemKind::CLASS,
+                    },
                 };
 
                 items.push(CompletionItem {
@@ -103,133 +116,73 @@ pub fn build_member_completions(
                 });
             }
 
-            if is_instance {
-                if let Some(tn) = match &ty.0 {
-                    varn_core::TypeKind::Named(n, _) | varn_core::TypeKind::Generic(n, _, _) => {
-                        Some(n.as_ref())
-                    }
-                    varn_core::TypeKind::Intrinsic(t) => Some(t.name()),
-                    _ => None,
-                } {
-                    if let Some(exts) = state.db.extension_members.get(tn) {
-                        for m in exts {
-                            if seen.insert(m.name.clone()) {
-                                items.push(member_to_completion_item(m, use_snippets));
-                            }
-                        }
-                    }
-                }
-            }
-
+            // Extensions are already in `members` above: the checker returns
+            // them from `get_members_of_type`, which is where they belong.
             items
         }
         ReceiverInfo::Named {
-            name,
-            is_instance,
-            origin,
+            name, is_instance, ..
         } => {
-            let mut target_bind = None;
-            if let Some(origin_mod) = origin.as_deref() {
-                if origin_mod.starts_with("std:")
-                    || origin_mod.starts_with("runtime:")
-                    || origin_mod.starts_with("core:")
-                {
-                    target_bind =
-                        crate::workspace::resolver::with_resolver(|r| r.stdlib_bind(origin_mod));
-                } else {
-                    target_bind =
-                        crate::workspace::resolver::with_resolver(|r| r.module_bind(origin_mod));
-                }
-            }
-
+            // One question, one answer. This used to try three sources in turn
+            // — the mirrored member table, then a foreign module's bind through
+            // four `get_*_local` fallbacks, then extensions from a separate map
+            // — because no single one of them was complete. Asking the checker
+            // about the type is complete by construction: it substitutes
+            // generics, follows origins, and includes extensions.
+            let ty = varn_checker::Type::named(name.clone());
             let mut seen = std::collections::HashSet::new();
-            let mut items = Vec::new();
-
-            if let Some(sym) = state.symbols.iter().find(|s| s.name == name) {
-                for m in sym
-                    .members
-                    .iter()
-                    .filter(|m| m.is_static != is_instance)
-                    .filter(|m| m.kind != MemberKind::Constructor)
-                {
-                    if seen.insert(m.name.clone()) {
-                        items.push(member_to_completion_item(m, use_snippets));
-                    }
-                }
-            } else if let Some(tb) = &target_bind {
-                let mapped = if let Some(class_info) = tb.get_class_entry(&name) {
-                    crate::pipeline::symbols::map_members(&class_info.members, &[])
-                } else if let Some(interface_info) = tb.get_interface_members_local(&name) {
-                    crate::pipeline::symbols::map_members(interface_info, &[])
-                } else if let Some(namespace_info) = tb.get_namespace_members_local(&name) {
-                    crate::pipeline::symbols::map_members(namespace_info, &[])
-                } else if let Some(enum_info) = tb.get_enum_members_local(&name) {
-                    crate::pipeline::symbols::map_enum_members(enum_info, &[])
-                } else {
-                    Vec::new()
-                };
-
-                for m in mapped
-                    .iter()
-                    .filter(|m| m.is_static != is_instance)
-                    .filter(|m| m.kind != MemberKind::Constructor)
-                {
-                    if seen.insert(m.name.clone()) {
-                        items.push(member_to_completion_item(m, use_snippets));
-                    }
-                }
-            }
-
-            if is_instance {
-                if let Some(exts) = state.db.extension_members.get(&name) {
-                    for m in exts {
-                        if seen.insert(m.name.clone()) {
-                            items.push(member_to_completion_item(m, use_snippets));
-                        }
-                    }
-                }
-            }
-
-            items
+            state
+                .members_of_type(&ty)
+                .iter()
+                .filter(|m| m.is_static != is_instance)
+                .filter(|m| seen.insert(m.name.to_string()))
+                .map(|m| summary_to_completion_item(m, use_snippets))
+                .collect()
         }
         ReceiverInfo::Anonymous(members) => members
-            .into_iter()
-            .filter(|m| m.kind != MemberKind::Constructor)
-            .map(|m| member_to_completion_item(&m, use_snippets))
+            .iter()
+            .filter(|m| m.kind != varn_checker::ResolvedMemberKind::Constructor)
+            .map(|m| summary_to_completion_item(m, use_snippets))
             .collect(),
     }
 }
 
-fn member_to_completion_item(m: &MemberRecord, use_snippets: bool) -> CompletionItem {
-    let (insert_text, insert_text_format) = match m.kind {
-        MemberKind::Method | MemberKind::Function => {
-            if use_snippets {
-                (format!("{}($0)", m.name), Some(InsertTextFormat::SNIPPET))
-            } else {
-                (m.name.clone(), None)
-            }
-        }
-        _ => (m.name.clone(), None),
+/// A completion item straight from the checker's summary of a member.
+fn summary_to_completion_item(
+    m: &varn_checker::ResolvedMemberSummary,
+    use_snippets: bool,
+) -> CompletionItem {
+    let is_method = matches!(
+        m.kind,
+        varn_checker::ResolvedMemberKind::Method
+            | varn_checker::ResolvedMemberKind::StaticMethod
+            | varn_checker::ResolvedMemberKind::ExtensionMethod
+    );
+    let (insert_text, insert_text_format) = if is_method && use_snippets {
+        (format!("{}($0)", m.name), Some(InsertTextFormat::SNIPPET))
+    } else {
+        (m.name.to_string(), None)
     };
-    let detail = match m.kind {
-        MemberKind::Property | MemberKind::Variable | MemberKind::Getter => {
-            Some(m.type_str.clone())
+    let detail = match &m.ty.0 {
+        varn_core::TypeKind::Fn(ft) => {
+            let params = ft
+                .params
+                .iter()
+                .map(|p| format!("{}: {}", p.name.as_deref().unwrap_or("arg"), p.ty))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!("({}): {}", params, ft.return_type)
         }
-        MemberKind::Setter => Some(format!("({})", m.params_str)),
-        MemberKind::Constructor => Some(format!("({})", m.params_str)),
-        MemberKind::Method | MemberKind::Function => {
-            Some(format!("({}): {}", m.params_str, m.type_str))
-        }
-        MemberKind::Class => Some("class".to_owned()),
-        MemberKind::Interface => Some("interface".to_owned()),
-        MemberKind::Namespace => Some("namespace".to_owned()),
-        MemberKind::Enum | MemberKind::EnumMember => Some("enum".to_owned()),
-        MemberKind::Struct => Some("struct".to_owned()),
+        _ => m.ty.to_string(),
     };
     CompletionItem {
-        label: m.name.clone(),
-        kind: Some(member_to_completion_kind(m.kind)),
-        detail,
+        label: m.name.to_string(),
+        kind: Some(if is_method {
+            tower_lsp::lsp_types::CompletionItemKind::METHOD
+        } else {
+            tower_lsp::lsp_types::CompletionItemKind::PROPERTY
+        }),
+        detail: Some(detail),
         insert_text: Some(insert_text),
         insert_text_format,
         ..Default::default()
@@ -335,65 +288,52 @@ pub fn dot_receiver(
     None
 }
 
-fn type_member_to_record(m: &varn_checker::types::ObjectTypeMember) -> Option<MemberRecord> {
+/// A member of a structural object type, as a summary.
+///
+/// Anonymous objects declare no class, so there is no `ClassMemberInfo` to read;
+/// the type itself is the declaration.
+fn object_member_summary(
+    m: &varn_checker::types::ObjectTypeMember,
+) -> Option<varn_checker::ResolvedMemberSummary> {
     use varn_checker::types::ObjectTypeMember::*;
-    match m {
-        Property { name, ty, .. } => Some(MemberRecord {
-            name: name.to_string(),
-            type_str: ty.to_string(),
-            params_str: String::new(),
-            is_static: false,
-            is_optional: false,
-            kind: MemberKind::Property,
-            is_arrow: false,
-            is_async: false,
-            is_generator: false,
-            line: 0,
-            col: 0,
-            init_value: String::new(),
-            ty: ty.clone(),
-            symbol_id: None,
-            members: Vec::new(),
-        }),
+    let (name, ty, kind) = match m {
+        Property { name, ty, .. } => (
+            name.clone(),
+            ty.clone(),
+            varn_checker::ResolvedMemberKind::Property,
+        ),
         Method {
             name,
             params,
             return_type,
             ..
-        } => {
-            let params_str = params
-                .iter()
-                .map(|p| format!("{}: {}", p.name.as_deref().unwrap_or("arg"), p.ty))
-                .collect::<Vec<_>>()
-                .join(", ");
-            Some(MemberRecord {
-                name: name.to_string(),
-                type_str: return_type.to_string(),
-                params_str,
-                is_static: false,
-                is_optional: false,
-                kind: MemberKind::Method,
-                is_arrow: false,
-                is_async: false,
-                is_generator: false,
-                line: 0,
-                col: 0,
-                init_value: String::new(),
-                ty: varn_checker::Type(
-                    varn_core::TypeKind::Fn(varn_checker::types::FunctionType {
-                        params: params.clone(),
-                        return_type: return_type.clone(),
-                        is_arrow: false,
-                        type_params: Vec::new(),
-                    }),
-                    false,
-                ),
-                symbol_id: None,
-                members: Vec::new(),
-            })
-        }
-        _ => None,
-    }
+        } => (
+            name.clone(),
+            varn_checker::Type(
+                varn_core::TypeKind::Fn(varn_checker::types::FunctionType {
+                    params: params.clone(),
+                    return_type: return_type.clone(),
+                    is_arrow: false,
+                    type_params: Vec::new(),
+                }),
+                false,
+            ),
+            varn_checker::ResolvedMemberKind::Method,
+        ),
+        _ => return None,
+    };
+    Some(varn_checker::ResolvedMemberSummary {
+        name,
+        ty,
+        kind,
+        is_static: false,
+        optional: false,
+        readonly: false,
+        def_line: None,
+        def_col: 0,
+        is_async: false,
+        is_generator: false,
+    })
 }
 
 fn dot_receiver_source_fallback(
@@ -436,7 +376,7 @@ fn dot_receiver_source_fallback(
 
             match &ty.0 {
                 varn_core::TypeKind::Object(members) => {
-                    let recs = members.iter().filter_map(type_member_to_record).collect();
+                    let recs = members.iter().filter_map(object_member_summary).collect();
                     return Some(ReceiverInfo::Anonymous(recs));
                 }
                 varn_core::TypeKind::Array(_) => {
@@ -488,7 +428,7 @@ pub fn pattern_receiver(state: &DocumentState, line: u32, col: u32) -> Option<Re
     if let Some(info) = state.expr_info_at_token(rhs_tok) {
         match &info.ty.0 {
             varn_core::TypeKind::Object(members) => {
-                let recs = members.iter().filter_map(type_member_to_record).collect();
+                let recs = members.iter().filter_map(object_member_summary).collect();
                 return Some(ReceiverInfo::Anonymous(recs));
             }
             varn_core::TypeKind::Intrinsic(tag) => {

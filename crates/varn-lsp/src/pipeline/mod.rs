@@ -1,19 +1,14 @@
-use varn_checker::module_resolver::ImportResolver;
-mod extensions;
-mod format;
 mod params;
-pub(crate) mod symbols;
 
 use std::collections::HashMap;
 
 use crate::constants::{SEVERITY_ERROR, SEVERITY_HINT, SEVERITY_WARNING};
 use crate::document::{
-    uri_to_path, DocumentAnalysis, LspDiag, RelatedLocation, SymbolRecord, TokenRecord,
+    uri_to_path, DocumentAnalysis, LspDiag, RelatedLocation, TokenRecord,
 };
-use varn_checker::types::FunctionType;
 use varn_checker::SymbolKind;
 use varn_core::ast::{Decl, Stmt, StmtKind};
-use varn_core::{DiagnosticKind, TokenKind, TypeKind};
+use varn_core::{DiagnosticKind, TokenKind};
 
 pub(super) fn stable_global_key(
     uri: &str,
@@ -177,246 +172,36 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         );
     }
 
-    // Module origins of `import * as ns` aliases. A class/interface destructured
-    // out of such a namespace (`const { Duration } = ns`) is bound locally with no
-    // origin link, so its member table can only be recovered by resolving the name
-    // back through these modules.
-    let namespace_origins: Vec<String> = result
-        .bind
-        .arena
-        .all()
-        .iter()
-        .filter(|s| s.kind == SymbolKind::Namespace)
-        .filter_map(|s| s.origin_module.as_deref().map(str::to_string))
-        .collect();
+    // Ids and one type map, not twenty fields per symbol. The rule for the
+    // type is the one this used to bake into each record: the type recorded at
+    // the symbol's own offset when it is not `dynamic`, else the declared type.
+    let mut resolved_types: rustc_hash::FxHashMap<varn_checker::SymbolId, varn_checker::Type> =
+        rustc_hash::FxHashMap::default();
+    let mut all_symbols: Vec<varn_checker::SymbolId> = Vec::new();
+    let mut symbol_map: HashMap<String, SymbolKind> = HashMap::new();
 
-    fn resolve_bind_any(origin: &str) -> Option<std::rc::Rc<varn_checker::BindResult>> {
-        if origin.starts_with("std:")
-            || origin.starts_with("runtime:")
-            || origin.starts_with("core:")
-        {
-            crate::workspace::resolver::with_resolver(|r| r.stdlib_bind(origin))
-        } else {
-            crate::workspace::resolver::with_resolver(|r| r.module_bind(origin))
+    for (id, sym) in result.bind.arena.all().iter().enumerate() {
+        let recorded = result
+            .expr_types
+            .get(&sym.offset)
+            .filter(|info| info.symbol_id == Some(id))
+            .map(|i| i.ty.clone())
+            .filter(|t| !t.is_dynamic());
+        if let Some(ty) = recorded.or_else(|| sym.ty.clone()) {
+            resolved_types.insert(id, ty);
         }
+        all_symbols.push(id);
+        symbol_map.entry(sym.name.to_string()).or_insert(sym.kind);
     }
 
-    // Membership in the global scope, precomputed once: scanning the global
-    // bindings per symbol is quadratic and dominates analysis of files with
-    // many top-level declarations.
-    let global_ids: rustc_hash::FxHashSet<usize> = result
-        .bind
-        .scopes
-        .get(result.bind.global_scope)
-        .bindings
-        .values()
-        .copied()
-        .collect();
-
-    let sym_records: Vec<SymbolRecord> = result
-        .bind
-        .arena
-        .all()
-        .iter()
-        .enumerate()
-        .map(|(id, sym)| {
-            let members = if sym.kind == SymbolKind::Enum {
-                result
-                    .bind
-                    .get_enum_members_local(&sym.name)
-                    .map(|ms| symbols::map_enum_members(ms, &tokens))
-                    .or_else(|| {
-                        sym.origin_module.as_ref().and_then(|origin| {
-                            crate::workspace::resolver::with_resolver(|r| r.module_bind(origin)).map(|b| (*b).clone()).and_then(|rb| {
-                                rb.get_enum_members_local(
-                                    sym.original_name.as_ref().unwrap_or(&sym.name),
-                                )
-                                .map(|ms| symbols::map_enum_members(ms, &tokens))
-                            })
-                        })
-                    })
-                    .unwrap_or_default()
-            } else if sym.kind == SymbolKind::Class || sym.kind == SymbolKind::Interface {
-                result
-                    .flattened_members
-                    .get(&sym.name)
-                    .map(|ms| symbols::map_members(ms, &tokens))
-                    .or_else(|| {
-                        if sym.kind == SymbolKind::Class {
-                            result
-                                .bind
-                                .get_class_entry(&sym.name)
-                                .map(|e| symbols::map_members(&e.members, &tokens))
-                        } else {
-                            result
-                                .bind
-                                .get_interface_members_local(&sym.name)
-                                .map(|ms| symbols::map_members(ms, &tokens))
-                        }
-                    })
-                    .or_else(|| {
-                        sym.origin_module.as_ref().and_then(|origin| {
-                            crate::workspace::resolver::with_resolver(|r| r.module_bind(origin)).map(|b| (*b).clone()).and_then(|rb| {
-                                let name = sym.original_name.as_ref().unwrap_or(&sym.name);
-                                rb.get_flattened_members(name)
-                                    .or_else(|| rb.get_class_entry(name).map(|e| &e.members))
-                                    .or_else(|| rb.get_interface_members_local(name))
-                                    .map(|ms| symbols::map_members(ms, &tokens))
-                            })
-                        })
-                    })
-                    .or_else(|| {
-                        // Destructured from a namespace alias: resolve the class /
-                        // interface name through the imported modules.
-                        namespace_origins.iter().find_map(|origin| {
-                            resolve_bind_any(origin).and_then(|rb| {
-                                rb.get_flattened_members(&sym.name)
-                                    .or_else(|| rb.get_class_entry(&sym.name).map(|e| &e.members))
-                                    .or_else(|| rb.get_interface_members_local(&sym.name))
-                                    .map(|ms| symbols::map_members(ms, &tokens))
-                            })
-                        })
-                    })
-                    .unwrap_or_default()
-            } else if matches!(
-                sym.kind,
-                SymbolKind::Let | SymbolKind::Var | SymbolKind::Const
-            ) {
-                result
-                    .bind
-                    .type_members
-                    .objects
-                    .get(&sym.name)
-                    .map(|ms| symbols::map_members(ms, &tokens))
-                    .unwrap_or_default()
-            } else if sym.kind == SymbolKind::Namespace {
-                result
-                    .bind
-                    .type_members
-                    .namespaces
-                    .get(&sym.name)
-                    .map(|ms| symbols::map_members(ms, &tokens))
-                    .or_else(|| {
-                        sym.origin_module.as_ref().and_then(|origin| {
-                            crate::workspace::resolver::with_resolver(|r| r.module_bind(origin)).map(|b| (*b).clone()).and_then(|rb| {
-                                rb.type_members
-                                    .namespaces
-                                    .get(sym.original_name.as_ref().unwrap_or(&sym.name))
-                                    .map(|ms| symbols::map_members(ms, &tokens))
-                            })
-                        })
-                    })
-                    .unwrap_or_default()
-            } else {
-                Vec::new()
-            };
-            let expr_info = result
-                .expr_types
-                .get(&sym.offset)
-                .filter(|info| info.symbol_id == Some(id));
-
-            let inferred_ty = match expr_info.map(|i| i.ty.clone()) {
-                Some(ct) if !ct.is_dynamic() => Some(ct),
-                _ => sym.ty.clone(),
-            };
-            let symbol_id = Some(id);
-            let is_global = global_ids.contains(&id);
-            let global_key = stable_global_key(
-                &uri,
-                sym.name.as_ref(),
-                sym.kind,
-                symbol_id,
-                sym.origin_module.as_deref(),
-                sym.original_name.as_deref().map(|s| s.as_ref()),
-                is_global,
-            );
-
-            SymbolRecord {
-                name: sym.name.to_string(),
-                kind: sym.kind,
-                type_str: match inferred_ty.as_ref() {
-                    Some(t) => {
-                        if sym.kind == SymbolKind::Function {
-                            if let TypeKind::Fn(FunctionType { return_type, .. }) = &t.0 {
-                                return_type.to_string()
-                            } else {
-                                t.to_string()
-                            }
-                        } else {
-                            t.to_string()
-                        }
-                    }
-                    None => String::new(),
-                },
-                params_str: inferred_ty
-                    .as_ref()
-                    .map(format::format_type_params)
-                    .unwrap_or_default(),
-                line: sym.line.saturating_sub(1),
-                col: sym.col,
-                end_line: if sym.full_range.end.line > 0 {
-                    sym.full_range.end.line.saturating_sub(1)
-                } else {
-                    sym.line.saturating_sub(1)
-                },
-                end_col: if sym.full_range.end.line > 0 {
-                    sym.full_range.end.column
-                } else {
-                    sym.col + sym.name.len() as u32
-                },
-                has_explicit_type: sym.has_explicit_type,
-                is_async: sym.is_async,
-                is_generator: sym.is_generator,
-                is_arrow: if let Some(TypeKind::Fn(FunctionType { is_arrow, .. })) =
-                    inferred_ty.as_ref().map(|t| &t.0)
-                {
-                    *is_arrow
-                } else {
-                    false
-                },
-                doc: sym.doc.as_deref().map(|s| s.to_owned()),
-                members,
-                type_params: sym.type_params.iter().map(|s| s.to_string()).collect(),
-                ty: inferred_ty.unwrap_or(varn_checker::types::Type::Dynamic),
-                symbol_id,
-                global_key,
-                full_range: sym.full_range,
-                is_from_stdlib: sym.origin_module.as_deref().map_or(false, |m| {
-                    m.starts_with("std:") || m.starts_with("core:") || m.starts_with("runtime:")
-                }),
-                origin: sym.origin_module.as_deref().map(|s| s.to_owned()),
-            }
-        })
-        .collect();
-
-    let mut symbol_map: HashMap<String, SymbolKind> =
-        HashMap::with_capacity(sym_records.len() + 64);
-    for sym in &sym_records {
-        symbol_map.entry(sym.name.clone()).or_insert(sym.kind);
-    }
-
-    let mut all_symbols = sym_records;
-    symbols::inject_stdlib_symbols(
-        &mut all_symbols,
-        &mut symbol_map,
-        &result.bind,
-        &tokens,
-        &uri,
-    );
-    let extension_members = extensions::build_extension_members(&result.bind);
-
-    let (type_param_map, mut type_param_names) = params::collect_type_params(&tokens);
-
-    for sym in &all_symbols {
+    // Type-parameter names: the token scan, plus every `TypeParameter` the
+    // checker bound. Feeds semantic tokens, which has no other way to know a
+    // bare name in a type annotation is a parameter.
+    let (_type_param_map, mut type_param_names) = params::collect_type_params(&tokens);
+    for &id in &all_symbols {
+        let sym = result.bind.arena.get(id);
         if sym.kind == SymbolKind::TypeParameter {
-            type_param_names.insert(sym.name.clone());
-        }
-    }
-    for sym in &mut all_symbols {
-        if sym.line != crate::constants::STDLIB_LINE_MARKER && sym.type_params.is_empty() {
-            if let Some(tps) = type_param_map.get(&sym.name) {
-                sym.type_params = tps.clone();
-            }
+            type_param_names.insert(sym.name.to_string());
         }
     }
 
@@ -438,7 +223,6 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
             .into_iter()
             .map(|(k, v)| (k.to_string(), v))
             .collect(),
-        extension_members,
         member_resolutions: result.member_resolutions,
         call_resolutions: result.call_resolutions,
         bind: result.bind,
@@ -451,6 +235,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         uri,
         diagnostics,
         symbols: all_symbols,
+        resolved_types,
         tokens,
         trivia,
         symbol_map,

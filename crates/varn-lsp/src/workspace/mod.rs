@@ -142,12 +142,12 @@ impl Workspace {
 
 fn extract_exports(state: &DocumentState) -> ModuleExports {
     let mut exported_symbols = Vec::new();
-    for sym in &state.symbols {
-        if !sym.is_from_stdlib && sym.line != u32::MAX {
+    for sym in state.symbols() {
+        if !sym.is_from_stdlib() {
             exported_symbols.push(ExportedSymbol {
-                name: sym.name.clone(),
-                kind_str: format!("{:?}", sym.kind),
-                signature_str: format!("{}: {}", sym.type_str, sym.params_str),
+                name: sym.name().to_owned(),
+                kind_str: format!("{:?}", sym.kind()),
+                signature_str: format!("{}: {}", sym.type_str(), sym.params_str()),
             });
         }
     }

@@ -172,19 +172,19 @@ pub fn build_completions(state: &DocumentState, line: u32) -> Vec<CompletionItem
         });
     }
 
-    let mut seen: std::collections::HashMap<&str, &crate::document::SymbolRecord> =
+    let mut seen: std::collections::HashMap<&str, crate::document::SymbolView<'_>> =
         std::collections::HashMap::new();
-    for sym in &state.symbols {
-        if sym.kind == SymbolKind::Parameter {
+    for sym in state.symbols() {
+        if sym.kind() == SymbolKind::Parameter {
             continue;
         }
 
-        if scope_names.contains(&sym.name) {
+        if scope_names.contains(sym.name()) {
             continue;
         }
-        seen.entry(&sym.name)
+        seen.entry(sym.name())
             .and_modify(|prev| {
-                if symbol_priority(sym.kind) < symbol_priority(prev.kind) {
+                if symbol_priority(sym.kind()) < symbol_priority(prev.kind()) {
                     *prev = sym;
                 }
             })
@@ -192,23 +192,23 @@ pub fn build_completions(state: &DocumentState, line: u32) -> Vec<CompletionItem
     }
 
     for sym in seen.values() {
-        let detail = if sym.type_str.is_empty() {
+        let detail = if sym.type_str().is_empty() {
             None
         } else {
-            Some(sym.type_str.clone())
+            Some(sym.type_str())
         };
         let (insert_text, insert_text_format) =
-            if sym.kind == SymbolKind::Function && sym.line == STDLIB_LINE_MARKER {
+            if sym.kind() == SymbolKind::Function && sym.line() == STDLIB_LINE_MARKER {
                 (
-                    Some(format!("{}($0)", sym.name)),
+                    Some(format!("{}($0)", sym.name())),
                     Some(InsertTextFormat::SNIPPET),
                 )
             } else {
                 (None, None)
             };
         items.push(CompletionItem {
-            label: sym.name.clone(),
-            kind: Some(to_completion_kind(sym.kind)),
+            label: sym.name().to_owned(),
+            kind: Some(to_completion_kind(sym.kind())),
             detail,
             insert_text,
             insert_text_format,

@@ -1,7 +1,7 @@
 use varn_checker::symbol::SymbolId;
 use varn_core::TokenKind;
 
-use super::{DocumentState, SymbolRecord, TokenRecord};
+use super::{DocumentState, SymbolView, TokenRecord};
 
 impl DocumentState {
     pub fn identifier_token_at(&self, line: u32, col: u32) -> Option<&TokenRecord> {
@@ -33,8 +33,8 @@ impl DocumentState {
         self.checker_symbol_id_at_token(tok)
     }
 
-    pub fn checker_symbol_at(&self, line: u32, col: u32) -> Option<&SymbolRecord> {
+    pub fn checker_symbol_at(&self, line: u32, col: u32) -> Option<SymbolView<'_>> {
         let sid = self.checker_symbol_id_at(line, col)?;
-        self.symbols.iter().find(|s| s.symbol_id == Some(sid))
+        self.symbols().find(|s| s.id == sid)
     }
 }

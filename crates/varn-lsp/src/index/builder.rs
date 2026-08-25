@@ -1,35 +1,33 @@
+use crate::document::SymbolView;
 use varn_checker::SymbolKind;
 use varn_modules::resolver::path_to_uri;
 use varn_modules::spec::{CORE_PREFIX, STD_PREFIX};
 
-use crate::document::{import::uri_to_path, DocumentState, MemberRecord};
-use crate::util::kinds::member_to_symbol_kind;
+use crate::document::{import::uri_to_path, DocumentState};
 
 use super::{ExportEntry, ProjectIndex};
 
 pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
     let mut exports: Vec<ExportEntry> = state
-        .symbols
-        .iter()
-        .filter(|s| is_indexable(s.kind, s.line))
+        .symbols()
+        .filter(|s| is_indexable(s.kind(), s.line()))
         .map(|s| ExportEntry {
-            name: s.name.clone(),
-            global_key: s.global_key.clone(),
-            kind: s.kind,
+            name: s.name().to_owned(),
+            global_key: s.global_key(true),
+            kind: s.kind(),
             uri: uri.to_owned(),
-            line: s.line,
-            col: s.col,
-            type_str: s.type_str.clone(),
-            doc: s.doc.clone(),
+            line: s.line(),
+            col: s.col(),
+            type_str: s.type_str(),
+            doc: s.doc().map(str::to_owned),
         })
         .collect();
 
     for sym in state
-        .symbols
-        .iter()
-        .filter(|s| is_indexable(s.kind, s.line))
+        .symbols()
+        .filter(|s| is_indexable(s.kind(), s.line()))
     {
-        collect_member_exports(uri, &sym.name, &sym.members, &mut exports);
+        collect_member_exports(state, uri, sym, &mut exports);
     }
 
     for export in &exports {
@@ -68,33 +66,39 @@ pub fn index_file(index: &mut ProjectIndex, uri: &str, state: &DocumentState) {
     }
 }
 
+/// Index the members `sym` declares, so a cross-file lookup can reach them.
+///
+/// Asked of the checker rather than read from a mirrored member tree. Only
+/// members the checker located are indexed: one with no `def_line` has no
+/// source of its own, and an index entry pointing nowhere is worse than none.
 fn collect_member_exports(
+    state: &crate::document::DocumentState,
     uri: &str,
-    parent_name: &str,
-    members: &[MemberRecord],
+    sym: SymbolView<'_>,
     out: &mut Vec<ExportEntry>,
 ) {
-    for m in members {
-        if m.line != u32::MAX {
-            let sid = m
-                .symbol_id
-                .map(|id| id.to_string())
-                .unwrap_or_else(|| "none".to_owned());
-            let key = format!("member:{parent_name}:{}:{sid}", m.name);
-            out.push(ExportEntry {
-                name: m.name.clone(),
-                global_key: key,
-                kind: member_to_symbol_kind(m.kind),
-                uri: uri.to_owned(),
-                line: m.line,
-                col: m.col,
-                type_str: m.type_str.clone(),
-                doc: None,
-            });
-        }
-        if !m.members.is_empty() {
-            collect_member_exports(uri, &m.name, &m.members, out);
-        }
+    for m in state.members_of(sym) {
+        let Some(line) = m.def_line else { continue };
+        out.push(ExportEntry {
+            name: m.name.to_string(),
+            global_key: format!("member:{}:{}", sym.name(), m.name),
+            kind: summary_to_symbol_kind(m.kind),
+            uri: uri.to_owned(),
+            line: line.saturating_sub(1),
+            col: m.def_col,
+            type_str: m.ty.to_string(),
+            doc: None,
+        });
+    }
+}
+
+fn summary_to_symbol_kind(k: varn_checker::ResolvedMemberKind) -> varn_checker::SymbolKind {
+    use varn_checker::ResolvedMemberKind as R;
+    use varn_checker::SymbolKind as S;
+    match k {
+        R::Method | R::StaticMethod | R::ExtensionMethod => S::Method,
+        R::EnumMember => S::EnumMember,
+        _ => S::Property,
     }
 }
 

@@ -27,12 +27,11 @@ fn dangling_dot_does_not_swallow_the_next_declaration() {
     let state = analyze("const g: str = \"hola\"\nconst n = g.\nconst m = 42\n");
 
     let m = state
-        .symbols
-        .iter()
-        .find(|s| s.name == "m")
+        .symbols()
+        .find(|s| s.name() == "m")
         .expect("`m` must still be declared: the dangling dot on the line above must not eat it");
     assert_eq!(
-        m.kind,
+        m.kind(),
         SymbolKind::Const,
         "`m` must bind as a const declaration, not as a bare assignment expression"
     );
@@ -114,10 +113,10 @@ fn unparseable_statement_does_not_drop_its_neighbours() {
 
     for name in ["a", "c"] {
         assert!(
-            state.symbols.iter().any(|s| s.name == name),
+            state.symbols().any(|s| s.name() == name),
             "`{name}` must survive recovery from the malformed declaration between them; \
              bound symbols: {:?}",
-            state.symbols.iter().map(|s| &s.name).collect::<Vec<_>>()
+            state.symbols().map(|s| s.name()).collect::<Vec<_>>()
         );
     }
 }

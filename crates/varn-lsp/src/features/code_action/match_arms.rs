@@ -253,9 +253,9 @@ fn resolve_variants(
 
     // Search in AST for Enum declarations matching subject identifier
     if let Some(ident) = &match_info.subject_ident {
-        for s in &state.symbols {
-            if s.name == *ident {
-                let ty_str = s.ty.to_string();
+        for s in state.symbols() {
+            if s.name() == *ident {
+                let ty_str = s.ty().to_string();
                 for stmt in &program.body {
                     if let StmtKind::Decl(decl) = &stmt.kind {
                         if let Decl::Enum(e) = decl.as_ref() {

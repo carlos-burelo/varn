@@ -71,6 +71,16 @@ pub fn resolve_token(
             | varn_checker::ResolvedMemberKind::ExtensionProperty
             | varn_checker::ResolvedMemberKind::Getter
             | varn_checker::ResolvedMemberKind::Setter => TT_PROPERTY,
+            varn_checker::ResolvedMemberKind::Constructor => TT_FUNCTION,
+            // A type declared inside another paints as the declaration it is.
+            varn_checker::ResolvedMemberKind::NestedType(k) => match k {
+                varn_checker::NestedTypeKind::Interface => TT_INTERFACE,
+                varn_checker::NestedTypeKind::Namespace => TT_NAMESPACE,
+                varn_checker::NestedTypeKind::Enum => TT_TYPE,
+                varn_checker::NestedTypeKind::Class | varn_checker::NestedTypeKind::Struct => {
+                    TT_CLASS
+                }
+            },
         });
     }
 

@@ -104,9 +104,8 @@ impl Backend {
                     a.workspace.update_file(uri_str.clone(), source);
                     let analysis = a.workspace.get(&uri_str)?;
                     let user_syms = analysis
-                        .symbols
-                        .iter()
-                        .filter(|s| s.line != u32::MAX)
+                        .symbols()
+                        .filter(|s| s.line() != u32::MAX)
                         .count();
                     Some((
                         convert_diagnostics(&analysis),

@@ -72,23 +72,23 @@ pub fn build_code_lenses(
     });
 
     // 2. Symbol-level lenses
-    for sym in &analysis.symbols {
-        if sym.line == u32::MAX || sym.is_from_stdlib {
+    for sym in analysis.symbols() {
+        if sym.line() == u32::MAX || sym.is_from_stdlib() {
             continue;
         }
 
         let sym_range = Range {
             start: Position {
-                line: sym.line,
-                character: sym.col,
+                line: sym.line(),
+                character: sym.col(),
             },
             end: Position {
-                line: sym.line,
-                character: sym.col + sym.name.len() as u32,
+                line: sym.line(),
+                character: sym.col() + sym.name().len() as u32,
             },
         };
 
-        if sym.name == "main" {
+        if sym.name() == "main" {
             lenses.push(CodeLens {
                 range: sym_range,
                 command: Some(Command {
@@ -107,7 +107,7 @@ pub fn build_code_lenses(
                 }),
                 data: None,
             });
-        } else if sym.name.starts_with("test_") {
+        } else if sym.name().starts_with("test_") {
             lenses.push(CodeLens {
                 range: sym_range,
                 command: Some(Command {
@@ -115,12 +115,12 @@ pub fn build_code_lenses(
                     command: "varn.runTest".to_string(),
                     arguments: Some(vec![
                         serde_json::to_value(uri_str.clone()).unwrap(),
-                        serde_json::to_value(sym.name.clone()).unwrap(),
+                        serde_json::to_value(sym.name().to_owned()).unwrap(),
                     ]),
                 }),
                 data: None,
             });
-        } else if sym.name.starts_with("bench_") {
+        } else if sym.name().starts_with("bench_") {
             lenses.push(CodeLens {
                 range: sym_range,
                 command: Some(Command {
@@ -128,7 +128,7 @@ pub fn build_code_lenses(
                     command: "varn.runBenchmark".to_string(),
                     arguments: Some(vec![
                         serde_json::to_value(uri_str.clone()).unwrap(),
-                        serde_json::to_value(sym.name.clone()).unwrap(),
+                        serde_json::to_value(sym.name().to_owned()).unwrap(),
                     ]),
                 }),
                 data: None,
@@ -137,11 +137,11 @@ pub fn build_code_lenses(
 
         // Reference count lens for top-level functions and classes
         if matches!(
-            sym.kind,
+            sym.kind(),
             SymbolKind::Function | SymbolKind::Class | SymbolKind::Interface
         ) {
             if let Some(ws) = workspace {
-                let ref_count = count_references(analysis, ws, sym.line, sym.col);
+                let ref_count = count_references(analysis, ws, sym.line(), sym.col());
                 if ref_count > 0 {
                     let title = if ref_count == 1 {
                         "1 reference".to_string()
@@ -155,8 +155,8 @@ pub fn build_code_lenses(
                             command: "varn.findReferences".to_string(),
                             arguments: Some(vec![
                                 serde_json::to_value(uri_str.clone()).unwrap(),
-                                serde_json::to_value(sym.line).unwrap(),
-                                serde_json::to_value(sym.col).unwrap(),
+                                serde_json::to_value(sym.line()).unwrap(),
+                                serde_json::to_value(sym.col()).unwrap(),
                             ]),
                         }),
                         data: None,

@@ -1,3 +1,4 @@
+use crate::document::SymbolView;
 use tower_lsp::lsp_types::{InlayHint, InlayHintKind, InlayHintLabel, Position};
 use varn_checker::SymbolKind;
 use varn_core::ast::{Expr, ExprKind, Program, Stmt, StmtKind};
@@ -8,22 +9,22 @@ use crate::document::DocumentState;
 pub fn build_type_hints(state: &DocumentState) -> Vec<InlayHint> {
     let mut hints = Vec::new();
 
-    for s in &state.symbols {
-        if s.line == u32::MAX || s.is_from_stdlib {
+    for s in state.symbols() {
+        if s.line() == u32::MAX || s.is_from_stdlib() {
             continue;
         }
 
-        match s.kind {
+        match s.kind() {
             SymbolKind::Const | SymbolKind::Let | SymbolKind::Var
-                if !s.has_explicit_type && !s.type_str.is_empty() =>
+                if !s.has_explicit_type() && !s.type_str().is_empty() =>
             {
-                let hint_col = s.col + s.name.len() as u32;
+                let hint_col = s.col() + s.name().len() as u32;
                 hints.push(InlayHint {
                     position: Position {
-                        line: s.line,
+                        line: s.line(),
                         character: hint_col,
                     },
-                    label: InlayHintLabel::String(format!(": {}", s.type_str)),
+                    label: InlayHintLabel::String(format!(": {}", s.type_str())),
                     kind: Some(InlayHintKind::TYPE),
                     text_edits: None,
                     tooltip: None,
@@ -50,12 +51,12 @@ pub fn build_type_hints(state: &DocumentState) -> Vec<InlayHint> {
     hints
 }
 
-fn fn_return_hint(state: &DocumentState, sym: &crate::document::SymbolRecord) -> Option<InlayHint> {
-    if sym.has_explicit_type {
+fn fn_return_hint(state: &DocumentState, sym: SymbolView<'_>) -> Option<InlayHint> {
+    if sym.has_explicit_type() {
         return None;
     }
 
-    let ret_ty = match &sym.ty.0 {
+    let ret_ty = match &sym.ty().0 {
         TypeKind::Fn(ft) => ft.return_type.as_ref(),
         _ => return None,
     };
@@ -69,11 +70,11 @@ fn fn_return_hint(state: &DocumentState, sym: &crate::document::SymbolRecord) ->
         return None;
     }
 
-    let rparen_col = find_rparen_col_on_line(state, sym.line, sym.col)?;
+    let rparen_col = find_rparen_col_on_line(state, sym.line(), sym.col())?;
 
     Some(InlayHint {
         position: Position {
-            line: sym.line,
+            line: sym.line(),
             character: rparen_col + 1,
         },
         label: InlayHintLabel::String(format!(": {ret_str}")),

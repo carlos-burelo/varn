@@ -17,13 +17,13 @@ pub fn build_goto_implementation(
 
     // Check if target is an interface or class in current file
     let (is_interface, is_class_or_method) = {
-        let is_iface = state.symbols.iter().any(|s| {
-            s.name == *target_name && s.kind == varn_checker::SymbolKind::Interface
+        let is_iface = state.symbols().any(|s| {
+            s.name() == *target_name && s.kind() == varn_checker::SymbolKind::Interface
         });
-        let is_cls = state.symbols.iter().any(|s| {
-            s.name == *target_name
+        let is_cls = state.symbols().any(|s| {
+            s.name() == *target_name
                 && matches!(
-                    s.kind,
+                    s.kind(),
                     varn_checker::SymbolKind::Class | varn_checker::SymbolKind::Method
                 )
         });

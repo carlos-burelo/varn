@@ -9,10 +9,9 @@ pub use members::{format_enum_member, format_member_sig};
 pub use symbols::symbol_hover;
 
 use tower_lsp::lsp_types::{Hover, HoverContents, MarkupContent, MarkupKind};
-use varn_checker::SymbolKind;
 use varn_core::TokenKind;
 
-use crate::document::{ChainResult, DocumentState, MemberKind};
+use crate::document::{ChainResult, DocumentState};
 use crate::query;
 
 pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> {
@@ -124,6 +123,14 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
                 varn_checker::ResolvedMemberKind::Property => {
                     format!("(property) {}.{}: {}", parent_str, mem_res.member_name, mem_res.member_ty)
                 }
+                varn_checker::ResolvedMemberKind::Constructor => {
+                    format!("(constructor) {}({})", parent_str, format_member_params(&mem_res.member_ty))
+                }
+                // A nested type reads as the declaration it is — `class A.B`,
+                // not `(property) A.B: B`.
+                varn_checker::ResolvedMemberKind::NestedType(k) => {
+                    format!("{} {}.{}", k.label(), parent_str, mem_res.member_name)
+                }
             };
             return Some(make_lang_hover(sig));
         }
@@ -132,34 +139,23 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
     if let Some(res) = query::resolve_chain(state, line, col) {
         match res {
             ChainResult::Symbol(sym) => {
-                if sym.is_from_stdlib {
+                if sym.is_from_stdlib() {
                     if let Some((_, tok)) = tok_any {
                         if let Some(h) = intrinsic_or_keyword_hover(tok) {
                             return Some(h);
                         }
                     }
                 }
-                return Some(symbol_hover(sym));
+                return Some(symbol_hover(state, sym));
             }
             ChainResult::Member {
                 member,
                 parent_name,
             } => {
-                let sig = if member.kind == MemberKind::EnumMember {
-                    format_enum_member(&parent_name, &member.name, &member.init_value)
+                let sig = if member.kind == varn_checker::ResolvedMemberKind::EnumMember {
+                    format_enum_member(&parent_name, &member.name, "")
                 } else {
-                    format_member_sig(&parent_name, member)
-                };
-                return Some(make_lang_hover(sig));
-            }
-            ChainResult::DynamicMember {
-                member,
-                parent_name,
-            } => {
-                let sig = if member.kind == MemberKind::EnumMember {
-                    format_enum_member(&parent_name, &member.name, &member.init_value)
-                } else {
-                    format_member_sig(&parent_name, &member)
+                    format_member_sig(state, &parent_name, &member)
                 };
                 return Some(make_lang_hover(sig));
             }
@@ -167,21 +163,23 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
     }
 
     if let Some(sym) = query::symbol_at(state, line, col) {
-        if sym.is_from_stdlib {
+        if sym.is_from_stdlib() {
             if let Some((_, tok)) = tok_any {
                 if let Some(h) = intrinsic_or_keyword_hover(tok) {
                     return Some(h);
                 }
             }
         }
-        return Some(symbol_hover(sym));
+        return Some(symbol_hover(state, sym));
     }
 
-    if let Some((parent_name, parent_kind, member)) = query::member_at(state, line, col) {
-        let sig = if parent_kind == SymbolKind::Enum && member.kind == MemberKind::EnumMember {
-            format_enum_member(&parent_name, &member.name, &member.init_value)
+    if let Some((parent_name, member)) = query::member_at(state, line, col) {
+        // The member's own kind decides; the parent's kind was only ever a
+        // proxy for it, and the checker states it outright.
+        let sig = if member.kind == varn_checker::ResolvedMemberKind::EnumMember {
+            format_enum_member(&parent_name, &member.name, "")
         } else {
-            format_member_sig(&parent_name, member)
+            format_member_sig(state, &parent_name, &member)
         };
         return Some(make_lang_hover(sig));
     }
@@ -231,3 +229,11 @@ fn format_fn_params(params: &[varn_checker::types::FunctionParam]) -> String {
         .join(", ")
 }
 
+
+/// The parameter list of a member whose type is a function, else empty.
+fn format_member_params(ty: &varn_checker::Type) -> String {
+    match &ty.0 {
+        varn_core::TypeKind::Fn(ft) => format_fn_params(&ft.params),
+        _ => String::new(),
+    }
+}

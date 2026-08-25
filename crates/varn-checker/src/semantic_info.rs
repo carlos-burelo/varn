@@ -13,6 +13,24 @@ pub enum ResolvedMemberKind {
     StaticProperty,
     ExtensionMethod,
     ExtensionProperty,
+    /// A type declared *inside* another — a class in a namespace, an enum in a
+    /// class. Distinct from `Property` because an editor renders it as the
+    /// declaration it is, not as a field that happens to hold a type.
+    ///
+    /// These used to collapse to `Property` here and be recovered from a
+    /// parallel `MemberKind` in the language server, which is why that enum
+    /// outlived the table it belonged to.
+    NestedType(NestedTypeKind),
+    Constructor,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NestedTypeKind {
+    Class,
+    Interface,
+    Namespace,
+    Enum,
+    Struct,
 }
 
 impl ResolvedMemberKind {
@@ -27,6 +45,20 @@ impl ResolvedMemberKind {
             ResolvedMemberKind::StaticProperty => "static property",
             ResolvedMemberKind::ExtensionMethod => "extension method",
             ResolvedMemberKind::ExtensionProperty => "extension property",
+            ResolvedMemberKind::Constructor => "constructor",
+            ResolvedMemberKind::NestedType(k) => k.label(),
+        }
+    }
+}
+
+impl NestedTypeKind {
+    pub fn label(&self) -> &'static str {
+        match self {
+            NestedTypeKind::Class => "class",
+            NestedTypeKind::Interface => "interface",
+            NestedTypeKind::Namespace => "namespace",
+            NestedTypeKind::Enum => "enum",
+            NestedTypeKind::Struct => "struct",
         }
     }
 }
@@ -66,5 +98,16 @@ pub struct ResolvedMemberSummary {
     pub is_static: bool,
     pub optional: bool,
     pub readonly: bool,
+    /// Where the member is declared, 1-based, when it is declared in source.
+    ///
+    /// `None` for a member that has no source of its own: one read out of a
+    /// precompiled interface blob, or synthesised (a tuple index, an intrinsic
+    /// property). An editor needs this to offer "go to" and to build an
+    /// outline, so a summary without it forces the caller to keep a parallel
+    /// table that has it — which is exactly what this replaces.
+    pub def_line: Option<u32>,
+    pub def_col: u32,
+    pub is_async: bool,
+    pub is_generator: bool,
 }
 

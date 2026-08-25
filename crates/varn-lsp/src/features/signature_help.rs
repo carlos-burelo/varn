@@ -57,18 +57,18 @@ pub fn build_signature_help(state: &DocumentState, line: u32, col: u32) -> Optio
         use crate::document::ChainResult;
         let (params_str, ret_str) = match chain {
             ChainResult::Symbol(sym) => {
-                if let TypeKind::Fn(ft) = &sym.ty.0 {
+                if let TypeKind::Fn(ft) = &sym.ty().0 {
                     (format_params(ft), ft.return_type.to_string())
                 } else {
-                    (sym.params_str.clone(), sym.type_str.clone())
+                    (sym.params_str(), sym.type_str())
                 }
             }
-            ChainResult::Member { member, .. } => {
-                (member.params_str.clone(), member.type_str.clone())
-            }
-            ChainResult::DynamicMember { member, .. } => {
-                (member.params_str.clone(), member.type_str.clone())
-            }
+            // Derived from the member's type at render time; the record this
+            // replaced carried both halves pre-flattened into `String`s.
+            ChainResult::Member { member, .. } => match &member.ty.0 {
+                TypeKind::Fn(ft) => (format_params(ft), ft.return_type.to_string()),
+                _ => (String::new(), member.ty.to_string()),
+            },
         };
         return build_signature_response(&fn_tok.lexeme, &params_str, &ret_str, active_param);
     }

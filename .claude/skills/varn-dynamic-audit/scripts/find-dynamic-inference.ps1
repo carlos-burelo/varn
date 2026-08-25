@@ -33,9 +33,9 @@
     Emit findings as JSON instead of the human-readable report.
 
 .EXAMPLE
-    pwsh -File scripts/find-dynamic-inference.ps1
-    pwsh -File scripts/find-dynamic-inference.ps1 -InferredOnly
-    pwsh -File scripts/find-dynamic-inference.ps1 -Path tests/47-isolates-multithread.vn -ShowAll
+    pwsh -File .claude/skills/varn-dynamic-audit/scripts/find-dynamic-inference.ps1
+    pwsh -File .claude/skills/varn-dynamic-audit/scripts/find-dynamic-inference.ps1 -InferredOnly
+    pwsh -File .claude/skills/varn-dynamic-audit/scripts/find-dynamic-inference.ps1 -Path tests/47-isolates-multithread.vn -ShowAll
 #>
 [CmdletBinding()]
 param(
@@ -53,7 +53,20 @@ $PSNativeCommandUseErrorActionPreference = $false
 # vn prints UTF-8 (the hover `→` etc.). Decode native output as UTF-8 so it
 # isn't mangled by the console's OEM codepage (would break the line regex).
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
-$repoRoot = Split-Path -Parent $PSScriptRoot
+# The script lives under .claude/skills/<skill>/scripts/, so the repo root is not
+# a fixed number of levels up. Walk parents until the workspace manifest appears;
+# fall back to the current directory when invoked from outside the tree.
+function Resolve-RepoRoot {
+    $dir = $PSScriptRoot
+    while ($dir) {
+        if (Test-Path (Join-Path $dir "Cargo.toml")) { return $dir }
+        $parent = Split-Path -Parent $dir
+        if ($parent -eq $dir) { break }
+        $dir = $parent
+    }
+    return (Get-Location).Path
+}
+$repoRoot = Resolve-RepoRoot
 
 function Resolve-VnBin {
     param([string]$Explicit)

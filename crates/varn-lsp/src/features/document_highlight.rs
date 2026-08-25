@@ -61,10 +61,9 @@ pub fn build_document_highlights(
     }
 
     let decl_positions: HashSet<(u32, u32)> = state
-        .symbols
-        .iter()
-        .filter(|s| s.name == name && s.line != u32::MAX)
-        .map(|s| (s.line, s.col))
+        .symbols()
+        .filter(|s| s.name() == name && s.line() != u32::MAX)
+        .map(|s| (s.line(), s.col()))
         .collect();
 
     state
