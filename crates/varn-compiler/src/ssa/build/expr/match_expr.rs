@@ -109,12 +109,29 @@ impl Builder {
                 HirCaseTest::Wildcard | HirCaseTest::Bind(_) | HirCaseTest::Record { .. } => None,
                 HirCaseTest::Literal(lit) => {
                     let litv = self.lower_expr(lit)?;
+                    let subj_ty = self
+                        .values
+                        .get(subj.0 as usize)
+                        .map_or(HirType::Dynamic, |v| v.ty);
+                    let lit_ty = self
+                        .values
+                        .get(litv.0 as usize)
+                        .map_or(HirType::Dynamic, |v| v.ty);
+                    let eq_ty = if subj_ty == lit_ty
+                        && matches!(
+                            subj_ty,
+                            HirType::Int | HirType::Float | HirType::Bool | HirType::Str
+                        ) {
+                        subj_ty
+                    } else {
+                        HirType::Dynamic
+                    };
                     Some(self.emit(
                         InstKind::Binary {
                             op: HirBinOp::Eq,
                             lhs: subj,
                             rhs: litv,
-                            ty: HirType::Dynamic,
+                            ty: eq_ty,
                         },
                         HirType::Bool,
                     ))
@@ -133,7 +150,7 @@ impl Builder {
                             op: HirBinOp::Eq,
                             lhs: tag,
                             rhs: namev,
-                            ty: HirType::Dynamic,
+                            ty: HirType::Str,
                         },
                         HirType::Bool,
                     ))

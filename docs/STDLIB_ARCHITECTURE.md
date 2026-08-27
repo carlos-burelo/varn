@@ -51,6 +51,7 @@ flowchart TD
 | `std:testing` | Framework de pruebas unitarias y aserciones. | `varn-builtins::testing` |
 | `std:result` | Tipos algebraicos monádicos `Option<T>` y `Result<T, E>`. | — |
 | `std:collections` | Estructuras de datos avanzadas (`Deque`, `PriorityQueue`). | — |
+| `std:markdown` | Parser de Markdown CommonMark/GFM a AST, renderizado a HTML y utilidades de extracción. | — |
 
 ---
 

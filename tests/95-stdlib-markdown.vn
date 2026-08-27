@@ -1,0 +1,143 @@
+import { Markdown, MarkdownNode, MarkdownOptions } from "std:markdown";
+import { assert, assertEqual } from "std:test";
+
+print("=== Suite: std:markdown (CommonMark & GFM Markdown Parser) ===");
+
+// 1. Headings and Slugify
+let mdHeadings = "# Main Title\n## Sub Title ##\n### Section 3\n###### Level 6";
+let headingsAst = Markdown.parse(mdHeadings);
+assertEqual(headingsAst.children.length, 4);
+assertEqual(headingsAst.children[0].type, "heading");
+assertEqual(headingsAst.children[0].level, 1);
+assertEqual(headingsAst.children[0].text, "Main Title");
+assertEqual(headingsAst.children[1].level, 2);
+assertEqual(headingsAst.children[1].text, "Sub Title");
+assertEqual(headingsAst.children[2].level, 3);
+assertEqual(headingsAst.children[3].level, 6);
+
+let renderedH1 = Markdown.render("# Hello World");
+assertEqual(renderedH1, "<h1>Hello World</h1>\n");
+
+let slug = Markdown.slugify("Varn 1.0: Next-Gen Language & Runtime!");
+assertEqual(slug, "varn-10-next-gen-language-runtime");
+
+let extractedHeadings = Markdown.extractHeadings("# Introduction\nSome text\n## Quick Start\nMore text\n### API Reference");
+assertEqual(extractedHeadings.length, 3);
+assertEqual(extractedHeadings[0].level, 1);
+assertEqual(extractedHeadings[0].text, "Introduction");
+assertEqual(extractedHeadings[0].id, "introduction");
+assertEqual(extractedHeadings[1].text, "Quick Start");
+assertEqual(extractedHeadings[1].id, "quick-start");
+assertEqual(extractedHeadings[2].text, "API Reference");
+assertEqual(extractedHeadings[2].id, "api-reference");
+print("  ✔ Headings, AST levels, slugification and ToC extraction");
+
+// 2. Paragraphs and Inlines (Bold, Italic, Strikethrough, Inline Code)
+let mdInlines = "This is **bold text**, *italic text*, ***bold and italic***, ~~strikethrough~~, and `inline_code()`.";
+let htmlInlines = Markdown.render(mdInlines);
+assert(htmlInlines.includes("<strong>bold text</strong>"));
+assert(htmlInlines.includes("<em>italic text</em>"));
+assert(htmlInlines.includes("<strong><em>bold and italic</em></strong>"));
+assert(htmlInlines.includes("<del>strikethrough</del>"));
+assert(htmlInlines.includes("<code>inline_code()</code>"));
+print("  ✔ Inline styles: bold, italic, bold+italic, strikethrough, inline code");
+
+// 3. Fenced and Indented Code Blocks
+let mdFenced = "```varn\nlet msg = \"Hello from Varn\";\nprint(msg);\n```";
+let htmlFenced = Markdown.render(mdFenced);
+assertEqual(htmlFenced, "<pre><code class=\"language-varn\">let msg = &quot;Hello from Varn&quot;;\nprint(msg);\n</code></pre>\n");
+
+let mdIndented = "    let x = 10;\n    let y = 20;";
+let htmlIndented = Markdown.render(mdIndented);
+assertEqual(htmlIndented, "<pre><code>let x = 10;\nlet y = 20;\n</code></pre>\n");
+print("  ✔ Fenced syntax highlighting code blocks and indented code blocks");
+
+// 4. Blockquotes and Nested Content
+let mdQuote = "> This is a blockquote.\n> Second line of quote.";
+let htmlQuote = Markdown.render(mdQuote);
+assertEqual(htmlQuote, "<blockquote>\n<p>This is a blockquote.\nSecond line of quote.</p>\n</blockquote>\n");
+print("  ✔ Blockquotes and multiline quote wrapping");
+
+// 5. Links, Images and Autolinks
+let mdLinks = "Visit [Varn Language](https://varn-lang.org \"Official Site\") or check ![Varn Logo](https://varn-lang.org/logo.png \"Logo\"). Also check <https://github.com/carlos-burelo/varn>.";
+let htmlLinks = Markdown.render(mdLinks);
+assert(htmlLinks.includes("<a href=\"https://varn-lang.org\" title=\"Official Site\">Varn Language</a>"));
+assert(htmlLinks.includes("<img src=\"https://varn-lang.org/logo.png\" alt=\"Varn Logo\" title=\"Logo\">"));
+assert(htmlLinks.includes("<a href=\"https://github.com/carlos-burelo/varn\">https://github.com/carlos-burelo/varn</a>"));
+
+let extractedLinks = Markdown.extractLinks(mdLinks);
+assertEqual(extractedLinks.length, 3);
+assertEqual(extractedLinks[0].text, "Varn Language");
+assertEqual(extractedLinks[0].url, "https://varn-lang.org");
+assertEqual(extractedLinks[0].title, "Official Site");
+assertEqual(extractedLinks[0].isImage, false);
+
+assertEqual(extractedLinks[1].text, "Varn Logo");
+assertEqual(extractedLinks[1].url, "https://varn-lang.org/logo.png");
+assertEqual(extractedLinks[1].title, "Logo");
+assertEqual(extractedLinks[1].isImage, true);
+
+assertEqual(extractedLinks[2].url, "https://github.com/carlos-burelo/varn");
+print("  ✔ Links, titled links, images, autolinks and link extractor");
+
+// 6. Lists (Unordered, Ordered, Task lists)
+let mdLists = "- Item 1\n- Item 2 with **bold**\n- Item 3";
+let htmlLists = Markdown.render(mdLists);
+assertEqual(htmlLists, "<ul>\n<li>Item 1</li>\n<li>Item 2 with <strong>bold</strong></li>\n<li>Item 3</li>\n</ul>\n");
+
+let mdOrdered = "1. First\n2. Second\n3. Third";
+let htmlOrdered = Markdown.render(mdOrdered);
+assertEqual(htmlOrdered, "<ol>\n<li>First</li>\n<li>Second</li>\n<li>Third</li>\n</ol>\n");
+
+let mdOrderedStart = "5. Fifth item\n6. Sixth item";
+let htmlOrderedStart = Markdown.render(mdOrderedStart);
+assertEqual(htmlOrderedStart, "<ol start=\"5\">\n<li>Fifth item</li>\n<li>Sixth item</li>\n</ol>\n");
+
+let mdTasks = "- [ ] Pending task\n- [x] Completed task";
+let htmlTasks = Markdown.render(mdTasks);
+assert(htmlTasks.includes("<li><input type=\"checkbox\" disabled> Pending task</li>"));
+assert(htmlTasks.includes("<li><input type=\"checkbox\" checked=\"\" disabled> Completed task</li>"));
+print("  ✔ Unordered lists, ordered lists with start offset, and GFM task lists");
+
+// 7. GFM Pipe Tables with Alignments
+let mdTable = "| Feature | Status | Speed |\n|:---|:---:|---:|\n| JIT | Active | Fast |\n| GC | Generational | 10x |";
+let htmlTable = Markdown.render(mdTable);
+assert(htmlTable.startsWith("<table>\n<thead>\n<tr><th align=\"left\">Feature</th><th align=\"center\">Status</th><th align=\"right\">Speed</th></tr>\n</thead>\n"));
+assert(htmlTable.includes("<tbody>\n<tr><td align=\"left\">JIT</td><td align=\"center\">Active</td><td align=\"right\">Fast</td></tr>"));
+assert(htmlTable.includes("<tr><td align=\"left\">GC</td><td align=\"center\">Generational</td><td align=\"right\">10x</td></tr>\n</tbody>\n</table>\n"));
+print("  ✔ GFM Tables with column alignment headers and cell rows");
+
+// 8. Thematic Breaks / Horizontal Rules
+let mdHR = "Paragraph 1\n\n---\n\nParagraph 2";
+let htmlHR = Markdown.render(mdHR);
+assertEqual(htmlHR, "<p>Paragraph 1</p>\n<hr>\n<p>Paragraph 2</p>\n");
+print("  ✔ Thematic breaks / horizontal rules");
+
+// 9. Plain Text Extractor (toPlainText)
+let mdComplex = "# Title\n\nThis is **formatted** markdown with `code` and [links](https://example.com).\n\n```\nlet block = 1;\n```";
+let plainText = Markdown.toPlainText(mdComplex);
+assert(plainText.includes("Title"));
+assert(plainText.includes("This is formatted markdown with code and links."));
+assert(plainText.includes("let block = 1;"));
+assert(!plainText.includes("**"));
+assert(!plainText.includes("```"));
+assert(!plainText.includes("<h1>"));
+print("  ✔ Plain text stripping and conversion (toPlainText)");
+
+// 10. Options (XHTML mode, HTML escaping, line breaks)
+let mdXhtml = "![Alt](img.png)\n\n---";
+let htmlXhtml = Markdown.render(mdXhtml, { xhtml: true });
+assert(htmlXhtml.includes("<img src=\"img.png\" alt=\"Alt\" />"));
+assert(htmlXhtml.includes("<hr />"));
+
+let mdXss = "<script>alert('xss')</script>";
+let htmlEscaped = Markdown.render(mdXss, { escapeHtml: true });
+assertEqual(htmlEscaped, "<p>&lt;script&gt;alert('xss')&lt;/script&gt;</p>\n");
+assert(!htmlEscaped.includes("<script>"));
+
+let mdBreaks = "Line 1\nLine 2";
+let htmlBreaks = Markdown.render(mdBreaks, { breaks: true });
+assertEqual(htmlBreaks, "<p>Line 1<br>\nLine 2</p>\n");
+print("  ✔ Configurable options (xhtml tags, html sanitization, soft breaks)");
+
+print("[PASSED] 95. Canonical std:markdown (CommonMark & GFM Parser, AST, HTML Renderer, Table of Contents, Link Extractor)");

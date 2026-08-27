@@ -91,7 +91,8 @@ import "./90-multi-catch.vn"
 import "./92-ffi-extended.vn"
 import "./93-match-guards-spread-predicates.vn"
 import "./94-ecma-features-and-meta-reflection.vn"
+import "./95-stdlib-markdown.vn"
 
-print("\n93 side-effect modules executed in suite")
+print("\n94 side-effect modules executed in suite")
 assertSummary()
 
