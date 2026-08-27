@@ -222,7 +222,17 @@ impl ObjData<[Cell<VmValue>]> {
 
     #[inline]
     pub fn get(&self, name: &str) -> Option<VmValue> {
-        let slot = self.shape().property_names.get(name).copied()?;
+        let shape = self.shape();
+        let ordered = shape.ordered_names();
+        if ordered.len() <= 4 {
+            for (slot, prop_name) in ordered.iter().enumerate() {
+                if prop_name.as_ref() == name {
+                    return self.field_at(slot);
+                }
+            }
+            return None;
+        }
+        let slot = shape.property_names.get(name).copied()?;
         self.field_at(slot)
     }
 
@@ -308,7 +318,12 @@ impl ObjData<[Cell<VmValue>]> {
 
     #[inline]
     pub fn contains_key(&self, name: &str) -> bool {
-        self.shape().property_names.contains_key(name)
+        let shape = self.shape();
+        let ordered = shape.ordered_names();
+        if ordered.len() <= 4 {
+            return ordered.iter().any(|p| p.as_ref() == name);
+        }
+        shape.property_names.contains_key(name)
     }
 
     /// Number of fields the object exposes — the shape is the authority, not
@@ -396,6 +411,41 @@ impl ObjData<[Cell<VmValue>]> {
     #[inline]
     pub fn set_field_nv(&self, key: RuntimeString, value: VmValue) {
         self.insert(key, value);
+    }
+
+    #[inline]
+    pub fn set_field_str(&self, key: &str, value: VmValue) {
+        let shape = self.shape();
+        let ordered = shape.ordered_names();
+        let existing_slot = if ordered.len() <= 4 {
+            ordered.iter().position(|p| p.as_ref() == key)
+        } else {
+            shape.property_names.get(key).copied()
+        };
+        if let Some(slot) = existing_slot {
+            if self.set_field_at(slot, value) {
+                return;
+            }
+            let overflow = self.overflow_mut();
+            overflow.resize(slot - self.inline_len() + 1, VmValue::null());
+            overflow[slot - self.inline_len()] = value;
+            return;
+        }
+
+        let new_shape = self.shape().transition_str(key);
+        let slot = new_shape.property_names[key];
+        self.set_shape(new_shape);
+
+        let base = self.inline_len();
+        if slot < base {
+            self.values[slot].set(value);
+            return;
+        }
+        let overflow = self.overflow_mut();
+        if slot - base >= overflow.len() {
+            overflow.resize(slot - base + 1, VmValue::null());
+        }
+        overflow[slot - base] = value;
     }
 }
 

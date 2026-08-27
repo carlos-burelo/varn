@@ -53,11 +53,12 @@ pub fn intrinsic_is_char_index(wire_byte: u8) -> bool {
 /// intrinsic (receiver statically typed as that core class). `None` keeps
 /// the method on the generic native op-id path.
 pub fn core_method_intrinsic(class: &str, method: &str) -> Option<u8> {
-    let entries: &[(&str, u8)] = match class {
-        "str" => self::str::METHOD_ENTRIES,
-        "int" => self::int::METHOD_ENTRIES,
-        "Map" => self::collections::MAP_METHOD_ENTRIES,
-        "Set" => self::collections::SET_METHOD_ENTRIES,
+    use crate::intrinsics::IntrinsicType;
+    let entries: &[(&str, u8)] = match IntrinsicType::from_str(class) {
+        Some(IntrinsicType::Str) => self::str::METHOD_ENTRIES,
+        Some(IntrinsicType::Int) => self::int::METHOD_ENTRIES,
+        Some(IntrinsicType::Map) => self::collections::MAP_METHOD_ENTRIES,
+        Some(IntrinsicType::Set) => self::collections::SET_METHOD_ENTRIES,
         _ => return None,
     };
     entries

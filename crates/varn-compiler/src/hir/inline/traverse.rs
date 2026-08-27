@@ -126,10 +126,6 @@ pub(crate) fn walk_exprs<'a>(e: &'a HirExpr, f: &mut impl FnMut(&'a HirExpr)) {
                 }
             }
         }
-        TaggedTemplate { tag, template } => {
-            walk_exprs(tag, f);
-            walk_exprs(template, f);
-        }
         Closure { .. } | Class(_) | Enum(_) | Match { .. } => {}
     }
 }
@@ -257,10 +253,6 @@ pub(crate) fn for_each_child_expr_mut(e: &mut HirExpr, f: &mut impl FnMut(&mut H
                 }
             }
         }
-        TaggedTemplate { tag, template } => {
-            f(tag);
-            f(template);
-        }
         Match { subject, cases } => {
             f(subject);
             for c in cases {
@@ -335,7 +327,8 @@ pub(crate) fn for_each_stmt_expr_mut(s: &mut HirStmt, f: &mut impl FnMut(&mut Hi
         | HirStmt::ExportNamed { .. }
         | HirStmt::ExportAll { .. }
         | HirStmt::Try { .. }
-        | HirStmt::Dispose { .. } => {}
+        | HirStmt::Dispose { .. }
+        | HirStmt::Line(_) => {}
     }
     if let HirStmt::Switch { cases, .. } = s {
         for c in cases {
@@ -385,7 +378,8 @@ pub(crate) fn for_each_stmt_expr<'a>(s: &'a HirStmt, f: &mut impl FnMut(&'a HirE
         | HirStmt::ExportNamed { .. }
         | HirStmt::ExportAll { .. }
         | HirStmt::Try { .. }
-        | HirStmt::Dispose { .. } => {}
+        | HirStmt::Dispose { .. }
+        | HirStmt::Line(_) => {}
     }
     if let HirStmt::Switch { cases, .. } = s {
         for c in cases {
@@ -413,11 +407,11 @@ pub(crate) fn child_stmts_mut(s: &mut HirStmt) -> Vec<&mut HirStmt> {
         HirStmt::Switch { cases, .. } => cases.iter_mut().flat_map(|c| c.body.iter_mut()).collect(),
         HirStmt::Try {
             block,
-            catch,
+            catches,
             finally,
         } => {
             let mut v: Vec<&mut HirStmt> = block.iter_mut().collect();
-            if let Some(c) = catch {
+            for c in catches {
                 v.extend(c.body.iter_mut());
             }
             if let Some(fin) = finally {
@@ -454,11 +448,11 @@ pub(crate) fn push_child_stmts<'a>(s: &'a HirStmt, out: &mut Vec<&'a HirStmt>) {
         }
         HirStmt::Try {
             block,
-            catch,
+            catches,
             finally,
         } => {
             out.extend(block.iter());
-            if let Some(c) = catch {
+            for c in catches {
                 out.extend(c.body.iter());
             }
             if let Some(fin) = finally {

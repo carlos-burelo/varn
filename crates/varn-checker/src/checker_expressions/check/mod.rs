@@ -89,7 +89,7 @@ impl<'r> Checker<'r> {
                 let saved_scope = self.current_scope;
                 if let Some(fn_scope) = self.next_child_scope(bind) {
                     self.current_scope = fn_scope;
-                    self.record_scope(expr.range.start.offset);
+                    self.record_scope_span(expr.range.start.offset, expr.range.end.offset, fn_scope);
                 }
 
                 let mut injected_type_params: Vec<Rc<str>> = vec![];
@@ -166,7 +166,7 @@ impl<'r> Checker<'r> {
                 let saved_scope = self.current_scope;
                 if let Some(fn_scope) = self.next_child_scope(bind) {
                     self.current_scope = fn_scope;
-                    self.record_scope(body.range.start.offset);
+                    self.record_scope_span(expr.range.start.offset, expr.range.end.offset, fn_scope);
                 }
 
                 self.in_function_body(|c| c.check_stmt(body, bind));
@@ -495,7 +495,7 @@ impl<'r> Checker<'r> {
 
                     self.with_narrowings(&narrowing_vec, |checker| {
                         if let Some(g) = &case.guard {
-                            let _ = g;
+                            checker.check_expr(g, bind);
                         }
 
                         let subject_ty = checker.infer_type(subject, bind);
@@ -569,6 +569,12 @@ impl<'r> Checker<'r> {
                 }
                 let obj_ty = self.infer_type(object, bind);
                 self.record_type(expr.range.start.offset, obj_ty);
+            }
+
+            ExprKind::MetaAccess { target, .. } => {
+                self.check_expr(target, bind);
+                let ty = self.infer_type(expr, bind);
+                self.record_type(expr.range.start.offset, ty);
             }
 
             ExprKind::Identifier { name } => {

@@ -31,37 +31,22 @@ impl ExecCtx {
 
 fn value_estimate_capacity(ctx: &ExecCtx, val: VmValue) -> usize {
     if ctx.is_array(val) {
-        ctx.array_len(val) * 64
+        ctx.array_len(val) * 80
+    } else if val.is_heap() {
+        if let Some(HeapObj::Object(o) | HeapObj::Record(o)) = ctx.heap.get(val.as_heap_idx()) {
+            o.borrow().len() * 48 + 32
+        } else {
+            128
+        }
     } else {
-        1024
+        64
     }
 }
 
-fn write_int(mut n: i64, out: &mut String) {
-    if n == 0 {
-        out.push('0');
-        return;
-    }
-    let mut buf = [0u8; 20];
-    let mut i = 20;
-    let negative = n < 0;
-    if negative {
-        if n == i64::MIN {
-            out.push_str("-9223372036854775808");
-            return;
-        }
-        n = -n;
-    }
-    while n > 0 {
-        i -= 1;
-        buf[i] = b'0' + (n % 10) as u8;
-        n /= 10;
-    }
-    if negative {
-        i -= 1;
-        buf[i] = b'-';
-    }
-    let s = unsafe { std::str::from_utf8_unchecked(&buf[i..]) };
+#[inline(always)]
+fn write_int(n: i64, out: &mut String) {
+    let mut buf = [0u8; crate::strbuf::INT_MAX_DIGITS];
+    let s = crate::strbuf::itoa(n, &mut buf);
     out.push_str(s);
 }
 
@@ -477,6 +462,66 @@ fn fast_parse_json(ctx: &mut ExecCtx, text: &str) -> Option<VmValue> {
     }
 }
 
+#[inline(always)]
+fn fast_parse_f64(s: &[u8]) -> Option<f64> {
+    if s.is_empty() {
+        return None;
+    }
+    let (neg, s) = if s[0] == b'-' { (true, &s[1..]) } else { (false, s) };
+    if s.is_empty() {
+        return None;
+    }
+    let mut dot_pos = None;
+    let mut int_val: u64 = 0;
+    let mut frac_val: u64 = 0;
+    let mut frac_len: u32 = 0;
+    let mut idx = 0;
+    while idx < s.len() {
+        let b = s[idx];
+        if b == b'.' {
+            if dot_pos.is_some() {
+                return None;
+            }
+            dot_pos = Some(idx);
+            idx += 1;
+            break;
+        } else if b.is_ascii_digit() {
+            int_val = int_val.checked_mul(10)?.checked_add((b - b'0') as u64)?;
+            idx += 1;
+        } else {
+            let s_full = std::str::from_utf8(s).ok()?;
+            let f = s_full.parse::<f64>().ok()?;
+            return Some(if neg { -f } else { f });
+        }
+    }
+    if dot_pos.is_some() {
+        while idx < s.len() {
+            let b = s[idx];
+            if b.is_ascii_digit() {
+                if frac_len < 15 {
+                    frac_val = frac_val * 10 + (b - b'0') as u64;
+                    frac_len += 1;
+                }
+                idx += 1;
+            } else {
+                let s_full = std::str::from_utf8(s).ok()?;
+                let f = s_full.parse::<f64>().ok()?;
+                return Some(if neg { -f } else { f });
+            }
+        }
+        const POW10: [f64; 16] = [
+            1.0, 10.0, 100.0, 1000.0, 10000.0, 100000.0, 1000000.0, 10000000.0,
+            100000000.0, 1000000000.0, 10000000000.0, 100000000000.0, 1000000000000.0,
+            10000000000000.0, 100000000000000.0, 1000000000000000.0,
+        ];
+        let frac = (frac_val as f64) / POW10[frac_len as usize];
+        let val = (int_val as f64) + frac;
+        Some(if neg { -val } else { val })
+    } else {
+        Some(if neg { -(int_val as f64) } else { int_val as f64 })
+    }
+}
+
 struct FastJsonParser<'a, 'ctx> {
     bytes: &'a [u8],
     pos: usize,
@@ -643,8 +688,7 @@ impl<'a, 'ctx> FastJsonParser<'a, 'ctx> {
             let val = if negative { -int_val } else { int_val };
             return Some(VmValue::from_int(val));
         }
-        let num_str = std::str::from_utf8(&self.bytes[start..i]).ok()?;
-        let f = num_str.parse::<f64>().ok()?;
+        let f = fast_parse_f64(&self.bytes[start..i])?;
         Some(VmValue::from_f64(f))
     }
 

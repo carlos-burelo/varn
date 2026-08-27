@@ -51,6 +51,15 @@ pub(super) fn collect_exports(
                         }
                     }
                 }
+                if let Decl::Enum(e) = declaration.as_ref() {
+                    for member in &e.members {
+                        if let Some(sym) = lookup_global(bind, &member.id) {
+                            let mut s = sym.clone();
+                            s.origin_module = Some(abs_path.to_owned().into());
+                            out.insert(member.id.to_string(), s);
+                        }
+                    }
+                }
             }
             ExportDecl::Named {
                 specifiers,

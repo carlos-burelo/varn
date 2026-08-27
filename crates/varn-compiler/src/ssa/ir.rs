@@ -73,6 +73,7 @@ impl SsaFunc {
             params: Vec::new(),
             insts: Vec::new(),
             term: Terminator::Unreachable,
+            term_line: 0,
             preds: Vec::new(),
         });
         id
@@ -106,6 +107,7 @@ pub struct Block {
     pub params: Vec<Value>,
     pub insts: Vec<Inst>,
     pub term: Terminator,
+    pub term_line: u32,
 
     pub preds: Vec<BlockId>,
 }
@@ -114,6 +116,7 @@ pub struct Block {
 pub struct Inst {
     pub dest: Option<Value>,
     pub kind: InstKind,
+    pub line: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -234,6 +237,11 @@ pub enum InstKind {
 
     BuildRecord {
         pairs: Vec<(Rc<str>, Value)>,
+    },
+
+    ObjectRest {
+        object: Value,
+        skip_keys: Vec<Rc<str>>,
     },
 
     ToString {

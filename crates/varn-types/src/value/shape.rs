@@ -94,6 +94,21 @@ impl Shape {
         child
     }
 
+    #[inline]
+    pub fn transition_str(&self, key: &str) -> Rc<Shape> {
+        let mut trans = self.transitions.borrow_mut();
+        if let Some(child) = trans.get(key) {
+            return Rc::clone(child);
+        }
+        let rc_key: RuntimeString = Rc::from(key);
+        let mut new_props = self.property_names.clone();
+        let slot = new_props.len();
+        new_props.insert(Rc::clone(&rc_key), slot);
+        let child = Shape::create(self.class.clone(), new_props);
+        trans.insert(rc_key, Rc::clone(&child));
+        child
+    }
+
     pub fn with_class(&self, class: Option<Rc<crate::value::ClassObj>>) -> Rc<Shape> {
         Shape::create(class, self.property_names.clone())
     }

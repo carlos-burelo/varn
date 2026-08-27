@@ -1,7 +1,12 @@
+pub mod exports;
 pub mod member;
 pub mod param;
+pub mod spatial;
 pub mod symbol;
 pub mod token;
+
+pub use exports::{ExportedSymbol, ModuleExports};
+pub use spatial::SpatialIndex;
 
 use crate::document::{ChainResult, DocumentState};
 

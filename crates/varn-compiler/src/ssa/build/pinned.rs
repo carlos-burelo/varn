@@ -116,13 +116,13 @@ fn scan_stmt(stmt: &HirStmt, pinned: &mut FxHashSet<VarId>, in_try: bool) {
         }
         HirStmt::Try {
             block,
-            catch,
+            catches,
             finally,
         } => {
             for s in block {
                 scan_stmt(s, pinned, true);
             }
-            if let Some(c) = catch {
+            for c in catches {
                 for s in &c.body {
                     scan_stmt(s, pinned, in_try);
                 }
@@ -504,10 +504,6 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
         HirExpr::Await(e) => scan_expr(e, pinned, in_try),
         HirExpr::Spawn(e) => scan_expr(e, pinned, in_try),
         HirExpr::Yield(e) => scan_expr(e, pinned, in_try),
-        HirExpr::TaggedTemplate { tag, template } => {
-            scan_expr(tag, pinned, in_try);
-            scan_expr(template, pinned, in_try);
-        }
         HirExpr::IntrinsicCall { object, args, .. } => {
             scan_expr(object, pinned, in_try);
             for a in args {
@@ -521,6 +517,7 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
             }
         }
         HirExpr::ModuleSlot { object, .. } => scan_expr(object, pinned, in_try),
+        HirExpr::ObjectRest { object, .. } => scan_expr(object, pinned, in_try),
         _ => {}
     }
 }

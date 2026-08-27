@@ -105,7 +105,7 @@ pub enum StmtKind {
     },
     Try {
         block: Box<Stmt>,
-        catch: Option<Box<CatchClause>>,
+        catches: Vec<CatchClause>,
         finally: Option<Box<Stmt>>,
     },
     Using {
@@ -162,6 +162,7 @@ pub struct SwitchCase {
 #[derive(Clone, Debug)]
 pub struct CatchClause {
     pub param: Option<Pattern>,
+    pub type_ann: Option<TypeNode>,
     pub body: Box<Stmt>,
     pub range: SourceRange,
 }

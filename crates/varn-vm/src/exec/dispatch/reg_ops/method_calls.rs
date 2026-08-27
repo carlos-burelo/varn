@@ -49,10 +49,84 @@ impl ExecCtx {
                     arr.push_vm(val);
                     self.heap.write_barrier(this_val.as_heap_idx(), val);
                     self.stack[base + dest] = VmValue::null();
+                    self.record_ic_hit_callmethod();
+                    self.record_call_native(|_, _| Ok(VmValue::null()), Some("push"));
                     return Ok(false);
                 } else if name.as_ref() == varn_core::MemberKey::Pop.as_str() && arg_count == 0 {
                     let val = arr.pop_vm().unwrap_or(VmValue::null());
                     self.stack[base + dest] = val;
+                    self.record_ic_hit_callmethod();
+                    self.record_call_native(|_, _| Ok(VmValue::null()), Some("pop"));
+                    return Ok(false);
+                }
+            }
+        }
+
+        // Direct fast-paths for high-frequency intrinsic String methods (startsWith, indexOf).
+        if this_val.is_sso() || (this_val.is_heap() && matches!(self.heap.get(this_val.as_heap_idx()), Some(crate::heap::HeapObj::Str(_)))) {
+            if name.as_ref() == varn_core::MemberKey::StartsWith.as_str() && arg_count == 1 {
+                let mut buf_a = [0u8; 5];
+                let mut buf_b = [0u8; 5];
+                let arg_val = self.stack[base + arg_start];
+                let s_opt = if this_val.is_sso() {
+                    Some(this_val.sso_as_str(&mut buf_a))
+                } else if let Some(crate::heap::HeapObj::Str(hs)) = self.heap.get(this_val.as_heap_idx()) {
+                    Some(hs.as_str())
+                } else {
+                    None
+                };
+                let p_opt = if arg_val.is_sso() {
+                    Some(arg_val.sso_as_str(&mut buf_b))
+                } else if arg_val.is_heap() {
+                    if let Some(crate::heap::HeapObj::Str(hs)) = self.heap.get(arg_val.as_heap_idx()) {
+                        Some(hs.as_str())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                if let (Some(s), Some(p)) = (s_opt, p_opt) {
+                    self.stack[base + dest] = VmValue::from_bool(s.starts_with(p));
+                    self.record_ic_hit_callmethod();
+                    return Ok(false);
+                }
+            } else if name.as_ref() == varn_core::MemberKey::IndexOf.as_str() && arg_count == 1 {
+                let mut buf_a = [0u8; 5];
+                let mut buf_b = [0u8; 5];
+                let arg_val = self.stack[base + arg_start];
+                let s_opt = if this_val.is_sso() {
+                    Some(this_val.sso_as_str(&mut buf_a))
+                } else if let Some(crate::heap::HeapObj::Str(hs)) = self.heap.get(this_val.as_heap_idx()) {
+                    Some(hs.as_str())
+                } else {
+                    None
+                };
+                let p_opt = if arg_val.is_sso() {
+                    Some(arg_val.sso_as_str(&mut buf_b))
+                } else if arg_val.is_heap() {
+                    if let Some(crate::heap::HeapObj::Str(hs)) = self.heap.get(arg_val.as_heap_idx()) {
+                        Some(hs.as_str())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                if let (Some(s), Some(p)) = (s_opt, p_opt) {
+                    let idx = if p.is_empty() {
+                        0
+                    } else if let Some(byte_idx) = s.find(p) {
+                        if s.is_ascii() {
+                            byte_idx as i64
+                        } else {
+                            s[..byte_idx].chars().count() as i64
+                        }
+                    } else {
+                        -1
+                    };
+                    self.stack[base + dest] = VmValue::from_int(idx);
+                    self.record_ic_hit_callmethod();
                     return Ok(false);
                 }
             }
@@ -419,29 +493,34 @@ impl ExecCtx {
         // receiver, the supplied args, and nulls for any param the call
         // omitted.
         let nparams = nc.proto.arity.saturating_sub(1);
-        let staged;
+        let final_base = self.stack.len();
+        if self.frames.len() >= 10000 {
+            return Err(crate::error::RuntimeError::new(
+                "stack overflow: call depth exceeded 10000",
+            ));
+        }
+        let required = final_base + nc.proto.register_count as usize;
+        if self.stack.len() < required {
+            self.stack.resize(required, VmValue::null());
+        }
+        self.stack[final_base] = this_val;
         if !nc.proto.has_rest {
-            self.stack.push(this_val);
-            for i in 0..arg_count {
-                let v = self.stack[base + arg_start + i];
-                self.stack.push(v);
+            if arg_count > 0 {
+                unsafe {
+                    let src = self.stack.as_ptr().add(base + arg_start);
+                    let dst = self.stack.as_mut_ptr().add(final_base + 1);
+                    std::ptr::copy_nonoverlapping(src, dst, arg_count);
+                }
             }
-            for _ in arg_count..nparams {
-                self.stack.push(VmValue::null());
-            }
-            staged = 1 + arg_count.max(nparams);
         } else {
-            // The last declared param collects the overflow, so only the ones
-            // before it are staged individually.
             let rest_idx = nparams.saturating_sub(1);
-            self.stack.push(this_val);
             let regular_count = arg_count.min(rest_idx);
-            for i in 0..regular_count {
-                let v = self.stack[base + arg_start + i];
-                self.stack.push(v);
-            }
-            for _ in regular_count..rest_idx {
-                self.stack.push(VmValue::null());
+            if regular_count > 0 {
+                unsafe {
+                    let src = self.stack.as_ptr().add(base + arg_start);
+                    let dst = self.stack.as_mut_ptr().add(final_base + 1);
+                    std::ptr::copy_nonoverlapping(src, dst, regular_count);
+                }
             }
             let rest_items: Vec<VmValue> = if arg_count > rest_idx {
                 (rest_idx..arg_count)
@@ -454,18 +533,7 @@ impl ExecCtx {
                 self.heap
                     .alloc(crate::heap::HeapObj::Array(VmArray::new(rest_items))),
             );
-            self.stack.push(rest_nv);
-            staged = 1 + rest_idx + 1;
-        }
-        let final_base = self.stack.len() - staged;
-        if self.frames.len() >= 10000 {
-            return Err(crate::error::RuntimeError::new(
-                "stack overflow: call depth exceeded 10000",
-            ));
-        }
-        let required = final_base + nc.proto.register_count as usize;
-        if self.stack.len() < required {
-            self.stack.resize(required, VmValue::null());
+            self.stack[final_base + 1 + rest_idx] = rest_nv;
         }
         let mut frame = crate::frame::CallFrame::new_owned(nc, final_base);
         frame.return_reg = Some(dest as u16);

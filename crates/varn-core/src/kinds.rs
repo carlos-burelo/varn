@@ -49,6 +49,11 @@ pub enum TypeKind<T, N, C, F, O, E = ()> {
         type_args: C,
         payload_ty: T,
     },
+
+    TypePredicate {
+        parameter_name: N,
+        target_type: T,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

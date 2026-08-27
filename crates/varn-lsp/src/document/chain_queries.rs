@@ -143,15 +143,15 @@ impl DocumentState {
                 return Some(ChainResult::Member {
                     member: summary_from_resolution(res),
                     parent_name: type_name_of(&res.receiver_ty)
-                        .unwrap_or_else(|| "dynamic".to_owned()),
+                        .unwrap_or_else(|| varn_core::TypeTag::Dynamic.name().to_string()),
                 });
             }
         }
 
-        if let Some(info) = self.db.expr_types.get(&tok.offset) {
-            let is_fn = matches!(info.ty.0, varn_core::TypeKind::Fn(_));
+        if let Some(entry) = self.expr_entry_at_offset(tok.offset) {
+            let is_fn = matches!(entry.ty.0, varn_core::TypeKind::Fn(_));
 
-            if let Some(sid) = info.symbol_id {
+            if let Some(sid) = entry.symbol_id {
                 if sid < self.db.arena.len() {
                     let sym = self.db.arena.get(sid);
 
@@ -172,12 +172,12 @@ impl DocumentState {
 
                         if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
                             let clean_parent = if !parent_name.is_empty()
-                                && parent_name != "dynamic"
+                                && parent_name != varn_core::TypeTag::Dynamic.name()
                             {
                                 parent_name
                             } else {
                                 type_name_of(&res.receiver_ty)
-                                    .unwrap_or_else(|| "dynamic".to_owned())
+                                    .unwrap_or_else(|| varn_core::TypeTag::Dynamic.name().to_string())
                             };
                             return Some(ChainResult::Member {
                                 member: summary_from_resolution(res),
@@ -188,7 +188,7 @@ impl DocumentState {
                         return Some(ChainResult::Member {
                             member: summary_of(
                                 sym.name.clone(),
-                                info.ty.clone(),
+                                entry.ty.clone(),
                                 if is_fn || sym.kind == SymbolKind::Method {
                                     varn_checker::ResolvedMemberKind::Method
                                 } else if sym.kind == SymbolKind::EnumMember {
@@ -208,7 +208,7 @@ impl DocumentState {
                         return Some(ChainResult::Member {
                             member: summary_of(
                                 std::rc::Rc::from(tok.lexeme.as_str()),
-                                info.ty.clone(),
+                                entry.ty.clone(),
                                 if is_fn {
                                     varn_checker::ResolvedMemberKind::Method
                                 } else {
@@ -246,7 +246,7 @@ impl DocumentState {
                 return Some(ChainResult::Member {
                     member: summary_of(
                         std::rc::Rc::from(tok.lexeme.as_str()),
-                        info.ty.clone(),
+                        entry.ty.clone(),
                         if is_fn {
                             varn_checker::ResolvedMemberKind::Method
                         } else {
@@ -270,16 +270,6 @@ impl DocumentState {
     }
 
     /// The name of the type `tok`'s member access is reading from.
-    ///
-    /// The checker records this per member access, typed, in
-    /// `member_resolutions[offset].receiver_ty` — so that is where it comes
-    /// from. This used to re-walk the entire AST from the root on every hover
-    /// and goto (O(AST) per request) through a hand-written `match` that had to
-    /// grow a case for each new `ExprKind`, and already had holes.
-    ///
-    /// The token fallback below is not a workaround for that: it answers the
-    /// case the checker legitimately has nothing to say about, a member read off
-    /// a `dynamic` value.
     pub fn resolve_receiver_type_name_at(&self, tok: &TokenRecord) -> String {
         if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
             if let Some(name) = type_name_of(&res.receiver_ty) {
@@ -290,12 +280,12 @@ impl DocumentState {
         let tok_idx_opt = self.tokens.iter().position(|t| t.offset == tok.offset);
         let tok_idx = match tok_idx_opt {
             Some(i) if i >= 2 => i,
-            _ => return "dynamic".to_string(),
+            _ => return varn_core::TypeTag::Dynamic.name().to_string(),
         };
 
         let dot_tok = &self.tokens[tok_idx - 1];
         if dot_tok.kind != TokenKind::Dot && dot_tok.kind != TokenKind::QuestionDot {
-            return "dynamic".to_string();
+            return varn_core::TypeTag::Dynamic.name().to_string();
         }
 
         let prev_tok = &self.tokens[tok_idx - 2];
@@ -314,30 +304,24 @@ impl DocumentState {
                         return prev_tok.lexeme.clone();
                     }
                 }
-                let ty_str = ty.to_string();
-                if !ty_str.is_empty() && ty_str != "unknown" && ty_str != "dynamic" {
-                    return ty_str;
+                if let Some(name) = type_name_of(&ty) {
+                    return name;
                 }
             }
             return prev_tok.lexeme.clone();
         }
 
-        "dynamic".to_string()
+        varn_core::TypeTag::Dynamic.name().to_string()
     }
 
     /// The member the cursor sits on, and the type it belongs to.
-    ///
-    /// `member_resolutions[offset]` is the checker's record of exactly this, so
-    /// it is the answer. This used to scan every symbol's mirrored member tree,
-    /// recursively, comparing names and line/column — an O(symbols x members)
-    /// walk per request that could only find members the mirror happened to
-    /// contain.
     pub fn member_at_pos(&self, line: u32, col: u32) -> Option<(String, varn_checker::ResolvedMemberSummary)> {
         let tok = self.identifier_token_at(line, col)?;
 
         // A member *access*: the checker recorded the receiver and the member.
         if let Some(res) = self.db.member_resolutions.get(&tok.offset) {
-            let parent = type_name_of(&res.receiver_ty).unwrap_or_else(|| "dynamic".to_owned());
+            let parent = type_name_of(&res.receiver_ty)
+                .unwrap_or_else(|| varn_core::TypeTag::Dynamic.name().to_string());
             return Some((parent, summary_from_resolution(res)));
         }
 
@@ -394,6 +378,4 @@ impl DocumentState {
         }
         None
     }
-
-
 }

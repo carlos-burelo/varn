@@ -171,19 +171,17 @@ pub(crate) fn apply_kinds(
             let src = (code[ip + 1] >> 8) as usize;
             state[dest] = state[src];
         }
-        // The one result the emitter serves in the register's DECLARED
-        // representation: `clif::arrays` converts an element to the wanted
-        // repr (an `I64` array element raw into an `Int` register, an `F64`
-        // one into an `F64` register).
-        OpCode::ArrayGetIndex => state[dest] = typed(dest),
+        // Results the emitter serves in the register's DECLARED
+        // representation: `clif::arrays` and `clif::fields` convert/unbox to the
+        // wanted repr (an `I64` into an `Int` register, an `F64` into an `F64` register).
+        OpCode::ArrayGetIndex | OpCode::GetFixedField => state[dest] = typed(dest),
         // Everything else helper-backed lands as boxed VmValue bits (a float
         // register still holds an unboxed `f64` — the emitters coerce on the
         // way in). Claiming `Int` here because the register meta types the
         // SLOT as int is a lie about the VALUE: `int_div` returns a whole
         // float into an `int` slot, and reading those bits as an i48 payload
         // yields garbage. Int consumers unbox at the use instead.
-        OpCode::GetFixedField
-        | OpCode::GetProperty
+        OpCode::GetProperty
         | OpCode::BuildArray
         | OpCode::BuildTuple
         | OpCode::BuildObjectWithShape
@@ -200,6 +198,7 @@ pub(crate) fn apply_kinds(
         | OpCode::Sub
         | OpCode::Mul
         | OpCode::Div
+        | OpCode::DivInt
         | OpCode::Mod => state[dest] = boxed(dest),
         OpCode::Negate => {
             let src = (code[ip + 1] >> 8) as usize;

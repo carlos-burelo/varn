@@ -150,13 +150,11 @@ pub fn execute_with_caps(
                                     thrown_val,
                                 );
                             } else {
-                                let mut msg = format!("awaited task failed: {}", err.message);
-                                for frame in &err.frames {
-                                    msg.push_str(&format!(
-                                        "\n  at {} ({}:{})",
-                                        frame.fn_name, frame.file, frame.line
-                                    ));
-                                }
+                                let msg = format_runtime_error(
+                                    Some("awaited task failed"),
+                                    &err.message,
+                                    &err.frames,
+                                );
                                 return Err(PipelineError::fatal(msg));
                             }
                         }
@@ -165,16 +163,43 @@ pub fn execute_with_caps(
                 Some(varn_vm::exec::VmSuspend::Yield { .. }) => {}
             },
             Err(e) => {
-                let mut msg = format!("runtime error: {}", e.message);
-                for frame in &e.frames {
-                    msg.push_str(&format!(
-                        "\n  at {} ({}:{})",
-                        frame.fn_name, frame.file, frame.line
-                    ));
-                }
+                let msg = format_runtime_error(None, &e.message, &e.frames);
                 return Err(PipelineError::fatal(msg));
             }
         }
     }
     Ok(())
+}
+
+fn format_runtime_error(
+    prefix: Option<&str>,
+    message: &str,
+    frames: &[varn_vm::FrameInfo],
+) -> String {
+    let mut msg = match prefix {
+        Some(p) => format!("{p}: {message}"),
+        None => message.to_string(),
+    };
+    let cwd = std::env::current_dir().ok();
+    for frame in frames {
+        let mut file_display = frame.file.as_str();
+        if file_display.starts_with(r"\\?\") {
+            file_display = &file_display[4..];
+        }
+        let clean_path = if let Some(ref root) = cwd {
+            let p = std::path::Path::new(file_display);
+            if let Ok(rel) = p.strip_prefix(root) {
+                rel.to_string_lossy().replace('\\', "/")
+            } else {
+                file_display.replace('\\', "/")
+            }
+        } else {
+            file_display.replace('\\', "/")
+        };
+        msg.push_str(&format!(
+            "\n    at {} ({}:{})",
+            frame.fn_name, clean_path, frame.line
+        ));
+    }
+    msg
 }

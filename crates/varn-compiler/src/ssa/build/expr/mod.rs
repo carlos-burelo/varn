@@ -67,6 +67,16 @@ impl Builder {
                     *ty,
                 ))
             }
+            HirExpr::ObjectRest { object, skip_keys } => {
+                let o = self.lower_expr(object)?;
+                Ok(self.emit(
+                    InstKind::ObjectRest {
+                        object: o,
+                        skip_keys: skip_keys.clone(),
+                    },
+                    HirType::Ref,
+                ))
+            }
 
             HirExpr::TryOp(operand) => {
                 let v = self.lower_expr(operand)?;

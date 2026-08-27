@@ -81,6 +81,7 @@ impl<'r> super::super::Binder<'r> {
                             .with_type(fn_type);
                     sym.col = method.range.start.column;
                     sym.offset = method.range.start.offset;
+                    sym.has_explicit_type = method.return_type.is_some();
                     sym.is_async = method.modifiers.is_async;
                     sym.is_generator = method.modifiers.is_generator;
                     self.define(mangled.clone(), sym);
@@ -127,6 +128,7 @@ impl<'r> super::super::Binder<'r> {
                     .with_type(fn_type);
                     sym.col = range.start.column;
                     sym.offset = range.start.offset;
+                    sym.has_explicit_type = return_type.is_some();
                     self.define(mangled.clone(), sym);
                     self.extensions
                         .getters
@@ -187,6 +189,7 @@ impl<'r> super::super::Binder<'r> {
                     .with_type(fn_type);
                     sym.col = range.start.column;
                     sym.offset = range.start.offset;
+                    sym.has_explicit_type = true;
                     self.define(mangled.clone(), sym);
                     self.extensions
                         .setters

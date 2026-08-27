@@ -197,25 +197,22 @@ impl ExecCtx {
                                 let fn_name =
                                     nc.proto.name.as_deref().unwrap_or("<anon>").to_owned();
                                 let is_jit = nc.jit_fn().is_some();
-                                self.record_hotspot_fn(&fn_name, is_jit);
-                                self.stack.push(callee);
-                                for i in 0..arg_count {
-                                    let v = self.stack[base + arg_start + i];
-                                    self.stack.push(v);
-                                }
-
-                                for _ in arg_count..arity {
-                                    self.stack.push(VmValue::null());
-                                }
+                                let new_base = self.stack.len();
                                 if self.frames.len() >= 10000 {
                                     return Err(crate::error::RuntimeError::new(
                                         "stack overflow: call depth exceeded 10000",
                                     ));
                                 }
-                                let new_base = self.stack.len() - arity;
                                 let required = new_base + nc.proto.register_count as usize;
                                 if self.stack.len() < required {
                                     self.stack.resize(required, VmValue::null());
+                                }
+                                if arg_count > 0 {
+                                    unsafe {
+                                        let src = self.stack.as_ptr().add(base + arg_start);
+                                        let dst = self.stack.as_mut_ptr().add(new_base);
+                                        std::ptr::copy_nonoverlapping(src, dst, arg_count);
+                                    }
                                 }
                                 let mut frame = crate::frame::CallFrame::new_owned(nc, new_base);
                                 frame.return_reg = Some(dest as u16);
@@ -229,7 +226,6 @@ impl ExecCtx {
                                 let is_jit2 = nc.jit_fn().is_some();
                                 self.record_hotspot_fn(&fn_name2, is_jit2);
                                 let rest_idx = arity.saturating_sub(1);
-                                self.stack.push(callee);
                                 let regular_count = arg_count.min(rest_idx);
                                 for i in 0..regular_count {
                                     let v = self.stack[base + arg_start + i];
@@ -330,24 +326,22 @@ impl ExecCtx {
                     .unwrap_or("<anon>")
                     .to_owned();
                 let is_jit = closure_ref.jit_fn().is_some();
-                self.record_hotspot_fn(&fn_name, is_jit);
-                self.stack.push(callee);
-                for i in 0..arg_count {
-                    let v = self.stack[base + arg_start + i];
-                    self.stack.push(v);
-                }
-                for _ in arg_count..arity {
-                    self.stack.push(VmValue::null());
-                }
+                let new_base = self.stack.len();
                 if self.frames.len() >= 10000 {
                     return Err(crate::error::RuntimeError::new(
                         "stack overflow: call depth exceeded 10000",
                     ));
                 }
-                let new_base = self.stack.len() - arity;
                 let required = new_base + closure_ref.proto.register_count as usize;
                 if self.stack.len() < required {
                     self.stack.resize(required, VmValue::null());
+                }
+                if arg_count > 0 {
+                    unsafe {
+                        let src = self.stack.as_ptr().add(base + arg_start);
+                        let dst = self.stack.as_mut_ptr().add(new_base);
+                        std::ptr::copy_nonoverlapping(src, dst, arg_count);
+                    }
                 }
                 let mut frame = crate::frame::CallFrame::new(closure_ref, new_base);
                 frame._owned_closure = self.frames[frame_idx]._owned_closure.clone();
@@ -366,7 +360,6 @@ impl ExecCtx {
                 let is_jit2 = closure_ref.jit_fn().is_some();
                 self.record_hotspot_fn(&fn_name2, is_jit2);
                 let rest_idx = arity.saturating_sub(1);
-                self.stack.push(callee);
                 let regular_count = arg_count.min(rest_idx);
                 for i in 0..regular_count {
                     let v = self.stack[base + arg_start + i];

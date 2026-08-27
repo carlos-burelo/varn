@@ -212,11 +212,28 @@ pub struct ImportPathContext {
     pub content_start_col: u32,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum SymbolTarget {
+    Local {
+        uri: String,
+        symbol_id: varn_checker::SymbolId,
+    },
+    Global {
+        origin: String,
+        canonical_name: String,
+    },
+    Member {
+        parent_name: String,
+        member_name: String,
+    },
+}
+
 pub struct SemanticDB {
+    pub expr_table: FxHashMap<varn_core::ast::AstId, varn_checker::TypeEntry>,
+
     pub expr_types: FxHashMap<u32, varn_checker::ExprInfo>,
-
     pub node_scopes: FxHashMap<u32, varn_checker::ScopeId>,
-
+    pub scope_spans: Vec<varn_checker::checker::ScopeSpan>,
     pub symbol_types: FxHashMap<varn_checker::SymbolId, varn_checker::Type>,
 
     pub arena: SymbolArena,
@@ -254,11 +271,14 @@ impl SemanticDB {
 
     pub fn scope_at_offset(&self, cursor_offset: u32) -> varn_checker::ScopeId {
         let mut best_scope = self.global_scope;
-        let mut best_offset: u32 = 0;
-        for (&offset, &scope) in &self.node_scopes {
-            if offset <= cursor_offset && offset >= best_offset {
-                best_offset = offset;
-                best_scope = scope;
+        let mut best_span_len = u32::MAX;
+        for span in &self.scope_spans {
+            if cursor_offset >= span.start && cursor_offset <= span.end {
+                let span_len = span.end.saturating_sub(span.start);
+                if span_len < best_span_len {
+                    best_span_len = span_len;
+                    best_scope = span.scope;
+                }
             }
         }
         best_scope
@@ -291,7 +311,7 @@ pub struct DocumentState {
     pub db: SemanticDB,
 
     pub import_paths: Vec<String>,
-    pub positional_index: crate::queries::indexes::PositionalIndex,
+    pub spatial_index: crate::query::SpatialIndex,
     pub ast: Option<varn_core::ast::Program>,
 }
 
@@ -361,7 +381,21 @@ impl DocumentState {
         }
     }
 
+    pub fn expr_entry_at_offset(&self, offset: u32) -> Option<&varn_checker::TypeEntry> {
+        let ast_id = self.spatial_index.innermost_at(offset)?;
+        self.db.expr_table.get(&ast_id)
+    }
+
+    pub fn expr_type_at_offset(&self, offset: u32) -> Option<&varn_checker::Type> {
+        self.expr_entry_at_offset(offset).map(|e| &e.ty)
+    }
+
     pub fn resolve_symbol_id_at_offset(&self, offset: u32) -> Option<varn_checker::SymbolId> {
+        if let Some(entry) = self.expr_entry_at_offset(offset) {
+            if let Some(sid) = entry.symbol_id {
+                return Some(sid);
+            }
+        }
         if let Some(info) = self.db.expr_types.get(&offset) {
             if let Some(sid) = info.symbol_id {
                 return Some(sid);
@@ -380,6 +414,72 @@ impl DocumentState {
         }
 
         None
+    }
+
+    pub fn symbol_target_for_id(&self, id: varn_checker::SymbolId) -> Option<SymbolTarget> {
+        if id >= self.db.arena.len() {
+            return None;
+        }
+        let sym = self.db.arena.get(id);
+        let name = sym.name.to_string();
+        if let Some(origin_mod) = &sym.origin_module {
+            let canonical_name = sym.original_name.as_deref().unwrap_or(&name).to_string();
+            let origin_uri = if origin_mod.starts_with("file://")
+                || origin_mod.starts_with("std:")
+                || origin_mod.starts_with("core:")
+                || origin_mod.starts_with("runtime:")
+            {
+                origin_mod.to_string()
+            } else {
+                varn_modules::resolver::path_to_uri(origin_mod)
+            };
+            return Some(SymbolTarget::Global {
+                origin: origin_uri,
+                canonical_name,
+            });
+        }
+
+        let is_global = self
+            .db
+            .scopes
+            .get(self.db.global_scope)
+            .bindings
+            .values()
+            .any(|&sid| sid == id);
+        let norm_uri = if self.uri.starts_with("file://")
+            || self.uri.starts_with("std:")
+            || self.uri.starts_with("core:")
+            || self.uri.starts_with("runtime:")
+        {
+            self.uri.clone()
+        } else {
+            varn_modules::resolver::path_to_uri(&self.uri)
+        };
+
+        if is_global {
+            Some(SymbolTarget::Global {
+                origin: norm_uri,
+                canonical_name: name,
+            })
+        } else {
+            Some(SymbolTarget::Local {
+                uri: norm_uri,
+                symbol_id: id,
+            })
+        }
+    }
+
+    pub fn symbol_target_at_offset(&self, offset: u32) -> Option<SymbolTarget> {
+        if let Some(token) = self.tokens.iter().find(|t| t.offset == offset) {
+            if let Some((parent_name, member)) = self.member_at_pos(token.line, token.col) {
+                return Some(SymbolTarget::Member {
+                    parent_name,
+                    member_name: member.name.to_string(),
+                });
+            }
+        }
+        let sid = self.resolve_symbol_id_at_offset(offset)?;
+        self.symbol_target_for_id(sid)
     }
 
     pub fn symbol_global_key_for_id(&self, id: varn_checker::SymbolId) -> Option<String> {

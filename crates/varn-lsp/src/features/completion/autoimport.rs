@@ -14,12 +14,34 @@ pub fn build_autoimport_completions(
     doc_uri: &str,
     index: &ProjectIndex,
     already_known: &HashSet<String>,
+    prefix_filter: Option<&str>,
 ) -> Vec<CompletionItem> {
     let insert_pos = import_insert_position(source);
     let mut items: Vec<CompletionItem> = Vec::new();
 
+    let filter_lower = prefix_filter
+        .map(|p| p.to_lowercase())
+        .filter(|p| !p.is_empty());
+
+    // If no prefix filter is typed, do not flood completion with 50,000+ external symbols
+    if filter_lower.is_none() {
+        return items;
+    }
+    let query = filter_lower.unwrap();
+
+    const MAX_AUTOIMPORT_ITEMS: usize = 50;
+
     for (name, entries) in &index.name_index {
+        if items.len() >= MAX_AUTOIMPORT_ITEMS {
+            break;
+        }
+
         if already_known.contains(name) {
+            continue;
+        }
+
+        let name_lower = name.to_lowercase();
+        if !name_lower.starts_with(&query) && !name_lower.contains(&query) {
             continue;
         }
 

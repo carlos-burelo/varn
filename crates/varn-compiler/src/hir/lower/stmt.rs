@@ -129,6 +129,10 @@ impl<'a> Lowerer<'a> {
         scope: &mut Scope,
         out: &mut Vec<HirStmt>,
     ) -> R<()> {
+        let line = stmt.range.start.line;
+        if line > 0 && !matches!(&stmt.kind, StmtKind::Empty | StmtKind::Block { .. }) {
+            out.push(HirStmt::Line(line));
+        }
         match &stmt.kind {
             StmtKind::Empty => {}
             // Editor-only node, same reasoning as `ExprKind::Missing` in
@@ -347,7 +351,7 @@ impl<'a> Lowerer<'a> {
                             func: Box::new(func),
                             upvalues,
                         },
-                        ty: HirType::Dynamic,
+                        ty: HirType::Ref,
                     });
                 }
                 Decl::Class(cl) => {
@@ -357,7 +361,7 @@ impl<'a> Lowerer<'a> {
                     out.push(HirStmt::Let {
                         local,
                         value: HirExpr::Class(Box::new(hir_class)),
-                        ty: HirType::Dynamic,
+                        ty: HirType::Ref,
                     });
                 }
                 Decl::Enum(en) => {
@@ -366,7 +370,7 @@ impl<'a> Lowerer<'a> {
                     out.push(HirStmt::Let {
                         local,
                         value: HirExpr::Enum(Box::new(hir_enum)),
-                        ty: HirType::Dynamic,
+                        ty: HirType::Ref,
                     });
                 }
                 Decl::SumType(st) => {
@@ -375,7 +379,7 @@ impl<'a> Lowerer<'a> {
                     out.push(HirStmt::Let {
                         local,
                         value: HirExpr::Enum(Box::new(hir_enum)),
-                        ty: HirType::Dynamic,
+                        ty: HirType::Ref,
                     });
                     for v in &st.variants {
                         let vlocal = scope.alloc_local(v.name.clone());
@@ -386,7 +390,7 @@ impl<'a> Lowerer<'a> {
                                 name: v.name.clone(),
                                 ty: HirType::Dynamic,
                             },
-                            ty: HirType::Dynamic,
+                            ty: HirType::Ref,
                         });
                     }
                 }
@@ -612,6 +616,11 @@ impl<'a> Lowerer<'a> {
                 is_await,
             } => {
                 for d in declarations {
+                    let ty = d
+                        .init
+                        .as_ref()
+                        .map(|i| self.value_ty(AnnKey::expr(i.id)))
+                        .unwrap_or(HirType::Dynamic);
                     let value = match &d.init {
                         Some(e) => self.lower_expr(e, scope)?,
                         None => HirExpr::Null,
@@ -622,7 +631,7 @@ impl<'a> Lowerer<'a> {
                             out.push(HirStmt::Let {
                                 local,
                                 value,
-                                ty: HirType::Dynamic,
+                                ty,
                             });
                             scope.record_disposable(local, *is_await);
                         }
@@ -631,7 +640,7 @@ impl<'a> Lowerer<'a> {
                             out.push(HirStmt::Let {
                                 local: temp_local,
                                 value,
-                                ty: HirType::Dynamic,
+                                ty,
                             });
                             scope.record_disposable(temp_local, *is_await);
                             self.desugar_pattern_local(
@@ -650,66 +659,73 @@ impl<'a> Lowerer<'a> {
             }
             StmtKind::Try {
                 block,
-                catch,
+                catches,
                 finally,
             } => {
                 let hblock = self.lower_block(block, scope)?;
-                let hcatch = match catch {
-                    Some(cc) => {
-                        scope.push_block();
-                        let param = match &cc.param {
-                            None => None,
-                            Some(Pattern::Identifier { name, .. }) => {
-                                Some(scope.alloc_local(name.clone()))
-                            }
-                            Some(_) => Some(scope.alloc_temp()),
-                        };
-                        let mut body = Vec::new();
-                        if let Some(param_local) = param {
-                            if let Some(pat) = &cc.param {
-                                if !matches!(pat, Pattern::Identifier { .. }) {
-                                    self.desugar_pattern_local(
-                                        pat,
-                                        HirExpr::Var(HirBinding::Local(param_local)),
-                                        scope,
-                                        &mut body,
-                                    )?;
-                                }
+                let mut hcatches = Vec::with_capacity(catches.len());
+                for cc in catches {
+                    scope.push_block();
+                    let param = match &cc.param {
+                        None => None,
+                        Some(Pattern::Identifier { name, .. }) => {
+                            Some(scope.alloc_local(name.clone()))
+                        }
+                        Some(_) => Some(scope.alloc_temp()),
+                    };
+                    let type_tests = if let Some(ann) = &cc.type_ann {
+                        self.type_tests_of(ann)
+                    } else {
+                        Vec::new()
+                    };
+                    let mut body = Vec::new();
+                    if let Some(param_local) = param {
+                        if let Some(pat) = &cc.param {
+                            if !matches!(pat, Pattern::Identifier { .. }) {
+                                self.desugar_pattern_local(
+                                    pat,
+                                    HirExpr::Var(HirBinding::Local(param_local)),
+                                    scope,
+                                    &mut body,
+                                )?;
                             }
                         }
-                        let mut err = None;
-                        match &cc.body.kind {
-                            StmtKind::Block { stmts } => {
-                                for s in stmts {
-                                    if let Err(e) = self.lower_stmt(s, scope, &mut body) {
-                                        err = Some(e);
-                                        break;
-                                    }
-                                }
-                            }
-                            _ => {
-                                if let Err(e) = self.lower_stmt(&cc.body, scope, &mut body) {
-                                    err = Some(e);
-                                }
-                            }
-                        }
-                        if let Some(e) = err {
-                            scope.pop_block();
-                            return Err(e);
-                        }
-                        let (captured, disposables) = scope.pop_block();
-                        block_epilogue(&mut body, captured, disposables);
-                        Some(HirCatch { param, body })
                     }
-                    None => None,
-                };
+                    let mut err = None;
+                    match &cc.body.kind {
+                        StmtKind::Block { stmts } => {
+                            for s in stmts {
+                                if let Err(e) = self.lower_stmt(s, scope, &mut body) {
+                                    err = Some(e);
+                                    break;
+                                }
+                            }
+                        }
+                        _ => {
+                            if let Err(e) = self.lower_stmt(&cc.body, scope, &mut body) {
+                                err = Some(e);
+                            }
+                        }
+                    }
+                    if let Some(e) = err {
+                        scope.pop_block();
+                        return Err(e);
+                    }
+                    let (captured, disposables) = scope.pop_block();
+                    block_epilogue(&mut body, captured, disposables);
+                    hcatches.push(HirCatch {
+                        param,
+                        type_tests,
+                        body,
+                    });
+                }
                 let hfinally = match finally {
                     Some(fin) => Some(self.lower_block(fin, scope)?),
                     None => None,
                 };
                 out.push(HirStmt::Try {
                     block: hblock,
-                    catch: hcatch,
+                    catches: hcatches,
                     finally: hfinally,
                 });
             }

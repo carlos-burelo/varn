@@ -138,6 +138,7 @@ impl<'r> super::Binder<'r> {
             ExprKind::As { expression, .. }
             | ExprKind::Is { expression, .. }
             | ExprKind::Satisfies { expression, .. } => self.bind_expr(expression),
+            ExprKind::MetaAccess { target, .. } => self.bind_expr(target),
             ExprKind::Await { argument } | ExprKind::Spawn { argument } => self.bind_expr(argument),
             ExprKind::Try { expression } => self.bind_expr(expression),
             ExprKind::Yield { argument, .. } => {
@@ -365,7 +366,7 @@ impl<'r> super::Binder<'r> {
         let ExprKind::Identifier { name: prop_name } = &property.kind else {
             return false;
         };
-        if prop_name.as_ref() != "push" {
+        if prop_name.as_ref() != varn_core::MemberKey::Push.as_str() {
             return false;
         }
         match args {

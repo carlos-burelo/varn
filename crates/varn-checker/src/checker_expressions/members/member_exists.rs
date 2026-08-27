@@ -20,6 +20,11 @@ fn check_in_bind(name: &Rc<str>, key: &str, ext_bind: &crate::binder::BindResult
             return true;
         }
     }
+    if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
+        if members.iter().any(|m| m.name.as_ref() == key) {
+            return true;
+        }
+    }
     if let Some(methods) = ext_bind.get_class_methods_for(name.as_ref()) {
         if methods.contains_key(key) {
             return true;
@@ -174,6 +179,9 @@ impl<'r> Checker<'r> {
                         if let Some(members) = ext_bind.get_enum_members_local(name.as_ref()) {
                             variants.extend(members.iter().map(|m| m.name.clone()));
                         }
+                    }
+                    if variants.iter().any(|v| v.as_ref() == key) {
+                        return true;
                     }
                     for v in &variants {
                         if let Some(fields) = bind.sum_variant_fields.get(v) {

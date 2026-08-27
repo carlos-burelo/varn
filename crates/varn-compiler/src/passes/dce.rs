@@ -147,7 +147,10 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         ToString { .. } | BuildStr { .. } => false,
 
         // Spread iterates the operand, which runs its iterator.
-        BuildArraySpread { .. } | BuildObjectSpread { .. } | CallSpread { .. } => false,
+        BuildArraySpread { .. }
+        | BuildObjectSpread { .. }
+        | CallSpread { .. }
+        | ObjectRest { .. } => false,
 
         // Calls, in every shape.
         Call { .. }

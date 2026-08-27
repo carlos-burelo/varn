@@ -14,20 +14,21 @@ impl<'a> Lowerer<'a> {
         f: &FunctionDecl,
         scope: &mut Scope,
     ) -> R<(HirFunction, Vec<HirUpvalueSrc>)> {
-        let (mut func, upvalues) = self.lower_function_like(
+        let start_line = f.range.start.line;
+        let return_ty = self.value_ty(AnnKey::decl(f.id_offset));
+        let (func, upvalues) = self.lower_function_like(
             f.id.clone(),
             &f.params,
             f.modifiers.is_async,
             f.modifiers.is_generator,
             false,
             false,
+            start_line,
             BodyRef::Block(&f.body),
             &[],
+            return_ty,
             scope,
         )?;
-        // Declared return type, recorded by the checker at the function's
-        // name offset.
-        func.return_ty = self.value_ty(AnnKey::decl(f.id_offset));
         Ok((func, upvalues))
     }
 
@@ -40,8 +41,10 @@ impl<'a> Lowerer<'a> {
         is_generator: bool,
         _generic: bool,
         has_this: bool,
+        start_line: u32,
         body: BodyRef<'_>,
         field_inits: &[(Rc<str>, &Expr)],
+        return_ty: HirType,
         scope: &mut Scope,
     ) -> R<(HirFunction, Vec<HirUpvalueSrc>)> {
         scope.push_frame();
@@ -65,10 +68,11 @@ impl<'a> Lowerer<'a> {
         }
         let func = HirFunction {
             name,
+            start_line,
             params,
             locals,
             body,
-            return_ty: HirType::Dynamic,
+            return_ty,
             upvalue_count: upvalues.len() as u32,
             has_this,
             has_rest: params_ast.iter().any(|p| p.is_rest),

@@ -7,6 +7,7 @@ pub mod escape;
 pub mod fixed_fields;
 pub mod licm;
 pub mod monomorphize;
+pub mod redundant_guards;
 pub mod state_machine;
 pub mod tco;
 
@@ -27,6 +28,8 @@ pub fn optimize_with(func: &mut SsaFunc, summaries: &CtorSummaries) {
         changed |= tco::run(func);
 
         changed |= const_fold::run(func);
+
+        changed |= redundant_guards::run(func);
 
         changed |= monomorphize::run(func);
 

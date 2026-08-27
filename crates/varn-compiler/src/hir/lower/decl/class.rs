@@ -125,8 +125,10 @@ impl<'a> Lowerer<'a> {
                 false,
                 false,
                 true,
+                body.range.start.line,
                 BodyRef::Block(body),
                 &field_inits,
+                HirType::Ref,
                 scope,
             )?,
             None => {
@@ -138,8 +140,10 @@ impl<'a> Lowerer<'a> {
                     false,
                     false,
                     true,
+                    decl.range.start.line,
                     BodyRef::Empty,
                     &field_inits,
+                    HirType::Ref,
                     scope,
                 )?
             }
@@ -288,6 +292,8 @@ impl<'a> Lowerer<'a> {
         is_generator: bool,
         scope: &mut Scope,
     ) -> R<(HirFunction, Vec<HirUpvalueSrc>)> {
+        let start_line = body.range.start.line;
+        let return_ty = self.value_ty(AnnKey::decl(body.range.start.offset));
         self.lower_function_like(
             key,
             params,
@@ -295,8 +301,10 @@ impl<'a> Lowerer<'a> {
             is_generator,
             false,
             has_this,
+            start_line,
             BodyRef::Block(body),
             &[],
+            return_ty,
             scope,
         )
     }
@@ -324,7 +332,7 @@ impl<'a> Lowerer<'a> {
                     out.push(HirStmt::Let {
                         local,
                         value,
-                        ty: HirType::Dynamic,
+                        ty: HirType::Ref,
                     });
                 }
                 Ok(vec![f.id.clone()])
@@ -341,7 +349,7 @@ impl<'a> Lowerer<'a> {
                     out.push(HirStmt::Let {
                         local,
                         value,
-                        ty: HirType::Dynamic,
+                        ty: HirType::Ref,
                     });
                 }
                 Ok(vec![name])
@@ -357,7 +365,7 @@ impl<'a> Lowerer<'a> {
                     out.push(HirStmt::Let {
                         local,
                         value,
-                        ty: HirType::Dynamic,
+                        ty: HirType::Ref,
                     });
                 }
                 Ok(vec![en.id.clone()])
@@ -387,7 +395,7 @@ impl<'a> Lowerer<'a> {
                     out.push(HirStmt::Let {
                         local,
                         value,
-                        ty: HirType::Dynamic,
+                        ty: HirType::Ref,
                     });
                     for v in &st.variants {
                         let vlocal = scope.alloc_local(v.name.clone());
@@ -398,7 +406,7 @@ impl<'a> Lowerer<'a> {
                                 name: v.name.clone(),
                                 ty: HirType::Dynamic,
                             },
-                            ty: HirType::Dynamic,
+                            ty: HirType::Ref,
                         });
                         bound.push(v.name.clone());
                     }

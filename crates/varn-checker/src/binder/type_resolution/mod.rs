@@ -378,6 +378,20 @@ pub fn resolve_type_node(node: &TypeNode, ctx: Option<&dyn TypeContext>) -> Type
 
         TypeKind::Infer(_) => Type::Dynamic.tainted(),
 
+        TypeKind::TypePredicate {
+            parameter_name,
+            target_type,
+        } => {
+            let target = resolve_type_node(target_type, ctx);
+            Type(
+                TypeKind::TypePredicate {
+                    parameter_name: parameter_name.clone().into(),
+                    target_type: Box::new(target),
+                },
+                false,
+            )
+        }
+
         _ => Type::Dynamic.tainted(),
     }
 }

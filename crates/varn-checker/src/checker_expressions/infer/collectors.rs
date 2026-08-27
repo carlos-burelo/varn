@@ -52,12 +52,12 @@ fn collect_returns(
         }
         StmtKind::Try {
             block,
-            catch,
+            catches,
             finally,
             ..
         } => {
             collect_returns(block, checker, bind, out);
-            if let Some(c) = catch {
+            for c in catches {
                 collect_returns(c.body.as_ref(), checker, bind, out);
             }
             if let Some(f) = finally {

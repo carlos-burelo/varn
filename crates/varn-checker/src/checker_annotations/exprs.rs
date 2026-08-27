@@ -1,7 +1,7 @@
 use super::stmts::annotate_stmt;
 use super::AnnotateCtx;
 use crate::types::{Type, TypeContext};
-use varn_core::ast::operators::BinaryOp;
+use varn_core::ast::operators::{BinaryOp, UnaryOp};
 use varn_core::ast::{Arg, ArrayEl, Expr, ExprKind};
 use varn_core::intrinsic_ops::intrinsic_lookup;
 use varn_core::AnnKey;
@@ -57,7 +57,24 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
             }
         }
         ExprKind::Paren { expression } => annotate_expr(expression, ann, ctx),
-        ExprKind::Unary { operand, .. } => annotate_expr(operand, ann, ctx),
+        ExprKind::Unary { op, operand, .. } => {
+            annotate_expr(operand, ann, ctx);
+            let un_ty = get_expr_type(operand, ctx);
+            use varn_core::TypeTag;
+            match (&un_ty.non_nullified().0, op) {
+                (
+                    TypeKind::Intrinsic(TypeTag::Int),
+                    UnaryOp::Minus | UnaryOp::Plus | UnaryOp::BitNot,
+                ) => {
+                    ann.record_numeric(AnnKey::expr(expr.id), NumericKind::Int);
+                }
+                (TypeKind::Intrinsic(TypeTag::Float), UnaryOp::Minus | UnaryOp::Plus) => {
+                    ann.record_numeric(AnnKey::expr(expr.id), NumericKind::Float);
+                }
+                _ => {}
+            }
+        }
+        ExprKind::MetaAccess { target, .. } => annotate_expr(target, ann, ctx),
         ExprKind::Logical { left, right, .. } => {
             annotate_expr(left, ann, ctx);
             annotate_expr(right, ann, ctx);
@@ -163,6 +180,7 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                 }
                 let elem_ty = get_expr_type(expr, ctx);
                 record_cg_ty_at(AnnKey::expr(property.id), &elem_ty, ann, ctx);
+                record_cg_ty_at(AnnKey::expr(expr.id), &elem_ty, ann, ctx);
             } else if let ExprKind::Identifier { name: prop_name } = &property.kind {
                 let obj_ty = get_expr_type(object, ctx);
                 let check_ty = obj_ty.non_nullified();
@@ -231,8 +249,13 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
             annotate_expr(tag, ann, ctx);
             annotate_expr(template, ann, ctx);
         }
-        ExprKind::As { expression, .. } | ExprKind::Satisfies { expression, .. } => {
-            annotate_expr(expression, ann, ctx)
+        ExprKind::As { expression, .. } => {
+            annotate_expr(expression, ann, ctx);
+            let result_ty = get_expr_type(expr, ctx);
+            record_cg_ty_at(AnnKey::expr(expr.id), &result_ty, ann, ctx);
+        }
+        ExprKind::Satisfies { expression, .. } => {
+            annotate_expr(expression, ann, ctx);
         }
         ExprKind::Array { elements } => {
             for el in elements {
@@ -333,6 +356,10 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                 annotate_expr(e, ann, ctx);
             }
         }
+        ExprKind::Identifier { .. } => {
+            let ty = get_expr_type(expr, ctx);
+            record_cg_ty_at(AnnKey::expr(expr.id), &ty, ann, ctx);
+        }
         _ => {}
     }
 }
@@ -388,24 +415,49 @@ fn project_cg_ty(ty: &Type, ctx: &AnnotateCtx) -> varn_core::CgTy {
         TypeKind::Intrinsic(TypeTag::Decimal) => CgTy::Decimal,
         TypeKind::Intrinsic(TypeTag::BigInt) => CgTy::BigInt,
         TypeKind::Array(el) => CgTy::Array(Box::new(project_cg_ty(el, ctx))),
-        TypeKind::Generic(name, args, _) => match (name.as_ref(), args.as_slice()) {
-            ("Task", [ret]) => project_cg_ty(ret, ctx),
-            _ => CgTy::Dynamic,
-        },
-        TypeKind::Named(name, origin) => match name.as_ref() {
-            "Map" => CgTy::Map(Box::new(CgTy::Dynamic), Box::new(CgTy::Dynamic)),
-            "Set" => CgTy::Set(Box::new(CgTy::Dynamic)),
-            _ => {
-                if ctx
-                    .get_class_members(name, origin.as_ref().map(|o| o.as_ref()))
-                    .is_some()
-                {
-                    CgTy::Class(name.clone())
-                } else {
-                    CgTy::Dynamic
+        TypeKind::Generic(name, args, _) => {
+            if name.as_ref() == varn_core::IntrinsicType::Task.as_str() {
+                if let [ret] = args.as_slice() {
+                    return project_cg_ty(ret, ctx);
+                }
+            } else if name.as_ref() == varn_core::IntrinsicType::Array.as_str() {
+                if let [el] = args.as_slice() {
+                    return CgTy::Array(Box::new(project_cg_ty(el, ctx)));
+                }
+            } else if name.as_ref() == varn_core::IntrinsicType::Map.as_str() {
+                if let [k, v] = args.as_slice() {
+                    return CgTy::Map(
+                        Box::new(project_cg_ty(k, ctx)),
+                        Box::new(project_cg_ty(v, ctx)),
+                    );
+                }
+            } else if name.as_ref() == varn_core::IntrinsicType::Set.as_str() {
+                if let [el] = args.as_slice() {
+                    return CgTy::Set(Box::new(project_cg_ty(el, ctx)));
                 }
             }
-        },
+            CgTy::Dynamic
+        }
+        TypeKind::Named(name, origin) => {
+            match varn_core::IntrinsicType::from_str(name.as_ref()) {
+                Some(varn_core::IntrinsicType::Map) => {
+                    CgTy::Map(Box::new(CgTy::Dynamic), Box::new(CgTy::Dynamic))
+                }
+                Some(varn_core::IntrinsicType::Set) => CgTy::Set(Box::new(CgTy::Dynamic)),
+                _ => {
+                    if ctx
+                        .get_class_members(name, origin.as_ref().map(|o| o.as_ref()))
+                        .is_some()
+                        || ctx.bind.get_enum_members_local(name).is_some()
+                    {
+                        CgTy::Class(name.clone())
+                    } else {
+                        CgTy::Dynamic
+                    }
+                }
+            }
+        }
+        TypeKind::EnumVariant { enum_name, .. } => CgTy::Class(enum_name.clone()),
         TypeKind::Fn(_) => CgTy::Fn,
         TypeKind::Union(members) => {
             let non_null: Vec<&Type> = members.iter().filter(|m| !m.is_nullable()).collect();

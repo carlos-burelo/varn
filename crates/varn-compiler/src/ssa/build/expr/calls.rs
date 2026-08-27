@@ -175,6 +175,11 @@ impl Builder {
                 ty,
             } => {
                 let o = self.lower_expr(object)?;
+                if *wire_byte == varn_core::intrinsic_ops::int::IntOp::ToString.wire()
+                    && args.is_empty()
+                {
+                    return Ok(self.emit(InstKind::ToString { operand: o }, HirType::Str));
+                }
                 let mut avs = Vec::with_capacity(args.len());
                 for a in args {
                     avs.push(self.lower_expr(a)?);

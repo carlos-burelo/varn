@@ -1,36 +1,36 @@
-//! `try` lowering in its three shapes, plus the finally blocks a jump out of
-//! a guarded region has to run on its way.
+//! `try` lowering in its shapes with multi-catch support, plus the finally blocks
+//! a jump out of a guarded region has to run on its way.
 
-use crate::hir::{HirCatch, HirStmt, HirType};
-use crate::ssa::ir::{InstKind, Terminator};
+use crate::hir::{HirBinOp, HirCatch, HirStmt, HirType, HirTypeTest, HirUnOp};
+use crate::ssa::ir::{InstKind, Terminator, Value};
 
-use super::super::{Builder, Result, VarId};
+use super::super::{BlockId, Builder, Result, VarId};
 
 impl Builder {
     pub(in crate::ssa::build) fn lower_try(
         &mut self,
         block: &[HirStmt],
-        catch: &Option<HirCatch>,
+        catches: &[HirCatch],
         finally: &Option<Vec<HirStmt>>,
     ) -> Result<()> {
-        match (catch, finally) {
-            (None, Some(fin)) => self.lower_try_finally(block, fin),
-            (Some(cc), None) => self.lower_try_catch(block, cc),
-            (Some(cc), Some(fin)) => self.lower_try_catch_finally(block, cc, fin),
-            (None, None) => self.lower_block(block),
+        match (catches.is_empty(), finally) {
+            (true, Some(fin)) => self.lower_try_finally(block, fin),
+            (false, None) => self.lower_try_catches(block, catches),
+            (false, Some(fin)) => self.lower_try_catches_finally(block, catches, fin),
+            (true, None) => self.lower_block(block),
         }
     }
 
-    pub(in crate::ssa::build) fn lower_try_catch(
+    pub(in crate::ssa::build) fn lower_try_catches(
         &mut self,
         block: &[HirStmt],
-        cc: &HirCatch,
+        catches: &[HirCatch],
     ) -> Result<()> {
         let try_entry = self.current;
-        let catch_b = self.new_block();
+        let landing_pad = self.new_block();
         let exit_b = self.new_block();
 
-        let try_val = self.emit(InstKind::Try { handler: catch_b }, HirType::Dynamic);
+        let try_val = self.emit(InstKind::Try { handler: landing_pad }, HirType::Dynamic);
 
         self.open_try_regions.push(Vec::new());
         self.lower_block(block)?;
@@ -46,25 +46,13 @@ impl Builder {
             self.add_pred(exit_b, from);
         }
 
-        self.add_pred(catch_b, try_entry);
-        self.seal_block(catch_b);
+        self.add_pred(landing_pad, try_entry);
+        self.seal_block(landing_pad);
 
-        self.current = catch_b;
+        self.current = landing_pad;
         let caught_err = self.emit(InstKind::CatchParam { try_val }, HirType::Dynamic);
-        if let Some(local) = cc.param {
-            self.write_var(VarId::Local(local), catch_b, caught_err);
-        }
 
-        self.lower_block(&cc.body)?;
-
-        if self.is_open() {
-            let from = self.current;
-            self.set_term(Terminator::Jump {
-                target: exit_b,
-                args: Vec::new(),
-            });
-            self.add_pred(exit_b, from);
-        }
+        self.lower_catches_dispatch(catches, caught_err, exit_b, None)?;
 
         self.seal_block(exit_b);
         self.current = exit_b;
@@ -111,10 +99,10 @@ impl Builder {
         Ok(())
     }
 
-    pub(in crate::ssa::build) fn lower_try_catch_finally(
+    pub(in crate::ssa::build) fn lower_try_catches_finally(
         &mut self,
         block: &[HirStmt],
-        cc: &HirCatch,
+        catches: &[HirCatch],
         fin: &[HirStmt],
     ) -> Result<()> {
         self.open_try_regions.push(fin.to_vec());
@@ -155,24 +143,9 @@ impl Builder {
             HirType::Dynamic,
         );
 
-        if let Some(local) = cc.param {
-            self.write_var(VarId::Local(local), handler_b, caught_err);
-        }
-
-        self.lower_block(&cc.body)?;
+        self.lower_catches_dispatch(catches, caught_err, exit_b, Some(fin))?;
 
         self.open_try_regions.pop();
-
-        if self.is_open() {
-            self.emit_effect(InstKind::PopTry);
-            self.lower_block(fin)?;
-            let from = self.current;
-            self.set_term(Terminator::Jump {
-                target: exit_b,
-                args: Vec::new(),
-            });
-            self.add_pred(exit_b, from);
-        }
 
         self.add_pred(handler2_b, catch_entry);
         self.seal_block(handler2_b);
@@ -185,6 +158,155 @@ impl Builder {
         self.seal_block(exit_b);
         self.current = exit_b;
         Ok(())
+    }
+
+    fn lower_catches_dispatch(
+        &mut self,
+        catches: &[HirCatch],
+        caught_err: Value,
+        exit_b: BlockId,
+        fin: Option<&[HirStmt]>,
+    ) -> Result<()> {
+        let mut current_test_b = self.current;
+
+        for cc in catches {
+            self.current = current_test_b;
+
+            if cc.type_tests.is_empty() {
+                // Catch-all clause (unconditional match)
+                if let Some(local) = cc.param {
+                    self.write_var(VarId::Local(local), current_test_b, caught_err);
+                }
+                self.lower_block(&cc.body)?;
+                if self.is_open() {
+                    if let Some(fin_stmts) = fin {
+                        self.emit_effect(InstKind::PopTry);
+                        self.lower_block(fin_stmts)?;
+                    }
+                    let from = self.current;
+                    self.set_term(Terminator::Jump {
+                        target: exit_b,
+                        args: Vec::new(),
+                    });
+                    self.add_pred(exit_b, from);
+                }
+                return Ok(());
+            }
+
+            let match_body_b = self.new_block();
+            let next_clause_test_b = self.new_block();
+
+            let num_tests = cc.type_tests.len();
+            for (k, test) in cc.type_tests.iter().enumerate() {
+                let cond = self.emit_single_type_test(test, caught_err);
+                let from_test = self.current;
+
+                if k + 1 < num_tests {
+                    let next_subtest_b = self.new_block();
+                    self.set_term(Terminator::Branch {
+                        cond,
+                        then_blk: match_body_b,
+                        then_args: Vec::new(),
+                        else_blk: next_subtest_b,
+                        else_args: Vec::new(),
+                    });
+                    self.add_pred(match_body_b, from_test);
+                    self.add_pred(next_subtest_b, from_test);
+                    self.seal_block(next_subtest_b);
+                    self.current = next_subtest_b;
+                } else {
+                    self.set_term(Terminator::Branch {
+                        cond,
+                        then_blk: match_body_b,
+                        then_args: Vec::new(),
+                        else_blk: next_clause_test_b,
+                        else_args: Vec::new(),
+                    });
+                    self.add_pred(match_body_b, from_test);
+                    self.add_pred(next_clause_test_b, from_test);
+                }
+            }
+
+            self.seal_block(match_body_b);
+            self.seal_block(next_clause_test_b);
+
+            // Match body
+            self.current = match_body_b;
+            if let Some(local) = cc.param {
+                self.write_var(VarId::Local(local), match_body_b, caught_err);
+            }
+            self.lower_block(&cc.body)?;
+            if self.is_open() {
+                if let Some(fin_stmts) = fin {
+                    self.emit_effect(InstKind::PopTry);
+                    self.lower_block(fin_stmts)?;
+                }
+                let from = self.current;
+                self.set_term(Terminator::Jump {
+                    target: exit_b,
+                    args: Vec::new(),
+                });
+                self.add_pred(exit_b, from);
+            }
+
+            current_test_b = next_clause_test_b;
+        }
+
+        // Unmatched exception fallthrough: rethrow caught_err
+        self.current = current_test_b;
+        if let Some(fin_stmts) = fin {
+            self.emit_effect(InstKind::PopTry);
+            self.lower_block(fin_stmts)?;
+        }
+        self.set_term(Terminator::Throw(caught_err));
+
+        Ok(())
+    }
+
+    fn emit_single_type_test(&mut self, test: &HirTypeTest, operand: Value) -> Value {
+        match test {
+            HirTypeTest::IsNull => {
+                self.emit(InstKind::IsNull { operand }, HirType::Bool)
+            }
+            HirTypeTest::IsArray => {
+                self.emit(InstKind::IsArray { operand }, HirType::Bool)
+            }
+            HirTypeTest::TypeofEq(name) => {
+                let t = self.emit(
+                    InstKind::Unary {
+                        op: HirUnOp::Typeof,
+                        operand,
+                        ty: HirType::Str,
+                    },
+                    HirType::Str,
+                );
+                let s = self.emit(InstKind::ConstStr(name.clone()), HirType::Str);
+                self.emit(
+                    InstKind::Binary {
+                        op: HirBinOp::Eq,
+                        lhs: t,
+                        rhs: s,
+                        ty: HirType::Dynamic,
+                    },
+                    HirType::Bool,
+                )
+            }
+            HirTypeTest::Instanceof(name) => {
+                let cls = self.emit(InstKind::LoadGlobal(name.clone()), HirType::Ref);
+                self.emit(
+                    InstKind::Binary {
+                        op: HirBinOp::Instanceof,
+                        lhs: operand,
+                        rhs: cls,
+                        ty: HirType::Dynamic,
+                    },
+                    HirType::Bool,
+                )
+            }
+            HirTypeTest::AlwaysFalse => {
+                self.emit(InstKind::ConstBool(false), HirType::Bool)
+            }
+        }
     }
 
     pub(in crate::ssa::build) fn emit_region_exits(&mut self, depth: usize) -> Result<()> {

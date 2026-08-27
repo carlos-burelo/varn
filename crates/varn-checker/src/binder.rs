@@ -352,16 +352,26 @@ impl<'r> Binder<'r> {
             }
             StmtKind::Try {
                 block,
-                catch,
+                catches,
                 finally,
             } => {
                 self.bind_stmt(block);
-                if let Some(clause) = catch {
+                for clause in catches {
                     let child = self.scopes.child(ScopeKind::Block, self.current);
                     let saved = self.current;
                     self.current = child;
                     if let Some(p) = &clause.param {
-                        self.bind_pattern(p, SymbolKind::Let, block.range.start.line, None, None);
+                        let ty = clause
+                            .type_ann
+                            .as_ref()
+                            .map(|ann| type_resolution::resolve_type_node(ann, Some(self)));
+                        self.bind_pattern(
+                            p,
+                            SymbolKind::Let,
+                            block.range.start.line,
+                            None,
+                            ty,
+                        );
                     }
                     self.bind_stmt(&clause.body);
                     self.finalize_array_watch(child);

@@ -59,6 +59,13 @@ impl std::fmt::Display for ExprInfo {
     }
 }
 
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ScopeSpan {
+    pub start: u32,
+    pub end: u32,
+    pub scope: ScopeId,
+}
+
 pub struct CheckResult {
     pub bind: BindResult,
     pub diagnostics: varn_core::DiagnosticBag,
@@ -76,6 +83,7 @@ pub struct CheckResult {
     pub extension_members: FxHashMap<u32, Rc<str>>,
     pub extension_set_members: FxHashMap<u32, Rc<str>>,
     pub node_scopes: FxHashMap<u32, crate::scope::ScopeId>,
+    pub scope_spans: Vec<ScopeSpan>,
     pub symbol_types: FxHashMap<SymbolId, crate::types::Type>,
     pub member_resolutions: FxHashMap<u32, MemberResolution>,
     pub call_resolutions: FxHashMap<u32, CallResolution>,
@@ -91,11 +99,14 @@ pub struct CheckResult {
 impl CheckResult {
     pub fn scope_at_offset(&self, cursor_offset: u32) -> crate::scope::ScopeId {
         let mut best_scope = self.bind.global_scope;
-        let mut best_offset: u32 = 0;
-        for (&offset, &scope) in &self.node_scopes {
-            if offset <= cursor_offset && offset >= best_offset {
-                best_offset = offset;
-                best_scope = scope;
+        let mut best_span_len = u32::MAX;
+        for span in &self.scope_spans {
+            if cursor_offset >= span.start && cursor_offset <= span.end {
+                let span_len = span.end.saturating_sub(span.start);
+                if span_len < best_span_len {
+                    best_span_len = span_len;
+                    best_scope = span.scope;
+                }
             }
         }
         best_scope
@@ -169,6 +180,7 @@ pub struct Checker<'r> {
     pub(crate) reassigned_names: rustc_hash::FxHashSet<Rc<str>>,
     pub(crate) record_expr_types: bool,
     pub(crate) node_scopes: FxHashMap<u32, ScopeId>,
+    pub(crate) scope_spans: Vec<ScopeSpan>,
     pub(crate) map_generics_cache: FxHashMap<(Type, Vec<Type>), Type>,
     pub(crate) yielded_types: Option<Vec<Type>>,
     pub warn_implicit_dynamic: bool,
@@ -318,6 +330,7 @@ impl<'r> Checker<'r> {
             reassigned_names: rustc_hash::FxHashSet::default(),
             record_expr_types,
             node_scopes: FxHashMap::default(),
+            scope_spans: Vec::new(),
             map_generics_cache: FxHashMap::with_capacity_and_hasher(512, Default::default()),
             yielded_types: None,
             loop_depth: 0,
@@ -437,6 +450,11 @@ impl<'r> Checker<'r> {
         } else {
             FxHashMap::default()
         };
+        let scope_spans = if record_expr_types {
+            checker.scope_spans
+        } else {
+            Vec::new()
+        };
 
         CheckResult {
             bind,
@@ -449,6 +467,7 @@ impl<'r> Checker<'r> {
             extension_members: checker.extension_members,
             extension_set_members: checker.extension_set_members,
             node_scopes,
+            scope_spans,
             symbol_types,
             member_resolutions: checker.member_resolutions,
             call_resolutions: checker.call_resolutions,
@@ -470,6 +489,46 @@ impl<'r> Checker<'r> {
         if self.record_expr_types {
             self.node_scopes.insert(offset, self.current_scope);
         }
+    }
+
+    pub(crate) fn record_scope_span(&mut self, start: u32, end: u32, scope: ScopeId) {
+        if self.record_expr_types {
+            self.scope_spans.push(ScopeSpan { start, end, scope });
+            self.node_scopes.insert(start, scope);
+        }
+    }
+
+    pub(crate) fn with_next_child_scope<R>(
+        &mut self,
+        bind: &BindResult,
+        offset: u32,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let saved_scope = self.current_scope;
+        if let Some(child) = self.next_child_scope(bind) {
+            self.current_scope = child;
+            self.record_scope(offset);
+        }
+        let res = f(self);
+        self.current_scope = saved_scope;
+        res
+    }
+
+    pub(crate) fn with_next_child_scope_span<R>(
+        &mut self,
+        bind: &BindResult,
+        start: u32,
+        end: u32,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let saved_scope = self.current_scope;
+        if let Some(child) = self.next_child_scope(bind) {
+            self.current_scope = child;
+            self.record_scope_span(start, end, child);
+        }
+        let res = f(self);
+        self.current_scope = saved_scope;
+        res
     }
 
     pub(crate) fn with_expected<R>(

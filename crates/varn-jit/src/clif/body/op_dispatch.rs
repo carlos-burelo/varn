@@ -133,10 +133,15 @@ pub(crate) fn dispatch_opcode(
         }
         OpCode::Negate => {
             let src = (code[ip + 1] >> 8) as usize;
-            if meta_is_float(&proto.register_meta, first_reg) {
+            if meta_is_float(&proto.register_meta, first_reg) || state[src] == K::Float {
                 let f = use_f64(b, vars, state, src)?;
                 let neg = b.ins().fneg(f);
-                b.def_var(vars[first_reg], neg);
+                if meta_is_float(&proto.register_meta, first_reg) {
+                    b.def_var(vars[first_reg], neg);
+                } else {
+                    let boxed = box_f64(b, neg);
+                    b.def_var(vars[first_reg], boxed);
+                }
             } else if state[src] == K::Int || state_meta_int(&proto.register_meta, first_reg) {
                 let i = use_int(b, vars, state, src)?;
                 let neg = b.ins().ineg(i);
@@ -384,11 +389,11 @@ pub(crate) fn dispatch_opcode(
         }
         OpCode::CallMethod => {
             let actx = actx.ok_or("clif: CallMethod outside alloc fn")?;
-            methods::emit_call_method(b, actx, state, &proto.register_meta, code, ip);
+            methods::emit_call_method(b, actx, state, proto, code, ip);
         }
         OpCode::InvokeVirtual => {
             let actx = actx.ok_or("clif: InvokeVirtual outside alloc fn")?;
-            methods::emit_invoke_virtual(b, actx, state, &proto.register_meta, code, ip);
+            methods::emit_invoke_virtual(b, actx, state, proto, code, ip);
         }
         OpCode::MakeEnumVariant => {
             let actx = actx.ok_or("clif: MakeEnumVariant outside alloc fn")?;

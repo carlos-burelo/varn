@@ -54,6 +54,7 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
         | Yield { operand } => f(*operand),
 
         GetProperty { object, .. }
+        | ObjectRest { object, .. }
         | GetFixedField { object, .. }
         | GetPropertyMaybe { object, .. }
         | ModuleSlot { object, .. }
@@ -194,6 +195,7 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
         | Yield { operand } => f(operand),
 
         GetProperty { object, .. }
+        | ObjectRest { object, .. }
         | GetFixedField { object, .. }
         | GetPropertyMaybe { object, .. }
         | ModuleSlot { object, .. }

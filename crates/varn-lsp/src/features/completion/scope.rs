@@ -4,10 +4,10 @@ use varn_checker::SymbolKind;
 use crate::document::DocumentState;
 use crate::util::converters::to_completion_kind;
 
-pub fn build_scope_completions(state: &DocumentState, line: u32) -> Vec<CompletionItem> {
+pub fn build_scope_completions(state: &DocumentState, line: u32, col: u32) -> Vec<CompletionItem> {
     let mut items: Vec<CompletionItem> = Vec::new();
 
-    let cursor_offset = state.offset_at_line_col(line, 0);
+    let cursor_offset = state.offset_at_line_col(line, col);
     let mut scope_id = state.db.scope_at_offset(cursor_offset);
 
     let mut seen_names = std::collections::HashSet::new();
@@ -47,6 +47,7 @@ pub fn build_scope_completions(state: &DocumentState, line: u32) -> Vec<Completi
                     detail,
                     insert_text,
                     insert_text_format,
+                    sort_text: Some(format!("0_{}", sym.name)),
                     ..Default::default()
                 });
             }

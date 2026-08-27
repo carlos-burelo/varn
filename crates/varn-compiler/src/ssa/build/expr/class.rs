@@ -30,7 +30,7 @@ impl Builder {
         for (key, init) in &cls.static_fields {
             let val = match init {
                 Some(e) => self.lower_expr(e)?,
-                None => self.emit(InstKind::ConstNull, HirType::Dynamic),
+                None => self.emit(InstKind::ConstNull, HirType::Ref),
             };
             self.emit_effect(InstKind::DefineStatic {
                 class: class_val,
@@ -132,7 +132,7 @@ impl Builder {
         for (key, init) in &en.static_fields {
             let val = match init {
                 Some(e) => self.lower_expr(e)?,
-                None => self.emit(InstKind::ConstNull, HirType::Dynamic),
+                None => self.emit(InstKind::ConstNull, HirType::Ref),
             };
             self.emit_effect(InstKind::DefineStatic {
                 class: class_val,

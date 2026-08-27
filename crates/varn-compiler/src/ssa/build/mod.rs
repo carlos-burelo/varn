@@ -39,13 +39,14 @@ struct Builder {
     next_synthetic: u32,
 
     current: BlockId,
+    current_line: u32,
     pinned_vars: FxHashSet<VarId>,
     open_try_regions: Vec<Vec<HirStmt>>,
     source_file: Option<Rc<str>>,
 }
 
 impl Builder {
-    fn new(pinned_vars: FxHashSet<VarId>, source_file: Option<Rc<str>>) -> Self {
+    fn new(pinned_vars: FxHashSet<VarId>, source_file: Option<Rc<str>>, start_line: u32) -> Self {
         let mut b = Builder {
             blocks: Vec::new(),
             values: Vec::new(),
@@ -56,6 +57,7 @@ impl Builder {
             loops: Vec::new(),
             next_synthetic: 0,
             current: BlockId(0),
+            current_line: start_line,
             pinned_vars,
             open_try_regions: Vec::new(),
             source_file,
@@ -72,6 +74,7 @@ impl Builder {
             params: Vec::new(),
             insts: Vec::new(),
             term: Terminator::Unreachable,
+            term_line: self.current_line,
             preds: Vec::new(),
         });
         self.sealed.push(false);
@@ -82,6 +85,11 @@ impl Builder {
         let v = Value(self.values.len() as u32);
         self.values.push(ValueDef { ty });
         v
+    }
+
+    #[inline]
+    fn value_ty(&self, v: Value) -> HirType {
+        self.values[v.0 as usize].ty
     }
 
     fn block_mut(&mut self, id: BlockId) -> &mut Block {
@@ -96,7 +104,10 @@ impl Builder {
     }
 
     fn set_term(&mut self, term: Terminator) {
-        self.block_mut(self.current).term = term;
+        let line = self.current_line;
+        let block = self.block_mut(self.current);
+        block.term = term;
+        block.term_line = line;
     }
 
     fn add_pred(&mut self, block: BlockId, pred: BlockId) {
@@ -105,17 +116,20 @@ impl Builder {
 
     fn emit(&mut self, kind: InstKind, ty: HirType) -> Value {
         let dest = self.new_value(ty);
+        let line = self.current_line;
         self.block_mut(self.current).insts.push(Inst {
             dest: Some(dest),
             kind,
+            line,
         });
         dest
     }
 
     fn emit_effect(&mut self, kind: InstKind) {
+        let line = self.current_line;
         self.block_mut(self.current)
             .insts
-            .push(Inst { dest: None, kind });
+            .push(Inst { dest: None, kind, line });
     }
 
     fn fresh_synthetic(&mut self) -> VarId {
@@ -269,7 +283,7 @@ pub fn build_function(
     source_file: Option<Rc<str>>,
 ) -> Result<SsaFunc> {
     let pinned = scan_pinned_vars(func);
-    let mut b = Builder::new(pinned, source_file.clone());
+    let mut b = Builder::new(pinned, source_file.clone(), func.start_line);
 
     b.next_synthetic = func.locals;
     let entry = b.current;

@@ -336,6 +336,7 @@ impl<'r> super::super::Binder<'r> {
             .with_type(ty.clone());
             field_sym.col = field.range.start.column;
             field_sym.offset = field.range.start.offset;
+            field_sym.has_explicit_type = true;
             let symbol_id = self.arena.push(field_sym);
 
             members.push(ClassMemberInfo {

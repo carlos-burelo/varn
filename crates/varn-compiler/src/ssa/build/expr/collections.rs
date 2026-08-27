@@ -20,7 +20,10 @@ impl Builder {
                         };
                         elements.push(item);
                     }
-                    return Ok(self.emit(InstKind::BuildArraySpread { elements }, HirType::Ref));
+                    return Ok(self.emit(
+                        InstKind::BuildArraySpread { elements },
+                        HirType::Array(crate::hir::TyId(0)),
+                    ));
                 }
                 let mut vals = Vec::with_capacity(els.len());
                 for el in els {
@@ -32,7 +35,10 @@ impl Builder {
                         HirArrayEl::Spread(_) => unreachable!("spread handled above"),
                     }
                 }
-                Ok(self.emit(InstKind::BuildArray { elements: vals }, HirType::Ref))
+                Ok(self.emit(
+                    InstKind::BuildArray { elements: vals },
+                    HirType::Array(crate::hir::TyId(0)),
+                ))
             }
 
             HirExpr::Tuple(els) => {

@@ -31,6 +31,7 @@ pub fn server_capabilities() -> ServerCapabilities {
             resolve_provider: Some(false),
             trigger_characters: Some(vec![
                 ".".to_string(),
+                ":".to_string(),
                 "'".to_string(),
                 "\"".to_string(),
             ]),
@@ -53,11 +54,7 @@ pub fn server_capabilities() -> ServerCapabilities {
             more_trigger_character: Some(vec![";".to_string(), "\n".to_string()]),
         }),
         execute_command_provider: Some(ExecuteCommandOptions {
-            commands: vec![
-                "varn.showBytecode".to_string(),
-                "varn.showSSA".to_string(),
-                "varn.evalSelection".to_string(),
-            ],
+            commands: vec![],
             work_done_progress_options: Default::default(),
         }),
         rename_provider: Some(OneOf::Right(RenameOptions {

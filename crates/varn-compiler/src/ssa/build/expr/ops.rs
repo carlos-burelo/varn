@@ -86,13 +86,18 @@ impl Builder {
             }
             HirExpr::Unary { op, operand, ty } => {
                 let o = self.lower_expr(operand)?;
+                let result_ty = match op {
+                    crate::hir::HirUnOp::Not => HirType::Bool,
+                    crate::hir::HirUnOp::Typeof => HirType::Str,
+                    crate::hir::HirUnOp::Neg | crate::hir::HirUnOp::BitNot => *ty,
+                };
                 Ok(self.emit(
                     InstKind::Unary {
                         op: *op,
                         operand: o,
                         ty: *ty,
                     },
-                    *ty,
+                    result_ty,
                 ))
             }
 

@@ -82,4 +82,21 @@ assertEqual((jsonObj as dynamic).status, 200);
 let jsonStr = JSON.stringify(jsonObj);
 assert(jsonStr.includes("\"status\":200"));
 
+// 9. Generic Typed JSON.parse<T> & CSV.parse<T>
+class UserDto {
+    id: int;
+    name: str;
+}
+let typedUsers = CSV.parse<UserDto>(csvBasic);
+assertEqual(typedUsers[0].name, "Alice");
+assertEqual(typedUsers[1].id, 2);
+
+class ApiResponse {
+    message: str;
+    status: int;
+}
+let typedJson = JSON.parse<ApiResponse>("{\"message\": \"hello\", \"status\": 200}");
+assertEqual(typedJson.status, 200);
+assertEqual(typedJson.message, "hello");
+
 print("[PASSED] 82. Canonical std:csv & std:json Namespaces (RFC 4180 parsing, types, custom delimiters & stringification)");

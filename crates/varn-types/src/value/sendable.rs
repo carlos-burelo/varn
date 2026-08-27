@@ -33,7 +33,7 @@ pub enum SendValue {
 pub struct SendEnumVariant {
     pub enum_name: String,
     pub variant_name: String,
-    pub variant_tag: u8,
+    pub variant_tag: i64,
     pub fields: Vec<String>,
     pub payload: SendValue,
 }

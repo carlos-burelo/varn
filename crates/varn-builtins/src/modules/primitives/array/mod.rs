@@ -90,18 +90,25 @@ varn_contract! {
         fn join(ctx: &mut dyn NativeCtx, this: VnArray, separator: Option<&str>) -> String {
             let sep = separator.unwrap_or(",");
             let len = this.len(ctx);
-            // Two passes: collect values first, then render borrowed reprs
-            // straight into one buffer — no per-element String allocation.
-            let mut vals = Vec::with_capacity(len);
-            for i in 0..len {
-                vals.push(this.get(ctx, i).unwrap_or_else(VmValue::null));
+            if len == 0 {
+                return String::new();
             }
-            let mut out = String::new();
-            for (i, &v) in vals.iter().enumerate() {
-                if i > 0 {
+            let mut out = String::with_capacity(len * (sep.len() + 8));
+            let mut first = true;
+            let mut buf = [0u8; 5];
+            for i in 0..len {
+                if !first {
                     out.push_str(sep);
+                } else {
+                    first = false;
                 }
-                out.push_str(&ctx.str_repr_borrowed(v));
+                if let Some(v) = this.get(ctx, i) {
+                    if v.is_sso() {
+                        out.push_str(v.sso_as_str(&mut buf));
+                    } else {
+                        out.push_str(&ctx.str_repr_borrowed(v));
+                    }
+                }
             }
             out
         }

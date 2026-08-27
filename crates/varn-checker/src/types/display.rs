@@ -77,7 +77,7 @@ impl fmt::Display for Type {
                 write!(f, ") => {}", ft.return_type)
             }
             TypeKind::Object(members) => {
-                write!(f, "#{{ ")?;
+                write!(f, "{{ ")?;
                 for (i, m) in members.iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
@@ -194,6 +194,12 @@ impl fmt::Display for Type {
                 write!(f, "{check} extends {extends} ? {true_type} : {false_type}")
             }
             TypeKind::Infer(name) => write!(f, "infer {name}"),
+            TypeKind::TypePredicate {
+                parameter_name,
+                target_type,
+            } => {
+                write!(f, "{parameter_name} is {target_type}")
+            }
         }
     }
 }

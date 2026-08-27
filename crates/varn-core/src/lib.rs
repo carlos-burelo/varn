@@ -19,7 +19,7 @@ pub mod type_tag;
 pub mod typed_ir;
 pub mod well_known;
 
-pub use ast::{assign_ast_ids, AstId};
+pub use ast::AstId;
 pub use doc::DocComment;
 
 pub use diagnostics::{

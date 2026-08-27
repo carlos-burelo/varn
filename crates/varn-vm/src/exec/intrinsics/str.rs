@@ -107,9 +107,13 @@ fn alloc_sub(
     if bs == 0 && be == s.len() {
         return recv;
     }
+    let sub = &s[bs..be];
+    if let Some(sso) = VmValue::try_from_sso(sub) {
+        return sso;
+    }
     match this {
         StrHandle::Heap(h) => heap.alloc_substring(h, bs, be),
-        StrHandle::Sso(..) => heap.alloc_str_dynamic(&s[bs..be]),
+        StrHandle::Sso(..) => heap.alloc_str_dynamic(sub),
     }
 }
 

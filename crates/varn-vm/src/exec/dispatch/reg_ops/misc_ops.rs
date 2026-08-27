@@ -157,12 +157,20 @@ impl ExecCtx {
     }
 
     pub(crate) fn exec_str_length(&mut self, v: VmValue) -> VmResult<VmValue> {
+        if v.is_sso() {
+            return Ok(VmValue::from_int(v.sso_len() as i64));
+        }
         if v.is_heap() {
             if let Some(HeapObj::Str(s)) = self.heap.get(v.as_heap_idx()) {
-                return Ok(VmValue::from_i32(s.chars().count() as i32));
+                let len = if s.is_ascii() {
+                    s.len()
+                } else {
+                    s.chars().count()
+                };
+                return Ok(VmValue::from_int(len as i64));
             }
         }
-        Ok(VmValue::from_i32(0))
+        Ok(VmValue::from_int(0))
     }
 
     pub(crate) fn exec_str_slice(&mut self, s: VmValue, idx: VmValue) -> VmResult<VmValue> {

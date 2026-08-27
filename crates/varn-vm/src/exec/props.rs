@@ -59,6 +59,10 @@ pub(crate) fn resolve_property(
         }
     }
 
+    if key.starts_with("::") {
+        return resolve_meta_property(obj, &key[2..], heap);
+    }
+
     if let Some(nv) = resolve_own_data_property(obj, key, heap) {
         return Ok(ResolvedProperty::Nv(nv));
     }
@@ -261,6 +265,22 @@ fn resolve_own_data_property(obj: VmValue, key: &str, heap: &Heap) -> Option<VmV
         {
             Some(VmValue::from_int(a.len() as i64))
         }
+        Some(HeapObj::Range(r)) => {
+            if key == varn_core::MemberKey::Start.as_str() {
+                Some(VmValue::from_int(r.start))
+            } else if key == varn_core::MemberKey::End.as_str() {
+                Some(VmValue::from_int(r.end))
+            } else if key == varn_core::MemberKey::Length.as_str() {
+                let len = if r.inclusive {
+                    (r.end - r.start + 1).max(0)
+                } else {
+                    (r.end - r.start).max(0)
+                };
+                Some(VmValue::from_int(len))
+            } else {
+                None
+            }
+        }
         _ => None,
     }
 }
@@ -385,12 +405,15 @@ fn resolve_specialized_value_property(
                     }
                 }
             }
-            match key {
-                "__tag" => Some(Ok(Value::Int(ev.variant_tag as i64))),
-                "__variant_name__" => Some(Ok(Value::Str(ev.variant_name.clone()))),
-                "name" => Some(Ok(Value::Str(ev.variant_name.clone()))),
-                "rawValue" => Some(Ok(Value::Int(ev.variant_tag as i64))),
-                "value0" if ev.fields.is_empty() => Some(Ok(ev.payload.clone())),
+            use varn_core::MemberKey;
+            match MemberKey::from_str(key) {
+                Some(MemberKey::Tag) | Some(MemberKey::RawValue) => {
+                    Some(Ok(Value::Int(ev.variant_tag)))
+                }
+                Some(MemberKey::VariantName) | Some(MemberKey::Name) => {
+                    Some(Ok(Value::Str(ev.variant_name.clone())))
+                }
+                Some(MemberKey::Value0) if ev.fields.is_empty() => Some(Ok(ev.payload.clone())),
                 _ => None,
             }
         }
@@ -414,22 +437,43 @@ fn generator_next(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, 
 }
 
 pub(crate) fn get_class(val: VmValue, heap: &Heap) -> Option<Rc<ClassObj>> {
-    // Fast path for heap types whose class is fixed by their type: avoid
-    // `heap.extract`, which deep-clones the contents. This is on the property-
-    // access IC hot path, so cloning made every `arr.length` / array property
-    // access O(n) and any loop over it O(n²). These return exactly what the slow
-    // path would (`get_class_for_value` maps `Value::Array` -> intrinsic "Array").
     if val.is_heap() {
         match heap.get(val.as_heap_idx()) {
-            Some(HeapObj::Array(_)) => {
+            Some(HeapObj::Object(o) | HeapObj::Record(o)) => return o.borrow().class(),
+            Some(HeapObj::Class(cls)) => return Some(cls.clone()),
+            Some(HeapObj::Array(_) | HeapObj::Tuple(_)) => {
                 return heap.get_intrinsic_class(IntrinsicType::Array.as_str())
             }
             Some(HeapObj::Str(_)) => return heap.get_intrinsic_class(IntrinsicType::Str.as_str()),
-            _ => {}
+            Some(HeapObj::Map(_)) => return heap.get_intrinsic_class(IntrinsicType::Map.as_str()),
+            Some(HeapObj::Set(_)) => return heap.get_intrinsic_class(IntrinsicType::Set.as_str()),
+            Some(HeapObj::EnumVariant(ev)) => return heap.get_intrinsic_class(&ev.enum_name),
+            Some(HeapObj::Range(_)) => {
+                return heap.get_intrinsic_class(IntrinsicType::Range.as_str())
+            }
+            Some(HeapObj::Buffer(_)) => return heap.get_intrinsic_class("Buffer"),
+            Some(HeapObj::Generator(_)) => {
+                return heap.get_intrinsic_class(IntrinsicType::Generator.as_str())
+            }
+            _ => return None,
         }
     }
-    let v = heap.extract(val);
-    get_class_for_value(&v, heap)
+    if val.is_int() {
+        return heap.get_intrinsic_class(IntrinsicType::Int.as_str());
+    }
+    if val.is_f64() {
+        return heap.get_intrinsic_class(IntrinsicType::Float.as_str());
+    }
+    if val.is_bool() {
+        return heap.get_intrinsic_class(IntrinsicType::Bool.as_str());
+    }
+    if val.is_sso() {
+        return heap.get_intrinsic_class(IntrinsicType::Str.as_str());
+    }
+    if val.is_null() {
+        return heap.get_intrinsic_class(IntrinsicType::Null.as_str());
+    }
+    None
 }
 
 pub(crate) fn bind_method_to_receiver(
@@ -459,3 +503,246 @@ pub(crate) fn bind_method_to_receiver(
         _ => method,
     }
 }
+
+pub(crate) fn resolve_meta_property(
+    obj: VmValue,
+    meta_key: &str,
+    heap: &mut Heap,
+) -> VmResult<ResolvedProperty> {
+    use varn_core::MemberKey;
+    let val = heap.extract(obj);
+    let key_enum = MemberKey::from_str(meta_key);
+    match key_enum {
+        Some(MemberKey::Type) => {
+            let type_str: &str = match &val {
+                Value::Int(_) => IntrinsicType::Int.as_str(),
+                Value::Float(_) => IntrinsicType::Float.as_str(),
+                Value::Str(_) => IntrinsicType::Str.as_str(),
+                Value::Bool(_) => IntrinsicType::Bool.as_str(),
+                Value::Char(_) => IntrinsicType::Char.as_str(),
+                Value::Null => IntrinsicType::Null.as_str(),
+                Value::Array(_) => IntrinsicType::Array.as_str(),
+                Value::Map(_) => IntrinsicType::Map.as_str(),
+                Value::Set(_) => IntrinsicType::Set.as_str(),
+                Value::Class(cls) => cls.name.as_str(),
+                Value::Object(o) => {
+                    if let Some(c) = o.0.class() {
+                        return Ok(ResolvedProperty::Built(Value::Str(c.name.clone().into())));
+                    } else {
+                        "Object"
+                    }
+                }
+                Value::EnumVariant(ev) => ev.enum_name.as_ref(),
+                Value::Decimal(_) => IntrinsicType::Decimal.as_str(),
+                Value::BigInt(_) => IntrinsicType::BigInt.as_str(),
+                Value::Generator(_) => IntrinsicType::Generator.as_str(),
+                Value::Task(_) | Value::TaskHandle(_) => IntrinsicType::Task.as_str(),
+                Value::Range(_) => IntrinsicType::Range.as_str(),
+                Value::Symbol(_) => IntrinsicType::Symbol.as_str(),
+                Value::NativeFn(_) | Value::BoundMethod(_) | Value::VmValue(_) => "Function",
+                _ => IntrinsicType::Dynamic.as_str(),
+            };
+            Ok(ResolvedProperty::Built(Value::Str(Rc::from(type_str))))
+        }
+        Some(MemberKey::Name) => {
+            let name_val = match &val {
+                Value::Class(cls) => Value::Str(Rc::from(cls.name.as_str())),
+                Value::EnumVariant(ev) => Value::Str(ev.variant_name.clone()),
+                Value::Object(o) => {
+                    if let Some(c) = o.0.class() {
+                        Value::Str(Rc::from(c.name.as_str()))
+                    } else {
+                        Value::Str(Rc::from("Object"))
+                    }
+                }
+                _ => Value::Null,
+            };
+            Ok(ResolvedProperty::Built(name_val))
+        }
+        Some(MemberKey::Class) => {
+            let class_val = match &val {
+                Value::Object(o) => o.0.class().map(Value::Class).unwrap_or(Value::Null),
+                Value::Class(cls) => Value::Class(cls.clone()),
+                _ => get_class_for_value(&val, heap)
+                    .map(Value::Class)
+                    .unwrap_or(Value::Null),
+            };
+            Ok(ResolvedProperty::Built(class_val))
+        }
+        Some(MemberKey::Fields) => {
+            let fields: Vec<Value> = match &val {
+                Value::Class(cls) => {
+                    let shape = cls.root_shape.borrow();
+                    let mut pairs: Vec<(Rc<str>, usize)> = shape
+                        .property_names
+                        .iter()
+                        .map(|(k, &idx)| (Rc::clone(k), idx))
+                        .collect();
+                    pairs.sort_unstable_by_key(|(_, idx)| *idx);
+                    pairs.into_iter().map(|(k, _)| Value::Str(k)).collect()
+                }
+                Value::Object(o) => o.0.keys().map(Value::Str).collect(),
+                _ => Vec::new(),
+            };
+            Ok(ResolvedProperty::Built(Value::Array(
+                varn_types::value::ArrayRef::new(fields),
+            )))
+        }
+        Some(MemberKey::Methods) => {
+            let methods: Vec<Value> = match &val {
+                Value::Class(cls) => cls
+                    .method_map
+                    .borrow()
+                    .keys()
+                    .map(|k| Value::Str(Rc::clone(k)))
+                    .collect(),
+                Value::Object(o) => o
+                    .0
+                    .class()
+                    .map(|c| {
+                        c.method_map
+                            .borrow()
+                            .keys()
+                            .map(|k| Value::Str(Rc::clone(k)))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+                _ => Vec::new(),
+            };
+            Ok(ResolvedProperty::Built(Value::Array(
+                varn_types::value::ArrayRef::new(methods),
+            )))
+        }
+        Some(MemberKey::Keys) => Ok(ResolvedProperty::Built(Value::native_bound(
+            val,
+            meta_keys_native,
+            MemberKey::Keys.as_str(),
+        ))),
+        Some(MemberKey::Values) => Ok(ResolvedProperty::Built(Value::native_bound(
+            val,
+            meta_values_native,
+            MemberKey::Values.as_str(),
+        ))),
+        Some(MemberKey::Entries) => Ok(ResolvedProperty::Built(Value::native_bound(
+            val,
+            meta_entries_native,
+            MemberKey::Entries.as_str(),
+        ))),
+        Some(MemberKey::HasOwn) => Ok(ResolvedProperty::Built(Value::native_bound(
+            val,
+            meta_has_own_native,
+            MemberKey::HasOwn.as_str(),
+        ))),
+        _ => Ok(ResolvedProperty::Built(Value::Null)),
+    }
+}
+
+fn meta_keys_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+    let recv = args.first().copied().ok_or("meta.keys: missing receiver")?;
+    let val = ctx.extract(recv);
+    let keys: Vec<Value> = match &val {
+        Value::Object(o) => o.0.keys().map(Value::Str).collect(),
+        Value::Class(cls) => {
+            let shape = cls.root_shape.borrow();
+            let mut pairs: Vec<(Rc<str>, usize)> = shape
+                .property_names
+                .iter()
+                .map(|(k, &idx)| (Rc::clone(k), idx))
+                .collect();
+            pairs.sort_unstable_by_key(|(_, idx)| *idx);
+            pairs.into_iter().map(|(k, _)| Value::Str(k)).collect()
+        }
+        Value::Map(m) => m.0.borrow().keys().map(|k| ctx.extract(k.0)).collect(),
+        _ => Vec::new(),
+    };
+    Ok(ctx.intern(Value::Array(varn_types::value::ArrayRef::new(keys))))
+}
+
+fn meta_values_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+    let recv = args
+        .first()
+        .copied()
+        .ok_or("meta.values: missing receiver")?;
+    let val = ctx.extract(recv);
+    let values: Vec<Value> = match &val {
+        Value::Object(o) => o
+            .0
+            .keys()
+            .filter_map(|k| o.0.get(&k).map(|nv| ctx.extract(nv)))
+            .collect(),
+        Value::Array(a) => a.read().clone(),
+        Value::Map(m) => m.0.borrow().values().map(|v| ctx.extract(*v)).collect(),
+        _ => Vec::new(),
+    };
+    Ok(ctx.intern(Value::Array(varn_types::value::ArrayRef::new(values))))
+}
+
+fn meta_entries_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+    let recv = args
+        .first()
+        .copied()
+        .ok_or("meta.entries: missing receiver")?;
+    let val = ctx.extract(recv);
+    let entries: Vec<Value> = match &val {
+        Value::Object(o) => o
+            .0
+            .keys()
+            .filter_map(|k| {
+                let v = o.0.get(&k).map(|nv| ctx.extract(nv))?;
+                Some(Value::Array(varn_types::value::ArrayRef::new(vec![
+                    Value::Str(k),
+                    v,
+                ])))
+            })
+            .collect(),
+        Value::Array(a) => a
+            .read()
+            .iter()
+            .enumerate()
+            .map(|(i, v)| {
+                Value::Array(varn_types::value::ArrayRef::new(vec![
+                    Value::Int(i as i64),
+                    v.clone(),
+                ]))
+            })
+            .collect(),
+        Value::Map(m) => m
+            .0
+            .borrow()
+            .iter()
+            .map(|(k, v)| {
+                Value::Array(varn_types::value::ArrayRef::new(vec![
+                    ctx.extract(k.0),
+                    ctx.extract(*v),
+                ]))
+            })
+            .collect(),
+        _ => Vec::new(),
+    };
+    Ok(ctx.intern(Value::Array(varn_types::value::ArrayRef::new(entries))))
+}
+
+fn meta_has_own_native(ctx: &mut dyn NativeCtx, args: &[VmValue]) -> Result<VmValue, String> {
+    let recv = args
+        .first()
+        .copied()
+        .ok_or("meta.hasOwn: missing receiver")?;
+    let key_nv = args.get(1).copied().unwrap_or(VmValue::null());
+    let key_val = ctx.extract(key_nv);
+    let key_str = match &key_val {
+        Value::Str(s) => s.as_ref(),
+        _ => return Ok(VmValue::from_bool(false)),
+    };
+    let val = ctx.extract(recv);
+    let exists = match &val {
+        Value::Object(o) => o.0.contains_key(key_str),
+        Value::Map(m) => m.0.borrow().keys().any(|k| match ctx.extract(k.0) {
+            Value::Str(s) => s.as_ref() == key_str,
+            _ => false,
+        }),
+        _ => false,
+    };
+    Ok(VmValue::from_bool(exists))
+}
+
+

@@ -87,6 +87,11 @@ import "./86-tagged-templates.vn"
 import "./87-primary-constructors-nullish-assign.vn"
 import "./88-range-indexing.vn"
 import "./89-raw-strings-and-with-expressions.vn"
+import "./90-multi-catch.vn"
+import "./92-ffi-extended.vn"
+import "./93-match-guards-spread-predicates.vn"
+import "./94-ecma-features-and-meta-reflection.vn"
 
-print("\n89 side-effect modules executed in suite")
+print("\n93 side-effect modules executed in suite")
 assertSummary()
+

@@ -251,6 +251,23 @@ fn parse_call_expr(s: &mut TokenStream) -> Result<Expr, String> {
                     );
                 }
             }
+            TokenKind::ColonColon => {
+                s.advance();
+                let prop_expr = parse_property_name(s);
+                let prop_name = match &prop_expr.kind {
+                    ExprKind::Identifier { name } => name.clone(),
+                    _ => std::rc::Rc::from(s.lexeme()),
+                };
+                let prop_range = *prop_expr.range();
+                let start_range = *expr.range();
+                expr = s.expr(
+                    start_range.to(prop_range),
+                    ExprKind::MetaAccess {
+                        target: Box::new(expr),
+                        property: prop_name,
+                    },
+                );
+            }
             TokenKind::LBracket => {
                 if s.line() > s.prev_line() {
                     break;

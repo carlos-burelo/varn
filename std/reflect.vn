@@ -88,3 +88,36 @@ export interface MethodContext {
     isPrivate: bool;
     kind: str;
 }
+
+export class Reflect {
+    static keys(target: dynamic): str[] {
+        if (target === null) return [];
+        return target::keys();
+    }
+
+    static values(target: dynamic): dynamic[] {
+        if (target === null) return [];
+        return target::values();
+    }
+
+    static entries(target: dynamic): dynamic[] {
+        if (target === null) return [];
+        return target::entries();
+    }
+
+    static hasOwn(target: dynamic, key: str): bool {
+        if (target === null) return false;
+        return target::hasOwn(key);
+    }
+
+    static typeOf(target: dynamic): str {
+        if (target === null) return "null";
+        return target::type;
+    }
+
+    static classOf(target: dynamic): dynamic {
+        if (target === null) return null;
+        return target::class;
+    }
+}
+

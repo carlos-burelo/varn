@@ -188,37 +188,38 @@ fn print_stmt(stmt: &Stmt, indent: &str, is_last: bool) {
         }
         StmtKind::Try {
             block,
-            catch,
+            catches,
             finally,
         } => {
             terminal::log(format!("{indent}{marker}{}", chalk("TryStmt").bold()));
-            print_stmt(block, &child_indent, catch.is_none() && finally.is_none());
-            if let Some(c) = catch {
-                let m = if finally.is_none() {
+            print_stmt(block, &child_indent, catches.is_empty() && finally.is_none());
+            for (i, c) in catches.iter().enumerate() {
+                let is_last = i == catches.len() - 1 && finally.is_none();
+                let m = if is_last {
                     "└── "
                 } else {
                     "├── "
                 };
+                let param_str = c
+                    .param
+                    .as_ref()
+                    .map(format_pattern)
+                    .unwrap_or("_".to_owned());
                 terminal::log(format!(
                     "{child_indent}{m}{} {}",
                     chalk("Catch").bold(),
-                    chalk(
-                        c.param
-                            .as_ref()
-                            .map(format_pattern)
-                            .unwrap_or("_".to_owned())
-                    )
-                    .yellow()
+                    chalk(param_str).yellow()
                 ));
                 let c_ind = format!(
                     "{child_indent}{}",
-                    if finally.is_none() { "    " } else { "│   " }
+                    if is_last { "    " } else { "│   " }
                 );
                 print_stmt(&c.body, &c_ind, true);
             }
             if let Some(f) = finally {
                 terminal::log(format!("{child_indent}└── {}", chalk("Finally").bold()));
-                print_stmt(f, &format!("{child_indent}    "), true);
+                let f_ind = format!("{child_indent}    ");
+                print_stmt(f, &f_ind, true);
             }
         }
         StmtKind::Using {

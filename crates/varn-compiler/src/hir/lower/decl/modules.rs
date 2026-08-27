@@ -125,6 +125,7 @@ impl<'a> Lowerer<'a> {
         is_generator: bool,
         scope: &mut Scope,
     ) -> R<()> {
+        let return_ty = self.value_ty(AnnKey::decl(body.range.start.offset));
         let (func, upvalues) = self.lower_function_like(
             name.clone(),
             params,
@@ -132,8 +133,10 @@ impl<'a> Lowerer<'a> {
             is_generator,
             false,
             true,
+            body.range.start.line,
             BodyRef::Block(body),
             &[],
+            return_ty,
             scope,
         )?;
         let target = self.global_binding(name);
@@ -207,7 +210,7 @@ impl<'a> Lowerer<'a> {
                                 func: Box::new(func),
                                 upvalues,
                             },
-                            ty: HirType::Dynamic,
+                            ty: HirType::Ref,
                         });
                         let slot = self
                             .export_names
@@ -237,7 +240,7 @@ impl<'a> Lowerer<'a> {
                             out.push(HirStmt::Let {
                                 local,
                                 value,
-                                ty: HirType::Dynamic,
+                                ty: HirType::Ref,
                             });
                         }
                         let slot = self

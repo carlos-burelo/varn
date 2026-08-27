@@ -141,7 +141,16 @@ fn parse_array_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
             s.eat(TokenKind::Comma);
             break;
         }
-        let pat = parse_pattern(s)?;
+        let mut pat = parse_pattern(s)?;
+        if s.eat(TokenKind::Eq) {
+            let default = parse_expr(s)?;
+            let assign_range = s.span_from(pat.range().clone());
+            pat = Pattern::Assignment {
+                left: Box::new(pat),
+                right: Box::new(default),
+                range: assign_range,
+            };
+        }
         elements.push(Some(ArrayPatternEl { pattern: pat }));
         s.eat(TokenKind::Comma);
     }

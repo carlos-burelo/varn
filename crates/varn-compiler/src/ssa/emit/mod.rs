@@ -24,8 +24,6 @@ use immediates::Immediates;
 
 type Result<T> = std::result::Result<T, OptError>;
 
-pub(super) const LINE: u32 = 0;
-
 pub fn emit_function(
     mut ssa: SsaFunc,
     f: &HirFunction,
@@ -33,6 +31,7 @@ pub fn emit_function(
 ) -> Result<FunctionProto> {
     phi_edges::split_phi_edges(&mut ssa);
 
+    let fn_line = if f.start_line > 0 { f.start_line } else { 1 };
     let nparams = f.params.len();
     let (reg, scratch, null_reg, call_base, register_count) =
         regs::assign_registers(&ssa, nparams)?;
@@ -78,6 +77,11 @@ pub fn emit_function(
             )?;
         }
         let term = ssa.blocks[b].term.clone();
+        let term_line = if ssa.blocks[b].term_line > 0 {
+            ssa.blocks[b].term_line
+        } else {
+            fn_line
+        };
         terminator::emit_terminator(
             &mut chunk,
             &ssa,
@@ -85,6 +89,7 @@ pub fn emit_function(
             i,
             &pos_of,
             &term,
+            term_line,
             null_reg,
             scratch,
             &block_offset,
@@ -92,8 +97,8 @@ pub fn emit_function(
         )?;
     }
 
-    chunk.write(Chunk::pack_op(OpCode::LoadNull, null_reg), LINE);
-    chunk.emit1(OpCode::Return, Chunk::pack(0, null_reg), LINE);
+    chunk.write(Chunk::pack_op(OpCode::LoadNull, null_reg), fn_line);
+    chunk.emit1(OpCode::Return, Chunk::pack(0, null_reg), fn_line);
 
     for (pos, target) in fixups {
         let target_off = block_offset[target.0 as usize];
@@ -304,7 +309,7 @@ fn emit_inst(
         // Same shape as any three-register op: dest in the opcode word, then
         // `(src, imm)` — the immediate rides in the byte a second register
         // would occupy, which is why it is 8-bit and signed.
-        chunk.emit_rrr(opcode, dest, reg[other.0 as usize], value as u8, LINE);
+        chunk.emit_rrr(opcode, dest, reg[other.0 as usize], value as u8, inst.line);
         return Ok(());
     }
 

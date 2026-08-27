@@ -36,9 +36,8 @@ pub fn build_hover(state: &DocumentState, line: u32, col: u32) -> Option<Hover> 
         // Handle 'this' keyword via Checker scope resolution
         if tok.kind == TokenKind::This {
             if let Some((_, ty)) = state.db.resolve_at("this", tok.offset) {
-                let ty_str = ty.to_string();
-                if !ty_str.is_empty() && ty_str != "unknown" && ty_str != "dynamic" {
-                    return Some(make_lang_hover(format!("this: {}", ty_str)));
+                if !ty.is_dynamic() {
+                    return Some(make_lang_hover(format!("this: {}", ty)));
                 }
             }
             return Some(make_lang_hover("this".to_owned()));

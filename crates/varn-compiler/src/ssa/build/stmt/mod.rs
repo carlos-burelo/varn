@@ -25,6 +25,10 @@ impl Builder {
 
     pub(in crate::ssa::build) fn lower_stmt(&mut self, stmt: &HirStmt) -> Result<()> {
         match stmt {
+            HirStmt::Line(line) => {
+                self.current_line = *line;
+                Ok(())
+            }
             HirStmt::Expr(e) => {
                 self.lower_expr(e)?;
                 Ok(())
@@ -162,9 +166,9 @@ impl Builder {
             }
             HirStmt::Try {
                 block,
-                catch,
+                catches,
                 finally,
-            } => self.lower_try(block, catch, finally),
+            } => self.lower_try(block, catches, finally),
             HirStmt::CloseUpvalues(targets) => {
                 let vars = targets
                     .iter()

@@ -97,6 +97,7 @@ impl Builder {
         let subj = self.lower_expr(subject)?;
         let merge = self.new_block();
         let mut chain_alive = true;
+        let mut arm_tys = Vec::new();
         for case in cases {
             if !chain_alive {
                 break;
@@ -172,6 +173,7 @@ impl Builder {
                         self.current = guard_b;
                         self.bind_pattern(&case.test, subj);
                         let g_val = self.lower_expr(case.guard.as_ref().unwrap())?;
+                        let guard_from = self.current;
                         self.set_term(Terminator::Branch {
                             cond: g_val,
                             then_blk: body_b,
@@ -179,13 +181,14 @@ impl Builder {
                             else_blk: fail_blk,
                             else_args: Vec::new(),
                         });
-                        self.add_pred(body_b, guard_b);
-                        self.add_pred(fail_blk, guard_b);
+                        self.add_pred(body_b, guard_from);
+                        self.add_pred(fail_blk, guard_from);
                         self.seal_block(body_b);
                         self.seal_block(fail_blk);
                     } else {
                         self.bind_pattern(&case.test, subj);
                         let g_val = self.lower_expr(case.guard.as_ref().unwrap())?;
+                        let guard_from = self.current;
                         self.set_term(Terminator::Branch {
                             cond: g_val,
                             then_blk: body_b,
@@ -193,8 +196,8 @@ impl Builder {
                             else_blk: fail_blk,
                             else_args: Vec::new(),
                         });
-                        self.add_pred(body_b, test_blk);
-                        self.add_pred(fail_blk, test_blk);
+                        self.add_pred(body_b, guard_from);
+                        self.add_pred(fail_blk, guard_from);
                         self.seal_block(body_b);
                         self.seal_block(fail_blk);
                     }
@@ -222,10 +225,11 @@ impl Builder {
             self.lower_block(&case.body)?;
             let rv = match &case.result {
                 Some(e) => self.lower_expr(e)?,
-                None => self.emit(InstKind::ConstNull, HirType::Dynamic),
+                None => self.emit(InstKind::ConstNull, HirType::Ref),
             };
             if self.is_open() {
                 let from = self.current;
+                arm_tys.push(self.value_ty(rv));
                 self.set_term(Terminator::Jump {
                     target: merge,
                     args: vec![rv],
@@ -241,16 +245,24 @@ impl Builder {
         }
         if chain_alive {
             let from = self.current;
-            let nullv = self.emit(InstKind::ConstNull, HirType::Dynamic);
+            let nullv = self.emit(InstKind::ConstNull, HirType::Ref);
+            arm_tys.push(HirType::Ref);
             self.set_term(Terminator::Jump {
                 target: merge,
                 args: vec![nullv],
             });
             self.add_pred(merge, from);
         }
+        let unified_ty = if arm_tys.is_empty() {
+            HirType::Dynamic
+        } else if arm_tys.windows(2).all(|w| w[0] == w[1]) {
+            arm_tys[0]
+        } else {
+            HirType::Dynamic
+        };
         self.seal_block(merge);
         self.current = merge;
-        Ok(self.add_block_param(merge, HirType::Dynamic))
+        Ok(self.add_block_param(merge, unified_ty))
     }
 
     fn bind_pattern(&mut self, test: &HirCaseTest, subj: Value) {

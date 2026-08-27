@@ -194,6 +194,10 @@ pub enum ExprKind {
         object: Box<Expr>,
         properties: Vec<ObjectProp>,
     },
+    MetaAccess {
+        target: Box<Expr>,
+        property: Rc<str>,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -297,9 +301,7 @@ impl Expr {
         Self { id, range, kind }
     }
 
-    pub fn new_with_range(range: SourceRange, kind: ExprKind) -> Self {
-        Self { id: 0, range, kind }
-    }
+
 
     pub fn id(&self) -> AstId {
         self.id

@@ -128,6 +128,9 @@ fn dump_stmt(out: &mut String, stmt: &HirStmt, depth: usize) {
                 dump_expr(value)
             );
         }
+        HirStmt::Line(line) => {
+            let _ = writeln!(out, "{ind}{DIM}// line {line}{R}");
+        }
         HirStmt::Return(Some(e)) => {
             let _ = writeln!(out, "{ind}{YELLOW}return{R} {}", dump_expr(e));
         }
@@ -234,14 +237,14 @@ fn dump_stmt(out: &mut String, stmt: &HirStmt, depth: usize) {
         }
         HirStmt::Try {
             block,
-            catch,
+            catches,
             finally,
         } => {
             let _ = writeln!(out, "{ind}{YELLOW}try{R} {{");
             for s in block {
                 dump_stmt(out, s, depth + 1);
             }
-            if let Some(c) = catch {
+            for c in catches {
                 let param_str = match c.param {
                     Some(id) => format!(" ({CYAN}l{}{R})", id.0),
                     None => String::new(),
@@ -345,9 +348,6 @@ fn dump_expr(expr: &HirExpr) -> String {
         HirExpr::Null => format!("{DIM}null{R}"),
         HirExpr::This => format!("{CYAN}this{R}"),
         HirExpr::Super => "super".to_string(),
-        HirExpr::TaggedTemplate { tag, template } => {
-            format!("{}[{}]", dump_expr(tag), dump_expr(template))
-        }
         HirExpr::IntrinsicCall {
             object,
             args,

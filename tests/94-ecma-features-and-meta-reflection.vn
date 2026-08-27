@@ -1,0 +1,252 @@
+// Test Suite 94: Reflection Operator (::), Logical Assignments, Do-While, and Destructuring Defaults
+
+import { describe, test, expect, assertEqual } from "std:test";
+import { Reflect } from "std:reflect";
+
+class SampleUser {
+    name: str = "Alice";
+    age: int = 30;
+    role: str = "Admin";
+
+    constructor(name: str, age: int, role: str) {
+        this.name = name;
+        this.age = age;
+        this.role = role;
+    }
+
+    greet(): str {
+        return "Hello, " + this.name;
+    }
+
+    save(): bool {
+        return true;
+    }
+}
+
+class ProductWithCollisions {
+    name: str = "Laptop";
+    type: str = "Hardware";
+    class: str = "Premium";
+    keys: str[] = ["serial", "sku"];
+}
+
+describe("Reflection Operator `::` on Types and Classes", () => {
+    test("Type-level reflection via Class::name, Class::fields, Class::methods", () => {
+        const className = SampleUser::name;
+        assertEqual(className, "SampleUser");
+
+        const fields = SampleUser::fields;
+        assertEqual(fields.length, 3);
+        assertEqual(fields[0], "name");
+        assertEqual(fields[1], "age");
+        assertEqual(fields[2], "role");
+
+        const methods = SampleUser::methods;
+        assertEqual(methods.includes("greet"), true);
+        assertEqual(methods.includes("save"), true);
+    });
+});
+
+
+
+describe("Reflection Operator `::` on Instances and Objects", () => {
+    test("Instance reflection: instance::type and instance::class", () => {
+        const u = new SampleUser("Bob", 25, "User");
+        assertEqual(u::type, "SampleUser");
+
+        const cls = u::class;
+        assertEqual(cls !== null, true);
+        assertEqual(cls::name, "SampleUser");
+    });
+
+    test("Instance reflection: instance::keys(), instance::values(), instance::entries()", () => {
+        const plainObj = { x: 10, y: 20, label: "Point" };
+        assertEqual(plainObj::type, "Object");
+
+        const keys = plainObj::keys();
+        assertEqual(keys.length, 3);
+        assertEqual(keys[0], "x");
+        assertEqual(keys[1], "y");
+        assertEqual(keys[2], "label");
+
+        const vals = plainObj::values();
+        assertEqual(vals.length, 3);
+        assertEqual(vals[0], 10);
+        assertEqual(vals[1], 20);
+        assertEqual(vals[2], "Point");
+
+        const entries = plainObj::entries();
+        assertEqual(entries.length, 3);
+        assertEqual(entries[0][0], "x");
+        assertEqual(entries[0][1], 10);
+
+        assertEqual(plainObj::hasOwn("x"), true);
+        assertEqual(plainObj::hasOwn("z"), false);
+    });
+
+    test("Zero-Collision Guarantee: user fields `.keys`, `.class`, `.type` vs reflection `::`", () => {
+        const prod = new ProductWithCollisions();
+
+        // 1. User properties accessed with `.`
+        assertEqual(prod.name, "Laptop");
+        assertEqual(prod.type, "Hardware");
+        assertEqual(prod.class, "Premium");
+        assertEqual(prod.keys.length, 2);
+        assertEqual(prod.keys[0], "serial");
+
+        // 2. Metalevel introspection accessed with `::`
+        assertEqual(prod::type, "ProductWithCollisions");
+        const metaKeys = prod::keys();
+        assertEqual(metaKeys.length, 4);
+        assertEqual(metaKeys.includes("name"), true);
+        assertEqual(metaKeys.includes("type"), true);
+        assertEqual(metaKeys.includes("class"), true);
+        assertEqual(metaKeys.includes("keys"), true);
+        assertEqual(prod::hasOwn("serial"), false);
+        assertEqual(prod::hasOwn("name"), true);
+    });
+
+    test("Primitive and record type reflection", () => {
+        const num = 42;
+        assertEqual(num::type, "int");
+
+        const strVal = "hello";
+        assertEqual(strVal::type, "str");
+
+        const boolVal = true;
+        assertEqual(boolVal::type, "bool");
+
+        const arrVal = [1, 2, 3];
+        assertEqual(arrVal::type, "Array");
+    });
+});
+
+describe("Reflect Standard Library Module (`std:reflect`)", () => {
+    test("Reflect helper methods", () => {
+        const obj = { a: 100, b: "test" };
+        assertEqual(Reflect.typeOf(obj), "Object");
+
+        const k = Reflect.keys(obj);
+        assertEqual(k.length, 2);
+        assertEqual(k[0], "a");
+        assertEqual(k[1], "b");
+
+        const v = Reflect.values(obj);
+        assertEqual(v[0], 100);
+        assertEqual(v[1], "test");
+
+        assertEqual(Reflect.hasOwn(obj, "a"), true);
+        assertEqual(Reflect.hasOwn(obj, "missing"), false);
+    });
+});
+
+describe("Do-While Loop (`do { ... } while (cond);`)", () => {
+    test("Executes at least once when condition is false initially", () => {
+        let count = 0;
+        do {
+            count = count + 1;
+        } while (false);
+        assertEqual(count, 1);
+    });
+
+    test("Iterates while condition holds", () => {
+        let sum = 0;
+        let i = 1;
+        do {
+            sum = sum + i;
+            i = i + 1;
+        } while (i <= 5);
+        assertEqual(sum, 15);
+    });
+
+    test("Supports break and continue", () => {
+        let sum = 0;
+        let i = 0;
+        do {
+            i = i + 1;
+            if (i === 3) {
+                continue;
+            }
+            if (i > 5) {
+                break;
+            }
+            sum = sum + i;
+        } while (i < 10);
+        assertEqual(sum, 1 + 2 + 4 + 5); // 12
+    });
+});
+
+describe("Logical & Power Assignment Operators (`&&=`, `||=`, `**=`, `??=`)", () => {
+    test("Logical AND assignment (`&&=`)", () => {
+        let a = true;
+        a &&= false;
+        assertEqual(a, false);
+
+        let b = false;
+        b &&= true;
+        assertEqual(b, false);
+    });
+
+    test("Logical OR assignment (`||=`)", () => {
+        let x = false;
+        x ||= true;
+        assertEqual(x, true);
+
+        let y = true;
+        y ||= false;
+        assertEqual(y, true);
+    });
+
+    test("Power assignment (`**=`)", () => {
+        let p = 2;
+        p **= 8;
+        assertEqual(p, 256);
+    });
+
+    test("Nullish coalescing assignment (`??=`)", () => {
+        let val: str? = null;
+        val ??= "initialized";
+        assertEqual(val, "initialized");
+
+        val ??= "ignored";
+        assertEqual(val, "initialized");
+    });
+});
+
+describe("Destructuring Default Values (`[a = 1] = arr`, `{ x = 10 } = obj`)", () => {
+    test("Object destructuring with default fallback on null", () => {
+        const config: dynamic = { host: "127.0.0.1" };
+        const { host = "localhost", port = 8080 } = config;
+
+        assertEqual(host, "127.0.0.1");
+        assertEqual(port, 8080);
+    });
+
+    test("Array destructuring with default values", () => {
+        const items = [100];
+        const [first = 0, second = 200, third = 300] = items;
+
+        assertEqual(first, 100);
+        assertEqual(second, 200);
+        assertEqual(third, 300);
+    });
+});
+
+describe("String Utility Methods (`repeat`, `padStart`, `padEnd`)", () => {
+    test("str.repeat(n)", () => {
+        const s = "abc";
+        assertEqual(s.repeat(3), "abcabcabc");
+        assertEqual(s.repeat(0), "");
+    });
+
+    test("str.padStart(len, pad)", () => {
+        const s = "42";
+        assertEqual(s.padStart(5, "0"), "00042");
+        assertEqual(s.padStart(2, "0"), "42");
+    });
+
+    test("str.padEnd(len, pad)", () => {
+        const s = "42";
+        assertEqual(s.padEnd(5, "!"), "42!!!");
+    });
+});

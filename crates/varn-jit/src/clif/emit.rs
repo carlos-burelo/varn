@@ -70,11 +70,7 @@ pub(super) fn use_int(
     r: usize,
 ) -> Result<cranelift_codegen::ir::Value, String> {
     match state[r] {
-        K::Int => {
-            let v = b.use_var(vars[r]);
-            let s = b.ins().ishl_imm(v, 16);
-            Ok(b.ins().sshr_imm(s, 16))
-        }
+        K::Int => Ok(b.use_var(vars[r])),
         k if is_boxed_kind(k) => {
             let v = b.use_var(vars[r]);
             let s = b.ins().ishl_imm(v, 16);
@@ -234,7 +230,14 @@ pub(super) fn use_f64(
         return Err(format!("clif: invalid register index {r}"));
     };
     match st {
-        K::Float => Ok(b.use_var(var)),
+        K::Float => {
+            let raw = b.use_var(var);
+            if b.func.dfg.value_type(raw) == types::F64 {
+                Ok(raw)
+            } else {
+                Ok(unbox_f64_coerce(b, raw))
+            }
+        }
         K::Int => {
             let iv = b.use_var(var);
             Ok(b.ins().fcvt_from_sint(types::F64, iv))

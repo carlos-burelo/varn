@@ -250,7 +250,7 @@ impl Builder {
         let len = self.emit(
             InstKind::GetProperty {
                 object: keys,
-                name: Rc::from("length"),
+                name: Rc::from(varn_core::MemberKey::Length.as_str()),
             },
             HirType::Int,
         );

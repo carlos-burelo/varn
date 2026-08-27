@@ -53,7 +53,7 @@ pub(crate) extern "C" fn jit_make_enum_variant(ctx: *mut ExecCtx, ip_before: usi
         let tag_reg = (w1 & 0xFF) as usize;
         let name_nv = closure_ref.constants[name_idx];
         let name = ctx_ref.heap.str_val(name_nv).expect("non-string const");
-        let tag = ctx_ref.stack[base + tag_reg].as_i32() as u8;
+        let tag = ctx_ref.stack[base + tag_reg].as_int();
 
         let name_str = name.as_ref();
         let (name_part, fields_part) = match name_str.find(':') {

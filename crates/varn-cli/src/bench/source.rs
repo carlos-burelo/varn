@@ -78,7 +78,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         .map_err(|e| format!("{e}"))
     })?;
 
-    let (mut program, parse_profile) = varn_parser::parse_with_profile(tokens, lexeme_buf, path)
+    let (program, parse_profile) = varn_parser::parse_with_profile(tokens, lexeme_buf, path)
         .map_err(|errs| {
             let msgs: Vec<String> = errs
                 .iter()
@@ -92,7 +92,6 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             CliError::fatal(format!("parse errors:\n{}", msgs.join("\n")))
         })?;
 
-    varn_core::assign_ast_ids(&mut program);
 
     let program_ref = &program;
     let check_samples = time_n(runs, || {
@@ -240,7 +239,7 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         let (tokens, lexeme_buf) = crate::pipeline::phase_lex(&source, path, false, &debug_flags)
             .map_err(|e| e.message)?;
 
-        let (mut program, _) =
+        let (program, _) =
             varn_parser::parse_with_profile(tokens, lexeme_buf, path).map_err(|errs| {
                 let msgs: Vec<String> = errs
                     .iter()
@@ -254,11 +253,9 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
                 format!("parse errors:\n{}", msgs.join("\n"))
             })?;
 
-        varn_core::assign_ast_ids(&mut program);
-
         let check_result = varn_pipeline::resolver::with_resolver(|r| {
-        Checker::check_with(&program, r, varn_checker::CheckOptions::compile())
-    });
+            Checker::check_with(&program, r, varn_checker::CheckOptions::compile())
+        });
 
         let mut proto = varn_compiler::compile_module(
             &program,

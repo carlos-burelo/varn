@@ -1,4 +1,7 @@
 pub mod auto_import;
+pub mod extract_function;
+pub mod extract_variable;
+pub mod generate_members;
 pub mod interface_impl;
 pub mod match_arms;
 pub mod organize_imports;
@@ -127,6 +130,21 @@ pub fn build_code_action(
         {
             actions.push(organize_action);
         }
+
+        if let Some(extract_var) =
+            extract_variable::generate_extract_variable_action(st, uri, params.range)
+        {
+            actions.push(extract_var);
+        }
+
+        if let Some(extract_fn) =
+            extract_function::generate_extract_function_action(st, uri, params.range)
+        {
+            actions.push(extract_fn);
+        }
+
+        let class_actions = generate_members::generate_class_member_actions(st, uri, cursor_line);
+        actions.extend(class_actions);
     }
 
     if actions.is_empty() {

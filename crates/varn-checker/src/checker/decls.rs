@@ -77,7 +77,7 @@ impl<'r> Checker<'r> {
                 let next_scope = self.next_child_scope(bind);
                 if let Some(fn_scope) = next_scope {
                     self.current_scope = fn_scope;
-                    self.record_scope(f.body.range.start.offset);
+                    self.record_scope_span(f.range.start.offset, f.range.end.offset, fn_scope);
                 }
                 let is_gen = f.modifiers.is_generator;
                 let old_yields = if is_gen {
@@ -240,7 +240,7 @@ impl<'r> Checker<'r> {
                             let saved_scope = self.current_scope;
                             if let Some(ctor_scope) = self.next_child_scope(bind) {
                                 self.current_scope = ctor_scope;
-                                self.record_scope(body.range.start.offset);
+                                self.record_scope_span(body.range.start.offset, body.range.end.offset, ctor_scope);
                             }
                             self.check_stmt(body, bind);
                             self.current_scope = saved_scope;
@@ -261,7 +261,7 @@ impl<'r> Checker<'r> {
                             let saved_scope = self.current_scope;
                             if let Some(m_scope) = self.next_child_scope(bind) {
                                 self.current_scope = m_scope;
-                                self.record_scope(body.range.start.offset);
+                                self.record_scope_span(body.range.start.offset, body.range.end.offset, m_scope);
                             }
 
                             self.check_stmt(body, bind);
@@ -285,7 +285,7 @@ impl<'r> Checker<'r> {
                             let saved_scope = self.current_scope;
                             if let Some(g_scope) = self.next_child_scope(bind) {
                                 self.current_scope = g_scope;
-                                self.record_scope(body.range.start.offset);
+                                self.record_scope_span(body.range.start.offset, body.range.end.offset, g_scope);
                             }
 
                             self.check_stmt(body, bind);
@@ -302,7 +302,7 @@ impl<'r> Checker<'r> {
                             let saved_scope = self.current_scope;
                             if let Some(s_scope) = self.next_child_scope(bind) {
                                 self.current_scope = s_scope;
-                                self.record_scope(body.range.start.offset);
+                                self.record_scope_span(body.range.start.offset, body.range.end.offset, s_scope);
                             }
 
                             self.check_stmt(body, bind);

@@ -134,7 +134,7 @@ impl TokenStream {
 
     #[inline]
     pub fn peek_line(&self, offset: usize) -> u32 {
-        let idx = self.pos + offset;
+        let idx = self.pos.saturating_add(offset);
         if idx < self.tokens.len() {
             self.tokens[idx].range.start.line
         } else {

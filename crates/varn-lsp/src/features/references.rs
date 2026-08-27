@@ -1,4 +1,4 @@
-use crate::document::DocumentState;
+use crate::document::{DocumentState, SymbolTarget};
 use tower_lsp::lsp_types::{Location, Position, Range, Url};
 
 pub fn build_references(
@@ -14,18 +14,12 @@ pub fn build_references(
             && (t.kind == varn_core::TokenKind::Identifier || t.kind.can_be_identifier())
     })?;
 
-    // Derive the target with the *same* function that derives the candidates.
-    //
-    // These used to disagree: the target came from `symbol_global_key_for_id`,
-    // which yields the `u:`/`m:` form, while each candidate came from
-    // `token_global_key`, which yields a `member:{type}:{name}` key when the
-    // token is a class member. For a member the two shapes can never compare
-    // equal, so "find all references" on a field or method returned nothing at
-    // all — while it worked on a top-level function, where both shapes coincide.
-    //
-    // Symmetry is the fix: one function, so both sides agree by construction.
-    let target_key = state.token_global_key(token.offset)?;
-    let target_name = token.lexeme.as_str();
+    let target = state.symbol_target_at_offset(token.offset)?;
+    let target_name = match &target {
+        SymbolTarget::Local { .. } => token.lexeme.as_str(),
+        SymbolTarget::Global { canonical_name, .. } => canonical_name.as_str(),
+        SymbolTarget::Member { member_name, .. } => member_name.as_str(),
+    };
 
     let mut locs: Vec<Location> = Vec::new();
 
@@ -39,21 +33,15 @@ pub fn build_references(
             Ok(u) => u,
             Err(_) => continue,
         };
-        let mut candidate_names = std::collections::HashSet::new();
-        candidate_names.insert(target_name.to_owned());
-        for sym in file_state.symbols() {
-            if sym.global_key(true) == target_key || sym.global_key(false) == target_key {
-                candidate_names.insert(sym.name().to_owned());
-            }
-        }
+
         for t in &file_state.tokens {
             if !(t.kind == varn_core::TokenKind::Identifier || t.kind.can_be_identifier()) {
                 continue;
             }
-            if !candidate_names.contains(&t.lexeme) {
+            if t.lexeme != target_name {
                 continue;
             }
-            if token_global_key(file_state, t.offset).as_deref() != Some(target_key.as_str()) {
+            if file_state.symbol_target_at_offset(t.offset).as_ref() != Some(&target) {
                 continue;
             }
             locs.push(Location::new(
@@ -79,7 +67,3 @@ pub fn build_references(
     }
 }
 
-
-fn token_global_key(state: &DocumentState, offset: u32) -> Option<String> {
-    state.token_global_key(offset)
-}

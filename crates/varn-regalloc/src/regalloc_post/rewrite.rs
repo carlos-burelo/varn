@@ -74,8 +74,19 @@ pub(crate) fn remap_bytecode(code: &mut Vec<u16>, constants: &[PoolEntry], mappi
                     code[offset + 1] = pack(m(mapping, hi1), lo1);
                 }
 
-                OpCode::Move
-                | OpCode::Negate
+                OpCode::Move => {
+                    let d = m(mapping, dest0);
+                    let s = m(mapping, hi1);
+                    if d == s {
+                        code[offset] = OpCode::Nop as u16;
+                        code[offset + 1] = 0;
+                    } else {
+                        code[offset] = pack_op(op, d);
+                        code[offset + 1] = pack(s, 0);
+                    }
+                }
+
+                OpCode::Negate
                 | OpCode::Not
                 | OpCode::ToString
                 | OpCode::IsNull
@@ -92,7 +103,7 @@ pub(crate) fn remap_bytecode(code: &mut Vec<u16>, constants: &[PoolEntry], mappi
                     code[offset + 1] = pack(m(mapping, hi1), 0);
                 }
 
-                OpCode::ArrayPush | OpCode::Inherit => {
+                OpCode::Inherit => {
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
                 }
                 OpCode::Yield | OpCode::Return => {
@@ -189,7 +200,7 @@ pub(crate) fn remap_bytecode(code: &mut Vec<u16>, constants: &[PoolEntry], mappi
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), m(mapping, lo1));
                 }
-                OpCode::ArrayExtend => {
+                OpCode::ArrayPush | OpCode::ArrayExtend => {
                     code[offset] = pack_op(op, m(mapping, dest0));
                     code[offset + 1] = pack(m(mapping, hi1), 0);
                 }

@@ -1,0 +1,172 @@
+// Test Suite 93: Match Guards, Object & Array Spread, Type Predicates, and Enum Casting
+
+import { describe, test, expect, assertEqual } from "std:test";
+
+enum HttpStatusCode {
+    Ok = 200,
+    Created = 201,
+    BadRequest = 400,
+    NotFound = 404,
+    InternalError = 500
+}
+
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+describe("Match Guards (pattern if condition => body)", () => {
+    test("Integer categorization with match guards and fallthrough", () => {
+        function classifyNumber(n: int): str {
+            return match (n) {
+                x if x < 0 => "Negative",
+                x if x === 0 => "Zero",
+                x if x % 2 === 0 => "Positive Even",
+                _ => "Positive Odd"
+            };
+        }
+
+        assertEqual(classifyNumber(-10), "Negative");
+        assertEqual(classifyNumber(-1), "Negative");
+        assertEqual(classifyNumber(0), "Zero");
+        assertEqual(classifyNumber(2), "Positive Even");
+        assertEqual(classifyNumber(42), "Positive Even");
+        assertEqual(classifyNumber(3), "Positive Odd");
+        assertEqual(classifyNumber(99), "Positive Odd");
+    });
+
+    test("Match guard using external scope variables and complex conditions", () => {
+        const threshold = 100;
+
+        function evaluateScore(score: int, isVip: bool): str {
+            return match (score) {
+                s if s >= threshold && isVip => "VIP High Score",
+                s if s >= threshold => "Standard High Score",
+                s if s >= 50 => "Passing",
+                _ => "Needs Improvement"
+            };
+        }
+
+        assertEqual(evaluateScore(150, true), "VIP High Score");
+        assertEqual(evaluateScore(120, false), "Standard High Score");
+        assertEqual(evaluateScore(75, true), "Passing");
+        assertEqual(evaluateScore(30, false), "Needs Improvement");
+    });
+
+    test("Match guard with multi-value patterns", () => {
+        function describeHttpCode(code: int): str {
+            return match (code) {
+                200 | 201 => "Success",
+                400 | 404 if code === 404 => "Not Found",
+                400 | 404 => "Other Client Error",
+                500 => "Server Error",
+                _ => "Unknown"
+            };
+        }
+
+        assertEqual(describeHttpCode(200), "Success");
+        assertEqual(describeHttpCode(201), "Success");
+        assertEqual(describeHttpCode(404), "Not Found");
+        assertEqual(describeHttpCode(400), "Other Client Error");
+        assertEqual(describeHttpCode(500), "Server Error");
+        assertEqual(describeHttpCode(999), "Unknown");
+    });
+});
+
+describe("Object & Array Spread", () => {
+    test("Object spread merging and property override", () => {
+        const defaults = { host: "127.0.0.1", port: 8080, debug: false };
+        const config = { ...defaults, port: 9000, secure: true };
+
+        assertEqual(config.host, "127.0.0.1");
+        assertEqual(config.port, 9000);
+        assertEqual(config.debug, false);
+        assertEqual(config.secure, true);
+    });
+
+    test("Multiple object spreads merging in order", () => {
+        const partA = { a: 1, shared: "fromA" };
+        const partB = { b: 2, shared: "fromB" };
+        const combined = { ...partA, ...partB, c: 3 };
+
+        assertEqual(combined.a, 1);
+        assertEqual(combined.b, 2);
+        assertEqual(combined.shared, "fromB");
+        assertEqual(combined.c, 3);
+    });
+
+    test("Array spread element merging and cloning", () => {
+        const head = [1, 2];
+        const tail = [4, 5];
+        const fullList = [0, ...head, 3, ...tail, 6];
+
+        assertEqual(fullList.length, 7);
+        assertEqual(fullList[0], 0);
+        assertEqual(fullList[1], 1);
+        assertEqual(fullList[2], 2);
+        assertEqual(fullList[3], 3);
+        assertEqual(fullList[4], 4);
+        assertEqual(fullList[5], 5);
+        assertEqual(fullList[6], 6);
+    });
+});
+
+describe("User-Defined Type Predicates (param is Type)", () => {
+    function isStr(val: dynamic): val is str {
+        return typeof val === "str";
+    }
+
+    function isInt(val: dynamic): val is int {
+        return typeof val === "int";
+    }
+
+    test("Type predicate narrows dynamic in conditional branch", () => {
+        function processValue(val: dynamic): str {
+            if (isStr(val)) {
+                return `string: ${val.toUpperCase()}`;
+            } else if (isInt(val)) {
+                return `int: ${val * 2}`;
+            } else {
+                return "other";
+            }
+        }
+
+        assertEqual(processValue("varn"), "string: VARN");
+        assertEqual(processValue(21), "int: 42");
+        assertEqual(processValue(true), "other");
+    });
+
+    test("Type predicate in ternary expressions", () => {
+        const itemA: dynamic = "test";
+        const resA = isStr(itemA) ? itemA.length : 0;
+        assertEqual(resA, 4);
+
+        const itemB: dynamic = 123;
+        const resB = isStr(itemB) ? itemB.length : -1;
+        assertEqual(resB, -1);
+    });
+});
+
+describe("Enum to int Cast (enumVal as int)", () => {
+    test("Cast custom enum variants to integer", () => {
+        const okVal = HttpStatusCode.Ok;
+        const notFoundVal = HttpStatusCode.NotFound;
+
+        const codeOk = okVal as int;
+        const codeNotFound = notFoundVal as int;
+
+        assertEqual(codeOk, 200);
+        assertEqual(codeNotFound, 404);
+    });
+
+    test("Cast sequential zero-indexed enums to integer", () => {
+        const r = Color.Red as int;
+        const g = Color.Green as int;
+        const b = Color.Blue as int;
+
+        assertEqual(r, 0);
+        assertEqual(g, 1);
+        assertEqual(b, 2);
+    });
+});

@@ -7,7 +7,6 @@
 
 use super::super::ir::{Inst, InstKind, VarId};
 use super::regs::var_reg;
-use super::LINE;
 use crate::OptError;
 use varn_core::OpCode;
 use varn_types::chunk::Chunk;
@@ -21,6 +20,7 @@ pub(super) fn emit_effect(
     cache_count: &mut u16,
     nparams: usize,
 ) -> Result<bool> {
+    let line = inst.line;
     match &inst.kind {
         InstKind::SetProperty {
             object,
@@ -41,7 +41,7 @@ pub(super) fn emit_effect(
                 reg[value.0 as usize],
                 idx,
                 cs,
-                LINE,
+                line,
             );
             return Ok(true);
         }
@@ -55,7 +55,7 @@ pub(super) fn emit_effect(
                 reg[object.0 as usize],
                 reg[value.0 as usize],
                 *slot,
-                LINE,
+                line,
             );
             return Ok(true);
         }
@@ -69,7 +69,7 @@ pub(super) fn emit_effect(
                 reg[object.0 as usize],
                 reg[index.0 as usize],
                 reg[value.0 as usize],
-                LINE,
+                line,
             );
             return Ok(true);
         }
@@ -83,7 +83,7 @@ pub(super) fn emit_effect(
                 reg[object.0 as usize],
                 reg[index.0 as usize],
                 reg[value.0 as usize],
-                LINE,
+                line,
             );
             return Ok(true);
         }
@@ -92,7 +92,7 @@ pub(super) fn emit_effect(
                 OpCode::ObjectMerge,
                 reg[target.0 as usize],
                 reg[source.0 as usize],
-                LINE,
+                line,
             );
             return Ok(true);
         }
@@ -101,14 +101,14 @@ pub(super) fn emit_effect(
             chunk.emit1(
                 OpCode::AssertNotNull,
                 Chunk::pack(reg[operand.0 as usize], 0),
-                LINE,
+                line,
             );
             return Ok(true);
         }
 
         InstKind::StoreGlobal { name, value } => {
             let idx = chunk.add_str(name);
-            chunk.emit_rrc(OpCode::DefineGlobal, 0, reg[value.0 as usize], idx, LINE);
+            chunk.emit_rrc(OpCode::DefineGlobal, 0, reg[value.0 as usize], idx, line);
             return Ok(true);
         }
 
@@ -116,17 +116,17 @@ pub(super) fn emit_effect(
             chunk.emit1(
                 OpCode::StoreUpvalue,
                 Chunk::pack(*index as u8, reg[value.0 as usize]),
-                LINE,
+                line,
             );
             return Ok(true);
         }
         InstKind::StoreCaptured { var, value } => {
             let dest_reg = var_reg(*var, nparams);
-            chunk.emit_rr(OpCode::Move, dest_reg, reg[value.0 as usize], LINE);
+            chunk.emit_rr(OpCode::Move, dest_reg, reg[value.0 as usize], line);
             return Ok(true);
         }
         InstKind::StoreModuleSlot { value, slot } => {
-            chunk.emit_rc(OpCode::StoreModuleSlot, reg[value.0 as usize], *slot, LINE);
+            chunk.emit_rc(OpCode::StoreModuleSlot, reg[value.0 as usize], *slot, line);
             return Ok(true);
         }
         InstKind::CloseUpvalues { targets } => {
@@ -135,7 +135,7 @@ pub(super) fn emit_effect(
                 .map(|t| var_reg(*t, nparams))
                 .min()
                 .unwrap_or(0);
-            chunk.emit1(OpCode::CloseUpvalue, lowest as u16, LINE);
+            chunk.emit1(OpCode::CloseUpvalue, lowest as u16, line);
             return Ok(true);
         }
         InstKind::Dispose { target, is_await } => {
@@ -149,31 +149,31 @@ pub(super) fn emit_effect(
             }
             let cs = *cache_count as u8;
             *cache_count += 1;
-            chunk.write(Chunk::pack_op(OpCode::CallMethod, cs), LINE);
-            chunk.write(Chunk::pack(r, r), LINE);
-            chunk.write(str_idx, LINE);
-            chunk.write(Chunk::pack(0u8, 0u8), LINE);
+            chunk.write(Chunk::pack_op(OpCode::CallMethod, cs), line);
+            chunk.write(Chunk::pack(r, r), line);
+            chunk.write(str_idx, line);
+            chunk.write(Chunk::pack(0u8, 0u8), line);
             return Ok(true);
         }
         InstKind::PopTry => {
-            chunk.emit(OpCode::PopTry, LINE);
+            chunk.emit(OpCode::PopTry, line);
             return Ok(true);
         }
         InstKind::DeclareField { class, name } => {
             let class_reg = reg[class.0 as usize];
             let key_idx = chunk.add_str(name);
-            chunk.emit(OpCode::DeclareField, LINE);
-            chunk.write(Chunk::pack(class_reg, 0), LINE);
-            chunk.write(key_idx, LINE);
+            chunk.emit(OpCode::DeclareField, line);
+            chunk.write(Chunk::pack(class_reg, 0), line);
+            chunk.write(key_idx, line);
             return Ok(true);
         }
         InstKind::DefineStatic { class, name, value } => {
             let class_reg = reg[class.0 as usize];
             let val_reg = reg[value.0 as usize];
             let key_idx = chunk.add_str(name);
-            chunk.emit(OpCode::DefineStatic, LINE);
-            chunk.write(Chunk::pack(class_reg, val_reg), LINE);
-            chunk.write(key_idx, LINE);
+            chunk.emit(OpCode::DefineStatic, line);
+            chunk.write(Chunk::pack(class_reg, val_reg), line);
+            chunk.write(key_idx, line);
             return Ok(true);
         }
         InstKind::DefineMethod {
@@ -190,9 +190,9 @@ pub(super) fn emit_effect(
             } else {
                 OpCode::Method
             };
-            chunk.emit(op, LINE);
-            chunk.write(Chunk::pack(class_reg, method_reg), LINE);
-            chunk.write(key_idx, LINE);
+            chunk.emit(op, line);
+            chunk.write(Chunk::pack(class_reg, method_reg), line);
+            chunk.write(key_idx, line);
             return Ok(true);
         }
         InstKind::DefineAccessor {
@@ -211,9 +211,9 @@ pub(super) fn emit_effect(
                 (false, true) => OpCode::DefineStaticSetter,
                 (false, false) => OpCode::DefineSetter,
             };
-            chunk.emit(op, LINE);
-            chunk.write(Chunk::pack(class_reg, acc_reg), LINE);
-            chunk.write(key_idx, LINE);
+            chunk.emit(op, line);
+            chunk.write(Chunk::pack(class_reg, acc_reg), line);
+            chunk.write(key_idx, line);
             return Ok(true);
         }
         _ => {}

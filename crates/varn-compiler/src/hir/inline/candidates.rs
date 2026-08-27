@@ -172,7 +172,6 @@ pub(crate) fn body_is_inlinable(e: &HirExpr) -> bool {
         | Await(_)
         | Spawn(_)
         | Yield(_)
-        | TaggedTemplate { .. }
         | Assign { .. }
         | Update { .. } => false,
     }

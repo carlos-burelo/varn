@@ -7,7 +7,7 @@ export interface CsvOptions {
 }
 
 export namespace CSV {
-    export function parse(text: str, options?: CsvOptions): dynamic[] {
+    export function parse<T = dynamic>(text: str, options?: CsvOptions): T[] {
         let delim = ",";
         let hasHeader = true;
         let trim = true;
@@ -24,7 +24,7 @@ export namespace CSV {
             }
         }
 
-        return parse$(text, delim, hasHeader, trim);
+        return parse$(text, delim, hasHeader, trim) as T[];
     }
 
     export function stringify(rows: dynamic[], options?: CsvOptions): str {

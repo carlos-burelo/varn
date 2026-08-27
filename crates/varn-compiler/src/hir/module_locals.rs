@@ -192,11 +192,11 @@ fn walk_stmt(s: &mut HirStmt, n: bool, act: &mut impl FnMut(&mut HirBinding, boo
         }
         HirStmt::Try {
             block,
-            catch,
+            catches,
             finally,
         } => {
             walk_stmts(block, n, act);
-            if let Some(HirCatch { body, .. }) = catch {
+            for HirCatch { body, .. } in catches {
                 walk_stmts(body, n, act);
             }
             if let Some(f) = finally {
@@ -212,7 +212,8 @@ fn walk_stmt(s: &mut HirStmt, n: bool, act: &mut impl FnMut(&mut HirBinding, boo
         | HirStmt::ExportNamed { .. }
         | HirStmt::ExportAll { .. }
         // Names a local, never a global.
-        | HirStmt::Dispose { .. } => {}
+        | HirStmt::Dispose { .. }
+        | HirStmt::Line(_) => {}
     }
 }
 
@@ -351,10 +352,6 @@ fn walk_expr(e: &mut HirExpr, n: bool, act: &mut impl FnMut(&mut HirBinding, boo
                     }
                 }
             }
-        }
-        TaggedTemplate { tag, template } => {
-            walk_expr(tag, n, act);
-            walk_expr(template, n, act);
         }
         Match { subject, cases } => {
             walk_expr(subject, n, act);

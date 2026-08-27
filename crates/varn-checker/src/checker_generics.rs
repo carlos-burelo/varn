@@ -52,7 +52,12 @@ pub(crate) fn build_call_mapping(
             .map(|(k, v)| (k.clone(), v))
             .collect()
     } else if type_args.is_empty() {
-        infer_mapping_from_args(&fn_type_params, &ft.params, args, checker, bind)
+        let mut mapping =
+            infer_mapping_from_args(&fn_type_params, &ft.params, args, checker, bind);
+        for tp in &fn_type_params {
+            mapping.entry(tp.clone()).or_insert(Type::Dynamic);
+        }
+        mapping
     } else {
         FxHashMap::default()
     }

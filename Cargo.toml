@@ -63,19 +63,33 @@ unused_crate_dependencies = "warn"
 [profile.release]
 opt-level = 3
 lto = "thin"
-codegen-units = 16
+codegen-units = 1
 panic = "abort"
+
+[profile.release.build-override]
+opt-level = 0
 
 [profile.dev]
 opt-level = 1
+debug = 0
+
+# Optimize all 3rd-party dependencies in dev so Cranelift, SQLite, Tokio
+# run at full speed without slowing down workspace crate compilation.
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.dev.build-override]
+opt-level = 0
 
 # Fast-iteration optimized build: keeps opt-level 3 for representative
-# JIT/VM perf, but disables LTO for instant linking (sub-5s rebuilds).
-# Use `cargo build --profile quick --bin vn` while iterating;
-# keep `release` for final benchmarks / distribution.
+# JIT/VM perf, but disables LTO for instant linking.
+# Use `cargo build --profile quick --bin vn` while iterating.
 [profile.quick]
 inherits = "release"
 opt-level = 3
 lto = false
 codegen-units = 16
 debug = 0
+
+[profile.quick.build-override]
+opt-level = 0

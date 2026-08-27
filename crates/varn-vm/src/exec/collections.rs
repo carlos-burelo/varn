@@ -133,8 +133,24 @@ pub(crate) fn get_index(obj: VmValue, key: VmValue, heap: &mut Heap) -> VmResult
     }
     match heap.get(obj.as_heap_idx()) {
         Some(HeapObj::Object(o) | HeapObj::Record(o)) => {
-            let key_s = heap.str_repr(key);
-            Ok(o.borrow().get_field_nv(&key_s).unwrap_or(VmValue::null()))
+            let mut buf = [0u8; 5];
+            let key_str = if key.is_sso() {
+                key.sso_as_str(&mut buf)
+            } else if key.is_heap() {
+                if let Some(HeapObj::Str(s)) = heap.get(key.as_heap_idx()) {
+                    s.as_str()
+                } else {
+                    ""
+                }
+            } else {
+                ""
+            };
+            if !key_str.is_empty() {
+                Ok(o.borrow().get_field_nv(key_str).unwrap_or(VmValue::null()))
+            } else {
+                let key_s = heap.str_repr(key);
+                Ok(o.borrow().get_field_nv(&key_s).unwrap_or(VmValue::null()))
+            }
         }
         Some(HeapObj::Str(s)) => {
             let idx = heap.as_int(key);
@@ -190,8 +206,24 @@ pub(crate) fn set_index(obj: VmValue, key: VmValue, val: VmValue, heap: &mut Hea
             Ok(())
         }
         Some(HeapObj::Object(o)) => {
-            let key_s = heap.str_repr(key);
-            o.set_field_nv(Rc::from(key_s.as_str()), val);
+            let mut buf = [0u8; 5];
+            let key_str = if key.is_sso() {
+                key.sso_as_str(&mut buf)
+            } else if key.is_heap() {
+                if let Some(HeapObj::Str(s)) = heap.get(key.as_heap_idx()) {
+                    s.as_str()
+                } else {
+                    ""
+                }
+            } else {
+                ""
+            };
+            if !key_str.is_empty() {
+                o.set_field_str(key_str, val);
+            } else {
+                let key_s = heap.str_repr(key);
+                o.set_field_str(&key_s, val);
+            }
             heap.write_barrier(heap_idx, val);
             Ok(())
         }

@@ -76,11 +76,11 @@ fn collect_returns_recursive(
         }
         StmtKind::Try {
             block,
-            catch,
+            catches,
             finally,
         } => {
             collect_returns_recursive(ctx, sym_map, block, bind, current_class, results);
-            if let Some(c) = catch {
+            for c in catches {
                 collect_returns_recursive(ctx, sym_map, &c.body, bind, current_class, results);
             }
             if let Some(f) = finally {
@@ -184,11 +184,11 @@ fn enrich_vars_recursive(
         }
         StmtKind::Try {
             block,
-            catch,
+            catches,
             finally,
         } => {
             enrich_vars_recursive(ctx, sym_map, block, bind, resolver, current_class);
-            if let Some(c) = catch {
+            for c in catches {
                 enrich_vars_recursive(ctx, sym_map, &c.body, bind, resolver, current_class);
             }
             if let Some(f) = finally {

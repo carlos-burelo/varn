@@ -96,6 +96,7 @@ impl<'a> Lowerer<'a> {
                                 PropKey::Int(n) => n.to_string(),
                                 PropKey::Computed(_) => "<computed>".to_owned(),
                             };
+                            let return_ty = self.value_ty(AnnKey::decl(body.range.start.offset));
                             let (func, upvalues) = self.lower_function_like(
                                 Rc::from(method_name.as_str()),
                                 params,
@@ -103,8 +104,10 @@ impl<'a> Lowerer<'a> {
                                 *is_generator,
                                 false,
                                 true,
+                                body.range.start.line,
                                 BodyRef::Block(body),
                                 &[],
+                                return_ty,
                                 scope,
                             )?;
                             props.push(HirObjectProp::Method {

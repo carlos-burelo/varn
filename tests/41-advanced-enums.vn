@@ -55,7 +55,7 @@ const v2 = match (t2) {
 assert("match named", v2 === "hello")
 
 // 4. Shared Fields & Constructors
-enum HttpStatus {
+enum CustomHttpStatus {
     Ok(200, "OK"),
     NotFound(404, "Not Found");
 
@@ -68,12 +68,12 @@ enum HttpStatus {
     }
 }
 
-print("HttpStatus.Ok.code =", HttpStatus.Ok.code)
-print("HttpStatus.Ok.message =", HttpStatus.Ok.message)
-assert("shared field code Ok", HttpStatus.Ok.code === 200)
-assert("shared field message Ok", HttpStatus.Ok.message === "OK")
-assert("shared field code NotFound", HttpStatus.NotFound.code === 404)
-assert("shared field message NotFound", HttpStatus.NotFound.message === "Not Found")
+print("CustomHttpStatus.Ok.code =", CustomHttpStatus.Ok.code)
+print("CustomHttpStatus.Ok.message =", CustomHttpStatus.Ok.message)
+assert("shared field code Ok", CustomHttpStatus.Ok.code === 200)
+assert("shared field message Ok", CustomHttpStatus.Ok.message === "OK")
+assert("shared field code NotFound", CustomHttpStatus.NotFound.code === 404)
+assert("shared field message NotFound", CustomHttpStatus.NotFound.message === "Not Found")
 
 // 5. Instance Methods with Pattern Matching on 'this'
 enum Shape {

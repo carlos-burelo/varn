@@ -101,7 +101,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         })
         .collect();
 
-    let (mut program, parse_errs) = varn_parser::parse_partial(raw_tokens, lexeme_buf, &path);
+    let (program, parse_errs) = varn_parser::parse_partial(raw_tokens, lexeme_buf, &path);
     for e in parse_errs {
         diagnostics.push(LspDiag {
             message: e.message,
@@ -116,7 +116,6 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         });
     }
 
-    varn_core::assign_ast_ids(&mut program);
     let result = crate::workspace::resolver::with_resolver(|r| {
         varn_checker::Checker::check_with(&program, r, varn_checker::CheckOptions::tooling())
     });
@@ -211,9 +210,13 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
     let scopes = result.bind.scopes.clone();
     let arena = result.bind.arena.clone();
 
+    let spatial_index = crate::query::SpatialIndex::build(&program);
+
     let db = crate::document::SemanticDB {
+        expr_table: result.expr_table,
         expr_types: result.expr_types,
         node_scopes: result.node_scopes,
+        scope_spans: result.scope_spans,
         symbol_types: result.symbol_types,
         arena,
         scopes,
@@ -228,8 +231,6 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         bind: result.bind,
     };
 
-    let positional_index = crate::queries::indexes::PositionalIndex::build(&db.node_scopes);
-
     DocumentAnalysis {
         source,
         uri,
@@ -242,7 +243,7 @@ pub fn run_pipeline(source: String, uri: String) -> DocumentAnalysis {
         type_param_names,
         db,
         import_paths,
-        positional_index,
+        spatial_index,
         ast: Some(program),
     }
 }

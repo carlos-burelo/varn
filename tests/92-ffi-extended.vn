@@ -1,0 +1,74 @@
+import { describe, test, Expectation } from "std:test";
+import { FFI, DynamicLibrary, Pointer, FfiType } from "std:ffi";
+
+function expect<T>(val: T): Expectation<T> {
+    return new Expectation<T>(val);
+}
+
+describe("Extended FFI API", () => {
+    test("Memory allocation and pointer integer read/write", () => {
+        let ptr = FFI.alloc(64);
+        expect(ptr.isNull()).toBe(false);
+
+        ptr.writeI8(42, 0);
+        expect(ptr.readI8(0)).toBe(42);
+
+        ptr.writeI16(1024, 2);
+        expect(ptr.readI16(2)).toBe(1024);
+
+        ptr.writeI32(70000, 4);
+        expect(ptr.readI32(4)).toBe(70000);
+
+        ptr.writeI64(9876543210, 8);
+        expect(ptr.readI64(8)).toBe(9876543210);
+
+        let off = ptr.offset(8);
+        expect(off.readI64(0)).toBe(9876543210);
+
+        ptr.free();
+    });
+
+    test("Memory allocation and pointer float read/write", () => {
+        let ptr = FFI.alloc(32);
+        ptr.writeF64(123.456, 0);
+        let val = ptr.readF64(0);
+        expect(val > 123.45 && val < 123.46).toBe(true);
+
+        ptr.writeF32(50.5, 8);
+        let f32Val = ptr.readF32(8);
+        expect(f32Val > 50.49 && f32Val < 50.51).toBe(true);
+
+        ptr.free();
+    });
+
+    test("CString allocation, reading and freeing", () => {
+        let text = "Varn Foreign Function Interface v2";
+        let cstr = FFI.cStr(text);
+        expect(cstr.isNull()).toBe(false);
+
+        let recovered = FFI.readCString(cstr);
+        expect(recovered).toBe(text);
+
+        let recoveredDirect = cstr.readCString();
+        expect(recoveredDirect).toBe(text);
+
+        cstr.free();
+    });
+
+    test("Dynamic library loading, binding and calling native functions", () => {
+        let isWindows = true;
+        let libName = "kernel32.dll";
+        let lib = FFI.open(libName);
+
+        let getPid = lib.bind("GetCurrentProcessId", FfiType.Int, []);
+        let pid = getPid.call() as int;
+        expect(pid > 0).toBe(true);
+
+        let getTicks = lib.bind("GetTickCount64", FfiType.Int, []);
+        let ticks = getTicks.call() as int;
+        expect(ticks > 0).toBe(true);
+
+        let closed = lib.close();
+        expect(closed).toBe(true);
+    });
+});

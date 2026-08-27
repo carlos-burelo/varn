@@ -1,0 +1,168 @@
+// Test Suite 90: Multi-Catch Error Handling in Varn
+
+import { describe, test, expect, assertEqual } from "std:test";
+
+class CustomNetworkError extends Error {
+    statusCode: int;
+    constructor(statusCode: int, message: str) {
+        super(message);
+        this.name = "CustomNetworkError";
+        this.statusCode = statusCode;
+    }
+}
+
+class CustomDatabaseError extends Error {
+    dbCode: str;
+    constructor(dbCode: str, message: str) {
+        super(message);
+        this.name = "CustomDatabaseError";
+        this.dbCode = dbCode;
+    }
+}
+
+describe("Multi-Catch Handling", () => {
+    test("Multiple distinct typed catch blocks", () => {
+        function testHandler(mode: int): str {
+            try {
+                if (mode === 1) {
+                    throw new TypeError("bad type argument");
+                } else if (mode === 2) {
+                    throw new RangeError("index out of bounds");
+                } else if (mode === 3) {
+                    throw new CustomNetworkError(503, "service unavailable");
+                } else if (mode === 4) {
+                    throw new CustomDatabaseError("ERR_CONN", "db timeout");
+                } else {
+                    return "success";
+                }
+            } catch (e: TypeError) {
+                return `caught TypeError: ${e.message}`;
+            } catch (e: RangeError) {
+                return `caught RangeError: ${e.message}`;
+            } catch (e: CustomNetworkError) {
+                return `caught NetworkError ${e.statusCode}: ${e.message}`;
+            } catch (e: CustomDatabaseError) {
+                return `caught DatabaseError ${e.dbCode}: ${e.message}`;
+            } catch (e: Error) {
+                return `caught general Error: ${e.message}`;
+            }
+        }
+
+        assertEqual(testHandler(0), "success");
+        assertEqual(testHandler(1), "caught TypeError: bad type argument");
+        assertEqual(testHandler(2), "caught RangeError: index out of bounds");
+        assertEqual(testHandler(3), "caught NetworkError 503: service unavailable");
+        assertEqual(testHandler(4), "caught DatabaseError ERR_CONN: db timeout");
+    });
+
+    test("Union type multi-catch: catch (e: A | B)", () => {
+        function handleUnion(mode: int): str {
+            try {
+                if (mode === 1) {
+                    throw new TypeError("type fault");
+                } else if (mode === 2) {
+                    throw new RangeError("range fault");
+                } else {
+                    throw new CustomNetworkError(404, "not found");
+                }
+            } catch (e: TypeError | RangeError) {
+                return `caught TypeOrRange: ${e.name}`;
+            } catch (e: CustomNetworkError) {
+                return `caught Network: ${e.statusCode}`;
+            }
+        }
+
+        assertEqual(handleUnion(1), "caught TypeOrRange: TypeError");
+        assertEqual(handleUnion(2), "caught TypeOrRange: RangeError");
+        assertEqual(handleUnion(3), "caught Network: 404");
+    });
+
+    test("Fallback catch-all after typed catches", () => {
+        function handleWithFallback(mode: int): str {
+            try {
+                if (mode === 1) {
+                    throw new TypeError("type fault");
+                } else {
+                    throw new CustomDatabaseError("SQL_ERR", "query failed");
+                }
+            } catch (e: TypeError) {
+                return "handled TypeError";
+            } catch (e) {
+                return `handled fallback: ${e.name}`;
+            }
+        }
+
+        assertEqual(handleWithFallback(1), "handled TypeError");
+        assertEqual(handleWithFallback(2), "handled fallback: CustomDatabaseError");
+    });
+
+    test("Catch block without parameter: catch { ... }", () => {
+        let caught = false;
+        try {
+            throw new Error("silent error");
+        } catch {
+            caught = true;
+        }
+        assertEqual(caught, true);
+    });
+
+    test("Automatic re-throw when no typed catch matches", () => {
+        let outerCaught = "";
+        try {
+            try {
+                throw new CustomDatabaseError("ERR_DEADLOCK", "deadlock detected");
+            } catch (e: TypeError) {
+                outerCaught = "wrongly caught by inner TypeError";
+            } catch (e: RangeError) {
+                outerCaught = "wrongly caught by inner RangeError";
+            }
+            // CustomDatabaseError does not match TypeError or RangeError, so it must be automatically rethrown!
+        } catch (e: CustomDatabaseError) {
+            outerCaught = `properly propagated to outer: ${e.dbCode}`;
+        }
+
+        assertEqual(outerCaught, "properly propagated to outer: ERR_DEADLOCK");
+    });
+
+    test("Multi-catch with finally block execution", () => {
+        let finallyRan = false;
+        let result = "";
+
+        try {
+            try {
+                throw new CustomNetworkError(500, "internal server error");
+            } catch (e: TypeError) {
+                result = "TypeError";
+            } catch (e: CustomNetworkError) {
+                result = `NetworkError: ${e.statusCode}`;
+            } finally {
+                finallyRan = true;
+            }
+        } catch (e) {
+            result = "outer catch";
+        }
+
+        assertEqual(result, "NetworkError: 500");
+        assertEqual(finallyRan, true);
+    });
+
+    test("Multi-catch with finally and automatic re-throw", () => {
+        let finallyRan = false;
+        let outerCaught = "";
+
+        try {
+            try {
+                throw new CustomDatabaseError("ERR_AUTH", "bad credentials");
+            } catch (e: TypeError) {
+                outerCaught = "inner TypeError";
+            } finally {
+                finallyRan = true;
+            }
+        } catch (e: CustomDatabaseError) {
+            outerCaught = `outer caught after finally: ${e.dbCode}`;
+        }
+
+        assertEqual(finallyRan, true);
+        assertEqual(outerCaught, "outer caught after finally: ERR_AUTH");
+    });
+});

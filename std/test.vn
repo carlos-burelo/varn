@@ -166,7 +166,10 @@ export function test(testName: str, body: () => void): void {
         body();
         logLine("  ✔ " + testName);
     } catch (err) {
-        logLine("  ✖ " + testName + ": " + err);
+        let errStr = (typeof err === "object" && err != null && (err as dynamic).message)
+            ? (err as dynamic).name + ": " + (err as dynamic).message
+            : "" + err;
+        logLine("  ✖ " + testName + ": " + errStr);
         throw err;
     }
 }

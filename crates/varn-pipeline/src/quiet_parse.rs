@@ -7,12 +7,8 @@
 
 use varn_core::ast::Program;
 
-/// Parse `source` and assign AST ids, mapping the first parse error to a
-/// message with `label` as its prefix (empty label = the bare message).
 pub(crate) fn parse_module(source: &str, path: &str, label: &str) -> Result<Program, String> {
-    let mut program = parse_only(source, path, label)?;
-    varn_core::assign_ast_ids(&mut program);
-    Ok(program)
+    parse_only(source, path, label)
 }
 
 /// Like [`parse_module`] but without assigning AST ids, for callers that only

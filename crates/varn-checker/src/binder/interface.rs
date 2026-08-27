@@ -81,6 +81,7 @@ impl<'r> super::Binder<'r> {
                     .with_type(ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
+                sym.has_explicit_type = true;
                 let symbol_id = self.arena.push(sym);
 
                 members.push(ClassMemberInfo {
@@ -159,6 +160,7 @@ impl<'r> super::Binder<'r> {
                     .with_type(fn_type.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
+                sym.has_explicit_type = return_type.is_some();
                 let symbol_id = self.arena.push(sym);
 
                 members.push(ClassMemberInfo {

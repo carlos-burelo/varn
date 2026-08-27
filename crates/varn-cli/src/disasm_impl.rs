@@ -318,7 +318,7 @@ impl<'a> Disassembler for DisassemblerImpl<'a> {
             OpCode::ObjectRest => {
                 let w1 = code.get(offset + 1).copied().unwrap_or(0);
                 let w2 = code.get(offset + 2).copied().unwrap_or(0);
-                let skip_count = (w2 & 0xff) as usize;
+                let skip_count = (w2 >> 8) as usize;
                 println!("{:?} {} {} (skip={})", op, w1, w2, skip_count);
                 offset + 3 + skip_count
             }

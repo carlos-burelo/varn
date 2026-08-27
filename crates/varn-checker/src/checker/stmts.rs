@@ -76,7 +76,7 @@ impl<'r> Checker<'r> {
             StmtKind::Decl(decl) => self.check_decl(decl, bind),
 
             StmtKind::Block { stmts } => {
-                self.with_next_child_scope(bind, stmt.range.start.offset, |checker| {
+                self.with_next_child_scope_span(bind, stmt.range.start.offset, stmt.range.end.offset, |checker| {
                     checker.check_stmts(stmts, bind)
                 });
             }
@@ -105,9 +105,14 @@ impl<'r> Checker<'r> {
                 };
 
                 if let Some(expected) = self.expected_return_type.clone() {
-                    let is_type_param = matches!(&expected.0, TypeKind::Named(n, _) if self.active_type_params.contains(n.as_ref()));
+                    let check_expected = if matches!(expected.0, TypeKind::TypePredicate { .. }) {
+                        Type::Bool
+                    } else {
+                        expected.clone()
+                    };
+                    let is_type_param = matches!(&check_expected.0, TypeKind::Named(n, _) if self.active_type_params.contains(n.as_ref()));
                     if !is_type_param
-                        && !self.types_compatible_cached(&expected, &actual, Some(bind))
+                        && !self.types_compatible_cached(&check_expected, &actual, Some(bind))
                     {
                         self.emit(
                             Diagnostic::error(ErrorCode::TypeMismatch, format!(
@@ -188,7 +193,7 @@ impl<'r> Checker<'r> {
                 body,
             } => {
                 self.loop_depth += 1;
-                self.with_next_child_scope(bind, body.range.start.offset, |checker| {
+                self.with_next_child_scope_span(bind, stmt.range.start.offset, stmt.range.end.offset, |checker| {
                     if let Some(i) = init {
                         match i.as_ref() {
                             ForInit::Var { declarators, .. } => {
@@ -215,12 +220,27 @@ impl<'r> Checker<'r> {
                 let right_ty = self.infer_type(right, bind);
                 let elem_ty = match &right_ty.0 {
                     TypeKind::Array(inner) => (**inner).clone(),
+                    TypeKind::Intrinsic(TypeTag::Str) | TypeKind::TemplateLiteral(_) => Type::Char,
+                    TypeKind::Named(name, _)
+                        if name.as_ref() == varn_core::IntrinsicType::Str.as_str() =>
+                    {
+                        Type::Char
+                    }
+                    TypeKind::Generic(name, args, _)
+                        if name.as_ref() == varn_core::IntrinsicType::Map.as_str()
+                            && args.len() == 2 =>
+                    {
+                        Type(
+                            TypeKind::Tuple(vec![args[0].clone(), args[1].clone()]),
+                            false,
+                        )
+                    }
                     TypeKind::Generic(_name, args, _) if args.len() == 1 => args[0].clone(),
                     TypeKind::Intrinsic(TypeTag::Range) => Type::Int,
                     _ => Type::Dynamic,
                 };
                 self.loop_depth += 1;
-                self.with_next_child_scope(bind, left.range().start.offset, |checker| {
+                self.with_next_child_scope_span(bind, stmt.range.start.offset, stmt.range.end.offset, |checker| {
                     checker.check_pattern(left, &elem_ty, bind);
                     checker.check_stmt(body, bind);
                 });
@@ -232,7 +252,7 @@ impl<'r> Checker<'r> {
             } => {
                 self.check_expr(right, bind);
                 self.loop_depth += 1;
-                self.with_next_child_scope(bind, left.range().start.offset, |checker| {
+                self.with_next_child_scope_span(bind, stmt.range.start.offset, stmt.range.end.offset, |checker| {
                     checker.check_pattern(left, &Type::Str, bind);
                     checker.check_stmt(body, bind);
                 });
@@ -268,17 +288,18 @@ impl<'r> Checker<'r> {
 
             StmtKind::Try {
                 block,
-                catch,
+                catches,
                 finally,
             } => {
                 self.check_stmt(block, bind);
-                if let Some(clause) = catch {
+                for clause in catches {
                     self.with_next_child_scope(bind, clause.body.range.start.offset, |checker| {
                         if let Some(param) = &clause.param {
-                            // `throw` only accepts `Error` subclasses, so the caught
-                            // value is soundly typed as the base `Error`. Accessing a
-                            // subclass requires an `instanceof` narrowing.
-                            let catch_ty = Type::named("Error");
+                            let catch_ty = if let Some(ann) = &clause.type_ann {
+                                checker.resolve_type_node_cached(ann, bind)
+                            } else {
+                                Type::named("Error")
+                            };
                             checker.check_pattern(param, &catch_ty, bind);
                         }
                         checker.check_stmt(&clause.body, bind);
@@ -408,16 +429,6 @@ impl<'r> Checker<'r> {
                 }
             }
         }
-    }
-
-    fn with_next_child_scope(&mut self, bind: &BindResult, offset: u32, f: impl FnOnce(&mut Self)) {
-        let saved = self.current_scope;
-        if let Some(child) = self.next_child_scope(bind) {
-            self.current_scope = child;
-            self.record_scope(offset);
-        }
-        f(self);
-        self.current_scope = saved;
     }
 
     pub(crate) fn with_narrowings(

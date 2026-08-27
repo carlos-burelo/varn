@@ -244,14 +244,14 @@ pub fn get_members_of_type(
                 add_member(
                     &mut results,
                     &mut seen,
-                    Rc::from("length"),
+                    Rc::from(varn_core::MemberKey::Length.as_str()),
                     Type::Int,
                     crate::semantic_info::ResolvedMemberKind::Property,
                     false,
                     false,
                     true,
                 );
-                let str_ty = Type::named("str".to_owned());
+                let str_ty = Type::named(varn_core::TypeTag::Str.name().to_owned());
                 return get_members_of_type(resolver, &str_ty, bind);
             }
             TypeKind::Intrinsic(tag) => {

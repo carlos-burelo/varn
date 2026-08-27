@@ -51,7 +51,8 @@ pub fn run(module: &mut HirModule) {
             continue;
         };
         if body_is_inlinable(&expr) {
-            candidates.insert(global, (f.params.len(), expr));
+            candidates.insert(global, (f.params.len(), expr.clone()));
+            candidates.insert(f.name.clone(), (f.params.len(), expr));
         }
     }
     if candidates.is_empty() {

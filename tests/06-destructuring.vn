@@ -34,4 +34,12 @@ const ext  = { ...base, z: 3 }
 assert("obj spread x", ext.x === 1)
 assert("obj spread z", ext.z === 3)
 
+const fullObj = { alpha: 10, beta: 20, gamma: 30, delta: 40 }
+const { alpha, beta, ...restObj } = fullObj
+assert("obj rest prop alpha", alpha === 10)
+assert("obj rest prop beta",  beta === 20)
+assert("obj rest remainder gamma", restObj.gamma === 30)
+assert("obj rest remainder delta", restObj.delta === 40)
+assert("obj rest excluded alpha", restObj.alpha === null)
+
 print("[PASSED] 6. Destructuring ")

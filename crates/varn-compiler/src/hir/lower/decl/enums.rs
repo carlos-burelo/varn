@@ -127,8 +127,10 @@ impl<'a> Lowerer<'a> {
                 false,
                 false,
                 true,
+                body.range.start.line,
                 BodyRef::Block(body),
                 &field_inits,
+                HirType::Ref,
                 scope,
             )?,
             None => self.lower_function_like(
@@ -138,8 +140,10 @@ impl<'a> Lowerer<'a> {
                 false,
                 false,
                 true,
+                decl.range.start.line,
                 BodyRef::Empty,
                 &field_inits,
+                HirType::Ref,
                 scope,
             )?,
         };
@@ -296,8 +300,10 @@ impl<'a> Lowerer<'a> {
             false,
             false,
             true,
+            decl.range.start.line,
             BodyRef::Empty,
             &[],
+            HirType::Ref,
             scope,
         )?;
         Ok(HirEnum {

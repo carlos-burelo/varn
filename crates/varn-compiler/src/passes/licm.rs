@@ -201,6 +201,8 @@ fn hoistable(kind: &InstKind, facts: LoopFacts) -> bool {
                 && matches!(op, HirUnOp::Neg | HirUnOp::Not)
         }
         InstKind::LoadGlobal(_) => facts.globals_stable,
+        InstKind::IsNull { .. } | InstKind::IsArray { .. } | InstKind::GetEnumTag { .. } => true,
+        InstKind::MakeClosure { upvalues, .. } => upvalues.is_empty(),
         _ => false,
     }
 }
@@ -232,6 +234,8 @@ fn is_transparent(kind: &InstKind) -> bool {
             | InstKind::ArraySetIndex { .. }
             | InstKind::IsNull { .. }
             | InstKind::IsArray { .. }
+            | InstKind::GetEnumTag { .. }
+            | InstKind::MakeClosure { .. }
     )
 }
 

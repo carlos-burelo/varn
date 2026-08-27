@@ -3,6 +3,7 @@
 
 use super::construct::jit_propagate_error;
 use crate::exec::ctx::ExecCtx;
+use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 
 pub(crate) extern "C" fn jit_dispatch_intrinsic(
@@ -177,6 +178,23 @@ pub(crate) extern "C" fn jit_str_slice_intrinsic(
     }
 }
 
+#[inline(always)]
+unsafe fn borrow_str_fast<'a>(
+    v: VmValue,
+    heap: &'a Heap,
+    buf: &'a mut [u8; 5],
+) -> Option<&'a str> {
+    if v.is_sso() {
+        return Some(v.sso_as_str(buf));
+    }
+    if v.is_heap() {
+        if let Some(HeapObj::Str(h)) = heap.get(v.as_heap_idx()) {
+            return Some(h.as_str());
+        }
+    }
+    None
+}
+
 /// Dedicated fast path for `startsWith(search)`.
 /// Avoids the generic intrinsic dispatcher's flush/reload overhead.
 pub(crate) extern "C" fn jit_str_starts_with_intrinsic(
@@ -185,13 +203,21 @@ pub(crate) extern "C" fn jit_str_starts_with_intrinsic(
     search: VmValue,
 ) -> VmValue {
     unsafe {
+        let heap = &(*ctx).heap;
+        let mut b1 = [0u8; 5];
+        let mut b2 = [0u8; 5];
+        if let (Some(s), Some(n)) = (
+            borrow_str_fast(receiver, heap, &mut b1),
+            borrow_str_fast(search, heap, &mut b2),
+        ) {
+            return VmValue::from_bool(s.as_bytes().starts_with(n.as_bytes()));
+        }
         let ctx_ref = &mut *ctx;
-        let heap = &mut ctx_ref.heap;
         let args = [receiver, search];
         match crate::exec::intrinsics::str::dispatch(
             varn_core::intrinsic_ops::str::StrOp::StartsWith as u8,
             &args,
-            heap,
+            &mut ctx_ref.heap,
         ) {
             Ok(v) => v,
             Err(e) => jit_propagate_error(ctx_ref, e),
@@ -207,13 +233,21 @@ pub(crate) extern "C" fn jit_str_ends_with_intrinsic(
     search: VmValue,
 ) -> VmValue {
     unsafe {
+        let heap = &(*ctx).heap;
+        let mut b1 = [0u8; 5];
+        let mut b2 = [0u8; 5];
+        if let (Some(s), Some(n)) = (
+            borrow_str_fast(receiver, heap, &mut b1),
+            borrow_str_fast(search, heap, &mut b2),
+        ) {
+            return VmValue::from_bool(s.as_bytes().ends_with(n.as_bytes()));
+        }
         let ctx_ref = &mut *ctx;
-        let heap = &mut ctx_ref.heap;
         let args = [receiver, search];
         match crate::exec::intrinsics::str::dispatch(
             varn_core::intrinsic_ops::str::StrOp::EndsWith as u8,
             &args,
-            heap,
+            &mut ctx_ref.heap,
         ) {
             Ok(v) => v,
             Err(e) => jit_propagate_error(ctx_ref, e),
@@ -229,13 +263,21 @@ pub(crate) extern "C" fn jit_str_includes_intrinsic(
     search: VmValue,
 ) -> VmValue {
     unsafe {
+        let heap = &(*ctx).heap;
+        let mut b1 = [0u8; 5];
+        let mut b2 = [0u8; 5];
+        if let (Some(s), Some(n)) = (
+            borrow_str_fast(receiver, heap, &mut b1),
+            borrow_str_fast(search, heap, &mut b2),
+        ) {
+            return VmValue::from_bool(varn_types::str_util::find_bytes(s, n).is_some());
+        }
         let ctx_ref = &mut *ctx;
-        let heap = &mut ctx_ref.heap;
         let args = [receiver, search];
         match crate::exec::intrinsics::str::dispatch(
             varn_core::intrinsic_ops::str::StrOp::Includes as u8,
             &args,
-            heap,
+            &mut ctx_ref.heap,
         ) {
             Ok(v) => v,
             Err(e) => jit_propagate_error(ctx_ref, e),
@@ -251,13 +293,35 @@ pub(crate) extern "C" fn jit_str_index_of_intrinsic(
     search: VmValue,
 ) -> VmValue {
     unsafe {
+        let heap = &(*ctx).heap;
+        let mut b1 = [0u8; 5];
+        let mut b2 = [0u8; 5];
+        if let (Some(s), Some(n)) = (
+            borrow_str_fast(receiver, heap, &mut b1),
+            borrow_str_fast(search, heap, &mut b2),
+        ) {
+            if n.is_empty() {
+                return VmValue::from_int(0);
+            }
+            let is_ascii = receiver.is_sso()
+                || heap
+                    .get(receiver.as_heap_idx())
+                    .map(|o| match o {
+                        HeapObj::Str(h) => h.is_ascii_cached(),
+                        _ => false,
+                    })
+                    .unwrap_or(false);
+            let idx = varn_types::str_util::find_bytes(s, n)
+                .map(|b| varn_types::str_util::byte_to_char_idx(s, is_ascii, b))
+                .unwrap_or(-1);
+            return VmValue::from_int(idx);
+        }
         let ctx_ref = &mut *ctx;
-        let heap = &mut ctx_ref.heap;
         let args = [receiver, search];
         match crate::exec::intrinsics::str::dispatch(
             varn_core::intrinsic_ops::str::StrOp::IndexOf as u8,
             &args,
-            heap,
+            &mut ctx_ref.heap,
         ) {
             Ok(v) => v,
             Err(e) => jit_propagate_error(ctx_ref, e),
@@ -273,13 +337,35 @@ pub(crate) extern "C" fn jit_str_last_index_of_intrinsic(
     search: VmValue,
 ) -> VmValue {
     unsafe {
+        let heap = &(*ctx).heap;
+        let mut b1 = [0u8; 5];
+        let mut b2 = [0u8; 5];
+        if let (Some(s), Some(n)) = (
+            borrow_str_fast(receiver, heap, &mut b1),
+            borrow_str_fast(search, heap, &mut b2),
+        ) {
+            let is_ascii = receiver.is_sso()
+                || heap
+                    .get(receiver.as_heap_idx())
+                    .map(|o| match o {
+                        HeapObj::Str(h) => h.is_ascii_cached(),
+                        _ => false,
+                    })
+                    .unwrap_or(false);
+            if n.is_empty() {
+                return VmValue::from_int(varn_types::str_util::char_len(s, is_ascii) as i64);
+            }
+            let idx = varn_types::str_util::rfind_bytes(s, n)
+                .map(|b| varn_types::str_util::byte_to_char_idx(s, is_ascii, b))
+                .unwrap_or(-1);
+            return VmValue::from_int(idx);
+        }
         let ctx_ref = &mut *ctx;
-        let heap = &mut ctx_ref.heap;
         let args = [receiver, search];
         match crate::exec::intrinsics::str::dispatch(
             varn_core::intrinsic_ops::str::StrOp::LastIndexOf as u8,
             &args,
-            heap,
+            &mut ctx_ref.heap,
         ) {
             Ok(v) => v,
             Err(e) => jit_propagate_error(ctx_ref, e),

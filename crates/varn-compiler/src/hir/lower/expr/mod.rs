@@ -122,10 +122,11 @@ impl<'a> Lowerer<'a> {
                     return self.lower_expr(operand, scope);
                 }
                 let operand = Box::new(self.lower_expr(operand, scope)?);
+                let ty = numeric_ty(self.ann, key);
                 Ok(HirExpr::Unary {
                     op: un_op(*op)?,
                     operand,
-                    ty: HirType::Dynamic,
+                    ty,
                 })
             }
             ExprKind::Call { .. }
@@ -209,8 +210,31 @@ impl<'a> Lowerer<'a> {
                 Ok(HirExpr::Yield(Box::new(inner)))
             }
 
-            ExprKind::As { expression, .. } | ExprKind::Satisfies { expression, .. } => {
-                self.lower_expr(expression, scope)
+            ExprKind::As { expression, .. } => {
+                let inner = self.lower_expr(expression, scope)?;
+                let target_ty = self.value_ty(AnnKey::expr(expr.id));
+                if target_ty == HirType::Int {
+                    if let Some(source_cg) = self.ann.get_cg_ty(AnnKey::expr(expression.id)) {
+                        if matches!(source_cg, varn_core::CgTy::Class(_)) {
+                            return Ok(HirExpr::Member {
+                                object: Box::new(inner),
+                                name: std::rc::Rc::from(varn_core::MemberKey::RawValue.as_str()),
+                                ty: HirType::Int,
+                            });
+                        }
+                    }
+                }
+                Ok(inner)
+            }
+            ExprKind::Satisfies { expression, .. } => self.lower_expr(expression, scope),
+            ExprKind::MetaAccess { target, property } => {
+                let inner = self.lower_expr(target, scope)?;
+                let prop_mangled = format!("::{}", property);
+                Ok(HirExpr::Member {
+                    object: Box::new(inner),
+                    name: std::rc::Rc::from(prop_mangled.as_str()),
+                    ty: HirType::Dynamic,
+                })
             }
             ExprKind::NonNull { expression } => Ok(HirExpr::NonNull(Box::new(
                 self.lower_expr(expression, scope)?,
@@ -342,7 +366,7 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    fn type_test_of(&self, type_ann: &varn_core::ast::types::TypeNode) -> HirTypeTest {
+    pub(super) fn type_test_of(&self, type_ann: &varn_core::ast::types::TypeNode) -> HirTypeTest {
         use varn_core::{IntrinsicType, TypeKind, TypeTag};
         match &type_ann.kind {
             TypeKind::Intrinsic(TypeTag::Null) => HirTypeTest::IsNull,
@@ -368,6 +392,18 @@ impl<'a> Lowerer<'a> {
                 }
             },
             _ => HirTypeTest::AlwaysFalse,
+        }
+    }
+
+    pub(super) fn type_tests_of(
+        &self,
+        type_ann: &varn_core::ast::types::TypeNode,
+    ) -> Vec<HirTypeTest> {
+        match &type_ann.kind {
+            varn_core::TypeKind::Union(types) => {
+                types.iter().map(|t| self.type_test_of(t)).collect()
+            }
+            _ => vec![self.type_test_of(type_ann)],
         }
     }
 }

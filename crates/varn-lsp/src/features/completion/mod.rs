@@ -3,26 +3,26 @@ mod calls;
 mod imports;
 mod keywords;
 pub mod members;
+pub mod postfix;
+pub mod reflection;
 mod scope;
 
 use tower_lsp::lsp_types::{
     CompletionItem, CompletionItemKind, CompletionList, CompletionResponse, Documentation,
     InsertTextFormat, MarkupContent, MarkupKind,
 };
-use varn_checker::SymbolKind;
 
-use crate::constants::STDLIB_LINE_MARKER;
 use crate::document::{
     import_path_at, named_import_module_at, named_imported_names_at, DocumentState,
 };
 use crate::index::ProjectIndex;
-use crate::util::converters::to_completion_kind;
-use crate::util::ranking::symbol_priority;
 
 pub use imports::{
     build_import_completions, build_module_export_completions, resolve_relative_module_debug,
 };
 pub use members::build_member_completions;
+pub use postfix::build_postfix_completions;
+pub use reflection::build_reflection_completions;
 
 pub fn build_completion_response(
     state: &DocumentState,
@@ -88,15 +88,42 @@ pub fn build_completion_response(
         return (None, Some(log));
     }
 
-    if let Some(info) = members::dot_receiver(state, line, col, trigger_char) {
-        let items = build_member_completions(state, info, true);
+    // 1. Reflection & Static Operator `::`
+    if let Some(receiver_name) = reflection::colon_colon_receiver(state, line, col, trigger_char) {
+        let items = reflection::build_reflection_completions(state, &receiver_name);
         let log = format!(
-            "completion({}:{})  dot  → {} members",
+            "completion({}:{})  reflection(::) receiver={:?} → {} items",
+            line + 1,
+            col + 1,
+            receiver_name,
+            items.len()
+        );
+        return (Some(CompletionResponse::Array(items)), Some(log));
+    }
+
+    // 2. Member Access `.` and `?.`
+    if let Some(info) = members::dot_receiver(state, line, col, trigger_char) {
+        let mut items = build_member_completions(state, info, true);
+        let postfix_items = build_postfix_completions(state, line, col);
+        items.extend(postfix_items);
+        let log = format!(
+            "completion({}:{})  dot  → {} members + postfix",
             line + 1,
             col + 1,
             items.len()
         );
         return (Some(CompletionResponse::Array(items)), Some(log));
+    }
+
+    let postfix_items = build_postfix_completions(state, line, col);
+    if !postfix_items.is_empty() {
+        let log = format!(
+            "completion({}:{})  postfix-only  → {} items",
+            line + 1,
+            col + 1,
+            postfix_items.len()
+        );
+        return (Some(CompletionResponse::Array(postfix_items)), Some(log));
     }
 
     if let Some(info) = members::pattern_receiver(state, line, col) {
@@ -120,18 +147,22 @@ pub fn build_completion_response(
         return (Some(CompletionResponse::Array(items)), Some(log));
     }
 
-    let mut items = build_completions(state, line);
+    let mut items = build_completions(state, line, col);
 
     if let Some(idx) = index {
-        let already_known: std::collections::HashSet<String> =
-            state.symbol_map.keys().cloned().collect();
-        let auto = autoimport::build_autoimport_completions(
-            &state.source,
-            &state.uri,
-            idx,
-            &already_known,
-        );
-        items.extend(auto);
+        let prefix = get_word_prefix(&state.source, line, col);
+        if prefix.is_some() {
+            let already_known: std::collections::HashSet<String> =
+                state.symbol_map.keys().cloned().collect();
+            let auto = autoimport::build_autoimport_completions(
+                &state.source,
+                &state.uri,
+                idx,
+                &already_known,
+                prefix.as_deref(),
+            );
+            items.extend(auto);
+        }
     }
 
     let log = format!(
@@ -143,15 +174,25 @@ pub fn build_completion_response(
     (Some(CompletionResponse::Array(items)), Some(log))
 }
 
-pub fn build_completions(state: &DocumentState, line: u32) -> Vec<CompletionItem> {
+fn get_word_prefix(source: &str, line: u32, col: u32) -> Option<String> {
+    let line_str = source.lines().nth(line as usize)?;
+    let col_idx = (col as usize).min(line_str.len());
+    let prefix = &line_str[..col_idx];
+    let word = prefix.rsplit(|c: char| !c.is_alphanumeric() && c != '_').next()?.trim();
+    if word.is_empty() {
+        None
+    } else {
+        Some(word.to_string())
+    }
+}
+
+pub fn build_completions(state: &DocumentState, line: u32, col: u32) -> Vec<CompletionItem> {
     let mut items: Vec<CompletionItem> = Vec::with_capacity(160);
 
-    let scope_items = scope::build_scope_completions(state, line);
-    let scope_names: std::collections::HashSet<String> =
-        scope_items.iter().map(|i| i.label.clone()).collect();
+    let scope_items = scope::build_scope_completions(state, line, col);
     items.extend(scope_items);
 
-    for kw in keywords::KEYWORDS {
+    for (idx, kw) in keywords::KEYWORDS.iter().enumerate() {
         items.push(CompletionItem {
             label: kw.label.into(),
             kind: Some(CompletionItemKind::KEYWORD),
@@ -168,50 +209,7 @@ pub fn build_completions(state: &DocumentState, line: u32) -> Vec<CompletionItem
             } else {
                 None
             },
-            ..Default::default()
-        });
-    }
-
-    let mut seen: std::collections::HashMap<&str, crate::document::SymbolView<'_>> =
-        std::collections::HashMap::new();
-    for sym in state.symbols() {
-        if sym.kind() == SymbolKind::Parameter {
-            continue;
-        }
-
-        if scope_names.contains(sym.name()) {
-            continue;
-        }
-        seen.entry(sym.name())
-            .and_modify(|prev| {
-                if symbol_priority(sym.kind()) < symbol_priority(prev.kind()) {
-                    *prev = sym;
-                }
-            })
-            .or_insert(sym);
-    }
-
-    for sym in seen.values() {
-        let detail = if sym.type_str().is_empty() {
-            None
-        } else {
-            Some(sym.type_str())
-        };
-        let (insert_text, insert_text_format) =
-            if sym.kind() == SymbolKind::Function && sym.line() == STDLIB_LINE_MARKER {
-                (
-                    Some(format!("{}($0)", sym.name())),
-                    Some(InsertTextFormat::SNIPPET),
-                )
-            } else {
-                (None, None)
-            };
-        items.push(CompletionItem {
-            label: sym.name().to_owned(),
-            kind: Some(to_completion_kind(sym.kind())),
-            detail,
-            insert_text,
-            insert_text_format,
+            sort_text: Some(format!("2_{:02}_{}", idx, kw.label)),
             ..Default::default()
         });
     }

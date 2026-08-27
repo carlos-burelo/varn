@@ -30,7 +30,7 @@ param(
     [switch]$Markdown
 )
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Continue'
 $root = Split-Path -Parent $PSScriptRoot
 $benchDir = Join-Path $root 'benchmarks'
 $vn = Join-Path $root 'target\release\vn.exe'
@@ -70,7 +70,7 @@ function Measure-RuntimeProcess([string]$exe, [string[]]$cmdArgs) {
     $lastOutput = ""
     for ($i = 0; $i -lt $Runs; $i++) {
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
-        $out = & $exe $cmdArgs 2>&1
+        $out = & $exe $cmdArgs
         $sw.Stop()
         $ms = $sw.Elapsed.TotalMilliseconds
         if ($ms -lt $minMs) {

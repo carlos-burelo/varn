@@ -393,7 +393,7 @@ fn parse_break_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
 
     let label = if s.check(TokenKind::Identifier)
         && !s.check(TokenKind::Semicolon)
-        && s.peek_line(0) == s.peek_line(usize::MAX)
+        && s.peek_line(0) == s.prev_line()
     {
         Some(s.consume_lexeme())
     } else {
@@ -410,7 +410,7 @@ fn parse_continue_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
 
     let label = if s.check(TokenKind::Identifier)
         && !s.check(TokenKind::Semicolon)
-        && s.peek_line(0) == s.peek_line(usize::MAX)
+        && s.peek_line(0) == s.prev_line()
     {
         Some(s.consume_lexeme())
     } else {
@@ -440,25 +440,37 @@ fn parse_try_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
     s.advance();
     let block = parse_block(s)?;
 
-    let catch = if s.eat(TokenKind::Catch) {
+    let mut catches = Vec::new();
+    while s.eat(TokenKind::Catch) {
         let catch_start = s.range();
-        let param = if s.eat(TokenKind::LParen) {
-            let p = Some(super::patterns::parse_pattern(s)?);
+        let (param, type_ann) = if s.eat(TokenKind::LParen) {
+            let p = super::patterns::parse_pattern(s)?;
+            let ty = match &p {
+                varn_core::ast::Pattern::Identifier { type_ann, .. } if type_ann.is_some() => {
+                    type_ann.clone()
+                }
+                _ => {
+                    if s.eat(TokenKind::Colon) {
+                        Some(crate::types::parse_type(s)?)
+                    } else {
+                        None
+                    }
+                }
+            };
             s.expect(TokenKind::RParen)?;
-            p
+            (Some(p), ty)
         } else {
-            None
+            (None, None)
         };
         let body = parse_block(s)?;
         let catch_range = s.span_from(catch_start);
-        Some(Box::new(CatchClause {
+        catches.push(CatchClause {
             param,
+            type_ann,
             body: Box::new(body),
             range: catch_range,
-        }))
-    } else {
-        None
-    };
+        });
+    }
 
     let finally = if s.eat(TokenKind::Finally) {
         Some(Box::new(parse_block(s)?))
@@ -466,12 +478,16 @@ fn parse_try_stmt(s: &mut TokenStream) -> Result<Stmt, String> {
         None
     };
 
+    if catches.is_empty() && finally.is_none() {
+        return Err("expected `catch` or `finally` after `try` block".to_owned());
+    }
+
     let range = s.span_from(start_range);
     Ok(s.stmt(
         range,
         StmtKind::Try {
             block: Box::new(block),
-            catch,
+            catches,
             finally,
         },
     ))

@@ -10,7 +10,7 @@ use varn_types::Value;
 pub(crate) struct EnumVariantTemplate {
     pub enum_name: Rc<str>,
     pub variant_name: Rc<str>,
-    pub variant_tag: u8,
+    pub variant_tag: i64,
     pub fields: Vec<Rc<str>>,
 }
 
@@ -219,7 +219,7 @@ impl ExecCtx {
             .heap
             .str_val(name_nv)
             .ok_or_else(|| RuntimeError::new("MakeEnumVariant: non-string const"))?;
-        let tag = self.stack[base + tag_reg].as_i32() as u8;
+        let tag = self.stack[base + tag_reg].as_int();
 
         let name_str = name.as_ref();
         let (name_part, fields_part) = match name_str.find(':') {

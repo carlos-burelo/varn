@@ -103,6 +103,33 @@ pub(crate) fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
 }
 
 pub(crate) fn to_string(val: VmValue, heap: &mut Heap) -> VmValue {
+    if val.is_sso() {
+        return val;
+    }
+    if val.is_int() {
+        use crate::strbuf::{itoa, INT_MAX_DIGITS};
+        let mut buf = [0u8; INT_MAX_DIGITS];
+        let s = itoa(val.as_int(), &mut buf);
+        if let Some(sso) = VmValue::try_from_sso(s) {
+            return sso;
+        }
+        return heap.alloc_str_dynamic(s);
+    }
+    if val.is_bool() {
+        return if val.as_bool() {
+            VmValue::try_from_sso("true").unwrap()
+        } else {
+            VmValue::try_from_sso("false").unwrap()
+        };
+    }
+    if val.is_null() {
+        return VmValue::try_from_sso("null").unwrap();
+    }
+    if val.is_heap() {
+        if let Some(HeapObj::Str(_)) = heap.get(val.as_heap_idx()) {
+            return val;
+        }
+    }
     let s = heap.str_repr(val);
     heap.alloc_str_dynamic(s)
 }

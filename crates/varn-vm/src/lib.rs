@@ -22,7 +22,7 @@ pub(crate) mod strbuf;
 pub(crate) mod value;
 pub(crate) mod vm;
 
-pub use error::{RuntimeError, VmResult};
+pub use error::{FrameInfo, RuntimeError, VmResult};
 pub use globals::GlobalStore;
 pub use heap::{Heap, HeapObj};
 pub use loader::{CompositeLoader, ModuleError, ModuleLoader};

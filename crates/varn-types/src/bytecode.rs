@@ -145,7 +145,8 @@ pub fn decode(code: &[u16], offset: usize, constants: &[PoolEntry]) -> Option<In
         // encodings across emitter, dispatch and JIT — see git history.)
         OpCode::Spawn => s(2, Some(dest0), vec![hi1]),
 
-        OpCode::ArrayPush | OpCode::Inherit => s(2, None, vec![hi1, lo1]),
+        OpCode::ArrayPush => s(2, None, vec![dest0, hi1]),
+        OpCode::Inherit => s(2, None, vec![hi1, lo1]),
         OpCode::Yield | OpCode::Return => s(2, None, vec![lo1]),
         OpCode::Throw => s(2, None, vec![hi1]),
         OpCode::StoreUpvalue => s(2, None, vec![lo1]),

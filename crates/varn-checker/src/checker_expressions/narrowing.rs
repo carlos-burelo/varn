@@ -16,6 +16,7 @@ impl<'r> Checker<'r> {
                 ..
             } | ExprKind::Logical { .. }
                 | ExprKind::Is { .. }
+                | ExprKind::Call { .. }
                 | ExprKind::Identifier { .. }
                 | ExprKind::Unary {
                     op: UnaryOp::Not,
@@ -97,17 +98,10 @@ impl<'r> Checker<'r> {
                         if let ExprKind::Identifier { name } = &typeof_op.kind {
                             let scope = bind.scopes.get(self.current_scope);
                             if let Some(id) = scope.resolve(name, &bind.scopes) {
-                                let narrowed_ty = match value {
-                                    "str" => Type::Str,
-                                    "int" => Type::Int,
-                                    "float" => Type::Float,
-                                    "bool" => Type::Bool,
-                                    "bigint" => Type::BigInt,
-                                    "decimal" => Type::Decimal,
-                                    "char" => Type::Char,
-                                    "null" => Type::Null,
-                                    _ => crate::binder::resolve_primitive(value, Some(&crate::binder::BindView::new(bind, self.resolver))),
-                                };
+                                let narrowed_ty = crate::binder::resolve_primitive(
+                                    value,
+                                    Some(&crate::binder::BindView::new(bind, self.resolver)),
+                                );
                                 narrowings.push((id, narrowed_ty));
                             }
                         }
@@ -303,6 +297,49 @@ impl<'r> Checker<'r> {
                                 let narrowed = original_ty.minus(&target_ty);
                                 if narrowed != *original_ty {
                                     narrowings.push((id, narrowed));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            ExprKind::Call { callee, args, .. } => {
+                let callee_ty = self.infer_type(callee, bind).non_nullified();
+                if let TypeKind::Fn(ft) = &callee_ty.0 {
+                    if let TypeKind::TypePredicate {
+                        parameter_name,
+                        target_type,
+                    } = &ft.return_type.0
+                    {
+                        let arg_expr = if let Some(pos) = ft
+                            .params
+                            .iter()
+                            .position(|p| p.name.as_deref() == Some(parameter_name.as_ref()))
+                        {
+                            args.get(pos).and_then(|a| match a {
+                                varn_core::ast::Arg::Positional(e) => Some(e),
+                                _ => None,
+                            })
+                        } else if args.len() == 1 {
+                            match &args[0] {
+                                varn_core::ast::Arg::Positional(e) => Some(e),
+                                _ => None,
+                            }
+                        } else {
+                            None
+                        };
+
+                        if let Some(ExprKind::Identifier { name: arg_name }) = arg_expr.map(|e| &e.kind) {
+                            let scope = bind.scopes.get(self.current_scope);
+                            if let Some(id) = scope.resolve(arg_name, &bind.scopes) {
+                                if is_true_branch {
+                                    narrowings.push((id, (**target_type).clone()));
+                                } else if let Some(original_ty) = &bind.arena.get(id).ty {
+                                    let narrowed = original_ty.minus(target_type);
+                                    if narrowed != *original_ty {
+                                        narrowings.push((id, narrowed));
+                                    }
                                 }
                             }
                         }

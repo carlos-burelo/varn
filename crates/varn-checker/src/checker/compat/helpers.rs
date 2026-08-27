@@ -24,6 +24,7 @@ pub(super) fn named_members(
     bind.get_interface_members(name, origin)
         .or_else(|| bind.get_class_members(name, origin))
         .or_else(|| bind.get_namespace_members(name, origin))
+        .or_else(|| bind.get_enum_members(name, origin))
 }
 
 pub(super) fn compatible_named(
@@ -35,8 +36,18 @@ pub(super) fn compatible_named(
     cache: &mut FxHashMap<(Type, Type, usize), bool>,
     in_progress: &mut FxHashSet<(Type, Type, usize)>,
 ) -> bool {
-    if declared == inferred && origin_decl == origin_inf {
-        return true;
+    if declared == inferred {
+        if origin_decl == origin_inf || origin_decl.is_none() || origin_inf.is_none() {
+            return true;
+        }
+        let origin_decl_str = origin_decl.unwrap_or("");
+        let origin_inf_str = origin_inf.unwrap_or("");
+        if origin_decl_str == origin_inf_str
+            || origin_decl_str.ends_with(origin_inf_str)
+            || origin_inf_str.ends_with(origin_decl_str)
+        {
+            return true;
+        }
     }
     let Some(bind) = bind else {
         return true;

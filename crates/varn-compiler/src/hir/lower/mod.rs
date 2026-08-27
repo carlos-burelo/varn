@@ -382,6 +382,7 @@ pub fn lower_program(input: &OptInput<'_>) -> R<HirModule> {
 
     let top_level = HirFunction {
         name: Rc::from("<module>"),
+        start_line: 1,
         params: Vec::new(),
         locals: module_scope.frames[0].next_local,
         body: top_body,
@@ -518,7 +519,7 @@ impl<'a> Lowerer<'a> {
                 if let Some(r) = rest {
                     let slice_expr = HirExpr::MethodCall {
                         recv: Box::new(tmp_expr),
-                        name: Rc::from("slice"),
+                        name: Rc::from(varn_core::MemberKey::Slice.as_str()),
                         args: vec![HirExpr::Int(elements.len() as i64)],
                         ty: HirType::Dynamic,
                     };
@@ -616,7 +617,7 @@ impl<'a> Lowerer<'a> {
                 if let Some(r) = rest {
                     let slice_expr = HirExpr::MethodCall {
                         recv: Box::new(tmp_expr),
-                        name: Rc::from("slice"),
+                        name: Rc::from(varn_core::MemberKey::Slice.as_str()),
                         args: vec![HirExpr::Int(elements.len() as i64)],
                         ty: HirType::Dynamic,
                     };

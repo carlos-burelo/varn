@@ -147,6 +147,9 @@ fn inst_kind(kind: &InstKind) -> String {
                 .join(", ");
             format!("record {{{inner}}}")
         }
+        InstKind::ObjectRest { object, skip_keys } => {
+            format!("objectrest {} skip={:?}", val(*object), skip_keys)
+        }
         InstKind::ToString { operand } => format!("tostring {}", val(*operand)),
         InstKind::BuildStr { parts } => format!("buildstr{}", args_list(parts)),
         InstKind::MakeClosure { func, .. } => format!("closure {}", func.name),

@@ -254,12 +254,12 @@ impl<'a> Lowerer<'a> {
                         let ty = self.value_ty(AnnKey::expr(expr.id));
                         return Ok(HirExpr::MethodCall {
                             recv,
-                            name: Rc::from("slice"),
+                            name: Rc::from(varn_core::MemberKey::Slice.as_str()),
                             args: vec![hstart, hend],
                             ty,
                         });
                     }
-                    let ty = self.value_ty(AnnKey::expr(property.id));
+                    let ty = self.value_ty(AnnKey::expr(expr.id));
                     let object = Box::new(self.lower_expr(object, scope)?);
                     let index = Box::new(self.lower_expr(property, scope)?);
                     let is_array = self.ann.get_array_index(key);
@@ -341,8 +341,10 @@ impl<'a> Lowerer<'a> {
                         false,
                         false,
                         false,
+                        expr.range.start.line,
                         body_ref,
                         &[],
+                        HirType::Dynamic,
                         scope,
                     )?;
                     let callee = HirExpr::Closure {

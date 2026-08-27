@@ -85,7 +85,7 @@ impl std::fmt::Display for RuntimeSymbol {
 pub struct EnumVariantData {
     pub enum_name: Rc<str>,
     pub variant_name: Rc<str>,
-    pub variant_tag: u8,
+    pub variant_tag: i64,
     pub fields: Vec<Rc<str>>,
     pub payload: Value,
 }

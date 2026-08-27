@@ -128,6 +128,11 @@ impl<'r> super::Binder<'r> {
                     .with_type(ty.clone());
                 sym.col = p.range.start.column;
                 sym.offset = p.range.start.offset;
+                sym.has_explicit_type = p.type_ann.is_some()
+                    || match &p.pattern {
+                        Pattern::Identifier { type_ann, .. } => type_ann.is_some(),
+                        _ => false,
+                    };
                 let symbol_id = self.arena.push(sym);
 
                 members.push(ClassMemberInfo {
@@ -342,6 +347,7 @@ impl<'r> super::Binder<'r> {
                 .with_type(fn_ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
+                sym.has_explicit_type = true;
                 let symbol_id = self.arena.push(sym);
 
                 members.push(ClassMemberInfo {
@@ -382,6 +388,11 @@ impl<'r> super::Binder<'r> {
                             .with_type(ty.clone());
                         sym.col = p.range.start.column;
                         sym.offset = p.range.start.offset;
+                        sym.has_explicit_type = p.type_ann.is_some()
+                            || match &p.pattern {
+                                Pattern::Identifier { type_ann, .. } => type_ann.is_some(),
+                                _ => false,
+                            };
                         let symbol_id = self.arena.push(sym);
 
                         members.push(ClassMemberInfo {
@@ -423,6 +434,7 @@ impl<'r> super::Binder<'r> {
                     .with_type(ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
+                sym.has_explicit_type = type_ann.is_some();
                 let symbol_id = self.arena.push(sym);
 
                 members.push(ClassMemberInfo {
@@ -503,6 +515,7 @@ impl<'r> super::Binder<'r> {
                     .with_type(fn_ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
+                sym.has_explicit_type = return_type.is_some();
                 sym.is_async = modifiers.is_async;
                 sym.is_generator = modifiers.is_generator;
                 let symbol_id = self.arena.push(sym);
@@ -544,6 +557,7 @@ impl<'r> super::Binder<'r> {
                     .with_type(ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
+                sym.has_explicit_type = return_type.is_some();
                 let symbol_id = self.arena.push(sym);
 
                 members.push(ClassMemberInfo {
@@ -568,16 +582,33 @@ impl<'r> super::Binder<'r> {
             }
             ClassMember::Setter {
                 key,
+                param,
                 modifiers,
                 range,
                 ..
             } => {
                 let key_rc: Rc<str> = Rc::from(key.as_ref());
+                let ty = param
+                    .type_ann
+                    .as_ref()
+                    .or(match &param.pattern {
+                        varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.as_ref(),
+                        _ => None,
+                    })
+                    .map(|ann| resolve_type_node(ann, Some(self)))
+                    .unwrap_or(Type::Dynamic);
+
+                let has_explicit = param.type_ann.is_some()
+                    || match &param.pattern {
+                        varn_core::ast::Pattern::Identifier { type_ann, .. } => type_ann.is_some(),
+                        _ => false,
+                    };
 
                 let mut sym = Symbol::new(SymbolKind::Property, key_rc.clone(), range.start.line)
-                    .with_type(Type::Dynamic);
+                    .with_type(ty.clone());
                 sym.col = range.start.column;
                 sym.offset = range.start.offset;
+                sym.has_explicit_type = has_explicit;
                 let symbol_id = self.arena.push(sym);
 
                 members.push(ClassMemberInfo {
@@ -590,15 +621,15 @@ impl<'r> super::Binder<'r> {
                     line: range.start.line.saturating_sub(1),
                     col: range.start.column,
                     offset: range.start.offset,
-                    ty: Type::Dynamic,
+                    ty,
                     members: Vec::new(),
                     visibility: modifiers.visibility,
                     is_abstract: modifiers.is_abstract,
                     is_readonly: false,
                     is_override: false,
                     symbol_id: Some(symbol_id),
-                                ..Default::default()
-                                });
+                    ..Default::default()
+                });
             }
             _ => {}
         }

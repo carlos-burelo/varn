@@ -5,7 +5,7 @@ use crate::db::{CancellationToken, Database, FileId};
 use crate::document::DocumentState;
 use crate::index::ProjectIndex;
 use crate::pipeline::run_pipeline;
-use crate::queries::exports::{ExportedSymbol, ModuleExports};
+use crate::query::exports::{ExportedSymbol, ModuleExports};
 use dashmap::DashMap;
 use std::sync::{Arc, RwLock};
 

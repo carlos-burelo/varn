@@ -143,14 +143,16 @@ impl<'r> super::super::Binder<'r> {
             })
             .collect();
 
+        let declared_ret = f
+            .return_type
+            .as_ref()
+            .map(|ann| resolve_type_node(ann, Some(self)));
+
         let ret = if f.modifiers.is_generator {
-            crate::types::generator_of(Type::Dynamic, f.modifiers.is_async)
+            crate::types::generator_of(declared_ret.unwrap_or(Type::Dynamic), f.modifiers.is_async)
         } else {
             crate::types::async_fn_return(
-                f.return_type
-                    .as_ref()
-                    .map(|ann| resolve_type_node(ann, Some(self)))
-                    .unwrap_or(Type::Void),
+                declared_ret.unwrap_or(Type::Void),
                 f.modifiers.is_async,
             )
         };

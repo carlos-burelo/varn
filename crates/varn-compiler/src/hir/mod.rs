@@ -417,11 +417,6 @@ pub enum HirExpr {
 
     Yield(Box<HirExpr>),
 
-    TaggedTemplate {
-        tag: Box<HirExpr>,
-        template: Box<HirExpr>,
-    },
-
     IntrinsicCall {
         object: Box<HirExpr>,
         args: Vec<HirExpr>,
@@ -614,6 +609,8 @@ pub struct HirClass {
 
 #[derive(Debug, Clone)]
 pub enum HirStmt {
+    Line(u32),
+
     Expr(HirExpr),
 
     Let {
@@ -695,7 +692,7 @@ pub enum HirStmt {
 
     Try {
         block: Vec<HirStmt>,
-        catch: Option<HirCatch>,
+        catches: Vec<HirCatch>,
         finally: Option<Vec<HirStmt>>,
     },
 
@@ -752,6 +749,7 @@ pub struct HirSwitchCase {
 #[derive(Debug, Clone)]
 pub struct HirCatch {
     pub param: Option<LocalId>,
+    pub type_tests: Vec<HirTypeTest>,
     pub body: Vec<HirStmt>,
 }
 
@@ -783,6 +781,7 @@ pub struct HirParam {
 #[derive(Debug, Clone)]
 pub struct HirFunction {
     pub name: Rc<str>,
+    pub start_line: u32,
     pub params: Vec<HirParam>,
     pub locals: u32,
     pub body: Vec<HirStmt>,

@@ -19,6 +19,7 @@ impl<'a> Lowerer<'a> {
                 ..
             } => {
                 let name = fn_id.clone().unwrap_or_else(|| Rc::from("<anon>"));
+                let return_ty = self.value_ty(AnnKey::expr(expr.id));
                 let (func, upvalues) = self.lower_function_like(
                     name,
                     params,
@@ -26,8 +27,10 @@ impl<'a> Lowerer<'a> {
                     *is_generator,
                     false,
                     false,
+                    expr.range.start.line,
                     BodyRef::Block(body),
                     &[],
+                    return_ty,
                     scope,
                 )?;
                 Ok(HirExpr::Closure {
@@ -45,6 +48,7 @@ impl<'a> Lowerer<'a> {
                     ArrowBody::Expr(e) => BodyRef::ExprBody(e),
                     ArrowBody::Block(s) => BodyRef::Block(s),
                 };
+                let return_ty = self.value_ty(AnnKey::expr(expr.id));
                 let (func, upvalues) = self.lower_function_like(
                     Rc::from("<arrow>"),
                     params,
@@ -52,8 +56,10 @@ impl<'a> Lowerer<'a> {
                     false,
                     false,
                     false,
+                    expr.range.start.line,
                     body_ref,
                     &[],
+                    return_ty,
                     scope,
                 )?;
                 Ok(HirExpr::Closure {

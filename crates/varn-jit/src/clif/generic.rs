@@ -13,9 +13,15 @@ use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_core::OpCode;
 use varn_types::VmValue;
 
-use super::emit::{box_or_pass, call_helper, meta_is_float, unbox_bool, unbox_f64_coerce};
+use super::emit::{
+    box_int, box_or_pass, call_helper, meta_is_float, unbox_bool, unbox_f64_coerce,
+};
 use super::kinds::K;
 use crate::JitHelpers;
+
+const SSO_TAG_MASK: u64 =
+    varn_types::vm_value::SIGN | varn_types::vm_value::QNAN | varn_types::vm_value::MASK_TAG;
+const SSO_TAG_BITS: u64 = varn_types::vm_value::QNAN | varn_types::vm_value::TAG_SSO;
 
 /// General lowering context (not frame-specific). Helper addresses are passed
 /// per-op, so this only carries the operand/dispatch essentials.
@@ -146,7 +152,7 @@ pub(super) fn try_emit(
         OpCode::Shr => emit_binop(b, g, state, code, ip, h.shr),
         OpCode::Ushr => emit_binop(b, g, state, code, ip, h.ushr),
         OpCode::StrSlice => emit_binop(b, g, state, code, ip, h.str_slice),
-        OpCode::StrLength => emit_unary(b, g, state, code, ip, h.str_length),
+        OpCode::StrLength => emit_str_length(b, g, state, code, ip, h.str_length),
         OpCode::ArrayPop => emit_unary(b, g, state, code, ip, h.array_pop),
         OpCode::Negate => emit_unary(b, g, state, code, ip, h.negate),
         OpCode::Typeof => emit_unary(b, g, state, code, ip, h.typeof_val),
@@ -174,6 +180,46 @@ pub(super) fn emit_unary(
     let src = (code[ip + 1] >> 8) as usize;
     let v = box_or_pass(b, g.vars, state, src);
     let res = call_helper(b, g.cc, helper, &[g.exec_ctx, v]);
+    def_boxed(b, g, dest, res);
+}
+
+/// `StrLength dest, src` with inline SSO fast-path.
+pub(super) fn emit_str_length(
+    b: &mut FunctionBuilder,
+    g: &GenCtx,
+    state: &[K],
+    code: &[u16],
+    ip: usize,
+    helper: usize,
+) {
+    let dest = (code[ip] >> 8) as usize;
+    let src = (code[ip + 1] >> 8) as usize;
+    let v = box_or_pass(b, g.vars, state, src);
+
+    let tag_mask = b.ins().iconst(types::I64, SSO_TAG_MASK as i64);
+    let tag_bits = b.ins().iconst(types::I64, SSO_TAG_BITS as i64);
+    let v_tag = b.ins().band(v, tag_mask);
+    let is_sso = b.ins().icmp(IntCC::Equal, v_tag, tag_bits);
+
+    let fast = b.create_block();
+    let slow = b.create_block();
+    let merge = b.create_block();
+    b.append_block_param(merge, types::I64);
+
+    b.ins().brif(is_sso, fast, &[], slow, &[]);
+
+    b.switch_to_block(fast);
+    let s = b.ins().ushr_imm(v, 45);
+    let sso_len = b.ins().band_imm(s, 0x7);
+    let boxed_len = box_int(b, sso_len);
+    b.ins().jump(merge, &[boxed_len.into()]);
+
+    b.switch_to_block(slow);
+    let res = call_helper(b, g.cc, helper, &[g.exec_ctx, v]);
+    b.ins().jump(merge, &[res.into()]);
+
+    b.switch_to_block(merge);
+    let res = b.block_params(merge)[0];
     def_boxed(b, g, dest, res);
 }
 

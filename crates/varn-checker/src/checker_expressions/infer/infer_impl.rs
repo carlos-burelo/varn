@@ -202,6 +202,53 @@ impl<'r> Checker<'r> {
                 }
                 ty
             }
+            ExprKind::MetaAccess { target, property } => {
+                let _target_ty = self.infer_type(target, bind);
+                match varn_core::MemberKey::from_str(property.as_ref()) {
+                    Some(varn_core::MemberKey::Name) | Some(varn_core::MemberKey::Type) => {
+                        Type::Str
+                    }
+                    Some(varn_core::MemberKey::Class) => Type::Dynamic,
+                    Some(varn_core::MemberKey::Fields) | Some(varn_core::MemberKey::Methods) => {
+                        Type::array(Type::Str)
+                    }
+                    Some(varn_core::MemberKey::Keys) => Type::fn_(crate::types::FunctionType {
+                        params: vec![],
+                        return_type: Box::new(Type::array(Type::Str)),
+                        is_arrow: true,
+                        type_params: vec![],
+                    }),
+                    Some(varn_core::MemberKey::Values) => Type::fn_(crate::types::FunctionType {
+                        params: vec![],
+                        return_type: Box::new(Type::array(Type::Dynamic)),
+                        is_arrow: true,
+                        type_params: vec![],
+                    }),
+                    Some(varn_core::MemberKey::Entries) => {
+                        Type::fn_(crate::types::FunctionType {
+                            params: vec![],
+                            return_type: Box::new(Type::array(Type(
+                                TypeKind::Tuple(vec![Type::Str, Type::Dynamic]),
+                                false,
+                            ))),
+                            is_arrow: true,
+                            type_params: vec![],
+                        })
+                    }
+                    Some(varn_core::MemberKey::HasOwn) => Type::fn_(crate::types::FunctionType {
+                        params: vec![crate::types::FunctionParam {
+                            name: Some(std::rc::Rc::from("key")),
+                            ty: Type::Str,
+                            optional: false,
+                            is_rest: false,
+                        }],
+                        return_type: Box::new(Type::Bool),
+                        is_arrow: true,
+                        type_params: vec![],
+                    }),
+                    _ => Type::Dynamic,
+                }
+            }
             ExprKind::Await { argument } => {
                 let inner = self.infer_type(argument, bind);
                 crate::types::awaited(&inner)
@@ -454,6 +501,20 @@ impl<'r> Checker<'r> {
                     if let varn_core::TypeKind::Object(spread_members) = &spread_ty.0 {
                         for m in spread_members {
                             members.push(m.clone());
+                        }
+                    } else if let varn_core::TypeKind::Named(name, origin) = &spread_ty.0 {
+                        let view = crate::binder::BindView::new(bind, self.resolver);
+                        if let Some(cms) = view.get_class_members(name.as_ref(), origin.as_deref()) {
+                            for cm in cms {
+                                if !cm.is_static {
+                                    members.push(ObjectTypeMember::Property {
+                                        name: cm.name.clone(),
+                                        ty: cm.ty.clone(),
+                                        optional: cm.is_optional,
+                                        readonly: cm.is_readonly,
+                                    });
+                                }
+                            }
                         }
                     }
                 }
