@@ -54,6 +54,9 @@ jobs:
   test-matrix:
     name: Test Matrix (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -61,15 +64,12 @@ jobs:
           - name: Linux x86_64
             os: ubuntu-latest
             bin_path: ./target/release/vn
-            shell: bash
           - name: Windows x86_64
             os: windows-latest
-            bin_path: .\target\release\vn.exe
-            shell: pwsh
+            bin_path: ./target/release/vn.exe
           - name: macOS Apple Silicon
             os: macos-14
             bin_path: ./target/release/vn
-            shell: bash
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -86,33 +86,23 @@ jobs:
         run: cargo build --release --bin vn
 
       - name: Quadrant 1 (dev-checkout + JIT)
-        shell: ${{ matrix.shell }}
-        run: |
-          ${{ matrix.bin_path }} run ./tests/main.vn
+        run: ${{ matrix.bin_path }} run ./tests/main.vn
 
       - name: Quadrant 2 (dev-checkout + No-JIT)
-        shell: ${{ matrix.shell }}
         env:
           VARN_NO_JIT: "1"
-        run: |
-          ${{ matrix.bin_path }} run ./tests/main.vn
+        run: ${{ matrix.bin_path }} run ./tests/main.vn
 
       - name: Quadrant 3 (@embedded + JIT)
-        shell: ${{ matrix.shell }}
         env:
           VARN_STD: "@embedded"
-        run: |
-          ${{ matrix.bin_path }} run ./tests/main.vn
+        run: ${{ matrix.bin_path }} run ./tests/main.vn
 
       - name: Quadrant 4 (@embedded + No-JIT)
-        shell: ${{ matrix.shell }}
         env:
           VARN_STD: "@embedded"
           VARN_NO_JIT: "1"
-        run: |
-          ${{ matrix.bin_path }} run ./tests/main.vn
+        run: ${{ matrix.bin_path }} run ./tests/main.vn
 
       - name: Stability Benchmark
-        shell: ${{ matrix.shell }}
-        run: |
-          ${{ matrix.bin_path }} bench ./benchmarks/bench_fib.vn -v
+        run: ${{ matrix.bin_path }} bench ./benchmarks/bench_fib.vn -v
