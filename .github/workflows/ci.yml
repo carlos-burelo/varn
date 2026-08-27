@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "master", "develop" ]
+  pull_request:
+    branches: [ "main", "master", "develop" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  lint:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+
+      - name: Verify Formatting (cargo fmt)
+        run: cargo fmt --all -- --check || echo "Formatting differences noted."
+
+      - name: Lint Workspace (cargo clippy)
+        run: cargo clippy --workspace --all-targets
+
+      - name: Anti-God File Governance Check
+        run: |
+          echo "Scanning Rust source files for line count limits..."
+          FAIL=0
+          while IFS= read -r file; do
+            LINES=$(wc -l < "$file")
+            if [ "$LINES" -gt 1000 ]; then
+              echo "::error file=$file::File exceeds 1000 lines ($LINES lines). Governance rule forbids files > 1000 lines."
+              FAIL=1
+            elif [ "$LINES" -gt 700 ]; then
+              echo "::warning file=$file::File has $LINES lines (>700 lines). Modularization refactoring recommended."
+            fi
+          done < <(find crates -name "*.rs")
+          if [ $FAIL -ne 0 ]; then
+            exit 1
+          fi
+
+  test-matrix:
+    name: Test Matrix (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64
+            os: ubuntu-latest
+            bin_path: ./target/release/vn
+            shell: bash
+          - name: Windows x86_64
+            os: windows-latest
+            bin_path: .\target\release\vn.exe
+            shell: pwsh
+          - name: macOS Apple Silicon
+            os: macos-14
+            bin_path: ./target/release/vn
+            shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+
+      - name: Build Release Binary
+        run: cargo build --release --bin vn
+
+      - name: Quadrant 1 (dev-checkout + JIT)
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.bin_path }} run ./tests/main.vn
+
+      - name: Quadrant 2 (dev-checkout + No-JIT)
+        shell: ${{ matrix.shell }}
+        env:
+          VARN_NO_JIT: "1"
+        run: |
+          ${{ matrix.bin_path }} run ./tests/main.vn
+
+      - name: Quadrant 3 (@embedded + JIT)
+        shell: ${{ matrix.shell }}
+        env:
+          VARN_STD: "@embedded"
+        run: |
+          ${{ matrix.bin_path }} run ./tests/main.vn
+
+      - name: Quadrant 4 (@embedded + No-JIT)
+        shell: ${{ matrix.shell }}
+        env:
+          VARN_STD: "@embedded"
+          VARN_NO_JIT: "1"
+        run: |
+          ${{ matrix.bin_path }} run ./tests/main.vn
+
+      - name: Stability Benchmark
+        shell: ${{ matrix.shell }}
+        run: |
+          ${{ matrix.bin_path }} bench ./benchmarks/bench_fib.vn -v

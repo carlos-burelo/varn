@@ -1,0 +1,168 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.1.0)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  build-production-binaries:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin_name: vn.exe
+            archive_type: zip
+            shell: pwsh
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bin_name: vn
+            archive_type: tar.gz
+            shell: bash
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            bin_name: vn
+            archive_type: tar.gz
+            shell: bash
+          - os: macos-13
+            target: x86_64-apple-darwin
+            bin_name: vn
+            archive_type: tar.gz
+            shell: bash
+          - os: macos-14
+            target: aarch64-apple-darwin
+            bin_name: vn
+            archive_type: tar.gz
+            shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "."
+          key: ${{ matrix.target }}
+
+      - name: Build Production Binary
+        run: cargo build --release --bin vn --target ${{ matrix.target }}
+
+      - name: Pre-verification Smoke Test (Windows)
+        if: matrix.archive_type == 'zip'
+        shell: pwsh
+        run: |
+          & "target/${{ matrix.target }}/release/${{ matrix.bin_name }}" --version
+          & "target/${{ matrix.target }}/release/${{ matrix.bin_name }}" run ./tests/main.vn
+
+      - name: Pre-verification Smoke Test (Unix)
+        if: matrix.archive_type == 'tar.gz'
+        shell: bash
+        run: |
+          chmod +x "target/${{ matrix.target }}/release/${{ matrix.bin_name }}"
+          "./target/${{ matrix.target }}/release/${{ matrix.bin_name }}" --version
+          "./target/${{ matrix.target }}/release/${{ matrix.bin_name }}" run ./tests/main.vn
+
+      - name: Package Release Assets (Unix)
+        if: matrix.archive_type == 'tar.gz'
+        shell: bash
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [ -z "$TAG" ] || [[ "$TAG" == *"/"* ]]; then
+            TAG="${{ github.event.inputs.tag }}"
+          fi
+          if [ -z "$TAG" ]; then
+            TAG="v$(cargo pkgid -p varn-cli | cut -d# -f2 | cut -d: -f2)"
+          fi
+
+          DIST_DIR="dist/vn-${TAG}-${{ matrix.target }}"
+          mkdir -p "$DIST_DIR"
+          
+          strip "target/${{ matrix.target }}/release/${{ matrix.bin_name }}" || true
+          cp "target/${{ matrix.target }}/release/${{ matrix.bin_name }}" "$DIST_DIR/"
+          cp README.md "$DIST_DIR/" 2>/dev/null || true
+          cp LICENSE "$DIST_DIR/" 2>/dev/null || true
+
+          ARCHIVE_NAME="vn-${TAG}-${{ matrix.target }}.tar.gz"
+          tar -czvf "$ARCHIVE_NAME" -C dist "vn-${TAG}-${{ matrix.target }}"
+          echo "ARCHIVE_PATH=$ARCHIVE_NAME" >> $GITHUB_ENV
+
+      - name: Package Release Assets (Windows)
+        if: matrix.archive_type == 'zip'
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if (-not $tag -or $tag.Contains("/")) {
+            $tag = "${{ github.event.inputs.tag }}"
+          }
+          if (-not $tag) {
+            $tag = "v0.1.0"
+          }
+
+          $distDir = "dist/vn-$tag-${{ matrix.target }}"
+          New-Item -ItemType Directory -Force -Path $distDir | Out-Null
+          
+          Copy-Item "target/${{ matrix.target }}/release/${{ matrix.bin_name }}" -Destination $distDir
+          if (Test-Path "README.md") { Copy-Item "README.md" -Destination $distDir }
+          if (Test-Path "LICENSE") { Copy-Item "LICENSE" -Destination $distDir }
+
+          $archiveName = "vn-$tag-${{ matrix.target }}.zip"
+          Compress-Archive -Path "$distDir/*" -DestinationPath $archiveName -Force
+          echo "ARCHIVE_PATH=$archiveName" >> $env:GITHUB_ENV
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.target }}
+          path: vn-*.*
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-production-binaries
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate Checksums (SHA-256)
+        working-directory: release-assets
+        run: |
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-assets/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false

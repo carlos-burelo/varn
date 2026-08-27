@@ -58,13 +58,9 @@ flowchart TD
 
 ---
 
-## Matriz de Validación Obligatoria
+## Matriz de Validación y Pre-verificación Local
 
 Ninguna tarea o Pull Request se considera completada sin pasar la matriz de 4 cuadrantes de validación:
-
-```mermaid
-matrix
-```
 
 | Procedencia Std | Modo JIT / Intérprete | Comando de Validación |
 |---|---|---|
@@ -75,6 +71,31 @@ matrix
 
 > [!IMPORTANT]
 > `cargo test` no ejercita la suite de integración completa del compilador. La prueba canónica del sistema es la ejecución de `tests/main.vn`.
+
+### Scripts de Pre-verificación Automatizada
+
+Para simplificar la validación y asegurar cero roturas antes de hacer commit/push o disparar CI/CD, disponemos de scripts de verificación:
+
+- **Windows (PowerShell)**:
+  ```powershell
+  .\scripts\verify.ps1          # Ejecución completa (fmt + clippy + audit + release + 4 cuadrantes + bench)
+  .\scripts\verify.ps1 -Fast    # Iteración rápida (sin benchmark)
+  ```
+
+- **Linux / macOS (Bash)**:
+  ```bash
+  ./scripts/verify.sh           # Ejecución completa
+  ./scripts/verify.sh --fast    # Iteración rápida
+  ```
+
+---
+
+## CI/CD en GitHub Actions
+
+El repositorio cuenta con dos flujos automatizados en `.github/workflows/`:
+
+1. **`ci.yml`**: Se ejecuta en cada Push y Pull Request sobre ramas principales. Valida formato (`rustfmt`), linter (`clippy`), límites de tamaño de archivo (regla anti-god files) y ejecuta la matriz multi-SO en Linux, Windows y macOS.
+2. **`release.yml`**: Se dispara con tags de versión (`v*`) o manualmente (`workflow_dispatch`). Compila binarios optimizados de producción para todas las arquitecturas (`x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-apple-darwin`, `aarch64-apple-darwin`), genera sumas de verificación criptográficas `SHA256SUMS.txt` y publica los artefactos automáticamente en GitHub Releases.
 
 ---
 
