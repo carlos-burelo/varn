@@ -1,0 +1,22 @@
+// std:fs — File system operations, streaming files, directory manipulation and metadata
+
+export { Stats } from "std:fs/stats";
+export { File } from "std:fs/file";
+export {
+    read,
+    readText,
+    write,
+    writeText,
+    appendText,
+    exists,
+    stat,
+    mkdir,
+    mkdirAll,
+    readDir,
+    remove,
+    removeAll,
+    rename,
+    copy,
+    tempDir,
+    readLines
+} from "std:fs/ops";

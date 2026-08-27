@@ -129,6 +129,8 @@ fn ascii_view(heap: &crate::heap::Heap, receiver: VmValue) -> Option<&str> {
 
 /// Dedicated fast path for `substring(start, end?)`.
 /// Avoids the generic intrinsic dispatcher's flush/reload overhead.
+/// Dedicated fast path for `substring(start, end?)`.
+/// Avoids the generic intrinsic dispatcher's flush/reload overhead.
 pub(crate) extern "C" fn jit_str_substring_intrinsic(
     ctx: *mut ExecCtx,
     receiver: VmValue,
@@ -138,10 +140,27 @@ pub(crate) extern "C" fn jit_str_substring_intrinsic(
     unsafe {
         let ctx_ref = &mut *ctx;
         let heap = &mut ctx_ref.heap;
-
-        // Delegate to the intrinsic dispatcher with a minimal stack slice.
-        // This is still cheaper than the generic path because the JIT caller
-        // did NOT flush/reload all boxed registers.
+        if receiver.is_heap() {
+            if let Some(crate::heap::HeapObj::Str(h)) = heap.get(receiver.as_heap_idx()) {
+                let ascii = h.is_ascii();
+                let s = h.as_str();
+                let len = if ascii { s.len() } else { h.char_len() };
+                let st = heap.as_int(start);
+                let en = if end.is_null() { len } else { (heap.as_int(end).max(0) as usize).min(len) };
+                let st_clamped = (st.max(0) as usize).min(len);
+                let (si, ei) = if st_clamped <= en { (st_clamped, en) } else { (en, st_clamped) };
+                if si == 0 && ei == s.len() {
+                    return receiver;
+                }
+                let (bs, be) = if ascii { (si, ei) } else { varn_types::str_util::char_range_to_bytes(s, false, si, ei) };
+                let sub = &s[bs..be];
+                if let Some(sso) = VmValue::try_from_sso(sub) {
+                    return sso;
+                }
+                let h_clone = h.clone();
+                return heap.alloc_substring(&h_clone, bs, be);
+            }
+        }
         let args = [receiver, start, end];
         match crate::exec::intrinsics::str::dispatch(
             varn_core::intrinsic_ops::str::StrOp::Substring as u8,
@@ -165,7 +184,31 @@ pub(crate) extern "C" fn jit_str_slice_intrinsic(
     unsafe {
         let ctx_ref = &mut *ctx;
         let heap = &mut ctx_ref.heap;
-
+        if receiver.is_heap() {
+            if let Some(crate::heap::HeapObj::Str(h)) = heap.get(receiver.as_heap_idx()) {
+                let ascii = h.is_ascii();
+                let s = h.as_str();
+                let len = if ascii { s.len() } else { h.char_len() };
+                let st = heap.as_int(start);
+                let si = if st < 0 { (len as i64 + st).max(0) as usize } else { (st as usize).min(len) };
+                let ei = if end.is_null() {
+                    len
+                } else {
+                    let e = heap.as_int(end);
+                    if e < 0 { (len as i64 + e).max(0) as usize } else { (e as usize).min(len) }
+                }.max(si);
+                if si == 0 && ei == s.len() {
+                    return receiver;
+                }
+                let (bs, be) = if ascii { (si, ei) } else { varn_types::str_util::char_range_to_bytes(s, false, si, ei) };
+                let sub = &s[bs..be];
+                if let Some(sso) = VmValue::try_from_sso(sub) {
+                    return sso;
+                }
+                let h_clone = h.clone();
+                return heap.alloc_substring(&h_clone, bs, be);
+            }
+        }
         let args = [receiver, start, end];
         match crate::exec::intrinsics::str::dispatch(
             varn_core::intrinsic_ops::str::StrOp::Slice as u8,
@@ -204,6 +247,26 @@ pub(crate) extern "C" fn jit_str_starts_with_intrinsic(
 ) -> VmValue {
     unsafe {
         let heap = &(*ctx).heap;
+        if receiver.is_heap() && search.is_sso() {
+            if let Some(HeapObj::Str(h)) = heap.get(receiver.as_heap_idx()) {
+                let n_len = search.sso_len();
+                let s_bytes = h.as_str().as_bytes();
+                if s_bytes.len() >= n_len {
+                    let mut b2 = [0u8; 5];
+                    search.sso_copy_bytes(&mut b2);
+                    return VmValue::from_bool(&s_bytes[..n_len] == &b2[..n_len]);
+                }
+                return VmValue::from_bool(false);
+            }
+        }
+        if receiver.is_heap() && search.is_heap() {
+            if let (Some(HeapObj::Str(h1)), Some(HeapObj::Str(h2))) = (
+                heap.get(receiver.as_heap_idx()),
+                heap.get(search.as_heap_idx()),
+            ) {
+                return VmValue::from_bool(h1.as_str().as_bytes().starts_with(h2.as_str().as_bytes()));
+            }
+        }
         let mut b1 = [0u8; 5];
         let mut b2 = [0u8; 5];
         if let (Some(s), Some(n)) = (
@@ -234,6 +297,26 @@ pub(crate) extern "C" fn jit_str_ends_with_intrinsic(
 ) -> VmValue {
     unsafe {
         let heap = &(*ctx).heap;
+        if receiver.is_heap() && search.is_sso() {
+            if let Some(HeapObj::Str(h)) = heap.get(receiver.as_heap_idx()) {
+                let n_len = search.sso_len();
+                let s_bytes = h.as_str().as_bytes();
+                if s_bytes.len() >= n_len {
+                    let mut b2 = [0u8; 5];
+                    search.sso_copy_bytes(&mut b2);
+                    return VmValue::from_bool(&s_bytes[s_bytes.len() - n_len..] == &b2[..n_len]);
+                }
+                return VmValue::from_bool(false);
+            }
+        }
+        if receiver.is_heap() && search.is_heap() {
+            if let (Some(HeapObj::Str(h1)), Some(HeapObj::Str(h2))) = (
+                heap.get(receiver.as_heap_idx()),
+                heap.get(search.as_heap_idx()),
+            ) {
+                return VmValue::from_bool(h1.as_str().as_bytes().ends_with(h2.as_str().as_bytes()));
+            }
+        }
         let mut b1 = [0u8; 5];
         let mut b2 = [0u8; 5];
         if let (Some(s), Some(n)) = (

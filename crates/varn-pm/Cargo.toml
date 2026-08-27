@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-varn-term      = { path = "../varn-term" }
+varn-core    = { path = "../varn-core" }
 varn-modules = { path = "../varn-modules" }
 serde      = { workspace = true }
 serde_json = { workspace = true }

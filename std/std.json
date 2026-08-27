@@ -2,32 +2,275 @@
     "version": "0.3.0",
     "hostApi": 3,
     "modules": [
-        { "id": "std:buffer" },
-        { "id": "std:cli", "pure": true },
-        { "id": "std:collections", "pure": true },
-        { "id": "std:compress" },
-        { "id": "std:crypto" },
-        { "id": "std:csv", "pure": true },
-        { "id": "std:env", "pure": true },
-        { "id": "std:ffi" },
-        { "id": "std:fs" },
-        { "id": "std:http" },
-        { "id": "std:io" },
-        { "id": "std:json", "pure": true },
-        { "id": "std:markdown", "pure": true },
-        { "id": "std:math", "pure": true },
-        { "id": "std:net" },
-        { "id": "std:path", "pure": true },
-        { "id": "std:process" },
-        { "id": "std:reflect" },
-        { "id": "std:regex" },
-        { "id": "std:result", "pure": true },
-        { "id": "std:sqlite" },
-        { "id": "std:sys" },
-        { "id": "std:task" },
-        { "id": "std:test" },
-        { "id": "std:time" },
-        { "id": "std:types", "pure": true },
-        { "id": "std:ws" }
+        {
+            "id": "std:sys/env"
+        },
+        {
+            "id": "std:sys/args"
+        },
+        {
+            "id": "std:sys"
+        },
+        {
+            "id": "std:buffer/buffer"
+        },
+        {
+            "id": "std:buffer"
+        },
+        {
+            "id": "std:cli/args",
+            "pure": true
+        },
+        {
+            "id": "std:cli",
+            "pure": true
+        },
+        {
+            "id": "std:collections/list",
+            "pure": true
+        },
+        {
+            "id": "std:collections/stack",
+            "pure": true
+        },
+        {
+            "id": "std:collections/queue",
+            "pure": true
+        },
+        {
+            "id": "std:collections/dict",
+            "pure": true
+        },
+        {
+            "id": "std:collections",
+            "pure": true
+        },
+        {
+            "id": "std:compress/gzip"
+        },
+        {
+            "id": "std:compress/tar"
+        },
+        {
+            "id": "std:compress/zip"
+        },
+        {
+            "id": "std:compress"
+        },
+        {
+            "id": "std:crypto/uuid"
+        },
+        {
+            "id": "std:crypto/hash"
+        },
+        {
+            "id": "std:crypto"
+        },
+        {
+            "id": "std:csv/types",
+            "pure": true
+        },
+        {
+            "id": "std:csv/parser",
+            "pure": true
+        },
+        {
+            "id": "std:csv",
+            "pure": true
+        },
+        {
+            "id": "std:env/env",
+            "pure": true
+        },
+        {
+            "id": "std:env",
+            "pure": true
+        },
+        {
+            "id": "std:ffi/types"
+        },
+        {
+            "id": "std:ffi/pointer"
+        },
+        {
+            "id": "std:ffi/library"
+        },
+        {
+            "id": "std:ffi"
+        },
+        {
+            "id": "std:io/stream"
+        },
+        {
+            "id": "std:io"
+        },
+        {
+            "id": "std:fs/stats"
+        },
+        {
+            "id": "std:fs/file"
+        },
+        {
+            "id": "std:fs/ops"
+        },
+        {
+            "id": "std:fs"
+        },
+        {
+            "id": "std:json/json",
+            "pure": true
+        },
+        {
+            "id": "std:json",
+            "pure": true
+        },
+        {
+            "id": "std:math/constants",
+            "pure": true
+        },
+        {
+            "id": "std:math/intrinsics",
+            "pure": true
+        },
+        {
+            "id": "std:math/class",
+            "pure": true
+        },
+        {
+            "id": "std:math",
+            "pure": true
+        },
+        {
+            "id": "std:path/utils",
+            "pure": true
+        },
+        {
+            "id": "std:path",
+            "pure": true
+        },
+        {
+            "id": "std:process/child"
+        },
+        {
+            "id": "std:process"
+        },
+        {
+            "id": "std:reflect/meta"
+        },
+        {
+            "id": "std:reflect/introspect"
+        },
+        {
+            "id": "std:reflect"
+        },
+        {
+            "id": "std:regex/regex"
+        },
+        {
+            "id": "std:regex"
+        },
+        {
+            "id": "std:result/result",
+            "pure": true
+        },
+        {
+            "id": "std:result/option",
+            "pure": true
+        },
+        {
+            "id": "std:result",
+            "pure": true
+        },
+        {
+            "id": "std:sqlite/db"
+        },
+        {
+            "id": "std:sqlite"
+        },
+        {
+            "id": "std:task/channel"
+        },
+        {
+            "id": "std:task/group"
+        },
+        {
+            "id": "std:task/combinators"
+        },
+        {
+            "id": "std:task"
+        },
+        {
+            "id": "std:test/assert"
+        },
+        {
+            "id": "std:test/suite"
+        },
+        {
+            "id": "std:test"
+        },
+        {
+            "id": "std:ws/client"
+        },
+        {
+            "id": "std:ws"
+        },
+        {
+            "id": "std:http/core"
+        },
+        {
+            "id": "std:http/server"
+        },
+        {
+            "id": "std:http/client"
+        },
+        {
+            "id": "std:http"
+        },
+        {
+            "id": "std:time/core"
+        },
+        {
+            "id": "std:time/instant"
+        },
+        {
+            "id": "std:time/duration"
+        },
+        {
+            "id": "std:time/datetime"
+        },
+        {
+            "id": "std:time"
+        },
+        {
+            "id": "std:net/encoding"
+        },
+        {
+            "id": "std:net/ip"
+        },
+        {
+            "id": "std:net/query"
+        },
+        {
+            "id": "std:net/url"
+        },
+        {
+            "id": "std:net"
+        },
+        {
+            "id": "std:markdown/ast",
+            "pure": true
+        },
+        {
+            "id": "std:markdown/utils",
+            "pure": true
+        },
+        {
+            "id": "std:markdown/parser",
+            "pure": true
+        },
+        {
+            "id": "std:markdown",
+            "pure": true
+        }
     ]
 }

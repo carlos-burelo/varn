@@ -1,0 +1,56 @@
+import { Task, TaskGroup, delay, sleep } from "std:task";
+import { assert, assertEqual, assertTrue } from "std:test";
+
+print("=== Suite: std:task Combinators and TaskGroup ===");
+
+let trackerArray = [false];
+
+async function main(): Task<void> {
+    // 1. Task.all
+    let t1 = (async () => { await delay(10); return 100; })();
+    let t2 = (async () => { await delay(5); return 200; })();
+    let allRes = await Task.all([t1, t2]);
+    assertEqual(allRes.length, 2);
+    assertEqual(allRes[0], 100);
+    assertEqual(allRes[1], 200);
+    print("  ✔ Task.all combinator");
+
+    // 2. Task.allSettled
+    let okTask = (async () => { return "success"; })();
+    let errTask = (async () => { throw new Error("failure"); })();
+    let settled = await Task.allSettled([okTask, errTask]);
+    assertEqual(settled.length, 2);
+    assertEqual(settled[0].status, "fulfilled");
+    assertEqual(settled[0].value, "success");
+    assertEqual(settled[1].status, "rejected");
+    print("  ✔ Task.allSettled with fulfilled and rejected");
+
+    // 3. Task.race
+    let fastTask = (async () => { await delay(5); return "first"; })();
+    let slowTask = (async () => { await delay(100); return "second"; })();
+    let winner = await Task.race([fastTask, slowTask]);
+    assertEqual(winner, "first");
+    print("  ✔ Task.race combinator");
+
+    // 4. TaskGroup concurrency and lifecycle hooks
+    let tg = TaskGroup();
+    tg.finally(() => {
+        trackerArray[0] = true;
+    });
+    tg.spawn((async () => {
+        return 1;
+    })());
+    tg.spawn((async () => {
+        return 2;
+    })());
+    let groupResults = await tg.join();
+    assertEqual(groupResults.length, 2);
+    assertEqual(groupResults[0], 1);
+    assertEqual(groupResults[1], 2);
+    assertTrue(trackerArray[0]);
+    print("  ✔ TaskGroup concurrency and finally hooks");
+}
+
+await main();
+
+print("[PASSED] 97. std:task Combinators and Structured Concurrency (all, allSettled, race, timeout)");

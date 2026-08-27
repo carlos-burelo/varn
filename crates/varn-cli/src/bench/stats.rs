@@ -11,7 +11,7 @@ pub const CV_UNRELIABLE: f64 = 0.10;
 
 pub struct PhaseStats {
     pub name: &'static str,
-    pub color_fn: fn(varn_term::chalk::Chalk) -> varn_term::chalk::Chalk,
+    pub color_fn: fn(varn_core::term::chalk::Chalk) -> varn_core::term::chalk::Chalk,
     pub min: Duration,
     pub p50: Duration,
     pub max: Duration,
@@ -23,7 +23,7 @@ pub struct PhaseStats {
 impl PhaseStats {
     pub fn from_samples(
         name: &'static str,
-        color_fn: fn(varn_term::chalk::Chalk) -> varn_term::chalk::Chalk,
+        color_fn: fn(varn_core::term::chalk::Chalk) -> varn_core::term::chalk::Chalk,
         samples: &[Duration],
     ) -> Self {
         let min = *samples.iter().min().expect("samples must not be empty");

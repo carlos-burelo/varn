@@ -1,0 +1,42 @@
+import { Math, exp, log, log10, log2, pow, hypot, cbrt, sign, trunc } from "std:math";
+import { assert, assertEqual, assertCloseTo } from "std:test";
+
+print("=== Suite: std:math Advanced Intrinsics ===");
+
+// 1. exp and log
+let e1 = Math.exp(1.0);
+assertCloseTo(e1, 2.718281828459045, 0.0001);
+let lne = Math.log(Math.E);
+assertCloseTo(lne, 1.0, 0.0001);
+
+let e1Free = exp(1.0);
+assertCloseTo(e1Free, 2.718281828459045, 0.0001);
+let lneFree = log(Math.E);
+assertCloseTo(lneFree, 1.0, 0.0001);
+print("  ✔ Math.exp and Math.log");
+
+// 2. log10 and log2
+assertCloseTo(Math.log10(100.0), 2.0, 0.0001);
+assertCloseTo(log10(1000.0), 3.0, 0.0001);
+assertCloseTo(Math.log2(8.0), 3.0, 0.0001);
+assertCloseTo(log2(16.0), 4.0, 0.0001);
+print("  ✔ Math.log10 and Math.log2");
+
+// 3. pow, cbrt, hypot
+assertCloseTo(Math.pow(2.0, 10.0), 1024.0, 0.0001);
+assertCloseTo(pow(3.0, 3.0), 27.0, 0.0001);
+assertCloseTo(Math.cbrt(27.0), 3.0, 0.0001);
+assertCloseTo(cbrt(64.0), 4.0, 0.0001);
+assertCloseTo(Math.hypot(3.0, 4.0), 5.0, 0.0001);
+assertCloseTo(hypot(5.0, 12.0), 13.0, 0.0001);
+print("  ✔ Math.pow, Math.cbrt, Math.hypot");
+
+// 4. sign and trunc
+assertEqual(Math.sign(42.0), 1.0);
+assertEqual(Math.sign(-42.0), -1.0);
+assertEqual(Math.sign(0.0), 0.0);
+assertEqual(Math.trunc(4.9), 4.0);
+assertEqual(Math.trunc(-4.9), -4.0);
+print("  ✔ Math.sign and Math.trunc");
+
+print("[PASSED] 96. std:math Advanced Intrinsics (exp, log, pow, log10, log2, hypot, cbrt)");

@@ -1,0 +1,53 @@
+import {
+    describe,
+    test,
+    it,
+    beforeEach,
+    afterEach,
+    assertFalse,
+    assertNull,
+    assertNotNull,
+    assertNotEqual,
+    assertContains,
+    assertCloseTo,
+    assertThrows,
+    assertEqual,
+    assertTrue
+} from "std:test";
+
+print("=== Suite: std:test Framework & Advanced Assertions ===");
+
+let hookCounter = 0;
+
+describe("Math & Assertions Subsuite", () => {
+    beforeEach(() => {
+        hookCounter = hookCounter + 1;
+    });
+
+    afterEach(() => {
+        hookCounter = hookCounter * 2;
+    });
+
+    it("runs test with lifecycle hooks", () => {
+        assertEqual(hookCounter, 1);
+        assertFalse(false);
+        assertNull(null);
+        assertNotNull("hello");
+        assertNotEqual(10, 20);
+        assertContains("abcdef", "bcd");
+        assertContains([1, 2, 3], 2);
+        assertCloseTo(3.14159, 3.14160, 0.001);
+    });
+
+    it("verifies assertThrows", () => {
+        assertThrows(() => {
+            throw new Error("Custom Error Message");
+        }, "Custom Error");
+    });
+});
+
+assertEqual(hookCounter, 6);
+print("  ✔ Lifecycle hooks: beforeEach, afterEach, describe, it");
+print("  ✔ Advanced assertions: assertFalse, assertNull, assertNotNull, assertNotEqual, assertContains, assertCloseTo, assertThrows");
+
+print("[PASSED] 98. std:test Full Framework (describe, it, lifecycle hooks, rich assertions)");

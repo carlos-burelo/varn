@@ -7,7 +7,7 @@ use std::rc::Rc;
 /// `s = s + x` accumulation appends in place from then on. Shorter results
 /// stay `Shared` — one-off concats (e.g. map keys) shouldn't pay the
 /// copy-on-materialize of a buffer view.
-const EXT_SEED_LEN: usize = 16;
+const EXT_SEED_LEN: usize = 8;
 
 /// `.length` for the property fast paths: str (char count) and Array
 /// (element count), matching the native getters in varn-builtins. `None`
@@ -19,12 +19,7 @@ pub(crate) fn fast_length(val: VmValue, heap: &Heap) -> Option<VmValue> {
     if val.is_heap() {
         match heap.get(val.as_heap_idx()) {
             Some(HeapObj::Str(s)) => {
-                let n = if s.is_ascii_cached() {
-                    s.len()
-                } else {
-                    s.as_str().chars().count()
-                };
-                return Some(VmValue::from_i32(n as i32));
+                return Some(VmValue::from_i32(s.char_len() as i32));
             }
             Some(HeapObj::Array(arr)) => {
                 return Some(VmValue::from_int(arr.len() as i64));
@@ -59,8 +54,14 @@ pub(crate) fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
                         crate::heap::ascii_flag::YES => crate::heap::ascii_flag::NO,
                         _ => crate::heap::ascii_flag::UNKNOWN,
                     };
+                    let target_len = len + sb.len();
+                    let cur_cap = unsafe { (&*buf.get()).capacity() };
+                    if target_len > cur_cap {
+                        let new_cap = (cur_cap * 2).max(target_len).max(64);
+                        unsafe { (*buf.get()).reserve(new_cap - len) };
+                    }
                     unsafe { (*buf.get()).push_str(&sb) };
-                    return heap.alloc_str_view(HeapStr::ext(buf, len + sb.len(), flag));
+                    return heap.alloc_str_view(HeapStr::ext(buf, target_len, flag));
                 }
             }
         }
@@ -92,7 +93,8 @@ pub(crate) fn str_concat(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
             crate::heap::ascii_flag::NO
         };
         let mut owned = out.into_string();
-        owned.reserve(total);
+        let seed_cap = (total * 2).max(64);
+        owned.reserve(seed_cap.saturating_sub(total));
         return heap.alloc_str_view(HeapStr::ext(
             Rc::new(std::cell::UnsafeCell::new(owned)),
             total,

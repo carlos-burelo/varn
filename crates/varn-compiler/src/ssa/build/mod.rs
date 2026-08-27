@@ -27,6 +27,7 @@ struct Builder {
     blocks: Vec<Block>,
     values: Vec<ValueDef>,
     sealed: Vec<bool>,
+    terminated: Vec<bool>,
 
     defs: FxHashMap<(VarId, BlockId), Value>,
 
@@ -51,6 +52,7 @@ impl Builder {
             blocks: Vec::new(),
             values: Vec::new(),
             sealed: Vec::new(),
+            terminated: Vec::new(),
             defs: FxHashMap::default(),
             var_ty: FxHashMap::default(),
             incomplete_phis: FxHashMap::default(),
@@ -78,6 +80,7 @@ impl Builder {
             preds: Vec::new(),
         });
         self.sealed.push(false);
+        self.terminated.push(false);
         id
     }
 
@@ -97,14 +100,12 @@ impl Builder {
     }
 
     fn is_open(&self) -> bool {
-        matches!(
-            self.blocks[self.current.0 as usize].term,
-            Terminator::Unreachable
-        )
+        !self.terminated[self.current.0 as usize]
     }
 
     fn set_term(&mut self, term: Terminator) {
         let line = self.current_line;
+        self.terminated[self.current.0 as usize] = true;
         let block = self.block_mut(self.current);
         block.term = term;
         block.term_line = line;

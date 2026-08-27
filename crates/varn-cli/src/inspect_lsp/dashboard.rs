@@ -1,6 +1,7 @@
 use tower_lsp::lsp_types::HoverContents;
 use varn_debug::colors::{BLUE, BOLD, C_TYPES, DIM, GREEN, R, YELLOW};
 use varn_debug::flags::DebugFlags;
+use varn_core::term::terminal;
 
 pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
     use varn_debug::colors::{footer, header};
@@ -11,7 +12,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
     let analysis = varn_lsp::pipeline::run_pipeline(source.to_string(), uri);
 
     if flags.lsp_symbols {
-        varn_term::terminal::log(format!(
+        terminal::log(format!(
             "  {BOLD}{BLUE}Symbols:{RESET}",
             BOLD = BOLD,
             BLUE = BLUE,
@@ -22,7 +23,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 continue;
             }
             let kind_str = format!("{:?}", sym.kind());
-            varn_term::terminal::log(format!(
+            terminal::log(format!(
                 "    {DIM}{:<12}{RESET} {BOLD}{:<20}{RESET} : {YELLOW}{:<20}{RESET} {DIM}(ln:{}){RESET}",
                 kind_str,
                 sym.name(),
@@ -34,11 +35,11 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 YELLOW = YELLOW
             ));
         }
-        varn_term::terminal::blank();
+        terminal::blank();
     }
 
     if flags.lsp_hovers {
-        varn_term::terminal::log(format!(
+        terminal::log(format!(
             "  {BOLD}{BLUE}Simulated Hovers:{RESET}",
             BOLD = BOLD,
             BLUE = BLUE,
@@ -63,7 +64,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                             .replace("\n```", "")
                             .replace("```", ""),
                     };
-                    varn_term::terminal::log(format!(
+                    terminal::log(format!(
                         "    {DIM}({:>2}:{:>2}){RESET} {YELLOW}{:<15}{RESET} → {BOLD}{}{RESET}",
                         tok.line + 1,
                         tok.col + 1,
@@ -77,11 +78,11 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 }
             }
         }
-        varn_term::terminal::blank();
+        terminal::blank();
     }
 
     if flags.lsp_completions {
-        varn_term::terminal::log(format!(
+        terminal::log(format!(
             "  {BOLD}{BLUE}Simulated Completions:{RESET}",
             BOLD = BOLD,
             BLUE = BLUE,
@@ -110,7 +111,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 if let Some(tower_lsp::lsp_types::CompletionResponse::Array(items)) = resp {
                     let labels: Vec<_> = items.iter().map(|it| it.label.clone()).collect();
                     if !labels.is_empty() {
-                        varn_term::terminal::log(format!(
+                        terminal::log(format!(
                             "    {DIM}({:>2}:{:>2}){RESET} {BOLD}{}{RESET} → [{}]",
                             tok.line + 1,
                             tok.col + 1,
@@ -124,11 +125,11 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 }
             }
         }
-        varn_term::terminal::blank();
+        terminal::blank();
     }
 
     if flags.lsp_types && !analysis.db.expr_types.is_empty() {
-        varn_term::terminal::log(format!(
+        terminal::log(format!(
             "  {BOLD}{BLUE}Expression Types (Detailed Mapping):{RESET}",
             BOLD = BOLD,
             BLUE = BLUE,
@@ -137,7 +138,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
         let mut sorted: Vec<_> = analysis.db.expr_types.iter().collect();
         sorted.sort_by_key(|(off, _)| *off);
         for (off, ty) in sorted {
-            varn_term::terminal::log(format!(
+            terminal::log(format!(
                 "    {DIM}offset {:>4}{RESET} : {YELLOW}{}{RESET}",
                 off,
                 ty,
@@ -146,12 +147,12 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 YELLOW = YELLOW
             ));
         }
-        varn_term::terminal::blank();
+        terminal::blank();
     }
 
     let sem_tokens = varn_lsp::features::semantic_tokens::build_semantic_tokens(&analysis);
     if flags.lsp_semantic {
-        varn_term::terminal::log(format!(
+        terminal::log(format!(
             "  {BOLD}{BLUE}Semantic Tokens Mapping:{RESET}",
             BOLD = BOLD,
             BLUE = BLUE,
@@ -173,7 +174,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 .map(|t| t.as_str())
                 .unwrap_or("dynamic");
             let lexeme = find_lexeme(&analysis, curr_line, curr_col, chunk[2]);
-            varn_term::terminal::log(format!(
+            terminal::log(format!(
                 "    {DIM}({:>2}:{:>2}){RESET} {YELLOW}{:<15}{RESET} → {GREEN}{}{RESET}",
                 curr_line + 1,
                 curr_col + 1,
@@ -185,11 +186,11 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 GREEN = GREEN
             ));
         }
-        varn_term::terminal::blank();
+        terminal::blank();
     }
 
     if flags.lsp_colorize {
-        varn_term::terminal::log(format!(
+        terminal::log(format!(
             "  {BOLD}{BLUE}Annotated Source:{RESET}  {DIM}(token#tag  tags: kw=keyword  ty=type  fn=function  cls=class  var=variable  param  prop=property  num=number  str=string  em=enum  ns=namespace  iface  tp=type_param){RESET}",
             BOLD = BOLD,
             BLUE = BLUE,
@@ -227,7 +228,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
             let mut spans = line_spans.get(&line_num).unwrap_or(&empty).clone();
             spans.sort_by_key(|(col, _, _)| *col);
             let colored = annotate_line(line_text, &spans);
-            varn_term::terminal::log(format!(
+            terminal::log(format!(
                 "  {DIM}{:>gutter$} │{RESET} {}",
                 line_idx + 1,
                 colored,
@@ -236,11 +237,11 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 gutter = gutter
             ));
         }
-        varn_term::terminal::blank();
+        terminal::blank();
     }
 
     if flags.lsp_hints {
-        varn_term::terminal::log(format!(
+        terminal::log(format!(
             "  {BOLD}{BLUE}Simulated Inlay Hints:{RESET}",
             BOLD = BOLD,
             BLUE = BLUE,
@@ -252,7 +253,7 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 tower_lsp::lsp_types::InlayHintLabel::String(s) => s,
                 _ => "".to_string(),
             };
-            varn_term::terminal::log(format!(
+            terminal::log(format!(
                 "    {DIM}({:>2}:{:>2}){RESET} → {YELLOW}{}{RESET}",
                 hint.position.line + 1,
                 hint.position.character + 1,
@@ -262,18 +263,18 @@ pub fn debug_lsp(path: &str, source: &str, flags: &DebugFlags) {
                 YELLOW = YELLOW
             ));
         }
-        varn_term::terminal::blank();
+        terminal::blank();
     }
 
     if !analysis.diagnostics.is_empty() {
-        varn_term::terminal::log(format!(
+        terminal::log(format!(
             "  {BOLD}{BLUE}LSP Diagnostics:{RESET}",
             BOLD = BOLD,
             BLUE = BLUE,
             RESET = R
         ));
         for diag in &analysis.diagnostics {
-            varn_term::terminal::log(format!(
+            terminal::log(format!(
                 "    {BOLD}[line {}]{RESET} {}",
                 diag.line + 1,
                 diag.message,

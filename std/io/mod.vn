@@ -1,0 +1,12 @@
+// std:io — Standard I/O streams, terminal input/output, Reader/Writer interfaces
+
+export {
+    Writer,
+    Reader,
+    write,
+    writeln,
+    print,
+    flush,
+    readLine,
+    readAll
+} from "std:io/stream";

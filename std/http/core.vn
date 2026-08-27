@@ -1,0 +1,523 @@
+import { tcpListen$, tcpAccept$, tcpConnect$, tcpRead$, tcpWrite$, tcpClose$, tcpCloseListener$, parseHttpRequest$, sendHttpResponse$ } from "runtime:net";
+import { Url } from "std:net";
+import { JSON, Json } from "std:json";
+import { spawn } from "std:task";
+
+export class HttpStatus {
+    static Ok = #{ code: 200, message: "OK" };
+    static Created = #{ code: 201, message: "Created" };
+    static Accepted = #{ code: 202, message: "Accepted" };
+    static NoContent = #{ code: 204, message: "No Content" };
+    static MovedPermanently = #{ code: 301, message: "Moved Permanently" };
+    static Found = #{ code: 302, message: "Found" };
+    static BadRequest = #{ code: 400, message: "Bad Request" };
+    static Unauthorized = #{ code: 401, message: "Unauthorized" };
+    static Forbidden = #{ code: 403, message: "Forbidden" };
+    static NotFound = #{ code: 404, message: "Not Found" };
+    static MethodNotAllowed = #{ code: 405, message: "Method Not Allowed" };
+    static InternalServerError = #{ code: 500, message: "Internal Server Error" };
+    static BadGateway = #{ code: 502, message: "Bad Gateway" };
+    static ServiceUnavailable = #{ code: 503, message: "Service Unavailable" };
+}
+
+// -----------------------------------------------------------------------------
+// Web Standard Headers (Case-Insensitive)
+// -----------------------------------------------------------------------------
+export class Headers {
+    private _map: { [key: str]: str } = {};
+
+    constructor(init?: dynamic) {
+        this._map = {};
+        if (init !== null && typeof init === "object") {
+            for (let k in init) {
+                this.set(k, init[k]);
+            }
+        }
+    }
+
+    get(name: str): str? {
+        let key = name.toLowerCase();
+        return this._map[key];
+    }
+
+    set(name: str, value: str): void {
+        let key = name.toLowerCase();
+        this._map[key] = value;
+    }
+
+    has(name: str): bool {
+        let key = name.toLowerCase();
+        return this._map[key] !== null;
+    }
+
+    delete(name: str): void {
+        let key = name.toLowerCase();
+        let newMap: { [key: str]: str } = {};
+        for (let k in this._map) {
+            if (k !== key) {
+                newMap[k] = this._map[k];
+            }
+        }
+        this._map = newMap;
+    }
+
+    append(name: str, value: str): void {
+        let key = name.toLowerCase();
+        let existing = this._map[key];
+        if (existing !== null) {
+            this._map[key] = existing + ", " + value;
+        } else {
+            this._map[key] = value;
+        }
+    }
+
+    toObject(): { [key: str]: str } {
+        let result: { [key: str]: str } = {};
+        for (let k in this._map) {
+            let v = this._map[k];
+            if (v !== null) {
+                result[k] = v;
+            }
+        }
+        return result;
+    }
+}
+
+export class RawRequest {
+    method: str = "";
+    path: str = "";
+    headers: { [key: str]: str } = {};
+    body: str = "";
+}
+
+export function parseRawRequest(raw: str): RawRequest? {
+    let parsed: dynamic = parseHttpRequest$(raw);
+    if (parsed === null) return null;
+    
+    let req = new RawRequest();
+    req.method = parsed.method;
+    req.path = parsed.path;
+    req.headers = parsed.headers;
+    req.body = parsed.body;
+    return req;
+}
+
+export async function readHttpRequest(connId: int, maxContentLength: int = 10485760): Task<RawRequest?> {
+    let raw = "";
+    let req: RawRequest? = null;
+    let keepReading = true;
+    while (keepReading) {
+        let chunk = await tcpRead$(connId, 4096);
+        if (chunk.length > 0) {
+            raw = raw + chunk;
+            if (raw.length > maxContentLength + 65536) {
+                throw new Error("413 Payload Too Large");
+            }
+            req = parseRawRequest(raw);
+            if (req !== null) {
+                let contentLenStr = req.headers["content-length"];
+                if (contentLenStr !== null) {
+                    let contentLen = int.parse(contentLenStr);
+                    if (contentLen > maxContentLength) {
+                        throw new Error("413 Payload Too Large");
+                    }
+                    if (req.body.length >= contentLen) {
+                        req.body = req.body.slice(0, contentLen);
+                        keepReading = false;
+                    }
+                } else {
+                    keepReading = false;
+                }
+            }
+        } else {
+            keepReading = false;
+        }
+    }
+    return req;
+}
+
+export class RawResponse {
+    status: int = 200;
+    statusText: str = "";
+    headers: { [key: str]: str } = {};
+    body: str = "";
+}
+
+export function parseRawResponse(raw: str): RawResponse? {
+    let headerEnd = raw.indexOf("\r\n\r\n");
+    if (headerEnd < 0) return null;
+    
+    let headerPart = raw.slice(0, headerEnd);
+    let bodyPart = raw.slice(headerEnd + 4);
+    
+    let lines = headerPart.split("\r\n");
+    if (lines.length === 0) return null;
+    
+    let resp = new RawResponse();
+    
+    let firstLine = lines[0];
+    let parts = firstLine.split(" ");
+    if (parts.length >= 2) {
+        resp.status = int.parse(parts[1]);
+        if (parts.length >= 3) {
+            resp.statusText = parts[2];
+        }
+    }
+    
+    for (let i = 1; i < lines.length; i = i + 1) {
+        let line = lines[i];
+        let colon = line.indexOf(":");
+        if (colon > 0) {
+            let key = line.slice(0, colon).trim().toLowerCase();
+            let val = line.slice(colon + 1).trim();
+            resp.headers[key] = val;
+        }
+    }
+    
+    resp.body = bodyPart;
+    return resp;
+}
+
+export async function readHttpResponse(connId: int): Task<RawResponse?> {
+    let raw = "";
+    let resp: RawResponse? = null;
+    let keepReading = true;
+    while (keepReading) {
+        let chunk = await tcpRead$(connId, 4096);
+        if (chunk.length > 0) {
+            raw = raw + chunk;
+            resp = parseRawResponse(raw);
+            if (resp !== null) {
+                let contentLenStr = resp.headers["content-length"];
+                if (contentLenStr !== null) {
+                    let contentLen = int.parse(contentLenStr);
+                    if (resp.body.length >= contentLen) {
+                        resp.body = resp.body.slice(0, contentLen);
+                        keepReading = false;
+                    }
+                } else {
+                    keepReading = false;
+                }
+            }
+        } else {
+            keepReading = false;
+        }
+    }
+    return resp;
+}
+
+// -----------------------------------------------------------------------------
+// Web Standard Request
+// -----------------------------------------------------------------------------
+export class Request {
+    url: str = "";
+    method: str = "GET";
+    headers: Headers = new Headers({});
+    body: str = "";
+    path: str = "";
+    query: { [key: str]: str } = {};
+    params: { [key: str]: str } = {};
+    cookies: { [key: str]: str } = {};
+
+    constructor(url: str = "", methodOrInit: dynamic = "GET", headers: dynamic = {}, body: str = "") {
+        this.url = url;
+        this.path = url;
+        this.query = {};
+        this.params = {};
+        this.cookies = {};
+        if (typeof methodOrInit === "object" && methodOrInit !== null) {
+            let m = methodOrInit["method"];
+            if (m !== null) {
+                this.method = m;
+            } else {
+                this.method = "GET";
+            }
+            this.headers = new Headers(methodOrInit["headers"]);
+            let b = methodOrInit["body"];
+            if (b !== null) {
+                this.body = b;
+            } else {
+                this.body = "";
+            }
+        } else {
+            if (typeof methodOrInit === "str") {
+                this.method = methodOrInit;
+            } else {
+                this.method = "GET";
+            }
+            this.headers = new Headers(headers);
+            this.body = body;
+        }
+
+        // Parse Cookies
+        let cookieHdr = this.headers.get("cookie");
+        if (cookieHdr !== null) {
+            let cookieStr = cookieHdr as str;
+            if (cookieStr.length > 0) {
+                let pairs = cookieStr.split(";");
+                for (let p of pairs) {
+                    let eq = p.indexOf("=");
+                    if (eq > 0) {
+                        let k = p.slice(0, eq).trim();
+                        let v = p.slice(eq + 1).trim();
+                        this.cookies[k] = v;
+                    }
+                }
+            }
+        }
+    }
+
+    text(): str {
+        return this.body;
+    }
+
+    json(): Json {
+        if (this.body.length === 0) return null;
+        return JSON.parse(this.body);
+    }
+
+    formData(): { [key: str]: str } {
+        let res: { [key: str]: str } = {};
+        if (this.body.length === 0) return res;
+        let pairs = this.body.split("&");
+        for (let p of pairs) {
+            let eq = p.indexOf("=");
+            if (eq > 0) {
+                let k = p.slice(0, eq);
+                let v = p.slice(eq + 1);
+                res[k] = v;
+            }
+        }
+        return res;
+    }
+}
+
+export class HttpRequest extends Request {}
+
+// -----------------------------------------------------------------------------
+// Server Response Builder (for callback style compatibility)
+// -----------------------------------------------------------------------------
+export class HttpResponse {
+    connId: int;
+    isSent: bool = false;
+    private statusCode: int = 200;
+    private responseHeaders: { [key: str]: str } = {};
+    private responseContentType: str = "text/plain";
+    private setCookies: str[] = [];
+
+    constructor(connId: int) {
+        this.connId = connId;
+        this.responseHeaders = {};
+        this.setCookies = [];
+    }
+
+    status(code: int): HttpResponse {
+        this.statusCode = code;
+        return this;
+    }
+
+    header(name: str, value: str): HttpResponse {
+        this.responseHeaders[name] = value;
+        return this;
+    }
+
+    type(contentType: str): HttpResponse {
+        this.responseContentType = contentType;
+        return this;
+    }
+
+    setCookie(name: str, value: str, options?: { maxAge?: int, path?: str, secure?: bool, httpOnly?: bool, sameSite?: str }): HttpResponse {
+        let cookieStr = name + "=" + value;
+        if (options !== null) {
+            if (options.maxAge !== null) {
+                cookieStr = cookieStr + "; Max-Age=" + options.maxAge;
+            }
+            if (options.path !== null) {
+                cookieStr = cookieStr + "; Path=" + options.path;
+            } else {
+                cookieStr = cookieStr + "; Path=/";
+            }
+            if (options.httpOnly) {
+                cookieStr = cookieStr + "; HttpOnly";
+            }
+            if (options.secure) {
+                cookieStr = cookieStr + "; Secure";
+            }
+            if (options.sameSite !== null) {
+                cookieStr = cookieStr + "; SameSite=" + options.sameSite;
+            }
+        }
+        this.setCookies.push(cookieStr);
+        return this;
+    }
+
+    send(body: str): void {
+        if (this.isSent) return;
+        
+        let statusText = "OK";
+        if (this.statusCode === 404) statusText = "Not Found";
+        else if (this.statusCode === 201) statusText = "Created";
+        else if (this.statusCode === 204) statusText = "No Content";
+        else if (this.statusCode === 413) statusText = "Payload Too Large";
+        else if (this.statusCode === 500) statusText = "Internal Server Error";
+        
+        let responseStr = "HTTP/1.1 " + this.statusCode.toString() + " " + statusText + "\r\n";
+        responseStr = responseStr + "Content-Type: " + this.responseContentType + "\r\n";
+        responseStr = responseStr + "Content-Length: " + body.length.toString() + "\r\n";
+        
+        for (let name in this.responseHeaders) {
+            responseStr = responseStr + name + ": " + this.responseHeaders[name] + "\r\n";
+        }
+        for (let c of this.setCookies) {
+            responseStr = responseStr + "Set-Cookie: " + c + "\r\n";
+        }
+        
+        responseStr = responseStr + "\r\n" + body;
+        
+        spawn(this._writeAndClose(responseStr));
+        this.isSent = true;
+    }
+
+    private async _writeAndClose(data: str): Task<void> {
+        await tcpWrite$(this.connId, data);
+        tcpClose$(this.connId);
+    }
+
+    json(data: Json): void {
+        this.type("application/json").send(JSON.stringify(data));
+    }
+
+    html(htmlContent: str): void {
+        this.type("text/html").send(htmlContent);
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Web Standard Response
+// -----------------------------------------------------------------------------
+export class Response {
+    status: int = 200;
+    statusText: str = "OK";
+    ok: bool = true;
+    body: str = "";
+    headers: Headers = new Headers({});
+    url: str = "";
+
+    constructor(
+        bodyOrStatus: dynamic = "",
+        statusOrStatusText: dynamic = 200,
+        headersOrOk: dynamic = {},
+        bodyPos: str = "",
+        headersPos: dynamic = {}
+    ) {
+        if (typeof bodyOrStatus === "int" || typeof bodyOrStatus === "float") {
+            let st = bodyOrStatus as int;
+            this.status = st;
+            this.statusText = typeof statusOrStatusText === "str" ? statusOrStatusText : (st >= 200 && st < 300 ? "OK" : (st === 404 ? "Not Found" : (st === 500 ? "Internal Server Error" : "Status")));
+            this.ok = st >= 200 && st < 300;
+            this.body = bodyPos;
+            this.headers = new Headers(headersPos);
+        } else {
+            this.body = typeof bodyOrStatus === "str" ? bodyOrStatus : "";
+            let st = (typeof statusOrStatusText === "int" || typeof statusOrStatusText === "float") ? (statusOrStatusText as int) : 200;
+            this.status = st;
+            this.statusText = st >= 200 && st < 300 ? "OK" : (st === 404 ? "Not Found" : (st === 500 ? "Internal Server Error" : "Status"));
+            this.ok = st >= 200 && st < 300;
+            this.headers = new Headers(headersOrOk);
+        }
+    }
+
+    text(): str {
+        return this.body;
+    }
+
+    json(): Json {
+        return JSON.parse(this.body);
+    }
+}
+
+export function json(data: Json, status: int = 200, headers: dynamic = {}): Response {
+    let body = JSON.stringify(data);
+    let h = new Headers(headers);
+    if (!h.has("content-type")) {
+        h.set("Content-Type", "application/json");
+    }
+    let res = new Response(body, status, h.toObject());
+    return res;
+}
+
+export function redirect(url: str, status: int = 302): Response {
+    let hdrs = { "Location": url };
+    return new Response("", status, hdrs);
+}
+
+export function error(status: int = 500, message: str = "Internal Server Error"): Response {
+    return new Response(message, status, { "Content-Type": "text/plain" });
+}
+
+// -----------------------------------------------------------------------------
+// Precompiled Dynamic Route Entry
+// -----------------------------------------------------------------------------
+export class DynamicRoute {
+    method: str;
+    segments: str[];
+    paramNames: { [key: int]: str };
+    isWildcard: bool;
+    handler: dynamic;
+
+    constructor(method: str, pattern: str, handler: dynamic) {
+        this.method = method.toUpperCase();
+        this.handler = handler;
+        this.isWildcard = pattern === "*";
+        this.segments = [];
+        this.paramNames = {};
+
+        if (!this.isWildcard) {
+            let segs = pattern.split("/");
+            for (let i = 0; i < segs.length; i = i + 1) {
+                let s = segs[i];
+                if (s.startsWith(":")) {
+                    this.segments.push(":");
+                    this.paramNames[i] = s.slice(1);
+                } else {
+                    this.segments.push(s);
+                }
+            }
+        }
+    }
+
+    match(method: str, pathSegments: str[]): { [key: str]: str }? {
+        if (this.method !== "*" && this.method !== method) {
+            return null;
+        }
+
+        if (this.isWildcard) {
+            return {};
+        }
+
+        if (this.segments.length !== pathSegments.length) {
+            return null;
+        }
+
+        let params: { [key: str]: str } = {};
+        for (let i = 0; i < this.segments.length; i = i + 1) {
+            let seg = this.segments[i];
+            let reqSeg = pathSegments[i];
+            if (seg === ":") {
+                let paramName = this.paramNames[i];
+                if (paramName !== null) {
+                    params[paramName] = reqSeg;
+                }
+            } else if (seg !== reqSeg) {
+                return null;
+            }
+        }
+
+        return params;
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Web Standard HttpServer (WinterCG / Bun aligned)
+// -----------------------------------------------------------------------------
+

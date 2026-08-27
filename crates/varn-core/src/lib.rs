@@ -13,6 +13,7 @@ pub mod op_meta;
 pub mod opcode;
 pub mod paths;
 pub mod source;
+pub mod term;
 pub mod token;
 pub mod trivia;
 pub mod type_tag;
@@ -36,6 +37,7 @@ pub use numeric::{binary_operand_kind, binary_result_kind, wrap_i48, NumericOper
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
+pub use term::{chalk, chalk_fmt, Chalk};
 pub use token::{ParsedNumber, Token, TokenKind};
 pub use trivia::{Trivia, TriviaKind};
 pub use type_tag::{TypeTag, VmValuePayload};

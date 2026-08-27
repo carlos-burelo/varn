@@ -3,7 +3,7 @@ use varn_core::ast::Program;
 
 use crate::PipelineError;
 use varn_debug::flags::DebugFlags;
-use varn_term::chalk::chalk;
+use varn_core::term::chalk::chalk;
 
 type PipelineResult<T> = Result<T, PipelineError>;
 
@@ -36,7 +36,7 @@ pub fn report_diagnostics(
 
     if error_count == 0 {
         for m in msgs {
-            varn_term::terminal::log(m);
+            varn_core::term::terminal::log(m);
         }
         return Ok(());
     }

@@ -1,0 +1,40 @@
+export enum Option<T> {
+    Some(val: T),
+    None
+}
+
+export function Some<T>(val: T): Option<T> {
+    return Option.Some(val);
+}
+
+export const None = Option.None;
+
+export function isSome<T>(opt: Option<T>): bool {
+    return match (opt) {
+        Some(_) => true,
+        _ => false
+    };
+}
+
+export function isNone<T>(opt: Option<T>): bool {
+    return match (opt) {
+        None => true,
+        _ => false
+    };
+}
+
+export function unwrapOpt<T>(opt: Option<T>): T {
+    return match (opt) {
+        Some(v) => v,
+        None => {
+            throw new Error("Called unwrap on Option.None");
+        }
+    };
+}
+
+export function unwrapOptOr<T>(opt: Option<T>, defaultVal: T): T {
+    return match (opt) {
+        Some(v) => v,
+        _ => defaultVal
+    };
+}

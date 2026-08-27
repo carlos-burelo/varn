@@ -1,5 +1,5 @@
 use crate::{cli::PkgCommands, error::CliError};
-use varn_term::terminal;
+use varn_core::term::terminal;
 
 pub fn execute(cmd: PkgCommands) -> Result<(), CliError> {
     match cmd {

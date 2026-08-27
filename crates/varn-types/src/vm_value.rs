@@ -121,9 +121,6 @@ impl VmValue {
         if b.len() > 5 {
             return None;
         }
-        if b.iter().any(|&c| c > 127) {
-            return None;
-        }
         let mut v: u64 = (b.len() as u64) << 45;
         for (i, &byte) in b.iter().enumerate() {
             v |= (byte as u64) << (37 - i as u32 * 8);
@@ -145,7 +142,18 @@ impl VmValue {
         len
     }
 
-    #[inline]
+    #[inline(always)]
+    pub fn sso_eq_bytes(self, bytes: &[u8]) -> bool {
+        let len = self.sso_len();
+        if bytes.len() != len {
+            return false;
+        }
+        let mut buf = [0u8; 5];
+        self.sso_copy_bytes(&mut buf);
+        &buf[..len] == bytes
+    }
+
+    #[inline(always)]
     pub fn sso_as_str<'a>(self, buf: &'a mut [u8; 5]) -> &'a str {
         let len = self.sso_copy_bytes(buf);
 

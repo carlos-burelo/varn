@@ -284,7 +284,7 @@ impl<'a> Lowerer<'a> {
                         .export_names
                         .iter()
                         .position(|n| &**n == &*spec.exported)
-                        .or_else(|| self.ann.get_slot_idx(AnnKey::decl(spec.range.start.offset)))
+                        .or_else(|| self.ann.get_exported_slot_idx(AnnKey::decl(spec.range.start.offset)))
                         .map(|s| s as u16);
                     specs.push(HirExportSpec {
                         binding,
@@ -350,3 +350,4 @@ fn extension_type_name(target: &TypeNode) -> String {
         _ => IntrinsicType::Dynamic.as_str().to_owned(),
     }
 }
+

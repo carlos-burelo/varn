@@ -1,0 +1,73 @@
+import { write$ } from "runtime:io";
+
+function logLine(msg: str): void {
+    write$(msg + "\n");
+}
+
+let beforeAllFns: Array<() => void> = [];
+let afterAllFns: Array<() => void> = [];
+let beforeEachFns: Array<() => void> = [];
+let afterEachFns: Array<() => void> = [];
+
+export function beforeAll(fn: () => void): void {
+    beforeAllFns.push(fn);
+}
+
+export function afterAll(fn: () => void): void {
+    afterAllFns.push(fn);
+}
+
+export function beforeEach(fn: () => void): void {
+    beforeEachFns.push(fn);
+}
+
+export function afterEach(fn: () => void): void {
+    afterEachFns.push(fn);
+}
+
+export function describe(suiteName: str, body: () => void): void {
+    logLine("=== Suite: " + suiteName + " ===");
+    let prevBeforeAll = beforeAllFns;
+    let prevAfterAll = afterAllFns;
+    let prevBeforeEach = beforeEachFns;
+    let prevAfterEach = afterEachFns;
+
+    beforeAllFns = [];
+    afterAllFns = [];
+    beforeEachFns = [];
+    afterEachFns = [];
+
+    try {
+        for (let fn of beforeAllFns) fn();
+        body();
+        for (let fn of afterAllFns) fn();
+    } finally {
+        beforeAllFns = prevBeforeAll;
+        afterAllFns = prevAfterAll;
+        beforeEachFns = prevBeforeEach;
+        afterEachFns = prevAfterEach;
+    }
+}
+
+export function suite(suiteName: str, body: () => void): void {
+    describe(suiteName, body);
+}
+
+export function test(testName: str, body: dynamic): void {
+    try {
+        for (let fn of beforeEachFns) fn();
+        body();
+        for (let fn of afterEachFns) fn();
+        logLine("  ✔ " + testName);
+    } catch (err) {
+        let errStr = (typeof err === "object" && err != null && (err as dynamic).message)
+            ? (err as dynamic).name + ": " + (err as dynamic).message
+            : "" + err;
+        logLine("  ✖ " + testName + ": " + errStr);
+        throw err;
+    }
+}
+
+export function it(testName: str, body: dynamic): void {
+    test(testName, body);
+}

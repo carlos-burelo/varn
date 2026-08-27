@@ -1,0 +1,5 @@
+// std:ffi — Foreign Function Interface, native dynamic library loading, memory allocation and raw pointer operations
+
+export { FfiType } from "std:ffi/types";
+export { Pointer } from "std:ffi/pointer";
+export { FfiFunction, DynamicLibrary, FFI } from "std:ffi/library";

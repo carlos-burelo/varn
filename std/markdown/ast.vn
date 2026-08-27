@@ -1,0 +1,53 @@
+// std:markdown/ast — Markdown AST and data structures
+
+export interface MarkdownOptions {
+    gfm?: bool;
+    xhtml?: bool;
+    escapeHtml?: bool;
+    breaks?: bool;
+}
+
+export interface MarkdownHeading {
+    level: int;
+    text: str;
+    id: str;
+}
+
+export interface MarkdownLink {
+    text: str;
+    url: str;
+    title: str;
+    isImage: bool;
+}
+
+export class MarkdownNode {
+    type: str;
+    text: str;
+    level: int;
+    lang: str;
+    ordered: bool;
+    start: int;
+    checked: bool?;
+    url: str;
+    title: str;
+    align: str[];
+    children: MarkdownNode[];
+
+    constructor(type: str, text: str = "") {
+        this.type = type;
+        this.text = text;
+        this.level = 0;
+        this.lang = "";
+        this.ordered = false;
+        this.start = 1;
+        this.checked = null;
+        this.url = "";
+        this.title = "";
+        this.align = [];
+        this.children = [];
+    }
+
+    addChild(child: MarkdownNode): void {
+        this.children.push(child);
+    }
+}

@@ -1,0 +1,18 @@
+// std:sys — Operating system interfaces, platform info, environment variables and argument parsing
+
+export {
+    env,
+    setEnv,
+    now,
+    parseDotEnv
+} from "std:sys/env";
+
+export {
+    platform,
+    cwd,
+    args,
+    exit,
+    SystemInfoRecord,
+    getSystemInfo,
+    parseArgs
+} from "std:sys/args";

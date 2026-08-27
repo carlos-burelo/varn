@@ -1,0 +1,46 @@
+// std:markdown/utils — String helpers, HTML escaping and slugification
+
+export function escapeHtmlStr(s: str): str {
+    let res = s.replaceAll("&", "&amp;");
+    res = res.replaceAll("<", "&lt;");
+    res = res.replaceAll(">", "&gt;");
+    res = res.replaceAll("\"", "&quot;");
+    return res;
+}
+
+export function isWhitespaceChar(c: str): bool {
+    return c === " " || c === "\t" || c === "\r" || c === "\n";
+}
+
+export function findFrom(s: str, search: str, fromIdx: int): int {
+    if (fromIdx >= s.length) return -1;
+    let sub = s.slice(fromIdx);
+    let idx = sub.indexOf(search);
+    if (idx === -1) return -1;
+    return fromIdx + idx;
+}
+
+export function startsWithAt(s: str, prefix: str, pos: int): bool {
+    if (pos + prefix.length > s.length) return false;
+    return s.slice(pos, pos + prefix.length) === prefix;
+}
+
+export function slugify(text: str): str {
+    let s = text.trim().toLowerCase();
+    let out = "";
+    for (let i = 0; i < s.length; i = i + 1) {
+        let code = s.charCodeAt(i);
+        let isAlphaNum = (code >= 97 && code <= 122) || (code >= 48 && code <= 57);
+        if (isAlphaNum) {
+            out = out + s[i];
+        } else if (code === 32 || code === 45 || code === 95) {
+            if (!out.endsWith("-") && out.length > 0) {
+                out = out + "-";
+            }
+        }
+    }
+    if (out.endsWith("-")) {
+        out = out.slice(0, out.length - 1);
+    }
+    return out;
+}

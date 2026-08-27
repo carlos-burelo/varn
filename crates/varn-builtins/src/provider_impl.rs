@@ -137,12 +137,17 @@ fn load_tree_std(root: &std::path::Path, provenance: StdProvenance) -> Result<Ac
     }
     let mut specs = Vec::new();
     for m in manifest.modules {
-        // std:math → math.vn
+        // std:math → math/mod.vn or math.vn
         let file = m.id.strip_prefix("std:").unwrap_or(&m.id);
+        let vn_source = if root.join(format!("{file}/mod.vn")).exists() {
+            format!("{file}/mod.vn")
+        } else {
+            format!("{file}.vn")
+        };
         specs.push(ModuleSpec::leaked(
             m.id.clone(),
             ModuleKind::Stdlib,
-            format!("{file}.vn"),
+            vn_source,
             m.pure,
         ));
     }

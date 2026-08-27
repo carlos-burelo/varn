@@ -1,5 +1,5 @@
 import { Duration, PlainDateTime, nowInstant, Instant } from 'std:time';
-import { List, Stack, Queue, Record } from 'std:collections';
+import { List, Stack, Queue, Dict } from 'std:collections';
 import { Http } from 'std:http';
 import { JSON } from 'std:json';
 import { uuid, sha256 } from 'std:crypto';
@@ -12,8 +12,8 @@ import { Path } from 'std:path';
 import { defineMetadata, getMetadata, hasMetadata, MetaKey } from 'std:reflect';
 import { sleep, TaskGroup, spawn, parallel } from 'std:task';
 
-// Import standard library modules
-import { Disposable, AsyncDisposable, Partial, Required, Readonly, Mutable } from 'std:types';
+// Disposable, AsyncDisposable, Partial, Required, Readonly, Mutable, Record
+// are now globally available (prelude) — no import needed.
 import { assert as testAssert, assertTrue, assertEqual, fail } from 'std:test';
 // Option/Result come from std:result, which is the only module that declares
 // them. `std:types` used to declare a second, incompatible pair; see the note
@@ -71,10 +71,10 @@ async function runComprehensiveTest(): Task<void> {
     assert("Queue peek", queue.peek() === "first");
     assert("Queue dequeue", queue.dequeue() === "first");
 
-    let rec = new Record<str, int>();
+    let rec = new Dict<str, int>();
     rec.set("key", 100);
-    assert("Record has", rec.has("key"));
-    assert("Record get", rec.get("key") === 100);
+    assert("Dict has", rec.has("key"));
+    assert("Dict get", rec.get("key") === 100);
 
     let rangeObj = Range.from(1, 5);
     assert("Range start val", rangeObj.start === 1);

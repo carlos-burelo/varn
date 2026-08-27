@@ -117,10 +117,10 @@ impl HeapInner {
         if let Some(sso) = VmValue::try_from_sso(sub) {
             return sso;
         }
-        let flag = if handle.is_ascii_cached() {
+        let flag = if handle.is_ascii() {
             ascii_flag::YES
         } else {
-            ascii_flag::UNKNOWN
+            ascii_flag::NO
         };
         let len = be - bs;
         if len as u64 <= SLICE_LEN_MASK as u64 {

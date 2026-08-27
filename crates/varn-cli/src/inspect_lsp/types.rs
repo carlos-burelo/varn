@@ -1,7 +1,7 @@
 use varn_checker::SymbolKind;
 use varn_debug::flags::DebugFlags;
-use varn_term::chalk::chalk;
-use varn_term::terminal::{Section, Table};
+use varn_core::term::chalk::chalk;
+use varn_core::term::terminal::{Section, Table};
 
 pub fn debug_types(path: &str, source: &str, flags: &DebugFlags) {
     let uri = varn_modules::resolver::path_to_uri(path);
@@ -51,7 +51,7 @@ pub fn debug_types(path: &str, source: &str, flags: &DebugFlags) {
             ]);
         }
         table.print();
-        varn_term::terminal::blank();
+        varn_core::term::terminal::blank();
     }
 
     let footer_msg = if std_hidden > 0 {
@@ -63,7 +63,7 @@ pub fn debug_types(path: &str, source: &str, flags: &DebugFlags) {
     } else {
         format!("{} symbols analyzed", analysis.symbols.len())
     };
-    varn_term::terminal::log(chalk(format!("── {footer_msg} ──")).dim());
+    varn_core::term::terminal::log(chalk(format!("── {footer_msg} ──")).dim());
 }
 
 fn format_sym_details(s: &varn_lsp::document::SymbolView<'_>) -> String {

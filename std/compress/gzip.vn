@@ -1,0 +1,24 @@
+import {
+    gzip$,
+    gunzip$,
+    deflate$,
+    inflate$
+} from "runtime:compress";
+
+export namespace Compress {
+    export function gzip(data: str): int[] {
+        return gzip$(data);
+    }
+
+    export function gunzip(bytes: int[]): str {
+        return gunzip$(bytes);
+    }
+
+    export function deflate(data: str): int[] {
+        return deflate$(data);
+    }
+
+    export function inflate(bytes: int[]): str {
+        return inflate$(bytes);
+    }
+}

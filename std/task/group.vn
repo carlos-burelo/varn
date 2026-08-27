@@ -1,0 +1,86 @@
+import { parallel$ } from "runtime:task";
+
+async function wrapTask<T>(task: Task<T>, group: TaskGroupImpl<T>): T {
+    try {
+        let res = await task;
+        if (group.isCancelled) {
+            throw new Error("TaskGroup cancelled");
+        }
+        return res;
+    } catch (e) {
+        group.cancel();
+        throw e;
+    }
+}
+
+export class TaskGroupImpl<T = dynamic> {
+    tasks: Array<Task<T>>;
+    isCancelled: bool;
+    private _finallyCbs: Array<() => void>;
+
+    constructor() {
+        this.tasks = [];
+        this.isCancelled = false;
+        this._finallyCbs = [];
+    }
+
+    spawn(task: Task<T>): Task<T> {
+        if (this.isCancelled) {
+            throw new Error("TaskGroup is cancelled");
+        }
+        let wrapped = wrapTask(task, this);
+        this.tasks.push(wrapped);
+        return wrapped;
+    }
+
+    async join(timeoutMs?: int): Task<Array<T>> {
+        if (this.isCancelled) {
+            throw new Error("TaskGroup is cancelled");
+        }
+        try {
+            let res = await parallel$(this.tasks);
+            this._runFinally();
+            return res;
+        } catch (e) {
+            this.cancel();
+            this._runFinally();
+            throw e;
+        }
+    }
+
+    finally(cb: () => void): TaskGroupImpl<T> {
+        this._finallyCbs.push(cb);
+        return this;
+    }
+
+    private _runFinally(): void {
+        for (let i = 0; i < this._finallyCbs.length; i = i + 1) {
+            let cb = this._finallyCbs[i];
+            cb();
+        }
+    }
+
+    dispose(): void {
+        this.cancel();
+        this._runFinally();
+    }
+
+    cancel(): void {
+        this.isCancelled = true;
+    }
+
+    async disposeAsync(): Task<void> {
+        this.cancel();
+        this._runFinally();
+    }
+}
+
+export type TaskGroup<T = dynamic> = TaskGroupImpl<T>;
+
+export function TaskGroup<T = dynamic>(): TaskGroupImpl<T> {
+    return new TaskGroupImpl<T>();
+}
+
+export function task_group<T>(): TaskGroupImpl<T> {
+    return new TaskGroupImpl<T>();
+}

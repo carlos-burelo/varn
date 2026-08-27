@@ -1,0 +1,115 @@
+import {
+    nowMs$,
+    parseIsoDuration$,
+    msToParts$,
+    partsToMs$,
+    RuntimeTimeParts
+} from "runtime:time";
+
+export type TimeParts = {
+    year: int;
+    month: int;
+    day: int;
+    hour: int;
+    minute: int;
+    second: int;
+    millisecond: int;
+    weekday?: int;
+};
+
+export type DurationParts = {
+    years?: int;
+    months?: int;
+    days?: int;
+    hours?: int;
+    minutes?: int;
+    seconds?: int;
+    milliseconds?: int;
+    sign?: int;
+};
+
+export function int_div(a: int, b: int): int {
+    return ((a - (a % b)) / b).toInt();
+}
+
+export function pad2(n: int): str {
+    if (n < 10) return "0" + n;
+    return "" + n;
+}
+
+export function pad3(n: int): str {
+    if (n < 10) return "00" + n;
+    if (n < 100) return "0" + n;
+    return "" + n;
+}
+
+export function pad4(n: int): str {
+    if (n < 10) return "000" + n;
+    if (n < 100) return "00" + n;
+    if (n < 1000) return "0" + n;
+    return "" + n;
+}
+
+export function now(): int {
+    return nowMs$();
+}
+
+export function toISOString(ms: int): str {
+    let parts = msToParts$(ms);
+    return pad4(parts.year) + "-" + pad2(parts.month) + "-" + pad2(parts.day) + "T" + pad2(parts.hour) + ":" + pad2(parts.minute) + ":" + pad2(parts.second) + "." + pad3(parts.millisecond) + "Z";
+}
+
+export function fromISO(iso: str): int {
+    return parseIsoDuration$(iso);
+}
+
+export function toParts(ms: int): TimeParts {
+    let parts = msToParts$(ms);
+    return {
+        year: parts.year,
+        month: parts.month,
+        day: parts.day,
+        hour: parts.hour,
+        minute: parts.minute,
+        second: parts.second,
+        millisecond: parts.millisecond
+    };
+}
+
+export function fromParts(parts: TimeParts): int {
+    return partsToMs$(parts);
+}
+
+export function durationFromString(s: str): int {
+    return parseIsoDuration$(s);
+}
+
+export function durationToString(ms: int): str {
+    return "Duration(" + ms + "ms)";
+}
+
+export function durationParts(ms: int): DurationParts {
+    let total_s = int_div(ms, 1000);
+    return {
+        days: int_div(total_s, 86400),
+        hours: int_div(total_s % 86400, 3600),
+        minutes: int_div(total_s % 3600, 60),
+        seconds: (total_s % 60),
+        milliseconds: (ms % 1000)
+    };
+}
+
+export function formatDurationMs(ms: int): str {
+    let seconds = int_div(ms, 1000);
+    let minutes = int_div(seconds, 60);
+    let hours = int_div(minutes, 60);
+    let remSec = seconds % 60;
+    let remMin = minutes % 60;
+    if (hours > 0) {
+        return hours + "h " + remMin + "m " + remSec + "s";
+    }
+    if (minutes > 0) {
+        return minutes + "m " + remSec + "s";
+    }
+    return seconds + "s";
+}

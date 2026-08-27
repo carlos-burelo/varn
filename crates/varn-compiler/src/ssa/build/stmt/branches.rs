@@ -41,6 +41,7 @@ impl Builder {
         self.current = then_b;
         self.lower_block(then_body)?;
 
+        let mut open_any = false;
         if self.is_open() {
             let from = self.current;
             self.set_term(Terminator::Jump {
@@ -48,6 +49,7 @@ impl Builder {
                 args: Vec::new(),
             });
             self.add_pred(merge, from);
+            open_any = true;
         }
 
         if let Some(eb) = else_b {
@@ -60,11 +62,17 @@ impl Builder {
                     args: Vec::new(),
                 });
                 self.add_pred(merge, from);
+                open_any = true;
             }
+        } else {
+            open_any = true;
         }
 
         self.seal_block(merge);
         self.current = merge;
+        if !open_any {
+            self.set_term(Terminator::Unreachable);
+        }
         Ok(())
     }
 
@@ -79,6 +87,8 @@ impl Builder {
         let then_b = self.new_block();
         let else_b = self.new_block();
         let merge = self.new_block();
+        let phi = self.add_block_param(merge, ty);
+
         self.set_term(Terminator::Branch {
             cond,
             then_blk: then_b,
@@ -112,7 +122,7 @@ impl Builder {
         self.seal_block(merge);
         self.current = merge;
 
-        Ok(self.add_block_param(merge, ty))
+        Ok(phi)
     }
 
     pub(in crate::ssa::build) fn lower_switch(

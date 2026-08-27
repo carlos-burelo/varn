@@ -1,0 +1,3 @@
+// std:cli — Command-line argument parsing, options and flags handling
+
+export { ParsedArgs, CLI, parseArgs } from "std:cli/args";

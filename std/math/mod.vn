@@ -1,0 +1,41 @@
+// std:math — Mathematical constants, trigonometry, logarithmic and algebraic intrinsics
+
+export {
+    E,
+    LN10,
+    LN2,
+    LOG10E,
+    LOG2E,
+    PI,
+    SQRT1_2,
+    SQRT2
+} from "std:math/constants";
+
+export {
+    abs,
+    sqrt,
+    cbrt,
+    sin,
+    cos,
+    tan,
+    floor,
+    ceil,
+    round,
+    random,
+    acos,
+    asin,
+    atan,
+    atan2,
+    exp,
+    log,
+    log10,
+    log2,
+    pow,
+    hypot,
+    max,
+    min,
+    sign,
+    trunc
+} from "std:math/intrinsics";
+
+export { Math } from "std:math/class";

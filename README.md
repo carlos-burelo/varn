@@ -317,13 +317,12 @@ varn-lang/
 
 | Crate | Responsabilidad Principal |
 |---|---|
-| [`varn-core`](docs/ARCHITECTURE.md#2-crates-y-responsabilidades) | Definición de AST, OpCodes, Spans y reglas numéricas. |
+| [`varn-core`](docs/ARCHITECTURE.md#2-crates-y-responsabilidades) | Definición de AST, OpCodes, Spans, reglas numéricas, diagnósticos y terminal. |
 | [`varn-types`](docs/ARCHITECTURE.md#2-crates-y-responsabilidades) | Estructura de `VmValue`, `Chunk`, `FunctionProto`, `Shape` y memoria. |
 | [`varn-lexer`](docs/ARCHITECTURE.md#2-crates-y-responsabilidades) | Tokenizador UTF-8 con ASI (Automatic Semicolon Insertion). |
 | [`varn-parser`](docs/ARCHITECTURE.md#2-crates-y-responsabilidades) | Parser Pratt / Recursive Descent. |
 | [`varn-checker`](docs/ARCHITECTURE.md#2-crates-y-responsabilidades) | Inferidor de tipos, CFA, narrowing y SemanticDB. |
-| [`varn-compiler`](docs/COMPILER_ARCHITECTURE.md) | **El Compilador**: HIR → SSA → Optimización → Bytecode. |
-| [`varn-regalloc`](docs/COMPILER_ARCHITECTURE.md) | Post-passes de bytecode: Liveness analysis y Register Allocation. |
+| [`varn-compiler`](docs/COMPILER_ARCHITECTURE.md) | **El Compilador**: HIR → SSA → Optimización → Bytecode + RegAlloc. |
 | [`varn-vm`](docs/VM_ARCHITECTURE.md) | VM de registros con NaN-Boxing, GC generacional e Inline Cache. |
 | [`varn-jit`](docs/VM_ARCHITECTURE.md) | Backend JIT nativo para x86-64. |
 | [`varn-runtime`](docs/RUNTIME_ARCHITECTURE.md) | Canales tipados entre Isolates y vtable de asignación del heap. |

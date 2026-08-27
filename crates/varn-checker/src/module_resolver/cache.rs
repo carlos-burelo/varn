@@ -43,7 +43,7 @@ pub(super) fn try_load_cache(
     virtual_id: &str,
     source: &str,
 ) -> Option<CachedModule> {
-    if virtual_id == "std:types" {
+    if virtual_id == "core:types" {
         return None;
     }
     let hash = compute_source_hash(source);
@@ -85,7 +85,7 @@ pub(super) fn save_to_cache(
     exports: &ExportMap,
     bind: &BindResult,
 ) {
-    if virtual_id == "std:types" {
+    if virtual_id == "core:types" {
         return;
     }
     let hash = compute_source_hash(source);

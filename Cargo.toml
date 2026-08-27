@@ -16,9 +16,7 @@ members = [
     "crates/varn-pm",
     "crates/varn-jit",
     "crates/varn-pipeline",
-    "crates/varn-term",
     "crates/varn-compiler",
-    "crates/varn-regalloc",
 ]
 resolver = "2"
 

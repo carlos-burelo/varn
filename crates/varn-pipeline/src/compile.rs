@@ -26,7 +26,7 @@ pub fn compile(
     debug: &DebugFlags,
 ) -> PipelineResult<CompileOutput> {
     if verbose {
-        varn_term::terminal::tagged("Varn", "generating bytecode...");
+        varn_core::term::terminal::tagged("Varn", "generating bytecode...");
     }
 
     let exports =
@@ -48,7 +48,7 @@ pub fn compile(
     .map_err(|e| {
         PipelineError::fatal(format!(
             "{}: {e}",
-            varn_term::chalk::chalk("error[emit]").red().bold()
+            varn_core::term::chalk::chalk("error[emit]").red().bold()
         ))
     })?;
 
@@ -125,7 +125,7 @@ pub fn compile(
     }
 
     if verbose {
-        varn_term::terminal::tagged("Varn", "resolving module graph...");
+        varn_core::term::terminal::tagged("Varn", "resolving module graph...");
     }
     let graph_build =
         crate::module_precompile::build_module_graph(program, source, &program.filename, &proto)

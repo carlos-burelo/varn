@@ -1,7 +1,7 @@
 //! Runtime hotspots: functions, natives, globals, allocations.
 
-use varn_term::chalk::chalk;
-use varn_term::terminal;
+use varn_core::term::chalk::chalk;
+use varn_core::term::terminal;
 use varn_vm::HotspotCounters;
 
 use super::fmt::{fmt_num, fmt_pct, row, row_note, short_global, LABEL_WIDTH};

@@ -1,0 +1,55 @@
+import { nowMs$, msToParts$ } from "runtime:time";
+import { pad2, pad3, pad4 } from "std:time/core";
+
+export class DateTime {
+    timestamp: int;
+
+    constructor(timestampMs?: int) {
+        if (timestampMs !== null) {
+            this.timestamp = timestampMs;
+        } else {
+            this.timestamp = nowMs$();
+        }
+    }
+
+    static now(): DateTime {
+        return new DateTime(nowMs$());
+    }
+
+    static fromTimestamp(ms: int): DateTime {
+        return new DateTime(ms);
+    }
+
+    get toMs(): int {
+        return this.timestamp;
+    }
+
+    toISOString(): str {
+        let p = msToParts$(this.timestamp);
+        return pad4(p.year) + "-" + pad2(p.month) + "-" + pad2(p.day) + "T" + pad2(p.hour) + ":" + pad2(p.minute) + ":" + pad2(p.second) + "." + pad3(p.millisecond) + "Z";
+    }
+
+    addMs(ms: int): DateTime {
+        return new DateTime(this.timestamp + ms);
+    }
+
+    addSeconds(s: int): DateTime {
+        return new DateTime(this.timestamp + s * 1000);
+    }
+
+    addMinutes(m: int): DateTime {
+        return new DateTime(this.timestamp + m * 60000);
+    }
+
+    addHours(h: int): DateTime {
+        return new DateTime(this.timestamp + h * 3600000);
+    }
+
+    addDays(d: int): DateTime {
+        return new DateTime(this.timestamp + d * 86400000);
+    }
+
+    diff(other: DateTime): int {
+        return this.timestamp - other.timestamp;
+    }
+}

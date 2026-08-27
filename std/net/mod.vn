@@ -1,0 +1,25 @@
+// std:net — Network primitives, URL parsing, Query strings, IP validation and URI codecs
+
+export {
+    encodeURIComponent,
+    decodeURIComponent
+} from "std:net/encoding";
+
+export {
+    isIP,
+    isIPv4,
+    isIPv6
+} from "std:net/ip";
+
+export {
+    URLSearchParams,
+    Query,
+    parseQuery,
+    buildQuery
+} from "std:net/query";
+
+export {
+    Url,
+    parseURL,
+    appendQuery
+} from "std:net/url";

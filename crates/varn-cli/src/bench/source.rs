@@ -8,8 +8,8 @@ use rustc_hash::FxHashMap;
 use varn_checker::Checker;
 use varn_compiler::FunctionProto;
 use varn_core::ModuleId;
-use varn_term::chalk::chalk;
-use varn_term::terminal;
+use varn_core::term::chalk::chalk;
+use varn_core::term::terminal;
 use varn_types::value::Closure;
 use varn_vm::Vm;
 
@@ -111,8 +111,8 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
 
     let optimize_samples = std::cell::RefCell::new(Vec::with_capacity(runs));
     let compile_samples = time_n(runs, || {
-        varn_regalloc::regalloc_post::OPTIMIZE_TIME.with(|t| t.set(Duration::ZERO));
-        varn_regalloc::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(true));
+        varn_compiler::regalloc::regalloc_post::OPTIMIZE_TIME.with(|t| t.set(Duration::ZERO));
+        varn_compiler::regalloc::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(true));
 
         let res = varn_compiler::compile_module(
             program_ref,
@@ -123,8 +123,8 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
             export_names_of(&program_ref.filename),
         );
 
-        varn_regalloc::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(false));
-        let opt_dur = varn_regalloc::regalloc_post::OPTIMIZE_TIME.with(|t| t.get());
+        varn_compiler::regalloc::regalloc_post::OPTIMIZE_ENABLED.with(|e| e.set(false));
+        let opt_dur = varn_compiler::regalloc::regalloc_post::OPTIMIZE_TIME.with(|t| t.get());
         optimize_samples.borrow_mut().push(opt_dur);
 
         res.map(|_| ())

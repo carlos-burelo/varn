@@ -1,0 +1,91 @@
+import {
+    abs$,
+    sqrt$,
+    sin$,
+    cos$,
+    tan$,
+    floor$,
+    ceil$,
+    round$,
+    random$,
+    acos$,
+    asin$,
+    atan$,
+    atan2$,
+    exp$,
+    log$,
+    log10$,
+    log2$,
+    pow$,
+    cbrt$,
+    hypot$
+} from "runtime:math";
+
+export class Math {
+    static E: float = 2.718281828459045;
+    static PI: float = 3.141592653589793;
+    static LN10: float = 2.302585092994046;
+    static LN2: float = 0.6931471805599453;
+    static LOG10E: float = 0.4342944819032518;
+    static LOG2E: float = 1.4426950408889634;
+    static SQRT1_2: float = 0.7071067811865476;
+    static SQRT2: float = 1.4142135623730951;
+
+    static abs(x: float): float { return abs$(x); }
+    static sqrt(x: float): float { return sqrt$(x); }
+    static cbrt(x: float): float { return cbrt$(x); }
+    static exp(x: float): float { return exp$(x); }
+    static log(x: float): float { return log$(x); }
+    static log10(x: float): float { return log10$(x); }
+    static log2(x: float): float { return log2$(x); }
+    static pow(x: float, y: float): float { return pow$(x, y); }
+    static hypot(x: float, y: float): float { return hypot$(x, y); }
+    static sin(x: float): float { return sin$(x); }
+    static cos(x: float): float { return cos$(x); }
+    static tan(x: float): float { return tan$(x); }
+    static floor(x: float): float { return floor$(x); }
+    static ceil(x: float): float { return ceil$(x); }
+    static round(x: float): float { return round$(x); }
+    static random(): float { return random$(); }
+    static acos(x: float): float { return acos$(x); }
+    static asin(x: float): float { return asin$(x); }
+    static atan(x: float): float { return atan$(x); }
+    static atan2(y: float, x: float): float { return atan2$(y, x); }
+    static sign(x: float): float {
+        if (x > 0.0) return 1.0;
+        if (x < 0.0) return -1.0;
+        return 0.0;
+    }
+    static trunc(x: float): float {
+        if (x >= 0.0) {
+            return floor$(x);
+        }
+        return ceil$(x);
+    }
+    static min(...args: float[]): float {
+        if (args.length === 0) {
+            throw new Error("min() requires at least one argument");
+        }
+        let current = args[0];
+        for (let i = 1; i < args.length; i = i + 1) {
+            let v = args[i];
+            if (v < current) {
+                current = v;
+            }
+        }
+        return current;
+    }
+    static max(...args: float[]): float {
+        if (args.length === 0) {
+            throw new Error("max() requires at least one argument");
+        }
+        let current = args[0];
+        for (let i = 1; i < args.length; i = i + 1) {
+            let v = args[i];
+            if (v > current) {
+                current = v;
+            }
+        }
+        return current;
+    }
+}

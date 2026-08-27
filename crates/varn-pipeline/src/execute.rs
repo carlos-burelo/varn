@@ -40,13 +40,13 @@ pub fn execute_with_caps(
     varn_vm::prefill_native_modules(&mut machine);
 
     if _debug.trace {
-        varn_term::terminal::tagged("pipeline:execute", "starting builtin initialization");
+        varn_core::term::terminal::tagged("pipeline:execute", "starting builtin initialization");
     }
 
     for builtin_proto in core::core_protos_owned()? {
         if _debug.trace {
             let name = builtin_proto.name.as_deref().unwrap_or("<builtin>");
-            varn_term::terminal::tagged("pipeline:execute", format_args!("running builtin {name}"));
+            varn_core::term::terminal::tagged("pipeline:execute", format_args!("running builtin {name}"));
         }
         let closure = Rc::new(Closure::new(Rc::new(builtin_proto), Vec::new(), Vec::new()));
         machine
@@ -91,7 +91,7 @@ pub fn execute_with_caps(
 
     if _debug.trace {
         let name = main_closure.proto.name.as_deref().unwrap_or("<main>");
-        varn_term::terminal::tagged("pipeline:execute", format_args!("running main {name}"));
+        varn_core::term::terminal::tagged("pipeline:execute", format_args!("running main {name}"));
     }
 
     loop {

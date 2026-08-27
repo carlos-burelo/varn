@@ -28,7 +28,7 @@ pub trait TypeContext {
 
     /// How this context reaches other modules, when it can.
     ///
-    /// Type resolution has to expand generic aliases declared in `std:types`,
+    /// Type resolution has to expand generic aliases declared in `core:types`,
     /// which means resolving a module from inside the type resolver. Exposing
     /// it here keeps that a property of the context that was passed in, rather
     /// than something the resolver reaches for globally.

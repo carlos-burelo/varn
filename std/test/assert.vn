@@ -1,0 +1,286 @@
+let passedCount = 0;
+let failedCount = 0;
+
+export function getPassedCount(): int {
+    return passedCount;
+}
+
+export function getFailedCount(): int {
+    return failedCount;
+}
+
+export function incPassed(): void {
+    passedCount = passedCount + 1;
+}
+
+export function incFailed(): void {
+    failedCount = failedCount + 1;
+}
+
+export function isEq(a: dynamic, b: dynamic): bool {
+    if (a === b || a == b) {
+        return true;
+    }
+    if (typeof a === "str" && typeof b === "str") {
+        let s1 = a as str;
+        let s2 = b as str;
+        if (s1.length != s2.length) {
+            return false;
+        }
+        for (let i = 0; i < s1.length; i = i + 1) {
+            if (s1.slice(i, i + 1) !== s2.slice(i, i + 1)) {
+                return false;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+export class Expectation<T> {
+    private actual: T;
+
+    constructor(actual: T) {
+        this.actual = actual;
+    }
+
+    toBe(expected: T): void {
+        if (!isEq(this.actual, expected)) {
+            failedCount = failedCount + 1;
+            throw new Error("Expected " + expected + " but received " + this.actual);
+        }
+        passedCount = passedCount + 1;
+    }
+
+    toEqual(expected: T): void {
+        if (!isEq(this.actual, expected)) {
+            failedCount = failedCount + 1;
+            throw new Error("Expected equal " + expected + " but received " + this.actual);
+        }
+        passedCount = passedCount + 1;
+    }
+
+    toBeTruthy(): void {
+        if (!this.actual) {
+            failedCount = failedCount + 1;
+            throw new Error("Expected truthy value but received " + this.actual);
+        }
+        passedCount = passedCount + 1;
+    }
+
+    toBeFalsy(): void {
+        if (this.actual) {
+            failedCount = failedCount + 1;
+            throw new Error("Expected falsy value but received " + this.actual);
+        }
+        passedCount = passedCount + 1;
+    }
+}
+
+export function expect<T>(val: T): Expectation<T> {
+    return new Expectation<T>(val);
+}
+
+export function assert(a: dynamic, b?: dynamic): void {
+    let cond: bool = false;
+    let label: str = "assert";
+
+    if (typeof a === "str") {
+        label = a as str;
+        cond = b as bool;
+    } else if (typeof b === "str") {
+        label = b as str;
+        cond = a as bool;
+    } else {
+        cond = a as bool;
+    }
+
+    if (!cond) {
+        failedCount = failedCount + 1;
+        throw new Error("ASSERT FAIL: " + label);
+    }
+    passedCount = passedCount + 1;
+}
+
+export function assertEqual<T>(a: dynamic, b: dynamic, c?: dynamic): void {
+    let label: str = "assertEqual";
+    let actual: dynamic = a;
+    let expected: dynamic = b;
+
+    if (c != null) {
+        if (isEq(b, c)) {
+            label = a as str;
+            actual = b;
+            expected = c;
+        } else if (isEq(a, b)) {
+            label = c as str;
+            actual = a;
+            expected = b;
+        } else if (typeof a === "str" && typeof c !== "str") {
+            label = a as str;
+            actual = b;
+            expected = c;
+        } else if (typeof c === "str") {
+            label = c as str;
+            actual = a;
+            expected = b;
+        }
+    }
+
+    if (!isEq(actual, expected)) {
+        failedCount = failedCount + 1;
+        throw new Error("ASSERT FAIL: " + label + " (expected " + expected + " but got " + actual + ")");
+    }
+    passedCount = passedCount + 1;
+}
+
+export function assertTrue(a: dynamic, b?: dynamic): void {
+    let cond: bool = false;
+    let label: str = "assertTrue";
+
+    if (typeof a === "bool") {
+        cond = a as bool;
+        if (typeof b === "str") {
+            label = b as str;
+        }
+    } else if (typeof b === "bool") {
+        cond = b as bool;
+        if (typeof a === "str") {
+            label = a as str;
+        }
+    } else {
+        cond = a as bool;
+    }
+
+    if (!cond) {
+        failedCount = failedCount + 1;
+        throw new Error("ASSERT FAIL: " + label);
+    }
+    passedCount = passedCount + 1;
+}
+
+export function assertFalse(a: dynamic, b?: dynamic): void {
+    let cond: bool = true;
+    let label: str = "assertFalse";
+
+    if (typeof a === "bool") {
+        cond = a as bool;
+        if (typeof b === "str") {
+            label = b as str;
+        }
+    } else if (typeof b === "bool") {
+        cond = b as bool;
+        if (typeof a === "str") {
+            label = a as str;
+        }
+    } else {
+        cond = a as bool;
+    }
+
+    if (cond) {
+        failedCount = failedCount + 1;
+        throw new Error("ASSERT FAIL: " + label + " (expected false but got true)");
+    }
+    passedCount = passedCount + 1;
+}
+
+export function assertNull(val: dynamic, msg?: str): void {
+    if (val !== null) {
+        failedCount = failedCount + 1;
+        throw new Error("ASSERT FAIL: " + (msg ?? "assertNull") + " (expected null, got " + val + ")");
+    }
+    passedCount = passedCount + 1;
+}
+
+export function assertNotNull(val: dynamic, msg?: str): void {
+    if (val === null) {
+        failedCount = failedCount + 1;
+        throw new Error("ASSERT FAIL: " + (msg ?? "assertNotNull") + " (expected non-null value)");
+    }
+    passedCount = passedCount + 1;
+}
+
+export function assertNotEqual(a: dynamic, b: dynamic, msg?: str): void {
+    if (isEq(a, b)) {
+        failedCount = failedCount + 1;
+        throw new Error("ASSERT FAIL: " + (msg ?? "assertNotEqual") + " (expected values to differ, got " + a + ")");
+    }
+    passedCount = passedCount + 1;
+}
+
+export function assertContains(container: dynamic, item: dynamic, msg?: str): void {
+    let found = false;
+    if (typeof container === "str" && typeof item === "str") {
+        found = (container as str).includes(item as str);
+    } else if (Array.isArray(container)) {
+        for (let elem of (container as dynamic[])) {
+            if (isEq(elem, item)) {
+                found = true;
+                break;
+            }
+        }
+    }
+    if (!found) {
+        failedCount = failedCount + 1;
+        throw new Error("ASSERT FAIL: " + (msg ?? "assertContains") + " (container does not contain item)");
+    }
+    passedCount = passedCount + 1;
+}
+
+export function assertCloseTo(a: float, b: float, epsilon?: float, msg?: str): void {
+    let eps = epsilon ?? 0.00001;
+    let diff = a - b;
+    if (diff < 0.0) diff = -diff;
+    if (diff > eps) {
+        failedCount = failedCount + 1;
+        throw new Error("ASSERT FAIL: " + (msg ?? "assertCloseTo") + " (" + a + " is not close to " + b + " within " + eps + ")");
+    }
+    passedCount = passedCount + 1;
+}
+
+export function assertThrows(fn: () => void, expectedErr?: str, msg?: str): void {
+    let threw = false;
+    let errMessage = "";
+    try {
+        fn();
+    } catch (e) {
+        threw = true;
+        if (e !== null && typeof e === "object") {
+            let dynE: dynamic = e;
+            if (dynE.message !== null) {
+                errMessage = "" + dynE.message;
+            } else {
+                errMessage = "" + e;
+            }
+        } else {
+            errMessage = "" + e;
+        }
+    }
+    if (!threw) {
+        failedCount = failedCount + 1;
+        throw new Error("ASSERT FAIL: " + (msg ?? "assertThrows") + " (function did not throw)");
+    }
+    if (expectedErr !== null && expectedErr.length > 0) {
+        if (!errMessage.includes(expectedErr)) {
+            failedCount = failedCount + 1;
+            throw new Error("ASSERT FAIL: " + (msg ?? "assertThrows") + " (expected error containing '" + expectedErr + "', got '" + errMessage + "')");
+        }
+    }
+    passedCount = passedCount + 1;
+}
+
+export function fail(msg?: str): void {
+    failedCount = failedCount + 1;
+    throw new Error("ASSERT FAIL: " + (msg ?? "fail"));
+}
+
+export function summary(): void {
+    print("\n════════════════════════════════════════");
+    print("PASSED: " + passedCount);
+    print("FAILED: " + failedCount);
+    if (failedCount === 0) {
+        print("ALL TESTS PASSED");
+    } else {
+        print("SOME TESTS FAILED");
+    }
+}

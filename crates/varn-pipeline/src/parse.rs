@@ -20,7 +20,7 @@ pub fn parse(
         let error_count = errs.len();
         let footer = format!(
             "\n{}: could not compile `{}` due to {} previous error{}",
-            varn_term::chalk::chalk("error").red().bold(),
+            varn_core::term::chalk::chalk("error").red().bold(),
             path,
             error_count,
             if error_count > 1 { "s" } else { "" }
@@ -29,7 +29,7 @@ pub fn parse(
     })?;
 
     if verbose {
-        varn_term::terminal::tagged(
+        varn_core::term::terminal::tagged(
             "Varn",
             format_args!("parsed {} top-level statements", program.body.len()),
         );

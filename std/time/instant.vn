@@ -1,0 +1,77 @@
+import { nowMs$, msToParts$ } from "runtime:time";
+import { pad2, pad3, pad4 } from "std:time/core";
+
+export class Instant {
+    epochMilliseconds: int;
+
+    constructor(epochMilliseconds: int) {
+        this.epochMilliseconds = epochMilliseconds;
+    }
+
+    toString(): str {
+        return `Instant(${this.epochMilliseconds}ms)`;
+    }
+
+    static compare(a: Instant, b: Instant): int {
+        return a.epochMilliseconds - b.epochMilliseconds;
+    }
+}
+
+export class PlainDateTime {
+    year: int;
+    month: int;
+    day: int;
+    hour: int;
+    minute: int;
+    second: int;
+    millisecond: int;
+
+    constructor(year: int, month: int, day: int, hour: int = 0, minute: int = 0, second: int = 0, millisecond: int = 0) {
+        this.year = year;
+        this.month = month;
+        this.day = day;
+        this.hour = hour;
+        this.minute = minute;
+        this.second = second;
+        this.millisecond = millisecond;
+    }
+
+    toString(): str {
+        let yr = this.year;
+        let mo = this.month;
+        let dy = this.day;
+        let hr = this.hour;
+        let mn = this.minute;
+        let sc = this.second;
+        let ms = this.millisecond;
+
+        return pad4(yr) + "-" + pad2(mo) + "-" + pad2(dy) + "T" + pad2(hr) + ":" + pad2(mn) + ":" + pad2(sc) + "." + pad3(ms);
+    }
+
+    static compare(a: PlainDateTime, b: PlainDateTime): int {
+        if (a.year !== b.year) return a.year - b.year;
+        if (a.month !== b.month) return a.month - b.month;
+        if (a.day !== b.day) return a.day - b.day;
+        if (a.hour !== b.hour) return a.hour - b.hour;
+        if (a.minute !== b.minute) return a.minute - b.minute;
+        if (a.second !== b.second) return a.second - b.second;
+        return a.millisecond - b.millisecond;
+    }
+}
+
+export function nowInstant(): Instant {
+    return new Instant(nowMs$());
+}
+
+export function nowPlainDateTimeISO(): PlainDateTime {
+    let parts = msToParts$(nowMs$());
+    return new PlainDateTime(
+        parts.year,
+        parts.month,
+        parts.day,
+        parts.hour,
+        parts.minute,
+        parts.second,
+        parts.millisecond
+    );
+}

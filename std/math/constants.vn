@@ -1,0 +1,8 @@
+export const E: float = 2.718281828459045;
+export const LN10: float = 2.302585092994046;
+export const LN2: float = 0.6931471805599453;
+export const LOG10E: float = 0.4342944819032518;
+export const LOG2E: float = 1.4426950408889634;
+export const PI: float = 3.141592653589793;
+export const SQRT1_2: float = 0.7071067811865476;
+export const SQRT2: float = 1.4142135623730951;

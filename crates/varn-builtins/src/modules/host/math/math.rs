@@ -23,5 +23,12 @@ varn_contract! {
         fn asin(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.asin()) }
         fn atan(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.atan()) }
         fn atan2(_ctx: &mut dyn NativeCtx, y: f64, x: f64) -> Result<f64, String> { Ok(y.atan2(x)) }
+        fn exp(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.exp()) }
+        fn log(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.ln()) }
+        fn log10(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.log10()) }
+        fn log2(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.log2()) }
+        fn pow(_ctx: &mut dyn NativeCtx, x: f64, y: f64) -> Result<f64, String> { Ok(x.powf(y)) }
+        fn cbrt(_ctx: &mut dyn NativeCtx, x: f64) -> Result<f64, String> { Ok(x.cbrt()) }
+        fn hypot(_ctx: &mut dyn NativeCtx, x: f64, y: f64) -> Result<f64, String> { Ok(x.hypot(y)) }
     }
 }

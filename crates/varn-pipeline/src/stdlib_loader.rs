@@ -281,10 +281,12 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
     // round-trip at a time is not worth the four-minute rebuild.
     let mut failures = String::new();
     for m in &manifest.modules {
-        let file = std_dir.join(format!(
-            "{}.vn",
-            m.id.strip_prefix("std:").ok_or("invalid std: prefix")?
-        ));
+        let rel_id = m.id.strip_prefix("std:").ok_or("invalid std: prefix")?;
+        let file = if std_dir.join(format!("{rel_id}/mod.vn")).exists() {
+            std_dir.join(format!("{rel_id}/mod.vn"))
+        } else {
+            std_dir.join(format!("{rel_id}.vn"))
+        };
         let source = std::fs::read_to_string(&file)
             .map_err(|e| format!("cannot read {}: {e}", file.display()))?;
 

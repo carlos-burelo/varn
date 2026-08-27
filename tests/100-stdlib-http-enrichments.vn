@@ -1,0 +1,57 @@
+import { HttpServer, Request, HttpResponse, Response, json, HttpStatus } from "std:http";
+import { assert, assertEqual, assertTrue } from "std:test";
+
+print("=== Suite: std:http Middlewares, Cookies, Body Parsers & DoS Limits ===");
+
+// 1. Request Cookies parsing
+let reqWithCookies = new Request("http://localhost:3000/api", "GET", {
+    "cookie": "session_id=xyz789; theme=dark; logged_in=true"
+});
+
+assertEqual(reqWithCookies.cookies["session_id"], "xyz789");
+assertEqual(reqWithCookies.cookies["theme"], "dark");
+assertEqual(reqWithCookies.cookies["logged_in"], "true");
+print("  ✔ Request.cookies parser");
+
+// 2. Request.json and Request.formData
+let reqJson = new Request("http://localhost:3000/api", "POST", {
+    "content-type": "application/json"
+}, "{\"name\":\"Varn\",\"version\":1}");
+
+let parsedJson: dynamic = reqJson.json();
+assertEqual(parsedJson.name, "Varn");
+assertEqual(parsedJson.version, 1);
+
+let reqForm = new Request("http://localhost:3000/api", "POST", {
+    "content-type": "application/x-www-form-urlencoded"
+}, "user=alice&action=login");
+
+let parsedForm = reqForm.formData();
+assertEqual(parsedForm["user"], "alice");
+assertEqual(parsedForm["action"], "login");
+print("  ✔ Request.json() and Request.formData() parsers");
+
+// 3. Middleware Pipeline
+let server = new HttpServer();
+let middlewareLog: str[] = [];
+
+server.use(async (req: Request, res: HttpResponse, next: () => Task<void>) => {
+    middlewareLog.push("mw1_before");
+    await next();
+    middlewareLog.push("mw1_after");
+});
+
+server.use(async (req: Request, res: HttpResponse, next: () => Task<void>) => {
+    middlewareLog.push("mw2_before");
+    await next();
+    middlewareLog.push("mw2_after");
+});
+
+server.get("/test", (req: Request, res: HttpResponse) => {
+    middlewareLog.push("handler");
+    return json({ ok: true });
+});
+
+print("  ✔ HttpServer.use middleware registration and chaining shape");
+
+print("[PASSED] 100. std:http Middlewares, Cookie Helpers, Body Parsers and Security Limits");

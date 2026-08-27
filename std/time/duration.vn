@@ -1,0 +1,81 @@
+import { parseIsoDuration$ } from "runtime:time";
+import { int_div, DurationParts } from "std:time/core";
+
+export type DurationLike = Duration | str | int | DurationParts;
+
+export class Duration {
+    totalMilliseconds: int;
+    hours: int;
+    minutes: int;
+    seconds: int;
+    days: int;
+    milliseconds: int;
+
+    constructor(ms: int) {
+        let total_s = int_div(ms, 1000);
+        this.totalMilliseconds = ms;
+        this.hours = int_div(total_s, 3600);
+        this.minutes = int_div(total_s % 3600, 60);
+        this.seconds = total_s;
+        this.days = int_div(total_s, 86400);
+        this.milliseconds = ms % 1000;
+    }
+
+    static from(input: DurationLike): Duration {
+        if (input instanceof Duration) {
+            return input as Duration;
+        } else if (input instanceof str) {
+            let ms = parseIsoDuration$(input as str);
+            return new Duration(ms);
+        } else if (input instanceof int) {
+            return new Duration(input as int);
+        } else {
+            let parts = input as DurationParts;
+            let ms = 0;
+            if (parts.milliseconds !== null) ms = ms + parts.milliseconds;
+            if (parts.seconds !== null) ms = ms + parts.seconds * 1000;
+            if (parts.minutes !== null) ms = ms + parts.minutes * 60000;
+            if (parts.hours !== null) ms = ms + parts.hours * 3600000;
+            if (parts.days !== null) ms = ms + parts.days * 86400000;
+            return new Duration(ms);
+        }
+    }
+
+    abs(): Duration {
+        let ms = this.totalMilliseconds;
+        if (ms < 0) ms = -ms;
+        return new Duration(ms);
+    }
+
+    negated(): Duration {
+        return new Duration(-this.totalMilliseconds);
+    }
+
+    add(other: DurationLike): Duration {
+        let od = Duration.from(other);
+        return new Duration(this.totalMilliseconds + od.totalMilliseconds);
+    }
+
+    subtract(other: DurationLike): Duration {
+        let od = Duration.from(other);
+        return new Duration(this.totalMilliseconds - od.totalMilliseconds);
+    }
+
+    compare(other: DurationLike): int {
+        let od = Duration.from(other);
+        return this.totalMilliseconds - od.totalMilliseconds;
+    }
+
+    equals(other: DurationLike): bool {
+        let od = Duration.from(other);
+        return this.totalMilliseconds === od.totalMilliseconds;
+    }
+
+    toString(): str {
+        return "Duration(" + this.totalMilliseconds + "ms)";
+    }
+
+    toJSON(): str {
+        return this.toString();
+    }
+}

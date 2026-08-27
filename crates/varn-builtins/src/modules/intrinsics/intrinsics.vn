@@ -26,3 +26,12 @@ export interface TaskHandle<T = dynamic> {
     await(): T;
     cancel(): void;
 }
+
+export interface Disposable {
+    dispose(): void;
+}
+
+export interface AsyncDisposable {
+    disposeAsync(): void;
+}
+

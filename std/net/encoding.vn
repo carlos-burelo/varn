@@ -1,0 +1,12 @@
+import {
+    encodeURIComponent$,
+    decodeURIComponent$
+} from "runtime:net";
+
+export function encodeURIComponent(s: str): str {
+    return encodeURIComponent$(s);
+}
+
+export function decodeURIComponent(s: str): str {
+    return decodeURIComponent$(s);
+}

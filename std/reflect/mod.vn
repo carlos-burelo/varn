@@ -1,0 +1,18 @@
+// std:reflect — Runtime reflection, metadata annotations and dynamic object introspection
+
+export {
+    ClassRef,
+    FunctionRef,
+    defineMetadata,
+    getMetadata,
+    hasMetadata,
+    createMetaKey,
+    setMetaKey,
+    getMetaKey,
+    hasMetaKey,
+    getMetadataKeys,
+    MetaKey,
+    MethodContext
+} from "std:reflect/meta";
+
+export { Reflect } from "std:reflect/introspect";

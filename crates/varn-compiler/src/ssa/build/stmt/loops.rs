@@ -24,6 +24,7 @@ impl Builder {
 
         self.current = header;
         let cond = self.lower_expr(test)?;
+        let test_end = self.current;
         let body_b = self.new_block();
         let exit_b = self.new_block();
         self.set_term(Terminator::Branch {
@@ -33,8 +34,8 @@ impl Builder {
             else_blk: exit_b,
             else_args: Vec::new(),
         });
-        self.add_pred(body_b, header);
-        self.add_pred(exit_b, header);
+        self.add_pred(body_b, test_end);
+        self.add_pred(exit_b, test_end);
         self.seal_block(body_b);
 
         self.loops.push(LoopCtx {
@@ -76,6 +77,7 @@ impl Builder {
 
         self.current = header;
         let cond = self.lower_expr(test)?;
+        let test_end = self.current;
         let body_b = self.new_block();
         let update_b = self.new_block();
         let exit_b = self.new_block();
@@ -86,8 +88,8 @@ impl Builder {
             else_blk: exit_b,
             else_args: Vec::new(),
         });
-        self.add_pred(body_b, header);
-        self.add_pred(exit_b, header);
+        self.add_pred(body_b, test_end);
+        self.add_pred(exit_b, test_end);
         self.seal_block(body_b);
 
         self.loops.push(LoopCtx {
@@ -369,6 +371,7 @@ impl Builder {
         self.seal_block(latch);
         self.current = latch;
         let cond = self.lower_expr(test)?;
+        let latch_end = self.current;
         self.set_term(Terminator::Branch {
             cond,
             then_blk: body_b,
@@ -376,8 +379,8 @@ impl Builder {
             else_blk: exit_b,
             else_args: Vec::new(),
         });
-        self.add_pred(body_b, latch);
-        self.add_pred(exit_b, latch);
+        self.add_pred(body_b, latch_end);
+        self.add_pred(exit_b, latch_end);
         self.seal_block(body_b);
         self.seal_block(exit_b);
         self.current = exit_b;

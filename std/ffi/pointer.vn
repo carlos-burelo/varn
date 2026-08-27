@@ -1,0 +1,98 @@
+import {
+    alloc$,
+    free$,
+    readInt$,
+    writeInt$,
+    readFloat$,
+    writeFloat$,
+    readCString$,
+    allocCString$
+} from "runtime:ffi";
+
+export class Pointer {
+    let address: int;
+
+    constructor(address: int) {
+        this.address = address;
+    }
+
+    offset(bytes: int): Pointer {
+        return new Pointer(this.address + bytes);
+    }
+
+    readI8(offset: int = 0): int {
+        return readInt$(this.address, offset, 1);
+    }
+
+    readI16(offset: int = 0): int {
+        return readInt$(this.address, offset, 2);
+    }
+
+    readI32(offset: int = 0): int {
+        return readInt$(this.address, offset, 4);
+    }
+
+    readI64(offset: int = 0): int {
+        return readInt$(this.address, offset, 8);
+    }
+
+    readInt(offset: int = 0, size: int = 8): int {
+        return readInt$(this.address, offset, size);
+    }
+
+    writeI8(val: int, offset: int = 0): void {
+        writeInt$(this.address, offset, val, 1);
+    }
+
+    writeI16(val: int, offset: int = 0): void {
+        writeInt$(this.address, offset, val, 2);
+    }
+
+    writeI32(val: int, offset: int = 0): void {
+        writeInt$(this.address, offset, val, 4);
+    }
+
+    writeI64(val: int, offset: int = 0): void {
+        writeInt$(this.address, offset, val, 8);
+    }
+
+    writeInt(val: int, offset: int = 0, size: int = 8): void {
+        writeInt$(this.address, offset, val, size);
+    }
+
+    readF32(offset: int = 0): float {
+        return readFloat$(this.address, offset, false);
+    }
+
+    readF64(offset: int = 0): float {
+        return readFloat$(this.address, offset, true);
+    }
+
+    readFloat(offset: int = 0, isDouble: bool = true): float {
+        return readFloat$(this.address, offset, isDouble);
+    }
+
+    writeF32(val: float, offset: int = 0): void {
+        writeFloat$(this.address, offset, val, false);
+    }
+
+    writeF64(val: float, offset: int = 0): void {
+        writeFloat$(this.address, offset, val, true);
+    }
+
+    writeFloat(val: float, offset: int = 0, isDouble: bool = true): void {
+        writeFloat$(this.address, offset, val, isDouble);
+    }
+
+    readCString(offset: int = 0): str {
+        return readCString$(this.address, offset);
+    }
+
+    free(): void {
+        free$(this.address);
+    }
+
+    isNull(): bool {
+        return this.address == 0;
+    }
+}

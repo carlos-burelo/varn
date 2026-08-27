@@ -1,0 +1,270 @@
+import {
+    encodeURIComponent$,
+    decodeURIComponent$
+} from "runtime:net";
+
+export function trimPrefixQ(s: str): str {
+    if (s.startsWith("?")) {
+        return s.slice(1);
+    }
+    return s;
+}
+
+export class URLSearchParams {
+    private values: { [key: str]: str[] } = {};
+
+    constructor(init?: str | { [key: str]: str | str[] }) {
+        this.values = {};
+        if (init !== null) {
+            if (typeof init === "str") {
+                this._parse(init as str);
+            } else if (typeof init === "object") {
+                for (const key in (init as { [key: str]: str | str[] })) {
+                    const value = (init as any)[key];
+                    if (Array.isArray(value)) {
+                        for (const item of value) {
+                            this.append(key, "" + item);
+                        }
+                    } else {
+                        this.append(key, "" + value);
+                    }
+                }
+            }
+        }
+    }
+
+    private _parse(s: str): void {
+        const text = trimPrefixQ(s);
+        if (text.length == 0) {
+            return;
+        }
+
+        const entries = text.split("&");
+        for (const entry of entries) {
+            if (entry.length == 0) {
+                continue;
+            }
+
+            const eq = entry.indexOf("=");
+            const rawKey = eq >= 0 ? entry.slice(0, eq) : entry;
+            const rawValue = eq >= 0 ? entry.slice(eq + 1) : "";
+
+            this.append(decodeURIComponent$(rawKey), decodeURIComponent$(rawValue));
+        }
+    }
+
+    get(key: str): str? {
+        const bucket = this.values[key];
+        if (bucket == null || bucket.length == 0) {
+            return null;
+        }
+        return bucket[0];
+    }
+
+    getAll(key: str): str[] {
+        const bucket = this.values[key];
+        if (bucket == null) {
+            return [];
+        }
+        return bucket.slice();
+    }
+
+    set(key: str, value: str): void {
+        this.values[key] = [value];
+    }
+
+    append(key: str, value: str): void {
+        const bucket = this.values[key];
+        if (bucket == null) {
+            this.values[key] = [value];
+        } else {
+            bucket.push(value);
+        }
+    }
+
+    has(key: str, value?: str): bool {
+        const bucket = this.values[key];
+        if (bucket == null || bucket.length == 0) {
+            return false;
+        }
+        if (value !== null) {
+            return bucket.includes(value);
+        }
+        return true;
+    }
+
+    delete(key: str): void {
+        let newValues: { [key: str]: str[] } = {};
+        for (const k in this.values) {
+            if (k !== key) {
+                newValues[k] = this.values[k];
+            }
+        }
+        this.values = newValues;
+    }
+
+    keys(): str[] {
+        let res: str[] = [];
+        for (const key in this.values) {
+            res.push(key);
+        }
+        return res;
+    }
+
+    valuesList(): str[] {
+        let res: str[] = [];
+        for (const key in this.values) {
+            const bucket = this.values[key];
+            for (const val of bucket) {
+                res.push(val);
+            }
+        }
+        return res;
+    }
+
+    entries(): [str, str][] {
+        let res: [str, str][] = [];
+        for (const key in this.values) {
+            const bucket = this.values[key];
+            for (const val of bucket) {
+                res.push([key, val]);
+            }
+        }
+        return res;
+    }
+
+    toObject(): { [key: str]: str[] } {
+        return this.values;
+    }
+
+    toString(): str {
+        const parts: str[] = [];
+        for (const key in this.values) {
+            const encodedKey = encodeURIComponent$(key);
+            const bucket = this.values[key];
+            for (const value of bucket) {
+                parts.push(encodedKey + "=" + encodeURIComponent$(value));
+            }
+        }
+        return parts.join("&");
+    }
+}
+
+export class Query {
+    private values: { [key: str]: str[] } = {};
+
+    constructor(init?: str | { [key: str]: str | str[] }) {
+        this.values = {};
+        if (init !== null) {
+            if (typeof init === "str") {
+                this._parse(init as str);
+            } else if (typeof init === "object") {
+                for (const key in (init as { [key: str]: str | str[] })) {
+                    const value = (init as any)[key];
+                    if (Array.isArray(value)) {
+                        for (const item of value) {
+                            this.append(key, "" + item);
+                        }
+                    } else {
+                        this.append(key, "" + value);
+                    }
+                }
+            }
+        }
+    }
+
+    private _parse(s: str): void {
+        const text = trimPrefixQ(s);
+        if (text.length == 0) {
+            return;
+        }
+
+        const entries = text.split("&");
+        for (const entry of entries) {
+            if (entry.length == 0) {
+                continue;
+            }
+
+            const eq = entry.indexOf("=");
+            const rawKey = eq >= 0 ? entry.slice(0, eq) : entry;
+            const rawValue = eq >= 0 ? entry.slice(eq + 1) : "";
+
+            this.append(decodeURIComponent$(rawKey), decodeURIComponent$(rawValue));
+        }
+    }
+
+    static parse(s: str): Query {
+        return new Query(s);
+    }
+
+    static fromObject(q: { [key: str]: str | str[] }): Query {
+        return new Query(q);
+    }
+
+    get(key: str): str? {
+        const bucket = this.values[key];
+        if (bucket == null || bucket.length == 0) {
+            return null;
+        }
+        return bucket[0];
+    }
+
+    getAll(key: str): str[] {
+        const bucket = this.values[key];
+        if (bucket == null) {
+            return [];
+        }
+        return bucket.slice();
+    }
+
+    set(key: str, value: str): void {
+        this.values[key] = [value];
+    }
+
+    append(key: str, value: str): void {
+        const bucket = this.values[key];
+        if (bucket == null) {
+            this.values[key] = [value];
+        } else {
+            bucket.push(value);
+        }
+    }
+
+    has(key: str): bool {
+        return this.values[key] !== null;
+    }
+
+    delete(key: str): void {
+        let newValues: { [key: str]: str[] } = {};
+        for (const k in this.values) {
+            if (k !== key) {
+                newValues[k] = this.values[k];
+            }
+        }
+        this.values = newValues;
+    }
+
+    toObject(): { [key: str]: str[] } {
+        return this.values;
+    }
+
+    toString(): str {
+        const parts: str[] = [];
+        for (const key in this.values) {
+            const encodedKey = encodeURIComponent$(key);
+            const bucket = this.values[key];
+            for (const value of bucket) {
+                parts.push(encodedKey + "=" + encodeURIComponent$(value));
+            }
+        }
+        return parts.join("&");
+    }
+}
+
+export function parseQuery(s: str): Query {
+    return Query.parse(s);
+}
+
+export function buildQuery(q: { [key: str]: str | str[] }): str {
+    return Query.fromObject(q).toString();
+}

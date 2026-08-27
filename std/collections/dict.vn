@@ -1,0 +1,23 @@
+export class Dict<K, V> {
+    private entries: Map<V>;
+
+    constructor() {
+        this.entries = new Map<V>();
+    }
+
+    get(key: K): V? {
+        return this.entries.get(key as str);
+    }
+
+    set(key: K, value: V): void {
+        this.entries.set(key as str, value);
+    }
+
+    has(key: K): bool {
+        return this.entries.has(key as str);
+    }
+
+    delete(key: K): bool {
+        return this.entries.delete(key as str);
+    }
+}

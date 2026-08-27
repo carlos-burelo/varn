@@ -10,7 +10,6 @@ edition.workspace = true
 [dependencies]
 varn-core  = { path = "../varn-core" }
 varn-types = { path = "../varn-types" }
-varn-regalloc = { path = "../varn-regalloc" }
 rustc-hash = { workspace = true }
 rust_decimal = { workspace = true }
 

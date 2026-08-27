@@ -16,7 +16,6 @@ pub fn try_compile_function(
     source_file: Rc<str>,
 ) -> Result<FunctionProto, OptError> {
     let mut ssa = build::build_function(f, &[], Some(source_file.clone()))?;
-    crate::passes::optimize_with(&mut ssa, &crate::hir::ctor_summary::current());
     let state_size = crate::passes::state_machine::run(&mut ssa);
     if let Err(why) = verify::verify(&ssa) {
         panic!("ssa: verify failed for {}: {}", f.name, why);

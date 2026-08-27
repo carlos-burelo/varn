@@ -227,14 +227,42 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
                         }
                     }
                 }
-                ExportDecl::Named { specifiers, .. } => {
-                    for spec in specifiers {
-                        if let Some(sym) = exports.get(&spec.exported.to_string()) {
-                            if let Some(slot_idx) = sym.slot_idx {
-                                ann.record_slot_idx(
-                                    AnnKey::decl(spec.range.start.offset),
-                                    slot_idx,
-                                );
+                ExportDecl::Named { specifiers, source, .. } => {
+                    if let Some(src) = source {
+                        let src_exports = if crate::module_resolver::paths::is_known_module(src) {
+                            ctx.resolver.stdlib_exports(src)
+                        } else {
+                            let base_dir = std::path::PathBuf::from(ctx.bind.source_file.as_ref()).parent().unwrap_or(std::path::Path::new(".")).to_path_buf();
+                            let src_abs = varn_modules::resolve_specifier_path(&base_dir, src);
+                            ctx.resolver.module_exports(src_abs.as_deref().unwrap_or(""), &mut vec![])
+                        };
+                        for spec in specifiers {
+                            if let Some(sym) = exports.get(&spec.exported.to_string()) {
+                                if let Some(exported_slot) = sym.slot_idx {
+                                    ann.record_exported_slot_idx(
+                                        varn_core::AnnKey::decl(spec.range.start.offset),
+                                        exported_slot,
+                                    );
+                                }
+                            }
+                            if let Some(sym) = src_exports.get(&spec.local.to_string()) {
+                                if let Some(imported_slot) = sym.slot_idx {
+                                    ann.record_slot_idx(
+                                        varn_core::AnnKey::decl(spec.range.start.offset),
+                                        imported_slot,
+                                    );
+                                }
+                            }
+                        }
+                    } else {
+                        for spec in specifiers {
+                            if let Some(sym) = exports.get(&spec.exported.to_string()) {
+                                if let Some(exported_slot) = sym.slot_idx {
+                                    ann.record_exported_slot_idx(
+                                        varn_core::AnnKey::decl(spec.range.start.offset),
+                                        exported_slot,
+                                    );
+                                }
                             }
                         }
                     }

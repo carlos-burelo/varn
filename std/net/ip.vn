@@ -1,0 +1,17 @@
+import {
+    isIP$,
+    isIPv4$,
+    isIPv6$
+} from "runtime:net";
+
+export function isIP(s: str): bool {
+    return isIP$(s);
+}
+
+export function isIPv4(s: str): bool {
+    return isIPv4$(s);
+}
+
+export function isIPv6(s: str): bool {
+    return isIPv6$(s);
+}

@@ -31,23 +31,19 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
 
     if a.is_sso() && b.is_heap() {
         if let Some(HeapObj::Str(s)) = heap.get(b.as_heap_idx()) {
-            if s.len() != a.sso_len() {
+            if s.byte_len() != a.sso_len() {
                 return false;
             }
-            let mut buf = [0u8; 5];
-            let s2 = a.sso_as_str(&mut buf);
-            return s.as_ref() == s2;
+            return a.sso_eq_bytes(s.as_str().as_bytes());
         }
         return false;
     }
     if b.is_sso() && a.is_heap() {
         if let Some(HeapObj::Str(s)) = heap.get(a.as_heap_idx()) {
-            if s.len() != b.sso_len() {
+            if s.byte_len() != b.sso_len() {
                 return false;
             }
-            let mut buf = [0u8; 5];
-            let s2 = b.sso_as_str(&mut buf);
-            return s.as_ref() == s2;
+            return b.sso_eq_bytes(s.as_str().as_bytes());
         }
         return false;
     }
@@ -58,7 +54,12 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
             return true;
         }
         match (heap.get(ai), heap.get(bi)) {
-            (Some(HeapObj::Str(sa)), Some(HeapObj::Str(sb))) => return sa == sb,
+            (Some(HeapObj::Str(sa)), Some(HeapObj::Str(sb))) => {
+                if sa.byte_len() != sb.byte_len() {
+                    return false;
+                }
+                return sa.as_str() == sb.as_str();
+            }
             (Some(HeapObj::Char(ca)), Some(HeapObj::Char(cb))) => return ca == cb,
             (Some(HeapObj::BigInt(a)), Some(HeapObj::BigInt(b))) => return a == b,
             (Some(HeapObj::Decimal(da)), Some(HeapObj::Decimal(db))) => return da == db,

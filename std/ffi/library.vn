@@ -1,0 +1,120 @@
+import {
+    dlopen$,
+    dlclose$,
+    dlsym$,
+    call$,
+    alloc$,
+    free$,
+    readCString$,
+    allocCString$
+} from "runtime:ffi";
+
+import { FfiType } from "std:ffi/types";
+import { Pointer } from "std:ffi/pointer";
+
+export class FfiFunction {
+    let fnPtr: int;
+    let returnType: FfiType;
+    let paramTypes: FfiType[];
+
+    constructor(fnPtr: int, returnType: FfiType, paramTypes: FfiType[]) {
+        this.fnPtr = fnPtr;
+        this.returnType = returnType;
+        this.paramTypes = paramTypes;
+    }
+
+    invoke(args: dynamic[] = []): dynamic {
+        let marshaledArgs: dynamic[] = [];
+        for (let i = 0; i < args.length; i = i + 1) {
+            let arg = args[i];
+            if (arg is Pointer) {
+                marshaledArgs.push((arg as Pointer).address);
+            } else {
+                marshaledArgs.push(arg);
+            }
+        }
+        let retTypeVal = (this.returnType is int) ? (this.returnType as int) : ((this.returnType as dynamic).rawValue as int);
+        return call$(this.fnPtr, retTypeVal, marshaledArgs);
+    }
+
+    call(...args: dynamic[]): dynamic {
+        return this.invoke(args);
+    }
+}
+
+export class DynamicLibrary {
+    let _handle: int;
+
+    constructor(handle: int) {
+        this._handle = handle;
+    }
+
+    symbol(name: str): Pointer {
+        let ptr = dlsym$(this._handle, name);
+        return new Pointer(ptr);
+    }
+
+    bind(name: str, returnType: FfiType, paramTypes: FfiType[] = []): FfiFunction {
+        let ptr = dlsym$(this._handle, name);
+        return new FfiFunction(ptr, returnType, paramTypes);
+    }
+
+    close(): bool {
+        return dlclose$(this._handle);
+    }
+}
+
+export class FFI {
+    static open(path: str): DynamicLibrary {
+        let handle = dlopen$(path);
+        return new DynamicLibrary(handle);
+    }
+
+    static alloc(size: int): Pointer {
+        let ptr = alloc$(size);
+        return new Pointer(ptr);
+    }
+
+    static free(ptr: Pointer | int): void {
+        if (ptr is Pointer) {
+            (ptr as Pointer).free();
+        } else {
+            free$(ptr as int);
+        }
+    }
+
+    static cStr(s: str): Pointer {
+        let ptr = allocCString$(s);
+        return new Pointer(ptr);
+    }
+
+    static readCString(ptr: Pointer | int, offset: int = 0): str {
+        if (ptr is Pointer) {
+            return (ptr as Pointer).readCString(offset);
+        }
+        return readCString$(ptr as int, offset);
+    }
+
+    static call(fnPtr: Pointer | int, returnType: FfiType, args: dynamic[] = []): dynamic {
+        let addr = (fnPtr is Pointer) ? (fnPtr as Pointer).address : (fnPtr as int);
+        let marshaledArgs: dynamic[] = [];
+        for (let i = 0; i < args.length; i = i + 1) {
+            let arg = args[i];
+            if (arg is Pointer) {
+                marshaledArgs.push((arg as Pointer).address);
+            } else {
+                marshaledArgs.push(arg);
+            }
+        }
+        let retTypeVal = (returnType is int) ? (returnType as int) : ((returnType as dynamic).rawValue as int);
+        return call$(addr, retTypeVal, marshaledArgs);
+    }
+
+    static callInt(fnPtr: Pointer | int, a1: int, a2: int): int {
+        return FFI.call(fnPtr, FfiType.Int, [a1, a2]) as int;
+    }
+
+    static callFloat(fnPtr: Pointer | int, a1: float, a2: float): float {
+        return FFI.call(fnPtr, FfiType.Float, [a1, a2]) as float;
+    }
+}

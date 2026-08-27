@@ -71,7 +71,12 @@ pub enum HeapStr {
 impl HeapStr {
     #[inline]
     pub(crate) fn shared(s: RuntimeString) -> Self {
-        HeapStr::Shared(s, std::cell::Cell::new(ascii_flag::UNKNOWN))
+        let flag = if s.is_ascii() {
+            ascii_flag::YES
+        } else {
+            ascii_flag::NO
+        };
+        HeapStr::Shared(s, std::cell::Cell::new(flag))
     }
 
     #[inline]
@@ -90,9 +95,14 @@ impl HeapStr {
         debug_assert!(s.len() <= INLINE_STR_CAP);
         let mut bytes = [0u8; INLINE_STR_CAP];
         bytes[..s.len()].copy_from_slice(s.as_bytes());
+        let flag = if s.is_ascii() {
+            ascii_flag::YES
+        } else {
+            ascii_flag::NO
+        };
         HeapStr::Inline {
             len: s.len() as u8,
-            ascii: std::cell::Cell::new(ascii_flag::UNKNOWN),
+            ascii: std::cell::Cell::new(flag),
             bytes,
         }
     }
@@ -161,6 +171,25 @@ impl HeapStr {
     #[inline]
     pub(crate) fn is_ascii_cached(&self) -> bool {
         self.ascii_state() == ascii_flag::YES
+    }
+
+    #[inline]
+    pub(crate) fn byte_len(&self) -> usize {
+        match self {
+            HeapStr::Shared(s, _) => s.len(),
+            HeapStr::Ext { len, .. } => *len,
+            HeapStr::Slice { len_ascii, .. } => (len_ascii.get() & SLICE_LEN_MASK) as usize,
+            HeapStr::Inline { len, .. } => *len as usize,
+        }
+    }
+
+    #[inline]
+    pub(crate) fn char_len(&self) -> usize {
+        if self.is_ascii() {
+            self.byte_len()
+        } else {
+            self.as_str().chars().count()
+        }
     }
 
     #[inline]

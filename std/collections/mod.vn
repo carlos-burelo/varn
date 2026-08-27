@@ -1,0 +1,6 @@
+// std:collections — High-performance data structures for Varn
+
+export { List } from "std:collections/list";
+export { Stack } from "std:collections/stack";
+export { Queue } from "std:collections/queue";
+export { Dict } from "std:collections/dict";

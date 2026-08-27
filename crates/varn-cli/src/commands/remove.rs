@@ -4,7 +4,7 @@ use varn_pm::{
     installer, lockfile,
     manifest::{find_project_manifest, ProjectManifest},
 };
-use varn_term::terminal;
+use varn_core::term::terminal;
 
 pub fn execute(args: RemoveArgs) -> Result<(), CliError> {
     let cwd =

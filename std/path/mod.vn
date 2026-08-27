@@ -1,0 +1,34 @@
+// std:path — File path manipulation, cross-platform separators and normalization
+
+export {
+    sep,
+    delimiter,
+    normalize,
+    dirname,
+    basename,
+    extname,
+    isAbsolute,
+    join
+} from "std:path/utils";
+
+import {
+    sep,
+    delimiter,
+    normalize,
+    dirname,
+    basename,
+    extname,
+    isAbsolute,
+    join
+} from "std:path/utils";
+
+export namespace Path {
+    export const sep = sep;
+    export const delimiter = delimiter;
+    export const normalize = normalize;
+    export const dirname = dirname;
+    export const basename = basename;
+    export const extname = extname;
+    export const isAbsolute = isAbsolute;
+    export const join = join;
+}

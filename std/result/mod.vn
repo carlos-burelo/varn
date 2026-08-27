@@ -1,0 +1,22 @@
+// std:result — Core Algebraic Data Types (Result<T, E> and Option<T>) for Varn
+
+export {
+    Result,
+    Ok,
+    Err,
+    isOk,
+    isErr,
+    unwrap,
+    unwrapOr,
+    tryRun
+} from "std:result/result";
+
+export {
+    Option,
+    Some,
+    None,
+    isSome,
+    isNone,
+    unwrapOpt,
+    unwrapOptOr
+} from "std:result/option";

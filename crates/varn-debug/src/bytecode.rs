@@ -1,8 +1,8 @@
 use varn_compiler::FunctionProto;
 use varn_core::OpCode;
-use varn_term::chalk::chalk;
-use varn_term::terminal;
-use varn_term::terminal::Section;
+use varn_core::term::chalk::chalk;
+use varn_core::term::terminal;
+use varn_core::term::terminal::Section;
 use varn_types::PoolEntry;
 
 const R: &str = "\x1b[0m";

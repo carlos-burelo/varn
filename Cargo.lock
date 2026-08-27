@@ -2268,7 +2268,6 @@ dependencies = [
  "varn-modules",
  "varn-op-macros",
  "varn-runtime",
- "varn-term",
  "varn-types",
  "zip",
 ]
@@ -2306,8 +2305,6 @@ dependencies = [
  "varn-parser",
  "varn-pipeline",
  "varn-pm",
- "varn-regalloc",
- "varn-term",
  "varn-types",
  "varn-vm",
 ]
@@ -2319,7 +2316,6 @@ dependencies = [
  "rust_decimal",
  "rustc-hash 1.1.0",
  "varn-core",
- "varn-regalloc",
  "varn-types",
 ]
 
@@ -2341,7 +2337,6 @@ dependencies = [
  "varn-compiler",
  "varn-core",
  "varn-jit",
- "varn-term",
  "varn-types",
  "varn-vm",
 ]
@@ -2430,7 +2425,6 @@ dependencies = [
  "varn-lexer",
  "varn-modules",
  "varn-parser",
- "varn-term",
  "varn-types",
  "varn-vm",
 ]
@@ -2448,16 +2442,8 @@ dependencies = [
  "tar",
  "toml",
  "ureq",
- "varn-modules",
- "varn-term",
-]
-
-[[package]]
-name = "varn-regalloc"
-version = "0.1.0"
-dependencies = [
  "varn-core",
- "varn-types",
+ "varn-modules",
 ]
 
 [[package]]
@@ -2466,10 +2452,6 @@ version = "0.1.0"
 dependencies = [
  "varn-types",
 ]
-
-[[package]]
-name = "varn-term"
-version = "0.1.0"
 
 [[package]]
 name = "varn-types"
@@ -2497,7 +2479,6 @@ dependencies = [
  "varn-jit",
  "varn-modules",
  "varn-runtime",
- "varn-term",
  "varn-types",
 ]
 

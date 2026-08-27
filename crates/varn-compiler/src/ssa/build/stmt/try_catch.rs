@@ -193,38 +193,36 @@ impl Builder {
                 return Ok(());
             }
 
+            let num_tests = cc.type_tests.len();
+            let mut subtest_blocks = Vec::with_capacity(num_tests);
+            subtest_blocks.push(current_test_b);
+            for _ in 1..num_tests {
+                subtest_blocks.push(self.new_block());
+            }
             let match_body_b = self.new_block();
             let next_clause_test_b = self.new_block();
 
-            let num_tests = cc.type_tests.len();
             for (k, test) in cc.type_tests.iter().enumerate() {
+                self.current = subtest_blocks[k];
+                if k > 0 {
+                    self.seal_block(subtest_blocks[k]);
+                }
                 let cond = self.emit_single_type_test(test, caught_err);
                 let from_test = self.current;
-
-                if k + 1 < num_tests {
-                    let next_subtest_b = self.new_block();
-                    self.set_term(Terminator::Branch {
-                        cond,
-                        then_blk: match_body_b,
-                        then_args: Vec::new(),
-                        else_blk: next_subtest_b,
-                        else_args: Vec::new(),
-                    });
-                    self.add_pred(match_body_b, from_test);
-                    self.add_pred(next_subtest_b, from_test);
-                    self.seal_block(next_subtest_b);
-                    self.current = next_subtest_b;
+                let else_target = if k + 1 < num_tests {
+                    subtest_blocks[k + 1]
                 } else {
-                    self.set_term(Terminator::Branch {
-                        cond,
-                        then_blk: match_body_b,
-                        then_args: Vec::new(),
-                        else_blk: next_clause_test_b,
-                        else_args: Vec::new(),
-                    });
-                    self.add_pred(match_body_b, from_test);
-                    self.add_pred(next_clause_test_b, from_test);
-                }
+                    next_clause_test_b
+                };
+                self.set_term(Terminator::Branch {
+                    cond,
+                    then_blk: match_body_b,
+                    then_args: Vec::new(),
+                    else_blk: else_target,
+                    else_args: Vec::new(),
+                });
+                self.add_pred(match_body_b, from_test);
+                self.add_pred(else_target, from_test);
             }
 
             self.seal_block(match_body_b);

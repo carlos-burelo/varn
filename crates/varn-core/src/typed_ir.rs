@@ -8,6 +8,7 @@ pub struct ExprAnnotation {
     pub type_only: bool,
     pub call_mapping: Option<Vec<Option<usize>>>,
     pub slot_idx: Option<usize>,
+    pub exported_slot_idx: Option<usize>,
     pub fixed_field_slot: Option<u16>,
     pub intrinsic: Option<u8>,
     pub native_op: Option<u64>,
@@ -122,6 +123,14 @@ impl TypeAnnotations {
 
     pub fn record_slot_idx(&mut self, key: AnnKey, slot_idx: usize) {
         self.inner.entry(key).or_default().slot_idx = Some(slot_idx);
+    }
+
+    pub fn record_exported_slot_idx(&mut self, key: AnnKey, slot_idx: usize) {
+        self.inner.entry(key).or_default().exported_slot_idx = Some(slot_idx);
+    }
+
+    pub fn get_exported_slot_idx(&self, key: AnnKey) -> Option<usize> {
+        self.inner.get(&key)?.exported_slot_idx
     }
 
     pub fn get_slot_idx(&self, key: AnnKey) -> Option<usize> {

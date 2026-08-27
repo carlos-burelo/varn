@@ -1,0 +1,87 @@
+import { spawn$, sleep$, parallel$, channel$, Channel } from "runtime:task";
+import { TaskHandle } from "core:intrinsics";
+
+export type TaskSettledResult<T = dynamic> = {
+    status: str,
+    value?: T,
+    reason?: dynamic
+};
+
+export function parallel<T>(tasks: Array<Task<T>>): Task<Array<T>> {
+    return parallel$(tasks);
+}
+
+export function spawn<T>(target: Task<T> | ((...args: dynamic[]) => T), ...args: dynamic[]): TaskHandle<T> {
+    return spawn$(target, ...args);
+}
+
+export function sleep(ms: int): TaskHandle<void> {
+    return sleep$(ms);
+}
+
+async function wrapSettledOne<T>(task: Task<T>): Task<TaskSettledResult<T>> {
+    try {
+        let val = await task;
+        return { status: "fulfilled", value: val };
+    } catch (err) {
+        return { status: "rejected", reason: err };
+    }
+}
+
+async function raceOne<T>(task: Task<T>, ch: Channel<T>): Task<void> {
+    try {
+        let res = await task;
+        await ch.tx.send(res);
+    } catch {}
+}
+
+export namespace Task {
+    export async function all<T>(tasks: Array<Task<T>>): Task<Array<T>> {
+        return await parallel$(tasks);
+    }
+
+    export async function allSettled<T>(tasks: Array<Task<T>>): Task<Array<TaskSettledResult<T>>> {
+        let wrappedTasks: Array<Task<TaskSettledResult<T>>> = [];
+        for (let i = 0; i < tasks.length; i = i + 1) {
+            wrappedTasks.push(wrapSettledOne(tasks[i]));
+        }
+        return await parallel$(wrappedTasks);
+    }
+
+    export async function race<T>(tasks: Array<Task<T>>): Task<T> {
+        if (tasks.length === 0) {
+            throw new Error("Task.race requires at least one task");
+        }
+        let ch = channel$<T>(tasks.length);
+        for (let i = 0; i < tasks.length; i = i + 1) {
+            spawn(raceOne(tasks[i], ch));
+        }
+        return await ch.rx.receive();
+    }
+
+    export async function delay(ms: int): Task<void> {
+        await sleep$(ms);
+    }
+
+    export async function sleep(ms: int): Task<void> {
+        await sleep$(ms);
+    }
+}
+
+export async function delay(ms: int): Task<void> {
+    await sleep$(ms);
+}
+
+export function setTimeout(callback: () => void, ms: int): TaskHandle<void> {
+    async function timerRunner(): Task<void> {
+        await sleep(ms);
+        callback();
+    }
+    return spawn(timerRunner);
+}
+
+export function clearTimeout(handle: TaskHandle<void>): void {
+    if (handle !== null) {
+        handle.cancel();
+    }
+}

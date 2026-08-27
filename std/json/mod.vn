@@ -1,0 +1,3 @@
+// std:json — Fast JSON parser, serializer and recursive type definitions
+
+export { Json, JSON } from "std:json/json";

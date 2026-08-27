@@ -26,7 +26,6 @@ runtime = [
 ]
 
 [dependencies]
-varn-term      = { path = "../varn-term" }
 varn-core      = { path = "../varn-core" }
 varn-types     = { path = "../varn-types" }
 varn-modules   = { path = "../varn-modules" }

@@ -24,7 +24,8 @@ pub(super) fn assign_registers(
     }
 
     let nvals = ssa.values.len();
-    let lv = crate::ssa::liveness::Liveness::analyze(ssa);
+    let order = super::emission_order(ssa);
+    let lv = crate::ssa::liveness::Liveness::analyze_ordered(ssa, &order);
     let def = lv.def;
     let end = lv.end;
 

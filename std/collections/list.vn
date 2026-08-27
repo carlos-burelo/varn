@@ -1,0 +1,26 @@
+export class List<T> {
+    private items: T[];
+
+    constructor(initial?: T[]) {
+        this.items = initial ?? [];
+    }
+
+    add(item: T): void {
+        this.items.push(item);
+    }
+
+    get(index: int): T? {
+        if (index < 0 || index >= this.items.length) {
+            return null;
+        }
+        return this.items[index];
+    }
+
+    get length(): int {
+        return this.items.length;
+    }
+
+    toArray(): T[] {
+        return this.items.slice();
+    }
+}

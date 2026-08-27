@@ -3,8 +3,8 @@
 use std::time::Duration;
 
 use varn_core::OpCode;
-use varn_term::chalk::chalk;
-use varn_term::terminal;
+use varn_core::term::chalk::chalk;
+use varn_core::term::terminal;
 use varn_vm::VmProfile;
 
 use super::fmt::{fmt_dur, fmt_num, fmt_pct, row, row_note, DurScale};
@@ -24,7 +24,7 @@ pub struct BreakdownOpts {
 /// `check` was unattributed and invisible.
 pub fn print_breakdown(
     title: &str,
-    colour: fn(varn_term::chalk::Chalk) -> varn_term::chalk::Chalk,
+    colour: fn(varn_core::term::chalk::Chalk) -> varn_core::term::chalk::Chalk,
     rows: &[(&str, Duration)],
     measured: Option<Duration>,
     opts: &BreakdownOpts,

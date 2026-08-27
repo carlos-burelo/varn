@@ -1,0 +1,3 @@
+// std:process — Child process execution, spawning and lifecycle management
+
+export { ProcessResult, ChildProcess, Process } from "std:process/child";

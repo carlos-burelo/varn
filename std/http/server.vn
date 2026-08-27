@@ -1,0 +1,253 @@
+import { tcpListen$, tcpAccept$, tcpConnect$, tcpRead$, tcpWrite$, tcpClose$, tcpCloseListener$, parseHttpRequest$, sendHttpResponse$ } from "runtime:net";
+import { Url } from "std:net";
+import { JSON, Json } from "std:json";
+import { spawn } from "std:task";
+
+import { HttpStatus, Headers, Request, HttpRequest, HttpResponse, Response, json, redirect, error, RawRequest, parseRawRequest, readHttpRequest, RawResponse, parseRawResponse, readHttpResponse, DynamicRoute } from "std:http/core";
+
+export class HttpServer {
+    private _port: int = 0;
+    private _listenerId: int = -1;
+    private _isListening: bool = false;
+    private _staticRoutes: { [key: str]: dynamic } = {};
+    private _dynamicRoutes: DynamicRoute[] = [];
+    private _middlewares: Array<dynamic> = [];
+    private _fetchHandler: dynamic = null;
+    private _maxContentLength: int = 10485760;
+
+    constructor(fetchHandler?: dynamic) {
+        this._staticRoutes = {};
+        this._dynamicRoutes = [];
+        this._middlewares = [];
+        this._maxContentLength = 10485760;
+        if (fetchHandler !== null) {
+            this._fetchHandler = fetchHandler;
+        }
+    }
+
+    use(middleware: dynamic): HttpServer {
+        this._middlewares.push(middleware);
+        return this;
+    }
+
+    maxContentLength(limitBytes: int): HttpServer {
+        this._maxContentLength = limitBytes;
+        return this;
+    }
+
+    private _registerRoute(method: str, pattern: str, handler: dynamic): HttpServer {
+        let m = method.toUpperCase();
+        if (pattern === "*" || pattern.indexOf(":") >= 0) {
+            this._dynamicRoutes.push(new DynamicRoute(m, pattern, handler));
+        } else {
+            this._staticRoutes[m + ":" + pattern] = handler;
+        }
+        return this;
+    }
+
+    get(pattern: str, handler: dynamic): HttpServer {
+        return this._registerRoute("GET", pattern, handler);
+    }
+
+    post(pattern: str, handler: dynamic): HttpServer {
+        return this._registerRoute("POST", pattern, handler);
+    }
+
+    put(pattern: str, handler: dynamic): HttpServer {
+        return this._registerRoute("PUT", pattern, handler);
+    }
+
+    delete(pattern: str, handler: dynamic): HttpServer {
+        return this._registerRoute("DELETE", pattern, handler);
+    }
+
+    route(method: str, pattern: str, handler: dynamic): HttpServer {
+        return this._registerRoute(method, pattern, handler);
+    }
+
+    all(pattern: str, handler: dynamic): HttpServer {
+        return this._registerRoute("*", pattern, handler);
+    }
+
+    listen(port: int): void {
+        if (this._isListening) return;
+        this._port = port;
+        this._listenerId = tcpListen$(port);
+        this._isListening = true;
+
+        spawn(this._acceptLoop());
+    }
+
+    close(): void {
+        if (!this._isListening) return;
+        this._isListening = false;
+        if (this._listenerId !== -1) {
+            tcpCloseListener$(this._listenerId);
+            this._listenerId = -1;
+        }
+    }
+
+    private async _acceptLoop(): Task<void> {
+        while (this._isListening) {
+            await this._acceptNext();
+        }
+    }
+
+    private async _acceptNext(): Task<void> {
+        let connId = await tcpAccept$(this._listenerId);
+        if (connId !== -1) {
+            spawn(this._handleConnection(connId));
+        } else {
+            this._isListening = false;
+        }
+    }
+
+    private async _sendWebResponse(connId: int, responseObj: Response): Task<void> {
+        let hdrs = responseObj.headers !== null ? responseObj.headers.toObject() : {};
+        await sendHttpResponse$(connId, responseObj.status, responseObj.statusText, hdrs, responseObj.body);
+    }
+
+    private async _handleConnection(connId: int): Task<void> {
+        let keepAlive = true;
+        while (keepAlive) {
+            let rawReq: RawRequest? = null;
+            try {
+                rawReq = await readHttpRequest(connId, this._maxContentLength);
+            } catch (err) {
+                let errHeaders: { [key: str]: str } = { "Content-Type": "text/plain", "Connection": "close" };
+                await sendHttpResponse$(connId, 413, "Payload Too Large", errHeaders, "Payload Too Large");
+                keepAlive = false;
+                break;
+            }
+
+            if (rawReq !== null) {
+                let connHdr = rawReq.headers["connection"];
+                if (connHdr !== null && connHdr.toLowerCase() === "close") {
+                    keepAlive = false;
+                }
+
+                let matchedHandler: dynamic = null;
+                let matchedParams: { [key: str]: str } = {};
+
+                let pathOnly = rawReq.path;
+                let queryStr = "";
+                let qIdx = rawReq.path.indexOf("?");
+                if (qIdx >= 0) {
+                    pathOnly = rawReq.path.slice(0, qIdx);
+                    queryStr = rawReq.path.slice(qIdx + 1);
+                }
+
+                let reqMethod = rawReq.method.toUpperCase();
+
+                // Tier 1: Fast O(1) Static Route Lookup
+                let staticKey = reqMethod + ":" + pathOnly;
+                let staticHandler = this._staticRoutes[staticKey];
+                if (staticHandler === null) {
+                    staticHandler = this._staticRoutes["*:" + pathOnly];
+                }
+
+                if (staticHandler !== null) {
+                    matchedHandler = staticHandler;
+                    matchedParams = {};
+                } else if (this._dynamicRoutes.length > 0) {
+                    // Tier 2: Precompiled Dynamic Segment Matching
+                    let pathSegments = pathOnly.split("/");
+                    for (let route of this._dynamicRoutes) {
+                        let params = route.match(reqMethod, pathSegments);
+                        if (params !== null) {
+                            matchedHandler = route.handler;
+                            matchedParams = params;
+                            break;
+                        }
+                    }
+                }
+
+                if (matchedHandler === null && this._fetchHandler !== null) {
+                    matchedHandler = this._fetchHandler;
+                }
+
+                let reqObj = new Request(rawReq.path, rawReq.method, rawReq.headers, rawReq.body);
+                reqObj.path = pathOnly;
+                
+                let queryObj: { [key: str]: str } = {};
+                if (queryStr.length > 0) {
+                    let pairs = queryStr.split("&");
+                    for (let i = 0; i < pairs.length; i = i + 1) {
+                        let pair = pairs[i];
+                        let eqIdx = pair.indexOf("=");
+                        if (eqIdx > 0) {
+                            let k = pair.slice(0, eqIdx);
+                            let v = pair.slice(eqIdx + 1);
+                            queryObj[k] = v;
+                        } else {
+                            queryObj[pair] = "true";
+                        }
+                    }
+                }
+                reqObj.query = queryObj;
+                reqObj.params = matchedParams;
+                
+                let resObj = new HttpResponse(connId);
+
+                // Run Middlewares + Route Handler Pipeline
+                let self = this;
+                let runPipeline = async (idx: int): Task<void> => {
+                    if (idx < self._middlewares.length) {
+                        let mw = self._middlewares[idx];
+                        let next = async (): Task<void> => {
+                            await runPipeline(idx + 1);
+                        };
+                        await mw(reqObj, resObj, next);
+                    } else if (matchedHandler !== null) {
+                        let result = await matchedHandler(reqObj, resObj);
+                        if (result !== null && typeof result === "object" && !resObj.isSent) {
+                            let finalResp = result as Response;
+                            if (finalResp.status !== null) {
+                                await self._sendWebResponse(connId, finalResp);
+                                resObj.isSent = true;
+                            }
+                        }
+                    } else {
+                        let notFoundHeaders: { [key: str]: str } = { "Content-Type": "text/plain" };
+                        await sendHttpResponse$(connId, 404, "Not Found", notFoundHeaders, "Not Found");
+                        resObj.isSent = true;
+                    }
+                };
+
+                await runPipeline(0);
+            } else {
+                keepAlive = false;
+            }
+        }
+        tcpClose$(connId);
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Bun.serve / WinterCG Standard serve() Initializer
+// -----------------------------------------------------------------------------
+export function serve(handlerOrOptions: dynamic, port: int = 3000): HttpServer {
+    let server = new HttpServer();
+    if (typeof handlerOrOptions === "function") {
+        server.all("*", handlerOrOptions);
+        server.listen(port);
+    } else if (typeof handlerOrOptions === "object") {
+        let targetPort = port;
+        if (handlerOrOptions["port"] !== null) {
+            targetPort = handlerOrOptions["port"];
+        }
+        let fetchFn = handlerOrOptions["fetch"];
+        server.all("*", fetchFn);
+        server.listen(targetPort);
+    }
+    return server;
+}
+
+// -----------------------------------------------------------------------------
+// Web Standard fetch() Implementation
+// -----------------------------------------------------------------------------
+
+
+export function server(fetchHandler?: dynamic): HttpServer {
+    return serve(fetchHandler);
+}

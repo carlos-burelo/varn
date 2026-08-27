@@ -1,0 +1,14 @@
+import {
+    zipCreate$,
+    zipExtract$
+} from "runtime:compress";
+
+export namespace Zip {
+    export function create(sourceDir: str, zipPath: str): bool {
+        return zipCreate$(sourceDir, zipPath);
+    }
+
+    export function extract(zipPath: str, destDir: str): bool {
+        return zipExtract$(zipPath, destDir);
+    }
+}

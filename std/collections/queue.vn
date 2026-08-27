@@ -1,0 +1,42 @@
+export class Queue<Q> {
+    private inbox: Q[];
+    private outbox: Q[];
+
+    constructor() {
+        this.inbox = [];
+        this.outbox = [];
+    }
+
+    enqueue(item: Q): void {
+        this.inbox.push(item);
+    }
+
+    dequeue(): Q? {
+        if (this.outbox.length === 0) {
+            while (this.inbox.length > 0) {
+                this.outbox.push(this.inbox.pop() as Q);
+            }
+        }
+        return this.outbox.pop();
+    }
+
+    peek(): Q? {
+        if (this.outbox.length === 0) {
+            while (this.inbox.length > 0) {
+                this.outbox.push(this.inbox.pop() as Q);
+            }
+        }
+        if (this.outbox.length === 0) {
+            return null;
+        }
+        return this.outbox[this.outbox.length - 1];
+    }
+
+    get size(): int {
+        return this.inbox.length + this.outbox.length;
+    }
+
+    get isEmpty(): bool {
+        return this.inbox.length === 0 && this.outbox.length === 0;
+    }
+}

@@ -1,0 +1,143 @@
+import {
+    abs$,
+    sqrt$,
+    sin$,
+    cos$,
+    tan$,
+    floor$,
+    ceil$,
+    round$,
+    random$,
+    acos$,
+    asin$,
+    atan$,
+    atan2$,
+    exp$,
+    log$,
+    log10$,
+    log2$,
+    pow$,
+    cbrt$,
+    hypot$
+} from "runtime:math";
+
+export function abs(x: float): float {
+    return abs$(x);
+}
+
+export function sqrt(x: float): float {
+    return sqrt$(x);
+}
+
+export function cbrt(x: float): float {
+    return cbrt$(x);
+}
+
+export function sin(x: float): float {
+    return sin$(x);
+}
+
+export function cos(x: float): float {
+    return cos$(x);
+}
+
+export function tan(x: float): float {
+    return tan$(x);
+}
+
+export function floor(x: float): float {
+    return floor$(x);
+}
+
+export function ceil(x: float): float {
+    return ceil$(x);
+}
+
+export function round(x: float): float {
+    return round$(x);
+}
+
+export function random(): float {
+    return random$();
+}
+
+export function acos(x: float): float {
+    return acos$(x);
+}
+
+export function asin(x: float): float {
+    return asin$(x);
+}
+
+export function atan(x: float): float {
+    return atan$(x);
+}
+
+export function atan2(y: float, x: float): float {
+    return atan2$(y, x);
+}
+
+export function exp(x: float): float {
+    return exp$(x);
+}
+
+export function log(x: float): float {
+    return log$(x);
+}
+
+export function log10(x: float): float {
+    return log10$(x);
+}
+
+export function log2(x: float): float {
+    return log2$(x);
+}
+
+export function pow(x: float, y: float): float {
+    return pow$(x, y);
+}
+
+export function hypot(x: float, y: float): float {
+    return hypot$(x, y);
+}
+
+export function max(...args: float[]): float {
+    if (args.length === 0) {
+        throw new Error("max() requires at least one argument");
+    }
+    let current = args[0];
+    for (let i = 1; i < args.length; i = i + 1) {
+        let v = args[i];
+        if (v > current) {
+            current = v;
+        }
+    }
+    return current;
+}
+
+export function min(...args: float[]): float {
+    if (args.length === 0) {
+        throw new Error("min() requires at least one argument");
+    }
+    let current = args[0];
+    for (let i = 1; i < args.length; i = i + 1) {
+        let v = args[i];
+        if (v < current) {
+            current = v;
+        }
+    }
+    return current;
+}
+
+export function sign(x: float): float {
+    if (x > 0.0) return 1.0;
+    if (x < 0.0) return -1.0;
+    return 0.0;
+}
+
+export function trunc(x: float): float {
+    if (x >= 0.0) {
+        return floor$(x);
+    }
+    return ceil$(x);
+}

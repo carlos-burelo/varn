@@ -7,7 +7,6 @@ edition.workspace = true
 profiling = []
 
 [dependencies]
-varn-term      = { path = "../varn-term" }
 varn-types    = { path = "../varn-types" }
 varn-core     = { path = "../varn-core" }
 varn-builtins = { path = "../varn-builtins", features = ["runtime"] }

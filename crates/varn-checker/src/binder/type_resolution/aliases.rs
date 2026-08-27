@@ -1,21 +1,29 @@
-use crate::types::{Type, TypeContext};
-use varn_core::{IntrinsicType, TypeKind};
+use crate::types::{ObjectTypeMember, Type, TypeContext};
+use std::rc::Rc;
+use varn_core::{IntrinsicType, TypeKind, TypeTag};
 
 use super::contexts::AliasSubstitutionContext;
 use super::resolve_type_node;
 
-/// Expand `name<args>` when `name` is a generic alias declared in `std:types`.
-///
-/// The bind comes from the context's resolver, which memoizes it and refuses
-/// to re-enter a module it is already binding — `std:types` resolves type
-/// nodes while binding, and so asks for itself. That guard used to live here
-/// as a thread-local flag beside a thread-local cache of the module.
+/// Expand `name<args>` when `name` is a generic alias declared in `core:types`.
 pub(super) fn try_stdlib_generic_alias(
     name: &str,
     args: &[Type],
     ctx: Option<&dyn TypeContext>,
 ) -> Option<Type> {
-    let bind_rc = ctx?.resolver()?.stdlib_bind("std:types")?;
+    if name == "Record" && args.len() == 2 {
+        let key_ty = &args[0];
+        let value_ty = &args[1];
+        if matches!(key_ty.0, TypeKind::Intrinsic(TypeTag::Str)) {
+            return Some(Type::object(vec![ObjectTypeMember::Index {
+                param_name: Rc::from("key"),
+                key_ty: Box::new(key_ty.clone()),
+                value_ty: Box::new(value_ty.clone()),
+            }]));
+        }
+    }
+
+    let bind_rc = ctx?.resolver()?.stdlib_bind("core:types")?;
 
     let (params, alias_node) = bind_rc.get_alias_node_local(name)?;
     if params.is_empty() || params.len() != args.len() {

@@ -1,0 +1,51 @@
+export enum Result<T, E> {
+    Ok(val: T),
+    Err(err: E)
+}
+
+export function Ok<T, E>(val: T): Result<T, E> {
+    return Result.Ok(val);
+}
+
+export function Err<T, E>(err: E): Result<T, E> {
+    return Result.Err(err);
+}
+
+export function isOk<T, E>(res: Result<T, E>): bool {
+    return match (res) {
+        Ok(_) => true,
+        _ => false
+    };
+}
+
+export function isErr<T, E>(res: Result<T, E>): bool {
+    return match (res) {
+        Err(_) => true,
+        _ => false
+    };
+}
+
+export function unwrap<T, E>(res: Result<T, E>): T {
+    return match (res) {
+        Ok(v) => v,
+        Err(e) => {
+            throw new Error("Called unwrap on Result.Err: " + e);
+        }
+    };
+}
+
+export function unwrapOr<T, E>(res: Result<T, E>, defaultVal: T): T {
+    return match (res) {
+        Ok(v) => v,
+        _ => defaultVal
+    };
+}
+
+export function tryRun<T>(fn: () => T): Result<T, Error> {
+    try {
+        return Ok<T, Error>(fn());
+    } catch (e) {
+        if (e instanceof Error) return Err<T, Error>(e);
+        return Err<T, Error>(new Error("" + e.toString()));
+    }
+}

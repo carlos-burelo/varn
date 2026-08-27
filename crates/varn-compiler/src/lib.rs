@@ -10,6 +10,7 @@ pub use varn_types::chunk::{Chunk, FunctionProto, LineMapping, Literal, PoolEntr
 pub mod hir;
 pub mod lower;
 pub mod passes;
+pub mod regalloc;
 pub mod ssa;
 
 pub struct OptInput<'a> {
@@ -62,7 +63,7 @@ pub fn compile(input: OptInput<'_>) -> Result<FunctionProto, OptError> {
         );
     }
     let mut proto = lower::lower(&module, source_file, export_names)?;
-    varn_regalloc::run_post_passes(&mut proto);
+    regalloc::run_post_passes(&mut proto);
     Ok(proto)
 }
 

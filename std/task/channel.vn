@@ -1,0 +1,22 @@
+import {
+    channel$,
+    Sender,
+    Receiver,
+    Channel,
+    ChannelClosed,
+    IsolateHandle,
+    spawnIsolate$
+} from "runtime:task";
+
+export { Sender, Receiver, Channel, ChannelClosed, IsolateHandle };
+
+export function channel<T = dynamic>(capacity: int): Channel<T> {
+    return channel$<T>(capacity);
+}
+
+export function spawnIsolate(
+    fn: dynamic,
+    args: Array<dynamic>
+): Task<IsolateHandle> {
+    return spawnIsolate$(fn, args);
+}

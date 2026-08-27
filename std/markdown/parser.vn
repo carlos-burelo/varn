@@ -1,0 +1,327 @@
+// std:markdown/parser — Block and inline token parser for CommonMark & GFM
+
+import { MarkdownOptions, MarkdownNode } from "std:markdown/ast";
+import { escapeHtmlStr, isWhitespaceChar, findFrom, startsWithAt } from "std:markdown/utils";
+
+export function isThematicBreak(line: str): bool {
+    let trimmed = line.trim();
+    if (trimmed.length < 3) return false;
+    let ch = trimmed[0];
+    if (ch !== "-" && ch !== "*" && ch !== "_") return false;
+    let count = 0;
+    for (let i = 0; i < trimmed.length; i = i + 1) {
+        let c = trimmed[i];
+        if (c === ch) {
+            count = count + 1;
+        } else if (c !== " " && c !== "\t") {
+            return false;
+        }
+    }
+    return count >= 3;
+}
+
+export function isHeadingLine(line: str): int {
+    let trimmed = line.trimStart();
+    if (!trimmed.startsWith("#")) return 0;
+    let level = 0;
+    for (let i = 0; i < trimmed.length; i = i + 1) {
+        if (trimmed[i] === "#") {
+            level = level + 1;
+        } else {
+            break;
+        }
+    }
+    if (level >= 1 && level <= 6) {
+        if (trimmed.length > level && isWhitespaceChar(trimmed[level])) {
+            return level;
+        }
+    }
+    return 0;
+}
+
+export function isListItemLine(line: str): bool {
+    let trimmed = line.trimStart();
+    if (trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("+ ")) {
+        return true;
+    }
+    let i = 0;
+    while (i < trimmed.length) {
+        let code = trimmed.charCodeAt(i);
+        if (code >= 48 && code <= 57) {
+            i = i + 1;
+        } else {
+            break;
+        }
+    }
+    if (i > 0 && i < trimmed.length) {
+        let ch = trimmed[i];
+        if (ch === "." || ch === ")") {
+            if (i + 1 < trimmed.length && trimmed[i + 1] === " ") {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+export function isTableSeparator(line: str): bool {
+    let trimmed = line.trim();
+    if (!trimmed.includes("-")) return false;
+    let parts = trimmed.split("|");
+    let validCols = 0;
+    for (let p of parts) {
+        let col = p.trim();
+        if (col.length === 0) continue;
+        let isSep = true;
+        let dashes = 0;
+        for (let i = 0; i < col.length; i = i + 1) {
+            let c = col[i];
+            if (c === "-") {
+                dashes = dashes + 1;
+            } else if (c !== ":") {
+                isSep = false;
+                break;
+            }
+        }
+        if (!isSep || dashes === 0) return false;
+        validCols = validCols + 1;
+    }
+    return validCols > 0;
+}
+
+export function parseTableAlignments(sepLine: str): str[] {
+    let parts = sepLine.trim().split("|");
+    let aligns: str[] = [];
+    for (let p of parts) {
+        let col = p.trim();
+        if (col.length === 0) continue;
+        let left = col.startsWith(":");
+        let right = col.endsWith(":");
+        if (left && right) {
+            aligns.push("center");
+        } else if (right) {
+            aligns.push("right");
+        } else if (left) {
+            aligns.push("left");
+        } else {
+            aligns.push("none");
+        }
+    }
+    return aligns;
+}
+
+export function splitTableRow(rowLine: str): str[] {
+    let trimmed = rowLine.trim();
+    if (trimmed.startsWith("|")) trimmed = trimmed.slice(1);
+    if (trimmed.endsWith("|")) trimmed = trimmed.slice(0, trimmed.length - 1);
+    let cells = trimmed.split("|");
+    let res: str[] = [];
+    for (let c of cells) {
+        res.push(c.trim());
+    }
+    return res;
+}
+
+export function parseInlineTokens(text: str, escapeHtml: bool): MarkdownNode[] {
+    let nodes: MarkdownNode[] = [];
+    let i = 0;
+    let buf = "";
+
+    function flushBuf(): void {
+        if (buf.length > 0) {
+            nodes.push(new MarkdownNode("text", buf));
+            buf = "";
+        }
+    }
+
+    while (i < text.length) {
+        // Escaped character
+        if (text[i] === "\\" && i + 1 < text.length) {
+            buf = buf + text[i + 1];
+            i = i + 2;
+            continue;
+        }
+
+        // Inline Code: `...`
+        if (text[i] === "`") {
+            let endBacktick = findFrom(text, "`", i + 1);
+            if (endBacktick !== -1) {
+                flushBuf();
+                let codeContent = text.slice(i + 1, endBacktick);
+                nodes.push(new MarkdownNode("inline_code", codeContent));
+                i = endBacktick + 1;
+                continue;
+            }
+        }
+
+        // Image: ![alt](url "title")
+        if (startsWithAt(text, "![", i)) {
+            let closeBracket = findFrom(text, "]", i + 2);
+            if (closeBracket !== -1 && startsWithAt(text, "(", closeBracket + 1)) {
+                let closeParen = findFrom(text, ")", closeBracket + 2);
+                if (closeParen !== -1) {
+                    flushBuf();
+                    let altText = text.slice(i + 2, closeBracket);
+                    let urlAndTitle = text.slice(closeBracket + 2, closeParen).trim();
+                    let url = urlAndTitle;
+                    let title = "";
+                    let quoteIdx = urlAndTitle.indexOf("\"");
+                    if (quoteIdx !== -1) {
+                        url = urlAndTitle.slice(0, quoteIdx).trim();
+                        let endQuote = urlAndTitle.lastIndexOf("\"");
+                        if (endQuote > quoteIdx) {
+                            title = urlAndTitle.slice(quoteIdx + 1, endQuote);
+                        }
+                    }
+                    let imgNode = new MarkdownNode("image", altText);
+                    imgNode.url = url;
+                    imgNode.title = title;
+                    nodes.push(imgNode);
+                    i = closeParen + 1;
+                    continue;
+                }
+            }
+        }
+
+        // Link: [text](url "title")
+        if (text[i] === "[") {
+            let closeBracket = findFrom(text, "]", i + 1);
+            if (closeBracket !== -1 && startsWithAt(text, "(", closeBracket + 1)) {
+                let closeParen = findFrom(text, ")", closeBracket + 2);
+                if (closeParen !== -1) {
+                    flushBuf();
+                    let linkText = text.slice(i + 1, closeBracket);
+                    let urlAndTitle = text.slice(closeBracket + 2, closeParen).trim();
+                    let url = urlAndTitle;
+                    let title = "";
+                    let quoteIdx = urlAndTitle.indexOf("\"");
+                    if (quoteIdx !== -1) {
+                        url = urlAndTitle.slice(0, quoteIdx).trim();
+                        let endQuote = urlAndTitle.lastIndexOf("\"");
+                        if (endQuote > quoteIdx) {
+                            title = urlAndTitle.slice(quoteIdx + 1, endQuote);
+                        }
+                    }
+                    let linkNode = new MarkdownNode("link", linkText);
+                    linkNode.url = url;
+                    linkNode.title = title;
+                    let innerTokens = parseInlineTokens(linkText, escapeHtml);
+                    for (let c of innerTokens) {
+                        linkNode.addChild(c);
+                    }
+                    nodes.push(linkNode);
+                    i = closeParen + 1;
+                    continue;
+                }
+            }
+        }
+
+        // Autolink: <http://...>
+        if (text[i] === "<") {
+            let closeAngle = findFrom(text, ">", i + 1);
+            if (closeAngle !== -1) {
+                let linkContent = text.slice(i + 1, closeAngle);
+                if (linkContent.startsWith("http://") || linkContent.startsWith("https://") || linkContent.startsWith("mailto:")) {
+                    flushBuf();
+                    let linkNode = new MarkdownNode("link", linkContent);
+                    linkNode.url = linkContent;
+                    linkNode.addChild(new MarkdownNode("text", linkContent));
+                    nodes.push(linkNode);
+                    i = closeAngle + 1;
+                    continue;
+                }
+            }
+        }
+
+        // Strikethrough: ~~...~~
+        if (startsWithAt(text, "~~", i)) {
+            let endStrike = findFrom(text, "~~", i + 2);
+            if (endStrike !== -1) {
+                flushBuf();
+                let strikeContent = text.slice(i + 2, endStrike);
+                let strikeNode = new MarkdownNode("strikethrough");
+                let inner = parseInlineTokens(strikeContent, escapeHtml);
+                for (let c of inner) {
+                    strikeNode.addChild(c);
+                }
+                nodes.push(strikeNode);
+                i = endStrike + 2;
+                continue;
+            }
+        }
+
+        // Bold + Italic: ***...*** or ___...___
+        if (startsWithAt(text, "***", i) || startsWithAt(text, "___", i)) {
+            let marker = text.slice(i, i + 3);
+            let endIdx = findFrom(text, marker, i + 3);
+            if (endIdx !== -1) {
+                flushBuf();
+                let content = text.slice(i + 3, endIdx);
+                let boldNode = new MarkdownNode("bold");
+                let italicNode = new MarkdownNode("italic");
+                let inner = parseInlineTokens(content, escapeHtml);
+                for (let c of inner) {
+                    italicNode.addChild(c);
+                }
+                boldNode.addChild(italicNode);
+                nodes.push(boldNode);
+                i = endIdx + 3;
+                continue;
+            }
+        }
+
+        // Bold: **...** or __...__
+        if (startsWithAt(text, "**", i) || startsWithAt(text, "__", i)) {
+            let marker = text.slice(i, i + 2);
+            let endIdx = findFrom(text, marker, i + 2);
+            if (endIdx !== -1) {
+                flushBuf();
+                let content = text.slice(i + 2, endIdx);
+                let boldNode = new MarkdownNode("bold");
+                let inner = parseInlineTokens(content, escapeHtml);
+                for (let c of inner) {
+                    boldNode.addChild(c);
+                }
+                nodes.push(boldNode);
+                i = endIdx + 2;
+                continue;
+            }
+        }
+
+        // Italic: *...* or _..._
+        if (text[i] === "*" || text[i] === "_") {
+            let marker = text[i];
+            let endIdx = findFrom(text, marker, i + 1);
+            if (endIdx !== -1 && endIdx > i + 1) {
+                flushBuf();
+                let content = text.slice(i + 1, endIdx);
+                let italicNode = new MarkdownNode("italic");
+                let inner = parseInlineTokens(content, escapeHtml);
+                for (let c of inner) {
+                    italicNode.addChild(c);
+                }
+                nodes.push(italicNode);
+                i = endIdx + 1;
+                continue;
+            }
+        }
+
+        // Normal character accumulation
+        buf = buf + text[i];
+        i = i + 1;
+    }
+
+    flushBuf();
+    return nodes;
+}
+
+export function isParagraphEnd(cur: str, curTrim: str): bool {
+    if (isHeadingLine(cur) > 0) return true;
+    if (isThematicBreak(cur)) return true;
+    if (isListItemLine(cur)) return true;
+    if (curTrim.startsWith(">")) return true;
+    if (curTrim.startsWith("```")) return true;
+    if (curTrim.startsWith("~~~")) return true;
+    return false;
+}
+

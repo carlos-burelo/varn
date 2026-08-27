@@ -182,6 +182,6 @@ pub fn row(label: &str, value: impl AsRef<str>) -> String {
 
 /// [`row`] plus a dim trailing note.
 pub fn row_note(label: &str, value: impl AsRef<str>, note: impl AsRef<str>) -> String {
-    use varn_term::chalk::chalk;
+    use varn_core::term::chalk::chalk;
     format!("{}  {}", row(label, value), chalk(note.as_ref()).dim())
 }

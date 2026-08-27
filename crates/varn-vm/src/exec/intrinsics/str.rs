@@ -168,6 +168,10 @@ pub(crate) fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<Vm
             if n.is_empty() {
                 return Ok(VmValue::from_int(0));
             }
+            if ascii {
+                let idx = find_bytes(s, n).map(|b| b as i64).unwrap_or(-1);
+                return Ok(VmValue::from_int(idx));
+            }
             let idx = find_bytes(s, n)
                 .map(|b| byte_to_char_idx(s, ascii, b))
                 .unwrap_or(-1);
@@ -178,6 +182,10 @@ pub(crate) fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<Vm
             let (n, _) = view(arg(args, 1), heap, &mut needle_buf)?;
             if n.is_empty() {
                 return Ok(VmValue::from_int(char_len(s, ascii) as i64));
+            }
+            if ascii {
+                let idx = rfind_bytes(s, n).map(|b| b as i64).unwrap_or(-1);
+                return Ok(VmValue::from_int(idx));
             }
             let idx = rfind_bytes(s, n)
                 .map(|b| byte_to_char_idx(s, ascii, b))
@@ -210,38 +218,42 @@ pub(crate) fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<Vm
 
     match op {
         o if o == StrOp::At as u8 => {
-            let len = char_len(s, ascii) as i64;
+            let len = if ascii { s.len() as i64 } else { char_len(s, ascii) as i64 };
             let idx = req_int(args, 1, heap);
             let idx = if idx < 0 { len + idx } else { idx };
             if idx < 0 || idx >= len {
                 return Ok(VmValue::null());
             }
-            let (bs, be) = char_range_to_bytes(s, ascii, idx as usize, idx as usize + 1);
+            let (bs, be) = if ascii {
+                (idx as usize, idx as usize + 1)
+            } else {
+                char_range_to_bytes(s, ascii, idx as usize, idx as usize + 1)
+            };
             Ok(alloc_sub(heap, recv, &this, s, bs, be))
         }
         o if o == StrOp::Substring as u8 => {
-            let len = char_len(s, ascii);
+            let len = if ascii { s.len() } else { char_len(s, ascii) };
             let start = req_int(args, 1, heap);
             let end = opt_int(args, 2, heap);
             let a = (start.max(0) as usize).min(len);
             let b = end.map(|e| e.max(0) as usize).unwrap_or(len).min(len);
             let (si, ei) = if a <= b { (a, b) } else { (b, a) };
-            let (bs, be) = char_range_to_bytes(s, ascii, si, ei);
+            let (bs, be) = if ascii { (si, ei) } else { char_range_to_bytes(s, ascii, si, ei) };
             Ok(alloc_sub(heap, recv, &this, s, bs, be))
         }
         o if o == StrOp::Slice as u8 => {
-            let len = char_len(s, ascii);
+            let len = if ascii { s.len() } else { char_len(s, ascii) };
             let start = req_int(args, 1, heap);
             let end = opt_int(args, 2, heap);
             let si = normalize_idx(start, len as i64).min(len);
             let ei = normalize_idx(end.unwrap_or(len as i64), len as i64)
                 .min(len)
                 .max(si);
-            let (bs, be) = char_range_to_bytes(s, ascii, si, ei);
+            let (bs, be) = if ascii { (si, ei) } else { char_range_to_bytes(s, ascii, si, ei) };
             Ok(alloc_sub(heap, recv, &this, s, bs, be))
         }
         o if o == StrOp::Substr as u8 => {
-            let len = char_len(s, ascii);
+            let len = if ascii { s.len() } else { char_len(s, ascii) };
             let start = req_int(args, 1, heap);
             let length = opt_int(args, 2, heap);
             let st = if start < 0 {
@@ -251,7 +263,7 @@ pub(crate) fn dispatch(op: u8, args: &[VmValue], heap: &mut Heap) -> VmResult<Vm
             };
             let count = length.map(|c| c.max(0) as usize).unwrap_or(len - st);
             let ei = (st + count).min(len);
-            let (bs, be) = char_range_to_bytes(s, ascii, st, ei);
+            let (bs, be) = if ascii { (st, ei) } else { char_range_to_bytes(s, ascii, st, ei) };
             Ok(alloc_sub(heap, recv, &this, s, bs, be))
         }
         _ => Err(RuntimeError::new(format!("str intrinsic: unknown op {op}"))),

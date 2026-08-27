@@ -1,0 +1,75 @@
+// std:test — Single unified native testing framework for Varn
+
+export {
+    Expectation,
+    expect,
+    assert,
+    assertEqual,
+    assertTrue,
+    assertFalse,
+    assertNull,
+    assertNotNull,
+    assertNotEqual,
+    assertContains,
+    assertCloseTo,
+    assertThrows,
+    fail,
+    summary,
+    isEq
+} from "std:test/assert";
+
+export {
+    beforeAll,
+    afterAll,
+    beforeEach,
+    afterEach,
+    describe,
+    suite,
+    test,
+    it
+} from "std:test/suite";
+
+import {
+    assert,
+    assertEqual,
+    assertTrue,
+    assertFalse,
+    assertNull,
+    assertNotNull,
+    assertNotEqual,
+    assertContains,
+    assertCloseTo,
+    assertThrows,
+    summary
+} from "std:test/assert";
+
+import {
+    describe,
+    suite,
+    test,
+    it
+} from "std:test/suite";
+
+export function assertSummary(): void {
+    summary();
+}
+
+const testImpl = {
+    assert: assert,
+    assertEqual: assertEqual,
+    assertTrue: assertTrue,
+    assertFalse: assertFalse,
+    assertNull: assertNull,
+    assertNotNull: assertNotNull,
+    assertNotEqual: assertNotEqual,
+    assertContains: assertContains,
+    assertCloseTo: assertCloseTo,
+    assertThrows: assertThrows,
+    describe: describe,
+    suite: suite,
+    test: test,
+    it: it,
+    summary: summary
+};
+
+export const testObj = testImpl;

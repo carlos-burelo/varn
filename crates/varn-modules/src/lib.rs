@@ -14,6 +14,7 @@ pub const CORE_BIGINT: &str = "core:bigint";
 pub const CORE_MAP: &str = "core:map";
 pub const CORE_SET: &str = "core:set";
 pub const CORE_SYMBOL: &str = "core:symbol";
+pub const CORE_TYPES: &str = "core:types";
 
 pub const PKG_PREFIX: &str = "pkg:";
 pub const ENV_DIR_NAME: &str = ".vn";
@@ -48,7 +49,6 @@ pub const STD_REFLECT: &str = "std:reflect";
 pub const STD_SYS: &str = "std:sys";
 pub const STD_TEST: &str = "std:test";
 pub const STD_TIME: &str = "std:time";
-pub const STD_TYPES: &str = "std:types";
 
 pub const RUNTIME_PREFIX: &str = "runtime:";
 pub const RUNTIME_FS: &str = "runtime:fs";

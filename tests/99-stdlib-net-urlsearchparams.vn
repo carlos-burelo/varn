@@ -1,0 +1,47 @@
+import { URLSearchParams, Query, Url, parseURL } from "std:net";
+import { assert, assertEqual, assertTrue, assertFalse } from "std:test";
+
+print("=== Suite: std:net URLSearchParams & Url.resolve ===");
+
+// 1. URLSearchParams basic operations
+let params = new URLSearchParams("foo=1&bar=2&foo=3");
+assertEqual(params.get("foo"), "1");
+assertEqual(params.get("bar"), "2");
+assertEqual(params.getAll("foo").length, 2);
+assertTrue(params.has("bar"));
+assertFalse(params.has("baz"));
+
+params.append("baz", "4");
+assertEqual(params.get("baz"), "4");
+
+params.set("foo", "single");
+assertEqual(params.getAll("foo").length, 1);
+assertEqual(params.get("foo"), "single");
+
+params.delete("bar");
+assertFalse(params.has("bar"));
+
+let strResult = params.toString();
+assertTrue(strResult.includes("foo=single"));
+assertTrue(strResult.includes("baz=4"));
+print("  ✔ URLSearchParams: get, getAll, set, append, has, delete, toString");
+
+// 2. URLSearchParams from object
+let paramsObj = new URLSearchParams({ page: "1", filter: ["a", "b"] });
+assertEqual(paramsObj.get("page"), "1");
+assertEqual(paramsObj.getAll("filter").length, 2);
+print("  ✔ URLSearchParams from object with array values");
+
+// 3. Url.resolve (Relativization)
+let base = "https://example.com/api/v1/users";
+let rel1 = Url.resolve(base, "123");
+assertEqual(rel1.toString(), "https://example.com/api/v1/123");
+
+let rel2 = Url.resolve(base, "/auth/login?redirect=dashboard#section");
+assertEqual(rel2.toString(), "https://example.com/auth/login?redirect=dashboard#section");
+
+let absUrl = Url.resolve(base, "http://other.org/test");
+assertEqual(absUrl.toString(), "http://other.org/test");
+print("  ✔ Url.resolve: relative paths, root-relative paths, and absolute overrides");
+
+print("[PASSED] 99. std:net URLSearchParams and Url.resolve (Web Standard URL compatibility)");

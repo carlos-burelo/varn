@@ -50,6 +50,11 @@ pub struct Liveness {
 
 impl Liveness {
     pub fn analyze(ssa: &SsaFunc) -> Liveness {
+        let order: Vec<usize> = (0..ssa.blocks.len()).collect();
+        Self::analyze_ordered(ssa, &order)
+    }
+
+    pub fn analyze_ordered(ssa: &SsaFunc, order: &[usize]) -> Liveness {
         let nvals = ssa.values.len();
         let nblocks = ssa.blocks.len();
         let mut def = vec![u32::MAX; nvals];
@@ -59,7 +64,8 @@ impl Liveness {
         let mut uses: Vec<FxHashSet<u32>> = vec![FxHashSet::default(); nblocks];
         let mut succ: Vec<Vec<usize>> = vec![Vec::new(); nblocks];
         let mut idx = 0u32;
-        for (b, block) in ssa.blocks.iter().enumerate() {
+        for &b in order {
+            let block = &ssa.blocks[b];
             let mut local_defined: FxHashSet<u32> = FxHashSet::default();
             for p in &block.params {
                 if def[p.0 as usize] == u32::MAX {
@@ -146,7 +152,7 @@ impl Liveness {
         }
 
         let mut end = last;
-        for b in 0..nblocks {
+        for &b in order {
             for &v in &live_out[b] {
                 if end[v as usize] < term_idx[b] {
                     end[v as usize] = term_idx[b];

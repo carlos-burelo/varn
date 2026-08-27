@@ -1,0 +1,34 @@
+import {
+    uuid$,
+    uuidV4$,
+    uuidV7$,
+    uuidValidate$
+} from "runtime:crypto";
+
+export namespace UUID {
+    export function v4(): str {
+        return uuidV4$();
+    }
+
+    export function v7(): str {
+        return uuidV7$();
+    }
+
+    export function isValid(s: str): bool {
+        return uuidValidate$(s);
+    }
+}
+
+export function uuid(): str {
+    return uuid$();
+}
+
+export function uuidV4(): str {
+    return uuid$();
+}
+
+export function isValidUuid(s: str): bool {
+    if (s.length !== 36) return false;
+    if (s[8] !== "-" || s[13] !== "-" || s[18] !== "-" || s[23] !== "-") return false;
+    return true;
+}

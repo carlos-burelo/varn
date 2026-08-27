@@ -1,0 +1,30 @@
+export class Stack<S> {
+    private items: S[];
+
+    constructor(initial?: S[]) {
+        this.items = initial ?? [];
+    }
+
+    push(item: S): void {
+        this.items.push(item);
+    }
+
+    pop(): S? {
+        return this.items.pop();
+    }
+
+    peek(): S? {
+        if (this.items.length === 0) {
+            return null;
+        }
+        return this.items[this.items.length - 1];
+    }
+
+    get size(): int {
+        return this.items.length;
+    }
+
+    get isEmpty(): bool {
+        return this.items.length === 0;
+    }
+}

@@ -1,0 +1,36 @@
+import { parse$, stringify$ } from "runtime:csv";
+import { CsvOptions } from "std:csv/types";
+
+export namespace CSV {
+    export function parse<T = dynamic>(text: str, options?: CsvOptions): T[] {
+        let delim = ",";
+        let hasHeader = true;
+        let trim = true;
+
+        if (options != null) {
+            if (options.delimiter != null) {
+                delim = options.delimiter;
+            }
+            if (options.hasHeader != null) {
+                hasHeader = options.hasHeader;
+            }
+            if (options.trim != null) {
+                trim = options.trim;
+            }
+        }
+
+        return parse$(text, delim, hasHeader, trim) as T[];
+    }
+
+    export function stringify(rows: dynamic[], options?: CsvOptions): str {
+        let delim = ",";
+
+        if (options != null) {
+            if (options.delimiter != null) {
+                delim = options.delimiter;
+            }
+        }
+
+        return stringify$(rows, delim);
+    }
+}

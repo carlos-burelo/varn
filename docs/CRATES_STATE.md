@@ -1,6 +1,6 @@
 # Estado e Inventario de Crates del Workspace
 
-Matriz de estado, jerarquía de dependencias y tamaños de los **19 crates** del workspace de **Varn**.
+Matriz de estado, jerarquía de dependencias y tamaños de los **17 crates** consolidados del workspace de **Varn**.
 
 Los tamaños son líneas de Rust medidas sobre el árbol actual. Este documento no publica porcentajes de cobertura: la suite de Rust son 85 tests, y la prueba real de integridad es `tests/main.vn` (1139 aserciones en 83 test suites) bajo las cuatro combinaciones de procedencia de std y JIT descritas en [CONTRIBUTING.md](../CONTRIBUTING.md).
 
@@ -29,12 +29,9 @@ graph TD
     Pipeline --> Opt["varn-compiler"]
     Pipeline --> VM["varn-vm"]
     Pipeline --> Modules["varn-modules"]
-    Pipeline --> Term["varn-term"]
 
-    Opt --> Backend["varn-regalloc"]
     Opt --> Core["varn-core"]
     Opt --> Types["varn-types"]
-    Backend --> Types
 
     VM --> Types
     VM --> JIT["varn-jit"]
@@ -72,24 +69,22 @@ Las vistas de inspección que necesitan el análisis del LSP (`-p types`, `-p ls
 | Crate | Dominio | Líneas | Estabilidad |
 |---|---|---|---|
 | `varn-vm` | Ejecución | 19 027 | Estable |
+| `varn-compiler` | Compilador (AST→HIR→SSA→bytecode + RegAlloc) | 17 222 | Estable |
 | `varn-checker` | Frontend | 16 576 | Estable |
-| `varn-compiler` | Compilador (AST→HIR→SSA→bytecode) | 16 119 | Estable |
 | `varn-jit` | JIT x86-64 (Cranelift) | 8 625 | En evolución |
 | `varn-lsp` | Servidor LSP | 7 437 | En evolución |
 | `varn-types` | Modelo de datos de runtime y bytecode | 6 311 | Estable |
+| `varn-core` | AST, opcodes, tokens, diagnósticos, term, `TypeTag` | 5 180 | Estable |
 | `varn-cli` | CLI (`vn`) | 5 085 | Estable |
 | `varn-parser` | Frontend | 4 943 | Estable |
-| `varn-core` | AST, opcodes, tokens, diagnósticos, `TypeTag` | 4 820 | Estable |
 | `varn-builtins` | Stdlib nativa (LBI) | 4 312 | Estable |
 | `varn-debug` | Inspección de fases | 3 294 | Herramienta |
 | `varn-pipeline` | Orquestación de fases y caché | 1 908 | Estable |
 | `varn-lexer` | Frontend | 1 557 | Estable |
 | `varn-modules` | Resolución de módulos y bundle `.vnb` | 1 292 | Estable |
-| `varn-regalloc` | Liveness + regalloc post-pass | 1 103 | Estable |
 | `varn-op-macros` | Proc-macro `varn_contract!` | 918 | Estable |
 | `varn-pm` | Gestor de paquetes | 802 | En evolución |
 | `varn-runtime` | Canales de isolates + vtable de heap | 381 | Estable |
-| `varn-term` | Estilo de terminal (chalk, colores) | 360 | Estable |
 
 ---
 
@@ -98,8 +93,8 @@ Las vistas de inspección que necesitan el análisis del LSP (`-p types`, `-p ls
 ### Frontend (`varn-lexer`, `varn-parser`, `varn-checker`)
 Tokenización con ASI, parser descendente con precedencia Pratt, y type-checker multi-fase que produce `TypedAST` + `SemanticDB`.
 
-### Compilador (`varn-compiler`, `varn-regalloc`)
-`varn-compiler` baja AST → HIR → SSA → bytecode y corre los passes de optimización. `varn-regalloc` no es una fase posterior: `varn-compiler` lo **invoca por dentro** (`run_post_passes`) para el liveness y la reasignación de registros sobre el bytecode ya emitido.
+### Compilador (`varn-compiler`)
+`varn-compiler` baja AST → HIR → SSA → bytecode, corre los passes de optimización e integra el análisis de registros (`regalloc`) para el liveness y la reasignación de registros sobre el bytecode emitido.
 
 ### Ejecución (`varn-vm`, `varn-jit`)
 VM de registros de 64 bits con NaN-boxing, GC generacional (nursery + mark-sweep) e inline caches. El JIT compila con Cranelift y comparte la tabla de helpers con la ruta de inspección `vn debug -p clif`.

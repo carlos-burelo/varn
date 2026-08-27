@@ -1,0 +1,13 @@
+export class Stats {
+    size: int;
+    isDir: bool;
+    isFile: bool;
+    mtime: int;
+
+    constructor(size: int, isDir: bool, isFile: bool, mtime: int) {
+        this.size = size;
+        this.isDir = isDir;
+        this.isFile = isFile;
+        this.mtime = mtime;
+    }
+}

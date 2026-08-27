@@ -91,8 +91,8 @@ pub struct DiskResolver {
     ///
     /// A module is only inserted into the graph *after* it binds, so a module
     /// that re-enters resolution while binding itself would recurse forever.
-    /// `std:types` does exactly that: binding it resolves type nodes, which
-    /// asks for `std:types` again to expand a generic alias.
+    /// `core:types` does exactly that: binding it resolves type nodes, which
+    /// asks for `core:types` again to expand a generic alias.
     in_flight: RefCell<std::collections::HashSet<String>>,
     /// The prelude, derived once from the stdlib this resolver serves.
     ///

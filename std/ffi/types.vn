@@ -1,0 +1,8 @@
+export enum FfiType {
+    Void = 0,
+    Int = 1,
+    Float = 2,
+    Str = 3,
+    Ptr = 4,
+    Bool = 5
+}

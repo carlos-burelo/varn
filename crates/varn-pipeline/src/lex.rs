@@ -21,7 +21,7 @@ pub fn lex(
         let error_count = errors.len();
         let footer = format!(
             "\n{}: could not compile `{}` due to {} previous error{}",
-            varn_term::chalk::chalk("error").red().bold(),
+            varn_core::term::chalk::chalk("error").red().bold(),
             path,
             error_count,
             if error_count > 1 { "s" } else { "" }
@@ -30,7 +30,7 @@ pub fn lex(
     }
 
     if verbose {
-        varn_term::terminal::tagged("Varn", format_args!("scanned {} tokens", tokens.len()));
+        varn_core::term::terminal::tagged("Varn", format_args!("scanned {} tokens", tokens.len()));
     }
 
     if debug.tokens {

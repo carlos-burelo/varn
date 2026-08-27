@@ -144,7 +144,7 @@ pub fn install_locked(project_root: &Path, lock: &PmLockfile) -> Result<(), Stri
             }
             DepOrigin::Remote { .. } => {
                 if !cache::is_cached(&origin, &pkg.version, &pkg.integrity) {
-                    varn_term::terminal::info(format!(
+                    varn_core::term::terminal::info(format!(
                         "downloading {}@{} ...",
                         pkg.name, pkg.version
                     ));

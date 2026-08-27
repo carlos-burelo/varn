@@ -1,7 +1,7 @@
 use varn_checker::CheckResult;
-use varn_term::chalk::chalk;
-use varn_term::terminal;
-use varn_term::terminal::Section;
+use varn_core::term::chalk::chalk;
+use varn_core::term::terminal;
+use varn_core::term::terminal::Section;
 
 pub fn debug_symbols(
     check_result: &CheckResult,

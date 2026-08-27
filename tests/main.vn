@@ -92,7 +92,12 @@ import "./92-ffi-extended.vn"
 import "./93-match-guards-spread-predicates.vn"
 import "./94-ecma-features-and-meta-reflection.vn"
 import "./95-stdlib-markdown.vn"
+import "./96-stdlib-math-advanced.vn"
+import "./97-stdlib-task-combinators.vn"
+import "./98-stdlib-test-framework.vn"
+import "./99-stdlib-net-urlsearchparams.vn"
+import "./100-stdlib-http-enrichments.vn"
 
-print("\n94 side-effect modules executed in suite")
+print("\n99 side-effect modules executed in suite")
 assertSummary()
 
