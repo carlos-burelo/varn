@@ -33,11 +33,21 @@ La conversión de tipos entre el formato NaN-boxed de 64 bits de la VM y las est
 
 | Tipo Varn | Representación `VmValue` | Tipo Rust | Método de Conversión |
 |---|---|---|---|
-| `int` | QNAN + Tag Int | `i64` | `val.to_int()` / `VmValue::from_int(n)` |
+| `int` | QNAN + Tag Int, payload de **48 bits** | `i64` (rango i48) | `val.to_int()` / `VmValue::from_int(n)` |
 | `float` | Standard IEEE 754 | `f64` | `val.to_float()` / `VmValue::from_float(f)` |
 | `bool` | QNAN + Tag Bool | `bool` | `val.to_bool()` / `VmValue::from_bool(b)` |
 | `str` | Pointer a Heap String | `&str` / `String` | `ctx.expect_string(val)` / `ctx.alloc_string(s)` |
 | `Array` | Pointer a Heap Object | `&[VmValue]` | `ctx.expect_array(val)` / `ctx.alloc_array(v)` |
+
+> **`int` es i48, no i64.** El tipo Rust del lado del host es `i64`, pero solo
+> los 48 bits bajos sobreviven al boxing: el payload del NaN-box es de 48 bits
+> y `VmValue::from_int` enmascara con `MASK_INT48`. Un builtin que devuelva un
+> `i64` legítimo fuera de `[-2^47, 2^47-1]` se **trunca en silencio**, sin error
+> ni saturación. Rango representable: `-140737488355328 ..= 140737488355327`.
+>
+> Esta tabla decía `i64` sin más, lo cual describía mal el contrato de la
+> frontera de host. Las reglas normativas están en `varn-core/src/numeric.rs`
+> (fuente única) y el comportamiento está fijado en `tests/53-int48-wrapping.vn`.
 
 ---
 
