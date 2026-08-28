@@ -110,10 +110,10 @@ pub(super) fn emit_region_caches(
                     b.switch_to_block(repr_ok);
                     b.ins().jump(merge, &[data.into(), len.into(), disc.into()]);
 
-                    // disc doesn't match: set data=0 to trigger slow path.
+                    // disc doesn't match: set data=0 and len=0 to trigger slow path.
                     b.switch_to_block(repr_bad);
                     let z1 = b.ins().iconst(types::I64, 0);
-                    b.ins().jump(merge, &[z1.into(), len.into(), disc.into()]);
+                    b.ins().jump(merge, &[z1.into(), z1.into(), disc.into()]);
                 } else {
                     b.ins().jump(merge, &[data.into(), len.into(), disc.into()]);
                 }

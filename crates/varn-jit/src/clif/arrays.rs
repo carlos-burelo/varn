@@ -250,13 +250,9 @@ pub(super) fn emit_array_get_index(
     if repr_validated {
         if let Some(view) = cache.and_then(|c| c.view) {
             let data = b.use_var(view[0]);
-            let resolved = b.ins().icmp_imm(IntCC::NotEqual, data, 0);
-            let live = b.create_block();
-            b.ins().brif(resolved, live, &[], slow, &[]);
-            b.switch_to_block(live);
             let len = b.use_var(view[1]);
 
-            // Bounds check (unsigned also rejects negative keys).
+            // Bounds check (unsigned also rejects negative keys and len=0 sentinel).
             let oob = b.ins().icmp(IntCC::UnsignedGreaterThanOrEqual, key, len);
             let inb = b.create_block();
             b.ins().brif(oob, slow, &[], inb, &[]);
