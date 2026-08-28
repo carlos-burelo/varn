@@ -106,6 +106,25 @@ function Invoke-Vn {
     }
 }
 
+# Strip compiler progress diagnostics from an output before comparing it.
+#
+# `[varn-compiler] compiled module: N fn(s) + top-level` is emitted once per
+# module the pipeline actually COMPILES, so the count depends on what the
+# bytecode cache already holds — which differs between the first run of a
+# batch and the rest, and across the `vn cache clean` this script performs at
+# provenance switches. That made `tests/main.vn` report DIFFER on all three
+# non-baseline tiers while the program output was byte-identical: a false
+# positive severe enough to make the check unusable on the one file the
+# validation protocol cares most about.
+#
+# Only build chatter is removed. Program output, panics and diagnostics all
+# survive, so a real divergence still shows up.
+function Remove-BuildNoise {
+    param([string]$Text)
+    if (-not $Text) { return $Text }
+    return (($Text -split "`r?`n" | Where-Object { $_ -notmatch '^\[varn-compiler\]' }) -join "`n").Trim()
+}
+
 $bin = Resolve-VnBin -Explicit $Bin
 $files = Get-VnFiles -Pattern $Path
 
@@ -139,7 +158,7 @@ foreach ($f in $files) {
     $outputs = [ordered]@{}
     foreach ($name in $runs.Keys) {
         if ($runs[$name].Purge) { Invoke-Vn -VnArgs @("cache", "clean") -Env $runs[$name].Env | Out-Null }
-        $outputs[$name] = Invoke-Vn -VnArgs @("run", $f.FullName) -Env $runs[$name].Env
+        $outputs[$name] = Remove-BuildNoise (Invoke-Vn -VnArgs @("run", $f.FullName) -Env $runs[$name].Env)
     }
     if ($Embedded) { Invoke-Vn -VnArgs @("cache", "clean") | Out-Null }
 
