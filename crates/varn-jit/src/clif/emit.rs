@@ -666,14 +666,68 @@ pub(super) fn array_disc(
     )
 }
 
-/// `(v << 16) >> 16` — the canonical i48 wrap (varn_core::numeric), which
-/// is also exactly the unboxing of an int-tagged VmValue payload.
+/// `(v << 16) >> 16` — sign-extend the low 48 bits. This is the unboxing of an
+/// int-tagged VmValue payload (`varn_core::numeric::wrap_i48`), NOT an
+/// overflow policy; see [`guard_i48`].
 pub(super) fn wrap_i48(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
     let s = b.ins().ishl_imm(v, 16);
     b.ins().sshr_imm(s, 16)
+}
+
+/// Raise `integer overflow` unless `r` fits in i48, then yield `r`.
+///
+/// `overflowed_i64` is an extra condition ORed into the failure test, for
+/// operations whose `i64` result can itself wrap: a product of two i48 values
+/// reaches 2^94, and a wrapped `i64` product can land back INSIDE i48 and read
+/// as a valid answer (2^32 · 2^32 ≡ 0). Addition and subtraction of i48
+/// operands cannot overflow `i64`, so they pass `None`.
+///
+/// The failure path calls the interpreter helper with both operands boxed.
+/// That helper re-runs the same op through `exec::arith`, hits the same
+/// `varn_core` check, and raises via longjmp — so the error text and the
+/// overflow predicate have exactly one definition and the tiers cannot drift.
+/// It never returns, which is why nothing is flushed or reloaded around it
+/// (the same shape as `floats::emit_fdiv`'s divide-by-zero trap), and why the
+/// operands being ints means the helper cannot allocate on the way out.
+///
+/// Cost on the hot path: the `ishl`/`sshr` pair was already emitted to wrap,
+/// so the guard adds one compare and a branch that is never taken.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn guard_i48(
+    b: &mut FunctionBuilder,
+    cc: cranelift_codegen::isa::CallConv,
+    exec_ctx: cranelift_codegen::ir::Value,
+    helper: usize,
+    r: cranelift_codegen::ir::Value,
+    lhs: cranelift_codegen::ir::Value,
+    rhs: cranelift_codegen::ir::Value,
+    overflowed_i64: Option<cranelift_codegen::ir::Value>,
+) -> cranelift_codegen::ir::Value {
+    let w = wrap_i48(b, r);
+    let fits = b.ins().icmp(IntCC::Equal, w, r);
+    let ok = match overflowed_i64 {
+        Some(bad) => {
+            let good64 = b.ins().bxor_imm(bad, 1);
+            b.ins().band(fits, good64)
+        }
+        None => fits,
+    };
+
+    let raise = b.create_block();
+    let cont = b.create_block();
+    b.ins().brif(ok, cont, &[], raise, &[]);
+
+    b.switch_to_block(raise);
+    let ba = box_int(b, lhs);
+    let bb = box_int(b, rhs);
+    let _ = call_helper(b, cc, helper, &[exec_ctx, ba, bb]);
+    b.ins().jump(cont, &[]);
+
+    b.switch_to_block(cont);
+    w
 }
 
 /// Resolve boxed object `obj` to its inline field base address (`objdata + values_off`),

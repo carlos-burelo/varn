@@ -60,9 +60,39 @@ impl VmValue {
         }
     }
 
+    /// Box an `i64` that is already known to fit Varn's 48-bit `int`.
+    ///
+    /// The mask is a no-op for an in-range value. Out of range it TRUNCATES,
+    /// which is why arithmetic checks the range first (`varn_core::numeric`)
+    /// and raises instead of arriving here — and why the debug assertion is
+    /// the boundary's tripwire: a host builtin handing back a legitimate `i64`
+    /// outside `[-2^47, 2^47-1]` would otherwise lose the high bits with no
+    /// diagnostic whatsoever.
+    ///
+    /// Callers that mean to truncate — shifts, whose result width is part of
+    /// the operation — must say so with [`Self::from_int_wrapping`].
     #[inline(always)]
     pub fn from_int(n: i64) -> Self {
+        debug_assert!(
+            ((n << 16) >> 16) == n,
+            "VmValue::from_int({n}) is outside int (-140737488355328..=140737488355327);              use from_int_wrapping if the truncation is intended"
+        );
         Self(QNAN | TAG_INT | ((n as u64) & MASK_INT48))
+    }
+
+    /// Box an `i64`, truncating to 48 bits. For operations whose result is
+    /// DEFINED modulo the type width — the shifts — as opposed to arithmetic,
+    /// where leaving the range is an error.
+    #[inline(always)]
+    pub fn from_int_wrapping(n: i64) -> Self {
+        Self(QNAN | TAG_INT | ((n as u64) & MASK_INT48))
+    }
+
+    /// Box an `i64` only if it fits Varn's `int`. The host boundary's checked
+    /// entry point: `None` says the value cannot cross into the VM intact.
+    #[inline(always)]
+    pub fn from_int_checked(n: i64) -> Option<Self> {
+        (((n << 16) >> 16) == n).then(|| Self::from_int_wrapping(n))
     }
 
     #[inline(always)]

@@ -1,7 +1,7 @@
 use crate::hir::{HirBinOp, HirType, HirUnOp};
 use crate::ssa::ir::{BlockId, InstKind, SsaFunc, Terminator, Value};
 use rustc_hash::FxHashMap;
-use varn_core::wrap_i48;
+use varn_core::{add_i48, mul_i48, neg_i48, pow_i48, sub_i48, wrap_i48};
 
 pub fn run(func: &mut SsaFunc) -> bool {
     let mut changed = false;
@@ -101,7 +101,10 @@ fn fold_inst(kind: &InstKind, const_map: &FxHashMap<Value, InstKind>) -> Option<
 
 fn fold_unary(op: HirUnOp, operand: &InstKind, _ty: HirType) -> Option<InstKind> {
     match (op, operand) {
-        (HirUnOp::Neg, InstKind::ConstInt(x)) => Some(InstKind::ConstInt(-x)),
+        // `-INT_MIN` has no i48 form. Declining to fold leaves the negation in
+        // the IR, where the interpreter/JIT raise `integer overflow` with a
+        // line number — never folding to a wrong constant.
+        (HirUnOp::Neg, InstKind::ConstInt(x)) => neg_i48(*x).map(InstKind::ConstInt),
         (HirUnOp::Neg, InstKind::ConstFloat(x)) => Some(InstKind::ConstFloat(-x)),
         (HirUnOp::Not, InstKind::ConstBool(x)) => Some(InstKind::ConstBool(!x)),
         (HirUnOp::BitNot, InstKind::ConstInt(x)) => Some(InstKind::ConstInt(!x)),
@@ -113,11 +116,18 @@ fn fold_binary(op: HirBinOp, lhs: &InstKind, rhs: &InstKind, _ty: HirType) -> Op
     use HirBinOp::*;
     match (lhs, rhs) {
         (InstKind::ConstInt(x), InstKind::ConstInt(y)) => match op {
-            // Integer arithmetic wraps at 48 bits (varn_core::numeric),
-            // identically to the interpreter and the JIT.
-            Add => Some(InstKind::ConstInt(wrap_i48(x.wrapping_add(*y)))),
-            Sub => Some(InstKind::ConstInt(wrap_i48(x.wrapping_sub(*y)))),
-            Mul => Some(InstKind::ConstInt(wrap_i48(x.wrapping_mul(*y)))),
+            // Integer arithmetic that leaves the i48 range RAISES
+            // (varn_core::numeric), so an overflowing expression must not be
+            // folded to a value: `None` keeps the operation in the IR and the
+            // interpreter/JIT raise it at run time, pointing at the line.
+            // Folding it — as this did — baked a wrong constant into the pool.
+            //
+            // A compile-time diagnostic would be better than a run-time one,
+            // but it belongs in the checker, which has spans; this pass has
+            // neither spans nor an error channel.
+            Add => add_i48(*x, *y).map(InstKind::ConstInt),
+            Sub => sub_i48(*x, *y).map(InstKind::ConstInt),
+            Mul => mul_i48(*x, *y).map(InstKind::ConstInt),
             // `int / int` always yields float.
             Div => {
                 if *y != 0 {
@@ -136,7 +146,7 @@ fn fold_binary(op: HirBinOp, lhs: &InstKind, rhs: &InstKind, _ty: HirType) -> Op
             // Negative exponents raise at runtime; never fold them.
             Pow => {
                 if *y >= 0 && *y <= 30 {
-                    Some(InstKind::ConstInt(wrap_i48(x.wrapping_pow(*y as u32))))
+                    pow_i48(*x, *y as u32).map(InstKind::ConstInt)
                 } else {
                     None
                 }
@@ -150,12 +160,15 @@ fn fold_binary(op: HirBinOp, lhs: &InstKind, rhs: &InstKind, _ty: HirType) -> Op
             BitAnd => Some(InstKind::ConstInt(x & y)),
             BitOr => Some(InstKind::ConstInt(x | y)),
             BitXor => Some(InstKind::ConstInt(x ^ y)),
-            Shl => Some(InstKind::ConstInt(x.wrapping_shl(*y as u32))),
-            Shr => Some(InstKind::ConstInt(x.wrapping_shr(*y as u32))),
+            // Shifts truncate to the type width by definition — that is the
+            // shift's result, not an overflow — so they keep `wrap_i48`, which
+            // is also what `VmValue::from_int` does to the runtime result.
+            Shl => Some(InstKind::ConstInt(wrap_i48(x.wrapping_shl(*y as u32)))),
+            Shr => Some(InstKind::ConstInt(wrap_i48(x.wrapping_shr(*y as u32)))),
             Ushr => {
                 let ux = *x as u64;
                 let uy = *y as u32;
-                Some(InstKind::ConstInt((ux >> uy) as i64))
+                Some(InstKind::ConstInt(wrap_i48((ux >> uy) as i64)))
             }
             _ => None,
         },

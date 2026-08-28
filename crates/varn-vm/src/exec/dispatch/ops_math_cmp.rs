@@ -8,6 +8,18 @@ use varn_core::OpCode;
 
 use super::{hi, lo};
 
+/// The `integer overflow` error for the typed int opcodes. Cold and outlined
+/// so the check on the hot path is a compare and a never-taken branch.
+#[cold]
+#[inline(never)]
+fn int_overflow(op: &str, a: i64, b: i64) -> crate::error::RuntimeError {
+    crate::error::RuntimeError::new(format!(
+        "integer overflow: {a} {op} {b} is outside int ({}..={})",
+        varn_core::INT_MIN,
+        varn_core::INT_MAX
+    ))
+}
+
 impl ExecCtx {
     #[inline(always)]
     pub(super) fn exec_math_cmp_op(
@@ -30,15 +42,15 @@ impl ExecCtx {
             // Generic arithmetic
             OpCode::Add => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = arith::add(a, b, &mut self.heap);
+                self.stack[base + first_reg] = arith::add(a, b, &mut self.heap)?;
             }
             OpCode::Sub => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = arith::sub(a, b, &mut self.heap);
+                self.stack[base + first_reg] = arith::sub(a, b, &mut self.heap)?;
             }
             OpCode::Mul => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
-                self.stack[base + first_reg] = arith::mul(a, b, &mut self.heap);
+                self.stack[base + first_reg] = arith::mul(a, b, &mut self.heap)?;
             }
             OpCode::Div => {
                 let (a, b) = read_binary_operands(code, ip, &self.stack);
@@ -82,7 +94,7 @@ impl ExecCtx {
                 let src = hi(code[*ip]);
                 *ip += 1;
                 let v = self.stack[base + src];
-                self.stack[base + first_reg] = arith::negate(v, &mut self.heap);
+                self.stack[base + first_reg] = arith::negate(v, &mut self.heap)?;
             }
             OpCode::Not => {
                 let src = hi(code[*ip]);
@@ -99,16 +111,18 @@ impl ExecCtx {
                 let imm = lo(w1) as i8 as i64;
                 let v = self.stack[base + src];
                 if self.heap.is_int(v) {
+                    // The old `overflowing_add` guard here tested i64 overflow and
+                    // promoted to float. Both were wrong: an i48 operand plus an
+                    // i8 immediate cannot overflow i64, so the branch was dead,
+                    // and float promotion is exactly what numeric.rs denies.
                     let a_val = self.heap.as_int(v);
-                    let (r, overflow) = a_val.overflowing_add(imm);
-                    self.stack[base + first_reg] = if overflow {
-                        VmValue::from_f64(a_val as f64 + imm as f64)
-                    } else {
-                        self.heap.make_int(r)
+                    self.stack[base + first_reg] = match varn_core::add_i48(a_val, imm) {
+                        Some(r) => VmValue::from_int(r),
+                        None => return Err(int_overflow("+", a_val, imm)),
                     };
                 } else {
-                    let imm_v = self.heap.make_int(imm);
-                    self.stack[base + first_reg] = arith::add(v, imm_v, &mut self.heap);
+                    let imm_v = VmValue::from_int(imm);
+                    self.stack[base + first_reg] = arith::add(v, imm_v, &mut self.heap)?;
                 }
             }
             OpCode::SubImm => {
@@ -118,16 +132,18 @@ impl ExecCtx {
                 let imm = lo(w1) as i8 as i64;
                 let v = self.stack[base + src];
                 if self.heap.is_int(v) {
+                    // The old `overflowing_sub` guard here tested i64 overflow and
+                    // promoted to float. Both were wrong: an i48 operand plus an
+                    // i8 immediate cannot overflow i64, so the branch was dead,
+                    // and float promotion is exactly what numeric.rs denies.
                     let a_val = self.heap.as_int(v);
-                    let (r, overflow) = a_val.overflowing_sub(imm);
-                    self.stack[base + first_reg] = if overflow {
-                        VmValue::from_f64(a_val as f64 - imm as f64)
-                    } else {
-                        self.heap.make_int(r)
+                    self.stack[base + first_reg] = match varn_core::sub_i48(a_val, imm) {
+                        Some(r) => VmValue::from_int(r),
+                        None => return Err(int_overflow("-", a_val, imm)),
                     };
                 } else {
-                    let imm_v = self.heap.make_int(imm);
-                    self.stack[base + first_reg] = arith::sub(v, imm_v, &mut self.heap);
+                    let imm_v = VmValue::from_int(imm);
+                    self.stack[base + first_reg] = arith::sub(v, imm_v, &mut self.heap)?;
                 }
             }
 
@@ -137,9 +153,12 @@ impl ExecCtx {
                 self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
                     let a_val = self.heap.as_int(a);
                     let b_val = self.heap.as_int(b);
-                    self.heap.make_int(a_val.wrapping_add(b_val))
+                    match varn_core::add_i48(a_val, b_val) {
+                        Some(r) => VmValue::from_int(r),
+                        None => return Err(int_overflow("+", a_val, b_val)),
+                    }
                 } else {
-                    arith::add(a, b, &mut self.heap)
+                    arith::add(a, b, &mut self.heap)?
                 };
             }
             OpCode::SubInt => {
@@ -147,9 +166,12 @@ impl ExecCtx {
                 self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
                     let a_val = self.heap.as_int(a);
                     let b_val = self.heap.as_int(b);
-                    self.heap.make_int(a_val.wrapping_sub(b_val))
+                    match varn_core::sub_i48(a_val, b_val) {
+                        Some(r) => VmValue::from_int(r),
+                        None => return Err(int_overflow("-", a_val, b_val)),
+                    }
                 } else {
-                    arith::sub(a, b, &mut self.heap)
+                    arith::sub(a, b, &mut self.heap)?
                 };
             }
             OpCode::MulInt => {
@@ -157,9 +179,12 @@ impl ExecCtx {
                 self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
                     let a_val = self.heap.as_int(a);
                     let b_val = self.heap.as_int(b);
-                    self.heap.make_int(a_val.wrapping_mul(b_val))
+                    match varn_core::mul_i48(a_val, b_val) {
+                        Some(r) => VmValue::from_int(r),
+                        None => return Err(int_overflow("*", a_val, b_val)),
+                    }
                 } else {
-                    arith::mul(a, b, &mut self.heap)
+                    arith::mul(a, b, &mut self.heap)?
                 };
             }
             OpCode::DivInt => {
@@ -199,7 +224,10 @@ impl ExecCtx {
                         ));
                     }
                     let e = u32::try_from(b_val).unwrap_or(u32::MAX);
-                    self.heap.make_int(a_val.wrapping_pow(e))
+                    match varn_core::pow_i48(a_val, e) {
+                        Some(r) => VmValue::from_int(r),
+                        None => return Err(int_overflow("**", a_val, b_val)),
+                    }
                 } else {
                     arith::pow(a, b, &mut self.heap)?
                 };
@@ -263,7 +291,7 @@ impl ExecCtx {
                 {
                     VmValue::from_f64(self.heap.to_f64_val(a) + self.heap.to_f64_val(b))
                 } else {
-                    arith::add(a, b, &mut self.heap)
+                    arith::add(a, b, &mut self.heap)?
                 };
             }
             OpCode::SubFloat => {
@@ -273,7 +301,7 @@ impl ExecCtx {
                 {
                     VmValue::from_f64(self.heap.to_f64_val(a) - self.heap.to_f64_val(b))
                 } else {
-                    arith::sub(a, b, &mut self.heap)
+                    arith::sub(a, b, &mut self.heap)?
                 };
             }
             OpCode::MulFloat => {
@@ -283,7 +311,7 @@ impl ExecCtx {
                 {
                     VmValue::from_f64(self.heap.to_f64_val(a) * self.heap.to_f64_val(b))
                 } else {
-                    arith::mul(a, b, &mut self.heap)
+                    arith::mul(a, b, &mut self.heap)?
                 };
             }
             OpCode::DivFloat => {

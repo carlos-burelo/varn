@@ -9,7 +9,10 @@ use crate::value::VmValue;
 pub(crate) extern "C" fn jit_negate(ctx: *mut ExecCtx, v: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
-        crate::exec::arith::negate(v, &mut ctx_ref.heap)
+        match crate::exec::arith::negate(v, &mut ctx_ref.heap) {
+            Ok(r) => r,
+            Err(e) => jit_propagate_error(ctx_ref, e),
+        }
     }
 }
 

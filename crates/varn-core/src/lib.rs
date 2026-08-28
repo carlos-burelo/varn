@@ -33,7 +33,10 @@ pub use source::{SourceLocation, SourceRange};
 pub use cg_ty::CgTy;
 pub use intrinsics::{IntrinsicType, MemberKey};
 pub use module_id::{ImportSpecifier, ModuleId};
-pub use numeric::{binary_operand_kind, binary_result_kind, wrap_i48, NumericOperand};
+pub use numeric::{
+    add_i48, binary_operand_kind, binary_result_kind, checked_i48, mul_i48, neg_i48, pow_i48,
+    sub_i48, wrap_i48, NumericOperand, INT_MAX, INT_MIN,
+};
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;

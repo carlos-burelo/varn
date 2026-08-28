@@ -1,0 +1,11 @@
+// expect: error[integer overflow]
+//
+// `int` is 48 bits and raises rather than wrapping. 1000000007 is prime and
+// its square is ~1e18, well past 2^47; this used to evaluate to
+// -80578252960719 with no diagnostic at all.
+//
+// Fatal by design: a VM arithmetic error is not catchable by `try`/`catch`,
+// the same as `division by zero`, so this cannot be asserted from inside the
+// main suite (see `tests/53-int48-overflow.vn`).
+function mul(a: int, b: int): int { return a * b }
+print(mul(1000000007, 1000000007))

@@ -13,7 +13,7 @@ use super::super::arrays;
 use super::super::emit::{
     box_f64, box_int, box_or_pass, call_helper, def_const, def_const_bool, def_const_int,
     emit_return_value, meta_is_float, state_meta_int, unbox_bool, unbox_f64_coerce, use_boxed,
-    use_f64, use_int, wrap_i48,
+    guard_i48, use_f64, use_int, wrap_i48,
 };
 use super::super::fields;
 use super::super::floats;
@@ -123,12 +123,21 @@ pub(crate) fn dispatch_opcode(
             let (r1, r2) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
             let s1 = use_int(b, vars, state, r1)?;
             let s2 = use_int(b, vars, state, r2)?;
-            let r = match op {
-                OpCode::AddInt => b.ins().iadd(s1, s2),
-                OpCode::SubInt => b.ins().isub(s1, s2),
-                _ => b.ins().imul(s1, s2),
+            // `smulhi` is the top half of the signed product: the i64 result
+            // is exact iff it equals the sign extension of the low half. Only
+            // multiplication needs it (see `guard_i48`).
+            let (r, bad64, helper) = match op {
+                OpCode::AddInt => (b.ins().iadd(s1, s2), None, helpers.add),
+                OpCode::SubInt => (b.ins().isub(s1, s2), None, helpers.sub),
+                _ => {
+                    let lo = b.ins().imul(s1, s2);
+                    let hi = b.ins().smulhi(s1, s2);
+                    let sign = b.ins().sshr_imm(lo, 63);
+                    let wrapped64 = b.ins().icmp(IntCC::NotEqual, hi, sign);
+                    (lo, Some(wrapped64), helpers.mul)
+                }
             };
-            let w = wrap_i48(b, r);
+            let w = guard_i48(b, cc, exec_ctx, helper, r, s1, s2, bad64);
             b.def_var(vars[first_reg], w);
         }
         OpCode::Negate => {
@@ -145,7 +154,19 @@ pub(crate) fn dispatch_opcode(
             } else if state[src] == K::Int || state_meta_int(&proto.register_meta, first_reg) {
                 let i = use_int(b, vars, state, src)?;
                 let neg = b.ins().ineg(i);
-                let wrapped = wrap_i48(b, neg);
+                let wrapped = {
+                    let w = wrap_i48(b, neg);
+                    let fits = b.ins().icmp(IntCC::Equal, w, neg);
+                    let raise = b.create_block();
+                    let cont = b.create_block();
+                    b.ins().brif(fits, cont, &[], raise, &[]);
+                    b.switch_to_block(raise);
+                    let boxed = box_int(b, i);
+                    let _ = call_helper(b, cc, helpers.negate, &[exec_ctx, boxed]);
+                    b.ins().jump(cont, &[]);
+                    b.switch_to_block(cont);
+                    w
+                };
                 if state_meta_int(&proto.register_meta, first_reg) {
                     b.def_var(vars[first_reg], wrapped);
                 } else {
@@ -205,12 +226,15 @@ pub(crate) fn dispatch_opcode(
             let src = (w1 >> 8) as usize;
             let imm = (w1 & 0xFF) as i8 as i64;
             let s = use_int(b, vars, state, src)?;
-            let r = if op == OpCode::AddImm {
-                b.ins().iadd_imm(s, imm)
+            let (r, delta) = if op == OpCode::AddImm {
+                (b.ins().iadd_imm(s, imm), imm)
             } else {
-                b.ins().iadd_imm(s, -imm)
+                (b.ins().iadd_imm(s, -imm), -imm)
             };
-            let w = wrap_i48(b, r);
+            // Routed through `helpers.add` with the immediate materialised, so
+            // the raise reports the operands the program actually wrote.
+            let imm_v = b.ins().iconst(types::I64, delta);
+            let w = guard_i48(b, cc, exec_ctx, helpers.add, r, s, imm_v, None);
             b.def_var(vars[first_reg], w);
         }
         OpCode::ModInt => {

@@ -2,6 +2,29 @@ use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use rust_decimal::Decimal;
+use varn_core::{add_i48, mul_i48, neg_i48, pow_i48, sub_i48, INT_MAX, INT_MIN};
+
+/// The `integer overflow` error, naming the operands so the message points at
+/// the actual computation rather than just the line.
+///
+/// `int` is 48 bits (the NaN-box payload). Leaving that range used to wrap
+/// silently, which turned `1000000007 * 1000000007` into a wrong number with
+/// no signal; the range is unchanged, only the behaviour at its edge.
+#[cold]
+#[inline(never)]
+fn overflow(op: &str, a: i64, b: i64) -> RuntimeError {
+    RuntimeError::new(format!(
+        "integer overflow: {a} {op} {b} is outside int ({INT_MIN}..={INT_MAX})"
+    ))
+}
+
+#[cold]
+#[inline(never)]
+fn overflow_neg(a: i64) -> RuntimeError {
+    RuntimeError::new(format!(
+        "integer overflow: -({a}) is outside int ({INT_MIN}..={INT_MAX})"
+    ))
+}
 
 /// The `decimal` payload of `v`, or `None`.
 ///
@@ -47,61 +70,70 @@ fn decimal_pair(a: VmValue, b: VmValue, heap: &Heap) -> Option<(Decimal, Decimal
 }
 
 #[inline(always)]
-pub(crate) fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+pub(crate) fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if heap.is_int(a) && heap.is_int(b) {
-        let r = heap.as_int(a).wrapping_add(heap.as_int(b));
-        return heap.make_int(r);
+        let (x, y) = (heap.as_int(a), heap.as_int(b));
+        return match add_i48(x, y) {
+            Some(r) => Ok(VmValue::from_int(r)),
+            None => Err(overflow("+", x, y)),
+        };
     }
     // Both sides numeric → float add. A bare `is_f64() || is_f64()` here is
     // wrong: `str + float` must fall through to the concat checks below, not
     // coerce the string operand to 0.0.
     if (a.is_f64() || heap.is_int(a)) && (b.is_f64() || heap.is_int(b)) {
-        return VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b));
+        return Ok(VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b)));
     }
 
     if a.is_sso() || b.is_sso() {
-        return crate::exec::strings::str_concat(a, b, heap);
+        return Ok(crate::exec::strings::str_concat(a, b, heap));
     }
     if a.is_heap() || b.is_heap() {
         let a_is_str = a.is_heap() && matches!(heap.get(a.as_heap_idx()), Some(HeapObj::Str(_)));
         let b_is_str = b.is_heap() && matches!(heap.get(b.as_heap_idx()), Some(HeapObj::Str(_)));
         if a_is_str || b_is_str {
-            return crate::exec::strings::str_concat(a, b, heap);
+            return Ok(crate::exec::strings::str_concat(a, b, heap));
         }
 
         if let Some((x, y)) = decimal_pair(a, b, heap) {
-            return heap.alloc_decimal(x + y);
+            return Ok(heap.alloc_decimal(x + y));
         }
     }
-    VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b))
+    Ok(VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b)))
 }
 
 #[inline(always)]
-pub(crate) fn sub(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+pub(crate) fn sub(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if heap.is_int(a) && heap.is_int(b) {
-        let r = heap.as_int(a).wrapping_sub(heap.as_int(b));
-        return heap.make_int(r);
+        let (x, y) = (heap.as_int(a), heap.as_int(b));
+        return match sub_i48(x, y) {
+            Some(r) => Ok(VmValue::from_int(r)),
+            None => Err(overflow("-", x, y)),
+        };
     }
     if a.is_heap() || b.is_heap() {
         if let Some((x, y)) = decimal_pair(a, b, heap) {
-            return heap.alloc_decimal(x - y);
+            return Ok(heap.alloc_decimal(x - y));
         }
     }
-    VmValue::from_f64(heap.to_f64_val(a) - heap.to_f64_val(b))
+    Ok(VmValue::from_f64(heap.to_f64_val(a) - heap.to_f64_val(b)))
 }
 
 #[inline(always)]
-pub(crate) fn mul(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
+pub(crate) fn mul(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if heap.is_int(a) && heap.is_int(b) {
-        let r = heap.as_int(a).wrapping_mul(heap.as_int(b));
-        return heap.make_int(r);
+        let (x, y) = (heap.as_int(a), heap.as_int(b));
+        return match mul_i48(x, y) {
+            Some(r) => Ok(VmValue::from_int(r)),
+            None => Err(overflow("*", x, y)),
+        };
     }
     if a.is_heap() || b.is_heap() {
         if let Some((x, y)) = decimal_pair(a, b, heap) {
-            return heap.alloc_decimal(x * y);
+            return Ok(heap.alloc_decimal(x * y));
         }
     }
-    VmValue::from_f64(heap.to_f64_val(a) * heap.to_f64_val(b))
+    Ok(VmValue::from_f64(heap.to_f64_val(a) * heap.to_f64_val(b)))
 }
 
 #[inline(always)]
@@ -159,9 +191,12 @@ pub(crate) fn pow(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
         if exp < 0 {
             return Err(RuntimeError::new("negative exponent in integer power"));
         }
+        let base = heap.as_int(a);
         let e = u32::try_from(exp).unwrap_or(u32::MAX);
-        let r = heap.as_int(a).wrapping_pow(e);
-        return Ok(heap.make_int(r));
+        return match pow_i48(base, e) {
+            Some(r) => Ok(VmValue::from_int(r)),
+            None => Err(overflow("**", base, exp)),
+        };
     }
     Ok(VmValue::from_f64(
         heap.to_f64_val(a).powf(heap.to_f64_val(b)),
@@ -169,18 +204,21 @@ pub(crate) fn pow(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
 }
 
 #[inline(always)]
-pub(crate) fn negate(a: VmValue, heap: &mut Heap) -> VmValue {
+pub(crate) fn negate(a: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if heap.is_int(a) {
-        let r = -heap.as_int(a);
-        return heap.make_int(r);
+        let x = heap.as_int(a);
+        return match neg_i48(x) {
+            Some(r) => Ok(VmValue::from_int(r)),
+            None => Err(overflow_neg(x)),
+        };
     }
     if a.is_f64() {
-        return VmValue::from_f64(-a.as_f64());
+        return Ok(VmValue::from_f64(-a.as_f64()));
     }
     if let Some(d) = decimal_of(a, &*heap) {
-        return heap.alloc_decimal(-d);
+        return Ok(heap.alloc_decimal(-d));
     }
-    VmValue::from_f64(-heap.to_f64_val(a))
+    Ok(VmValue::from_f64(-heap.to_f64_val(a)))
 }
 
 #[inline(always)]
@@ -206,7 +244,7 @@ pub(crate) fn shl(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
     let r = heap
         .as_int(a)
         .wrapping_shl(heap.to_f64_val(b) as i32 as u32 & 63);
-    heap.make_int(r)
+    VmValue::from_int_wrapping(r)
 }
 
 #[inline(always)]
@@ -214,11 +252,11 @@ pub(crate) fn shr(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
     let r = heap
         .as_int(a)
         .wrapping_shr(heap.to_f64_val(b) as i32 as u32 & 63);
-    heap.make_int(r)
+    VmValue::from_int_wrapping(r)
 }
 
 #[inline(always)]
 pub(crate) fn ushr(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
     let r = ((heap.as_int(a) as u64).wrapping_shr(heap.to_f64_val(b) as i32 as u32 & 63)) as i64;
-    heap.make_int(r)
+    VmValue::from_int_wrapping(r)
 }

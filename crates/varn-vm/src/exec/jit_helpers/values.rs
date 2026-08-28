@@ -72,21 +72,30 @@ pub(crate) extern "C" fn jit_gte(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> V
 pub(crate) extern "C" fn jit_add(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
-        crate::exec::arith::add(a, b, &mut ctx_ref.heap)
+        match crate::exec::arith::add(a, b, &mut ctx_ref.heap) {
+            Ok(v) => v,
+            Err(e) => super::construct::jit_propagate_error(ctx_ref, e),
+        }
     }
 }
 
 pub(crate) extern "C" fn jit_sub(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
-        crate::exec::arith::sub(a, b, &mut ctx_ref.heap)
+        match crate::exec::arith::sub(a, b, &mut ctx_ref.heap) {
+            Ok(v) => v,
+            Err(e) => super::construct::jit_propagate_error(ctx_ref, e),
+        }
     }
 }
 
 pub(crate) extern "C" fn jit_mul(ctx: *mut ExecCtx, a: VmValue, b: VmValue) -> VmValue {
     unsafe {
         let ctx_ref = &mut *ctx;
-        crate::exec::arith::mul(a, b, &mut ctx_ref.heap)
+        match crate::exec::arith::mul(a, b, &mut ctx_ref.heap) {
+            Ok(v) => v,
+            Err(e) => super::construct::jit_propagate_error(ctx_ref, e),
+        }
     }
 }
 

@@ -1,0 +1,65 @@
+// `int` is a 48-bit two's-complement integer that RAISES on overflow.
+//
+// It does not wrap, does not saturate and does not promote to float. The range
+// is `[-2^47, 2^47-1]`; leaving it raises `integer overflow` naming both
+// operands. The rules live in one place, `varn-core/src/numeric.rs`, and are
+// tier-identical by contract — every assertion here must hold under
+// `VARN_NO_JIT=1`, and the constant folder must agree with both.
+//
+// This replaces the wrapping contract asserted by `53-int48-wrapping.vn`.
+// A 48-bit `int` is a legitimate design; one that answers
+// `1000000007 * 1000000007` with a wrong number and no signal is not — and
+// those are two primes anyone writing a hash or a modular routine will reach
+// for. The width did not change, only the behaviour at its edge.
+//
+// The raising cases themselves are NOT here: a VM arithmetic error is fatal
+// and `try`/`catch` does not intercept it (the same is true of
+// `division by zero`), so a program cannot observe one and keep running. They
+// live in `tests/errors/int-overflow-*.vn` instead.
+
+const INT_MAX = 140737488355327 // 2^47 - 1
+const INT_MIN = -140737488355328 // -2^47
+
+assert("i48: max is representable", INT_MAX === 140737488355327)
+assert("i48: min is representable", INT_MIN === -140737488355328)
+
+// Arithmetic that stays inside the range is exact, right up to the edge.
+assert("i48: reaching max is exact", (INT_MAX - 1) + 1 === INT_MAX)
+assert("i48: reaching min is exact", (INT_MIN + 1) - 1 === INT_MIN)
+assert("i48: max negates", -INT_MAX === INT_MIN + 1)
+
+// Products that fit are exact — including ones whose operands are large
+// enough that a wrapping implementation would have been indistinguishable.
+assert("i48: large exact product", 3000000 * 40000000 === 120000000000000)
+assert("i48: negative exact product", -3000000 * 40000000 === -120000000000000)
+
+// The folder must reach the same values as the interpreter and the JIT. These
+// are all literal expressions, so they are folded at compile time; the ones
+// above run through registers.
+assert("fold: exact product", 1000000 * 100000000 === 100000000000000)
+assert("fold: exact sum", 140737488355000 + 327 === INT_MAX)
+assert("fold: exponent", 2 ** 46 === 70368744177664)
+
+// The same arithmetic inside a function, which is the shape that reaches the
+// JIT: a loop long enough to be compiled must agree with the interpreter.
+function accumulate(start: int, step: int, times: int): int {
+    let current = start
+    let i = 0
+    while (i < times) {
+        current = current + step
+        i = i + 1
+    }
+    return current
+}
+
+assert("i48: loop stays exact", accumulate(0, 1000000000, 100) === 100000000000)
+// Hot enough to be compiled and then rescued by OSR, so the compiled arm is
+// exercised and not just the interpreter.
+assert("i48: hot loop stays exact", accumulate(0, 1, 100000) === 100000)
+assert("i48: hot loop near the edge", accumulate(INT_MAX - 100000, 1, 100000) === INT_MAX)
+
+// Shifts truncate to the type width by definition — that is the shift's
+// result, not an overflow — so they do NOT raise.
+assert("i48: shift truncates, does not raise", (1 << 47) === INT_MIN)
+
+print("[PASSED] 53. int is i48 and raises on overflow")
