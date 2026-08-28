@@ -116,7 +116,7 @@ impl ExecCtx {
                     // i8 immediate cannot overflow i64, so the branch was dead,
                     // and float promotion is exactly what numeric.rs denies.
                     let a_val = self.heap.as_int(v);
-                    self.stack[base + first_reg] = match varn_core::add_i48(a_val, imm) {
+                    self.stack[base + first_reg] = match varn_core::add_int(a_val, imm) {
                         Some(r) => VmValue::from_int(r),
                         None => return Err(int_overflow("+", a_val, imm)),
                     };
@@ -132,12 +132,8 @@ impl ExecCtx {
                 let imm = lo(w1) as i8 as i64;
                 let v = self.stack[base + src];
                 if self.heap.is_int(v) {
-                    // The old `overflowing_sub` guard here tested i64 overflow and
-                    // promoted to float. Both were wrong: an i48 operand plus an
-                    // i8 immediate cannot overflow i64, so the branch was dead,
-                    // and float promotion is exactly what numeric.rs denies.
                     let a_val = self.heap.as_int(v);
-                    self.stack[base + first_reg] = match varn_core::sub_i48(a_val, imm) {
+                    self.stack[base + first_reg] = match varn_core::sub_int(a_val, imm) {
                         Some(r) => VmValue::from_int(r),
                         None => return Err(int_overflow("-", a_val, imm)),
                     };
@@ -153,7 +149,7 @@ impl ExecCtx {
                 self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
                     let a_val = self.heap.as_int(a);
                     let b_val = self.heap.as_int(b);
-                    match varn_core::add_i48(a_val, b_val) {
+                    match varn_core::add_int(a_val, b_val) {
                         Some(r) => VmValue::from_int(r),
                         None => return Err(int_overflow("+", a_val, b_val)),
                     }
@@ -166,7 +162,7 @@ impl ExecCtx {
                 self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
                     let a_val = self.heap.as_int(a);
                     let b_val = self.heap.as_int(b);
-                    match varn_core::sub_i48(a_val, b_val) {
+                    match varn_core::sub_int(a_val, b_val) {
                         Some(r) => VmValue::from_int(r),
                         None => return Err(int_overflow("-", a_val, b_val)),
                     }
@@ -179,7 +175,7 @@ impl ExecCtx {
                 self.stack[base + first_reg] = if self.heap.is_int(a) && self.heap.is_int(b) {
                     let a_val = self.heap.as_int(a);
                     let b_val = self.heap.as_int(b);
-                    match varn_core::mul_i48(a_val, b_val) {
+                    match varn_core::mul_int(a_val, b_val) {
                         Some(r) => VmValue::from_int(r),
                         None => return Err(int_overflow("*", a_val, b_val)),
                     }
@@ -224,7 +220,7 @@ impl ExecCtx {
                         ));
                     }
                     let e = u32::try_from(b_val).unwrap_or(u32::MAX);
-                    match varn_core::pow_i48(a_val, e) {
+                    match varn_core::pow_int(a_val, e) {
                         Some(r) => VmValue::from_int(r),
                         None => return Err(int_overflow("**", a_val, b_val)),
                     }

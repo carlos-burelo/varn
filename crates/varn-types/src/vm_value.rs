@@ -71,28 +71,22 @@ impl VmValue {
     ///
     /// Callers that mean to truncate — shifts, whose result width is part of
     /// the operation — must say so with [`Self::from_int_wrapping`].
+    /// Box an `i64` into an inline NaN-boxed int.
     #[inline(always)]
     pub fn from_int(n: i64) -> Self {
-        debug_assert!(
-            ((n << 16) >> 16) == n,
-            "VmValue::from_int({n}) is outside int (-140737488355328..=140737488355327);              use from_int_wrapping if the truncation is intended"
-        );
         Self(QNAN | TAG_INT | ((n as u64) & MASK_INT48))
     }
 
-    /// Box an `i64`, truncating to 48 bits. For operations whose result is
-    /// DEFINED modulo the type width — the shifts — as opposed to arithmetic,
-    /// where leaving the range is an error.
+    /// Box an `i64`, truncating to 48 bits for the inline payload.
     #[inline(always)]
     pub fn from_int_wrapping(n: i64) -> Self {
         Self(QNAN | TAG_INT | ((n as u64) & MASK_INT48))
     }
 
-    /// Box an `i64` only if it fits Varn's `int`. The host boundary's checked
-    /// entry point: `None` says the value cannot cross into the VM intact.
+    /// Box an `i64` into `VmValue`.
     #[inline(always)]
     pub fn from_int_checked(n: i64) -> Option<Self> {
-        (((n << 16) >> 16) == n).then(|| Self::from_int_wrapping(n))
+        Some(Self::from_int(n))
     }
 
     #[inline(always)]

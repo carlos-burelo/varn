@@ -70,8 +70,6 @@ fn render_recursive(
 /// (Consequence: a string constant shows as `null` in the IR/disasm — see
 /// the phase limitations.)
 fn constants_for_inspect(proto: &FunctionProto) -> Vec<VmValue> {
-    const I48_MIN: i64 = -(1_i64 << 47);
-    const I48_MAX: i64 = (1_i64 << 47) - 1;
     proto
         .chunk
         .constants
@@ -79,10 +77,7 @@ fn constants_for_inspect(proto: &FunctionProto) -> Vec<VmValue> {
         .map(|entry| match entry {
             PoolEntry::Literal(Literal::Null) => VmValue::null(),
             PoolEntry::Literal(Literal::Bool(b)) => VmValue::from_bool(*b),
-            PoolEntry::Literal(Literal::Int(n)) if *n >= I48_MIN && *n <= I48_MAX => {
-                VmValue::from_int(*n)
-            }
-            PoolEntry::Literal(Literal::Int(n)) => VmValue::from_f64(*n as f64),
+            PoolEntry::Literal(Literal::Int(n)) => VmValue::from_int(*n),
             PoolEntry::Literal(Literal::Float(f)) => VmValue::from_f64(*f),
             // Heap literals + function/shape entries: non-int placeholder.
             _ => VmValue::null(),

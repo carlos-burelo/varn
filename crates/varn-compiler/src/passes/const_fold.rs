@@ -1,7 +1,7 @@
 use crate::hir::{HirBinOp, HirType, HirUnOp};
 use crate::ssa::ir::{BlockId, InstKind, SsaFunc, Terminator, Value};
 use rustc_hash::FxHashMap;
-use varn_core::{add_i48, mul_i48, neg_i48, pow_i48, sub_i48, wrap_i48};
+use varn_core::{add_i48, mul_i48, neg_i48, pow_i48, sub_i48};
 
 pub fn run(func: &mut SsaFunc) -> bool {
     let mut changed = false;
@@ -160,15 +160,12 @@ fn fold_binary(op: HirBinOp, lhs: &InstKind, rhs: &InstKind, _ty: HirType) -> Op
             BitAnd => Some(InstKind::ConstInt(x & y)),
             BitOr => Some(InstKind::ConstInt(x | y)),
             BitXor => Some(InstKind::ConstInt(x ^ y)),
-            // Shifts truncate to the type width by definition — that is the
-            // shift's result, not an overflow — so they keep `wrap_i48`, which
-            // is also what `VmValue::from_int` does to the runtime result.
-            Shl => Some(InstKind::ConstInt(wrap_i48(x.wrapping_shl(*y as u32)))),
-            Shr => Some(InstKind::ConstInt(wrap_i48(x.wrapping_shr(*y as u32)))),
+            Shl => Some(InstKind::ConstInt(x.wrapping_shl(*y as u32))),
+            Shr => Some(InstKind::ConstInt(x.wrapping_shr(*y as u32))),
             Ushr => {
                 let ux = *x as u64;
                 let uy = *y as u32;
-                Some(InstKind::ConstInt(wrap_i48((ux >> uy) as i64)))
+                Some(InstKind::ConstInt((ux >> uy) as i64))
             }
             _ => None,
         },

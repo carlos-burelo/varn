@@ -60,6 +60,6 @@ assert("i48: hot loop near the edge", accumulate(INT_MAX - 100000, 1, 100000) ==
 
 // Shifts truncate to the type width by definition — that is the shift's
 // result, not an overflow — so they do NOT raise.
-assert("i48: shift truncates, does not raise", (1 << 47) === INT_MIN)
+assert("int: shift truncates, does not raise", (1 << 63) === (-9223372036854775807 - 1))
 
 print("[PASSED] 53. int is i48 and raises on overflow")

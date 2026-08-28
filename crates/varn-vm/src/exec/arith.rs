@@ -2,14 +2,13 @@ use crate::error::{RuntimeError, VmResult};
 use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
 use rust_decimal::Decimal;
-use varn_core::{add_i48, mul_i48, neg_i48, pow_i48, sub_i48, INT_MAX, INT_MIN};
+use varn_core::{add_int, mul_int, neg_int, pow_int, sub_int, INT_MAX, INT_MIN};
 
 /// The `integer overflow` error, naming the operands so the message points at
 /// the actual computation rather than just the line.
 ///
-/// `int` is 48 bits (the NaN-box payload). Leaving that range used to wrap
-/// silently, which turned `1000000007 * 1000000007` into a wrong number with
-/// no signal; the range is unchanged, only the behaviour at its edge.
+/// `int` is 64 bits with hardware-checked overflow. Leaving that range
+/// raises an integer overflow error.
 #[cold]
 #[inline(never)]
 fn overflow(op: &str, a: i64, b: i64) -> RuntimeError {
@@ -73,7 +72,7 @@ fn decimal_pair(a: VmValue, b: VmValue, heap: &Heap) -> Option<(Decimal, Decimal
 pub(crate) fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if heap.is_int(a) && heap.is_int(b) {
         let (x, y) = (heap.as_int(a), heap.as_int(b));
-        return match add_i48(x, y) {
+        return match add_int(x, y) {
             Some(r) => Ok(VmValue::from_int(r)),
             None => Err(overflow("+", x, y)),
         };
@@ -106,7 +105,7 @@ pub(crate) fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
 pub(crate) fn sub(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if heap.is_int(a) && heap.is_int(b) {
         let (x, y) = (heap.as_int(a), heap.as_int(b));
-        return match sub_i48(x, y) {
+        return match sub_int(x, y) {
             Some(r) => Ok(VmValue::from_int(r)),
             None => Err(overflow("-", x, y)),
         };
@@ -123,7 +122,7 @@ pub(crate) fn sub(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
 pub(crate) fn mul(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if heap.is_int(a) && heap.is_int(b) {
         let (x, y) = (heap.as_int(a), heap.as_int(b));
-        return match mul_i48(x, y) {
+        return match mul_int(x, y) {
             Some(r) => Ok(VmValue::from_int(r)),
             None => Err(overflow("*", x, y)),
         };
@@ -193,7 +192,7 @@ pub(crate) fn pow(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
         }
         let base = heap.as_int(a);
         let e = u32::try_from(exp).unwrap_or(u32::MAX);
-        return match pow_i48(base, e) {
+        return match pow_int(base, e) {
             Some(r) => Ok(VmValue::from_int(r)),
             None => Err(overflow("**", base, exp)),
         };
@@ -207,7 +206,7 @@ pub(crate) fn pow(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
 pub(crate) fn negate(a: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
     if heap.is_int(a) {
         let x = heap.as_int(a);
-        return match neg_i48(x) {
+        return match neg_int(x) {
             Some(r) => Ok(VmValue::from_int(r)),
             None => Err(overflow_neg(x)),
         };

@@ -19,15 +19,7 @@ pub(crate) fn resolve_constants(proto: &FunctionProto, heap: &mut Heap) -> Vec<V
                 PoolEntry::Literal(lit) => match lit {
                     Literal::Null => VmValue::null(),
                     Literal::Bool(b) => VmValue::from_bool(*b),
-                    Literal::Int(n) => {
-                        const I48_MIN: i64 = -(1_i64 << 47);
-                        const I48_MAX: i64 = (1_i64 << 47) - 1;
-                        if *n >= I48_MIN && *n <= I48_MAX {
-                            VmValue::from_int(*n)
-                        } else {
-                            VmValue::from_f64(*n as f64)
-                        }
-                    }
+                    Literal::Int(n) => VmValue::from_int(*n),
                     Literal::Float(f) => VmValue::from_f64(*f),
                     Literal::Str(s) => heap.alloc_str_interned(s.as_ref()),
                     Literal::BigInt(n) => heap.intern(Value::BigInt(Box::new(*n))),

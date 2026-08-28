@@ -44,7 +44,7 @@ pub fn intrinsic_or_keyword_hover(tok: &TokenRecord) -> Option<Hover> {
         TokenKind::Identifier => match tok.lexeme.as_str() {
             "int" => Some(make_doc_hover(
                 "type int",
-                "Entero de 48 bits (i48) con operaciones aritméticas rápidas de bajo coste y desbordamiento controlado.",
+                "Entero de 64 bits con operaciones aritméticas nativas de hardware y desbordamiento controlado.",
             )),
             "float" => Some(make_doc_hover(
                 "type float",

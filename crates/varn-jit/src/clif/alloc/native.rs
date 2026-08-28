@@ -5,7 +5,7 @@ use varn_types::register_meta::RegisterMeta;
 
 use super::super::emit::{
     box_bool, box_f64, box_int, box_or_pass, call_helper, meta_is_float, unbox_bool,
-    unbox_f64_coerce, use_f64, use_int, wrap_i48,
+    unbox_f64_coerce, use_f64, use_int,
 };
 use super::super::kinds::K;
 use super::safepoints::{
@@ -99,8 +99,7 @@ pub(crate) fn emit_call_native_op(
             }
             varn_types::ArgType::Int => {
                 let i_res = b.inst_results(call)[0];
-                let w = wrap_i48(b, i_res);
-                box_int(b, w)
+                box_int(b, i_res)
             }
             varn_types::ArgType::Bool => {
                 let b_res = b.inst_results(call)[0];

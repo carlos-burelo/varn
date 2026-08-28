@@ -68,3 +68,16 @@ impl fmt::Display for RuntimeError {
 impl std::error::Error for RuntimeError {}
 
 pub type VmResult<T> = Result<T, RuntimeError>;
+
+#[cfg(test)]
+mod size_probe {
+    #[test]
+    fn sizes() {
+        eprintln!(
+            "RuntimeError={} VmResult<VmValue>={} Boxed={}",
+            std::mem::size_of::<super::RuntimeError>(),
+            std::mem::size_of::<Result<crate::value::VmValue, super::RuntimeError>>(),
+            std::mem::size_of::<Result<crate::value::VmValue, Box<super::RuntimeError>>>()
+        );
+    }
+}
