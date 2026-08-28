@@ -105,7 +105,12 @@ Para forzar el bundle embebido: `VARN_STD=@embedded vn run file.vn`.
 
 ## 8. Garantías Numéricas
 
-- `int`: aritmética de 48 bits con wrapping en overflow (comportamiento documentado en `tests/53-int48-wrapping.vn`).
+- `int`: aritmética de 48 bits, rango `-140737488355328 ..= 140737488355327`.
+  Salir de ese rango **lanza `integer overflow`**: no envuelve, no satura y no
+  promociona a float. Los desplazamientos (`<<`, `>>`, `>>>`) sí truncan al
+  ancho del tipo, porque ese es su resultado definido y no un desbordamiento.
+  Reglas en `varn-core/src/numeric.rs`; contrato fijado en
+  `tests/53-int48-overflow.vn` y `tests/errors/int-overflow-*.vn`.
 - `float`: IEEE 754 doble precisión. División `int/int` produce `float`.
 - `decimal`: precisión exacta para operaciones financieras, sin errores de punto flotante.
 - `bigint`: sin overflow, precisión arbitraria.

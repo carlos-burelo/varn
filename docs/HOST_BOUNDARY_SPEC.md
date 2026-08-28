@@ -40,14 +40,27 @@ La conversión de tipos entre el formato NaN-boxed de 64 bits de la VM y las est
 | `Array` | Pointer a Heap Object | `&[VmValue]` | `ctx.expect_array(val)` / `ctx.alloc_array(v)` |
 
 > **`int` es i48, no i64.** El tipo Rust del lado del host es `i64`, pero solo
-> los 48 bits bajos sobreviven al boxing: el payload del NaN-box es de 48 bits
-> y `VmValue::from_int` enmascara con `MASK_INT48`. Un builtin que devuelva un
-> `i64` legítimo fuera de `[-2^47, 2^47-1]` se **trunca en silencio**, sin error
-> ni saturación. Rango representable: `-140737488355328 ..= 140737488355327`.
+> los 48 bits bajos sobreviven al boxing: el payload del NaN-box es de 48 bits.
+> Rango representable: `-140737488355328 ..= 140737488355327`.
 >
-> Esta tabla decía `i64` sin más, lo cual describía mal el contrato de la
-> frontera de host. Las reglas normativas están en `varn-core/src/numeric.rs`
-> (fuente única) y el comportamiento está fijado en `tests/53-int48-wrapping.vn`.
+> **Aritmética:** dentro del lenguaje, una operación que sale de ese rango
+> **lanza `integer overflow`** — no envuelve, no satura y no promociona a
+> float. Reglas normativas en `varn-core/src/numeric.rs` (fuente única);
+> comportamiento fijado en `tests/53-int48-overflow.vn` y
+> `tests/errors/int-overflow-*.vn`.
+>
+> **Cruce desde el host:** `VmValue::from_int` es para valores que el llamante
+> ya sabe en rango — lleva un `debug_assert`, pero en release **trunca**. Un
+> builtin que pueda producir un `i64` fuera de rango debe usar:
+>
+> | Constructor | Cuándo |
+> |---|---|
+> | `VmValue::from_int(n)` | `n` ya probado en rango (el caso normal) |
+> | `VmValue::from_int_checked(n)` | `n` puede desbordar; devuelve `Option` |
+> | `VmValue::from_int_wrapping(n)` | el truncamiento es intencional (shifts) |
+>
+> Compilar en perfil `dev` y correr `tests/main.vn` ejercita el `debug_assert`
+> sobre toda la stdlib; hoy pasa limpio.
 
 ---
 

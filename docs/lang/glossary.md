@@ -150,7 +150,7 @@ Operador usado en `for...in` para iterar claves de objeto.
 Operador de verificación de tipo en tiempo de ejecución. Devuelve `bool`. También estrecha el tipo en bloques condicionales.
 
 **`int`**  
-Tipo primitivo de entero de 48 bits con signo y wrapping en overflow.
+Tipo primitivo de entero de 48 bits con signo, rango `-140737488355328 ..= 140737488355327`. La aritmética que sale de ese rango lanza `integer overflow`; no envuelve.
 
 **`interface`**  
 Contrato estructural sin implementación. Los campos opcionales se marcan con `?`. Varn usa tipado estructural.
