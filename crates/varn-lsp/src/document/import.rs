@@ -65,10 +65,9 @@ pub fn named_import_module_at(source: &str, line: u32, col: u32) -> Option<Strin
         return None;
     }
     let after = &src_line[col as usize..];
-    let full = if let Some(close_idx) = after.find('}') {
+    let full = {
+        let close_idx = after.find('}')?;
         format!("{}{}", before, &after[..=close_idx])
-    } else {
-        return None;
     };
 
     if !full.contains("import") && !full.contains("export") {

@@ -138,8 +138,7 @@ pub fn build_module_graph(
         if let Some(&start) = cycle_nodes.first() {
             let mut stack: Vec<&str> = vec![start];
             let mut visited: Vec<&str> = Vec::new();
-            'dfs: loop {
-                let Some(&cur) = stack.last() else { break };
+            'dfs: while let Some(&cur) = stack.last() {
                 if let Some(pos) = visited.iter().position(|&v| v == cur) {
                     cycle_path = visited[pos..].iter().map(|s| s.to_string()).collect();
                     cycle_path.push(cur.to_string());

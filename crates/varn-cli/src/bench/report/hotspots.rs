@@ -20,7 +20,7 @@ pub fn print_hotspots(h: &HotspotCounters) {
     if !h.fn_calls.is_empty() {
         section("Funciones");
         let mut entries: Vec<_> = h.fn_calls.iter().collect();
-        entries.sort_by(|a, b| b.1.calls.cmp(&a.1.calls));
+        entries.sort_by_key(|b| std::cmp::Reverse(b.1.calls));
         let counted: u64 = entries.iter().map(|(_, e)| e.calls).sum();
         for (name, entry) in entries.iter().take(TOP_N) {
             let jit_share = if entry.calls > 0 {
@@ -53,7 +53,7 @@ pub fn print_hotspots(h: &HotspotCounters) {
     if !h.method_calls.is_empty() {
         section("Métodos");
         let mut entries: Vec<_> = h.method_calls.iter().collect();
-        entries.sort_by(|a, b| b.1.calls.cmp(&a.1.calls));
+        entries.sort_by_key(|b| std::cmp::Reverse(b.1.calls));
         for (name, entry) in entries.iter().take(TOP_N) {
             let jit_share = if entry.calls > 0 {
                 entry.jit_calls as f64 / entry.calls as f64

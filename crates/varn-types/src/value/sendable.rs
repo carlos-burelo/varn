@@ -135,7 +135,7 @@ impl Value {
                 fields: d.fields.iter().map(|f| f.to_string()).collect(),
                 payload: d.payload.to_sendable()?,
             }))),
-            _ => Err(format!("Value cannot be sent to an isolate")),
+            _ => Err("Value cannot be sent to an isolate".to_string()),
         }
     }
 }

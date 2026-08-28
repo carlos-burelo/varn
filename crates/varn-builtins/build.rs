@@ -252,7 +252,7 @@ fn extract_exports_from_source(source: &str) -> Vec<String> {
             '/' => {
                 if chars.peek() == Some(&'/') {
                     chars.next();
-                    while let Some(next_c) = chars.next() {
+                    for next_c in chars.by_ref() {
                         if next_c == '\n' {
                             break;
                         }
@@ -270,7 +270,7 @@ fn extract_exports_from_source(source: &str) -> Vec<String> {
             '"' | '\'' | '`' => {
                 let quote = c;
                 let mut escaped = false;
-                while let Some(next_c) = chars.next() {
+                for next_c in chars.by_ref() {
                     if escaped {
                         escaped = false;
                     } else if next_c == '\\' {
@@ -352,12 +352,10 @@ fn extract_exports_from_source(source: &str) -> Vec<String> {
                                 "let",
                             ]
                             .contains(&kw.as_str())
-                            {
-                                if keyword_idx + 1 < words.len() {
+                                && keyword_idx + 1 < words.len() {
                                     let name = &words[keyword_idx + 1];
                                     exports.push(name.clone());
                                 }
-                            }
                         }
                     }
                 }
@@ -378,7 +376,7 @@ fn skip_whitespace_and_comments(chars: &mut std::iter::Peekable<std::str::Chars>
             chars.next();
             if chars.peek() == Some(&'/') {
                 chars.next();
-                while let Some(next_c) = chars.next() {
+                for next_c in chars.by_ref() {
                     if next_c == '\n' {
                         break;
                     }

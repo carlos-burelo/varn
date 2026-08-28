@@ -47,7 +47,7 @@ pub(crate) extern "C" fn jit_invoke_virtual(
                     }
                     ctx_ref
                         .frames
-                        .push(crate::frame::CallFrame::new(&**closure, callee_base));
+                        .push(crate::frame::CallFrame::new(closure, callee_base));
                     ctx_ref.jit_frame_prepushed = 1;
                     let res = (jit_fn)(
                         ctx_ref.stack.as_mut_ptr() as *mut std::ffi::c_void,
@@ -128,13 +128,12 @@ pub(crate) extern "C" fn jit_get_property_ic_fast(
                     let slot_cache = &*closure_ref.ic_cache.as_ptr();
                     let poly_slot = &slot_cache[cs_idx];
                     for entry in &poly_slot.entries {
-                        if entry.id != 0 && entry.is_class == ICKind::SHAPE_PROP {
-                            if guard.shape().id == entry.id {
+                        if entry.id != 0 && entry.is_class == ICKind::SHAPE_PROP
+                            && guard.shape().id == entry.id {
                                 if let Some(v) = guard.field_at(entry.slot as usize) {
                                     return v;
                                 }
                             }
-                        }
                     }
                 }
             }

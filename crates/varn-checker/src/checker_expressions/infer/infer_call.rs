@@ -100,7 +100,7 @@ impl<'r> Checker<'r> {
                         if self.warn_implicit_dynamic && !name.is_empty() && name != "_" {
                             self.emit(
                                 Diagnostic::hint(ErrorCode::TypeAnnotationRequired, format!("parameter '{name}' has no type annotation — inferred as 'dynamic'"))
-                                    .with_range(p.pattern.range().clone()),
+                                    .with_range(*p.pattern.range()),
                             );
                         }
                         Type::Dynamic
@@ -133,7 +133,7 @@ impl<'r> Checker<'r> {
                 if name.is_empty() || name == "_" {
                     continue;
                 }
-                if let Some(sym_id) = bind.scopes.get(scope_id).resolve(&name, &bind.scopes) {
+                if let Some(sym_id) = bind.scopes.get(scope_id).resolve(name, &bind.scopes) {
                     self.symbol_types.insert(sym_id, fp.ty.clone());
                 }
             }

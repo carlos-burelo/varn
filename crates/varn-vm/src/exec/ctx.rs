@@ -378,44 +378,24 @@ impl ExecCtx {
         let globals_slice = &all_vals[globals_start..modules_start];
         self.globals.values.copy_from_slice(globals_slice);
 
-        {
-            let mut mi = modules_start;
-            for v in self.modules.values_mut() {
-                *v = all_vals[mi];
-                mi += 1;
-            }
+        for (mi, v) in (modules_start..).zip(self.modules.values_mut()) {
+            *v = all_vals[mi];
         }
 
-        {
-            let mut ei = module_exports_start;
-            for v in self.module_exports.values_mut() {
-                *v = all_vals[ei];
-                ei += 1;
-            }
+        for (ei, v) in (module_exports_start..).zip(self.module_exports.values_mut()) {
+            *v = all_vals[ei];
         }
 
-        {
-            let mut si = static_closures_start;
-            for (_, v) in self.static_closures.values_mut() {
-                *v = all_vals[si];
-                si += 1;
-            }
+        for (si, (_, v)) in (static_closures_start..).zip(self.static_closures.values_mut()) {
+            *v = all_vals[si];
         }
 
-        {
-            let mut ci = pending_ctors_start;
-            for (_, v) in self.pending_constructors.iter_mut() {
-                *v = all_vals[ci];
-                ci += 1;
-            }
+        for (ci, (_, v)) in (pending_ctors_start..).zip(self.pending_constructors.iter_mut()) {
+            *v = all_vals[ci];
         }
 
-        {
-            let mut sti = pending_setters_start;
-            for (_, v) in self.pending_setters.iter_mut() {
-                *v = all_vals[sti];
-                sti += 1;
-            }
+        for (sti, (_, v)) in (pending_setters_start..).zip(self.pending_setters.iter_mut()) {
+            *v = all_vals[sti];
         }
 
         if let Some(VmSuspend::Yield { value, .. }) = &mut self.vm_suspend {
@@ -468,7 +448,7 @@ impl ExecCtx {
             }
         }
 
-        for (_k, v) in &self.modules {
+        for v in self.modules.values() {
             if v.is_heap() {
                 roots.push(v.as_heap_idx());
             }

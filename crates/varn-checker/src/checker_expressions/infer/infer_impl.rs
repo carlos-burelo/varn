@@ -114,9 +114,7 @@ impl<'r> Checker<'r> {
                     t_ty
                 } else if t_ty.is_dynamic() {
                     f_ty
-                } else if f_ty.is_dynamic() {
-                    t_ty
-                } else if t_ty == f_ty {
+                } else if f_ty.is_dynamic() || t_ty == f_ty {
                     t_ty
                 } else {
                     Type::union(vec![t_ty, f_ty])

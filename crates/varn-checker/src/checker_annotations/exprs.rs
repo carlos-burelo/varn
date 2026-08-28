@@ -221,8 +221,7 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                                     if !m.is_static
                                         && (m.kind == crate::types::ClassMemberKind::Property
                                             || m.kind == crate::types::ClassMemberKind::Variable)
-                                    {
-                                        if known_props.insert(m.name.clone()) {
+                                        && known_props.insert(m.name.clone()) {
                                             if m.name.as_ref() == prop_name.as_ref() {
                                                 ann.record_fixed_field_slot(
                                                     AnnKey::expr(property.id),
@@ -233,7 +232,6 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
                                             }
                                             slot += 1;
                                         }
-                                    }
                                 }
                             }
                             if found {
@@ -335,11 +333,14 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
         ExprKind::Await { argument }
         | ExprKind::Spawn { argument }
         | ExprKind::Spread { argument } => annotate_expr(argument, ann, ctx),
-        ExprKind::Yield { argument, .. } => {
-            if let Some(e) = argument {
-                annotate_expr(e, ann, ctx);
-            }
+        ExprKind::Yield {
+            argument: Some(e), ..
+        } => {
+            annotate_expr(e, ann, ctx);
         }
+        ExprKind::Yield {
+            argument: None, ..
+        } => {}
         ExprKind::NonNull { expression } | ExprKind::Try { expression } => {
             annotate_expr(expression, ann, ctx)
         }
@@ -507,7 +508,7 @@ fn core_has_method(bind: &crate::BindResult, class: &str, method: &str) -> bool 
     bind.core
         .as_ref()
         .and_then(|c| c.class_members.get(class))
-        .map_or(false, |info| {
+        .is_some_and(|info| {
             info.members.iter().any(|m| {
                 m.name.as_ref() == method
                     && matches!(m.kind, crate::types::ClassMemberKind::Method)

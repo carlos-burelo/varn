@@ -132,8 +132,8 @@ fn hoist_loop(func: &mut SsaFunc, latches: &[BlockId], header: BlockId) -> bool 
     let mut changed = false;
     loop {
         let mut moved_any = false;
-        for b in 0..n {
-            if !in_loop[b] || b == pre.0 as usize {
+        for (b, &is_in) in in_loop.iter().enumerate().take(n) {
+            if !is_in || b == pre.0 as usize {
                 continue;
             }
             let mut i = 0;

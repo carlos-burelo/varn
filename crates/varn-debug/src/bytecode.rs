@@ -511,7 +511,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             OpCode::ObjectRest => {
                 let w1 = w!();
                 let w2 = w!();
-                let skip = hi(w2) as usize;
+                let skip = hi(w2);
                 for _ in 0..skip {
                     let _ = w!();
                 }
@@ -652,7 +652,7 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
             OpCode::BuildStr => {
                 let dest = hi(op_val);
                 let w1 = w!();
-                let count = hi(w1) as usize;
+                let count = hi(w1);
                 let mut reg_list = Vec::with_capacity(count);
                 for _ in 0..count {
                     reg_list.push(format!("r{}", hi(w!())));

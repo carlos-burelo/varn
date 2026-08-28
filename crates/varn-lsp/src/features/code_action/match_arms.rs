@@ -149,6 +149,9 @@ fn check_stmt_for_match(stmt: &Stmt, line: u32) -> Option<MatchInfo> {
 fn check_expr_for_match(expr: &Expr, line: u32) -> Option<MatchInfo> {
     if let ExprKind::Match { subject, cases } = &expr.kind {
         let range = &expr.range;
+        if line < range.start.line || line > range.end.line {
+            return None;
+        }
 
         let mut handled = HashSet::new();
         let mut last_case_end_line = range.start.line.saturating_sub(1);

@@ -231,11 +231,11 @@ pub fn dispatch_runtime_op(
     Err(format!("E_RUNTIME_UNKNOWN_WIRE:id={id}"))
 }
 
-fn resolve_ns<'a>(
+fn resolve_ns(
     root: VmValue,
     ns_path: &str,
     ctx: &mut dyn NativeCtx,
-    cache: &'a mut FxHashMap<String, VmValue>,
+    cache: &mut FxHashMap<String, VmValue>,
 ) -> VmValue {
     let parts: Vec<&str> = if ns_path.contains(':') {
         ns_path.split(':').filter(|p| !p.is_empty()).collect()

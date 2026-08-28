@@ -332,7 +332,7 @@ varn_contract! {
                     }
                 }
                 None => {
-                    items.sort_by(|a, b| ctx.str_repr(*a).cmp(&ctx.str_repr(*b)));
+                    items.sort_by_key(|a| ctx.str_repr(*a));
                 }
             }
             for (i, v) in items.iter().enumerate() {

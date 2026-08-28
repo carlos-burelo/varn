@@ -1,6 +1,8 @@
 //! Bytecode container types: the chunk itself, its constant pool, the line
 //! table, per-function metadata and the inline caches hanging off it.
 
+#![allow(clippy::mutable_key_type)]
+
 mod inline_cache;
 mod lines;
 mod literal;
@@ -20,6 +22,7 @@ use std::rc::Rc;
 use varn_core::OpCode;
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[allow(clippy::mutable_key_type)]
 pub struct Chunk {
     pub code: Vec<u16>,
 

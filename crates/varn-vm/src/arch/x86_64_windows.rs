@@ -21,6 +21,11 @@ pub struct JmpBuf {
     pub rip: u64,
 }
 
+/// Saves the current register state into `_buf`.
+///
+/// # Safety
+///
+/// `_buf` must be a valid, aligned, non-null pointer to a [`JmpBuf`].
 #[unsafe(naked)]
 pub unsafe extern "C" fn vm_setjmp(_buf: *mut JmpBuf) -> i32 {
     std::arch::naked_asm!(
@@ -41,6 +46,11 @@ pub unsafe extern "C" fn vm_setjmp(_buf: *mut JmpBuf) -> i32 {
     );
 }
 
+/// Restores the register state previously saved by [`vm_setjmp`].
+///
+/// # Safety
+///
+/// `_buf` must point to a valid [`JmpBuf`] initialized by a prior call to `vm_setjmp`.
 #[unsafe(naked)]
 pub unsafe extern "C" fn vm_longjmp(_buf: *const JmpBuf, _val: i32) -> ! {
     std::arch::naked_asm!(

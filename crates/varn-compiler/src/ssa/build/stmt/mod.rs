@@ -131,11 +131,10 @@ impl Builder {
             } => self.lower_for_of(*var, iterable, body, *is_await),
             HirStmt::Switch { disc, cases } => self.lower_switch(disc, cases),
             HirStmt::Break => {
-                let loop_ctx = self
+                let loop_ctx = *self
                     .loops
                     .last()
-                    .ok_or(OptError::Unsupported("ssa: break outside loop"))?
-                    .clone();
+                    .ok_or(OptError::Unsupported("ssa: break outside loop"))?;
                 self.emit_region_exits(loop_ctx.try_region_depth)?;
                 if self.is_open() {
                     let from = self.current;
@@ -148,11 +147,10 @@ impl Builder {
                 Ok(())
             }
             HirStmt::Continue => {
-                let loop_ctx = self
+                let loop_ctx = *self
                     .loops
                     .last()
-                    .ok_or(OptError::Unsupported("ssa: continue outside loop"))?
-                    .clone();
+                    .ok_or(OptError::Unsupported("ssa: continue outside loop"))?;
                 self.emit_region_exits(loop_ctx.try_region_depth)?;
                 if self.is_open() {
                     let from = self.current;

@@ -65,12 +65,11 @@ pub(crate) fn try_prepare_call_fast(
 
     match heap.get(callee_nv.as_heap_idx())? {
         HeapObj::VmClosure(nc) => {
-            if !nc.proto.is_generator && !nc.proto.is_async {
-                if !nc.proto.has_rest || arg_count <= nc.proto.arity {
+            if !nc.proto.is_generator && !nc.proto.is_async
+                && (!nc.proto.has_rest || arg_count <= nc.proto.arity) {
                     let base = stack.len() - arg_count;
-                    return Some((PreparedCall::Frame(CallFrame::new(&nc, base)), false));
+                    return Some((PreparedCall::Frame(CallFrame::new(nc, base)), false));
                 }
-            }
             None
         }
         // A bound method is the hot shape for every stdlib method call
@@ -192,7 +191,7 @@ pub(crate) fn prepare_call(
 
                     return Ok(PreparedCall::PushValue(heap.intern(task)));
                 }
-                let base = stack.len() - nc.proto.arity as usize;
+                let base = stack.len() - nc.proto.arity;
                 return Ok(PreparedCall::Frame(CallFrame::new(&nc, base)));
             }
             HeapObj::NativeFn(f, _name) => {

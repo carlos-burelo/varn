@@ -275,7 +275,7 @@ fn format_line_tokens(line: &str) -> String {
                 out.push(' ');
             }
             out.push(c);
-            while let Some(rem) = chars.next() {
+            for rem in chars.by_ref() {
                 out.push(rem);
             }
             break;

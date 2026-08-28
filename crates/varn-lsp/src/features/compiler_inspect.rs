@@ -105,7 +105,7 @@ pub fn compile_and_get_cfg_json(state: &DocumentState) -> Result<serde_json::Val
                     let repr_str = format_inst_human(&inst.kind);
                     let op_name = format!("{:?}", inst.kind);
                     let op_short = op_name
-                        .split(|c: char| c == '(' || c == ' ' || c == '{')
+                        .split(['(', ' ', '{'])
                         .next()
                         .unwrap_or(&op_name);
 

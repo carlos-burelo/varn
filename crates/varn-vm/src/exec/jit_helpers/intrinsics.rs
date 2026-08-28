@@ -254,7 +254,7 @@ pub(crate) extern "C" fn jit_str_starts_with_intrinsic(
                 if s_bytes.len() >= n_len {
                     let mut b2 = [0u8; 5];
                     search.sso_copy_bytes(&mut b2);
-                    return VmValue::from_bool(&s_bytes[..n_len] == &b2[..n_len]);
+                    return VmValue::from_bool(s_bytes[..n_len] == b2[..n_len]);
                 }
                 return VmValue::from_bool(false);
             }
@@ -304,7 +304,7 @@ pub(crate) extern "C" fn jit_str_ends_with_intrinsic(
                 if s_bytes.len() >= n_len {
                     let mut b2 = [0u8; 5];
                     search.sso_copy_bytes(&mut b2);
-                    return VmValue::from_bool(&s_bytes[s_bytes.len() - n_len..] == &b2[..n_len]);
+                    return VmValue::from_bool(s_bytes[s_bytes.len() - n_len..] == b2[..n_len]);
                 }
                 return VmValue::from_bool(false);
             }

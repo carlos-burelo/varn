@@ -22,7 +22,7 @@ varn_contract! {
             val.is_int()
         }
         fn isSafeInteger(_ctx: &mut dyn NativeCtx, val: i64) -> bool {
-            val >= INT_MIN && val <= INT_MAX
+            (INT_MIN..=INT_MAX).contains(&val)
         }
 
 

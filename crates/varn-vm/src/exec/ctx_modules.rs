@@ -86,7 +86,7 @@ impl ExecCtx {
             .last()
             .map(|f| f.closure().proto.chunk.source_file.clone())
             .unwrap_or_else(|| "".to_owned().into());
-        self.load_module_from_source(specifier, &source_file.to_string())
+        self.load_module_from_source(specifier, source_file.as_ref())
     }
 
     pub(crate) fn load_module_from_source(
@@ -115,11 +115,11 @@ impl ExecCtx {
         }
 
         let spec_str = canonical_id_str(&resolved);
-        let is_pure = varn_builtins::spec_for(&spec_str).map_or(false, |s| s.pure);
+        let is_pure = varn_builtins::spec_for(&spec_str).is_some_and(|s| s.pure);
         let builtin_nv = if !is_pure {
             varn_builtins::build_module(&spec_str, &mut self.heap).or_else(|| match &resolved {
                 ModuleId::Std(name) | ModuleId::Core(name) | ModuleId::Runtime(name) => {
-                    let is_p = varn_builtins::spec_for(name.as_ref()).map_or(false, |s| s.pure);
+                    let is_p = varn_builtins::spec_for(name.as_ref()).is_some_and(|s| s.pure);
                     if !is_p {
                         varn_builtins::build_module(name.as_ref(), &mut self.heap)
                     } else {

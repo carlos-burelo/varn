@@ -98,7 +98,7 @@ impl ExecCtx {
                 Ok(instance_nv)
             }
             PreparedCall::NativeConstructor(f, args, instance_nv) => {
-                let result = (f)(self as &mut dyn NativeCtx, &args).map_err(|e| e)?;
+                let result = (f)(self as &mut dyn NativeCtx, &args)?;
                 let nv = if result.is_null() {
                     instance_nv
                 } else {
@@ -323,7 +323,7 @@ pub(super) fn spawn_isolate(
                 }
                 done_t.resolve(varn_types::Value::Null);
             }
-            Err(e) => done_t.reject(worker_error(&format!("{e}"))),
+            Err(e) => done_t.reject(worker_error(&e.to_string())),
         }
     });
 

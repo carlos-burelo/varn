@@ -153,10 +153,10 @@ impl<'r> Checker<'r> {
                     || bind
                         .core
                         .as_ref()
-                        .map_or(false, |b| b.enum_members.contains_key(name.as_ref()))
+                        .is_some_and(|b| b.enum_members.contains_key(name.as_ref()))
                     || self.resolver.find_bind_for_type(name, &origin_modules)
                         .as_ref()
-                        .map_or(false, |eb| {
+                        .is_some_and(|eb| {
                             eb.get_enum_members_local(name.as_ref()).is_some()
                         });
 
@@ -227,7 +227,7 @@ impl<'r> Checker<'r> {
 
                 if bind
                     .get_class_methods_for(name.as_ref())
-                    .map_or(false, |m| m.contains_key(key))
+                    .is_some_and(|m| m.contains_key(key))
                 {
                     return true;
                 }
@@ -290,7 +290,7 @@ impl<'r> Checker<'r> {
                     .extensions
                     .methods
                     .get(&tn)
-                    .map_or(false, |m| m.contains_key(key))
+                    .is_some_and(|m| m.contains_key(key))
                 {
                     return true;
                 }
@@ -298,7 +298,7 @@ impl<'r> Checker<'r> {
                     .extensions
                     .getters
                     .get(&tn)
-                    .map_or(false, |m| m.contains_key(key))
+                    .is_some_and(|m| m.contains_key(key))
                 {
                     return true;
                 }
@@ -306,7 +306,7 @@ impl<'r> Checker<'r> {
                     .extensions
                     .setters
                     .get(&tn)
-                    .map_or(false, |m| m.contains_key(key))
+                    .is_some_and(|m| m.contains_key(key))
                 {
                     return true;
                 }

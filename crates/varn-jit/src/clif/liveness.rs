@@ -202,10 +202,10 @@ pub(super) fn analyze(code: &[u16], pool: &[PoolEntry], nregs: usize) -> Livenes
                     acc[w] |= live_in[c * words + w];
                 }
             }
-            for w in 0..words {
+            for (w, &acc_w) in acc.iter().enumerate().take(words) {
                 let slot = i * words + w;
-                if after[slot] != acc[w] {
-                    after[slot] = acc[w];
+                if after[slot] != acc_w {
+                    after[slot] = acc_w;
                     changed = true;
                 }
             }
@@ -224,10 +224,10 @@ pub(super) fn analyze(code: &[u16], pool: &[PoolEntry], nregs: usize) -> Livenes
                 }
                 in_bits[u / 64] |= 1u64 << (u % 64);
             }
-            for w in 0..words {
+            for (w, &in_w) in in_bits.iter().enumerate().take(words) {
                 let slot = i * words + w;
-                if live_in[slot] != in_bits[w] {
-                    live_in[slot] = in_bits[w];
+                if live_in[slot] != in_w {
+                    live_in[slot] = in_w;
                     changed = true;
                 }
             }

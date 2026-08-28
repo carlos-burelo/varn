@@ -67,18 +67,18 @@ varn_contract! {
             }
 
             let mut raw_args = [0usize; 8];
-            for i in 0..argc {
+            for (i, slot) in raw_args.iter_mut().enumerate().take(argc) {
                 let v = args.get(ctx, i).unwrap_or_else(VmValue::null);
                 if v.is_int() {
-                    raw_args[i] = v.as_int() as usize;
+                    *slot = v.as_int() as usize;
                 } else if v.is_f64() {
-                    raw_args[i] = v.as_f64().to_bits() as usize;
+                    *slot = v.as_f64().to_bits() as usize;
                 } else if v.is_bool() {
-                    raw_args[i] = if v.as_bool() { 1 } else { 0 };
+                    *slot = if v.as_bool() { 1 } else { 0 };
                 } else if v.is_null() {
-                    raw_args[i] = 0;
+                    *slot = 0;
                 } else {
-                    raw_args[i] = ctx.as_int(v) as usize;
+                    *slot = ctx.as_int(v) as usize;
                 }
             }
 

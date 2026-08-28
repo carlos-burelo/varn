@@ -164,9 +164,9 @@ fn reorder_blocks_rpo(func: &mut SsaFunc) {
     }
     let mut next_new = order.len() as u32;
     let mut full_order = order;
-    for old_idx in 0..n {
+    for (old_idx, slot) in old_to_new.iter_mut().enumerate().take(n) {
         if !full_order.iter().any(|b| b.0 as usize == old_idx) {
-            old_to_new[old_idx] = BlockId(next_new);
+            *slot = BlockId(next_new);
             next_new += 1;
             full_order.push(BlockId(old_idx as u32));
         }

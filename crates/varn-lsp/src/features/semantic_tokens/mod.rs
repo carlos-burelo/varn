@@ -137,16 +137,15 @@ pub fn build_semantic_tokens(state: &DocumentState) -> Vec<u32> {
 
         // `readonly` modifier for `this` and `const` bindings — derived from the
         // checker's symbol kind, not a name table.
-        let modifier = if tok.kind == TokenKind::This {
-            MOD_READONLY
-        } else if state
-            .db
-            .expr_types
-            .get(&tok.offset)
-            .and_then(|info| info.symbol_id)
-            .filter(|s| *s < state.db.arena.len())
-            .map(|s| state.db.arena.get(s).kind)
-            == Some(SymbolKind::Const)
+        let modifier = if tok.kind == TokenKind::This
+            || state
+                .db
+                .expr_types
+                .get(&tok.offset)
+                .and_then(|info| info.symbol_id)
+                .filter(|s| *s < state.db.arena.len())
+                .map(|s| state.db.arena.get(s).kind)
+                == Some(SymbolKind::Const)
         {
             MOD_READONLY
         } else {

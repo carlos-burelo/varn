@@ -56,13 +56,14 @@ impl Builder {
             }
 
             HirExpr::Object { properties } => {
-                let has_computed_or_method = properties.iter().any(|p| match p {
-                    HirObjectProp::Property {
-                        key: HirPropKey::Computed(_),
-                        ..
-                    } => true,
-                    HirObjectProp::Method { .. } => true,
-                    _ => false,
+                let has_computed_or_method = properties.iter().any(|p| {
+                    matches!(
+                        p,
+                        HirObjectProp::Property {
+                            key: HirPropKey::Computed(_),
+                            ..
+                        } | HirObjectProp::Method { .. }
+                    )
                 });
                 if has_computed_or_method {
                     let obj = self.emit(InstKind::BuildObject { pairs: Vec::new() }, HirType::Ref);

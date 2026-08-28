@@ -58,7 +58,7 @@ pub fn debug_summary(proto: &FunctionProto) {
         varn_jit::SIZE_GATE_WORDS
     );
 
-    fns.sort_by(|a, b| b.words.cmp(&a.words));
+    fns.sort_by_key(|b| std::cmp::Reverse(b.words));
     eprintln!("\n  {DIM}top-{TOP_N} por tamaño{R}");
     for f in fns.iter().take(TOP_N) {
         let flag = if f.words > varn_jit::SIZE_GATE_WORDS {

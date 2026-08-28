@@ -138,6 +138,8 @@ pub(crate) fn has_try(code: &[u16], pool: &[varn_types::chunk::PoolEntry]) -> Re
     Ok(false)
 }
 
+pub(crate) type SafepointRecord = (usize, Vec<usize>, Vec<usize>);
+
 pub(crate) struct AllocCtx<'a> {
     pub vars: &'a [Variable],
     pub helpers: &'a JitHelpers,
@@ -150,7 +152,7 @@ pub(crate) struct AllocCtx<'a> {
     pub live: &'a Liveness,
     pub narrow_roots: bool,
     pub cur_ip: Cell<usize>,
-    pub safepoints: Option<RefCell<Vec<(usize, Vec<usize>, Vec<usize>)>>>,
+    pub safepoints: Option<RefCell<Vec<SafepointRecord>>>,
 }
 
 pub(crate) fn frame_base_addr(
@@ -273,7 +275,7 @@ pub(crate) fn live_boxed(actx: &AllocCtx, state: &[K]) -> Vec<usize> {
     let live_nonfloat = (0..actx.nregs)
         .filter(|&r| !meta_is_float(actx.register_meta, r))
         .filter(|&r| actx.live.is_live_after(ip, r));
-    let rooted = |r: usize| !actx.narrow_roots || state.get(r).copied().map_or(true, is_root_kind);
+    let rooted = |r: usize| !actx.narrow_roots || state.get(r).copied().is_none_or(is_root_kind);
     let regs: Vec<usize> = live_nonfloat.clone().filter(|&r| rooted(r)).collect();
     if let Some(rec) = &actx.safepoints {
         let unboxed: Vec<usize> = live_nonfloat.filter(|&r| !rooted(r)).collect();

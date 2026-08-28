@@ -194,7 +194,7 @@ pub fn print_coverage(jit: &JitStatsSnapshot, records: &[CompileRecord], scope: 
     }
 
     let mut by_cost: Vec<&CompileRecord> = records.iter().filter(|r| r.compile_ns > 0).collect();
-    by_cost.sort_by(|a, b| b.compile_ns.cmp(&a.compile_ns));
+    by_cost.sort_by_key(|b| std::cmp::Reverse(b.compile_ns));
     if !by_cost.is_empty() {
         let top = by_cost
             .iter()

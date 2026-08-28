@@ -41,7 +41,7 @@ pub(super) mod opt_rc_str_serde {
         }
     }
     pub fn deserialize<'de, D: Deserializer<'de>>(de: D) -> Result<Option<Rc<str>>, D::Error> {
-        Ok(Option::<String>::deserialize(de)?.map(|s| Rc::from(s)))
+        Ok(Option::<String>::deserialize(de)?.map(Rc::from))
     }
 }
 

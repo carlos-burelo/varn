@@ -48,7 +48,7 @@ impl<'r> super::super::Binder<'r> {
                 });
 
             let needs_enrich = !has_explicit_ann
-                && (ty.is_none() || ty.as_ref().map_or(false, |t| t.is_dynamic()));
+                && (ty.is_none() || ty.as_ref().is_some_and(|t| t.is_dynamic()));
             self.bind_pattern(&d.id, sym_kind, line, v.doc.clone(), ty);
 
             if let Pattern::Identifier { name, .. } = &d.id {
@@ -290,7 +290,7 @@ impl<'r> super::super::Binder<'r> {
 
         let mut variants_info = Vec::new();
 
-        for (_i, member) in e.members.iter().enumerate() {
+        for member in e.members.iter() {
             let fields: Vec<(Rc<str>, Type)> = member
                 .payload_fields
                 .iter()
@@ -418,7 +418,6 @@ impl<'r> super::super::Binder<'r> {
                     key,
                     return_type,
                     body: Some(body),
-                    range: _,
                     ..
                 } => {
                     let key_rc: Rc<str> = Rc::from(key.as_ref());

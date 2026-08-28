@@ -14,6 +14,12 @@ pub struct LivenessAnalyzer {
     live_ranges: Vec<LiveRange>,
 }
 
+impl Default for LivenessAnalyzer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LivenessAnalyzer {
     pub fn new() -> Self {
         Self {
@@ -80,7 +86,7 @@ impl LivenessAnalyzer {
     pub fn record_use(&mut self, vreg: u16, instr_idx: usize) {
         self.use_sites
             .entry(vreg)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(instr_idx);
     }
 

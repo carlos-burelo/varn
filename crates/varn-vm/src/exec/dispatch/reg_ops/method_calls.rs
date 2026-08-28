@@ -185,7 +185,7 @@ impl ExecCtx {
                                         let nc = nc.clone();
                                         if !nc.proto.is_generator
                                             && !nc.proto.is_async
-                                            && arg_count <= nc.proto.arity as usize
+                                            && arg_count <= nc.proto.arity
                                         {
                                             found_vm = Some((nc, Some(cls.clone())));
                                             break 'ic;
@@ -255,8 +255,8 @@ impl ExecCtx {
             crate::exec::props::ResolvedProperty::Built(v) => self.heap.intern(v),
         };
 
-        if receiver_class.is_some() {
-            if cs < cache_len && method_nv.is_heap() && !is_megamorphic {
+        if receiver_class.is_some()
+            && cs < cache_len && method_nv.is_heap() && !is_megamorphic {
                 if let Some(crate::heap::HeapObj::BoundMethod(bm)) =
                     self.heap.get(method_nv.as_heap_idx())
                 {
@@ -298,12 +298,8 @@ impl ExecCtx {
                     }
                 }
             }
-        }
 
-        let native_call: Option<(
-            fn(&mut dyn varn_types::NativeCtx, &[VmValue]) -> Result<VmValue, String>,
-            VmValue,
-        )> = if method_nv.is_heap() {
+        let native_call: Option<(varn_types::NativeFn, VmValue)> = if method_nv.is_heap() {
             match self.heap.get(method_nv.as_heap_idx()) {
                 Some(crate::heap::HeapObj::BoundMethod(bm)) => {
                     if let varn_types::value::BoundMethodTarget::Native { func: f, .. } = &bm.target
@@ -438,7 +434,7 @@ impl ExecCtx {
         arg_start: usize,
         arg_count: usize,
     ) -> VmResult<VmValue> {
-        let result = if arg_count + 1 <= 16 {
+        let result = if arg_count < 16 {
             let mut buf = [VmValue::null(); 17];
             buf[0] = receiver;
             if arg_count > 0 {
@@ -462,7 +458,7 @@ impl ExecCtx {
             }
             self.invoke_native(f, &args)
         }
-        .map_err(|e| RuntimeError::new(e))?;
+        .map_err(RuntimeError::new)?;
         Ok(result)
     }
 

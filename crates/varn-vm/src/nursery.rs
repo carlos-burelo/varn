@@ -3,7 +3,7 @@ use crate::value::VmValue;
 use std::rc::Rc;
 
 pub const OLD_GEN_FLAG: u32 = 0x8000_0000;
-pub const NURSERY_CAPACITY: usize = 16384;
+pub const NURSERY_CAPACITY: usize = 65536;
 
 #[inline(always)]
 pub(crate) fn is_nursery_idx(idx: u32) -> bool {

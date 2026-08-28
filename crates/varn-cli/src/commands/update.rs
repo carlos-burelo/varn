@@ -13,8 +13,8 @@ pub fn execute() -> Result<(), CliError> {
         .ok_or_else(|| CliError::fatal("no varn.toml found".to_owned()))?;
     let project_root = manifest_path.parent().unwrap_or(&cwd).to_path_buf();
 
-    let manifest = ProjectManifest::load(&manifest_path).map_err(|e| CliError::fatal(e))?;
-    let deps = manifest.parsed_deps().map_err(|e| CliError::fatal(e))?;
+    let manifest = ProjectManifest::load(&manifest_path).map_err(CliError::fatal)?;
+    let deps = manifest.parsed_deps().map_err(CliError::fatal)?;
 
     if deps.is_empty() {
         terminal::log("No dependencies to update.");
@@ -24,12 +24,12 @@ pub fn execute() -> Result<(), CliError> {
     terminal::log(format!("Updating {} dependency(ies)...", deps.len()));
 
     let result = installer::resolve_and_install(&project_root, &deps, None, true)
-        .map_err(|e| CliError::fatal(e))?;
+        .map_err(CliError::fatal)?;
 
     result
         .lock
         .save(&lockfile::lock_path(&project_root))
-        .map_err(|e| CliError::fatal(e))?;
+        .map_err(CliError::fatal)?;
 
     for pkg in &result.lock.packages {
         terminal::log(format!("  {} → v{}", pkg.name, pkg.version));

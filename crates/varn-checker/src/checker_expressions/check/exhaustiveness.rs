@@ -95,7 +95,7 @@ impl<'r> Checker<'r> {
                     let is_variant = bind
                         .sum_variant_parent
                         .get(v.name.as_ref())
-                        .map_or(false, |parent| parent.as_ref() == type_name.as_ref());
+                        .is_some_and(|parent| parent.as_ref() == type_name.as_ref());
                     if !is_variant {
                         return false;
                     }
@@ -144,14 +144,10 @@ impl<'r> Checker<'r> {
                     .with_range(*range),
                 );
             }
-            return;
         }
     }
 }
 
 fn pattern_covers_type(pattern: &MatchPattern, _ty: &Type) -> bool {
-    match pattern {
-        MatchPattern::Wildcard => true,
-        _ => false,
-    }
+    matches!(pattern, MatchPattern::Wildcard)
 }

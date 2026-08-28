@@ -58,7 +58,6 @@ impl<'r> super::super::Binder<'r> {
                         key,
                         params,
                         return_type: ret_ann,
-                        body: _,
                         ..
                     } => {
                         let name = match key {

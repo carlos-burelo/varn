@@ -29,7 +29,7 @@ impl VmBuffer {
     pub fn slice(&self, start: usize, end: usize) -> Self {
         let start = (self.offset as usize + start).min(self.offset as usize + self.length as usize);
         let end = (self.offset as usize + end).min(self.offset as usize + self.length as usize);
-        let len = if end >= start { end - start } else { 0 };
+        let len = end.saturating_sub(start);
         Self {
             data: Rc::clone(&self.data),
             offset: start as u32,

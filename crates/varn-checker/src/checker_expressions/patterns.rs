@@ -3,6 +3,11 @@ use crate::checker::Checker;
 use crate::types::Type;
 use varn_core::TypeKind;
 
+type VariantSubst = (
+    Vec<(std::rc::Rc<str>, Type)>,
+    rustc_hash::FxHashMap<std::rc::Rc<str>, Type>,
+);
+
 impl<'r> Checker<'r> {
     pub(crate) fn check_pattern(
         &mut self,
@@ -141,10 +146,7 @@ impl<'r> Checker<'r> {
         variant: &str,
         value_ty: &Type,
         bind: &BindResult,
-    ) -> Option<(
-        Vec<(std::rc::Rc<str>, Type)>,
-        rustc_hash::FxHashMap<std::rc::Rc<str>, Type>,
-    )> {
+    ) -> Option<VariantSubst> {
         let (parent, args, origin) = match &value_ty.0 {
             TypeKind::Generic(n, a, o) => (Some(n.clone()), a.clone(), o.clone()),
             TypeKind::Named(n, o) => (Some(n.clone()), Vec::new(), o.clone()),

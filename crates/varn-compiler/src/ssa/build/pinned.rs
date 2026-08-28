@@ -51,11 +51,10 @@ fn scan_stmt(stmt: &HirStmt, pinned: &mut FxHashSet<VarId>, in_try: bool) {
             scan_expr(index, pinned, in_try);
             scan_expr(value, pinned, in_try);
         }
-        HirStmt::Return(value) => {
-            if let Some(e) = value {
-                scan_expr(e, pinned, in_try);
-            }
+        HirStmt::Return(Some(e)) => {
+            scan_expr(e, pinned, in_try);
         }
+        HirStmt::Return(None) => {}
         HirStmt::Throw(expr) => scan_expr(expr, pinned, in_try),
         HirStmt::If {
             test,

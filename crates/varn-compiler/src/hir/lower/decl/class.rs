@@ -24,13 +24,14 @@ impl<'a> Lowerer<'a> {
             None => None,
         };
 
+type MethodAstTuple<'a> = (Rc<str>, &'a [Param], &'a Stmt, &'a [Decorator], &'a Modifiers);
+
         let mut fields: Vec<Rc<str>> = Vec::new();
         let mut field_inits: Vec<(Rc<str>, &Expr)> = Vec::new();
         let mut static_fields: Vec<(Rc<str>, Option<HirExpr>)> = Vec::new();
         let mut ctor_member: Option<(&[Param], &Stmt)> = None;
-        let mut methods_ast: Vec<(Rc<str>, &[Param], &Stmt, &[Decorator], &Modifiers)> = Vec::new();
-        let mut static_methods_ast: Vec<(Rc<str>, &[Param], &Stmt, &[Decorator], &Modifiers)> =
-            Vec::new();
+        let mut methods_ast: Vec<MethodAstTuple> = Vec::new();
+        let mut static_methods_ast: Vec<MethodAstTuple> = Vec::new();
         let mut getters_ast: Vec<(Rc<str>, &Stmt, bool)> = Vec::new();
         let mut setters_ast: Vec<(Rc<str>, &Param, &Stmt, bool)> = Vec::new();
         let mut static_blocks_ast: Vec<&Stmt> = Vec::new();
@@ -452,7 +453,7 @@ impl<'a> Lowerer<'a> {
                 Ok(Vec::new())
             }
             Decl::Interface(_) | Decl::TypeAlias(_) | Decl::Struct(_) => Ok(Vec::new()),
-            _ => return Err(OptError::Unsupported("hir: inline decl kind")),
+            _ => Err(OptError::Unsupported("hir: inline decl kind")),
         }
     }
 }

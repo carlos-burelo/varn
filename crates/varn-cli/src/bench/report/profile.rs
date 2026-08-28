@@ -60,7 +60,7 @@ pub fn print_breakdown(
         ));
     }
 
-    terminal::log(format!("{}", row("subtotal", scale.fmt(total))));
+    terminal::log(row("subtotal", scale.fmt(total)).to_string());
 
     if let Some(measured) = measured {
         let residual = measured.saturating_sub(total);

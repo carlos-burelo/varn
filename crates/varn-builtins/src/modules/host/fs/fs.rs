@@ -30,7 +30,7 @@ varn_contract! {
             let file = match mode {
                 "r" => OpenOptions::new().read(true).open(path),
                 "w" => OpenOptions::new().write(true).create(true).truncate(true).open(path),
-                "a" => OpenOptions::new().write(true).create(true).append(true).open(path),
+                "a" => OpenOptions::new().create(true).append(true).open(path),
                 _ => OpenOptions::new().read(true).open(path),
             }.map_err(|e| e.to_string())?;
 
@@ -62,7 +62,7 @@ varn_contract! {
 
             use std::io::Write;
             file.write_all(data.as_bytes()).map_err(|e| e.to_string())?;
-            Ok(data.as_bytes().len() as i64)
+            Ok(data.len() as i64)
         }
 
         fn seek(_ctx: &mut dyn NativeCtx, fd: i64, offset: i64, whence: i64) -> Result<i64, String> {

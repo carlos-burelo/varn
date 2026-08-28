@@ -32,23 +32,20 @@ impl<'a> Lowerer<'a> {
             ExprKind::Record { properties } => {
                 let mut props = Vec::with_capacity(properties.len());
                 for prop in properties {
-                    match prop {
-                        ObjectProp::Property { key, value, .. } => {
-                            let k = match key {
-                                PropKey::Computed(e) => {
-                                    HirPropKey::Computed(self.lower_expr(e, scope)?)
-                                }
-                                PropKey::Identifier(s) | PropKey::Str(s) => {
-                                    HirPropKey::Static(Rc::from(s.as_str()))
-                                }
-                                PropKey::Int(n) => {
-                                    HirPropKey::Static(Rc::from(n.to_string().as_str()))
-                                }
-                            };
-                            let val = self.lower_expr(value, scope)?;
-                            props.push(HirObjectProp::Property { key: k, value: val });
-                        }
-                        _ => {}
+                    if let ObjectProp::Property { key, value, .. } = prop {
+                        let k = match key {
+                            PropKey::Computed(e) => {
+                                HirPropKey::Computed(self.lower_expr(e, scope)?)
+                            }
+                            PropKey::Identifier(s) | PropKey::Str(s) => {
+                                HirPropKey::Static(Rc::from(s.as_str()))
+                            }
+                            PropKey::Int(n) => {
+                                HirPropKey::Static(Rc::from(n.to_string().as_str()))
+                            }
+                        };
+                        let val = self.lower_expr(value, scope)?;
+                        props.push(HirObjectProp::Property { key: k, value: val });
                     }
                 }
                 Ok(HirExpr::Record { properties: props })

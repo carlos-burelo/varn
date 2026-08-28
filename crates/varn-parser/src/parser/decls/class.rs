@@ -70,7 +70,7 @@ pub fn parse_class_decl(
 
     let full_range = s.span_from(range);
     Ok(ClassDecl {
-        id: id.map(|name| name.into()),
+        id,
         ast_id: s.next_ast_id(),
         id_offset,
         type_params,

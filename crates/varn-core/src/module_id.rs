@@ -33,8 +33,8 @@ pub enum ModuleId {
 }
 
 fn normalize_local_path(path: &str) -> Arc<str> {
-    if path.starts_with("\\\\?\\") {
-        return Arc::from(path[4..].replace('\\', "/").as_str());
+    if let Some(stripped) = path.strip_prefix(r"\\?\") {
+        return Arc::from(stripped.replace('\\', "/").as_str());
     }
     Arc::from(path.replace('\\', "/").as_str())
 }
@@ -166,8 +166,6 @@ impl ImportSpecifier {
             Self::Core(Arc::from(raw))
         } else if raw.starts_with("std:") {
             Self::Stdlib(Arc::from(raw))
-        } else if raw.starts_with("pkg:") {
-            Self::Package(Arc::from(raw))
         } else {
             Self::Package(Arc::from(raw))
         }

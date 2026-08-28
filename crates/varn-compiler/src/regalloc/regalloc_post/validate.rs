@@ -99,9 +99,9 @@ pub(crate) fn verify_build_array_constraints(
                 if count > 1 {
                     let mapped_start = mapping.get(&start).copied().unwrap_or(start);
                     for i in 1..count {
-                        let orig = start.wrapping_add(i as u8);
+                        let orig = start.wrapping_add(i);
                         let mapped = mapping.get(&orig).copied().unwrap_or(orig);
-                        if mapped != mapped_start.wrapping_add(i as u8) {
+                        if mapped != mapped_start.wrapping_add(i) {
                             return false;
                         }
                     }

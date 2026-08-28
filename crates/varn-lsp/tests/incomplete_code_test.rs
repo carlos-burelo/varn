@@ -1,3 +1,5 @@
+#![allow(unused_crate_dependencies)]
+
 use varn_lsp::features::completion::build_completion_response;
 use varn_lsp::pipeline::run_pipeline;
 

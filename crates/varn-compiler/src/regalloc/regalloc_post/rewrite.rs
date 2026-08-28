@@ -3,7 +3,7 @@ use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::chunk::PoolEntry;
 
-pub(crate) fn remap_bytecode(code: &mut Vec<u16>, constants: &[PoolEntry], mapping: &HashMap<u8, u8>) {
+pub(crate) fn remap_bytecode(code: &mut [u16], constants: &[PoolEntry], mapping: &HashMap<u8, u8>) {
     fn m(mapping: &HashMap<u8, u8>, r: u8) -> u8 {
         mapping.get(&r).copied().unwrap_or(r)
     }
@@ -55,7 +55,7 @@ pub(crate) fn remap_bytecode(code: &mut Vec<u16>, constants: &[PoolEntry], mappi
                 let w1 = code.get(offset + 1).copied().unwrap_or(0);
                 let old_err_reg = (w1 >> 8) as u8;
                 let new_err_reg = m(mapping, old_err_reg);
-                code[offset + 1] = ((new_err_reg as u16) << 8) | 0;
+                code[offset + 1] = (new_err_reg as u16) << 8;
             }
 
             match op {

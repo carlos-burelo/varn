@@ -1,3 +1,5 @@
+#![allow(unused_crate_dependencies)]
+
 use varn_lsp::features::inlay_hints::build_inlay_hints;
 use varn_lsp::pipeline::run_pipeline;
 

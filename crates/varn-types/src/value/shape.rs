@@ -119,5 +119,5 @@ thread_local! {
 }
 
 pub fn root_shape() -> Rc<Shape> {
-    ROOT_SHAPE.with(|r| Rc::clone(r))
+    ROOT_SHAPE.with(Rc::clone)
 }

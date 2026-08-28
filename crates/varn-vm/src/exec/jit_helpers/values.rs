@@ -111,8 +111,8 @@ pub(crate) extern "C" fn jit_load_upvalue(
 
         let closure_ref = &*closure;
 
-        let val = closure_ref.upvalues[uv_idx].read(&ctx_ref.stack);
-        val
+        
+        closure_ref.upvalues[uv_idx].read(&ctx_ref.stack)
     }
 }
 

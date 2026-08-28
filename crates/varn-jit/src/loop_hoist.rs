@@ -19,6 +19,7 @@
 //!     reloads global `a` every pass). The preheader must synthesize that
 //!     load once (see `compiler.rs`) since the register may hold stale
 //!     data at the point the preheader runs.
+//!
 //! Classification is per SITE, not per register: the same physical register
 //! can carry two different globals at different points in one iteration
 //! (seen in matrix-multiply inner loops — `a` then `b` both land in the
@@ -334,8 +335,7 @@ pub fn diagnose_loops(code: &[u16], constants: &[PoolEntry]) -> Vec<LoopDiagnost
 
             let mut candidates: Vec<HoistCandidate> = Vec::with_capacity(MAX_CANDIDATES);
             if is_real[i] && alloc_free && is_innermost {
-                for instr_idx in lp.header..=lp.latch {
-                    let instr_offset = offsets[instr_idx];
+                for &instr_offset in &offsets[lp.header..=lp.latch] {
                     let op = OpCode::from_u16(code[instr_offset])?;
                     if !matches!(op, OpCode::ArrayGetIndex | OpCode::ArrayLength) {
                         continue;

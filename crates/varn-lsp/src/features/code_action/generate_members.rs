@@ -144,7 +144,7 @@ pub fn generate_class_member_actions(
     actions
 }
 
-fn find_class_at_line<'a>(program: &'a Program, line: u32) -> Option<&'a varn_core::ast::ClassDecl> {
+fn find_class_at_line(program: &Program, line: u32) -> Option<&varn_core::ast::ClassDecl> {
     for stmt in &program.body {
         if let Some(c) = find_class_in_stmt(stmt, line) {
             return Some(c);
@@ -153,7 +153,7 @@ fn find_class_at_line<'a>(program: &'a Program, line: u32) -> Option<&'a varn_co
     None
 }
 
-fn find_class_in_stmt<'a>(stmt: &'a Stmt, line: u32) -> Option<&'a varn_core::ast::ClassDecl> {
+fn find_class_in_stmt(stmt: &Stmt, line: u32) -> Option<&varn_core::ast::ClassDecl> {
     let s_line = stmt.range.start.line.saturating_sub(1);
     let e_line = stmt.range.end.line;
     if line < s_line || line > e_line {

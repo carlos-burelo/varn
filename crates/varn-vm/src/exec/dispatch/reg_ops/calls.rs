@@ -78,7 +78,7 @@ impl ExecCtx {
                             }
                             self.invoke_native(f, &varn_args)
                         }
-                        .map_err(|e| crate::error::RuntimeError::new(e))?;
+                        .map_err(crate::error::RuntimeError::new)?;
                         self.stack[base + dest] = result;
                         return Ok(false);
                     }
@@ -184,12 +184,12 @@ impl ExecCtx {
                             let slice = if arg_count > 1 { &varn_args[1..] } else { &[] };
                             self.invoke_native(f, slice)
                         }
-                        .map_err(|e| crate::error::RuntimeError::new(e))?;
+                        .map_err(crate::error::RuntimeError::new)?;
                         self.stack[base + dest] = result;
                         return Ok(false);
                     }
-                    Some(crate::heap::HeapObj::VmClosure(nc)) => {
-                        if !nc.proto.is_generator && !nc.proto.is_async {
+                    Some(crate::heap::HeapObj::VmClosure(nc))
+                        if !nc.proto.is_generator && !nc.proto.is_async => {
                             let arity = nc.proto.arity;
 
                             if !nc.proto.has_rest && arg_count <= arity {
@@ -263,7 +263,6 @@ impl ExecCtx {
                                 return Ok(true);
                             }
                         }
-                    }
                     _ => {}
                 }
             }

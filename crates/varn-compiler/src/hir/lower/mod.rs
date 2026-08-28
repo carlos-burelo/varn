@@ -40,6 +40,13 @@ pub(super) struct Scope {
     frames: Vec<Frame>,
 }
 
+type FramePopResult = (
+    u32,
+    Vec<HirUpvalueSrc>,
+    Vec<CaptureTarget>,
+    Vec<(LocalId, bool)>,
+);
+
 impl Scope {
     fn new() -> Self {
         Self {
@@ -51,14 +58,7 @@ impl Scope {
         self.frames.push(Frame::new());
     }
 
-    fn pop_frame(
-        &mut self,
-    ) -> (
-        u32,
-        Vec<HirUpvalueSrc>,
-        Vec<CaptureTarget>,
-        Vec<(LocalId, bool)>,
-    ) {
+    fn pop_frame(&mut self) -> FramePopResult {
         let mut f = self.frames.pop().expect("frame underflow");
         let block0 = f.captured.pop().unwrap_or_default();
         let disp0 = f.disposables.pop().unwrap_or_default();
@@ -688,10 +688,8 @@ pub fn collect_pattern_identifiers(pat: &Pattern, names: &mut Vec<Rc<str>>) {
             names.push(name.clone());
         }
         Pattern::Array { elements, rest, .. } => {
-            for el in elements {
-                if let Some(elem) = el {
-                    collect_pattern_identifiers(&elem.pattern, names);
-                }
+            for elem in elements.iter().flatten() {
+                collect_pattern_identifiers(&elem.pattern, names);
             }
             if let Some(r) = rest {
                 collect_pattern_identifiers(r, names);

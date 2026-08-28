@@ -34,8 +34,10 @@ pub struct ClassObj {
     /// resolved closure here (`Rc<VmClosure>` as `Rc<dyn Any>`) so hot `new`
     /// paths skip the `Value` box clone + downcast. `Some((v, None))` means
     /// "class has no constructor". varn-types only provides the slot.
-    pub ctor_rt_cache: RefCell<Option<(u32, Option<Rc<dyn std::any::Any>>)>>,
+    pub ctor_rt_cache: RefCell<Option<CtorRtCacheEntry>>,
 }
+
+pub type CtorRtCacheEntry = (u32, Option<Rc<dyn std::any::Any>>);
 
 impl ClassObj {
     pub fn new(name: impl Into<String>) -> Self {

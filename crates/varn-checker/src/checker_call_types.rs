@@ -22,7 +22,7 @@ pub(crate) fn infer_call_type(
         ExprKind::BoolLiteral { .. } => Some(Type::Bool),
         ExprKind::This => current_class.map(|n| {
             let origin = ctx.and_then(|c| c.source_file());
-            Type::named_with_origin(Rc::from(n), origin.map(|s| Rc::from(s)))
+            Type::named_with_origin(Rc::from(n), origin.map(Rc::from))
         }),
         ExprKind::Identifier { name } => sym_map.get(name.as_ref()).cloned(),
 

@@ -45,7 +45,7 @@ pub(crate) fn scan_bytecode(code: &[u16], constants: &[PoolEntry]) -> ScanResult
             defs.entry(def_reg).or_insert(instr_idx);
         }
         for &use_reg in &info.uses {
-            uses.entry(use_reg).or_insert_with(Vec::new).push(instr_idx);
+            uses.entry(use_reg).or_default().push(instr_idx);
         }
         if let Some((arg_start, arg_count)) = info.call_args {
             call_sites.push((instr_idx, arg_start, arg_count));
@@ -57,7 +57,7 @@ pub(crate) fn scan_bytecode(code: &[u16], constants: &[PoolEntry]) -> ScanResult
 
     let last = instr_idx.saturating_sub(1);
     for reg in open_captures {
-        uses.entry(reg).or_insert_with(Vec::new).push(last);
+        uses.entry(reg).or_default().push(last);
     }
 
     ScanResult {

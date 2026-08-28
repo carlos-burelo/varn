@@ -1,3 +1,5 @@
+#![allow(unused_crate_dependencies)]
+
 use varn_lsp::features::hover::build_hover;
 use varn_lsp::pipeline::run_pipeline;
 use tower_lsp::lsp_types::HoverContents;

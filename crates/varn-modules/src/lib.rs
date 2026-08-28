@@ -213,8 +213,7 @@ fn resolve_export_target(
     for (key, val) in &manifest.exports {
         if key.contains('*') {
             let prefix = key.trim_end_matches('*');
-            if export_key.starts_with(prefix) {
-                let matched_suffix = &export_key[prefix.len()..];
+            if let Some(matched_suffix) = export_key.strip_prefix(prefix) {
                 let resolved_val = val.replace('*', matched_suffix);
                 let entry =
                     package_root.join(resolved_val.trim_start_matches(RELATIVE_EXPORT_PREFIX));
@@ -261,7 +260,7 @@ fn resolve_export_target(
 
     Err(format!(
         "cannot resolve subpath '{sub}' in package '{}' (root: {})",
-        manifest.name.as_deref().unwrap_or(&package_name),
+        manifest.name.as_deref().unwrap_or(package_name),
         package_root.display()
     ))
 }
@@ -390,7 +389,7 @@ pub fn normalize_path_string(path: String) -> String {
         if let Some(rest) = path.strip_prefix("\\\\?\\") {
             return rest.replace('\\', "/");
         }
-        return path.replace('\\', "/");
+        path.replace('\\', "/")
     }
     #[cfg(not(windows))]
     path

@@ -71,9 +71,11 @@ pub fn lower_to_hir(input: OptInput<'_>) -> Result<hir::HirModule, OptError> {
     hir::lower::lower_program(&input)
 }
 
+pub type SsaLowerOutput = (Vec<ssa::ir::SsaFunc>, Vec<(Rc<str>, &'static str)>);
+
 pub fn lower_to_ssa(
     input: OptInput<'_>,
-) -> Result<(Vec<ssa::ir::SsaFunc>, Vec<(Rc<str>, &'static str)>), OptError> {
+) -> Result<SsaLowerOutput, OptError> {
     let mut module = hir::lower::lower_program(&input)?;
     hir::inline::run(&mut module);
     hir::module_locals::run(&mut module);

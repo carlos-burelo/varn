@@ -6,6 +6,8 @@ use std::path::Path;
 use std::rc::Rc;
 use varn_core::ModuleId;
 
+type CoreExportsMap = rustc_hash::FxHashMap<Rc<str>, crate::symbol::Symbol>;
+
 /// How the checker reaches other modules.
 ///
 /// The checker asks questions ("what does this module export?", "what did it
@@ -87,11 +89,8 @@ pub trait ImportResolver {
 #[derive(Default)]
 pub struct DiskResolver {
     graph: RefCell<ModuleGraph>,
-    /// Modules whose bind is currently being computed.
-    ///
-    /// A module is only inserted into the graph *after* it binds, so a module
-    /// that re-enters resolution while binding itself would recurse forever.
-    /// `core:types` does exactly that: binding it resolves type nodes, which
+    /// Modules whose binding is currently on the stack. Used to break
+    /// mutual-import deadlocks when a module's body imports a peer that then
     /// asks for `core:types` again to expand a generic alias.
     in_flight: RefCell<std::collections::HashSet<String>>,
     /// The prelude, derived once from the stdlib this resolver serves.
@@ -100,7 +99,7 @@ pub struct DiskResolver {
     /// *function of the stdlib in use*: a process that switches std provenance
     /// (the language server does, between the checkout tree and the embedded
     /// bundle) would otherwise keep answering from the first one it ever saw.
-    core_exports: RefCell<Option<Rc<rustc_hash::FxHashMap<Rc<str>, crate::symbol::Symbol>>>>,
+    core_exports: RefCell<Option<Rc<CoreExportsMap>>>,
     core_members: RefCell<Option<Rc<crate::core::loader::CoreMembers>>>,
 }
 
@@ -250,7 +249,7 @@ impl DiskResolver {
 
     // ── stdlib carriers ──────────────────────────────────────────────────
 
-    fn from_interface_blob(
+    fn load_from_interface_blob(
         &self,
         specifier: &str,
         key: &str,
@@ -381,7 +380,7 @@ impl ImportResolver for DiskResolver {
 
         match super::stdlib::stdlib_carrier(specifier)? {
             super::stdlib::Carrier::Blob => {
-                self.from_interface_blob(specifier, &key).map(|(_, b)| b)
+                self.load_from_interface_blob(specifier, &key).map(|(_, b)| b)
             }
             super::stdlib::Carrier::Embedded(source) => self.bind_from_embedded(specifier, source),
             super::stdlib::Carrier::File(abs) => self.module_bind(&abs),
@@ -396,7 +395,7 @@ impl ImportResolver for DiskResolver {
 
         let result = match super::stdlib::stdlib_carrier(specifier) {
             Some(super::stdlib::Carrier::Blob) => {
-                self.from_interface_blob(specifier, &key).map(|(e, _)| e)
+                self.load_from_interface_blob(specifier, &key).map(|(e, _)| e)
             }
             Some(super::stdlib::Carrier::Embedded(source)) => {
                 Some(self.exports_from_embedded(specifier, source, &mut Vec::new()))

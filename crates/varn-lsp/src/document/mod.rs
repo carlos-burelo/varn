@@ -199,7 +199,7 @@ pub enum ChainResult<'a> {
 impl ChainResult<'_> {
     pub fn name(&self) -> &str {
         match self {
-            ChainResult::Symbol(s) => &s.name(),
+            ChainResult::Symbol(s) => s.name(),
             ChainResult::Member { member, .. } => &member.name,
         }
     }

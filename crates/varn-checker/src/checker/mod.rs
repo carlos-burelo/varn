@@ -18,6 +18,8 @@ pub(crate) use crate::checker_enrichment::enrich_call_returns;
 
 use crate::semantic_info::{CallResolution, MemberResolution};
 
+pub(crate) type MemberTypeCacheEntry = Option<(Type, Option<usize>)>;
+
 #[derive(Clone, Debug)]
 pub struct ExprInfo {
     pub ty: Type,
@@ -174,7 +176,7 @@ pub struct Checker<'r> {
     pub(crate) extension_members: FxHashMap<u32, Rc<str>>,
     pub(crate) extension_set_members: FxHashMap<u32, Rc<str>>,
     pub(crate) member_exists_cache: FxHashMap<(Type, Rc<str>), bool>,
-    pub(crate) member_type_cache: FxHashMap<(Type, Rc<str>), Option<(Type, Option<usize>)>>,
+    pub(crate) member_type_cache: FxHashMap<(Type, Rc<str>), MemberTypeCacheEntry>,
     pub(crate) expected_type: Option<Type>,
     pub(crate) call_mappings: FxHashMap<varn_core::ast::AstId, Vec<Option<usize>>>,
     pub(crate) reassigned_names: rustc_hash::FxHashSet<Rc<str>>,

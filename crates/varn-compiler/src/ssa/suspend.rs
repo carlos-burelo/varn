@@ -188,12 +188,11 @@ fn compute_in_loop(ssa: &SsaFunc) -> Vec<bool> {
     // Clausura transitiva (Floyd-Warshall booleano). Los CFG de una función
     // caben de sobra en O(n^3) a estos tamaños.
     for k in 0..n {
-        for i in 0..n {
-            if reach[i][k] {
-                for j in 0..n {
-                    if reach[k][j] {
-                        reach[i][j] = true;
-                    }
+        let row_k = reach[k].clone();
+        for reach_i in reach.iter_mut().take(n) {
+            if reach_i[k] {
+                for (rij, &rkj) in reach_i.iter_mut().take(n).zip(&row_k) {
+                    *rij |= rkj;
                 }
             }
         }

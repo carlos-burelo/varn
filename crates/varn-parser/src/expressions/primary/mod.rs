@@ -35,7 +35,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 range,
                 ExprKind::IntLiteral {
                     value,
-                    raw: raw.into(),
+                    raw,
                 },
             ))
         }
@@ -52,7 +52,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
                 range,
                 ExprKind::FloatLiteral {
                     value,
-                    raw: raw.into(),
+                    raw,
                 },
             ))
         }
@@ -61,7 +61,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             Ok(s.expr(
                 range,
                 ExprKind::BigIntLiteral {
-                    raw: raw.into(),
+                    raw,
                 },
             ))
         }
@@ -70,7 +70,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             Ok(s.expr(
                 range,
                 ExprKind::DecimalLiteral {
-                    raw: raw.into(),
+                    raw,
                 },
             ))
         }
@@ -79,7 +79,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             Ok(s.expr(
                 range,
                 ExprKind::StrLiteral {
-                    value: value.into(),
+                    value,
                 },
             ))
         }
@@ -89,7 +89,7 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             Ok(s.expr(
                 range,
                 ExprKind::StrLiteral {
-                    value: value.into(),
+                    value,
                 },
             ))
         }
@@ -125,8 +125,8 @@ pub fn parse_primary_expr(s: &mut TokenStream) -> Result<Expr, String> {
             Ok(s.expr(
                 range,
                 ExprKind::RegexLiteral {
-                    pattern: pattern.into(),
-                    flags: flags.into(),
+                    pattern,
+                    flags,
                 },
             ))
         }
@@ -340,7 +340,7 @@ fn parse_function_expr_inner_with_start(
 
 fn parse_class_expr(s: &mut TokenStream) -> Result<Expr, String> {
     let decl = crate::parser::parse_class_decl(s, vec![], false)?;
-    let full_range = decl.range.clone();
+    let full_range = decl.range;
     Ok(s.expr(
         full_range,
         ExprKind::ClassExpr {

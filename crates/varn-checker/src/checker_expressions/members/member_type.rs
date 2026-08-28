@@ -205,10 +205,10 @@ impl<'r> Checker<'r> {
                     || bind
                         .core
                         .as_ref()
-                        .map_or(false, |b| b.enum_members.contains_key(name.as_ref()))
+                        .is_some_and(|b| b.enum_members.contains_key(name.as_ref()))
                     || self.resolver.find_bind_for_type(name, &origin_modules)
                         .as_ref()
-                        .map_or(false, |eb| {
+                        .is_some_and(|eb| {
                             eb.get_enum_members_local(name.as_ref()).is_some()
                         });
 

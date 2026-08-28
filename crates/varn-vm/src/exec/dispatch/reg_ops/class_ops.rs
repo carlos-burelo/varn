@@ -408,7 +408,7 @@ impl ExecCtx {
         let arg_count = (w3 >> 8) as usize;
         let arg_start = (w3 & 0xFF) as usize;
         let end_reg = (w4 >> 8) as usize;
-        let flag = (w4 & 0xFF) as u16;
+        let flag = w4 & 0xFF ;
 
         let name_nv = closure.constants[method_idx];
         let name = self.heap.str_val(name_nv).ok_or_else(|| {

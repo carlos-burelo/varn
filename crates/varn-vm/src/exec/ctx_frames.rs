@@ -17,8 +17,8 @@ impl ExecCtx {
         if let Some((prepared, needs_receiver)) =
             super::calls::try_prepare_call_fast(callee_nv, arg_count, &self.stack, &self.heap)
         {
-            if needs_receiver {
-                if callee_nv.is_heap() {
+            if needs_receiver
+                && callee_nv.is_heap() {
                     let receiver_clone = if let Some(crate::heap::HeapObj::BoundMethod(bm)) =
                         self.heap.get(callee_nv.as_heap_idx())
                     {
@@ -49,7 +49,6 @@ impl ExecCtx {
                         }
                     }
                 }
-            }
             return Ok(prepared);
         }
 

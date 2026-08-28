@@ -64,7 +64,7 @@ pub(crate) extern "C" fn jit_call(
 
                     ctx_ref
                         .frames
-                        .push(crate::frame::CallFrame::new(&**closure, callee_base));
+                        .push(crate::frame::CallFrame::new(closure, callee_base));
 
                     ctx_ref.jit_frame_prepushed = 1;
                     let res = (jit_fn)(
@@ -105,9 +105,9 @@ pub(crate) extern "C" fn jit_call(
                     let actual_count = args.arg_count - 1;
                     if actual_count <= 8 {
                         let mut buf = [VmValue::null(); 8];
-                        for i in 0..actual_count {
-                            buf[i] = ctx_ref.stack[arg_base + 1 + i];
-                        }
+                        buf[..actual_count].copy_from_slice(
+                            &ctx_ref.stack[(arg_base + 1)..(arg_base + 1 + actual_count)],
+                        );
                         ctx_ref.invoke_native(f, &buf[..actual_count])
                     } else {
                         let vargs: Vec<VmValue> = (1..=actual_count)
@@ -193,7 +193,6 @@ pub(crate) extern "C" fn jit_call_method(
 }
 
 /// Flat-argument shim over [`jit_call_method`] for the CLIF backend.
-#[allow(clippy::too_many_arguments)]
 #[allow(clippy::too_many_arguments)]
 pub(crate) extern "C" fn jit_call_method_flat(
     ctx: *mut ExecCtx,

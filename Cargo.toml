@@ -58,6 +58,14 @@ tungstenite  = "0.21"
 [workspace.lints.rust]
 unused_crate_dependencies = "warn"
 
+[workspace.lints.clippy]
+too_many_arguments = "allow"
+arc_with_non_send_sync = "allow"
+needless_borrow = "allow"
+should_implement_trait = "allow"
+box_collection = "allow"
+collapsible_match = "allow"
+
 [profile.release]
 opt-level = 3
 lto = "thin"

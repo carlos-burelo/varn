@@ -238,7 +238,7 @@ impl VmClosure {
         let linker = crate::clif_link::CtxLinker::current();
         match varn_jit::compile(&self.proto, &self.constants, helpers, &linker, None) {
             Ok(compiled) => {
-                let entry_usize: usize = unsafe { std::mem::transmute(compiled.entry) };
+                let entry_usize: usize = compiled.entry as usize;
                 self.proto.jit_epoch.set(epoch);
                 self.proto
                     .jit_serial
@@ -313,7 +313,7 @@ impl VmClosure {
         let linker = crate::clif_link::CtxLinker::current();
         match varn_jit::compile(proto, &self.constants, helpers, &linker, Some(osr_ip)) {
             Ok(compiled) => {
-                let entry_usize: usize = unsafe { std::mem::transmute(compiled.entry) };
+                let entry_usize: usize = compiled.entry as usize;
                 proto.jit_osr_epoch.set(epoch);
                 proto.jit_osr_ip.set(osr_ip);
                 proto.jit_osr_entry.set(Some(entry_usize));

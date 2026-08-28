@@ -136,8 +136,8 @@ impl VmValue {
     #[inline(always)]
     pub fn sso_copy_bytes(self, buf: &mut [u8; 5]) -> usize {
         let len = self.sso_len();
-        for i in 0..len {
-            buf[i] = ((self.0 >> (37 - i as u32 * 8)) & 0xFF) as u8;
+        for (i, slot) in buf.iter_mut().enumerate().take(len) {
+            *slot = ((self.0 >> (37 - i as u32 * 8)) & 0xFF) as u8;
         }
         len
     }
@@ -154,7 +154,7 @@ impl VmValue {
     }
 
     #[inline(always)]
-    pub fn sso_as_str<'a>(self, buf: &'a mut [u8; 5]) -> &'a str {
+    pub fn sso_as_str(self, buf: &mut [u8; 5]) -> &str {
         let len = self.sso_copy_bytes(buf);
 
         unsafe { std::str::from_utf8_unchecked(&buf[..len]) }

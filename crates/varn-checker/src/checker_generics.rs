@@ -158,7 +158,7 @@ fn infer_arrow_with_context(
             let name = pattern_lead_name(&ap.pattern);
             if !name.is_empty() && name != "_" {
                 let scope = bind.scopes.get(scope_id);
-                if let Some(sym_id) = scope.resolve(&name, &bind.scopes) {
+                if let Some(sym_id) = scope.resolve(name, &bind.scopes) {
                     let explicit_ty = ap
                         .type_ann
                         .as_ref()
@@ -343,7 +343,7 @@ pub(crate) fn map_generics_cached(
 
     let sorted_args: Vec<Type> = {
         let mut pairs: Vec<(&Rc<str>, &Type)> = mapping.iter().collect();
-        pairs.sort_by(|(a, _), (b, _)| a.cmp(b));
+        pairs.sort_by_key(|(a, _)| *a);
         pairs.into_iter().map(|(_, v)| v.clone()).collect()
     };
     let key = (base.clone(), sorted_args);

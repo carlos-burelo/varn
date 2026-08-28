@@ -14,9 +14,7 @@ pub fn build_call_argument_completions(
         .position(|t| t.line > line || (t.line == line && t.col >= col))
         .unwrap_or(state.tokens.len());
 
-    if current_idx > 0 {
-        current_idx -= 1;
-    }
+    current_idx = current_idx.saturating_sub(1);
 
     let mut balance = 0_i32;
     let mut lparen_idx = None;
@@ -32,14 +30,12 @@ pub fn build_call_argument_completions(
             } else {
                 balance -= 1;
             }
-        } else if t.kind == TokenKind::LBrace
+        } else if (t.kind == TokenKind::LBrace
             || t.kind == TokenKind::RBrace
-            || t.kind == TokenKind::Semicolon
-        {
-            if balance == 0 {
+            || t.kind == TokenKind::Semicolon)
+            && balance == 0 {
                 return None;
             }
-        }
     }
 
     let lparen_idx = lparen_idx?;
@@ -55,12 +51,11 @@ pub fn build_call_argument_completions(
                 angle_balance += 1;
             } else if state.tokens[i].kind == TokenKind::LAngle {
                 angle_balance -= 1;
-                if angle_balance == 0 {
-                    if i > 0 {
+                if angle_balance == 0
+                    && i > 0 {
                         callee_idx = i - 1;
                         break;
                     }
-                }
             }
         }
     }
@@ -113,11 +108,9 @@ pub fn build_call_argument_completions(
         let t = &state.tokens[i];
         if (t.kind == TokenKind::Identifier || t.kind.can_be_identifier())
             && i + 1 < state.tokens.len()
-        {
-            if state.tokens[i + 1].kind == TokenKind::Colon {
+            && state.tokens[i + 1].kind == TokenKind::Colon {
                 provided_named_args.insert(t.lexeme.clone());
             }
-        }
     }
 
     let mut items = Vec::new();

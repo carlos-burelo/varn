@@ -49,9 +49,7 @@ fn expected_disc_for_receiver(
     let mut agreed: Option<i64> = None;
     let mut ip = header;
     while ip < back_edge {
-        let Some(info) = decode(code, ip, pool) else {
-            return None;
-        };
+        let info = decode(code, ip, pool)?;
         let op = OpCode::from_u8((code[ip] & 0xFF) as u8);
         if matches!(op, Some(OpCode::ArrayGetIndex)) {
             let obj_r = (code[ip + 1] >> 8) as usize;

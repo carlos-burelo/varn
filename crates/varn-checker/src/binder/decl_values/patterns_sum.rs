@@ -129,7 +129,7 @@ impl<'r> super::super::Binder<'r> {
                 }
             }
             Pattern::Assignment { left, right, .. } => {
-                let resolved_ty = if ty.is_none() || ty.as_ref().map_or(false, |t| t.is_dynamic()) {
+                let resolved_ty = if ty.is_none() || ty.as_ref().is_some_and(|t| t.is_dynamic()) {
                     let inferred = infer_expr_type(right, Some(self));
                     if inferred.is_dynamic() {
                         ty

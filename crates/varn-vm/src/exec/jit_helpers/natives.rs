@@ -62,9 +62,9 @@ pub(crate) extern "C" fn jit_call_native_fast(
                     let actual_count = arg_count - 1;
                     if actual_count <= 8 {
                         let mut buf = [VmValue::null(); 8];
-                        for i in 0..actual_count {
-                            buf[i] = ctx_ref.stack[arg_base + 1 + i];
-                        }
+                        buf[..actual_count].copy_from_slice(
+                            &ctx_ref.stack[(arg_base + 1)..(arg_base + 1 + actual_count)],
+                        );
                         ctx_ref.invoke_native(f, &buf[..actual_count])
                     } else {
                         let vargs: Vec<VmValue> = (1..=actual_count)

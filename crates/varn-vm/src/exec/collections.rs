@@ -295,7 +295,7 @@ pub(crate) fn object_keys(obj: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
             let keys: Vec<Value> = o
                 .borrow()
                 .keys()
-                .map(|k| Value::Str(k.clone().into()))
+                .map(|k| Value::Str(k.clone()))
                 .collect();
             return Ok(heap.alloc_array(keys));
         }
@@ -327,14 +327,11 @@ pub(crate) fn object_merge(target: VmValue, spread: VmValue, heap: &mut Heap) ->
         Some(HeapObj::Object(o)) => o.clone(),
         _ => return Ok(target),
     };
-    match spread_val {
-        Value::Object(src) => {
-            let pairs: Vec<(Rc<str>, VmValue)> = src.borrow().iter().collect();
-            for (k, nv) in pairs {
-                target_obj.insert(k, nv);
-            }
+    if let Value::Object(src) = spread_val {
+        let pairs: Vec<(Rc<str>, VmValue)> = src.borrow().iter().collect();
+        for (k, nv) in pairs {
+            target_obj.insert(k, nv);
         }
-        _ => {}
     }
     Ok(target)
 }

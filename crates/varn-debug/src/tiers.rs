@@ -182,8 +182,8 @@ pub fn debug_tiers(
         rows.len()
     );
     eprintln!(
-        "  {DIM}{:<name_w$}  {:>6}  {:<5}  {}{R}",
-        "función", "words", "tier", "razón"
+        "  {DIM}{:<name_w$}  {:>6}  {:<5}  razón{R}",
+        "función", "words", "tier"
     );
     for r in &rows {
         let fa = if r.frame_aware {

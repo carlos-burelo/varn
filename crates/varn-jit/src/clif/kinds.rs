@@ -72,8 +72,8 @@ pub(crate) fn apply_kinds(
         Some(d) if (d as usize) < state.len() => d as usize,
         _ => return,
     };
-    let meta_int = |r: usize| meta.get(r).map_or(false, |m| m.kind == SlotKind::Int);
-    let meta_float = |r: usize| meta.get(r).map_or(false, |m| m.kind == SlotKind::Float);
+    let meta_int = |r: usize| meta.get(r).is_some_and(|m| m.kind == SlotKind::Int);
+    let meta_float = |r: usize| meta.get(r).is_some_and(|m| m.kind == SlotKind::Float);
     // A result the emitter serves in the register's declared representation
     // (it unboxes to int / converts to f64 when the meta proves the type).
     let typed = |r: usize| {
@@ -305,7 +305,7 @@ pub(crate) fn kind_flow(
     // representation), so seed it `Float` at entry — params (overriding the
     // boxed default above) and locals alike; the flow preserves it.
     for (r, e) in entry0.iter_mut().enumerate() {
-        if meta.get(r).map_or(false, |m| m.kind == SlotKind::Float) {
+        if meta.get(r).is_some_and(|m| m.kind == SlotKind::Float) {
             *e = K::Float;
         }
     }

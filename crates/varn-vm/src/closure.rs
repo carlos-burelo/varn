@@ -52,7 +52,7 @@ impl VmUpvalue {
         }
     }
 
-    pub(crate) fn write(&self, val: VmValue, stack: &mut Vec<VmValue>) {
+    pub(crate) fn write(&self, val: VmValue, stack: &mut [VmValue]) {
         let mut g = self.inner.borrow_mut();
         match g.stack_slot {
             Some(slot) => stack[slot] = val,

@@ -317,11 +317,15 @@ pub fn visit_term_uses(term: &Terminator, f: &mut impl FnMut(Value)) {
 }
 
 /// Mutable twin of [`visit_term_uses`].
-pub fn visit_term_uses_mut(term: &mut Terminator, f: &mut impl FnMut(&mut Value)) {
+pub fn visit_term_uses_mut(term: &mut Terminator, mut f: impl FnMut(&mut Value)) {
     match term {
         Terminator::Return(Some(v)) | Terminator::Throw(v) => f(v),
         Terminator::Return(None) | Terminator::Unreachable => {}
-        Terminator::Jump { args, .. } => args.iter_mut().for_each(|a| f(a)),
+        Terminator::Jump { args, .. } => {
+            for a in args {
+                f(a);
+            }
+        }
         Terminator::Branch {
             cond,
             then_args,
@@ -329,8 +333,12 @@ pub fn visit_term_uses_mut(term: &mut Terminator, f: &mut impl FnMut(&mut Value)
             ..
         } => {
             f(cond);
-            then_args.iter_mut().for_each(|a| f(a));
-            else_args.iter_mut().for_each(|a| f(a));
+            for a in then_args {
+                f(a);
+            }
+            for a in else_args {
+                f(a);
+            }
         }
     }
 }

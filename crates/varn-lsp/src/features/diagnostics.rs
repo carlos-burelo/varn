@@ -102,7 +102,6 @@ pub fn convert_diagnostics(state: &DocumentState) -> Vec<LspDiagnostic> {
                 tags,
                 related_information,
                 data,
-                ..Default::default()
             }
         })
         .collect()

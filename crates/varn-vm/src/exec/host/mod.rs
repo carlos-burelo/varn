@@ -313,7 +313,7 @@ impl NativeCtx for ExecCtx {
                 Ok(instance_nv)
             }
             PreparedCall::NativeConstructor(f, args, instance_nv) => {
-                let result = (f)(self as &mut dyn NativeCtx, &args).map_err(|e| e)?;
+                let result = (f)(self as &mut dyn NativeCtx, &args)?;
                 let nv = if result.is_null() {
                     instance_nv
                 } else {
@@ -329,7 +329,7 @@ impl NativeCtx for ExecCtx {
     fn spawn_vm(&mut self, callee: VmValue, args: &[VmValue]) -> Result<VmValue, String> {
         let value = self.heap.extract(callee);
         let val_args: Vec<varn_types::Value> = args.iter().map(|&a| self.heap.extract(a)).collect();
-        let task = self.spawn_internal(value, &val_args).map_err(|e| e)?;
+        let task = self.spawn_internal(value, &val_args)?;
         Ok(self.heap.intern(task))
     }
 

@@ -211,15 +211,13 @@ impl<'r> Checker<'r> {
                                                     narrowings.push((id, t));
                                                 }
                                             }
-                                        } else if (is_neq && is_true_branch)
-                                            || (is_eq && !is_true_branch)
-                                        {
-                                            if !matched.is_empty() {
+                                        } else if ((is_neq && is_true_branch)
+                                            || (is_eq && !is_true_branch))
+                                            && !matched.is_empty() {
                                                 if let Some(t) = make_ty(unmatched) {
                                                     narrowings.push((id, t));
                                                 }
                                             }
-                                        }
                                     }
                                 }
                             }

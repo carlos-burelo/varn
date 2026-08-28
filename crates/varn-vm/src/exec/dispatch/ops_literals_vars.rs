@@ -51,7 +51,7 @@ impl ExecCtx {
                 let w1 = code[*ip];
                 *ip += 1;
                 let dest = base + first_reg;
-                let src = base + hi(w1) as usize;
+                let src = base + hi(w1);
 
                 let max_idx = dest.max(src);
                 if max_idx >= self.stack.len() {

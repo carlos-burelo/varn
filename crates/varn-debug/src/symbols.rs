@@ -35,7 +35,7 @@ pub fn debug_symbols(
         let ty = check_result
             .symbol_types
             .get(&id)
-            .or_else(|| sym.ty.as_ref())
+            .or(sym.ty.as_ref())
             .map(|t| t.to_string())
             .unwrap_or_else(|| "dynamic".to_string());
 

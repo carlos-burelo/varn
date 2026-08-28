@@ -51,6 +51,12 @@ pub struct PolyICSlot {
     last_hit: u8,
 }
 
+impl Default for PolyICSlot {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PolyICSlot {
     pub fn new() -> Self {
         Self {

@@ -63,10 +63,12 @@ impl<'r> Checker<'r> {
 
             // Sign and negation preserve the numeric type; `!` does not
             // produce a refinement worth carrying (its type is already known).
-            ExprKind::Unary { op, operand, .. } => match op {
-                UnaryOp::Minus | UnaryOp::Plus => self.refine(operand, bind),
-                _ => None,
-            },
+            ExprKind::Unary {
+                op: UnaryOp::Minus | UnaryOp::Plus,
+                operand,
+                ..
+            } => self.refine(operand, bind),
+            ExprKind::Unary { .. } => None,
 
             ExprKind::Member {
                 object,

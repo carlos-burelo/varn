@@ -163,7 +163,7 @@ pub(crate) fn emit_call_spread(
 
     reload_boxed(b, actx, state, &regs);
 
-    if meta.get(dest).map_or(false, |m| m.kind == SlotKind::Int) {
+    if meta.get(dest).is_some_and(|m| m.kind == SlotKind::Int) {
         let s = b.ins().ishl_imm(res, 16);
         let un = b.ins().sshr_imm(s, 16);
         b.def_var(actx.vars[dest], un);

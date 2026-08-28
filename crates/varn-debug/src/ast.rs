@@ -38,7 +38,7 @@ fn print_stmt(stmt: &Stmt, indent: &str, is_last: bool) {
         StmtKind::Error => terminal::log(format!(
             "{indent}{marker}{} {}",
             chalk("ErrorStmt").bold(),
-            chalk(&format!(
+            chalk(format!(
                 "{}:{}..{}:{}",
                 stmt.range.start.line,
                 stmt.range.start.column,

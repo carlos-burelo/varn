@@ -270,7 +270,6 @@ impl<'a> Lowerer<'a> {
             ExportDecl::Named {
                 specifiers,
                 source,
-                range: _,
                 ..
             } => {
                 let mut specs = Vec::new();
@@ -283,7 +282,7 @@ impl<'a> Lowerer<'a> {
                     let exported_slot = self
                         .export_names
                         .iter()
-                        .position(|n| &**n == &*spec.exported)
+                        .position(|n| **n == *spec.exported)
                         .or_else(|| self.ann.get_exported_slot_idx(AnnKey::decl(spec.range.start.offset)))
                         .map(|s| s as u16);
                     specs.push(HirExportSpec {

@@ -25,7 +25,7 @@ pub(crate) fn collect_frames(frames: &[CallFrame]) -> Vec<FrameInfo> {
     frames
         .iter()
         .rev()
-        .filter_map(|f| {
+        .map(|f| {
             let proto = &f.closure().proto;
             let fn_name = proto
                 .name
@@ -40,11 +40,11 @@ pub(crate) fn collect_frames(frames: &[CallFrame]) -> Vec<FrameInfo> {
             };
             let raw_line = proto.chunk.lines.get_line(f.ip.saturating_sub(1));
             let line = if raw_line > 0 { raw_line } else { 1 };
-            Some(FrameInfo {
+            FrameInfo {
                 fn_name,
                 file,
                 line,
-            })
+            }
         })
         .collect()
 }

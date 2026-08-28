@@ -23,7 +23,7 @@ pub fn debug_types(path: &str, source: &str, flags: &DebugFlags) {
     for sym in analysis.symbols() {
         let show_std = flags.types_all;
         if (show_std || !sym.is_from_stdlib()) && in_range(sym.line() + 1) {
-            entries.push(sym.clone());
+            entries.push(sym);
         } else if sym.is_from_stdlib() {
             std_hidden += 1;
         }
@@ -46,7 +46,7 @@ pub fn debug_types(path: &str, source: &str, flags: &DebugFlags) {
             table.row([
                 chalk(loc).dim().to_string(),
                 chalk(kind).yellow().to_string(),
-                format!("{}{}", name_prefix, chalk(&s.name()).bold()),
+                format!("{}{}", name_prefix, chalk(s.name()).bold()),
                 chalk(details).dim().to_string(),
             ]);
         }

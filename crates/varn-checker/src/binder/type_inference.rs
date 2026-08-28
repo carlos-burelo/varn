@@ -191,7 +191,7 @@ fn infer_member(
                             if let Some(p) = ft.params.iter().find(|p| {
                                 p.name
                                     .as_ref()
-                                    .map_or(false, |pn| pn.as_ref() == prop_name.as_ref())
+                                    .is_some_and(|pn| pn.as_ref() == prop_name.as_ref())
                             }) {
                                 found_tys.push(p.ty.clone());
                             }

@@ -59,8 +59,8 @@ pub(crate) fn resolve_property(
         }
     }
 
-    if key.starts_with("::") {
-        return resolve_meta_property(obj, &key[2..], heap);
+    if let Some(stripped) = key.strip_prefix("::") {
+        return resolve_meta_property(obj, stripped, heap);
     }
 
     if let Some(nv) = resolve_own_data_property(obj, key, heap) {

@@ -74,7 +74,7 @@ impl<'a> Lowerer<'a> {
                     }
                 }
             }
-            _ => return Err(OptError::Unsupported("hir: non-identifier assign target")),
+            _ => Err(OptError::Unsupported("hir: non-identifier assign target")),
         }
     }
 

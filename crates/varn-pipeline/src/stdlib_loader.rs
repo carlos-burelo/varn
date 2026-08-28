@@ -29,7 +29,8 @@ thread_local! {
         RefCell::new(FxHashMap::default());
 }
 
-static COMPILED_BYTES: Mutex<Option<FxHashMap<String, (u64, Arc<[u8]>)>>> = Mutex::new(None);
+type CompiledBytesMap = FxHashMap<String, (u64, Arc<[u8]>)>;
+static COMPILED_BYTES: Mutex<Option<CompiledBytesMap>> = Mutex::new(None);
 
 const STD_FINGERPRINT: u64 = 0;
 

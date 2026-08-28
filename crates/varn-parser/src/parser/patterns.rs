@@ -144,7 +144,7 @@ fn parse_array_pattern(s: &mut TokenStream) -> Result<Pattern, String> {
         let mut pat = parse_pattern(s)?;
         if s.eat(TokenKind::Eq) {
             let default = parse_expr(s)?;
-            let assign_range = s.span_from(pat.range().clone());
+            let assign_range = s.span_from(*pat.range());
             pat = Pattern::Assignment {
                 left: Box::new(pat),
                 right: Box::new(default),

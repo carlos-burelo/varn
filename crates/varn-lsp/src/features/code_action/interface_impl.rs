@@ -164,8 +164,8 @@ fn find_class_at_line(program: &Program, line: u32) -> Option<&ClassDecl> {
     None
 }
 
-fn find_interface<'a>(
-    program: &'a Program,
+fn find_interface(
+    program: &Program,
     _index: Option<&ProjectIndex>,
     name: &str,
 ) -> Option<InterfaceDecl> {

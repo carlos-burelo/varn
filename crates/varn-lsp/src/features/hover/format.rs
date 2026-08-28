@@ -93,7 +93,7 @@ fn is_primitive_class_name(name: &str) -> bool {
 fn format_class(state: &DocumentState, sym: SymbolView<'_>) -> String {
     let tp = format_type_params(&sym.type_params());
     let members = state.members_of(sym);
-    if members.is_empty() || is_primitive_class_name(&sym.name()) {
+    if members.is_empty() || is_primitive_class_name(sym.name()) {
         return format!("class {}{}", sym.name(), tp);
     }
     let mut lines = vec![format!("class {}{} {{", sym.name(), tp)];

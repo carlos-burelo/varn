@@ -44,6 +44,7 @@ impl<'r> Checker<'r> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn check_member_expr(
         &mut self,
         expr: &Expr,

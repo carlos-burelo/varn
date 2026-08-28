@@ -209,8 +209,7 @@ pub fn dot_receiver(
     }
     let dot_idx = dot_idx?;
 
-    for i in (dot_idx + 1)..line_toks.len() {
-        let t = line_toks[i];
+    for t in line_toks.iter().skip(dot_idx + 1) {
         if t.col >= col {
             break;
         }

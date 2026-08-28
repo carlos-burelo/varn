@@ -28,7 +28,7 @@ pub fn enrich_call_returns(
                     .get(*sym_id)
                     .ty
                     .as_ref()
-                    .map_or(false, |t| !t.is_dynamic())
+                    .is_some_and(|t| !t.is_dynamic())
                 {
                     continue;
                 }
@@ -61,7 +61,7 @@ pub fn enrich_call_returns(
                     let final_ret = crate::types::async_fn_return(ret_ty, *is_async);
                     let sym = bind.arena.get_mut(*sym_id);
                     if let Some(crate::types::Type(varn_core::TypeKind::Fn(ft), _)) = &mut sym.ty {
-                        ft.return_type = Box::new(final_ret);
+                        *ft.return_type = final_ret;
                     }
                 }
                 enrich_stmts_for_vars(&ctx, &mut sym_map, stmt, bind, resolver, None);
@@ -88,7 +88,7 @@ pub fn enrich_call_returns(
                         if let Some(crate::types::Type(varn_core::TypeKind::Fn(ft), _)) =
                             ft_map.get_mut(key)
                         {
-                            ft.return_type = Box::new(final_ret.clone());
+                            *ft.return_type = final_ret.clone();
                         }
                     }
                     if let Some(class_info) = bind.type_members.classes.get_mut(class_name) {
@@ -98,13 +98,13 @@ pub fn enrich_call_returns(
                             .find(|m| m.name.as_ref() == key.as_ref())
                         {
                             if let crate::types::Type(varn_core::TypeKind::Fn(ft), _) = &mut m.ty {
-                                ft.return_type = Box::new(final_ret.clone());
+                                *ft.return_type = final_ret.clone();
                             }
                             if let Some(symbol_id) = m.symbol_id {
                                 if let Some(crate::types::Type(varn_core::TypeKind::Fn(ft), _)) =
                                     &mut bind.arena.get_mut(symbol_id).ty
                                 {
-                                    ft.return_type = Box::new(final_ret.clone());
+                                    *ft.return_type = final_ret.clone();
                                 }
                             }
                         }

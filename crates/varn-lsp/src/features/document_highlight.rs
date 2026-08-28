@@ -41,9 +41,9 @@ pub fn build_document_highlights(
             }
             if let Some(info) = state.db.expr_types.get(&t.offset) {
                 if info.symbol_id == Some(target_sid) {
-                    let kind = if decl_positions.contains(&(t.line, t.col)) {
-                        DocumentHighlightKind::WRITE
-                    } else if is_assignment_lhs(state, t) {
+                    let kind = if decl_positions.contains(&(t.line, t.col))
+                        || is_assignment_lhs(state, t)
+                    {
                         DocumentHighlightKind::WRITE
                     } else {
                         DocumentHighlightKind::READ
@@ -73,9 +73,9 @@ pub fn build_document_highlights(
             (t.kind == TokenKind::Identifier || t.kind.can_be_identifier()) && t.lexeme == name
         })
         .map(|t| {
-            let kind = if decl_positions.contains(&(t.line, t.col)) {
-                DocumentHighlightKind::WRITE
-            } else if is_assignment_lhs(state, t) {
+            let kind = if decl_positions.contains(&(t.line, t.col))
+                || is_assignment_lhs(state, t)
+            {
                 DocumentHighlightKind::WRITE
             } else {
                 DocumentHighlightKind::READ
@@ -100,8 +100,5 @@ fn is_assignment_lhs(state: &DocumentState, tok: &crate::document::TokenRecord) 
     }
 
     let next = state.tokens.get(idx + 1);
-    match next.map(|t| t.kind) {
-        Some(TokenKind::Eq) => true,
-        _ => false,
-    }
+    matches!(next.map(|t| t.kind), Some(TokenKind::Eq))
 }

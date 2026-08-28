@@ -202,7 +202,6 @@ impl<'r> super::Binder<'r> {
                     key,
                     return_type,
                     body: Some(body),
-                    range: _,
                     ..
                 } => {
                     let key_rc: Rc<str> = Rc::from(key.as_ref());

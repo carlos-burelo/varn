@@ -1,3 +1,5 @@
+#![allow(unused_crate_dependencies)]
+
 use tower_lsp::lsp_types::{FormattingOptions, Position, Range, Url};
 use varn_lsp::features::code_action::extract_function::generate_extract_function_action;
 use varn_lsp::features::code_action::extract_variable::generate_extract_variable_action;

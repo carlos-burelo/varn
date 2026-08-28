@@ -1,3 +1,5 @@
+#![allow(unused_crate_dependencies)]
+
 use varn_lsp::features::references::build_references;
 use varn_lsp::features::rename::build_rename;
 use varn_lsp::workspace::Workspace;

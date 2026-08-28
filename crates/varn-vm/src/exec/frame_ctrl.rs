@@ -191,7 +191,7 @@ impl ExecCtx {
                             }
                         }
                     }
-                    for (_k, v) in &self.modules {
+                    for v in self.modules.values() {
                         if v.is_heap() {
                             roots.push(v.as_heap_idx());
                         }
@@ -234,7 +234,7 @@ impl ExecCtx {
                     self.stack.truncate(args_start - 1);
                     (f)(self as &mut dyn NativeCtx, &vm_args)
                 }
-                .map_err(|e| RuntimeError::new(e))?;
+                .map_err(RuntimeError::new)?;
 
                 self.push(result);
             }
@@ -264,14 +264,14 @@ impl ExecCtx {
                     };
                     (f)(self as &mut dyn NativeCtx, slice)
                 }
-                .map_err(|e| RuntimeError::new(e))?;
+                .map_err(RuntimeError::new)?;
 
                 self.push(result);
             }
             PreparedCall::NativeConstructor(f, args, instance_nv) => {
                 self.record_call_native(f, None);
                 let result =
-                    (f)(self as &mut dyn NativeCtx, &args).map_err(|e| RuntimeError::new(e))?;
+                    (f)(self as &mut dyn NativeCtx, &args).map_err(RuntimeError::new)?;
                 self.stack.pop();
                 let nv = if result.is_null() {
                     instance_nv

@@ -110,7 +110,7 @@ impl TypeAnnotations {
     }
 
     pub fn is_type_only(&self, key: AnnKey) -> bool {
-        self.inner.get(&key).map_or(false, |a| a.type_only)
+        self.inner.get(&key).is_some_and(|a| a.type_only)
     }
 
     pub fn record_call_mapping(&mut self, key: AnnKey, mapping: Vec<Option<usize>>) {
@@ -160,7 +160,7 @@ impl TypeAnnotations {
 
     /// Whether the object of the computed-member is a known Array.
     pub fn get_array_index(&self, key: AnnKey) -> bool {
-        self.inner.get(&key).map_or(false, |a| a.array_index)
+        self.inner.get(&key).is_some_and(|a| a.array_index)
     }
 
     /// Record the codegen projection of the annotated place's value type.

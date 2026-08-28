@@ -18,8 +18,8 @@ pub(crate) use validate::*;
 use crate::regalloc::liveness::LivenessAnalyzer;
 
 thread_local! {
-    pub static OPTIMIZE_TIME: Cell<Duration> = Cell::new(Duration::ZERO);
-    pub static OPTIMIZE_ENABLED: Cell<bool> = Cell::new(true);
+    pub static OPTIMIZE_TIME: Cell<Duration> = const { Cell::new(Duration::ZERO) };
+    pub static OPTIMIZE_ENABLED: Cell<bool> = const { Cell::new(true) };
 }
 
 
@@ -82,7 +82,7 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         }
     }
 
-    for (&reg, _use_positions) in &scan.uses {
+    for &reg in scan.uses.keys() {
         if reg >= base && !scan.defs.contains_key(&reg) {
             analyzer.record_def(reg as u16, 0);
         }

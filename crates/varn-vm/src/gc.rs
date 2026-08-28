@@ -16,7 +16,7 @@ pub struct MarkBitmap {
 
 impl MarkBitmap {
     pub(crate) fn new(capacity: u32) -> Self {
-        let bytes_needed = ((capacity as usize * 2) + 7) / 8;
+        let bytes_needed = (capacity as usize * 2).div_ceil(8);
         Self {
             bitmap: vec![0u8; bytes_needed],
         }

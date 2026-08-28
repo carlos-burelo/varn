@@ -218,7 +218,7 @@ impl ExecCtx {
                         let w1 = code[ip];
                         ip += 1;
                         let dest = base + first_reg;
-                        let src = base + hi(w1) as usize;
+                        let src = base + hi(w1);
                         let max_idx = dest.max(src);
                         if max_idx >= (*ctx).stack.len() {
                             (*ctx)
@@ -239,7 +239,7 @@ impl ExecCtx {
                     | OpCode::LoadIntOne
                     | OpCode::LoadIntMinusOne => {
                         let handled = (*ctx).exec_literals_vars_op(
-                            op, code, &mut ip, base, frame_idx, &closure, first_reg,
+                            op, code, &mut ip, base, frame_idx, closure, first_reg,
                         )?;
                         debug_assert!(handled, "exec_literals_vars_op must handle grouped opcodes");
                     }
@@ -296,7 +296,7 @@ impl ExecCtx {
                     | OpCode::StrLength
                     | OpCode::StrSlice => {
                         let handled = (*ctx).exec_math_cmp_op(
-                            op, code, &mut ip, base, frame_idx, &closure, first_reg,
+                            op, code, &mut ip, base, frame_idx, closure, first_reg,
                         )?;
                         debug_assert!(handled, "exec_math_cmp_op must handle grouped opcodes");
                     }
@@ -312,7 +312,7 @@ impl ExecCtx {
                     | OpCode::InvokeVirtual
                     | OpCode::CallSpread => {
                         if let Some(flow) = (*ctx).exec_control_calls_op(
-                            op, code, &mut ip, base, frame_idx, &closure, first_reg, depth,
+                            op, code, &mut ip, base, frame_idx, closure, first_reg, depth,
                         )? {
                             match flow {
                                 crate::exec::dispatch::ops_control_calls::ControlCallFlow::ContinueInstruction => {}
@@ -359,7 +359,7 @@ impl ExecCtx {
                     | OpCode::IsNull
                     | OpCode::IsArray => {
                         if let Some(flow) = (*ctx).exec_objects_collections_op(
-                            op, code, &mut ip, base, frame_idx, &closure, first_reg,
+                            op, code, &mut ip, base, frame_idx, closure, first_reg,
                         )? {
                             match flow {
                                 crate::exec::dispatch::ops_objects_collections::ObjectFlow::ContinueInstruction => {}
@@ -381,7 +381,7 @@ impl ExecCtx {
                     | OpCode::BindMethod => {
                         (*ctx).frames[frame_idx].ip = ip;
                         (*ctx).exec_class_op(
-                            op, code, &mut ip, base, frame_idx, &closure, first_reg,
+                            op, code, &mut ip, base, frame_idx, closure, first_reg,
                         )?;
                         let frame_idx2 = (*ctx).frames.len() - 1;
                         ip = (*ctx).frames[frame_idx2].ip;
@@ -389,7 +389,7 @@ impl ExecCtx {
                     OpCode::MakeEnumVariant => {
                         (*ctx).frames[frame_idx].ip = ip;
                         (*ctx)
-                            .exec_make_enum_variant_reg(code, &mut ip, base, frame_idx, &closure)?;
+                            .exec_make_enum_variant_reg(code, &mut ip, base, frame_idx, closure)?;
                         let frame_idx2 = (*ctx).frames.len() - 1;
                         ip = (*ctx).frames[frame_idx2].ip;
                     }
@@ -505,14 +505,14 @@ impl ExecCtx {
                         ip += 1;
                         let (dest, src) = (first_reg, hi(w1));
 
-                        let src_slot = base + src as usize;
+                        let src_slot = base + src;
                         if src_slot >= (*ctx).stack.len() {
                             (*ctx)
                                 .stack
                                 .resize(src_slot + 1, crate::value::VmValue::null());
                         }
                         let task_val = reg![src];
-                        let dest_slot = base + dest as usize;
+                        let dest_slot = base + dest;
                         if dest_slot >= (*ctx).stack.len() {
                             (*ctx)
                                 .stack
@@ -524,7 +524,7 @@ impl ExecCtx {
                     OpCode::LoadModule | OpCode::LoadModuleSlot | OpCode::StoreModuleSlot => {
                         (*ctx).frames[frame_idx].ip = ip;
                         (*ctx).exec_module_op_reg(
-                            op, code, &mut ip, frame_idx, &closure, first_reg,
+                            op, code, &mut ip, frame_idx, closure, first_reg,
                         )?;
                         ip = (*ctx).frames[frame_idx].ip;
                     }
@@ -532,7 +532,7 @@ impl ExecCtx {
                     OpCode::InvokeRuntimeStatic => {
                         (*ctx).frames[frame_idx].ip = ip;
                         (*ctx).exec_invoke_runtime_static_reg(
-                            code, &mut ip, base, frame_idx, &closure,
+                            code, &mut ip, base, frame_idx, closure,
                         )?;
                         let frame_idx2 = (*ctx).frames.len() - 1;
                         ip = (*ctx).frames[frame_idx2].ip;

@@ -21,11 +21,7 @@ pub fn build_goto_type_definition(
             .get(&sid)
             .cloned()
             .or_else(|| state.db.arena.get(sid).ty.clone())
-    } else if let Some(info) = state.db.expr_types.get(&token.offset) {
-        Some(info.ty.clone())
-    } else {
-        None
-    }?;
+    } else { state.db.expr_types.get(&token.offset).map(|info| info.ty.clone()) }?;
 
     let type_name = extract_type_identifier(&target_type)?;
 
@@ -40,8 +36,7 @@ pub fn build_goto_type_definition(
                     | SymbolKind::Struct
                     | SymbolKind::TypeAlias
             )
-        {
-            if sym.line() != u32::MAX {
+            && sym.line() != u32::MAX {
                 let url = Url::parse(&state.uri).ok()?;
                 let loc = Location::new(
                     url,
@@ -58,7 +53,6 @@ pub fn build_goto_type_definition(
                 );
                 return Some(GotoDefinitionResponse::Scalar(loc));
             }
-        }
     }
 
     // 3. Search in ProjectIndex across workspace

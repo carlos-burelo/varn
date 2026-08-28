@@ -31,7 +31,7 @@ pub(super) fn patch_rel32(buf: &mut [u8], site: usize, target: usize) {
 }
 
 pub(super) fn meta_is_int(meta: &[varn_types::register_meta::RegisterMeta], r: usize) -> bool {
-    meta.get(r).map_or(false, |m| m.kind == SlotKind::Int)
+    meta.get(r).is_some_and(|m| m.kind == SlotKind::Int)
 }
 
 pub(super) fn def_const(b: &mut FunctionBuilder, vars: &[Variable], reg: usize, v: i64) {
@@ -248,7 +248,7 @@ pub(super) fn use_f64(
 
 /// Whether register `r` is float-typed (its Variable is declared `F64`).
 pub(super) fn meta_is_float(meta: &[varn_types::register_meta::RegisterMeta], r: usize) -> bool {
-    meta.get(r).map_or(false, |m| m.kind == SlotKind::Float)
+    meta.get(r).is_some_and(|m| m.kind == SlotKind::Float)
 }
 
 /// Read a register as boxed VmValue bits regardless of its representation:
@@ -306,7 +306,7 @@ pub(super) fn box_for_target(
 }
 
 pub(super) fn state_meta_int(meta: &[varn_types::register_meta::RegisterMeta], r: usize) -> bool {
-    meta.get(r).map_or(false, |m| m.kind == SlotKind::Int)
+    meta.get(r).is_some_and(|m| m.kind == SlotKind::Int)
 }
 
 /// Innermost loop region containing `ip` with a hoisted cache for `r`.

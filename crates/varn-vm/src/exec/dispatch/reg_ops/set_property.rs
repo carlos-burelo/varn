@@ -209,7 +209,7 @@ impl ExecCtx {
                 let f = boxed.0;
                 let args = [receiver, value];
                 f(self as &mut dyn varn_types::NativeCtx, &args)
-                    .map_err(|e| crate::error::RuntimeError::new(e))?;
+                    .map_err(crate::error::RuntimeError::new)?;
             }
             varn_types::Value::VmValue(_) | varn_types::Value::BoundMethod(_) => {
                 let setter_nv2 = self.heap.intern(setter_val);
@@ -255,7 +255,7 @@ impl ExecCtx {
                 let f = boxed.0;
                 let args = [receiver];
                 let nv = f(self as &mut dyn varn_types::NativeCtx, &args)
-                    .map_err(|e| crate::error::RuntimeError::new(e))?;
+                    .map_err(crate::error::RuntimeError::new)?;
                 Some(self.heap.extract(nv))
             }
             varn_types::Value::VmValue(_) | varn_types::Value::BoundMethod(_) => {

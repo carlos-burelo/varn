@@ -16,7 +16,7 @@ pub fn execute() -> Result<(), CliError> {
     let lock_path = lockfile::lock_path(&project_root);
 
     if lock_path.exists() {
-        let lock = lockfile::PmLockfile::load(&lock_path).map_err(|e| CliError::fatal(e))?;
+        let lock = lockfile::PmLockfile::load(&lock_path).map_err(CliError::fatal)?;
         if lock.packages.is_empty() {
             terminal::log("Nothing to install.");
             return Ok(());
@@ -25,21 +25,21 @@ pub fn execute() -> Result<(), CliError> {
             "Installing {} package(s) from lockfile...",
             lock.packages.len()
         ));
-        installer::install_locked(&project_root, &lock).map_err(|e| CliError::fatal(e))?;
+        installer::install_locked(&project_root, &lock).map_err(CliError::fatal)?;
     } else {
-        let manifest = ProjectManifest::load(&manifest_path).map_err(|e| CliError::fatal(e))?;
-        let deps = manifest.parsed_deps().map_err(|e| CliError::fatal(e))?;
+        let manifest = ProjectManifest::load(&manifest_path).map_err(CliError::fatal)?;
+        let deps = manifest.parsed_deps().map_err(CliError::fatal)?;
         if deps.is_empty() {
             terminal::log("No dependencies declared in varn.toml.");
             return Ok(());
         }
         terminal::log(format!("Resolving {} dependency(ies)...", deps.len()));
         let result = installer::resolve_and_install(&project_root, &deps, None, false)
-            .map_err(|e| CliError::fatal(e))?;
+            .map_err(CliError::fatal)?;
         result
             .lock
             .save(&lock_path)
-            .map_err(|e| CliError::fatal(e))?;
+            .map_err(CliError::fatal)?;
         terminal::log("Lockfile written.");
     }
 

@@ -87,9 +87,7 @@ impl Heap {
 
         {
             let mut i64_vec: Vec<i64> = Vec::with_capacity(7);
-            for _ in 0..3 {
-                i64_vec.push(0);
-            }
+            i64_vec.extend([0, 0, 0]);
             let i64_ptr = i64_vec.as_ptr() as usize;
             let repr = varn_types::vm_value::ArrayRepr::I64(i64_vec);
             let base = &repr as *const _ as *const u8;
@@ -111,9 +109,7 @@ impl Heap {
         }
         {
             let mut f64_vec: Vec<f64> = Vec::with_capacity(7);
-            for _ in 0..3 {
-                f64_vec.push(0.0);
-            }
+            f64_vec.extend([0.0, 0.0, 0.0]);
             let f64_ptr = f64_vec.as_ptr() as usize;
             let repr = varn_types::vm_value::ArrayRepr::F64(f64_vec);
             let base = &repr as *const _ as *const u8;

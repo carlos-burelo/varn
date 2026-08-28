@@ -106,7 +106,7 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
         match heap.get(a.as_heap_idx()) {
             Some(HeapObj::BigInt(av)) => return *av == heap.as_int(b) as i128,
             Some(HeapObj::Decimal(da)) => return **da == rust_decimal::Decimal::from(heap.as_int(b)),
-            Some(HeapObj::EnumVariant(ev)) => return ev.variant_tag as i64 == heap.as_int(b),
+            Some(HeapObj::EnumVariant(ev)) => return ev.variant_tag == heap.as_int(b),
             _ => return false,
         }
     }
@@ -114,7 +114,7 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
         match heap.get(b.as_heap_idx()) {
             Some(HeapObj::BigInt(bv)) => return *bv == heap.as_int(a) as i128,
             Some(HeapObj::Decimal(db)) => return rust_decimal::Decimal::from(heap.as_int(a)) == **db,
-            Some(HeapObj::EnumVariant(ev)) => return ev.variant_tag as i64 == heap.as_int(a),
+            Some(HeapObj::EnumVariant(ev)) => return ev.variant_tag == heap.as_int(a),
             _ => return false,
         }
     }

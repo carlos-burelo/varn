@@ -104,15 +104,12 @@ pub(super) fn save_to_cache(
         exports: exports.clone(),
         bind: bind.clone(),
     };
-    match postcard::to_allocvec(&cached) {
-        Ok(payload) => {
-            let bytes = varn_modules::artifact::write_envelope(
-                varn_modules::artifact::MAGIC_VNM,
-                varn_modules::artifact::BUILD_FINGERPRINT,
-                &payload,
-            );
-            let _ = std::fs::write(&cache_file, bytes);
-        }
-        Err(_) => {}
+    if let Ok(payload) = postcard::to_allocvec(&cached) {
+        let bytes = varn_modules::artifact::write_envelope(
+            varn_modules::artifact::MAGIC_VNM,
+            varn_modules::artifact::BUILD_FINGERPRINT,
+            &payload,
+        );
+        let _ = std::fs::write(&cache_file, bytes);
     }
 }

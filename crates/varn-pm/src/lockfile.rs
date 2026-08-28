@@ -54,7 +54,7 @@ impl PmLockfile {
         let mine = self.by_name();
         let theirs = other.by_name();
         mine.iter().any(|(name, a)| {
-            theirs.get(name).map_or(true, |b| {
+            theirs.get(name).is_none_or(|b| {
                 a.origin != b.origin
                     || a.version != b.version
                     || a.commit != b.commit

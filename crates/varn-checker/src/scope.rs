@@ -49,9 +49,9 @@ impl CheckerScope {
             if let Some(&id) = current.bindings.get(name) {
                 return Some(id);
             }
-            match current.parent {
-                Some(parent_id) => current = arena.get(parent_id),
-                None => return None,
+            {
+                let parent_id = current.parent?;
+                current = arena.get(parent_id)
             }
         }
     }

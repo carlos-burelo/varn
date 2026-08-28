@@ -48,7 +48,7 @@ impl<'r> Checker<'r> {
         // has to re-derive it from a different engine. See `checker::refine`.
         let refined = self.refine(expr, bind);
         debug_assert!(
-            refined.as_ref().map_or(true, |r| !r.is_dynamic()),
+            refined.as_ref().is_none_or(|r| !r.is_dynamic()),
             "a refinement must tell codegen MORE than the checked type, and              `dynamic` is the absence of information"
         );
 
@@ -622,7 +622,7 @@ impl<'r> Checker<'r> {
             | ExprKind::CharLiteral { .. }
             | ExprKind::BoolLiteral { .. }
             | ExprKind::RegexLiteral { .. }
-            | ExprKind::NullLiteral { .. }
+            | ExprKind::NullLiteral
             | ExprKind::Super
             | ExprKind::This => {}
         }

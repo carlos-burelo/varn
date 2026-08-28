@@ -1,3 +1,5 @@
+#![allow(unused_crate_dependencies)]
+
 use varn_lsp::backend::sync::edits::apply_change;
 use varn_lsp::document::position::byte_offset;
 use tower_lsp::lsp_types::{Position, Range, TextDocumentContentChangeEvent};
