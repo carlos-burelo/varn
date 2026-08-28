@@ -14,6 +14,27 @@ use varn_core::ast::{ArrowBody, Expr, ExprKind, MatchBody, MatchPattern, Templat
 use varn_core::{Diagnostic, ErrorCode, IntrinsicType, Suggestion, TypeKind, TypeTag};
 
 impl<'r> Checker<'r> {
+
+    /// Emit the literal-overflow diagnostic for `expr`.
+    ///
+    /// Callers gate on the operands NOT overflowing themselves, so a nested
+    /// overflow is named once at its innermost expression instead of again at
+    /// every enclosing one.
+    fn report_int_overflow(&mut self, expr: &Expr) {
+        self.diagnostics.push(
+            Diagnostic::error(
+                ErrorCode::IntegerOverflow,
+                format!(
+                    "this expression overflows int ({}..={})",
+                    varn_core::INT_MIN,
+                    varn_core::INT_MAX
+                ),
+            )
+            .with_file(self.source_file.clone())
+            .with_range(expr.range),
+        );
+    }
+
     pub(crate) fn check_expr(&mut self, expr: &Expr, bind: &BindResult) {
         self.check_expr_no_record(expr, bind);
         let start = expr.range.start.offset;
@@ -221,10 +242,28 @@ impl<'r> Checker<'r> {
                     yields.push(ty);
                 }
             }
-            ExprKind::Unary { operand, .. } => self.check_expr(operand, bind),
+            ExprKind::Unary { operand, .. } => {
+                self.check_expr(operand, bind);
+                if overflows_int_literal(expr) && !overflows_int_literal(operand) {
+                    self.report_int_overflow(expr);
+                }
+            }
             ExprKind::Binary { left, right, op } => {
                 self.check_expr(left, bind);
                 self.check_expr(right, bind);
+
+                // An all-literal arithmetic expression whose value leaves the
+                // i48 range is reported HERE, where the span is, rather than
+                // waiting for the run-time raise. Reported only when neither
+                // operand already overflows on its own, so a nested overflow
+                // names its innermost expression once.
+                if overflows_int_literal(expr)
+                    && !overflows_int_literal(left)
+                    && !overflows_int_literal(right)
+                {
+                    self.report_int_overflow(expr);
+                }
+
                 let l_ty = self.infer_type(left, bind);
                 let r_ty = self.infer_type(right, bind);
 
@@ -645,4 +684,91 @@ fn closest_name(
     }
     let all_rc: Vec<Rc<str>> = all.into_iter().map(Rc::from).collect();
     closest_in_list(name, &all_rc).map(|s| s.to_owned())
+}
+
+/// What an expression is, for the literal-overflow diagnostic.
+///
+/// Three states, not two: an expression this cannot evaluate and one whose
+/// value does not fit are DIFFERENT answers, and collapsing them into `None`
+/// is how `2 ** 46` — which fits comfortably — got reported as overflow.
+#[derive(PartialEq)]
+enum ConstInt {
+    /// An integer-literal expression with this value.
+    Value(i64),
+    /// An integer-literal expression whose value leaves the i48 range.
+    Overflow,
+    /// Not an integer-literal expression at all (an identifier, a call, a
+    /// float, an operator this does not evaluate).
+    NotConst,
+}
+
+/// Evaluate an integer-literal expression.
+///
+/// Deliberately narrow: literals, unary `+`/`-`, and the arithmetic operators,
+/// all evaluated with the same `varn_core` checks the interpreter uses. It does
+/// NOT follow `const` bindings or fold across statements — that is constant
+/// propagation, which the SSA pipeline already owns. The point is to catch the
+/// expression a person can read and see is out of range, where they wrote it.
+fn const_int_expr(e: &Expr) -> ConstInt {
+    use ConstInt::*;
+    let lift = |o: Option<i64>| o.map_or(Overflow, Value);
+    match &e.kind {
+        // A literal outside i48 is typed `float`, not an overflowing `int`
+        // (`typeof 200000000000000` is "float"), so it is not this
+        // diagnostic's business.
+        ExprKind::IntLiteral { value, .. } => match varn_core::checked_i48(*value) {
+            Some(v) => Value(v),
+            None => NotConst,
+        },
+        ExprKind::Unary { op, operand, .. } => {
+            use varn_core::ast::operators::UnaryOp;
+            let v = match const_int_expr(operand) {
+                Value(v) => v,
+                other => return other,
+            };
+            match op {
+                UnaryOp::Minus => lift(varn_core::neg_i48(v)),
+                UnaryOp::Plus => Value(v),
+                _ => NotConst,
+            }
+        }
+        // Parentheses are a node, not just syntax; without this `(1 << 47)`
+        // and `-(-x)` read as NotConst.
+        ExprKind::Paren { expression } => const_int_expr(expression),
+        ExprKind::Binary { left, right, op } => {
+            let a = match const_int_expr(left) {
+                Value(v) => v,
+                other => return other,
+            };
+            let b = match const_int_expr(right) {
+                Value(v) => v,
+                other => return other,
+            };
+            match op {
+                BinaryOp::Add => lift(varn_core::add_i48(a, b)),
+                BinaryOp::Sub => lift(varn_core::sub_i48(a, b)),
+                BinaryOp::Mul => lift(varn_core::mul_i48(a, b)),
+                // A negative exponent raises at run time rather than
+                // overflowing, and one past u32 cannot be a literal `int`
+                // anyway; neither is this diagnostic's business.
+                BinaryOp::Pow => match u32::try_from(b) {
+                    Ok(e) => lift(varn_core::pow_i48(a, e)),
+                    Err(_) => NotConst,
+                },
+                _ => NotConst,
+            }
+        }
+        _ => NotConst,
+    }
+}
+
+/// Whether `e` is an integer-literal expression that does not fit `int`.
+///
+/// KNOWN GAP: a literal `-(-2^47)` is not reported here even though it does
+/// overflow — the shape the parser produces for a doubly-negated literal does
+/// not reach this evaluator. It is caught at run time instead (see
+/// `tests/errors/int-overflow-negate.vn`), which is the arm that matters for
+/// safety; this diagnostic is an earlier warning, not the guarantee.
+fn overflows_int_literal(e: &Expr) -> bool {
+    const_int_expr(e) == ConstInt::Overflow
 }

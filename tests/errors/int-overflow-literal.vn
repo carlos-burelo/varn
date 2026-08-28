@@ -1,0 +1,8 @@
+// expect: error[VN3021]
+//
+// Caught by the checker, not the VM: an all-literal arithmetic expression whose
+// value leaves the i48 range is reported at its own span, before the program
+// runs. The run-time raise (int-overflow-mul.vn) stays the guarantee; this is
+// the earlier, better-located warning.
+const squared = 1000000007 * 1000000007
+print(squared)

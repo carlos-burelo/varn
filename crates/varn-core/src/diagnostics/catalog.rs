@@ -51,6 +51,7 @@ pub enum ErrorCode {
     RecordShapeMismatch = 3018,
     InvalidConstAssertion = 3019,
     InfiniteTypeExpansion = 3020,
+    IntegerOverflow = 3021,
 
     TypeArgInferenceFailed = 3201,
     ConstraintViolation = 3202,
@@ -238,6 +239,7 @@ impl ErrorCode {
             ErrorCode::UnsupportedPattern => "unsupported-pattern",
             ErrorCode::UnsupportedTypeNode => "unsupported-type-node",
             ErrorCode::CompilationInternalError => "compilation-internal-error",
+            ErrorCode::IntegerOverflow => "integer-overflow",
             ErrorCode::BytecodeOverflow => "bytecode-overflow",
             ErrorCode::ConstantPoolOverflow => "constant-pool-overflow",
         }
