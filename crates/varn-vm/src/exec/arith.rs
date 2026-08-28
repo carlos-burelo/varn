@@ -1,7 +1,50 @@
 use crate::error::{RuntimeError, VmResult};
-use crate::heap::Heap;
+use crate::heap::{Heap, HeapObj};
 use crate::value::VmValue;
-use varn_types::Value;
+use rust_decimal::Decimal;
+
+/// The `decimal` payload of `v`, or `None`.
+///
+/// A decimal lives ONLY as a `HeapObj::Decimal`, so the heap tag test alone
+/// rejects every int, float, bool, null and inline (SSO) string without ever
+/// touching the heap.
+///
+/// This replaces a pair of `Heap::extract_val` calls that every non-int
+/// arithmetic path used to make just to ask "is either side a decimal?".
+/// `extract_val` builds a full `varn_types::Value` — a 24-variant enum — and
+/// for `HeapObj::Array` it DEEP-COPIES the whole array into a fresh
+/// `Vec<Value>` (see `heap::intern::extract_val`). Every `float - float` was
+/// paying two enum constructions, and every `array + x` a full array copy, to
+/// answer a question a single tag test answers.
+#[inline(always)]
+fn decimal_of(v: VmValue, heap: &Heap) -> Option<Decimal> {
+    if !v.is_heap() {
+        return None;
+    }
+    match heap.get(v.as_heap_idx()) {
+        Some(HeapObj::Decimal(d)) => Some(**d),
+        _ => None,
+    }
+}
+
+/// Both operands as decimals, when this is a decimal operation at all.
+///
+/// `int` absorbs into `decimal` and a `decimal`/`float` mix is a checker error
+/// that never reaches the VM — see `varn_core::numeric::binary_operand_kind`,
+/// the single source of truth these arms mirror.
+///
+/// Cold and outlined: callers reach it only after the int/int fast path has
+/// missed AND at least one side is a heap value, so the hot numeric paths do
+/// not carry its code.
+#[cold]
+fn decimal_pair(a: VmValue, b: VmValue, heap: &Heap) -> Option<(Decimal, Decimal)> {
+    match (decimal_of(a, heap), decimal_of(b, heap)) {
+        (Some(x), Some(y)) => Some((x, y)),
+        (Some(x), None) if heap.is_int(b) => Some((x, Decimal::from(heap.as_int(b)))),
+        (None, Some(y)) if heap.is_int(a) => Some((Decimal::from(heap.as_int(a)), y)),
+        _ => None,
+    }
+}
 
 #[inline(always)]
 pub(crate) fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
@@ -20,35 +63,14 @@ pub(crate) fn add(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
         return crate::exec::strings::str_concat(a, b, heap);
     }
     if a.is_heap() || b.is_heap() {
-        let a_is_str = a.is_heap()
-            && matches!(
-                heap.get(a.as_heap_idx()),
-                Some(crate::heap::HeapObj::Str(_))
-            );
-        let b_is_str = b.is_heap()
-            && matches!(
-                heap.get(b.as_heap_idx()),
-                Some(crate::heap::HeapObj::Str(_))
-            );
+        let a_is_str = a.is_heap() && matches!(heap.get(a.as_heap_idx()), Some(HeapObj::Str(_)));
+        let b_is_str = b.is_heap() && matches!(heap.get(b.as_heap_idx()), Some(HeapObj::Str(_)));
         if a_is_str || b_is_str {
             return crate::exec::strings::str_concat(a, b, heap);
         }
 
-        let av = heap.extract_val(a);
-        let bv = heap.extract_val(b);
-        match (&av, &bv) {
-            (Ok(Value::Decimal(da)), Ok(Value::Decimal(db))) => {
-                return heap.alloc_decimal(**da + **db)
-            }
-            (Ok(Value::Decimal(da)), _) if heap.is_int(b) => {
-                let bi = rust_decimal::Decimal::from(heap.as_int(b));
-                return heap.alloc_decimal(**da + bi);
-            }
-            (_, Ok(Value::Decimal(db))) if heap.is_int(a) => {
-                let ai = rust_decimal::Decimal::from(heap.as_int(a));
-                return heap.alloc_decimal(ai + **db);
-            }
-            _ => {}
+        if let Some((x, y)) = decimal_pair(a, b, heap) {
+            return heap.alloc_decimal(x + y);
         }
     }
     VmValue::from_f64(heap.to_f64_val(a) + heap.to_f64_val(b))
@@ -60,19 +82,10 @@ pub(crate) fn sub(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
         let r = heap.as_int(a).wrapping_sub(heap.as_int(b));
         return heap.make_int(r);
     }
-    let av = heap.extract_val(a);
-    let bv = heap.extract_val(b);
-    match (&av, &bv) {
-        (Ok(Value::Decimal(da)), Ok(Value::Decimal(db))) => return heap.alloc_decimal(**da - **db),
-        (Ok(Value::Decimal(da)), _) if heap.is_int(b) => {
-            let bi = rust_decimal::Decimal::from(heap.as_int(b));
-            return heap.alloc_decimal(**da - bi);
+    if a.is_heap() || b.is_heap() {
+        if let Some((x, y)) = decimal_pair(a, b, heap) {
+            return heap.alloc_decimal(x - y);
         }
-        (_, Ok(Value::Decimal(db))) if heap.is_int(a) => {
-            let ai = rust_decimal::Decimal::from(heap.as_int(a));
-            return heap.alloc_decimal(ai - **db);
-        }
-        _ => {}
     }
     VmValue::from_f64(heap.to_f64_val(a) - heap.to_f64_val(b))
 }
@@ -83,50 +96,25 @@ pub(crate) fn mul(a: VmValue, b: VmValue, heap: &mut Heap) -> VmValue {
         let r = heap.as_int(a).wrapping_mul(heap.as_int(b));
         return heap.make_int(r);
     }
-    let av = heap.extract_val(a);
-    let bv = heap.extract_val(b);
-    match (&av, &bv) {
-        (Ok(Value::Decimal(da)), Ok(Value::Decimal(db))) => return heap.alloc_decimal(**da * **db),
-        (Ok(Value::Decimal(da)), _) if heap.is_int(b) => {
-            let bi = rust_decimal::Decimal::from(heap.as_int(b));
-            return heap.alloc_decimal(**da * bi);
+    if a.is_heap() || b.is_heap() {
+        if let Some((x, y)) = decimal_pair(a, b, heap) {
+            return heap.alloc_decimal(x * y);
         }
-        (_, Ok(Value::Decimal(db))) if heap.is_int(a) => {
-            let ai = rust_decimal::Decimal::from(heap.as_int(a));
-            return heap.alloc_decimal(ai * **db);
-        }
-        _ => {}
     }
     VmValue::from_f64(heap.to_f64_val(a) * heap.to_f64_val(b))
 }
 
 #[inline(always)]
 pub(crate) fn div(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
-    {
-        let av = heap.extract_val(a);
-        let bv = heap.extract_val(b);
-        match (&av, &bv) {
-            (Ok(Value::Decimal(da)), Ok(Value::Decimal(db))) => {
-                if **db == 0.into() {
-                    return Err(RuntimeError::new("division by zero"));
-                }
-                return Ok(heap.alloc_decimal(**da / **db));
+    // `int / int` is float division by contract (varn_core::numeric), so there
+    // is deliberately no integer fast path returning an int here — only the
+    // decimal detour to skip.
+    if a.is_heap() || b.is_heap() {
+        if let Some((x, y)) = decimal_pair(a, b, heap) {
+            if y.is_zero() {
+                return Err(RuntimeError::new("division by zero"));
             }
-            (Ok(Value::Decimal(da)), _) if heap.is_int(b) => {
-                let di = rust_decimal::Decimal::from(heap.as_int(b));
-                if di == 0.into() {
-                    return Err(RuntimeError::new("division by zero"));
-                }
-                return Ok(heap.alloc_decimal(**da / di));
-            }
-            (_, Ok(Value::Decimal(db))) if heap.is_int(a) => {
-                if **db == 0.into() {
-                    return Err(RuntimeError::new("division by zero"));
-                }
-                let ai = rust_decimal::Decimal::from(heap.as_int(a));
-                return Ok(heap.alloc_decimal(ai / **db));
-            }
-            _ => {}
+            return Ok(heap.alloc_decimal(x / y));
         }
     }
     let bv = heap.to_f64_val(b);
@@ -138,28 +126,6 @@ pub(crate) fn div(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> 
 
 #[inline(always)]
 pub(crate) fn modulo(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValue> {
-    {
-        let av = heap.extract_val(a);
-        let bv = heap.extract_val(b);
-        match (&av, &bv) {
-            (Ok(Value::Decimal(da)), Ok(Value::Decimal(db))) => {
-                return Ok(heap.alloc_decimal(**da % **db))
-            }
-            (Ok(Value::Decimal(da)), _) if heap.is_int(b) => {
-                let bi = rust_decimal::Decimal::from(heap.as_int(b));
-                return Ok(heap.alloc_decimal(**da % bi));
-            }
-            (_, Ok(Value::Decimal(db))) if heap.is_int(a) => {
-                let ai = rust_decimal::Decimal::from(heap.as_int(a));
-                return Ok(heap.alloc_decimal(ai % **db));
-            }
-            _ => {}
-        }
-    }
-    let bv = heap.to_f64_val(b);
-    if bv == 0.0 {
-        return Err(RuntimeError::new("modulo by zero"));
-    }
     if heap.is_int(a) && heap.is_int(b) {
         let bi = heap.as_int(b);
         if bi == 0 {
@@ -167,6 +133,21 @@ pub(crate) fn modulo(a: VmValue, b: VmValue, heap: &mut Heap) -> VmResult<VmValu
         }
         let r = heap.as_int(a) % bi;
         return Ok(heap.make_int(r));
+    }
+    if a.is_heap() || b.is_heap() {
+        if let Some((x, y)) = decimal_pair(a, b, heap) {
+            // The zero guard the decimal arms used to lack, while `div`'s had
+            // it. `Decimal % 0` panics inside rust_decimal, so the omission
+            // turned a Varn-level error into a process abort.
+            if y.is_zero() {
+                return Err(RuntimeError::new("modulo by zero"));
+            }
+            return Ok(heap.alloc_decimal(x % y));
+        }
+    }
+    let bv = heap.to_f64_val(b);
+    if bv == 0.0 {
+        return Err(RuntimeError::new("modulo by zero"));
     }
     Ok(VmValue::from_f64(heap.to_f64_val(a) % bv))
 }
@@ -196,8 +177,8 @@ pub(crate) fn negate(a: VmValue, heap: &mut Heap) -> VmValue {
     if a.is_f64() {
         return VmValue::from_f64(-a.as_f64());
     }
-    if let Ok(Value::Decimal(d)) = heap.extract_val(a) {
-        return heap.alloc_decimal(-*d);
+    if let Some(d) = decimal_of(a, &*heap) {
+        return heap.alloc_decimal(-d);
     }
     VmValue::from_f64(-heap.to_f64_val(a))
 }
