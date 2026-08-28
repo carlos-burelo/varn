@@ -97,6 +97,7 @@ import "./97-stdlib-task-combinators.vn"
 import "./98-stdlib-test-framework.vn"
 import "./99-stdlib-net-urlsearchparams.vn"
 import "./100-stdlib-http-enrichments.vn"
+import "./101-self-recursion-return-kind.vn"
 
 print("\n99 side-effect modules executed in suite")
 assertSummary()

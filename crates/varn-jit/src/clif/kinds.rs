@@ -67,6 +67,7 @@ pub(crate) fn apply_kinds(
     op: OpCode,
     constants: &[VmValue],
     meta: &[varn_types::register_meta::RegisterMeta],
+    return_kind: SlotKind,
 ) {
     let dest = match decode(code, ip, pool).and_then(|i| i.def) {
         Some(d) if (d as usize) < state.len() => d as usize,
@@ -104,8 +105,33 @@ pub(crate) fn apply_kinds(
         | OpCode::LoadIntMinusOne
         | OpCode::LoadInt => state[dest] = if meta_float(dest) { K::Float } else { K::Int },
         OpCode::LoadTrue | OpCode::LoadFalse => state[dest] = K::Bool,
-        // A self-call routes only on an int contract.
-        OpCode::CallSelf => state[dest] = K::Int,
+        // A self-call returns in THIS function's own return convention, so its
+        // result kind is `return_kind`, never a constant.
+        //
+        // `emit_return_value` produces a raw, unboxed i48 for a `SlotKind::Int`
+        // return and BOXED VmValue bits for every other kind. This arm used to
+        // say `K::Int` unconditionally — correct only for the int contract, and
+        // silently wrong for the rest: `box_or_pass` then ran `box_int` over
+        // boxed bits, replacing the value's tag with the int tag while keeping
+        // its low 48 bits. For a heap value those low bits are the heap INDEX,
+        // so a recursive function returning `str` handed its caller the slot
+        // number as an integer:
+        //
+        //     function repeatStr(s: str, n: int): str {
+        //         if (n <= 0) { return "" }
+        //         return s + repeatStr(s, n - 1)   // "ab" + 52
+        //     }
+        //
+        // The mirror of `op_dispatch`'s `CallSelf` arm, which unboxes the
+        // result to an `f64` whenever the destination's meta is float and
+        // otherwise defines the variable with the returned bits verbatim.
+        OpCode::CallSelf => {
+            state[dest] = if !meta_float(dest) && return_kind == SlotKind::Int {
+                K::Int
+            } else {
+                boxed(dest)
+            }
+        }
         // A call result is ALWAYS boxed bits, even into an `int`-typed slot:
         // the register meta types the slot, not the value, and stdlib code
         // relies on the VM coercing a whole float (`int_div`) at the int sink
@@ -284,6 +310,7 @@ pub(crate) fn kind_flow(
     param_kinds: &[SlotKind],
     meta: &[varn_types::register_meta::RegisterMeta],
     has_this: bool,
+    return_kind: SlotKind,
 ) -> Result<HashMap<usize, Vec<K>>, String> {
     let mut entry0 = vec![K::Unset; nregs];
     // A method/constructor receives its `this` receiver (a heap object) in
@@ -346,7 +373,7 @@ pub(crate) fn kind_flow(
                 }
                 OpCode::Return => break,
                 _ => {
-                    apply_kinds(&mut state, code, pool, ip, op, constants, meta);
+                    apply_kinds(&mut state, code, pool, ip, op, constants, meta, return_kind);
                 }
             }
             ip += info.len;

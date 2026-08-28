@@ -1,0 +1,81 @@
+// A self-recursive call returns in ITS OWN function's return convention.
+//
+// `emit_return_value` hands back a raw, unboxed i48 for a `SlotKind::Int`
+// return and boxed VmValue bits for every other kind. The CLIF kind lattice
+// used to type every `CallSelf` result as `K::Int` regardless, so a recursive
+// function returning anything else had `box_int` applied to already-boxed
+// bits: the tag was replaced with the int tag and the low 48 bits — for a heap
+// value, the heap INDEX — survived as the payload. The caller then saw the
+// slot number as an integer.
+//
+// It never showed up in `vn run`, which makes one pass and rarely crosses the
+// tiering threshold; `vn bench` iterates enough to compile and failed on
+// `95-stdlib-markdown.vn`, whose `renderAst` is self-recursive and returns
+// `str`. That is what these assertions pin: every non-`int` return kind, each
+// exercised past the JIT threshold, and each identical to the interpreter.
+
+function repeatStr(s: str, n: int): str {
+    if (n <= 0) { return "" }
+    return s + repeatStr(s, n - 1)
+}
+
+function countDown(n: int): int {
+    if (n <= 0) { return 0 }
+    return n + countDown(n - 1)
+}
+
+function halve(x: float, n: int): float {
+    if (n <= 0) { return x }
+    return halve(x / 2.0, n - 1)
+}
+
+function isEvenDepth(n: int): bool {
+    if (n <= 0) { return true }
+    return !isEvenDepth(n - 1)
+}
+
+function collect(n: int): int[] {
+    if (n <= 0) { return [] }
+    const rest = collect(n - 1)
+    rest.push(n)
+    return rest
+}
+
+// Nullable return: `SlotKind::Dynamic`, the kind `renderAst` actually had.
+function findDeep(n: int): str? {
+    if (n <= 0) { return null }
+    if (n === 1) { return "bottom" }
+    return findDeep(n - 1)
+}
+
+// Each loop must run past the tiering threshold so the compiled body, not the
+// interpreted one, produces the values being compared.
+let i = 0
+let badStr = 0
+let badInt = 0
+let badFloat = 0
+let badBool = 0
+let badArr = 0
+let badNull = 0
+while (i < 300) {
+    if (repeatStr("ab", 3) !== "ababab") { badStr = badStr + 1 }
+    if (countDown(10) !== 55) { badInt = badInt + 1 }
+    if (halve(8.0, 3) !== 1.0) { badFloat = badFloat + 1 }
+    if (isEvenDepth(4) !== true) { badBool = badBool + 1 }
+    if (collect(3).length !== 3) { badArr = badArr + 1 }
+    if (findDeep(5) !== "bottom") { badNull = badNull + 1 }
+    i = i + 1
+}
+
+assert("self-recursion returning str stays a str", badStr === 0)
+assert("self-recursion returning int stays an int", badInt === 0)
+assert("self-recursion returning float stays a float", badFloat === 0)
+assert("self-recursion returning bool stays a bool", badBool === 0)
+assert("self-recursion returning an array stays an array", badArr === 0)
+assert("self-recursion returning a nullable stays a str", badNull === 0)
+
+// The exact shape that failed: the recursive result feeding a string concat,
+// which is where `box_or_pass` turned the heap index into a number.
+assert("recursive result concatenates as a string", ("x" + repeatStr("y", 2)) === "xyy")
+
+print("[PASSED] 101. self-recursive calls return in their own return convention")

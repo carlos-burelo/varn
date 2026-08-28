@@ -243,6 +243,7 @@ pub(super) fn lower_raw(
         &proto.param_kinds,
         &proto.register_meta,
         proto.has_this,
+        proto.return_kind,
     )?;
 
     super::debug::capture_kinds(&mut debug, &entries, nregs);
@@ -463,6 +464,7 @@ pub(super) fn lower_raw(
             op,
             constants,
             &proto.register_meta,
+            proto.return_kind,
         );
 
         ip = next_ip;
