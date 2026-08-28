@@ -1,13 +1,26 @@
 <#
 .SYNOPSIS
-  Paired benchmark table: Varn against Bun, Node and Python.
+  Paired benchmark comparison: Varn against Bun, Node and Python, split by phase.
 
 .DESCRIPTION
-  Runs every benchmark on every available runtime back to back and prints one
-  formatted comparison table showing process wall-clock time and internal loop timing.
+  Process wall-clock time is two things added together — the time a runtime
+  needs to exist at all, and the time it spends on the program. Reporting only
+  the sum lets one hide behind the other, and for short benchmarks the sum is
+  mostly startup.
+
+  Varn starts in roughly half the time Bun does, so that difference is added to
+  every row. A benchmark can show Varn "winning" on total while the rival does
+  the actual work several times faster.
+
+  So each runtime is calibrated once on an empty program, and every result is
+  reported as `startup + work`. The verdict column compares WORK, because that
+  is what a language change can move; startup is reported next to it because it
+  is a real advantage, just a different one.
 
 .PARAMETER Runs
-  Timed runs for `vn` (default 5).
+  Timed runs per benchmark, per runtime (default 5). The minimum is kept:
+  wall-clock noise is one-sided, so the fastest run is the closest to the
+  machine's actual capability.
 
 .PARAMETER Only
   Run just the named benchmarks, e.g. -Only fib,matrix,dto.
@@ -15,18 +28,23 @@
 .PARAMETER SkipPython
   Skip Python benchmark execution.
 
+.PARAMETER Compact
+  Print the one-line-per-benchmark table instead of the bar chart.
+
 .PARAMETER Markdown
   Emit a Markdown table for docs/reports.
 
 .EXAMPLE
   .\benchmarks\compare.ps1
-  .\benchmarks\compare.ps1 -SkipPython -Markdown
+  .\benchmarks\compare.ps1 -Only fib,matrix
+  .\benchmarks\compare.ps1 -SkipPython -Compact
 #>
 [CmdletBinding()]
 param(
     [int]$Runs = 5,
     [string[]]$Only,
     [switch]$SkipPython,
+    [switch]$Compact,
     [switch]$Markdown
 )
 
@@ -39,7 +57,6 @@ if (-not (Test-Path $vn)) {
     throw "vn.exe not found at $vn -- run: cargo build --release --bin vn"
 }
 
-# Master list of benchmarks
 $AllBenchmarks = @(
     @{ Name = 'fib';                 Vn = 'bench_fib.vn';                 TS = 'bench_fib.ts';                 Py = 'py/fib.py' }
     @{ Name = 'gc_alloc';            Vn = 'bench_gc_alloc.vn';            TS = 'bench_gc_alloc.ts';            Py = 'py/gc_alloc.py' }
@@ -56,155 +73,209 @@ $AllBenchmarks = @(
 )
 
 if ($Only) {
-    $AllBenchmarks = $AllBenchmarks | Where-Object { $Only -contains $_.Name }
+    # `pwsh -File script.ps1 -Only fib,matrix` hands the whole thing over as a
+    # single string, while `-Command` and dot-sourcing bind a real array. Split
+    # on commas so both invocations behave the same.
+    $Only = @($Only | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    $AllBenchmarks = @($AllBenchmarks | Where-Object { $Only -contains $_.Name })
+    if (-not $AllBenchmarks) { throw "no benchmark matched: $($Only -join ', ')" }
 }
 
-# Discover runtimes
 $runtimes = @('varn')
 if (Get-Command 'bun' -ErrorAction SilentlyContinue) { $runtimes += 'bun' }
 if (Get-Command 'node' -ErrorAction SilentlyContinue) { $runtimes += 'node' }
 if (-not $SkipPython -and (Get-Command 'python' -ErrorAction SilentlyContinue)) { $runtimes += 'python' }
 
-function Measure-RuntimeProcess([string]$exe, [string[]]$cmdArgs) {
+# How each runtime is invoked, and what an empty program looks like for it.
+# The startup probe MUST go through the same pipeline as the benchmarks — same
+# extension, same launcher — or it measures a path the benchmarks never take.
+$Invoke = @{
+    varn   = { param($f) & $vn 'run' $f }
+    bun    = { param($f) & 'bun' 'run' $f }
+    node   = { param($f) & 'node' $f }
+    python = { param($f) & 'python' $f }
+}
+$EmptyProgram = @{
+    varn   = @{ Ext = '.vn'; Body = 'print(1)' }
+    bun    = @{ Ext = '.ts'; Body = 'console.log(1)' }
+    node   = @{ Ext = '.ts'; Body = 'console.log(1)' }
+    python = @{ Ext = '.py'; Body = 'print(1)' }
+}
+
+function Measure-Min([string]$rt, [string]$file) {
     $minMs = [double]::MaxValue
-    $lastOutput = ""
     for ($i = 0; $i -lt $Runs; $i++) {
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
-        $out = & $exe $cmdArgs
+        & $Invoke[$rt] $file | Out-Null
         $sw.Stop()
-        $ms = $sw.Elapsed.TotalMilliseconds
-        if ($ms -lt $minMs) {
-            $minMs = $ms
-        }
-        $lastOutput = ($out -join ' ')
+        if ($sw.Elapsed.TotalMilliseconds -lt $minMs) { $minMs = $sw.Elapsed.TotalMilliseconds }
     }
-    return [pscustomobject]@{
-        MinMs = [Math]::Round($minMs, 1)
-        Output = $lastOutput
-    }
+    return [Math]::Round($minMs, 1)
 }
+
+# ---------------------------------------------------------------- calibration
 
 Write-Host ""
 Write-Host "  Runtimes: $($runtimes -join ', ')  |  Runs per bench: $Runs" -ForegroundColor Cyan
-Write-Host "  Measuring real process wall-clock time (Min of $Runs runs)." -ForegroundColor DarkGray
-Write-Host ""
+Write-Host "  Calibrating startup on an empty program ..." -ForegroundColor DarkGray
 
-$results = @()
-
-foreach ($b in $AllBenchmarks) {
-    $name = $b.Name
-    Write-Host "  Running $name ..." -NoNewline
-
-    $row = [ordered]@{ Benchmark = $name }
-
+$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("varn-bench-" + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+$startup = @{}
+try {
     foreach ($rt in $runtimes) {
-        $ms = $null
-        switch ($rt) {
-            'varn' {
-                $file = Join-Path $benchDir $b.Vn
-                if (Test-Path $file) {
-                    $res = Measure-RuntimeProcess $vn @('run', $file)
-                    $ms = $res.MinMs
-                }
-            }
-            'bun' {
-                if ($b.TS) {
-                    $file = Join-Path $benchDir $b.TS
-                    if (Test-Path $file) {
-                        $res = Measure-RuntimeProcess 'bun' @('run', $file)
-                        $ms = $res.MinMs
-                    }
-                }
-            }
-            'node' {
-                if ($b.TS) {
-                    $file = Join-Path $benchDir $b.TS
-                    if (Test-Path $file) {
-                        $res = Measure-RuntimeProcess 'node' @($file)
-                        $ms = $res.MinMs
-                    }
-                }
-            }
-            'python' {
-                if ($b.Py) {
-                    $file = Join-Path $benchDir $b.Py
-                    if (Test-Path $file) {
-                        $res = Measure-RuntimeProcess 'python' @($file)
-                        $ms = $res.MinMs
-                    }
-                }
-            }
-        }
-        $row[$rt] = $ms
+        $spec = $EmptyProgram[$rt]
+        $probe = Join-Path $tmp ("startup" + $spec.Ext)
+        Set-Content -Path $probe -Value $spec.Body -Encoding utf8
+        $startup[$rt] = Measure-Min $rt $probe
     }
-
-    # Compare Varn vs fastest rival
-    $vnVal = $row['varn']
-    $rivals = @()
-    foreach ($rt in $runtimes) {
-        if ($rt -ne 'varn' -and $null -ne $row[$rt]) {
-            $rivals += $row[$rt]
-        }
-    }
-    if ($vnVal -and $rivals.Count -gt 0) {
-        $fastestRival = ($rivals | Measure-Object -Minimum).Minimum
-        $ratio = [Math]::Round(($fastestRival / $vnVal), 2)
-        $row['Ratio'] = $ratio
-    } else {
-        $row['Ratio'] = $null
-    }
-
-    $results += [pscustomobject]$row
-    Write-Host "`r  Done: $name           " -ForegroundColor Green
+}
+finally {
+    Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 }
 
+$startupLine = ($runtimes | ForEach-Object { "{0} {1} ms" -f $_, $startup[$_] }) -join '   '
+Write-Host "  startup: $startupLine" -ForegroundColor DarkGray
 Write-Host ""
 
-if ($Markdown) {
-    $cols = $runtimes
-    $headerStr = "| Benchmark | " + ($cols -join " | ") + " | vs Fastest Rival |"
-    $sepStr = "|---| " + (($cols | ForEach-Object { "---" }) -join " | ") + " |---|"
-    Write-Host $headerStr
-    Write-Host $sepStr
-    foreach ($r in $results) {
-        $line = "| $($r.Benchmark) | "
-        foreach ($rt in $runtimes) {
-            $val = if ($null -ne $r.$rt) { "$($r.$rt) ms" } else { "--" }
-            $line += "$val | "
-        }
-        $ratStr = if ($null -ne $r.Ratio) {
-            if ($r.Ratio -ge 1.0) { "$($r.Ratio)x WIN *" } else { "$($r.Ratio)x" }
-        } else { "--" }
-        $line += "$ratStr |"
-        Write-Host $line
-    }
-} else {
-    $w = 12
-    $hdr = "  {0,-16}" -f "Benchmark"
+# ------------------------------------------------------------------- measure
+
+$results = @()
+foreach ($b in $AllBenchmarks) {
+    Write-Host ("`r  Running {0} ...{1}" -f $b.Name, (' ' * 30)) -NoNewline -ForegroundColor DarkGray
+
+    $row = [ordered]@{ Benchmark = $b.Name }
     foreach ($rt in $runtimes) {
-        $hdr += "{0,$w}" -f $rt
+        $rel = switch ($rt) {
+            'varn'   { $b.Vn }
+            'python' { $b.Py }
+            default  { $b.TS }
+        }
+        $total = $null
+        if ($rel) {
+            $file = Join-Path $benchDir $rel
+            if (Test-Path $file) { $total = Measure-Min $rt $file }
+        }
+        $row["${rt}_total"] = $total
+        # Work can measure slightly below zero on a benchmark that finishes in
+        # about the time the runtime needs to start; that is noise, not a
+        # negative duration, so it floors at zero and the row is flagged.
+        $row["${rt}_work"] = if ($null -ne $total) { [Math]::Round([Math]::Max(0.0, $total - $startup[$rt]), 1) } else { $null }
     }
-    $hdr += "{0,18}" -f "vs Fastest Rival"
+
+    $rivalWork = @()
+    foreach ($rt in $runtimes) {
+        if ($rt -ne 'varn' -and $null -ne $row["${rt}_work"]) { $rivalWork += $row["${rt}_work"] }
+    }
+    $vnWork = $row['varn_work']
+    $row['RivalWork'] = if ($rivalWork.Count) { ($rivalWork | Measure-Object -Minimum).Minimum } else { $null }
+    # Ratio on WORK: >1 means Varn does the work faster. Guarded against a zero
+    # denominator, which a sub-startup benchmark can produce.
+    $row['WorkRatio'] = if ($null -ne $vnWork -and $vnWork -gt 0 -and $null -ne $row['RivalWork']) {
+        [Math]::Round($row['RivalWork'] / $vnWork, 2)
+    } else { $null }
+    $row['TotalRatio'] = if ($null -ne $row['varn_total']) {
+        $rt2 = @($runtimes | Where-Object { $_ -ne 'varn' -and $null -ne $row["${_}_total"] } | ForEach-Object { $row["${_}_total"] })
+        if ($rt2.Count) { [Math]::Round((($rt2 | Measure-Object -Minimum).Minimum) / $row['varn_total'], 2) } else { $null }
+    } else { $null }
+
+    $results += [pscustomobject]$row
+}
+# Wipe the progress line: a bare CR leaves the longest previous name behind.
+Write-Host ("`r" + (' ' * 60) + "`r") -NoNewline
+
+# -------------------------------------------------------------------- output
+
+function Get-Bar([double]$startupMs, [double]$workMs, [double]$scale, [int]$width) {
+    if ($scale -le 0) { return '' }
+    $s = [int][Math]::Round(($startupMs / $scale) * $width)
+    $w = [int][Math]::Round(($workMs / $scale) * $width)
+    if ($workMs -gt 0 -and $w -lt 1) { $w = 1 }
+    return @{ Startup = ('░' * $s); Work = ('█' * $w) }
+}
+
+if ($Markdown) {
+    $hdrCells = ($runtimes | ForEach-Object { "$_ work" }) -join " | "
+    $sepCells = ($runtimes | ForEach-Object { "---" }) -join "|"
+    Write-Host "| Benchmark | $hdrCells | Varn vs rival (work) |"
+    Write-Host "|---|$sepCells|---|"
+    foreach ($r in $results) {
+        $cells = ($runtimes | ForEach-Object {
+            if ($null -ne $r."${_}_work") { "$($r."${_}_work") ms" } else { "--" }
+        }) -join " | "
+        $verdict = if ($null -ne $r.WorkRatio) { "$($r.WorkRatio)x" } else { "--" }
+        Write-Host "| $($r.Benchmark) | $cells | $verdict |"
+    }
+}
+elseif ($Compact) {
+    $hdr = "  {0,-20}" -f "Benchmark"
+    foreach ($rt in $runtimes) { $hdr += "{0,14}" -f "$rt work" }
+    $hdr += "{0,14}" -f "work ratio"
     Write-Host $hdr -ForegroundColor Cyan
     Write-Host ("  " + ("-" * ($hdr.Length - 2))) -ForegroundColor DarkGray
-
     foreach ($r in $results) {
-        $line = "  {0,-16}" -f $r.Benchmark
+        $line = "  {0,-20}" -f $r.Benchmark
         foreach ($rt in $runtimes) {
-            $valStr = if ($null -ne $r.$rt) { "$($r.$rt) ms" } else { "--" }
-            $line += "{0,$w}" -f $valStr
+            $line += "{0,14}" -f $(if ($null -ne $r."${rt}_work") { "$($r."${rt}_work") ms" } else { "--" })
         }
-        $ratStr = if ($null -ne $r.Ratio) {
-            if ($r.Ratio -ge 1.0) { "$($r.Ratio)x WIN *" } else { "$($r.Ratio)x" }
-        } else { "--" }
-        $line += "{0,18}" -f $ratStr
-
-        $color = if ($null -ne $r.Ratio -and $r.Ratio -ge 1.0) { 'Green' } else { 'Yellow' }
+        $line += "{0,14}" -f $(if ($null -ne $r.WorkRatio) { "$($r.WorkRatio)x" } else { "--" })
+        $color = if ($null -ne $r.WorkRatio -and $r.WorkRatio -ge 1.0) { 'Green' } else { 'Yellow' }
         Write-Host $line -ForegroundColor $color
     }
 }
+else {
+    $width = 44
+    foreach ($r in $results) {
+        $totals = @($runtimes | Where-Object { $null -ne $r."${_}_total" } | ForEach-Object { $r."${_}_total" })
+        if (-not $totals.Count) { continue }
+        $scale = ($totals | Measure-Object -Maximum).Maximum
+
+        Write-Host ""
+        Write-Host ("  " + $r.Benchmark) -ForegroundColor Cyan
+        foreach ($rt in $runtimes) {
+            $total = $r."${rt}_total"
+            if ($null -eq $total) {
+                Write-Host ("    {0,-7} --" -f $rt) -ForegroundColor DarkGray
+                continue
+            }
+            $work = $r."${rt}_work"
+            $bar = Get-Bar $startup[$rt] $work $scale $width
+            $isVarn = ($rt -eq 'varn')
+            Write-Host ("    {0,-7} " -f $rt) -NoNewline -ForegroundColor $(if ($isVarn) { 'White' } else { 'Gray' })
+            Write-Host $bar.Startup -NoNewline -ForegroundColor DarkGray
+            Write-Host $bar.Work -NoNewline -ForegroundColor $(if ($isVarn) { 'Cyan' } else { 'DarkYellow' })
+            $pad = $width - $bar.Startup.Length - $bar.Work.Length
+            if ($pad -gt 0) { Write-Host (' ' * $pad) -NoNewline }
+            $flag = if ($work -le 0) { ' (below startup)' } else { '' }
+            Write-Host ("  {0,6} + {1,7} = {2,7} ms{3}" -f $startup[$rt], $work, $total, $flag) -ForegroundColor DarkGray
+        }
+
+        if ($null -ne $r.WorkRatio) {
+            $v = $r.WorkRatio
+            if ($v -ge 1.0) {
+                Write-Host ("    -> work: varn {0}x faster than the fastest rival" -f $v) -ForegroundColor Green
+            } else {
+                $inv = if ($v -gt 0) { [Math]::Round(1 / $v, 2) } else { 0 }
+                Write-Host ("    -> work: varn {0}x SLOWER than the fastest rival" -f $inv) -ForegroundColor Red
+            }
+            if ($null -ne $r.TotalRatio) {
+                $tv = $r.TotalRatio
+                # The row worth calling out: total says one thing, work says the
+                # opposite, and the gap between them is startup.
+                if (($tv -ge 1.0) -ne ($v -ge 1.0)) {
+                    Write-Host ("       total says {0}x -- that difference is startup, not execution" -f $tv) -ForegroundColor DarkYellow
+                }
+            }
+        }
+    }
+}
 
 Write-Host ""
-Write-Host "  Values are minimum process wall-clock time over $Runs runs." -ForegroundColor DarkGray
-Write-Host "  Ratio >= 1.0x WIN = Varn is faster than the fastest rival." -ForegroundColor DarkGray
+Write-Host "  Minimum of $Runs runs. Bars are process wall-clock, scaled to the slowest runtime per benchmark." -ForegroundColor DarkGray
+Write-Host "  " -NoNewline
+Write-Host "  startup" -NoNewline -ForegroundColor DarkGray
+Write-Host "   " -NoNewline
+Write-Host "  work" -NoNewline -ForegroundColor Cyan
+Write-Host "   (startup calibrated once per runtime on an empty program)" -ForegroundColor DarkGray
+Write-Host "  Verdict compares WORK. Startup is a real advantage, but a different one." -ForegroundColor DarkGray
 Write-Host ""
