@@ -29,6 +29,14 @@ temp_*.txt
 .superpowers/
 .agents/
 
+# Documentos generados por agente (no son artefactos del proyecto público)
+AGENTS.md
+AUDIT.md
+PLAN.md
+PLAN_ROADMAP.md
+docs/notes/PLAN.md
+docs/superpowers/
+
 # JS tooling
 node_modules/
 
