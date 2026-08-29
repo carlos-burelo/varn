@@ -32,10 +32,14 @@ temp_*.txt
 # Documentos generados por agente (no son artefactos del proyecto público)
 AGENTS.md
 AUDIT.md
+CLAUDE.md
 PLAN.md
 PLAN_ROADMAP.md
 docs/notes/PLAN.md
 docs/superpowers/
+
+# Configuración local de Cargo (perfil de compilación específico del host)
+.cargo/
 
 # JS tooling
 node_modules/
