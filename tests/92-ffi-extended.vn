@@ -1,5 +1,6 @@
 import { describe, test, Expectation } from "std:test";
 import { FFI, DynamicLibrary, Pointer, FfiType } from "std:ffi";
+import { platform } from "std:sys";
 
 function expect<T>(val: T): Expectation<T> {
     return new Expectation<T>(val);
@@ -56,17 +57,16 @@ describe("Extended FFI API", () => {
     });
 
     test("Dynamic library loading, binding and calling native functions", () => {
-        let isWindows = true;
-        let libName = "kernel32.dll";
-        let lib = FFI.open(libName);
+        let os = platform();
+        let libName = os == "windows" ? "kernel32.dll"
+                    : os == "macos"   ? "libSystem.B.dylib"
+                    :                   "libc.so.6";
+        let fnName = os == "windows" ? "GetCurrentProcessId" : "getpid";
 
-        let getPid = lib.bind("GetCurrentProcessId", FfiType.Int, []);
+        let lib = FFI.open(libName);
+        let getPid = lib.bind(fnName, FfiType.Int, []);
         let pid = getPid.call() as int;
         expect(pid > 0).toBe(true);
-
-        let getTicks = lib.bind("GetTickCount64", FfiType.Int, []);
-        let ticks = getTicks.call() as int;
-        expect(ticks > 0).toBe(true);
 
         let closed = lib.close();
         expect(closed).toBe(true);
