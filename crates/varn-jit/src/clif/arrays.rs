@@ -236,6 +236,7 @@ pub(super) fn emit_array_get_index(
     let want = reg_repr(c.register_meta, first_reg);
 
     let slow = b.create_block();
+    b.set_cold_block(slow);
     let merge = b.create_block();
     b.append_block_param(merge, want.ty());
     let cache = c.loops.array(ip, obj_r);
@@ -247,22 +248,37 @@ pub(super) fn emit_array_get_index(
     //   sentinel check → bounds check → raw load
     // No repr branching at all — 2 branches instead of 4.
     let repr_validated = cache.is_some_and(|c| c.repr_validated_disc.is_some());
+    let bounds_guaranteed = cache.is_some_and(|c| c.bounds_guaranteed);
     if repr_validated {
         if let Some(view) = cache.and_then(|c| c.view) {
             let data = b.use_var(view[0]);
             let len = b.use_var(view[1]);
 
-            // Bounds check (unsigned also rejects negative keys and len=0 sentinel).
-            let oob = b.ins().icmp(IntCC::UnsignedGreaterThanOrEqual, key, len);
-            let inb = b.create_block();
-            b.ins().brif(oob, slow, &[], inb, &[]);
-            b.switch_to_block(inb);
+            if bounds_guaranteed {
+                // Bounds guaranteed by preheader — data != 0 already implies
+                // all induction-variable-based indices are within len.
+                // Skip the cmp+jae and go straight to the raw load.
+                // Still need to check data != 0 (sentinel for repr mismatch
+                // OR bounds failure), which is handled by the caller's
+                // existing sentinel check on the view cache.
+                let off = b.ins().ishl_imm(key, 3);
+                let addr = b.ins().iadd(data, off);
+                let v = load_elem_as(b, addr, want, want);
+                b.ins().jump(merge, &[v.into()]);
+            } else {
+                // Bounds check (unsigned also rejects negative keys and len=0 sentinel).
+                let oob = b.ins().icmp(IntCC::UnsignedGreaterThanOrEqual, key, len);
+                let inb = b.create_block();
+                b.set_cold_block(slow);
+                b.ins().brif(oob, slow, &[], inb, &[]);
+                b.switch_to_block(inb);
 
-            // Direct raw load — repr is guaranteed by the preheader.
-            let off = b.ins().ishl_imm(key, 3);
-            let addr = b.ins().iadd(data, off);
-            let v = load_elem_as(b, addr, want, want);
-            b.ins().jump(merge, &[v.into()]);
+                // Direct raw load — repr is guaranteed by the preheader.
+                let off = b.ins().ishl_imm(key, 3);
+                let addr = b.ins().iadd(data, off);
+                let v = load_elem_as(b, addr, want, want);
+                b.ins().jump(merge, &[v.into()]);
+            }
 
             // slow: generic helper (always correct, handles every repr).
             b.switch_to_block(slow);
@@ -460,6 +476,7 @@ pub(super) fn emit_array_set_index(
     };
 
     let slow = b.create_block();
+    b.set_cold_block(slow);
     let merge = b.create_block();
     let cache = c.loops.array(ip, obj_r);
     let payload = cached_payload(

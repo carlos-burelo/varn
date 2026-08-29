@@ -106,9 +106,49 @@ pub(super) fn emit_region_caches(
                     let repr_bad = b.create_block();
                     b.ins().brif(disc_ok, repr_ok, &[], repr_bad, &[]);
 
-                    // disc matches expected: emit with real data.
+                    // disc matches expected — now check bounds hoisting.
                     b.switch_to_block(repr_ok);
-                    b.ins().jump(merge, &[data.into(), len.into(), disc.into()]);
+
+                    // Check if this array has a bounds-hoistable access pattern.
+                    let bh = region.bounds_hoistable.iter().find(|bh| bh.array_reg == r);
+                    if let (Some(bh), Some(bound_reg)) = (bh, region.induction_bound) {
+                        // Emit: max_index < len?
+                        // For base+offset: (base + bound) <= len  (with overflow check)
+                        // For direct:       bound <= len
+                        let bound = b.use_var(vars[bound_reg]);
+                        let bounds_ok = b.create_block();
+                        let bounds_bad = b.create_block();
+
+                        if let Some(base_r) = bh.base_reg {
+                            let base = b.use_var(vars[base_r]);
+                            // Checked add: base + bound. If it overflows, bounds fail.
+                            let (sum, ovf) = b.ins().uadd_overflow(base, bound);
+                            let no_ovf = b.create_block();
+                            b.ins().brif(ovf, bounds_bad, &[], no_ovf, &[]);
+                            b.switch_to_block(no_ovf);
+                            // sum <= len  ⟺  !(sum > len)  ⟺  sum unsigned-le len
+                            let ok = b.ins().icmp(IntCC::UnsignedLessThanOrEqual, sum, len);
+                            b.ins().brif(ok, bounds_ok, &[], bounds_bad, &[]);
+                        } else {
+                            // Direct case: bound <= len
+                            let ok = b.ins().icmp(IntCC::UnsignedLessThanOrEqual, bound, len);
+                            b.ins().brif(ok, bounds_ok, &[], bounds_bad, &[]);
+                        }
+
+                        // Bounds OK: proceed with real data.
+                        // bounds_guaranteed was already set statically in vars.rs
+                        // because the preheader zeros data on failure.
+                        b.switch_to_block(bounds_ok);
+                        b.ins().jump(merge, &[data.into(), len.into(), disc.into()]);
+
+                        // Bounds bad: zero data to trigger slow path.
+                        b.switch_to_block(bounds_bad);
+                        let z_b = b.ins().iconst(types::I64, 0);
+                        b.ins().jump(merge, &[z_b.into(), z_b.into(), disc.into()]);
+                    } else {
+                        // No bounds hoisting for this array — proceed with real data.
+                        b.ins().jump(merge, &[data.into(), len.into(), disc.into()]);
+                    }
 
                     // disc doesn't match: set data=0 and len=0 to trigger slow path.
                     b.switch_to_block(repr_bad);

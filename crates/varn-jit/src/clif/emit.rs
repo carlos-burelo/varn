@@ -342,6 +342,11 @@ pub(crate) struct RegionCache {
     /// (specialization happens on push, migration on mismatched write —
     /// both allocate or call, which the allowlist excludes).
     pub repr_validated_disc: Option<i64>,
+    /// When true, the preheader verified that ALL induction-variable-based
+    /// indices into this array are within bounds (max_index < len).
+    /// The per-iteration bounds check can be skipped entirely — `data != 0`
+    /// already guarantees both repr match AND bounds safety.
+    pub bounds_guaranteed: bool,
 }
 
 /// What a loop region knows about one string receiver, resolved once in the
@@ -373,6 +378,17 @@ pub(crate) struct ObjRegionCache {
     pub data_base: Variable,
 }
 
+/// An array access inside a loop that can have its bounds check hoisted to the
+/// preheader because the index is derived from the loop induction variable.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct BoundsHoistable {
+    /// Register of the array receiver.
+    pub array_reg: usize,
+    /// Register of the loop-invariant base, if the index pattern is `base + k`.
+    /// `None` if the index is directly the induction variable.
+    pub base_reg: Option<usize>,
+}
+
 /// One loop region and everything hoistable out of it.
 ///
 /// A struct rather than the 4-tuple this used to be: the fields are all
@@ -395,6 +411,19 @@ pub(crate) struct Region {
     pub strings: Vec<usize>,
     /// Object receivers of fixed-field accesses that the region never redefines.
     pub objects: Vec<usize>,
+    /// Bytecode offsets of induction variable increments (e.g. AddImm / SubImm)
+    /// proven to operate on bounded loop index variables.
+    pub induction_increments: Vec<usize>,
+    /// Register of the loop induction variable (left operand of the header comparison).
+    #[allow(dead_code)]
+    pub induction_var: Option<usize>,
+    /// Register of the loop bound (right operand of the header comparison).
+    pub induction_bound: Option<usize>,
+    /// Array accesses whose bounds check can be hoisted to the preheader.
+    pub bounds_hoistable: Vec<BoundsHoistable>,
+    /// Bytecode offsets of AddInt operations that compute induction-based
+    /// indices — proven unable to overflow when bounds are guaranteed.
+    pub bounds_safe_arith: Vec<usize>,
 }
 
 impl Region {
@@ -418,6 +447,19 @@ pub(crate) struct LoopCaches<'a> {
 }
 
 impl LoopCaches<'_> {
+    /// Whether an AddImm / SubImm instruction at `ip` is an induction variable increment
+    /// inside a bounded loop region, exempt from hardware overflow checks.
+    pub(super) fn is_induction_increment(&self, ip: usize) -> bool {
+        self.regions.iter().any(|reg| reg.induction_increments.contains(&ip))
+    }
+
+    /// Whether an AddInt at `ip` is an index computation for a bounds-guaranteed
+    /// array access, proven unable to overflow because the preheader validated
+    /// that the maximum index fits within the array length (which fits in i64).
+    pub(super) fn is_bounds_safe_arith(&self, ip: usize) -> bool {
+        self.regions.iter().any(|reg| reg.bounds_safe_arith.contains(&ip))
+    }
+
     /// The array-payload cache `r` should use at `ip`.
     pub(super) fn array(&self, ip: usize, r: usize) -> Option<RegionCache> {
         self.find(ip, r, |reg| &reg.arrays, self.arrays)

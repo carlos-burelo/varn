@@ -25,7 +25,9 @@ pub fn optimize_with(func: &mut SsaFunc, summaries: &CtorSummaries) {
     loop {
         let mut changed = false;
 
-        changed |= tco::run(func);
+        // TCO converts self-tail-calls to jumps to entry_id without setting up phi arguments,
+        // which corrupts function emission. Disabled until proper loop-header lowering is in place.
+        // changed |= tco::run(func);
 
         changed |= const_fold::run(func);
 

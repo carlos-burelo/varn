@@ -123,22 +123,30 @@ pub(crate) fn dispatch_opcode(
             let (r1, r2) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
             let s1 = use_int(b, vars, state, r1)?;
             let s2 = use_int(b, vars, state, r2)?;
-            let (r, overflow, helper) = match op {
-                OpCode::AddInt => {
-                    let (res, ovf) = b.ins().sadd_overflow(s1, s2);
-                    (res, ovf, helpers.add)
-                }
-                OpCode::SubInt => {
-                    let (res, ovf) = b.ins().ssub_overflow(s1, s2);
-                    (res, ovf, helpers.sub)
-                }
-                _ => {
-                    let (res, ovf) = b.ins().smul_overflow(s1, s2);
-                    (res, ovf, helpers.mul)
-                }
-            };
-            let w = guard_overflow(b, cc, exec_ctx, helper, r, overflow, s1, s2);
-            b.def_var(vars[first_reg], w);
+            // Bounds-safe arithmetic: the preheader proved that the result
+            // of this AddInt fits within the array length (< i64::MAX),
+            // so overflow is impossible. Emit a plain iadd.
+            if op == OpCode::AddInt && arr.loops.is_bounds_safe_arith(ip) {
+                let v = b.ins().iadd(s1, s2);
+                b.def_var(vars[first_reg], v);
+            } else {
+                let (r, overflow, helper) = match op {
+                    OpCode::AddInt => {
+                        let (res, ovf) = b.ins().sadd_overflow(s1, s2);
+                        (res, ovf, helpers.add)
+                    }
+                    OpCode::SubInt => {
+                        let (res, ovf) = b.ins().ssub_overflow(s1, s2);
+                        (res, ovf, helpers.sub)
+                    }
+                    _ => {
+                        let (res, ovf) = b.ins().smul_overflow(s1, s2);
+                        (res, ovf, helpers.mul)
+                    }
+                };
+                let w = guard_overflow(b, cc, exec_ctx, helper, r, overflow, s1, s2);
+                b.def_var(vars[first_reg], w);
+            }
         }
         OpCode::Negate => {
             let src = (code[ip + 1] >> 8) as usize;
@@ -219,16 +227,25 @@ pub(crate) fn dispatch_opcode(
             let src = (w1 >> 8) as usize;
             let imm = (w1 & 0xFF) as i8 as i64;
             let s = use_int(b, vars, state, src)?;
-            let imm_v = b.ins().iconst(types::I64, imm);
-            let (r, overflow, helper) = if op == OpCode::AddImm {
-                let (res, ovf) = b.ins().sadd_overflow(s, imm_v);
-                (res, ovf, helpers.add)
+            if arr.loops.is_induction_increment(ip) {
+                let r = if op == OpCode::AddImm {
+                    b.ins().iadd_imm(s, imm)
+                } else {
+                    b.ins().iadd_imm(s, -imm)
+                };
+                b.def_var(vars[first_reg], r);
             } else {
-                let (res, ovf) = b.ins().ssub_overflow(s, imm_v);
-                (res, ovf, helpers.sub)
-            };
-            let w = guard_overflow(b, cc, exec_ctx, helper, r, overflow, s, imm_v);
-            b.def_var(vars[first_reg], w);
+                let imm_v = b.ins().iconst(types::I64, imm);
+                let (r, overflow, helper) = if op == OpCode::AddImm {
+                    let (res, ovf) = b.ins().sadd_overflow(s, imm_v);
+                    (res, ovf, helpers.add)
+                } else {
+                    let (res, ovf) = b.ins().ssub_overflow(s, imm_v);
+                    (res, ovf, helpers.sub)
+                };
+                let w = guard_overflow(b, cc, exec_ctx, helper, r, overflow, s, imm_v);
+                b.def_var(vars[first_reg], w);
+            }
         }
         OpCode::ModInt => {
             let w1 = code[ip + 1];
@@ -345,8 +362,16 @@ pub(crate) fn dispatch_opcode(
             if meta_is_float(&proto.register_meta, dest) {
                 let f = unbox_f64_coerce(b, res);
                 b.def_var(vars[dest], f);
+                state[dest] = K::Float;
+            } else if proto.return_kind == SlotKind::Int {
+                b.def_var(vars[dest], res);
+                state[dest] = K::Int;
+            } else if proto.return_kind == SlotKind::Bool {
+                b.def_var(vars[dest], res);
+                state[dest] = K::Bool;
             } else {
                 b.def_var(vars[dest], res);
+                state[dest] = K::Boxed;
             }
         }
 

@@ -134,12 +134,23 @@ pub(super) fn declare(
             let repr_validated_disc = read_only
                 .then(|| expected_disc_for_receiver(code, pool, register_meta, h, e, r))
                 .flatten();
+            // Bounds hoisting: the preheader will validate that the loop
+            // bound fits within the array length. When it does, data != 0
+            // guarantees BOTH repr match AND bounds safety, so the loop body
+            // can skip per-iteration bounds checks entirely.
+            let bounds_guaranteed = repr_validated_disc.is_some()
+                && regions.iter().any(|reg| {
+                    reg.header == h
+                        && reg.induction_bound.is_some()
+                        && reg.bounds_hoistable.iter().any(|bh| bh.array_reg == r)
+                });
             (
                 (h, r),
                 emit::RegionCache {
                     payload,
                     view,
                     repr_validated_disc,
+                    bounds_guaranteed,
                 },
             )
         })
