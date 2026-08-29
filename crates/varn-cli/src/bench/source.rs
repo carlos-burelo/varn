@@ -324,24 +324,16 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         coverage_scope: "programa completo",
         top_blocker: top_blocker(&records),
         cpu: cpu_freq,
+        phases: Some(&phases),
+        e2e_samples: Some(&e2e_samples),
     }
     .print();
 
-    terminal::blank();
-    print_table(
-        &phases,
-        Some(&e2e_stats),
-        &TableOpts {
-            all_rows: opts.all_rows,
-        },
-    );
-
-    terminal::blank();
     terminal::log(format!(
-        "  {} {}  {}",
-        chalk("precompilación de módulos:").dim(),
-        chalk(super::report::fmt::fmt_dur(precompile_dur)).cyan(),
-        chalk("(costo de arranque en frío, fuera del p50)").dim()
+        "  {}{}  {}",
+        chalk("precompilación: ").dim(),
+        chalk(super::report::fmt::fmt_dur(precompile_dur)).cyan().dim(),
+        chalk("(costo de arranque en frío)").dim()
     ));
     if !opts.show_output {
         terminal::log(
@@ -350,6 +342,14 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
     }
 
     if opts.verbose {
+        terminal::blank();
+        print_table(
+            &phases,
+            Some(&e2e_stats),
+            &TableOpts {
+                all_rows: opts.all_rows,
+            },
+        );
         verbose_sections(
             &factory,
             &exec_jit,

@@ -131,26 +131,26 @@ pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
         coverage_scope: "bundle .vnc",
         top_blocker: top_blocker(&records),
         cpu: cpu_freq,
+        phases: Some(&phases),
+        e2e_samples: None,
     }
     .print();
 
-    terminal::blank();
-    print_table(
-        &phases,
-        None,
-        &TableOpts {
-            all_rows: opts.all_rows,
-        },
-    );
-
     if !opts.show_output {
-        terminal::blank();
         terminal::log(
             chalk("  Ejecución medida con stdout silenciado (--show-output para verlo)").dim(),
         );
     }
 
     if opts.verbose {
+        terminal::blank();
+        print_table(
+            &phases,
+            None,
+            &TableOpts {
+                all_rows: opts.all_rows,
+            },
+        );
         varn_builtins::reset_testing_counters();
         varn_builtins::set_print_silent(true);
         varn_builtins::set_testing_silent(true);

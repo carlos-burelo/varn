@@ -79,3 +79,24 @@ impl PhaseStats {
         (self.max.as_nanos() - self.min.as_nanos()) as f64 / self.min.as_nanos() as f64
     }
 }
+
+/// Map duration samples to a Unicode block sparkline (▁▂▃▄▅▆▇█).
+/// Samples are bucketed by magnitude across the observed min–max range.
+pub fn sparkline(samples: &[Duration]) -> String {
+    const LEVELS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    if samples.is_empty() {
+        return String::new();
+    }
+    let mut sorted = samples.to_vec();
+    sorted.sort();
+    let min_ns = sorted[0].as_nanos();
+    let max_ns = sorted[sorted.len() - 1].as_nanos();
+    let range = (max_ns - min_ns).max(1);
+    sorted
+        .iter()
+        .map(|d| {
+            let idx = (((d.as_nanos() - min_ns) * 7) / range) as usize;
+            LEVELS[idx.min(7)]
+        })
+        .collect()
+}
