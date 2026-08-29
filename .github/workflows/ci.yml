@@ -105,4 +105,4 @@ jobs:
         run: ${{ matrix.bin_path }} run ./tests/main.vn
 
       - name: Stability Benchmark
-        run: ${{ matrix.bin_path }} bench ./benchmarks/bench_fib.vn -v
+        run: ${{ matrix.bin_path }} bench ./tests/benchmarks/bench_fib.vn -v
