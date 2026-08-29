@@ -159,8 +159,8 @@ fi
 
 # 6. Benchmark
 if [ $FAST -eq 0 ]; then
-    header "6/6: Benchmark de Estabilidad (vn bench benchmarks/bench_fib.vn -v)"
-    if $VN_BIN bench benchmarks/bench_fib.vn -v; then
+    header "6/6: Benchmark de Estabilidad (vn bench tests/benchmarks/bench_fib.vn -v)"
+    if $VN_BIN bench tests/benchmarks/bench_fib.vn -v; then
         pass "Benchmark de estabilidad completado satisfactoriamente."
     else
         fail "El benchmark de estabilidad reportó errores."
