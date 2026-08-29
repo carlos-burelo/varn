@@ -26,7 +26,7 @@ La versión previa de este documento leyó en parte las copias sin commitear, y 
 
 ## 2. Código muerto (medido)
 
-Método: para cada `pub fn` del workspace (1232 en total), se contó toda aparición del identificador en cualquier `.rs` del repo fuera de su archivo de definición, más las apariciones dentro del propio archivo. Cero externas + una interna (la declaración) = sin uso. Verificado también contra `docs/`, `std/`, `benchmarks/` y `scripts/`.
+Método: para cada `pub fn` del workspace (1232 en total), se contó toda aparición del identificador en cualquier `.rs` del repo fuera de su archivo de definición, más las apariciones dentro del propio archivo. Cero externas + una interna (la declaración) = sin uso. Verificado también contra `docs/`, `std/`, `tests/benchmarks/` y `scripts/`.
 
 **Resultado: 101 funciones públicas sin ningún consumidor** (99 `pub fn` + `varn_scan`/`varn_free`).
 

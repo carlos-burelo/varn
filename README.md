@@ -231,7 +231,7 @@ function* range(start: int, end: int) {
 
 ## Rendimiento (Varn vs Bun vs Node)
 
-Resultados de `benchmarks/compare.ps1 -Runs 8` en build `release`, mínimo de
+Resultados de `tests/benchmarks/compare.ps1 -Runs 8` en build `release`, mínimo de
 tiempo de pared del **proceso completo** (incluye arranque, compilación y
 ejecución). Medidos el 2026-08-14 sobre un i7-1355U / Windows 11:
 
@@ -307,7 +307,8 @@ varn-lang/
 ├── Cargo.toml          ← Configuración del workspace Rust
 ├── crates/             ← Módulos del núcleo del compilador y VM
 ├── std/                ← Código fuente de la biblioteca estándar (.vn)
-├── benchmarks/         ← Suite de rendimiento y compare.ps1
+├── tests/              ← Tests de lenguaje, errores y benchmarks de rendimiento
+│   ├── benchmarks/     ← Suite de rendimiento y compare.ps1
 └── docs/               ← Especificaciones de arquitectura y referencia
 ```
 

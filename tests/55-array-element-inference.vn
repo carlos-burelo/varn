@@ -70,7 +70,7 @@ function evolveEscapeStaysPermissive(): int {
     return sumOf(a)
 }
 
-// matmul-shaped nested-loop pattern (see benchmarks/bench_matrix.vn):
+// matmul-shaped nested-loop pattern (see tests/benchmarks/bench_matrix.vn):
 // push to grow, then index-write to mutate in a later pass, reading two
 // other evolved arrays via `x[i]` inside the inner accumulation loop.
 function evolveMatmulShape(): int {

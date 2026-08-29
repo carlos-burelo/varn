@@ -64,7 +64,7 @@ function chained(iterations: int): float {
 
 assert("math fastpath: float ops", floatOps(2000));
 assert("math fastpath: int args keep their values", near(intOps(2000), 19.0));
-// Same recurrence and iteration count as `benchmarks/bench_math.vn`, whose
+// Same recurrence and iteration count as `tests/benchmarks/bench_math.vn`, whose
 // result is verified equal to the Bun twin's.
 assert("math fastpath: chained float accumulator", near(chained(500000), 706.6));
 

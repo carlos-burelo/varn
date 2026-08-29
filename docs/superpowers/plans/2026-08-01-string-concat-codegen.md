@@ -383,7 +383,7 @@ Then extend every `match` over `HeapStr` in `heap.rs`. Compile errors enumerate 
 
 - [ ] **Step 7: Confirm the slot stride did not change.** Re-run the size test from Step 1. If `size_of::<HeapObj>()` grew, the capacity is too large — reduce `INLINE_STR_CAP` and repeat. This is not optional: a wider stride is a global regression that this benchmark would not show.
 
-- [ ] **Step 8: Measure** per §2, and **also** measure a non-string allocating benchmark (`benchmarks/bench_gc_alloc.vn`'s object phase, or `bench_dto.vn`) to prove the wider `HeapStr` did not cost anything elsewhere.
+- [ ] **Step 8: Measure** per §2, and **also** measure a non-string allocating benchmark (`tests/benchmarks/bench_gc_alloc.vn`'s object phase, or `bench_dto.vn`) to prove the wider `HeapStr` did not cost anything elsewhere.
 
 - [ ] **Step 9: Commit**, with both the string numbers and the no-regression numbers in the message. Delete the temporary size test, or keep it as a real assertion:
 

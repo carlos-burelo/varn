@@ -16,7 +16,7 @@ Este documento especifica la estrategia arquitectónica, el análisis de cuellos
 
 ## 1. Estado Actual de Rendimiento (compare.ps1)
 
-Resultados medidos en la máquina host ejecutando la suite de benchmark pareada en build `release` (`benchmarks/compare.ps1`):
+Resultados medidos en la máquina host ejecutando la suite de benchmark pareada en build `release` (`tests/benchmarks/compare.ps1`):
 
 | Benchmark | Varn | Bun | Node | vs Fastest Rival |
 |---| --- | --- | --- |---|
@@ -80,5 +80,5 @@ Al finalizar una solicitud HTTP o una tarea en un Isolate, toda la región de me
 ## 5. Metodología de Benchmark y Regresiones
 
 - Todas las pruebas comparativas deben ejecutarse en builds `release`.
-- Se debe utilizar la suite de scripts en `benchmarks/compare.ps1`.
+- Se debe utilizar la suite de scripts en `tests/benchmarks/compare.ps1`.
 - Medir siempre el tiempo mínimo de ejecución en pared (*wall-clock time*) sobre al menos 5 ejecuciones rotativas.

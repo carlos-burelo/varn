@@ -93,7 +93,7 @@ Método correcto:
 Con n ≥ 24 y máquina tranquila esto resuelve ±1 %. Toda razón entre 0.98 y 1.02
 es ruido en este host, y hay que decirlo así en vez de reportarla como mejora.
 
-`benchmarks/compare.ps1` usa min-de-5 y está expuesto al mismo efecto, pero sus
+`tests/benchmarks/compare.ps1` usa min-de-5 y está expuesto al mismo efecto, pero sus
 rivales sirven de control: **si bun y node se mueven en la misma dirección y
 magnitud, es la máquina, no Varn.**
 

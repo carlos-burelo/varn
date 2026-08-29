@@ -174,8 +174,8 @@ if (-not $q4) { $failedSteps += "Cuadrante 4 (@embedded + No-JIT)" }
 
 # 6. Benchmark de Estabilidad
 if (-not $Fast) {
-    Write-StepHeader "6/6: Benchmark de Estabilidad (vn bench benchmarks/bench_fib.vn -v)"
-    $proc = Start-Process -FilePath $vnBin -ArgumentList @("bench", "benchmarks/bench_fib.vn", "-v") -NoNewWindow -PassThru -Wait
+    Write-StepHeader "6/6: Benchmark de Estabilidad (vn bench tests/benchmarks/bench_fib.vn -v)"
+    $proc = Start-Process -FilePath $vnBin -ArgumentList @("bench", "tests/benchmarks/bench_fib.vn", "-v") -NoNewWindow -PassThru -Wait
     if ($proc.ExitCode -ne 0) {
         Write-Failure "El benchmark de estabilidad reporto errores."
         $failedSteps += "Benchmark de Estabilidad"

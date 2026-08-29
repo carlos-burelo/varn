@@ -68,9 +68,9 @@
   Emit a Markdown table for docs/reports.
 
 .EXAMPLE
-  .\benchmarks\compare.ps1
-  .\benchmarks\compare.ps1 -Only fib,matrix -Runs 15
-  .\benchmarks\compare.ps1 -Baseline C:\tmp\vn-before.exe -SkipPython
+  .\tests\benchmarks\compare.ps1
+  .\tests\benchmarks\compare.ps1 -Only fib,matrix -Runs 15
+  .\tests\benchmarks\compare.ps1 -Baseline C:\tmp\vn-before.exe -SkipPython
 #>
 [CmdletBinding()]
 param(
@@ -83,8 +83,8 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
-$root = Split-Path -Parent $PSScriptRoot
-$benchDir = Join-Path $root 'benchmarks'
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$benchDir = $PSScriptRoot
 $vn = Join-Path $root 'target\release\vn.exe'
 
 if (-not (Test-Path $vn)) {
