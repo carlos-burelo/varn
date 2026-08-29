@@ -60,43 +60,51 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "."
-          key: ${{ matrix.target }}
+          key: ${{ matrix.target }}-publish
 
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        run: |
+          TAG="${{ github.ref_name }}"
+          # ref_name is "main" or similar on workflow_dispatch — not a tag
+          if [ -z "$TAG" ] || [[ "$TAG" != v* ]]; then
+            TAG="${{ github.event.inputs.tag }}"
+          fi
+          if [ -z "$TAG" ] || [[ "$TAG" != v* ]]; then
+            TAG="v$(grep '^version' Cargo.toml | head -1 | sed 's/.*= "\(.*\)"/\1/')"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      # profile publish: fat LTO + strip, used for all distributed binaries.
+      # Slower than --release but produces the smallest, most optimized binary.
       - name: Build Production Binary
-        run: cargo build --release --bin vn --target ${{ matrix.target }}
+        run: cargo build --profile publish --bin vn --target ${{ matrix.target }}
 
       - name: Pre-verification Smoke Test (Windows)
         if: matrix.archive_type == 'zip'
         shell: pwsh
         run: |
-          & "target/${{ matrix.target }}/release/${{ matrix.bin_name }}" --version
-          & "target/${{ matrix.target }}/release/${{ matrix.bin_name }}" run ./tests/main.vn
+          & "target/${{ matrix.target }}/publish/${{ matrix.bin_name }}" --version
+          & "target/${{ matrix.target }}/publish/${{ matrix.bin_name }}" run ./tests/main.vn
 
       - name: Pre-verification Smoke Test (Unix)
         if: matrix.archive_type == 'tar.gz'
         shell: bash
         run: |
-          chmod +x "target/${{ matrix.target }}/release/${{ matrix.bin_name }}"
-          "./target/${{ matrix.target }}/release/${{ matrix.bin_name }}" --version
-          "./target/${{ matrix.target }}/release/${{ matrix.bin_name }}" run ./tests/main.vn
+          chmod +x "target/${{ matrix.target }}/publish/${{ matrix.bin_name }}"
+          "./target/${{ matrix.target }}/publish/${{ matrix.bin_name }}" --version
+          "./target/${{ matrix.target }}/publish/${{ matrix.bin_name }}" run ./tests/main.vn
 
       - name: Package Release Assets (Unix)
         if: matrix.archive_type == 'tar.gz'
         shell: bash
         run: |
-          TAG="${{ github.ref_name }}"
-          if [ -z "$TAG" ] || [[ "$TAG" == *"/"* ]]; then
-            TAG="${{ github.event.inputs.tag }}"
-          fi
-          if [ -z "$TAG" ]; then
-            TAG="v$(cargo pkgid -p varn-cli | cut -d# -f2 | cut -d: -f2)"
-          fi
-
+          TAG="${{ steps.tag.outputs.tag }}"
           DIST_DIR="dist/vn-${TAG}-${{ matrix.target }}"
           mkdir -p "$DIST_DIR"
-          
-          strip "target/${{ matrix.target }}/release/${{ matrix.bin_name }}" || true
-          cp "target/${{ matrix.target }}/release/${{ matrix.bin_name }}" "$DIST_DIR/"
+
+          cp "target/${{ matrix.target }}/publish/${{ matrix.bin_name }}" "$DIST_DIR/"
           cp README.md "$DIST_DIR/" 2>/dev/null || true
           cp LICENSE "$DIST_DIR/" 2>/dev/null || true
 
@@ -108,18 +116,11 @@ jobs:
         if: matrix.archive_type == 'zip'
         shell: pwsh
         run: |
-          $tag = "${{ github.ref_name }}"
-          if (-not $tag -or $tag.Contains("/")) {
-            $tag = "${{ github.event.inputs.tag }}"
-          }
-          if (-not $tag) {
-            $tag = "v0.1.0"
-          }
-
+          $tag = "${{ steps.tag.outputs.tag }}"
           $distDir = "dist/vn-$tag-${{ matrix.target }}"
           New-Item -ItemType Directory -Force -Path $distDir | Out-Null
-          
-          Copy-Item "target/${{ matrix.target }}/release/${{ matrix.bin_name }}" -Destination $distDir
+
+          Copy-Item "target/${{ matrix.target }}/publish/${{ matrix.bin_name }}" -Destination $distDir
           if (Test-Path "README.md") { Copy-Item "README.md" -Destination $distDir }
           if (Test-Path "LICENSE") { Copy-Item "LICENSE" -Destination $distDir }
 
@@ -141,6 +142,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [ -z "$TAG" ] || [[ "$TAG" != v* ]]; then
+            TAG="${{ github.event.inputs.tag }}"
+          fi
+          if [ -z "$TAG" ] || [[ "$TAG" != v* ]]; then
+            TAG="v$(grep '^version' Cargo.toml | head -1 | sed 's/.*= "\(.*\)"/\1/')"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -156,6 +170,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.tag.outputs.tag }}
           files: |
             release-assets/*
           generate_release_notes: true

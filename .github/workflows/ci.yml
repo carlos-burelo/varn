@@ -104,5 +104,42 @@ jobs:
           VARN_NO_JIT: "1"
         run: ${{ matrix.bin_path }} run ./tests/main.vn
 
+
+      # NOTE: macOS Apple Silicon (aarch64) runs entirely in the interpreter —
+      # Cranelift JIT does not compile functions on that target in CI. The bench
+      # step below will show 0% Cranelift coverage on that runner. This is a
+      # known platform gap; correctness is still fully validated by the 4
+      # quadrants above. Do not interpret slow bench numbers on macOS as a
+      # regression unless the same workload regresses on Linux or Windows.
       - name: Stability Benchmark
         run: ${{ matrix.bin_path }} bench ./tests/benchmarks/bench_fib.vn -v
+
+  # Runs only on direct push to main (not on PRs).
+  # Reads the workspace version from Cargo.toml and pushes a "vX.Y.Z" tag if
+  # it does not already exist, which in turn triggers release.yml.
+  auto-tag:
+    name: Auto-tag release
+    runs-on: ubuntu-latest
+    needs: [lint, test-matrix]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create version tag if new
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*= "\(.*\)"/\1/')
+          TAG="v$VERSION"
+          if git ls-remote --tags origin | grep -q "refs/tags/${TAG}$"; then
+            echo "Tag $TAG already exists — skipping."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag "$TAG"
+            git push origin "$TAG"
+            echo "Pushed tag $TAG — release.yml will publish binaries."
+          fi
