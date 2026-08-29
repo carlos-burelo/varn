@@ -48,8 +48,20 @@ mod sys {
     pub const PROT_EXEC: i32 = 4;
 
     pub const MAP_PRIVATE: i32 = 0x02;
-    pub const MAP_ANONYMOUS: i32 = 0x20;
     pub const MAP_FAILED: *mut c_void = !0 as *mut c_void;
+
+    // MAP_ANONYMOUS differs between Linux (0x20) and macOS (MAP_ANON = 0x1000).
+    #[cfg(target_os = "macos")]
+    pub const MAP_ANON: i32 = 0x1000;
+    #[cfg(not(target_os = "macos"))]
+    pub const MAP_ANON: i32 = 0x20;
+
+    // Apple Silicon requires MAP_JIT for any mapping that will be made
+    // executable. Without it, mprotect(PROT_EXEC) returns ENOTSUP.
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    pub const MAP_JIT: i32 = 0x0800;
+    #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+    pub const MAP_JIT: i32 = 0;
 
     extern "C" {
         pub fn mmap(
@@ -65,6 +77,17 @@ mod sys {
 
         pub fn munmap(addr: *mut c_void, length: usize) -> i32;
     }
+
+    // Apple Silicon W^X: before writing JIT code, disable execute protection;
+    // after writing, re-enable it. No-op on other platforms.
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    extern "C" {
+        pub fn pthread_jit_write_protect_np(enabled: i32);
+    }
+
+    #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
+    #[inline(always)]
+    pub unsafe fn pthread_jit_write_protect_np(_enabled: i32) {}
 }
 
 pub struct JitBuffer {
@@ -104,12 +127,15 @@ impl JitBuffer {
 
         #[cfg(not(target_os = "windows"))]
         {
+            // On Apple Silicon, MAP_JIT is required for executable mappings.
+            // On other Unix systems, MAP_JIT == 0 (no-op OR).
+            let flags = sys::MAP_PRIVATE | sys::MAP_ANON | sys::MAP_JIT;
             let ptr = unsafe {
                 sys::mmap(
                     ptr::null_mut(),
                     size,
                     sys::PROT_READ | sys::PROT_WRITE,
-                    sys::MAP_PRIVATE | sys::MAP_ANONYMOUS,
+                    flags,
                     -1,
                     0,
                 )
@@ -127,6 +153,13 @@ impl JitBuffer {
 
     pub fn as_mut_slice(&mut self) -> &mut [u8] {
         assert!(!self.executable, "Cannot modify an executable JIT buffer");
+        // On Apple Silicon, MAP_JIT memory starts write-protected; disable
+        // the guard for the duration of the write, then re-enable in
+        // make_executable() via pthread_jit_write_protect_np(1).
+        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+        unsafe {
+            sys::pthread_jit_write_protect_np(0);
+        }
         unsafe { std::slice::from_raw_parts_mut(self.ptr, self.size) }
     }
 
@@ -164,32 +197,45 @@ impl JitBuffer {
 
         #[cfg(not(target_os = "windows"))]
         {
-            let res = unsafe {
-                sys::mprotect(
-                    self.ptr as *mut c_void,
-                    self.size,
-                    sys::PROT_READ | sys::PROT_EXEC,
-                )
-            };
-            if res != 0 {
-                return Err(
-                    "Failed to change memory protection to executable (mprotect)".to_owned(),
-                );
-            }
-
-            #[cfg(target_arch = "x86_64")]
+            // On Apple Silicon: re-enable write-execute protection (was disabled
+            // in as_mut_slice), then invalidate the instruction cache.
+            // On other platforms: mprotect to PROT_READ|PROT_EXEC.
+            #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
             {
                 unsafe {
-                    std::arch::asm!("mfence", "lfence", options(nostack, preserves_flags));
+                    sys::pthread_jit_write_protect_np(1);
+                    let end = self.ptr as usize + self.size;
+                    extern "C" {
+                        fn sys_icache_invalidate(start: *mut c_void, size: usize);
+                    }
+                    sys_icache_invalidate(self.ptr as *mut c_void, self.size);
+                    let _ = end;
                 }
             }
 
-            #[cfg(target_arch = "aarch64")]
+            #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
             {
-                unsafe {
-                    let start = self.ptr as usize;
-                    let end = start + self.size;
+                let res = unsafe {
+                    sys::mprotect(
+                        self.ptr as *mut c_void,
+                        self.size,
+                        sys::PROT_READ | sys::PROT_EXEC,
+                    )
+                };
+                if res != 0 {
+                    return Err(
+                        "Failed to change memory protection to executable (mprotect)".to_owned(),
+                    );
+                }
 
+                #[cfg(target_arch = "x86_64")]
+                unsafe {
+                    std::arch::asm!("mfence", "lfence", options(nostack, preserves_flags));
+                }
+
+                #[cfg(all(target_arch = "aarch64", not(target_os = "macos")))]
+                unsafe {
+                    let end = self.ptr as usize + self.size;
                     extern "C" {
                         fn __clear_cache(start: *mut c_void, end: *mut c_void);
                     }

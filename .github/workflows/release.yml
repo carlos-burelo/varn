@@ -60,7 +60,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "."
-          key: ${{ matrix.target }}-publish
+          key: ${{ matrix.target }}-dist
 
       - name: Resolve release tag
         id: tag
@@ -76,25 +76,25 @@ jobs:
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      # profile publish: fat LTO + strip, used for all distributed binaries.
+      # profile dist: fat LTO + strip, used for all distributed binaries.
       # Slower than --release but produces the smallest, most optimized binary.
       - name: Build Production Binary
-        run: cargo build --profile publish --bin vn --target ${{ matrix.target }}
+        run: cargo build --profile dist --bin vn --target ${{ matrix.target }}
 
       - name: Pre-verification Smoke Test (Windows)
         if: matrix.archive_type == 'zip'
         shell: pwsh
         run: |
-          & "target/${{ matrix.target }}/publish/${{ matrix.bin_name }}" --version
-          & "target/${{ matrix.target }}/publish/${{ matrix.bin_name }}" run ./tests/main.vn
+          & "target/${{ matrix.target }}/dist/${{ matrix.bin_name }}" --version
+          & "target/${{ matrix.target }}/dist/${{ matrix.bin_name }}" run ./tests/main.vn
 
       - name: Pre-verification Smoke Test (Unix)
         if: matrix.archive_type == 'tar.gz'
         shell: bash
         run: |
-          chmod +x "target/${{ matrix.target }}/publish/${{ matrix.bin_name }}"
-          "./target/${{ matrix.target }}/publish/${{ matrix.bin_name }}" --version
-          "./target/${{ matrix.target }}/publish/${{ matrix.bin_name }}" run ./tests/main.vn
+          chmod +x "target/${{ matrix.target }}/dist/${{ matrix.bin_name }}"
+          "./target/${{ matrix.target }}/dist/${{ matrix.bin_name }}" --version
+          "./target/${{ matrix.target }}/dist/${{ matrix.bin_name }}" run ./tests/main.vn
 
       - name: Package Release Assets (Unix)
         if: matrix.archive_type == 'tar.gz'
@@ -104,7 +104,7 @@ jobs:
           DIST_DIR="dist/vn-${TAG}-${{ matrix.target }}"
           mkdir -p "$DIST_DIR"
 
-          cp "target/${{ matrix.target }}/publish/${{ matrix.bin_name }}" "$DIST_DIR/"
+          cp "target/${{ matrix.target }}/dist/${{ matrix.bin_name }}" "$DIST_DIR/"
           cp README.md "$DIST_DIR/" 2>/dev/null || true
           cp LICENSE "$DIST_DIR/" 2>/dev/null || true
 
@@ -120,7 +120,7 @@ jobs:
           $distDir = "dist/vn-$tag-${{ matrix.target }}"
           New-Item -ItemType Directory -Force -Path $distDir | Out-Null
 
-          Copy-Item "target/${{ matrix.target }}/publish/${{ matrix.bin_name }}" -Destination $distDir
+          Copy-Item "target/${{ matrix.target }}/dist/${{ matrix.bin_name }}" -Destination $distDir
           if (Test-Path "README.md") { Copy-Item "README.md" -Destination $distDir }
           if (Test-Path "LICENSE") { Copy-Item "LICENSE" -Destination $distDir }
 
