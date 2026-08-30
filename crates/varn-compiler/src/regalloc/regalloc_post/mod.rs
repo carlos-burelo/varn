@@ -64,6 +64,25 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
         return;
     }
 
+    // Same opt-out as the float case above, for a second thing this pass
+    // cannot preserve: a `MakeClosure` upvalue descriptor names a FRAME SLOT,
+    // not an SSA value. `capture_upvalue(base + index)` reads whatever sits
+    // there at that instant, so the staging register has to survive untouched
+    // from its `Move` to the capture -- and re-colouring by liveness alone puts
+    // a closure result on a slot that a later staging `Move` then overwrites:
+    //
+    //   MakeClosure r3 = closure[0]   ; result -> r3
+    //   Move        r3 = r5           ; restages `current`, clobbers closure[0]
+    //   Move        r2 = r3           ; object field gets "idle", not the closure
+    //
+    // `scan` already collects `open_captures` and extends those live ranges to
+    // the end of the function, which is meant to pin them; it demonstrably does
+    // not hold for this shape. Until that is understood, functions that capture
+    // a local keep the allocation the SSA emitter gave them.
+    if has_captured_locals(&proto.chunk.code, &proto.chunk.constants) {
+        return;
+    }
+
     let back_edges =
         varn_types::loop_analysis::collect_back_edges(&proto.chunk.code, &proto.chunk.constants);
     let scan = scan_bytecode(&proto.chunk.code, &proto.chunk.constants);
@@ -220,4 +239,25 @@ fn optimize_function_inner(proto: &mut FunctionProto) {
     }
 
     proto.register_count = new_register_count;
+}
+
+/// True when any `MakeClosure` in `code` captures a parent local, i.e. names a
+/// frame slot that must not be re-coloured out from under it.
+fn has_captured_locals(code: &[u16], constants: &[varn_types::PoolEntry]) -> bool {
+    let mut offset = 0;
+    while offset < code.len() {
+        let Some(info) = decode(code, offset, constants) else {
+            break;
+        };
+        if OpCode::from_u16(code[offset]) == Some(OpCode::MakeClosure) {
+            let uv_count = (code[offset + 1] & 0xff) as usize;
+            for i in 0..uv_count {
+                if code.get(offset + 3 + i).is_some_and(|d| (d >> 8) as u8 == 1) {
+                    return true;
+                }
+            }
+        }
+        offset += info.len;
+    }
+    false
 }

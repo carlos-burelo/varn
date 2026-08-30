@@ -1,0 +1,179 @@
+diff --git a/crates/varn-compiler/src/ssa/emit/regs.rs b/crates/varn-compiler/src/ssa/emit/regs.rs
+index 6016f85..f8b0d21 100644
+--- a/crates/varn-compiler/src/ssa/emit/regs.rs
++++ b/crates/varn-compiler/src/ssa/emit/regs.rs
+@@ -42,63 +42,6 @@ pub(super) fn assign_registers(
+         .filter(|&v| !assigned[v] && def[v] != u32::MAX)
+         .collect();
+     order.sort_by_key(|&v| def[v]);
+-    // Type-aware linear scan: float values and non-float values draw from
+-    // separate free-register pools so no physical register is ever shared
+-    // between a float and a non-float value. Packing the two into one register
+-    // (their live ranges are disjoint, so a type-agnostic allocator would)
+-    // makes `derive_register_meta` meet their kinds to Dynamic, which erases
+-    // the float type the backend needs to route native f64. A pure-int
+-    // function never fills the float pool, so its allocation is unchanged.
+-    let is_float_v = |v: usize| {
+-        matches!(
+-            slot_kind_of(ssa.values[v].ty),
+-            varn_types::register_meta::SlotKind::Float
+-        )
+-    };
+-    let mut next: u32 = base;
+-    let mut free_float: Vec<u32> = Vec::new();
+-    let mut free_other: Vec<u32> = Vec::new();
+-    // (interval end, register, is_float)
+-    let mut active: Vec<(u32, u32, bool)> = Vec::new();
+-    for &v in &order {
+-        let d = def[v];
+-        let vf = is_float_v(v);
+-        let mut i = 0;
+-        while i < active.len() {
+-            if active[i].0 < d {
+-                let (_, r, rf) = active[i];
+-                if rf {
+-                    free_float.push(r);
+-                } else {
+-                    free_other.push(r);
+-                }
+-                active.swap_remove(i);
+-            } else {
+-                i += 1;
+-            }
+-        }
+-        let pool = if vf { &mut free_float } else { &mut free_other };
+-        let r = match pool.iter().copied().min() {
+-            Some(m) => {
+-                pool.retain(|&x| x != m);
+-                m
+-            }
+-            None => {
+-                let r = next;
+-                next += 1;
+-                r
+-            }
+-        };
+-        if r > 255 {
+-            return Err(OptError::Unsupported(
+-                "ssa-emit: register count exceeds 255",
+-            ));
+-        }
+-        reg[v] = r as u8;
+-        assigned[v] = true;
+-        active.push((end[v], r, vf));
+-    }
+-
+     let mut max_call = 0u32;
+     for block in &ssa.blocks {
+         for inst in &block.insts {
+@@ -133,6 +76,90 @@ pub(super) fn assign_registers(
+         }
+     }
+ 
++
++    // Kind-aware linear scan: each `SlotKind` draws from its own free-register
++    // pool, so a physical register is not shared between values of different
++    // kinds while there is room to avoid it.
++    //
++    // The reason is `derive_register_meta`, which meets the kinds of every SSA
++    // value assigned to a register and yields `Dynamic` the moment two differ.
++    // Live ranges being disjoint, a kind-agnostic allocator packs them freely --
++    // and one such packing is enough to erase the kind for the whole function.
++    // It cost real time: a matmul's `b[k * n + col]` landed the loop's `Bool`
++    // comparison and the load's `Int` destination in one register, the meet
++    // returned `Dynamic`, and the JIT lost the repr specialisation that lets a
++    // loop body skip the per-access representation branch. 15 ms against 3 ms
++    // for the identical loop whose registers happened not to collide.
++    //
++    // This generalises a split that was already here for `Float` alone, for
++    // exactly the same reason.
++    //
++    // Where it differs from that one: the split is a preference, not a rule.
++    // Separate pools mean a value that finds its own pool empty takes a fresh
++    // register, so total pressure grows -- and a function over 255 registers is
++    // rejected outright by the caller, which is a far worse outcome than a lost
++    // kind. So a fresh register is only taken while one fits under the ceiling
++    // the call window leaves; past that, the scan falls back to reusing another
++    // kind's register and accepts the `Dynamic` meet, exactly as before.
++    let kind_of_v = |v: usize| slot_kind_of(ssa.values[v].ty);
++    // Highest register the frame can hand out: `total` below is
++    // `next + 2 + max_call`, and the caller rejects the function past 256.
++    let ceiling = 256u32.saturating_sub(2 + max_call);
++    let mut next: u32 = base;
++    // One free list per `SlotKind`, indexed by `pool_index`.
++    let mut free: [Vec<u32>; POOLS] = Default::default();
++    // (interval end, register, kind index)
++    let mut active: Vec<(u32, u32, usize)> = Vec::new();
++    for &v in &order {
++        let d = def[v];
++        let vk = pool_index(kind_of_v(v));
++        let mut i = 0;
++        while i < active.len() {
++            if active[i].0 < d {
++                let (_, r, rk) = active[i];
++                free[rk].push(r);
++                active.swap_remove(i);
++            } else {
++                i += 1;
++            }
++        }
++        let r = if let Some(m) = free[vk].iter().copied().min() {
++            free[vk].retain(|&x| x != m);
++            m
++        } else if next < ceiling {
++            let r = next;
++            next += 1;
++            r
++        } else {
++            // Out of room: reuse the lowest register any other kind has freed,
++            // losing that register's kind rather than the whole function.
++            let borrowed = free
++                .iter()
++                .enumerate()
++                .filter_map(|(k, p)| p.iter().copied().min().map(|m| (m, k)))
++                .min();
++            match borrowed {
++                Some((m, k)) => {
++                    free[k].retain(|&x| x != m);
++                    m
++                }
++                None => {
++                    let r = next;
++                    next += 1;
++                    r
++                }
++            }
++        };
++        if r > 255 {
++            return Err(OptError::Unsupported(
++                "ssa-emit: register count exceeds 255",
++            ));
++        }
++        reg[v] = r as u8;
++        assigned[v] = true;
++        active.push((end[v], r, vk));
++    }
++
+     let total = next + 2 + max_call;
+     if total > 256 {
+         return Err(OptError::Unsupported(
+@@ -152,3 +179,19 @@ pub(super) fn var_reg(var: VarId, nparams: usize) -> u8 {
+         VarId::Local(id) => (1 + nparams + id.0 as usize) as u8,
+     }
+ }
++
++/// Number of `SlotKind` variants, and so of free-register pools.
++const POOLS: usize = 6;
++
++/// Dense index of a `SlotKind`, for the per-kind free lists.
++fn pool_index(k: varn_types::register_meta::SlotKind) -> usize {
++    use varn_types::register_meta::SlotKind;
++    match k {
++        SlotKind::Int => 0,
++        SlotKind::Float => 1,
++        SlotKind::Bool => 2,
++        SlotKind::Str => 3,
++        SlotKind::Ref => 4,
++        SlotKind::Dynamic => 5,
++    }
++}
