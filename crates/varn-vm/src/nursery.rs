@@ -287,7 +287,44 @@ impl Nursery {
         }
         let obj = match self.objects.get_mut(nursery_idx as usize) {
             Some(slot @ &mut Some(_)) => slot.take().unwrap(),
-            _ => return pack_old_idx(0),
+            // Llegar aquí significa que algo conserva un índice de nursery que
+            // ya no existe: casi siempre una referencia old→young que la
+            // barrera de escritura no registró.
+            //
+            // El resultado tiene que ser un índice VÁLIDO. Devolver uno
+            // imposible (`u32::MAX`) para que fallase pronto convierte esto en
+            // un SEGFAULT: el código compilado resuelve handles del heap sin
+            // comprobar límites, así que un índice fuera de rango revienta el
+            // proceso en vez de dar un error de VM. Medido, no supuesto —
+            // `bench_http_routing` con 95 000 peticiones lo hace.
+            //
+            // Así que el valor se queda, pero el suceso deja de ser mudo: sin
+            // este aviso el programa sigue con un objeto ajeno en la mano y el
+            // fallo aparece mucho después y en otro sitio (un `GetFixedField`
+            // sobre la clase `Error`, sin nada que lo ligue a la colección que
+            // lo causó). Ver `bench-jit-snapshot-corruption` en las notas del
+            // proyecto: la causa raíz sigue abierta.
+            _ => {
+                debug_assert!(
+                    false,
+                    "evacuate: índice de nursery {nursery_idx} sin objeto — \
+                     referencia old→young no registrada por la barrera"
+                );
+                // Una vez por proceso: el caso se da dentro de una colección,
+                // y una colección puede encontrar miles de referencias al
+                // mismo objeto perdido.
+                static WARNED: std::sync::atomic::AtomicBool =
+                    std::sync::atomic::AtomicBool::new(false);
+                if !WARNED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                    eprintln!(
+                        "warning[gc]: referencia colgante al nursery ({nursery_idx}) durante la \
+                         colección menor — una referencia old→young no quedó registrada por la \
+                         barrera de escritura. Los valores leídos a través de ella serán \
+                         incorrectos. (Sólo se avisa una vez.)"
+                    );
+                }
+                return pack_old_idx(0);
+            }
         };
         let raw_old = old_gen.alloc_raw(obj);
         let packed = pack_old_idx(raw_old);
