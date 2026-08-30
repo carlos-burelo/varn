@@ -97,8 +97,12 @@ pub struct FunctionProto {
     /// del struct sin cambiar nada más desplazaría los campos siguientes en
     /// vez de aplicar el default. Lo que de verdad invalida las cachés
     /// viejas es `BUILD_FINGERPRINT` (`varn-modules/build.rs`), que cubre
-    /// las fuentes de `varn-types` y `varn-compiler` y por tanto cambia con
-    /// cualquier cambio de forma de `FunctionProto`.
+    /// `varn-types`, `varn-modules` y `varn-checker` — los crates cuyos tipos
+    /// entran en un payload — y por tanto cambia con cualquier cambio de forma
+    /// de `FunctionProto`. (No cubre `varn-compiler`, que no aporta tipos
+    /// serializados; de que el bytecode que ESE crate emite no sobreviva a su
+    /// propio cambio responde `producer_fingerprint`, que sella las entradas
+    /// de caché con la identidad del binario.)
     #[serde(default)]
     pub state_size: u16,
 
