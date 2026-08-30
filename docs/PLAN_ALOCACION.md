@@ -23,8 +23,41 @@ El detalle y las mediciones están en
 [HIPOTESIS_DESCARTADAS.md](HIPOTESIS_DESCARTADAS.md). **Lee eso antes de
 proponer una causa alternativa.**
 
-Lo que **no** está medido: el reparto exacto de esos 54 ns entre las piezas del
-camino. Por eso la Fase 0 no es opcional.
+### Reparto por tramo (Fase 0, hecha)
+
+Contadores de ciclos sobre 2M objetos, con el overhead de la propia medición
+descontado y calibrado. Micro: `{ a: i, b: i as float, c: true }` en bucle.
+
+| tramo | ns | % | ¿evitable? |
+|---|---|---|---|
+| **Fuera del helper** — cruce, `store_home` de los campos, lectura | **24,5** | **59 %** | sí, Fase 1 |
+| `ObjData::alloc` (asignación DST + copia) | 6,6 | 16 % | sólo Fase 2 |
+| `Heap::alloc` (mover 48 B, dos `push`) | 4,2 | 10 % | sólo Fase 2 |
+| barrido de closures entre los campos | 3,2 | 8 % | **sí, y es desperdicio** |
+| `resolved_shape` en runtime | 2,7 | 7 % | **sí, y es desperdicio** |
+| **total por objeto** | **41,5** | | |
+
+Cómo se obtuvo el 41,5: el mismo bucle sin crear objeto cuesta 46 ms y creando
+objeto 129 ms; la diferencia son 83 ms para 2M objetos.
+
+Dos avisos sobre el método, por si alguien repite la medición:
+
+* **El desglose anidado se mide a sí mismo.** Con los sub-tramos activos el
+  helper "cuesta" 218 ciclos; sin ellos, 57. Los 161 de diferencia son las ocho
+  lecturas de `rdtsc`. Por eso hay dos niveles (`VARN_ALLOC_PROFILE=1` para
+  totales, `=2` para desglose) y el total sólo se lee del nivel 1.
+* Con el nivel correcto, los sub-tramos **suman el total**. No hay coste sin
+  explicar dentro del helper: el "resto" que aparecía era el artefacto.
+
+### Lo que esto cambia respecto a la intuición inicial
+
+**El cruce vale casi tres veces más que la representación del heap.** La Fase 1
+ataca 24,5 ns de cruce más 5,9 ns de desperdicio puro (shape y closures, ambos
+decidibles al compilar) = **30,4 ns**. La Fase 2 entera ataca 10,8 ns.
+
+El plan mantiene el orden, pero la Fase 2 deja de ser el objetivo y pasa a ser
+el remate: si la Fase 1 rinde lo que el reparto dice, el objetivo de ≤20 ns se
+alcanza sin tocar la representación del heap ni romper ninguna garantía.
 
 ## 2. La tesis
 
@@ -53,9 +86,13 @@ el JIT, sin cruzar a Rust.
 
 ---
 
-## Fase 0 — Atribución (obligatoria, primero)
+## Fase 0 — Atribución — HECHA
 
-**Sin esto el resto es adivinar.** Esta máquina no resuelve diferencias menores
+Implementada en `varn-vm/src/alloc_profile.rs`, apagada por defecto y sin coste
+medible apagada (la bandera es un atómico global; como `thread_local` costaba un
+6 % con el perfilado apagado). Resultados arriba.
+
+**Sin esto el resto era adivinar.** Esta máquina no resuelve diferencias menores
 del 10 % (deriva del 36 % entre corridas, ±23 % entre repeticiones), y las
 piezas que quedan valen 10-15 ns cada una sobre 60.
 

@@ -71,7 +71,9 @@ fn main() {
         }
     }
 
+    varn_vm::alloc_profile::init();
     let result = dispatch(cli.command);
+    varn_vm::alloc_profile::report();
 
     if let Err(e) = result {
         if e.exit_code == 3 {

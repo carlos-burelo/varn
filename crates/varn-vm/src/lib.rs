@@ -1,3 +1,4 @@
+pub mod alloc_profile;
 pub mod arch;
 pub(crate) mod clif_link;
 pub(crate) mod closure;

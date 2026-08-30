@@ -49,9 +49,20 @@ pub(crate) extern "C" fn jit_build_object_with_shape(
     shape_idx: usize,
 ) -> VmValue {
     unsafe {
+        use crate::alloc_profile as prof;
+        let on = prof::enabled();
+        let t_all = if on { prof::read() } else { 0 };
+
         let ctx_ref = &mut *ctx;
         let closure_ref = &*closure;
-        let Some(shape) = closure_ref.proto.resolved_shape(shape_idx) else {
+
+        let det = prof::detail();
+        let t_shape = if det { prof::read() } else { 0 };
+        let resolved = closure_ref.proto.resolved_shape(shape_idx);
+        if det {
+            prof::record(prof::Seg::ShapeLookup, t_shape, prof::read());
+        }
+        let Some(shape) = resolved else {
             return VmValue::null();
         };
         let count = shape.property_names.len();
@@ -60,12 +71,16 @@ pub(crate) extern "C" fn jit_build_object_with_shape(
         if ctx_ref.stack.len() < required {
             ctx_ref.stack.resize(required, VmValue::null());
         }
-        crate::exec::collections::build_object_with_shape(
+        let out = crate::exec::collections::build_object_with_shape(
             &ctx_ref.stack,
             base + start_reg,
             shape,
             &mut ctx_ref.heap,
-        )
+        );
+        if on {
+            prof::record(prof::Seg::HelperTotal, t_all, prof::read());
+        }
+        out
     }
 }
 

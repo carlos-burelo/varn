@@ -15,7 +15,7 @@ pub(crate) fn build_object_with_shape(
     heap: &mut Heap,
 ) -> VmValue {
     let oref = build_shaped(stack, values_start, shape, heap);
-    VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref)))
+    alloc_timed(heap, HeapObj::Object(oref))
 }
 
 pub(crate) fn build_record_with_shape(
@@ -25,7 +25,22 @@ pub(crate) fn build_record_with_shape(
     heap: &mut Heap,
 ) -> VmValue {
     let oref = build_shaped(stack, values_start, shape, heap);
-    VmValue::from_heap_idx(heap.alloc(HeapObj::Record(oref)))
+    alloc_timed(heap, HeapObj::Record(oref))
+}
+
+/// `Heap::alloc` con el tramo anotado: mover el `HeapObj` de 48 bytes y
+/// empujarlo al nursery es uno de los candidatos a explicar los ~54 ns que el
+/// allocator no explica.
+#[inline(always)]
+fn alloc_timed(heap: &mut Heap, obj: HeapObj) -> VmValue {
+    use crate::alloc_profile as prof;
+    if !prof::detail() {
+        return VmValue::from_heap_idx(heap.alloc(obj));
+    }
+    let t0 = prof::read();
+    let idx = heap.alloc(obj);
+    prof::record(prof::Seg::HeapPush, t0, prof::read());
+    VmValue::from_heap_idx(idx)
 }
 
 /// Parte común de objeto y record: cerrar las upvalues de los valores que sean
@@ -42,8 +57,11 @@ fn build_shaped(
     shape: Rc<varn_types::Shape>,
     heap: &Heap,
 ) -> ObjRef {
+    use crate::alloc_profile as prof;
     let count = shape.property_names.len();
+    let on = prof::detail();
 
+    let t0 = if on { prof::read() } else { 0 };
     for i in 0..count {
         let val_nv = stack[values_start + i];
         if val_nv.is_heap() {
@@ -56,8 +74,16 @@ fn build_shaped(
             }
         }
     }
+    if on {
+        prof::record(prof::Seg::ClosureScan, t0, prof::read());
+    }
 
-    ObjRef::with_shape_slice(shape, &stack[values_start..values_start + count])
+    let t1 = if on { prof::read() } else { 0 };
+    let oref = ObjRef::with_shape_slice(shape, &stack[values_start..values_start + count]);
+    if on {
+        prof::record(prof::Seg::ObjDataAlloc, t1, prof::read());
+    }
+    oref
 }
 
 #[inline(always)]

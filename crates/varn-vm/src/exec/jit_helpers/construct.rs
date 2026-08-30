@@ -53,6 +53,9 @@ pub(crate) fn construct_staged_fast(
     cls: &std::rc::Rc<varn_types::ClassObj>,
     callee_base: usize,
 ) -> Option<VmValue> {
+    use crate::alloc_profile as prof;
+    let on = prof::enabled();
+    let t_ctor = if on { prof::read() } else { 0 };
     let ver = cls
         .vtable_version
         .load(std::sync::atomic::Ordering::Relaxed);
@@ -93,9 +96,22 @@ pub(crate) fn construct_staged_fast(
         }
     };
 
+    if on {
+        prof::record(prof::Seg::CtorResolve, t_ctor, prof::read());
+    }
+
+    let t_alloc = if on { prof::read() } else { 0 };
     let oref = varn_types::value::ObjRef::instance(cls.clone());
+    if on {
+        prof::record(prof::Seg::ObjDataAlloc, t_alloc, prof::read());
+    }
+    let t_push = if on { prof::read() } else { 0 };
     let instance_nv =
         VmValue::from_heap_idx(ctx_ref.heap.alloc(crate::heap::HeapObj::Object(oref)));
+    if on {
+        prof::record(prof::Seg::HeapPush, t_push, prof::read());
+    }
+    let t_frame = if on { prof::read() } else { 0 };
 
     let Some((closure, jit_fn)) = jit_ctor else {
         return Some(instance_nv);
@@ -123,6 +139,9 @@ pub(crate) fn construct_staged_fast(
 
     ctx_ref.frames.pop();
     ctx_ref.close_upvalues_above(callee_base);
+    if on {
+        prof::record(prof::Seg::CtorFrame, t_frame, prof::read());
+    }
 
     Some(if res.is_null() { instance_nv } else { res })
 }
