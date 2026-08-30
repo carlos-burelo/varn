@@ -138,6 +138,19 @@ flowchart TD
 - **CallFrames**: Cada llamada a función asigna un `CallFrame` que apunta a una ventana contigua del array global de registros `registers[base + slot]`. La resolución de variables locales es una lectura $O(1)$ por offset indexado.
 - **Upvalues**: Las funciones anidadas que capturan variables de un ámbito superior utilizan `Upvalues`. Mientras el frame padre está activo, el upvalue es **Abierto** (*Open*) y apunta al registro en la pila. Al finalizar el frame padre, el upvalue se **Cierra** (*Closed*) copiando el valor al heap.
 
+### Excepciones: Un Solo Camino
+
+Todo error que llega a la máquina —lo lance el usuario con `throw` o lo produzca el runtime— pasa por `exceptions::dispatch_to_handler`, que busca primero en la pila `try_handlers` y después en la `exception_table` del proto, desenrollando frames hasta el fondo de la invocación actual.
+
+Que el camino sea uno solo es de corrección, no de estilo. La búsqueda vivía únicamente dentro del brazo del opcode `Throw`, así que cualquier operación que devolviera `Err` —una división por cero, una nativa que falla, `JSON.parse` de una entrada inválida— salía del bucle de ejecución **sin consultar nunca la tabla**. El resultado: `try/catch` capturaba lo que lanzaba el código Varn y nada más. Un servidor no podía manejar entrada no confiable, porque un cuerpo malformado terminaba el proceso en lugar de la petición.
+
+Dos detalles que el camino tiene que respetar:
+
+* **Sincronizar el `ip`.** El bucle lleva `ip` en una variable local y sólo lo escribe al frame en puntos concretos. La `exception_table` se indexa por el ip de la instrucción que falló, así que el camino de error lo sincroniza antes de buscar; sin eso encuentra el rango equivocado, o ninguno.
+* **Respetar el fondo (`depth`).** Por debajo del fondo de la invocación hay frames de un llamador de Rust, que no puede reanudarse desde el intérprete: ahí el error se propaga como `Err` en vez de desmontarlos.
+
+Un error nativo no traía valor lanzado, así que se materializa como instancia de `Error` con su mensaje y `e.message` funciona igual que con uno lanzado a mano.
+
 ---
 
 ## 7. Resolución de Globals

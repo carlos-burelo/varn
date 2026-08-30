@@ -74,4 +74,55 @@ function withFinally(): int {
 const fres = withFinally()
 assert("finally return value", fres === 42)
 assert("finally ran",          finallyRan)
+// ── Errores nacidos en el RUNTIME, no lanzados con `throw` ───────
+// La búsqueda de handler vivía sólo en el brazo del opcode `Throw`, así que
+// todo `Err` del runtime salía del bucle sin mirar la tabla de excepciones:
+// una división por cero o un `JSON.parse` inválido terminaban el proceso
+// aunque estuvieran dentro de un `try`. El resto de este archivo no lo
+// detectaba porque comprueba `b === 0` y lanza a mano antes de dividir.
+
+let zeros: int[] = [0]
+
+let divCaught = false
+let divMsg = ""
+try {
+    let q = 10 / zeros[0]
+} catch (e) {
+    divCaught = true
+    divMsg = e.message
+}
+assert("runtime div by zero is catchable", divCaught)
+assert("runtime error carries message",    divMsg === "division by zero")
+
+let modCaught = false
+try {
+    let q = 10 % zeros[0]
+} catch (e) {
+    modCaught = true
+}
+assert("runtime mod by zero is catchable", modCaught)
+
+function divideOrDefault(a: int, b: int): float {
+    try {
+        return (a as float) / (b as float)
+    } catch (e) {
+        return -1.0
+    }
+}
+assert("catchable inside a function", divideOrDefault(10, 0) === -1.0)
+
+// Un error nacido dentro de una llamada anidada tiene que desenrollar hasta
+// el `try` del llamador.
+function inner(): int {
+    let z: int[] = [0]
+    return 5 % z[0]
+}
+let nestedCaught = false
+try {
+    let v = inner()
+} catch (e) {
+    nestedCaught = true
+}
+assert("catchable across a call frame", nestedCaught)
+
 print("[PASSED] 11. Error handling ")

@@ -88,3 +88,71 @@ pub fn build_thrown_error(val: VmValue, heap: &Heap, frames: &[CallFrame]) -> Ru
         thrown: Some(val),
     }
 }
+
+/// El valor que verá el `catch`.
+///
+/// Un `throw` del usuario ya trae el suyo. Un error nacido en el runtime
+/// —división por cero, una nativa que falla— no traía ninguno porque nunca
+/// llegaba a un `catch`: la búsqueda de handler vivía dentro del brazo del
+/// opcode `Throw`, así que todo `Err(RuntimeError)` salía del bucle sin mirar
+/// la tabla de excepciones. Se materializa como una instancia de `Error` para
+/// que `e.message` funcione igual que con uno lanzado a mano.
+pub(crate) fn thrown_value_for(err: &RuntimeError, heap: &mut Heap) -> VmValue {
+    if let Some(v) = err.thrown {
+        return v;
+    }
+    let msg = heap.alloc_str_dynamic(&err.message);
+    let Some(cls) = heap.get_intrinsic_class(IntrinsicType::Error.as_str()) else {
+        // Sin la clase `Error` registrada (arranque temprano, isolate sin
+        // globals): el mensaje suelto sigue siendo capturable e imprimible.
+        return msg;
+    };
+    let oref = varn_types::value::ObjRef::instance(cls);
+    oref.set_field_nv(std::rc::Rc::from("message"), msg);
+    VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref)))
+}
+
+/// Busca un handler para `thrown_val` y, si lo encuentra, deja el contexto
+/// listo para reanudar dentro del `catch`. Devuelve si lo manejó.
+///
+/// `depth` es el fondo de la invocación actual de la máquina: por debajo hay
+/// frames de un llamador de Rust, que no puede reanudarse desde aquí, así que
+/// el error tiene que propagarse como `Err` en vez de desmontarlos.
+#[allow(dangerous_implicit_autorefs)]
+pub(crate) unsafe fn dispatch_to_handler(
+    ctx: *mut crate::exec::ExecCtx,
+    thrown_val: VmValue,
+    depth: usize,
+) -> bool {
+    if let Some(handler) = (*ctx).try_handlers.pop() {
+        crate::exec::frame_ctrl::unwind_to_handler(&mut *ctx, handler, thrown_val);
+        return true;
+    }
+    // Tabla lateral: coste cero mientras no se lanza nada.
+    while (*ctx).frames.len() > depth {
+        let cur_ip = (*ctx).frames.last().unwrap().ip as u32;
+        let proto = &(*ctx).frames.last().unwrap().closure().proto;
+        let hit = proto
+            .exception_table
+            .iter()
+            .find(|r| cur_ip >= r.try_start_ip && cur_ip <= r.try_end_ip)
+            .map(|r| (r.catch_ip as usize, r.err_reg as usize));
+        let Some((catch_ip, err_reg)) = hit else {
+            let popped = (*ctx).frames.pop().unwrap();
+            (*ctx).close_upvalues_above(popped.base);
+            continue;
+        };
+        let f2 = (*ctx).frames.len() - 1;
+        let b2 = (*ctx).frames[f2].base;
+        let required_depth = b2 + (*ctx).frames[f2].closure().proto.register_count as usize;
+        (*ctx).stack.truncate(required_depth);
+        let slot = b2 + err_reg;
+        if slot >= (*ctx).stack.len() {
+            (*ctx).stack.resize(slot + 1, VmValue::null());
+        }
+        (*ctx).stack[slot] = thrown_val;
+        (*ctx).frames[f2].ip = catch_ip;
+        return true;
+    }
+    false
+}
