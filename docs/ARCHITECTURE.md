@@ -60,7 +60,8 @@ flowchart TD
 >
 > Para las decisiones de fondo —por qué las referencias de heap son índices y
 > no punteros, y qué cuesta eso— ver
-> [AUDITORIA_DISENO.md](AUDITORIA_DISENO.md).
+> [AUDITORIA_DISENO.md](AUDITORIA_DISENO.md), y para el diseño de referencia
+> contra el que contrastarlas, [DISENO_IDEAL.md](DISENO_IDEAL.md).
 
 ## 2. Arquitectura de Crates y Modularidad
 
