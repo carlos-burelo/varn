@@ -222,6 +222,21 @@ un presupuesto de mejoras. Cualquier fase que se justifique sumando tramos
 —incluida la Fase 2 y sus 10,8 ns— tiene que demostrar su ganancia end-to-end
 antes de darse por buena.
 
+### Se puede estimar el techo de la arena sin construirla — NO
+
+La idea: hacer que el helper devuelva siempre el mismo objeto en vez de crear
+uno. El programa da resultados incorrectos a propósito, pero el tiempo diría
+cuánto cuesta el cruce con la creación a coste cero — el techo de lo que la
+Fase 2 podría recuperar.
+
+**Medición**: `panicked at heap/native.rs:200: heap.extract: dangling or
+corrupted heap reference`. El valor cacheado no es raíz del GC, así que la
+primera colección lo invalida. Es el mismo patrón que el bug abierto de
+`bench_http_routing`.
+
+Cualquier atajo que evite crear el objeto rompe el colector. **El beneficio de
+la Fase 2 no se puede estimar sin implementarla.**
+
 ## 4. Método de medición
 
 ### Wall-clock absoluto entre corridas separadas — INVÁLIDO en esta máquina

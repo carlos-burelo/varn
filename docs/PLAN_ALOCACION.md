@@ -149,6 +149,23 @@ aditivo, el helper se queda como camino lento.
 
 ## Fase 2 — La generación joven es una arena, no una tabla
 
+> **Estado: no arrancada, y con una advertencia que hay que leer antes.**
+>
+> Se intentó medir su techo antes de pagarla —una sonda que devolvía siempre el
+> mismo objeto, para cronometrar el cruce con la creación a coste cero— y **no
+> es posible**: el valor cacheado deja de ser raíz del GC y el programa muere
+> con «dangling or corrupted heap reference». Cualquier atajo que evite crear el
+> objeto rompe el colector, así que **el beneficio de esta fase no se puede
+> estimar sin implementarla**.
+>
+> Súmale que los tramos no son aditivos (ver más arriba): sus 10,8 ns nominales
+> pueden quedarse en nada por solapamiento, igual que le pasó a la Fase 1.
+>
+> Eso convierte la Fase 2 en una **apuesta**, no en una decisión informada. Es
+> defendible —es la única que cambia la LATENCIA del camino en vez de quitarle
+> trabajo solapable— pero hay que abordarla sabiendo eso, y con el bug de raíces
+> del JIT cerrado antes, no después.
+
 El cambio de fondo.
 
 `Nursery` deja de ser `Vec<Option<HeapObj>>` + `Vec<Option<u32>>` y pasa a ser
