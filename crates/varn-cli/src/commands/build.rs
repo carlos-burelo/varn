@@ -36,9 +36,9 @@ pub fn execute(args: BuildArgs) -> Result<(), CliError> {
         let payload = postcard::to_allocvec(&compiled.graph_artifact)
             .map_err(|e| CliError::fatal(format!("cannot serialize artifact: {e}")))?;
 
-        let wrc_envelope = varn_modules::artifact::write_envelope(
-            varn_modules::artifact::MAGIC_WRC,
-            pipeline::DISTRIBUTABLE_VERSION,
+        let wrc_envelope = varn_modules::artifact::write_artifact(
+            varn_modules::artifact::ArtifactKind::ModuleGraph,
+            varn_modules::artifact::ArtifactClass::Distributable,
             &payload,
         );
 

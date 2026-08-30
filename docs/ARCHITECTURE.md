@@ -15,7 +15,7 @@ Este documento ofrece una descripción técnica detallada e integral de la arqui
 - [7. Concurrencia: `await` e Isolates](#7-concurrencia-await-e-isolates)
 - [8. Interfaz Nativa LBI (`varn-builtins`)](#8-interfaz-nativa-lbi-varn-builtins)
 - [9. Sistema de Módulos y Bundles `.vnb`](#9-sistema-de-módulos-y-bundles-vnb)
-- [10. Formato de Artefacto `.vnc`](#10-formato-de-artefacto-vnc)
+- [10. Artefactos Serializados](#10-artefactos-serializados)
 
 ---
 
@@ -192,32 +192,38 @@ flowchart TD
 
 ---
 
-## 10. Formato de Artefacto `.vnc`
+## 10. Artefactos Serializados
 
-Los binarios compilados `.vnc` utilizan la siguiente estructura física:
+Todo artefacto de Varn —caché de compilación, interfaz del checker, bundle de stdlib, salida de `vn build`— comparte **una sola envolvente**:
 
 ```
-[ Magic Header: "WRC\0" (4 bytes) ]
-[ Version: u32 LE (4 bytes)       ]
-[ Serialized Module Graph Postcard Payload ]
+[0..4)    magic "VARN"
+[4..6)    versión de cabecera   u16 LE
+[6..8)    kind                  u16 LE    grafo | interfaz | bundle
+[8..9)    class                 u8        caché | distribuible
+[9..13)   BUILD_FINGERPRINT     u32 LE    forma del payload
+[13..17)  productor             u32 LE    0 en los distribuibles
+[17..)    payload (postcard)
 ```
 
-Permite la ejecución instantánea (`vn run app.vnc`) omitiendo el parsing y type checking.
+Antes eran cuatro magics (`WRC`, `VNC`, `VNM`, `VNB`) para **dos payloads reales**: `WRC` y `VNC` envolvían el mismo `ModuleGraphArtifact` y sólo se diferenciaban en la política de versión. Esa política la elegía *el sitio de llamada*, no el artefacto: nada dentro de un archivo decía de qué clase era, así que sellar un distribuible con la clave de una caché compilaba, pasaba los tests y sólo fallaba al llevar el `.vnc` a otra máquina. Ahora la clase viaja dentro y la validación se deriva de ella, así que esa clase de error no se puede escribir.
+
+El `kind` también paga: pedir un grafo y encontrar una interfaz de checker se diagnostica como *«se esperaba grafo de módulos, el archivo lleva interfaz de checker»* en vez de «magic incorrecto».
 
 ### Dos Clases de Artefacto
 
-Los magics ya las separaban; lo que faltaba era que cada una usara su propia versión.
-
-| Clase | Magic | Versión | Si no casa |
+| Clase | Quién | Validez | Si no casa |
 |---|---|---|---|
-| Caché interna (`~/.varn/cache`) | `VNC`, `VNM` | esquema **⊕ productor** | recompila en silencio |
-| Distribuible (`vn build`) | `WRC` (`.vnc` portable, standalone) | **sólo esquema** | error al usuario |
+| Caché (`~/.varn/cache`) | compilación (`.vncache`), interfaces (`.vnm`) | esquema **⊕ productor** | recompila en silencio |
+| Distribuible | `vn build` (`.vnc`), standalone, bundle de std | **sólo esquema** | error a quien lo ejecuta |
 
 Un distribuible viaja a otra máquina y lo ejecuta otro binario, así que atarlo a la identidad del productor lo vuelve ilegible en destino. Una entrada de caché es un detalle invisible y regenerable, así que puede —y debe— depender del binario que la emitió.
 
+Las extensiones ya no colisionan: `.vnc` es **sólo** el artefacto que produce `vn build` y que el usuario ejecuta; las entradas de caché usan `.vncache`. Compartir sufijo hacía que el mismo nombre designara dos cosas con reglas de validez opuestas.
+
 ### Clave de un Artefacto Cacheado
 
-Un `.vnc`/`.vnm` se identifica por dos cosas distintas, y ambas van en el **nombre** del archivo además de en la envolvente:
+Una entrada de caché se identifica por dos cosas distintas, y ambas van en el **nombre** del archivo además de en la envolvente:
 
 * **Forma del esquema** (`BUILD_FINGERPRINT`, hash de `varn-types` y `varn-modules`): si cambia, el artefacto no se puede ni deserializar. Su lista de crates es corta a propósito — observar desde el build script un crate del que todos dependen recompilaría el grafo entero en cada edición.
 * **Identidad del productor** (`producer_fingerprint`, ruta + tamaño + mtime del ejecutable): el bytecode cacheado es la SALIDA del compilador, así que el compilador forma parte de su clave. Se resuelve en tiempo de ejecución, lo que además captura cambios de toolchain que un hash de fuentes no ve.

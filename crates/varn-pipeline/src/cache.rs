@@ -21,8 +21,13 @@ pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
     // si dos binarios distintos comparten ruta de caché se sobreescriben el
     // archivo mutuamente y ninguno llega a reutilizar nada. Separarlos por
     // nombre deja a cada uno su propia entrada.
+    //
+    // Extensión `.vncache`, no `.vnc`: esta última es la del artefacto que
+    // produce `vn build` y que el usuario ejecuta. Compartirla hacía que el
+    // mismo sufijo nombrara dos cosas con reglas de validez opuestas —
+    // portable una, atada a este binario la otra.
     varn_modules::artifact::get_bytecode_cache_dir(&project_root).join(format!(
-        "{}.{:x}.{:08x}.vnc",
+        "{}.{:x}.{:08x}.vncache",
         stem,
         path_hash as u32,
         varn_modules::artifact::cache_key()
@@ -38,7 +43,6 @@ pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
 /// `std:time/duration` como ruta de disco.
 pub fn load_cached_graph(
     cache_path: &Path,
-    version: u32,
     entry_source: &str,
     verbose: bool,
 ) -> Result<Option<ModuleGraphArtifact>, String> {
@@ -46,12 +50,13 @@ pub fn load_cached_graph(
         return Ok(None);
     }
     let bytes = std::fs::read(cache_path).map_err(|e| e.to_string())?;
-    let payload =
-        varn_modules::artifact::read_envelope(varn_modules::artifact::MAGIC_VNC, version, &bytes)
-            .map_err(|e| e.to_string())?;
-    let dbg = verbose;
+    let payload = varn_modules::artifact::read_artifact(
+        varn_modules::artifact::ArtifactKind::ModuleGraph,
+        &bytes,
+    )
+    .map_err(|e| e.to_string())?;
     let reason = |what: std::fmt::Arguments<'_>| {
-        if dbg {
+        if verbose {
             varn_core::term::terminal::tagged("Varn", format_args!("cache miss: {what}"));
         }
     };
@@ -86,9 +91,7 @@ pub fn load_cached_graph(
             if let Some(src) = provider.embedded_source(path) {
                 let current_hash = crate::hash::fnv1a64(src.as_bytes());
                 if cached_hash != current_hash {
-                    if dbg {
-                        reason(format_args!("el módulo embebido {path} cambió"));
-                    }
+                    reason(format_args!("el módulo embebido {path} cambió"));
                     return Ok(None);
                 }
                 continue;
@@ -100,17 +103,13 @@ pub fn load_cached_graph(
                     Ok(src) => {
                         let current_hash = crate::hash::fnv1a64(&src);
                         if cached_hash != current_hash {
-                            if dbg {
-                                reason(format_args!("la fuente std {path} cambió"));
-                            }
+                            reason(format_args!("la fuente std {path} cambió"));
                             return Ok(None);
                         }
                         continue;
                     }
                     Err(e) => {
-                        if dbg {
-                            reason(format_args!("la fuente std {path} no se pudo leer: {e}"));
-                        }
+                        reason(format_args!("la fuente std {path} no se pudo leer: {e}"));
                         return Ok(None);
                     }
                 }
@@ -121,12 +120,12 @@ pub fn load_cached_graph(
             Ok(src) => {
                 let current_hash = crate::hash::fnv1a64(&src);
                 if cached_hash != current_hash {
-                    if dbg { reason(format_args!("la dependencia {path} cambió")); }
+                    reason(format_args!("la dependencia {path} cambió"));
                     return Ok(None);
                 }
             }
             Err(e) => {
-                if dbg { reason(format_args!("la dependencia {path} no se pudo leer: {e}")); }
+                reason(format_args!("la dependencia {path} no se pudo leer: {e}"));
                 return Ok(None);
             }
         }
@@ -156,9 +155,9 @@ pub fn store_cached_graph(cache_path: &Path, graph: &ModuleGraphArtifact) -> Pip
             e
         ))
     })?;
-    let bytes = varn_modules::artifact::write_envelope(
-        varn_modules::artifact::MAGIC_VNC,
-        crate::compile::cache_format_version(),
+    let bytes = varn_modules::artifact::write_artifact(
+        varn_modules::artifact::ArtifactKind::ModuleGraph,
+        varn_modules::artifact::ArtifactClass::Cache,
         &payload,
     );
     std::fs::write(cache_path, bytes).map_err(|e| {

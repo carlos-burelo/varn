@@ -8,19 +8,6 @@ use varn_core::ast::Program;
 use varn_debug::flags::DebugFlags;
 use varn_types::ModuleGraphArtifact;
 
-/// Clave de la caché interna de compilación (`.vnc` bajo `~/.varn/cache`):
-/// esquema más identidad del binario que lo emitió. No es `const` porque el
-/// productor se resuelve en tiempo de ejecución desde el propio ejecutable.
-pub fn cache_format_version() -> u32 {
-    varn_modules::artifact::cache_key()
-}
-
-/// Versión de los artefactos DISTRIBUIBLES (`vn build`: `.vnc` portable y
-/// ejecutables standalone). Sólo la forma del esquema: estos viajan a otras
-/// máquinas y los ejecuta otro binario, así que atarlos al productor los haría
-/// ilegibles en destino.
-pub const DISTRIBUTABLE_VERSION: u32 = varn_modules::artifact::BUILD_FINGERPRINT;
-
 type PipelineResult<T> = Result<T, PipelineError>;
 
 pub struct CompileOutput {
@@ -211,7 +198,6 @@ pub fn compile(
         acc.wrapping_mul(0x9e3779b97f4a7c15).wrapping_add(h)
     });
     let graph_artifact = ModuleGraphArtifact {
-        format_version: cache_format_version(),
         entry_path: graph_build.entry_path.clone(),
         graph_hash,
         source_hashes: graph_build.source_hashes,

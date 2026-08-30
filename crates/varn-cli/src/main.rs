@@ -170,9 +170,8 @@ fn try_run_standalone_executable() {
         return;
     }
 
-    let Ok(inner_payload) = varn_modules::artifact::read_envelope(
-        varn_modules::artifact::MAGIC_WRC,
-        pipeline::DISTRIBUTABLE_VERSION,
+    let Ok(inner_payload) = varn_modules::artifact::read_artifact(
+        varn_modules::artifact::ArtifactKind::ModuleGraph,
         &envelope,
     ) else {
         return;

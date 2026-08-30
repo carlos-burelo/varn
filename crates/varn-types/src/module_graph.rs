@@ -14,7 +14,6 @@ pub struct PackageNode {
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct ModuleGraphArtifact {
-    pub format_version: u32,
     pub entry_path: String,
     pub graph_hash: u64,
     pub source_hashes: HashMap<String, u64>,

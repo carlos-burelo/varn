@@ -66,9 +66,8 @@ pub(super) fn try_load_cache(
         return None;
     }
     let bytes = std::fs::read(&cache_file).ok()?;
-    let payload = match varn_modules::artifact::read_envelope(
-        varn_modules::artifact::MAGIC_VNM,
-        varn_modules::artifact::cache_key(),
+    let payload = match varn_modules::artifact::read_artifact(
+        varn_modules::artifact::ArtifactKind::CheckerInterface,
         &bytes,
     ) {
         Ok(p) => p,
@@ -115,9 +114,9 @@ pub(super) fn save_to_cache(
         bind: bind.clone(),
     };
     if let Ok(payload) = postcard::to_allocvec(&cached) {
-        let bytes = varn_modules::artifact::write_envelope(
-            varn_modules::artifact::MAGIC_VNM,
-            varn_modules::artifact::cache_key(),
+        let bytes = varn_modules::artifact::write_artifact(
+            varn_modules::artifact::ArtifactKind::CheckerInterface,
+            varn_modules::artifact::ArtifactClass::Cache,
             &payload,
         );
         let _ = std::fs::write(&cache_file, bytes);

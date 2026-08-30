@@ -334,7 +334,6 @@ pub fn compile_stdlib_bundle(std_dir: &std::path::Path) -> Result<Vec<u8>, Strin
 
     let bundle = varn_modules::bundle::StdBundle {
         std_version: manifest.version,
-        build_fingerprint: varn_modules::artifact::BUILD_FINGERPRINT,
         host_api_version: varn_core::HOST_API_VERSION,
         modules,
     };

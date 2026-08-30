@@ -22,9 +22,9 @@ pub const STD_DIR_NAME: &str = "std";
 pub const STD_EMBEDDED_SENTINEL: &str = "@embedded";
 
 /// Where `std:` comes from. Two forms only, and the override is always
-/// source: a `.vnb` is gated on `build_fingerprint` equality, so the only
-/// bundle a given `vn` accepts is the one its own build produced — which is
-/// precisely the embedded one. A loose bundle file could never be anything
+/// source: a `.vnb` is gated on schema equality by its envelope, so the only
+/// bundle a given `vn` accepts is one built from the same artifact schema —
+/// in practice the embedded one. A loose bundle file could never be anything
 /// but a copy of it, so there is no tier for one.
 #[derive(Debug, Clone)]
 pub enum StdSource {

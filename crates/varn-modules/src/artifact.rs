@@ -71,22 +71,16 @@ pub fn producer_fingerprint() -> u32 {
     })
 }
 
-/// Clave de la CACHÉ INTERNA (`~/.varn/cache`: `.vnc` de compilación, `.vnm`
-/// de interfaces): forma del esquema e identidad del productor juntas.
+/// Clave con la que se NOMBRA una entrada de caché en disco: esquema e
+/// identidad del productor juntos.
 ///
-/// Los artefactos de esta clase son un detalle de implementación, invisibles y
-/// regenerables: si la clave no casa, se recompila en silencio. Por eso pueden
-/// —y deben— depender del binario que los emitió.
+/// Va en el nombre del archivo además de en la envolvente, y por un motivo
+/// distinto: la envolvente decide si una entrada es *válida*, el nombre decide
+/// de *quién* es. Sin ella dos binarios comparten ruta, se sobreescriben la
+/// entrada en cada ejecución y ninguno reutiliza nada — el artefacto seguiría
+/// siendo correcto, pero la caché dejaría de servir para lo que existe.
 ///
-/// Los artefactos DISTRIBUIBLES son la otra clase y siguen la regla contraria:
-/// un `.vnc` de `vn build` o un ejecutable standalone viajan a otra máquina y
-/// se ejecutan con otro binario, así que sólo pueden depender de
-/// [`BUILD_FINGERPRINT`], que es lo que determina si el contenido se puede
-/// deserializar. Sellarlos con la identidad del productor los volvería
-/// ilegibles fuera de la máquina que los construyó.
-///
-/// Los magics ya separan las dos clases ([`MAGIC_VNC`]/[`MAGIC_VNM`] frente a
-/// [`MAGIC_WRC`]); lo que faltaba era que cada una usara su propia versión.
+/// La validez la aplica [`read_artifact`] a partir de [`ArtifactClass`].
 pub fn cache_key() -> u32 {
     BUILD_FINGERPRINT ^ producer_fingerprint()
 }
@@ -156,12 +150,133 @@ pub fn prune_superseded(current: &Path) {
 /// pierda su entrada, y acota el directorio a un múltiplo pequeño.
 pub const ARTIFACT_GENERATIONS: usize = 3;
 
-pub const MAGIC_WRC: &[u8; 4] = b"WRC\0";
-pub const MAGIC_VNC: &[u8; 4] = b"VNC\0";
-pub const MAGIC_VNM: &[u8; 4] = b"VNM\0";
-pub const MAGIC_VNB: &[u8; 4] = b"VNB\0";
+/// Cabecera única de todo artefacto serializado de Varn.
+///
+/// Antes había cuatro magics (`WRC`, `VNC`, `VNM`, `VNB`) para dos payloads
+/// reales: el grafo de módulos compilado y la interfaz del checker. `WRC` y
+/// `VNC` envolvían el MISMO tipo, y su única diferencia era la política de
+/// versión — que elegía el sitio de llamada, no el artefacto. Nada dentro de
+/// un archivo decía de qué clase era, así que sellar un distribuible con la
+/// clave de una caché compilaba, pasaba los tests, y sólo se notaba al llevar
+/// el `.vnc` a otra máquina. Ahora la clase viaja DENTRO y la validación se
+/// deriva de ella.
+pub const MAGIC: &[u8; 4] = b"VARN";
+
+/// Marcador de cola de un ejecutable standalone. No es una envolvente: son los
+/// últimos cuatro bytes del `.exe`, que señalan que lleva un artefacto pegado.
 pub const MAGIC_VEXE: &[u8; 4] = b"VEXE";
-pub const VNB_FORMAT_VERSION: u32 = 2;
+
+/// Versión de esta CABECERA. Sube sólo si cambia la disposición de los campos,
+/// no cuando cambia el contenido del payload — de eso responde
+/// [`BUILD_FINGERPRINT`].
+const ENVELOPE_VERSION: u16 = 1;
+
+/// Qué lleva el payload. Lo comprueba el lector, que sabe qué esperaba: pedir
+/// un grafo y encontrar una interfaz del checker es un error de programa, y se
+/// diagnostica como tal en vez de como "magic incorrecto".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u16)]
+pub enum ArtifactKind {
+    /// `ModuleGraphArtifact`: grafo de módulos compilado a bytecode.
+    ModuleGraph = 1,
+    /// `CachedModule` de varn-checker: interfaz (exports + binds) de un módulo.
+    CheckerInterface = 2,
+    /// `StdBundle`: interfaces, bytecode y fuentes de toda la stdlib.
+    StdBundle = 3,
+}
+
+impl ArtifactKind {
+    fn from_u16(v: u16) -> Option<Self> {
+        match v {
+            1 => Some(Self::ModuleGraph),
+            2 => Some(Self::CheckerInterface),
+            3 => Some(Self::StdBundle),
+            _ => None,
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::ModuleGraph => "grafo de modulos",
+            Self::CheckerInterface => "interfaz de checker",
+            Self::StdBundle => "bundle de stdlib",
+        }
+    }
+}
+
+/// Para qué existe el artefacto, que es lo que determina cómo se valida.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum ArtifactClass {
+    /// Detalle de implementación regenerable bajo `~/.varn/cache`. Se sella
+    /// también con la identidad del productor: es la salida de ESTE compilador
+    /// y no debe sobrevivirle. Si no casa, se recompila en silencio.
+    Cache = 1,
+    /// Producto que el usuario mueve: `vn build`, ejecutables standalone, el
+    /// bundle de std. Viaja a otra máquina y lo ejecuta otro binario, así que
+    /// sólo puede depender del esquema. Si no casa, es un error que se reporta
+    /// a quien lo ejecuta.
+    Distributable = 2,
+}
+
+impl ArtifactClass {
+    fn from_u8(v: u8) -> Option<Self> {
+        match v {
+            1 => Some(Self::Cache),
+            2 => Some(Self::Distributable),
+            _ => None,
+        }
+    }
+
+    /// La identidad de productor que corresponde sellar para esta clase.
+    fn producer_stamp(self) -> u32 {
+        match self {
+            Self::Cache => producer_fingerprint(),
+            Self::Distributable => 0,
+        }
+    }
+}
+
+/// Por qué se rechazó un artefacto. La distinción importa: [`Self::Superseded`]
+/// es la operación normal de una caché y se recompila sin decir nada, mientras
+/// que los demás son archivos que no deberían estar ahí.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ArtifactError {
+    TooShort,
+    BadMagic,
+    /// Cabecera de una versión de Varn que este binario no entiende.
+    UnknownEnvelope(u16),
+    UnknownKind(u16),
+    UnknownClass(u8),
+    /// Se pidió un tipo y el archivo lleva otro.
+    WrongKind {
+        expected: ArtifactKind,
+        found: ArtifactKind,
+    },
+    /// Emitido por otro build: esquema o productor distintos.
+    Superseded,
+}
+
+impl std::fmt::Display for ArtifactError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TooShort => write!(f, "artefacto truncado"),
+            Self::BadMagic => write!(f, "no es un artefacto de Varn"),
+            Self::UnknownEnvelope(v) => {
+                write!(f, "cabecera de artefacto v{v}, no reconocida por este vn")
+            }
+            Self::UnknownKind(k) => write!(f, "tipo de artefacto desconocido ({k})"),
+            Self::UnknownClass(c) => write!(f, "clase de artefacto desconocida ({c})"),
+            Self::WrongKind { expected, found } => write!(
+                f,
+                "se esperaba {}, el archivo lleva {}",
+                expected.name(),
+                found.name()
+            ),
+            Self::Superseded => write!(f, "compilado por otra version de Varn"),
+        }
+    }
+}
 
 pub fn find_project_root(start_path: &Path) -> PathBuf {
     start_path
@@ -212,28 +327,73 @@ fn dirs_home() -> Option<PathBuf> {
     }
 }
 
-pub fn write_envelope(magic: &[u8; 4], version: u32, payload: &[u8]) -> Vec<u8> {
-    let mut out = Vec::with_capacity(8 + payload.len());
-    out.extend_from_slice(magic);
-    out.extend_from_slice(&version.to_le_bytes());
+/// Disposición de la cabecera, 15 bytes:
+///
+/// ```text
+/// [0..4)   magic "VARN"
+/// [4..6)   ENVELOPE_VERSION  u16 LE
+/// [6..8)   ArtifactKind      u16 LE
+/// [8..9)   ArtifactClass     u8
+/// [9..13)  BUILD_FINGERPRINT u32 LE   forma del payload
+/// [13..17) productor         u32 LE   0 en los distribuibles
+/// [17..)   payload
+/// ```
+const HEADER_LEN: usize = 17;
+
+/// Sella un payload. La `class` decide sola qué identidad de productor se
+/// graba, así que quien escribe no puede equivocarse de política: declara para
+/// qué es el artefacto y el resto se deriva.
+pub fn write_artifact(kind: ArtifactKind, class: ArtifactClass, payload: &[u8]) -> Vec<u8> {
+    let mut out = Vec::with_capacity(HEADER_LEN + payload.len());
+    out.extend_from_slice(MAGIC);
+    out.extend_from_slice(&ENVELOPE_VERSION.to_le_bytes());
+    out.extend_from_slice(&(kind as u16).to_le_bytes());
+    out.push(class as u8);
+    out.extend_from_slice(&BUILD_FINGERPRINT.to_le_bytes());
+    out.extend_from_slice(&class.producer_stamp().to_le_bytes());
     out.extend_from_slice(payload);
     out
 }
 
-pub fn read_envelope<'a>(
-    magic: &[u8; 4],
-    expected_version: u32,
-    bytes: &'a [u8],
-) -> Result<&'a [u8], &'static str> {
-    if bytes.len() < 8 {
-        return Err("invalid artifact: file too short");
+/// Valida y devuelve el payload. `expected` es lo que el llamante va a
+/// deserializar; que no coincida es un error de programa, no un artefacto
+/// obsoleto, y se distingue como tal.
+///
+/// La regla de caducidad NO la pone el llamante: sale de la `class` grabada en
+/// el archivo. Un distribuible se acepta en cualquier máquina mientras el
+/// esquema case; una entrada de caché exige además haber salido de este mismo
+/// binario.
+pub fn read_artifact(expected: ArtifactKind, bytes: &[u8]) -> Result<&[u8], ArtifactError> {
+    if bytes.len() < HEADER_LEN {
+        return Err(ArtifactError::TooShort);
     }
-    if &bytes[..4] != magic {
-        return Err("invalid artifact: bad magic header");
+    if &bytes[..4] != MAGIC {
+        return Err(ArtifactError::BadMagic);
     }
-    let version = u32::from_le_bytes(bytes[4..8].try_into().unwrap());
-    if version != expected_version {
-        return Err("invalid artifact: version mismatch");
+    let envelope = u16::from_le_bytes(bytes[4..6].try_into().unwrap());
+    if envelope != ENVELOPE_VERSION {
+        return Err(ArtifactError::UnknownEnvelope(envelope));
     }
-    Ok(&bytes[8..])
+    let raw_kind = u16::from_le_bytes(bytes[6..8].try_into().unwrap());
+    let Some(kind) = ArtifactKind::from_u16(raw_kind) else {
+        return Err(ArtifactError::UnknownKind(raw_kind));
+    };
+    if kind != expected {
+        return Err(ArtifactError::WrongKind {
+            expected,
+            found: kind,
+        });
+    }
+    let Some(class) = ArtifactClass::from_u8(bytes[8]) else {
+        return Err(ArtifactError::UnknownClass(bytes[8]));
+    };
+    let schema = u32::from_le_bytes(bytes[9..13].try_into().unwrap());
+    if schema != BUILD_FINGERPRINT {
+        return Err(ArtifactError::Superseded);
+    }
+    let producer = u32::from_le_bytes(bytes[13..17].try_into().unwrap());
+    if producer != class.producer_stamp() {
+        return Err(ArtifactError::Superseded);
+    }
+    Ok(&bytes[HEADER_LEN..])
 }
