@@ -53,6 +53,10 @@ flowchart TD
 > objetos, el GC como causa del coste de alocar, varias raíces del colector— con
 > el dato que cerró cada una. Reabrir una exige un dato nuevo que contradiga al
 > que la mató.
+>
+> El frente abierto de rendimiento es el coste de alocar un objeto (60 ns
+> contra los 24 de Bun), que decide todos los benchmarks que perdemos. El plan
+> está en [PLAN_ALOCACION.md](PLAN_ALOCACION.md).
 
 ## 2. Arquitectura de Crates y Modularidad
 
