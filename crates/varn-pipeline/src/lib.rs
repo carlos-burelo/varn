@@ -14,7 +14,7 @@ mod opts;
 mod parse;
 mod quiet_parse;
 pub mod stdlib_loader;
-pub mod wrc;
+pub mod portable;
 
 mod lex;
 
@@ -41,8 +41,8 @@ pub fn read_source_file(path: &str) -> PipelineResult<String> {
 }
 
 pub fn run(opts: &RunOpts) -> PipelineResult<()> {
-    if wrc::is_wrc(&opts.file_path) {
-        return run_wrc(opts);
+    if portable::is_portable(&opts.file_path) {
+        return run_portable(opts);
     }
 
     let source = if let Some(ref s) = opts.eval {
@@ -82,8 +82,8 @@ pub fn run(opts: &RunOpts) -> PipelineResult<()> {
     )
 }
 
-fn run_wrc(opts: &RunOpts) -> PipelineResult<()> {
-    let artifact = wrc::read_wrc(&opts.file_path)?;
+fn run_portable(opts: &RunOpts) -> PipelineResult<()> {
+    let artifact = portable::read_portable(&opts.file_path)?;
     let compiled = cache::compile_output_from_graph(artifact)?;
 
     if opts.no_run {

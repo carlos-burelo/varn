@@ -160,7 +160,7 @@ pub fn store_cached_graph(cache_path: &Path, graph: &ModuleGraphArtifact) -> Pip
         varn_modules::artifact::ArtifactClass::Cache,
         &payload,
     );
-    std::fs::write(cache_path, bytes).map_err(|e| {
+    varn_modules::artifact::write_artifact_file(cache_path, &bytes).map_err(|e| {
         PipelineError::fatal(format!(
             "{}{}error[cache]{}: write failed: {}",
             varn_debug::colors::BOLD,

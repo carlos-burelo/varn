@@ -203,12 +203,21 @@ Todo artefacto de Varn —caché de compilación, interfaz del checker, bundle d
 [8..9)    class                 u8        caché | distribuible
 [9..13)   BUILD_FINGERPRINT     u32 LE    forma del payload
 [13..17)  productor             u32 LE    0 en los distribuibles
-[17..)    payload (postcard)
+[17..21)  checksum              u32 LE    FNV-1a del payload
+[21..)    payload (postcard)
 ```
 
 Antes eran cuatro magics (`WRC`, `VNC`, `VNM`, `VNB`) para **dos payloads reales**: `WRC` y `VNC` envolvían el mismo `ModuleGraphArtifact` y sólo se diferenciaban en la política de versión. Esa política la elegía *el sitio de llamada*, no el artefacto: nada dentro de un archivo decía de qué clase era, así que sellar un distribuible con la clave de una caché compilaba, pasaba los tests y sólo fallaba al llevar el `.vnc` a otra máquina. Ahora la clase viaja dentro y la validación se deriva de ella, así que esa clase de error no se puede escribir.
 
 El `kind` también paga: pedir un grafo y encontrar una interfaz de checker se diagnostica como *«se esperaba grafo de módulos, el archivo lleva interfaz de checker»* en vez de «magic incorrecto».
+
+### Integridad
+
+postcard no lleva descripción del esquema: detecta la corrupción sólo cuando produce una longitud imposible. Alterar bytes **dentro** de un `Vec<u16>` de bytecode deserializa sin quejarse y se ejecutaría sin que nada lo notase. El checksum es lo que convierte eso en un error.
+
+Y las entradas de caché se escriben a un temporal y se renombran. `fs::write` trunca y va llenando, así que un `vn` concurrente —el LSP y una terminal a la vez es lo normal— o un Ctrl-C dejaban una entrada parcial en su sitio definitivo.
+
+El checksum no es criptográfico ni pretende serlo: cubre escrituras a medias y discos con bits podridos, no manipulación deliberada. Quien puede reescribir el archivo puede recalcular el checksum — y ejecutar un artefacto ya es ejecutar código, igual que un `.exe`.
 
 ### Dos Clases de Artefacto
 

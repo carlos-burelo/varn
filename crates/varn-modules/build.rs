@@ -1,13 +1,31 @@
 use std::io::Write;
 use std::path::Path;
 
-/// Crates whose type definitions shape serialized binary artifact schemas
-/// (`.vnc`/`.vnb` bytecode payloads and `.vnm` checker interface blobs).
-/// Isolating the watch list to schema-defining crates enables true independent
-/// incremental compilation across all frontend, compiler, VM and CLI crates.
+/// Crates whose type definitions shape serialized binary artifact schemas.
+/// The list must cover every type that reaches a payload, transitively — a
+/// gap here is not a stale artifact but a WRONG one: postcard carries no
+/// schema, so a struct that gained a field is read back as whatever the new
+/// layout says those bytes mean.
+///
+/// * `varn-types`  — `ModuleGraphArtifact`, `FunctionProto`.
+/// * `varn-modules` — `StdBundle` and this envelope.
+/// * `varn-checker` — `CachedModule { ExportMap, BindResult }`, which is the
+///   payload of every `.vnm` and rides inside the std bundle. It was missing:
+///   the bundle is a DISTRIBUTABLE, validated on schema alone, so a checker
+///   type change left older bundles looking valid. Nothing broke only because
+///   `varn-cli`'s build script rebuilds the bundle whenever `varn-pipeline`
+///   recompiles — an accident of the dependency graph, not a guarantee.
+///
+/// Watching a crate that others depend on does widen recompilation. Measured
+/// on this host, touching `varn-checker/src/symbol.rs` and rebuilding
+/// `vn --release`: 111 s before, 129 s after — +16%, and only on edits to
+/// this one crate. The frontend, compiler, VM and CLI crates stay independent
+/// of each other; only the three schema crates pull the graph. That is the
+/// price of the guarantee the doc comment above already claimed.
 const FINGERPRINTED_CRATES: &[&str] = &[
     "varn-types",
     "varn-modules",
+    "varn-checker",
 ];
 
 fn main() {

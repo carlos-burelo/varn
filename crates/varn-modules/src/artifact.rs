@@ -255,6 +255,9 @@ pub enum ArtifactError {
     },
     /// Emitido por otro build: esquema o productor distintos.
     Superseded,
+    /// El payload no coincide con su checksum: escritura a medias, disco con
+    /// bit podrido o edición del archivo.
+    Corrupt,
 }
 
 impl std::fmt::Display for ArtifactError {
@@ -274,8 +277,22 @@ impl std::fmt::Display for ArtifactError {
                 found.name()
             ),
             Self::Superseded => write!(f, "compilado por otra version de Varn"),
+            Self::Corrupt => write!(f, "artefacto corrupto (checksum no coincide)"),
         }
     }
+}
+
+/// FNV-1a de 32 bits sobre el payload. No es criptográfico y no pretende
+/// serlo: detecta escrituras a medias y corrupción de disco, no manipulación
+/// deliberada — quien puede reescribir el archivo puede recalcular el
+/// checksum, y de todas formas ejecutar un artefacto ya es ejecutar código.
+fn payload_checksum(payload: &[u8]) -> u32 {
+    let mut hash: u32 = 0x811c9dc5;
+    for &b in payload {
+        hash ^= b as u32;
+        hash = hash.wrapping_mul(0x0100_0193);
+    }
+    hash
 }
 
 pub fn find_project_root(start_path: &Path) -> PathBuf {
@@ -327,7 +344,7 @@ fn dirs_home() -> Option<PathBuf> {
     }
 }
 
-/// Disposición de la cabecera, 15 bytes:
+/// Disposición de la cabecera, 21 bytes:
 ///
 /// ```text
 /// [0..4)   magic "VARN"
@@ -336,9 +353,10 @@ fn dirs_home() -> Option<PathBuf> {
 /// [8..9)   ArtifactClass     u8
 /// [9..13)  BUILD_FINGERPRINT u32 LE   forma del payload
 /// [13..17) productor         u32 LE   0 en los distribuibles
-/// [17..)   payload
+/// [17..21) checksum          u32 LE   FNV-1a del payload
+/// [21..)   payload
 /// ```
-const HEADER_LEN: usize = 17;
+const HEADER_LEN: usize = 21;
 
 /// Sella un payload. La `class` decide sola qué identidad de productor se
 /// graba, así que quien escribe no puede equivocarse de política: declara para
@@ -351,6 +369,7 @@ pub fn write_artifact(kind: ArtifactKind, class: ArtifactClass, payload: &[u8]) 
     out.push(class as u8);
     out.extend_from_slice(&BUILD_FINGERPRINT.to_le_bytes());
     out.extend_from_slice(&class.producer_stamp().to_le_bytes());
+    out.extend_from_slice(&payload_checksum(payload).to_le_bytes());
     out.extend_from_slice(payload);
     out
 }
@@ -395,5 +414,34 @@ pub fn read_artifact(expected: ArtifactKind, bytes: &[u8]) -> Result<&[u8], Arti
     if producer != class.producer_stamp() {
         return Err(ArtifactError::Superseded);
     }
-    Ok(&bytes[HEADER_LEN..])
+    let expected_sum = u32::from_le_bytes(bytes[17..21].try_into().unwrap());
+    let payload = &bytes[HEADER_LEN..];
+    // postcard no lleva descripción del esquema, así que detecta la corrupción
+    // sólo cuando produce una longitud imposible. Alterar bytes DENTRO de un
+    // `Vec<u16>` de bytecode deserializa perfectamente y se ejecutaría sin que
+    // nada lo notara; el checksum es lo que convierte eso en un error.
+    if payload_checksum(payload) != expected_sum {
+        return Err(ArtifactError::Corrupt);
+    }
+    Ok(payload)
+}
+
+/// Escribe un artefacto de forma que ningún lector pueda ver una versión a
+/// medias: a un temporal en el mismo directorio y luego `rename`, que es
+/// atómico dentro de un volumen.
+///
+/// `fs::write` trunca y va llenando, así que un `vn` concurrente —el LSP y una
+/// terminal a la vez es lo normal— o un Ctrl-C dejan una entrada parcial en su
+/// sitio definitivo. Con checksum eso se detecta, pero se detecta *después* de
+/// haber perdido la entrada; con rename no llega a ocurrir.
+pub fn write_artifact_file(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let tmp = path.with_extension(format!("tmp{}", std::process::id()));
+    std::fs::write(&tmp, bytes)?;
+    match std::fs::rename(&tmp, path) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            let _ = std::fs::remove_file(&tmp);
+            Err(e)
+        }
+    }
 }

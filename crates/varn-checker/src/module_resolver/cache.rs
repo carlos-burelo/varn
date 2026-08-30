@@ -119,7 +119,7 @@ pub(super) fn save_to_cache(
             varn_modules::artifact::ArtifactClass::Cache,
             &payload,
         );
-        let _ = std::fs::write(&cache_file, bytes);
+        let _ = varn_modules::artifact::write_artifact_file(&cache_file, &bytes);
         varn_modules::artifact::prune_superseded(&cache_file);
     }
 }

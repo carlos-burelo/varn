@@ -36,16 +36,16 @@ pub fn execute(args: BuildArgs) -> Result<(), CliError> {
         let payload = postcard::to_allocvec(&compiled.graph_artifact)
             .map_err(|e| CliError::fatal(format!("cannot serialize artifact: {e}")))?;
 
-        let wrc_envelope = varn_modules::artifact::write_artifact(
+        let portable_envelope = varn_modules::artifact::write_artifact(
             varn_modules::artifact::ArtifactKind::ModuleGraph,
             varn_modules::artifact::ArtifactClass::Distributable,
             &payload,
         );
 
-        let mut standalone = Vec::with_capacity(host_bytes.len() + wrc_envelope.len() + 12);
+        let mut standalone = Vec::with_capacity(host_bytes.len() + portable_envelope.len() + 12);
         standalone.extend_from_slice(&host_bytes);
-        standalone.extend_from_slice(&wrc_envelope);
-        standalone.extend_from_slice(&(wrc_envelope.len() as u64).to_le_bytes());
+        standalone.extend_from_slice(&portable_envelope);
+        standalone.extend_from_slice(&(portable_envelope.len() as u64).to_le_bytes());
         standalone.extend_from_slice(varn_modules::artifact::MAGIC_VEXE);
 
         std::fs::write(&out_path, &standalone).map_err(|e| {
@@ -54,7 +54,7 @@ pub fn execute(args: BuildArgs) -> Result<(), CliError> {
             ))
         })?;
     } else {
-        pipeline::wrc::write_wrc(&out_path, &compiled.graph_artifact)?;
+        pipeline::portable::write_portable(&out_path, &compiled.graph_artifact)?;
     }
 
     let size = std::fs::metadata(&out_path).map(|m| m.len()).unwrap_or(0);

@@ -22,13 +22,13 @@ use crate::error::CliError;
 
 pub fn run(path: &str, opts: &BenchOpts) -> Result<(), CliError> {
     let runs = opts.runs;
-    let compiled = crate::pipeline::wrc::read_wrc(path)?;
+    let compiled = crate::pipeline::portable::read_portable(path)?;
     let compile_output = crate::pipeline::cache::compile_output_from_graph(compiled)?;
 
     let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
 
     let load_samples = time_n(runs, || {
-        crate::pipeline::wrc::read_wrc(path)
+        crate::pipeline::portable::read_portable(path)
             .map(|_| ())
             .map_err(|e| e.message.clone())
     })?;

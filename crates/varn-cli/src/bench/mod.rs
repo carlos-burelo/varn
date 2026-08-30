@@ -19,7 +19,7 @@ pub struct BenchOpts {
 }
 
 pub fn run_bench(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliError> {
-    if eval.is_none() && crate::pipeline::wrc::is_wrc(path) {
+    if eval.is_none() && crate::pipeline::portable::is_portable(path) {
         return compiled::run(path, opts);
     }
     source::run(path, eval, opts)
