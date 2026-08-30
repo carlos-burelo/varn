@@ -1,3 +1,10 @@
+/// Cada objeto de Varn es una asignación del allocator global (`ObjData` es un
+/// DST detrás de un `Rc`), así que el allocator está en el camino caliente de
+/// todo programa que construya objetos. El de Windows (`HeapAlloc`) es la razón
+/// medida de que alocar cueste ~90 ns por objeto frente a los ~24 ns de Bun.
+#[global_allocator]
+static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 mod bench;
 mod cli;
 mod commands;

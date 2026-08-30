@@ -37,6 +37,7 @@ postcard      = { workspace = true }
 clap          = { version = "4", features = ["derive"] }
 clap_complete = "4"
 rustc-hash    = { workspace = true }
+mimalloc = "0.1.52"
 
 [build-dependencies]
 varn-pipeline = { path = "../varn-pipeline" }

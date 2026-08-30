@@ -14,22 +14,7 @@ pub(crate) fn build_object_with_shape(
     shape: Rc<varn_types::Shape>,
     heap: &mut Heap,
 ) -> VmValue {
-    let count = shape.property_names.len();
-
-    for i in 0..count {
-        let val_nv = stack[values_start + i];
-        if val_nv.is_heap() {
-            if let Some(crate::heap::HeapObj::VmClosure(nc)) = heap.get(val_nv.as_heap_idx()) {
-                let nc = nc.clone();
-                for uv in &nc.upvalues {
-                    uv.close(stack);
-                }
-            }
-        }
-    }
-
-    let values = stack[values_start..values_start + count].to_vec();
-    let oref = ObjRef::with_shape(shape, values);
+    let oref = build_shaped(stack, values_start, shape, heap);
     VmValue::from_heap_idx(heap.alloc(HeapObj::Object(oref)))
 }
 
@@ -39,13 +24,32 @@ pub(crate) fn build_record_with_shape(
     shape: Rc<varn_types::Shape>,
     heap: &mut Heap,
 ) -> VmValue {
+    let oref = build_shaped(stack, values_start, shape, heap);
+    VmValue::from_heap_idx(heap.alloc(HeapObj::Record(oref)))
+}
+
+/// Parte común de objeto y record: cerrar las upvalues de los valores que sean
+/// closures y copiar los campos dentro del objeto.
+///
+/// `with_shape_slice`, no `with_shape`: la forma con `Vec` aloca un buffer,
+/// lo copia en el almacenamiento inline del objeto y lo tira — una asignación
+/// entera de heap por objeto construido, sin ningún fin. Es el mismo derroche
+/// que el comentario de `ObjData::with_shape_slice` documenta como corregido
+/// para `JSON.parse`, y estaba en el camino principal de creación de objetos.
+fn build_shaped(
+    stack: &[VmValue],
+    values_start: usize,
+    shape: Rc<varn_types::Shape>,
+    heap: &Heap,
+) -> ObjRef {
     let count = shape.property_names.len();
 
     for i in 0..count {
         let val_nv = stack[values_start + i];
         if val_nv.is_heap() {
+            // Sin clonar el closure: sólo se leen sus upvalues, y `close` toca
+            // la pila, no el heap.
             if let Some(crate::heap::HeapObj::VmClosure(nc)) = heap.get(val_nv.as_heap_idx()) {
-                let nc = nc.clone();
                 for uv in &nc.upvalues {
                     uv.close(stack);
                 }
@@ -53,9 +57,7 @@ pub(crate) fn build_record_with_shape(
         }
     }
 
-    let values = stack[values_start..values_start + count].to_vec();
-    let oref = ObjRef::with_shape(shape, values);
-    VmValue::from_heap_idx(heap.alloc(HeapObj::Record(oref)))
+    ObjRef::with_shape_slice(shape, &stack[values_start..values_start + count])
 }
 
 #[inline(always)]

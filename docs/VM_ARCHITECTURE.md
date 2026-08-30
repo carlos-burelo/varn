@@ -106,6 +106,14 @@ Puntero del Heap                          Propiedades en Offsets Fijos
 
 Dado que la cabecera y el array de campos forman un bloque contiguo, el objeto **nunca se mueve en memoria**, garantizando la validez de punteros en código C/Rust nativo.
 
+### El Allocator Está en el Camino Caliente
+
+Un objeto DST es *una* asignación, pero sigue siendo una asignación del allocator global por cada objeto que el programa construye. Eso pone al allocator dentro del bucle caliente de cualquier programa con objetos, y el de Windows (`HeapAlloc`) no está a la altura: medido con 2 millones de objetos que mueren jóvenes —el colector no llega a copiar nada—, alocar costaba ~90 ns por objeto frente a los ~24 ns de Bun.
+
+El binario `vn` instala **mimalloc** como `#[global_allocator]`. Baja el coste a ~60 ns por objeto, no cambia el tamaño del ejecutable (17,78 MB frente a 17,88 MB) y no penaliza el arranque (42 ms frente a 46 ms, programa vacío). Sobre los benchmarks reales, medido A/B con caché purgada y mediana de tres: `gc_alloc` −42 %, `dto` −43 %, `collection_pipeline` −39 %, `json_api_payloads` −41 %.
+
+Ese coste sigue siendo la distancia principal contra Bun en programas que construyen objetos. La vía siguiente es no llamar al allocator una vez por objeto — un arena por el que el nursery reparta a puntero móvil —, no seguir afinando el allocator.
+
 ---
 
 ## 5. Sistema de Inline Cache (IC) Polimórfico
