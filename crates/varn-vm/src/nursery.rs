@@ -29,6 +29,17 @@ pub struct Nursery {
     objects: Vec<Option<HeapObj>>,
     forwarding: Vec<Option<u32>>,
     pub remembered: Vec<u32>,
+    /// Buffers de trabajo del colector menor, propiedad del `Nursery` para
+    /// conservar su capacidad entre colecciones. Antes eran locales de
+    /// `collect`, así que cada minor GC asignaba y liberaba 256 KB de
+    /// worklist más una copia del vector de raíces del old gen; ese coste era
+    /// fijo por colección, no proporcional a lo que sobrevive.
+    ///
+    /// `collect` los saca con `mem::take` y los devuelve al terminar: los
+    /// métodos que los consumen también toman `&mut self`, así que no pueden
+    /// prestarse como campos a la vez.
+    worklist: Vec<u32>,
+    scan_candidates: Vec<u32>,
     pub alloc_count: u64,
     pub minor_gc_count: u64,
     pub minor_gc_promoted: u64,
@@ -70,6 +81,8 @@ impl Clone for Nursery {
             objects,
             forwarding,
             remembered: self.remembered.clone(),
+            worklist: Vec::new(),
+            scan_candidates: Vec::new(),
             alloc_count: self.alloc_count,
             minor_gc_count: self.minor_gc_count,
             minor_gc_promoted: self.minor_gc_promoted,
@@ -93,6 +106,8 @@ impl Nursery {
             objects: Vec::with_capacity(NURSERY_CAPACITY),
             forwarding: Vec::with_capacity(NURSERY_CAPACITY),
             remembered: Vec::new(),
+            worklist: Vec::new(),
+            scan_candidates: Vec::new(),
             alloc_count: 0,
             minor_gc_count: 0,
             minor_gc_promoted: 0,
@@ -115,6 +130,8 @@ impl Nursery {
             objects: Vec::new(),
             forwarding: Vec::new(),
             remembered: Vec::new(),
+            worklist: Vec::new(),
+            scan_candidates: Vec::new(),
             alloc_count: 0,
             minor_gc_count: 0,
             minor_gc_promoted: 0,
@@ -192,7 +209,8 @@ impl Nursery {
         extra_root_packed: &[u32],
     ) {
         self.minor_gc_count += 1;
-        let mut worklist: Vec<u32> = Vec::with_capacity(NURSERY_CAPACITY);
+        let mut worklist = std::mem::take(&mut self.worklist);
+        worklist.clear();
         // Reused across every scanned object: one promoted object per scan
         // previously meant one fresh Vec allocation each.
         let mut fixups: Vec<(ChildSlot, u32)> = Vec::with_capacity(8);
@@ -211,12 +229,15 @@ impl Nursery {
         // Closures/classes/modules hold Rust-side `Value`s the write barrier
         // does not cover; scan only the tracked candidates instead of the
         // whole old gen (which made every minor GC O(old-gen size)).
-        let candidates: Vec<u32> = old_gen.scan_roots().to_vec();
-        for raw_idx in candidates {
+        let mut candidates = std::mem::take(&mut self.scan_candidates);
+        candidates.clear();
+        candidates.extend_from_slice(old_gen.scan_roots());
+        for &raw_idx in &candidates {
             if matches!(old_gen.get_raw(raw_idx), Some(obj) if Self::can_reference_nursery(obj)) {
                 self.scan_and_fix_old_obj(raw_idx, old_gen, &mut worklist, &mut fixups);
             }
         }
+        self.scan_candidates = candidates;
 
         for &packed in extra_root_packed {
             if is_old_idx(packed) {
@@ -230,13 +251,11 @@ impl Nursery {
             self.scan_and_fix_old_obj(raw, old_gen, &mut worklist, &mut fixups);
         }
 
-        let n_promoted = self.forwarding.iter().filter(|f| f.is_some()).count();
-        self.minor_gc_promoted += n_promoted as u64;
-
         old_gen.update_interners_after_minor_gc(&self.forwarding);
 
         self.objects.clear();
         self.forwarding.clear();
+        self.worklist = worklist;
     }
 
     #[inline]
@@ -275,6 +294,10 @@ impl Nursery {
         if let Some(slot) = self.forwarding.get_mut(nursery_idx as usize) {
             *slot = Some(packed);
         }
+        // Contado aquí, que es donde la promoción ocurre. Derivarlo al final
+        // contando entradas en `forwarding` recorría toda la nursery (hasta
+        // 49 152 ranuras) en cada colección para una sola estadística.
+        self.minor_gc_promoted += 1;
         worklist.push(raw_old);
         packed
     }

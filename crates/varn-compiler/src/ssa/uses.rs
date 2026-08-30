@@ -91,6 +91,10 @@ pub fn visit_uses(kind: &InstKind, f: &mut impl FnMut(Value)) {
             f(*target);
             f(*source);
         }
+        ArrayPush { array, value } => {
+            f(*array);
+            f(*value);
+        }
         Range { start, end, .. } => {
             f(*start);
             f(*end);
@@ -230,6 +234,10 @@ pub fn visit_uses_mut(kind: &mut InstKind, f: &mut impl FnMut(&mut Value)) {
         ObjectMerge { target, source } => {
             f(target);
             f(source);
+        }
+        ArrayPush { array, value } => {
+            f(array);
+            f(value);
         }
         Range { start, end, .. } => {
             f(start);

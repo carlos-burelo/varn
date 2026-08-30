@@ -280,6 +280,7 @@ fn format_inst_human(kind: &varn_compiler::ssa::ir::InstKind) -> String {
         ArraySetIndex { object, index, value } => {
             format!("v{}[v{}] = v{}", object.0, index.0, value.0)
         }
+        ArrayPush { array, value } => format!("push v{}, v{}", array.0, value.0),
         ObjectMerge { target, source } => format!("merge v{}, v{}", target.0, source.0),
         MethodCall { recv, name, args } => {
             let args_str = args

@@ -30,6 +30,20 @@ impl Builder {
                 Ok(())
             }
             HirStmt::Expr(e) => {
+                // `arr.push(v)` como sentencia: la nativa no devuelve nada, así
+                // que el resultado ya está descartado y el opcode dedicado
+                // evita la ventana de argumentos y el cruce de frontera.
+                if let crate::hir::HirExpr::NativeMethodCall {
+                    object, args, op_id, ..
+                } = e
+                {
+                    if *op_id == varn_core::op_id::array_push_op_id() && args.len() == 1 {
+                        let array = self.lower_expr(object)?;
+                        let value = self.lower_expr(&args[0])?;
+                        self.emit_effect(InstKind::ArrayPush { array, value });
+                        return Ok(());
+                    }
+                }
                 self.lower_expr(e)?;
                 Ok(())
             }

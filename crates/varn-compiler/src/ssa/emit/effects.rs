@@ -87,6 +87,15 @@ pub(super) fn emit_effect(
             );
             return Ok(true);
         }
+        InstKind::ArrayPush { array, value } => {
+            chunk.emit_rr(
+                OpCode::ArrayPush,
+                reg[array.0 as usize],
+                reg[value.0 as usize],
+                line,
+            );
+            return Ok(true);
+        }
         InstKind::ObjectMerge { target, source } => {
             chunk.emit_rr(
                 OpCode::ObjectMerge,

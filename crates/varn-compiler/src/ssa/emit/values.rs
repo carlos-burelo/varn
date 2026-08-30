@@ -606,6 +606,7 @@ pub(super) fn emit_value(
         InstKind::SetProperty { .. }
         | InstKind::SetFixedField { .. }
         | InstKind::SetIndex { .. }
+        | InstKind::ArrayPush { .. }
         | InstKind::ArraySetIndex { .. }
         | InstKind::ObjectMerge { .. }
         | InstKind::AssertNotNull { .. }

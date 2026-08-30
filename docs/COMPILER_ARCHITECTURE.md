@@ -163,6 +163,12 @@ El compilador emite un `FunctionProto` reutilizable que contiene:
 - **`register_count`**: Cantidad total de registros del frame requeridos.
 - **`upvalue_count`**: Variables capturadas por closure.
 
+### `arr.push(v)` como Sentencia
+
+La nativa `Array::push` no devuelve nada, así que en posición de sentencia su resultado siempre está descartado. El lowering reconoce ese caso (`op_id` de `Array::push`, un argumento, sin spread) y emite el opcode dedicado `ArrayPush` en lugar de `CallNativeOp`.
+
+Importa porque es el método nativo más ejecutado del lenguaje: en los benchmarks de colecciones era el 97 % de todas las llamadas nativas. `CallNativeOp` exige stagear receptor y argumento en una ventana contigua de registros y, en el JIT, volcar esa ventana a sus home slots antes de cruzar; `ArrayPush` pasa ambos valores en registros. Medido: `bench_gc_alloc` pasa de 399 000 llamadas nativas a 3.
+
 ### Captura de Closures
 
 El nodo SSA `MakeClosure` describe sus capturas **sólo por origen** (`upvalues_src`: slot local del padre, parámetro, o upvalue heredada). No lista los `Value` capturados, porque el descriptor emitido nombra el slot canónico del frame padre (`var_reg`) o un índice de upvalue: el valor SSA nunca se lee.

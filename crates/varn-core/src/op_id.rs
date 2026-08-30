@@ -53,6 +53,19 @@ pub fn core_method_op_id(class: &str, method: &str) -> u64 {
     compound_op_id3(CORE_MODULE, class, method)
 }
 
+/// Op-id de `Array::push`, el método nativo más ejecutado del lenguaje: en los
+/// benchmarks de colecciones es el 97 % de todas las llamadas nativas. El
+/// lowering lo compara para bajarlo al opcode dedicado `ArrayPush` en vez de
+/// cruzar la frontera nativa, que exige stagear receptor y argumento en una
+/// ventana contigua y volcar los registros a sus home slots.
+///
+/// Cacheado porque el id es un FNV-1a sobre tres segmentos y la comparación
+/// ocurre una vez por sentencia lowerada.
+pub fn array_push_op_id() -> u64 {
+    static ID: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *ID.get_or_init(|| core_method_op_id(crate::TypeTag::Array.name(), "push"))
+}
+
 /// The core builtin classes whose instance methods are natively registered
 /// (via the `varn_contract!` invocations in `varn-builtins/src/modules/
 /// primitives/*`) and are therefore op-id-addressable.

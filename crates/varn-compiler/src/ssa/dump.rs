@@ -110,6 +110,9 @@ fn inst_kind(kind: &InstKind) -> String {
                 val(*value)
             )
         }
+        InstKind::ArrayPush { array, value } => {
+            format!("arraypush {}, {}", val(*array), val(*value))
+        }
         InstKind::ArraySetIndex {
             object,
             index,

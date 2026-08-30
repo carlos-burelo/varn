@@ -80,10 +80,12 @@ flowchart LR
 ```
 
 ### Nursery & Asignación Bump Pointer
-Los objetos de vida corta nacen en un Nursery de 4096 ranuras mediante un puntero decreciente de asignación lineal (asociación $O(1)$ sin fragmentación).
+Los objetos de vida corta nacen en un Nursery de `NURSERY_CAPACITY = 65 536` ranuras mediante un puntero decreciente de asignación lineal (asociación $O(1)$ sin fragmentación). La reserva se hace completa desde el nacimiento y nunca crece: el colector indexa `objects` y `forwarding` en paralelo por índice de nursery, y la asignación inline del JIT depende de que el backing store no se mueva. La recolección menor se dispara al 75 % de ocupación (`FULL_THRESHOLD`), el mismo límite que compara el safepoint de back-edge del JIT.
 
 ### Promoción y Old-Gen Mark-and-Sweep
 Durante la recolección menor, los objetos sobrevivientes se promueven al Old-Gen. En el Old-Gen opera un recolector Mark-and-Sweep tricolor no bloqueante con *free-list*.
+
+Los buffers de trabajo del colector (worklist y lista de candidatos del old-gen) son propiedad del `Nursery` y se reutilizan entre colecciones. Deben serlo: como locales de `collect` costaban una asignación de 256 KB más una copia del vector de raíces **por colección**, un coste fijo que no dependía de cuántos objetos sobrevivían. Por el mismo motivo el contador de promociones se incrementa en `evacuate`, donde la promoción ocurre, en vez de derivarse al final recorriendo `forwarding` entero.
 
 ### Barrera de Escritura (*Write Barrier*)
 Cuando un objeto promovido en el Old-Gen almacena una referencia a un objeto joven en el Nursery, la barrera de escritura intercepta la operación y registra la referencia en el *Remembered Set* para evitar que el GC menor elimine el objeto joven.

@@ -161,7 +161,8 @@ pub(crate) fn is_pure(kind: &InstKind) -> bool {
         | ExtensionCall { .. }
         | IterCall { .. }
         | IntrinsicCall { .. }
-        | CallNativeOp { .. } => false,
+        | CallNativeOp { .. }
+        | ArrayPush { .. } => false,
 
         // Stores and other observable writes.
         StoreGlobal { .. }

@@ -208,6 +208,14 @@ pub enum InstKind {
         value: Value,
     },
 
+    /// `arr.push(v)` con receptor probado como array y resultado descartado.
+    /// La nativa `push` no devuelve nada, así que como sentencia siempre
+    /// puede tomar el opcode dedicado.
+    ArrayPush {
+        array: Value,
+        value: Value,
+    },
+
     ObjectMerge {
         target: Value,
         source: Value,
