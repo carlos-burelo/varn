@@ -272,22 +272,18 @@ pub(super) fn emit_value(
             chunk.emit_rr(OpCode::ToString, d, reg[operand.0 as usize], line);
         }
 
-        InstKind::MakeClosure {
-            func,
-            upvalues,
-            upvalues_src,
-        } => {
+        InstKind::MakeClosure { func, upvalues_src } => {
             let proto = crate::lower::lower_function(func, source_file.clone());
             let idx = chunk.add_constant(PoolEntry::Function(Rc::new(proto)));
-            if upvalues.is_empty() {
+            if upvalues_src.is_empty() {
                 chunk.write(Chunk::pack_op(OpCode::LoadStaticFn, d), line);
                 chunk.write(idx, line);
             } else {
-                let uv_count = upvalues.len() as u8;
+                let uv_count = upvalues_src.len() as u8;
                 chunk.emit(OpCode::MakeClosure, line);
                 chunk.write(Chunk::pack(d, uv_count), line);
                 chunk.write(idx, line);
-                for (_uv_val, uv_src) in upvalues.iter().zip(upvalues_src) {
+                for uv_src in upvalues_src {
                     let is_local = match uv_src {
                         HirUpvalueSrc::ParentLocal(_) | HirUpvalueSrc::ParentParam(_) => 1u8,
                         HirUpvalueSrc::ParentUpvalue(_) => 0u8,

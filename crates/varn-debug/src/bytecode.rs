@@ -529,10 +529,19 @@ fn print_proto(proto: &FunctionProto, depth: usize, total: &mut usize) {
                     hint = const_hint(c);
                 }
                 let dest = hi(w1);
+                // Los descriptores de captura nombran SLOTS del frame padre
+                // (`is_local=1`) o upvalues heredadas; sin verlos es imposible
+                // auditar la interacción entre captura y register allocation.
+                let mut uvs = Vec::with_capacity(uv_count as usize);
                 for _ in 0..uv_count {
-                    let _ = w!();
+                    let d = w!();
+                    uvs.push(if hi(d) != 0 {
+                        format!("r{}", lo(d))
+                    } else {
+                        format!("uv{}", lo(d))
+                    });
                 }
-                format!("r{} = closure[{}] uvs={}", dest, proto_idx, uv_count)
+                format!("r{} = closure[{}] uvs=[{}]", dest, proto_idx, uvs.join(", "))
             }
 
             OpCode::MakeClass => {

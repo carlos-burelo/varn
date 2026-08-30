@@ -1,5 +1,31 @@
 use std::collections::HashMap;
 
+/// Puntos extremos de escritura de un registro dentro de la función.
+///
+/// Una escritura ocupa el registro en ese instante igual que una lectura: si el
+/// rango terminase en el último USO, un registro reescrito más tarde parecería
+/// libre entre medias y el coloreado podría entregar su slot a un valor que
+/// sigue vivo ahí. Guardar `last` mantiene el rango cubriendo cada escritura.
+#[derive(Debug, Clone, Copy)]
+pub struct DefSites {
+    pub first: usize,
+    pub last: usize,
+}
+
+impl DefSites {
+    pub fn at(idx: usize) -> Self {
+        Self {
+            first: idx,
+            last: idx,
+        }
+    }
+
+    pub fn extend(&mut self, idx: usize) {
+        self.first = self.first.min(idx);
+        self.last = self.last.max(idx);
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct LiveRange {
     pub vreg: u16,
@@ -9,7 +35,7 @@ pub struct LiveRange {
 }
 
 pub struct LivenessAnalyzer {
-    def_sites: HashMap<u16, usize>,
+    def_sites: HashMap<u16, DefSites>,
     use_sites: HashMap<u16, Vec<usize>>,
     live_ranges: Vec<LiveRange>,
 }
@@ -37,13 +63,14 @@ impl LivenessAnalyzer {
         self.live_ranges.clear();
 
         for vreg in vregs_used {
-            if let Some(&start_val) = self.def_sites.get(&vreg) {
-                let mut start = start_val;
+            if let Some(&defs) = self.def_sites.get(&vreg) {
+                let mut start = defs.first;
                 let mut end = self
                     .use_sites
                     .get(&vreg)
-                    .map(|uses| uses.iter().copied().max().unwrap_or(start_val))
-                    .unwrap_or(start_val);
+                    .map(|uses| uses.iter().copied().max().unwrap_or(defs.last))
+                    .unwrap_or(defs.last)
+                    .max(defs.last);
 
                 let mut changed = true;
                 while changed {
@@ -79,8 +106,8 @@ impl LivenessAnalyzer {
     pub fn record_def(&mut self, vreg: u16, instr_idx: usize) {
         self.def_sites
             .entry(vreg)
-            .and_modify(|existing| *existing = (*existing).min(instr_idx))
-            .or_insert(instr_idx);
+            .and_modify(|existing| existing.extend(instr_idx))
+            .or_insert_with(|| DefSites::at(instr_idx));
     }
 
     pub fn record_use(&mut self, vreg: u16, instr_idx: usize) {

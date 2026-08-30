@@ -51,8 +51,8 @@ pub(crate) fn verify_callee_frame_constraints(scan: &ScanResult, mapping: &HashM
     for &(call_idx, arg_start, arg_count) in &scan.call_sites {
         let mapped_start = m(arg_start);
         let arg_end = arg_start.wrapping_add(arg_count);
-        for (&reg, &def_idx) in &scan.defs {
-            if def_idx >= call_idx {
+        for (&reg, defs) in &scan.defs {
+            if defs.first >= call_idx {
                 continue;
             }
             if reg >= arg_start && reg < arg_end {

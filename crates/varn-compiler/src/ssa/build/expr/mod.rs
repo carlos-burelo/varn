@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use crate::hir::{
-    HirBinOp, HirBinding, HirExpr, HirFunction, HirType, HirTypeTest, HirUnOp, HirUpvalueSrc,
+    HirBinOp, HirExpr, HirFunction, HirType, HirTypeTest, HirUnOp, HirUpvalueSrc,
 };
 use crate::ssa::ir::{InstKind, Terminator, Value};
 use crate::OptError;
@@ -213,22 +213,13 @@ impl Builder {
         }
     }
 
+    /// No carga los valores capturados: el descriptor de `MakeClosure`
+    /// referencia el slot del frame padre, así que materializarlos sólo
+    /// producía cargas muertas (una por captura y closure).
     fn lower_closure(&mut self, func: &HirFunction, upvalues: &[HirUpvalueSrc]) -> Result<Value> {
-        let mut uvs = Vec::with_capacity(upvalues.len());
-        for uv in upvalues {
-            let val = match uv {
-                HirUpvalueSrc::ParentLocal(id) => self.load_binding(&HirBinding::Local(*id))?,
-                HirUpvalueSrc::ParentParam(i) => self.load_binding(&HirBinding::Param(*i))?,
-                HirUpvalueSrc::ParentUpvalue(uv) => {
-                    self.emit(InstKind::LoadUpvalue(*uv), HirType::Dynamic)
-                }
-            };
-            uvs.push(val);
-        }
         Ok(self.emit(
             InstKind::MakeClosure {
                 func: Rc::new(func.clone()),
-                upvalues: uvs,
                 upvalues_src: upvalues.to_vec(),
             },
             HirType::Ref,

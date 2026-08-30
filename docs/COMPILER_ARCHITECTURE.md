@@ -163,6 +163,14 @@ El compilador emite un `FunctionProto` reutilizable que contiene:
 - **`register_count`**: Cantidad total de registros del frame requeridos.
 - **`upvalue_count`**: Variables capturadas por closure.
 
+### Captura de Closures
+
+El nodo SSA `MakeClosure` describe sus capturas **sólo por origen** (`upvalues_src`: slot local del padre, parámetro, o upvalue heredada). No lista los `Value` capturados, porque el descriptor emitido nombra el slot canónico del frame padre (`var_reg`) o un índice de upvalue: el valor SSA nunca se lee.
+
+Listarlos convertía cada captura en un operando fantasma: el constructor emitía un `LoadCaptured`/`LoadUpvalue` por captura, el backend lo materializaba en un `Move` a un registro que nadie leía, y esas escrituras muertas inflaban el frame. En `makeStateMachine` (`tests/37-complex-closures.vn`) eliminarlas bajó la función de 44 a 30 palabras y de 14 a 8 registros.
+
+El valor capturado sigue vivo sin ese operando: lo escribe `StoreCaptured` (un efecto, no eliminable) en el slot canónico, que es *home slot* del frame en todo safepoint y raíz del GC.
+
 ---
 
 ## 6. Post-Passes del Backend (`varn-regalloc`)
@@ -171,6 +179,10 @@ Una vez emitido el bytecode inicial, `varn-regalloc` procesa el resultado:
 
 ### Análisis de Vida de Registros (`liveness`)
 Calcula los intervalos de vida (*live ranges*) de cada registro virtual para determinar la interferencia de variables.
+
+El intervalo de un registro es `[primera escritura, max(último uso, última escritura)]`. Incluir la **última escritura** es de corrección, no una holgura: un registro reescrito después de su último uso sigue ocupando el slot en ese punto. Si el rango terminase en el último uso, un registro con escrituras múltiples y muertas parecería libre y el coloreado podría entregar su slot a un valor todavía vivo, pisándolo.
+
+Los slots capturados por `MakeClosure` con `is_local=1` se fijan aparte: la VM crea una *open upvalue* que apunta al slot del frame padre y lo lee hasta que el frame cierra, así que el escaneo extiende su rango hasta el final de la función.
 
 ### Asignación de Registros Nativos (`regalloc_post`)
 Reasigna los registros para minimizar el tamaño del frame de la VM, reutilizando slots de registros que ya no estén activos.

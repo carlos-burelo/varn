@@ -299,7 +299,6 @@ pub fn build_function(
         let fn_val = b.emit(
             InstKind::MakeClosure {
                 func: Rc::new(f.clone()),
-                upvalues: Vec::new(),
                 upvalues_src: Vec::new(),
             },
             HirType::Ref,

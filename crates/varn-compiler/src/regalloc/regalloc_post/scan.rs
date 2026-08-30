@@ -3,14 +3,16 @@ use varn_core::OpCode;
 use varn_types::bytecode::decode;
 use varn_types::chunk::PoolEntry;
 
+use crate::regalloc::liveness::DefSites;
+
 pub(crate) struct ScanResult {
-    pub(crate) defs: HashMap<u8, usize>,
+    pub(crate) defs: HashMap<u8, DefSites>,
     pub(crate) uses: HashMap<u8, Vec<usize>>,
     pub(crate) call_sites: Vec<(usize, u8, u8)>,
 }
 
 pub(crate) fn scan_bytecode(code: &[u16], constants: &[PoolEntry]) -> ScanResult {
-    let mut defs: HashMap<u8, usize> = HashMap::new();
+    let mut defs: HashMap<u8, DefSites> = HashMap::new();
     let mut uses: HashMap<u8, Vec<usize>> = HashMap::new();
     let mut call_sites: Vec<(usize, u8, u8)> = Vec::new();
     let mut open_captures: Vec<u8> = Vec::new();
@@ -42,7 +44,9 @@ pub(crate) fn scan_bytecode(code: &[u16], constants: &[PoolEntry]) -> ScanResult
         }
 
         if let Some(def_reg) = info.def {
-            defs.entry(def_reg).or_insert(instr_idx);
+            defs.entry(def_reg)
+                .and_modify(|d| d.extend(instr_idx))
+                .or_insert_with(|| DefSites::at(instr_idx));
         }
         for &use_reg in &info.uses {
             uses.entry(use_reg).or_default().push(instr_idx);

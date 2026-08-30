@@ -252,9 +252,13 @@ pub enum InstKind {
         parts: Vec<Value>,
     },
 
+    /// Las capturas se describen SÓLO por origen (`upvalues_src`): el
+    /// descriptor emitido nombra el slot canónico del frame padre
+    /// (`var_reg`) o un índice de upvalue heredada, nunca un `Value`.
+    /// Listar aquí los valores capturados creaba operandos fantasma que el
+    /// backend materializaba en `Move` que nadie lee.
     MakeClosure {
         func: Rc<HirFunction>,
-        upvalues: Vec<Value>,
         upvalues_src: Vec<HirUpvalueSrc>,
     },
     LoadCaptured {

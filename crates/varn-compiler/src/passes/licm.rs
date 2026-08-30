@@ -202,7 +202,7 @@ fn hoistable(kind: &InstKind, facts: LoopFacts) -> bool {
         }
         InstKind::LoadGlobal(_) => facts.globals_stable,
         InstKind::IsNull { .. } | InstKind::IsArray { .. } | InstKind::GetEnumTag { .. } => true,
-        InstKind::MakeClosure { upvalues, .. } => upvalues.is_empty(),
+        InstKind::MakeClosure { upvalues_src, .. } => upvalues_src.is_empty(),
         _ => false,
     }
 }

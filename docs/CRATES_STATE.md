@@ -112,10 +112,10 @@ Los mayores hoy, todos en la banda de "refactor recomendado" (700-1000):
 
 | Archivo | Líneas |
 |---|---|
-| `varn-jit/src/clif/alloc/objects.rs` | 993 |
-| `varn-regalloc/src/regalloc_post.rs` | 970 |
-| `varn-compiler/src/hir/inline.rs` | 950 |
-| `varn-compiler/src/ssa/build/mod.rs` | 933 |
-| `varn-debug/src/ast.rs` | 921 |
+| `varn-debug/src/ast.rs` | 934 |
+| `varn-op-macros/src/varn_contract.rs` | 910 |
+| `varn-lsp/src/features/compiler_inspect.rs` | 847 |
+| `varn-vm/src/exec/ctx_json.rs` | 842 |
+| `varn-jit/src/clif/emit.rs` | 818 |
 
 El subárbol `varn-vm/src/exec/` son 12 795 líneas (67 % del crate) repartidas en archivos que sí respetan el umbral; su división es una tarea de dominio, no de gobierno de tamaño.

@@ -92,7 +92,7 @@ pub(crate) fn color_with_base(
         for offset in 0..count {
             let child = reg + offset;
             for &(call_idx, arg_start, _) in &scan.call_sites {
-                let is_live_across = scan.defs.get(&child).is_some_and(|&def| def < call_idx)
+                let is_live_across = scan.defs.get(&child).is_some_and(|d| d.first < call_idx)
                     && scan
                         .uses
                         .get(&child)
