@@ -1,5 +1,4 @@
 mod alloc;
-mod arena;
 mod buffer;
 mod class;
 mod closure;
@@ -17,9 +16,6 @@ pub use alloc::{
     alloc_array, alloc_map, alloc_object, alloc_set, get_global_vtable, init_thread_heap,
     install_allocator, register_global_vtable, AllocVtable, ArrayRef, MapKey, MapRef, ObjRef,
     RuntimeString, SetRef, ValueMap, ValueSet,
-};
-pub use arena::{
-    enter_request_arena, exit_request_arena, request_arena_stats, reset_request_arena, RequestArena,
 };
 pub use buffer::VmBuffer;
 pub use class::{find_method_with_owner, ClassObj};
