@@ -47,6 +47,13 @@ flowchart TD
     end
 ```
 
+> **Antes de perseguir un cuello de botella o un bug de GC/JIT, lee
+> [HIPOTESIS_DESCARTADAS.md](HIPOTESIS_DESCARTADAS.md).** Recoge las hipótesis
+> que ya se probaron y murieron por medición —el acceso a campos, el arena de
+> objetos, el GC como causa del coste de alocar, varias raíces del colector— con
+> el dato que cerró cada una. Reabrir una exige un dato nuevo que contradiga al
+> que la mató.
+
 ## 2. Arquitectura de Crates y Modularidad
 
 El workspace son 17 crates consolidados. El inventario completo con tamaños y el grafo de aristas reales está en [CRATES_STATE.md](CRATES_STATE.md); aquí van los que definen la arquitectura:
