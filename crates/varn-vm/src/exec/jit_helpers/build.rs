@@ -41,42 +41,26 @@ pub(crate) extern "C" fn jit_build_str(
     }
 }
 
+/// `shape` llega ya resuelto por el compilador JIT y `may_hold_closure` dice si
+/// algún campo puede serlo. Antes se pasaba el índice de la shape y se resolvía
+/// aquí —`RefCell`, búsqueda, `Rc::clone`— y el barrido de closures recorría
+/// los campos siempre: 5,9 ns por objeto que el sitio de llamada ya sabía.
+///
+/// # Safety
+/// `shape` apunta a un `Shape` que vive en `proto.resolved_shapes`, y este
+/// código compilado pertenece a ese proto.
 pub(crate) extern "C" fn jit_build_object_with_shape(
     ctx: *mut ExecCtx,
-    closure: *const crate::closure::VmClosure,
     base: usize,
     start_reg: usize,
-    shape_idx: usize,
+    shape: *const varn_types::Shape,
+    may_hold_closure: usize,
 ) -> VmValue {
     unsafe {
         use crate::alloc_profile as prof;
         let on = prof::enabled();
         let t_all = if on { prof::read() } else { 0 };
-
-        let ctx_ref = &mut *ctx;
-        let closure_ref = &*closure;
-
-        let det = prof::detail();
-        let t_shape = if det { prof::read() } else { 0 };
-        let resolved = closure_ref.proto.resolved_shape(shape_idx);
-        if det {
-            prof::record(prof::Seg::ShapeLookup, t_shape, prof::read());
-        }
-        let Some(shape) = resolved else {
-            return VmValue::null();
-        };
-        let count = shape.property_names.len();
-
-        let required = base + start_reg + count;
-        if ctx_ref.stack.len() < required {
-            ctx_ref.stack.resize(required, VmValue::null());
-        }
-        let out = crate::exec::collections::build_object_with_shape(
-            &ctx_ref.stack,
-            base + start_reg,
-            shape,
-            &mut ctx_ref.heap,
-        );
+        let out = build_shaped_from_ptr(ctx, base, start_reg, shape, may_hold_closure != 0, false);
         if on {
             prof::record(prof::Seg::HelperTotal, t_all, prof::read());
         }
@@ -86,30 +70,40 @@ pub(crate) extern "C" fn jit_build_object_with_shape(
 
 pub(crate) extern "C" fn jit_build_record_with_shape(
     ctx: *mut ExecCtx,
-    closure: *const crate::closure::VmClosure,
     base: usize,
     start_reg: usize,
-    shape_idx: usize,
+    shape: *const varn_types::Shape,
+    may_hold_closure: usize,
 ) -> VmValue {
-    unsafe {
-        let ctx_ref = &mut *ctx;
-        let closure_ref = &*closure;
-        let Some(shape) = closure_ref.proto.resolved_shape(shape_idx) else {
-            return VmValue::null();
-        };
-        let count = shape.property_names.len();
+    unsafe { build_shaped_from_ptr(ctx, base, start_reg, shape, may_hold_closure != 0, true) }
+}
 
-        let required = base + start_reg + count;
-        if ctx_ref.stack.len() < required {
-            ctx_ref.stack.resize(required, VmValue::null());
-        }
-        crate::exec::collections::build_record_with_shape(
-            &ctx_ref.stack,
-            base + start_reg,
-            shape,
-            &mut ctx_ref.heap,
-        )
+#[inline(always)]
+unsafe fn build_shaped_from_ptr(
+    ctx: *mut ExecCtx,
+    base: usize,
+    start_reg: usize,
+    shape: *const varn_types::Shape,
+    may_hold_closure: bool,
+    is_record: bool,
+) -> VmValue {
+    let ctx_ref = &mut *ctx;
+    // Re-crea un `Rc` sin tomar propiedad: el dueño es `proto.resolved_shapes`.
+    let shape = std::mem::ManuallyDrop::new(std::rc::Rc::from_raw(shape));
+    let count = shape.property_names.len();
+
+    let required = base + start_reg + count;
+    if ctx_ref.stack.len() < required {
+        ctx_ref.stack.resize(required, VmValue::null());
     }
+    crate::exec::collections::build_with_shape(
+        &ctx_ref.stack,
+        base + start_reg,
+        (*shape).clone(),
+        &mut ctx_ref.heap,
+        may_hold_closure,
+        is_record,
+    )
 }
 
 pub(crate) extern "C" fn jit_range(

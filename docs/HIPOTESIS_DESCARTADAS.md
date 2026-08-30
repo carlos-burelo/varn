@@ -201,6 +201,27 @@ idénticos**.
 
 ---
 
+### Los ciclos por tramo predicen el tiempo que ahorras — NO
+
+El desglose de la creación de objetos dice que `resolved_shape` cuesta 2,7 ns y
+el barrido de closures 3,2 ns. Eliminados ambos (la shape se resuelve al
+compilar y se pasa por puntero; el barrido se omite cuando el backend prueba que
+ningún campo puede ser closure), el helper baja de **57,8 a 41,0 ciclos** —
+medido con `rdtsc`, reproducible, exactamente los ~17 ciclos previstos.
+
+**Y el tiempo end-to-end no se mueve**: −2,3 % sobre el micro, por debajo de lo
+que este host resuelve.
+
+La explicación es que **los tramos no son aditivos**. En un procesador
+superescalar, quitar cargas y comparaciones de un camino cuya latencia real la
+marca el `malloc` no acorta el camino: se solapaban. El desglose dice cuánto
+TRABAJO hace cada tramo, no cuánto TIEMPO ahorra quitarlo.
+
+Consecuencia para el plan: un reparto por tramos es un mapa de dónde mirar, no
+un presupuesto de mejoras. Cualquier fase que se justifique sumando tramos
+—incluida la Fase 2 y sus 10,8 ns— tiene que demostrar su ganancia end-to-end
+antes de darse por buena.
+
 ## 4. Método de medición
 
 ### Wall-clock absoluto entre corridas separadas — INVÁLIDO en esta máquina

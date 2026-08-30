@@ -7,6 +7,10 @@ use super::safepoints::{
     def_result, flush_boxed, frame_base_addr, live_boxed, reload_boxed, store_home, AllocCtx,
 };
 
+/// `shape_ptr` es el `Shape` ya resuelto en compilación y `may_hold_closure`
+/// dice si algún campo puede ser una closure. Ambos se resuelven aquí porque el
+/// helper los repetía por objeto: eran 5,9 ns de los 41,5 que cuesta crear uno.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn emit_build_object_with_shape(
     b: &mut FunctionBuilder,
     actx: &AllocCtx,
@@ -15,18 +19,22 @@ pub(crate) fn emit_build_object_with_shape(
     ip: usize,
     count: usize,
     is_record: bool,
+    shape_ptr: usize,
+    may_hold_closure: bool,
 ) {
     let w1 = code[ip + 1];
     let dest = (w1 >> 8) as usize;
     let start = (w1 & 0xFF) as usize;
-    let shape_idx = code[ip + 2] as usize;
 
     let fb = frame_base_addr(b, actx);
     for i in 0..count {
         store_home(b, actx, state, fb, start + i);
     }
     let start_v = b.ins().iconst(types::I64, start as i64);
-    let shape_v = b.ins().iconst(types::I64, shape_idx as i64);
+    let shape_v = b.ins().iconst(types::I64, shape_ptr as i64);
+    let flags_v = b
+        .ins()
+        .iconst(types::I64, if may_hold_closure { 1 } else { 0 });
     let helper = if is_record {
         actx.helpers.build_record_with_shape
     } else {
@@ -36,7 +44,7 @@ pub(crate) fn emit_build_object_with_shape(
         b,
         actx.cc,
         helper,
-        &[actx.exec_ctx, actx.closure, actx.base, start_v, shape_v],
+        &[actx.exec_ctx, actx.base, start_v, shape_v, flags_v],
     );
     def_result(b, actx, dest, res);
 }

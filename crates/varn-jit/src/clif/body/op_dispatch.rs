@@ -471,12 +471,42 @@ pub(crate) fn dispatch_opcode(
         OpCode::BuildObjectWithShape | OpCode::BuildRecord => {
             let actx = actx.ok_or("clif: BuildObjectWithShape outside alloc fn")?;
             let shape_idx = code[ip + 2] as usize;
-            let count = proto
+            // La shape ya se resuelve aquí, en COMPILACIÓN, para saber cuántos
+            // campos hay. Pasar su puntero en vez del índice le ahorra al
+            // helper repetir la resolución una vez por objeto construido
+            // (`RefCell` + búsqueda + `Rc::clone`, 2,7 ns de los 41,5 medidos).
+            //
+            // El `Rc` vive en `proto.resolved_shapes` mientras el proto viva, y
+            // este código compilado pertenece al proto: el puntero no puede
+            // sobrevivirle. `resolved_shapes` puede realojar su `Vec`, pero eso
+            // mueve el `Rc`, no el `Shape` al que apunta.
+            let shape = proto
                 .resolved_shape(shape_idx)
-                .map(|s| s.property_names.len())
                 .ok_or("clif: unresolved object shape")?;
+            let count = shape.property_names.len();
+            let shape_ptr = std::rc::Rc::as_ptr(&shape) as usize;
+            let start = (code[ip + 1] & 0xFF) as usize;
+            // Un campo que el backend sabe desboxado no puede ser una closure,
+            // así que el barrido que cierra upvalues sobra si NINGUNO puede
+            // serlo (otros 3,2 ns).
+            let may_hold_closure = (0..count).any(|i| {
+                !matches!(
+                    state.get(start + i),
+                    Some(K::Int) | Some(K::Float) | Some(K::Bool)
+                )
+            });
             let is_record = op == OpCode::BuildRecord;
-            alloc::emit_build_object_with_shape(b, actx, state, code, ip, count, is_record);
+            alloc::emit_build_object_with_shape(
+                b,
+                actx,
+                state,
+                code,
+                ip,
+                count,
+                is_record,
+                shape_ptr,
+                may_hold_closure,
+            );
         }
         OpCode::LoadUpvalue => {
             let actx = actx.ok_or("clif: LoadUpvalue outside frame-aware fn")?;

@@ -14,8 +14,7 @@ pub(crate) fn build_object_with_shape(
     shape: Rc<varn_types::Shape>,
     heap: &mut Heap,
 ) -> VmValue {
-    let oref = build_shaped(stack, values_start, shape, heap);
-    alloc_timed(heap, HeapObj::Object(oref))
+    build_with_shape(stack, values_start, shape, heap, true, false)
 }
 
 pub(crate) fn build_record_with_shape(
@@ -24,8 +23,27 @@ pub(crate) fn build_record_with_shape(
     shape: Rc<varn_types::Shape>,
     heap: &mut Heap,
 ) -> VmValue {
-    let oref = build_shaped(stack, values_start, shape, heap);
-    alloc_timed(heap, HeapObj::Record(oref))
+    build_with_shape(stack, values_start, shape, heap, true, true)
+}
+
+/// `may_hold_closure` lo decide el sitio de llamada cuando puede: si el backend
+/// sabe que todos los campos son valores desboxados, ninguno es una closure y el
+/// barrido que cierra upvalues sobra. El intérprete no lo sabe y pasa `true`.
+pub(crate) fn build_with_shape(
+    stack: &[VmValue],
+    values_start: usize,
+    shape: Rc<varn_types::Shape>,
+    heap: &mut Heap,
+    may_hold_closure: bool,
+    is_record: bool,
+) -> VmValue {
+    let oref = build_shaped(stack, values_start, shape, heap, may_hold_closure);
+    let obj = if is_record {
+        HeapObj::Record(oref)
+    } else {
+        HeapObj::Object(oref)
+    };
+    alloc_timed(heap, obj)
 }
 
 /// `Heap::alloc` con el tramo anotado: mover el `HeapObj` de 48 bytes y
@@ -56,20 +74,23 @@ fn build_shaped(
     values_start: usize,
     shape: Rc<varn_types::Shape>,
     heap: &Heap,
+    may_hold_closure: bool,
 ) -> ObjRef {
     use crate::alloc_profile as prof;
     let count = shape.property_names.len();
     let on = prof::detail();
 
     let t0 = if on { prof::read() } else { 0 };
-    for i in 0..count {
-        let val_nv = stack[values_start + i];
-        if val_nv.is_heap() {
-            // Sin clonar el closure: sólo se leen sus upvalues, y `close` toca
-            // la pila, no el heap.
-            if let Some(crate::heap::HeapObj::VmClosure(nc)) = heap.get(val_nv.as_heap_idx()) {
-                for uv in &nc.upvalues {
-                    uv.close(stack);
+    if may_hold_closure {
+        for i in 0..count {
+            let val_nv = stack[values_start + i];
+            if val_nv.is_heap() {
+                // Sin clonar el closure: sólo se leen sus upvalues, y `close`
+                // toca la pila, no el heap.
+                if let Some(crate::heap::HeapObj::VmClosure(nc)) = heap.get(val_nv.as_heap_idx()) {
+                    for uv in &nc.upvalues {
+                        uv.close(stack);
+                    }
                 }
             }
         }

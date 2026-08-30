@@ -59,6 +59,22 @@ El plan mantiene el orden, pero la Fase 2 deja de ser el objetivo y pasa a ser
 el remate: si la Fase 1 rinde lo que el reparto dice, el objetivo de ≤20 ns se
 alcanza sin tocar la representación del heap ni romper ninguna garantía.
 
+### Aviso, aprendido al ejecutar la primera parte de la Fase 1
+
+**Este reparto NO es un presupuesto de mejoras.** Se eliminaron los dos tramos
+marcados como desperdicio (5,9 ns entre ambos): el helper bajó de 57,8 a 41,0
+ciclos, justo lo previsto, y **el tiempo end-to-end no se movió** (−2,3 %, bajo
+el umbral de resolución).
+
+Los tramos no son aditivos: en un procesador superescalar, quitar cargas de un
+camino cuya latencia la marca el `malloc` no acorta el camino. El reparto dice
+dónde mirar, no cuánto vas a ganar.
+
+Por tanto **ninguna fase se da por buena con el desglose**: hay que demostrar la
+ganancia end-to-end, pareada y alternada. Eso vale también para los 10,8 ns que
+la Fase 2 dice atacar — y es la razón de que la Fase 2 siga estando después de
+la 1, no antes.
+
 ## 2. La tesis
 
 El coste es **estructural, no algorítmico**. Un objeto joven hoy es:
