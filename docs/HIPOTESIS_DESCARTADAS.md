@@ -151,6 +151,36 @@ válida.
 Lo que sí se hizo: dejar el valor y **avisar una vez por proceso** con el
 índice. Eso es lo que reveló el `49152`.
 
+### La barrera de escritura no registra el objeto — NO
+
+Era la lectura natural del aviso, que dice literalmente «una referencia
+old→young no quedó registrada por la barrera».
+
+**Medición**: etiquetando la fase de la colección, el índice colgante aparece
+recorriendo el **remembered set**. O sea, el objeto **sí está registrado**: la
+barrera disparó. Comprobados además `for_each_field` (cubre inline y overflow) y
+`set_field_at` (escribe en ambos). El campo no se quedó viejo porque nadie lo
+mirara.
+
+### El campo se queda viejo porque el escaneo no lo actualiza — NO
+
+**Medición**: una trampa en `Heap::write_barrier` que compara el índice que se
+escribe contra la longitud viva del nursery caza el instante exacto:
+
+```
+[GC-TRAP] se escribe el índice de nursery 49147 (len=0) en el objeto old 257
+[GC-TRAP] se escribe el índice de nursery 49152 (len=0) en el objeto old 257
+```
+
+`len=0` con la colección ya terminada es el nursery recién limpiado: **el valor
+ya estaba obsoleto AL ESCRIBIRSE**. No es que el fixup fallara; es que el
+programa escribió un índice muerto después de la colección.
+
+Ojo al montarla de nuevo: durante `minor_gc` el nursery real está fuera
+(`mem::replace` por `vacant()`), así que `live_len()` es 0 y **toda** escritura
+parece obsoleta. Hay que excluir las de dentro de la colección o todo son falsos
+positivos.
+
 ### Pista viva (no descartada)
 
 `vn debug -p roots:diff` sobre ese benchmark: 149 safepoints, sólo 52 cubiertos
