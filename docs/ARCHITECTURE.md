@@ -57,6 +57,10 @@ flowchart TD
 > El frente abierto de rendimiento es el coste de alocar un objeto (60 ns
 > contra los 24 de Bun), que decide todos los benchmarks que perdemos. El plan
 > está en [PLAN_ALOCACION.md](PLAN_ALOCACION.md).
+>
+> Para las decisiones de fondo —por qué las referencias de heap son índices y
+> no punteros, y qué cuesta eso— ver
+> [AUDITORIA_DISENO.md](AUDITORIA_DISENO.md).
 
 ## 2. Arquitectura de Crates y Modularidad
 
