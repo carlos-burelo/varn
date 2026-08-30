@@ -17,6 +17,44 @@ pub fn print_hotspots(h: &HotspotCounters) {
     terminal::blank();
     terminal::log(chalk("Runtime Hotspots").cyan().bold());
 
+    // ── Interpreted frames: functions that ran as interpreter, most first ──
+    let mut interp_only: Vec<_> = h
+        .fn_calls
+        .iter()
+        .filter(|(_, e)| e.interp_calls > 0)
+        .collect();
+    if !interp_only.is_empty() {
+        interp_only.sort_by_key(|b| std::cmp::Reverse(b.1.interp_calls));
+        let total_interp: u64 = interp_only.iter().map(|(_, e)| e.interp_calls).sum();
+        section("Frames interpretados");
+        for (name, entry) in interp_only.iter().take(TOP_N) {
+            let interp_share = entry.interp_calls as f64 / entry.calls.max(1) as f64;
+            let note = chalk(format!(
+                "{} de {}  ({})",
+                fmt_num(entry.interp_calls),
+                fmt_num(entry.calls),
+                fmt_pct(interp_share),
+            ))
+            .red()
+            .to_string();
+            terminal::log(format!(
+                "{}  {note}",
+                row(name, fmt_num(entry.interp_calls))
+            ));
+        }
+        if interp_only.len() > TOP_N {
+            terminal::log(format!(
+                "  {}",
+                chalk(format!("… y {} fns más interpretadas", interp_only.len() - TOP_N)).dim()
+            ));
+        }
+        terminal::log(row_note(
+            "total frames interpretados",
+            fmt_num(total_interp),
+            "solo fns con nombre",
+        ));
+    }
+
     if !h.fn_calls.is_empty() {
         section("Funciones");
         let mut entries: Vec<_> = h.fn_calls.iter().collect();

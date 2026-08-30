@@ -16,8 +16,7 @@ use super::alloc::{self, AllocCtx};
 use super::arrays;
 use super::debug::ClifDebugSink;
 use super::emit::{
-    box_for_target, box_or_pass, call_helper, meta_is_float, meta_is_int, unbox_bool,
-    unbox_f64_coerce, wrap_i48,
+    box_for_target, box_or_pass, call_helper, meta_is_float, meta_is_int, unbox_bool, wrap_i48,
 };
 use super::fields;
 use super::floats;
@@ -162,7 +161,9 @@ pub(super) fn lower_raw(
         let param_idx = if frame_aware { 4 + i } else { 1 + i };
         let p = b.block_params(entry)[param_idx];
         if meta_is_float(&proto.register_meta, r) {
-            let f = unbox_f64_coerce(&mut b, p);
+            // The ABI wrapper already ran unbox_f64_coerce on the VmValue and
+            // passed raw f64 bits as i64. A plain bitcast suffices here.
+            let f = b.ins().bitcast(types::F64, MemFlags::new(), p);
             b.def_var(vars[r], f);
         } else if proto.param_kinds.get(i) == Some(&SlotKind::Int) && actx.is_some() {
             let un = wrap_i48(&mut b, p);

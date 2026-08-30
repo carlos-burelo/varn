@@ -19,7 +19,7 @@
 //! intrinsics that ARE a single ISA instruction, keeping them out of the
 //! generic `dispatch_intrinsic` helper (and its register flush/reload).
 
-use cranelift_codegen::ir::{condcodes::FloatCC, types, InstBuilder, Value};
+use cranelift_codegen::ir::{condcodes::FloatCC, types, InstructionData, InstBuilder, Value, ValueDef};
 use cranelift_codegen::isa::{CallConv, OwnedTargetIsa};
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_core::intrinsic_ops::math::MathOp;
@@ -364,6 +364,19 @@ pub(super) fn emit_float_op(
     }
 }
 
+/// Returns `true` when `v` was produced by an `f64const` instruction whose
+/// value is neither +0.0 nor −0.0. When the divisor in `emit_fdiv` satisfies
+/// this condition the divide-by-zero branch is statically dead and can be
+/// omitted entirely.
+fn f64_const_nonzero(b: &FunctionBuilder, v: Value) -> bool {
+    if let ValueDef::Result(inst, _) = b.func.dfg.value_def(v) {
+        if let InstructionData::UnaryIeee64 { imm, .. } = b.func.dfg.insts[inst] {
+            return f64::from_bits(imm.bits()) != 0.0;
+        }
+    }
+    false
+}
+
 /// Native `fdiv` with the interpreter's divide-by-zero trap: `b == 0.0`
 /// diverts to the runtime `div` helper (which raises the VM error via longjmp
 /// and never returns); the common path is a plain `fdiv`. Leaves the builder
@@ -376,6 +389,9 @@ fn emit_fdiv(
     a: Value,
     bb: Value,
 ) -> Value {
+    if f64_const_nonzero(b, bb) {
+        return b.ins().fdiv(a, bb);
+    }
     let zero = b.ins().f64const(0.0);
     let is_zero = b.ins().fcmp(FloatCC::Equal, bb, zero);
     let trap_blk = b.create_block();

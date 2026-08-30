@@ -169,6 +169,35 @@ pub fn time_n<F: Fn() -> Result<(), String>>(runs: usize, f: F) -> Result<Vec<Du
     Ok(samples)
 }
 
+/// [`time_n_freq_setup`] with an optional progress callback invoked after
+/// each timed run. Callback receives `(completed_runs, samples_so_far)`.
+pub fn time_n_freq_setup_progress<T, S, F, P>(
+    runs: usize,
+    setup: S,
+    f: F,
+    progress: P,
+) -> Result<(Vec<Duration>, Option<crate::cpu_freq::CpuFreq>), CliError>
+where
+    S: Fn() -> T,
+    F: Fn(&mut T) -> Result<(), String>,
+    P: Fn(usize, &[Duration]),
+{
+    let mut warm = setup();
+    f(&mut warm).map_err(|e| CliError::fatal(format!("bench warmup failed: {e}")))?;
+
+    let mut samples = Vec::with_capacity(runs);
+    let mut peak = None;
+    for i in 0..runs {
+        let mut state = setup();
+        let start = Instant::now();
+        f(&mut state).map_err(|e| CliError::fatal(format!("bench run failed: {e}")))?;
+        samples.push(start.elapsed());
+        peak = crate::cpu_freq::keep_peak(peak, crate::cpu_freq::sample());
+        progress(i + 1, &samples);
+    }
+    Ok((samples, peak))
+}
+
 /// [`time_n`], sampling CPU frequency right after each run and keeping the
 /// peak, with a per-run SETUP step that is deliberately left out of the
 /// measurement.

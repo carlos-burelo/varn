@@ -8,12 +8,14 @@ use rustc_hash::FxHashMap;
 use varn_checker::Checker;
 use varn_compiler::FunctionProto;
 use varn_core::ModuleId;
+use std::io::Write as IoWrite;
+
 use varn_core::term::chalk::chalk;
 use varn_core::term::terminal;
 use varn_types::value::Closure;
 use varn_vm::Vm;
 
-use super::harness::{run_vm_to_completion, time_n, time_n_freq_setup, VmFactory};
+use super::harness::{run_vm_to_completion, time_n, time_n_freq_setup_progress, VmFactory};
 use super::report::coverage::{print_coverage, top_blocker};
 use super::report::headline::{ExecSplit, Headline};
 use super::report::hotspots::print_hotspots;
@@ -221,14 +223,37 @@ pub fn run(path: &str, eval: Option<&str>, opts: &BenchOpts) -> Result<(), CliEr
         proto: Rc::new(optimized_proto),
     };
 
-    let (exec_samples, cpu_freq) = time_n_freq_setup(
+    const PROG_BAR: usize = 32;
+    let (exec_samples, cpu_freq) = time_n_freq_setup_progress(
         runs,
         || {
             varn_builtins::reset_testing_counters();
             factory.build()
         },
         |machine| run_vm_to_completion(machine, factory.closure()),
+        |done, samples| {
+            let filled = (done * PROG_BAR / runs.max(1)).min(PROG_BAR);
+            let bar = format!(
+                "\x1b[36m{}\x1b[2m{}\x1b[0m",
+                "█".repeat(filled),
+                "░".repeat(PROG_BAR - filled)
+            );
+            let mut sorted = samples.to_vec();
+            sorted.sort();
+            let p50_ns = sorted[sorted.len() / 2].as_nanos();
+            let p50_str = if p50_ns < 1_000 {
+                format!("{p50_ns}ns")
+            } else if p50_ns < 1_000_000 {
+                format!("{}µs", p50_ns / 1_000)
+            } else {
+                format!("{:.1}ms", p50_ns as f64 / 1_000_000.0)
+            };
+            print!("\r  \x1b[2mexecute\x1b[0m  [{bar}]  {done}/{runs}  \x1b[2mp50 {p50_str}\x1b[0m  ");
+            let _ = std::io::stdout().flush();
+        },
     )?;
+    print!("\r\x1b[2K");
+    let _ = std::io::stdout().flush();
 
     let e2e_samples = time_n(runs, || {
         let source = match eval {
@@ -431,9 +456,11 @@ fn verbose_sections(
             ("bind", cp.bind),
             ("merge_core", cp.merge_core_members),
             ("enrich_calls", cp.enrich_call_returns),
+            ("init", cp.init),
             ("check_stmts", cp.check_stmts),
             ("annotations", cp.collect_annotations),
             ("finalize", cp.finalize),
+            ("cleanup", cp.cleanup),
         ],
         phase_p50("check"),
         &breakdown,

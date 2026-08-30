@@ -6,7 +6,10 @@
 
 use std::collections::HashMap;
 
-use cranelift_codegen::ir::{condcodes::IntCC, types, AbiParam, InstBuilder, MemFlags, Signature};
+use cranelift_codegen::ir::{
+    condcodes::IntCC, types, AbiParam, InstBuilder, InstructionData, MemFlags, Signature, Value,
+    ValueDef,
+};
 use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_types::register_meta::SlotKind;
 use varn_types::VmValue;
@@ -717,6 +720,18 @@ pub(super) fn wrap_i48(
 ) -> cranelift_codegen::ir::Value {
     let s = b.ins().ishl_imm(v, 16);
     b.ins().sshr_imm(s, 16)
+}
+
+/// Returns `true` when `v` is an `iconst` whose absolute value is below `threshold`.
+/// Used to prove that `v * i48_value` cannot overflow i64: choose `threshold = 2^16`
+/// since `(2^16 - 1) * (2^47 - 1) < 2^63 - 1`.
+pub(super) fn i64_const_fits(b: &FunctionBuilder, v: Value, threshold: u64) -> bool {
+    if let ValueDef::Result(inst, _) = b.func.dfg.value_def(v) {
+        if let InstructionData::UnaryImm { imm, .. } = b.func.dfg.insts[inst] {
+            return (imm.bits() as i64).unsigned_abs() < threshold;
+        }
+    }
+    false
 }
 
 /// Raise `integer overflow` if the CPU's overflow flag was set, otherwise yield `r`.

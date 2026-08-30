@@ -80,8 +80,34 @@ impl PhaseStats {
     }
 }
 
+/// Frequency histogram: divide the [min, max] range into `cols` buckets,
+/// count runs per bucket, map to Unicode block heights (▁▂▃▄▅▆▇█).
+/// Empty buckets are spaces; the peak bucket always maps to █.
+pub fn freq_histogram(samples: &[Duration], cols: usize) -> String {
+    const LEVELS: [char; 9] = [' ', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    if samples.is_empty() || cols == 0 {
+        return " ".repeat(cols);
+    }
+    let min_ns = samples.iter().map(|d| d.as_nanos()).min().unwrap();
+    let max_ns = samples.iter().map(|d| d.as_nanos()).max().unwrap();
+    let range = (max_ns - min_ns).max(1);
+    let mut bins = vec![0usize; cols];
+    for s in samples {
+        let idx = (((s.as_nanos() - min_ns) * cols as u128) / range) as usize;
+        bins[idx.min(cols - 1)] += 1;
+    }
+    let max_count = *bins.iter().max().unwrap_or(&1).max(&1);
+    bins.iter()
+        .map(|&c| {
+            let level = if c == 0 { 0 } else { (c * 8 / max_count).max(1) };
+            LEVELS[level.min(8)]
+        })
+        .collect()
+}
+
 /// Map duration samples to a Unicode block sparkline (▁▂▃▄▅▆▇█).
 /// Samples are bucketed by magnitude across the observed min–max range.
+#[allow(dead_code)]
 pub fn sparkline(samples: &[Duration]) -> String {
     const LEVELS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
     if samples.is_empty() {

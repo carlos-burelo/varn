@@ -194,9 +194,11 @@ impl ExecCtx {
 
                             if !nc.proto.has_rest && arg_count <= arity {
                                 let nc = nc.clone();
-                                let _fn_name =
-                                    nc.proto.name.as_deref().unwrap_or("<anon>").to_owned();
-                                let _is_jit = nc.jit_fn().is_some();
+                                if self.hotspot_counters.is_some() {
+                                    let fn_name = nc.proto.name.as_deref().unwrap_or("<anon>");
+                                    let is_jit = nc.jit_fn().is_some();
+                                    self.record_hotspot_fn(fn_name, is_jit);
+                                }
                                 let new_base = self.stack.len();
                                 if self.frames.len() >= 10000 {
                                     return Err(crate::error::RuntimeError::new(
@@ -318,13 +320,11 @@ impl ExecCtx {
             let arity = closure_ref.proto.arity;
 
             if !closure_ref.proto.has_rest && arg_count <= arity {
-                let _fn_name = closure_ref
-                    .proto
-                    .name
-                    .as_deref()
-                    .unwrap_or("<anon>")
-                    .to_owned();
-                let _is_jit = closure_ref.jit_fn().is_some();
+                if self.hotspot_counters.is_some() {
+                    let fn_name = closure_ref.proto.name.as_deref().unwrap_or("<anon>");
+                    let is_jit = closure_ref.jit_fn().is_some();
+                    self.record_hotspot_fn(fn_name, is_jit);
+                }
                 let new_base = self.stack.len();
                 if self.frames.len() >= 10000 {
                     return Err(crate::error::RuntimeError::new(

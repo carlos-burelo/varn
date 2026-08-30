@@ -160,6 +160,22 @@ impl JitStatsSnapshot {
         self.compile_success + self.compile_fail + self.gate_rejected
     }
 
+    /// Fraction of offered functions that were successfully compiled, 0.0..=1.0.
+    ///
+    /// This is the only frame-count-independent coverage figure: it counts each
+    /// unique function once regardless of how many times it was called, and it
+    /// is not affected by JIT-direct call paths that bypass the dispatcher.
+    /// Frame-based ratios (`machine_code_ratio`) undercount compiled coverage
+    /// for any function whose recursive or chained calls run as machine-code
+    /// without re-entering the interpreter trampoline.
+    pub fn fn_compilation_rate(&self) -> f64 {
+        let seen = self.functions_seen();
+        if seen == 0 {
+            return 1.0;
+        }
+        self.compile_success as f64 / seen as f64
+    }
+
     /// Mean lowering cost per successfully routed function.
     pub fn ns_per_routed_fn(&self) -> Option<f64> {
         if self.compile_success == 0 {

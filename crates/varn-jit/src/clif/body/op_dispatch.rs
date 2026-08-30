@@ -12,7 +12,7 @@ use super::super::alloc::{self, AllocCtx};
 use super::super::arrays;
 use super::super::emit::{
     box_f64, box_int, box_or_pass, call_helper, def_const, def_const_bool, def_const_int,
-    emit_return_value, guard_overflow, meta_is_float, state_meta_int, unbox_bool,
+    emit_return_value, guard_overflow, i64_const_fits, meta_is_float, state_meta_int, unbox_bool,
     unbox_f64_coerce, use_boxed, use_f64, use_int,
 };
 use super::super::fields;
@@ -91,29 +91,29 @@ pub(crate) fn dispatch_opcode(
             let src_is_float = meta_is_float(&proto.register_meta, src);
             let dest_is_float = meta_is_float(&proto.register_meta, first_reg);
             if first_reg < vars.len() && src < vars.len() {
-                let val_to_store = if dest_is_float && !src_is_float {
-                    let v = box_or_pass(b, vars, state, src);
-                    let f = unbox_f64_coerce(b, v);
-                    b.def_var(vars[first_reg], f);
-                    v
-                } else if !dest_is_float && src_is_float {
-                    let f = b.use_var(vars[src]);
-                    let boxed = box_f64(b, f);
-                    b.def_var(vars[first_reg], boxed);
-                    boxed
-                } else {
-                    let v = b.use_var(vars[src]);
-                    b.def_var(vars[first_reg], v);
-                    box_or_pass(b, vars, state, src)
-                };
+                // Some(v) means boxing already computed (needed for def_var anyway).
+                // None defers box_or_pass to the if-actx block so non-frame-aware
+                // functions don't emit dead boxing instructions.
+                let preboxed: Option<cranelift_codegen::ir::Value> =
+                    if dest_is_float && !src_is_float {
+                        let v = box_or_pass(b, vars, state, src);
+                        let f = unbox_f64_coerce(b, v);
+                        b.def_var(vars[first_reg], f);
+                        Some(v)
+                    } else if !dest_is_float && src_is_float {
+                        let f = b.use_var(vars[src]);
+                        let boxed = box_f64(b, f);
+                        b.def_var(vars[first_reg], boxed);
+                        Some(boxed)
+                    } else {
+                        let v = b.use_var(vars[src]);
+                        b.def_var(vars[first_reg], v);
+                        None
+                    };
                 if let Some(actx) = actx {
                     let fb = alloc::frame_base_addr(b, actx);
-                    b.ins().store(
-                        MemFlags::trusted(),
-                        val_to_store,
-                        fb,
-                        (first_reg * 8) as i32,
-                    );
+                    let val = preboxed.unwrap_or_else(|| box_or_pass(b, vars, state, src));
+                    b.ins().store(MemFlags::trusted(), val, fb, (first_reg * 8) as i32);
                 }
             }
         }
@@ -123,11 +123,21 @@ pub(crate) fn dispatch_opcode(
             let (r1, r2) = ((w1 >> 8) as usize, (w1 & 0xFF) as usize);
             let s1 = use_int(b, vars, state, r1)?;
             let s2 = use_int(b, vars, state, r2)?;
-            // Bounds-safe arithmetic: the preheader proved that the result
-            // of this AddInt fits within the array length (< i64::MAX),
-            // so overflow is impossible. Emit a plain iadd.
-            if op == OpCode::AddInt && arr.loops.is_bounds_safe_arith(ip) {
+            // Two K::Int vars are sign-extended i48 payloads (range [-2^47, 2^47-1]).
+            // i48 ± i48 fits in i64 (|result| ≤ 2^48−1 ≪ 2^63−1), so the i64
+            // overflow flag is mathematically impossible — skip the guard.
+            let both_int = state[r1] == K::Int && state[r2] == K::Int;
+            if op == OpCode::AddInt && (arr.loops.is_bounds_safe_arith(ip) || both_int) {
                 let v = b.ins().iadd(s1, s2);
+                b.def_var(vars[first_reg], v);
+            } else if op == OpCode::SubInt && both_int {
+                let v = b.ins().isub(s1, s2);
+                b.def_var(vars[first_reg], v);
+            } else if op == OpCode::MulInt && both_int
+                && (i64_const_fits(b, s1, 1 << 16) || i64_const_fits(b, s2, 1 << 16))
+            {
+                // k * i48 where |k| < 2^16 fits in i64: (2^16-1)*(2^47-1) < 2^63-1.
+                let v = b.ins().imul(s1, s2);
                 b.def_var(vars[first_reg], v);
             } else {
                 let (r, overflow, helper) = match op {
@@ -227,7 +237,8 @@ pub(crate) fn dispatch_opcode(
             let src = (w1 >> 8) as usize;
             let imm = (w1 & 0xFF) as i8 as i64;
             let s = use_int(b, vars, state, src)?;
-            if arr.loops.is_induction_increment(ip) {
+            // K::Int ± i8 cannot overflow i64 (i48 + 128 ≪ 2^63). Skip the guard.
+            if arr.loops.is_induction_increment(ip) || state[src] == K::Int {
                 let r = if op == OpCode::AddImm {
                     b.ins().iadd_imm(s, imm)
                 } else {

@@ -7,18 +7,19 @@ use varn_core::term::terminal;
 use varn_vm::varn_jit::JitStatsSnapshot;
 
 use super::fmt::{fmt_bytes, fmt_dur, fmt_num, fmt_pct, short_path};
-use crate::bench::stats::{sparkline, PhaseStats, CV_UNRELIABLE};
+use crate::bench::stats::{freq_histogram, PhaseStats, CV_UNRELIABLE};
 
-/// Inner content width of the dashboard box (chars between `│ ` and ` │`).
-const INNER: usize = 64;
-/// Width of the phase proportional bars (frontend / execute rows).
-const BAR_W: usize = 30;
+/// Inner content width of the dashboard box (visible chars between `│ ` and ` │`).
+const INNER: usize = 66;
+/// Width of the individual phase proportional bars.
+const BAR_W: usize = 26;
 /// Width of the JIT coverage bar.
-const JIT_BAR_W: usize = 34;
+const JIT_BAR_W: usize = 36;
+/// Histogram columns shown in the distribution row.
+const HIST_COLS: usize = 16;
 
-// ─── Box rendering helpers ────────────────────────────────────────────────
+// ─── Box rendering ────────────────────────────────────────────────────────
 
-/// Count visible chars in a string, skipping ANSI SGR sequences (`\x1b[...m`).
 fn visible_len(s: &str) -> usize {
     let mut n = 0;
     let mut in_esc = false;
@@ -33,27 +34,22 @@ fn visible_len(s: &str) -> usize {
     n
 }
 
-/// A content line inside the box, padded to INNER visible chars.
 fn box_line(content: &str) -> String {
     let vis = visible_len(content);
     let pad = INNER.saturating_sub(vis);
     format!("  │ {}{} │", content, " ".repeat(pad))
 }
 
-/// Horizontal rule separating sections inside the box.
 fn box_rule() -> String {
     format!("  ├{}┤", "─".repeat(INNER + 2))
 }
 
-/// Box bottom border.
 fn box_bottom() -> String {
     format!("  ╰{}╯", "─".repeat(INNER + 2))
 }
 
 // ─── Bar helpers ─────────────────────────────────────────────────────────
 
-/// Proportional bar with 1/8-block sub-pixel precision.
-/// Returns exactly `width` visible chars.
 fn proportional_bar(share: f64, width: usize) -> String {
     const EIGHTHS: [char; 7] = ['▏', '▎', '▍', '▌', '▋', '▊', '▉'];
     let share = share.clamp(0.0, 1.0);
@@ -76,7 +72,6 @@ fn proportional_bar(share: f64, width: usize) -> String {
     s
 }
 
-/// Two-tone bar: `█` for JIT frames, `░` for interpreter.
 fn jit_bar(ratio: f64, width: usize) -> String {
     let filled = ((ratio.clamp(0.0, 1.0) * width as f64).round() as usize).min(width);
     (0..width)
@@ -84,9 +79,34 @@ fn jit_bar(ratio: f64, width: usize) -> String {
         .collect()
 }
 
+fn jit_grade(ratio: f64) -> String {
+    if ratio >= 0.90 {
+        chalk("[A]").green().bold().to_string()
+    } else if ratio >= 0.70 {
+        chalk("[B]").cyan().bold().to_string()
+    } else if ratio >= 0.50 {
+        chalk("[C]").yellow().bold().to_string()
+    } else if ratio >= 0.30 {
+        chalk("[D]").yellow().to_string()
+    } else {
+        chalk("[F]").red().bold().to_string()
+    }
+}
+
+/// Compact duration without trailing decimals (used for tight inline notes).
+fn fmt_compact(d: Duration) -> String {
+    let ns = d.as_nanos();
+    if ns < 1_000 {
+        format!("{ns}ns")
+    } else if ns < 1_000_000 {
+        format!("{}µs", ns / 1_000)
+    } else {
+        format!("{:.1}ms", ns as f64 / 1_000_000.0)
+    }
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────
 
-/// Which build produced these numbers.
 pub struct BuildId {
     pub profile: &'static str,
     pub backend: &'static str,
@@ -126,7 +146,6 @@ impl BuildId {
     }
 }
 
-/// The compile-versus-run split of one execution.
 pub struct ExecSplit {
     pub compile: Duration,
     #[allow(dead_code)]
@@ -164,9 +183,9 @@ pub struct Headline<'a> {
     pub coverage_scope: &'a str,
     pub top_blocker: Option<(String, String)>,
     pub cpu: Option<crate::cpu_freq::CpuFreq>,
-    /// All pipeline phases — used to render proportional bars.
+    /// All pipeline phases — renders individual proportional bars.
     pub phases: Option<&'a [PhaseStats]>,
-    /// Raw e2e duration samples — used to render the sparkline.
+    /// Raw e2e duration samples — renders the frequency histogram.
     pub e2e_samples: Option<&'a [Duration]>,
 }
 
@@ -178,7 +197,6 @@ impl Headline<'_> {
         // ── Box top ──────────────────────────────────────────────────────
         let left = format!("bench · {}", short_path(self.path));
         let right = build.render(self.runs);
-        // Truncate path so it always fits.
         let max_left = INNER.saturating_sub(right.chars().count() + 6);
         let left = if left.chars().count() > max_left {
             super::fmt::truncate_middle(&left, max_left)
@@ -186,13 +204,12 @@ impl Headline<'_> {
             left
         };
         let dashes = INNER.saturating_sub(4 + left.chars().count() + right.chars().count());
-        let top = format!(
+        terminal::log(format!(
             "  ╭─ {} {} {} ─╮",
             chalk(&left).bold(),
             "─".repeat(dashes),
             chalk(&right).dim(),
-        );
-        terminal::log(top);
+        ));
 
         // ── Stats line ───────────────────────────────────────────────────
         let e2e_dur = self.e2e.map(|e| e.p50).unwrap_or(self.total_p50);
@@ -214,52 +231,49 @@ impl Headline<'_> {
         );
         terminal::log(box_line(&stats));
 
-        // ── Phase bars ───────────────────────────────────────────────────
+        // ── Individual phase bars ─────────────────────────────────────────
         if let Some(phases) = self.phases {
             terminal::log(box_rule());
             let total_ns = self.total_p50.as_nanos() as f64;
 
-            let frontend_p50: Duration =
-                phases.iter().filter(|p| p.name != "execute").map(|p| p.p50).sum();
-            let execute_p50 = phases
-                .iter()
-                .find(|p| p.name == "execute")
-                .map(|p| p.p50)
-                .unwrap_or(Duration::ZERO);
+            for phase in phases {
+                let share = if total_ns > 0.0 {
+                    phase.p50.as_nanos() as f64 / total_ns
+                } else {
+                    0.0
+                };
 
-            let fe_share =
-                if total_ns > 0.0 { frontend_p50.as_nanos() as f64 / total_ns } else { 0.0 };
-            let ex_share =
-                if total_ns > 0.0 { execute_p50.as_nanos() as f64 / total_ns } else { 0.0 };
+                let bar_str = proportional_bar(share, BAR_W);
+                let colored_bar = (phase.color_fn)(chalk(bar_str.as_str())).to_string();
+                let name_plain = format!("{:<10}", phase.name);
+                let colored_name = (phase.color_fn)(chalk(name_plain.as_str()))
+                    .bold()
+                    .to_string();
+                let dur_str = format!("{:<9}", fmt_dur(phase.p50));
+                let pct_str = format!("{:>5}", fmt_pct(share));
 
-            // name(10) + bar(BAR_W) + "  " + dur(9) + "  " + pct(5) = visible
-            let fe_name = format!("{:<10}", "frontend");
-            let fe_bar = chalk(proportional_bar(fe_share, BAR_W)).dim().to_string();
-            let fe_dur = format!("{:<9}", fmt_dur(frontend_p50));
-            let fe_pct = format!("{:>5}", fmt_pct(fe_share));
-            let fe_line =
-                format!("{}{}  {}  {}", chalk(fe_name).dim(), fe_bar, chalk(fe_dur).dim(), fe_pct);
-            terminal::log(box_line(&fe_line));
+                // For execute: show JIT compile note inline if it fits.
+                let compile_note = if phase.name == "execute" {
+                    self.split
+                        .as_ref()
+                        .map(|s| {
+                            chalk(format!("  ↪{}", fmt_compact(s.compile))).dim().to_string()
+                        })
+                        .unwrap_or_default()
+                } else {
+                    String::new()
+                };
 
-            let ex_name = format!("{:<10}", "execute");
-            let ex_bar = chalk(proportional_bar(ex_share, BAR_W)).blue().to_string();
-            let ex_dur = format!("{:<9}", fmt_dur(execute_p50));
-            let ex_pct = format!("{:>5}", fmt_pct(ex_share));
-            let compile_note = self.split.as_ref().map(|s| {
-                chalk(format!("  [{} compile]", fmt_dur(s.compile))).dim().to_string()
-            }).unwrap_or_default();
-            let ex_line = format!(
-                "{}{}  {}  {}{}",
-                chalk(ex_name).blue().bold(),
-                ex_bar,
-                chalk(ex_dur).blue(),
-                chalk(ex_pct).dim(),
-                compile_note,
-            );
-            terminal::log(box_line(&ex_line));
+                let colored_dur = (phase.color_fn)(chalk(dur_str.as_str())).to_string();
+                let row = format!(
+                    "{}{}  {}  {}{}",
+                    colored_name, colored_bar, colored_dur, pct_str, compile_note
+                );
+                terminal::log(box_line(&row));
+            }
         }
 
-        // ── JIT bar + distribution ────────────────────────────────────────
+        // ── JIT bar + grade ───────────────────────────────────────────────
         let show_jit_section =
             (self.jit.is_some() && !build.jit_disabled()) || self.e2e_samples.is_some();
         if show_jit_section {
@@ -268,45 +282,59 @@ impl Headline<'_> {
 
         if !build.jit_disabled() {
             if let Some(jit) = self.jit {
-                let ratio = jit.machine_code_ratio();
-                let machine = jit.machine_code_frames();
-                let total = jit.total_frames();
+                // fn_compilation_rate is the only accurate metric: counts each
+                // unique function once, unaffected by JIT-direct recursive calls
+                // that bypass the interpreter trampoline entirely.
+                let ratio = jit.fn_compilation_rate();
+                let compiled = jit.compile_success;
+                let total_fns = jit.functions_seen();
 
                 let bar_str = jit_bar(ratio, JIT_BAR_W);
-                let bar_colored = if ratio >= 0.8 {
+                let bar_colored = if ratio >= 0.90 {
                     chalk(&bar_str).green().to_string()
-                } else if ratio >= 0.3 {
+                } else if ratio >= 0.50 {
                     chalk(&bar_str).yellow().to_string()
                 } else {
                     chalk(&bar_str).red().to_string()
                 };
-                let pct_colored = if ratio >= 0.8 {
+                let pct_colored = if ratio >= 0.90 {
                     chalk(fmt_pct(ratio)).green().bold().to_string()
+                } else if ratio >= 0.70 {
+                    chalk(fmt_pct(ratio)).cyan().bold().to_string()
                 } else {
                     chalk(fmt_pct(ratio)).yellow().bold().to_string()
                 };
-                let counts = chalk(format!("({machine}/{total})")).dim().to_string();
+                let grade = jit_grade(ratio);
+                let counts = chalk(format!("({compiled}/{total_fns} fns)")).dim().to_string();
 
-                // "JIT  " + bar(JIT_BAR_W) + "  " + pct(6) + "  " + counts(~10)
-                let jit_line = format!("JIT  {}  {}  {}", bar_colored, pct_colored, counts);
+                let jit_line =
+                    format!("JIT  {}  {} {}  {}", bar_colored, pct_colored, grade, counts);
                 terminal::log(box_line(&jit_line));
 
-                // Blockers / notes (compact, not the full verbose section)
-                let never = jit.never_compiled_frames();
-                if never > 0 && jit.functions_seen() > 0 {
+                // Note: distinguish uncompilable functions (real problem) from
+                // tiering warm-up frames (expected behavior, not a defect).
+                let blocked = jit.gate_rejected + jit.compile_fail;
+                if blocked > 0 {
                     let note = if let Some((name, reason)) = &self.top_blocker {
+                        let reason_short =
+                            super::fmt::truncate_middle(&format!("{name}: {reason}"), 40);
                         format!(
-                            "{} frames interpreted  ·  {}",
-                            fmt_num(never),
-                            super::fmt::truncate_middle(&format!("{name}: {reason}"), 36)
+                            "{} fns sin compilar  ·  {}",
+                            fmt_num(blocked),
+                            reason_short
                         )
                     } else {
-                        format!("{} frames interpreted", fmt_num(never))
+                        format!("{} fns sin compilar", fmt_num(blocked))
                     };
                     terminal::log(box_line(&chalk(note).dim().to_string()));
+                } else if jit.never_compiled_frames() > 0 {
+                    let tiering = jit.never_compiled_frames();
+                    let note = format!(
+                        "{} entradas de calentamiento (tiering)",
+                        fmt_num(tiering)
+                    );
+                    terminal::log(box_line(&chalk(note).dim().to_string()));
                 }
-            } else if self.phases.is_some() || self.e2e_samples.is_some() {
-                // JIT enabled at build but no stats collected — silent skip.
             }
         } else if show_jit_section {
             terminal::log(box_line(
@@ -314,18 +342,20 @@ impl Headline<'_> {
             ));
         }
 
-        // ── Sparkline + distribution ──────────────────────────────────────
+        // ── Frequency histogram + distribution ────────────────────────────
         if let Some(e2e) = self.e2e {
             if let Some(samples) = self.e2e_samples {
-                let spark = sparkline(samples);
+                let hist = freq_histogram(samples, HIST_COLS);
                 let spread = e2e.spread();
                 let spread_warn = self.execute.map(|ex| ex.cv() >= CV_UNRELIABLE).unwrap_or(false);
 
                 let dist = format!(
-                    "{} – {}  ·  σ {}",
+                    "{}  {}  σ {}  {}–{}",
+                    chalk(hist).dim(),
+                    chalk(format!("{:.1}/s", 1e9 / e2e.p50.as_nanos().max(1) as f64)).dim(),
+                    chalk(fmt_pct(e2e.cv())).dim(),
                     fmt_dur(e2e.min),
                     fmt_dur(e2e.max),
-                    fmt_pct(e2e.cv()),
                 );
                 let spread_part = if spread_warn {
                     format!("  {}", chalk(format!("⚠ spread {}", fmt_pct(spread))).yellow())
@@ -333,25 +363,28 @@ impl Headline<'_> {
                     String::new()
                 };
 
-                // Throttle note if CPU is significantly collapsed.
+                // Throttle note.
                 let throttle = self.cpu.as_ref().and_then(|cf| {
                     if cf.max_mhz > 0 && cf.cur_mhz as f64 / (cf.max_mhz as f64) < 0.90 {
-                        Some(format!(
-                            "  ·  CPU {} MHz ({})",
-                            cf.cur_mhz,
-                            fmt_pct(cf.cur_mhz as f64 / cf.max_mhz as f64)
-                        ))
+                        Some(
+                            chalk(format!(
+                                "  CPU {}MHz ({})",
+                                cf.cur_mhz,
+                                fmt_pct(cf.cur_mhz as f64 / (cf.max_mhz as f64))
+                            ))
+                            .dim()
+                            .to_string(),
+                        )
                     } else {
                         None
                     }
                 });
 
                 let dist_line = format!(
-                    "{}  {}{}{}",
-                    chalk(spark).dim(),
-                    chalk(dist).dim(),
+                    "{}{}{}",
+                    dist,
                     spread_part,
-                    throttle.as_deref().map(|t| chalk(t).dim().to_string()).unwrap_or_default(),
+                    throttle.unwrap_or_default(),
                 );
                 terminal::log(box_line(&dist_line));
             }

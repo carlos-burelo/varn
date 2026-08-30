@@ -138,9 +138,13 @@ pub struct CheckProfile {
     pub bind: Duration,
     pub merge_core_members: Duration,
     pub enrich_call_returns: Duration,
+    /// Checker struct construction + abstract_classes scan.
+    pub init: Duration,
     pub check_stmts: Duration,
     pub collect_annotations: Duration,
     pub finalize: Duration,
+    /// symbol_types clone + CheckResult construction.
+    pub cleanup: Duration,
 }
 
 pub struct Checker<'r> {
@@ -293,6 +297,7 @@ impl<'r> Checker<'r> {
 
         let source_file: std::rc::Rc<str> = std::rc::Rc::from(bind.source_file.as_ref());
 
+        let started = Instant::now();
         let mut checker = Checker {
             resolver,
             current_scope: bind.global_scope,
@@ -359,6 +364,7 @@ impl<'r> Checker<'r> {
                 checker.abstract_classes.insert(name.clone());
             }
         }
+        profile.init = started.elapsed();
 
         let started = Instant::now();
         checker.check_stmts(&program.body, &bind);
@@ -446,6 +452,7 @@ impl<'r> Checker<'r> {
         }
         profile.finalize = started.elapsed();
 
+        let started = Instant::now();
         let symbol_types = checker.symbol_types.clone();
         let node_scopes = if record_expr_types {
             checker.node_scopes.clone()
@@ -457,6 +464,8 @@ impl<'r> Checker<'r> {
         } else {
             Vec::new()
         };
+
+        profile.cleanup = started.elapsed();
 
         CheckResult {
             bind,
