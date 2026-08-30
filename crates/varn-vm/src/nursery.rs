@@ -40,6 +40,9 @@ pub struct Nursery {
     /// prestarse como campos a la vez.
     worklist: Vec<u32>,
     scan_candidates: Vec<u32>,
+    /// SONDA: fase de `collect` en curso, para que el aviso de referencia
+    /// colgante diga de qué conjunto de raíces salió.
+    phase: &'static str,
     pub alloc_count: u64,
     pub minor_gc_count: u64,
     pub minor_gc_promoted: u64,
@@ -82,6 +85,7 @@ impl Clone for Nursery {
             forwarding,
             remembered: self.remembered.clone(),
             worklist: Vec::new(),
+            phase: "?",
             scan_candidates: Vec::new(),
             alloc_count: self.alloc_count,
             minor_gc_count: self.minor_gc_count,
@@ -107,6 +111,7 @@ impl Nursery {
             forwarding: Vec::with_capacity(NURSERY_CAPACITY),
             remembered: Vec::new(),
             worklist: Vec::new(),
+            phase: "?",
             scan_candidates: Vec::new(),
             alloc_count: 0,
             minor_gc_count: 0,
@@ -131,6 +136,7 @@ impl Nursery {
             forwarding: Vec::new(),
             remembered: Vec::new(),
             worklist: Vec::new(),
+            phase: "?",
             scan_candidates: Vec::new(),
             alloc_count: 0,
             minor_gc_count: 0,
@@ -215,6 +221,7 @@ impl Nursery {
         // previously meant one fresh Vec allocation each.
         let mut fixups: Vec<(ChildSlot, u32)> = Vec::with_capacity(8);
 
+        self.phase = "stack/ctx roots";
         for slot in stack.iter_mut() {
             self.update_value(slot, old_gen, &mut worklist);
         }
@@ -222,6 +229,7 @@ impl Nursery {
         let mut old_indices_to_scan = std::mem::take(&mut self.remembered);
         old_indices_to_scan.sort_unstable();
         old_indices_to_scan.dedup();
+        self.phase = "remembered set (barrera old->young)";
         for packed in old_indices_to_scan {
             self.scan_and_fix_old_obj(old_idx_raw(packed), old_gen, &mut worklist, &mut fixups);
         }
@@ -232,6 +240,7 @@ impl Nursery {
         let mut candidates = std::mem::take(&mut self.scan_candidates);
         candidates.clear();
         candidates.extend_from_slice(old_gen.scan_roots());
+        self.phase = "scan_roots del old gen";
         for &raw_idx in &candidates {
             if matches!(old_gen.get_raw(raw_idx), Some(obj) if Self::can_reference_nursery(obj)) {
                 self.scan_and_fix_old_obj(raw_idx, old_gen, &mut worklist, &mut fixups);
@@ -239,6 +248,7 @@ impl Nursery {
         }
         self.scan_candidates = candidates;
 
+        self.phase = "extra roots";
         for &packed in extra_root_packed {
             if is_old_idx(packed) {
                 self.scan_and_fix_old_obj(old_idx_raw(packed), old_gen, &mut worklist, &mut fixups);
@@ -247,6 +257,7 @@ impl Nursery {
             }
         }
 
+        self.phase = "worklist (hijos de lo ya promovido)";
         while let Some(raw) = worklist.pop() {
             self.scan_and_fix_old_obj(raw, old_gen, &mut worklist, &mut fixups);
         }
@@ -318,9 +329,10 @@ impl Nursery {
                 if !WARNED.swap(true, std::sync::atomic::Ordering::Relaxed) {
                     eprintln!(
                         "warning[gc]: referencia colgante al nursery ({nursery_idx}) durante la \
-                         colección menor — una referencia old→young no quedó registrada por la \
-                         barrera de escritura. Los valores leídos a través de ella serán \
-                         incorrectos. (Sólo se avisa una vez.)"
+                         colección menor, fase «{}» — una referencia old→young no quedó \
+                         registrada por la barrera de escritura. Los valores leídos a través de \
+                         ella serán incorrectos. (Sólo se avisa una vez.)",
+                        self.phase
                     );
                 }
                 return pack_old_idx(0);
