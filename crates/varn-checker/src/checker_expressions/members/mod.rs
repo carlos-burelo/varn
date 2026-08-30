@@ -8,6 +8,46 @@ use crate::checker::Checker;
 use crate::types::{ObjectTypeMember, Type};
 use varn_core::TypeKind;
 
+/// Is `name` an enum, as `bind` sees it?
+///
+/// The origin module is consulted last, and only when the local tables cannot
+/// settle the question. They almost always can, and the ordering matters more
+/// than it looks: resolving `origin` means binding a module, and a type
+/// declared in the file under check carries that file as its origin -- so the
+/// probe re-bound the very `BindResult` already passed in as `bind`. Two calls
+/// per member access (`find_member_info_uncached` and `member_exists`) put a
+/// full read-parse-bind of the current file on the path of every `p.x`.
+///
+/// A name in `type_members.classes` but not in `type_members.enums` is a class
+/// or struct: enums are written to both, so the local-enum check above has
+/// already returned for them.
+pub(crate) fn is_enum_type(
+    resolver: &dyn crate::module_resolver::ImportResolver,
+    bind: &BindResult,
+    name: &Rc<str>,
+    origin_modules: &[String],
+) -> bool {
+    if bind.get_enum_members_local(name.as_ref()).is_some() {
+        return true;
+    }
+    if bind
+        .core
+        .as_ref()
+        .is_some_and(|b| b.enum_members.contains_key(name.as_ref()))
+    {
+        return true;
+    }
+    if bind.type_members.classes.contains_key(name)
+        || bind.type_members.interfaces.contains_key(name)
+    {
+        return false;
+    }
+    resolver
+        .find_bind_for_type(name, origin_modules)
+        .as_ref()
+        .is_some_and(|eb| eb.get_enum_members_local(name.as_ref()).is_some())
+}
+
 fn nested(k: crate::semantic_info::NestedTypeKind) -> crate::semantic_info::ResolvedMemberKind {
     crate::semantic_info::ResolvedMemberKind::NestedType(k)
 }

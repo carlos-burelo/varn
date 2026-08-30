@@ -149,16 +149,7 @@ impl<'r> Checker<'r> {
                 }
 
                 let origin_modules: Vec<String> = origin.iter().map(|s| s.to_string()).collect();
-                let is_enum = bind.get_enum_members_local(name.as_ref()).is_some()
-                    || bind
-                        .core
-                        .as_ref()
-                        .is_some_and(|b| b.enum_members.contains_key(name.as_ref()))
-                    || self.resolver.find_bind_for_type(name, &origin_modules)
-                        .as_ref()
-                        .is_some_and(|eb| {
-                            eb.get_enum_members_local(name.as_ref()).is_some()
-                        });
+                let is_enum = super::is_enum_type(self.resolver, bind, name, &origin_modules);
 
                 if is_enum {
                     if key == varn_core::MemberKey::RawValue.as_str()

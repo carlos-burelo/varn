@@ -322,6 +322,19 @@ impl ImportResolver for DiskResolver {
         }
 
         let canonical = varn_modules::canonical_or_original(Path::new(abs_path));
+        // Look again under the canonical key. Callers reach this with whatever
+        // spelling the type's `origin` carries -- on Windows that is the
+        // extended form, `\\?\C:\...\m.vn`, while every store below writes
+        // `C:/.../m.vn`. Checking only `abs_path` made the memo permanently
+        // cold for those callers: each one re-read the file and re-hashed the
+        // on-disk cache to rebuild a `BindResult` already sitting in the graph.
+        // `module_exports` has always done this; `module_bind` had not.
+        if canonical != abs_path {
+            if let Some(cached) = self.cached_bind(&canonical) {
+                return Some(cached);
+            }
+        }
+
         let source = std::fs::read_to_string(&canonical).ok()?;
 
         if let Some(cached) = super::cache::try_load_cache(self, &canonical, &source) {
