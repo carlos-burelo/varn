@@ -56,14 +56,19 @@ pub(super) fn try_load_cache(
     };
 
     let cache_dir = get_cache_dir(resolver);
-    let cache_file = cache_dir.join(format!("{}.{:x}.vnm", name, hash));
+    let cache_file = cache_dir.join(format!(
+        "{}.{:x}.{:08x}.vnm",
+        name,
+        hash,
+        varn_modules::artifact::cache_key()
+    ));
     if !cache_file.exists() {
         return None;
     }
     let bytes = std::fs::read(&cache_file).ok()?;
     let payload = match varn_modules::artifact::read_envelope(
         varn_modules::artifact::MAGIC_VNM,
-        varn_modules::artifact::BUILD_FINGERPRINT,
+        varn_modules::artifact::cache_key(),
         &bytes,
     ) {
         Ok(p) => p,
@@ -99,7 +104,12 @@ pub(super) fn save_to_cache(
         format!("file_{:x}", hasher.finish())
     };
 
-    let cache_file = cache_dir.join(format!("{}.{:x}.vnm", name, hash));
+    let cache_file = cache_dir.join(format!(
+        "{}.{:x}.{:08x}.vnm",
+        name,
+        hash,
+        varn_modules::artifact::cache_key()
+    ));
     let cached = CachedModule {
         exports: exports.clone(),
         bind: bind.clone(),
@@ -107,9 +117,10 @@ pub(super) fn save_to_cache(
     if let Ok(payload) = postcard::to_allocvec(&cached) {
         let bytes = varn_modules::artifact::write_envelope(
             varn_modules::artifact::MAGIC_VNM,
-            varn_modules::artifact::BUILD_FINGERPRINT,
+            varn_modules::artifact::cache_key(),
             &payload,
         );
         let _ = std::fs::write(&cache_file, bytes);
+        varn_modules::artifact::prune_superseded(&cache_file);
     }
 }

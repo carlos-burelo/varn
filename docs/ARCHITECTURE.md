@@ -203,3 +203,31 @@ Los binarios compilados `.vnc` utilizan la siguiente estructura física:
 ```
 
 Permite la ejecución instantánea (`vn run app.vnc`) omitiendo el parsing y type checking.
+
+### Dos Clases de Artefacto
+
+Los magics ya las separaban; lo que faltaba era que cada una usara su propia versión.
+
+| Clase | Magic | Versión | Si no casa |
+|---|---|---|---|
+| Caché interna (`~/.varn/cache`) | `VNC`, `VNM` | esquema **⊕ productor** | recompila en silencio |
+| Distribuible (`vn build`) | `WRC` (`.vnc` portable, standalone) | **sólo esquema** | error al usuario |
+
+Un distribuible viaja a otra máquina y lo ejecuta otro binario, así que atarlo a la identidad del productor lo vuelve ilegible en destino. Una entrada de caché es un detalle invisible y regenerable, así que puede —y debe— depender del binario que la emitió.
+
+### Clave de un Artefacto Cacheado
+
+Un `.vnc`/`.vnm` se identifica por dos cosas distintas, y ambas van en el **nombre** del archivo además de en la envolvente:
+
+* **Forma del esquema** (`BUILD_FINGERPRINT`, hash de `varn-types` y `varn-modules`): si cambia, el artefacto no se puede ni deserializar. Su lista de crates es corta a propósito — observar desde el build script un crate del que todos dependen recompilaría el grafo entero en cada edición.
+* **Identidad del productor** (`producer_fingerprint`, ruta + tamaño + mtime del ejecutable): el bytecode cacheado es la SALIDA del compilador, así que el compilador forma parte de su clave. Se resuelve en tiempo de ejecución, lo que además captura cambios de toolchain que un hash de fuentes no ve.
+
+Sin la segunda, un `vn` actualizado ejecutaba bytecode emitido por su predecesor hasta que alguien corría `vn cache clean`: un fallo de corrección, no de rendimiento, porque ese bytecode es anterior a cada arreglo del compilador.
+
+Va en el nombre y no sólo dentro de la envolvente porque, compartiendo ruta, dos binarios se sobreescriben la entrada mutuamente y ninguno reutiliza nada. Con la clave en el nombre cada uno tiene la suya; se conservan las `ARTIFACT_GENERATIONS` más recientes por archivo fuente para que el directorio no crezca sin límite.
+
+### Revalidación de Dependencias
+
+Un artefacto sólo vale si TODAS sus fuentes siguen iguales, así que guarda un hash por módulo del grafo. La procedencia de cada uno la decide el *provider*, nunca la forma del texto: la regla anterior —«contiene `:` y no contiene `/`»— clasificaba `std:time` como id virtual pero `std:time/duration` como ruta de disco, y ese `fs::read` de una ruta inexistente invalidaba el grafo entero en cada arranque. Un solo import con submódulo bastaba para que un programa no volviera a acertar la caché nunca.
+
+Un *miss* silencioso se comporta igual que una caché fría, así que una validación rota se manifiesta como lentitud difusa y puede sobrevivir sin que nadie la note. Por eso `vn run -v` imprime el MOTIVO del fallo, no sólo el hecho.

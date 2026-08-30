@@ -17,14 +17,30 @@ pub fn compile_cache_path(file_path: &str) -> std::path::PathBuf {
     let path_hash = crate::hash::fnv1a64(canonical.to_string_lossy().as_bytes());
 
     let stem = path.file_stem().unwrap_or_default().to_string_lossy();
-    varn_modules::artifact::get_bytecode_cache_dir(&project_root)
-        .join(format!("{}.{:x}.vnc", stem, path_hash as u32))
+    // La clave del artefacto va en el NOMBRE, no sólo dentro de la envolvente:
+    // si dos binarios distintos comparten ruta de caché se sobreescriben el
+    // archivo mutuamente y ninguno llega a reutilizar nada. Separarlos por
+    // nombre deja a cada uno su propia entrada.
+    varn_modules::artifact::get_bytecode_cache_dir(&project_root).join(format!(
+        "{}.{:x}.{:08x}.vnc",
+        stem,
+        path_hash as u32,
+        varn_modules::artifact::cache_key()
+    ))
 }
 
+/// Carga el grafo cacheado si sigue siendo válido.
+///
+/// `verbose` hace visible el MOTIVO de un fallo, no sólo el hecho. Un miss
+/// silencioso se comporta igual que una caché fría, así que una validación
+/// rota se manifiesta como lentitud difusa y puede sobrevivir indefinidamente
+/// sin que nadie la note: exactamente lo que pasó con la regla que clasificaba
+/// `std:time/duration` como ruta de disco.
 pub fn load_cached_graph(
     cache_path: &Path,
     version: u32,
     entry_source: &str,
+    verbose: bool,
 ) -> Result<Option<ModuleGraphArtifact>, String> {
     if !cache_path.exists() {
         return Ok(None);
@@ -33,6 +49,12 @@ pub fn load_cached_graph(
     let payload =
         varn_modules::artifact::read_envelope(varn_modules::artifact::MAGIC_VNC, version, &bytes)
             .map_err(|e| e.to_string())?;
+    let dbg = verbose;
+    let reason = |what: std::fmt::Arguments<'_>| {
+        if dbg {
+            varn_core::term::terminal::tagged("Varn", format_args!("cache miss: {what}"));
+        }
+    };
 
     let graph: ModuleGraphArtifact = postcard::from_bytes(payload).map_err(|e| e.to_string())?;
 
@@ -40,47 +62,73 @@ pub fn load_cached_graph(
         Some(&cached_hash) => {
             let current_hash = crate::hash::fnv1a64(entry_source.as_bytes());
             if cached_hash != current_hash {
+                reason(format_args!("el fuente de entrada cambió"));
                 return Ok(None);
             }
         }
-        None => return Ok(None),
+        None => {
+            reason(format_args!("el artefacto no registra hash de la entrada"));
+            return Ok(None);
+        }
     }
 
     for (path, &cached_hash) in &graph.source_hashes {
         if path == &graph.entry_path {
             continue;
         }
-        if path.contains(':') && !path.contains('/') && !path.contains('\\') {
-            if let Some(provider) = varn_modules::provider::get() {
-                if let Some(src) = provider.embedded_source(path) {
-                    let current_hash = crate::hash::fnv1a64(src.as_bytes());
-                    if cached_hash != current_hash {
-                        return Ok(None);
+        // Procedencia decidida por el provider, no por la forma del texto.
+        // La regla anterior era `contiene ':' y no contiene '/'`, que clasifica
+        // `std:time` como virtual pero `std:time/duration` como ruta de disco:
+        // el segundo caía al `fs::read` de una ruta inexistente y el grafo
+        // entero fallaba la validación en CADA arranque. Un solo id con
+        // submódulo basta para que un programa no vuelva a acertar la caché.
+        if let Some(provider) = varn_modules::provider::get() {
+            if let Some(src) = provider.embedded_source(path) {
+                let current_hash = crate::hash::fnv1a64(src.as_bytes());
+                if cached_hash != current_hash {
+                    if dbg {
+                        reason(format_args!("el módulo embebido {path} cambió"));
                     }
-                } else if let Some(p) = provider.source_path(path) {
-                    // std served from a source tree: revalidate against disk
-                    // so editing std/*.vn invalidates dependent caches.
-                    match std::fs::read(&p) {
-                        Ok(src) => {
-                            let current_hash = crate::hash::fnv1a64(&src);
-                            if cached_hash != current_hash {
-                                return Ok(None);
+                    return Ok(None);
+                }
+                continue;
+            }
+            if let Some(p) = provider.source_path(path) {
+                // std servida desde un árbol de fuentes: revalidar contra disco
+                // para que editar std/*.vn invalide las cachés dependientes.
+                match std::fs::read(&p) {
+                    Ok(src) => {
+                        let current_hash = crate::hash::fnv1a64(&src);
+                        if cached_hash != current_hash {
+                            if dbg {
+                                reason(format_args!("la fuente std {path} cambió"));
                             }
+                            return Ok(None);
                         }
-                        Err(_) => return Ok(None),
+                        continue;
+                    }
+                    Err(e) => {
+                        if dbg {
+                            reason(format_args!("la fuente std {path} no se pudo leer: {e}"));
+                        }
+                        return Ok(None);
                     }
                 }
             }
-            continue;
         }
+
         match std::fs::read(path) {
             Ok(src) => {
                 let current_hash = crate::hash::fnv1a64(&src);
                 if cached_hash != current_hash {
+                    if dbg { reason(format_args!("la dependencia {path} cambió")); }
                     return Ok(None);
                 }
             }
-            Err(_) => return Ok(None),
+            Err(e) => {
+                if dbg { reason(format_args!("la dependencia {path} no se pudo leer: {e}")); }
+                return Ok(None);
+            }
         }
     }
 
@@ -110,7 +158,7 @@ pub fn store_cached_graph(cache_path: &Path, graph: &ModuleGraphArtifact) -> Pip
     })?;
     let bytes = varn_modules::artifact::write_envelope(
         varn_modules::artifact::MAGIC_VNC,
-        crate::compile::CACHE_FORMAT_VERSION,
+        crate::compile::cache_format_version(),
         &payload,
     );
     std::fs::write(cache_path, bytes).map_err(|e| {
@@ -122,6 +170,7 @@ pub fn store_cached_graph(cache_path: &Path, graph: &ModuleGraphArtifact) -> Pip
             e
         ))
     })?;
+    varn_modules::artifact::prune_superseded(cache_path);
     Ok(())
 }
 

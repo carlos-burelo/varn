@@ -19,7 +19,7 @@ pub mod wrc;
 mod lex;
 
 pub use check::check as phase_check;
-pub use compile::{CompileOutput, CACHE_FORMAT_VERSION};
+pub use compile::{cache_format_version, CompileOutput, DISTRIBUTABLE_VERSION};
 pub use core::core_protos_owned;
 pub use error::PipelineError;
 pub use execute::{execute, execute_with_caps};
@@ -136,7 +136,7 @@ fn compile_source(
 fn compile_source_cached(source: &str, path: &str, verbose: bool) -> PipelineResult<CompileOutput> {
     let cache_path = cache::compile_cache_path(path);
 
-    match cache::load_cached_graph(&cache_path, compile::CACHE_FORMAT_VERSION, source) {
+    match cache::load_cached_graph(&cache_path, compile::cache_format_version(), source, verbose) {
         Ok(Some(graph_artifact)) => {
             if verbose {
                 varn_core::term::terminal::tagged("Varn", "compile cache hit");

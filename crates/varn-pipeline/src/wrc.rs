@@ -7,7 +7,7 @@ pub fn write_wrc(path: &str, artifact: &ModuleGraphArtifact) -> Result<(), Pipel
 
     let out = varn_modules::artifact::write_envelope(
         varn_modules::artifact::MAGIC_WRC,
-        crate::compile::CACHE_FORMAT_VERSION,
+        crate::compile::DISTRIBUTABLE_VERSION,
         &payload,
     );
 
@@ -21,7 +21,7 @@ pub fn read_wrc(path: &str) -> Result<ModuleGraphArtifact, PipelineError> {
 
     let payload = varn_modules::artifact::read_envelope(
         varn_modules::artifact::MAGIC_WRC,
-        crate::compile::CACHE_FORMAT_VERSION,
+        crate::compile::DISTRIBUTABLE_VERSION,
         &bytes,
     )
     .map_err(|e| PipelineError::fatal(format!("invalid .vnc file '{}': {}", path, e)))?;

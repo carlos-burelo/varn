@@ -38,7 +38,7 @@ pub fn execute(args: BuildArgs) -> Result<(), CliError> {
 
         let wrc_envelope = varn_modules::artifact::write_envelope(
             varn_modules::artifact::MAGIC_WRC,
-            pipeline::CACHE_FORMAT_VERSION,
+            pipeline::DISTRIBUTABLE_VERSION,
             &payload,
         );
 

@@ -190,10 +190,31 @@ function Get-ResultSignature([string]$raw) {
 
 # One timed execution. Output is captured, not discarded: it is the only way to
 # tell a fast right answer from a fast wrong one.
+# One bytecode-cache directory per runtime, created fresh for this session so
+# no earlier run's artifacts leak into these numbers.
+$CacheRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("varn-bench-cache-" + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+$CacheDirs = @{}
+foreach ($rt in $runtimes) {
+    $dir = Join-Path $CacheRoot ($rt -replace '[^a-zA-Z0-9]', '_')
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    $CacheDirs[$rt] = $dir
+}
+
 function Invoke-Once([string]$rt, [string]$file) {
+    # Each runtime gets its own bytecode cache. Varn keys a cache entry by the
+    # producing binary, so `varn` and `varn-base` no longer read each other's
+    # bytecode - but sharing one directory still makes them compete for the
+    # same retained generations, and a measurement harness should not depend
+    # on the runtime's retention policy to stay honest. A directory apiece
+    # makes the isolation explicit and survives any future change to that
+    # policy. Non-Varn runtimes ignore the variable.
+    $prev = $env:VARN_CACHE_DIR
+    $env:VARN_CACHE_DIR = $CacheDirs[$rt]
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     $out = & $Invoke[$rt] $file 2>&1
     $sw.Stop()
+    if ($null -eq $prev) { Remove-Item Env:\VARN_CACHE_DIR -ErrorAction SilentlyContinue }
+    else { $env:VARN_CACHE_DIR = $prev }
     $raw = ($out | Out-String).Trim()
     return [pscustomobject]@{
         Ms        = $sw.Elapsed.TotalMilliseconds
