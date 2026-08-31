@@ -34,9 +34,8 @@ pub use cg_ty::CgTy;
 pub use intrinsics::{IntrinsicType, MemberKey};
 pub use module_id::{ImportSpecifier, ModuleId};
 pub use numeric::{
-    add_i48, add_int, binary_operand_kind, binary_result_kind, checked_i48, checked_int, mul_i48,
-    mul_int, neg_i48, neg_int, pow_i48, pow_int, sub_i48, sub_int, wrap_i48, NumericOperand,
-    INT_MAX, INT_MIN,
+    add_int, binary_operand_kind, binary_result_kind, checked_int, mul_int, neg_int, pow_int,
+    sub_int, NumericOperand, INT_MAX, INT_MIN,
 };
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;

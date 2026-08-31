@@ -13,15 +13,13 @@ use cranelift_frontend::{FunctionBuilder, Variable};
 use varn_core::OpCode;
 use varn_types::VmValue;
 
-use super::emit::{
-    box_int, box_or_pass, call_helper, meta_is_float, unbox_bool, unbox_f64_coerce,
-};
+use super::emit::{box_int, box_or_pass, call_helper, meta_is_float, unbox_bool, unbox_f64_coerce};
 use super::kinds::K;
 use crate::JitHelpers;
 
-const SSO_TAG_MASK: u64 =
-    varn_types::vm_value::SIGN | varn_types::vm_value::QNAN | varn_types::vm_value::MASK_TAG;
-const SSO_TAG_BITS: u64 = varn_types::vm_value::QNAN | varn_types::vm_value::TAG_SSO;
+/// Kind test for an inline (SSO) string, applied to a value's TAG WORD.
+const SSO_TAG_MASK: u64 = varn_types::vm_value::KIND_MASK;
+const SSO_TAG_BITS: u64 = varn_types::vm_value::KIND_SSO;
 
 /// General lowering context (not frame-specific). Helper addresses are passed
 /// per-op, so this only carries the operand/dispatch essentials.
@@ -77,7 +75,9 @@ pub(super) fn emit_is_null(
         K::Int | K::Float | K::Bool => b.ins().iconst(types::I64, 0),
         _ => {
             let v = box_or_pass(b, g.vars, state, src);
-            let cmp = b.ins().icmp_imm(IntCC::Equal, v, VmValue::null().0 as i64);
+            let cmp = b
+                .ins()
+                .icmp_imm(IntCC::Equal, v, VmValue::null().raw_tag() as i64);
             b.ins().uextend(types::I64, cmp)
         }
     };

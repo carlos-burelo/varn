@@ -16,14 +16,13 @@ use varn_types::VmValue;
 
 use super::kinds::{is_boxed_kind, K};
 
-pub(super) const INT_TAG: i64 = 0x7FFC_0000_0000_0000u64 as i64;
-pub(super) const MASK_48: i64 = 0x0000_FFFF_FFFF_FFFFu64 as i64;
-pub(super) const HEAP_MASK: i64 = (varn_types::vm_value::SIGN
-    | varn_types::vm_value::QNAN
-    | varn_types::vm_value::MASK_TAG) as i64;
-pub(super) const HEAP_EXPECT: i64 = (varn_types::vm_value::SIGN
-    | varn_types::vm_value::QNAN
-    | varn_types::vm_value::TAG_PTR) as i64;
+// Tag tests, re-emitted inline. These apply to a value's TAG WORD; the
+// payload word carries the datum and is never masked. Under the NaN-box
+// these were 64-bit constants that had to come from a constant pool — as
+// small immediates they now fold into the compare.
+pub(super) const KIND_MASK: i64 = varn_types::vm_value::KIND_MASK as i64;
+pub(super) const INT_KIND: i64 = varn_types::vm_value::KIND_INT as i64;
+pub(super) const HEAP_KIND: i64 = varn_types::vm_value::KIND_HEAP as i64;
 
 /// `site` is the buffer offset of the rel32 field; `target` the buffer
 /// offset the call must reach.
@@ -110,7 +109,7 @@ pub(super) fn emit_return_value(
     src: usize,
 ) -> Result<cranelift_codegen::ir::Value, String> {
     if state[src] == K::Poison {
-        return Ok(b.ins().iconst(types::I64, VmValue::null().0 as i64));
+        return Ok(b.ins().iconst(types::I64, VmValue::null().raw_tag() as i64));
     }
     Ok(match return_kind {
         SlotKind::Int => match state[src] {
@@ -155,8 +154,13 @@ pub(super) fn box_int(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
-    let m = b.ins().band_imm(v, MASK_48);
-    b.ins().bor_imm(m, INT_TAG)
+    // NOT YET MIGRATED to the two-word value. This primitive encodes or
+    // decodes a boxed `VmValue` as a single machine word, which the NaN-box
+    // allowed and the tag+payload pair does not: it needs a `(tag, payload)`
+    // pair of Cranelift values and a caller that threads both. `jit::compile`
+    // refuses every function while these holes stand (see `PAIR_MIGRATION`),
+    // so this is unreachable rather than wrong.
+    unimplemented!("clif: box_int awaits the two-word value migration")
 }
 
 /// Box an unboxed 0/1 bool as a VmValue: `false` = 0x7FFA…, `true` = 0x7FFB…
@@ -165,8 +169,13 @@ pub(super) fn box_bool(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
-    let shifted = b.ins().ishl_imm(v, 48);
-    b.ins().bor_imm(shifted, 0x7FFA_0000_0000_0000u64 as i64)
+    // NOT YET MIGRATED to the two-word value. This primitive encodes or
+    // decodes a boxed `VmValue` as a single machine word, which the NaN-box
+    // allowed and the tag+payload pair does not: it needs a `(tag, payload)`
+    // pair of Cranelift values and a caller that threads both. `jit::compile`
+    // refuses every function while these holes stand (see `PAIR_MIGRATION`),
+    // so this is unreachable rather than wrong.
+    unimplemented!("clif: box_bool awaits the two-word value migration")
 }
 
 /// Unbox a boxed bool VmValue (TAG_TRUE=0x7FFB…, TAG_FALSE=0x7FFA…) to 0/1:
@@ -175,8 +184,13 @@ pub(super) fn unbox_bool(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
-    let s = b.ins().ushr_imm(v, 48);
-    b.ins().band_imm(s, 1)
+    // NOT YET MIGRATED to the two-word value. This primitive encodes or
+    // decodes a boxed `VmValue` as a single machine word, which the NaN-box
+    // allowed and the tag+payload pair does not: it needs a `(tag, payload)`
+    // pair of Cranelift values and a caller that threads both. `jit::compile`
+    // refuses every function while these holes stand (see `PAIR_MIGRATION`),
+    // so this is unreachable rather than wrong.
+    unimplemented!("clif: unbox_bool awaits the two-word value migration")
 }
 
 /// Box an unboxed `f64` as a VmValue, replicating `VmValue::from_f64`: a
@@ -188,18 +202,17 @@ pub(super) fn box_f64(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
-    let bits = b.ins().bitcast(types::I64, MemFlags::new(), v);
-    let q = b.ins().band_imm(bits, varn_types::vm_value::QNAN as i64);
-    let is_qnan = b
-        .ins()
-        .icmp_imm(IntCC::Equal, q, varn_types::vm_value::QNAN as i64);
-    let null = b.ins().iconst(types::I64, VmValue::null().0 as i64);
-    b.ins().select(is_qnan, null, bits)
+    // NOT YET MIGRATED to the two-word value. This primitive encodes or
+    // decodes a boxed `VmValue` as a single machine word, which the NaN-box
+    // allowed and the tag+payload pair does not: it needs a `(tag, payload)`
+    // pair of Cranelift values and a caller that threads both. `jit::compile`
+    // refuses every function while these holes stand (see `PAIR_MIGRATION`),
+    // so this is unreachable rather than wrong.
+    unimplemented!("clif: box_f64 awaits the two-word value migration")
 }
 
-/// Mask isolating a VmValue's QNAN+tag bits, for an int-tag test.
-pub(super) const INT_CHECK_MASK: i64 =
-    (varn_types::vm_value::QNAN | varn_types::vm_value::MASK_TAG) as i64;
+/// Mask isolating a value's kind, for an int-kind test.
+pub(super) const INT_CHECK_MASK: i64 = varn_types::vm_value::KIND_MASK as i64;
 
 /// Unbox a VmValue a float slot may hold as EITHER float bits OR an int
 /// VmValue — the latter arises when a widening int argument is passed to a
@@ -211,12 +224,13 @@ pub(super) fn unbox_f64_coerce(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
-    let masked = b.ins().band_imm(v, INT_CHECK_MASK);
-    let is_int = b.ins().icmp_imm(IntCC::Equal, masked, INT_TAG);
-    let ext = wrap_i48(b, v);
-    let from_int = b.ins().fcvt_from_sint(types::F64, ext);
-    let from_bits = b.ins().bitcast(types::F64, MemFlags::new(), v);
-    b.ins().select(is_int, from_int, from_bits)
+    // NOT YET MIGRATED to the two-word value. This primitive encodes or
+    // decodes a boxed `VmValue` as a single machine word, which the NaN-box
+    // allowed and the tag+payload pair does not: it needs a `(tag, payload)`
+    // pair of Cranelift values and a caller that threads both. `jit::compile`
+    // refuses every function while these holes stand (see `PAIR_MIGRATION`),
+    // so this is unreachable rather than wrong.
+    unimplemented!("clif: unbox_f64_coerce awaits the two-word value migration")
 }
 
 /// Read a register as a raw `f64`: a `Float` var is already `F64`; an `Int`
@@ -265,7 +279,7 @@ pub(super) fn box_or_pass(
     r: usize,
 ) -> cranelift_codegen::ir::Value {
     let Some(&var) = vars.get(r) else {
-        return b.ins().iconst(types::I64, VmValue::null().0 as i64);
+        return b.ins().iconst(types::I64, VmValue::null().raw_tag() as i64);
     };
     let raw = b.use_var(var);
     if b.func.dfg.value_type(raw) == types::F64 {
@@ -453,14 +467,18 @@ impl LoopCaches<'_> {
     /// Whether an AddImm / SubImm instruction at `ip` is an induction variable increment
     /// inside a bounded loop region, exempt from hardware overflow checks.
     pub(super) fn is_induction_increment(&self, ip: usize) -> bool {
-        self.regions.iter().any(|reg| reg.induction_increments.contains(&ip))
+        self.regions
+            .iter()
+            .any(|reg| reg.induction_increments.contains(&ip))
     }
 
     /// Whether an AddInt at `ip` is an index computation for a bounds-guaranteed
     /// array access, proven unable to overflow because the preheader validated
     /// that the maximum index fits within the array length (which fits in i64).
     pub(super) fn is_bounds_safe_arith(&self, ip: usize) -> bool {
-        self.regions.iter().any(|reg| reg.bounds_safe_arith.contains(&ip))
+        self.regions
+            .iter()
+            .any(|reg| reg.bounds_safe_arith.contains(&ip))
     }
 
     /// The array-payload cache `r` should use at `ip`.
@@ -632,8 +650,8 @@ pub(super) fn emit_array_payload(
     // Vec's data/len words are never readonly — an out-of-bounds store's
     // append path reallocates them.
     let ro = MemFlags::trusted();
-    let tag = b.ins().band_imm(obj, HEAP_MASK);
-    let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_EXPECT);
+    let tag = b.ins().band_imm(obj, KIND_MASK);
+    let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_KIND);
     let chk = b.create_block();
     b.ins().brif(is_heap, chk, &[], slow, &[]);
     b.switch_to_block(chk);
@@ -718,8 +736,13 @@ pub(super) fn wrap_i48(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
 ) -> cranelift_codegen::ir::Value {
-    let s = b.ins().ishl_imm(v, 16);
-    b.ins().sshr_imm(s, 16)
+    // NOT YET MIGRATED to the two-word value. This primitive encodes or
+    // decodes a boxed `VmValue` as a single machine word, which the NaN-box
+    // allowed and the tag+payload pair does not: it needs a `(tag, payload)`
+    // pair of Cranelift values and a caller that threads both. `jit::compile`
+    // refuses every function while these holes stand (see `PAIR_MIGRATION`),
+    // so this is unreachable rather than wrong.
+    unimplemented!("clif: wrap_i48 awaits the two-word value migration")
 }
 
 /// Returns `true` when `v` is an `iconst` whose absolute value is below `threshold`.
@@ -773,8 +796,8 @@ pub(super) fn emit_object_data_base(
     let m = MemFlags::trusted();
 
     // 1. Heap-pointer tag check.
-    let tag = b.ins().band_imm(obj, HEAP_MASK);
-    let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_EXPECT);
+    let tag = b.ins().band_imm(obj, KIND_MASK);
+    let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_KIND);
     let chk = b.create_block();
     b.ins().brif(is_heap, chk, &[], invalid, &[]);
     b.switch_to_block(chk);

@@ -159,6 +159,14 @@ pub fn try_compile(
     osr_ip: Option<usize>,
     mut debug: Option<&mut ClifDebugSink>,
 ) -> Result<ClifArtifact, String> {
+    // The single choke point for the lowering: `jit::compile` reaches it and
+    // so does `clif::debug::inspect` (`vn debug -p tiers` / `-p clif`), which
+    // compiles without executing. Gating only the former left the debug passes
+    // walking into the `unimplemented!` encoding primitives.
+    if crate::PAIR_MIGRATION_PENDING {
+        return Err(crate::PAIR_MIGRATION_BAIL.to_owned());
+    }
+
     let nparams = proto.arity.saturating_sub(1);
     if proto.param_kinds.len() != nparams {
         return Err("clif: missing param kinds".into());

@@ -145,31 +145,31 @@ impl GeneratorDriver for NanGenDriver {
         let inner = self.inner.borrow();
 
         for &nv in &inner.ctx.stack {
-            callback(varn_types::VmValue(nv.0));
+            callback(nv);
         }
 
         for frame in &inner.ctx.frames {
             for &c in frame.closure().constants.iter() {
-                callback(varn_types::VmValue(c.0));
+                callback(c);
             }
             for uv in &frame.closure().upvalues {
                 if let Ok(upval_inner) = uv.inner.try_borrow() {
-                    callback(varn_types::VmValue(upval_inner.value.0));
+                    callback(upval_inner.value);
                 }
             }
         }
 
         for (_, uv) in &inner.ctx.open_upvalues {
             if let Ok(upval_inner) = uv.inner.try_borrow() {
-                callback(varn_types::VmValue(upval_inner.value.0));
+                callback(upval_inner.value);
             }
         }
 
         for (_, nv) in &inner.ctx.pending_constructors {
-            callback(varn_types::VmValue(nv.0));
+            callback(*nv);
         }
         for (_, nv) in &inner.ctx.pending_setters {
-            callback(varn_types::VmValue(nv.0));
+            callback(*nv);
         }
     }
 

@@ -31,7 +31,7 @@ pub(super) fn emit_make_class(
     let name_idx = code[ip + 2] as usize;
     let super_val = if super_reg == 0 {
         b.ins()
-            .iconst(types::I64, varn_types::VmValue::null().0 as i64)
+            .iconst(types::I64, varn_types::VmValue::null().raw_tag() as i64)
     } else {
         box_or_pass(b, actx.vars, state, super_reg)
     };

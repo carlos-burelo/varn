@@ -131,8 +131,9 @@ impl HeapInner {
             Ok(v) => v,
             Err(e) => {
                 eprintln!(
-                    "[GC DEBUG] heap.extract failed on nv=0x{:016x} (is_heap={}, heap_idx={})",
-                    nv.0,
+                    "[GC DEBUG] heap.extract failed on nv=0x{:016x}:0x{:016x} (is_heap={}, heap_idx={})",
+                    nv.raw_tag(),
+                    nv.raw_payload(),
                     nv.is_heap(),
                     if nv.is_heap() {
                         nv.as_heap_idx() as i64

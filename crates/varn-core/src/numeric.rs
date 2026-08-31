@@ -28,14 +28,7 @@
 
 use crate::ast::operators::BinaryOp;
 
-/// Sign-extend the low 48 bits of `v`. This is the unboxing of an inline
-/// int-tagged `VmValue` payload in the NaN-box.
-#[inline(always)]
-pub fn wrap_i48(v: i64) -> i64 {
-    (v << 16) >> 16
-}
-
-/// The largest and smallest values Varn's `int` can hold (native 64-bit integer).
+/// The largest and smallest values Varn's `int` can hold.
 pub const INT_MAX: i64 = i64::MAX;
 pub const INT_MIN: i64 = i64::MIN;
 
@@ -45,20 +38,10 @@ pub fn checked_int(v: i64) -> Option<i64> {
     Some(v)
 }
 
-#[inline(always)]
-pub fn checked_i48(v: i64) -> Option<i64> {
-    checked_int(v)
-}
-
 /// `a + b` as an `int`, or `None` on overflow.
 #[inline(always)]
 pub fn add_int(a: i64, b: i64) -> Option<i64> {
     a.checked_add(b)
-}
-
-#[inline(always)]
-pub fn add_i48(a: i64, b: i64) -> Option<i64> {
-    add_int(a, b)
 }
 
 /// `a - b` as an `int`, or `None` on overflow.
@@ -67,20 +50,10 @@ pub fn sub_int(a: i64, b: i64) -> Option<i64> {
     a.checked_sub(b)
 }
 
-#[inline(always)]
-pub fn sub_i48(a: i64, b: i64) -> Option<i64> {
-    sub_int(a, b)
-}
-
 /// `a * b` as an `int`, or `None` on overflow.
 #[inline(always)]
 pub fn mul_int(a: i64, b: i64) -> Option<i64> {
     a.checked_mul(b)
-}
-
-#[inline(always)]
-pub fn mul_i48(a: i64, b: i64) -> Option<i64> {
-    mul_int(a, b)
 }
 
 /// `a ** e` as an `int`, or `None` on overflow.
@@ -89,20 +62,10 @@ pub fn pow_int(a: i64, e: u32) -> Option<i64> {
     a.checked_pow(e)
 }
 
-#[inline(always)]
-pub fn pow_i48(a: i64, e: u32) -> Option<i64> {
-    pow_int(a, e)
-}
-
 /// `-a` as an `int`, or `None` on overflow (when `a == i64::MIN`).
 #[inline(always)]
 pub fn neg_int(a: i64) -> Option<i64> {
     a.checked_neg()
-}
-
-#[inline(always)]
-pub fn neg_i48(a: i64) -> Option<i64> {
-    neg_int(a)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

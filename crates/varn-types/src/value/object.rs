@@ -33,9 +33,19 @@ pub struct ObjData<T: ?Sized = [Cell<VmValue>]> {
 /// Header words preceding the tail. Asserted against the real layout below.
 const HEADER_WORDS: usize = 3;
 
+/// `u64` words one field slot occupies. Derived, not written down: the tail is
+/// allocated as a `u64` slice, so this is what converts a field count into a
+/// word count. It was 1 when a value was a NaN-boxed `u64`; it is 2 now that a
+/// value is a tag word plus a payload word.
+const WORDS_PER_VALUE: usize = size_of::<Cell<VmValue>>() / size_of::<u64>();
+
 const _: () = {
-    assert!(size_of::<VmValue>() == 8 && align_of::<VmValue>() == 8);
-    assert!(size_of::<Cell<VmValue>>() == 8 && align_of::<Cell<VmValue>>() == 8);
+    // The tail is carved out of a `u64` slice, so a value must be a whole
+    // number of words and must not need stricter alignment than one.
+    assert!(size_of::<Cell<VmValue>>() % size_of::<u64>() == 0);
+    assert!(align_of::<VmValue>() == 8);
+    assert!(align_of::<Cell<VmValue>>() == 8);
+    assert!(size_of::<Cell<VmValue>>() == size_of::<VmValue>());
     // The tail must start exactly HEADER_WORDS in, or `alloc` below hands `Rc`
     // a block of the wrong size and `drop` deallocates with the wrong layout.
     assert!(std::mem::offset_of!(ObjData<[Cell<VmValue>; 0]>, values) == HEADER_WORDS * 8);
@@ -49,12 +59,14 @@ impl ObjData {
     /// The only unsafe construction in the object model. `Rc` cannot be handed
     /// a runtime-sized DST directly, so we allocate a `u64` slice whose block
     /// is byte-identical to `RcBox<ObjData<[Cell<VmValue>; n]>>` — header
-    /// (24 bytes) plus `n` 8-byte slots — and re-point the fat pointer at it.
-    /// The static asserts above are what make "byte-identical" true; `Rc`'s
-    /// own drop then deallocates with `Layout::for_value`, which recomputes
-    /// exactly this size from the tail length.
+    /// (24 bytes) plus `n` slots of [`WORDS_PER_VALUE`] words each — and
+    /// re-point the fat pointer at it. The static asserts above are what make
+    /// "byte-identical" true; `Rc`'s own drop then deallocates with
+    /// `Layout::for_value`, which recomputes exactly this size from the tail
+    /// length.
     pub fn alloc(shape: Rc<Shape>, n: usize) -> Rc<ObjData> {
-        let backing: Rc<[MaybeUninit<u64>]> = Rc::new_uninit_slice(HEADER_WORDS + n);
+        let backing: Rc<[MaybeUninit<u64>]> =
+            Rc::new_uninit_slice(HEADER_WORDS + n * WORDS_PER_VALUE);
         let base = Rc::into_raw(backing) as *const MaybeUninit<u64> as *mut Cell<VmValue>;
         let data = ptr::slice_from_raw_parts_mut(base, n) as *mut ObjData;
 

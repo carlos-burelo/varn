@@ -1,9 +1,36 @@
 use std::fmt;
 use varn_core::VmValuePayload;
 
+/// A VM value: an explicit tag word plus a full 64-bit payload.
+///
+/// This *was* a 64-bit NaN-box. NaN-boxing exists so a dynamically typed
+/// engine can carry any value in one machine word, and it buys that with a
+/// payload of 48 bits — which is why `int` used to be a 48-bit integer that
+/// truncated in silence past `2^47`. Varn knows its types before it emits an
+/// opcode, so it was paying a dynamic language's tax and taking a dynamic
+/// language's integer.
+///
+/// Now: `int` is a native `i64`, `float` is a real `f64` with no QNAN games,
+/// and a heap reference gets a whole word (room for a direct pointer when the
+/// heap table goes away). Two 64-bit registers cost the same as one on
+/// x86-64 and aarch64; the masking and shifting they replace did not.
+///
+/// `#[repr(C)]` with two `u64`s — not `u128` — keeps the alignment at 8, so
+/// the DST tail of [`crate::value::ObjData`] still starts on a word boundary
+/// and the JIT can address a stack slot as two adjacent words.
+///
+/// Both fields are PRIVATE. Every producer and consumer goes through the
+/// constructors and accessors below, so a further change of representation is
+/// a change to this file. The escape hatches
+/// [`VmValue::from_raw_parts`]/[`VmValue::raw_tag`]/[`VmValue::raw_payload`]
+/// exist for the JIT, which re-emits the encoding inline; they move bits and
+/// never interpret them.
 #[derive(Copy, Clone)]
-#[repr(transparent)]
-pub struct VmValue(pub u64);
+#[repr(C)]
+pub struct VmValue {
+    tag: u64,
+    payload: u64,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct VmValueRef(pub VmValue);
@@ -17,73 +44,151 @@ impl VmValuePayload for VmValueRef {
     }
 }
 
-pub const QNAN: u64 = 0x7FF8_0000_0000_0000;
-pub const SIGN: u64 = 0x8000_0000_0000_0000;
+// ── Tag word ────────────────────────────────────────────────────────────
+//
+// The low byte is the kind. The bytes above it are per-kind metadata, used
+// today only by SSO for its length. A whole word for a 3-bit answer is
+// deliberate: comparing a tag is now one `cmp` against a small immediate,
+// where the NaN-box needed a mask, a shift and a 64-bit constant that would
+// not fit in an instruction and had to be loaded from a constant pool.
+//
+// Values are dense from 0 so a `match` on the kind lowers to a jump table.
 
-const TAG_NULL: u64 = 0x0001_0000_0000_0000;
-const TAG_FALSE: u64 = 0x0002_0000_0000_0000;
-const TAG_TRUE: u64 = 0x0003_0000_0000_0000;
-const TAG_INT: u64 = 0x0004_0000_0000_0000;
-// Public: JIT codegen re-emits the `is_heap` bit test inline.
-pub const TAG_PTR: u64 = 0x0005_0000_0000_0000;
+/// Kind of a value: the low byte of the tag word.
+pub const KIND_MASK: u64 = 0xFF;
 
-pub const TAG_SSO: u64 = 0x0006_0000_0000_0000;
-pub const TAG_SYMBOL: u64 = 0x0007_0000_0000_0000;
+pub const KIND_NULL: u64 = 0;
+pub const KIND_BOOL: u64 = 1;
+pub const KIND_INT: u64 = 2;
+pub const KIND_FLOAT: u64 = 3;
+/// Heap reference. Payload is the heap-table index today, and has room for a
+/// direct pointer when that table goes away.
+pub const KIND_HEAP: u64 = 4;
+/// Small string stored inline in the payload; length in the tag above the
+/// kind byte.
+pub const KIND_SSO: u64 = 5;
+pub const KIND_SYMBOL: u64 = 6;
 
-pub const MASK_TAG: u64 = 0x0007_0000_0000_0000;
-const MASK_LOW32: u64 = 0x0000_0000_FFFF_FFFF;
-const MASK_INT48: u64 = 0x0000_FFFF_FFFF_FFFF;
-const SIGN_BIT_47: u64 = 0x0000_8000_0000_0000;
+/// Bit position, inside the tag word, of the SSO length.
+const SSO_LEN_SHIFT: u32 = 8;
+
+/// Longest string that fits inline.
+///
+/// The payload is now a full 64-bit word, so 8 bytes would fit. It stays at 5
+/// because every caller passes a `[u8; 5]` buffer and widening SSO is a
+/// separate, independently testable change — not something to smuggle into a
+/// representation swap.
+pub const SSO_MAX_LEN: usize = 5;
 
 impl VmValue {
+    /// Assemble a value from its two words. Only for code that received them
+    /// *from* [`Self::raw_tag`]/[`Self::raw_payload`] — JIT-produced values,
+    /// safepoint spills, layout probes. Never to synthesize an encoding by
+    /// hand: use a constructor.
+    #[inline(always)]
+    pub const fn from_raw_parts(tag: u64, payload: u64) -> Self {
+        Self { tag, payload }
+    }
+
+    /// The tag word, for code that round-trips it through
+    /// [`Self::from_raw_parts`]. Not for inspection — every question about a
+    /// value has an accessor.
+    #[inline(always)]
+    pub const fn raw_tag(self) -> u64 {
+        self.tag
+    }
+
+    /// The payload word. Same contract as [`Self::raw_tag`].
+    #[inline(always)]
+    pub const fn raw_payload(self) -> u64 {
+        self.payload
+    }
+
+    /// This value's kind, as one of the `KIND_*` constants.
+    #[inline(always)]
+    pub const fn kind(self) -> u64 {
+        self.tag & KIND_MASK
+    }
+
+    /// The "no answer" sentinel the inline-cache fast paths return on a miss.
+    ///
+    /// A tag no constructor produces, so it can never collide with a real
+    /// result the helper could have found.
+    #[inline(always)]
+    pub const fn ic_miss() -> Self {
+        Self {
+            tag: u64::MAX,
+            payload: 0,
+        }
+    }
+
+    /// Whether this is the [`Self::ic_miss`] sentinel.
+    #[inline(always)]
+    pub const fn is_ic_miss(self) -> bool {
+        self.tag == u64::MAX
+    }
+
+    /// Whether two values have the *same representation*. Narrower than `==`,
+    /// which coerces int and float; this is what SSO string comparison and
+    /// identity checks want.
+    #[inline(always)]
+    pub fn bits_eq(self, other: Self) -> bool {
+        self.tag == other.tag && self.payload == other.payload
+    }
+
     #[inline(always)]
     pub const fn null() -> Self {
-        Self(QNAN | TAG_NULL)
+        Self {
+            tag: KIND_NULL,
+            payload: 0,
+        }
     }
 
     #[inline(always)]
     pub const fn bool_true() -> Self {
-        Self(QNAN | TAG_TRUE)
+        Self {
+            tag: KIND_BOOL,
+            payload: 1,
+        }
     }
 
     #[inline(always)]
     pub const fn bool_false() -> Self {
-        Self(QNAN | TAG_FALSE)
+        Self {
+            tag: KIND_BOOL,
+            payload: 0,
+        }
     }
 
     #[inline(always)]
     pub fn from_bool(b: bool) -> Self {
-        if b {
-            Self::bool_true()
-        } else {
-            Self::bool_false()
+        Self {
+            tag: KIND_BOOL,
+            payload: b as u64,
         }
     }
 
-    /// Box an `i64` that is already known to fit Varn's 48-bit `int`.
-    ///
-    /// The mask is a no-op for an in-range value. Out of range it TRUNCATES,
-    /// which is why arithmetic checks the range first (`varn_core::numeric`)
-    /// and raises instead of arriving here — and why the debug assertion is
-    /// the boundary's tripwire: a host builtin handing back a legitimate `i64`
-    /// outside `[-2^47, 2^47-1]` would otherwise lose the high bits with no
-    /// diagnostic whatsoever.
-    ///
-    /// Callers that mean to truncate — shifts, whose result width is part of
-    /// the operation — must say so with [`Self::from_int_wrapping`].
-    /// Box an `i64` into an inline NaN-boxed int.
+    /// Carry an `i64`. Every `i64` is a valid `int` and the payload is a full
+    /// word, so this is exact for the whole range — no mask, no truncation,
+    /// no range preconditions on the caller.
     #[inline(always)]
     pub fn from_int(n: i64) -> Self {
-        Self(QNAN | TAG_INT | ((n as u64) & MASK_INT48))
+        Self {
+            tag: KIND_INT,
+            payload: n as u64,
+        }
     }
 
-    /// Box an `i64`, truncating to 48 bits for the inline payload.
+    /// Kept as the name shift operations use to say their result width is
+    /// part of the operation. Nothing wraps any more: the payload holds
+    /// every `i64`.
     #[inline(always)]
     pub fn from_int_wrapping(n: i64) -> Self {
-        Self(QNAN | TAG_INT | ((n as u64) & MASK_INT48))
+        Self::from_int(n)
     }
 
-    /// Box an `i64` into `VmValue`.
+    /// Every `i64` is representable, so this never fails. Kept so call sites
+    /// that already handle an `Option` need not change.
     #[inline(always)]
     pub fn from_int_checked(n: i64) -> Option<Self> {
         Some(Self::from_int(n))
@@ -94,74 +199,89 @@ impl VmValue {
         Self::from_int(n as i64)
     }
 
+    /// Carry an `f64`.
+    ///
+    /// NaN used to be unrepresentable — every QNAN pattern was tag space, so
+    /// `from_f64(NaN)` had to answer `null`. With a tag of its own the payload
+    /// is just the IEEE bits, NaN included. That behaviour change is
+    /// deliberately NOT made here: `Self::null()` for NaN is preserved so the
+    /// representation swap moves no semantics but the width of `int`.
+    /// Removing it is a separate change with its own tests.
     #[inline(always)]
     pub fn from_f64(n: f64) -> Self {
-        let bits = n.to_bits();
-        if (bits & QNAN) == QNAN {
+        if n.is_nan() {
             return Self::null();
         }
-        Self(bits)
+        Self {
+            tag: KIND_FLOAT,
+            payload: n.to_bits(),
+        }
     }
 
     #[inline(always)]
     pub fn from_heap_idx(idx: u32) -> Self {
-        Self(SIGN | QNAN | TAG_PTR | idx as u64)
+        Self {
+            tag: KIND_HEAP,
+            payload: idx as u64,
+        }
     }
 
     #[inline(always)]
     pub fn is_f64(self) -> bool {
-        (self.0 & QNAN) != QNAN
+        self.kind() == KIND_FLOAT
     }
 
     #[inline(always)]
     pub fn is_null(self) -> bool {
-        (self.0 & (QNAN | MASK_TAG)) == (QNAN | TAG_NULL)
+        self.kind() == KIND_NULL
     }
 
     #[inline(always)]
     pub fn is_bool(self) -> bool {
-        let tag = self.0 & (QNAN | MASK_TAG);
-        tag == (QNAN | TAG_FALSE) || tag == (QNAN | TAG_TRUE)
+        self.kind() == KIND_BOOL
     }
 
     #[inline(always)]
     pub fn is_int(self) -> bool {
-        (self.0 & (QNAN | MASK_TAG)) == (QNAN | TAG_INT)
+        self.kind() == KIND_INT
     }
 
     #[inline(always)]
     pub fn is_heap(self) -> bool {
-        (self.0 & (SIGN | QNAN | MASK_TAG)) == (SIGN | QNAN | TAG_PTR)
+        self.kind() == KIND_HEAP
     }
 
     #[inline(always)]
     pub fn is_sso(self) -> bool {
-        (self.0 & (SIGN | QNAN | MASK_TAG)) == (QNAN | TAG_SSO)
+        self.kind() == KIND_SSO
     }
 
     #[inline(always)]
     pub fn try_from_sso(s: &str) -> Option<Self> {
         let b = s.as_bytes();
-        if b.len() > 5 {
+        if b.len() > SSO_MAX_LEN {
             return None;
         }
-        let mut v: u64 = (b.len() as u64) << 45;
+        let mut packed: u64 = 0;
         for (i, &byte) in b.iter().enumerate() {
-            v |= (byte as u64) << (37 - i as u32 * 8);
+            packed |= (byte as u64) << (i as u32 * 8);
         }
-        Some(VmValue(QNAN | TAG_SSO | v))
+        Some(Self {
+            tag: KIND_SSO | ((b.len() as u64) << SSO_LEN_SHIFT),
+            payload: packed,
+        })
     }
 
     #[inline(always)]
     pub fn sso_len(self) -> usize {
-        ((self.0 >> 45) & 0x7) as usize
+        ((self.tag >> SSO_LEN_SHIFT) & 0xFF) as usize
     }
 
     #[inline(always)]
-    pub fn sso_copy_bytes(self, buf: &mut [u8; 5]) -> usize {
+    pub fn sso_copy_bytes(self, buf: &mut [u8; SSO_MAX_LEN]) -> usize {
         let len = self.sso_len();
         for (i, slot) in buf.iter_mut().enumerate().take(len) {
-            *slot = ((self.0 >> (37 - i as u32 * 8)) & 0xFF) as u8;
+            *slot = ((self.payload >> (i as u32 * 8)) & 0xFF) as u8;
         }
         len
     }
@@ -172,13 +292,13 @@ impl VmValue {
         if bytes.len() != len {
             return false;
         }
-        let mut buf = [0u8; 5];
+        let mut buf = [0u8; SSO_MAX_LEN];
         self.sso_copy_bytes(&mut buf);
         &buf[..len] == bytes
     }
 
     #[inline(always)]
-    pub fn sso_as_str(self, buf: &mut [u8; 5]) -> &str {
+    pub fn sso_as_str(self, buf: &mut [u8; SSO_MAX_LEN]) -> &str {
         let len = self.sso_copy_bytes(buf);
 
         unsafe { std::str::from_utf8_unchecked(&buf[..len]) }
@@ -186,17 +306,15 @@ impl VmValue {
 
     #[inline(always)]
     pub fn as_f64(self) -> f64 {
-        f64::from_bits(self.0)
+        f64::from_bits(self.payload)
     }
 
+    /// The `int` this value carries. A plain reinterpret of the payload —
+    /// the sign-extension the 48-bit payload needed is gone, and with it the
+    /// `shl`/`sar` pair that used to run on every read of an int register.
     #[inline(always)]
     pub fn as_int(self) -> i64 {
-        let raw = self.0 & MASK_INT48;
-        if raw & SIGN_BIT_47 != 0 {
-            (raw | !MASK_INT48) as i64
-        } else {
-            raw as i64
-        }
+        self.payload as i64
     }
 
     #[inline(always)]
@@ -206,12 +324,12 @@ impl VmValue {
 
     #[inline(always)]
     pub fn as_bool(self) -> bool {
-        (self.0 & MASK_TAG) == TAG_TRUE
+        self.payload != 0
     }
 
     #[inline(always)]
     pub fn as_heap_idx(self) -> u32 {
-        (self.0 & MASK_LOW32) as u32
+        self.payload as u32
     }
 
     #[inline(always)]
@@ -269,7 +387,7 @@ impl VmValue {
 
 impl PartialEq for VmValue {
     fn eq(&self, other: &Self) -> bool {
-        if self.0 == other.0 {
+        if self.bits_eq(*other) {
             return true;
         }
         if (self.is_int() || self.is_f64()) && (other.is_int() || other.is_f64()) {
@@ -280,6 +398,20 @@ impl PartialEq for VmValue {
 }
 
 impl Eq for VmValue {}
+
+/// Hashes the value's representation, not its numeric meaning.
+///
+/// This is deliberately *narrower* than [`PartialEq`] above, which coerces
+/// int/float. Every keyed container in the VM canonicalizes through
+/// `Heap::canonical_map_key` before hashing, so two keys that compare equal
+/// arrive here with identical bits.
+impl std::hash::Hash for VmValue {
+    #[inline(always)]
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.tag.hash(state);
+        self.payload.hash(state);
+    }
+}
 
 impl fmt::Debug for VmValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -292,13 +424,19 @@ impl fmt::Debug for VmValue {
         } else if self.is_null() {
             write!(f, "null")
         } else if self.is_sso() {
-            let mut buf = [0u8; 5];
+            let mut buf = [0u8; SSO_MAX_LEN];
             let s = self.sso_as_str(&mut buf);
             write!(f, "sso({:?})", s)
         } else if self.is_heap() {
             write!(f, "heap[{}]", self.as_heap_idx())
+        } else if self.is_ic_miss() {
+            write!(f, "<ic-miss>")
         } else {
-            write!(f, "nan(0x{:016x})", self.0)
+            write!(
+                f,
+                "unknown(tag=0x{:016x}, payload=0x{:016x})",
+                self.tag, self.payload
+            )
         }
     }
 }

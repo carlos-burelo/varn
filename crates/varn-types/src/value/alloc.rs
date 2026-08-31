@@ -17,7 +17,9 @@ pub struct MapKey(pub crate::vm_value::VmValue);
 impl std::hash::Hash for MapKey {
     #[inline(always)]
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0 .0.hash(state);
+        // Delegates to `VmValue`'s bit hash so that widening the value
+        // representation is a change to `vm_value.rs` and not to this map.
+        self.0.hash(state);
     }
 }
 

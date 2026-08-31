@@ -1,7 +1,7 @@
 use crate::hir::{HirBinOp, HirType, HirUnOp};
 use crate::ssa::ir::{BlockId, InstKind, SsaFunc, Terminator, Value};
 use rustc_hash::FxHashMap;
-use varn_core::{add_i48, mul_i48, neg_i48, pow_i48, sub_i48};
+use varn_core::{add_int, mul_int, neg_int, pow_int, sub_int};
 
 pub fn run(func: &mut SsaFunc) -> bool {
     let mut changed = false;
@@ -101,10 +101,10 @@ fn fold_inst(kind: &InstKind, const_map: &FxHashMap<Value, InstKind>) -> Option<
 
 fn fold_unary(op: HirUnOp, operand: &InstKind, _ty: HirType) -> Option<InstKind> {
     match (op, operand) {
-        // `-INT_MIN` has no i48 form. Declining to fold leaves the negation in
+        // `-INT_MIN` has no `int` form. Declining to fold leaves the negation in
         // the IR, where the interpreter/JIT raise `integer overflow` with a
         // line number — never folding to a wrong constant.
-        (HirUnOp::Neg, InstKind::ConstInt(x)) => neg_i48(*x).map(InstKind::ConstInt),
+        (HirUnOp::Neg, InstKind::ConstInt(x)) => neg_int(*x).map(InstKind::ConstInt),
         (HirUnOp::Neg, InstKind::ConstFloat(x)) => Some(InstKind::ConstFloat(-x)),
         (HirUnOp::Not, InstKind::ConstBool(x)) => Some(InstKind::ConstBool(!x)),
         (HirUnOp::BitNot, InstKind::ConstInt(x)) => Some(InstKind::ConstInt(!x)),
@@ -116,7 +116,7 @@ fn fold_binary(op: HirBinOp, lhs: &InstKind, rhs: &InstKind, _ty: HirType) -> Op
     use HirBinOp::*;
     match (lhs, rhs) {
         (InstKind::ConstInt(x), InstKind::ConstInt(y)) => match op {
-            // Integer arithmetic that leaves the i48 range RAISES
+            // Integer arithmetic that leaves the `int` range RAISES
             // (varn_core::numeric), so an overflowing expression must not be
             // folded to a value: `None` keeps the operation in the IR and the
             // interpreter/JIT raise it at run time, pointing at the line.
@@ -125,9 +125,9 @@ fn fold_binary(op: HirBinOp, lhs: &InstKind, rhs: &InstKind, _ty: HirType) -> Op
             // A compile-time diagnostic would be better than a run-time one,
             // but it belongs in the checker, which has spans; this pass has
             // neither spans nor an error channel.
-            Add => add_i48(*x, *y).map(InstKind::ConstInt),
-            Sub => sub_i48(*x, *y).map(InstKind::ConstInt),
-            Mul => mul_i48(*x, *y).map(InstKind::ConstInt),
+            Add => add_int(*x, *y).map(InstKind::ConstInt),
+            Sub => sub_int(*x, *y).map(InstKind::ConstInt),
+            Mul => mul_int(*x, *y).map(InstKind::ConstInt),
             // `int / int` always yields float.
             Div => {
                 if *y != 0 {
@@ -146,7 +146,7 @@ fn fold_binary(op: HirBinOp, lhs: &InstKind, rhs: &InstKind, _ty: HirType) -> Op
             // Negative exponents raise at runtime; never fold them.
             Pow => {
                 if *y >= 0 && *y <= 30 {
-                    pow_i48(*x, *y as u32).map(InstKind::ConstInt)
+                    pow_int(*x, *y as u32).map(InstKind::ConstInt)
                 } else {
                     None
                 }

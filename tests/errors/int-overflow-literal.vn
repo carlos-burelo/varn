@@ -1,8 +1,11 @@
 // expect: error[VN3021]
 //
 // Caught by the checker, not the VM: an all-literal arithmetic expression whose
-// value leaves the i48 range is reported at its own span, before the program
+// value leaves the `int` range is reported at its own span, before the program
 // runs. The run-time raise (int-overflow-mul.vn) stays the guarantee; this is
 // the earlier, better-located warning.
-const squared = 1000000007 * 1000000007
+//
+// `int` is a native i64, so the operands have to be genuinely enormous. Two
+// values just above 2^32 whose product passes 2^63.
+const squared = 4000000000 * 4000000000
 print(squared)

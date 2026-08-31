@@ -166,7 +166,12 @@ impl Heap {
 
         let shape = varn_types::Shape::create(None, std::collections::HashMap::new());
         let shape_id = shape.id;
-        let oref = ObjRef::with_shape(Rc::clone(&shape), vec![VmValue(SENTINEL_FIELD); TAIL]);
+        // Both words carry the sentinel, so the word-stepping probe below
+        // lands on the FIRST word of the tail whichever half it scans first.
+        let oref = ObjRef::with_shape(
+            Rc::clone(&shape),
+            vec![VmValue::from_raw_parts(SENTINEL_FIELD, SENTINEL_FIELD); TAIL],
+        );
 
         let rcbox = Rc::as_ptr(&oref.0) as *const u8 as usize - 2 * std::mem::size_of::<usize>();
         let shape_ptr = Rc::as_ptr(&shape) as *const u8 as usize - 2 * std::mem::size_of::<usize>();

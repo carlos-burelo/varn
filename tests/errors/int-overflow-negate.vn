@@ -1,6 +1,7 @@
 // expect: error[integer overflow]
 //
-// -INT_MIN has no i48 representation. Unchecked negation returned INT_MIN
-// again, so `-x === x` held for one value of `x`.
+// `-INT_MIN` has no `int` representation: the two's-complement range is
+// asymmetric. Unchecked negation returned INT_MIN again, so `-x === x` held
+// for one value of `x`.
 function neg(a: int): int { return -a }
-print(neg(-140737488355328))
+print(neg(-9223372036854775807 - 1))

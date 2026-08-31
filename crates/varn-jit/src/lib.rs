@@ -282,6 +282,37 @@ pub struct Compiled {
     pub code: Rc<dyn Any>,
 }
 
+/// Whether the CLIF backend is held shut for the two-word value migration.
+///
+/// `VmValue` is now a tag word plus a payload word. The interpreter, the heap
+/// and the host boundary carry both; this backend does not — every VM register
+/// here is a single Cranelift `Variable` of type `I64` holding a whole
+/// NaN-boxed value, an assumption baked into `use_boxed`, the box/unbox
+/// primitives, the stack home-slot addressing and every runtime-helper
+/// signature.
+///
+/// Rather than ship a lowering that quietly reads half a value, the backend
+/// declines. Everything runs interpreted meanwhile: correct, and slower on the
+/// hot paths. The primitives that must change are marked with
+/// `unimplemented!("… awaits the two-word value migration")`; when the last of
+/// them is gone this flips to `false`.
+///
+/// What the migration has to do, in order:
+/// 1. `K` boxed kinds carry two `Variable`s; raw `Int`/`Float`/`Bool` keep one.
+/// 2. Home-slot addressing scales by `size_of::<VmValue>()`, not by 8.
+/// 3. Helper signatures take/return the pair. On Windows x64 a 16-byte struct
+///    returns through a hidden pointer, so the return convention differs from
+///    SysV and must be declared per target.
+/// 4. The inline fast paths (fields, arrays, SSO, strconcat) test the tag word
+///    and read the payload word, instead of masking one word.
+pub(crate) const PAIR_MIGRATION_PENDING: bool = true;
+
+/// The bail reason reported while [`PAIR_MIGRATION_PENDING`] stands. Shows up
+/// in `vn debug -p bails` and in `VARN_CLIF_TRACE=1`, so the reason a function
+/// is interpreted is never a mystery.
+pub(crate) const PAIR_MIGRATION_BAIL: &str =
+    "clif: disabled while `VmValue` moves to a (tag, payload) pair; the lowering still models every register as one machine word";
+
 /// Lower `proto` for the running context.
 ///
 /// `osr_ip` picks the entry shape. `None` is the ordinary one. `Some(ip)`
@@ -298,6 +329,9 @@ pub fn compile(
     linker: &dyn clif::lower::ClifLinker,
     osr_ip: Option<usize>,
 ) -> Result<Compiled, String> {
+    // The `PAIR_MIGRATION_PENDING` gate is NOT repeated here: it lives in
+    // `clif::lower::try_compile`, which this and the debug passes both reach.
+
     // NOT a compile-time budget: this cap is what keeps module top-levels
     // (and other long functions) out of clif, and with them the only shapes
     // that put one clif frame underneath another.

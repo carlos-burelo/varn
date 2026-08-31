@@ -1,44 +1,73 @@
-// `int` is a 48-bit two's-complement integer that RAISES on overflow.
+// `int` is a native 64-bit two's-complement integer that RAISES on overflow.
 //
 // It does not wrap, does not saturate and does not promote to float. The range
-// is `[-2^47, 2^47-1]`; leaving it raises `integer overflow` naming both
+// is `[-2^63, 2^63-1]`; leaving it raises `integer overflow` naming both
 // operands. The rules live in one place, `varn-core/src/numeric.rs`, and are
 // tier-identical by contract — every assertion here must hold under
 // `VARN_NO_JIT=1`, and the constant folder must agree with both.
 //
-// This replaces the wrapping contract asserted by `53-int48-wrapping.vn`.
-// A 48-bit `int` is a legitimate design; one that answers
-// `1000000007 * 1000000007` with a wrong number and no signal is not — and
-// those are two primes anyone writing a hash or a modular routine will reach
-// for. The width did not change, only the behaviour at its edge.
+// This replaces the 48-bit contract this file used to assert. `int` was 48 bits
+// for one reason: a NaN-boxed `VmValue` has a 48-bit payload, and Varn had
+// inherited that representation from JavaScript engines, which need it because
+// they do not know a value's type until they run. Varn does. The width was a
+// runtime artefact leaking into the language's semantics.
+//
+// The section marked REGRESSION below is the reason this is not a cosmetic
+// change: those expressions used to produce wrong numbers with no diagnostic
+// whatsoever, because `numeric.rs` had already moved to `i64` bounds while
+// `VmValue::from_int` still masked the payload down to 48 bits. The range check
+// therefore guarded a range the representation could not hold.
 //
 // The raising cases themselves are NOT here: a VM arithmetic error is fatal
 // and `try`/`catch` does not intercept it (the same is true of
 // `division by zero`), so a program cannot observe one and keep running. They
 // live in `tests/errors/int-overflow-*.vn` instead.
 
-const INT_MAX = 140737488355327 // 2^47 - 1
-const INT_MIN = -140737488355328 // -2^47
+const INT_MAX = 9223372036854775807 // 2^63 - 1
+const INT_MIN = -9223372036854775807 - 1 // -2^63, which has no literal form
 
-assert("i48: max is representable", INT_MAX === 140737488355327)
-assert("i48: min is representable", INT_MIN === -140737488355328)
+assert("int: max is representable", INT_MAX === 9223372036854775807)
+assert("int: min is representable", INT_MIN === -9223372036854775807 - 1)
+assert("int: max matches the standard library", int.MAX_VALUE === INT_MAX)
+assert("int: min matches the standard library", int.MIN_VALUE === INT_MIN)
 
 // Arithmetic that stays inside the range is exact, right up to the edge.
-assert("i48: reaching max is exact", (INT_MAX - 1) + 1 === INT_MAX)
-assert("i48: reaching min is exact", (INT_MIN + 1) - 1 === INT_MIN)
-assert("i48: max negates", -INT_MAX === INT_MIN + 1)
+assert("int: reaching max is exact", (INT_MAX - 1) + 1 === INT_MAX)
+assert("int: reaching min is exact", (INT_MIN + 1) - 1 === INT_MIN)
+assert("int: max negates", -INT_MAX === INT_MIN + 1)
 
-// Products that fit are exact — including ones whose operands are large
-// enough that a wrapping implementation would have been indistinguishable.
-assert("i48: large exact product", 3000000 * 40000000 === 120000000000000)
-assert("i48: negative exact product", -3000000 * 40000000 === -120000000000000)
+// ── REGRESSION ──────────────────────────────────────────────────────────────
+// Every line below answered with a silently wrong number while the payload was
+// 48 bits wide. They are the whole point of the change.
+
+// 2^47 is where the old payload ran out. Nothing happens here now.
+assert("regression: crossing 2^47 is exact", 140737488355327 + 1 === 140737488355328)
+assert("regression: 2^47 doubles", 140737488355328 * 2 === 281474976710656)
+
+// Two primes anyone writing a hash or a modular routine reaches for. This used
+// to evaluate to -80578252960719.
+assert("regression: square of a prime", 1000000007 * 1000000007 === 1000000014000000049)
+
+// Used to be -81474976710656 and 18525023289344.
+assert("regression: large sum", 100000000000000 + 100000000000000 === 200000000000000)
+assert("regression: large product", 100000000000000 * 3 === 300000000000000)
+
+// A literal the checker accepts must survive to run time intact. This one used
+// to print -1.
+assert("regression: i64::MAX as a literal", 9223372036854775807 === INT_MAX)
 
 // The folder must reach the same values as the interpreter and the JIT. These
 // are all literal expressions, so they are folded at compile time; the ones
 // above run through registers.
-assert("fold: exact product", 1000000 * 100000000 === 100000000000000)
-assert("fold: exact sum", 140737488355000 + 327 === INT_MAX)
-assert("fold: exponent", 2 ** 46 === 70368744177664)
+assert("fold: exact product", 1000000000 * 1000000000 === 1000000000000000000)
+assert("fold: exact sum", 9223372036854775000 + 807 === INT_MAX)
+assert("fold: exponent", 2 ** 62 === 4611686018427387904)
+
+// Values held in variables take the register path rather than the folder, so
+// the same arithmetic has to agree through both.
+let a: int = 1000000007
+let b: int = 1000000007
+assert("registers: square of a prime", a * b === 1000000014000000049)
 
 // The same arithmetic inside a function, which is the shape that reaches the
 // JIT: a loop long enough to be compiled must agree with the interpreter.
@@ -52,14 +81,16 @@ function accumulate(start: int, step: int, times: int): int {
     return current
 }
 
-assert("i48: loop stays exact", accumulate(0, 1000000000, 100) === 100000000000)
+assert("int: loop stays exact", accumulate(0, 1000000000, 100) === 100000000000)
+// A step that crosses the old 48-bit ceiling inside the loop.
+assert("int: loop crosses 2^47", accumulate(0, 100000000000000, 10) === 1000000000000000)
 // Hot enough to be compiled and then rescued by OSR, so the compiled arm is
 // exercised and not just the interpreter.
-assert("i48: hot loop stays exact", accumulate(0, 1, 100000) === 100000)
-assert("i48: hot loop near the edge", accumulate(INT_MAX - 100000, 1, 100000) === INT_MAX)
+assert("int: hot loop stays exact", accumulate(0, 1, 100000) === 100000)
+assert("int: hot loop near the edge", accumulate(INT_MAX - 100000, 1, 100000) === INT_MAX)
 
 // Shifts truncate to the type width by definition — that is the shift's
 // result, not an overflow — so they do NOT raise.
-assert("int: shift truncates, does not raise", (1 << 63) === (-9223372036854775807 - 1))
+assert("int: shift truncates, does not raise", (1 << 63) === INT_MIN)
 
-print("[PASSED] 53. int is i48 and raises on overflow")
+print("[PASSED] 53. int is a native i64 and raises on overflow")

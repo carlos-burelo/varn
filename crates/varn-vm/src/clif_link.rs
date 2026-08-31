@@ -223,7 +223,10 @@ impl ClifLinker for CtxLinker {
         // frame-aware lowering; the call site checks it on every call.
         Some(ClifTarget {
             raw_slot: &proto.clif_raw as *const std::cell::Cell<usize> as usize,
-            expected_bits: gv.0,
+            // Identity of the closure the call site was linked against. For a
+            // heap value that is the payload word; the tag is constant across
+            // every value this can hold.
+            expected_bits: gv.raw_payload(),
             param_kinds: proto.param_kinds.clone(),
             return_kind: proto.return_kind,
         })

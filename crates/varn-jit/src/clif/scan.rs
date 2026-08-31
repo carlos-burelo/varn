@@ -210,13 +210,22 @@ pub(super) fn loop_regions(
                     induction_bound = Some(info.bound_var);
                     // Detect bounds-hoistable array accesses.
                     let (bh, sa) = find_bounds_hoistable(
-                        code, pool, header, ip,
-                        info.cond_var, &redefined, &read_only,
+                        code,
+                        pool,
+                        header,
+                        ip,
+                        info.cond_var,
+                        &redefined,
+                        &read_only,
                     );
                     bounds_hoistable = bh;
                     bounds_safe_arith = sa;
                 }
-                if !receivers.is_empty() || !strings.is_empty() || !objects.is_empty() || !induction_increments.is_empty() {
+                if !receivers.is_empty()
+                    || !strings.is_empty()
+                    || !objects.is_empty()
+                    || !induction_increments.is_empty()
+                {
                     if super::trace() {
                         eprintln!(
                             "CLIF REGION {:?}: [{header}..{ip}] recv={receivers:?} \
@@ -346,7 +355,10 @@ fn find_bounds_hoistable(
         };
         let jop = match OpCode::from_u8(code[j] as u8) {
             Some(o) => o,
-            None => { j += jinfo.len; continue; }
+            None => {
+                j += jinfo.len;
+                continue;
+            }
         };
         if jop == OpCode::ArrayGetIndex {
             let arr_reg = (code[j + 1] >> 8) as usize;
@@ -424,4 +436,3 @@ fn find_addint_of(
     }
     result
 }
-

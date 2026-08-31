@@ -14,7 +14,6 @@ use varn_core::ast::{ArrowBody, Expr, ExprKind, MatchBody, MatchPattern, Templat
 use varn_core::{Diagnostic, ErrorCode, IntrinsicType, Suggestion, TypeKind, TypeTag};
 
 impl<'r> Checker<'r> {
-
     /// Emit the literal-overflow diagnostic for `expr`.
     ///
     /// Callers gate on the operands NOT overflowing themselves, so a nested
@@ -110,7 +109,11 @@ impl<'r> Checker<'r> {
                 let saved_scope = self.current_scope;
                 if let Some(fn_scope) = self.next_child_scope(bind) {
                     self.current_scope = fn_scope;
-                    self.record_scope_span(expr.range.start.offset, expr.range.end.offset, fn_scope);
+                    self.record_scope_span(
+                        expr.range.start.offset,
+                        expr.range.end.offset,
+                        fn_scope,
+                    );
                 }
 
                 let mut injected_type_params: Vec<Rc<str>> = vec![];
@@ -187,7 +190,11 @@ impl<'r> Checker<'r> {
                 let saved_scope = self.current_scope;
                 if let Some(fn_scope) = self.next_child_scope(bind) {
                     self.current_scope = fn_scope;
-                    self.record_scope_span(expr.range.start.offset, expr.range.end.offset, fn_scope);
+                    self.record_scope_span(
+                        expr.range.start.offset,
+                        expr.range.end.offset,
+                        fn_scope,
+                    );
                 }
 
                 self.in_function_body(|c| c.check_stmt(body, bind));
@@ -253,7 +260,7 @@ impl<'r> Checker<'r> {
                 self.check_expr(right, bind);
 
                 // An all-literal arithmetic expression whose value leaves the
-                // i48 range is reported HERE, where the span is, rather than
+                // `int` range is reported HERE, where the span is, rather than
                 // waiting for the run-time raise. Reported only when neither
                 // operand already overflows on its own, so a nested overflow
                 // names its innermost expression once.
@@ -695,7 +702,7 @@ fn closest_name(
 enum ConstInt {
     /// An integer-literal expression with this value.
     Value(i64),
-    /// An integer-literal expression whose value leaves the i48 range.
+    /// An integer-literal expression whose value leaves the `int` range.
     Overflow,
     /// Not an integer-literal expression at all (an identifier, a call, a
     /// float, an operator this does not evaluate).
@@ -713,13 +720,10 @@ fn const_int_expr(e: &Expr) -> ConstInt {
     use ConstInt::*;
     let lift = |o: Option<i64>| o.map_or(Overflow, Value);
     match &e.kind {
-        // A literal outside i48 is typed `float`, not an overflowing `int`
-        // (`typeof 200000000000000` is "float"), so it is not this
-        // diagnostic's business.
-        ExprKind::IntLiteral { value, .. } => match varn_core::checked_i48(*value) {
-            Some(v) => Value(v),
-            None => NotConst,
-        },
+        // Every `i64` is a valid `int`, so a literal the parser produced is
+        // always in range; a number too large to be an `i64` never reaches
+        // here as an `IntLiteral`.
+        ExprKind::IntLiteral { value, .. } => Value(*value),
         ExprKind::Unary { op, operand, .. } => {
             use varn_core::ast::operators::UnaryOp;
             let v = match const_int_expr(operand) {
@@ -727,7 +731,7 @@ fn const_int_expr(e: &Expr) -> ConstInt {
                 other => return other,
             };
             match op {
-                UnaryOp::Minus => lift(varn_core::neg_i48(v)),
+                UnaryOp::Minus => lift(varn_core::neg_int(v)),
                 UnaryOp::Plus => Value(v),
                 _ => NotConst,
             }
@@ -745,14 +749,14 @@ fn const_int_expr(e: &Expr) -> ConstInt {
                 other => return other,
             };
             match op {
-                BinaryOp::Add => lift(varn_core::add_i48(a, b)),
-                BinaryOp::Sub => lift(varn_core::sub_i48(a, b)),
-                BinaryOp::Mul => lift(varn_core::mul_i48(a, b)),
+                BinaryOp::Add => lift(varn_core::add_int(a, b)),
+                BinaryOp::Sub => lift(varn_core::sub_int(a, b)),
+                BinaryOp::Mul => lift(varn_core::mul_int(a, b)),
                 // A negative exponent raises at run time rather than
                 // overflowing, and one past u32 cannot be a literal `int`
                 // anyway; neither is this diagnostic's business.
                 BinaryOp::Pow => match u32::try_from(b) {
-                    Ok(e) => lift(varn_core::pow_i48(a, e)),
+                    Ok(e) => lift(varn_core::pow_int(a, e)),
                     Err(_) => NotConst,
                 },
                 _ => NotConst,

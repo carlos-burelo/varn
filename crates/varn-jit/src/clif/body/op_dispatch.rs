@@ -80,11 +80,11 @@ pub(crate) fn dispatch_opcode(
             } else if c.is_heap() && (c.as_heap_idx() & 0x8000_0000 == 0) {
                 return Err("clif: nursery heap constant".into());
             } else {
-                def_const(b, vars, first_reg, c.0 as i64);
+                def_const(b, vars, first_reg, c.raw_payload() as i64);
             }
         }
         OpCode::LoadNull => {
-            def_const(b, vars, first_reg, VmValue::null().0 as i64);
+            def_const(b, vars, first_reg, VmValue::null().raw_tag() as i64);
         }
         OpCode::Move => {
             let src = (code[ip + 1] >> 8) as usize;
@@ -113,7 +113,8 @@ pub(crate) fn dispatch_opcode(
                 if let Some(actx) = actx {
                     let fb = alloc::frame_base_addr(b, actx);
                     let val = preboxed.unwrap_or_else(|| box_or_pass(b, vars, state, src));
-                    b.ins().store(MemFlags::trusted(), val, fb, (first_reg * 8) as i32);
+                    b.ins()
+                        .store(MemFlags::trusted(), val, fb, (first_reg * 8) as i32);
                 }
             }
         }
@@ -133,7 +134,8 @@ pub(crate) fn dispatch_opcode(
             } else if op == OpCode::SubInt && both_int {
                 let v = b.ins().isub(s1, s2);
                 b.def_var(vars[first_reg], v);
-            } else if op == OpCode::MulInt && both_int
+            } else if op == OpCode::MulInt
+                && both_int
                 && (i64_const_fits(b, s1, 1 << 16) || i64_const_fits(b, s2, 1 << 16))
             {
                 // k * i48 where |k| < 2^16 fits in i64: (2^16-1)*(2^47-1) < 2^63-1.

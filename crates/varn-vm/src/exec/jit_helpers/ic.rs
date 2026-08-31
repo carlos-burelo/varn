@@ -128,12 +128,14 @@ pub(crate) extern "C" fn jit_get_property_ic_fast(
                     let slot_cache = &*closure_ref.ic_cache.as_ptr();
                     let poly_slot = &slot_cache[cs_idx];
                     for entry in &poly_slot.entries {
-                        if entry.id != 0 && entry.is_class == ICKind::SHAPE_PROP
-                            && guard.shape().id == entry.id {
-                                if let Some(v) = guard.field_at(entry.slot as usize) {
-                                    return v;
-                                }
+                        if entry.id != 0
+                            && entry.is_class == ICKind::SHAPE_PROP
+                            && guard.shape().id == entry.id
+                        {
+                            if let Some(v) = guard.field_at(entry.slot as usize) {
+                                return v;
                             }
+                        }
                     }
                 }
             }
@@ -155,7 +157,7 @@ pub(crate) extern "C" fn jit_get_property_ic_fast(
                 }
             }
         }
-        VmValue(0x7FF8_0000_0000_0000)
+        VmValue::ic_miss()
     }
 }
 

@@ -15,7 +15,7 @@ use varn_types::register_meta::RegisterMeta;
 
 use super::emit::{
     self, box_or_pass, call_helper, call_helper_void, meta_is_float, state_meta_int,
-    unbox_f64_coerce, use_boxed, wrap_i48, HEAP_EXPECT, HEAP_MASK,
+    unbox_f64_coerce, use_boxed, wrap_i48, HEAP_KIND, KIND_MASK,
 };
 use super::kinds::K;
 use crate::JitHelpers;
@@ -52,8 +52,8 @@ fn emit_object_field_addr(
     let m = MemFlags::trusted();
 
     // 1. Heap-pointer tag check.
-    let tag = b.ins().band_imm(obj, HEAP_MASK);
-    let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_EXPECT);
+    let tag = b.ins().band_imm(obj, KIND_MASK);
+    let is_heap = b.ins().icmp_imm(IntCC::Equal, tag, HEAP_KIND);
     let chk = b.create_block();
     b.ins().brif(is_heap, chk, &[], slow, &[]);
     b.switch_to_block(chk);
@@ -148,7 +148,9 @@ pub(super) fn emit_get_fixed_field(
         b.ins().brif(ok_cache, fast_blk, &[], unhoisted_blk, &[]);
 
         b.switch_to_block(fast_blk);
-        let val = b.ins().load(types::I64, MemFlags::trusted(), base, slot_off);
+        let val = b
+            .ins()
+            .load(types::I64, MemFlags::trusted(), base, slot_off);
         b.ins().jump(cont, &[val.into()]);
 
         b.switch_to_block(unhoisted_blk);

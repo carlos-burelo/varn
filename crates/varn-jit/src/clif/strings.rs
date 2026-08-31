@@ -76,7 +76,7 @@ pub(super) fn emit_str_intrinsic_native(
         let end = if arg_count == 3 {
             box_or_pass(b, vars, state, dest + 2)
         } else {
-            b.ins().iconst(types::I64, VmValue::null().0 as i64)
+            b.ins().iconst(types::I64, VmValue::null().raw_tag() as i64)
         };
 
         let res = call_helper(
@@ -96,7 +96,7 @@ pub(super) fn emit_str_intrinsic_native(
         let end = if arg_count == 3 {
             box_or_pass(b, vars, state, dest + 2)
         } else {
-            b.ins().iconst(types::I64, VmValue::null().0 as i64)
+            b.ins().iconst(types::I64, VmValue::null().raw_tag() as i64)
         };
 
         let res = call_helper(

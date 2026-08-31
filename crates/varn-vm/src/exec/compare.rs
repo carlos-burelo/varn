@@ -26,7 +26,7 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     }
 
     if a.is_sso() && b.is_sso() {
-        return a.0 == b.0;
+        return a.bits_eq(b);
     }
 
     if a.is_sso() && b.is_heap() {
@@ -105,7 +105,9 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     if a.is_heap() && heap.is_int(b) {
         match heap.get(a.as_heap_idx()) {
             Some(HeapObj::BigInt(av)) => return *av == heap.as_int(b) as i128,
-            Some(HeapObj::Decimal(da)) => return **da == rust_decimal::Decimal::from(heap.as_int(b)),
+            Some(HeapObj::Decimal(da)) => {
+                return **da == rust_decimal::Decimal::from(heap.as_int(b))
+            }
             Some(HeapObj::EnumVariant(ev)) => return ev.variant_tag == heap.as_int(b),
             _ => return false,
         }
@@ -113,7 +115,9 @@ pub(crate) fn eq(a: VmValue, b: VmValue, heap: &Heap) -> bool {
     if heap.is_int(a) && b.is_heap() {
         match heap.get(b.as_heap_idx()) {
             Some(HeapObj::BigInt(bv)) => return *bv == heap.as_int(a) as i128,
-            Some(HeapObj::Decimal(db)) => return rust_decimal::Decimal::from(heap.as_int(a)) == **db,
+            Some(HeapObj::Decimal(db)) => {
+                return rust_decimal::Decimal::from(heap.as_int(a)) == **db
+            }
             Some(HeapObj::EnumVariant(ev)) => return ev.variant_tag == heap.as_int(a),
             _ => return false,
         }

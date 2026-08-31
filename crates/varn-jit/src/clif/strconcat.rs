@@ -13,10 +13,10 @@ use super::emit::{box_or_pass, call_helper};
 use super::kinds::K;
 
 /// The bits that identify an SSO value: `VmValue::is_sso` is
-/// `(v & (SIGN | QNAN | MASK_TAG)) == (QNAN | TAG_SSO)`.
-const SSO_TAG_MASK: u64 =
-    varn_types::vm_value::SIGN | varn_types::vm_value::QNAN | varn_types::vm_value::MASK_TAG;
-const SSO_TAG_BITS: u64 = varn_types::vm_value::QNAN | varn_types::vm_value::TAG_SSO;
+/// `v.kind() == KIND_SSO`.
+/// Kind test for an inline (SSO) string, applied to a value's TAG WORD.
+const SSO_TAG_MASK: u64 = varn_types::vm_value::KIND_MASK;
+const SSO_TAG_BITS: u64 = varn_types::vm_value::KIND_SSO;
 
 /// The five payload bytes, at bits 37, 29, 21, 13 and 5 — so bits 5..45.
 /// `try_from_sso` writes byte `i` at `37 - i * 8`.
