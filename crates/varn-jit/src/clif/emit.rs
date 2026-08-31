@@ -150,6 +150,9 @@ pub(super) fn emit_return_value(
 }
 
 /// Re-tag an unboxed int as a VmValue.
+// Parameters kept, unused: they document the signature the migrated
+// version has to satisfy.
+#[allow(unused_variables)]
 pub(super) fn box_int(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
@@ -165,6 +168,9 @@ pub(super) fn box_int(
 
 /// Box an unboxed 0/1 bool as a VmValue: `false` = 0x7FFA…, `true` = 0x7FFB…
 /// (`0x7FFA_0000_0000_0000 | (v << 48)`, valid because v ∈ {0,1}).
+// Parameters kept, unused: they document the signature the migrated
+// version has to satisfy.
+#[allow(unused_variables)]
 pub(super) fn box_bool(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
@@ -180,6 +186,9 @@ pub(super) fn box_bool(
 
 /// Unbox a boxed bool VmValue (TAG_TRUE=0x7FFB…, TAG_FALSE=0x7FFA…) to 0/1:
 /// the two tags differ only in bit 48, so `(v >> 48) & 1`.
+// Parameters kept, unused: they document the signature the migrated
+// version has to satisfy.
+#[allow(unused_variables)]
 pub(super) fn unbox_bool(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
@@ -198,6 +207,9 @@ pub(super) fn unbox_bool(
 /// (`bits & QNAN == QNAN`) canonicalizes to `null`. This keeps a native float
 /// result byte-identical to the interpreter, which routes every float op
 /// through `from_f64`.
+// Parameters kept, unused: they document the signature the migrated
+// version has to satisfy.
+#[allow(unused_variables)]
 pub(super) fn box_f64(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
@@ -220,6 +232,9 @@ pub(super) const INT_CHECK_MASK: i64 = varn_types::vm_value::KIND_MASK as i64;
 /// callee must coerce, exactly as the interpreter's `to_f64_val` does. An
 /// int-tagged value sign-extends its i48 payload and `fcvt`s; anything else is
 /// reinterpreted as its f64 bits.
+// Parameters kept, unused: they document the signature the migrated
+// version has to satisfy.
+#[allow(unused_variables)]
 pub(super) fn unbox_f64_coerce(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
@@ -732,6 +747,9 @@ pub(super) fn array_disc(
 /// `(v << 16) >> 16` — sign-extend the low 48 bits. This is the unboxing of an
 /// int-tagged VmValue payload (`varn_core::numeric::wrap_i48`), NOT an
 /// overflow policy; see [`guard_i48`].
+// Parameters kept, unused: they document the signature the migrated
+// version has to satisfy.
+#[allow(unused_variables)]
 pub(super) fn wrap_i48(
     b: &mut FunctionBuilder,
     v: cranelift_codegen::ir::Value,
