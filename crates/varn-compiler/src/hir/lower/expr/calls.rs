@@ -100,11 +100,17 @@ impl<'a> Lowerer<'a> {
                         if !has_spread {
                             let hobj = self.lower_expr(object, scope)?;
                             let hargs = self.lower_call_args(args, key, scope)?;
+                            // Same key as the `IntrinsicCall` arm above: a
+                            // method form keys at the method-name offset. The
+                            // op-id already fixes the exact core method being
+                            // called, so its result type is as known here as
+                            // anywhere in the pipeline.
+                            let ty = self.value_ty(method_key.unwrap_or(key));
                             return Ok(HirExpr::NativeMethodCall {
                                 object: Box::new(hobj),
                                 args: hargs,
                                 op_id,
-                                ty: HirType::Dynamic,
+                                ty,
                             });
                         }
                     }

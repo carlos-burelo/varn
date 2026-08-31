@@ -1,10 +1,10 @@
 use rustc_hash::FxHashSet;
 
+use super::super::ir::VarId;
 use crate::hir::{
     HirArrayEl, HirAssignTarget, HirBinding, HirExpr, HirFunction, HirObjectProp,
     HirOptionalProperty, HirPropKey, HirStmt, HirTemplatePart, HirUpvalueSrc,
 };
-use super::super::ir::VarId;
 
 pub(super) fn scan_pinned_vars(func: &HirFunction) -> FxHashSet<VarId> {
     let mut pinned = FxHashSet::default();
@@ -500,7 +500,7 @@ fn scan_expr(expr: &HirExpr, pinned: &mut FxHashSet<VarId>, in_try: bool) {
                 _ => {}
             }
         }
-        HirExpr::Await(e) => scan_expr(e, pinned, in_try),
+        HirExpr::Await(e, _) => scan_expr(e, pinned, in_try),
         HirExpr::Spawn(e) => scan_expr(e, pinned, in_try),
         HirExpr::Yield(e) => scan_expr(e, pinned, in_try),
         HirExpr::IntrinsicCall { object, args, .. } => {

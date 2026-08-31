@@ -203,7 +203,7 @@ impl<'a> Lowerer<'a> {
             }),
             ExprKind::Await { argument } => {
                 let inner = self.lower_expr(argument, scope)?;
-                Ok(HirExpr::Await(Box::new(inner)))
+                Ok(HirExpr::Await(Box::new(inner), self.value_ty(key)))
             }
             ExprKind::Spawn { argument } => {
                 let inner = self.lower_expr(argument, scope)?;

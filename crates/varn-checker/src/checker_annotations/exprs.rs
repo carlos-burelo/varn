@@ -335,9 +335,18 @@ pub(crate) fn annotate_expr(expr: &Expr, ann: &mut TypeAnnotations, ctx: &mut An
             annotate_expr(expression, ann, ctx);
         }
         ExprKind::Update { operand, .. } => annotate_expr(operand, ann, ctx),
-        ExprKind::Await { argument }
-        | ExprKind::Spawn { argument }
-        | ExprKind::Spread { argument } => annotate_expr(argument, ann, ctx),
+        ExprKind::Await { argument } => {
+            annotate_expr(argument, ann, ctx);
+            // The checker already unwrapped the task: this is `T`, not
+            // `Task<T>`. Recording it here is what replaces the projection
+            // shortcut removed from `project_cg_ty`, and it puts the type on
+            // the expression that actually produces the value.
+            let result_ty = get_expr_type(expr, ctx);
+            record_cg_ty_at(AnnKey::expr(expr.id), &result_ty, ann, ctx);
+        }
+        ExprKind::Spawn { argument } | ExprKind::Spread { argument } => {
+            annotate_expr(argument, ann, ctx)
+        }
         ExprKind::Yield {
             argument: Some(e), ..
         } => {
@@ -420,11 +429,18 @@ fn project_cg_ty(ty: &Type, ctx: &AnnotateCtx) -> varn_core::CgTy {
         TypeKind::Intrinsic(TypeTag::BigInt) => CgTy::BigInt,
         TypeKind::Array(el) => CgTy::Array(Box::new(project_cg_ty(el, ctx))),
         TypeKind::Generic(name, args, _) => {
-            if name.as_ref() == varn_core::IntrinsicType::Task.as_str() {
-                if let [ret] = args.as_slice() {
-                    return project_cg_ty(ret, ctx);
-                }
-            } else if name.as_ref() == varn_core::IntrinsicType::Array.as_str() {
+            // `Task<T>` is deliberately NOT projected to `T`. It used to be,
+            // and that typed the RESULT OF THE CALL — a live task handle, a
+            // heap object — as whatever the task will eventually resolve to.
+            // `Task<int>` became `Int`, which is `SlotKind::Int`, which the
+            // backend treats as an immediate: `is_root_kind` excludes it, so
+            // the safepoint never flushes it and the collector never sees the
+            // reference. `T` belongs to the `await` EXPRESSION, which is
+            // annotated with it directly (see `ExprKind::Await` above).
+            //
+            // A task handle has no `CgTy`, so it stays `Dynamic`:
+            // conservative, never wrong.
+            if name.as_ref() == varn_core::IntrinsicType::Array.as_str() {
                 if let [el] = args.as_slice() {
                     return CgTy::Array(Box::new(project_cg_ty(el, ctx)));
                 }

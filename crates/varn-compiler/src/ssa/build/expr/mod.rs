@@ -1,8 +1,6 @@
 use std::rc::Rc;
 
-use crate::hir::{
-    HirBinOp, HirExpr, HirFunction, HirType, HirTypeTest, HirUnOp, HirUpvalueSrc,
-};
+use crate::hir::{HirBinOp, HirExpr, HirFunction, HirType, HirTypeTest, HirUnOp, HirUpvalueSrc};
 use crate::ssa::ir::{InstKind, Terminator, Value};
 use crate::OptError;
 
@@ -197,9 +195,9 @@ impl Builder {
             HirExpr::Match { subject, cases } => self.lower_match(subject, cases),
             HirExpr::Class(cls) => self.lower_class(cls),
             HirExpr::Enum(en) => self.lower_enum(en),
-            HirExpr::Await(e) => {
+            HirExpr::Await(e, ty) => {
                 let val = self.lower_expr(e)?;
-                Ok(self.emit(InstKind::Await { operand: val }, HirType::Dynamic))
+                Ok(self.emit(InstKind::Await { operand: val }, *ty))
             }
             HirExpr::Spawn(e) => {
                 let val = self.lower_expr(e)?;

@@ -150,7 +150,7 @@ impl<'a> Lowerer<'a> {
         Ok(())
     }
 
-    pub(in crate::hir::lower) fn lower_import(&self, decl: &ImportDecl) -> R<HirStmt> {
+    pub(in crate::hir::lower) fn lower_import(&mut self, decl: &ImportDecl) -> R<HirStmt> {
         let mut specs = Vec::new();
         for spec in &decl.specifiers {
             let (local, kind, off) = match spec {
@@ -171,7 +171,13 @@ impl<'a> Lowerer<'a> {
                 }
             };
             let slot = self.ann.get_slot_idx(AnnKey::decl(off)).map(|s| s as u16);
-            specs.push(HirImportSpec { local, kind, slot });
+            let ty = self.value_ty(AnnKey::decl(off));
+            specs.push(HirImportSpec {
+                local,
+                kind,
+                slot,
+                ty,
+            });
         }
         Ok(HirStmt::Import {
             source: decl.source.clone(),

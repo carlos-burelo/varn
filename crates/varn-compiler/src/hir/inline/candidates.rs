@@ -167,7 +167,7 @@ pub(crate) fn body_is_inlinable(e: &HirExpr) -> bool {
         | Class(_)
         | Enum(_)
         | Match { .. }
-        | Await(_)
+        | Await(..)
         | Spawn(_)
         | Yield(_)
         | Assign { .. }

@@ -425,7 +425,9 @@ pub enum HirExpr {
 
     Spread(Box<HirExpr>),
 
-    Await(Box<HirExpr>),
+    /// `await e`, with the type the checker proved for the AWAIT — the
+    /// resolved `T`, not the `Task<T>` the operand holds.
+    Await(Box<HirExpr>, HirType),
 
     Spawn(Box<HirExpr>),
 
@@ -773,6 +775,10 @@ pub struct HirImportSpec {
     pub kind: HirImportKind,
 
     pub slot: Option<u16>,
+    /// Type of the imported binding, taken from the symbol the exporting
+    /// module bound. Reading a slot across a module boundary is not a reason
+    /// to lose the type.
+    pub ty: HirType,
 }
 
 #[derive(Debug, Clone)]

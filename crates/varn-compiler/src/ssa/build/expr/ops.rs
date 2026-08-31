@@ -74,6 +74,24 @@ impl Builder {
                 // value's type is the result class — they differ for
                 // `int / int → float` and for comparisons.
                 let result_ty = crate::hir::binary_result_ty(*op, *ty);
+                // `+` with one proven `str` operand is concatenation, and its
+                // result is a `str`. The operand class cannot say so: for
+                // `"n=" + count` the two sides are different types, so the
+                // checker records no numeric class and `ty` is `Dynamic`.
+                //
+                // Deliberately the SAME condition `ssa::emit::values` uses to
+                // pick `StrConcat` over the generic add, read from the same
+                // proven operand types at the same point in the pipeline — so
+                // the value's type and the opcode cannot disagree about what
+                // the instruction produces.
+                let result_ty = if matches!(op, crate::hir::HirBinOp::Add)
+                    && result_ty == HirType::Dynamic
+                    && (self.value_ty(l) == HirType::Str || self.value_ty(r) == HirType::Str)
+                {
+                    HirType::Str
+                } else {
+                    result_ty
+                };
                 Ok(self.emit(
                     InstKind::Binary {
                         op: *op,

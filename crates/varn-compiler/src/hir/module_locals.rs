@@ -250,7 +250,7 @@ fn walk_expr(e: &mut HirExpr, n: bool, act: &mut impl FnMut(&mut HirBinding, boo
         NonNull(x)
         | TryOp(x)
         | Spread(x)
-        | Await(x)
+        | Await(x, _)
         | Spawn(x)
         | Yield(x)
         | TypeTest { value: x, .. } => walk_expr(x, n, act),

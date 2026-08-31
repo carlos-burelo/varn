@@ -27,7 +27,7 @@ pub(crate) fn walk_exprs<'a>(e: &'a HirExpr, f: &mut impl FnMut(&'a HirExpr)) {
         NonNull(x)
         | TryOp(x)
         | Spread(x)
-        | Await(x)
+        | Await(x, _)
         | Spawn(x)
         | Yield(x)
         | TypeTest { value: x, .. } => walk_exprs(x, f),
@@ -151,7 +151,7 @@ pub(crate) fn for_each_child_expr_mut(e: &mut HirExpr, f: &mut impl FnMut(&mut H
         NonNull(x)
         | TryOp(x)
         | Spread(x)
-        | Await(x)
+        | Await(x, _)
         | Spawn(x)
         | Yield(x)
         | TypeTest { value: x, .. } => f(x),

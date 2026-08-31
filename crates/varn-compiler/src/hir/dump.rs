@@ -380,7 +380,7 @@ fn dump_expr(expr: &HirExpr) -> String {
 
         HirExpr::NonNull(e) => format!("{}!", dump_expr(e)),
         HirExpr::TryOp(e) => format!("{}?", dump_expr(e)),
-        HirExpr::Await(e) => format!("{YELLOW}await{R} {}", dump_expr(e)),
+        HirExpr::Await(e, _) => format!("{YELLOW}await{R} {}", dump_expr(e)),
         HirExpr::Spawn(e) => format!("{YELLOW}spawn{R} {}", dump_expr(e)),
         HirExpr::Yield(e) => format!("{YELLOW}yield{R} {}", dump_expr(e)),
         HirExpr::Spread(e) => format!("...{}", dump_expr(e)),

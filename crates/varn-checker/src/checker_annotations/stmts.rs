@@ -170,6 +170,13 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
                     if let Some(slot_idx) = sym.slot_idx {
                         ann.record_slot_idx(AnnKey::decl(spec.range().start.offset), slot_idx);
                     }
+                    // The imported binding's type, from the symbol the
+                    // exporting module bound. Crossing a module boundary is
+                    // not a reason to lose it: without this the slot read is
+                    // `Dynamic` and so is the global it initializes.
+                    if let Some(ty) = sym.ty.clone() {
+                        record_cg_ty_at(AnnKey::decl(spec.range().start.offset), &ty, ann, ctx);
+                    }
                     if matches!(
                         sym.kind,
                         SymbolKind::Interface
@@ -188,10 +195,8 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
             {
                 ctx.resolver.stdlib_exports(&ctx.bind.source_file)
             } else {
-                ctx.resolver.module_exports(
-                    &ctx.bind.source_file,
-                    &mut vec![],
-                )
+                ctx.resolver
+                    .module_exports(&ctx.bind.source_file, &mut vec![])
             };
             match e {
                 ExportDecl::Decl { declaration, .. } => {
@@ -227,14 +232,20 @@ pub(crate) fn annotate_decl(decl: &Decl, ann: &mut TypeAnnotations, ctx: &mut An
                         }
                     }
                 }
-                ExportDecl::Named { specifiers, source, .. } => {
+                ExportDecl::Named {
+                    specifiers, source, ..
+                } => {
                     if let Some(src) = source {
                         let src_exports = if crate::module_resolver::paths::is_known_module(src) {
                             ctx.resolver.stdlib_exports(src)
                         } else {
-                            let base_dir = std::path::PathBuf::from(ctx.bind.source_file.as_ref()).parent().unwrap_or(std::path::Path::new(".")).to_path_buf();
+                            let base_dir = std::path::PathBuf::from(ctx.bind.source_file.as_ref())
+                                .parent()
+                                .unwrap_or(std::path::Path::new("."))
+                                .to_path_buf();
                             let src_abs = varn_modules::resolve_specifier_path(&base_dir, src);
-                            ctx.resolver.module_exports(src_abs.as_deref().unwrap_or(""), &mut vec![])
+                            ctx.resolver
+                                .module_exports(src_abs.as_deref().unwrap_or(""), &mut vec![])
                         };
                         for spec in specifiers {
                             if let Some(sym) = exports.get(&spec.exported.to_string()) {

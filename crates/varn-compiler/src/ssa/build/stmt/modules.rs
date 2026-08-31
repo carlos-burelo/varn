@@ -42,7 +42,7 @@ impl Builder {
                                     object: mod_val,
                                     slot,
                                 },
-                                HirType::Dynamic,
+                                spec.ty,
                             )
                         } else {
                             let key = match &spec.kind {
