@@ -24,7 +24,10 @@ estado.
 | §2.1 `global` sin tipo | **CORREGIDO.** `HirBinding::Global` lleva su `HirType`. De 2 470 valores `Dynamic` a 182. |
 | §2.2 `new C(...)` sin tipo | **CORREGIDO.** El checker anota la expresión `New`; el lowering la propaga. |
 | §2.3 `CgTy::Fn` → `Dynamic` | **CORREGIDO.** Proyecta a `HirType::Ref`: un closure es una referencia de heap, y eso basta para sacar cada lectura de función de un registro dinámico. |
-| **Cobertura de tipos del corpus** | **41 % `Dynamic` → 22 %.** Medido igual: `vn debug -p ssa` sobre `tests/*.vn`. |
+| **Cobertura de tipos del corpus** | **41 % `Dynamic` → 8 %.** Medido igual: `vn debug -p ssa` sobre `tests/*.vn`. |
+| Bug encontrado al hacerlo | **CORREGIDO.** `project_cg_ty` desenvolvía `Task<T>` a `T`, así que el resultado de llamar a una `async` —un handle vivo, objeto de heap— quedaba tipado `Int`/`Str`. `SlotKind::Int` es inmediato, `is_root_kind` lo excluye, y el safepoint nunca lo vuelca: una referencia de heap invisible para el colector. Es la vía 2 que el bug abierto de `bench_http_routing` tenía sin explorar. |
+| Destinos muertos | **CORREGIDO.** Una llamada a `void` tenía destino: valor SSA, rango vivo y registro `Dynamic` que nadie leía. DCE se lo quita ahora (1 661 registros menos en el corpus). |
+| Tipos que sobreviven a `await`, concatenación, imports y ops nativas | **CORREGIDO.** Ver la tabla de abajo. |
 | §2.3 `Nullable(T)` → `Dynamic` | Pendiente (paso 6). |
 | §3 shapes/overflow en objetos tipados | Pendiente (paso 7). |
 | §3.1 `InvokeVirtual` sin productor | Pendiente (paso 4). |
@@ -42,6 +45,26 @@ se interpreta mientras tanto: correcto, y ~40x más lento en código caliente
 (`bench_fib`: 1,83 s contra 44 ms). Los primitivos que faltan están marcados con
 `unimplemented!("… awaits the two-word value migration")`; son la lista de
 tareas exacta.
+
+### Dónde se fue el 41 %
+
+Contando por instrucción productora, `vn debug -p ssa` sobre `tests/*.vn`:
+
+| Productor | Antes | Ahora | Qué lo arregló |
+|---|---:|---:|---|
+| `call` | 1 720 | 200 | destino muerto quitado (la mayoría eran `assert`/`print`) |
+| `global` | 2 470 | 182 | `HirBinding::Global` lleva su tipo; `CgTy::Fn` → `Ref` |
+| `moduleslot` | 275 | 28 | el tipo del símbolo exportado llega al `ModuleSlot` |
+| `nativeop` | 118 | 7 | misma clave de anotación que el brazo `IntrinsicCall` de al lado |
+| `add.dyn` | 137 | 36 | `+` con un operando `str` probado da `str` |
+| `await` | 108 | 47 | la expresión `await` se anota con su `T` |
+| `getprop` | 148 | 148 | receptores dinámicos; no es plomería |
+
+Lo que queda es en buena parte honesto: llamadas que devuelven `Task` (ahora
+correctamente `Dynamic`), objetos de clase de la stdlib (`JSON`, `Markdown`,
+`Error` — su tipo es `typeof C`, que no tiene `CgTy`), el literal `null`, y
+arrays cuyo tipo de elemento ya era `Dynamic`. Bajar de aquí pide vocabulario
+nuevo en `CgTy`, no arreglar tuberías.
 
 La matriz de 4 cuadrantes pasa 1 167/1 167 en los cuatro.
 
